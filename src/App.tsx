@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useAppStore } from "./stores/appStore";
 
 function App() {
   const [config, setConfig] = useState<any>(null);
+  const { showResultWindow } = useAppStore();
 
   useEffect(() => {
     // Load config on mount
@@ -22,7 +24,7 @@ function App() {
         </p>
 
         {config && (
-          <div className="bg-gray-50 p-4 rounded">
+          <div className="bg-gray-50 p-4 rounded mb-6">
             <h2 className="text-lg font-semibold mb-2">Configuration</h2>
             <pre className="text-sm text-gray-700 overflow-auto">
               {JSON.stringify(config, null, 2)}
@@ -30,7 +32,14 @@ function App() {
           </div>
         )}
 
-        <div className="mt-6 text-sm text-gray-500">
+        <button
+          onClick={showResultWindow}
+          className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors mb-6"
+        >
+          Open Translation Window
+        </button>
+
+        <div className="text-sm text-gray-500">
           <p>🚧 Project initialized - ready for development</p>
           <p className="mt-2">Next steps:</p>
           <ul className="list-disc list-inside mt-1">
