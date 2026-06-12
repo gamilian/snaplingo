@@ -78,6 +78,7 @@ pub fn run() {
       commands::detect_language,
       commands::get_config,
       commands::update_config,
+      commands::open_result_window,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

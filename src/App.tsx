@@ -1,16 +1,27 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useAppStore } from "./stores/appStore";
 
 function App() {
   const [config, setConfig] = useState<any>(null);
-  const { showResultWindow } = useAppStore();
+  const { showResultWindow, setSourceText } = useAppStore();
 
   useEffect(() => {
     // Load config on mount
     invoke("get_config")
       .then((data) => setConfig(data))
       .catch((err) => console.error("Failed to load config:", err));
+
+    // Listen for input-translation events
+    const unlisten = listen<string>("input-translation", (event) => {
+      setSourceText(event.payload);
+      showResultWindow();
+    });
+
+    return () => {
+      unlisten.then((fn) => fn());
+    };
   }, []);
 
   return (
