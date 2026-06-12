@@ -1,6 +1,7 @@
 // Module declarations
 mod commands;
 mod config;
+mod language;
 mod ocr;
 mod translate;
 mod capture;
