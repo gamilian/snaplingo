@@ -47,6 +47,7 @@ lingua = "1.5"
 
 # Configuration
 dirs = "5.0"
+json-patch = "1.2"
 
 # Database and secrets
 rusqlite = { version = "0.29", features = ["bundled"] }
