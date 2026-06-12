@@ -1,0 +1,54 @@
+[package]
+name = "snaplingo"
+version = "0.1.0"
+description = "A cross-platform screenshot, OCR, and translation tool"
+authors = ["SnapLingo Contributors"]
+license = ""
+repository = ""
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "snaplingo_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.2", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2.6", features = ["tray-icon", "image-png", "image-ico"] }
+tauri-plugin-log = "2"
+tauri-plugin-shell = "2"
+
+# Force compatible time crate version to avoid trait conflicts
+time = "=0.3.36"
+
+# Image processing
+image = { version = "0.25", features = ["png", "jpeg", "webp"] }
+
+# Clipboard and keyboard
+arboard = "3.4"
+enigo = "0.2"
+
+# HTTP client for providers
+reqwest = { version = "0.12", features = ["json"] }
+tokio = { version = "1", features = ["full"] }
+
+# Language detection
+whatlang = "0.16"
+
+# Configuration
+toml = "0.8"
+dirs = "5.0"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework = "2.11"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Security_Credentials"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+secret-service = "4.0"
