@@ -7,6 +7,7 @@ mod translate;
 mod capture;
 mod history;
 mod utils;
+mod hotkeys;
 
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
@@ -14,16 +15,19 @@ use std::path::PathBuf;
 use config::Config;
 use translate::{GoogleTranslateProvider, TranslationProvider};
 use language::LanguageDetector;
+use hotkeys::HotkeyManager;
+use tauri::Manager;
 
 pub struct AppState {
     pub config: Arc<Mutex<Config>>,
     pub config_path: PathBuf,
     translation_providers: Arc<Mutex<HashMap<String, Arc<dyn TranslationProvider>>>>,
     pub language_detector: LanguageDetector,
+    pub hotkey_manager: HotkeyManager,
 }
 
 impl AppState {
-    pub fn new(config_path: PathBuf) -> Self {
+    pub fn new(config_path: PathBuf, app: tauri::AppHandle) -> Self {
         let config = Config::load_or_default(&config_path).unwrap_or_default();
         let mut providers: HashMap<String, Arc<dyn TranslationProvider>> = HashMap::new();
 
@@ -38,6 +42,7 @@ impl AppState {
             config_path,
             translation_providers: Arc::new(Mutex::new(providers)),
             language_detector: LanguageDetector::new(),
+            hotkey_manager: HotkeyManager::new(app),
         }
     }
 
@@ -54,10 +59,7 @@ pub fn run() {
   std::fs::create_dir_all(&config_dir).unwrap();
   let config_path = config_dir.join("config.json");
 
-  let app_state = AppState::new(config_path);
-
   tauri::Builder::default()
-    .manage(app_state)
     .plugin(tauri_plugin_shell::init())
     .setup(|app| {
       if cfg!(debug_assertions) {
@@ -67,6 +69,9 @@ pub fn run() {
             .build(),
         )?;
       }
+
+      let app_state = AppState::new(config_path, app.handle().clone());
+      app.manage(app_state);
 
       // TODO: Register global hotkeys
       // TODO: Create system tray
