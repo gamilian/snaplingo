@@ -1,7 +1,8 @@
 // Module declarations
 mod commands;
 mod config;
-mod providers;
+mod ocr;
+mod translate;
 mod capture;
 mod history;
 mod utils;
