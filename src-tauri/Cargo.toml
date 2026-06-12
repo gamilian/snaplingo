@@ -18,37 +18,44 @@ tauri-build = { version = "2.6.2", features = [] }
 [dependencies]
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
-log = "0.4"
-tauri = { version = "2.6", features = ["tray-icon", "image-png", "image-ico"] }
+tauri = { version = "2.0", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-shell = "2"
+log = "0.4"
 
-# Force compatible time crate version to avoid trait conflicts
-time = "=0.3.36"
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
 
 # Image processing
-image = { version = "0.25", features = ["png", "jpeg", "webp"] }
+image = "0.24"
 
 # Clipboard and keyboard
-arboard = "3.4"
-enigo = "0.2"
+arboard = "3.2"
+enigo = "0.1"
 
 # HTTP client for providers
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.11", features = ["json"] }
 tokio = { version = "1", features = ["full"] }
 
 # Language detection
-whatlang = "0.16"
+lingua = "1.5"
 
 # Configuration
-toml = "0.8"
 dirs = "5.0"
 
+# Database and secrets
+rusqlite = { version = "0.29", features = ["bundled"] }
+keyring = "2.0"
+
 [target.'cfg(target_os = "macos")'.dependencies]
-security-framework = "2.11"
+core-graphics = "0.23"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Security_Credentials"] }
+windows = { version = "0.51", features = ["Win32_UI_Input_KeyboardAndMouse"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-secret-service = "4.0"
+xcb = "1.2"
+
+[dev-dependencies]
+tempfile = "3.8"
