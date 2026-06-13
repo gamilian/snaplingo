@@ -4,10 +4,6 @@ mod domain;
 mod infrastructure;
 mod application;
 mod commands;
-mod config;
-mod language;
-mod history;
-mod utils;
 
 // Public exports for new infrastructure layer
 pub use error::{AppError, Result};
@@ -17,8 +13,6 @@ pub use application::*;
 
 use std::sync::{Arc, Mutex};
 use std::path::PathBuf;
-use config::Config;
-use language::LanguageDetector;
 use tauri::Manager;
 
 // Phase 1, 2 & 3 imports
@@ -55,11 +49,6 @@ pub struct AppState {
 
     // Phase 4: Capture
     pub capture_service: Arc<CaptureService>,
-
-    // Legacy (Phase 5: remove these)
-    pub config: Arc<Mutex<Config>>,
-    pub config_path: PathBuf,
-    pub language_detector: LanguageDetector,
 }
 
 impl AppState {
@@ -130,9 +119,6 @@ impl AppState {
         let screenshot_backend = get_screenshot_backend();
         let capture_service = Arc::new(CaptureService::new(screenshot_backend));
 
-        // Legacy initialization
-        let config = Config::load_or_default(&config_path).unwrap_or_default();
-
         Self {
             config_file,
             keychain,
@@ -142,9 +128,6 @@ impl AppState {
             ocr_registry,
             ocr_service,
             capture_service,
-            config: Arc::new(Mutex::new(config)),
-            config_path,
-            language_detector: LanguageDetector::new(),
         }
     }
 }
@@ -177,8 +160,6 @@ pub fn run() {
       Ok(())
     })
     .invoke_handler(tauri::generate_handler![
-      commands::get_config,
-      commands::update_config,
       commands::open_result_window,
       commands::translate_text_v2,
       commands::list_translation_providers,
