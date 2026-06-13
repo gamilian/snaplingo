@@ -7,7 +7,6 @@ mod commands;
 mod config;
 mod language;
 mod ocr;
-mod translate;
 mod capture;
 mod history;
 mod utils;
@@ -20,10 +19,8 @@ pub use infrastructure::*;
 pub use application::*;
 
 use std::sync::{Arc, Mutex};
-use std::collections::HashMap;
 use std::path::PathBuf;
 use config::Config;
-use translate::{GoogleTranslateProvider, TranslationProvider};
 use language::LanguageDetector;
 use hotkeys::HotkeyManager;
 use tauri::Manager;
@@ -52,7 +49,6 @@ pub struct AppState {
     // Legacy (Phase 5: remove these)
     pub config: Arc<Mutex<Config>>,
     pub config_path: PathBuf,
-    translation_providers: Arc<Mutex<HashMap<String, Arc<dyn TranslationProvider>>>>,
     pub language_detector: LanguageDetector,
     pub hotkey_manager: HotkeyManager,
 }
@@ -99,11 +95,6 @@ impl AppState {
 
         // Legacy initialization
         let config = Config::load_or_default(&config_path).unwrap_or_default();
-        let mut providers: HashMap<String, Arc<dyn TranslationProvider>> = HashMap::new();
-        providers.insert(
-            "google-translate".to_string(),
-            Arc::new(GoogleTranslateProvider::default()),
-        );
 
         Self {
             config_file,
@@ -113,14 +104,9 @@ impl AppState {
             translation_service,
             config: Arc::new(Mutex::new(config)),
             config_path,
-            translation_providers: Arc::new(Mutex::new(providers)),
             language_detector: LanguageDetector::new(),
             hotkey_manager: HotkeyManager::new(app),
         }
-    }
-
-    pub fn get_translation_provider(&self, id: &str) -> Option<Arc<dyn TranslationProvider>> {
-        self.translation_providers.lock().unwrap().get(id).cloned()
     }
 }
 
@@ -152,8 +138,6 @@ pub fn run() {
       Ok(())
     })
     .invoke_handler(tauri::generate_handler![
-      commands::translate_text,
-      commands::detect_language,
       commands::get_config,
       commands::update_config,
       commands::open_result_window,

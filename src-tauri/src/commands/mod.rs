@@ -1,8 +1,10 @@
-mod translate;
 mod config;
+mod translation_commands;
+mod provider_commands;
 
-pub use translate::*;
 pub use config::*;
+pub use translation_commands::*;
+pub use provider_commands::*;
 
 use tauri::{Emitter, Manager};
 
