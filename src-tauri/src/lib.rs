@@ -25,7 +25,7 @@ use language::LanguageDetector;
 use hotkeys::HotkeyManager;
 use tauri::Manager;
 
-// Phase 1 & 2 imports
+// Phase 1, 2 & 3 imports
 use infrastructure::storage::{ConfigFile, Keychain};
 use infrastructure::http::{HttpClient, ReqwestHttpClient};
 use application::providers::translation::{
@@ -34,6 +34,11 @@ use application::providers::translation::{
     GoogleTranslateProvider as GoogleTranslateProviderV2,
     DeepLProvider,
     BaiduTranslateProvider,
+};
+use application::providers::ocr::{
+    OcrRegistry,
+    OcrService,
+    impls::{TesseractProvider, BaiduOcrProvider},
 };
 
 pub struct AppState {
@@ -45,6 +50,10 @@ pub struct AppState {
     // Phase 2: Translation
     pub translation_registry: Arc<Mutex<TranslationRegistry>>,
     pub translation_service: Arc<TranslationService>,
+
+    // Phase 3: OCR
+    pub ocr_registry: Arc<Mutex<OcrRegistry>>,
+    pub ocr_service: Arc<OcrService>,
 
     // Legacy (Phase 5: remove these)
     pub config: Arc<Mutex<Config>>,
@@ -93,6 +102,30 @@ impl AppState {
         let translation_registry = Arc::new(Mutex::new(translation_registry));
         let translation_service = Arc::new(TranslationService::new(translation_registry.clone()));
 
+        // Phase 3: OCR
+        let mut ocr_registry = OcrRegistry::new();
+
+        // Register Tesseract (no credentials needed)
+        let tesseract_provider = TesseractProvider::new();
+        ocr_registry.register(Arc::new(tesseract_provider)).ok();
+
+        // Register Baidu OCR (load credentials from keychain)
+        let mut baidu_ocr_provider = BaiduOcrProvider::new(http_client.clone());
+        if let Ok(api_key) = keychain.load_provider_credential("baidu_ocr_api_key") {
+            if let Ok(secret_key) = keychain.load_provider_credential("baidu_ocr_secret_key") {
+                baidu_ocr_provider.configure(api_key, secret_key);
+            }
+        }
+        ocr_registry.register(Arc::new(baidu_ocr_provider)).ok();
+
+        // Restore active OCR provider from config
+        if let Ok(active_id) = config_file.load::<String>("ocr.active_provider") {
+            ocr_registry.activate(&active_id).ok();
+        }
+
+        let ocr_registry = Arc::new(Mutex::new(ocr_registry));
+        let ocr_service = Arc::new(OcrService::new(ocr_registry.clone()));
+
         // Legacy initialization
         let config = Config::load_or_default(&config_path).unwrap_or_default();
 
@@ -102,6 +135,8 @@ impl AppState {
             http_client,
             translation_registry,
             translation_service,
+            ocr_registry,
+            ocr_service,
             config: Arc::new(Mutex::new(config)),
             config_path,
             language_detector: LanguageDetector::new(),
@@ -146,6 +181,10 @@ pub fn run() {
       commands::activate_translation_provider,
       commands::deactivate_translation_provider,
       commands::configure_translation_provider,
+      commands::recognize_image,
+      commands::list_ocr_providers,
+      commands::activate_ocr_provider,
+      commands::configure_ocr_provider,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
