@@ -31,7 +31,9 @@ use application::providers::ocr::{
     impls::{TesseractProvider, BaiduOcrProvider},
 };
 use application::CaptureService;
+use application::HotkeyService;
 use infrastructure::system::screenshot::get_screenshot_backend;
+use infrastructure::system::hotkey::get_hotkey_backend;
 
 pub struct AppState {
     // Phase 1: Infrastructure
@@ -49,6 +51,7 @@ pub struct AppState {
 
     // Phase 4: Capture
     pub capture_service: Arc<CaptureService>,
+    pub hotkey_service: Arc<HotkeyService>,
 }
 
 impl AppState {
@@ -119,6 +122,9 @@ impl AppState {
         let screenshot_backend = get_screenshot_backend();
         let capture_service = Arc::new(CaptureService::new(screenshot_backend));
 
+        let hotkey_backend = get_hotkey_backend();
+        let hotkey_service = Arc::new(HotkeyService::new(hotkey_backend));
+
         Self {
             config_file,
             keychain,
@@ -128,6 +134,7 @@ impl AppState {
             ocr_registry,
             ocr_service,
             capture_service,
+            hotkey_service,
         }
     }
 }
