@@ -14,9 +14,8 @@ pub struct ProviderInfo {
 pub async fn list_translation_providers(
     state: State<'_, crate::AppState>,
 ) -> Result<Vec<ProviderInfo>, String> {
-    let registry = state.translation_registry.lock().unwrap();
-    let all_providers = registry.list_all();
-    let active = registry.get_active();
+    let all_providers = state.translation_coordinator.list_all();
+    let active = state.translation_coordinator.get_active();
     let active_ids: Vec<_> = active.iter().map(|p| p.id().to_string()).collect();
 
     let info: Vec<_> = all_providers.iter().map(|p| ProviderInfo {
@@ -35,9 +34,7 @@ pub async fn activate_translation_provider(
     provider_id: String,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    state.translation_registry
-        .lock()
-        .unwrap()
+    state.translation_coordinator
         .activate(&provider_id)
         .map_err(|e| e.to_string())
 }
@@ -47,9 +44,7 @@ pub async fn deactivate_translation_provider(
     provider_id: String,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    state.translation_registry
-        .lock()
-        .unwrap()
+    state.translation_coordinator
         .deactivate(&provider_id)
         .map_err(|e| e.to_string())
 }

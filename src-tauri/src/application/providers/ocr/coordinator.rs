@@ -1,29 +1,37 @@
 use super::OcrProvider;
+use crate::domain::ocr::{OcrRequest, OcrResult};
 use crate::infrastructure::storage::ConfigFile;
 use crate::Result;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
-/// Registry for managing OCR providers.
+/// Coordinator for managing OCR providers and operations.
 ///
-/// This registry maintains a collection of OCR providers and tracks which one
-/// is currently active. Unlike TranslationRegistry, only ONE provider can be
-/// active at a time (single-select pattern).
-pub struct OcrRegistry {
+/// This coordinator consolidates provider registration, activation management,
+/// and OCR execution. It replaces the previous Registry + Service split with
+/// a single cohesive component.
+///
+/// Unlike TranslationCoordinator, only ONE provider can be active at a time
+/// (single-select pattern).
+///
+/// Concurrency model: Uses fine-grained internal locking to allow safe &self
+/// access while maintaining thread-safety.
+pub struct OcrCoordinator {
     /// Map of provider ID to provider instance
     providers: HashMap<String, Arc<dyn OcrProvider>>,
     /// Currently active provider ID (single-select)
-    active_provider_id: Option<String>,
+    /// Wrapped in Arc<Mutex<>> for interior mutability
+    active_provider_id: Arc<Mutex<Option<String>>>,
     /// Configuration file for persisting active provider
     config: Arc<ConfigFile>,
 }
 
-impl OcrRegistry {
-    /// Creates a new empty OCR registry.
+impl OcrCoordinator {
+    /// Creates a new OcrCoordinator with the given config.
     pub fn new(config: Arc<ConfigFile>) -> Self {
         Self {
             providers: HashMap::new(),
-            active_provider_id: None,
+            active_provider_id: Arc::new(Mutex::new(None)),
             config,
         }
     }
@@ -58,12 +66,16 @@ impl OcrRegistry {
     /// # Returns
     ///
     /// * `Result<()>` - Ok if successful, Err if the provider doesn't exist or persistence fails
-    pub fn activate(&mut self, id: &str) -> Result<()> {
+    pub fn activate(&self, id: &str) -> Result<()> {
         if !self.providers.contains_key(id) {
             return Err(format!("Provider not found: {}", id).into());
         }
-        self.active_provider_id = Some(id.to_string());
-        self.persist_active()?;
+
+        let mut active = self.active_provider_id.lock().unwrap();
+        *active = Some(id.to_string());
+
+        // Persist to config
+        self.config.save("active_ocr_provider", &id.to_string())?;
         Ok(())
     }
 
@@ -73,7 +85,8 @@ impl OcrRegistry {
     ///
     /// * `Option<Arc<dyn OcrProvider>>` - The active provider if one is set, None otherwise
     pub fn get_active(&self) -> Option<Arc<dyn OcrProvider>> {
-        self.active_provider_id
+        let active_id = self.active_provider_id.lock().unwrap();
+        active_id
             .as_ref()
             .and_then(|id| self.providers.get(id).cloned())
     }
@@ -106,25 +119,44 @@ impl OcrRegistry {
     pub fn restore_from_config(&mut self) -> Result<()> {
         if let Ok(active_id) = self.config.load::<String>("active_ocr_provider") {
             if self.providers.contains_key(&active_id) {
-                self.active_provider_id = Some(active_id);
+                let mut active = self.active_provider_id.lock().unwrap();
+                *active = Some(active_id);
             }
         }
         Ok(())
     }
 
-    /// Persists the current active provider to the config file.
-    fn persist_active(&self) -> Result<()> {
-        if let Some(ref id) = self.active_provider_id {
-            self.config.save("active_ocr_provider", id)?;
-        }
-        Ok(())
-    }
-}
+    /// Recognizes text using the active provider.
+    ///
+    /// This method:
+    /// 1. Gets the active provider
+    /// 2. Calls the provider's recognize method
+    /// 3. Returns the result
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The OCR request
+    ///
+    /// # Returns
+    ///
+    /// * `Result<OcrResult>` - Result from the active provider
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no provider is active.
+    pub async fn recognize(&self, request: &OcrRequest) -> Result<OcrResult> {
+        // Get active provider
+        let active_provider = self.get_active();
 
-impl Default for OcrRegistry {
-    fn default() -> Self {
-        // Note: Default implementation requires a config file path.
-        // In practice, always use OcrRegistry::new(config) instead.
-        panic!("OcrRegistry::default() should not be used. Use OcrRegistry::new(config) instead.");
+        // Check if a provider is active
+        let provider = active_provider
+            .ok_or_else(|| "No active OCR provider".to_string())?;
+
+        // Call provider's recognize method
+        let result = provider.recognize(request).await?;
+
+        // TODO(Phase 5): Add history recording here
+
+        Ok(result)
     }
 }

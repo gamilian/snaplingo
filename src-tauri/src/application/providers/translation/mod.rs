@@ -1,15 +1,10 @@
 mod trait_def;
-mod registry;
-mod service;
+mod coordinator;
 mod impls;
 
 #[cfg(test)]
-mod registry_test;
-
-#[cfg(test)]
-mod service_test;
+mod coordinator_test;
 
 pub use trait_def::TranslationProvider;
-pub use registry::TranslationRegistry;
-pub use service::TranslationService;
+pub use coordinator::TranslationCoordinator;
 pub use impls::{GoogleTranslateProvider, DeepLProvider, BaiduTranslateProvider};

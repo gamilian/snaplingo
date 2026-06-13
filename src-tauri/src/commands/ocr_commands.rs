@@ -27,7 +27,7 @@ pub async fn recognize_image(
         language: request.language,
     };
 
-    state.ocr_service
+    state.ocr_coordinator
         .recognize(&ocr_request)
         .await
         .map_err(|e| e.to_string())
@@ -37,9 +37,8 @@ pub async fn recognize_image(
 pub async fn list_ocr_providers(
     state: State<'_, crate::AppState>,
 ) -> Result<Vec<OcrProviderInfo>, String> {
-    let registry = state.ocr_registry.lock().unwrap();
-    let all_providers = registry.list_all();
-    let active = registry.get_active();
+    let all_providers = state.ocr_coordinator.list_all();
+    let active = state.ocr_coordinator.get_active();
 
     let info: Vec<_> = all_providers.iter().map(|p| OcrProviderInfo {
         id: p.id().to_string(),
@@ -57,9 +56,7 @@ pub async fn activate_ocr_provider(
     provider_id: String,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    state.ocr_registry
-        .lock()
-        .unwrap()
+    state.ocr_coordinator
         .activate(&provider_id)
         .map_err(|e| e.to_string())
 }

@@ -1,29 +1,34 @@
 use super::TranslationProvider;
+use crate::domain::translation::{TranslationRequest, TranslationResult};
 use crate::infrastructure::storage::ConfigFile;
 use crate::Result;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
-/// Registry for managing translation providers.
+/// Coordinator for managing translation providers and operations.
 ///
-/// This registry maintains a collection of translation providers and tracks which ones
-/// are currently active. Multiple providers can be active simultaneously, allowing for
-/// concurrent translation requests to different services.
-pub struct TranslationRegistry {
+/// This coordinator consolidates provider registration, activation management,
+/// and translation execution with concurrent provider support. It replaces
+/// the previous Registry + Service split with a single cohesive component.
+///
+/// Concurrency model: Uses fine-grained internal locking to allow safe &self
+/// access while maintaining thread-safety.
+pub struct TranslationCoordinator {
     /// Map of provider ID to provider instance
     providers: HashMap<String, Arc<dyn TranslationProvider>>,
     /// List of active provider IDs (in order of activation)
-    active: Vec<String>,
+    /// Wrapped in Arc<Mutex<>> for interior mutability
+    active: Arc<Mutex<Vec<String>>>,
     /// Configuration file for persisting active providers
     config: Arc<ConfigFile>,
 }
 
-impl TranslationRegistry {
-    /// Creates a new empty translation registry.
+impl TranslationCoordinator {
+    /// Creates a new TranslationCoordinator with the given config.
     pub fn new(config: Arc<ConfigFile>) -> Self {
         Self {
             providers: HashMap::new(),
-            active: Vec::new(),
+            active: Arc::new(Mutex::new(Vec::new())),
             config,
         }
     }
@@ -58,14 +63,18 @@ impl TranslationRegistry {
     /// # Returns
     ///
     /// * `Result<()>` - Ok if successful, Err if the provider doesn't exist or persistence fails
-    pub fn activate(&mut self, id: &str) -> Result<()> {
+    pub fn activate(&self, id: &str) -> Result<()> {
         if !self.providers.contains_key(id) {
             return Err(format!("Provider not found: {}", id).into());
         }
-        if !self.active.contains(&id.to_string()) {
-            self.active.push(id.to_string());
+
+        let mut active = self.active.lock().unwrap();
+        if !active.contains(&id.to_string()) {
+            active.push(id.to_string());
         }
-        self.persist_active()?;
+
+        // Persist to config
+        self.config.save("active_translation_providers", &*active)?;
         Ok(())
     }
 
@@ -81,12 +90,16 @@ impl TranslationRegistry {
     /// # Returns
     ///
     /// * `Result<()>` - Ok if successful, Err if the provider doesn't exist or persistence fails
-    pub fn deactivate(&mut self, id: &str) -> Result<()> {
+    pub fn deactivate(&self, id: &str) -> Result<()> {
         if !self.providers.contains_key(id) {
             return Err(format!("Provider not found: {}", id).into());
         }
-        self.active.retain(|active_id| active_id != id);
-        self.persist_active()?;
+
+        let mut active = self.active.lock().unwrap();
+        active.retain(|active_id| active_id != id);
+
+        // Persist to config
+        self.config.save("active_translation_providers", &*active)?;
         Ok(())
     }
 
@@ -96,7 +109,8 @@ impl TranslationRegistry {
     ///
     /// * `Vec<Arc<dyn TranslationProvider>>` - List of active providers in activation order
     pub fn get_active(&self) -> Vec<Arc<dyn TranslationProvider>> {
-        self.active
+        let active = self.active.lock().unwrap();
+        active
             .iter()
             .filter_map(|id| self.providers.get(id).cloned())
             .collect()
@@ -129,26 +143,78 @@ impl TranslationRegistry {
     /// Skips any provider IDs that are not registered.
     pub fn restore_from_config(&mut self) -> Result<()> {
         if let Ok(active_ids) = self.config.load::<Vec<String>>("active_translation_providers") {
-            self.active.clear();
+            let mut active = self.active.lock().unwrap();
+            active.clear();
             for id in active_ids {
                 if self.providers.contains_key(&id) {
-                    self.active.push(id);
+                    active.push(id);
                 }
             }
         }
         Ok(())
     }
 
-    /// Persists the current active provider list to the config file.
-    fn persist_active(&self) -> Result<()> {
-        self.config.save("active_translation_providers", &self.active)
-    }
-}
+    /// Translates text using all active providers concurrently.
+    ///
+    /// This method:
+    /// 1. Gets all active providers
+    /// 2. Spawns concurrent translation tasks for each provider
+    /// 3. Collects and returns all successful results
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The translation request
+    ///
+    /// # Returns
+    ///
+    /// * `Result<Vec<TranslationResult>>` - Results from all active providers
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no providers are active.
+    /// Individual provider failures are logged but don't fail the entire request.
+    pub async fn translate(&self, request: &TranslationRequest) -> Result<Vec<TranslationResult>> {
+        // Get active providers (lock is released immediately after cloning)
+        let active_providers = self.get_active();
 
-impl Default for TranslationRegistry {
-    fn default() -> Self {
-        // Note: Default implementation requires a config file path.
-        // In practice, always use TranslationRegistry::new(config) instead.
-        panic!("TranslationRegistry::default() should not be used. Use TranslationRegistry::new(config) instead.");
+        // Check if any providers are active
+        if active_providers.is_empty() {
+            return Err("No active translation providers".into());
+        }
+
+        // Spawn concurrent translation tasks
+        let mut tasks = Vec::new();
+        for provider in active_providers {
+            let request = request.clone();
+            let provider = provider.clone();
+
+            let task = tokio::spawn(async move {
+                provider.translate(&request).await
+            });
+
+            tasks.push(task);
+        }
+
+        // Collect results
+        let mut results = Vec::new();
+        for task in tasks {
+            match task.await {
+                Ok(Ok(result)) => {
+                    results.push(result);
+                }
+                Ok(Err(e)) => {
+                    // Log provider error but continue with other providers
+                    eprintln!("Translation provider error: {}", e);
+                }
+                Err(e) => {
+                    // Log task join error but continue
+                    eprintln!("Translation task error: {}", e);
+                }
+            }
+        }
+
+        // TODO(Phase 5): Add history recording here
+
+        Ok(results)
     }
 }

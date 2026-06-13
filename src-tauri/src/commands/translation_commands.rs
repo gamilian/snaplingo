@@ -20,7 +20,7 @@ pub async fn translate_text_v2(
         target_lang: request.target_lang,
     };
 
-    state.translation_service
+    state.translation_coordinator
         .translate(&translation_request)
         .await
         .map_err(|e| e.to_string())
