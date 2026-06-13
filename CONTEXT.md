@@ -8,6 +8,42 @@
 
 ## Core Concepts
 
+### Provider（提供者）
+翻译或 OCR 服务的可插拔实现。每个 Provider 实现 `TranslationProvider` 或 `OcrProvider` trait，封装特定 API 的逻辑（认证、请求格式化、响应解析）。
+
+**已实现的 Providers：**
+- Translation: Google Translate、DeepL、Baidu Translation
+- OCR: Tesseract（本地）、Baidu OCR（远程）
+
+### Provider Activation（Provider 激活）
+使 Provider 可用的过程。SnapLingo 支持两种激活模型：
+
+- **多选模式（Translation）**：多个 Provider 可同时激活。请求会并发发送到所有活动 Provider 以便比较结果。
+  ```
+  状态：Vec<String> = ["google", "deepl", "baidu"]
+  配置键：active_translation_providers
+  ```
+
+- **单选模式（OCR）**：同时只能激活一个 Provider。激活新 Provider 会替换之前的。
+  ```
+  状态：Option<String> = Some("tesseract")
+  配置键：active_ocr_provider
+  ```
+
+这种区别反映了使用模式：用户需要比较多个翻译结果，但只需要一个 OCR 结果。
+
+### Configuration Persistence（配置持久化）
+Provider 激活状态自动保存到磁盘。Registry 模块内部处理持久化——Commands 和 Services 层不知道存储机制。这确保：
+
+- **局部性（Locality）**：状态管理和持久化在 Registry 中共同定位
+- **原子性（Atomicity）**：激活和持久化作为一个操作成功或失败
+- **配置清理**：无效 Provider（如会话间被删除）在恢复时自动清理
+
+**设计原则：**
+- Registry 拥有 `Arc<ConfigFile>`，在状态变更时立即调用 `config.save()`
+- 启动时通过 `restore_from_config()` 恢复状态，跳过无效 Provider
+- 持久化失败导致整个 `activate()` 操作失败（通过 `?` 运算符）
+
 ### Capture Mode（捕获模式）
 用户触发的五种独立功能入口：
 
