@@ -1,5 +1,7 @@
 use tauri::State;
 use base64::Engine;
+use crate::infrastructure::system::screenshot::ScreenRegion;
+use std::path::PathBuf;
 
 #[tauri::command]
 pub async fn capture_full_screen(
@@ -18,7 +20,8 @@ pub async fn capture_region(
     height: u32,
     state: State<'_, crate::AppState>,
 ) -> Result<String, String> {
-    let png_data = state.capture_service.capture_region(x, y, width, height).await
+    let region = ScreenRegion { x, y, width, height };
+    let png_data = state.capture_service.capture_region(region).await
         .map_err(|e| e.to_string())?;
     Ok(base64::engine::general_purpose::STANDARD.encode(&png_data))
 }
@@ -33,6 +36,9 @@ pub async fn save_screenshot(
     let png_data = base64::engine::general_purpose::STANDARD.decode(data)
         .map_err(|e| format!("Failed to decode base64: {}", e))?;
 
-    state.capture_service.save_screenshot(&png_data, &path).await
-        .map_err(|e| e.to_string())
+    let path_buf = PathBuf::from(path);
+    state.capture_service.save_screenshot(&png_data, &path_buf).await
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
 }

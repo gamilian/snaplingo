@@ -39,6 +39,8 @@ use application::providers::ocr::{
     OcrService,
     impls::{TesseractProvider, BaiduOcrProvider},
 };
+use application::CaptureService;
+use infrastructure::system::screenshot::get_screenshot_backend;
 
 pub struct AppState {
     // Phase 1: Infrastructure
@@ -53,6 +55,9 @@ pub struct AppState {
     // Phase 3: OCR
     pub ocr_registry: Arc<Mutex<OcrRegistry>>,
     pub ocr_service: Arc<OcrService>,
+
+    // Phase 4: Capture
+    pub capture_service: Arc<CaptureService>,
 
     // Legacy (Phase 5: remove these)
     pub config: Arc<Mutex<Config>>,
@@ -125,6 +130,10 @@ impl AppState {
         let ocr_registry = Arc::new(Mutex::new(ocr_registry));
         let ocr_service = Arc::new(OcrService::new(ocr_registry.clone()));
 
+        // Phase 4: Capture
+        let screenshot_backend = get_screenshot_backend();
+        let capture_service = Arc::new(CaptureService::new(screenshot_backend));
+
         // Legacy initialization
         let config = Config::load_or_default(&config_path).unwrap_or_default();
 
@@ -136,6 +145,7 @@ impl AppState {
             translation_service,
             ocr_registry,
             ocr_service,
+            capture_service,
             config: Arc::new(Mutex::new(config)),
             config_path,
             language_detector: LanguageDetector::new(),
@@ -184,6 +194,9 @@ pub fn run() {
       commands::list_ocr_providers,
       commands::activate_ocr_provider,
       commands::configure_ocr_provider,
+      commands::capture_full_screen,
+      commands::capture_region,
+      commands::save_screenshot,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
