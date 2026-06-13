@@ -18,7 +18,6 @@ pub async fn translate_text_v2(
         text: request.text,
         source_lang: request.source_lang.unwrap_or_else(|| "auto".to_string()),
         target_lang: request.target_lang,
-        provider: String::new(), // Not used by new service
     };
 
     state.translation_service

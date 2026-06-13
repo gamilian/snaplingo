@@ -194,7 +194,6 @@ mod tests {
             text: "Bonjour".to_string(),
             source_lang: "fr".to_string(),
             target_lang: "en".to_string(),
-            provider: "deepl".to_string(),
         };
 
         let result = provider.translate(&request).await.unwrap();
@@ -220,7 +219,6 @@ mod tests {
             text: "Hello".to_string(),
             source_lang: "en".to_string(),
             target_lang: "fr".to_string(),
-            provider: "deepl".to_string(),
         };
 
         let result = provider.translate(&request).await;
@@ -244,7 +242,6 @@ mod tests {
             text: "Hello".to_string(),
             source_lang: "en".to_string(),
             target_lang: "fr".to_string(),
-            provider: "deepl".to_string(),
         };
 
         let result = provider.translate(&request).await;
@@ -268,7 +265,6 @@ mod tests {
             text: "Hello".to_string(),
             source_lang: "en".to_string(),
             target_lang: "fr".to_string(),
-            provider: "deepl".to_string(),
         };
 
         let result = provider.translate(&request).await;
@@ -294,7 +290,6 @@ mod tests {
             text: "Hello".to_string(),
             source_lang: "en".to_string(),
             target_lang: "fr".to_string(),
-            provider: "deepl".to_string(),
         };
 
         let result = provider.translate(&request).await;

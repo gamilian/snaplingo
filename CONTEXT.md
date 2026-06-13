@@ -393,3 +393,15 @@ Provider 类型：
 - 快捷键注册失败时，在设置界面显示警告："快捷键已被占用，请重新设置"
 - 该功能的快捷键显示为"未设置"状态，功能不可用直到用户设置有效快捷键
 - 用户可在设置中自定义所有快捷键
+
+## Architecture Decisions
+
+### TranslationRequest 不包含 provider 字段
+Translation 请求不指定具体的 Provider。所有请求都发送到当前激活的所有 Providers 以便用户比较结果。这是设计决策，不是技术限制。
+
+**理由：**
+- 用户需求是"比较多个翻译"，而非"选择一个翻译"
+- 并发调用所有 Providers 符合使用场景
+- 如果以后需要单 Provider 路由，应该作为新的 API 设计（例如 `translate_with_provider()`），而非在现有请求中添加可选字段
+
+**历史：** 2026-06-13 删除了未使用的 `provider: String` 字段（从未被读取，造成混淆）。

@@ -73,7 +73,6 @@ mod tests {
             text: "Hello".to_string(),
             source_lang: "en".to_string(),
             target_lang: "es".to_string(),
-            provider: "google".to_string(),
         };
 
         let results = service.translate(&request).await.unwrap();
@@ -107,7 +106,6 @@ mod tests {
             text: "Hello".to_string(),
             source_lang: "en".to_string(),
             target_lang: "es".to_string(),
-            provider: "google".to_string(),
         };
 
         let results = service.translate(&request).await.unwrap();
@@ -129,7 +127,6 @@ mod tests {
             text: "Hello".to_string(),
             source_lang: "en".to_string(),
             target_lang: "es".to_string(),
-            provider: "google".to_string(),
         };
 
         let result = service.translate(&request).await;

@@ -6,7 +6,6 @@ pub struct TranslationRequest {
     pub text: String,
     pub source_lang: String,
     pub target_lang: String,
-    pub provider: String,
 }
 
 impl TranslationRequest {
@@ -20,7 +19,6 @@ pub struct TranslationRequestBuilder {
     text: Option<String>,
     source_lang: Option<String>,
     target_lang: Option<String>,
-    provider: Option<String>,
 }
 
 impl TranslationRequestBuilder {
@@ -39,17 +37,11 @@ impl TranslationRequestBuilder {
         self
     }
 
-    pub fn provider(mut self, provider: impl Into<String>) -> Self {
-        self.provider = Some(provider.into());
-        self
-    }
-
     pub fn build(self) -> Result<TranslationRequest, String> {
         Ok(TranslationRequest {
             text: self.text.ok_or("text is required")?,
             source_lang: self.source_lang.ok_or("source_lang is required")?,
             target_lang: self.target_lang.ok_or("target_lang is required")?,
-            provider: self.provider.ok_or("provider is required")?,
         })
     }
 }

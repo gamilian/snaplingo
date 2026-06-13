@@ -246,7 +246,6 @@ mod tests {
             text: "hello".to_string(),
             source_lang: "en".to_string(),
             target_lang: "zh".to_string(),
-            provider: "baidu-translate".to_string(),
         };
 
         let result = provider.translate(&request).await.unwrap();
@@ -272,7 +271,6 @@ mod tests {
             text: "hello".to_string(),
             source_lang: "en".to_string(),
             target_lang: "zh".to_string(),
-            provider: "baidu-translate".to_string(),
         };
 
         let result = provider.translate(&request).await;
@@ -298,7 +296,6 @@ mod tests {
             text: "hello".to_string(),
             source_lang: "en".to_string(),
             target_lang: "zh".to_string(),
-            provider: "baidu-translate".to_string(),
         };
 
         let result = provider.translate(&request).await;
@@ -322,7 +319,6 @@ mod tests {
             text: "hello".to_string(),
             source_lang: "en".to_string(),
             target_lang: "zh".to_string(),
-            provider: "baidu-translate".to_string(),
         };
 
         let result = provider.translate(&request).await;
@@ -348,7 +344,6 @@ mod tests {
             text: "hello".to_string(),
             source_lang: "en".to_string(),
             target_lang: "zh".to_string(),
-            provider: "baidu-translate".to_string(),
         };
 
         let result = provider.translate(&request).await;
