@@ -15,7 +15,8 @@ use std::sync::Arc;
 pub fn get_hotkey_backend() -> Arc<dyn HotkeyBackend> {
     #[cfg(target_os = "macos")]
     {
-        Arc::new(macos::MacOSHotkeyBackend::new())
+        Arc::new(macos::MacOSHotkeyBackend::new()
+            .expect("Failed to initialize macOS hotkey backend"))
     }
 
     #[cfg(target_os = "windows")]
