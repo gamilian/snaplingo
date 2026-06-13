@@ -2,6 +2,7 @@
 mod error;
 mod domain;
 mod infrastructure;
+mod application;
 mod commands;
 mod config;
 mod language;
@@ -16,6 +17,7 @@ mod hotkeys;
 pub use error::{AppError, Result};
 pub use domain::*;
 pub use infrastructure::*;
+pub use application::*;
 
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
