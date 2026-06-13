@@ -12,6 +12,11 @@ mod history;
 mod utils;
 mod hotkeys;
 
+// Public exports for new infrastructure layer
+pub use error::{AppError, Result};
+pub use domain::*;
+pub use infrastructure::*;
+
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 use std::path::PathBuf;
