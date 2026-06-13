@@ -994,7 +994,209 @@ git commit -m "feat(infra): add platform-specific path utilities"
 
 ---
 
-## Task 7: Infrastructure - Screenshot Backend (Platform Abstraction)
+## Task 7: Infrastructure - Hotkey Backend (Platform Abstraction)
+
+**Files:**
+- Create: `src-tauri/src/infrastructure/system/hotkey/mod.rs`
+- Create: `src-tauri/src/infrastructure/system/hotkey/backend.rs`
+- Create: `src-tauri/src/infrastructure/system/hotkey/macos.rs`
+- Create: `src-tauri/src/infrastructure/system/hotkey/windows.rs`
+- Create: `src-tauri/src/infrastructure/system/hotkey/linux.rs`
+- Modify: `src-tauri/src/infrastructure/system/mod.rs`
+- Modify: `src-tauri/Cargo.toml`
+
+- [ ] **Step 1: Add global-hotkey dependency**
+
+Add to `src-tauri/Cargo.toml` dependencies:
+
+```toml
+global-hotkey = "0.5"
+```
+
+- [ ] **Step 2: Define HotkeyBackend trait**
+
+```rust
+// src-tauri/src/infrastructure/system/hotkey/backend.rs
+
+use crate::Result;
+
+pub type HotkeyId = u32;
+
+pub trait HotkeyBackend: Send + Sync {
+    fn register(&mut self, key_combo: &str) -> Result<HotkeyId>;
+    fn unregister(&mut self, id: HotkeyId) -> Result<()>;
+}
+```
+
+- [ ] **Step 3: Implement macOS hotkey backend**
+
+```rust
+// src-tauri/src/infrastructure/system/hotkey/macos.rs
+
+use super::backend::{HotkeyBackend, HotkeyId};
+use crate::Result;
+use std::collections::HashMap;
+
+pub struct MacOSHotkey {
+    next_id: HotkeyId,
+    registered: HashMap<HotkeyId, String>,
+}
+
+impl MacOSHotkey {
+    pub fn new() -> Self {
+        Self {
+            next_id: 1,
+            registered: HashMap::new(),
+        }
+    }
+}
+
+impl HotkeyBackend for MacOSHotkey {
+    fn register(&mut self, key_combo: &str) -> Result<HotkeyId> {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.registered.insert(id, key_combo.to_string());
+        // TODO: Actual registration in Phase 4
+        Ok(id)
+    }
+    
+    fn unregister(&mut self, id: HotkeyId) -> Result<()> {
+        self.registered.remove(&id);
+        // TODO: Actual unregistration in Phase 4
+        Ok(())
+    }
+}
+```
+
+- [ ] **Step 4: Implement Windows and Linux hotkey backends**
+
+```rust
+// src-tauri/src/infrastructure/system/hotkey/windows.rs
+
+use super::backend::{HotkeyBackend, HotkeyId};
+use crate::Result;
+use std::collections::HashMap;
+
+pub struct WindowsHotkey {
+    next_id: HotkeyId,
+    registered: HashMap<HotkeyId, String>,
+}
+
+impl WindowsHotkey {
+    pub fn new() -> Self {
+        Self {
+            next_id: 1,
+            registered: HashMap::new(),
+        }
+    }
+}
+
+impl HotkeyBackend for WindowsHotkey {
+    fn register(&mut self, key_combo: &str) -> Result<HotkeyId> {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.registered.insert(id, key_combo.to_string());
+        Ok(id)
+    }
+    
+    fn unregister(&mut self, id: HotkeyId) -> Result<()> {
+        self.registered.remove(&id);
+        Ok(())
+    }
+}
+
+// src-tauri/src/infrastructure/system/hotkey/linux.rs
+
+use super::backend::{HotkeyBackend, HotkeyId};
+use crate::Result;
+use std::collections::HashMap;
+
+pub struct LinuxHotkey {
+    next_id: HotkeyId,
+    registered: HashMap<HotkeyId, String>,
+}
+
+impl LinuxHotkey {
+    pub fn new() -> Self {
+        Self {
+            next_id: 1,
+            registered: HashMap::new(),
+        }
+    }
+}
+
+impl HotkeyBackend for LinuxHotkey {
+    fn register(&mut self, key_combo: &str) -> Result<HotkeyId> {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.registered.insert(id, key_combo.to_string());
+        Ok(id)
+    }
+    
+    fn unregister(&mut self, id: HotkeyId) -> Result<()> {
+        self.registered.remove(&id);
+        Ok(())
+    }
+}
+```
+
+- [ ] **Step 5: Create platform-adaptive Hotkey**
+
+```rust
+// src-tauri/src/infrastructure/system/hotkey/mod.rs
+
+mod backend;
+
+#[cfg(target_os = "macos")]
+mod macos;
+#[cfg(target_os = "windows")]
+mod windows;
+#[cfg(target_os = "linux")]
+mod linux;
+
+pub use backend::{HotkeyBackend, HotkeyId};
+
+#[cfg(target_os = "macos")]
+pub use macos::MacOSHotkey as PlatformHotkey;
+
+#[cfg(target_os = "windows")]
+pub use windows::WindowsHotkey as PlatformHotkey;
+
+#[cfg(target_os = "linux")]
+pub use linux::LinuxHotkey as PlatformHotkey;
+```
+
+- [ ] **Step 6: Update system module exports**
+
+```rust
+// src-tauri/src/infrastructure/system/mod.rs
+
+pub mod paths;
+pub mod screenshot;
+pub mod hotkey;
+
+pub use paths::{get_config_dir, get_config_path, get_history_db_path};
+pub use screenshot::{ScreenshotBackend, PlatformScreenshot};
+pub use hotkey::{HotkeyBackend, HotkeyId, PlatformHotkey};
+```
+
+- [ ] **Step 7: Verify compilation**
+
+Run: `cargo check`
+Expected: SUCCESS
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add src-tauri/src/infrastructure/system/hotkey/
+git add src-tauri/src/infrastructure/system/mod.rs
+git add src-tauri/Cargo.toml
+git commit -m "feat(infra): add Hotkey backend with platform abstraction (placeholder implementations)"
+```
+
+---
+
+## Task 8: Infrastructure - Screenshot Backend (Platform Abstraction)
 
 **Files:**
 - Create: `src-tauri/src/infrastructure/system/screenshot/mod.rs`
@@ -1174,7 +1376,7 @@ git commit -m "feat(infra): add Screenshot backend with platform abstraction (pl
 
 ---
 
-## Task 8: Update lib.rs Module Declarations
+## Task 9: Update lib.rs Module Declarations
 
 **Files:**
 - Modify: `src-tauri/src/lib.rs:1-20`
@@ -1294,7 +1496,7 @@ git commit -m "refactor: update lib.rs module declarations for new infrastructur
 
 ---
 
-## Task 9: Integration Test - Infrastructure Layer
+## Task 10: Integration Test - Infrastructure Layer
 
 **Files:**
 - Create: `src-tauri/tests/infrastructure_integration_test.rs`
@@ -1376,7 +1578,7 @@ git commit -m "test(infra): add integration tests for infrastructure layer"
 
 ---
 
-## Task 10: Documentation and Summary
+## Task 11: Documentation and Summary
 
 **Files:**
 - Create: `src-tauri/src/infrastructure/README.md`
@@ -1469,6 +1671,7 @@ git commit -m "docs(infra): add infrastructure layer documentation"
 - [ ] HttpClient abstraction with Reqwest
 - [ ] System paths (platform-specific)
 - [ ] Screenshot backend (placeholder)
+- [ ] Hotkey backend (placeholder)
 - [ ] Unit tests pass
 - [ ] Integration tests pass
 - [ ] Documentation complete
@@ -1476,4 +1679,4 @@ git commit -m "docs(infra): add infrastructure layer documentation"
 
 **Next Phase:** Phase 2 - Translation Provider vertical slice (migrate Google Translate, add DeepL and Baidu)
 
-**Estimated Time:** 2-3 days
+**Estimated Time:** 2.5-3.5 days (adjusted for Hotkey backend addition)
