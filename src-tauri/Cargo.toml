@@ -46,6 +46,9 @@ md5 = "0.7"
 # Language detection
 lingua = "1.5"
 
+# OCR
+tesseract = "0.14"
+
 # Configuration
 dirs = "5.0"
 json-patch = "1.2"

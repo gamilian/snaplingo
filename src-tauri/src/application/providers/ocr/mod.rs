@@ -1,6 +1,7 @@
 mod trait_def;
 mod registry;
 mod service;
+pub mod impls;
 
 #[cfg(test)]
 mod registry_test;
