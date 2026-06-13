@@ -555,6 +555,9 @@ impl TranslationService {
             }
         }
         
+        // NOTE: History recording will be added in Phase 5
+        // TODO(Phase 5): Add history recording here
+        
         Ok(results)
     }
 }
