@@ -1,10 +1,12 @@
 mod config;
 mod translation_commands;
 mod provider_commands;
+mod ocr_commands;
 
 pub use config::*;
 pub use translation_commands::*;
 pub use provider_commands::*;
+pub use ocr_commands::*;
 
 use tauri::{Emitter, Manager};
 
