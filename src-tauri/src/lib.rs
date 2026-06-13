@@ -6,10 +6,8 @@ mod application;
 mod commands;
 mod config;
 mod language;
-mod capture;
 mod history;
 mod utils;
-mod hotkeys;
 
 // Public exports for new infrastructure layer
 pub use error::{AppError, Result};
@@ -21,7 +19,6 @@ use std::sync::{Arc, Mutex};
 use std::path::PathBuf;
 use config::Config;
 use language::LanguageDetector;
-use hotkeys::HotkeyManager;
 use tauri::Manager;
 
 // Phase 1, 2 & 3 imports
@@ -63,7 +60,6 @@ pub struct AppState {
     pub config: Arc<Mutex<Config>>,
     pub config_path: PathBuf,
     pub language_detector: LanguageDetector,
-    pub hotkey_manager: HotkeyManager,
 }
 
 impl AppState {
@@ -149,7 +145,6 @@ impl AppState {
             config: Arc::new(Mutex::new(config)),
             config_path,
             language_detector: LanguageDetector::new(),
-            hotkey_manager: HotkeyManager::new(app),
         }
     }
 }
