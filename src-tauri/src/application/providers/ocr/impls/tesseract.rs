@@ -46,6 +46,14 @@ impl Provider for TesseractProvider {
 #[async_trait]
 impl OcrProvider for TesseractProvider {
     async fn recognize(&self, request: &OcrRequest) -> Result<OcrResult> {
+        // Check if Tesseract is available before attempting OCR
+        if !is_tesseract_available() {
+            return Err(AppError::Other(
+                "Tesseract OCR is not available. Please install Tesseract OCR. \
+                See docs/TESSERACT_SETUP.md for installation instructions.".to_string()
+            ));
+        }
+
         // Map language code to Tesseract language code (e.g., "zh-CN" -> "chi_sim")
         let lang = request.language.as_deref().and_then(map_language_code);
 
@@ -68,6 +76,17 @@ impl OcrProvider for TesseractProvider {
             confidence: None,
         })
     }
+}
+
+/// Checks if Tesseract is available on the system.
+///
+/// This attempts to run `tesseract --version` to verify installation.
+fn is_tesseract_available() -> bool {
+    std::process::Command::new("tesseract")
+        .arg("--version")
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
 }
 
 /// Maps common language codes to Tesseract language codes.
