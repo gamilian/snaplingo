@@ -48,6 +48,7 @@ lingua = "1.5"
 
 # OCR
 tesseract = "0.14"
+base64 = "0.21"
 
 # Configuration
 dirs = "5.0"
