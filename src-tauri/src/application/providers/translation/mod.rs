@@ -1,6 +1,7 @@
 mod trait_def;
 mod registry;
 mod service;
+mod impls;
 
 #[cfg(test)]
 mod registry_test;
@@ -11,6 +12,4 @@ mod service_test;
 pub use trait_def::TranslationProvider;
 pub use registry::TranslationRegistry;
 pub use service::TranslationService;
-
-// Future modules (to be implemented in subsequent tasks)
-// mod impls;
+pub use impls::GoogleTranslateProvider;
