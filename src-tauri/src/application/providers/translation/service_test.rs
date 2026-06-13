@@ -5,6 +5,7 @@ mod tests {
     use super::super::TranslationProvider;
     use crate::application::providers::common::Provider;
     use crate::domain::translation::{TranslationRequest, TranslationResult};
+    use crate::infrastructure::storage::ConfigFile;
     use crate::Result;
     use async_trait::async_trait;
     use std::sync::{Arc, Mutex};
@@ -57,7 +58,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_translate_with_single_provider() {
-        let mut registry = TranslationRegistry::new();
+        let config = Arc::new(ConfigFile::new_temp());
+        let mut registry = TranslationRegistry::new(config);
         let provider = Arc::new(MockTranslationProvider::new(
             "google",
             "Google Translate",
@@ -83,7 +85,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_translate_with_multiple_providers() {
-        let mut registry = TranslationRegistry::new();
+        let config = Arc::new(ConfigFile::new_temp());
+        let mut registry = TranslationRegistry::new(config);
         let provider1 = Arc::new(MockTranslationProvider::new(
             "google",
             "Google Translate",
@@ -120,7 +123,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_translate_with_no_active_provider() {
-        let registry = TranslationRegistry::new();
+        let config = Arc::new(ConfigFile::new_temp());
+        let registry = TranslationRegistry::new(config);
         let service = TranslationService::new(Arc::new(Mutex::new(registry)));
 
         let request = TranslationRequest {

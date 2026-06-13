@@ -61,22 +61,7 @@ pub async fn activate_ocr_provider(
         .lock()
         .unwrap()
         .activate(&provider_id)
-        .map_err(|e| e.to_string())?;
-
-    // Persist to config (single-select stores just the ID string)
-    let active_id = state.ocr_registry
-        .lock()
-        .unwrap()
-        .get_active()
-        .map(|p| p.id().to_string());
-
-    if let Some(id) = active_id {
-        state.config_file
-            .save("active_ocr_provider", &id)
-            .map_err(|e| e.to_string())?;
-    }
-
-    Ok(())
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

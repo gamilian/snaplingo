@@ -58,4 +58,17 @@ impl ConfigFile {
         let value = serde_json::from_value(json_value.clone())?;
         Ok(value)
     }
+
+    /// Creates a temporary ConfigFile for testing purposes.
+    /// The file is created in the system's temp directory and will be cleaned up automatically.
+    #[cfg(test)]
+    pub fn new_temp() -> Self {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let temp_path = std::env::temp_dir().join(format!("snaplingo_test_{}.json", nanos));
+        Self::new(temp_path)
+    }
 }

@@ -4,6 +4,7 @@ mod tests {
     use super::super::TranslationProvider;
     use crate::application::providers::common::Provider;
     use crate::domain::translation::{TranslationRequest, TranslationResult};
+    use crate::infrastructure::storage::ConfigFile;
     use crate::Result;
     use async_trait::async_trait;
     use std::sync::Arc;
@@ -54,7 +55,8 @@ mod tests {
 
     #[test]
     fn test_register_provider() {
-        let mut registry = TranslationRegistry::new();
+        let config = Arc::new(ConfigFile::new_temp());
+        let mut registry = TranslationRegistry::new(config);
         let provider = Arc::new(MockTranslationProvider::new("google", "Google Translate"));
 
         registry.register(provider.clone()).unwrap();
@@ -66,7 +68,8 @@ mod tests {
 
     #[test]
     fn test_activate_multiple_providers() {
-        let mut registry = TranslationRegistry::new();
+        let config = Arc::new(ConfigFile::new_temp());
+        let mut registry = TranslationRegistry::new(config);
         let provider1 = Arc::new(MockTranslationProvider::new("google", "Google Translate"));
         let provider2 = Arc::new(MockTranslationProvider::new("deepl", "DeepL"));
 
@@ -84,7 +87,8 @@ mod tests {
 
     #[test]
     fn test_deactivate_provider() {
-        let mut registry = TranslationRegistry::new();
+        let config = Arc::new(ConfigFile::new_temp());
+        let mut registry = TranslationRegistry::new(config);
         let provider = Arc::new(MockTranslationProvider::new("google", "Google Translate"));
 
         registry.register(provider.clone()).unwrap();
@@ -101,7 +105,8 @@ mod tests {
 
     #[test]
     fn test_activate_nonexistent_provider() {
-        let mut registry = TranslationRegistry::new();
+        let config = Arc::new(ConfigFile::new_temp());
+        let mut registry = TranslationRegistry::new(config);
 
         let result = registry.activate("nonexistent");
         assert!(result.is_err());

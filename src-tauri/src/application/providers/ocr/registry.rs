@@ -1,4 +1,5 @@
 use super::OcrProvider;
+use crate::infrastructure::storage::ConfigFile;
 use crate::Result;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -13,14 +14,17 @@ pub struct OcrRegistry {
     providers: HashMap<String, Arc<dyn OcrProvider>>,
     /// Currently active provider ID (single-select)
     active_provider_id: Option<String>,
+    /// Configuration file for persisting active provider
+    config: Arc<ConfigFile>,
 }
 
 impl OcrRegistry {
     /// Creates a new empty OCR registry.
-    pub fn new() -> Self {
+    pub fn new(config: Arc<ConfigFile>) -> Self {
         Self {
             providers: HashMap::new(),
             active_provider_id: None,
+            config,
         }
     }
 
@@ -45,6 +49,7 @@ impl OcrRegistry {
     /// Activates a provider by ID.
     ///
     /// This replaces any currently active provider (single-select pattern).
+    /// The updated active provider is automatically persisted to the config file.
     ///
     /// # Arguments
     ///
@@ -52,12 +57,13 @@ impl OcrRegistry {
     ///
     /// # Returns
     ///
-    /// * `Result<()>` - Ok if successful, Err if the provider doesn't exist
+    /// * `Result<()>` - Ok if successful, Err if the provider doesn't exist or persistence fails
     pub fn activate(&mut self, id: &str) -> Result<()> {
         if !self.providers.contains_key(id) {
             return Err(format!("Provider not found: {}", id).into());
         }
         self.active_provider_id = Some(id.to_string());
+        self.persist_active()?;
         Ok(())
     }
 
@@ -93,10 +99,32 @@ impl OcrRegistry {
     pub fn get(&self, id: &str) -> Option<Arc<dyn OcrProvider>> {
         self.providers.get(id).cloned()
     }
+
+    /// Restores the active provider from the config file.
+    ///
+    /// Skips if the provider ID is not registered.
+    pub fn restore_from_config(&mut self) -> Result<()> {
+        if let Ok(active_id) = self.config.load::<String>("active_ocr_provider") {
+            if self.providers.contains_key(&active_id) {
+                self.active_provider_id = Some(active_id);
+            }
+        }
+        Ok(())
+    }
+
+    /// Persists the current active provider to the config file.
+    fn persist_active(&self) -> Result<()> {
+        if let Some(ref id) = self.active_provider_id {
+            self.config.save("active_ocr_provider", id)?;
+        }
+        Ok(())
+    }
 }
 
 impl Default for OcrRegistry {
     fn default() -> Self {
-        Self::new()
+        // Note: Default implementation requires a config file path.
+        // In practice, always use OcrRegistry::new(config) instead.
+        panic!("OcrRegistry::default() should not be used. Use OcrRegistry::new(config) instead.");
     }
 }

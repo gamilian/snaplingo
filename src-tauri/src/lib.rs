@@ -62,7 +62,7 @@ impl AppState {
         let http_client: Arc<dyn HttpClient> = Arc::new(ReqwestHttpClient::new());
 
         // Phase 2: Translation
-        let mut translation_registry = TranslationRegistry::new();
+        let mut translation_registry = TranslationRegistry::new(config_file.clone());
 
         // Register Google Translate (no credentials needed)
         let google_provider = GoogleTranslateProviderV2::new(http_client.clone());
@@ -85,17 +85,13 @@ impl AppState {
         translation_registry.register(Arc::new(baidu_provider)).ok();
 
         // Restore active providers from config
-        if let Ok(active_ids) = config_file.load::<Vec<String>>("translation.active_providers") {
-            for id in active_ids {
-                translation_registry.activate(&id).ok();
-            }
-        }
+        translation_registry.restore_from_config().ok();
 
         let translation_registry = Arc::new(Mutex::new(translation_registry));
         let translation_service = Arc::new(TranslationService::new(translation_registry.clone()));
 
         // Phase 3: OCR
-        let mut ocr_registry = OcrRegistry::new();
+        let mut ocr_registry = OcrRegistry::new(config_file.clone());
 
         // Register Tesseract (no credentials needed)
         let tesseract_provider = TesseractProvider::new();
@@ -111,9 +107,7 @@ impl AppState {
         ocr_registry.register(Arc::new(baidu_ocr_provider)).ok();
 
         // Restore active OCR provider from config
-        if let Ok(active_id) = config_file.load::<String>("ocr.active_provider") {
-            ocr_registry.activate(&active_id).ok();
-        }
+        ocr_registry.restore_from_config().ok();
 
         let ocr_registry = Arc::new(Mutex::new(ocr_registry));
         let ocr_service = Arc::new(OcrService::new(ocr_registry.clone()));

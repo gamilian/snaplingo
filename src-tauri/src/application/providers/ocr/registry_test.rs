@@ -4,6 +4,7 @@ mod tests {
     use super::super::OcrProvider;
     use crate::application::providers::common::Provider;
     use crate::domain::ocr::{OcrRequest, OcrResult};
+    use crate::infrastructure::storage::ConfigFile;
     use crate::Result;
     use async_trait::async_trait;
     use std::sync::Arc;
@@ -53,7 +54,8 @@ mod tests {
 
     #[test]
     fn test_register_provider() {
-        let mut registry = OcrRegistry::new();
+        let config = Arc::new(ConfigFile::new_temp());
+        let mut registry = OcrRegistry::new(config);
         let provider = Arc::new(MockOcrProvider::new("tesseract", "Tesseract OCR"));
 
         registry.register(provider.clone()).unwrap();
@@ -65,7 +67,8 @@ mod tests {
 
     #[test]
     fn test_activate_single_provider() {
-        let mut registry = OcrRegistry::new();
+        let config = Arc::new(ConfigFile::new_temp());
+        let mut registry = OcrRegistry::new(config);
         let provider = Arc::new(MockOcrProvider::new("tesseract", "Tesseract OCR"));
 
         registry.register(provider.clone()).unwrap();
@@ -78,7 +81,8 @@ mod tests {
 
     #[test]
     fn test_switch_provider() {
-        let mut registry = OcrRegistry::new();
+        let config = Arc::new(ConfigFile::new_temp());
+        let mut registry = OcrRegistry::new(config);
         let provider1 = Arc::new(MockOcrProvider::new("tesseract", "Tesseract OCR"));
         let provider2 = Arc::new(MockOcrProvider::new("baidu", "Baidu OCR"));
 
@@ -100,7 +104,8 @@ mod tests {
 
     #[test]
     fn test_activate_nonexistent_provider() {
-        let mut registry = OcrRegistry::new();
+        let config = Arc::new(ConfigFile::new_temp());
+        let mut registry = OcrRegistry::new(config);
 
         let result = registry.activate("nonexistent");
         assert!(result.is_err());

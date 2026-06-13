@@ -39,22 +39,7 @@ pub async fn activate_translation_provider(
         .lock()
         .unwrap()
         .activate(&provider_id)
-        .map_err(|e| e.to_string())?;
-
-    // Persist to config
-    let active_ids: Vec<_> = state.translation_registry
-        .lock()
-        .unwrap()
-        .get_active()
-        .iter()
-        .map(|p| p.id().to_string())
-        .collect();
-
-    state.config_file
-        .save("active_translation_providers", &active_ids)
-        .map_err(|e| e.to_string())?;
-
-    Ok(())
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -66,22 +51,7 @@ pub async fn deactivate_translation_provider(
         .lock()
         .unwrap()
         .deactivate(&provider_id)
-        .map_err(|e| e.to_string())?;
-
-    // Persist to config
-    let active_ids: Vec<_> = state.translation_registry
-        .lock()
-        .unwrap()
-        .get_active()
-        .iter()
-        .map(|p| p.id().to_string())
-        .collect();
-
-    state.config_file
-        .save("active_translation_providers", &active_ids)
-        .map_err(|e| e.to_string())?;
-
-    Ok(())
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

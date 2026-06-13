@@ -5,6 +5,7 @@ mod tests {
     use super::super::OcrProvider;
     use crate::application::providers::common::Provider;
     use crate::domain::ocr::{OcrRequest, OcrResult};
+    use crate::infrastructure::storage::ConfigFile;
     use crate::Result;
     use async_trait::async_trait;
     use std::sync::{Arc, Mutex};
@@ -57,7 +58,8 @@ mod tests {
     #[tokio::test]
     async fn test_recognize_with_active_provider() {
         // Arrange
-        let mut registry = OcrRegistry::new();
+        let config = Arc::new(ConfigFile::new_temp());
+        let mut registry = OcrRegistry::new(config);
         let provider = Arc::new(MockOcrProvider::new(
             "tesseract",
             "Tesseract OCR",
@@ -86,7 +88,8 @@ mod tests {
     #[tokio::test]
     async fn test_recognize_with_no_active_provider() {
         // Arrange
-        let registry = OcrRegistry::new();
+        let config = Arc::new(ConfigFile::new_temp());
+        let registry = OcrRegistry::new(config);
         let service = OcrService::new(Arc::new(Mutex::new(registry)));
         let request = OcrRequest {
             image_data: vec![1, 2, 3],
@@ -104,7 +107,8 @@ mod tests {
     #[tokio::test]
     async fn test_recognize_updates_provider_in_result() {
         // Arrange
-        let mut registry = OcrRegistry::new();
+        let config = Arc::new(ConfigFile::new_temp());
+        let mut registry = OcrRegistry::new(config);
         let provider = Arc::new(MockOcrProvider::new(
             "google-vision",
             "Google Vision API",
