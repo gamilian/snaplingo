@@ -10,6 +10,7 @@ pub enum AppError {
     ProviderNotFound(String),
     ProviderNotConfigured(String),
     NoActiveProvider,
+    System(String),
     Other(String),
 }
 
@@ -24,6 +25,7 @@ impl fmt::Display for AppError {
             AppError::ProviderNotFound(id) => write!(f, "Provider not found: {}", id),
             AppError::ProviderNotConfigured(id) => write!(f, "Provider not configured: {}", id),
             AppError::NoActiveProvider => write!(f, "No active provider configured"),
+            AppError::System(msg) => write!(f, "System error: {}", msg),
             AppError::Other(msg) => write!(f, "{}", msg),
         }
     }

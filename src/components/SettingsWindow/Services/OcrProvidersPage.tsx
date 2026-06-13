@@ -1,0 +1,69 @@
+import { useState } from 'react';
+import { useProviderStore } from '../../../stores/providerStore';
+import { ProviderCard } from './ProviderCard';
+import { ProviderConfigDialog } from './ProviderConfigDialog';
+
+export function OcrProvidersPage() {
+  const providers = useProviderStore((state) => state.ocrProviders);
+  const activeProvider = useProviderStore((state) => state.activeOcrProvider);
+  const activateProvider = useProviderStore((state) => state.activateOcrProvider);
+  const updateProviderConfig = useProviderStore((state) => state.updateProviderConfig);
+
+  const [configuringProvider, setConfiguringProvider] = useState<string | null>(null);
+
+  const handleActivate = (id: string) => {
+    activateProvider(id);
+  };
+
+  const handleConfigure = (id: string) => {
+    setConfiguringProvider(id);
+  };
+
+  const handleSaveConfig = (config: any) => {
+    if (configuringProvider) {
+      updateProviderConfig(configuringProvider, config);
+      // 配置完成后自动激活
+      activateProvider(configuringProvider);
+    }
+    setConfiguringProvider(null);
+  };
+
+  const handleTest = (_id: string) => {
+    // TODO: 实现 Provider 测试
+    alert('测试功能：将调用该 OCR 服务识别一张示例图片\n\n此功能待实现');
+  };
+
+  const currentProvider = providers.find((p) => p.id === configuringProvider);
+
+  return (
+    <div className="max-w-4xl space-y-8">
+      <div>
+        <h2 className="text-3xl font-bold text-gray-900 mb-2">OCR 服务</h2>
+        <p className="text-gray-600">
+          当前激活：<span className="font-medium text-blue-600">
+            {providers.find((p) => p.id === activeProvider)?.name || '无'}
+          </span>
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        {providers.map((provider) => (
+          <ProviderCard
+            key={provider.id}
+            provider={provider}
+            onActivate={() => handleActivate(provider.id)}
+            onConfigure={() => handleConfigure(provider.id)}
+            onTest={() => handleTest(provider.id)}
+          />
+        ))}
+      </div>
+
+      <ProviderConfigDialog
+        isOpen={configuringProvider !== null}
+        onClose={() => setConfiguringProvider(null)}
+        onSave={handleSaveConfig}
+        provider={currentProvider || null}
+      />
+    </div>
+  );
+}
