@@ -15,6 +15,23 @@
 - Translation: Google Translate、DeepL、Baidu Translation
 - OCR: Tesseract（本地）、Baidu OCR（远程）
 
+### Coordinator（协调器）
+管理 Providers 并协调其执行的核心模块。每种 Provider 类型有对应的 Coordinator：
+
+- **TranslationCoordinator**：管理翻译 Providers，协调并发翻译
+- **OcrCoordinator**：管理 OCR Providers，执行单个 OCR 识别
+
+**职责：**
+- Provider 注册和管理
+- 激活状态管理（多选/单选）
+- 配置持久化（自动保存/恢复）
+- 执行协调（并发/单次调用）
+
+**设计原则：**
+- 使用内部细粒度锁（`Arc<Mutex<Vec<String>>>`）实现并发安全
+- Builder 模式初始化：构建时可变（`&mut self`），使用时不可变（`Arc<Self>`）
+- `providers` 在初始化后不变（无需锁），`active` 运行时可变（需要锁）
+
 ### Provider Activation（Provider 激活）
 使 Provider 可用的过程。SnapLingo 支持两种激活模型：
 
@@ -22,27 +39,34 @@
   ```
   状态：Vec<String> = ["google", "deepl", "baidu"]
   配置键：active_translation_providers
+  实现：TranslationCoordinator 使用 tokio::spawn 并发调用
   ```
 
 - **单选模式（OCR）**：同时只能激活一个 Provider。激活新 Provider 会替换之前的。
   ```
   状态：Option<String> = Some("tesseract")
   配置键：active_ocr_provider
+  实现：OcrCoordinator 直接调用单个 Provider
   ```
 
 这种区别反映了使用模式：用户需要比较多个翻译结果，但只需要一个 OCR 结果。
 
 ### Configuration Persistence（配置持久化）
-Provider 激活状态自动保存到磁盘。Registry 模块内部处理持久化——Commands 和 Services 层不知道存储机制。这确保：
+Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持久化——Commands 层不知道存储机制。这确保：
 
-- **局部性（Locality）**：状态管理和持久化在 Registry 中共同定位
+- **局部性（Locality）**：状态管理和持久化在 Coordinator 中共同定位
 - **原子性（Atomicity）**：激活和持久化作为一个操作成功或失败
 - **配置清理**：无效 Provider（如会话间被删除）在恢复时自动清理
 
-**设计原则：**
-- Registry 拥有 `Arc<ConfigFile>`，在状态变更时立即调用 `config.save()`
+**实现细节：**
+- Coordinator 拥有 `Arc<ConfigFile>`，在状态变更时立即调用 `config.save()`
 - 启动时通过 `restore_from_config()` 恢复状态，跳过无效 Provider
 - 持久化失败导致整个 `activate()` 操作失败（通过 `?` 运算符）
+
+**并发安全：**
+- `active` 状态用 `Arc<Mutex<Vec<String>>>` 或 `Arc<Mutex<Option<String>>>` 包装
+- 短锁：只在修改 `active` 列表时锁定，读取后立即释放
+- `translate()` 和 `recognize()` 可以并发调用，互不阻塞
 
 ### Capture Mode（捕获模式）
 用户触发的五种独立功能入口：
@@ -405,3 +429,40 @@ Translation 请求不指定具体的 Provider。所有请求都发送到当前�
 - 如果以后需要单 Provider 路由，应该作为新的 API 设计（例如 `translate_with_provider()`），而非在现有请求中添加可选字段
 
 **历史：** 2026-06-13 删除了未使用的 `provider: String` 字段（从未被读取，造成混淆）。
+
+## Architecture Patterns
+
+### Coordinator Pattern（协调器模式）
+用于管理和协调多个同类 Provider 的架构模式。
+
+**结构：**
+```rust
+pub struct TranslationCoordinator {
+    providers: HashMap<String, Arc<dyn TranslationProvider>>, // 不可变，无锁
+    active: Arc<Mutex<Vec<String>>>,  // 可变，细粒度锁
+    config: Arc<ConfigFile>,           // 持久化
+}
+```
+
+**生命周期：**
+1. **构建阶段**（`&mut self`）：
+   - 调用 `register()` 注册所有 Providers
+   - 条件性注册（根据 API key 是否存在）
+   - 调用 `restore_from_config()` 恢复激活状态
+
+2. **使用阶段**（`Arc<Self>`）：
+   - 包装为 `Arc` 后变为不可变共享
+   - 所有方法使用 `&self`
+   - 内部通过 `Mutex` 保护可变状态
+
+**并发特性：**
+- `translate()` 可以并发调用（多个请求同时处理）
+- `activate()` 可以并发调用（不同用户同时修改配置）
+- 锁粒度小（只锁 `active` 列表，不锁整个 Coordinator）
+
+**适用场景：**
+- 需要管理多个同类实现（Provider）
+- 需要动态激活/停用（运行时配置）
+- 需要并发执行或并发配置
+- 需要持久化状态
+
