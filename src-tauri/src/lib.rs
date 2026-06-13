@@ -1,5 +1,7 @@
 // Module declarations
 mod error;
+mod domain;
+mod infrastructure;
 mod commands;
 mod config;
 mod language;
