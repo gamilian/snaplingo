@@ -12,4 +12,4 @@ mod service_test;
 pub use trait_def::TranslationProvider;
 pub use registry::TranslationRegistry;
 pub use service::TranslationService;
-pub use impls::GoogleTranslateProvider;
+pub use impls::{GoogleTranslateProvider, DeepLProvider};
