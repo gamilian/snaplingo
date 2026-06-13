@@ -6,7 +6,6 @@ mod application;
 mod commands;
 mod config;
 mod language;
-mod ocr;
 mod capture;
 mod history;
 mod utils;
