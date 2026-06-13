@@ -1,4 +1,5 @@
 // Module declarations
+mod error;
 mod commands;
 mod config;
 mod language;
