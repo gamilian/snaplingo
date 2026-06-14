@@ -19,9 +19,9 @@ export function TtsProvidersPage() {
     setConfiguringProvider(id);
   };
 
-  const handleSaveConfig = (config: any) => {
+  const handleSaveConfig = async (config: any) => {
     if (configuringProvider) {
-      updateProviderConfig(configuringProvider, config);
+      await updateProviderConfig(configuringProvider, configuringProvider, config);
       activateProvider(configuringProvider);
     }
     setConfiguringProvider(null);

@@ -14,16 +14,21 @@ pub use application::*;
 use std::sync::Arc;
 use std::path::PathBuf;
 use tauri::Manager;
+use serde::{Deserialize, Serialize};
 
 // Phase 1, 2 & 3 imports
 use infrastructure::storage::{ConfigFile, Keychain, HistoryDatabase};
 use infrastructure::http::{HttpClient, ReqwestHttpClient};
 use infrastructure::events::{EventBus, EventSubscriber};
+use infrastructure::llm::{
+    LLMClient, LLMProtocol, OpenAILLMClient, AnthropicLLMClient, GeminiLLMClient, ReasoningLevel,
+};
 use application::providers::translation::{
-    TranslationCoordinator,
+    TranslationCoordinator, TranslationProvider,
     GoogleTranslateProvider as GoogleTranslateProviderV2,
     DeepLProvider,
     BaiduTranslateProvider,
+    LLMTranslationProvider,
 };
 use application::providers::ocr::{
     OcrCoordinator,
@@ -33,6 +38,52 @@ use application::{CaptureService, HotkeyService, HistoryService};
 use infrastructure::system::screenshot::get_screenshot_backend;
 use infrastructure::system::hotkey::get_hotkey_backend;
 use infrastructure::system::paths::get_history_db_path;
+
+/// Custom translation provider definition (for persistence)
+#[derive(Clone, Serialize, Deserialize)]
+pub struct CustomTranslationProviderDef {
+    pub id: String,
+    pub name: String,
+    pub protocol: LLMProtocol,
+    pub endpoint: String,
+    pub model: String,
+    pub reasoning_level: Option<ReasoningLevel>,
+}
+
+/// Factory function to create LLM translation provider
+pub fn create_llm_translation_provider(
+    def: &CustomTranslationProviderDef,
+    http_client: Arc<dyn HttpClient>,
+    api_key: String,
+) -> Arc<dyn TranslationProvider> {
+    let llm_client: Arc<dyn LLMClient> = match def.protocol {
+        LLMProtocol::OpenAI => Arc::new(OpenAILLMClient::new(
+            http_client,
+            def.endpoint.clone(),
+            def.model.clone(),
+            api_key,
+        )),
+        LLMProtocol::Anthropic => Arc::new(AnthropicLLMClient::new(
+            http_client,
+            def.endpoint.clone(),
+            def.model.clone(),
+            api_key,
+        )),
+        LLMProtocol::Gemini => Arc::new(GeminiLLMClient::new(
+            http_client,
+            def.endpoint.clone(),
+            def.model.clone(),
+            api_key,
+        )),
+    };
+
+    Arc::new(LLMTranslationProvider::new(
+        llm_client,
+        def.id.clone(),
+        def.name.clone(),
+        def.reasoning_level,
+    ))
+}
 
 pub struct AppState {
     // Phase 1: Infrastructure
@@ -76,13 +127,13 @@ impl AppState {
         });
 
         // Phase 2: Translation
-        let mut translation_coordinator = TranslationCoordinator::new(config_file.clone());
+        let translation_coordinator = TranslationCoordinator::new(config_file.clone());
 
         // Register Google Translate (no credentials needed)
         let google_provider = GoogleTranslateProviderV2::new(http_client.clone());
         translation_coordinator.register(Arc::new(google_provider)).ok();
 
-        // Register DeepL (load credentials from keychain)
+        // Register DeepL (load credentials from keychain using provider ID)
         let mut deepl_provider = DeepLProvider::new(http_client.clone());
         if let Ok(api_key) = keychain.load_provider_credential("deepl") {
             deepl_provider.set_api_key(api_key);
@@ -90,13 +141,38 @@ impl AppState {
         translation_coordinator.register(Arc::new(deepl_provider)).ok();
 
         // Register Baidu (load credentials from keychain)
+        // Try new multi-field format first, fallback to legacy keys for backward compatibility
         let mut baidu_provider = BaiduTranslateProvider::new(http_client.clone());
-        if let Ok(app_id) = keychain.load_provider_credential("baidu_app_id") {
-            if let Ok(secret_key) = keychain.load_provider_credential("baidu_secret_key") {
-                baidu_provider.configure(app_id, secret_key);
+
+        // Try new format: provider:baidu-translate:credential:{app_id,secret_key}
+        let credentials_result = keychain.load_provider_credentials(
+            "baidu-translate",
+            &["app_id".to_string(), "secret_key".to_string()],
+        );
+
+        if let Ok(creds) = credentials_result {
+            let _ = baidu_provider.configure_from_map(&creds);
+        } else {
+            // Fallback to legacy keys: provider:baidu_app_id:api_key, provider:baidu_secret_key:api_key
+            if let Ok(app_id) = keychain.load_provider_credential("baidu_app_id") {
+                if let Ok(secret_key) = keychain.load_provider_credential("baidu_secret_key") {
+                    baidu_provider.configure(app_id, secret_key);
+                }
             }
         }
+
         translation_coordinator.register(Arc::new(baidu_provider)).ok();
+
+        // Load and register custom LLM providers
+        if let Ok(custom_defs) = config_file.load::<Vec<CustomTranslationProviderDef>>("custom_translation_providers") {
+            for def in custom_defs {
+                // Load API key from keychain
+                if let Ok(api_key) = keychain.load_provider_credential(&def.id) {
+                    let provider = create_llm_translation_provider(&def, http_client.clone(), api_key);
+                    translation_coordinator.register(provider).ok();
+                }
+            }
+        }
 
         // Restore active providers from config
         translation_coordinator.restore_from_config().ok();
@@ -114,12 +190,26 @@ impl AppState {
         ocr_coordinator.register(Arc::new(tesseract_provider)).ok();
 
         // Register Baidu OCR (load credentials from keychain)
+        // Try new multi-field format first, fallback to legacy keys for backward compatibility
         let mut baidu_ocr_provider = BaiduOcrProvider::new(http_client.clone());
-        if let Ok(api_key) = keychain.load_provider_credential("baidu_ocr_api_key") {
-            if let Ok(secret_key) = keychain.load_provider_credential("baidu_ocr_secret_key") {
-                baidu_ocr_provider.configure(api_key, secret_key);
+
+        // Try new format: provider:baidu-ocr:credential:{api_key,secret_key}
+        let credentials_result = keychain.load_provider_credentials(
+            "baidu-ocr",
+            &["api_key".to_string(), "secret_key".to_string()],
+        );
+
+        if let Ok(creds) = credentials_result {
+            let _ = baidu_ocr_provider.configure_from_map(&creds);
+        } else {
+            // Fallback to legacy keys: provider:baidu_ocr_api_key:api_key, provider:baidu_ocr_secret_key:api_key
+            if let Ok(api_key) = keychain.load_provider_credential("baidu_ocr_api_key") {
+                if let Ok(secret_key) = keychain.load_provider_credential("baidu_ocr_secret_key") {
+                    baidu_ocr_provider.configure(api_key, secret_key);
+                }
             }
         }
+
         ocr_coordinator.register(Arc::new(baidu_ocr_provider)).ok();
 
         // Restore active OCR provider from config
@@ -184,7 +274,12 @@ pub fn run() {
       commands::list_translation_providers,
       commands::activate_translation_provider,
       commands::deactivate_translation_provider,
+      commands::reorder_active_translation_providers,
       commands::configure_translation_provider,
+      commands::get_provider_credential_schema,
+      commands::configure_translation_provider_credentials,
+      commands::add_custom_translation_provider,
+      commands::remove_custom_translation_provider,
       commands::recognize_image,
       commands::list_ocr_providers,
       commands::activate_ocr_provider,

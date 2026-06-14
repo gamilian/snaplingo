@@ -13,6 +13,12 @@ pub enum AppError {
     NoActiveProvider,
     System(String),
     Other(String),
+    // LLM 相关错误
+    Unauthorized(String),
+    RateLimited(String),
+    InvalidResponse(String),
+    Network(String),
+    UpstreamStatus(u16, String),
 }
 
 impl fmt::Display for AppError {
@@ -29,6 +35,11 @@ impl fmt::Display for AppError {
             AppError::NoActiveProvider => write!(f, "No active provider configured"),
             AppError::System(msg) => write!(f, "System error: {}", msg),
             AppError::Other(msg) => write!(f, "{}", msg),
+            AppError::Unauthorized(msg) => write!(f, "Unauthorized: {}", msg),
+            AppError::RateLimited(msg) => write!(f, "Rate limited: {}", msg),
+            AppError::InvalidResponse(msg) => write!(f, "Invalid response: {}", msg),
+            AppError::Network(msg) => write!(f, "Network error: {}", msg),
+            AppError::UpstreamStatus(status, body) => write!(f, "Upstream status {}: {}", status, body),
         }
     }
 }
@@ -85,6 +96,12 @@ impl From<String> for AppError {
 impl From<&str> for AppError {
     fn from(msg: &str) -> Self {
         AppError::Other(msg.to_string())
+    }
+}
+
+impl From<anyhow::Error> for AppError {
+    fn from(err: anyhow::Error) -> Self {
+        AppError::Other(err.to_string())
     }
 }
 

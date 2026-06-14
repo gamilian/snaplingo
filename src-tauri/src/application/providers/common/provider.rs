@@ -1,3 +1,28 @@
+use serde::{Deserialize, Serialize};
+
+/// Describes a single credential field required by a provider.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CredentialField {
+    /// Internal field name (e.g., "api_key", "app_id", "secret_key")
+    pub name: String,
+
+    /// Human-readable label for the UI (e.g., "API Key", "App ID")
+    pub label: String,
+
+    /// Whether this field contains sensitive data (should be masked in UI)
+    pub secret: bool,
+}
+
+impl CredentialField {
+    pub fn new(name: impl Into<String>, label: impl Into<String>, secret: bool) -> Self {
+        Self {
+            name: name.into(),
+            label: label.into(),
+            secret,
+        }
+    }
+}
+
 /// Base trait for all provider types (OCR, Translation, TTS).
 ///
 /// This trait defines the common interface that all providers must implement,
@@ -25,4 +50,16 @@ pub trait Provider: Send + Sync {
     ///
     /// This helps the UI determine whether to prompt for credentials.
     fn requires_api_key(&self) -> bool;
+
+    /// Returns the credential fields required by this provider.
+    ///
+    /// Default implementation returns a single "api_key" field for backward compatibility.
+    /// Providers with multiple credentials (e.g., Baidu with app_id + secret_key) should override this.
+    fn credential_fields(&self) -> Vec<CredentialField> {
+        if self.requires_api_key() {
+            vec![CredentialField::new("api_key", "API Key", true)]
+        } else {
+            vec![]
+        }
+    }
 }

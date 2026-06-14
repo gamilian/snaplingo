@@ -1,32 +1,77 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { Provider } from '../../../stores/providerStore';
+
+interface CredentialField {
+  name: string;
+  label: string;
+  secret: boolean;
+}
 
 interface ProviderConfigDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (config: any) => void;
+  onSave: (credentials: Record<string, string>) => void;
   provider: Provider | null;
 }
 
 export function ProviderConfigDialog({ isOpen, onClose, onSave, provider }: ProviderConfigDialogProps) {
-  const [apiKey, setApiKey] = useState(provider?.config?.apiKey || '');
-  const [endpoint, setEndpoint] = useState(provider?.config?.endpoint || '');
-  const [model, setModel] = useState(provider?.config?.model || '');
+  const [fields, setFields] = useState<CredentialField[]>([]);
+  const [credentials, setCredentials] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !provider) return;
+
+    // Load credential schema for this provider
+    setLoading(true);
+    invoke<CredentialField[]>('get_provider_credential_schema', {
+      providerId: provider.id,
+    })
+      .then((schema) => {
+        setFields(schema);
+
+        // Initialize empty credentials
+        const initialCreds: Record<string, string> = {};
+        schema.forEach((field) => {
+          initialCreds[field.name] = '';
+        });
+        setCredentials(initialCreds);
+      })
+      .catch((error) => {
+        console.error('Failed to load credential schema:', error);
+        alert(`加载凭证配置失败: ${error}`);
+        onClose();
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [isOpen, provider]);
 
   const handleSave = () => {
-    onSave({
-      apiKey: apiKey.trim(),
-      endpoint: endpoint.trim(),
-      model: model.trim(),
-    });
-    onClose();
+    // Validate all fields are filled
+    for (const field of fields) {
+      if (!credentials[field.name]?.trim()) {
+        alert(`请填写：${field.label}`);
+        return;
+      }
+    }
+
+    onSave(credentials);
+    handleClose();
   };
 
   const handleClose = () => {
-    setApiKey('');
-    setEndpoint('');
-    setModel('');
+    setFields([]);
+    setCredentials({});
     onClose();
+  };
+
+  const updateCredential = (fieldName: string, value: string) => {
+    setCredentials((prev) => ({
+      ...prev,
+      [fieldName]: value,
+    }));
   };
 
   if (!isOpen || !provider) return null;
@@ -43,81 +88,68 @@ export function ProviderConfigDialog({ isOpen, onClose, onSave, provider }: Prov
         </div>
 
         <div className="p-6 space-y-6">
-          {/* API Key */}
-          {provider.requiresApiKey && (
-            <div>
-              <label className="block font-medium text-gray-700 mb-2">
-                API Key <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="请输入 API Key"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <p className="text-xs text-gray-500 mt-2">
-                {provider.id === 'deepl' && '获取地址：https://www.deepl.com/pro-api'}
-                {provider.id === 'baidu-ocr' && '获取地址：https://cloud.baidu.com/product/ocr'}
-                {provider.id === 'baidu-translate' && '获取地址：https://fanyi-api.baidu.com/'}
-              </p>
-            </div>
-          )}
+          {loading ? (
+            <div className="text-center py-8 text-gray-500">加载中...</div>
+          ) : (
+            <>
+              {fields.map((field) => (
+                <div key={field.name}>
+                  <label className="block font-medium text-gray-700 mb-2">
+                    {field.label} <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type={field.secret ? 'password' : 'text'}
+                    value={credentials[field.name] || ''}
+                    onChange={(e) => updateCredential(field.name, e.target.value)}
+                    placeholder={`请输入 ${field.label}`}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              ))}
 
-          {/* API Endpoint（可选） */}
-          <div>
-            <label className="block font-medium text-gray-700 mb-2">
-              API Endpoint <span className="text-gray-400 text-sm">(可选)</span>
-            </label>
-            <input
-              type="text"
-              value={endpoint}
-              onChange={(e) => setEndpoint(e.target.value)}
-              placeholder="自定义 API 端点（留空使用默认）"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="text-xs text-gray-500 mt-2">仅在使用自定义端点时填写</p>
-          </div>
+              {/* Baidu 特殊提示 */}
+              {provider.id === 'baidu-translate' && (
+                <p className="text-xs text-gray-500">
+                  获取地址：<a href="https://fanyi-api.baidu.com/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">https://fanyi-api.baidu.com/</a>
+                </p>
+              )}
 
-          {/* Model（可选） */}
-          {provider.type === 'translation' && (
-            <div>
-              <label className="block font-medium text-gray-700 mb-2">
-                模型 <span className="text-gray-400 text-sm">(可选)</span>
-              </label>
-              <input
-                type="text"
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                placeholder="指定模型名称（留空使用默认）"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <p className="text-xs text-gray-500 mt-2">例如：gpt-4, claude-3-opus 等</p>
-            </div>
-          )}
+              {provider.id === 'baidu-ocr' && (
+                <p className="text-xs text-gray-500">
+                  获取地址：<a href="https://cloud.baidu.com/product/ocr" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">https://cloud.baidu.com/product/ocr</a>
+                </p>
+              )}
 
-          {/* 提示信息 */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-start space-x-3">
-              <svg
-                className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <div className="text-sm text-blue-800">
-                <p className="font-medium mb-1">安全提示</p>
-                <p>API Key 将加密保存在本地，不会上传到任何服务器</p>
+              {provider.id === 'deepl' && (
+                <p className="text-xs text-gray-500">
+                  获取地址：<a href="https://www.deepl.com/pro-api" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">https://www.deepl.com/pro-api</a>
+                </p>
+              )}
+
+              {/* 提示信息 */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start space-x-3">
+                  <svg
+                    className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  <div className="text-sm text-blue-800">
+                    <p className="font-medium mb-1">安全提示</p>
+                    <p>凭证将加密保存在系统密钥链中，不会上传到任何服务器</p>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            </>
+          )}
         </div>
 
         <div className="p-6 border-t border-gray-200 flex items-center justify-between">
@@ -129,7 +161,7 @@ export function ProviderConfigDialog({ isOpen, onClose, onSave, provider }: Prov
           </button>
           <button
             onClick={handleSave}
-            disabled={provider.requiresApiKey && !apiKey.trim()}
+            disabled={loading || fields.some((f) => !credentials[f.name]?.trim())}
             className="px-6 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
             保存配置

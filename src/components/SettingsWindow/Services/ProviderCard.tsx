@@ -6,9 +6,10 @@ interface ProviderCardProps {
   onDeactivate?: () => void;
   onConfigure?: () => void;
   onTest?: () => void;
+  onRemove?: () => void;
 }
 
-export function ProviderCard({ provider, onActivate, onDeactivate, onConfigure, onTest }: ProviderCardProps) {
+export function ProviderCard({ provider, onActivate, onDeactivate, onConfigure, onTest, onRemove }: ProviderCardProps) {
   const getStatusBadge = () => {
     switch (provider.status) {
       case 'active':
@@ -88,6 +89,15 @@ export function ProviderCard({ provider, onActivate, onDeactivate, onConfigure, 
                 className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 测试
+              </button>
+            )}
+
+            {!provider.isBuiltin && onRemove && (
+              <button
+                onClick={onRemove}
+                className="px-3 py-1.5 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+              >
+                删除
               </button>
             )}
           </div>

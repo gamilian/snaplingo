@@ -1,4 +1,4 @@
-use crate::application::providers::common::Provider;
+use crate::application::providers::common::{Provider, CredentialField};
 use crate::application::providers::translation::TranslationProvider;
 use crate::domain::translation::{TranslationRequest, TranslationResult};
 use crate::infrastructure::http::HttpClient;
@@ -34,6 +34,22 @@ impl BaiduTranslateProvider {
         self.secret_key = Some(secret_key);
     }
 
+    /// Configures the provider from a HashMap of credentials.
+    /// Expected keys: "app_id", "secret_key"
+    pub fn configure_from_map(&mut self, credentials: &HashMap<String, String>) -> crate::Result<()> {
+        let app_id = credentials
+            .get("app_id")
+            .ok_or_else(|| crate::AppError::Other("Missing app_id".to_string()))?
+            .clone();
+        let secret_key = credentials
+            .get("secret_key")
+            .ok_or_else(|| crate::AppError::Other("Missing secret_key".to_string()))?
+            .clone();
+
+        self.configure(app_id, secret_key);
+        Ok(())
+    }
+
     /// Generates MD5 signature for Baidu API authentication.
     /// Signature formula: MD5(appid + query + salt + secret)
     fn generate_signature(&self, query: &str, salt: &str) -> Result<String> {
@@ -63,6 +79,13 @@ impl Provider for BaiduTranslateProvider {
 
     fn requires_api_key(&self) -> bool {
         true
+    }
+
+    fn credential_fields(&self) -> Vec<CredentialField> {
+        vec![
+            CredentialField::new("app_id", "App ID", false),
+            CredentialField::new("secret_key", "Secret Key", true),
+        ]
     }
 }
 

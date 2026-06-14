@@ -319,4 +319,51 @@ mod tests {
             _ => panic!("Expected TranslationCompleted event"),
         }
     }
+
+    #[tokio::test]
+    async fn test_unregister_provider() {
+        // Arrange
+        let config = Arc::new(ConfigFile::new_temp());
+        let coordinator = TranslationCoordinator::new(config);
+
+        coordinator
+            .register(Arc::new(MockTranslationProvider::new("google", "Google")))
+            .unwrap();
+
+        // Act
+        coordinator.unregister("google").unwrap();
+
+        // Assert
+        assert!(coordinator.get("google").is_none());
+        assert_eq!(coordinator.list_all().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_unregister_active_provider() {
+        // Arrange
+        let config = Arc::new(ConfigFile::new_temp());
+        let coordinator = TranslationCoordinator::new(config);
+
+        coordinator
+            .register(Arc::new(MockTranslationProvider::new("google", "Google")))
+            .unwrap();
+        coordinator.activate("google").unwrap();
+
+        // Act
+        coordinator.unregister("google").unwrap();
+
+        // Assert - provider removed and deactivated
+        assert!(coordinator.get("google").is_none());
+        assert_eq!(coordinator.get_active().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_unregister_nonexistent_provider_fails() {
+        // Arrange
+        let config = Arc::new(ConfigFile::new_temp());
+        let coordinator = TranslationCoordinator::new(config);
+
+        // Act & Assert
+        assert!(coordinator.unregister("nonexistent").is_err());
+    }
 }

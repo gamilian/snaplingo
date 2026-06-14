@@ -1,4 +1,4 @@
-use crate::application::providers::common::Provider;
+use crate::application::providers::common::{Provider, CredentialField};
 use crate::application::providers::ocr::OcrProvider;
 use crate::domain::ocr::{OcrRequest, OcrResult};
 use crate::infrastructure::http::HttpClient;
@@ -34,6 +34,22 @@ impl BaiduOcrProvider {
     pub fn configure(&mut self, api_key: String, secret_key: String) {
         self.api_key = Some(api_key);
         self.secret_key = Some(secret_key);
+    }
+
+    /// Configures the provider from a HashMap of credentials.
+    /// Expected keys: "api_key", "secret_key"
+    pub fn configure_from_map(&mut self, credentials: &std::collections::HashMap<String, String>) -> crate::Result<()> {
+        let api_key = credentials
+            .get("api_key")
+            .ok_or_else(|| crate::AppError::Other("Missing api_key".to_string()))?
+            .clone();
+        let secret_key = credentials
+            .get("secret_key")
+            .ok_or_else(|| crate::AppError::Other("Missing secret_key".to_string()))?
+            .clone();
+
+        self.configure(api_key, secret_key);
+        Ok(())
     }
 
     /// Gets an access token from Baidu OAuth API.
@@ -89,6 +105,13 @@ impl Provider for BaiduOcrProvider {
 
     fn requires_api_key(&self) -> bool {
         true
+    }
+
+    fn credential_fields(&self) -> Vec<CredentialField> {
+        vec![
+            CredentialField::new("api_key", "API Key", false),
+            CredentialField::new("secret_key", "Secret Key", true),
+        ]
     }
 }
 

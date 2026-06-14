@@ -19,9 +19,9 @@ export function OcrProvidersPage() {
     setConfiguringProvider(id);
   };
 
-  const handleSaveConfig = (config: any) => {
+  const handleSaveConfig = async (config: any) => {
     if (configuringProvider) {
-      updateProviderConfig(configuringProvider, config);
+      await updateProviderConfig(configuringProvider, configuringProvider, config);
       // 配置完成后自动激活
       activateProvider(configuringProvider);
     }
