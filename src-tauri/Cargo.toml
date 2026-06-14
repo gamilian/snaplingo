@@ -63,6 +63,7 @@ chrono = { version = "0.4", features = ["serde"] }
 
 # Global hotkeys
 global-hotkey = "0.5"
+parking_lot = { version = "0.12.5", features = ["send_guard"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-graphics = "0.23"

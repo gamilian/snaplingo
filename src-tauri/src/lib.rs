@@ -120,25 +120,22 @@ impl AppState {
         let history_db = Arc::new(HistoryDatabase::new(history_db_path).expect("Failed to initialize history database"));
         let history_service = Arc::new(HistoryService::new(history_db));
 
-        // Subscribe history service to events
-        let history_service_subscriber = history_service.clone() as Arc<dyn EventSubscriber>;
-        tokio::runtime::Handle::current().block_on(async {
-            event_bus.subscribe(history_service_subscriber).await;
-        });
+        // Subscribe history service to events (will be done in setup hook)
+        // Note: Cannot block_on here as Tokio runtime may not be ready yet
 
         // Phase 2: Translation
         let translation_coordinator = TranslationCoordinator::new(config_file.clone());
 
         // Register Google Translate (no credentials needed)
         let google_provider = GoogleTranslateProviderV2::new(http_client.clone());
-        translation_coordinator.register(Arc::new(google_provider)).ok();
+        translation_coordinator.register(google_provider).ok();
 
         // Register DeepL (load credentials from keychain using provider ID)
         let mut deepl_provider = DeepLProvider::new(http_client.clone());
         if let Ok(api_key) = keychain.load_provider_credential("deepl") {
             deepl_provider.set_api_key(api_key);
         }
-        translation_coordinator.register(Arc::new(deepl_provider)).ok();
+        translation_coordinator.register(deepl_provider).ok();
 
         // Register Baidu (load credentials from keychain)
         // Try new multi-field format first, fallback to legacy keys for backward compatibility
@@ -161,14 +158,40 @@ impl AppState {
             }
         }
 
-        translation_coordinator.register(Arc::new(baidu_provider)).ok();
+        translation_coordinator.register(baidu_provider).ok();
 
         // Load and register custom LLM providers
         if let Ok(custom_defs) = config_file.load::<Vec<CustomTranslationProviderDef>>("custom_translation_providers") {
             for def in custom_defs {
                 // Load API key from keychain
                 if let Ok(api_key) = keychain.load_provider_credential(&def.id) {
-                    let provider = create_llm_translation_provider(&def, http_client.clone(), api_key);
+                    let llm_client: Arc<dyn LLMClient> = match def.protocol {
+                        LLMProtocol::OpenAI => Arc::new(OpenAILLMClient::new(
+                            http_client.clone(),
+                            def.endpoint.clone(),
+                            def.model.clone(),
+                            api_key,
+                        )),
+                        LLMProtocol::Anthropic => Arc::new(AnthropicLLMClient::new(
+                            http_client.clone(),
+                            def.endpoint.clone(),
+                            def.model.clone(),
+                            api_key,
+                        )),
+                        LLMProtocol::Gemini => Arc::new(GeminiLLMClient::new(
+                            http_client.clone(),
+                            def.endpoint.clone(),
+                            def.model.clone(),
+                            api_key,
+                        )),
+                    };
+
+                    let provider = LLMTranslationProvider::new(
+                        llm_client,
+                        def.id.clone(),
+                        def.name.clone(),
+                        def.reasoning_level,
+                    );
                     translation_coordinator.register(provider).ok();
                 }
             }
@@ -261,6 +284,14 @@ pub fn run() {
       }
 
       let app_state = AppState::new(config_path, app.handle().clone());
+
+      // Subscribe history service to event bus (must be done after Tokio runtime is ready)
+      let history_service_subscriber = app_state.history_service.clone() as Arc<dyn EventSubscriber>;
+      let event_bus = app_state.event_bus.clone();
+      tauri::async_runtime::spawn(async move {
+        event_bus.subscribe(history_service_subscriber).await;
+      });
+
       app.manage(app_state);
 
       // TODO: Register global hotkeys

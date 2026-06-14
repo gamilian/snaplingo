@@ -1,7 +1,8 @@
 use tauri::State;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
-use crate::{CustomTranslationProviderDef, create_llm_translation_provider};
+use std::sync::Arc;
+use crate::CustomTranslationProviderDef;
 use crate::application::providers::common::CredentialField;
 
 #[derive(Serialize, Deserialize)]
@@ -25,7 +26,7 @@ pub async fn list_translation_providers(
 ) -> Result<Vec<ProviderInfo>, String> {
     let all_providers = state.translation_coordinator.list_all();
     let active = state.translation_coordinator.get_active();
-    let active_ids: Vec<_> = active.iter().map(|p| p.id().to_string()).collect();
+    let active_ids: Vec<_> = active.iter().map(|p| p.read().id().to_string()).collect();
 
     // Load custom provider definitions for extra metadata
     let custom_defs = state.config_file
@@ -33,7 +34,8 @@ pub async fn list_translation_providers(
         .unwrap_or_default();
 
     let info: Vec<_> = all_providers.iter().map(|p| {
-        let id = p.id().to_string();
+        let provider = p.read();
+        let id = provider.id().to_string();
         let is_builtin = matches!(id.as_str(), "google-translate" | "deepl" | "baidu-translate");
 
         // Find matching custom def
@@ -41,9 +43,9 @@ pub async fn list_translation_providers(
 
         ProviderInfo {
             id: id.clone(),
-            name: p.name().to_string(),
-            is_configured: p.is_configured(),
-            requires_api_key: p.requires_api_key(),
+            name: provider.name().to_string(),
+            is_configured: provider.is_configured(),
+            requires_api_key: provider.requires_api_key(),
             is_active: active_ids.contains(&id),
             is_builtin,
             protocol: custom_def.map(|def| format!("{:?}", def.protocol).to_lowercase()),
@@ -113,12 +115,13 @@ pub async fn get_provider_credential_schema(
     state: State<'_, crate::AppState>,
 ) -> Result<Vec<CredentialField>, String> {
     let providers = state.translation_coordinator.list_all();
-    let provider = providers
+    let provider_lock = providers
         .iter()
-        .find(|p| p.id() == provider_id)
+        .find(|p| p.read().id() == provider_id)
         .ok_or_else(|| format!("Provider not found: {}", provider_id))?;
 
-    Ok(provider.credential_fields())
+    let fields = provider_lock.read().credential_fields();
+    Ok(fields)
 }
 
 #[tauri::command]
@@ -129,13 +132,13 @@ pub async fn configure_translation_provider_credentials(
 ) -> Result<(), String> {
     // Validate provider exists
     let providers = state.translation_coordinator.list_all();
-    let provider = providers
+    let provider_lock = providers
         .iter()
-        .find(|p| p.id() == provider_id)
+        .find(|p| p.read().id() == provider_id)
         .ok_or_else(|| format!("Provider not found: {}", provider_id))?;
 
     // Get expected fields
-    let expected_fields = provider.credential_fields();
+    let expected_fields = provider_lock.read().credential_fields();
 
     // Validate all required fields are present
     for field in &expected_fields {
@@ -152,8 +155,10 @@ pub async fn configure_translation_provider_credentials(
         .save_provider_credentials(&provider_id, &credentials)
         .map_err(|e| e.to_string())?;
 
-    // Note: Providers are currently recreated on startup with credentials from keychain.
-    // Runtime reconfiguration would require providers to support interior mutability.
+    // Reconfigure provider at runtime (hot-reload)
+    state.translation_coordinator
+        .reconfigure_provider(&provider_id, &credentials)
+        .map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -248,7 +253,34 @@ pub async fn add_custom_translation_provider(
         })?;
 
     // Step 5: Create and register provider at runtime
-    let provider = create_llm_translation_provider(&def, state.http_client.clone(), request.api_key.clone());
+    let llm_client: Arc<dyn crate::infrastructure::llm::LLMClient> = match protocol {
+        LLMProtocol::OpenAI => Arc::new(crate::infrastructure::llm::OpenAILLMClient::new(
+            state.http_client.clone(),
+            def.endpoint.clone(),
+            def.model.clone(),
+            request.api_key.clone(),
+        )),
+        LLMProtocol::Anthropic => Arc::new(crate::infrastructure::llm::AnthropicLLMClient::new(
+            state.http_client.clone(),
+            def.endpoint.clone(),
+            def.model.clone(),
+            request.api_key.clone(),
+        )),
+        LLMProtocol::Gemini => Arc::new(crate::infrastructure::llm::GeminiLLMClient::new(
+            state.http_client.clone(),
+            def.endpoint.clone(),
+            def.model.clone(),
+            request.api_key.clone(),
+        )),
+    };
+
+    let provider = crate::application::providers::translation::LLMTranslationProvider::new(
+        llm_client,
+        def.id.clone(),
+        def.name.clone(),
+        def.reasoning_level,
+    );
+
     state.translation_coordinator
         .register(provider)
         .map_err(|e| {

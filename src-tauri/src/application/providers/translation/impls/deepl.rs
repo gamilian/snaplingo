@@ -48,6 +48,15 @@ impl Provider for DeepLProvider {
     fn requires_api_key(&self) -> bool {
         true
     }
+
+    fn reconfigure_credentials(&mut self, credentials: &std::collections::HashMap<String, String>) -> crate::Result<()> {
+        let api_key = credentials
+            .get("api_key")
+            .ok_or_else(|| crate::AppError::Other("Missing api_key".to_string()))?
+            .clone();
+        self.api_key = Some(api_key);
+        Ok(())
+    }
 }
 
 #[derive(Serialize)]

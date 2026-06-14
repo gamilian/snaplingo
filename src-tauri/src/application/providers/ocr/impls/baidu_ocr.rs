@@ -113,6 +113,21 @@ impl Provider for BaiduOcrProvider {
             CredentialField::new("secret_key", "Secret Key", true),
         ]
     }
+
+    fn reconfigure_credentials(&mut self, credentials: &std::collections::HashMap<String, String>) -> crate::Result<()> {
+        let api_key = credentials
+            .get("api_key")
+            .ok_or_else(|| crate::AppError::Other("Missing api_key".to_string()))?
+            .clone();
+        let secret_key = credentials
+            .get("secret_key")
+            .ok_or_else(|| crate::AppError::Other("Missing secret_key".to_string()))?
+            .clone();
+
+        self.api_key = Some(api_key);
+        self.secret_key = Some(secret_key);
+        Ok(())
+    }
 }
 
 #[derive(Deserialize)]

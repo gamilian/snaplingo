@@ -92,6 +92,14 @@ impl EventSubscriber for HistoryService {
                     eprintln!("[HistoryService] Failed to record OCR: {}", e);
                 }
             }
+            DomainEvent::ProviderConfigurationFailed {
+                provider_id,
+                error_message,
+                ..
+            } => {
+                // Log the error but don't persist to history database
+                eprintln!("[HistoryService] Provider configuration failed: {} - {}", provider_id, error_message);
+            }
         }
     }
 

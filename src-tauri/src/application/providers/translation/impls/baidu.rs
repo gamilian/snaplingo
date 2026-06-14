@@ -87,6 +87,10 @@ impl Provider for BaiduTranslateProvider {
             CredentialField::new("secret_key", "Secret Key", true),
         ]
     }
+
+    fn reconfigure_credentials(&mut self, credentials: &HashMap<String, String>) -> crate::Result<()> {
+        self.configure_from_map(credentials)
+    }
 }
 
 #[derive(Deserialize)]

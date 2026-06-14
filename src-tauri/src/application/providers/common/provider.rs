@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Describes a single credential field required by a provider.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -61,5 +62,29 @@ pub trait Provider: Send + Sync {
         } else {
             vec![]
         }
+    }
+
+    /// Reconfigures the provider's credentials at runtime.
+    ///
+    /// This allows hot-reloading of credentials without restarting the application.
+    /// The credentials map should contain all fields returned by `credential_fields()`.
+    ///
+    /// # Arguments
+    ///
+    /// * `credentials` - HashMap mapping field names to their values
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(())` if reconfiguration succeeded
+    /// * `Err` if validation failed or required fields are missing
+    ///
+    /// # Default Implementation
+    ///
+    /// The default implementation returns an error. Providers that support runtime
+    /// reconfiguration should override this method.
+    fn reconfigure_credentials(&mut self, _credentials: &HashMap<String, String>) -> crate::Result<()> {
+        Err(crate::AppError::Other(
+            format!("Provider {} does not support runtime credential reconfiguration", self.id())
+        ))
     }
 }

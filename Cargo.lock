@@ -5946,6 +5946,7 @@ dependencies = [
  "log",
  "md5",
  "mockito",
+ "parking_lot",
  "reqwest 0.11.27",
  "rusqlite",
  "serde",

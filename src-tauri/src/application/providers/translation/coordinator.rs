@@ -5,7 +5,8 @@ use crate::infrastructure::storage::ConfigFile;
 use crate::infrastructure::events::EventBus;
 use crate::Result;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex};
+use parking_lot::RwLock;
 use std::time::Instant;
 use chrono::Utc;
 
@@ -19,8 +20,8 @@ use chrono::Utc;
 /// access while maintaining thread-safety. Providers use RwLock for dynamic
 /// registration/removal.
 pub struct TranslationCoordinator {
-    /// Map of provider ID to provider instance (wrapped for dynamic registration)
-    providers: Arc<RwLock<HashMap<String, Arc<dyn TranslationProvider>>>>,
+    /// Map of provider ID to provider instance (wrapped for dynamic registration and reconfiguration)
+    providers: Arc<RwLock<HashMap<String, Arc<RwLock<dyn TranslationProvider>>>>>,
     /// List of active provider IDs (in order of activation)
     /// Wrapped in Arc<Mutex<>> for interior mutability
     active: Arc<Mutex<Vec<String>>>,
@@ -51,18 +52,18 @@ impl TranslationCoordinator {
     ///
     /// # Arguments
     ///
-    /// * `provider` - The provider to register
+    /// * `provider` - The provider to register (will be wrapped in Arc<RwLock<>>)
     ///
     /// # Returns
     ///
     /// * `Result<()>` - Ok if successful, Err if a provider with the same ID already exists
-    pub fn register(&self, provider: Arc<dyn TranslationProvider>) -> Result<()> {
+    pub fn register<T: TranslationProvider + 'static>(&self, provider: T) -> Result<()> {
         let id = provider.id().to_string();
-        let mut providers = self.providers.write().unwrap();
+        let mut providers = self.providers.write();
         if providers.contains_key(&id) {
             return Err(format!("Provider already registered: {}", id).into());
         }
-        providers.insert(id, provider);
+        providers.insert(id, Arc::new(RwLock::new(provider)));
         Ok(())
     }
 
@@ -89,7 +90,7 @@ impl TranslationCoordinator {
         drop(active);
 
         // Remove from providers
-        let mut providers = self.providers.write().unwrap();
+        let mut providers = self.providers.write();
         if !providers.contains_key(id) {
             return Err(format!("Provider not found: {}", id).into());
         }
@@ -110,7 +111,7 @@ impl TranslationCoordinator {
     ///
     /// * `Result<()>` - Ok if successful, Err if the provider doesn't exist or persistence fails
     pub fn activate(&self, id: &str) -> Result<()> {
-        let providers = self.providers.read().unwrap();
+        let providers = self.providers.read();
         if !providers.contains_key(id) {
             return Err(format!("Provider not found: {}", id).into());
         }
@@ -139,7 +140,7 @@ impl TranslationCoordinator {
     ///
     /// * `Result<()>` - Ok if successful, Err if the provider doesn't exist or persistence fails
     pub fn deactivate(&self, id: &str) -> Result<()> {
-        let providers = self.providers.read().unwrap();
+        let providers = self.providers.read();
         if !providers.contains_key(id) {
             return Err(format!("Provider not found: {}", id).into());
         }
@@ -197,10 +198,10 @@ impl TranslationCoordinator {
     ///
     /// # Returns
     ///
-    /// * `Vec<Arc<dyn TranslationProvider>>` - List of active providers in activation order
-    pub fn get_active(&self) -> Vec<Arc<dyn TranslationProvider>> {
+    /// * `Vec<Arc<RwLock<dyn TranslationProvider>>>` - List of active providers in activation order
+    pub fn get_active(&self) -> Vec<Arc<RwLock<dyn TranslationProvider>>> {
         let active = self.active.lock().unwrap();
-        let providers = self.providers.read().unwrap();
+        let providers = self.providers.read();
         active
             .iter()
             .filter_map(|id| providers.get(id).cloned())
@@ -211,9 +212,9 @@ impl TranslationCoordinator {
     ///
     /// # Returns
     ///
-    /// * `Vec<Arc<dyn TranslationProvider>>` - List of all registered providers
-    pub fn list_all(&self) -> Vec<Arc<dyn TranslationProvider>> {
-        let providers = self.providers.read().unwrap();
+    /// * `Vec<Arc<RwLock<dyn TranslationProvider>>>` - List of all registered providers
+    pub fn list_all(&self) -> Vec<Arc<RwLock<dyn TranslationProvider>>> {
+        let providers = self.providers.read();
         providers.values().cloned().collect()
     }
 
@@ -225,9 +226,9 @@ impl TranslationCoordinator {
     ///
     /// # Returns
     ///
-    /// * `Option<Arc<dyn TranslationProvider>>` - The provider if found, None otherwise
-    pub fn get(&self, id: &str) -> Option<Arc<dyn TranslationProvider>> {
-        let providers = self.providers.read().unwrap();
+    /// * `Option<Arc<RwLock<dyn TranslationProvider>>>` - The provider if found, None otherwise
+    pub fn get(&self, id: &str) -> Option<Arc<RwLock<dyn TranslationProvider>>> {
+        let providers = self.providers.read();
         providers.get(id).cloned()
     }
 
@@ -237,7 +238,7 @@ impl TranslationCoordinator {
     pub fn restore_from_config(&self) -> Result<()> {
         if let Ok(active_ids) = self.config.load::<Vec<String>>("active_translation_providers") {
             let mut active = self.active.lock().unwrap();
-            let providers = self.providers.read().unwrap();
+            let providers = self.providers.read();
             active.clear();
             for id in active_ids {
                 if providers.contains_key(&id) {
@@ -280,11 +281,12 @@ impl TranslationCoordinator {
 
         // Spawn concurrent translation tasks
         let mut tasks = Vec::new();
-        for provider in &active_providers {
+        for provider_lock in &active_providers {
             let request = request.clone();
-            let provider = provider.clone();
+            let provider_lock = provider_lock.clone();
 
             let task = tokio::spawn(async move {
+                let provider = provider_lock.read();
                 provider.translate(&request).await
             });
 
@@ -313,7 +315,7 @@ impl TranslationCoordinator {
         if let Some(event_bus) = &self.event_bus {
             let providers_used: Vec<String> = active_providers
                 .iter()
-                .map(|p| p.id().to_string())
+                .map(|p| p.read().id().to_string())
                 .collect();
 
             event_bus.publish(DomainEvent::TranslationCompleted {
@@ -326,5 +328,44 @@ impl TranslationCoordinator {
         }
 
         Ok(results)
+    }
+
+    /// Reconfigures a provider's credentials at runtime.
+    ///
+    /// This allows hot-reloading of credentials without restarting the application.
+    ///
+    /// # Arguments
+    ///
+    /// * `provider_id` - The ID of the provider to reconfigure
+    /// * `credentials` - HashMap mapping credential field names to their values
+    ///
+    /// # Returns
+    ///
+    /// * `Result<()>` - Ok if successful, Err if provider not found or reconfiguration fails
+    pub fn reconfigure_provider(&self, provider_id: &str, credentials: &HashMap<String, String>) -> Result<()> {
+        let providers = self.providers.read();
+        let provider_lock = providers
+            .get(provider_id)
+            .ok_or_else(|| crate::AppError::Other(format!("Provider not found: {}", provider_id)))?
+            .clone();
+        drop(providers);
+
+        let result = {
+            let mut provider = provider_lock.write();
+            provider.reconfigure_credentials(credentials)
+        };
+
+        // Publish event on failure
+        if let Err(ref e) = result {
+            if let Some(event_bus) = &self.event_bus {
+                event_bus.publish(DomainEvent::ProviderConfigurationFailed {
+                    provider_id: provider_id.to_string(),
+                    error_message: e.to_string(),
+                    timestamp: Utc::now(),
+                });
+            }
+        }
+
+        result
     }
 }

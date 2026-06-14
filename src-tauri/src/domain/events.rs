@@ -25,6 +25,12 @@ pub enum DomainEvent {
         timestamp: DateTime<Utc>,
         duration_ms: u64,
     },
+    /// A provider configuration operation failed
+    ProviderConfigurationFailed {
+        provider_id: String,
+        error_message: String,
+        timestamp: DateTime<Utc>,
+    },
 }
 
 impl DomainEvent {
@@ -33,6 +39,7 @@ impl DomainEvent {
         match self {
             Self::TranslationCompleted { timestamp, .. } => *timestamp,
             Self::OcrCompleted { timestamp, .. } => *timestamp,
+            Self::ProviderConfigurationFailed { timestamp, .. } => *timestamp,
         }
     }
 
@@ -41,6 +48,7 @@ impl DomainEvent {
         match self {
             Self::TranslationCompleted { .. } => "translation_completed",
             Self::OcrCompleted { .. } => "ocr_completed",
+            Self::ProviderConfigurationFailed { .. } => "provider_configuration_failed",
         }
     }
 }
