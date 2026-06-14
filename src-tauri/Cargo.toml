@@ -70,9 +70,10 @@ core-graphics = "0.23"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.51", features = ["Win32_UI_Input_KeyboardAndMouse"] }
+xcap = "0.9"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-xcb = "1.2"
+xcap = "0.9"
 
 [dev-dependencies]
 tempfile = "3.8"

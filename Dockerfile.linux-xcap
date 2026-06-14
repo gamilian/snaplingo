@@ -1,0 +1,29 @@
+# Custom Dockerfile for cross-compiling Rust projects with XCap to Linux
+#
+# Based on the official cross image, adds GUI libraries required by XCap:
+# - libxcb (X11 protocol)
+# - libxrandr (multi-monitor support)
+# - libdbus (system bus)
+# - libpipewire (Wayland screen capture)
+# - libwayland (Wayland protocol)
+# - libegl (OpenGL ES)
+
+FROM ghcr.io/cross-rs/x86_64-unknown-linux-gnu:latest
+
+# Install XCap dependencies
+RUN apt-get update && \
+    apt-get install -y \
+        pkg-config \
+        libclang-dev \
+        libxcb1-dev \
+        libxrandr-dev \
+        libdbus-1-dev \
+        libwayland-dev \
+        libegl-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+# Note: libpipewire-0.3-dev might not be available in older Debian versions
+# If the build fails, try removing it (XCap will still work on X11)
+RUN apt-get update && \
+    (apt-get install -y libpipewire-0.3-dev || echo "pipewire not available, continuing without it") && \
+    rm -rf /var/lib/apt/lists/*

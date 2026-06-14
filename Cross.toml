@@ -1,0 +1,16 @@
+# Cross.toml - Custom Docker configuration for cross-compilation
+#
+# XCap requires additional Linux GUI libraries not present in the default
+# cross Docker images. This config tells cross to build a custom image with
+# the necessary dependencies.
+
+[build]
+# Use custom Dockerfile for Linux targets
+dockerfile = "Dockerfile.linux-xcap"
+
+[target.x86_64-unknown-linux-gnu]
+# Will use the custom Dockerfile specified above
+
+[target.x86_64-pc-windows-gnu]
+# Windows target uses default image (no GUI dependencies needed)
+

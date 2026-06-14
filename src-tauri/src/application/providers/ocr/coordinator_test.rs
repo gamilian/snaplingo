@@ -74,9 +74,9 @@ mod tests {
     #[test]
     fn test_register_provider() {
         let config = Arc::new(ConfigFile::new_temp());
-        let mut coordinator = OcrCoordinator::new(config);
+        let coordinator = OcrCoordinator::new(config);
         coordinator
-            .register(Arc::new(MockOcrProvider::new("tesseract", "Tesseract OCR")))
+            .register(MockOcrProvider::new("tesseract", "Tesseract OCR"))
             .unwrap();
 
         let all = coordinator.list_all();
@@ -87,9 +87,9 @@ mod tests {
     #[test]
     fn test_activate_single_provider() {
         let config = Arc::new(ConfigFile::new_temp());
-        let mut coordinator = OcrCoordinator::new(config);
+        let coordinator = OcrCoordinator::new(config);
         coordinator
-            .register(Arc::new(MockOcrProvider::new("tesseract", "Tesseract OCR")))
+            .register(MockOcrProvider::new("tesseract", "Tesseract OCR"))
             .unwrap();
 
         coordinator.activate("tesseract").unwrap();
@@ -102,12 +102,12 @@ mod tests {
     #[test]
     fn test_switch_provider() {
         let config = Arc::new(ConfigFile::new_temp());
-        let mut coordinator = OcrCoordinator::new(config);
+        let coordinator = OcrCoordinator::new(config);
         coordinator
-            .register(Arc::new(MockOcrProvider::new("tesseract", "Tesseract OCR")))
+            .register(MockOcrProvider::new("tesseract", "Tesseract OCR"))
             .unwrap();
         coordinator
-            .register(Arc::new(MockOcrProvider::new("baidu", "Baidu OCR")))
+            .register(MockOcrProvider::new("baidu", "Baidu OCR"))
             .unwrap();
 
         // Activate first provider
@@ -137,9 +137,9 @@ mod tests {
     #[test]
     fn test_activate_persists() {
         let config = Arc::new(ConfigFile::new_temp());
-        let mut coordinator = OcrCoordinator::new(config.clone());
+        let coordinator = OcrCoordinator::new(config.clone());
         coordinator
-            .register(Arc::new(MockOcrProvider::new("tesseract", "Tesseract")))
+            .register(MockOcrProvider::new("tesseract", "Tesseract"))
             .unwrap();
 
         coordinator.activate("tesseract").unwrap();
@@ -153,9 +153,9 @@ mod tests {
         let config = Arc::new(ConfigFile::new_temp());
         config.save("active_ocr_provider", &"ghost".to_string()).unwrap();
 
-        let mut coordinator = OcrCoordinator::new(config);
+        let coordinator = OcrCoordinator::new(config);
         coordinator
-            .register(Arc::new(MockOcrProvider::new("tesseract", "Tesseract")))
+            .register(MockOcrProvider::new("tesseract", "Tesseract"))
             .unwrap();
 
         coordinator.restore_from_config().unwrap();
@@ -169,13 +169,13 @@ mod tests {
     #[tokio::test]
     async fn test_recognize_with_active_provider() {
         let config = Arc::new(ConfigFile::new_temp());
-        let mut coordinator = OcrCoordinator::new(config);
+        let coordinator = OcrCoordinator::new(config);
         coordinator
-            .register(Arc::new(MockOcrProvider::with_text(
+            .register(MockOcrProvider::with_text(
                 "tesseract",
                 "Tesseract OCR",
                 "Hello World",
-            )))
+            ))
             .unwrap();
         coordinator.activate("tesseract").unwrap();
 
