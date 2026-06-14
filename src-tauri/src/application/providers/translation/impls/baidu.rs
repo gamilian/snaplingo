@@ -164,7 +164,7 @@ impl TranslationProvider for BaiduTranslateProvider {
             .ok_or_else(|| AppError::Other("Empty translation result from Baidu".to_string()))?;
 
         Ok(TranslationResult {
-            provider_id: None,
+            provider_id: self.id().to_string(),
             translated_text: translation.dst.clone(),
             detected_language: None, // Baidu doesn't provide detected language in this endpoint
             confidence: None,

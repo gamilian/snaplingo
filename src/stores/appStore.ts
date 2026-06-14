@@ -1,11 +1,5 @@
 import { create } from 'zustand';
-
-interface TranslationResult {
-  provider_id?: string;
-  translated_text: string;
-  detected_language?: string;
-  confidence?: number;
-}
+import { TranslationResult } from '../types';
 
 interface AppState {
   sourceText: string;

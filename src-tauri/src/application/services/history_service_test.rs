@@ -30,7 +30,7 @@ mod tests {
                 target_lang: "es".to_string(),
             },
             results: vec![TranslationResult {
-                provider_id: None,
+                provider_id: "google".to_string(),
                 translated_text: "Hola mundo".to_string(),
                 detected_language: Some("en".to_string()),
                 confidence: Some(0.95),
@@ -94,7 +94,7 @@ mod tests {
                 target_lang: "fr".to_string(),
             },
             results: vec![TranslationResult {
-                provider_id: None,
+                provider_id: "deepl".to_string(),
                 translated_text: "Tester".to_string(),
                 detected_language: Some("en".to_string()),
                 confidence: Some(0.98),
@@ -131,7 +131,7 @@ mod tests {
                 target_lang: "es".to_string(),
             },
             results: vec![TranslationResult {
-                provider_id: None,
+                provider_id: "google".to_string(),
                 translated_text: "Bórrame".to_string(),
                 detected_language: None,
                 confidence: None,

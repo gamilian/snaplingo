@@ -72,9 +72,9 @@ export interface ProviderInfo {
 
 export interface TranslationResult {
   provider_id: string;
-  provider_name: string;
-  text: string;
-  error?: string;
+  translated_text: string;
+  detected_language: string | null;
+  confidence: number | null;
 }
 
 export interface HistoryEntry {

@@ -185,9 +185,9 @@ export default function ResultWindow() {
               {translations.map((result, index) => (
                 <TranslationCard
                   key={index}
-                  providerId={result.provider_id || 'Unknown'}
+                  providerId={result.provider_id}
                   text={result.translated_text}
-                  detectedLanguage={result.detected_language}
+                  detectedLanguage={result.detected_language || undefined}
                 />
               ))}
             </div>

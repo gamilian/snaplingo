@@ -72,7 +72,7 @@ impl TranslationProvider for GoogleTranslateProvider {
         let detected_language = json[2].as_str().map(String::from);
 
         Ok(TranslationResult {
-            provider_id: None,
+            provider_id: self.id().to_string(),
             translated_text,
             detected_language,
             confidence: None, // Google's free API doesn't provide confidence scores

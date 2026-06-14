@@ -56,7 +56,7 @@ mod tests {
     impl TranslationProvider for MockTranslationProvider {
         async fn translate(&self, _request: &TranslationRequest) -> Result<TranslationResult> {
             Ok(TranslationResult {
-                provider_id: None,
+                provider_id: self.id().to_string(),
                 translated_text: self.response_text.clone(),
                 detected_language: Some("en".to_string()),
                 confidence: Some(1.0),

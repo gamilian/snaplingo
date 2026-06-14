@@ -57,7 +57,7 @@ mod tests {
                 target_lang: "es".to_string(),
             },
             results: vec![TranslationResult {
-                provider_id: None,
+                provider_id: "google".to_string(),
                 translated_text: "Hola".to_string(),
                 detected_language: Some("en".to_string()),
                 confidence: Some(1.0),
