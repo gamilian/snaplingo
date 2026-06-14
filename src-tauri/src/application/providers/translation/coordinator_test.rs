@@ -7,7 +7,7 @@ mod tests {
     use crate::infrastructure::storage::ConfigFile;
     use crate::Result;
     use async_trait::async_trait;
-    use std::sync::Arc;
+    use std::sync::Arc; // Still needed for Arc<ConfigFile>
 
     // Mock provider for testing
     struct MockTranslationProvider {
@@ -56,6 +56,7 @@ mod tests {
     impl TranslationProvider for MockTranslationProvider {
         async fn translate(&self, _request: &TranslationRequest) -> Result<TranslationResult> {
             Ok(TranslationResult {
+                provider_id: None,
                 translated_text: self.response_text.clone(),
                 detected_language: Some("en".to_string()),
                 confidence: Some(1.0),
@@ -77,13 +78,13 @@ mod tests {
     fn test_register_provider() {
         let config = Arc::new(ConfigFile::new_temp());
         let mut coordinator = TranslationCoordinator::new(config);
-        let provider = Arc::new(MockTranslationProvider::new("google", "Google Translate"));
+        let provider = MockTranslationProvider::new("google", "Google Translate");
 
-        coordinator.register(provider.clone()).unwrap();
+        coordinator.register(provider).unwrap();
 
         let all = coordinator.list_all();
         assert_eq!(all.len(), 1);
-        assert_eq!(all[0].id(), "google");
+        assert_eq!(all[0].read().id(), "google");
     }
 
     #[test]
@@ -92,10 +93,10 @@ mod tests {
         let mut coordinator = TranslationCoordinator::new(config);
 
         coordinator
-            .register(Arc::new(MockTranslationProvider::new("google", "Google")))
+            .register(MockTranslationProvider::new("google", "Google"))
             .unwrap();
         let result =
-            coordinator.register(Arc::new(MockTranslationProvider::new("google", "Google")));
+            coordinator.register(MockTranslationProvider::new("google", "Google"));
 
         assert!(result.is_err());
     }
@@ -105,10 +106,10 @@ mod tests {
         let config = Arc::new(ConfigFile::new_temp());
         let mut coordinator = TranslationCoordinator::new(config);
         coordinator
-            .register(Arc::new(MockTranslationProvider::new("google", "Google Translate")))
+            .register(MockTranslationProvider::new("google", "Google Translate"))
             .unwrap();
         coordinator
-            .register(Arc::new(MockTranslationProvider::new("deepl", "DeepL")))
+            .register(MockTranslationProvider::new("deepl", "DeepL"))
             .unwrap();
 
         coordinator.activate("google").unwrap();
@@ -116,8 +117,8 @@ mod tests {
 
         let active = coordinator.get_active();
         assert_eq!(active.len(), 2);
-        assert_eq!(active[0].id(), "google");
-        assert_eq!(active[1].id(), "deepl");
+        assert_eq!(active[0].read().id(), "google");
+        assert_eq!(active[1].read().id(), "deepl");
     }
 
     #[test]
@@ -125,7 +126,7 @@ mod tests {
         let config = Arc::new(ConfigFile::new_temp());
         let mut coordinator = TranslationCoordinator::new(config);
         coordinator
-            .register(Arc::new(MockTranslationProvider::new("google", "Google Translate")))
+            .register(MockTranslationProvider::new("google", "Google Translate"))
             .unwrap();
 
         coordinator.activate("google").unwrap();
@@ -155,7 +156,7 @@ mod tests {
         let config = Arc::new(ConfigFile::new_temp());
         let mut coordinator = TranslationCoordinator::new(config.clone());
         coordinator
-            .register(Arc::new(MockTranslationProvider::new("google", "Google")))
+            .register(MockTranslationProvider::new("google", "Google"))
             .unwrap();
 
         coordinator.activate("google").unwrap();
@@ -176,14 +177,14 @@ mod tests {
 
         let mut coordinator = TranslationCoordinator::new(config);
         coordinator
-            .register(Arc::new(MockTranslationProvider::new("google", "Google")))
+            .register(MockTranslationProvider::new("google", "Google"))
             .unwrap();
 
         coordinator.restore_from_config().unwrap();
 
         let active = coordinator.get_active();
         assert_eq!(active.len(), 1);
-        assert_eq!(active[0].id(), "google");
+        assert_eq!(active[0].read().id(), "google");
     }
 
     // ---- Translation execution tests ----
@@ -191,13 +192,13 @@ mod tests {
     #[tokio::test]
     async fn test_translate_with_single_provider() {
         let config = Arc::new(ConfigFile::new_temp());
-        let mut coordinator = TranslationCoordinator::new(config);
+        let coordinator = TranslationCoordinator::new(config);
         coordinator
-            .register(Arc::new(MockTranslationProvider::with_response(
+            .register(MockTranslationProvider::with_response(
                 "google",
                 "Google Translate",
                 "Hola",
-            )))
+            ))
             .unwrap();
         coordinator.activate("google").unwrap();
 
@@ -210,20 +211,20 @@ mod tests {
     #[tokio::test]
     async fn test_translate_with_multiple_providers() {
         let config = Arc::new(ConfigFile::new_temp());
-        let mut coordinator = TranslationCoordinator::new(config);
+        let coordinator = TranslationCoordinator::new(config);
         coordinator
-            .register(Arc::new(MockTranslationProvider::with_response(
+            .register(MockTranslationProvider::with_response(
                 "google",
                 "Google Translate",
                 "Hola (Google)",
-            )))
+            ))
             .unwrap();
         coordinator
-            .register(Arc::new(MockTranslationProvider::with_response(
+            .register(MockTranslationProvider::with_response(
                 "deepl",
                 "DeepL",
                 "Hola (DeepL)",
-            )))
+            ))
             .unwrap();
         coordinator.activate("google").unwrap();
         coordinator.activate("deepl").unwrap();
@@ -280,13 +281,13 @@ mod tests {
 
         event_bus.subscribe(subscriber.clone()).await;
 
-        let mut coordinator = TranslationCoordinator::new(config);
+        let coordinator = TranslationCoordinator::new(config);
         coordinator
-            .register(Arc::new(MockTranslationProvider::with_response(
+            .register(MockTranslationProvider::with_response(
                 "google",
                 "Google Translate",
                 "Hola",
-            )))
+            ))
             .unwrap();
         coordinator.activate("google").unwrap();
 
@@ -327,7 +328,7 @@ mod tests {
         let coordinator = TranslationCoordinator::new(config);
 
         coordinator
-            .register(Arc::new(MockTranslationProvider::new("google", "Google")))
+            .register(MockTranslationProvider::new("google", "Google"))
             .unwrap();
 
         // Act
@@ -345,7 +346,7 @@ mod tests {
         let coordinator = TranslationCoordinator::new(config);
 
         coordinator
-            .register(Arc::new(MockTranslationProvider::new("google", "Google")))
+            .register(MockTranslationProvider::new("google", "Google"))
             .unwrap();
         coordinator.activate("google").unwrap();
 

@@ -287,7 +287,14 @@ impl TranslationCoordinator {
 
             let task = tokio::spawn(async move {
                 let provider = provider_lock.read();
-                provider.translate(&request).await
+                let provider_id = provider.id().to_string();
+                match provider.translate(&request).await {
+                    Ok(mut result) => {
+                        result.provider_id = Some(provider_id);
+                        Ok(result)
+                    }
+                    Err(e) => Err(e),
+                }
             });
 
             tasks.push(task);

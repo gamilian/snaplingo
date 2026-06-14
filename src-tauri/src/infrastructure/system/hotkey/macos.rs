@@ -7,8 +7,8 @@ use global_hotkey::{GlobalHotKeyManager, hotkey::{HotKey, Code, Modifiers}};
 /// macOS hotkey backend using Carbon Event Manager via global-hotkey crate
 pub struct MacOSHotkeyBackend {
     manager: Arc<GlobalHotKeyManager>,
+    // Map from HotKey.id() to (accelerator, HotKey)
     registrations: Mutex<HashMap<u32, (String, HotKey)>>,
-    next_id: Mutex<u32>,
 }
 
 impl MacOSHotkeyBackend {
@@ -19,7 +19,6 @@ impl MacOSHotkeyBackend {
         Ok(Self {
             manager: Arc::new(manager),
             registrations: Mutex::new(HashMap::new()),
-            next_id: Mutex::new(1),
         })
     }
 
@@ -138,25 +137,23 @@ impl HotkeyBackend for MacOSHotkeyBackend {
         // Parse accelerator
         let (modifiers, code) = Self::parse_accelerator(accelerator)?;
 
-        // Create hotkey with unique ID
-        let mut next_id = self.next_id.lock().unwrap();
-        let id = *next_id;
-        *next_id += 1;
-        drop(next_id);
-
+        // Create hotkey (global-hotkey assigns unique ID internally)
         let hotkey = HotKey::new(Some(modifiers), code);
+
+        // Get the internal ID that global-hotkey assigned
+        let internal_id = hotkey.id();
 
         // Register with Carbon Event Manager via global-hotkey
         self.manager.register(hotkey)
             .map_err(|e| AppError::Other(format!("Failed to register hotkey '{}': {}", accelerator, e)))?;
 
-        // Store registration
+        // Store registration using the HotKey's internal ID
         let mut registrations = self.registrations.lock().unwrap();
-        registrations.insert(id, (accelerator.to_string(), hotkey));
+        registrations.insert(internal_id, (accelerator.to_string(), hotkey));
 
-        log::info!("Hotkey registered: {} -> {:?}", accelerator, id);
+        log::info!("Hotkey registered: {} -> ID {}", accelerator, internal_id);
 
-        Ok(HotkeyId(id))
+        Ok(HotkeyId(internal_id))
     }
 
     async fn unregister(&self, id: HotkeyId) -> Result<(), AppError> {

@@ -40,12 +40,18 @@ pub async fn list_ocr_providers(
     let all_providers = state.ocr_coordinator.list_all();
     let active = state.ocr_coordinator.get_active();
 
-    let info: Vec<_> = all_providers.iter().map(|p| OcrProviderInfo {
-        id: p.id().to_string(),
-        name: p.name().to_string(),
-        is_configured: p.is_configured(),
-        requires_api_key: p.requires_api_key(),
-        is_active: active.as_ref().map_or(false, |active_p| active_p.id() == p.id()),
+    let info: Vec<_> = all_providers.iter().map(|p| {
+        let is_active = active.as_ref().map_or(false, |active_p| {
+            active_p.id() == p.id()
+        });
+
+        OcrProviderInfo {
+            id: p.id().to_string(),
+            name: p.name().to_string(),
+            is_configured: p.is_configured(),
+            requires_api_key: p.requires_api_key(),
+            is_active,
+        }
     }).collect();
 
     Ok(info)
@@ -68,19 +74,23 @@ pub async fn configure_ocr_provider(
     secret_key: Option<String>,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    // Save API key to keychain
-    state.keychain
-        .save_provider_credential(&provider_id, &api_key)
-        .map_err(|e| e.to_string())?;
+    // Build credentials map using new multi-field format
+    let mut credentials = std::collections::HashMap::new();
+    credentials.insert("api_key".to_string(), api_key);
 
-    // Save secret key to keychain if provided (for Baidu OCR)
     if let Some(secret) = secret_key {
-        let secret_key_name = format!("{}_secret", provider_id);
-        state.keychain
-            .save_provider_credential(&secret_key_name, &secret)
-            .map_err(|e| e.to_string())?;
+        credentials.insert("secret_key".to_string(), secret);
     }
 
-    // Note: Providers are recreated on startup with credentials from keychain
+    // Save credentials using new format
+    state.keychain
+        .save_provider_credentials(&provider_id, &credentials)
+        .map_err(|e| e.to_string())?;
+
+    // Reconfigure provider at runtime
+    state.ocr_coordinator
+        .reconfigure_provider(&provider_id, &credentials)
+        .map_err(|e| e.to_string())?;
+
     Ok(())
 }

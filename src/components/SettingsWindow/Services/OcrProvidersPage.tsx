@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useProviderStore } from '../../../stores/providerStore';
 import { ProviderCard } from './ProviderCard';
 import { ProviderConfigDialog } from './ProviderConfigDialog';
@@ -6,13 +6,22 @@ import { ProviderConfigDialog } from './ProviderConfigDialog';
 export function OcrProvidersPage() {
   const providers = useProviderStore((state) => state.ocrProviders);
   const activeProvider = useProviderStore((state) => state.activeOcrProvider);
+  const loadProviders = useProviderStore((state) => state.loadOcrProviders);
   const activateProvider = useProviderStore((state) => state.activateOcrProvider);
-  const updateProviderConfig = useProviderStore((state) => state.updateProviderConfig);
+  const configureProvider = useProviderStore((state) => state.configureOcrProvider);
 
   const [configuringProvider, setConfiguringProvider] = useState<string | null>(null);
 
-  const handleActivate = (id: string) => {
-    activateProvider(id);
+  useEffect(() => {
+    loadProviders();
+  }, [loadProviders]);
+
+  const handleActivate = async (id: string) => {
+    try {
+      await activateProvider(id);
+    } catch (error) {
+      console.error('Failed to activate provider:', error);
+    }
   };
 
   const handleConfigure = (id: string) => {
@@ -21,9 +30,14 @@ export function OcrProvidersPage() {
 
   const handleSaveConfig = async (config: any) => {
     if (configuringProvider) {
-      await updateProviderConfig(configuringProvider, configuringProvider, config);
-      // 配置完成后自动激活
-      activateProvider(configuringProvider);
+      try {
+        // OCR providers use api_key and optional secret_key
+        await configureProvider(configuringProvider, config.apiKey, config.secretKey);
+        // 配置完成后自动激活
+        await activateProvider(configuringProvider);
+      } catch (error) {
+        console.error('Failed to configure provider:', error);
+      }
     }
     setConfiguringProvider(null);
   };

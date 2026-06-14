@@ -4,6 +4,13 @@ use crate::error::AppError;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HotkeyId(pub(super) u32);
 
+impl HotkeyId {
+    /// Get the internal ID value (for mapping with global-hotkey events)
+    pub fn as_u32(&self) -> u32 {
+        self.0
+    }
+}
+
 /// Platform-agnostic hotkey backend trait
 #[async_trait::async_trait]
 pub trait HotkeyBackend: Send + Sync {

@@ -24,3 +24,7 @@ Thumbs.db
 
 # User data
 .snaplingo/
+
+# Target directories
+target
+

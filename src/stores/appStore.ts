@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 
 interface TranslationResult {
-  provider_id: string;
-  text: string;
+  provider_id?: string;
+  translated_text: string;
   detected_language?: string;
+  confidence?: number;
 }
 
 interface AppState {

@@ -13,7 +13,7 @@ pub use application::*;
 
 use std::sync::Arc;
 use std::path::PathBuf;
-use tauri::Manager;
+use tauri::{Manager, Emitter};
 use serde::{Deserialize, Serialize};
 
 // Phase 1, 2 & 3 imports
@@ -34,10 +34,14 @@ use application::providers::ocr::{
     OcrCoordinator,
     impls::{TesseractProvider, BaiduOcrProvider},
 };
-use application::{CaptureService, HotkeyService, HistoryService};
+use application::{CaptureService, HotkeyService, HistoryService, WorkflowService};
 use infrastructure::system::screenshot::get_screenshot_backend;
 use infrastructure::system::hotkey::get_hotkey_backend;
 use infrastructure::system::paths::get_history_db_path;
+use domain::HotkeyAction;
+
+use std::collections::HashMap;
+use std::sync::Mutex;
 
 /// Custom translation provider definition (for persistence)
 #[derive(Clone, Serialize, Deserialize)]
@@ -104,6 +108,9 @@ pub struct AppState {
     // Phase 5: History
     pub history_service: Arc<HistoryService>,
     pub event_bus: Arc<EventBus>,
+
+    // Phase 6: Workflows
+    pub workflow_service: Arc<WorkflowService>,
 }
 
 impl AppState {
@@ -206,11 +213,11 @@ impl AppState {
         );
 
         // Phase 3: OCR
-        let mut ocr_coordinator = OcrCoordinator::new(config_file.clone());
+        let ocr_coordinator = OcrCoordinator::new(config_file.clone());
 
         // Register Tesseract (no credentials needed)
         let tesseract_provider = TesseractProvider::new();
-        ocr_coordinator.register(Arc::new(tesseract_provider)).ok();
+        ocr_coordinator.register(tesseract_provider).ok();
 
         // Register Baidu OCR (load credentials from keychain)
         // Try new multi-field format first, fallback to legacy keys for backward compatibility
@@ -223,7 +230,7 @@ impl AppState {
         );
 
         if let Ok(creds) = credentials_result {
-            let _ = baidu_ocr_provider.configure_from_map(&creds);
+            let _ = baidu_ocr_provider.reconfigure_credentials(&creds);
         } else {
             // Fallback to legacy keys: provider:baidu_ocr_api_key:api_key, provider:baidu_ocr_secret_key:api_key
             if let Ok(api_key) = keychain.load_provider_credential("baidu_ocr_api_key") {
@@ -233,7 +240,7 @@ impl AppState {
             }
         }
 
-        ocr_coordinator.register(Arc::new(baidu_ocr_provider)).ok();
+        ocr_coordinator.register(baidu_ocr_provider).ok();
 
         // Restore active OCR provider from config
         ocr_coordinator.restore_from_config().ok();
@@ -250,6 +257,13 @@ impl AppState {
         let hotkey_backend = get_hotkey_backend();
         let hotkey_service = Arc::new(HotkeyService::new(hotkey_backend));
 
+        // Phase 6: Workflows
+        let workflow_service = Arc::new(WorkflowService::new(
+            capture_service.clone(),
+            ocr_coordinator.clone(),
+            translation_coordinator.clone(),
+        ));
+
         Self {
             config_file,
             keychain,
@@ -260,8 +274,104 @@ impl AppState {
             hotkey_service,
             history_service,
             event_bus,
+            workflow_service,
         }
     }
+}
+
+/// Setup global hotkeys and start event listening loop
+async fn setup_hotkeys(app: tauri::AppHandle) -> Result<()> {
+    let state = app.state::<AppState>();
+
+    // Define default hotkey mappings
+    // Format: (accelerator, action)
+    let default_hotkeys = vec![
+        ("CommandOrControl+Shift+C", HotkeyAction::ScreenshotTranslate),
+        ("CommandOrControl+Shift+T", HotkeyAction::InputTranslate),
+        ("CommandOrControl+Shift+O", HotkeyAction::ScreenshotOcr),
+    ];
+
+    // Map from global-hotkey's internal ID to HotkeyAction
+    // Using u32 directly since HotKey.id() returns u32
+    let action_map = Arc::new(Mutex::new(HashMap::<u32, HotkeyAction>::new()));
+
+    // Get hotkey backend directly for registration
+    let hotkey_backend = get_hotkey_backend();
+
+    // Register hotkeys
+    for (accelerator, action) in default_hotkeys {
+        match hotkey_backend.register(accelerator).await {
+            Ok(hotkey_id) => {
+                // HotkeyId.as_u32() is the internal ID from global-hotkey
+                let id = hotkey_id.as_u32();
+                action_map.lock().unwrap().insert(id, action);
+                log::info!("Registered hotkey: {} -> {:?} (ID: {})", accelerator, action, id);
+            }
+            Err(e) => {
+                log::warn!("Failed to register hotkey '{}': {}", accelerator, e);
+            }
+        }
+    }
+
+    // Clone references for event loop
+    let workflow_service = state.workflow_service.clone();
+    let app_handle = app.clone();
+    let action_map_clone = action_map.clone();
+
+    // Start event listening loop
+    use global_hotkey::GlobalHotKeyEvent;
+
+    tauri::async_runtime::spawn(async move {
+        let receiver = GlobalHotKeyEvent::receiver();
+
+        loop {
+            // Poll for hotkey events
+            if let Ok(event) = receiver.try_recv() {
+                let event_id = event.id;
+                log::info!("Hotkey event received: ID {}", event_id);
+
+                // Look up the corresponding action
+                let action = {
+                    let map = action_map_clone.lock().unwrap();
+                    map.get(&event_id).copied()
+                };
+
+                match action {
+                    Some(action) => {
+                        log::info!("Executing workflow: {:?}", action);
+
+                        // Execute workflow
+                        let workflow = workflow_service.clone();
+                        tauri::async_runtime::spawn(async move {
+                            match workflow.execute(action).await {
+                                Ok(outcome) => {
+                                    log::info!("Workflow completed: {:?}", outcome);
+                                    // TODO: Show result window based on outcome
+                                }
+                                Err(e) => {
+                                    log::error!("Workflow failed: {}", e);
+                                }
+                            }
+                        });
+
+                        // Also emit event to frontend
+                        if let Err(e) = app_handle.emit("hotkey-triggered", event_id) {
+                            log::warn!("Failed to emit hotkey event: {}", e);
+                        }
+                    }
+                    None => {
+                        log::warn!("Received hotkey event for unknown ID: {}", event_id);
+                    }
+                }
+            }
+
+            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+        }
+    });
+
+    log::info!("Hotkey event loop started - {} hotkeys registered", action_map.lock().unwrap().len());
+
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -294,7 +404,14 @@ pub fn run() {
 
       app.manage(app_state);
 
-      // TODO: Register global hotkeys
+      // Register global hotkeys and start event loop
+      let app_handle = app.handle().clone();
+      tauri::async_runtime::spawn(async move {
+          if let Err(e) = setup_hotkeys(app_handle).await {
+              log::error!("Failed to setup hotkeys: {}", e);
+          }
+      });
+
       // TODO: Create system tray
 
       Ok(())
@@ -323,6 +440,7 @@ pub fn run() {
       commands::search_history,
       commands::delete_history,
       commands::clear_all_history,
+      commands::trigger_workflow,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

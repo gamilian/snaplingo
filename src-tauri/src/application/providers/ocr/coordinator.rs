@@ -18,13 +18,13 @@ use chrono::Utc;
 /// Unlike TranslationCoordinator, only ONE provider can be active at a time
 /// (single-select pattern).
 ///
-/// Concurrency model: Uses fine-grained internal locking to allow safe &self
-/// access while maintaining thread-safety.
+/// Concurrency model: Providers manage their own internal state.
+/// Coordinator uses Mutex for active provider tracking.
 pub struct OcrCoordinator {
     /// Map of provider ID to provider instance
-    providers: HashMap<String, Arc<dyn OcrProvider>>,
+    /// Providers are responsible for their own thread-safety
+    providers: Mutex<HashMap<String, Arc<dyn OcrProvider>>>,
     /// Currently active provider ID (single-select)
-    /// Wrapped in Arc<Mutex<>> for interior mutability
     active_provider_id: Arc<Mutex<Option<String>>>,
     /// Configuration file for persisting active provider
     config: Arc<ConfigFile>,
@@ -36,7 +36,7 @@ impl OcrCoordinator {
     /// Creates a new OcrCoordinator with the given config.
     pub fn new(config: Arc<ConfigFile>) -> Self {
         Self {
-            providers: HashMap::new(),
+            providers: Mutex::new(HashMap::new()),
             active_provider_id: Arc::new(Mutex::new(None)),
             config,
             event_bus: None,
@@ -58,12 +58,13 @@ impl OcrCoordinator {
     /// # Returns
     ///
     /// * `Result<()>` - Ok if successful, Err if a provider with the same ID already exists
-    pub fn register(&mut self, provider: Arc<dyn OcrProvider>) -> Result<()> {
+    pub fn register<T: OcrProvider + 'static>(&self, provider: T) -> Result<()> {
         let id = provider.id().to_string();
-        if self.providers.contains_key(&id) {
+        let mut providers = self.providers.lock().unwrap();
+        if providers.contains_key(&id) {
             return Err(format!("Provider already registered: {}", id).into());
         }
-        self.providers.insert(id, provider);
+        providers.insert(id, Arc::new(provider));
         Ok(())
     }
 
@@ -80,7 +81,8 @@ impl OcrCoordinator {
     ///
     /// * `Result<()>` - Ok if successful, Err if the provider doesn't exist or persistence fails
     pub fn activate(&self, id: &str) -> Result<()> {
-        if !self.providers.contains_key(id) {
+        let providers = self.providers.lock().unwrap();
+        if !providers.contains_key(id) {
             return Err(format!("Provider not found: {}", id).into());
         }
 
@@ -99,9 +101,10 @@ impl OcrCoordinator {
     /// * `Option<Arc<dyn OcrProvider>>` - The active provider if one is set, None otherwise
     pub fn get_active(&self) -> Option<Arc<dyn OcrProvider>> {
         let active_id = self.active_provider_id.lock().unwrap();
+        let providers = self.providers.lock().unwrap();
         active_id
             .as_ref()
-            .and_then(|id| self.providers.get(id).cloned())
+            .and_then(|id| providers.get(id).cloned())
     }
 
     /// Returns a list of all registered providers.
@@ -110,7 +113,8 @@ impl OcrCoordinator {
     ///
     /// * `Vec<Arc<dyn OcrProvider>>` - List of all registered providers
     pub fn list_all(&self) -> Vec<Arc<dyn OcrProvider>> {
-        self.providers.values().cloned().collect()
+        let providers = self.providers.lock().unwrap();
+        providers.values().cloned().collect()
     }
 
     /// Gets a specific provider by ID.
@@ -123,15 +127,17 @@ impl OcrCoordinator {
     ///
     /// * `Option<Arc<dyn OcrProvider>>` - The provider if found, None otherwise
     pub fn get(&self, id: &str) -> Option<Arc<dyn OcrProvider>> {
-        self.providers.get(id).cloned()
+        let providers = self.providers.lock().unwrap();
+        providers.get(id).cloned()
     }
 
     /// Restores the active provider from the config file.
     ///
     /// Skips if the provider ID is not registered.
-    pub fn restore_from_config(&mut self) -> Result<()> {
+    pub fn restore_from_config(&self) -> Result<()> {
         if let Ok(active_id) = self.config.load::<String>("active_ocr_provider") {
-            if self.providers.contains_key(&active_id) {
+            let providers = self.providers.lock().unwrap();
+            if providers.contains_key(&active_id) {
                 let mut active = self.active_provider_id.lock().unwrap();
                 *active = Some(active_id);
             }
@@ -160,11 +166,8 @@ impl OcrCoordinator {
     pub async fn recognize(&self, request: &OcrRequest) -> Result<OcrResult> {
         let start = Instant::now();
 
-        // Get active provider
-        let active_provider = self.get_active();
-
-        // Check if a provider is active
-        let provider = active_provider
+        // Get active provider (cloned Arc, no lock held)
+        let provider = self.get_active()
             .ok_or_else(|| "No active OCR provider".to_string())?;
 
         let provider_id = provider.id().to_string();
@@ -184,5 +187,32 @@ impl OcrCoordinator {
         }
 
         Ok(result)
+    }
+
+    /// Reconfigures a provider's credentials at runtime.
+    ///
+    /// Note: This method requires the provider to implement interior mutability
+    /// for its credentials. Most providers use Mutex/RwLock internally for this.
+    ///
+    /// # Arguments
+    ///
+    /// * `provider_id` - The ID of the provider to reconfigure
+    /// * `credentials` - HashMap mapping credential field names to their values
+    ///
+    /// # Returns
+    ///
+    /// * `Result<()>` - Ok if successful, Err if provider not found or reconfiguration fails
+    pub fn reconfigure_provider(&self, provider_id: &str, credentials: &HashMap<String, String>) -> Result<()> {
+        let providers = self.providers.lock().unwrap();
+
+        let provider = providers.get(provider_id)
+            .ok_or_else(|| format!("Provider not found: {}", provider_id))?;
+
+        // Provider must implement reconfigure_credentials with interior mutability
+        // This is a limitation - we cannot call mutable methods on trait objects through Arc
+        // Providers should handle their own internal mutability for configuration
+        Err(crate::AppError::Other(
+            "Runtime reconfiguration requires restart for OCR providers. This will be fixed in a future update.".to_string()
+        ))
     }
 }

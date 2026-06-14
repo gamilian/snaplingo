@@ -114,6 +114,7 @@ impl TranslationProvider for DeepLProvider {
             .ok_or_else(|| AppError::Other("Empty response from DeepL".to_string()))?;
 
         Ok(TranslationResult {
+            provider_id: None,
             translated_text: translation.text.clone(),
             detected_language: translation.detected_source_language.clone(),
             confidence: None, // DeepL doesn't provide confidence scores

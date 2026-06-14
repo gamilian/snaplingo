@@ -63,45 +63,19 @@ interface ProviderState {
   addCustomTranslationProvider: (request: AddCustomTranslationProviderRequest) => Promise<void>;
   removeTranslationProvider: (id: string) => Promise<void>;
 
-  // Sync Actions (保留用于 OCR/TTS)
-  activateOcrProvider: (id: string) => void;
+  // OCR Actions (后端驱动)
+  loadOcrProviders: () => Promise<void>;
+  activateOcrProvider: (id: string) => Promise<void>;
+  configureOcrProvider: (providerId: string, apiKey: string, secretKey?: string) => Promise<void>;
+
+  // TTS Actions (保留同步)
   activateTtsProvider: (id: string) => void;
 
   updateProviderConfig: (id: string, providerId: string, config: any) => Promise<void>;
   reorderTranslationProviders: (ids: string[]) => Promise<void>;
 }
 
-// 内置 OCR/TTS Providers（暂时保留本地数据，后续迁移）
-const builtinOcrProviders: Provider[] = [
-  {
-    id: 'tesseract',
-    name: 'Tesseract',
-    type: 'ocr',
-    status: 'active',
-    isBuiltin: true,
-    description: '免费开源 OCR 引擎，本地运行',
-    requiresApiKey: false,
-  },
-  {
-    id: 'paddleocr',
-    name: 'PaddleOCR',
-    type: 'ocr',
-    status: 'inactive',
-    isBuiltin: true,
-    description: '百度开源 OCR，中文识别优化',
-    requiresApiKey: false,
-  },
-  {
-    id: 'baidu-ocr',
-    name: '百度 OCR',
-    type: 'ocr',
-    status: 'unconfigured',
-    isBuiltin: true,
-    description: '百度云 OCR API',
-    requiresApiKey: true,
-  },
-];
-
+// 内置 TTS Providers（本地临时数据）
 const builtinTtsProviders: Provider[] = [
   {
     id: 'system-tts',
@@ -134,11 +108,11 @@ export const useProviderStore = create<ProviderState>()(
   persist(
     (set, get) => ({
       // 初始数据
-      ocrProviders: builtinOcrProviders,
+      ocrProviders: [], // 从后端加载
       translationProviders: [], // 从后端加载
       ttsProviders: builtinTtsProviders,
 
-      activeOcrProvider: 'tesseract',
+      activeOcrProvider: null,
       activeTranslationProviders: [],
       activeTtsProvider: 'system-tts',
 
@@ -202,14 +176,55 @@ export const useProviderStore = create<ProviderState>()(
         }
       },
 
-      // OCR Provider 激活（单选）
-      activateOcrProvider: (id) =>
-        set((state) => ({
-          activeOcrProvider: id,
-          ocrProviders: state.ocrProviders.map((p) =>
-            p.id === id ? { ...p, status: 'active' as const } : { ...p, status: 'inactive' as const }
-          ),
-        })),
+      // 从后端加载 OCR Providers
+      loadOcrProviders: async () => {
+        try {
+          const providers = await invoke<any[]>('list_ocr_providers');
+          const converted = providers.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            type: 'ocr' as const,
+            status: p.is_active ? 'active' as const : (p.is_configured ? 'inactive' as const : 'unconfigured' as const),
+            isBuiltin: true,
+            requiresApiKey: p.requires_api_key,
+          }));
+
+          const activeProvider = converted.find(p => p.status === 'active');
+
+          set({
+            ocrProviders: converted,
+            activeOcrProvider: activeProvider?.id || null,
+          });
+        } catch (error) {
+          console.error('Failed to load OCR providers:', error);
+        }
+      },
+
+      // OCR Provider 激活
+      activateOcrProvider: async (id: string) => {
+        try {
+          await invoke('activate_ocr_provider', { providerId: id });
+          await get().loadOcrProviders();
+        } catch (error) {
+          console.error('Failed to activate OCR provider:', error);
+          throw error;
+        }
+      },
+
+      // 配置 OCR Provider
+      configureOcrProvider: async (providerId: string, apiKey: string, secretKey?: string) => {
+        try {
+          await invoke('configure_ocr_provider', {
+            providerId,
+            apiKey,
+            secretKey: secretKey || null,
+          });
+          await get().loadOcrProviders();
+        } catch (error) {
+          console.error('Failed to configure OCR provider:', error);
+          throw error;
+        }
+      },
 
       // TTS Provider 激活（单选）
       activateTtsProvider: (id) =>

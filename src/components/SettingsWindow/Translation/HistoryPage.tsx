@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useHistoryStore } from '../../../stores/historyStore';
 import { formatRelativeTime } from '../../../utils/formatTime';
 
@@ -12,12 +12,17 @@ const typeLabels: Record<string, string> = {
 
 export function HistoryPage() {
   const history = useHistoryStore((state) => state.translationHistory);
+  const loadHistory = useHistoryStore((state) => state.loadTranslationHistory);
   const deleteItem = useHistoryStore((state) => state.deleteTranslationHistory);
   const toggleFavorite = useHistoryStore((state) => state.toggleTranslationFavorite);
   const clearHistory = useHistoryStore((state) => state.clearTranslationHistory);
 
   const [filter, setFilter] = useState<FilterType>('all');
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
 
   const filteredHistory = history.filter((item) => {
     const matchesFilter = filter === 'all' || item.type === filter;

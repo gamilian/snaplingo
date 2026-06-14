@@ -20,19 +20,12 @@ export function useTranslate() {
     setTranslating(true);
 
     try {
-      let detectedFrom = fromLang;
-
-      if (fromLang === 'auto') {
-        detectedFrom = await invoke<string>('detect_language', {
-          text: textToTranslate
-        });
-      }
-
-      const results = await invoke<any[]>('translate_text', {
-        text: textToTranslate,
-        from: detectedFrom,
-        to: toLang,
-        providerIds: ['google-translate'],
+      const results = await invoke<any[]>('translate_text_v2', {
+        request: {
+          text: textToTranslate,
+          source_lang: fromLang === 'auto' ? null : fromLang,
+          target_lang: toLang,
+        }
       });
 
       setTranslations(results);

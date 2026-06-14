@@ -34,6 +34,7 @@ mod tests {
             target_lang: "es".to_string(),
         };
         let results = vec![TranslationResult {
+            provider_id: None,
             translated_text: "Hola mundo".to_string(),
             detected_language: Some("en".to_string()),
             confidence: Some(0.95),

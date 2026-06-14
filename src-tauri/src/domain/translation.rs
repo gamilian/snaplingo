@@ -49,6 +49,7 @@ impl TranslationRequestBuilder {
 /// Result from translation service
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TranslationResult {
+    pub provider_id: Option<String>,
     pub translated_text: String,
     pub detected_language: Option<String>,
     pub confidence: Option<f32>,
