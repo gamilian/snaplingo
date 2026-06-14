@@ -16,8 +16,9 @@ use std::path::PathBuf;
 use tauri::Manager;
 
 // Phase 1, 2 & 3 imports
-use infrastructure::storage::{ConfigFile, Keychain};
+use infrastructure::storage::{ConfigFile, Keychain, HistoryDatabase};
 use infrastructure::http::{HttpClient, ReqwestHttpClient};
+use infrastructure::events::{EventBus, EventSubscriber};
 use application::providers::translation::{
     TranslationCoordinator,
     GoogleTranslateProvider as GoogleTranslateProviderV2,
@@ -28,10 +29,10 @@ use application::providers::ocr::{
     OcrCoordinator,
     impls::{TesseractProvider, BaiduOcrProvider},
 };
-use application::CaptureService;
-use application::HotkeyService;
+use application::{CaptureService, HotkeyService, HistoryService};
 use infrastructure::system::screenshot::get_screenshot_backend;
 use infrastructure::system::hotkey::get_hotkey_backend;
+use infrastructure::system::paths::get_history_db_path;
 
 pub struct AppState {
     // Phase 1: Infrastructure
@@ -48,14 +49,31 @@ pub struct AppState {
     // Phase 4: Capture
     pub capture_service: Arc<CaptureService>,
     pub hotkey_service: Arc<HotkeyService>,
+
+    // Phase 5: History
+    pub history_service: Arc<HistoryService>,
+    pub event_bus: Arc<EventBus>,
 }
 
 impl AppState {
-    pub fn new(config_path: PathBuf, app: tauri::AppHandle) -> Self {
+    pub fn new(config_path: PathBuf, _app: tauri::AppHandle) -> Self {
         // Phase 1: Infrastructure
         let config_file = Arc::new(ConfigFile::new(config_path.clone()));
         let keychain = Arc::new(Keychain::new());
         let http_client: Arc<dyn HttpClient> = Arc::new(ReqwestHttpClient::new());
+
+        // Phase 5: EventBus & History
+        let event_bus = Arc::new(EventBus::new());
+
+        let history_db_path = get_history_db_path().expect("Failed to get history database path");
+        let history_db = Arc::new(HistoryDatabase::new(history_db_path).expect("Failed to initialize history database"));
+        let history_service = Arc::new(HistoryService::new(history_db));
+
+        // Subscribe history service to events
+        let history_service_subscriber = history_service.clone() as Arc<dyn EventSubscriber>;
+        tokio::runtime::Handle::current().block_on(async {
+            event_bus.subscribe(history_service_subscriber).await;
+        });
 
         // Phase 2: Translation
         let mut translation_coordinator = TranslationCoordinator::new(config_file.clone());
@@ -83,7 +101,10 @@ impl AppState {
         // Restore active providers from config
         translation_coordinator.restore_from_config().ok();
 
-        let translation_coordinator = Arc::new(translation_coordinator);
+        // Attach event bus to coordinator
+        let translation_coordinator = Arc::new(
+            translation_coordinator.with_event_bus(event_bus.clone())
+        );
 
         // Phase 3: OCR
         let mut ocr_coordinator = OcrCoordinator::new(config_file.clone());
@@ -104,7 +125,10 @@ impl AppState {
         // Restore active OCR provider from config
         ocr_coordinator.restore_from_config().ok();
 
-        let ocr_coordinator = Arc::new(ocr_coordinator);
+        // Attach event bus to coordinator
+        let ocr_coordinator = Arc::new(
+            ocr_coordinator.with_event_bus(event_bus.clone())
+        );
 
         // Phase 4: Capture
         let screenshot_backend = get_screenshot_backend();
@@ -121,6 +145,8 @@ impl AppState {
             ocr_coordinator,
             capture_service,
             hotkey_service,
+            history_service,
+            event_bus,
         }
     }
 }
@@ -166,6 +192,11 @@ pub fn run() {
       commands::capture_full_screen,
       commands::capture_region,
       commands::save_screenshot,
+      commands::get_translation_history,
+      commands::get_ocr_history,
+      commands::search_history,
+      commands::delete_history,
+      commands::clear_all_history,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

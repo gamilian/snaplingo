@@ -1,6 +1,6 @@
 pub mod capture_service;
 pub mod hotkey_service;
-mod history_service;
+pub mod history_service;
 
 #[cfg(test)]
 mod history_service_test;
