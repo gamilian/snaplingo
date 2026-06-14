@@ -40,7 +40,33 @@ impl ConfigFile {
         store.insert(key.to_string(), json_value);
 
         let content = serde_json::to_string_pretty(&*store)?;
-        fs::write(&self.path, content)?;
+
+        // Atomic write: write to temp file in same directory, then rename
+        let parent = self.path.parent().unwrap_or_else(|| std::path::Path::new("."));
+
+        // Ensure parent directory exists
+        if !parent.exists() {
+            fs::create_dir_all(parent)?;
+        }
+
+        // Generate unique temp filename (handle concurrent tests)
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let temp_path = parent.join(format!(".config.tmp.{}.{}", std::process::id(), nanos));
+
+        // Write to temp file
+        fs::write(&temp_path, &content)?;
+
+        // Atomic rename (on Windows, need to remove target first)
+        #[cfg(windows)]
+        {
+            let _ = fs::remove_file(&self.path); // Ignore if doesn't exist
+        }
+
+        fs::rename(&temp_path, &self.path)?;
 
         Ok(())
     }

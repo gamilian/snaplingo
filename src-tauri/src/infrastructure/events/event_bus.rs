@@ -1,6 +1,7 @@
 use crate::domain::events::DomainEvent;
 use async_trait::async_trait;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::sync::RwLock;
 
 /// Trait for event subscribers.
@@ -24,6 +25,7 @@ pub trait EventSubscriber: Send + Sync {
 /// Events are delivered concurrently to all subscribers with timeout protection.
 pub struct EventBus {
     subscribers: Arc<RwLock<Vec<Arc<dyn EventSubscriber>>>>,
+    pending_events: Arc<AtomicUsize>,
 }
 
 impl EventBus {
@@ -31,6 +33,7 @@ impl EventBus {
     pub fn new() -> Self {
         Self {
             subscribers: Arc::new(RwLock::new(Vec::new())),
+            pending_events: Arc::new(AtomicUsize::new(0)),
         }
     }
 
@@ -47,6 +50,10 @@ impl EventBus {
     pub fn publish(&self, event: DomainEvent) {
         // Clone the Arc to RwLock (not the RwLock itself)
         let subscribers = Arc::clone(&self.subscribers);
+        let pending = Arc::clone(&self.pending_events);
+
+        // Increment pending counter
+        pending.fetch_add(1, Ordering::SeqCst);
 
         tokio::spawn(async move {
             // Acquire read lock and clone the subscriber list
@@ -83,7 +90,32 @@ impl EventBus {
             for handle in handles {
                 let _ = handle.await;
             }
+
+            // Decrement pending counter after all handlers complete
+            pending.fetch_sub(1, Ordering::SeqCst);
         });
+    }
+
+    /// Wait for all pending events to complete (for graceful shutdown)
+    ///
+    /// Blocks for up to `timeout` duration waiting for pending events to finish.
+    /// Returns true if all events completed, false if timed out.
+    pub async fn drain(&self, timeout: std::time::Duration) -> bool {
+        let start = std::time::Instant::now();
+
+        while self.pending_events.load(Ordering::SeqCst) > 0 {
+            if start.elapsed() >= timeout {
+                log::warn!(
+                    "EventBus drain timed out with {} pending events",
+                    self.pending_events.load(Ordering::SeqCst)
+                );
+                return false;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+
+        log::info!("EventBus drained successfully");
+        true
     }
 }
 

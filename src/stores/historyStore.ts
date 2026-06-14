@@ -165,7 +165,21 @@ export const useHistoryStore = create<HistoryState>()(
       // 删除单个展示项（删除整个 entry）
       deleteTranslationHistory: async (id: string) => {
         try {
-          const entryId = parseInt(id.split('-')[0]);
+          // Parse and validate ID format (expected: "entryId-resultIndex")
+          const parts = id.split('-');
+          if (parts.length !== 2) {
+            console.error(`Invalid history ID format: expected "number-number", got "${id}"`);
+            throw new Error(`Invalid history ID format: ${id}`);
+          }
+
+          const entryId = parseInt(parts[0]);
+          const resultIndex = parseInt(parts[1]);
+
+          if (isNaN(entryId) || isNaN(resultIndex)) {
+            console.error(`Invalid history ID: cannot parse numbers from "${id}"`);
+            throw new Error(`Invalid history ID: ${id}`);
+          }
+
           await invoke('delete_history', { id: entryId });
 
           // 从原始数据中移除

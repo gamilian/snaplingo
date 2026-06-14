@@ -145,7 +145,9 @@ pub async fn configure_translation_provider_credentials(
         if !credentials.contains_key(&field.name) {
             return Err(format!("Missing required field: {}", field.label));
         }
-        if credentials.get(&field.name).unwrap().trim().is_empty() {
+        let value = credentials.get(&field.name)
+            .ok_or_else(|| format!("Missing field: {}", field.name))?;
+        if value.trim().is_empty() {
             return Err(format!("Field cannot be empty: {}", field.label));
         }
     }
@@ -327,10 +329,8 @@ pub async fn remove_custom_translation_provider(
         return Err("Cannot remove builtin provider".into());
     }
 
-    let index = custom_defs.iter().position(|def| def.id == provider_id);
-    if index.is_none() {
-        return Err(format!("Provider not found: {}", provider_id));
-    }
+    let index = custom_defs.iter().position(|def| def.id == provider_id)
+        .ok_or_else(|| format!("Provider not found: {}", provider_id))?;
 
     // Step 3: Deactivate and unregister
     state.translation_coordinator
@@ -338,7 +338,7 @@ pub async fn remove_custom_translation_provider(
         .map_err(|e| format!("Failed to unregister: {}", e))?;
 
     // Step 4: Remove from config
-    custom_defs.remove(index.unwrap());
+    custom_defs.remove(index);
     state.config_file
         .save("custom_translation_providers", &custom_defs)
         .map_err(|e| format!("Failed to save config: {}", e))?;

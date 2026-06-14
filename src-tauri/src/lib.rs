@@ -287,6 +287,21 @@ impl AppState {
             workflow_service,
         }
     }
+
+    /// Gracefully shutdown the application, waiting for pending events to complete
+    pub async fn shutdown(&self) -> Result<()> {
+        log::info!("Starting graceful shutdown...");
+
+        // Wait for all pending events to complete (max 5 seconds)
+        let drained = self.event_bus.drain(std::time::Duration::from_secs(5)).await;
+
+        if !drained {
+            log::warn!("Shutdown: Some events did not complete in time");
+        }
+
+        log::info!("Graceful shutdown complete");
+        Ok(())
+    }
 }
 
 /// Setup global hotkeys and start event listening loop
