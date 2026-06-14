@@ -6,6 +6,7 @@ pub enum AppError {
     Json(serde_json::Error),
     Http(reqwest::Error),
     Keychain(keyring::Error),
+    Database(rusqlite::Error),
     Config(String),
     ProviderNotFound(String),
     ProviderNotConfigured(String),
@@ -21,6 +22,7 @@ impl fmt::Display for AppError {
             AppError::Json(e) => write!(f, "JSON error: {}", e),
             AppError::Http(e) => write!(f, "HTTP error: {}", e),
             AppError::Keychain(e) => write!(f, "Keychain error: {}", e),
+            AppError::Database(e) => write!(f, "Database error: {}", e),
             AppError::Config(msg) => write!(f, "Configuration error: {}", msg),
             AppError::ProviderNotFound(id) => write!(f, "Provider not found: {}", id),
             AppError::ProviderNotConfigured(id) => write!(f, "Provider not configured: {}", id),
@@ -38,6 +40,7 @@ impl std::error::Error for AppError {
             AppError::Json(e) => Some(e),
             AppError::Http(e) => Some(e),
             AppError::Keychain(e) => Some(e),
+            AppError::Database(e) => Some(e),
             _ => None,
         }
     }
@@ -64,6 +67,12 @@ impl From<reqwest::Error> for AppError {
 impl From<keyring::Error> for AppError {
     fn from(err: keyring::Error) -> Self {
         AppError::Keychain(err)
+    }
+}
+
+impl From<rusqlite::Error> for AppError {
+    fn from(err: rusqlite::Error) -> Self {
+        AppError::Database(err)
     }
 }
 
