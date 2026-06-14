@@ -47,9 +47,26 @@ pub enum HistoryEntry {
 }
 
 impl HistoryDatabase {
+    /// Current database schema version
+    /// Increment this when making schema changes
+    const SCHEMA_VERSION: i32 = 1;
+
     /// Creates a new HistoryDatabase at the given path
     pub fn new(path: PathBuf) -> Result<Self> {
         let conn = Connection::open(path)?;
+
+        // Check schema version compatibility
+        let db_version: i32 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap_or(0);
+
+        if db_version != 0 && db_version != Self::SCHEMA_VERSION {
+            return Err(crate::AppError::Other(format!(
+                "Database schema version mismatch. Expected v{}, found v{}. \
+                 Please backup and delete ~/.snaplingo/history.db to recreate with new schema.",
+                Self::SCHEMA_VERSION,
+                db_version
+            )));
+        }
 
         // Create translation history table
         conn.execute(
@@ -93,6 +110,9 @@ impl HistoryDatabase {
              ON ocr_history(timestamp DESC)",
             [],
         )?;
+
+        // Set schema version
+        conn.execute(&format!("PRAGMA user_version = {}", Self::SCHEMA_VERSION), [])?;
 
         Ok(Self {
             conn: Mutex::new(conn),

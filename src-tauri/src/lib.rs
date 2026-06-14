@@ -135,14 +135,18 @@ impl AppState {
 
         // Register Google Translate (no credentials needed)
         let google_provider = GoogleTranslateProviderV2::new(http_client.clone());
-        translation_coordinator.register(google_provider).ok();
+        if let Err(e) = translation_coordinator.register(google_provider) {
+            log::warn!("Failed to register Google Translate provider: {}", e);
+        }
 
         // Register DeepL (load credentials from keychain using provider ID)
         let mut deepl_provider = DeepLProvider::new(http_client.clone());
         if let Ok(api_key) = keychain.load_provider_credential("deepl") {
             deepl_provider.set_api_key(api_key);
         }
-        translation_coordinator.register(deepl_provider).ok();
+        if let Err(e) = translation_coordinator.register(deepl_provider) {
+            log::warn!("Failed to register DeepL provider: {}", e);
+        }
 
         // Register Baidu (load credentials from keychain)
         // Try new multi-field format first, fallback to legacy keys for backward compatibility
@@ -165,7 +169,9 @@ impl AppState {
             }
         }
 
-        translation_coordinator.register(baidu_provider).ok();
+        translation_coordinator.register(baidu_provider)
+            .map_err(|e| log::warn!("Failed to register Baidu Translate provider: {}", e))
+            .ok();
 
         // Load and register custom LLM providers
         if let Ok(custom_defs) = config_file.load::<Vec<CustomTranslationProviderDef>>("custom_translation_providers") {
@@ -199,13 +205,17 @@ impl AppState {
                         def.name.clone(),
                         def.reasoning_level,
                     );
-                    translation_coordinator.register(provider).ok();
+                    if let Err(e) = translation_coordinator.register(provider) {
+                        log::warn!("Failed to register custom LLM provider '{}': {}", def.name, e);
+                    }
                 }
             }
         }
 
         // Restore active providers from config
-        translation_coordinator.restore_from_config().ok();
+        if let Err(e) = translation_coordinator.restore_from_config() {
+            log::warn!("Failed to restore active providers from config: {}", e);
+        }
 
         // Attach event bus to coordinator
         let translation_coordinator = Arc::new(
@@ -304,8 +314,15 @@ async fn setup_hotkeys(app: tauri::AppHandle) -> Result<()> {
             Ok(hotkey_id) => {
                 // HotkeyId.as_u32() is the internal ID from global-hotkey
                 let id = hotkey_id.as_u32();
-                action_map.lock().unwrap().insert(id, action);
-                log::info!("Registered hotkey: {} -> {:?} (ID: {})", accelerator, action, id);
+                match action_map.lock() {
+                    Ok(mut map) => {
+                        map.insert(id, action);
+                        log::info!("Registered hotkey: {} -> {:?} (ID: {})", accelerator, action, id);
+                    }
+                    Err(e) => {
+                        log::error!("Action map lock poisoned during hotkey registration: {}", e);
+                    }
+                }
             }
             Err(e) => {
                 log::warn!("Failed to register hotkey '{}': {}", accelerator, e);
@@ -332,8 +349,13 @@ async fn setup_hotkeys(app: tauri::AppHandle) -> Result<()> {
 
                 // Look up the corresponding action
                 let action = {
-                    let map = action_map_clone.lock().unwrap();
-                    map.get(&event_id).copied()
+                    match action_map_clone.lock() {
+                        Ok(map) => map.get(&event_id).copied(),
+                        Err(e) => {
+                            log::error!("Action map lock poisoned: {}", e);
+                            None
+                        }
+                    }
                 };
 
                 match action {
@@ -369,7 +391,8 @@ async fn setup_hotkeys(app: tauri::AppHandle) -> Result<()> {
         }
     });
 
-    log::info!("Hotkey event loop started - {} hotkeys registered", action_map.lock().unwrap().len());
+    log::info!("Hotkey event loop started - {} hotkeys registered",
+               action_map.lock().map(|m| m.len()).unwrap_or(0));
 
     Ok(())
 }
@@ -377,9 +400,10 @@ async fn setup_hotkeys(app: tauri::AppHandle) -> Result<()> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   let config_dir = dirs::home_dir()
-      .unwrap()
+      .expect("Cannot determine home directory")
       .join(".snaplingo");
-  std::fs::create_dir_all(&config_dir).unwrap();
+  std::fs::create_dir_all(&config_dir)
+      .expect("Failed to create config directory");
   let config_path = config_dir.join("config.json");
 
   tauri::Builder::default()
