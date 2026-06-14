@@ -1,9 +1,13 @@
 use super::TranslationProvider;
 use crate::domain::translation::{TranslationRequest, TranslationResult};
+use crate::domain::events::DomainEvent;
 use crate::infrastructure::storage::ConfigFile;
+use crate::infrastructure::events::EventBus;
 use crate::Result;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
+use chrono::Utc;
 
 /// Coordinator for managing translation providers and operations.
 ///
@@ -21,6 +25,8 @@ pub struct TranslationCoordinator {
     active: Arc<Mutex<Vec<String>>>,
     /// Configuration file for persisting active providers
     config: Arc<ConfigFile>,
+    /// Optional event bus for publishing domain events
+    event_bus: Option<Arc<EventBus>>,
 }
 
 impl TranslationCoordinator {
@@ -30,7 +36,14 @@ impl TranslationCoordinator {
             providers: HashMap::new(),
             active: Arc::new(Mutex::new(Vec::new())),
             config,
+            event_bus: None,
         }
+    }
+
+    /// Attach an event bus for publishing domain events
+    pub fn with_event_bus(mut self, event_bus: Arc<EventBus>) -> Self {
+        self.event_bus = Some(event_bus);
+        self
     }
 
     /// Registers a new translation provider.
@@ -174,6 +187,8 @@ impl TranslationCoordinator {
     /// Returns an error if no providers are active.
     /// Individual provider failures are logged but don't fail the entire request.
     pub async fn translate(&self, request: &TranslationRequest) -> Result<Vec<TranslationResult>> {
+        let start = Instant::now();
+
         // Get active providers (lock is released immediately after cloning)
         let active_providers = self.get_active();
 
@@ -184,7 +199,7 @@ impl TranslationCoordinator {
 
         // Spawn concurrent translation tasks
         let mut tasks = Vec::new();
-        for provider in active_providers {
+        for provider in &active_providers {
             let request = request.clone();
             let provider = provider.clone();
 
@@ -213,7 +228,21 @@ impl TranslationCoordinator {
             }
         }
 
-        // TODO(Phase 5): Add history recording here
+        // Publish domain event if event bus is attached
+        if let Some(event_bus) = &self.event_bus {
+            let providers_used: Vec<String> = active_providers
+                .iter()
+                .map(|p| p.id().to_string())
+                .collect();
+
+            event_bus.publish(DomainEvent::TranslationCompleted {
+                request: request.clone(),
+                results: results.clone(),
+                providers_used,
+                timestamp: Utc::now(),
+                duration_ms: start.elapsed().as_millis() as u64,
+            });
+        }
 
         Ok(results)
     }

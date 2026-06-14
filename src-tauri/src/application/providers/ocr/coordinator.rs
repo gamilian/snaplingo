@@ -1,9 +1,13 @@
 use super::OcrProvider;
 use crate::domain::ocr::{OcrRequest, OcrResult};
+use crate::domain::events::DomainEvent;
 use crate::infrastructure::storage::ConfigFile;
+use crate::infrastructure::events::EventBus;
 use crate::Result;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
+use chrono::Utc;
 
 /// Coordinator for managing OCR providers and operations.
 ///
@@ -24,6 +28,8 @@ pub struct OcrCoordinator {
     active_provider_id: Arc<Mutex<Option<String>>>,
     /// Configuration file for persisting active provider
     config: Arc<ConfigFile>,
+    /// Optional event bus for publishing domain events
+    event_bus: Option<Arc<EventBus>>,
 }
 
 impl OcrCoordinator {
@@ -33,7 +39,14 @@ impl OcrCoordinator {
             providers: HashMap::new(),
             active_provider_id: Arc::new(Mutex::new(None)),
             config,
+            event_bus: None,
         }
+    }
+
+    /// Attach an event bus for publishing domain events
+    pub fn with_event_bus(mut self, event_bus: Arc<EventBus>) -> Self {
+        self.event_bus = Some(event_bus);
+        self
     }
 
     /// Registers a new OCR provider.
@@ -145,6 +158,8 @@ impl OcrCoordinator {
     ///
     /// Returns an error if no provider is active.
     pub async fn recognize(&self, request: &OcrRequest) -> Result<OcrResult> {
+        let start = Instant::now();
+
         // Get active provider
         let active_provider = self.get_active();
 
@@ -152,10 +167,21 @@ impl OcrCoordinator {
         let provider = active_provider
             .ok_or_else(|| "No active OCR provider".to_string())?;
 
+        let provider_id = provider.id().to_string();
+
         // Call provider's recognize method
         let result = provider.recognize(request).await?;
 
-        // TODO(Phase 5): Add history recording here
+        // Publish domain event if event bus is attached
+        if let Some(event_bus) = &self.event_bus {
+            event_bus.publish(DomainEvent::OcrCompleted {
+                request: request.clone(),
+                result: result.clone(),
+                provider_used: provider_id,
+                timestamp: Utc::now(),
+                duration_ms: start.elapsed().as_millis() as u64,
+            });
+        }
 
         Ok(result)
     }

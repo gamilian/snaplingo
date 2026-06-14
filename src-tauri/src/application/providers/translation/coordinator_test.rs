@@ -249,4 +249,74 @@ mod tests {
             "No active translation providers"
         );
     }
+
+    #[tokio::test]
+    async fn test_coordinator_publishes_event_when_translation_completes() {
+        use crate::infrastructure::events::{EventBus, EventSubscriber};
+        use crate::domain::events::DomainEvent;
+        use tokio::sync::Mutex as TokioMutex;
+
+        // Mock subscriber to capture events
+        struct MockSubscriber {
+            events: Arc<TokioMutex<Vec<DomainEvent>>>,
+        }
+
+        #[async_trait]
+        impl EventSubscriber for MockSubscriber {
+            async fn handle(&self, event: &DomainEvent) {
+                self.events.lock().await.push(event.clone());
+            }
+            fn name(&self) -> &str {
+                "mock"
+            }
+        }
+
+        // Arrange
+        let config = Arc::new(ConfigFile::new_temp());
+        let event_bus = Arc::new(EventBus::new());
+        let subscriber = Arc::new(MockSubscriber {
+            events: Arc::new(TokioMutex::new(Vec::new())),
+        });
+
+        event_bus.subscribe(subscriber.clone()).await;
+
+        let mut coordinator = TranslationCoordinator::new(config);
+        coordinator
+            .register(Arc::new(MockTranslationProvider::with_response(
+                "google",
+                "Google Translate",
+                "Hola",
+            )))
+            .unwrap();
+        coordinator.activate("google").unwrap();
+
+        // Inject event bus
+        let coordinator = coordinator.with_event_bus(event_bus);
+
+        // Act
+        let _results = coordinator.translate(&sample_request()).await.unwrap();
+
+        // Wait for async event processing
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        // Assert - event was published
+        let events = subscriber.events.lock().await;
+        assert_eq!(events.len(), 1);
+
+        match &events[0] {
+            DomainEvent::TranslationCompleted {
+                request,
+                results,
+                providers_used,
+                ..
+            } => {
+                assert_eq!(request.text, "Hello");
+                assert_eq!(results.len(), 1);
+                assert_eq!(results[0].translated_text, "Hola");
+                assert_eq!(providers_used.len(), 1);
+                assert_eq!(providers_used[0], "google");
+            }
+            _ => panic!("Expected TranslationCompleted event"),
+        }
+    }
 }
