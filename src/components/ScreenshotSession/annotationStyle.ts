@@ -25,6 +25,8 @@ interface AnnotationToolShortcutEvent {
   altKey: boolean;
 }
 
+export type AnnotationSizeDirection = 'decrease' | 'increase';
+
 export const ANNOTATION_COLORS: AnnotationColor[] = [
   [255, 77, 79, 255],
   [40, 167, 69, 255],
@@ -36,6 +38,10 @@ export const ANNOTATION_COLORS: AnnotationColor[] = [
 
 export const ANNOTATION_STROKE_WIDTHS = [2, 4, 6, 8];
 export const DEFAULT_TEXT_FONT_SIZE = 24;
+export const MIN_ANNOTATION_STROKE_WIDTH = 1;
+export const MAX_ANNOTATION_STROKE_WIDTH = 8;
+export const MIN_TEXT_FONT_SIZE = 12;
+export const MAX_TEXT_FONT_SIZE = 48;
 
 export const DEFAULT_ANNOTATION_STYLE: AnnotationStyle = {
   color: ANNOTATION_COLORS[0],
@@ -63,6 +69,45 @@ export function annotationToolFromShortcut(
   if (event.metaKey || event.ctrlKey || event.altKey) return null;
 
   return ANNOTATION_TOOL_SHORTCUTS[event.key.toLowerCase()] ?? null;
+}
+
+export function annotationSizeDirectionFromShortcut(
+  event: AnnotationToolShortcutEvent,
+): AnnotationSizeDirection | null {
+  if (event.metaKey || event.ctrlKey || event.altKey) return null;
+  if (event.key === '[') return 'decrease';
+  if (event.key === ']') return 'increase';
+
+  return null;
+}
+
+function stepBoundedValue(
+  value: number,
+  direction: AnnotationSizeDirection,
+  min: number,
+  max: number,
+) {
+  const step = direction === 'increase' ? 1 : -1;
+  return Math.min(Math.max(value + step, min), max);
+}
+
+export function nextAnnotationStrokeWidth(
+  value: number,
+  direction: AnnotationSizeDirection,
+) {
+  return stepBoundedValue(
+    value,
+    direction,
+    MIN_ANNOTATION_STROKE_WIDTH,
+    MAX_ANNOTATION_STROKE_WIDTH,
+  );
+}
+
+export function nextTextFontSize(
+  value: number,
+  direction: AnnotationSizeDirection,
+) {
+  return stepBoundedValue(value, direction, MIN_TEXT_FONT_SIZE, MAX_TEXT_FONT_SIZE);
 }
 
 export function annotationFromGesture(

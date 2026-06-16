@@ -45,14 +45,22 @@ import {
   ANNOTATION_COLORS,
   DEFAULT_TEXT_FONT_SIZE,
   DEFAULT_ANNOTATION_STYLE,
+  MAX_ANNOTATION_STROKE_WIDTH,
+  MAX_TEXT_FONT_SIZE,
+  MIN_ANNOTATION_STROKE_WIDTH,
+  MIN_TEXT_FONT_SIZE,
   applyAnnotationStyle,
+  annotationSizeDirectionFromShortcut,
   annotationToolFromShortcut,
   annotationColorToCss,
   annotationFromGesture,
   arrowHeadPoints,
   isCommittedAnnotation,
+  nextAnnotationStrokeWidth,
+  nextTextFontSize,
   type AnnotationColor,
   type AnnotationStyle,
+  type AnnotationSizeDirection,
   type AnnotationTool,
 } from './annotationStyle';
 import {
@@ -800,6 +808,38 @@ export default function ScreenshotSession({
     ],
   );
 
+  const adjustAnnotationSize = useCallback(
+    (direction: AnnotationSizeDirection) => {
+      if (textDraft) return;
+
+      if (isTextSizingActive) {
+        applySelectedAnnotationStyle(
+          annotationStyle,
+          nextTextFontSize(textFontSize, direction),
+        );
+        return;
+      }
+
+      applySelectedAnnotationStyle(
+        {
+          ...annotationStyle,
+          strokeWidth: nextAnnotationStrokeWidth(
+            annotationStyle.strokeWidth,
+            direction,
+          ),
+        },
+        textFontSize,
+      );
+    },
+    [
+      annotationStyle,
+      applySelectedAnnotationStyle,
+      isTextSizingActive,
+      textDraft,
+      textFontSize,
+    ],
+  );
+
   const commitTextDraft = useCallback(() => {
     const nextHistory = commitTextDraftToHistory();
     if (selection && nextHistory !== annotationHistory) {
@@ -965,6 +1005,16 @@ export default function ScreenshotSession({
       } else if (
         status === 'preview' &&
         !textDraft &&
+        (event.key === '[' || event.key === ']')
+      ) {
+        const sizeDirection = annotationSizeDirectionFromShortcut(event);
+        if (sizeDirection) {
+          event.preventDefault();
+          adjustAnnotationSize(sizeDirection);
+        }
+      } else if (
+        status === 'preview' &&
+        !textDraft &&
         !annotationGesture &&
         !annotationMoveGesture
       ) {
@@ -1011,6 +1061,7 @@ export default function ScreenshotSession({
       window.removeEventListener('keyup', handleKeyUp);
     };
   }, [
+    adjustAnnotationSize,
     cancelSession,
     copyCurrentColor,
     copySelection,
@@ -1911,8 +1962,16 @@ export default function ScreenshotSession({
               <input
                 className="h-7 w-20 accent-white disabled:opacity-50"
                 type="range"
-                min={isTextSizingActive ? 12 : 1}
-                max={isTextSizingActive ? 48 : 8}
+                min={
+                  isTextSizingActive
+                    ? MIN_TEXT_FONT_SIZE
+                    : MIN_ANNOTATION_STROKE_WIDTH
+                }
+                max={
+                  isTextSizingActive
+                    ? MAX_TEXT_FONT_SIZE
+                    : MAX_ANNOTATION_STROKE_WIDTH
+                }
                 step={1}
                 value={
                   isTextSizingActive

@@ -3,8 +3,11 @@ import {
   annotationFromText,
   annotationFromGesture,
   applyAnnotationStyle,
+  annotationSizeDirectionFromShortcut,
   annotationToolFromShortcut,
   isCommittedAnnotation,
+  nextAnnotationStrokeWidth,
+  nextTextFontSize,
   type AnnotationStyle,
 } from './annotationStyle';
 
@@ -203,6 +206,36 @@ describe('annotation style', () => {
         altKey: false,
       }),
     ).toBeNull();
+  });
+
+  it('maps bracket shortcuts to annotation size directions', () => {
+    const plainKey = { metaKey: false, ctrlKey: false, altKey: false };
+
+    expect(annotationSizeDirectionFromShortcut({ ...plainKey, key: '[' })).toBe(
+      'decrease',
+    );
+    expect(annotationSizeDirectionFromShortcut({ ...plainKey, key: ']' })).toBe(
+      'increase',
+    );
+    expect(
+      annotationSizeDirectionFromShortcut({
+        key: ']',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+      }),
+    ).toBeNull();
+    expect(annotationSizeDirectionFromShortcut({ ...plainKey, key: 'r' })).toBeNull();
+  });
+
+  it('steps annotation stroke width and text font size within toolbar bounds', () => {
+    expect(nextAnnotationStrokeWidth(4, 'increase')).toBe(5);
+    expect(nextAnnotationStrokeWidth(1, 'decrease')).toBe(1);
+    expect(nextAnnotationStrokeWidth(8, 'increase')).toBe(8);
+
+    expect(nextTextFontSize(24, 'increase')).toBe(25);
+    expect(nextTextFontSize(12, 'decrease')).toBe(12);
+    expect(nextTextFontSize(48, 'increase')).toBe(48);
   });
 
   it('updates committed annotations with the selected style', () => {
