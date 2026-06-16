@@ -1,5 +1,6 @@
+use super::backend::{rgba_image_to_png, MonitorSnapshot, ScreenRegion};
+use crate::domain::capture::{LogicalRect, PhysicalRect};
 use crate::error::AppError;
-use super::backend::{rgba_image_to_png, ScreenRegion};
 use xcap::Monitor;
 
 /// Get the primary monitor (not just the first enumerated one).
@@ -28,6 +29,35 @@ pub fn capture_full_screen_png() -> Result<Vec<u8>, AppError> {
         .capture_image()
         .map_err(|e| with_platform_hint(format!("Screenshot failed: {}", e)))?;
     rgba_image_to_png(image)
+}
+
+/// Capture the primary monitor as a session snapshot.
+pub fn capture_primary_monitor_snapshot() -> Result<MonitorSnapshot, AppError> {
+    let primary = get_primary_monitor()?;
+    let image = primary
+        .capture_image()
+        .map_err(|e| with_platform_hint(format!("Screenshot failed: {}", e)))?;
+    let width = image.width();
+    let height = image.height();
+    let png_data = rgba_image_to_png(image)?;
+
+    Ok(MonitorSnapshot {
+        id: "primary".to_string(),
+        logical_bounds: LogicalRect {
+            x: 0.0,
+            y: 0.0,
+            width: width as f64,
+            height: height as f64,
+        },
+        physical_bounds: PhysicalRect {
+            x: 0,
+            y: 0,
+            width,
+            height,
+        },
+        scale_factor: 1.0,
+        png_data,
+    })
 }
 
 /// Capture a region of the primary monitor as PNG bytes.

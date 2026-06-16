@@ -1,6 +1,6 @@
-use crate::error::AppError;
-use super::backend::{ScreenshotBackend, ScreenRegion};
+use super::backend::{ScreenRegion, ScreenshotBackend};
 use super::xcap_common;
+use crate::error::AppError;
 
 /// Linux screenshot backend using the cross-platform XCap crate.
 ///
@@ -16,6 +16,12 @@ impl LinuxScreenshotBackend {
 
 #[async_trait::async_trait]
 impl ScreenshotBackend for LinuxScreenshotBackend {
+    async fn capture_monitor_snapshots(
+        &self,
+    ) -> Result<Vec<super::backend::MonitorSnapshot>, AppError> {
+        Ok(vec![xcap_common::capture_primary_monitor_snapshot()?])
+    }
+
     async fn capture_full_screen(&self) -> Result<Vec<u8>, AppError> {
         xcap_common::capture_full_screen_png()
     }

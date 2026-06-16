@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::infrastructure::system::screenshot::{ScreenshotBackend, ScreenRegion};
+use crate::infrastructure::system::screenshot::{ScreenRegion, ScreenshotBackend};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -44,7 +44,7 @@ impl CaptureService {
 mod tests {
     use super::CaptureService;
     use crate::error::AppError;
-    use crate::infrastructure::system::screenshot::{ScreenshotBackend, ScreenRegion};
+    use crate::infrastructure::system::screenshot::{ScreenRegion, ScreenshotBackend};
     use std::sync::Arc;
 
     // Mock ScreenshotBackend for testing
@@ -64,6 +64,31 @@ mod tests {
 
     #[async_trait::async_trait]
     impl ScreenshotBackend for MockScreenshotBackend {
+        async fn capture_monitor_snapshots(
+            &self,
+        ) -> Result<Vec<crate::infrastructure::system::screenshot::MonitorSnapshot>, AppError>
+        {
+            Ok(vec![
+                crate::infrastructure::system::screenshot::MonitorSnapshot {
+                    id: "primary".to_string(),
+                    logical_bounds: crate::domain::capture::LogicalRect {
+                        x: 0.0,
+                        y: 0.0,
+                        width: 1.0,
+                        height: 1.0,
+                    },
+                    physical_bounds: crate::domain::capture::PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 1,
+                        height: 1,
+                    },
+                    scale_factor: 1.0,
+                    png_data: self.full_screen_data.clone(),
+                },
+            ])
+        }
+
         async fn capture_full_screen(&self) -> Result<Vec<u8>, AppError> {
             Ok(self.full_screen_data.clone())
         }

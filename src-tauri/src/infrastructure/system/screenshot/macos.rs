@@ -1,5 +1,6 @@
+use super::backend::{MonitorSnapshot, ScreenRegion, ScreenshotBackend};
+use crate::domain::capture::{LogicalRect, PhysicalRect};
 use crate::error::AppError;
-use super::backend::{ScreenshotBackend, ScreenRegion};
 use core_graphics::display::{CGDisplay, CGRect};
 use core_graphics::image::CGImage;
 use image::codecs::png::PngEncoder;
@@ -44,21 +45,52 @@ fn image_to_png(cg_image: CGImage) -> Result<Vec<u8>, AppError> {
     let mut cursor = Cursor::new(&mut png_data);
     let encoder = PngEncoder::new(&mut cursor);
 
-    encoder.write_image(
-        &rgba_data,
-        width as u32,
-        height as u32,
-        ExtendedColorType::Rgba8,
-    ).map_err(|e| AppError::System(format!("Failed to encode PNG: {}", e)))?;
+    encoder
+        .write_image(
+            &rgba_data,
+            width as u32,
+            height as u32,
+            ExtendedColorType::Rgba8,
+        )
+        .map_err(|e| AppError::System(format!("Failed to encode PNG: {}", e)))?;
 
     Ok(png_data)
 }
 
 #[async_trait::async_trait]
 impl ScreenshotBackend for MacOSScreenshotBackend {
+    async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError> {
+        let display = CGDisplay::main();
+        let image = display
+            .image()
+            .ok_or_else(|| AppError::System("Failed to capture screenshot".to_string()))?;
+        let width = image.width() as u32;
+        let height = image.height() as u32;
+        let png_data = image_to_png(image)?;
+
+        Ok(vec![MonitorSnapshot {
+            id: "primary".to_string(),
+            logical_bounds: LogicalRect {
+                x: 0.0,
+                y: 0.0,
+                width: width as f64,
+                height: height as f64,
+            },
+            physical_bounds: PhysicalRect {
+                x: 0,
+                y: 0,
+                width,
+                height,
+            },
+            scale_factor: 1.0,
+            png_data,
+        }])
+    }
+
     async fn capture_full_screen(&self) -> Result<Vec<u8>, AppError> {
         let display = CGDisplay::main();
-        let image = display.image()
+        let image = display
+            .image()
             .ok_or_else(|| AppError::System("Failed to capture screenshot".to_string()))?;
 
         image_to_png(image)

@@ -1,15 +1,15 @@
 mod backend;
 
+#[cfg(target_os = "linux")]
+mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
 #[cfg(target_os = "windows")]
 mod windows;
-#[cfg(target_os = "linux")]
-mod linux;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 mod xcap_common;
 
-pub use backend::{ScreenshotBackend, ScreenRegion};
+pub use backend::{MonitorSnapshot, ScreenRegion, ScreenshotBackend};
 
 use std::sync::Arc;
 
