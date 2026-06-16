@@ -2,6 +2,7 @@ use super::ConfigFile;
 use crate::domain::AppConfig;
 use crate::error::{AppError, Result};
 use tempfile::NamedTempFile;
+use std::collections::HashSet;
 
 #[test]
 fn test_save_and_load() {
@@ -84,4 +85,15 @@ fn test_save_multiple_keys() {
     assert_eq!(loaded2.source_language, "ja");
     assert_eq!(loaded1.translation_provider, "google-translate");
     assert_eq!(loaded2.translation_provider, "deepl");
+}
+
+#[test]
+fn test_unique_temp_write_paths_do_not_collide() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let mut paths = HashSet::new();
+
+    for _ in 0..1000 {
+        let path = super::config_file::unique_temp_write_path(temp_dir.path());
+        assert!(paths.insert(path));
+    }
 }
