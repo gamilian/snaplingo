@@ -6,6 +6,7 @@ use tauri::{
     WebviewWindowBuilder,
 };
 
+use crate::application::services::image_composition_service::PngPlacement;
 use crate::domain::capture::{
     CaptureOutputAction, CaptureSessionId, CaptureSessionView, LogicalRect, MonitorSnapshotView,
     PhysicalRect, PinnedImageView,
@@ -16,6 +17,20 @@ use crate::infrastructure::system::screenshot::MonitorSnapshot;
 const CAPTURE_WINDOW_LABEL: &str = "capture";
 const PIN_WINDOW_MAX_WIDTH: f64 = 900.0;
 const PIN_WINDOW_MAX_HEIGHT: f64 = 700.0;
+
+#[derive(Debug, PartialEq)]
+struct CaptureImageCompositionPlan {
+    width: u32,
+    height: u32,
+    placements: Vec<CaptureImagePlacement>,
+}
+
+#[derive(Debug, PartialEq)]
+struct CaptureImagePlacement {
+    snapshot_index: usize,
+    source_rect: PhysicalRect,
+    destination_rect: PhysicalRect,
+}
 
 #[tauri::command]
 pub async fn open_capture_window(
@@ -322,23 +337,27 @@ fn render_capture_png(
     rect: &LogicalRect,
     state: &crate::AppState,
 ) -> Result<Vec<u8>, String> {
-    let physical_rect = state
-        .capture_session_service
-        .logical_rect_to_physical(session_id, rect)
-        .map_err(|e| e.to_string())?;
     let session = state
         .capture_session_service
         .get_session(session_id)
         .map_err(|e| e.to_string())?;
-    let snapshot = session
-        .snapshots
+
+    let plan = capture_image_composition_plan(rect, &session.snapshots)?;
+    let placements = plan
+        .placements
         .iter()
-        .find(|snapshot| physical_rects_intersect(&physical_rect, &snapshot.physical_bounds))
-        .ok_or_else(|| "Selection does not intersect any captured monitor".to_string())?;
-    let crop_rect = snapshot_relative_crop_rect(&physical_rect, &snapshot.physical_bounds);
+        .map(|placement| {
+            PngPlacement {
+                png_data: session.snapshots[placement.snapshot_index].png_data.as_slice(),
+                source_rect: placement.source_rect.clone(),
+                destination_rect: placement.destination_rect.clone(),
+            }
+        })
+        .collect::<Vec<_>>();
+
     state
         .image_composition_service
-        .crop_png(&snapshot.png_data, &crop_rect)
+        .compose_png(plan.width, plan.height, &placements)
         .map_err(|e| e.to_string())
 }
 
@@ -400,58 +419,113 @@ fn normalized_capture_mode(mode: &str) -> &'static str {
     }
 }
 
-fn snapshot_relative_crop_rect(
-    selected: &PhysicalRect,
-    snapshot_bounds: &PhysicalRect,
-) -> PhysicalRect {
-    PhysicalRect {
-        x: selected.x - snapshot_bounds.x,
-        y: selected.y - snapshot_bounds.y,
-        width: selected.width,
-        height: selected.height,
+fn capture_image_composition_plan(
+    rect: &LogicalRect,
+    snapshots: &[MonitorSnapshot],
+) -> Result<CaptureImageCompositionPlan, String> {
+    if rect.width <= 0.0 || rect.height <= 0.0 {
+        return Err("Selection has no area".to_string());
     }
+
+    let intersections = snapshots
+        .iter()
+        .enumerate()
+        .filter_map(|(snapshot_index, snapshot)| {
+            logical_rect_intersection(rect, &snapshot.logical_bounds).map(|intersection| {
+                (snapshot_index, snapshot, intersection)
+            })
+        })
+        .collect::<Vec<_>>();
+
+    if intersections.is_empty() {
+        return Err("Selection does not intersect any captured monitor".to_string());
+    }
+
+    let output_scale = intersections
+        .iter()
+        .map(|(_, snapshot, _)| snapshot.scale_factor)
+        .fold(1.0_f64, f64::max);
+    let output_width = scaled_extent(rect.width, output_scale)?;
+    let output_height = scaled_extent(rect.height, output_scale)?;
+    let placements = intersections
+        .into_iter()
+        .map(|(snapshot_index, snapshot, intersection)| {
+            let source_rect = scaled_logical_rect_relative_to(
+                &intersection,
+                &snapshot.logical_bounds,
+                snapshot.scale_factor,
+            )?;
+            let destination_rect =
+                scaled_logical_rect_relative_to(&intersection, rect, output_scale)?;
+
+            Ok(CaptureImagePlacement {
+                snapshot_index,
+                source_rect,
+                destination_rect,
+            })
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+
+    Ok(CaptureImageCompositionPlan {
+        width: output_width,
+        height: output_height,
+        placements,
+    })
 }
 
-fn physical_rects_intersect(a: &PhysicalRect, b: &PhysicalRect) -> bool {
-    let a_right = a.x + a.width as i32;
-    let a_bottom = a.y + a.height as i32;
-    let b_right = b.x + b.width as i32;
-    let b_bottom = b.y + b.height as i32;
+fn logical_rect_intersection(a: &LogicalRect, b: &LogicalRect) -> Option<LogicalRect> {
+    let left = a.x.max(b.x);
+    let top = a.y.max(b.y);
+    let right = (a.x + a.width).min(b.x + b.width);
+    let bottom = (a.y + a.height).min(b.y + b.height);
 
-    a.x < b_right && a_right > b.x && a.y < b_bottom && a_bottom > b.y
+    if right <= left || bottom <= top {
+        return None;
+    }
+
+    Some(LogicalRect {
+        x: left,
+        y: top,
+        width: right - left,
+        height: bottom - top,
+    })
+}
+
+fn scaled_logical_rect_relative_to(
+    rect: &LogicalRect,
+    origin: &LogicalRect,
+    scale: f64,
+) -> Result<PhysicalRect, String> {
+    let left = ((rect.x - origin.x) * scale).floor();
+    let top = ((rect.y - origin.y) * scale).floor();
+    let right = ((rect.x + rect.width - origin.x) * scale).ceil();
+    let bottom = ((rect.y + rect.height - origin.y) * scale).ceil();
+
+    if left < 0.0 || top < 0.0 || right <= left || bottom <= top {
+        return Err("Selection has invalid scaled capture bounds".to_string());
+    }
+
+    Ok(PhysicalRect {
+        x: left as i32,
+        y: top as i32,
+        width: (right - left) as u32,
+        height: (bottom - top) as u32,
+    })
+}
+
+fn scaled_extent(value: f64, scale: f64) -> Result<u32, String> {
+    let scaled = (value * scale).ceil();
+    if scaled <= 0.0 {
+        return Err("Selection has invalid scaled capture size".to_string());
+    }
+
+    Ok(scaled as u32)
 }
 
 #[cfg(test)]
 mod tests {
     use crate::domain::capture::{LogicalRect, MonitorSnapshotView, PhysicalRect};
-
-    #[test]
-    fn converts_global_physical_rect_to_snapshot_local_crop_rect() {
-        let snapshot_bounds = PhysicalRect {
-            x: 100,
-            y: 200,
-            width: 300,
-            height: 400,
-        };
-        let selected = PhysicalRect {
-            x: 110,
-            y: 220,
-            width: 30,
-            height: 40,
-        };
-
-        let crop_rect = super::snapshot_relative_crop_rect(&selected, &snapshot_bounds);
-
-        assert_eq!(
-            crop_rect,
-            PhysicalRect {
-                x: 10,
-                y: 20,
-                width: 30,
-                height: 40,
-            }
-        );
-    }
+    use crate::infrastructure::system::screenshot::MonitorSnapshot;
 
     #[test]
     fn capture_window_url_encodes_supported_mode() {
@@ -533,6 +607,99 @@ mod tests {
                 width: 2720.0,
                 height: 1500.0,
             })
+        );
+    }
+
+    #[test]
+    fn capture_image_placements_split_selection_across_monitors() {
+        let snapshots = vec![
+            MonitorSnapshot {
+                id: "left".to_string(),
+                logical_bounds: LogicalRect {
+                    x: -4.0,
+                    y: 0.0,
+                    width: 4.0,
+                    height: 2.0,
+                },
+                physical_bounds: PhysicalRect {
+                    x: -4,
+                    y: 0,
+                    width: 4,
+                    height: 2,
+                },
+                scale_factor: 1.0,
+                png_data: Vec::new(),
+            },
+            MonitorSnapshot {
+                id: "primary".to_string(),
+                logical_bounds: LogicalRect {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 4.0,
+                    height: 2.0,
+                },
+                physical_bounds: PhysicalRect {
+                    x: 0,
+                    y: 0,
+                    width: 4,
+                    height: 2,
+                },
+                scale_factor: 1.0,
+                png_data: Vec::new(),
+            },
+        ];
+
+        let plan = super::capture_image_composition_plan(
+            &LogicalRect {
+                x: -2.0,
+                y: 0.0,
+                width: 4.0,
+                height: 2.0,
+            },
+            &snapshots,
+        )
+        .unwrap();
+
+        assert_eq!(plan.width, 4);
+        assert_eq!(plan.height, 2);
+        assert_eq!(plan.placements.len(), 2);
+        assert_eq!(plan.placements[0].snapshot_index, 0);
+        assert_eq!(
+            plan.placements[0].source_rect,
+            PhysicalRect {
+                x: 2,
+                y: 0,
+                width: 2,
+                height: 2,
+            }
+        );
+        assert_eq!(
+            plan.placements[0].destination_rect,
+            PhysicalRect {
+                x: 0,
+                y: 0,
+                width: 2,
+                height: 2,
+            }
+        );
+        assert_eq!(plan.placements[1].snapshot_index, 1);
+        assert_eq!(
+            plan.placements[1].source_rect,
+            PhysicalRect {
+                x: 0,
+                y: 0,
+                width: 2,
+                height: 2,
+            }
+        );
+        assert_eq!(
+            plan.placements[1].destination_rect,
+            PhysicalRect {
+                x: 2,
+                y: 0,
+                width: 2,
+                height: 2,
+            }
         );
     }
 
