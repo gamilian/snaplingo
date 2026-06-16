@@ -6,6 +6,16 @@ export type CaptureInvoke = <T>(
   args?: CaptureInvokeArgs,
 ) => Promise<T>;
 
+interface CaptureShortcutEvent {
+  key: string;
+  metaKey: boolean;
+  ctrlKey: boolean;
+}
+
+export function isSaveCaptureShortcut(event: CaptureShortcutEvent) {
+  return event.key.toLowerCase() === 's' && (event.metaKey || event.ctrlKey);
+}
+
 export async function saveCaptureSelection(
   invoke: CaptureInvoke,
   sessionId: string,

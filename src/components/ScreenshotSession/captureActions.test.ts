@@ -3,6 +3,7 @@ import type { AnnotationCommand, LogicalRect } from './types';
 import {
   type CaptureInvoke,
   type CaptureInvokeArgs,
+  isSaveCaptureShortcut,
   saveCaptureSelection,
 } from './captureActions';
 
@@ -46,5 +47,36 @@ describe('capture session actions', () => {
         },
       },
     ]);
+  });
+
+  it('uses Cmd/Ctrl+S for saving the current selection', () => {
+    expect(
+      isSaveCaptureShortcut({
+        key: 's',
+        metaKey: true,
+        ctrlKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isSaveCaptureShortcut({
+        key: 'S',
+        metaKey: false,
+        ctrlKey: true,
+      }),
+    ).toBe(true);
+    expect(
+      isSaveCaptureShortcut({
+        key: 's',
+        metaKey: false,
+        ctrlKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      isSaveCaptureShortcut({
+        key: 'c',
+        metaKey: true,
+        ctrlKey: false,
+      }),
+    ).toBe(false);
   });
 });

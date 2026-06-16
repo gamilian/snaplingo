@@ -60,7 +60,10 @@ import {
   updateTextAnnotationDraft,
   type TextAnnotationDraft,
 } from './textAnnotationDraft';
-import { saveCaptureSelection } from './captureActions';
+import {
+  isSaveCaptureShortcut,
+  saveCaptureSelection,
+} from './captureActions';
 import { parseCaptureLaunchPayload } from './windowMode';
 import {
   getMonitorAtVirtualPoint,
@@ -943,6 +946,9 @@ export default function ScreenshotSession({
       ) {
         event.preventDefault();
         void copySelection();
+      } else if (status === 'preview' && isSaveCaptureShortcut(event)) {
+        event.preventDefault();
+        void saveSelection();
       } else if (status === 'preview' && selection && selectionBounds && isArrowKey(event.key)) {
         event.preventDefault();
         const step = event.shiftKey ? KEYBOARD_FAST_NUDGE_STEP : KEYBOARD_NUDGE_STEP;
@@ -968,6 +974,7 @@ export default function ScreenshotSession({
     redoAnnotation,
     isActive,
     renderSelectionPreview,
+    saveSelection,
     selection,
     selectionBounds,
     selectedAnnotationIndex,
