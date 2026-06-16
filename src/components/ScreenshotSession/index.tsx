@@ -55,6 +55,7 @@ import {
   annotationSizeDirectionFromShortcut,
   annotationToolFromShortcut,
   annotationColorToCss,
+  constrainAnnotationGesturePoint,
   annotationFromGesture,
   arrowHeadPoints,
   isCommittedAnnotation,
@@ -1304,6 +1305,13 @@ export default function ScreenshotSession({
       const points = isPointStrokeAnnotationTool(annotationGesture.tool)
         ? appendAnnotationPoint(annotationGesture.points ?? [], localPoint)
         : undefined;
+      const gesturePoint = event.shiftKey
+        ? constrainAnnotationGesturePoint(
+            annotationGesture.tool,
+            annotationGesture.startPoint,
+            localPoint,
+          )
+        : localPoint;
       if (points) {
         setAnnotationGesture({
           ...annotationGesture,
@@ -1314,7 +1322,7 @@ export default function ScreenshotSession({
         annotationFromGesture(
           annotationGesture.tool,
           annotationGesture.startPoint,
-          localPoint,
+          gesturePoint,
           annotationStyle,
           points,
         ),
@@ -1390,10 +1398,17 @@ export default function ScreenshotSession({
       const points = isPointStrokeAnnotationTool(annotationGesture.tool)
         ? appendAnnotationPoint(annotationGesture.points ?? [], localPoint)
         : undefined;
+      const gesturePoint = event.shiftKey
+        ? constrainAnnotationGesturePoint(
+            annotationGesture.tool,
+            annotationGesture.startPoint,
+            localPoint,
+          )
+        : localPoint;
       const nextAnnotation = annotationFromGesture(
         annotationGesture.tool,
         annotationGesture.startPoint,
-        localPoint,
+        gesturePoint,
         annotationStyle,
         points,
       );

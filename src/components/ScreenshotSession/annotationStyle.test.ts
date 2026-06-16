@@ -5,6 +5,7 @@ import {
   annotationFromText,
   annotationFromGesture,
   applyAnnotationStyle,
+  constrainAnnotationGesturePoint,
   annotationSizeDirectionFromShortcut,
   annotationToolFromShortcut,
   isCommittedAnnotation,
@@ -159,6 +160,44 @@ describe('annotation style', () => {
       color: [40, 167, 69, 255],
       font_size: 24,
     });
+  });
+
+  it('constrains geometric annotation gestures while holding shift', () => {
+    expect(
+      constrainAnnotationGesturePoint(
+        'rectangle',
+        { x: 10, y: 10 },
+        { x: 40, y: 20 },
+      ),
+    ).toEqual({ x: 20, y: 20 });
+    expect(
+      constrainAnnotationGesturePoint(
+        'ellipse',
+        { x: 40, y: 40 },
+        { x: 15, y: 20 },
+      ),
+    ).toEqual({ x: 20, y: 20 });
+    expect(
+      constrainAnnotationGesturePoint(
+        'arrow',
+        { x: 10, y: 10 },
+        { x: 30, y: 18 },
+      ),
+    ).toEqual({ x: 30, y: 10 });
+    expect(
+      constrainAnnotationGesturePoint(
+        'line',
+        { x: 10, y: 10 },
+        { x: 20, y: 40 },
+      ),
+    ).toEqual({ x: 10, y: 40 });
+    expect(
+      constrainAnnotationGesturePoint(
+        'pen',
+        { x: 10, y: 10 },
+        { x: 30, y: 18 },
+      ),
+    ).toEqual({ x: 30, y: 18 });
   });
 
   it('maps plain tool shortcut keys to annotation tools', () => {

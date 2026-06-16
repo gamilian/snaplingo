@@ -120,6 +120,56 @@ export function nextTextFontSize(
   return stepBoundedValue(value, direction, MIN_TEXT_FONT_SIZE, MAX_TEXT_FONT_SIZE);
 }
 
+function constrainToSquare(startPoint: Point, currentPoint: Point): Point {
+  const deltaX = currentPoint.x - startPoint.x;
+  const deltaY = currentPoint.y - startPoint.y;
+  const size = Math.min(Math.abs(deltaX), Math.abs(deltaY));
+
+  return {
+    x: startPoint.x + Math.sign(deltaX) * size,
+    y: startPoint.y + Math.sign(deltaY) * size,
+  };
+}
+
+function constrainToStraightLine(startPoint: Point, currentPoint: Point): Point {
+  const deltaX = currentPoint.x - startPoint.x;
+  const deltaY = currentPoint.y - startPoint.y;
+  const absX = Math.abs(deltaX);
+  const absY = Math.abs(deltaY);
+  if (absX === 0 || absY === 0) return currentPoint;
+
+  const ratio = absX / absY;
+  if (ratio >= 2) return { x: currentPoint.x, y: startPoint.y };
+  if (ratio <= 0.5) return { x: startPoint.x, y: currentPoint.y };
+
+  const size = Math.min(absX, absY);
+  return {
+    x: startPoint.x + Math.sign(deltaX) * size,
+    y: startPoint.y + Math.sign(deltaY) * size,
+  };
+}
+
+export function constrainAnnotationGesturePoint(
+  tool: AnnotationTool,
+  startPoint: Point,
+  currentPoint: Point,
+): Point {
+  if (
+    tool === 'rectangle' ||
+    tool === 'ellipse' ||
+    tool === 'mosaic' ||
+    tool === 'blur'
+  ) {
+    return constrainToSquare(startPoint, currentPoint);
+  }
+
+  if (tool === 'line' || tool === 'arrow') {
+    return constrainToStraightLine(startPoint, currentPoint);
+  }
+
+  return currentPoint;
+}
+
 export function annotationFromGesture(
   tool: AnnotationTool,
   startPoint: Point,
