@@ -14,6 +14,15 @@ interface CaptureShortcutEvent {
   shiftKey?: boolean;
 }
 
+interface CapturePointerEvent {
+  detail: number;
+  button: number;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  altKey: boolean;
+  shiftKey: boolean;
+}
+
 export function isSaveCaptureShortcut(event: CaptureShortcutEvent) {
   return event.key.toLowerCase() === 's' && (event.metaKey || event.ctrlKey);
 }
@@ -21,6 +30,17 @@ export function isSaveCaptureShortcut(event: CaptureShortcutEvent) {
 export function isPinCaptureShortcut(event: CaptureShortcutEvent) {
   return (
     event.key === 'F3' &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !event.shiftKey
+  );
+}
+
+export function isCopyCaptureDoubleClick(event: CapturePointerEvent) {
+  return (
+    event.detail >= 2 &&
+    event.button === 0 &&
     !event.metaKey &&
     !event.ctrlKey &&
     !event.altKey &&

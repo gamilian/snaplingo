@@ -72,6 +72,7 @@ import {
   type TextAnnotationDraft,
 } from './textAnnotationDraft';
 import {
+  isCopyCaptureDoubleClick,
   isPinCaptureShortcut,
   isSaveCaptureShortcut,
   saveCaptureSelection,
@@ -1467,6 +1468,12 @@ export default function ScreenshotSession({
         startPoint: localPoint,
         startAnnotation: hitAnnotation,
       });
+      return;
+    }
+
+    if (!textDraft && isCopyCaptureDoubleClick(event)) {
+      event.preventDefault();
+      void copySelection();
       return;
     }
 

@@ -3,6 +3,7 @@ import type { AnnotationCommand, LogicalRect } from './types';
 import {
   type CaptureInvoke,
   type CaptureInvokeArgs,
+  isCopyCaptureDoubleClick,
   isPinCaptureShortcut,
   isSaveCaptureShortcut,
   saveCaptureSelection,
@@ -114,6 +115,49 @@ describe('capture session actions', () => {
         key: 'p',
         metaKey: false,
         ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('uses an unmodified primary-button double click for copying the current selection', () => {
+    expect(
+      isCopyCaptureDoubleClick({
+        detail: 2,
+        button: 0,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isCopyCaptureDoubleClick({
+        detail: 1,
+        button: 0,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      isCopyCaptureDoubleClick({
+        detail: 2,
+        button: 2,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      isCopyCaptureDoubleClick({
+        detail: 2,
+        button: 0,
+        metaKey: false,
+        ctrlKey: true,
         altKey: false,
         shiftKey: false,
       }),
