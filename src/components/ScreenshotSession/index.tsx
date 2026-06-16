@@ -76,6 +76,7 @@ import {
   isCopyCaptureDoubleClick,
   isPinCaptureShortcut,
   isSaveCaptureShortcut,
+  isToggleToolbarShortcut,
   saveCaptureSelection,
 } from './captureActions';
 import { parseCaptureLaunchPayload } from './windowMode';
@@ -366,6 +367,7 @@ export default function ScreenshotSession({
   const [cursorColor, setCursorColor] = useState<ColorSample | null>(null);
   const [sampleCanvasVersion, setSampleCanvasVersion] = useState(0);
   const [isRenderingOutput, setIsRenderingOutput] = useState(false);
+  const [isToolbarHidden, setIsToolbarHidden] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasStartedInitialSession, setHasStartedInitialSession] = useState(false);
 
@@ -481,6 +483,7 @@ export default function ScreenshotSession({
     setCursorColor(null);
     setSampleCanvasVersion(0);
     setIsRenderingOutput(false);
+    setIsToolbarHidden(false);
     setError(null);
   }, []);
 
@@ -520,6 +523,7 @@ export default function ScreenshotSession({
     setCursorColor(null);
     setSampleCanvasVersion(0);
     setIsRenderingOutput(false);
+    setIsToolbarHidden(false);
     setError(null);
 
     try {
@@ -1047,6 +1051,13 @@ export default function ScreenshotSession({
       } else if (
         status === 'preview' &&
         !textDraft &&
+        isToggleToolbarShortcut(event)
+      ) {
+        event.preventDefault();
+        setIsToolbarHidden((isHidden) => !isHidden);
+      } else if (
+        status === 'preview' &&
+        !textDraft &&
         (event.key === '[' || event.key === ']')
       ) {
         const sizeDirection = annotationSizeDirectionFromShortcut(event);
@@ -1173,6 +1184,7 @@ export default function ScreenshotSession({
     setTextDraft(null);
     setTextDraftAnnotationIndex(null);
     setAnnotationHistory(emptyAnnotationHistory());
+    setIsToolbarHidden(false);
   };
 
   const applyEditGesture = useCallback(
@@ -1852,7 +1864,7 @@ export default function ScreenshotSession({
               ))}
             </div>
           )}
-          {toolbarPosition && (
+          {toolbarPosition && !isToolbarHidden && (
             <div
               className="absolute flex h-9 items-center gap-1 rounded bg-neutral-950/90 p-1 text-xs text-white shadow-lg ring-1 ring-white/15"
               style={{

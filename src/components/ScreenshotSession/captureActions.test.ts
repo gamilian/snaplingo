@@ -7,6 +7,7 @@ import {
   isCopyCaptureDoubleClick,
   isPinCaptureShortcut,
   isSaveCaptureShortcut,
+  isToggleToolbarShortcut,
   saveCaptureSelection,
 } from './captureActions';
 
@@ -190,6 +191,36 @@ describe('capture session actions', () => {
         metaKey: false,
         ctrlKey: false,
         altKey: true,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('uses plain Tab for toggling the capture toolbar visibility', () => {
+    expect(
+      isToggleToolbarShortcut({
+        key: 'Tab',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isToggleToolbarShortcut({
+        key: 'Tab',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(false);
+    expect(
+      isToggleToolbarShortcut({
+        key: 't',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
         shiftKey: false,
       }),
     ).toBe(false);
