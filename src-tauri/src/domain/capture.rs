@@ -75,6 +75,15 @@ pub struct CaptureSessionView {
     pub monitors: Vec<MonitorSnapshotView>,
 }
 
+/// Frontend-safe pinned image metadata and image data.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PinnedImageView {
+    pub id: String,
+    pub image_base64: String,
+    pub width: u32,
+    pub height: u32,
+}
+
 /// Output action requested for a capture session selection.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]

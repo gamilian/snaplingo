@@ -37,7 +37,7 @@ const MIN_SELECTION_SIZE = 10;
 const KEYBOARD_NUDGE_STEP = 1;
 const KEYBOARD_FAST_NUDGE_STEP = 10;
 const TOOLBAR_GAP = 8;
-const TOOLBAR_SIZE = { width: 168, height: 36 };
+const TOOLBAR_SIZE = { width: 216, height: 36 };
 const ARROW_KEYS: ArrowKey[] = ['ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowLeft'];
 const SELECTION_HANDLES: SelectionHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
@@ -265,6 +265,29 @@ export default function ScreenshotSession({
         rect: selection,
       });
       await invoke('open_result_window', { text: ocrResult.text });
+      await invoke('cancel_capture_session', { sessionId: session.id });
+      resetSessionState();
+      onInactive?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setStatus('error');
+    } finally {
+      setIsRenderingOutput(false);
+    }
+  }, [onInactive, resetSessionState, selection, session]);
+
+  const pinSelection = useCallback(async () => {
+    if (!session || !selection) return;
+
+    setIsRenderingOutput(true);
+    setError(null);
+
+    try {
+      await invoke('output_capture', {
+        sessionId: session.id,
+        rect: selection,
+        action: { type: 'pin' },
+      });
       await invoke('cancel_capture_session', { sessionId: session.id });
       resetSessionState();
       onInactive?.();
@@ -557,6 +580,16 @@ export default function ScreenshotSession({
                 onClick={runOcrSelection}
               >
                 OCR
+              </button>
+              <button
+                type="button"
+                className="h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50"
+                disabled={isRenderingOutput}
+                title="Pin"
+                aria-label="Pin selection"
+                onClick={pinSelection}
+              >
+                Pin
               </button>
               <button
                 type="button"

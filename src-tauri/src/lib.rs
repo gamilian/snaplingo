@@ -37,7 +37,7 @@ use application::providers::ocr::{
 };
 use application::{
     CaptureOutputService, CaptureService, CaptureSessionService, HistoryService,
-    ImageCompositionService, WorkflowService,
+    ImageCompositionService, PinnedImageService, WorkflowService,
 };
 use infrastructure::system::screenshot::get_screenshot_backend;
 use infrastructure::system::paths::get_history_db_path;
@@ -118,6 +118,7 @@ pub struct AppState {
     pub capture_session_service: Arc<CaptureSessionService>,
     pub image_composition_service: Arc<ImageCompositionService>,
     pub capture_output_service: Arc<CaptureOutputService>,
+    pub pinned_image_service: Arc<PinnedImageService>,
     pub screenshot_state: Arc<ParkingLotMutex<ScreenshotState>>,
 
     // Phase 5: History
@@ -281,6 +282,7 @@ impl AppState {
         let capture_session_service = Arc::new(CaptureSessionService::new(screenshot_backend));
         let image_composition_service = Arc::new(ImageCompositionService::new());
         let capture_output_service = Arc::new(CaptureOutputService::new());
+        let pinned_image_service = Arc::new(PinnedImageService::new());
         let screenshot_state = Arc::new(ParkingLotMutex::new(ScreenshotState::default()));
 
         // Phase 6: Workflows
@@ -300,6 +302,7 @@ impl AppState {
             capture_session_service,
             image_composition_service,
             capture_output_service,
+            pinned_image_service,
             screenshot_state,
             history_service,
             event_bus,
@@ -440,6 +443,8 @@ pub fn run() {
       commands::cancel_capture_session,
       commands::render_capture_output,
       commands::output_capture,
+      commands::get_pinned_image,
+      commands::remove_pinned_image,
       commands::run_capture_ocr,
       commands::get_translation_history,
       commands::get_ocr_history,

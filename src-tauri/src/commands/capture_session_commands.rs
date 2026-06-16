@@ -5,12 +5,14 @@ use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder
 
 use crate::domain::capture::{
     CaptureOutputAction, CaptureSessionId, CaptureSessionView, LogicalRect, MonitorSnapshotView,
-    PhysicalRect,
+    PhysicalRect, PinnedImageView,
 };
 use crate::domain::ocr::{OcrRequest, OcrResult};
 use crate::infrastructure::system::screenshot::MonitorSnapshot;
 
 const CAPTURE_WINDOW_LABEL: &str = "capture";
+const PIN_WINDOW_MAX_WIDTH: f64 = 900.0;
+const PIN_WINDOW_MAX_HEIGHT: f64 = 700.0;
 
 #[tauri::command]
 pub async fn open_capture_window(
@@ -89,6 +91,7 @@ pub async fn output_capture(
     session_id: String,
     rect: LogicalRect,
     action: CaptureOutputAction,
+    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     let session_id = CaptureSessionId(session_id);
@@ -108,10 +111,32 @@ pub async fn output_capture(
             .copy_png(&png_data)
             .await
             .map_err(|e| e.to_string()),
-        CaptureOutputAction::Pin => {
-            Err("Pin output is not available until the pin window backend is wired".to_string())
-        }
+        CaptureOutputAction::Pin => pin_capture_png(&app, state.inner(), png_data),
     }
+}
+
+#[tauri::command]
+pub fn get_pinned_image(
+    image_id: String,
+    state: State<'_, crate::AppState>,
+) -> Result<PinnedImageView, String> {
+    state
+        .inner()
+        .pinned_image_service
+        .get_pinned_image(&image_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn remove_pinned_image(
+    image_id: String,
+    state: State<'_, crate::AppState>,
+) -> Result<(), String> {
+    state
+        .inner()
+        .pinned_image_service
+        .remove_pinned_image(&image_id)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -188,6 +213,47 @@ pub fn open_capture_window_for_session(
     Ok(())
 }
 
+fn pin_capture_png(
+    app: &AppHandle,
+    state: &crate::AppState,
+    png_data: Vec<u8>,
+) -> Result<(), String> {
+    let image_id = state
+        .pinned_image_service
+        .pin_png(png_data)
+        .map_err(|e| e.to_string())?;
+    let image = state
+        .pinned_image_service
+        .get_pinned_image(&image_id)
+        .map_err(|e| e.to_string())?;
+
+    open_pinned_image_window(app, &image)
+}
+
+fn open_pinned_image_window(app: &AppHandle, image: &PinnedImageView) -> Result<(), String> {
+    let label = pinned_window_label(&image.id);
+    let (width, height) = pinned_window_size(image.width, image.height);
+
+    WebviewWindowBuilder::new(
+        app,
+        &label,
+        WebviewUrl::App(pinned_window_url(&image.id)),
+    )
+    .title("SnapLingo Pin")
+    .inner_size(width, height)
+    .min_inner_size(80.0, 60.0)
+    .decorations(false)
+    .always_on_top(true)
+    .visible_on_all_workspaces(true)
+    .skip_taskbar(true)
+    .focused(true)
+    .shadow(true)
+    .build()
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
 fn render_capture_png(
     session_id: &CaptureSessionId,
     rect: &LogicalRect,
@@ -236,6 +302,24 @@ fn capture_window_url_with_session(mode: &str, session_id: &str) -> PathBuf {
         capture_window_url(mode).to_string_lossy(),
         session_id
     ))
+}
+
+fn pinned_window_url(image_id: &str) -> PathBuf {
+    PathBuf::from(format!("index.html?window=pin&imageId={}", image_id))
+}
+
+fn pinned_window_label(image_id: &str) -> String {
+    format!("pin-{}", image_id)
+}
+
+fn pinned_window_size(width: u32, height: u32) -> (f64, f64) {
+    let width = width.max(1) as f64;
+    let height = height.max(1) as f64;
+    let scale = (PIN_WINDOW_MAX_WIDTH / width)
+        .min(PIN_WINDOW_MAX_HEIGHT / height)
+        .min(1.0);
+
+    ((width * scale).max(80.0), (height * scale).max(60.0))
 }
 
 fn normalized_capture_mode(mode: &str) -> &'static str {
@@ -316,5 +400,19 @@ mod tests {
             super::capture_window_url("unknown").to_string_lossy(),
             "index.html?window=capture&mode=screenshot"
         );
+    }
+
+    #[test]
+    fn pinned_window_url_targets_pin_route() {
+        assert_eq!(
+            super::pinned_window_url("pin-1").to_string_lossy(),
+            "index.html?window=pin&imageId=pin-1"
+        );
+    }
+
+    #[test]
+    fn pinned_window_size_preserves_aspect_ratio_with_cap() {
+        assert_eq!(super::pinned_window_size(300, 200), (300.0, 200.0));
+        assert_eq!(super::pinned_window_size(1800, 900), (900.0, 450.0));
     }
 }

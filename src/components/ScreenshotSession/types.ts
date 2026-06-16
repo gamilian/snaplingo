@@ -25,6 +25,13 @@ export interface CaptureSessionView {
   monitors: MonitorSnapshotView[];
 }
 
+export interface PinnedImageView {
+  id: string;
+  image_base64: string;
+  width: number;
+  height: number;
+}
+
 export type CaptureMode = 'screenshot' | 'screenshot-ocr' | 'screenshot-translate';
 
 export interface CaptureLaunch {

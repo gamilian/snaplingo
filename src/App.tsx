@@ -3,6 +3,10 @@ import { listen } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { SettingsWindow } from './components/SettingsWindow';
 import ResultWindow from './components/ResultWindow';
+import {
+  PinnedImageWindow,
+  readPinnedImageLaunch,
+} from './components/PinnedImageWindow';
 import ScreenshotSession from './components/ScreenshotSession';
 import {
   CAPTURE_WINDOW_LABEL,
@@ -12,6 +16,7 @@ import { useAppStore } from './stores/appStore';
 
 const currentWindow = getCurrentWebviewWindow();
 const captureLaunch = readCaptureLaunch(window.location.search);
+const pinnedImageId = readPinnedImageLaunch(window.location.search);
 
 function App() {
   const resultWindowVisible = useAppStore((state) => state.resultWindowVisible);
@@ -19,9 +24,10 @@ function App() {
   const showResultWindow = useAppStore((state) => state.showResultWindow);
   const isCaptureWindow =
     currentWindow.label === CAPTURE_WINDOW_LABEL || captureLaunch !== null;
+  const isPinnedImageWindow = pinnedImageId !== null;
 
   useEffect(() => {
-    if (isCaptureWindow) return;
+    if (isCaptureWindow || isPinnedImageWindow) return;
 
     let disposed = false;
     let unlisten: (() => void) | undefined;
@@ -45,7 +51,7 @@ function App() {
       disposed = true;
       unlisten?.();
     };
-  }, [isCaptureWindow, setSourceText, showResultWindow]);
+  }, [isCaptureWindow, isPinnedImageWindow, setSourceText, showResultWindow]);
 
   if (isCaptureWindow) {
     return (
@@ -57,6 +63,10 @@ function App() {
         }}
       />
     );
+  }
+
+  if (pinnedImageId) {
+    return <PinnedImageWindow imageId={pinnedImageId} />;
   }
 
   return (
