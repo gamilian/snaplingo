@@ -6,7 +6,10 @@ use tauri::{
     WebviewWindowBuilder,
 };
 
-use crate::application::services::image_composition_service::{ImageAnnotation, PngPlacement};
+use crate::application::services::{
+    image_composition_service::{ImageAnnotation, PngPlacement},
+    CaptureOutputService, PinnedImageService,
+};
 use crate::domain::capture::{
     AnnotationCommand, CaptureOutputAction, CaptureSessionId, CaptureSessionView, LogicalPoint,
     LogicalRect, MonitorSnapshotView, PhysicalPoint, PhysicalRect, PinnedImageView,
@@ -191,6 +194,38 @@ pub async fn copy_pinned_image(
         .capture_output_service
         .copy_png(&png_data)
         .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn save_pinned_image(
+    image_id: String,
+    path: String,
+    state: State<'_, crate::AppState>,
+) -> Result<(), String> {
+    save_pinned_png_by_id(
+        &state.inner().pinned_image_service,
+        &state.inner().capture_output_service,
+        &image_id,
+        Path::new(&path),
+    )
+    .await
+}
+
+async fn save_pinned_png_by_id(
+    pinned_images: &PinnedImageService,
+    output: &CaptureOutputService,
+    image_id: &str,
+    path: &Path,
+) -> Result<(), String> {
+    let png_data = pinned_images
+        .get_pinned_png(image_id)
+        .map_err(|e| e.to_string())?;
+
+    output
+        .save_png(&png_data, path)
+        .await
+        .map(|_| ())
         .map_err(|e| e.to_string())
 }
 
@@ -671,7 +706,12 @@ fn scaled_extent(value: f64, scale: f64) -> Result<u32, String> {
 
 #[cfg(test)]
 mod tests {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use image::ImageEncoder;
+
     use crate::application::services::image_composition_service::ImageAnnotation;
+    use crate::application::services::{CaptureOutputService, PinnedImageService};
     use crate::domain::capture::{
         AnnotationCommand, LogicalPoint, LogicalRect, MonitorSnapshotView, PhysicalPoint,
         PhysicalRect,
@@ -1035,5 +1075,42 @@ mod tests {
         let path = super::capture_save_path(std::path::Path::new("/tmp"), "20260617-023000");
 
         assert_eq!(path.to_string_lossy(), "/tmp/SnapLingo-20260617-023000.png");
+    }
+
+    #[tokio::test]
+    async fn save_pinned_png_by_id_writes_original_png_to_path() {
+        let pinned_images = PinnedImageService::new();
+        let output = CaptureOutputService::new();
+        let png = make_test_png(2, 3);
+        let image_id = pinned_images.pin_png(png.clone()).unwrap();
+        let path = temp_png_path();
+
+        super::save_pinned_png_by_id(&pinned_images, &output, &image_id, &path)
+            .await
+            .unwrap();
+
+        assert_eq!(std::fs::read(&path).unwrap(), png);
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    fn make_test_png(width: u32, height: u32) -> Vec<u8> {
+        let pixels = vec![255; (width * height * 4) as usize];
+        let mut png = Vec::new();
+        let encoder = image::codecs::png::PngEncoder::new(&mut png);
+        encoder
+            .write_image(&pixels, width, height, image::ExtendedColorType::Rgba8)
+            .unwrap();
+        png
+    }
+
+    fn temp_png_path() -> std::path::PathBuf {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir()
+            .join("snaplingo-pinned-output-tests")
+            .join(format!("pin-{}.png", suffix))
     }
 }

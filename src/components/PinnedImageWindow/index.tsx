@@ -10,10 +10,11 @@ import {
   getPinnedOpacityPreset,
   getPinnedZoomFromWheel,
 } from './pinControls';
+import { savePinnedImage } from './pinActions';
 
 const appWindow = getCurrentWindow();
 const webviewWindow = getCurrentWebviewWindow();
-const PIN_CONTEXT_MENU_SIZE = { width: 132, height: 192 };
+const PIN_CONTEXT_MENU_SIZE = { width: 132, height: 220 };
 
 function readPinnedImageId(search: string) {
   const params = new URLSearchParams(search);
@@ -102,6 +103,15 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
   const copyPinnedImage = useCallback(async () => {
     try {
       await invoke('copy_pinned_image', { imageId });
+      setContextMenuPosition(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [imageId]);
+
+  const savePinnedImageAs = useCallback(async () => {
+    try {
+      await savePinnedImage(invoke, imageId);
       setContextMenuPosition(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -206,6 +216,13 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
             onClick={copyPinnedImage}
           >
             Copy
+          </button>
+          <button
+            type="button"
+            className="h-7 w-full rounded px-2 text-left hover:bg-white/15"
+            onClick={savePinnedImageAs}
+          >
+            Save As
           </button>
           <button
             type="button"
