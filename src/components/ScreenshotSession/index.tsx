@@ -28,9 +28,14 @@ import {
 import {
   addAnnotationToHistory,
   emptyAnnotationHistory,
+  removeAnnotationFromHistory,
   redoAnnotationHistory,
   undoAnnotationHistory,
 } from './annotationHistory';
+import {
+  getAnnotationBounds,
+  hitTestAnnotations,
+} from './annotationGeometry';
 import {
   ANNOTATION_COLORS,
   DEFAULT_TEXT_FONT_SIZE,
@@ -309,6 +314,9 @@ export default function ScreenshotSession({
   const [annotationGesture, setAnnotationGesture] =
     useState<AnnotationGesture | null>(null);
   const [draftAnnotation, setDraftAnnotation] = useState<AnnotationCommand | null>(null);
+  const [selectedAnnotationIndex, setSelectedAnnotationIndex] = useState<number | null>(
+    null,
+  );
   const [textDraft, setTextDraft] = useState<TextAnnotationDraft | null>(null);
   const [annotationStyle, setAnnotationStyle] = useState<AnnotationStyle>(
     DEFAULT_ANNOTATION_STYLE,
@@ -324,8 +332,14 @@ export default function ScreenshotSession({
 
   const isActive = status !== 'idle';
   const annotations = annotationHistory.annotations;
-  const canUndoAnnotation = annotationHistory.annotations.length > 0;
-  const canRedoAnnotation = annotationHistory.undoneAnnotations.length > 0;
+  const canUndoAnnotation =
+    annotationHistory.undoSnapshots !== undefined
+      ? annotationHistory.undoSnapshots.length > 0
+      : annotationHistory.annotations.length > 0;
+  const canRedoAnnotation =
+    annotationHistory.redoSnapshots !== undefined
+      ? annotationHistory.redoSnapshots.length > 0
+      : annotationHistory.undoneAnnotations.length > 0;
   const sizeLabel = selection
     ? `${Math.round(selection.width)} x ${Math.round(selection.height)}`
     : '';
@@ -371,6 +385,13 @@ export default function ScreenshotSession({
 
     return virtualPointToViewportPoint(cursorPoint, selectionBounds);
   }, [cursorPoint, selectionBounds]);
+  const selectedAnnotationBounds = useMemo<LogicalRect | null>(() => {
+    if (selectedAnnotationIndex === null || !annotations[selectedAnnotationIndex]) {
+      return null;
+    }
+
+    return getAnnotationBounds(annotations[selectedAnnotationIndex]);
+  }, [annotations, selectedAnnotationIndex]);
   const cursorMonitor = useMemo<MonitorSnapshotView | null>(() => {
     if (!session || !cursorPoint) return null;
 
@@ -401,6 +422,7 @@ export default function ScreenshotSession({
     setActiveAnnotationTool(null);
     setAnnotationGesture(null);
     setDraftAnnotation(null);
+    setSelectedAnnotationIndex(null);
     setTextDraft(null);
     setAnnotationHistory(emptyAnnotationHistory());
     setPreviewImageBase64(null);
@@ -436,6 +458,7 @@ export default function ScreenshotSession({
     setActiveAnnotationTool(null);
     setAnnotationGesture(null);
     setDraftAnnotation(null);
+    setSelectedAnnotationIndex(null);
     setTextDraft(null);
     setAnnotationHistory(emptyAnnotationHistory());
     setPreviewImageBase64(null);
@@ -502,6 +525,7 @@ export default function ScreenshotSession({
     );
     setTextDraft(null);
     if (nextHistory !== annotationHistory) {
+      setSelectedAnnotationIndex(null);
       setAnnotationHistory(nextHistory);
     }
 
@@ -607,20 +631,41 @@ export default function ScreenshotSession({
   }, [commitTextDraftToHistory, onInactive, resetSessionState, selection, session]);
 
   const undoAnnotation = useCallback(() => {
-    if (!selection || annotationHistory.annotations.length === 0) return;
+    if (!selection || !canUndoAnnotation) return;
 
     const nextHistory = undoAnnotationHistory(annotationHistory);
+    setSelectedAnnotationIndex(null);
     setAnnotationHistory(nextHistory);
     void renderSelectionPreview(selection, nextHistory.annotations);
-  }, [annotationHistory, renderSelectionPreview, selection]);
+  }, [annotationHistory, canUndoAnnotation, renderSelectionPreview, selection]);
 
   const redoAnnotation = useCallback(() => {
-    if (!selection || annotationHistory.undoneAnnotations.length === 0) return;
+    if (!selection || !canRedoAnnotation) return;
 
     const nextHistory = redoAnnotationHistory(annotationHistory);
+    setSelectedAnnotationIndex(null);
     setAnnotationHistory(nextHistory);
     void renderSelectionPreview(selection, nextHistory.annotations);
-  }, [annotationHistory, renderSelectionPreview, selection]);
+  }, [annotationHistory, canRedoAnnotation, renderSelectionPreview, selection]);
+
+  const deleteSelectedAnnotation = useCallback(() => {
+    if (!selection || selectedAnnotationIndex === null) return;
+
+    const nextHistory = removeAnnotationFromHistory(
+      annotationHistory,
+      selectedAnnotationIndex,
+    );
+    if (nextHistory === annotationHistory) return;
+
+    setSelectedAnnotationIndex(null);
+    setAnnotationHistory(nextHistory);
+    void renderSelectionPreview(selection, nextHistory.annotations);
+  }, [
+    annotationHistory,
+    renderSelectionPreview,
+    selectedAnnotationIndex,
+    selection,
+  ]);
 
   const commitTextDraft = useCallback(() => {
     const nextHistory = commitTextDraftToHistory();
@@ -724,6 +769,8 @@ export default function ScreenshotSession({
         event.preventDefault();
         if (textDraft) {
           setTextDraft(null);
+        } else if (selectedAnnotationIndex !== null) {
+          setSelectedAnnotationIndex(null);
         } else if (activeAnnotationTool || annotationGesture) {
           setActiveAnnotationTool(null);
           setAnnotationGesture(null);
@@ -751,6 +798,13 @@ export default function ScreenshotSession({
         redoAnnotation();
       } else if (
         status === 'preview' &&
+        selectedAnnotationIndex !== null &&
+        (event.key === 'Backspace' || event.key === 'Delete')
+      ) {
+        event.preventDefault();
+        deleteSelectedAnnotation();
+      } else if (
+        status === 'preview' &&
         (event.key === 'Enter' ||
           ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'c'))
       ) {
@@ -774,11 +828,13 @@ export default function ScreenshotSession({
     activeAnnotationTool,
     annotationGesture,
     textDraft,
+    deleteSelectedAnnotation,
     redoAnnotation,
     isActive,
     renderSelectionPreview,
     selection,
     selectionBounds,
+    selectedAnnotationIndex,
     status,
     undoAnnotation,
   ]);
@@ -809,6 +865,7 @@ export default function ScreenshotSession({
     setActiveAnnotationTool(null);
     setAnnotationGesture(null);
     setDraftAnnotation(null);
+    setSelectedAnnotationIndex(null);
     setTextDraft(null);
     setAnnotationHistory(emptyAnnotationHistory());
   };
@@ -944,6 +1001,7 @@ export default function ScreenshotSession({
       setDraftAnnotation(null);
       if (isCommittedAnnotation(nextAnnotation)) {
         const nextHistory = addAnnotationToHistory(annotationHistory, nextAnnotation);
+        setSelectedAnnotationIndex(null);
         setAnnotationHistory(nextHistory);
         void renderSelectionPreview(selection, nextHistory.annotations);
       }
@@ -1000,6 +1058,7 @@ export default function ScreenshotSession({
     );
     setCursorPoint(point);
     if (activeAnnotationTool) {
+      setSelectedAnnotationIndex(null);
       const localPoint = clampPointToRect(
         { x: point.x - selection.x, y: point.y - selection.y },
         selection,
@@ -1030,6 +1089,17 @@ export default function ScreenshotSession({
       return;
     }
 
+    const localPoint = clampPointToRect(
+      { x: point.x - selection.x, y: point.y - selection.y },
+      selection,
+    );
+    const hitAnnotationIndex = hitTestAnnotations(annotations, localPoint);
+    if (hitAnnotationIndex !== null) {
+      setSelectedAnnotationIndex(hitAnnotationIndex);
+      return;
+    }
+
+    setSelectedAnnotationIndex(null);
     setEditGesture({
       type: 'move',
       startPoint: point,
@@ -1327,6 +1397,17 @@ export default function ScreenshotSession({
                 }
               }}
               onPointerDown={(event) => event.stopPropagation()}
+            />
+          )}
+          {selectedAnnotationBounds && (
+            <div
+              className="pointer-events-none absolute border border-dashed border-white shadow-[0_0_0_1px_rgba(0,0,0,0.55)]"
+              style={rectStyle(
+                annotationRectToViewportRect(
+                  selectedAnnotationBounds,
+                  selectionViewportRect,
+                ),
+              )}
             />
           )}
           <div

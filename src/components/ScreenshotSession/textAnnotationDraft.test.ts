@@ -94,6 +94,8 @@ describe('text annotation draft', () => {
         },
       ],
       undoneAnnotations: [],
+      undoSnapshots: [history.annotations],
+      redoSnapshots: [],
     });
   });
 

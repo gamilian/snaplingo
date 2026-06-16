@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { AnnotationCommand } from './types';
 import {
   addAnnotationToHistory,
+  removeAnnotationFromHistory,
   redoAnnotationHistory,
   undoAnnotationHistory,
 } from './annotationHistory';
@@ -31,24 +32,81 @@ describe('annotation history', () => {
     expect(history).toEqual({
       annotations: [rectangle, arrow],
       undoneAnnotations: [],
+      undoSnapshots: [[rectangle]],
+      redoSnapshots: [],
     });
   });
 
   it('undos and redos the last annotation', () => {
-    const undone = undoAnnotationHistory({
-      annotations: [rectangle, arrow],
-      undoneAnnotations: [],
-    });
+    const history = addAnnotationToHistory(
+      addAnnotationToHistory(
+        { annotations: [], undoneAnnotations: [] },
+        rectangle,
+      ),
+      arrow,
+    );
+    const undone = undoAnnotationHistory(history);
 
     expect(undone).toEqual({
       annotations: [rectangle],
-      undoneAnnotations: [arrow],
+      undoneAnnotations: [],
+      undoSnapshots: [[]],
+      redoSnapshots: [[rectangle, arrow]],
     });
 
     expect(redoAnnotationHistory(undone)).toEqual({
       annotations: [rectangle, arrow],
       undoneAnnotations: [],
+      undoSnapshots: [[], [rectangle]],
+      redoSnapshots: [],
     });
+  });
+
+  it('removes annotations with undo and redo support', () => {
+    const removed = removeAnnotationFromHistory(
+      {
+        annotations: [rectangle, arrow],
+        undoneAnnotations: [rectangle],
+      },
+      0,
+    );
+
+    expect(removed).toEqual({
+      annotations: [arrow],
+      undoneAnnotations: [],
+      undoSnapshots: [[rectangle, arrow]],
+      redoSnapshots: [],
+    });
+
+    expect(undoAnnotationHistory(removed)).toEqual({
+      annotations: [rectangle, arrow],
+      undoneAnnotations: [],
+      undoSnapshots: [],
+      redoSnapshots: [[arrow]],
+    });
+  });
+
+  it('keeps snapshot undo stable after the stack is exhausted', () => {
+    const removed = removeAnnotationFromHistory(
+      {
+        annotations: [rectangle, arrow],
+        undoneAnnotations: [],
+      },
+      1,
+    );
+    const undone = undoAnnotationHistory(removed);
+
+    expect(undoAnnotationHistory(undone)).toBe(undone);
+    expect(redoAnnotationHistory(redoAnnotationHistory(undone))).toEqual(
+      redoAnnotationHistory(undone),
+    );
+  });
+
+  it('keeps invalid annotation removals stable', () => {
+    const history = { annotations: [rectangle], undoneAnnotations: [] };
+
+    expect(removeAnnotationFromHistory(history, -1)).toBe(history);
+    expect(removeAnnotationFromHistory(history, 1)).toBe(history);
   });
 
   it('keeps empty undo and redo operations stable', () => {
