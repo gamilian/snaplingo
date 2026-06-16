@@ -4,6 +4,7 @@ use tauri::State;
 use crate::domain::capture::{
     CaptureOutputAction, CaptureSessionId, CaptureSessionView, LogicalRect, PhysicalRect,
 };
+use crate::domain::ocr::{OcrRequest, OcrResult};
 
 #[tauri::command]
 pub async fn create_capture_session(
@@ -65,6 +66,26 @@ pub async fn output_capture(
             Err("Pin output is not available until the pin window backend is wired".to_string())
         }
     }
+}
+
+#[tauri::command]
+pub async fn run_capture_ocr(
+    session_id: String,
+    rect: LogicalRect,
+    state: State<'_, crate::AppState>,
+) -> Result<OcrResult, String> {
+    let session_id = CaptureSessionId(session_id);
+    let png_data = render_capture_png(&session_id, &rect, &state)?;
+    let request = OcrRequest {
+        image_data: png_data,
+        language: None,
+    };
+
+    state
+        .ocr_coordinator
+        .recognize(&request)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 fn render_capture_png(

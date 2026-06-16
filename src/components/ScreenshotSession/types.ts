@@ -29,3 +29,8 @@ export interface Point {
   x: number;
   y: number;
 }
+
+export interface OcrResult {
+  text: string;
+  confidence: number | null;
+}

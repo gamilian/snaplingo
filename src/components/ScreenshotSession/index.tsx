@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { useAppStore } from '../../stores/appStore';
 import { normalizeSelection } from './selection';
-import type { CaptureSessionView, LogicalRect, Point } from './types';
+import type { CaptureSessionView, LogicalRect, OcrResult, Point } from './types';
 
 type CaptureMode = 'screenshot' | 'screenshot-ocr' | 'screenshot-translate';
 type SessionStatus = 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
@@ -74,6 +75,8 @@ export default function ScreenshotSession() {
   const [previewImageBase64, setPreviewImageBase64] = useState<string | null>(null);
   const [isRenderingOutput, setIsRenderingOutput] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const setSourceText = useAppStore((state) => state.setSourceText);
+  const showResultWindow = useAppStore((state) => state.showResultWindow);
 
   const monitor = session?.monitors[0] ?? null;
   const isActive = status !== 'idle';
@@ -137,6 +140,17 @@ export default function ScreenshotSession() {
           rect,
         });
         setPreviewImageBase64(base64);
+
+        if (mode === 'screenshot-ocr') {
+          const ocrResult = await invoke<OcrResult>('run_capture_ocr', {
+            sessionId: session.id,
+            rect,
+          });
+          setSourceText(ocrResult.text);
+          showResultWindow();
+          await invoke('cancel_capture_session', { sessionId: session.id });
+          resetSessionState();
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
         setStatus('error');
@@ -144,7 +158,7 @@ export default function ScreenshotSession() {
         setIsRenderingOutput(false);
       }
     },
-    [session],
+    [mode, resetSessionState, session, setSourceText, showResultWindow],
   );
 
   useEffect(() => {

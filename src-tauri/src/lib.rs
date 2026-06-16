@@ -452,6 +452,7 @@ pub fn run() {
       commands::cancel_capture_session,
       commands::render_capture_output,
       commands::output_capture,
+      commands::run_capture_ocr,
       commands::get_translation_history,
       commands::get_ocr_history,
       commands::search_history,
