@@ -74,4 +74,14 @@ export interface ArrowAnnotationCommand {
   stroke_width: number;
 }
 
-export type AnnotationCommand = RectangleAnnotationCommand | ArrowAnnotationCommand;
+export interface FreehandAnnotationCommand {
+  type: 'freehand';
+  points: Point[];
+  color: [number, number, number, number];
+  stroke_width: number;
+}
+
+export type AnnotationCommand =
+  | RectangleAnnotationCommand
+  | ArrowAnnotationCommand
+  | FreehandAnnotationCommand;

@@ -1,7 +1,7 @@
 import { normalizeSelection } from './selection';
 import type { AnnotationCommand, Point } from './types';
 
-export type AnnotationTool = 'rectangle' | 'arrow';
+export type AnnotationTool = 'rectangle' | 'arrow' | 'pen';
 export type AnnotationColor = [number, number, number, number];
 
 export interface AnnotationStyle {
@@ -32,11 +32,21 @@ export function annotationFromGesture(
   startPoint: Point,
   currentPoint: Point,
   style: AnnotationStyle,
+  points?: Point[],
 ): AnnotationCommand {
   if (tool === 'rectangle') {
     return {
       type: 'rectangle',
       rect: normalizeSelection(startPoint, currentPoint),
+      color: style.color,
+      stroke_width: style.strokeWidth,
+    };
+  }
+
+  if (tool === 'pen') {
+    return {
+      type: 'freehand',
+      points: points ?? [startPoint, currentPoint],
       color: style.color,
       stroke_width: style.strokeWidth,
     };
@@ -57,6 +67,17 @@ export function isCommittedAnnotation(annotation: AnnotationCommand) {
       annotation.rect.width >= MIN_ANNOTATION_SIZE &&
       annotation.rect.height >= MIN_ANNOTATION_SIZE
     );
+  }
+
+  if (annotation.type === 'freehand') {
+    if (annotation.points.length < 2) return false;
+
+    const pathLength = annotation.points.slice(1).reduce((total, point, index) => {
+      const previousPoint = annotation.points[index];
+      return total + Math.hypot(point.x - previousPoint.x, point.y - previousPoint.y);
+    }, 0);
+
+    return pathLength >= MIN_ANNOTATION_SIZE;
   }
 
   return (

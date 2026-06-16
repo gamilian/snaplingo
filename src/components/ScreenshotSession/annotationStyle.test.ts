@@ -44,6 +44,23 @@ describe('annotation style', () => {
     });
   });
 
+  it('creates freehand annotations from the captured stroke points', () => {
+    expect(
+      annotationFromGesture(
+        'pen',
+        { x: 1, y: 2 },
+        { x: 9, y: 10 },
+        style,
+        [{ x: 1, y: 2 }, { x: 4, y: 6 }, { x: 9, y: 10 }],
+      ),
+    ).toEqual({
+      type: 'freehand',
+      points: [{ x: 1, y: 2 }, { x: 4, y: 6 }, { x: 9, y: 10 }],
+      color: [40, 167, 69, 255],
+      stroke_width: 5,
+    });
+  });
+
   it('rejects tiny annotations', () => {
     expect(
       isCommittedAnnotation(
@@ -52,6 +69,17 @@ describe('annotation style', () => {
           { x: 1, y: 1 },
           { x: 2, y: 2 },
           style,
+        ),
+      ),
+    ).toBe(false);
+    expect(
+      isCommittedAnnotation(
+        annotationFromGesture(
+          'pen',
+          { x: 1, y: 1 },
+          { x: 2, y: 2 },
+          style,
+          [{ x: 1, y: 1 }, { x: 2, y: 2 }],
         ),
       ),
     ).toBe(false);

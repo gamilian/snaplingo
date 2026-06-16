@@ -401,6 +401,20 @@ fn image_annotations_from_commands(
                 color: *color,
                 stroke_width: ((*stroke_width).max(1) as f64 * output_scale).ceil() as u32,
             }),
+            AnnotationCommand::Freehand {
+                points,
+                color,
+                stroke_width,
+            } => Ok(ImageAnnotation::Freehand {
+                points: points
+                    .iter()
+                    .map(|point| {
+                        scaled_logical_point_relative_to(point, &annotation_origin, output_scale)
+                    })
+                    .collect::<Result<Vec<_>, String>>()?,
+                color: *color,
+                stroke_width: ((*stroke_width).max(1) as f64 * output_scale).ceil() as u32,
+            }),
         })
         .collect()
 }
@@ -788,6 +802,14 @@ mod tests {
                     color: [255, 77, 79, 255],
                     stroke_width: 2,
                 },
+                AnnotationCommand::Freehand {
+                    points: vec![
+                        LogicalPoint { x: 1.0, y: 1.5 },
+                        LogicalPoint { x: 3.0, y: 4.0 },
+                    ],
+                    color: [24, 144, 255, 255],
+                    stroke_width: 1,
+                },
             ],
             &LogicalRect {
                 x: 100.0,
@@ -799,7 +821,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(annotations.len(), 2);
+        assert_eq!(annotations.len(), 3);
         assert_eq!(
             annotations[0],
             ImageAnnotation::Rectangle {
@@ -820,6 +842,14 @@ mod tests {
                 end: PhysicalPoint { x: 10, y: 14 },
                 color: [255, 77, 79, 255],
                 stroke_width: 4,
+            }
+        );
+        assert_eq!(
+            annotations[2],
+            ImageAnnotation::Freehand {
+                points: vec![PhysicalPoint { x: 2, y: 3 }, PhysicalPoint { x: 6, y: 8 }],
+                color: [24, 144, 255, 255],
+                stroke_width: 2,
             }
         );
     }

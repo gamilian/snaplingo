@@ -179,4 +179,46 @@ mod tests {
         assert_eq!(png_pixel(&output, 5, 1), [255, 0, 0, 255]);
         assert_eq!(png_pixel(&output, 5, 7), [255, 0, 0, 255]);
     }
+
+    #[test]
+    fn composes_png_with_freehand_annotation() {
+        let service = ImageCompositionService::new();
+        let white = make_solid_png(8, 8, [255, 255, 255, 255]);
+
+        let output = service
+            .compose_png_with_annotations(
+                8,
+                8,
+                &[PngPlacement {
+                    png_data: white.as_slice(),
+                    source_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 8,
+                        height: 8,
+                    },
+                    destination_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 8,
+                        height: 8,
+                    },
+                }],
+                &[ImageAnnotation::Freehand {
+                    points: vec![
+                        PhysicalPoint { x: 1, y: 1 },
+                        PhysicalPoint { x: 4, y: 1 },
+                        PhysicalPoint { x: 4, y: 5 },
+                    ],
+                    color: [255, 0, 0, 255],
+                    stroke_width: 1,
+                }],
+            )
+            .unwrap();
+
+        assert_eq!(png_pixel(&output, 1, 1), [255, 0, 0, 255]);
+        assert_eq!(png_pixel(&output, 4, 1), [255, 0, 0, 255]);
+        assert_eq!(png_pixel(&output, 4, 5), [255, 0, 0, 255]);
+        assert_eq!(png_pixel(&output, 2, 4), [255, 255, 255, 255]);
+    }
 }

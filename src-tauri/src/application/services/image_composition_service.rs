@@ -23,6 +23,11 @@ pub enum ImageAnnotation {
         color: [u8; 4],
         stroke_width: u32,
     },
+    Freehand {
+        points: Vec<PhysicalPoint>,
+        color: [u8; 4],
+        stroke_width: u32,
+    },
 }
 
 pub struct ImageCompositionService;
@@ -181,6 +186,11 @@ fn draw_annotation(output: &mut image::RgbaImage, annotation: &ImageAnnotation) 
             color,
             stroke_width,
         } => draw_arrow_annotation(output, start, end, *color, *stroke_width),
+        ImageAnnotation::Freehand {
+            points,
+            color,
+            stroke_width,
+        } => draw_freehand_annotation(output, points, *color, *stroke_width),
     }
 }
 
@@ -278,6 +288,30 @@ fn draw_arrow_annotation(
             color,
             stroke_width,
         );
+    }
+}
+
+fn draw_freehand_annotation(
+    output: &mut image::RgbaImage,
+    points: &[PhysicalPoint],
+    color: [u8; 4],
+    stroke_width: u32,
+) {
+    if points.is_empty() {
+        return;
+    }
+
+    let color = image::Rgba(color);
+    let stroke_width = stroke_width.max(1);
+    if points.len() == 1 {
+        draw_stroked_point(output, points[0].x, points[0].y, color, stroke_width);
+        return;
+    }
+
+    for segment in points.windows(2) {
+        let start = &segment[0];
+        let end = &segment[1];
+        draw_line(output, start.x, start.y, end.x, end.y, color, stroke_width);
     }
 }
 

@@ -78,6 +78,7 @@ type EditGesture =
 type AnnotationGesture = {
   tool: AnnotationTool;
   startPoint: Point;
+  points?: Point[];
 };
 
 const MIN_SELECTION_SIZE = 10;
@@ -85,7 +86,7 @@ const EDGE_SNAP_THRESHOLD = 6;
 const KEYBOARD_NUDGE_STEP = 1;
 const KEYBOARD_FAST_NUDGE_STEP = 10;
 const TOOLBAR_GAP = 8;
-const TOOLBAR_SIZE = { width: 680, height: 36 };
+const TOOLBAR_SIZE = { width: 720, height: 36 };
 const MAGNIFIER_GAP = 14;
 const MAGNIFIER_SIZE = { width: 120, height: 96 };
 const MAGNIFIER_ZOOM = 4;
@@ -141,6 +142,19 @@ function annotationRectToViewportRect(
 
 function sameAnnotationColor(a: AnnotationColor, b: AnnotationColor) {
   return a.every((channel, index) => channel === b[index]);
+}
+
+function appendAnnotationPoint(points: Point[], point: Point) {
+  const previousPoint = points[points.length - 1];
+  if (previousPoint && previousPoint.x === point.x && previousPoint.y === point.y) {
+    return points;
+  }
+
+  return [...points, point];
+}
+
+function svgPolylinePoints(points: Point[]) {
+  return points.map((point) => `${point.x},${point.y}`).join(' ');
 }
 
 function DimMask({ rect }: { rect: LogicalRect }) {
@@ -800,12 +814,23 @@ export default function ScreenshotSession({
         { x: point.x - selection.x, y: point.y - selection.y },
         selection,
       );
+      const points =
+        annotationGesture.tool === 'pen'
+          ? appendAnnotationPoint(annotationGesture.points ?? [], localPoint)
+          : undefined;
+      if (points) {
+        setAnnotationGesture({
+          ...annotationGesture,
+          points,
+        });
+      }
       setDraftAnnotation(
         annotationFromGesture(
           annotationGesture.tool,
           annotationGesture.startPoint,
           localPoint,
           annotationStyle,
+          points,
         ),
       );
       return;
@@ -842,11 +867,16 @@ export default function ScreenshotSession({
         { x: point.x - selection.x, y: point.y - selection.y },
         selection,
       );
+      const points =
+        annotationGesture.tool === 'pen'
+          ? appendAnnotationPoint(annotationGesture.points ?? [], localPoint)
+          : undefined;
       const nextAnnotation = annotationFromGesture(
         annotationGesture.tool,
         annotationGesture.startPoint,
         localPoint,
         annotationStyle,
+        points,
       );
       setAnnotationGesture(null);
       setDraftAnnotation(null);
@@ -912,9 +942,11 @@ export default function ScreenshotSession({
         { x: point.x - selection.x, y: point.y - selection.y },
         selection,
       );
+      const points = activeAnnotationTool === 'pen' ? [localPoint] : undefined;
       setAnnotationGesture({
         tool: activeAnnotationTool,
         startPoint: localPoint,
+        ...(points ? { points } : {}),
       });
       setDraftAnnotation(
         annotationFromGesture(
@@ -922,6 +954,7 @@ export default function ScreenshotSession({
           localPoint,
           localPoint,
           annotationStyle,
+          points,
         ),
       );
       return;
@@ -1084,6 +1117,22 @@ export default function ScreenshotSession({
               )}
             </svg>
           )}
+          {draftAnnotation?.type === 'freehand' && (
+            <svg
+              className="pointer-events-none absolute overflow-visible"
+              style={rectStyle(selectionViewportRect)}
+              viewBox={`0 0 ${selectionViewportRect.width} ${selectionViewportRect.height}`}
+              fill="none"
+            >
+              <polyline
+                points={svgPolylinePoints(draftAnnotation.points)}
+                stroke={annotationColorToCss(draftAnnotation.color)}
+                strokeWidth={draftAnnotation.stroke_width}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
           <div
             className={`absolute border ${overlayClassName} bg-transparent ${
               status === 'preview'
@@ -1160,6 +1209,18 @@ export default function ScreenshotSession({
                 onClick={() => toggleAnnotationTool('arrow')}
               >
                 Arrow
+              </button>
+              <button
+                type="button"
+                className={`h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50 ${
+                  activeAnnotationTool === 'pen' ? 'bg-white/15' : ''
+                }`}
+                disabled={isRenderingOutput}
+                title="Pen"
+                aria-label="Draw freehand annotation"
+                onClick={() => toggleAnnotationTool('pen')}
+              >
+                Pen
               </button>
               <div className="flex h-7 items-center gap-1 px-1">
                 {ANNOTATION_COLORS.map((color) => (
