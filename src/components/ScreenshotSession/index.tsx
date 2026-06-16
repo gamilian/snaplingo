@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { normalizeSelection } from './selection';
+import {
+  moveSelectionByDelta,
+  normalizeSelection,
+  resizeSelectionByHandle,
+  type SelectionHandle,
+} from './selection';
 import { parseCaptureLaunchPayload } from './windowMode';
 import type {
   CaptureMode,
@@ -12,8 +17,32 @@ import type {
 } from './types';
 
 type SessionStatus = 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
+type EditGesture =
+  | {
+      type: 'move';
+      startPoint: Point;
+      startSelection: LogicalRect;
+    }
+  | {
+      type: 'resize';
+      handle: SelectionHandle;
+      startPoint: Point;
+      startSelection: LogicalRect;
+    };
 
 const MIN_SELECTION_SIZE = 10;
+const SELECTION_HANDLES: SelectionHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+
+const handleClassNames: Record<SelectionHandle, string> = {
+  nw: '-left-1.5 -top-1.5 cursor-nwse-resize',
+  n: 'left-1/2 -top-1.5 -translate-x-1/2 cursor-ns-resize',
+  ne: '-right-1.5 -top-1.5 cursor-nesw-resize',
+  e: '-right-1.5 top-1/2 -translate-y-1/2 cursor-ew-resize',
+  se: '-bottom-1.5 -right-1.5 cursor-nwse-resize',
+  s: '-bottom-1.5 left-1/2 -translate-x-1/2 cursor-ns-resize',
+  sw: '-bottom-1.5 -left-1.5 cursor-nesw-resize',
+  w: '-left-1.5 top-1/2 -translate-y-1/2 cursor-ew-resize',
+};
 
 function rectStyle(rect: LogicalRect) {
   return {
@@ -79,6 +108,7 @@ export default function ScreenshotSession({
   const [session, setSession] = useState<CaptureSessionView | null>(null);
   const [startPoint, setStartPoint] = useState<Point | null>(null);
   const [selection, setSelection] = useState<LogicalRect | null>(null);
+  const [editGesture, setEditGesture] = useState<EditGesture | null>(null);
   const [previewImageBase64, setPreviewImageBase64] = useState<string | null>(null);
   const [isRenderingOutput, setIsRenderingOutput] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,12 +119,23 @@ export default function ScreenshotSession({
   const sizeLabel = selection
     ? `${Math.round(selection.width)} x ${Math.round(selection.height)}`
     : '';
+  const selectionBounds = useMemo<LogicalRect | null>(() => {
+    if (!monitor) return null;
+
+    return {
+      x: 0,
+      y: 0,
+      width: monitor.logical_bounds.width,
+      height: monitor.logical_bounds.height,
+    };
+  }, [monitor]);
 
   const resetSessionState = useCallback(() => {
     setStatus('idle');
     setSession(null);
     setStartPoint(null);
     setSelection(null);
+    setEditGesture(null);
     setPreviewImageBase64(null);
     setIsRenderingOutput(false);
     setError(null);
@@ -120,6 +161,7 @@ export default function ScreenshotSession({
     setMode(nextMode);
     setStartPoint(null);
     setSelection(null);
+    setEditGesture(null);
     setPreviewImageBase64(null);
     setIsRenderingOutput(false);
     setError(null);
@@ -261,7 +303,41 @@ export default function ScreenshotSession({
     setStatus('selecting');
   };
 
+  const applyEditGesture = useCallback(
+    (gesture: EditGesture, point: Point) => {
+      if (!selectionBounds) return gesture.startSelection;
+
+      const delta = {
+        x: point.x - gesture.startPoint.x,
+        y: point.y - gesture.startPoint.y,
+      };
+
+      if (gesture.type === 'move') {
+        return moveSelectionByDelta(gesture.startSelection, delta, selectionBounds);
+      }
+
+      return resizeSelectionByHandle(
+        gesture.startSelection,
+        gesture.handle,
+        delta,
+        selectionBounds,
+        MIN_SELECTION_SIZE,
+      );
+    },
+    [selectionBounds],
+  );
+
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (editGesture) {
+      setSelection(applyEditGesture(editGesture, {
+        x: event.clientX,
+        y: event.clientY,
+      }));
+      setPreviewImageBase64(null);
+      setIsRenderingOutput(false);
+      return;
+    }
+
     if (!startPoint || status !== 'selecting') return;
 
     setSelection(normalizeSelection(startPoint, {
@@ -271,6 +347,18 @@ export default function ScreenshotSession({
   };
 
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (editGesture) {
+      const nextSelection = applyEditGesture(editGesture, {
+        x: event.clientX,
+        y: event.clientY,
+      });
+      setEditGesture(null);
+      setSelection(nextSelection);
+      setStatus('preview');
+      void renderSelectionPreview(nextSelection);
+      return;
+    }
+
     if (!startPoint || status !== 'selecting') return;
 
     const nextSelection = normalizeSelection(startPoint, {
@@ -290,6 +378,36 @@ export default function ScreenshotSession({
     setSelection(nextSelection);
     setStatus('preview');
     void renderSelectionPreview(nextSelection);
+  };
+
+  const startMoveGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (status !== 'preview' || !selection) return;
+
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setEditGesture({
+      type: 'move',
+      startPoint: { x: event.clientX, y: event.clientY },
+      startSelection: selection,
+    });
+    setPreviewImageBase64(null);
+  };
+
+  const startResizeGesture = (
+    handle: SelectionHandle,
+    event: React.PointerEvent<HTMLButtonElement>,
+  ) => {
+    if (status !== 'preview' || !selection) return;
+
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setEditGesture({
+      type: 'resize',
+      handle,
+      startPoint: { x: event.clientX, y: event.clientY },
+      startSelection: selection,
+    });
+    setPreviewImageBase64(null);
   };
 
   const overlayClassName = useMemo(() => {
@@ -337,9 +455,24 @@ export default function ScreenshotSession({
             />
           )}
           <div
-            className={`absolute border ${overlayClassName} bg-transparent`}
+            className={`absolute border ${overlayClassName} bg-transparent ${
+              status === 'preview' ? 'cursor-move' : ''
+            }`}
             style={rectStyle(selection)}
+            onPointerDown={startMoveGesture}
           />
+          {status === 'preview' && (
+            <div className="absolute pointer-events-none" style={rectStyle(selection)}>
+              {SELECTION_HANDLES.map((handle) => (
+                <button
+                  key={handle}
+                  className={`pointer-events-auto absolute h-3 w-3 rounded-full border border-black/70 bg-white shadow ${handleClassNames[handle]}`}
+                  aria-label={`Resize selection ${handle}`}
+                  onPointerDown={(event) => startResizeGesture(handle, event)}
+                />
+              ))}
+            </div>
+          )}
           <div
             className="absolute rounded bg-black/80 px-2 py-1 text-xs leading-none text-white shadow"
             style={{
