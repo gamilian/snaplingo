@@ -4,13 +4,16 @@ import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import type { PinnedImageView } from '../ScreenshotSession/types';
 import {
+  getPinnedContextMenuPosition,
   getPinnedDisplaySize,
   getPinnedOpacityFromWheel,
+  getPinnedOpacityPreset,
   getPinnedZoomFromWheel,
 } from './pinControls';
 
 const appWindow = getCurrentWindow();
 const webviewWindow = getCurrentWebviewWindow();
+const PIN_CONTEXT_MENU_SIZE = { width: 132, height: 164 };
 
 function readPinnedImageId(search: string) {
   const params = new URLSearchParams(search);
@@ -25,8 +28,12 @@ interface PinnedImageWindowProps {
 
 export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
   const [image, setImage] = useState<PinnedImageView | null>(null);
-  const [, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(1);
   const [opacity, setOpacity] = useState(1);
+  const [contextMenuPosition, setContextMenuPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const closePinnedImage = useCallback(async () => {
@@ -81,10 +88,22 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     [image],
   );
 
+  const resetPinnedSize = useCallback(() => {
+    setZoom(1);
+    setContextMenuPosition(null);
+    void resizePinnedWindow(1);
+  }, [resizePinnedWindow]);
+
+  const setPinnedOpacityPreset = useCallback((nextOpacity: number) => {
+    setOpacity(getPinnedOpacityPreset(nextOpacity));
+    setContextMenuPosition(null);
+  }, []);
+
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
     if (!image) return;
 
     event.preventDefault();
+    setContextMenuPosition(null);
     const wheelDirection = Math.sign(event.deltaY) || 1;
 
     if (event.shiftKey) {
@@ -101,6 +120,17 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     });
   };
 
+  const handleContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setContextMenuPosition(
+      getPinnedContextMenuPosition(
+        { x: event.clientX, y: event.clientY },
+        PIN_CONTEXT_MENU_SIZE,
+        { width: window.innerWidth, height: window.innerHeight },
+      ),
+    );
+  };
+
   if (error) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-neutral-950 p-3 text-xs text-red-100">
@@ -113,6 +143,8 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     <div
       className="group relative h-screen w-screen overflow-hidden bg-transparent"
       onWheel={handleWheel}
+      onContextMenu={handleContextMenu}
+      onPointerDown={() => setContextMenuPosition(null)}
     >
       {image && (
         <img
@@ -120,10 +152,53 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
           className="h-full w-full object-fill"
           style={{ opacity }}
           draggable={false}
-          onPointerDown={() => {
+          onPointerDown={(event) => {
+            if (event.button !== 0) return;
             void appWindow.startDragging();
           }}
         />
+      )}
+      {contextMenuPosition && (
+        <div
+          className="absolute z-10 w-[132px] rounded bg-neutral-950/95 p-1 text-xs text-white shadow-xl ring-1 ring-white/15"
+          style={{
+            left: `${contextMenuPosition.x}px`,
+            top: `${contextMenuPosition.y}px`,
+          }}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <button
+            type="button"
+            className="flex h-7 w-full items-center justify-between rounded px-2 text-left hover:bg-white/15"
+            onClick={resetPinnedSize}
+          >
+            <span>Reset size</span>
+            <span className="font-mono text-[10px] text-white/55">
+              {Math.round(zoom * 100)}%
+            </span>
+          </button>
+          {[1, 0.75, 0.5].map((preset) => (
+            <button
+              key={preset}
+              type="button"
+              className="flex h-7 w-full items-center justify-between rounded px-2 text-left hover:bg-white/15"
+              onClick={() => setPinnedOpacityPreset(preset)}
+            >
+              <span>Opacity</span>
+              <span className="font-mono text-[10px] text-white/55">
+                {Math.round(preset * 100)}%
+              </span>
+            </button>
+          ))}
+          <div className="my-1 h-px bg-white/10" />
+          <button
+            type="button"
+            className="h-7 w-full rounded px-2 text-left text-red-100 hover:bg-red-500/20"
+            onClick={closePinnedImage}
+          >
+            Close
+          </button>
+        </div>
       )}
       <button
         type="button"

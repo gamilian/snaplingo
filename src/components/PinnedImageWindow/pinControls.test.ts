@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  getPinnedContextMenuPosition,
   getPinnedDisplaySize,
   getPinnedOpacityFromWheel,
+  getPinnedOpacityPreset,
   getPinnedZoomFromWheel,
 } from './pinControls';
 
@@ -33,5 +35,30 @@ describe('pinned image controls', () => {
       width: 1800,
       height: 900,
     });
+  });
+
+  it('keeps context menus inside the pinned window', () => {
+    expect(
+      getPinnedContextMenuPosition(
+        { x: 240, y: 160 },
+        { width: 96, height: 120 },
+        { width: 300, height: 220 },
+      ),
+    ).toEqual({ x: 204, y: 100 });
+
+    expect(
+      getPinnedContextMenuPosition(
+        { x: -10, y: -20 },
+        { width: 96, height: 120 },
+        { width: 300, height: 220 },
+      ),
+    ).toEqual({ x: 0, y: 0 });
+  });
+
+  it('normalizes pinned opacity menu presets', () => {
+    expect(getPinnedOpacityPreset(1)).toBe(1);
+    expect(getPinnedOpacityPreset(0.75)).toBe(0.75);
+    expect(getPinnedOpacityPreset(1.4)).toBe(1);
+    expect(getPinnedOpacityPreset(0.05)).toBe(0.2);
   });
 });

@@ -14,6 +14,11 @@ export interface PinnedSize {
   height: number;
 }
 
+export interface PinnedPoint {
+  x: number;
+  y: number;
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
@@ -39,6 +44,10 @@ export function getPinnedOpacityFromWheel(
   return roundToTwoDecimals(clamp(nextOpacity, MIN_OPACITY, MAX_OPACITY));
 }
 
+export function getPinnedOpacityPreset(opacity: number) {
+  return roundToTwoDecimals(clamp(opacity, MIN_OPACITY, MAX_OPACITY));
+}
+
 export function getPinnedDisplaySize(originalSize: PinnedSize, zoom: number) {
   const originalWidth = Math.max(1, originalSize.width);
   const originalHeight = Math.max(1, originalSize.height);
@@ -51,5 +60,16 @@ export function getPinnedDisplaySize(originalSize: PinnedSize, zoom: number) {
   return {
     width: Math.max(MIN_WIDTH, Math.round(originalWidth * initialScale * zoom)),
     height: Math.max(MIN_HEIGHT, Math.round(originalHeight * initialScale * zoom)),
+  };
+}
+
+export function getPinnedContextMenuPosition(
+  point: PinnedPoint,
+  menuSize: PinnedSize,
+  viewportSize: PinnedSize,
+): PinnedPoint {
+  return {
+    x: clamp(point.x, 0, Math.max(0, viewportSize.width - menuSize.width)),
+    y: clamp(point.y, 0, Math.max(0, viewportSize.height - menuSize.height)),
   };
 }
