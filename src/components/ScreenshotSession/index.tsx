@@ -18,7 +18,9 @@ import {
   getMagnifierPosition,
 } from './magnifier';
 import {
+  colorSampleToClipboardText,
   type ColorSample,
+  isColorSampleCopyShortcut,
   sampleCanvasColor,
 } from './colorSampler';
 import {
@@ -586,6 +588,17 @@ export default function ScreenshotSession({
     }
   }, [commitTextDraftToHistory, onInactive, resetSessionState, selection, session]);
 
+  const copyCurrentColor = useCallback(async () => {
+    if (!cursorColor) return;
+
+    try {
+      await navigator.clipboard.writeText(colorSampleToClipboardText(cursorColor));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setStatus('error');
+    }
+  }, [cursorColor]);
+
   const saveSelection = useCallback(async () => {
     if (!session || !selection) return;
 
@@ -917,6 +930,13 @@ export default function ScreenshotSession({
         event.preventDefault();
         deleteSelectedAnnotation();
       } else if (
+        !textDraft &&
+        cursorColor &&
+        isColorSampleCopyShortcut(event)
+      ) {
+        event.preventDefault();
+        void copyCurrentColor();
+      } else if (
         status === 'preview' &&
         (event.key === 'Enter' ||
           ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'c'))
@@ -937,6 +957,7 @@ export default function ScreenshotSession({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
     cancelSession,
+    copyCurrentColor,
     copySelection,
     activeAnnotationTool,
     annotationGesture,
@@ -951,6 +972,7 @@ export default function ScreenshotSession({
     selectionBounds,
     selectedAnnotationIndex,
     status,
+    cursorColor,
     undoAnnotation,
   ]);
 

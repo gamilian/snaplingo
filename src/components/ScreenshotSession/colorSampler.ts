@@ -12,6 +12,13 @@ export interface ColorSample {
   blue: number;
 }
 
+interface ColorSampleCopyShortcutEvent {
+  key: string;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  altKey: boolean;
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
@@ -39,6 +46,19 @@ function channelToHex(value: number) {
 
 export function rgbaToHex(red: number, green: number, blue: number) {
   return `#${channelToHex(red)}${channelToHex(green)}${channelToHex(blue)}`;
+}
+
+export function colorSampleToClipboardText(sample: ColorSample) {
+  return sample.hex;
+}
+
+export function isColorSampleCopyShortcut(event: ColorSampleCopyShortcutEvent) {
+  return (
+    event.key.toLowerCase() === 'c' &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey
+  );
 }
 
 export function sampleCanvasColor(
