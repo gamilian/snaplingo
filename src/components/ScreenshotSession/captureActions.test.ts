@@ -3,6 +3,7 @@ import type { AnnotationCommand, LogicalRect } from './types';
 import {
   type CaptureInvoke,
   type CaptureInvokeArgs,
+  isPinCaptureShortcut,
   isSaveCaptureShortcut,
   saveCaptureSelection,
 } from './captureActions';
@@ -76,6 +77,45 @@ describe('capture session actions', () => {
         key: 'c',
         metaKey: true,
         ctrlKey: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('uses plain F3 for pinning the current selection', () => {
+    expect(
+      isPinCaptureShortcut({
+        key: 'F3',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isPinCaptureShortcut({
+        key: 'F3',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      isPinCaptureShortcut({
+        key: 'F3',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(false);
+    expect(
+      isPinCaptureShortcut({
+        key: 'p',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
       }),
     ).toBe(false);
   });

@@ -72,6 +72,7 @@ import {
   type TextAnnotationDraft,
 } from './textAnnotationDraft';
 import {
+  isPinCaptureShortcut,
   isSaveCaptureShortcut,
   saveCaptureSelection,
 } from './captureActions';
@@ -1023,6 +1024,9 @@ export default function ScreenshotSession({
       } else if (status === 'preview' && isSaveCaptureShortcut(event)) {
         event.preventDefault();
         void saveSelection();
+      } else if (status === 'preview' && isPinCaptureShortcut(event)) {
+        event.preventDefault();
+        void pinSelection();
       } else if (
         status === 'preview' &&
         !textDraft &&
@@ -1102,6 +1106,7 @@ export default function ScreenshotSession({
     deleteSelectedAnnotation,
     redoAnnotation,
     isActive,
+    pinSelection,
     renderSelectionPreview,
     saveSelection,
     selectAnnotationColor,

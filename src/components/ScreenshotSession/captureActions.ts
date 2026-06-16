@@ -10,10 +10,22 @@ interface CaptureShortcutEvent {
   key: string;
   metaKey: boolean;
   ctrlKey: boolean;
+  altKey?: boolean;
+  shiftKey?: boolean;
 }
 
 export function isSaveCaptureShortcut(event: CaptureShortcutEvent) {
   return event.key.toLowerCase() === 's' && (event.metaKey || event.ctrlKey);
+}
+
+export function isPinCaptureShortcut(event: CaptureShortcutEvent) {
+  return (
+    event.key === 'F3' &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !event.shiftKey
+  );
 }
 
 export async function saveCaptureSelection(
