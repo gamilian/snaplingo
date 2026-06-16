@@ -171,6 +171,29 @@ export default function ScreenshotSession({
     [mode, onInactive, resetSessionState, session],
   );
 
+  const copySelection = useCallback(async () => {
+    if (!session || !selection) return;
+
+    setIsRenderingOutput(true);
+    setError(null);
+
+    try {
+      await invoke('output_capture', {
+        sessionId: session.id,
+        rect: selection,
+        action: { type: 'copy' },
+      });
+      await invoke('cancel_capture_session', { sessionId: session.id });
+      resetSessionState();
+      onInactive?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setStatus('error');
+    } finally {
+      setIsRenderingOutput(false);
+    }
+  }, [onInactive, resetSessionState, selection, session]);
+
   useEffect(() => {
     if (!initialMode || hasStartedInitialSession) return;
 
@@ -218,12 +241,13 @@ export default function ScreenshotSession({
           ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'c'))
       ) {
         event.preventDefault();
+        void copySelection();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cancelSession, isActive, status]);
+  }, [cancelSession, copySelection, isActive, status]);
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (status !== 'selecting' && status !== 'preview') return;

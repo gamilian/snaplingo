@@ -103,9 +103,11 @@ pub async fn output_capture(
                 .map_err(|e| e.to_string())?;
             Ok(())
         }
-        CaptureOutputAction::Copy => Err(
-            "Copy output is not available until the clipboard image backend is wired".to_string(),
-        ),
+        CaptureOutputAction::Copy => state
+            .capture_output_service
+            .copy_png(&png_data)
+            .await
+            .map_err(|e| e.to_string()),
         CaptureOutputAction::Pin => {
             Err("Pin output is not available until the pin window backend is wired".to_string())
         }
