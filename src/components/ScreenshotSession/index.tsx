@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import {
@@ -14,6 +14,10 @@ import {
   getMagnifierImageStyle,
   getMagnifierPosition,
 } from './magnifier';
+import {
+  type ColorSample,
+  sampleCanvasColor,
+} from './colorSampler';
 import { saveCaptureSelection } from './captureActions';
 import { parseCaptureLaunchPayload } from './windowMode';
 import type {
@@ -117,11 +121,13 @@ function Magnifier({
   cursor,
   imageBounds,
   selection,
+  color,
 }: {
   imageBase64: string;
   cursor: Point;
   imageBounds: LogicalRect;
   selection: LogicalRect | null;
+  color: ColorSample | null;
 }) {
   const position = getMagnifierPosition(
     cursor,
@@ -165,7 +171,18 @@ function Magnifier({
         <span>
           {Math.round(cursor.x)}, {Math.round(cursor.y)}
         </span>
-        {sizeText && <span>{sizeText}</span>}
+        <span className="flex items-center gap-1">
+          {color && (
+            <>
+              <span
+                className="h-2.5 w-2.5 border border-white/60"
+                style={{ backgroundColor: color.hex }}
+              />
+              <span>{color.hex}</span>
+            </>
+          )}
+          {sizeText && <span>{sizeText}</span>}
+        </span>
       </div>
     </div>
   );
@@ -182,6 +199,7 @@ export default function ScreenshotSession({
   initialSessionId,
   onInactive,
 }: ScreenshotSessionProps) {
+  const sampleCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [status, setStatus] = useState<SessionStatus>('idle');
   const [mode, setMode] = useState<CaptureMode>('screenshot');
   const [session, setSession] = useState<CaptureSessionView | null>(null);
@@ -190,6 +208,8 @@ export default function ScreenshotSession({
   const [selection, setSelection] = useState<LogicalRect | null>(null);
   const [editGesture, setEditGesture] = useState<EditGesture | null>(null);
   const [previewImageBase64, setPreviewImageBase64] = useState<string | null>(null);
+  const [cursorColor, setCursorColor] = useState<ColorSample | null>(null);
+  const [sampleCanvasVersion, setSampleCanvasVersion] = useState(0);
   const [isRenderingOutput, setIsRenderingOutput] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasStartedInitialSession, setHasStartedInitialSession] = useState(false);
@@ -223,6 +243,8 @@ export default function ScreenshotSession({
     setSelection(null);
     setEditGesture(null);
     setPreviewImageBase64(null);
+    setCursorColor(null);
+    setSampleCanvasVersion(0);
     setIsRenderingOutput(false);
     setError(null);
   }, []);
@@ -250,6 +272,8 @@ export default function ScreenshotSession({
     setSelection(null);
     setEditGesture(null);
     setPreviewImageBase64(null);
+    setCursorColor(null);
+    setSampleCanvasVersion(0);
     setIsRenderingOutput(false);
     setError(null);
 
@@ -421,6 +445,46 @@ export default function ScreenshotSession({
       unlisten?.();
     };
   }, [startSession]);
+
+  useEffect(() => {
+    sampleCanvasRef.current = null;
+    setCursorColor(null);
+    setSampleCanvasVersion((version) => version + 1);
+
+    if (!monitor) return;
+
+    let disposed = false;
+    const image = new Image();
+    image.onload = () => {
+      if (disposed) return;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      canvas.getContext('2d')?.drawImage(image, 0, 0);
+      sampleCanvasRef.current = canvas;
+      setSampleCanvasVersion((version) => version + 1);
+    };
+    image.src = `data:image/png;base64,${monitor.image_base64}`;
+
+    return () => {
+      disposed = true;
+    };
+  }, [monitor]);
+
+  useEffect(() => {
+    if (!cursorPoint || !selectionBounds || !sampleCanvasRef.current) {
+      setCursorColor(null);
+      return;
+    }
+
+    setCursorColor(
+      sampleCanvasColor(sampleCanvasRef.current, cursorPoint, {
+        width: selectionBounds.width,
+        height: selectionBounds.height,
+      }),
+    );
+  }, [cursorPoint, sampleCanvasVersion, selectionBounds]);
 
   useEffect(() => {
     if (!isActive) return;
@@ -738,6 +802,7 @@ export default function ScreenshotSession({
           cursor={cursorPoint}
           imageBounds={selectionBounds}
           selection={selection}
+          color={cursorColor}
         />
       )}
     </div>
