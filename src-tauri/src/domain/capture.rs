@@ -126,6 +126,11 @@ pub enum AnnotationCommand {
         color: [u8; 4],
         stroke_width: u32,
     },
+    Ellipse {
+        rect: LogicalRect,
+        color: [u8; 4],
+        stroke_width: u32,
+    },
     Arrow {
         start: LogicalPoint,
         end: LogicalPoint,
@@ -248,5 +253,25 @@ mod tests {
         assert_eq!(serialized["type"], "mosaic");
         assert_eq!(serialized["rect"]["x"], 1.0);
         assert_eq!(serialized["block_size"], 6);
+    }
+
+    #[test]
+    fn ellipse_annotation_serializes_with_type_tag() {
+        let annotation = AnnotationCommand::Ellipse {
+            rect: LogicalRect {
+                x: 1.0,
+                y: 2.0,
+                width: 6.0,
+                height: 4.0,
+            },
+            color: [255, 0, 0, 255],
+            stroke_width: 2,
+        };
+
+        let serialized = serde_json::to_value(&annotation).unwrap();
+
+        assert_eq!(serialized["type"], "ellipse");
+        assert_eq!(serialized["rect"]["width"], 6.0);
+        assert_eq!(serialized["stroke_width"], 2);
     }
 }

@@ -27,6 +27,22 @@ describe('annotation style', () => {
     });
   });
 
+  it('creates ellipse annotations with the selected color and stroke width', () => {
+    expect(
+      annotationFromGesture(
+        'ellipse',
+        { x: 12, y: 20 },
+        { x: 4, y: 6 },
+        style,
+      ),
+    ).toEqual({
+      type: 'ellipse',
+      rect: { x: 4, y: 6, width: 8, height: 14 },
+      color: [40, 167, 69, 255],
+      stroke_width: 5,
+    });
+  });
+
   it('creates arrow annotations with the selected color and stroke width', () => {
     expect(
       annotationFromGesture(
@@ -81,6 +97,16 @@ describe('annotation style', () => {
       isCommittedAnnotation(
         annotationFromGesture(
           'mosaic',
+          { x: 1, y: 1 },
+          { x: 2, y: 2 },
+          style,
+        ),
+      ),
+    ).toBe(false);
+    expect(
+      isCommittedAnnotation(
+        annotationFromGesture(
+          'ellipse',
           { x: 1, y: 1 },
           { x: 2, y: 2 },
           style,

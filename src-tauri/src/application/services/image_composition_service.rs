@@ -17,6 +17,11 @@ pub enum ImageAnnotation {
         color: [u8; 4],
         stroke_width: u32,
     },
+    Ellipse {
+        rect: PhysicalRect,
+        color: [u8; 4],
+        stroke_width: u32,
+    },
     Arrow {
         start: PhysicalPoint,
         end: PhysicalPoint,
@@ -184,6 +189,11 @@ fn draw_annotation(output: &mut image::RgbaImage, annotation: &ImageAnnotation) 
             color,
             stroke_width,
         } => draw_rectangle_annotation(output, rect, *color, *stroke_width),
+        ImageAnnotation::Ellipse {
+            rect,
+            color,
+            stroke_width,
+        } => draw_ellipse_annotation(output, rect, *color, *stroke_width),
         ImageAnnotation::Arrow {
             start,
             end,
@@ -257,6 +267,36 @@ fn draw_rectangle_annotation(
             output_height,
             color,
         );
+    }
+}
+
+fn draw_ellipse_annotation(
+    output: &mut image::RgbaImage,
+    rect: &PhysicalRect,
+    color: [u8; 4],
+    stroke_width: u32,
+) {
+    if rect.width == 0 || rect.height == 0 {
+        return;
+    }
+
+    let color = image::Rgba(color);
+    let stroke_width = stroke_width.max(1);
+    let radius_x = (rect.width.saturating_sub(1) as f64) / 2.0;
+    let radius_y = (rect.height.saturating_sub(1) as f64) / 2.0;
+    let center_x = rect.x as f64 + radius_x;
+    let center_y = rect.y as f64 + radius_y;
+    if radius_x <= f64::EPSILON || radius_y <= f64::EPSILON {
+        draw_rectangle_annotation(output, rect, color.0, stroke_width);
+        return;
+    }
+
+    let steps = ((radius_x + radius_y) * 12.0).ceil().max(36.0) as u32;
+    for step in 0..steps {
+        let angle = (step as f64 / steps as f64) * 2.0 * PI;
+        let x = (center_x + radius_x * angle.cos()).round() as i32;
+        let y = (center_y + radius_y * angle.sin()).round() as i32;
+        draw_stroked_point(output, x, y, color, stroke_width);
     }
 }
 

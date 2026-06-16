@@ -1,7 +1,7 @@
 import { normalizeSelection } from './selection';
 import type { AnnotationCommand, Point } from './types';
 
-export type AnnotationTool = 'rectangle' | 'arrow' | 'pen' | 'mosaic';
+export type AnnotationTool = 'rectangle' | 'ellipse' | 'arrow' | 'pen' | 'mosaic';
 export type AnnotationColor = [number, number, number, number];
 
 export interface AnnotationStyle {
@@ -43,6 +43,15 @@ export function annotationFromGesture(
     };
   }
 
+  if (tool === 'ellipse') {
+    return {
+      type: 'ellipse',
+      rect: normalizeSelection(startPoint, currentPoint),
+      color: style.color,
+      stroke_width: style.strokeWidth,
+    };
+  }
+
   if (tool === 'pen') {
     return {
       type: 'freehand',
@@ -70,7 +79,11 @@ export function annotationFromGesture(
 }
 
 export function isCommittedAnnotation(annotation: AnnotationCommand) {
-  if (annotation.type === 'rectangle' || annotation.type === 'mosaic') {
+  if (
+    annotation.type === 'rectangle' ||
+    annotation.type === 'ellipse' ||
+    annotation.type === 'mosaic'
+  ) {
     return (
       annotation.rect.width >= MIN_ANNOTATION_SIZE &&
       annotation.rect.height >= MIN_ANNOTATION_SIZE

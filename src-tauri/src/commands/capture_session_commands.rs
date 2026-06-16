@@ -390,6 +390,15 @@ fn image_annotations_from_commands(
                 color: *color,
                 stroke_width: ((*stroke_width).max(1) as f64 * output_scale).ceil() as u32,
             }),
+            AnnotationCommand::Ellipse {
+                rect,
+                color,
+                stroke_width,
+            } => Ok(ImageAnnotation::Ellipse {
+                rect: scaled_logical_rect_relative_to(rect, &annotation_origin, output_scale)?,
+                color: *color,
+                stroke_width: ((*stroke_width).max(1) as f64 * output_scale).ceil() as u32,
+            }),
             AnnotationCommand::Arrow {
                 start,
                 end,
@@ -823,6 +832,16 @@ mod tests {
                     },
                     block_size: 3,
                 },
+                AnnotationCommand::Ellipse {
+                    rect: LogicalRect {
+                        x: 0.5,
+                        y: 1.0,
+                        width: 2.5,
+                        height: 3.5,
+                    },
+                    color: [40, 167, 69, 255],
+                    stroke_width: 2,
+                },
             ],
             &LogicalRect {
                 x: 100.0,
@@ -834,7 +853,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(annotations.len(), 4);
+        assert_eq!(annotations.len(), 5);
         assert_eq!(
             annotations[0],
             ImageAnnotation::Rectangle {
@@ -875,6 +894,19 @@ mod tests {
                     height: 10,
                 },
                 block_size: 6,
+            }
+        );
+        assert_eq!(
+            annotations[4],
+            ImageAnnotation::Ellipse {
+                rect: PhysicalRect {
+                    x: 1,
+                    y: 2,
+                    width: 5,
+                    height: 7,
+                },
+                color: [40, 167, 69, 255],
+                stroke_width: 4,
             }
         );
     }

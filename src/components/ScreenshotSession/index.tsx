@@ -86,7 +86,7 @@ const EDGE_SNAP_THRESHOLD = 6;
 const KEYBOARD_NUDGE_STEP = 1;
 const KEYBOARD_FAST_NUDGE_STEP = 10;
 const TOOLBAR_GAP = 8;
-const TOOLBAR_SIZE = { width: 780, height: 36 };
+const TOOLBAR_SIZE = { width: 840, height: 36 };
 const MAGNIFIER_GAP = 14;
 const MAGNIFIER_SIZE = { width: 120, height: 96 };
 const MAGNIFIER_ZOOM = 4;
@@ -1083,6 +1083,23 @@ export default function ScreenshotSession({
               }}
             />
           )}
+          {draftAnnotation?.type === 'ellipse' && (
+            <svg
+              className="pointer-events-none absolute overflow-visible"
+              style={rectStyle(selectionViewportRect)}
+              viewBox={`0 0 ${selectionViewportRect.width} ${selectionViewportRect.height}`}
+              fill="none"
+            >
+              <ellipse
+                cx={draftAnnotation.rect.x + draftAnnotation.rect.width / 2}
+                cy={draftAnnotation.rect.y + draftAnnotation.rect.height / 2}
+                rx={draftAnnotation.rect.width / 2}
+                ry={draftAnnotation.rect.height / 2}
+                stroke={annotationColorToCss(draftAnnotation.color)}
+                strokeWidth={draftAnnotation.stroke_width}
+              />
+            </svg>
+          )}
           {draftAnnotation?.type === 'mosaic' && (
             <div
               className="pointer-events-none absolute border border-white/70 bg-black/35"
@@ -1214,6 +1231,18 @@ export default function ScreenshotSession({
                 onClick={() => toggleAnnotationTool('rectangle')}
               >
                 Rect
+              </button>
+              <button
+                type="button"
+                className={`h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50 ${
+                  activeAnnotationTool === 'ellipse' ? 'bg-white/15' : ''
+                }`}
+                disabled={isRenderingOutput}
+                title="Ellipse"
+                aria-label="Draw ellipse annotation"
+                onClick={() => toggleAnnotationTool('ellipse')}
+              >
+                Ellipse
               </button>
               <button
                 type="button"

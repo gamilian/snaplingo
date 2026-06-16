@@ -66,6 +66,13 @@ export interface RectangleAnnotationCommand {
   stroke_width: number;
 }
 
+export interface EllipseAnnotationCommand {
+  type: 'ellipse';
+  rect: LogicalRect;
+  color: [number, number, number, number];
+  stroke_width: number;
+}
+
 export interface ArrowAnnotationCommand {
   type: 'arrow';
   start: Point;
@@ -89,6 +96,7 @@ export interface MosaicAnnotationCommand {
 
 export type AnnotationCommand =
   | RectangleAnnotationCommand
+  | EllipseAnnotationCommand
   | ArrowAnnotationCommand
   | FreehandAnnotationCommand
   | MosaicAnnotationCommand;

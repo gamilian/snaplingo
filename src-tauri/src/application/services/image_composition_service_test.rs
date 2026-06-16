@@ -146,6 +146,50 @@ mod tests {
     }
 
     #[test]
+    fn composes_png_with_ellipse_annotation() {
+        let service = ImageCompositionService::new();
+        let white = make_solid_png(9, 7, [255, 255, 255, 255]);
+
+        let output = service
+            .compose_png_with_annotations(
+                9,
+                7,
+                &[PngPlacement {
+                    png_data: white.as_slice(),
+                    source_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 9,
+                        height: 7,
+                    },
+                    destination_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 9,
+                        height: 7,
+                    },
+                }],
+                &[ImageAnnotation::Ellipse {
+                    rect: PhysicalRect {
+                        x: 1,
+                        y: 1,
+                        width: 7,
+                        height: 5,
+                    },
+                    color: [255, 0, 0, 255],
+                    stroke_width: 1,
+                }],
+            )
+            .unwrap();
+
+        assert_eq!(png_pixel(&output, 1, 3), [255, 0, 0, 255]);
+        assert_eq!(png_pixel(&output, 7, 3), [255, 0, 0, 255]);
+        assert_eq!(png_pixel(&output, 4, 1), [255, 0, 0, 255]);
+        assert_eq!(png_pixel(&output, 4, 5), [255, 0, 0, 255]);
+        assert_eq!(png_pixel(&output, 4, 3), [255, 255, 255, 255]);
+    }
+
+    #[test]
     fn composes_png_with_arrow_annotation() {
         let service = ImageCompositionService::new();
         let white = make_solid_png(12, 9, [255, 255, 255, 255]);
