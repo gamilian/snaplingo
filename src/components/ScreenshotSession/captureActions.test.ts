@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { LogicalRect } from './types';
+import type { AnnotationCommand, LogicalRect } from './types';
 import {
   type CaptureInvoke,
   type CaptureInvokeArgs,
@@ -20,8 +20,16 @@ describe('capture session actions', () => {
       return undefined as T;
     };
     const rect: LogicalRect = { x: 10, y: 20, width: 30, height: 40 };
+    const annotations: AnnotationCommand[] = [
+      {
+        type: 'rectangle',
+        rect: { x: 12, y: 24, width: 10, height: 8 },
+        color: [255, 0, 0, 255],
+        stroke_width: 2,
+      },
+    ];
 
-    await saveCaptureSelection(invoke, 'session-1', rect);
+    await saveCaptureSelection(invoke, 'session-1', rect, annotations);
 
     expect(calls).toEqual([
       { command: 'default_capture_save_path', args: undefined },
@@ -34,6 +42,7 @@ describe('capture session actions', () => {
             type: 'save',
             path: '/tmp/SnapLingo-20260617-023000.png',
           },
+          annotations,
         },
       },
     ]);

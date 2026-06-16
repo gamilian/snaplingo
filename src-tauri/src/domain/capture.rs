@@ -103,10 +103,15 @@ pub enum CaptureOutputAction {
     Pin,
 }
 
-/// Placeholder for vector annotation commands.
+/// Vector annotation command in selection-local logical pixels.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct AnnotationCommand {
-    pub kind: String,
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum AnnotationCommand {
+    Rectangle {
+        rect: LogicalRect,
+        color: [u8; 4],
+        stroke_width: u32,
+    },
 }
 
 /// Supported image formats
@@ -140,5 +145,24 @@ mod tests {
 
         assert_eq!(serialized["type"], "save");
         assert_eq!(serialized["path"], "/tmp/snap.png");
+    }
+
+    #[test]
+    fn rectangle_annotation_serializes_with_type_tag() {
+        let annotation = AnnotationCommand::Rectangle {
+            rect: LogicalRect {
+                x: 1.0,
+                y: 2.0,
+                width: 3.0,
+                height: 4.0,
+            },
+            color: [255, 0, 0, 255],
+            stroke_width: 2,
+        };
+
+        let serialized = serde_json::to_value(&annotation).unwrap();
+
+        assert_eq!(serialized["type"], "rectangle");
+        assert_eq!(serialized["stroke_width"], 2);
     }
 }

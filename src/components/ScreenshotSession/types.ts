@@ -58,3 +58,12 @@ export interface OcrResult {
   text: string;
   confidence: number | null;
 }
+
+export interface RectangleAnnotationCommand {
+  type: 'rectangle';
+  rect: LogicalRect;
+  color: [number, number, number, number];
+  stroke_width: number;
+}
+
+export type AnnotationCommand = RectangleAnnotationCommand;

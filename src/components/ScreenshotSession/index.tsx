@@ -36,6 +36,7 @@ import {
   virtualRectToViewportRect,
 } from './virtualDesktop';
 import type {
+  AnnotationCommand,
   CaptureMode,
   CaptureSessionView,
   LogicalRect,
@@ -45,6 +46,7 @@ import type {
 } from './types';
 
 type SessionStatus = 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
+type AnnotationTool = 'rectangle';
 type EditGesture =
   | {
       type: 'move';
@@ -57,13 +59,18 @@ type EditGesture =
       startPoint: Point;
       startSelection: LogicalRect;
     };
+type AnnotationGesture = {
+  tool: AnnotationTool;
+  startPoint: Point;
+};
 
 const MIN_SELECTION_SIZE = 10;
+const MIN_ANNOTATION_SIZE = 4;
 const EDGE_SNAP_THRESHOLD = 6;
 const KEYBOARD_NUDGE_STEP = 1;
 const KEYBOARD_FAST_NUDGE_STEP = 10;
 const TOOLBAR_GAP = 8;
-const TOOLBAR_SIZE = { width: 272, height: 36 };
+const TOOLBAR_SIZE = { width: 320, height: 36 };
 const MAGNIFIER_GAP = 14;
 const MAGNIFIER_SIZE = { width: 120, height: 96 };
 const MAGNIFIER_ZOOM = 4;
@@ -92,6 +99,38 @@ function rectStyle(rect: LogicalRect) {
 
 function isArrowKey(key: string): key is ArrowKey {
   return ARROW_KEYS.includes(key as ArrowKey);
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function clampPointToRect(point: Point, rect: LogicalRect): Point {
+  return {
+    x: clamp(point.x, 0, rect.width),
+    y: clamp(point.y, 0, rect.height),
+  };
+}
+
+function annotationRectToViewportRect(
+  rect: LogicalRect,
+  selectionViewportRect: LogicalRect,
+) {
+  return {
+    x: selectionViewportRect.x + rect.x,
+    y: selectionViewportRect.y + rect.y,
+    width: rect.width,
+    height: rect.height,
+  };
+}
+
+function rectangleAnnotation(rect: LogicalRect): AnnotationCommand {
+  return {
+    type: 'rectangle',
+    rect,
+    color: [255, 77, 79, 255],
+    stroke_width: 2,
+  };
 }
 
 function DimMask({ rect }: { rect: LogicalRect }) {
@@ -229,6 +268,12 @@ export default function ScreenshotSession({
   const [selection, setSelection] = useState<LogicalRect | null>(null);
   const [hoverSelection, setHoverSelection] = useState<LogicalRect | null>(null);
   const [editGesture, setEditGesture] = useState<EditGesture | null>(null);
+  const [activeAnnotationTool, setActiveAnnotationTool] =
+    useState<AnnotationTool | null>(null);
+  const [annotationGesture, setAnnotationGesture] =
+    useState<AnnotationGesture | null>(null);
+  const [draftAnnotation, setDraftAnnotation] = useState<AnnotationCommand | null>(null);
+  const [annotations, setAnnotations] = useState<AnnotationCommand[]>([]);
   const [previewImageBase64, setPreviewImageBase64] = useState<string | null>(null);
   const [cursorColor, setCursorColor] = useState<ColorSample | null>(null);
   const [sampleCanvasVersion, setSampleCanvasVersion] = useState(0);
@@ -309,6 +354,10 @@ export default function ScreenshotSession({
     setSelection(null);
     setHoverSelection(null);
     setEditGesture(null);
+    setActiveAnnotationTool(null);
+    setAnnotationGesture(null);
+    setDraftAnnotation(null);
+    setAnnotations([]);
     setPreviewImageBase64(null);
     setCursorColor(null);
     setSampleCanvasVersion(0);
@@ -358,7 +407,7 @@ export default function ScreenshotSession({
   }, []);
 
   const renderSelectionPreview = useCallback(
-    async (rect: LogicalRect) => {
+    async (rect: LogicalRect, nextAnnotations: AnnotationCommand[] = annotations) => {
       if (!session) return;
 
       setIsRenderingOutput(true);
@@ -369,6 +418,7 @@ export default function ScreenshotSession({
         const base64 = await invoke<string>('render_capture_output', {
           sessionId: session.id,
           rect,
+          annotations: nextAnnotations,
         });
         setPreviewImageBase64(base64);
 
@@ -389,7 +439,7 @@ export default function ScreenshotSession({
         setIsRenderingOutput(false);
       }
     },
-    [mode, onInactive, resetSessionState, session],
+    [annotations, mode, onInactive, resetSessionState, session],
   );
 
   const copySelection = useCallback(async () => {
@@ -402,6 +452,7 @@ export default function ScreenshotSession({
       await invoke('output_capture', {
         sessionId: session.id,
         rect: selection,
+        annotations,
         action: { type: 'copy' },
       });
       await invoke('cancel_capture_session', { sessionId: session.id });
@@ -413,7 +464,7 @@ export default function ScreenshotSession({
     } finally {
       setIsRenderingOutput(false);
     }
-  }, [onInactive, resetSessionState, selection, session]);
+  }, [annotations, onInactive, resetSessionState, selection, session]);
 
   const saveSelection = useCallback(async () => {
     if (!session || !selection) return;
@@ -422,7 +473,7 @@ export default function ScreenshotSession({
     setError(null);
 
     try {
-      await saveCaptureSelection(invoke, session.id, selection);
+      await saveCaptureSelection(invoke, session.id, selection, annotations);
       await invoke('cancel_capture_session', { sessionId: session.id });
       resetSessionState();
       onInactive?.();
@@ -432,7 +483,7 @@ export default function ScreenshotSession({
     } finally {
       setIsRenderingOutput(false);
     }
-  }, [onInactive, resetSessionState, selection, session]);
+  }, [annotations, onInactive, resetSessionState, selection, session]);
 
   const runOcrSelection = useCallback(async () => {
     if (!session || !selection) return;
@@ -467,6 +518,7 @@ export default function ScreenshotSession({
       await invoke('output_capture', {
         sessionId: session.id,
         rect: selection,
+        annotations,
         action: { type: 'pin' },
       });
       await invoke('cancel_capture_session', { sessionId: session.id });
@@ -478,7 +530,7 @@ export default function ScreenshotSession({
     } finally {
       setIsRenderingOutput(false);
     }
-  }, [onInactive, resetSessionState, selection, session]);
+  }, [annotations, onInactive, resetSessionState, selection, session]);
 
   useEffect(() => {
     if (!initialMode || hasStartedInitialSession) return;
@@ -568,7 +620,13 @@ export default function ScreenshotSession({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        void cancelSession();
+        if (activeAnnotationTool || annotationGesture) {
+          setActiveAnnotationTool(null);
+          setAnnotationGesture(null);
+          setDraftAnnotation(null);
+        } else {
+          void cancelSession();
+        }
       } else if (
         status === 'preview' &&
         (event.key === 'Enter' ||
@@ -591,6 +649,8 @@ export default function ScreenshotSession({
   }, [
     cancelSession,
     copySelection,
+    activeAnnotationTool,
+    annotationGesture,
     isActive,
     renderSelectionPreview,
     selection,
@@ -613,6 +673,10 @@ export default function ScreenshotSession({
     setPreviewImageBase64(null);
     setIsRenderingOutput(false);
     setStatus('selecting');
+    setActiveAnnotationTool(null);
+    setAnnotationGesture(null);
+    setDraftAnnotation(null);
+    setAnnotations([]);
   };
 
   const applyEditGesture = useCallback(
@@ -675,6 +739,17 @@ export default function ScreenshotSession({
       setHoverSelection(getBestCandidateAtPoint(captureCandidates, point)?.rect ?? null);
     }
 
+    if (annotationGesture && selection) {
+      const localPoint = clampPointToRect(
+        { x: point.x - selection.x, y: point.y - selection.y },
+        selection,
+      );
+      setDraftAnnotation(
+        rectangleAnnotation(normalizeSelection(annotationGesture.startPoint, localPoint)),
+      );
+      return;
+    }
+
     if (editGesture) {
       setSelection(applyEditGesture(editGesture, point));
       setPreviewImageBase64(null);
@@ -701,12 +776,28 @@ export default function ScreenshotSession({
     );
     setCursorPoint(point);
 
+    if (annotationGesture && selection) {
+      const localPoint = clampPointToRect(
+        { x: point.x - selection.x, y: point.y - selection.y },
+        selection,
+      );
+      const nextRect = normalizeSelection(annotationGesture.startPoint, localPoint);
+      setAnnotationGesture(null);
+      setDraftAnnotation(null);
+      if (nextRect.width >= MIN_ANNOTATION_SIZE && nextRect.height >= MIN_ANNOTATION_SIZE) {
+        const nextAnnotations = [...annotations, rectangleAnnotation(nextRect)];
+        setAnnotations(nextAnnotations);
+        void renderSelectionPreview(selection, nextAnnotations);
+      }
+      return;
+    }
+
     if (editGesture) {
       const nextSelection = applyEditGesture(editGesture, point);
       setEditGesture(null);
       setSelection(nextSelection);
       setStatus('preview');
-      void renderSelectionPreview(nextSelection);
+      void renderSelectionPreview(nextSelection, annotations);
       return;
     }
 
@@ -726,7 +817,7 @@ export default function ScreenshotSession({
         setSelection(hoverSelection);
         setHoverSelection(null);
         setStatus('preview');
-        void renderSelectionPreview(hoverSelection);
+        void renderSelectionPreview(hoverSelection, []);
         return;
       }
 
@@ -737,7 +828,7 @@ export default function ScreenshotSession({
     setSelection(nextSelection);
     setHoverSelection(null);
     setStatus('preview');
-    void renderSelectionPreview(nextSelection);
+    void renderSelectionPreview(nextSelection, []);
   };
 
   const startMoveGesture = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -750,12 +841,31 @@ export default function ScreenshotSession({
       selectionBounds,
     );
     setCursorPoint(point);
+    if (activeAnnotationTool === 'rectangle') {
+      const localPoint = clampPointToRect(
+        { x: point.x - selection.x, y: point.y - selection.y },
+        selection,
+      );
+      setAnnotationGesture({
+        tool: 'rectangle',
+        startPoint: localPoint,
+      });
+      setDraftAnnotation(rectangleAnnotation(normalizeSelection(localPoint, localPoint)));
+      return;
+    }
+
     setEditGesture({
       type: 'move',
       startPoint: point,
       startSelection: selection,
     });
     setPreviewImageBase64(null);
+  };
+
+  const toggleRectangleTool = () => {
+    setActiveAnnotationTool((tool) => (tool === 'rectangle' ? null : 'rectangle'));
+    setAnnotationGesture(null);
+    setDraftAnnotation(null);
   };
 
   const startResizeGesture = (
@@ -851,9 +961,24 @@ export default function ScreenshotSession({
               draggable={false}
             />
           )}
+          {draftAnnotation?.type === 'rectangle' && (
+            <div
+              className="pointer-events-none absolute border-2 border-red-400"
+              style={rectStyle(
+                annotationRectToViewportRect(
+                  draftAnnotation.rect,
+                  selectionViewportRect,
+                ),
+              )}
+            />
+          )}
           <div
             className={`absolute border ${overlayClassName} bg-transparent ${
-              status === 'preview' ? 'cursor-move' : ''
+              status === 'preview'
+                ? activeAnnotationTool === 'rectangle'
+                  ? 'cursor-crosshair'
+                  : 'cursor-move'
+                : ''
             }`}
             style={rectStyle(selectionViewportRect)}
             onPointerDown={startMoveGesture}
@@ -880,6 +1005,16 @@ export default function ScreenshotSession({
               }}
               onPointerDown={(event) => event.stopPropagation()}
             >
+              <button
+                type="button"
+                className="h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50"
+                disabled={isRenderingOutput}
+                title="Rectangle"
+                aria-label="Draw rectangle annotation"
+                onClick={toggleRectangleTool}
+              >
+                Rect
+              </button>
               <button
                 type="button"
                 className="h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50"

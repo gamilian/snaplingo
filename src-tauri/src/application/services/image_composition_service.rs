@@ -9,6 +9,12 @@ pub struct PngPlacement<'a> {
     pub destination_rect: PhysicalRect,
 }
 
+pub struct ImageAnnotation {
+    pub rect: PhysicalRect,
+    pub color: [u8; 4],
+    pub stroke_width: u32,
+}
+
 pub struct ImageCompositionService;
 
 impl ImageCompositionService {
@@ -51,6 +57,16 @@ impl ImageCompositionService {
         width: u32,
         height: u32,
         placements: &[PngPlacement<'_>],
+    ) -> Result<Vec<u8>> {
+        self.compose_png_with_annotations(width, height, placements, &[])
+    }
+
+    pub fn compose_png_with_annotations(
+        &self,
+        width: u32,
+        height: u32,
+        placements: &[PngPlacement<'_>],
+        annotations: &[ImageAnnotation],
     ) -> Result<Vec<u8>> {
         if width == 0 || height == 0 {
             return Err(AppError::System(
@@ -130,12 +146,105 @@ impl ImageCompositionService {
                 placement.destination_rect.y.into(),
             );
         }
+        for annotation in annotations {
+            draw_rectangle_annotation(&mut output, annotation);
+        }
 
         let mut output_png = Vec::new();
         image::DynamicImage::ImageRgba8(output)
             .write_to(&mut Cursor::new(&mut output_png), image::ImageFormat::Png)
             .map_err(|e| AppError::System(format!("Failed to encode composed PNG: {}", e)))?;
         Ok(output_png)
+    }
+}
+
+fn draw_rectangle_annotation(output: &mut image::RgbaImage, annotation: &ImageAnnotation) {
+    if annotation.rect.width == 0 || annotation.rect.height == 0 {
+        return;
+    }
+
+    let stroke_width = annotation.stroke_width.max(1);
+    let color = image::Rgba(annotation.color);
+    let output_width = output.width() as i64;
+    let output_height = output.height() as i64;
+    let left = annotation.rect.x as i64;
+    let top = annotation.rect.y as i64;
+    let right = left + annotation.rect.width as i64 - 1;
+    let bottom = top + annotation.rect.height as i64 - 1;
+
+    for stroke in 0..stroke_width as i64 {
+        draw_horizontal_line(
+            output,
+            left,
+            right,
+            top + stroke,
+            output_width,
+            output_height,
+            color,
+        );
+        draw_horizontal_line(
+            output,
+            left,
+            right,
+            bottom - stroke,
+            output_width,
+            output_height,
+            color,
+        );
+        draw_vertical_line(
+            output,
+            top,
+            bottom,
+            left + stroke,
+            output_width,
+            output_height,
+            color,
+        );
+        draw_vertical_line(
+            output,
+            top,
+            bottom,
+            right - stroke,
+            output_width,
+            output_height,
+            color,
+        );
+    }
+}
+
+fn draw_horizontal_line(
+    output: &mut image::RgbaImage,
+    left: i64,
+    right: i64,
+    y: i64,
+    output_width: i64,
+    output_height: i64,
+    color: image::Rgba<u8>,
+) {
+    if y < 0 || y >= output_height {
+        return;
+    }
+
+    for x in left.max(0)..=right.min(output_width - 1) {
+        output.put_pixel(x as u32, y as u32, color);
+    }
+}
+
+fn draw_vertical_line(
+    output: &mut image::RgbaImage,
+    top: i64,
+    bottom: i64,
+    x: i64,
+    output_width: i64,
+    output_height: i64,
+    color: image::Rgba<u8>,
+) {
+    if x < 0 || x >= output_width {
+        return;
+    }
+
+    for y in top.max(0)..=bottom.min(output_height - 1) {
+        output.put_pixel(x as u32, y as u32, color);
     }
 }
 

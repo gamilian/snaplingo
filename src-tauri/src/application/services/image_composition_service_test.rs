@@ -3,13 +3,12 @@ mod tests {
     use image::ImageEncoder;
 
     use crate::application::services::image_composition_service::{
-        ImageCompositionService, PngPlacement,
+        ImageAnnotation, ImageCompositionService, PngPlacement,
     };
     use crate::domain::capture::PhysicalRect;
 
     fn make_solid_png(width: u32, height: u32, rgba: [u8; 4]) -> Vec<u8> {
-        let pixels = rgba
-            .repeat((width * height) as usize);
+        let pixels = rgba.repeat((width * height) as usize);
         let mut png = Vec::new();
         let encoder = image::codecs::png::PngEncoder::new(&mut png);
         encoder
@@ -98,5 +97,47 @@ mod tests {
         assert_eq!(png_pixel(&output, 2, 1), [255, 0, 0, 255]);
         assert_eq!(png_pixel(&output, 3, 0), [0, 0, 255, 255]);
         assert_eq!(png_pixel(&output, 5, 1), [0, 0, 255, 255]);
+    }
+
+    #[test]
+    fn composes_png_with_rectangle_annotation() {
+        let service = ImageCompositionService::new();
+        let white = make_solid_png(6, 6, [255, 255, 255, 255]);
+
+        let output = service
+            .compose_png_with_annotations(
+                6,
+                6,
+                &[PngPlacement {
+                    png_data: white.as_slice(),
+                    source_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 6,
+                        height: 6,
+                    },
+                    destination_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 6,
+                        height: 6,
+                    },
+                }],
+                &[ImageAnnotation {
+                    rect: PhysicalRect {
+                        x: 1,
+                        y: 1,
+                        width: 4,
+                        height: 3,
+                    },
+                    color: [255, 0, 0, 255],
+                    stroke_width: 1,
+                }],
+            )
+            .unwrap();
+
+        assert_eq!(png_pixel(&output, 1, 1), [255, 0, 0, 255]);
+        assert_eq!(png_pixel(&output, 4, 3), [255, 0, 0, 255]);
+        assert_eq!(png_pixel(&output, 2, 2), [255, 255, 255, 255]);
     }
 }

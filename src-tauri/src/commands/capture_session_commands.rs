@@ -6,10 +6,10 @@ use tauri::{
     WebviewWindowBuilder,
 };
 
-use crate::application::services::image_composition_service::PngPlacement;
+use crate::application::services::image_composition_service::{ImageAnnotation, PngPlacement};
 use crate::domain::capture::{
-    CaptureOutputAction, CaptureSessionId, CaptureSessionView, LogicalRect, MonitorSnapshotView,
-    PhysicalRect, PinnedImageView,
+    AnnotationCommand, CaptureOutputAction, CaptureSessionId, CaptureSessionView, LogicalRect,
+    MonitorSnapshotView, PhysicalRect, PinnedImageView,
 };
 use crate::domain::ocr::{OcrRequest, OcrResult};
 use crate::infrastructure::system::screenshot::MonitorSnapshot;
@@ -99,10 +99,11 @@ pub async fn cancel_capture_session(
 pub async fn render_capture_output(
     session_id: String,
     rect: LogicalRect,
+    annotations: Vec<AnnotationCommand>,
     state: State<'_, crate::AppState>,
 ) -> Result<String, String> {
     let session_id = CaptureSessionId(session_id);
-    let png_data = render_capture_png(&session_id, &rect, &state)?;
+    let png_data = render_capture_png(&session_id, &rect, &annotations, &state)?;
 
     Ok(base64::engine::general_purpose::STANDARD.encode(png_data))
 }
@@ -113,9 +114,7 @@ pub fn default_capture_save_path() -> Result<String, String> {
         .or_else(dirs::picture_dir)
         .or_else(dirs::home_dir)
         .unwrap_or_else(std::env::temp_dir);
-    let timestamp = chrono::Local::now()
-        .format("%Y%m%d-%H%M%S")
-        .to_string();
+    let timestamp = chrono::Local::now().format("%Y%m%d-%H%M%S").to_string();
 
     Ok(capture_save_path(&base_dir, &timestamp)
         .to_string_lossy()
@@ -126,12 +125,13 @@ pub fn default_capture_save_path() -> Result<String, String> {
 pub async fn output_capture(
     session_id: String,
     rect: LogicalRect,
+    annotations: Vec<AnnotationCommand>,
     action: CaptureOutputAction,
     app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     let session_id = CaptureSessionId(session_id);
-    let png_data = render_capture_png(&session_id, &rect, &state)?;
+    let png_data = render_capture_png(&session_id, &rect, &annotations, &state)?;
 
     match action {
         CaptureOutputAction::Save { path } => {
@@ -182,7 +182,7 @@ pub async fn run_capture_ocr(
     state: State<'_, crate::AppState>,
 ) -> Result<OcrResult, String> {
     let session_id = CaptureSessionId(session_id);
-    let png_data = render_capture_png(&session_id, &rect, &state)?;
+    let png_data = render_capture_png(&session_id, &rect, &[], &state)?;
     let request = OcrRequest {
         image_data: png_data,
         language: None,
@@ -313,22 +313,18 @@ fn open_pinned_image_window(app: &AppHandle, image: &PinnedImageView) -> Result<
     let label = pinned_window_label(&image.id);
     let (width, height) = pinned_window_size(image.width, image.height);
 
-    WebviewWindowBuilder::new(
-        app,
-        &label,
-        WebviewUrl::App(pinned_window_url(&image.id)),
-    )
-    .title("SnapLingo Pin")
-    .inner_size(width, height)
-    .min_inner_size(80.0, 60.0)
-    .decorations(false)
-    .always_on_top(true)
-    .visible_on_all_workspaces(true)
-    .skip_taskbar(true)
-    .focused(true)
-    .shadow(true)
-    .build()
-    .map_err(|e| e.to_string())?;
+    WebviewWindowBuilder::new(app, &label, WebviewUrl::App(pinned_window_url(&image.id)))
+        .title("SnapLingo Pin")
+        .inner_size(width, height)
+        .min_inner_size(80.0, 60.0)
+        .decorations(false)
+        .always_on_top(true)
+        .visible_on_all_workspaces(true)
+        .skip_taskbar(true)
+        .focused(true)
+        .shadow(true)
+        .build()
+        .map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -336,6 +332,7 @@ fn open_pinned_image_window(app: &AppHandle, image: &PinnedImageView) -> Result<
 fn render_capture_png(
     session_id: &CaptureSessionId,
     rect: &LogicalRect,
+    annotations: &[AnnotationCommand],
     state: &crate::AppState,
 ) -> Result<Vec<u8>, String> {
     let session = state
@@ -347,19 +344,54 @@ fn render_capture_png(
     let placements = plan
         .placements
         .iter()
-        .map(|placement| {
-            PngPlacement {
-                png_data: session.snapshots[placement.snapshot_index].png_data.as_slice(),
-                source_rect: placement.source_rect.clone(),
-                destination_rect: placement.destination_rect.clone(),
-            }
+        .map(|placement| PngPlacement {
+            png_data: session.snapshots[placement.snapshot_index]
+                .png_data
+                .as_slice(),
+            source_rect: placement.source_rect.clone(),
+            destination_rect: placement.destination_rect.clone(),
         })
         .collect::<Vec<_>>();
 
+    let image_annotations = image_annotations_from_commands(annotations, rect, plan.width)?;
+
     state
         .image_composition_service
-        .compose_png(plan.width, plan.height, &placements)
+        .compose_png_with_annotations(plan.width, plan.height, &placements, &image_annotations)
         .map_err(|e| e.to_string())
+}
+
+fn image_annotations_from_commands(
+    annotations: &[AnnotationCommand],
+    selection_rect: &LogicalRect,
+    output_width: u32,
+) -> Result<Vec<ImageAnnotation>, String> {
+    if annotations.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let output_scale = output_width as f64 / selection_rect.width;
+    let annotation_origin = LogicalRect {
+        x: 0.0,
+        y: 0.0,
+        width: selection_rect.width,
+        height: selection_rect.height,
+    };
+
+    annotations
+        .iter()
+        .map(|annotation| match annotation {
+            AnnotationCommand::Rectangle {
+                rect,
+                color,
+                stroke_width,
+            } => Ok(ImageAnnotation {
+                rect: scaled_logical_rect_relative_to(rect, &annotation_origin, output_scale)?,
+                color: *color,
+                stroke_width: ((*stroke_width).max(1) as f64 * output_scale).ceil() as u32,
+            }),
+        })
+        .collect()
 }
 
 fn snapshot_to_view(snapshot: &MonitorSnapshot) -> MonitorSnapshotView {
@@ -432,9 +464,8 @@ fn capture_image_composition_plan(
         .iter()
         .enumerate()
         .filter_map(|(snapshot_index, snapshot)| {
-            logical_rect_intersection(rect, &snapshot.logical_bounds).map(|intersection| {
-                (snapshot_index, snapshot, intersection)
-            })
+            logical_rect_intersection(rect, &snapshot.logical_bounds)
+                .map(|intersection| (snapshot_index, snapshot, intersection))
         })
         .collect::<Vec<_>>();
 
@@ -525,7 +556,9 @@ fn scaled_extent(value: f64, scale: f64) -> Result<u32, String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::domain::capture::{LogicalRect, MonitorSnapshotView, PhysicalRect};
+    use crate::domain::capture::{
+        AnnotationCommand, LogicalRect, MonitorSnapshotView, PhysicalRect,
+    };
     use crate::infrastructure::system::screenshot::MonitorSnapshot;
 
     #[test]
@@ -705,6 +738,42 @@ mod tests {
     }
 
     #[test]
+    fn scales_selection_local_annotations_to_output_pixels() {
+        let annotations = super::image_annotations_from_commands(
+            &[AnnotationCommand::Rectangle {
+                rect: LogicalRect {
+                    x: 1.0,
+                    y: 2.0,
+                    width: 3.0,
+                    height: 4.0,
+                },
+                color: [255, 77, 79, 255],
+                stroke_width: 2,
+            }],
+            &LogicalRect {
+                x: 100.0,
+                y: 200.0,
+                width: 10.0,
+                height: 10.0,
+            },
+            20,
+        )
+        .unwrap();
+
+        assert_eq!(annotations.len(), 1);
+        assert_eq!(
+            annotations[0].rect,
+            PhysicalRect {
+                x: 2,
+                y: 4,
+                width: 6,
+                height: 8,
+            }
+        );
+        assert_eq!(annotations[0].stroke_width, 4);
+    }
+
+    #[test]
     fn pinned_window_url_targets_pin_route() {
         assert_eq!(
             super::pinned_window_url("pin-1").to_string_lossy(),
@@ -720,14 +789,8 @@ mod tests {
 
     #[test]
     fn capture_save_path_uses_timestamped_png_name() {
-        let path = super::capture_save_path(
-            std::path::Path::new("/tmp"),
-            "20260617-023000",
-        );
+        let path = super::capture_save_path(std::path::Path::new("/tmp"), "20260617-023000");
 
-        assert_eq!(
-            path.to_string_lossy(),
-            "/tmp/SnapLingo-20260617-023000.png"
-        );
+        assert_eq!(path.to_string_lossy(), "/tmp/SnapLingo-20260617-023000.png");
     }
 }
