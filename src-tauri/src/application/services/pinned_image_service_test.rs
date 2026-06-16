@@ -37,4 +37,17 @@ mod tests {
 
         assert!(service.get_pinned_image(&image_id).is_err());
     }
+
+    #[test]
+    fn returns_original_pinned_png_data() {
+        let service = PinnedImageService::new();
+        let png = make_test_png(2, 2);
+
+        let image_id = service.pin_png(png.clone()).unwrap();
+
+        assert_eq!(service.get_pinned_png(&image_id).unwrap(), png);
+
+        service.remove_pinned_image(&image_id).unwrap();
+        assert!(service.get_pinned_png(&image_id).is_err());
+    }
 }

@@ -176,6 +176,25 @@ pub fn remove_pinned_image(
 }
 
 #[tauri::command]
+pub async fn copy_pinned_image(
+    image_id: String,
+    state: State<'_, crate::AppState>,
+) -> Result<(), String> {
+    let png_data = state
+        .inner()
+        .pinned_image_service
+        .get_pinned_png(&image_id)
+        .map_err(|e| e.to_string())?;
+
+    state
+        .inner()
+        .capture_output_service
+        .copy_png(&png_data)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn run_capture_ocr(
     session_id: String,
     rect: LogicalRect,

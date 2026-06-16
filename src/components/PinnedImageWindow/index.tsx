@@ -13,7 +13,7 @@ import {
 
 const appWindow = getCurrentWindow();
 const webviewWindow = getCurrentWebviewWindow();
-const PIN_CONTEXT_MENU_SIZE = { width: 132, height: 164 };
+const PIN_CONTEXT_MENU_SIZE = { width: 132, height: 192 };
 
 function readPinnedImageId(search: string) {
   const params = new URLSearchParams(search);
@@ -98,6 +98,15 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     setOpacity(getPinnedOpacityPreset(nextOpacity));
     setContextMenuPosition(null);
   }, []);
+
+  const copyPinnedImage = useCallback(async () => {
+    try {
+      await invoke('copy_pinned_image', { imageId });
+      setContextMenuPosition(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [imageId]);
 
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
     if (!image) return;
@@ -191,6 +200,13 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
             </button>
           ))}
           <div className="my-1 h-px bg-white/10" />
+          <button
+            type="button"
+            className="h-7 w-full rounded px-2 text-left hover:bg-white/15"
+            onClick={copyPinnedImage}
+          >
+            Copy
+          </button>
           <button
             type="button"
             className="h-7 w-full rounded px-2 text-left text-red-100 hover:bg-red-500/20"

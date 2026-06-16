@@ -57,6 +57,15 @@ impl PinnedImageService {
         })
     }
 
+    pub fn get_pinned_png(&self, image_id: &str) -> Result<Vec<u8>> {
+        self.images
+            .lock()
+            .unwrap()
+            .get(image_id)
+            .map(|image| image.png_data.clone())
+            .ok_or_else(|| AppError::System(format!("Pinned image not found: {}", image_id)))
+    }
+
     pub fn remove_pinned_image(&self, image_id: &str) -> Result<()> {
         self.images
             .lock()

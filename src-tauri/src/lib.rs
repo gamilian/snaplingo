@@ -445,6 +445,7 @@ pub fn run() {
       commands::default_capture_save_path,
       commands::output_capture,
       commands::get_pinned_image,
+      commands::copy_pinned_image,
       commands::remove_pinned_image,
       commands::run_capture_ocr,
       commands::get_translation_history,
