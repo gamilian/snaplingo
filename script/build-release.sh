@@ -23,7 +23,7 @@ fi
 # Step 1: Clean old build artifacts
 echo -e "${GREEN}🧹 清理旧构建产物...${NC}"
 rm -rf dist/
-rm -rf src-tauri/target/release
+rm -rf target/release
 echo -e "   清理完成"
 echo ""
 
@@ -56,7 +56,7 @@ echo ""
 # Step 5: Verify build artifacts
 echo -e "${GREEN}✅ 验证构建产物...${NC}"
 
-BUNDLE_DIR="src-tauri/target/release/bundle"
+BUNDLE_DIR="target/release/bundle"
 if [ ! -d "$BUNDLE_DIR" ]; then
     echo -e "${RED}❌ 构建失败: 未找到 bundle 目录${NC}"
     exit 1
@@ -68,7 +68,7 @@ case "$OS" in
     Darwin)
         echo -e "   平台: ${YELLOW}macOS${NC}"
         APP_PATH="$BUNDLE_DIR/macos/SnapLingo.app"
-        DMG_PATH=$(find "$BUNDLE_DIR/dmg" -name "*.dmg" 2>/dev/null | head -1)
+        DMG_PATH=$(find "$BUNDLE_DIR/dmg" -name "SnapLingo_*.dmg" -not -name "rw.*" 2>/dev/null | head -1)
 
         if [ -d "$APP_PATH" ]; then
             APP_SIZE=$(du -sh "$APP_PATH" | cut -f1)
@@ -77,7 +77,8 @@ case "$OS" in
 
         if [ -n "$DMG_PATH" ]; then
             DMG_SIZE=$(du -sh "$DMG_PATH" | cut -f1)
-            echo -e "   💿 DMG: $DMG_PATH (${DMG_SIZE})"
+            DMG_FILENAME=$(basename "$DMG_PATH")
+            echo -e "   💿 DMG: $DMG_FILENAME (${DMG_SIZE})"
         fi
         ;;
     Linux)
