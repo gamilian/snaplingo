@@ -12,6 +12,7 @@ pub use infrastructure::*;
 pub use application::*;
 
 use std::sync::Arc;
+use parking_lot::Mutex as ParkingLotMutex;
 use std::path::PathBuf;
 use tauri::{Manager, Emitter};
 use serde::{Deserialize, Serialize};
@@ -34,9 +35,8 @@ use application::providers::ocr::{
     OcrCoordinator,
     impls::{TesseractProvider, BaiduOcrProvider},
 };
-use application::{CaptureService, HotkeyService, HistoryService, WorkflowService};
+use application::{CaptureService, HistoryService, WorkflowService};
 use infrastructure::system::screenshot::get_screenshot_backend;
-use infrastructure::system::hotkey::get_hotkey_backend;
 use infrastructure::system::paths::get_history_db_path;
 use domain::HotkeyAction;
 
@@ -89,6 +89,15 @@ pub fn create_llm_translation_provider(
     ))
 }
 
+/// Screenshot state for storing captured image data
+#[derive(Default)]
+pub struct ScreenshotState {
+    pub data: Option<Vec<u8>>,
+    pub width: u32,
+    pub height: u32,
+    pub scale_factor: f64,
+}
+
 pub struct AppState {
     // Phase 1: Infrastructure
     pub config_file: Arc<ConfigFile>,
@@ -103,7 +112,7 @@ pub struct AppState {
 
     // Phase 4: Capture
     pub capture_service: Arc<CaptureService>,
-    pub hotkey_service: Arc<HotkeyService>,
+    pub screenshot_state: Arc<ParkingLotMutex<ScreenshotState>>,
 
     // Phase 5: History
     pub history_service: Arc<HistoryService>,
@@ -263,9 +272,7 @@ impl AppState {
         // Phase 4: Capture
         let screenshot_backend = get_screenshot_backend();
         let capture_service = Arc::new(CaptureService::new(screenshot_backend));
-
-        let hotkey_backend = get_hotkey_backend();
-        let hotkey_service = Arc::new(HotkeyService::new(hotkey_backend));
+        let screenshot_state = Arc::new(ParkingLotMutex::new(ScreenshotState::default()));
 
         // Phase 6: Workflows
         let workflow_service = Arc::new(WorkflowService::new(
@@ -281,7 +288,7 @@ impl AppState {
             translation_coordinator,
             ocr_coordinator,
             capture_service,
-            hotkey_service,
+            screenshot_state,
             history_service,
             event_bus,
             workflow_service,
@@ -304,110 +311,50 @@ impl AppState {
     }
 }
 
-/// Setup global hotkeys and start event listening loop
-async fn setup_hotkeys(app: tauri::AppHandle) -> Result<()> {
-    let state = app.state::<AppState>();
+/// Register screenshot shortcut
+fn register_screenshot_shortcut(app: &tauri::AppHandle) -> Result<()> {
+    let app_clone = app.clone();
 
-    // Define default hotkey mappings
-    // Format: (accelerator, action)
-    let default_hotkeys = vec![
-        ("CommandOrControl+Shift+C", HotkeyAction::ScreenshotTranslate),
-        ("CommandOrControl+Shift+T", HotkeyAction::InputTranslate),
-        ("CommandOrControl+Shift+O", HotkeyAction::ScreenshotOcr),
-    ];
+    infrastructure::system::register_shortcut(app, "Cmd+Shift+R", move || {
+        log::info!("Screenshot shortcut triggered!");
 
-    // Map from global-hotkey's internal ID to HotkeyAction
-    // Using u32 directly since HotKey.id() returns u32
-    let action_map = Arc::new(Mutex::new(HashMap::<u32, HotkeyAction>::new()));
+        let app = app_clone.clone();
 
-    // Get hotkey backend directly for registration
-    let hotkey_backend = get_hotkey_backend();
-
-    // Register hotkeys
-    for (accelerator, action) in default_hotkeys {
-        match hotkey_backend.register(accelerator).await {
-            Ok(hotkey_id) => {
-                // HotkeyId.as_u32() is the internal ID from global-hotkey
-                let id = hotkey_id.as_u32();
-                match action_map.lock() {
-                    Ok(mut map) => {
-                        map.insert(id, action);
-                        log::info!("Registered hotkey: {} -> {:?} (ID: {})", accelerator, action, id);
-                    }
-                    Err(e) => {
-                        log::error!("Action map lock poisoned during hotkey registration: {}", e);
-                    }
-                }
+        // Emit event to frontend to trigger screenshot workflow
+        if let Some(window) = app.get_webview_window("main") {
+            if let Err(e) = window.emit("hotkey-triggered", "screenshot") {
+                log::error!("Failed to emit hotkey-triggered event: {}", e);
+            } else {
+                log::info!("Screenshot hotkey event emitted successfully");
             }
-            Err(e) => {
-                log::warn!("Failed to register hotkey '{}': {}", accelerator, e);
-            }
+        } else {
+            log::error!("Main window not found");
         }
-    }
+    })?;
 
-    // Clone references for event loop
-    let workflow_service = state.workflow_service.clone();
-    let app_handle = app.clone();
-    let action_map_clone = action_map.clone();
+    Ok(())
+}
 
-    // Start event listening loop
-    use global_hotkey::GlobalHotKeyEvent;
+/// Register screenshot OCR shortcut
+fn register_screenshot_ocr_shortcut(app: &tauri::AppHandle) -> Result<()> {
+    let app_clone = app.clone();
 
-    tauri::async_runtime::spawn(async move {
-        let receiver = GlobalHotKeyEvent::receiver();
+    infrastructure::system::register_shortcut(app, "Cmd+Shift+S", move || {
+        log::info!("Screenshot OCR shortcut triggered!");
 
-        loop {
-            // Poll for hotkey events
-            if let Ok(event) = receiver.try_recv() {
-                let event_id = event.id;
-                log::info!("Hotkey event received: ID {}", event_id);
+        let app = app_clone.clone();
 
-                // Look up the corresponding action
-                let action = {
-                    match action_map_clone.lock() {
-                        Ok(map) => map.get(&event_id).copied(),
-                        Err(e) => {
-                            log::error!("Action map lock poisoned: {}", e);
-                            None
-                        }
-                    }
-                };
-
-                match action {
-                    Some(action) => {
-                        log::info!("Executing workflow: {:?}", action);
-
-                        // Execute workflow
-                        let workflow = workflow_service.clone();
-                        tauri::async_runtime::spawn(async move {
-                            match workflow.execute(action).await {
-                                Ok(outcome) => {
-                                    log::info!("Workflow completed: {:?}", outcome);
-                                    // TODO: Show result window based on outcome
-                                }
-                                Err(e) => {
-                                    log::error!("Workflow failed: {}", e);
-                                }
-                            }
-                        });
-
-                        // Also emit event to frontend
-                        if let Err(e) = app_handle.emit("hotkey-triggered", event_id) {
-                            log::warn!("Failed to emit hotkey event: {}", e);
-                        }
-                    }
-                    None => {
-                        log::warn!("Received hotkey event for unknown ID: {}", event_id);
-                    }
-                }
+        // Emit event to frontend to trigger screenshot OCR workflow
+        if let Some(window) = app.get_webview_window("main") {
+            if let Err(e) = window.emit("hotkey-triggered", "screenshot-ocr") {
+                log::error!("Failed to emit hotkey-triggered event: {}", e);
+            } else {
+                log::info!("Screenshot OCR hotkey event emitted successfully");
             }
-
-            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+        } else {
+            log::error!("Main window not found");
         }
-    });
-
-    log::info!("Hotkey event loop started - {} hotkeys registered",
-               action_map.lock().map(|m| m.len()).unwrap_or(0));
+    })?;
 
     Ok(())
 }
@@ -423,6 +370,8 @@ pub fn run() {
 
   tauri::Builder::default()
     .plugin(tauri_plugin_shell::init())
+    .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+    .plugin(tauri_plugin_screenshots::init())
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -443,11 +392,21 @@ pub fn run() {
 
       app.manage(app_state);
 
-      // Register global hotkeys and start event loop
+      // Register global shortcuts using Tauri plugin after setup completes
       let app_handle = app.handle().clone();
       tauri::async_runtime::spawn(async move {
-          if let Err(e) = setup_hotkeys(app_handle).await {
-              log::error!("Failed to setup hotkeys: {}", e);
+          tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+          if let Err(e) = register_screenshot_shortcut(&app_handle) {
+              log::error!("Failed to register screenshot shortcut: {}", e);
+          } else {
+              log::info!("Screenshot shortcut registered: Cmd+Shift+R");
+          }
+
+          if let Err(e) = register_screenshot_ocr_shortcut(&app_handle) {
+              log::error!("Failed to register screenshot OCR shortcut: {}", e);
+          } else {
+              log::info!("Screenshot OCR shortcut registered: Cmd+Shift+S");
           }
       });
 
@@ -457,6 +416,11 @@ pub fn run() {
     })
     .invoke_handler(tauri::generate_handler![
       commands::open_result_window,
+      commands::trigger_screenshot,
+      commands::create_screenshot_window,
+      commands::create_screenshot_window_simple,
+      commands::close_screenshot_window,
+      commands::crop_screenshot,
       commands::translate_text_v2,
       commands::list_translation_providers,
       commands::activate_translation_provider,
