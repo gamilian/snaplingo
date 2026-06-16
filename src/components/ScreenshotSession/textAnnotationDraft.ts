@@ -3,6 +3,10 @@ import {
   isCommittedAnnotation,
   type AnnotationStyle,
 } from './annotationStyle';
+import {
+  addAnnotationToHistory,
+  type AnnotationHistory,
+} from './annotationHistory';
 import type { TextAnnotationCommand, Point } from './types';
 
 export interface TextAnnotationDraft {
@@ -44,4 +48,15 @@ export function annotationFromTextDraft(
   );
 
   return isCommittedAnnotation(annotation) ? annotation : null;
+}
+
+export function commitTextAnnotationDraft(
+  history: AnnotationHistory,
+  draft: TextAnnotationDraft,
+  style: AnnotationStyle,
+): AnnotationHistory {
+  const annotation = annotationFromTextDraft(draft, style);
+  if (!annotation) return history;
+
+  return addAnnotationToHistory(history, annotation);
 }

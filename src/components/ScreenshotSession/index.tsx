@@ -44,7 +44,7 @@ import {
   type AnnotationTool,
 } from './annotationStyle';
 import {
-  annotationFromTextDraft,
+  commitTextAnnotationDraft,
   startTextAnnotationDraft,
   updateTextAnnotationDraft,
   type TextAnnotationDraft,
@@ -492,6 +492,22 @@ export default function ScreenshotSession({
     [annotations, mode, onInactive, resetSessionState, session],
   );
 
+  const commitTextDraftToHistory = useCallback(() => {
+    if (!textDraft) return annotationHistory;
+
+    const nextHistory = commitTextAnnotationDraft(
+      annotationHistory,
+      textDraft,
+      annotationStyle,
+    );
+    setTextDraft(null);
+    if (nextHistory !== annotationHistory) {
+      setAnnotationHistory(nextHistory);
+    }
+
+    return nextHistory;
+  }, [annotationHistory, annotationStyle, textDraft]);
+
   const copySelection = useCallback(async () => {
     if (!session || !selection) return;
 
@@ -499,10 +515,11 @@ export default function ScreenshotSession({
     setError(null);
 
     try {
+      const outputHistory = commitTextDraftToHistory();
       await invoke('output_capture', {
         sessionId: session.id,
         rect: selection,
-        annotations,
+        annotations: outputHistory.annotations,
         action: { type: 'copy' },
       });
       await invoke('cancel_capture_session', { sessionId: session.id });
@@ -514,7 +531,7 @@ export default function ScreenshotSession({
     } finally {
       setIsRenderingOutput(false);
     }
-  }, [annotations, onInactive, resetSessionState, selection, session]);
+  }, [commitTextDraftToHistory, onInactive, resetSessionState, selection, session]);
 
   const saveSelection = useCallback(async () => {
     if (!session || !selection) return;
@@ -523,7 +540,13 @@ export default function ScreenshotSession({
     setError(null);
 
     try {
-      await saveCaptureSelection(invoke, session.id, selection, annotations);
+      const outputHistory = commitTextDraftToHistory();
+      await saveCaptureSelection(
+        invoke,
+        session.id,
+        selection,
+        outputHistory.annotations,
+      );
       await invoke('cancel_capture_session', { sessionId: session.id });
       resetSessionState();
       onInactive?.();
@@ -533,7 +556,7 @@ export default function ScreenshotSession({
     } finally {
       setIsRenderingOutput(false);
     }
-  }, [annotations, onInactive, resetSessionState, selection, session]);
+  }, [commitTextDraftToHistory, onInactive, resetSessionState, selection, session]);
 
   const runOcrSelection = useCallback(async () => {
     if (!session || !selection) return;
@@ -565,10 +588,11 @@ export default function ScreenshotSession({
     setError(null);
 
     try {
+      const outputHistory = commitTextDraftToHistory();
       await invoke('output_capture', {
         sessionId: session.id,
         rect: selection,
-        annotations,
+        annotations: outputHistory.annotations,
         action: { type: 'pin' },
       });
       await invoke('cancel_capture_session', { sessionId: session.id });
@@ -580,7 +604,7 @@ export default function ScreenshotSession({
     } finally {
       setIsRenderingOutput(false);
     }
-  }, [annotations, onInactive, resetSessionState, selection, session]);
+  }, [commitTextDraftToHistory, onInactive, resetSessionState, selection, session]);
 
   const undoAnnotation = useCallback(() => {
     if (!selection || annotationHistory.annotations.length === 0) return;
@@ -599,19 +623,16 @@ export default function ScreenshotSession({
   }, [annotationHistory, renderSelectionPreview, selection]);
 
   const commitTextDraft = useCallback(() => {
-    if (!textDraft || !selection) {
-      setTextDraft(null);
-      return;
+    const nextHistory = commitTextDraftToHistory();
+    if (selection && nextHistory !== annotationHistory) {
+      void renderSelectionPreview(selection, nextHistory.annotations);
     }
-
-    const nextAnnotation = annotationFromTextDraft(textDraft, annotationStyle);
-    setTextDraft(null);
-    if (!nextAnnotation) return;
-
-    const nextHistory = addAnnotationToHistory(annotationHistory, nextAnnotation);
-    setAnnotationHistory(nextHistory);
-    void renderSelectionPreview(selection, nextHistory.annotations);
-  }, [annotationHistory, annotationStyle, renderSelectionPreview, selection, textDraft]);
+  }, [
+    annotationHistory,
+    commitTextDraftToHistory,
+    renderSelectionPreview,
+    selection,
+  ]);
 
   useEffect(() => {
     if (!initialMode || hasStartedInitialSession) return;
@@ -1018,10 +1039,14 @@ export default function ScreenshotSession({
   };
 
   const toggleAnnotationTool = (nextTool: AnnotationTool) => {
+    const nextHistory = commitTextDraftToHistory();
+    if (selection && nextHistory !== annotationHistory) {
+      void renderSelectionPreview(selection, nextHistory.annotations);
+    }
+
     setActiveAnnotationTool((tool) => (tool === nextTool ? null : nextTool));
     setAnnotationGesture(null);
     setDraftAnnotation(null);
-    setTextDraft(null);
   };
 
   const startResizeGesture = (
@@ -1289,16 +1314,15 @@ export default function ScreenshotSession({
                 );
               }}
               onKeyDown={(event) => {
+                event.stopPropagation();
                 if (event.key === 'Escape') {
                   event.preventDefault();
-                  event.stopPropagation();
                   setTextDraft(null);
                 } else if (
                   event.key === 'Enter' &&
                   (event.metaKey || event.ctrlKey)
                 ) {
                   event.preventDefault();
-                  event.stopPropagation();
                   event.currentTarget.blur();
                 }
               }}
@@ -1336,7 +1360,13 @@ export default function ScreenshotSession({
                 top: `${toolbarPosition.y}px`,
                 width: `${TOOLBAR_SIZE.width}px`,
               }}
-              onPointerDown={(event) => event.stopPropagation()}
+              onPointerDown={(event) => {
+                event.stopPropagation();
+                const target = event.target as HTMLElement;
+                if (textDraft && target.tagName !== 'INPUT') {
+                  event.preventDefault();
+                }
+              }}
             >
               <button
                 type="button"

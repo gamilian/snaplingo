@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { AnnotationStyle } from './annotationStyle';
+import type { AnnotationHistory } from './annotationHistory';
 import {
   annotationFromTextDraft,
+  commitTextAnnotationDraft,
   startTextAnnotationDraft,
   updateTextAnnotationDraft,
 } from './textAnnotationDraft';
@@ -9,6 +11,26 @@ import {
 const style: AnnotationStyle = {
   color: [24, 144, 255, 255],
   strokeWidth: 4,
+};
+
+const history: AnnotationHistory = {
+  annotations: [
+    {
+      type: 'rectangle',
+      rect: { x: 1, y: 2, width: 3, height: 4 },
+      color: [255, 77, 79, 255],
+      stroke_width: 2,
+    },
+  ],
+  undoneAnnotations: [
+    {
+      type: 'line',
+      start: { x: 0, y: 0 },
+      end: { x: 8, y: 8 },
+      color: [255, 255, 255, 255],
+      stroke_width: 1,
+    },
+  ],
 };
 
 describe('text annotation draft', () => {
@@ -52,5 +74,35 @@ describe('text annotation draft', () => {
       color: [24, 144, 255, 255],
       font_size: 24,
     });
+  });
+
+  it('commits text drafts into annotation history and clears redo history', () => {
+    const draft = updateTextAnnotationDraft(
+      startTextAnnotationDraft({ x: 4, y: 9 }, 24),
+      'Snap',
+    );
+
+    expect(commitTextAnnotationDraft(history, draft, style)).toEqual({
+      annotations: [
+        history.annotations[0],
+        {
+          type: 'text',
+          position: { x: 4, y: 9 },
+          text: 'Snap',
+          color: [24, 144, 255, 255],
+          font_size: 24,
+        },
+      ],
+      undoneAnnotations: [],
+    });
+  });
+
+  it('leaves history unchanged when committing blank drafts', () => {
+    const draft = updateTextAnnotationDraft(
+      startTextAnnotationDraft({ x: 4, y: 9 }, 24),
+      ' ',
+    );
+
+    expect(commitTextAnnotationDraft(history, draft, style)).toBe(history);
   });
 });
