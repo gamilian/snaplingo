@@ -35,6 +35,15 @@ mod tests {
         image.get_pixel(x, y).0
     }
 
+    fn count_pixels_with_color(png: &[u8], rgba: [u8; 4]) -> usize {
+        image::load_from_memory(png)
+            .unwrap()
+            .to_rgba8()
+            .pixels()
+            .filter(|pixel| pixel.0 == rgba)
+            .count()
+    }
+
     #[test]
     fn crops_png_to_physical_rect() {
         let service = ImageCompositionService::new();
@@ -395,5 +404,42 @@ mod tests {
         assert_eq!(png_pixel(&output, 1, 1), [127, 127, 127, 255]);
         assert_eq!(png_pixel(&output, 2, 0), [10, 20, 30, 255]);
         assert_eq!(png_pixel(&output, 0, 2), [90, 91, 92, 255]);
+    }
+
+    #[test]
+    fn composes_png_with_text_annotation() {
+        let service = ImageCompositionService::new();
+        let white = make_solid_png(80, 32, [255, 255, 255, 255]);
+
+        let output = service
+            .compose_png_with_annotations(
+                80,
+                32,
+                &[PngPlacement {
+                    png_data: white.as_slice(),
+                    source_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 80,
+                        height: 32,
+                    },
+                    destination_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 80,
+                        height: 32,
+                    },
+                }],
+                &[ImageAnnotation::Text {
+                    position: PhysicalPoint { x: 4, y: 22 },
+                    text: "Snap".to_string(),
+                    color: [255, 0, 0, 255],
+                    font_size: 18,
+                }],
+            )
+            .unwrap();
+
+        assert!(count_pixels_with_color(&output, [255, 0, 0, 255]) > 8);
+        assert_eq!(png_pixel(&output, 79, 31), [255, 255, 255, 255]);
     }
 }

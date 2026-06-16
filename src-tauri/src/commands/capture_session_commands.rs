@@ -453,6 +453,21 @@ fn image_annotations_from_commands(
                 rect: scaled_logical_rect_relative_to(rect, &annotation_origin, output_scale)?,
                 block_size: ((*block_size).max(1) as f64 * output_scale).ceil() as u32,
             }),
+            AnnotationCommand::Text {
+                position,
+                text,
+                color,
+                font_size,
+            } => Ok(ImageAnnotation::Text {
+                position: scaled_logical_point_relative_to(
+                    position,
+                    &annotation_origin,
+                    output_scale,
+                )?,
+                text: text.clone(),
+                color: *color,
+                font_size: ((*font_size).max(1) as f64 * output_scale).ceil() as u32,
+            }),
         })
         .collect()
 }
@@ -881,6 +896,12 @@ mod tests {
                     color: [40, 167, 69, 255],
                     stroke_width: 2,
                 },
+                AnnotationCommand::Text {
+                    position: LogicalPoint { x: 3.5, y: 4.5 },
+                    text: "Snap".to_string(),
+                    color: [255, 255, 255, 255],
+                    font_size: 12,
+                },
             ],
             &LogicalRect {
                 x: 100.0,
@@ -892,7 +913,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(annotations.len(), 7);
+        assert_eq!(annotations.len(), 8);
         assert_eq!(
             annotations[0],
             ImageAnnotation::Rectangle {
@@ -963,6 +984,15 @@ mod tests {
                 },
                 color: [40, 167, 69, 255],
                 stroke_width: 4,
+            }
+        );
+        assert_eq!(
+            annotations[7],
+            ImageAnnotation::Text {
+                position: PhysicalPoint { x: 7, y: 9 },
+                text: "Snap".to_string(),
+                color: [255, 255, 255, 255],
+                font_size: 24,
             }
         );
     }

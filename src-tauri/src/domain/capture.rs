@@ -157,6 +157,12 @@ pub enum AnnotationCommand {
         rect: LogicalRect,
         block_size: u32,
     },
+    Text {
+        position: LogicalPoint,
+        text: String,
+        color: [u8; 4],
+        font_size: u32,
+    },
 }
 
 /// Supported image formats
@@ -321,5 +327,22 @@ mod tests {
         assert_eq!(serialized["type"], "ellipse");
         assert_eq!(serialized["rect"]["width"], 6.0);
         assert_eq!(serialized["stroke_width"], 2);
+    }
+
+    #[test]
+    fn text_annotation_serializes_with_type_tag() {
+        let annotation = AnnotationCommand::Text {
+            position: LogicalPoint { x: 1.0, y: 2.0 },
+            text: "Snap text".to_string(),
+            color: [255, 0, 0, 255],
+            font_size: 18,
+        };
+
+        let serialized = serde_json::to_value(&annotation).unwrap();
+
+        assert_eq!(serialized["type"], "text");
+        assert_eq!(serialized["position"]["x"], 1.0);
+        assert_eq!(serialized["text"], "Snap text");
+        assert_eq!(serialized["font_size"], 18);
     }
 }

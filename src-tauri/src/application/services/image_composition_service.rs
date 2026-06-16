@@ -1,8 +1,12 @@
 use std::f64::consts::PI;
 use std::io::Cursor;
 
+use ab_glyph::{point, Font, FontArc, Glyph, PxScale, ScaleFont};
+
 use crate::domain::capture::{PhysicalPoint, PhysicalRect};
 use crate::error::{AppError, Result};
+
+const TEXT_FONT_BYTES: &[u8] = include_bytes!("../../../assets/fonts/NotoSans-Regular.ttf");
 
 pub struct PngPlacement<'a> {
     pub png_data: &'a [u8],
@@ -47,6 +51,12 @@ pub enum ImageAnnotation {
     Mosaic {
         rect: PhysicalRect,
         block_size: u32,
+    },
+    Text {
+        position: PhysicalPoint,
+        text: String,
+        color: [u8; 4],
+        font_size: u32,
     },
 }
 
@@ -230,6 +240,12 @@ fn draw_annotation(output: &mut image::RgbaImage, annotation: &ImageAnnotation) 
         ImageAnnotation::Mosaic { rect, block_size } => {
             draw_mosaic_annotation(output, rect, *block_size)
         }
+        ImageAnnotation::Text {
+            position,
+            text,
+            color,
+            font_size,
+        } => draw_text_annotation(output, position, text, *color, *font_size),
     }
 }
 
@@ -460,6 +476,56 @@ fn draw_mosaic_annotation(output: &mut image::RgbaImage, rect: &PhysicalRect, bl
         }
 
         y += block_size;
+    }
+}
+
+fn draw_text_annotation(
+    output: &mut image::RgbaImage,
+    position: &PhysicalPoint,
+    text: &str,
+    color: [u8; 4],
+    font_size: u32,
+) {
+    if text.is_empty() {
+        return;
+    }
+
+    let Ok(font) = FontArc::try_from_slice(TEXT_FONT_BYTES) else {
+        return;
+    };
+    let font_size = font_size.max(1) as f32;
+    let scale = PxScale::from(font_size);
+    let scaled_font = font.as_scaled(scale);
+    let line_height = scaled_font.height().max(font_size);
+    let start_x = position.x as f32;
+    let mut caret = point(start_x, position.y as f32);
+
+    for character in text.chars() {
+        if character == '\n' {
+            caret.x = start_x;
+            caret.y += line_height;
+            continue;
+        }
+
+        let glyph_id = font.glyph_id(character);
+        let glyph: Glyph = glyph_id.with_scale_and_position(scale, caret);
+        caret.x += scaled_font.h_advance(glyph_id);
+
+        if let Some(outlined_glyph) = font.outline_glyph(glyph) {
+            outlined_glyph.draw(|x, y, coverage| {
+                let alpha = ((color[3] as f32) * coverage).round() as u8;
+                if alpha == 0 {
+                    return;
+                }
+
+                blend_pixel_if_in_bounds(
+                    output,
+                    x as i32,
+                    y as i32,
+                    image::Rgba([color[0], color[1], color[2], alpha]),
+                );
+            });
+        }
     }
 }
 

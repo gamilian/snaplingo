@@ -109,6 +109,14 @@ export interface MosaicAnnotationCommand {
   block_size: number;
 }
 
+export interface TextAnnotationCommand {
+  type: 'text';
+  position: Point;
+  text: string;
+  color: [number, number, number, number];
+  font_size: number;
+}
+
 export type AnnotationCommand =
   | RectangleAnnotationCommand
   | EllipseAnnotationCommand
@@ -116,4 +124,5 @@ export type AnnotationCommand =
   | LineAnnotationCommand
   | FreehandAnnotationCommand
   | HighlightAnnotationCommand
-  | MosaicAnnotationCommand;
+  | MosaicAnnotationCommand
+  | TextAnnotationCommand;

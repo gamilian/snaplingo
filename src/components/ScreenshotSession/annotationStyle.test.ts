@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  annotationFromText,
   annotationFromGesture,
   isCommittedAnnotation,
   type AnnotationStyle,
@@ -123,6 +124,18 @@ describe('annotation style', () => {
       type: 'mosaic',
       rect: { x: 4, y: 6, width: 8, height: 14 },
       block_size: 5,
+    });
+  });
+
+  it('creates text annotations with the selected color and font size', () => {
+    expect(
+      annotationFromText({ x: 6, y: 8 }, 'Snap text', style, 24),
+    ).toEqual({
+      type: 'text',
+      position: { x: 6, y: 8 },
+      text: 'Snap text',
+      color: [40, 167, 69, 255],
+      font_size: 24,
     });
   });
 

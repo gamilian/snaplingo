@@ -8,7 +8,8 @@ export type AnnotationTool =
   | 'line'
   | 'pen'
   | 'highlight'
-  | 'mosaic';
+  | 'mosaic'
+  | 'text';
 export type AnnotationColor = [number, number, number, number];
 
 export interface AnnotationStyle {
@@ -26,6 +27,7 @@ export const ANNOTATION_COLORS: AnnotationColor[] = [
 ];
 
 export const ANNOTATION_STROKE_WIDTHS = [2, 4, 6, 8];
+export const DEFAULT_TEXT_FONT_SIZE = 24;
 
 export const DEFAULT_ANNOTATION_STYLE: AnnotationStyle = {
   color: ANNOTATION_COLORS[0],
@@ -105,7 +107,26 @@ export function annotationFromGesture(
   };
 }
 
+export function annotationFromText(
+  position: Point,
+  text: string,
+  style: AnnotationStyle,
+  fontSize = DEFAULT_TEXT_FONT_SIZE,
+): AnnotationCommand {
+  return {
+    type: 'text',
+    position,
+    text,
+    color: style.color,
+    font_size: fontSize,
+  };
+}
+
 export function isCommittedAnnotation(annotation: AnnotationCommand) {
+  if (annotation.type === 'text') {
+    return annotation.text.trim().length > 0 && annotation.font_size > 0;
+  }
+
   if (
     annotation.type === 'rectangle' ||
     annotation.type === 'ellipse' ||
