@@ -37,6 +37,7 @@ import {
   undoAnnotationHistory,
 } from './annotationHistory';
 import {
+  getAnnotationKeyboardNudgeDelta,
   getAnnotationBounds,
   hitTestAnnotations,
   moveAnnotationByDelta,
@@ -742,6 +743,39 @@ export default function ScreenshotSession({
     selection,
   ]);
 
+  const nudgeSelectedAnnotation = useCallback(
+    (delta: Point) => {
+      if (
+        !selection ||
+        selectedAnnotationIndex === null ||
+        !annotations[selectedAnnotationIndex]
+      ) {
+        return;
+      }
+
+      const nextAnnotation = moveAnnotationByDelta(
+        annotations[selectedAnnotationIndex],
+        delta,
+      );
+      const nextHistory = replaceAnnotationInHistory(
+        annotationHistory,
+        selectedAnnotationIndex,
+        nextAnnotation,
+      );
+      if (nextHistory === annotationHistory) return;
+
+      setAnnotationHistory(nextHistory);
+      void renderSelectionPreview(selection, nextHistory.annotations);
+    },
+    [
+      annotationHistory,
+      annotations,
+      renderSelectionPreview,
+      selectedAnnotationIndex,
+      selection,
+    ],
+  );
+
   const syncToolbarStyleFromAnnotation = useCallback(
     (annotation: AnnotationCommand) => {
       if (annotation.type === 'mosaic') {
@@ -1096,6 +1130,20 @@ export default function ScreenshotSession({
           startSelection: selection,
           startAnchorPoint: startPoint,
         });
+      } else if (
+        status === 'preview' &&
+        !textDraft &&
+        !annotationGesture &&
+        !annotationMoveGesture &&
+        selectedAnnotationIndex !== null &&
+        isArrowKey(event.key)
+      ) {
+        event.preventDefault();
+        const step = event.shiftKey ? KEYBOARD_FAST_NUDGE_STEP : KEYBOARD_NUDGE_STEP;
+        const delta = getAnnotationKeyboardNudgeDelta(event.key, step);
+        if (delta) {
+          nudgeSelectedAnnotation(delta);
+        }
       } else if (status === 'preview' && selection && selectionBounds && isArrowKey(event.key)) {
         event.preventDefault();
         const step = event.shiftKey ? KEYBOARD_FAST_NUDGE_STEP : KEYBOARD_NUDGE_STEP;
@@ -1132,6 +1180,7 @@ export default function ScreenshotSession({
     deleteSelectedAnnotation,
     redoAnnotation,
     isActive,
+    nudgeSelectedAnnotation,
     pinSelection,
     saveSelection,
     selectAnnotationColor,

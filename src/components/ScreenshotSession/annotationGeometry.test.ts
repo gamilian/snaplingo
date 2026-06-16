@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   getAnnotationBounds,
+  getAnnotationKeyboardNudgeDelta,
   hitTestAnnotations,
   moveAnnotationByDelta,
 } from './annotationGeometry';
@@ -104,5 +105,19 @@ describe('annotation geometry', () => {
       ...blur,
       rect: { x: 34, y: 34, width: 20, height: 10 },
     });
+  });
+
+  it('maps arrow keys to annotation nudge deltas', () => {
+    expect(getAnnotationKeyboardNudgeDelta('ArrowLeft', 1)).toEqual({ x: -1, y: 0 });
+    expect(getAnnotationKeyboardNudgeDelta('ArrowRight', 10)).toEqual({
+      x: 10,
+      y: 0,
+    });
+    expect(getAnnotationKeyboardNudgeDelta('ArrowUp', 1)).toEqual({ x: 0, y: -1 });
+    expect(getAnnotationKeyboardNudgeDelta('ArrowDown', 10)).toEqual({
+      x: 0,
+      y: 10,
+    });
+    expect(getAnnotationKeyboardNudgeDelta('Enter', 1)).toBeNull();
   });
 });

@@ -126,3 +126,15 @@ export function moveAnnotationByDelta(
     position: movePointByDelta(annotation.position, delta),
   };
 }
+
+export function getAnnotationKeyboardNudgeDelta(
+  key: string,
+  step: number,
+): Point | null {
+  if (key === 'ArrowLeft') return { x: -step, y: 0 };
+  if (key === 'ArrowRight') return { x: step, y: 0 };
+  if (key === 'ArrowUp') return { x: 0, y: -step };
+  if (key === 'ArrowDown') return { x: 0, y: step };
+
+  return null;
+}
