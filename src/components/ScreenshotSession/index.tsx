@@ -20,10 +20,19 @@ import {
 } from './colorSampler';
 import { saveCaptureSelection } from './captureActions';
 import { parseCaptureLaunchPayload } from './windowMode';
+import {
+  getMonitorAtVirtualPoint,
+  getMonitorViewportRect,
+  getVirtualDesktopBounds,
+  viewportPointToVirtualPoint,
+  virtualPointToViewportPoint,
+  virtualRectToViewportRect,
+} from './virtualDesktop';
 import type {
   CaptureMode,
   CaptureSessionView,
   LogicalRect,
+  MonitorSnapshotView,
   OcrResult,
   Point,
 } from './types';
@@ -118,27 +127,31 @@ function DimMask({ rect }: { rect: LogicalRect }) {
 
 function Magnifier({
   imageBase64,
-  cursor,
-  imageBounds,
+  viewportCursor,
+  imageCursor,
+  viewportBounds,
+  imageSize,
   selection,
   color,
 }: {
   imageBase64: string;
-  cursor: Point;
-  imageBounds: LogicalRect;
+  viewportCursor: Point;
+  imageCursor: Point;
+  viewportBounds: LogicalRect;
+  imageSize: { width: number; height: number };
   selection: LogicalRect | null;
   color: ColorSample | null;
 }) {
   const position = getMagnifierPosition(
-    cursor,
-    imageBounds,
+    viewportCursor,
+    viewportBounds,
     MAGNIFIER_SIZE,
     MAGNIFIER_GAP,
   );
   const imageStyle = getMagnifierImageStyle(
     imageBase64,
-    cursor,
-    { width: imageBounds.width, height: imageBounds.height },
+    imageCursor,
+    imageSize,
     MAGNIFIER_SIZE,
     MAGNIFIER_ZOOM,
   );
@@ -169,7 +182,7 @@ function Magnifier({
       </div>
       <div className="flex items-center justify-between px-1.5 py-1 font-mono leading-none">
         <span>
-          {Math.round(cursor.x)}, {Math.round(cursor.y)}
+          {Math.round(imageCursor.x)}, {Math.round(imageCursor.y)}
         </span>
         <span className="flex items-center gap-1">
           {color && (
@@ -199,7 +212,7 @@ export default function ScreenshotSession({
   initialSessionId,
   onInactive,
 }: ScreenshotSessionProps) {
-  const sampleCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const sampleCanvasByMonitorRef = useRef<Map<string, HTMLCanvasElement>>(new Map());
   const [status, setStatus] = useState<SessionStatus>('idle');
   const [mode, setMode] = useState<CaptureMode>('screenshot');
   const [session, setSession] = useState<CaptureSessionView | null>(null);
@@ -214,26 +227,53 @@ export default function ScreenshotSession({
   const [error, setError] = useState<string | null>(null);
   const [hasStartedInitialSession, setHasStartedInitialSession] = useState(false);
 
-  const monitor = session?.monitors[0] ?? null;
   const isActive = status !== 'idle';
   const sizeLabel = selection
     ? `${Math.round(selection.width)} x ${Math.round(selection.height)}`
     : '';
   const selectionBounds = useMemo<LogicalRect | null>(() => {
-    if (!monitor) return null;
+    if (!session) return null;
+
+    return getVirtualDesktopBounds(session.monitors);
+  }, [session]);
+  const viewportBounds = useMemo<LogicalRect | null>(() => {
+    if (!selectionBounds) return null;
 
     return {
       x: 0,
       y: 0,
-      width: monitor.logical_bounds.width,
-      height: monitor.logical_bounds.height,
+      width: selectionBounds.width,
+      height: selectionBounds.height,
     };
-  }, [monitor]);
-  const toolbarPosition = useMemo(() => {
-    if (!selection || !selectionBounds || status !== 'preview') return null;
+  }, [selectionBounds]);
+  const selectionViewportRect = useMemo<LogicalRect | null>(() => {
+    if (!selection || !selectionBounds) return null;
 
-    return getToolbarPosition(selection, selectionBounds, TOOLBAR_SIZE, TOOLBAR_GAP);
-  }, [selection, selectionBounds, status]);
+    return virtualRectToViewportRect(selection, selectionBounds);
+  }, [selection, selectionBounds]);
+  const cursorViewportPoint = useMemo<Point | null>(() => {
+    if (!cursorPoint || !selectionBounds) return null;
+
+    return virtualPointToViewportPoint(cursorPoint, selectionBounds);
+  }, [cursorPoint, selectionBounds]);
+  const cursorMonitor = useMemo<MonitorSnapshotView | null>(() => {
+    if (!session || !cursorPoint) return null;
+
+    return getMonitorAtVirtualPoint(session.monitors, cursorPoint);
+  }, [cursorPoint, session]);
+  const cursorInMonitorPoint = useMemo<Point | null>(() => {
+    if (!cursorPoint || !cursorMonitor) return null;
+
+    return {
+      x: cursorPoint.x - cursorMonitor.logical_bounds.x,
+      y: cursorPoint.y - cursorMonitor.logical_bounds.y,
+    };
+  }, [cursorMonitor, cursorPoint]);
+  const toolbarPosition = useMemo(() => {
+    if (!selectionViewportRect || !viewportBounds || status !== 'preview') return null;
+
+    return getToolbarPosition(selectionViewportRect, viewportBounds, TOOLBAR_SIZE, TOOLBAR_GAP);
+  }, [selectionViewportRect, status, viewportBounds]);
 
   const resetSessionState = useCallback(() => {
     setStatus('idle');
@@ -447,44 +487,52 @@ export default function ScreenshotSession({
   }, [startSession]);
 
   useEffect(() => {
-    sampleCanvasRef.current = null;
+    sampleCanvasByMonitorRef.current = new Map();
     setCursorColor(null);
     setSampleCanvasVersion((version) => version + 1);
 
-    if (!monitor) return;
+    if (!session) return;
 
     let disposed = false;
-    const image = new Image();
-    image.onload = () => {
-      if (disposed) return;
+    session.monitors.forEach((monitor) => {
+      const image = new Image();
+      image.onload = () => {
+        if (disposed) return;
 
-      const canvas = document.createElement('canvas');
-      canvas.width = image.naturalWidth;
-      canvas.height = image.naturalHeight;
-      canvas.getContext('2d')?.drawImage(image, 0, 0);
-      sampleCanvasRef.current = canvas;
-      setSampleCanvasVersion((version) => version + 1);
-    };
-    image.src = `data:image/png;base64,${monitor.image_base64}`;
+        const canvas = document.createElement('canvas');
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        canvas.getContext('2d')?.drawImage(image, 0, 0);
+        sampleCanvasByMonitorRef.current.set(monitor.id, canvas);
+        setSampleCanvasVersion((version) => version + 1);
+      };
+      image.src = `data:image/png;base64,${monitor.image_base64}`;
+    });
 
     return () => {
       disposed = true;
     };
-  }, [monitor]);
+  }, [session]);
 
   useEffect(() => {
-    if (!cursorPoint || !selectionBounds || !sampleCanvasRef.current) {
+    if (!cursorInMonitorPoint || !cursorMonitor) {
+      setCursorColor(null);
+      return;
+    }
+
+    const canvas = sampleCanvasByMonitorRef.current.get(cursorMonitor.id);
+    if (!canvas) {
       setCursorColor(null);
       return;
     }
 
     setCursorColor(
-      sampleCanvasColor(sampleCanvasRef.current, cursorPoint, {
-        width: selectionBounds.width,
-        height: selectionBounds.height,
+      sampleCanvasColor(canvas, cursorInMonitorPoint, {
+        width: cursorMonitor.logical_bounds.width,
+        height: cursorMonitor.logical_bounds.height,
       }),
     );
-  }, [cursorPoint, sampleCanvasVersion, selectionBounds]);
+  }, [cursorInMonitorPoint, cursorMonitor, sampleCanvasVersion]);
 
   useEffect(() => {
     if (!isActive) return;
@@ -523,9 +571,12 @@ export default function ScreenshotSession({
   ]);
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (status !== 'selecting' && status !== 'preview') return;
+    if ((status !== 'selecting' && status !== 'preview') || !selectionBounds) return;
 
-    const point = { x: event.clientX, y: event.clientY };
+    const point = viewportPointToVirtualPoint(
+      { x: event.clientX, y: event.clientY },
+      selectionBounds,
+    );
     setCursorPoint(point);
     event.currentTarget.setPointerCapture(event.pointerId);
     setStartPoint(point);
@@ -560,15 +611,19 @@ export default function ScreenshotSession({
   );
 
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!selectionBounds) return;
+
+    const point = viewportPointToVirtualPoint(
+      { x: event.clientX, y: event.clientY },
+      selectionBounds,
+    );
+
     if (status === 'selecting' || status === 'preview') {
-      setCursorPoint({ x: event.clientX, y: event.clientY });
+      setCursorPoint(point);
     }
 
     if (editGesture) {
-      setSelection(applyEditGesture(editGesture, {
-        x: event.clientX,
-        y: event.clientY,
-      }));
+      setSelection(applyEditGesture(editGesture, point));
       setPreviewImageBase64(null);
       setIsRenderingOutput(false);
       return;
@@ -576,20 +631,20 @@ export default function ScreenshotSession({
 
     if (!startPoint || status !== 'selecting') return;
 
-    setSelection(normalizeSelection(startPoint, {
-      x: event.clientX,
-      y: event.clientY,
-    }));
+    setSelection(normalizeSelection(startPoint, point));
   };
 
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    setCursorPoint({ x: event.clientX, y: event.clientY });
+    if (!selectionBounds) return;
+
+    const point = viewportPointToVirtualPoint(
+      { x: event.clientX, y: event.clientY },
+      selectionBounds,
+    );
+    setCursorPoint(point);
 
     if (editGesture) {
-      const nextSelection = applyEditGesture(editGesture, {
-        x: event.clientX,
-        y: event.clientY,
-      });
+      const nextSelection = applyEditGesture(editGesture, point);
       setEditGesture(null);
       setSelection(nextSelection);
       setStatus('preview');
@@ -599,10 +654,7 @@ export default function ScreenshotSession({
 
     if (!startPoint || status !== 'selecting') return;
 
-    const nextSelection = normalizeSelection(startPoint, {
-      x: event.clientX,
-      y: event.clientY,
-    });
+    const nextSelection = normalizeSelection(startPoint, point);
     setStartPoint(null);
 
     if (
@@ -619,14 +671,18 @@ export default function ScreenshotSession({
   };
 
   const startMoveGesture = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (status !== 'preview' || !selection) return;
+    if (status !== 'preview' || !selection || !selectionBounds) return;
 
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
-    setCursorPoint({ x: event.clientX, y: event.clientY });
+    const point = viewportPointToVirtualPoint(
+      { x: event.clientX, y: event.clientY },
+      selectionBounds,
+    );
+    setCursorPoint(point);
     setEditGesture({
       type: 'move',
-      startPoint: { x: event.clientX, y: event.clientY },
+      startPoint: point,
       startSelection: selection,
     });
     setPreviewImageBase64(null);
@@ -636,15 +692,19 @@ export default function ScreenshotSession({
     handle: SelectionHandle,
     event: React.PointerEvent<HTMLButtonElement>,
   ) => {
-    if (status !== 'preview' || !selection) return;
+    if (status !== 'preview' || !selection || !selectionBounds) return;
 
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
-    setCursorPoint({ x: event.clientX, y: event.clientY });
+    const point = viewportPointToVirtualPoint(
+      { x: event.clientX, y: event.clientY },
+      selectionBounds,
+    );
+    setCursorPoint(point);
     setEditGesture({
       type: 'resize',
       handle,
-      startPoint: { x: event.clientX, y: event.clientY },
+      startPoint: point,
       startSelection: selection,
     });
     setPreviewImageBase64(null);
@@ -660,18 +720,26 @@ export default function ScreenshotSession({
 
   return (
     <div
-      className="fixed inset-0 z-[9999] cursor-crosshair select-none overflow-hidden bg-black text-white"
+      className="fixed left-0 top-0 z-[9999] cursor-crosshair select-none overflow-hidden bg-black text-white"
+      style={{
+        width: `${viewportBounds?.width ?? window.innerWidth}px`,
+        height: `${viewportBounds?.height ?? window.innerHeight}px`,
+      }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
     >
-      {monitor && (
-        <img
-          src={`data:image/png;base64,${monitor.image_base64}`}
-          className="absolute inset-0 h-full w-full object-fill"
-          draggable={false}
-        />
-      )}
+      {session &&
+        selectionBounds &&
+        session.monitors.map((monitor) => (
+          <img
+            key={monitor.id}
+            src={`data:image/png;base64,${monitor.image_base64}`}
+            className="absolute object-fill"
+            style={rectStyle(getMonitorViewportRect(monitor, selectionBounds))}
+            draggable={false}
+          />
+        ))}
 
       {status === 'loading' && (
         <div className="absolute inset-0 bg-black" aria-label="Loading capture" />
@@ -683,14 +751,14 @@ export default function ScreenshotSession({
         </div>
       )}
 
-      {selection && (
+      {selection && selectionViewportRect && (
         <>
-          <DimMask rect={selection} />
+          <DimMask rect={selectionViewportRect} />
           {previewImageBase64 && status === 'preview' && (
             <img
               src={`data:image/png;base64,${previewImageBase64}`}
               className="absolute object-fill"
-              style={rectStyle(selection)}
+              style={rectStyle(selectionViewportRect)}
               draggable={false}
             />
           )}
@@ -698,11 +766,11 @@ export default function ScreenshotSession({
             className={`absolute border ${overlayClassName} bg-transparent ${
               status === 'preview' ? 'cursor-move' : ''
             }`}
-            style={rectStyle(selection)}
+            style={rectStyle(selectionViewportRect)}
             onPointerDown={startMoveGesture}
           />
           {status === 'preview' && (
-            <div className="absolute pointer-events-none" style={rectStyle(selection)}>
+            <div className="absolute pointer-events-none" style={rectStyle(selectionViewportRect)}>
               {SELECTION_HANDLES.map((handle) => (
                 <button
                   key={handle}
@@ -778,8 +846,8 @@ export default function ScreenshotSession({
           <div
             className="absolute rounded bg-black/80 px-2 py-1 text-xs leading-none text-white shadow"
             style={{
-              left: `${selection.x}px`,
-              top: `${Math.max(0, selection.y - 24)}px`,
+              left: `${selectionViewportRect.x}px`,
+              top: `${Math.max(0, selectionViewportRect.y - 24)}px`,
             }}
           >
             {sizeLabel}
@@ -788,19 +856,27 @@ export default function ScreenshotSession({
             <div
               className="absolute h-1 bg-white/80"
               style={{
-                left: `${selection.x}px`,
-                top: `${selection.y + selection.height}px`,
-                width: `${selection.width}px`,
+                left: `${selectionViewportRect.x}px`,
+                top: `${selectionViewportRect.y + selectionViewportRect.height}px`,
+                width: `${selectionViewportRect.width}px`,
               }}
             />
           )}
         </>
       )}
-      {monitor && cursorPoint && selectionBounds && (
+      {cursorMonitor &&
+        cursorViewportPoint &&
+        cursorInMonitorPoint &&
+        viewportBounds && (
         <Magnifier
-          imageBase64={monitor.image_base64}
-          cursor={cursorPoint}
-          imageBounds={selectionBounds}
+          imageBase64={cursorMonitor.image_base64}
+          viewportCursor={cursorViewportPoint}
+          imageCursor={cursorInMonitorPoint}
+          viewportBounds={viewportBounds}
+          imageSize={{
+            width: cursorMonitor.logical_bounds.width,
+            height: cursorMonitor.logical_bounds.height,
+          }}
           selection={selection}
           color={cursorColor}
         />
