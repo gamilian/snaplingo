@@ -1,6 +1,12 @@
 import type { LogicalRect, Point } from './types';
 
 export type SelectionHandle = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw';
+export type ArrowKey = 'ArrowUp' | 'ArrowRight' | 'ArrowDown' | 'ArrowLeft';
+
+interface Size {
+  width: number;
+  height: number;
+}
 
 export function normalizeSelection(start: Point, current: Point): LogicalRect {
   return {
@@ -64,5 +70,40 @@ export function resizeSelectionByHandle(
     y: top,
     width: right - left,
     height: bottom - top,
+  };
+}
+
+export function nudgeSelection(
+  rect: LogicalRect,
+  direction: ArrowKey,
+  bounds: LogicalRect,
+  step: number,
+): LogicalRect {
+  const deltaByDirection: Record<ArrowKey, Point> = {
+    ArrowUp: { x: 0, y: -step },
+    ArrowRight: { x: step, y: 0 },
+    ArrowDown: { x: 0, y: step },
+    ArrowLeft: { x: -step, y: 0 },
+  };
+
+  return moveSelectionByDelta(rect, deltaByDirection[direction], bounds);
+}
+
+export function getToolbarPosition(
+  rect: LogicalRect,
+  bounds: LogicalRect,
+  toolbarSize: Size,
+  gap: number,
+): Point {
+  const boundsRight = bounds.x + bounds.width;
+  const boundsBottom = bounds.y + bounds.height;
+  const preferredX = rect.x;
+  const belowY = rect.y + rect.height + gap;
+  const aboveY = rect.y - toolbarSize.height - gap;
+  const hasRoomBelow = belowY + toolbarSize.height <= boundsBottom;
+
+  return {
+    x: clamp(preferredX, bounds.x, boundsRight - toolbarSize.width),
+    y: hasRoomBelow ? belowY : clamp(aboveY, bounds.y, boundsBottom - toolbarSize.height),
   };
 }

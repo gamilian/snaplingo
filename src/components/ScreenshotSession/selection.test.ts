@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { moveSelectionByDelta, resizeSelectionByHandle } from './selection';
+import {
+  getToolbarPosition,
+  moveSelectionByDelta,
+  nudgeSelection,
+  resizeSelectionByHandle,
+} from './selection';
 import type { LogicalRect } from './types';
 
 const bounds: LogicalRect = { x: 0, y: 0, width: 300, height: 200 };
@@ -49,5 +54,49 @@ describe('selection editing', () => {
       width: 140,
       height: 80,
     });
+  });
+
+  it('nudges a selection by keyboard direction and keeps it in bounds', () => {
+    const rect: LogicalRect = { x: 40, y: 30, width: 100, height: 80 };
+
+    expect(nudgeSelection(rect, 'ArrowRight', bounds, 1)).toEqual({
+      x: 41,
+      y: 30,
+      width: 100,
+      height: 80,
+    });
+    expect(nudgeSelection(rect, 'ArrowUp', bounds, 10)).toEqual({
+      x: 40,
+      y: 20,
+      width: 100,
+      height: 80,
+    });
+    expect(nudgeSelection(rect, 'ArrowLeft', bounds, 100)).toEqual({
+      x: 0,
+      y: 30,
+      width: 100,
+      height: 80,
+    });
+  });
+
+  it('positions the toolbar near the selection within capture bounds', () => {
+    const toolbarSize = { width: 120, height: 32 };
+
+    expect(
+      getToolbarPosition(
+        { x: 40, y: 30, width: 100, height: 80 },
+        bounds,
+        toolbarSize,
+        8,
+      ),
+    ).toEqual({ x: 40, y: 118 });
+    expect(
+      getToolbarPosition(
+        { x: 230, y: 160, width: 60, height: 30 },
+        bounds,
+        toolbarSize,
+        8,
+      ),
+    ).toEqual({ x: 180, y: 120 });
   });
 });

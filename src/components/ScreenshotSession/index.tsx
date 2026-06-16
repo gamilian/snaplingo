@@ -2,9 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import {
+  getToolbarPosition,
   moveSelectionByDelta,
   normalizeSelection,
+  nudgeSelection,
   resizeSelectionByHandle,
+  type ArrowKey,
   type SelectionHandle,
 } from './selection';
 import { parseCaptureLaunchPayload } from './windowMode';
@@ -31,6 +34,11 @@ type EditGesture =
     };
 
 const MIN_SELECTION_SIZE = 10;
+const KEYBOARD_NUDGE_STEP = 1;
+const KEYBOARD_FAST_NUDGE_STEP = 10;
+const TOOLBAR_GAP = 8;
+const TOOLBAR_SIZE = { width: 168, height: 36 };
+const ARROW_KEYS: ArrowKey[] = ['ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowLeft'];
 const SELECTION_HANDLES: SelectionHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
 const handleClassNames: Record<SelectionHandle, string> = {
@@ -51,6 +59,10 @@ function rectStyle(rect: LogicalRect) {
     width: `${rect.width}px`,
     height: `${rect.height}px`,
   };
+}
+
+function isArrowKey(key: string): key is ArrowKey {
+  return ARROW_KEYS.includes(key as ArrowKey);
 }
 
 function DimMask({ rect }: { rect: LogicalRect }) {
@@ -129,6 +141,11 @@ export default function ScreenshotSession({
       height: monitor.logical_bounds.height,
     };
   }, [monitor]);
+  const toolbarPosition = useMemo(() => {
+    if (!selection || !selectionBounds || status !== 'preview') return null;
+
+    return getToolbarPosition(selection, selectionBounds, TOOLBAR_SIZE, TOOLBAR_GAP);
+  }, [selection, selectionBounds, status]);
 
   const resetSessionState = useCallback(() => {
     setStatus('idle');
@@ -236,6 +253,29 @@ export default function ScreenshotSession({
     }
   }, [onInactive, resetSessionState, selection, session]);
 
+  const runOcrSelection = useCallback(async () => {
+    if (!session || !selection) return;
+
+    setIsRenderingOutput(true);
+    setError(null);
+
+    try {
+      const ocrResult = await invoke<OcrResult>('run_capture_ocr', {
+        sessionId: session.id,
+        rect: selection,
+      });
+      await invoke('open_result_window', { text: ocrResult.text });
+      await invoke('cancel_capture_session', { sessionId: session.id });
+      resetSessionState();
+      onInactive?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setStatus('error');
+    } finally {
+      setIsRenderingOutput(false);
+    }
+  }, [onInactive, resetSessionState, selection, session]);
+
   useEffect(() => {
     if (!initialMode || hasStartedInitialSession) return;
 
@@ -284,12 +324,27 @@ export default function ScreenshotSession({
       ) {
         event.preventDefault();
         void copySelection();
+      } else if (status === 'preview' && selection && selectionBounds && isArrowKey(event.key)) {
+        event.preventDefault();
+        const step = event.shiftKey ? KEYBOARD_FAST_NUDGE_STEP : KEYBOARD_NUDGE_STEP;
+        const nextSelection = nudgeSelection(selection, event.key, selectionBounds, step);
+        setSelection(nextSelection);
+        setPreviewImageBase64(null);
+        void renderSelectionPreview(nextSelection);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cancelSession, copySelection, isActive, status]);
+  }, [
+    cancelSession,
+    copySelection,
+    isActive,
+    renderSelectionPreview,
+    selection,
+    selectionBounds,
+    status,
+  ]);
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (status !== 'selecting' && status !== 'preview') return;
@@ -471,6 +526,48 @@ export default function ScreenshotSession({
                   onPointerDown={(event) => startResizeGesture(handle, event)}
                 />
               ))}
+            </div>
+          )}
+          {toolbarPosition && (
+            <div
+              className="absolute flex h-9 items-center gap-1 rounded bg-neutral-950/90 p-1 text-xs text-white shadow-lg ring-1 ring-white/15"
+              style={{
+                left: `${toolbarPosition.x}px`,
+                top: `${toolbarPosition.y}px`,
+                width: `${TOOLBAR_SIZE.width}px`,
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50"
+                disabled={isRenderingOutput}
+                title="Copy"
+                aria-label="Copy selection"
+                onClick={copySelection}
+              >
+                Copy
+              </button>
+              <button
+                type="button"
+                className="h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50"
+                disabled={isRenderingOutput}
+                title="OCR"
+                aria-label="Run OCR"
+                onClick={runOcrSelection}
+              >
+                OCR
+              </button>
+              <button
+                type="button"
+                className="h-7 w-7 rounded text-center leading-7 hover:bg-white/15 disabled:opacity-50"
+                disabled={isRenderingOutput}
+                title="Cancel"
+                aria-label="Cancel capture"
+                onClick={cancelSession}
+              >
+                X
+              </button>
             </div>
           )}
           <div
