@@ -1,5 +1,5 @@
 import { normalizeSelection } from './selection';
-import type { AnnotationCommand, Point } from './types';
+import type { AnnotationCommand, Point, TextAnnotationCommand } from './types';
 
 export type AnnotationTool =
   | 'rectangle'
@@ -112,7 +112,7 @@ export function annotationFromText(
   text: string,
   style: AnnotationStyle,
   fontSize = DEFAULT_TEXT_FONT_SIZE,
-): AnnotationCommand {
+): TextAnnotationCommand {
   return {
     type: 'text',
     position,

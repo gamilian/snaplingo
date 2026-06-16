@@ -37,13 +37,18 @@ import {
   DEFAULT_ANNOTATION_STYLE,
   annotationColorToCss,
   annotationFromGesture,
-  annotationFromText,
   arrowHeadPoints,
   isCommittedAnnotation,
   type AnnotationColor,
   type AnnotationStyle,
   type AnnotationTool,
 } from './annotationStyle';
+import {
+  annotationFromTextDraft,
+  startTextAnnotationDraft,
+  updateTextAnnotationDraft,
+  type TextAnnotationDraft,
+} from './textAnnotationDraft';
 import { saveCaptureSelection } from './captureActions';
 import { parseCaptureLaunchPayload } from './windowMode';
 import {
@@ -290,6 +295,7 @@ export default function ScreenshotSession({
   onInactive,
 }: ScreenshotSessionProps) {
   const sampleCanvasByMonitorRef = useRef<Map<string, HTMLCanvasElement>>(new Map());
+  const textDraftInputRef = useRef<HTMLTextAreaElement | null>(null);
   const [status, setStatus] = useState<SessionStatus>('idle');
   const [mode, setMode] = useState<CaptureMode>('screenshot');
   const [session, setSession] = useState<CaptureSessionView | null>(null);
@@ -303,9 +309,11 @@ export default function ScreenshotSession({
   const [annotationGesture, setAnnotationGesture] =
     useState<AnnotationGesture | null>(null);
   const [draftAnnotation, setDraftAnnotation] = useState<AnnotationCommand | null>(null);
+  const [textDraft, setTextDraft] = useState<TextAnnotationDraft | null>(null);
   const [annotationStyle, setAnnotationStyle] = useState<AnnotationStyle>(
     DEFAULT_ANNOTATION_STYLE,
   );
+  const [textFontSize, setTextFontSize] = useState(DEFAULT_TEXT_FONT_SIZE);
   const [annotationHistory, setAnnotationHistory] = useState(emptyAnnotationHistory);
   const [previewImageBase64, setPreviewImageBase64] = useState<string | null>(null);
   const [cursorColor, setCursorColor] = useState<ColorSample | null>(null);
@@ -393,6 +401,7 @@ export default function ScreenshotSession({
     setActiveAnnotationTool(null);
     setAnnotationGesture(null);
     setDraftAnnotation(null);
+    setTextDraft(null);
     setAnnotationHistory(emptyAnnotationHistory());
     setPreviewImageBase64(null);
     setCursorColor(null);
@@ -427,6 +436,7 @@ export default function ScreenshotSession({
     setActiveAnnotationTool(null);
     setAnnotationGesture(null);
     setDraftAnnotation(null);
+    setTextDraft(null);
     setAnnotationHistory(emptyAnnotationHistory());
     setPreviewImageBase64(null);
     setCursorColor(null);
@@ -588,6 +598,21 @@ export default function ScreenshotSession({
     void renderSelectionPreview(selection, nextHistory.annotations);
   }, [annotationHistory, renderSelectionPreview, selection]);
 
+  const commitTextDraft = useCallback(() => {
+    if (!textDraft || !selection) {
+      setTextDraft(null);
+      return;
+    }
+
+    const nextAnnotation = annotationFromTextDraft(textDraft, annotationStyle);
+    setTextDraft(null);
+    if (!nextAnnotation) return;
+
+    const nextHistory = addAnnotationToHistory(annotationHistory, nextAnnotation);
+    setAnnotationHistory(nextHistory);
+    void renderSelectionPreview(selection, nextHistory.annotations);
+  }, [annotationHistory, annotationStyle, renderSelectionPreview, selection, textDraft]);
+
   useEffect(() => {
     if (!initialMode || hasStartedInitialSession) return;
 
@@ -676,7 +701,9 @@ export default function ScreenshotSession({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        if (activeAnnotationTool || annotationGesture) {
+        if (textDraft) {
+          setTextDraft(null);
+        } else if (activeAnnotationTool || annotationGesture) {
           setActiveAnnotationTool(null);
           setAnnotationGesture(null);
           setDraftAnnotation(null);
@@ -725,6 +752,7 @@ export default function ScreenshotSession({
     copySelection,
     activeAnnotationTool,
     annotationGesture,
+    textDraft,
     redoAnnotation,
     isActive,
     renderSelectionPreview,
@@ -733,6 +761,14 @@ export default function ScreenshotSession({
     status,
     undoAnnotation,
   ]);
+
+  useEffect(() => {
+    if (!textDraft) return;
+
+    requestAnimationFrame(() => {
+      textDraftInputRef.current?.focus();
+    });
+  }, [textDraft]);
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if ((status !== 'selecting' && status !== 'preview') || !selectionBounds) return;
@@ -752,6 +788,7 @@ export default function ScreenshotSession({
     setActiveAnnotationTool(null);
     setAnnotationGesture(null);
     setDraftAnnotation(null);
+    setTextDraft(null);
     setAnnotationHistory(emptyAnnotationHistory());
   };
 
@@ -947,18 +984,8 @@ export default function ScreenshotSession({
         selection,
       );
       if (activeAnnotationTool === 'text') {
-        const text = window.prompt('Text')?.trim();
-        if (text) {
-          const nextAnnotation = annotationFromText(
-            localPoint,
-            text,
-            annotationStyle,
-            DEFAULT_TEXT_FONT_SIZE,
-          );
-          const nextHistory = addAnnotationToHistory(annotationHistory, nextAnnotation);
-          setAnnotationHistory(nextHistory);
-          void renderSelectionPreview(selection, nextHistory.annotations);
-        }
+        if (textDraft) return;
+        setTextDraft(startTextAnnotationDraft(localPoint, textFontSize));
         return;
       }
 
@@ -994,6 +1021,7 @@ export default function ScreenshotSession({
     setActiveAnnotationTool((tool) => (tool === nextTool ? null : nextTool));
     setAnnotationGesture(null);
     setDraftAnnotation(null);
+    setTextDraft(null);
   };
 
   const startResizeGesture = (
@@ -1237,6 +1265,46 @@ export default function ScreenshotSession({
               {draftAnnotation.text}
             </div>
           )}
+          {textDraft && (
+            <textarea
+              ref={textDraftInputRef}
+              data-screenshot-text-draft="true"
+              className="absolute resize-none overflow-hidden border border-white/70 bg-black/15 px-1 py-0 text-left outline-none ring-1 ring-black/35"
+              style={{
+                left: `${selectionViewportRect.x + textDraft.position.x}px`,
+                top: `${selectionViewportRect.y + textDraft.position.y - textDraft.fontSize}px`,
+                width: `${Math.max(160, selectionViewportRect.width - textDraft.position.x)}px`,
+                minHeight: `${Math.ceil(textDraft.fontSize * 1.35)}px`,
+                color: annotationColorToCss(annotationStyle.color),
+                fontSize: `${textDraft.fontSize}px`,
+                lineHeight: 1.2,
+                zIndex: 2,
+              }}
+              value={textDraft.text}
+              onBlur={commitTextDraft}
+              onChange={(event) => {
+                const text = event.currentTarget.value;
+                setTextDraft((draft) =>
+                  draft ? updateTextAnnotationDraft(draft, text) : draft,
+                );
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setTextDraft(null);
+                } else if (
+                  event.key === 'Enter' &&
+                  (event.metaKey || event.ctrlKey)
+                ) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  event.currentTarget.blur();
+                }
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+            />
+          )}
           <div
             className={`absolute border ${overlayClassName} bg-transparent ${
               status === 'preview'
@@ -1412,19 +1480,40 @@ export default function ScreenshotSession({
               <input
                 className="h-7 w-20 accent-white disabled:opacity-50"
                 type="range"
-                min={1}
-                max={8}
+                min={activeAnnotationTool === 'text' ? 12 : 1}
+                max={activeAnnotationTool === 'text' ? 48 : 8}
                 step={1}
-                value={annotationStyle.strokeWidth}
+                value={
+                  activeAnnotationTool === 'text'
+                    ? textFontSize
+                    : annotationStyle.strokeWidth
+                }
                 disabled={isRenderingOutput}
-                title="Annotation stroke width"
-                aria-label="Annotation stroke width"
-                onChange={(event) =>
+                title={
+                  activeAnnotationTool === 'text'
+                    ? 'Text font size'
+                    : 'Annotation stroke width'
+                }
+                aria-label={
+                  activeAnnotationTool === 'text'
+                    ? 'Text font size'
+                    : 'Annotation stroke width'
+                }
+                onChange={(event) => {
+                  const value = Number(event.currentTarget.value);
+                  if (activeAnnotationTool === 'text') {
+                    setTextFontSize(value);
+                    setTextDraft((draft) =>
+                      draft ? { ...draft, fontSize: value } : draft,
+                    );
+                    return;
+                  }
+
                   setAnnotationStyle((style) => ({
                     ...style,
-                    strokeWidth: Number(event.currentTarget.value),
-                  }))
-                }
+                    strokeWidth: value,
+                  }));
+                }}
               />
               <button
                 type="button"
