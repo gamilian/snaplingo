@@ -46,6 +46,7 @@ import {
   DEFAULT_TEXT_FONT_SIZE,
   DEFAULT_ANNOTATION_STYLE,
   applyAnnotationStyle,
+  annotationToolFromShortcut,
   annotationColorToCss,
   annotationFromGesture,
   arrowHeadPoints,
@@ -962,6 +963,17 @@ export default function ScreenshotSession({
         event.preventDefault();
         void saveSelection();
       } else if (
+        status === 'preview' &&
+        !textDraft &&
+        !annotationGesture &&
+        !annotationMoveGesture
+      ) {
+        const shortcutTool = annotationToolFromShortcut(event);
+        if (shortcutTool) {
+          event.preventDefault();
+          toggleAnnotationTool(shortcutTool);
+        }
+      } else if (
         event.key === ' ' &&
         status === 'selecting' &&
         startPoint &&
@@ -1020,6 +1032,7 @@ export default function ScreenshotSession({
     startPoint,
     status,
     cursorColor,
+    toggleAnnotationTool,
     undoAnnotation,
   ]);
 
@@ -1383,7 +1396,7 @@ export default function ScreenshotSession({
     setPreviewImageBase64(null);
   };
 
-  const toggleAnnotationTool = (nextTool: AnnotationTool) => {
+  function toggleAnnotationTool(nextTool: AnnotationTool) {
     const nextHistory = commitTextDraftToHistory();
     if (selection && nextHistory !== annotationHistory) {
       void renderSelectionPreview(selection, nextHistory.annotations);
@@ -1393,7 +1406,7 @@ export default function ScreenshotSession({
     setAnnotationGesture(null);
     setAnnotationMoveGesture(null);
     setDraftAnnotation(null);
-  };
+  }
 
   const startResizeGesture = (
     handle: SelectionHandle,

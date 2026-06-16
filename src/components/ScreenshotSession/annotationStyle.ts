@@ -18,6 +18,13 @@ export interface AnnotationStyle {
   strokeWidth: number;
 }
 
+interface AnnotationToolShortcutEvent {
+  key: string;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  altKey: boolean;
+}
+
 export const ANNOTATION_COLORS: AnnotationColor[] = [
   [255, 77, 79, 255],
   [40, 167, 69, 255],
@@ -37,6 +44,26 @@ export const DEFAULT_ANNOTATION_STYLE: AnnotationStyle = {
 
 const MIN_ANNOTATION_SIZE = 4;
 const HIGHLIGHT_ALPHA = 96;
+
+const ANNOTATION_TOOL_SHORTCUTS: Record<string, AnnotationTool> = {
+  r: 'rectangle',
+  e: 'ellipse',
+  a: 'arrow',
+  l: 'line',
+  p: 'pen',
+  h: 'highlight',
+  m: 'mosaic',
+  b: 'blur',
+  t: 'text',
+};
+
+export function annotationToolFromShortcut(
+  event: AnnotationToolShortcutEvent,
+): AnnotationTool | null {
+  if (event.metaKey || event.ctrlKey || event.altKey) return null;
+
+  return ANNOTATION_TOOL_SHORTCUTS[event.key.toLowerCase()] ?? null;
+}
 
 export function annotationFromGesture(
   tool: AnnotationTool,

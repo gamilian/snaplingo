@@ -3,6 +3,7 @@ import {
   annotationFromText,
   annotationFromGesture,
   applyAnnotationStyle,
+  annotationToolFromShortcut,
   isCommittedAnnotation,
   type AnnotationStyle,
 } from './annotationStyle';
@@ -153,6 +154,55 @@ describe('annotation style', () => {
       color: [40, 167, 69, 255],
       font_size: 24,
     });
+  });
+
+  it('maps plain tool shortcut keys to annotation tools', () => {
+    const plainKey = { metaKey: false, ctrlKey: false, altKey: false };
+
+    expect(annotationToolFromShortcut({ ...plainKey, key: 'r' })).toBe('rectangle');
+    expect(annotationToolFromShortcut({ ...plainKey, key: 'E' })).toBe('ellipse');
+    expect(annotationToolFromShortcut({ ...plainKey, key: 'a' })).toBe('arrow');
+    expect(annotationToolFromShortcut({ ...plainKey, key: 'l' })).toBe('line');
+    expect(annotationToolFromShortcut({ ...plainKey, key: 'p' })).toBe('pen');
+    expect(annotationToolFromShortcut({ ...plainKey, key: 'h' })).toBe('highlight');
+    expect(annotationToolFromShortcut({ ...plainKey, key: 'm' })).toBe('mosaic');
+    expect(annotationToolFromShortcut({ ...plainKey, key: 'b' })).toBe('blur');
+    expect(annotationToolFromShortcut({ ...plainKey, key: 't' })).toBe('text');
+  });
+
+  it('does not map modified or unknown tool shortcut keys', () => {
+    expect(
+      annotationToolFromShortcut({
+        key: 'r',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+      }),
+    ).toBeNull();
+    expect(
+      annotationToolFromShortcut({
+        key: 'r',
+        metaKey: false,
+        ctrlKey: true,
+        altKey: false,
+      }),
+    ).toBeNull();
+    expect(
+      annotationToolFromShortcut({
+        key: 'r',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: true,
+      }),
+    ).toBeNull();
+    expect(
+      annotationToolFromShortcut({
+        key: 'x',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+      }),
+    ).toBeNull();
   });
 
   it('updates committed annotations with the selected style', () => {
