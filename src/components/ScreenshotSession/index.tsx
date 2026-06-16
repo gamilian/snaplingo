@@ -31,6 +31,17 @@ import {
   redoAnnotationHistory,
   undoAnnotationHistory,
 } from './annotationHistory';
+import {
+  ANNOTATION_COLORS,
+  DEFAULT_ANNOTATION_STYLE,
+  annotationColorToCss,
+  annotationFromGesture,
+  arrowHeadPoints,
+  isCommittedAnnotation,
+  type AnnotationColor,
+  type AnnotationStyle,
+  type AnnotationTool,
+} from './annotationStyle';
 import { saveCaptureSelection } from './captureActions';
 import { parseCaptureLaunchPayload } from './windowMode';
 import {
@@ -52,7 +63,6 @@ import type {
 } from './types';
 
 type SessionStatus = 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
-type AnnotationTool = 'rectangle' | 'arrow';
 type EditGesture =
   | {
       type: 'move';
@@ -71,12 +81,11 @@ type AnnotationGesture = {
 };
 
 const MIN_SELECTION_SIZE = 10;
-const MIN_ANNOTATION_SIZE = 4;
 const EDGE_SNAP_THRESHOLD = 6;
 const KEYBOARD_NUDGE_STEP = 1;
 const KEYBOARD_FAST_NUDGE_STEP = 10;
 const TOOLBAR_GAP = 8;
-const TOOLBAR_SIZE = { width: 476, height: 36 };
+const TOOLBAR_SIZE = { width: 680, height: 36 };
 const MAGNIFIER_GAP = 14;
 const MAGNIFIER_SIZE = { width: 120, height: 96 };
 const MAGNIFIER_ZOOM = 4;
@@ -130,72 +139,8 @@ function annotationRectToViewportRect(
   };
 }
 
-function rectangleAnnotation(rect: LogicalRect): AnnotationCommand {
-  return {
-    type: 'rectangle',
-    rect,
-    color: [255, 77, 79, 255],
-    stroke_width: 2,
-  };
-}
-
-function arrowAnnotation(start: Point, end: Point): AnnotationCommand {
-  return {
-    type: 'arrow',
-    start,
-    end,
-    color: [255, 77, 79, 255],
-    stroke_width: 2,
-  };
-}
-
-function annotationFromGesture(
-  tool: AnnotationTool,
-  startPoint: Point,
-  currentPoint: Point,
-): AnnotationCommand {
-  if (tool === 'rectangle') {
-    return rectangleAnnotation(normalizeSelection(startPoint, currentPoint));
-  }
-
-  return arrowAnnotation(startPoint, currentPoint);
-}
-
-function isCommittedAnnotation(annotation: AnnotationCommand) {
-  if (annotation.type === 'rectangle') {
-    return (
-      annotation.rect.width >= MIN_ANNOTATION_SIZE &&
-      annotation.rect.height >= MIN_ANNOTATION_SIZE
-    );
-  }
-
-  return (
-    Math.hypot(
-      annotation.end.x - annotation.start.x,
-      annotation.end.y - annotation.start.y,
-    ) >= MIN_ANNOTATION_SIZE
-  );
-}
-
-function arrowHeadPoints(start: Point, end: Point) {
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const length = Math.hypot(dx, dy);
-  if (length === 0) return null;
-
-  const headLength = Math.min(Math.max(6, 2 * 6), length * 0.8);
-  const lineAngle = Math.atan2(dy, dx);
-  const headAngle = (35 * Math.PI) / 180;
-  const wingA = {
-    x: end.x + Math.cos(lineAngle + Math.PI - headAngle) * headLength,
-    y: end.y + Math.sin(lineAngle + Math.PI - headAngle) * headLength,
-  };
-  const wingB = {
-    x: end.x + Math.cos(lineAngle + Math.PI + headAngle) * headLength,
-    y: end.y + Math.sin(lineAngle + Math.PI + headAngle) * headLength,
-  };
-
-  return `${end.x},${end.y} ${wingA.x},${wingA.y} ${wingB.x},${wingB.y}`;
+function sameAnnotationColor(a: AnnotationColor, b: AnnotationColor) {
+  return a.every((channel, index) => channel === b[index]);
 }
 
 function DimMask({ rect }: { rect: LogicalRect }) {
@@ -338,6 +283,9 @@ export default function ScreenshotSession({
   const [annotationGesture, setAnnotationGesture] =
     useState<AnnotationGesture | null>(null);
   const [draftAnnotation, setDraftAnnotation] = useState<AnnotationCommand | null>(null);
+  const [annotationStyle, setAnnotationStyle] = useState<AnnotationStyle>(
+    DEFAULT_ANNOTATION_STYLE,
+  );
   const [annotationHistory, setAnnotationHistory] = useState(emptyAnnotationHistory);
   const [previewImageBase64, setPreviewImageBase64] = useState<string | null>(null);
   const [cursorColor, setCursorColor] = useState<ColorSample | null>(null);
@@ -857,6 +805,7 @@ export default function ScreenshotSession({
           annotationGesture.tool,
           annotationGesture.startPoint,
           localPoint,
+          annotationStyle,
         ),
       );
       return;
@@ -897,6 +846,7 @@ export default function ScreenshotSession({
         annotationGesture.tool,
         annotationGesture.startPoint,
         localPoint,
+        annotationStyle,
       );
       setAnnotationGesture(null);
       setDraftAnnotation(null);
@@ -967,7 +917,12 @@ export default function ScreenshotSession({
         startPoint: localPoint,
       });
       setDraftAnnotation(
-        annotationFromGesture(activeAnnotationTool, localPoint, localPoint),
+        annotationFromGesture(
+          activeAnnotationTool,
+          localPoint,
+          localPoint,
+          annotationStyle,
+        ),
       );
       return;
     }
@@ -1081,18 +1036,23 @@ export default function ScreenshotSession({
           )}
           {draftAnnotation?.type === 'rectangle' && (
             <div
-              className="pointer-events-none absolute border-2 border-red-400"
-              style={rectStyle(
-                annotationRectToViewportRect(
-                  draftAnnotation.rect,
-                  selectionViewportRect,
+              className="pointer-events-none absolute"
+              style={{
+                ...rectStyle(
+                  annotationRectToViewportRect(
+                    draftAnnotation.rect,
+                    selectionViewportRect,
+                  ),
                 ),
-              )}
+                border: `${draftAnnotation.stroke_width}px solid ${annotationColorToCss(
+                  draftAnnotation.color,
+                )}`,
+              }}
             />
           )}
           {draftAnnotation?.type === 'arrow' && (
             <svg
-              className="pointer-events-none absolute overflow-visible text-red-400"
+              className="pointer-events-none absolute overflow-visible"
               style={rectStyle(selectionViewportRect)}
               viewBox={`0 0 ${selectionViewportRect.width} ${selectionViewportRect.height}`}
               fill="none"
@@ -1102,14 +1062,24 @@ export default function ScreenshotSession({
                 y1={draftAnnotation.start.y}
                 x2={draftAnnotation.end.x}
                 y2={draftAnnotation.end.y}
-                stroke="currentColor"
-                strokeWidth={2}
+                stroke={annotationColorToCss(draftAnnotation.color)}
+                strokeWidth={draftAnnotation.stroke_width}
                 strokeLinecap="round"
               />
-              {arrowHeadPoints(draftAnnotation.start, draftAnnotation.end) && (
+              {arrowHeadPoints(
+                draftAnnotation.start,
+                draftAnnotation.end,
+                draftAnnotation.stroke_width,
+              ) && (
                 <polygon
-                  points={arrowHeadPoints(draftAnnotation.start, draftAnnotation.end) ?? ''}
-                  fill="currentColor"
+                  points={
+                    arrowHeadPoints(
+                      draftAnnotation.start,
+                      draftAnnotation.end,
+                      draftAnnotation.stroke_width,
+                    ) ?? ''
+                  }
+                  fill={annotationColorToCss(draftAnnotation.color)}
                 />
               )}
             </svg>
@@ -1191,6 +1161,46 @@ export default function ScreenshotSession({
               >
                 Arrow
               </button>
+              <div className="flex h-7 items-center gap-1 px-1">
+                {ANNOTATION_COLORS.map((color) => (
+                  <button
+                    key={color.join('-')}
+                    type="button"
+                    className={`h-5 w-5 rounded border border-white/40 ${
+                      sameAnnotationColor(annotationStyle.color, color)
+                        ? 'ring-2 ring-white'
+                        : ''
+                    }`}
+                    style={{ backgroundColor: annotationColorToCss(color) }}
+                    disabled={isRenderingOutput}
+                    title="Annotation color"
+                    aria-label="Annotation color"
+                    onClick={() =>
+                      setAnnotationStyle((style) => ({
+                        ...style,
+                        color,
+                      }))
+                    }
+                  />
+                ))}
+              </div>
+              <input
+                className="h-7 w-20 accent-white disabled:opacity-50"
+                type="range"
+                min={1}
+                max={8}
+                step={1}
+                value={annotationStyle.strokeWidth}
+                disabled={isRenderingOutput}
+                title="Annotation stroke width"
+                aria-label="Annotation stroke width"
+                onChange={(event) =>
+                  setAnnotationStyle((style) => ({
+                    ...style,
+                    strokeWidth: Number(event.currentTarget.value),
+                  }))
+                }
+              />
               <button
                 type="button"
                 className="h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50"

@@ -103,6 +103,17 @@ describe('selection editing', () => {
     ).toEqual({ x: 180, y: 120 });
   });
 
+  it('keeps an oversized toolbar anchored inside the left capture bound', () => {
+    expect(
+      getToolbarPosition(
+        { x: 40, y: 30, width: 100, height: 80 },
+        bounds,
+        { width: 680, height: 32 },
+        8,
+      ),
+    ).toEqual({ x: 0, y: 118 });
+  });
+
   it('snaps a drawn point to nearby target edges', () => {
     const targets: LogicalRect[] = [
       { x: 100, y: 50, width: 80, height: 60 },

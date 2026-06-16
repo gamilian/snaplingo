@@ -180,10 +180,12 @@ export function getToolbarPosition(
   const belowY = rect.y + rect.height + gap;
   const aboveY = rect.y - toolbarSize.height - gap;
   const hasRoomBelow = belowY + toolbarSize.height <= boundsBottom;
+  const maxX = Math.max(bounds.x, boundsRight - toolbarSize.width);
+  const maxY = Math.max(bounds.y, boundsBottom - toolbarSize.height);
 
   return {
-    x: clamp(preferredX, bounds.x, boundsRight - toolbarSize.width),
-    y: hasRoomBelow ? belowY : clamp(aboveY, bounds.y, boundsBottom - toolbarSize.height),
+    x: clamp(preferredX, bounds.x, maxX),
+    y: hasRoomBelow ? belowY : clamp(aboveY, bounds.y, maxY),
   };
 }
 
