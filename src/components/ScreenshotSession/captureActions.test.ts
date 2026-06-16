@@ -3,6 +3,7 @@ import type { AnnotationCommand, LogicalRect } from './types';
 import {
   type CaptureInvoke,
   type CaptureInvokeArgs,
+  isCancelCapturePointer,
   isCopyCaptureDoubleClick,
   isPinCaptureShortcut,
   isSaveCaptureShortcut,
@@ -159,6 +160,36 @@ describe('capture session actions', () => {
         metaKey: false,
         ctrlKey: true,
         altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('uses an unmodified secondary-button press for canceling the current capture layer', () => {
+    expect(
+      isCancelCapturePointer({
+        button: 2,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isCancelCapturePointer({
+        button: 0,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      isCancelCapturePointer({
+        button: 2,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: true,
         shiftKey: false,
       }),
     ).toBe(false);

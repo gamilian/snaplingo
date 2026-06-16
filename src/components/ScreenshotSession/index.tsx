@@ -72,6 +72,7 @@ import {
   type TextAnnotationDraft,
 } from './textAnnotationDraft';
 import {
+  isCancelCapturePointer,
   isCopyCaptureDoubleClick,
   isPinCaptureShortcut,
   isSaveCaptureShortcut,
@@ -875,6 +876,40 @@ export default function ScreenshotSession({
     selection,
   ]);
 
+  const dismissCaptureLayer = useCallback(() => {
+    if (textDraft) {
+      setTextDraft(null);
+      setTextDraftAnnotationIndex(null);
+    } else if (annotationMoveGesture) {
+      setAnnotationMoveGesture(null);
+      setDraftAnnotation(null);
+      if (selection) {
+        void renderSelectionPreview(selection, annotations);
+      }
+    } else if (draftSelectionMoveGesture) {
+      setDraftSelectionMoveGesture(null);
+    } else if (selectedAnnotationIndex !== null) {
+      setSelectedAnnotationIndex(null);
+    } else if (activeAnnotationTool || annotationGesture) {
+      setActiveAnnotationTool(null);
+      setAnnotationGesture(null);
+      setDraftAnnotation(null);
+    } else {
+      void cancelSession();
+    }
+  }, [
+    activeAnnotationTool,
+    annotationGesture,
+    annotationMoveGesture,
+    annotations,
+    cancelSession,
+    draftSelectionMoveGesture,
+    renderSelectionPreview,
+    selectedAnnotationIndex,
+    selection,
+    textDraft,
+  ]);
+
   useEffect(() => {
     if (!initialMode || hasStartedInitialSession) return;
 
@@ -963,26 +998,7 @@ export default function ScreenshotSession({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        if (textDraft) {
-          setTextDraft(null);
-          setTextDraftAnnotationIndex(null);
-        } else if (annotationMoveGesture) {
-          setAnnotationMoveGesture(null);
-          setDraftAnnotation(null);
-          if (selection) {
-            void renderSelectionPreview(selection, annotations);
-          }
-        } else if (draftSelectionMoveGesture) {
-          setDraftSelectionMoveGesture(null);
-        } else if (selectedAnnotationIndex !== null) {
-          setSelectedAnnotationIndex(null);
-        } else if (activeAnnotationTool || annotationGesture) {
-          setActiveAnnotationTool(null);
-          setAnnotationGesture(null);
-          setDraftAnnotation(null);
-        } else {
-          void cancelSession();
-        }
+        dismissCaptureLayer();
       } else if (
         status === 'preview' &&
         (event.metaKey || event.ctrlKey) &&
@@ -1094,21 +1110,18 @@ export default function ScreenshotSession({
     };
   }, [
     adjustAnnotationSize,
-    cancelSession,
     copyCurrentColor,
     copySelection,
-    activeAnnotationTool,
     annotationGesture,
     annotationMoveGesture,
-    annotations,
     cursorPoint,
     draftSelectionMoveGesture,
+    dismissCaptureLayer,
     textDraft,
     deleteSelectedAnnotation,
     redoAnnotation,
     isActive,
     pinSelection,
-    renderSelectionPreview,
     saveSelection,
     selectAnnotationColor,
     selection,
@@ -1130,6 +1143,13 @@ export default function ScreenshotSession({
   }, [textDraft]);
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (isCancelCapturePointer(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+      dismissCaptureLayer();
+      return;
+    }
+
     if ((status !== 'selecting' && status !== 'preview') || !selectionBounds) return;
 
     const point = viewportPointToVirtualPoint(
@@ -1539,6 +1559,7 @@ export default function ScreenshotSession({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onContextMenu={(event) => event.preventDefault()}
     >
       {session &&
         selectionBounds &&

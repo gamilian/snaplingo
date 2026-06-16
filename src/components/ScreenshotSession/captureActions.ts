@@ -15,7 +15,7 @@ interface CaptureShortcutEvent {
 }
 
 interface CapturePointerEvent {
-  detail: number;
+  detail?: number;
   button: number;
   metaKey: boolean;
   ctrlKey: boolean;
@@ -39,8 +39,18 @@ export function isPinCaptureShortcut(event: CaptureShortcutEvent) {
 
 export function isCopyCaptureDoubleClick(event: CapturePointerEvent) {
   return (
-    event.detail >= 2 &&
+    (event.detail ?? 0) >= 2 &&
     event.button === 0 &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !event.shiftKey
+  );
+}
+
+export function isCancelCapturePointer(event: CapturePointerEvent) {
+  return (
+    event.button === 2 &&
     !event.metaKey &&
     !event.ctrlKey &&
     !event.altKey &&
