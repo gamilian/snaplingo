@@ -24,6 +24,9 @@ fi
 echo -e "${GREEN}🧹 清理旧构建产物...${NC}"
 rm -rf dist/
 rm -rf target/release
+# Clean up any temporary DMG files from previous builds
+rm -f target/release/bundle/macos/rw.*.dmg 2>/dev/null || true
+rm -f target/release/bundle/dmg/rw.*.dmg 2>/dev/null || true
 echo -e "   清理完成"
 echo ""
 
