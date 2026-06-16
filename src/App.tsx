@@ -1,5 +1,6 @@
 import { SettingsWindow } from './components/SettingsWindow';
 import ResultWindow from './components/ResultWindow';
+import ScreenshotSession from './components/ScreenshotSession';
 import { useAppStore } from './stores/appStore';
 
 function App() {
@@ -12,6 +13,8 @@ function App() {
 
       {/* 翻译结果窗口（浮动） */}
       {resultWindowVisible && <ResultWindow />}
+
+      <ScreenshotSession />
     </>
   );
 }
