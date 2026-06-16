@@ -1,7 +1,13 @@
 import { normalizeSelection } from './selection';
 import type { AnnotationCommand, Point } from './types';
 
-export type AnnotationTool = 'rectangle' | 'ellipse' | 'arrow' | 'pen' | 'mosaic';
+export type AnnotationTool =
+  | 'rectangle'
+  | 'ellipse'
+  | 'arrow'
+  | 'line'
+  | 'pen'
+  | 'mosaic';
 export type AnnotationColor = [number, number, number, number];
 
 export interface AnnotationStyle {
@@ -66,6 +72,16 @@ export function annotationFromGesture(
       type: 'mosaic',
       rect: normalizeSelection(startPoint, currentPoint),
       block_size: style.strokeWidth,
+    };
+  }
+
+  if (tool === 'line') {
+    return {
+      type: 'line',
+      start: startPoint,
+      end: currentPoint,
+      color: style.color,
+      stroke_width: style.strokeWidth,
     };
   }
 

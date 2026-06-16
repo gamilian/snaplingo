@@ -86,7 +86,7 @@ const EDGE_SNAP_THRESHOLD = 6;
 const KEYBOARD_NUDGE_STEP = 1;
 const KEYBOARD_FAST_NUDGE_STEP = 10;
 const TOOLBAR_GAP = 8;
-const TOOLBAR_SIZE = { width: 840, height: 36 };
+const TOOLBAR_SIZE = { width: 900, height: 36 };
 const MAGNIFIER_GAP = 14;
 const MAGNIFIER_SIZE = { width: 120, height: 96 };
 const MAGNIFIER_ZOOM = 4;
@@ -1117,6 +1117,24 @@ export default function ScreenshotSession({
               }}
             />
           )}
+          {draftAnnotation?.type === 'line' && (
+            <svg
+              className="pointer-events-none absolute overflow-visible"
+              style={rectStyle(selectionViewportRect)}
+              viewBox={`0 0 ${selectionViewportRect.width} ${selectionViewportRect.height}`}
+              fill="none"
+            >
+              <line
+                x1={draftAnnotation.start.x}
+                y1={draftAnnotation.start.y}
+                x2={draftAnnotation.end.x}
+                y2={draftAnnotation.end.y}
+                stroke={annotationColorToCss(draftAnnotation.color)}
+                strokeWidth={draftAnnotation.stroke_width}
+                strokeLinecap="round"
+              />
+            </svg>
+          )}
           {draftAnnotation?.type === 'arrow' && (
             <svg
               className="pointer-events-none absolute overflow-visible"
@@ -1255,6 +1273,18 @@ export default function ScreenshotSession({
                 onClick={() => toggleAnnotationTool('arrow')}
               >
                 Arrow
+              </button>
+              <button
+                type="button"
+                className={`h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50 ${
+                  activeAnnotationTool === 'line' ? 'bg-white/15' : ''
+                }`}
+                disabled={isRenderingOutput}
+                title="Line"
+                aria-label="Draw line annotation"
+                onClick={() => toggleAnnotationTool('line')}
+              >
+                Line
               </button>
               <button
                 type="button"

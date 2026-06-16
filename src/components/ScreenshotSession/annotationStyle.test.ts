@@ -60,6 +60,23 @@ describe('annotation style', () => {
     });
   });
 
+  it('creates line annotations with the selected color and stroke width', () => {
+    expect(
+      annotationFromGesture(
+        'line',
+        { x: 2, y: 3 },
+        { x: 12, y: 9 },
+        style,
+      ),
+    ).toEqual({
+      type: 'line',
+      start: { x: 2, y: 3 },
+      end: { x: 12, y: 9 },
+      color: [40, 167, 69, 255],
+      stroke_width: 5,
+    });
+  });
+
   it('creates freehand annotations from the captured stroke points', () => {
     expect(
       annotationFromGesture(
@@ -117,6 +134,16 @@ describe('annotation style', () => {
       isCommittedAnnotation(
         annotationFromGesture(
           'arrow',
+          { x: 1, y: 1 },
+          { x: 2, y: 2 },
+          style,
+        ),
+      ),
+    ).toBe(false);
+    expect(
+      isCommittedAnnotation(
+        annotationFromGesture(
+          'line',
           { x: 1, y: 1 },
           { x: 2, y: 2 },
           style,

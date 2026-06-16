@@ -28,6 +28,12 @@ pub enum ImageAnnotation {
         color: [u8; 4],
         stroke_width: u32,
     },
+    Line {
+        start: PhysicalPoint,
+        end: PhysicalPoint,
+        color: [u8; 4],
+        stroke_width: u32,
+    },
     Freehand {
         points: Vec<PhysicalPoint>,
         color: [u8; 4],
@@ -200,6 +206,12 @@ fn draw_annotation(output: &mut image::RgbaImage, annotation: &ImageAnnotation) 
             color,
             stroke_width,
         } => draw_arrow_annotation(output, start, end, *color, *stroke_width),
+        ImageAnnotation::Line {
+            start,
+            end,
+            color,
+            stroke_width,
+        } => draw_line_annotation(output, start, end, *color, *stroke_width),
         ImageAnnotation::Freehand {
             points,
             color,
@@ -336,6 +348,24 @@ fn draw_arrow_annotation(
             stroke_width,
         );
     }
+}
+
+fn draw_line_annotation(
+    output: &mut image::RgbaImage,
+    start: &PhysicalPoint,
+    end: &PhysicalPoint,
+    color: [u8; 4],
+    stroke_width: u32,
+) {
+    draw_line(
+        output,
+        start.x,
+        start.y,
+        end.x,
+        end.y,
+        image::Rgba(color),
+        stroke_width.max(1),
+    );
 }
 
 fn draw_freehand_annotation(

@@ -81,6 +81,14 @@ export interface ArrowAnnotationCommand {
   stroke_width: number;
 }
 
+export interface LineAnnotationCommand {
+  type: 'line';
+  start: Point;
+  end: Point;
+  color: [number, number, number, number];
+  stroke_width: number;
+}
+
 export interface FreehandAnnotationCommand {
   type: 'freehand';
   points: Point[];
@@ -98,5 +106,6 @@ export type AnnotationCommand =
   | RectangleAnnotationCommand
   | EllipseAnnotationCommand
   | ArrowAnnotationCommand
+  | LineAnnotationCommand
   | FreehandAnnotationCommand
   | MosaicAnnotationCommand;

@@ -229,6 +229,45 @@ mod tests {
     }
 
     #[test]
+    fn composes_png_with_line_annotation() {
+        let service = ImageCompositionService::new();
+        let white = make_solid_png(8, 6, [255, 255, 255, 255]);
+
+        let output = service
+            .compose_png_with_annotations(
+                8,
+                6,
+                &[PngPlacement {
+                    png_data: white.as_slice(),
+                    source_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 8,
+                        height: 6,
+                    },
+                    destination_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 8,
+                        height: 6,
+                    },
+                }],
+                &[ImageAnnotation::Line {
+                    start: PhysicalPoint { x: 1, y: 3 },
+                    end: PhysicalPoint { x: 6, y: 3 },
+                    color: [255, 0, 0, 255],
+                    stroke_width: 1,
+                }],
+            )
+            .unwrap();
+
+        assert_eq!(png_pixel(&output, 1, 3), [255, 0, 0, 255]);
+        assert_eq!(png_pixel(&output, 6, 3), [255, 0, 0, 255]);
+        assert_eq!(png_pixel(&output, 4, 3), [255, 0, 0, 255]);
+        assert_eq!(png_pixel(&output, 4, 1), [255, 255, 255, 255]);
+    }
+
+    #[test]
     fn composes_png_with_freehand_annotation() {
         let service = ImageCompositionService::new();
         let white = make_solid_png(8, 8, [255, 255, 255, 255]);

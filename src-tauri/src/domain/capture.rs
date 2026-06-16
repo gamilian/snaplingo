@@ -137,6 +137,12 @@ pub enum AnnotationCommand {
         color: [u8; 4],
         stroke_width: u32,
     },
+    Line {
+        start: LogicalPoint,
+        end: LogicalPoint,
+        color: [u8; 4],
+        stroke_width: u32,
+    },
     Freehand {
         points: Vec<LogicalPoint>,
         color: [u8; 4],
@@ -212,6 +218,23 @@ mod tests {
         let serialized = serde_json::to_value(&annotation).unwrap();
 
         assert_eq!(serialized["type"], "arrow");
+        assert_eq!(serialized["start"]["x"], 1.0);
+        assert_eq!(serialized["end"]["y"], 4.0);
+        assert_eq!(serialized["stroke_width"], 2);
+    }
+
+    #[test]
+    fn line_annotation_serializes_with_type_tag() {
+        let annotation = AnnotationCommand::Line {
+            start: LogicalPoint { x: 1.0, y: 2.0 },
+            end: LogicalPoint { x: 3.0, y: 4.0 },
+            color: [255, 0, 0, 255],
+            stroke_width: 2,
+        };
+
+        let serialized = serde_json::to_value(&annotation).unwrap();
+
+        assert_eq!(serialized["type"], "line");
         assert_eq!(serialized["start"]["x"], 1.0);
         assert_eq!(serialized["end"]["y"], 4.0);
         assert_eq!(serialized["stroke_width"], 2);
