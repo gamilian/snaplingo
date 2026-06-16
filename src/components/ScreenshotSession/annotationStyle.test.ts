@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   annotationFromText,
   annotationFromGesture,
+  applyAnnotationStyle,
   isCommittedAnnotation,
   type AnnotationStyle,
 } from './annotationStyle';
@@ -136,6 +137,79 @@ describe('annotation style', () => {
       text: 'Snap text',
       color: [40, 167, 69, 255],
       font_size: 24,
+    });
+  });
+
+  it('updates committed annotations with the selected style', () => {
+    expect(
+      applyAnnotationStyle(
+        {
+          type: 'rectangle',
+          rect: { x: 1, y: 2, width: 10, height: 8 },
+          color: [255, 77, 79, 255],
+          stroke_width: 2,
+        },
+        style,
+      ),
+    ).toEqual({
+      type: 'rectangle',
+      rect: { x: 1, y: 2, width: 10, height: 8 },
+      color: [40, 167, 69, 255],
+      stroke_width: 5,
+    });
+
+    expect(
+      applyAnnotationStyle(
+        {
+          type: 'highlight',
+          points: [{ x: 1, y: 2 }, { x: 4, y: 6 }],
+          color: [255, 77, 79, 96],
+          stroke_width: 2,
+        },
+        style,
+      ),
+    ).toEqual({
+      type: 'highlight',
+      points: [{ x: 1, y: 2 }, { x: 4, y: 6 }],
+      color: [40, 167, 69, 96],
+      stroke_width: 5,
+    });
+
+    expect(
+      applyAnnotationStyle(
+        {
+          type: 'mosaic',
+          rect: { x: 1, y: 2, width: 10, height: 8 },
+          block_size: 2,
+        },
+        style,
+      ),
+    ).toEqual({
+      type: 'mosaic',
+      rect: { x: 1, y: 2, width: 10, height: 8 },
+      block_size: 5,
+    });
+  });
+
+  it('updates text annotations with the selected color and font size', () => {
+    expect(
+      applyAnnotationStyle(
+        {
+          type: 'text',
+          position: { x: 1, y: 2 },
+          text: 'Snap',
+          color: [255, 77, 79, 255],
+          font_size: 18,
+        },
+        style,
+        32,
+      ),
+    ).toEqual({
+      type: 'text',
+      position: { x: 1, y: 2 },
+      text: 'Snap',
+      color: [40, 167, 69, 255],
+      font_size: 32,
     });
   });
 

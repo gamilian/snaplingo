@@ -122,6 +122,41 @@ export function annotationFromText(
   };
 }
 
+export function applyAnnotationStyle(
+  annotation: AnnotationCommand,
+  style: AnnotationStyle,
+  fontSize = DEFAULT_TEXT_FONT_SIZE,
+): AnnotationCommand {
+  if (annotation.type === 'mosaic') {
+    return {
+      ...annotation,
+      block_size: style.strokeWidth,
+    };
+  }
+
+  if (annotation.type === 'text') {
+    return {
+      ...annotation,
+      color: style.color,
+      font_size: fontSize,
+    };
+  }
+
+  if (annotation.type === 'highlight') {
+    return {
+      ...annotation,
+      color: [style.color[0], style.color[1], style.color[2], HIGHLIGHT_ALPHA],
+      stroke_width: style.strokeWidth,
+    };
+  }
+
+  return {
+    ...annotation,
+    color: style.color,
+    stroke_width: style.strokeWidth,
+  };
+}
+
 export function isCommittedAnnotation(annotation: AnnotationCommand) {
   if (annotation.type === 'text') {
     return annotation.text.trim().length > 0 && annotation.font_size > 0;

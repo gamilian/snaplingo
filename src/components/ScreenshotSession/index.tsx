@@ -42,6 +42,7 @@ import {
   ANNOTATION_COLORS,
   DEFAULT_TEXT_FONT_SIZE,
   DEFAULT_ANNOTATION_STYLE,
+  applyAnnotationStyle,
   annotationColorToCss,
   annotationFromGesture,
   arrowHeadPoints,
@@ -344,6 +345,8 @@ export default function ScreenshotSession({
 
   const isActive = status !== 'idle';
   const annotations = annotationHistory.annotations;
+  const selectedAnnotation =
+    selectedAnnotationIndex === null ? null : annotations[selectedAnnotationIndex] ?? null;
   const canUndoAnnotation =
     annotationHistory.undoSnapshots !== undefined
       ? annotationHistory.undoSnapshots.length > 0
@@ -352,7 +355,10 @@ export default function ScreenshotSession({
     annotationHistory.redoSnapshots !== undefined
       ? annotationHistory.redoSnapshots.length > 0
       : annotationHistory.undoneAnnotations.length > 0;
-  const isTextSizingActive = activeAnnotationTool === 'text' || Boolean(textDraft);
+  const isTextSizingActive =
+    activeAnnotationTool === 'text' ||
+    Boolean(textDraft) ||
+    selectedAnnotation?.type === 'text';
   const sizeLabel = selection
     ? `${Math.round(selection.width)} x ${Math.round(selection.height)}`
     : '';
@@ -692,6 +698,72 @@ export default function ScreenshotSession({
     selectedAnnotationIndex,
     selection,
   ]);
+
+  const syncToolbarStyleFromAnnotation = useCallback(
+    (annotation: AnnotationCommand) => {
+      if (annotation.type === 'mosaic') {
+        setAnnotationStyle((style) => ({
+          ...style,
+          strokeWidth: annotation.block_size,
+        }));
+        return;
+      }
+
+      if (annotation.type === 'text') {
+        setAnnotationStyle((style) => ({
+          ...style,
+          color: annotation.color,
+        }));
+        setTextFontSize(annotation.font_size);
+        return;
+      }
+
+      setAnnotationStyle({
+        color: annotation.color,
+        strokeWidth: annotation.stroke_width,
+      });
+    },
+    [],
+  );
+
+  const applySelectedAnnotationStyle = useCallback(
+    (nextStyle: AnnotationStyle, nextTextFontSize: number) => {
+      setAnnotationStyle(nextStyle);
+      setTextFontSize(nextTextFontSize);
+
+      if (
+        !selection ||
+        textDraft ||
+        selectedAnnotationIndex === null ||
+        !annotations[selectedAnnotationIndex]
+      ) {
+        return;
+      }
+
+      const nextAnnotation = applyAnnotationStyle(
+        annotations[selectedAnnotationIndex],
+        nextStyle,
+        nextTextFontSize,
+      );
+      const nextHistory = replaceAnnotationInHistory(
+        annotationHistory,
+        selectedAnnotationIndex,
+        nextAnnotation,
+      );
+      if (nextHistory === annotationHistory) return;
+
+      setAnnotationHistory(nextHistory);
+      void renderSelectionPreview(selection, nextHistory.annotations);
+    },
+    [
+      annotationHistory,
+      annotations,
+      renderSelectionPreview,
+      selectedAnnotationIndex,
+      selection,
+      textDraft,
+    ],
+  );
 
   const commitTextDraft = useCallback(() => {
     const nextHistory = commitTextDraftToHistory();
@@ -1186,11 +1258,7 @@ export default function ScreenshotSession({
         setDraftAnnotation(null);
         setTextDraft(startTextAnnotationDraftFromAnnotation(hitAnnotation));
         setTextDraftAnnotationIndex(hitAnnotationIndex);
-        setAnnotationStyle((style) => ({
-          ...style,
-          color: hitAnnotation.color,
-        }));
-        setTextFontSize(hitAnnotation.font_size);
+        syncToolbarStyleFromAnnotation(hitAnnotation);
         setPreviewImageBase64(null);
         void renderSelectionPreview(
           selection,
@@ -1200,6 +1268,7 @@ export default function ScreenshotSession({
       }
 
       setSelectedAnnotationIndex(hitAnnotationIndex);
+      syncToolbarStyleFromAnnotation(hitAnnotation);
       setAnnotationMoveGesture({
         annotationIndex: hitAnnotationIndex,
         startPoint: localPoint,
@@ -1694,12 +1763,13 @@ export default function ScreenshotSession({
                     disabled={isRenderingOutput}
                     title="Annotation color"
                     aria-label="Annotation color"
-                    onClick={() =>
-                      setAnnotationStyle((style) => ({
-                        ...style,
+                    onClick={() => {
+                      const nextStyle = {
+                        ...annotationStyle,
                         color,
-                      }))
-                    }
+                      };
+                      applySelectedAnnotationStyle(nextStyle, textFontSize);
+                    }}
                   />
                 ))}
               </div>
@@ -1727,7 +1797,7 @@ export default function ScreenshotSession({
                 }
                 onChange={(event) => {
                   const value = Number(event.currentTarget.value);
-                  if (isTextSizingActive) {
+                  if (textDraft) {
                     setTextFontSize(value);
                     setTextDraft((draft) =>
                       draft ? { ...draft, fontSize: value } : draft,
@@ -1735,10 +1805,18 @@ export default function ScreenshotSession({
                     return;
                   }
 
-                  setAnnotationStyle((style) => ({
-                    ...style,
-                    strokeWidth: value,
-                  }));
+                  if (isTextSizingActive) {
+                    applySelectedAnnotationStyle(annotationStyle, value);
+                    return;
+                  }
+
+                  applySelectedAnnotationStyle(
+                    {
+                      ...annotationStyle,
+                      strokeWidth: value,
+                    },
+                    textFontSize,
+                  );
                 }}
               />
               <button
