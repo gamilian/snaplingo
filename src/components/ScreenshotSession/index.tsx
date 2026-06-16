@@ -50,6 +50,7 @@ import {
   MIN_ANNOTATION_STROKE_WIDTH,
   MIN_TEXT_FONT_SIZE,
   applyAnnotationStyle,
+  annotationColorFromShortcut,
   annotationSizeDirectionFromShortcut,
   annotationToolFromShortcut,
   annotationColorToCss,
@@ -840,6 +841,26 @@ export default function ScreenshotSession({
     ],
   );
 
+  const selectAnnotationColor = useCallback(
+    (color: AnnotationColor) => {
+      if (textDraft) return;
+
+      applySelectedAnnotationStyle(
+        {
+          ...annotationStyle,
+          color,
+        },
+        textFontSize,
+      );
+    },
+    [
+      annotationStyle,
+      applySelectedAnnotationStyle,
+      textDraft,
+      textFontSize,
+    ],
+  );
+
   const commitTextDraft = useCallback(() => {
     const nextHistory = commitTextDraftToHistory();
     if (selection && nextHistory !== annotationHistory) {
@@ -1018,10 +1039,16 @@ export default function ScreenshotSession({
         !annotationGesture &&
         !annotationMoveGesture
       ) {
-        const shortcutTool = annotationToolFromShortcut(event);
-        if (shortcutTool) {
+        const shortcutColor = annotationColorFromShortcut(event);
+        if (shortcutColor) {
           event.preventDefault();
-          toggleAnnotationTool(shortcutTool);
+          selectAnnotationColor(shortcutColor);
+        } else {
+          const shortcutTool = annotationToolFromShortcut(event);
+          if (shortcutTool) {
+            event.preventDefault();
+            toggleAnnotationTool(shortcutTool);
+          }
         }
       } else if (
         event.key === ' ' &&
@@ -1077,6 +1104,7 @@ export default function ScreenshotSession({
     isActive,
     renderSelectionPreview,
     saveSelection,
+    selectAnnotationColor,
     selection,
     selectionBounds,
     selectedAnnotationIndex,

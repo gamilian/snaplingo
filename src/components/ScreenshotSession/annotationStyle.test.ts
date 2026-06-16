@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ANNOTATION_COLORS,
+  annotationColorFromShortcut,
   annotationFromText,
   annotationFromGesture,
   applyAnnotationStyle,
@@ -201,6 +203,44 @@ describe('annotation style', () => {
     expect(
       annotationToolFromShortcut({
         key: 'x',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+      }),
+    ).toBeNull();
+  });
+
+  it('maps number shortcuts to annotation colors', () => {
+    const plainKey = { metaKey: false, ctrlKey: false, altKey: false };
+
+    expect(annotationColorFromShortcut({ ...plainKey, key: '1' })).toEqual(
+      ANNOTATION_COLORS[0],
+    );
+    expect(annotationColorFromShortcut({ ...plainKey, key: '6' })).toEqual(
+      ANNOTATION_COLORS[5],
+    );
+  });
+
+  it('does not map modified or unavailable color shortcut keys', () => {
+    expect(
+      annotationColorFromShortcut({
+        key: '1',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+      }),
+    ).toBeNull();
+    expect(
+      annotationColorFromShortcut({
+        key: '0',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+      }),
+    ).toBeNull();
+    expect(
+      annotationColorFromShortcut({
+        key: '7',
         metaKey: false,
         ctrlKey: false,
         altKey: false,

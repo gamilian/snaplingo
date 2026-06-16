@@ -71,6 +71,16 @@ export function annotationToolFromShortcut(
   return ANNOTATION_TOOL_SHORTCUTS[event.key.toLowerCase()] ?? null;
 }
 
+export function annotationColorFromShortcut(
+  event: AnnotationToolShortcutEvent,
+): AnnotationColor | null {
+  if (event.metaKey || event.ctrlKey || event.altKey) return null;
+  if (!/^[1-9]$/.test(event.key)) return null;
+
+  const colorIndex = Number(event.key) - 1;
+  return ANNOTATION_COLORS[colorIndex] ?? null;
+}
+
 export function annotationSizeDirectionFromShortcut(
   event: AnnotationToolShortcutEvent,
 ): AnnotationSizeDirection | null {
