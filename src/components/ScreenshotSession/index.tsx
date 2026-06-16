@@ -10,6 +10,10 @@ import {
   type ArrowKey,
   type SelectionHandle,
 } from './selection';
+import {
+  getMagnifierImageStyle,
+  getMagnifierPosition,
+} from './magnifier';
 import { saveCaptureSelection } from './captureActions';
 import { parseCaptureLaunchPayload } from './windowMode';
 import type {
@@ -39,6 +43,9 @@ const KEYBOARD_NUDGE_STEP = 1;
 const KEYBOARD_FAST_NUDGE_STEP = 10;
 const TOOLBAR_GAP = 8;
 const TOOLBAR_SIZE = { width: 272, height: 36 };
+const MAGNIFIER_GAP = 14;
+const MAGNIFIER_SIZE = { width: 120, height: 96 };
+const MAGNIFIER_ZOOM = 4;
 const ARROW_KEYS: ArrowKey[] = ['ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowLeft'];
 const SELECTION_HANDLES: SelectionHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
@@ -105,6 +112,65 @@ function DimMask({ rect }: { rect: LogicalRect }) {
   );
 }
 
+function Magnifier({
+  imageBase64,
+  cursor,
+  imageBounds,
+  selection,
+}: {
+  imageBase64: string;
+  cursor: Point;
+  imageBounds: LogicalRect;
+  selection: LogicalRect | null;
+}) {
+  const position = getMagnifierPosition(
+    cursor,
+    imageBounds,
+    MAGNIFIER_SIZE,
+    MAGNIFIER_GAP,
+  );
+  const imageStyle = getMagnifierImageStyle(
+    imageBase64,
+    cursor,
+    { width: imageBounds.width, height: imageBounds.height },
+    MAGNIFIER_SIZE,
+    MAGNIFIER_ZOOM,
+  );
+  const sizeText = selection
+    ? `${Math.round(selection.width)} x ${Math.round(selection.height)}`
+    : '';
+
+  return (
+    <div
+      className="pointer-events-none absolute overflow-hidden rounded border border-white/70 bg-neutral-950 text-[10px] text-white shadow-2xl ring-1 ring-black/50"
+      style={{
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+        width: `${MAGNIFIER_SIZE.width}px`,
+      }}
+    >
+      <div
+        className="relative border-b border-white/20"
+        style={{
+          ...imageStyle,
+          width: `${MAGNIFIER_SIZE.width}px`,
+          height: `${MAGNIFIER_SIZE.height}px`,
+          backgroundRepeat: 'no-repeat',
+        }}
+      >
+        <div className="absolute left-1/2 top-0 h-full w-px bg-red-400/90" />
+        <div className="absolute left-0 top-1/2 h-px w-full bg-red-400/90" />
+      </div>
+      <div className="flex items-center justify-between px-1.5 py-1 font-mono leading-none">
+        <span>
+          {Math.round(cursor.x)}, {Math.round(cursor.y)}
+        </span>
+        {sizeText && <span>{sizeText}</span>}
+      </div>
+    </div>
+  );
+}
+
 interface ScreenshotSessionProps {
   initialMode?: CaptureMode;
   initialSessionId?: string;
@@ -120,6 +186,7 @@ export default function ScreenshotSession({
   const [mode, setMode] = useState<CaptureMode>('screenshot');
   const [session, setSession] = useState<CaptureSessionView | null>(null);
   const [startPoint, setStartPoint] = useState<Point | null>(null);
+  const [cursorPoint, setCursorPoint] = useState<Point | null>(null);
   const [selection, setSelection] = useState<LogicalRect | null>(null);
   const [editGesture, setEditGesture] = useState<EditGesture | null>(null);
   const [previewImageBase64, setPreviewImageBase64] = useState<string | null>(null);
@@ -152,6 +219,7 @@ export default function ScreenshotSession({
     setStatus('idle');
     setSession(null);
     setStartPoint(null);
+    setCursorPoint(null);
     setSelection(null);
     setEditGesture(null);
     setPreviewImageBase64(null);
@@ -178,6 +246,7 @@ export default function ScreenshotSession({
     setStatus('loading');
     setMode(nextMode);
     setStartPoint(null);
+    setCursorPoint(null);
     setSelection(null);
     setEditGesture(null);
     setPreviewImageBase64(null);
@@ -393,6 +462,7 @@ export default function ScreenshotSession({
     if (status !== 'selecting' && status !== 'preview') return;
 
     const point = { x: event.clientX, y: event.clientY };
+    setCursorPoint(point);
     event.currentTarget.setPointerCapture(event.pointerId);
     setStartPoint(point);
     setSelection(normalizeSelection(point, point));
@@ -426,6 +496,10 @@ export default function ScreenshotSession({
   );
 
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (status === 'selecting' || status === 'preview') {
+      setCursorPoint({ x: event.clientX, y: event.clientY });
+    }
+
     if (editGesture) {
       setSelection(applyEditGesture(editGesture, {
         x: event.clientX,
@@ -445,6 +519,8 @@ export default function ScreenshotSession({
   };
 
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    setCursorPoint({ x: event.clientX, y: event.clientY });
+
     if (editGesture) {
       const nextSelection = applyEditGesture(editGesture, {
         x: event.clientX,
@@ -483,6 +559,7 @@ export default function ScreenshotSession({
 
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
+    setCursorPoint({ x: event.clientX, y: event.clientY });
     setEditGesture({
       type: 'move',
       startPoint: { x: event.clientX, y: event.clientY },
@@ -499,6 +576,7 @@ export default function ScreenshotSession({
 
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
+    setCursorPoint({ x: event.clientX, y: event.clientY });
     setEditGesture({
       type: 'resize',
       handle,
@@ -653,6 +731,14 @@ export default function ScreenshotSession({
             />
           )}
         </>
+      )}
+      {monitor && cursorPoint && selectionBounds && (
+        <Magnifier
+          imageBase64={monitor.image_base64}
+          cursor={cursorPoint}
+          imageBounds={selectionBounds}
+          selection={selection}
+        />
       )}
     </div>
   );
