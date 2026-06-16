@@ -29,12 +29,14 @@ import {
   addAnnotationToHistory,
   emptyAnnotationHistory,
   removeAnnotationFromHistory,
+  replaceAnnotationInHistory,
   redoAnnotationHistory,
   undoAnnotationHistory,
 } from './annotationHistory';
 import {
   getAnnotationBounds,
   hitTestAnnotations,
+  moveAnnotationByDelta,
 } from './annotationGeometry';
 import {
   ANNOTATION_COLORS,
@@ -91,6 +93,11 @@ type AnnotationGesture = {
   tool: AnnotationTool;
   startPoint: Point;
   points?: Point[];
+};
+type AnnotationMoveGesture = {
+  annotationIndex: number;
+  startPoint: Point;
+  startAnnotation: AnnotationCommand;
 };
 
 const MIN_SELECTION_SIZE = 10;
@@ -317,6 +324,8 @@ export default function ScreenshotSession({
   const [selectedAnnotationIndex, setSelectedAnnotationIndex] = useState<number | null>(
     null,
   );
+  const [annotationMoveGesture, setAnnotationMoveGesture] =
+    useState<AnnotationMoveGesture | null>(null);
   const [textDraft, setTextDraft] = useState<TextAnnotationDraft | null>(null);
   const [annotationStyle, setAnnotationStyle] = useState<AnnotationStyle>(
     DEFAULT_ANNOTATION_STYLE,
@@ -386,12 +395,16 @@ export default function ScreenshotSession({
     return virtualPointToViewportPoint(cursorPoint, selectionBounds);
   }, [cursorPoint, selectionBounds]);
   const selectedAnnotationBounds = useMemo<LogicalRect | null>(() => {
-    if (selectedAnnotationIndex === null || !annotations[selectedAnnotationIndex]) {
+    if (
+      annotationMoveGesture ||
+      selectedAnnotationIndex === null ||
+      !annotations[selectedAnnotationIndex]
+    ) {
       return null;
     }
 
     return getAnnotationBounds(annotations[selectedAnnotationIndex]);
-  }, [annotations, selectedAnnotationIndex]);
+  }, [annotationMoveGesture, annotations, selectedAnnotationIndex]);
   const cursorMonitor = useMemo<MonitorSnapshotView | null>(() => {
     if (!session || !cursorPoint) return null;
 
@@ -423,6 +436,7 @@ export default function ScreenshotSession({
     setAnnotationGesture(null);
     setDraftAnnotation(null);
     setSelectedAnnotationIndex(null);
+    setAnnotationMoveGesture(null);
     setTextDraft(null);
     setAnnotationHistory(emptyAnnotationHistory());
     setPreviewImageBase64(null);
@@ -459,6 +473,7 @@ export default function ScreenshotSession({
     setAnnotationGesture(null);
     setDraftAnnotation(null);
     setSelectedAnnotationIndex(null);
+    setAnnotationMoveGesture(null);
     setTextDraft(null);
     setAnnotationHistory(emptyAnnotationHistory());
     setPreviewImageBase64(null);
@@ -635,6 +650,7 @@ export default function ScreenshotSession({
 
     const nextHistory = undoAnnotationHistory(annotationHistory);
     setSelectedAnnotationIndex(null);
+    setAnnotationMoveGesture(null);
     setAnnotationHistory(nextHistory);
     void renderSelectionPreview(selection, nextHistory.annotations);
   }, [annotationHistory, canUndoAnnotation, renderSelectionPreview, selection]);
@@ -644,6 +660,7 @@ export default function ScreenshotSession({
 
     const nextHistory = redoAnnotationHistory(annotationHistory);
     setSelectedAnnotationIndex(null);
+    setAnnotationMoveGesture(null);
     setAnnotationHistory(nextHistory);
     void renderSelectionPreview(selection, nextHistory.annotations);
   }, [annotationHistory, canRedoAnnotation, renderSelectionPreview, selection]);
@@ -658,6 +675,7 @@ export default function ScreenshotSession({
     if (nextHistory === annotationHistory) return;
 
     setSelectedAnnotationIndex(null);
+    setAnnotationMoveGesture(null);
     setAnnotationHistory(nextHistory);
     void renderSelectionPreview(selection, nextHistory.annotations);
   }, [
@@ -769,6 +787,12 @@ export default function ScreenshotSession({
         event.preventDefault();
         if (textDraft) {
           setTextDraft(null);
+        } else if (annotationMoveGesture) {
+          setAnnotationMoveGesture(null);
+          setDraftAnnotation(null);
+          if (selection) {
+            void renderSelectionPreview(selection, annotations);
+          }
         } else if (selectedAnnotationIndex !== null) {
           setSelectedAnnotationIndex(null);
         } else if (activeAnnotationTool || annotationGesture) {
@@ -827,6 +851,8 @@ export default function ScreenshotSession({
     copySelection,
     activeAnnotationTool,
     annotationGesture,
+    annotationMoveGesture,
+    annotations,
     textDraft,
     deleteSelectedAnnotation,
     redoAnnotation,
@@ -866,6 +892,7 @@ export default function ScreenshotSession({
     setAnnotationGesture(null);
     setDraftAnnotation(null);
     setSelectedAnnotationIndex(null);
+    setAnnotationMoveGesture(null);
     setTextDraft(null);
     setAnnotationHistory(emptyAnnotationHistory());
   };
@@ -956,6 +983,22 @@ export default function ScreenshotSession({
       return;
     }
 
+    if (annotationMoveGesture && selection) {
+      const localPoint = clampPointToRect(
+        { x: point.x - selection.x, y: point.y - selection.y },
+        selection,
+      );
+      const delta = {
+        x: localPoint.x - annotationMoveGesture.startPoint.x,
+        y: localPoint.y - annotationMoveGesture.startPoint.y,
+      };
+      setPreviewImageBase64(null);
+      setDraftAnnotation(
+        moveAnnotationByDelta(annotationMoveGesture.startAnnotation, delta),
+      );
+      return;
+    }
+
     if (editGesture) {
       setSelection(applyEditGesture(editGesture, point));
       setPreviewImageBase64(null);
@@ -1003,6 +1046,36 @@ export default function ScreenshotSession({
         const nextHistory = addAnnotationToHistory(annotationHistory, nextAnnotation);
         setSelectedAnnotationIndex(null);
         setAnnotationHistory(nextHistory);
+        void renderSelectionPreview(selection, nextHistory.annotations);
+      }
+      return;
+    }
+
+    if (annotationMoveGesture && selection) {
+      const localPoint = clampPointToRect(
+        { x: point.x - selection.x, y: point.y - selection.y },
+        selection,
+      );
+      const delta = {
+        x: localPoint.x - annotationMoveGesture.startPoint.x,
+        y: localPoint.y - annotationMoveGesture.startPoint.y,
+      };
+      const nextAnnotation = moveAnnotationByDelta(
+        annotationMoveGesture.startAnnotation,
+        delta,
+      );
+      const nextHistory = replaceAnnotationInHistory(
+        annotationHistory,
+        annotationMoveGesture.annotationIndex,
+        nextAnnotation,
+      );
+      setAnnotationMoveGesture(null);
+      setDraftAnnotation(null);
+      setAnnotationHistory(nextHistory);
+      if (nextHistory === annotationHistory) {
+        void renderSelectionPreview(selection, annotations);
+      } else {
+        setSelectedAnnotationIndex(annotationMoveGesture.annotationIndex);
         void renderSelectionPreview(selection, nextHistory.annotations);
       }
       return;
@@ -1096,10 +1169,16 @@ export default function ScreenshotSession({
     const hitAnnotationIndex = hitTestAnnotations(annotations, localPoint);
     if (hitAnnotationIndex !== null) {
       setSelectedAnnotationIndex(hitAnnotationIndex);
+      setAnnotationMoveGesture({
+        annotationIndex: hitAnnotationIndex,
+        startPoint: localPoint,
+        startAnnotation: annotations[hitAnnotationIndex],
+      });
       return;
     }
 
     setSelectedAnnotationIndex(null);
+    setAnnotationMoveGesture(null);
     setEditGesture({
       type: 'move',
       startPoint: point,
@@ -1116,6 +1195,7 @@ export default function ScreenshotSession({
 
     setActiveAnnotationTool((tool) => (tool === nextTool ? null : nextTool));
     setAnnotationGesture(null);
+    setAnnotationMoveGesture(null);
     setDraftAnnotation(null);
   };
 

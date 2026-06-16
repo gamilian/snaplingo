@@ -28,6 +28,10 @@ function snapshotHistory(
   };
 }
 
+function sameAnnotation(a: AnnotationCommand, b: AnnotationCommand) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 export function addAnnotationToHistory(
   history: AnnotationHistory,
   annotation: AnnotationCommand,
@@ -49,6 +53,27 @@ export function removeAnnotationFromHistory(
   return snapshotHistory(
     history,
     history.annotations.filter((_, index) => index !== annotationIndex),
+  );
+}
+
+export function replaceAnnotationInHistory(
+  history: AnnotationHistory,
+  annotationIndex: number,
+  annotation: AnnotationCommand,
+): AnnotationHistory {
+  if (
+    annotationIndex < 0 ||
+    annotationIndex >= history.annotations.length ||
+    sameAnnotation(history.annotations[annotationIndex], annotation)
+  ) {
+    return history;
+  }
+
+  return snapshotHistory(
+    history,
+    history.annotations.map((currentAnnotation, index) =>
+      index === annotationIndex ? annotation : currentAnnotation,
+    ),
   );
 }
 

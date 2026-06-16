@@ -64,6 +64,13 @@ function containsPoint(rect: LogicalRect, point: Point, tolerance: number) {
   );
 }
 
+function movePointByDelta(point: Point, delta: Point): Point {
+  return {
+    x: point.x + delta.x,
+    y: point.y + delta.y,
+  };
+}
+
 export function hitTestAnnotations(
   annotations: AnnotationCommand[],
   point: Point,
@@ -76,4 +83,44 @@ export function hitTestAnnotations(
   }
 
   return null;
+}
+
+export function moveAnnotationByDelta(
+  annotation: AnnotationCommand,
+  delta: Point,
+): AnnotationCommand {
+  if (
+    annotation.type === 'rectangle' ||
+    annotation.type === 'ellipse' ||
+    annotation.type === 'mosaic'
+  ) {
+    return {
+      ...annotation,
+      rect: {
+        ...annotation.rect,
+        x: annotation.rect.x + delta.x,
+        y: annotation.rect.y + delta.y,
+      },
+    };
+  }
+
+  if (annotation.type === 'line' || annotation.type === 'arrow') {
+    return {
+      ...annotation,
+      start: movePointByDelta(annotation.start, delta),
+      end: movePointByDelta(annotation.end, delta),
+    };
+  }
+
+  if (annotation.type === 'freehand' || annotation.type === 'highlight') {
+    return {
+      ...annotation,
+      points: annotation.points.map((point) => movePointByDelta(point, delta)),
+    };
+  }
+
+  return {
+    ...annotation,
+    position: movePointByDelta(annotation.position, delta),
+  };
 }

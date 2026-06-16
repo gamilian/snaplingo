@@ -3,6 +3,7 @@ import type { AnnotationCommand } from './types';
 import {
   addAnnotationToHistory,
   removeAnnotationFromHistory,
+  replaceAnnotationInHistory,
   redoAnnotationHistory,
   undoAnnotationHistory,
 } from './annotationHistory';
@@ -84,6 +85,44 @@ describe('annotation history', () => {
       undoSnapshots: [],
       redoSnapshots: [[arrow]],
     });
+  });
+
+  it('replaces annotations with undo and redo support', () => {
+    const movedArrow: AnnotationCommand = {
+      ...arrow,
+      start: { x: 10, y: 20 },
+      end: { x: 30, y: 40 },
+    };
+    const replaced = replaceAnnotationInHistory(
+      {
+        annotations: [rectangle, arrow],
+        undoneAnnotations: [rectangle],
+      },
+      1,
+      movedArrow,
+    );
+
+    expect(replaced).toEqual({
+      annotations: [rectangle, movedArrow],
+      undoneAnnotations: [],
+      undoSnapshots: [[rectangle, arrow]],
+      redoSnapshots: [],
+    });
+
+    expect(undoAnnotationHistory(replaced)).toEqual({
+      annotations: [rectangle, arrow],
+      undoneAnnotations: [],
+      undoSnapshots: [],
+      redoSnapshots: [[rectangle, movedArrow]],
+    });
+  });
+
+  it('keeps no-op annotation replacements stable', () => {
+    const history = { annotations: [rectangle], undoneAnnotations: [] };
+
+    expect(replaceAnnotationInHistory(history, 0, rectangle)).toBe(history);
+    expect(replaceAnnotationInHistory(history, -1, arrow)).toBe(history);
+    expect(replaceAnnotationInHistory(history, 1, arrow)).toBe(history);
   });
 
   it('keeps snapshot undo stable after the stack is exhausted', () => {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getAnnotationBounds,
   hitTestAnnotations,
+  moveAnnotationByDelta,
 } from './annotationGeometry';
 import type { AnnotationCommand } from './types';
 
@@ -71,5 +72,21 @@ describe('annotation geometry', () => {
   it('uses tolerance when hit testing thin annotations', () => {
     expect(hitTestAnnotations([arrow], { x: 79, y: 19 }, 2)).toBe(0);
     expect(hitTestAnnotations([arrow], { x: 75, y: 15 }, 2)).toBeNull();
+  });
+
+  it('moves annotations by delta without changing their style', () => {
+    expect(moveAnnotationByDelta(rectangle, { x: 4, y: -6 })).toEqual({
+      ...rectangle,
+      rect: { x: 14, y: 14, width: 30, height: 40 },
+    });
+    expect(moveAnnotationByDelta(arrow, { x: 4, y: -6 })).toEqual({
+      ...arrow,
+      start: { x: 84, y: 14 },
+      end: { x: 124, y: 54 },
+    });
+    expect(moveAnnotationByDelta(text, { x: 4, y: -6 })).toEqual({
+      ...text,
+      position: { x: 16, y: 84 },
+    });
   });
 });
