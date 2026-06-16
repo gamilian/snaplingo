@@ -71,6 +71,8 @@ export default function ScreenshotSession() {
   const [session, setSession] = useState<CaptureSessionView | null>(null);
   const [startPoint, setStartPoint] = useState<Point | null>(null);
   const [selection, setSelection] = useState<LogicalRect | null>(null);
+  const [previewImageBase64, setPreviewImageBase64] = useState<string | null>(null);
+  const [isRenderingOutput, setIsRenderingOutput] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const monitor = session?.monitors[0] ?? null;
@@ -84,6 +86,8 @@ export default function ScreenshotSession() {
     setSession(null);
     setStartPoint(null);
     setSelection(null);
+    setPreviewImageBase64(null);
+    setIsRenderingOutput(false);
     setError(null);
   }, []);
 
@@ -105,6 +109,8 @@ export default function ScreenshotSession() {
     setMode(nextMode);
     setStartPoint(null);
     setSelection(null);
+    setPreviewImageBase64(null);
+    setIsRenderingOutput(false);
     setError(null);
 
     try {
@@ -116,6 +122,30 @@ export default function ScreenshotSession() {
       setStatus('error');
     }
   }, []);
+
+  const renderSelectionPreview = useCallback(
+    async (rect: LogicalRect) => {
+      if (!session) return;
+
+      setIsRenderingOutput(true);
+      setPreviewImageBase64(null);
+      setError(null);
+
+      try {
+        const base64 = await invoke<string>('render_capture_output', {
+          sessionId: session.id,
+          rect,
+        });
+        setPreviewImageBase64(base64);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        setStatus('error');
+      } finally {
+        setIsRenderingOutput(false);
+      }
+    },
+    [session],
+  );
 
   useEffect(() => {
     let disposed = false;
@@ -150,12 +180,18 @@ export default function ScreenshotSession() {
       if (event.key === 'Escape') {
         event.preventDefault();
         void cancelSession();
+      } else if (
+        status === 'preview' &&
+        (event.key === 'Enter' ||
+          ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'c'))
+      ) {
+        event.preventDefault();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cancelSession, isActive]);
+  }, [cancelSession, isActive, status]);
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (status !== 'selecting' && status !== 'preview') return;
@@ -164,6 +200,8 @@ export default function ScreenshotSession() {
     event.currentTarget.setPointerCapture(event.pointerId);
     setStartPoint(point);
     setSelection(normalizeSelection(point, point));
+    setPreviewImageBase64(null);
+    setIsRenderingOutput(false);
     setStatus('selecting');
   };
 
@@ -195,6 +233,7 @@ export default function ScreenshotSession() {
 
     setSelection(nextSelection);
     setStatus('preview');
+    void renderSelectionPreview(nextSelection);
   };
 
   const overlayClassName = useMemo(() => {
@@ -233,6 +272,14 @@ export default function ScreenshotSession() {
       {selection && (
         <>
           <DimMask rect={selection} />
+          {previewImageBase64 && status === 'preview' && (
+            <img
+              src={`data:image/png;base64,${previewImageBase64}`}
+              className="absolute object-fill"
+              style={rectStyle(selection)}
+              draggable={false}
+            />
+          )}
           <div
             className={`absolute border ${overlayClassName} bg-transparent`}
             style={rectStyle(selection)}
@@ -246,6 +293,16 @@ export default function ScreenshotSession() {
           >
             {sizeLabel}
           </div>
+          {isRenderingOutput && (
+            <div
+              className="absolute h-1 bg-white/80"
+              style={{
+                left: `${selection.x}px`,
+                top: `${selection.y + selection.height}px`,
+                width: `${selection.width}px`,
+              }}
+            />
+          )}
         </>
       )}
     </div>
