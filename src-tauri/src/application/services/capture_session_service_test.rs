@@ -29,6 +29,10 @@ mod tests {
     }
 
     fn make_backend() -> MockScreenshotBackend {
+        make_backend_with_scale(1.0)
+    }
+
+    fn make_backend_with_scale(scale_factor: f64) -> MockScreenshotBackend {
         MockScreenshotBackend {
             snapshot: MonitorSnapshot {
                 id: "primary".to_string(),
@@ -44,7 +48,7 @@ mod tests {
                     width: 10,
                     height: 10,
                 },
-                scale_factor: 1.0,
+                scale_factor,
                 png_data: vec![1, 2, 3],
             },
         }
@@ -70,5 +74,51 @@ mod tests {
         service.cancel_session(&view.id).unwrap();
 
         assert!(!service.has_session(&view.id));
+    }
+
+    #[tokio::test]
+    async fn converts_logical_rect_to_physical_rect() {
+        let service = CaptureSessionService::new(Arc::new(make_backend_with_scale(2.0)));
+        let view = service.create_session().await.unwrap();
+
+        let physical = service
+            .logical_rect_to_physical(
+                &view.id,
+                &crate::domain::capture::LogicalRect {
+                    x: 1.0,
+                    y: 2.0,
+                    width: 3.0,
+                    height: 4.0,
+                },
+            )
+            .unwrap();
+
+        assert_eq!(physical.x, 2);
+        assert_eq!(physical.y, 4);
+        assert_eq!(physical.width, 6);
+        assert_eq!(physical.height, 8);
+    }
+
+    #[tokio::test]
+    async fn clamps_logical_rect_to_monitor_bounds() {
+        let service = CaptureSessionService::new(Arc::new(make_backend_with_scale(2.0)));
+        let view = service.create_session().await.unwrap();
+
+        let physical = service
+            .logical_rect_to_physical(
+                &view.id,
+                &crate::domain::capture::LogicalRect {
+                    x: -1.0,
+                    y: -2.0,
+                    width: 4.0,
+                    height: 5.0,
+                },
+            )
+            .unwrap();
+
+        assert_eq!(physical.x, 0);
+        assert_eq!(physical.y, 0);
+        assert_eq!(physical.width, 6);
+        assert_eq!(physical.height, 6);
     }
 }

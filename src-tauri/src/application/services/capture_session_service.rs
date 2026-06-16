@@ -5,7 +5,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
 
-use crate::domain::capture::{CaptureSessionId, CaptureSessionView, MonitorSnapshotView};
+use crate::domain::capture::{
+    CaptureSessionId, CaptureSessionView, LogicalRect, MonitorSnapshotView, PhysicalRect,
+};
 use crate::error::{AppError, Result};
 use crate::infrastructure::system::screenshot::{MonitorSnapshot, ScreenshotBackend};
 
@@ -86,6 +88,23 @@ impl CaptureSessionService {
             .map(|sessions| sessions.contains_key(id))
             .unwrap_or(false)
     }
+
+    pub fn logical_rect_to_physical(
+        &self,
+        id: &CaptureSessionId,
+        rect: &LogicalRect,
+    ) -> Result<PhysicalRect> {
+        let session = self.get_session(id)?;
+        let snapshot = session
+            .snapshots
+            .iter()
+            .find(|snapshot| logical_rects_intersect(rect, &snapshot.logical_bounds))
+            .ok_or_else(|| {
+                AppError::System("Selection does not intersect any captured monitor".to_string())
+            })?;
+
+        logical_rect_to_snapshot_physical(rect, snapshot)
+    }
 }
 
 fn snapshot_to_view(snapshot: &MonitorSnapshot) -> MonitorSnapshotView {
@@ -105,4 +124,49 @@ fn generate_session_id() -> String {
         .unwrap_or_default();
     let counter = NEXT_SESSION_COUNTER.fetch_add(1, Ordering::Relaxed);
     format!("capture-{}-{}", timestamp, counter)
+}
+
+fn logical_rect_to_snapshot_physical(
+    rect: &LogicalRect,
+    snapshot: &MonitorSnapshot,
+) -> Result<PhysicalRect> {
+    let left = rect.x.max(snapshot.logical_bounds.x);
+    let top = rect.y.max(snapshot.logical_bounds.y);
+    let right =
+        (rect.x + rect.width).min(snapshot.logical_bounds.x + snapshot.logical_bounds.width);
+    let bottom =
+        (rect.y + rect.height).min(snapshot.logical_bounds.y + snapshot.logical_bounds.height);
+
+    if right <= left || bottom <= top {
+        return Err(AppError::System(
+            "Selection has no area inside captured monitor".to_string(),
+        ));
+    }
+
+    let scale = snapshot.scale_factor;
+    let relative_left = left - snapshot.logical_bounds.x;
+    let relative_top = top - snapshot.logical_bounds.y;
+    let relative_right = right - snapshot.logical_bounds.x;
+    let relative_bottom = bottom - snapshot.logical_bounds.y;
+
+    let physical_left = snapshot.physical_bounds.x + (relative_left * scale).floor() as i32;
+    let physical_top = snapshot.physical_bounds.y + (relative_top * scale).floor() as i32;
+    let physical_right = snapshot.physical_bounds.x + (relative_right * scale).ceil() as i32;
+    let physical_bottom = snapshot.physical_bounds.y + (relative_bottom * scale).ceil() as i32;
+
+    Ok(PhysicalRect {
+        x: physical_left,
+        y: physical_top,
+        width: (physical_right - physical_left) as u32,
+        height: (physical_bottom - physical_top) as u32,
+    })
+}
+
+fn logical_rects_intersect(a: &LogicalRect, b: &LogicalRect) -> bool {
+    let a_right = a.x + a.width;
+    let a_bottom = a.y + a.height;
+    let b_right = b.x + b.width;
+    let b_bottom = b.y + b.height;
+
+    a.x < b_right && a_right > b.x && a.y < b_bottom && a_bottom > b.y
 }
