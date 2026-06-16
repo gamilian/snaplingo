@@ -25,6 +25,12 @@ import {
   buildCaptureCandidates,
   getBestCandidateAtPoint,
 } from './captureCandidates';
+import {
+  addAnnotationToHistory,
+  emptyAnnotationHistory,
+  redoAnnotationHistory,
+  undoAnnotationHistory,
+} from './annotationHistory';
 import { saveCaptureSelection } from './captureActions';
 import { parseCaptureLaunchPayload } from './windowMode';
 import {
@@ -70,7 +76,7 @@ const EDGE_SNAP_THRESHOLD = 6;
 const KEYBOARD_NUDGE_STEP = 1;
 const KEYBOARD_FAST_NUDGE_STEP = 10;
 const TOOLBAR_GAP = 8;
-const TOOLBAR_SIZE = { width: 372, height: 36 };
+const TOOLBAR_SIZE = { width: 476, height: 36 };
 const MAGNIFIER_GAP = 14;
 const MAGNIFIER_SIZE = { width: 120, height: 96 };
 const MAGNIFIER_ZOOM = 4;
@@ -332,7 +338,7 @@ export default function ScreenshotSession({
   const [annotationGesture, setAnnotationGesture] =
     useState<AnnotationGesture | null>(null);
   const [draftAnnotation, setDraftAnnotation] = useState<AnnotationCommand | null>(null);
-  const [annotations, setAnnotations] = useState<AnnotationCommand[]>([]);
+  const [annotationHistory, setAnnotationHistory] = useState(emptyAnnotationHistory);
   const [previewImageBase64, setPreviewImageBase64] = useState<string | null>(null);
   const [cursorColor, setCursorColor] = useState<ColorSample | null>(null);
   const [sampleCanvasVersion, setSampleCanvasVersion] = useState(0);
@@ -341,6 +347,9 @@ export default function ScreenshotSession({
   const [hasStartedInitialSession, setHasStartedInitialSession] = useState(false);
 
   const isActive = status !== 'idle';
+  const annotations = annotationHistory.annotations;
+  const canUndoAnnotation = annotationHistory.annotations.length > 0;
+  const canRedoAnnotation = annotationHistory.undoneAnnotations.length > 0;
   const sizeLabel = selection
     ? `${Math.round(selection.width)} x ${Math.round(selection.height)}`
     : '';
@@ -416,7 +425,7 @@ export default function ScreenshotSession({
     setActiveAnnotationTool(null);
     setAnnotationGesture(null);
     setDraftAnnotation(null);
-    setAnnotations([]);
+    setAnnotationHistory(emptyAnnotationHistory());
     setPreviewImageBase64(null);
     setCursorColor(null);
     setSampleCanvasVersion(0);
@@ -450,7 +459,7 @@ export default function ScreenshotSession({
     setActiveAnnotationTool(null);
     setAnnotationGesture(null);
     setDraftAnnotation(null);
-    setAnnotations([]);
+    setAnnotationHistory(emptyAnnotationHistory());
     setPreviewImageBase64(null);
     setCursorColor(null);
     setSampleCanvasVersion(0);
@@ -595,6 +604,22 @@ export default function ScreenshotSession({
     }
   }, [annotations, onInactive, resetSessionState, selection, session]);
 
+  const undoAnnotation = useCallback(() => {
+    if (!selection || annotationHistory.annotations.length === 0) return;
+
+    const nextHistory = undoAnnotationHistory(annotationHistory);
+    setAnnotationHistory(nextHistory);
+    void renderSelectionPreview(selection, nextHistory.annotations);
+  }, [annotationHistory, renderSelectionPreview, selection]);
+
+  const redoAnnotation = useCallback(() => {
+    if (!selection || annotationHistory.undoneAnnotations.length === 0) return;
+
+    const nextHistory = redoAnnotationHistory(annotationHistory);
+    setAnnotationHistory(nextHistory);
+    void renderSelectionPreview(selection, nextHistory.annotations);
+  }, [annotationHistory, renderSelectionPreview, selection]);
+
   useEffect(() => {
     if (!initialMode || hasStartedInitialSession) return;
 
@@ -692,6 +717,24 @@ export default function ScreenshotSession({
         }
       } else if (
         status === 'preview' &&
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === 'z'
+      ) {
+        event.preventDefault();
+        if (event.shiftKey) {
+          redoAnnotation();
+        } else {
+          undoAnnotation();
+        }
+      } else if (
+        status === 'preview' &&
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === 'y'
+      ) {
+        event.preventDefault();
+        redoAnnotation();
+      } else if (
+        status === 'preview' &&
         (event.key === 'Enter' ||
           ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'c'))
       ) {
@@ -714,11 +757,13 @@ export default function ScreenshotSession({
     copySelection,
     activeAnnotationTool,
     annotationGesture,
+    redoAnnotation,
     isActive,
     renderSelectionPreview,
     selection,
     selectionBounds,
     status,
+    undoAnnotation,
   ]);
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -739,7 +784,7 @@ export default function ScreenshotSession({
     setActiveAnnotationTool(null);
     setAnnotationGesture(null);
     setDraftAnnotation(null);
-    setAnnotations([]);
+    setAnnotationHistory(emptyAnnotationHistory());
   };
 
   const applyEditGesture = useCallback(
@@ -856,9 +901,9 @@ export default function ScreenshotSession({
       setAnnotationGesture(null);
       setDraftAnnotation(null);
       if (isCommittedAnnotation(nextAnnotation)) {
-        const nextAnnotations = [...annotations, nextAnnotation];
-        setAnnotations(nextAnnotations);
-        void renderSelectionPreview(selection, nextAnnotations);
+        const nextHistory = addAnnotationToHistory(annotationHistory, nextAnnotation);
+        setAnnotationHistory(nextHistory);
+        void renderSelectionPreview(selection, nextHistory.annotations);
       }
       return;
     }
@@ -1102,6 +1147,26 @@ export default function ScreenshotSession({
               }}
               onPointerDown={(event) => event.stopPropagation()}
             >
+              <button
+                type="button"
+                className="h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50"
+                disabled={isRenderingOutput || !canUndoAnnotation}
+                title="Undo"
+                aria-label="Undo annotation"
+                onClick={undoAnnotation}
+              >
+                Undo
+              </button>
+              <button
+                type="button"
+                className="h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50"
+                disabled={isRenderingOutput || !canRedoAnnotation}
+                title="Redo"
+                aria-label="Redo annotation"
+                onClick={redoAnnotation}
+              >
+                Redo
+              </button>
               <button
                 type="button"
                 className={`h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50 ${
