@@ -1,7 +1,9 @@
 use base64::Engine;
 use tauri::State;
 
-use crate::domain::capture::{CaptureSessionId, CaptureSessionView, LogicalRect, PhysicalRect};
+use crate::domain::capture::{
+    CaptureOutputAction, CaptureSessionId, CaptureSessionView, LogicalRect, PhysicalRect,
+};
 
 #[tauri::command]
 pub async fn create_capture_session(
@@ -32,13 +34,51 @@ pub async fn render_capture_output(
     state: State<'_, crate::AppState>,
 ) -> Result<String, String> {
     let session_id = CaptureSessionId(session_id);
+    let png_data = render_capture_png(&session_id, &rect, &state)?;
+
+    Ok(base64::engine::general_purpose::STANDARD.encode(png_data))
+}
+
+#[tauri::command]
+pub async fn output_capture(
+    session_id: String,
+    rect: LogicalRect,
+    action: CaptureOutputAction,
+    state: State<'_, crate::AppState>,
+) -> Result<(), String> {
+    let session_id = CaptureSessionId(session_id);
+    let png_data = render_capture_png(&session_id, &rect, &state)?;
+
+    match action {
+        CaptureOutputAction::Save { path } => {
+            state
+                .capture_output_service
+                .save_png(&png_data, std::path::Path::new(&path))
+                .await
+                .map_err(|e| e.to_string())?;
+            Ok(())
+        }
+        CaptureOutputAction::Copy => Err(
+            "Copy output is not available until the clipboard image backend is wired".to_string(),
+        ),
+        CaptureOutputAction::Pin => {
+            Err("Pin output is not available until the pin window backend is wired".to_string())
+        }
+    }
+}
+
+fn render_capture_png(
+    session_id: &CaptureSessionId,
+    rect: &LogicalRect,
+    state: &crate::AppState,
+) -> Result<Vec<u8>, String> {
     let physical_rect = state
         .capture_session_service
-        .logical_rect_to_physical(&session_id, &rect)
+        .logical_rect_to_physical(session_id, rect)
         .map_err(|e| e.to_string())?;
     let session = state
         .capture_session_service
-        .get_session(&session_id)
+        .get_session(session_id)
         .map_err(|e| e.to_string())?;
     let snapshot = session
         .snapshots
@@ -46,12 +86,10 @@ pub async fn render_capture_output(
         .find(|snapshot| physical_rects_intersect(&physical_rect, &snapshot.physical_bounds))
         .ok_or_else(|| "Selection does not intersect any captured monitor".to_string())?;
     let crop_rect = snapshot_relative_crop_rect(&physical_rect, &snapshot.physical_bounds);
-    let png_data = state
+    state
         .image_composition_service
         .crop_png(&snapshot.png_data, &crop_rect)
-        .map_err(|e| e.to_string())?;
-
-    Ok(base64::engine::general_purpose::STANDARD.encode(png_data))
+        .map_err(|e| e.to_string())
 }
 
 fn snapshot_relative_crop_rect(
