@@ -14,7 +14,7 @@ pub use application::*;
 use std::sync::Arc;
 use parking_lot::Mutex as ParkingLotMutex;
 use std::path::PathBuf;
-use tauri::{Manager, Emitter};
+use tauri::Manager;
 use serde::{Deserialize, Serialize};
 
 // Phase 1, 2 & 3 imports
@@ -331,17 +331,10 @@ fn register_screenshot_shortcut(app: &tauri::AppHandle) -> Result<()> {
         log::info!("Screenshot shortcut triggered!");
 
         let app = app_clone.clone();
-
-        // Emit event to frontend to trigger screenshot workflow
-        if let Some(window) = app.get_webview_window("main") {
-            if let Err(e) = window.emit("hotkey-triggered", "screenshot") {
-                log::error!("Failed to emit hotkey-triggered event: {}", e);
-            } else {
-                log::info!("Screenshot hotkey event emitted successfully");
-            }
-        } else {
-            log::error!("Main window not found");
-        }
+        tauri::async_runtime::spawn(commands::open_capture_window_from_shortcut(
+            app,
+            "screenshot",
+        ));
     })?;
 
     Ok(())
@@ -355,17 +348,10 @@ fn register_screenshot_ocr_shortcut(app: &tauri::AppHandle) -> Result<()> {
         log::info!("Screenshot OCR shortcut triggered!");
 
         let app = app_clone.clone();
-
-        // Emit event to frontend to trigger screenshot OCR workflow
-        if let Some(window) = app.get_webview_window("main") {
-            if let Err(e) = window.emit("hotkey-triggered", "screenshot-ocr") {
-                log::error!("Failed to emit hotkey-triggered event: {}", e);
-            } else {
-                log::info!("Screenshot OCR hotkey event emitted successfully");
-            }
-        } else {
-            log::error!("Main window not found");
-        }
+        tauri::async_runtime::spawn(commands::open_capture_window_from_shortcut(
+            app,
+            "screenshot-ocr",
+        ));
     })?;
 
     Ok(())
@@ -427,6 +413,7 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       commands::open_result_window,
       commands::trigger_screenshot,
+      commands::open_capture_window,
       commands::create_screenshot_window,
       commands::create_screenshot_window_simple,
       commands::close_screenshot_window,
@@ -449,6 +436,7 @@ pub fn run() {
       commands::capture_region,
       commands::save_screenshot,
       commands::create_capture_session,
+      commands::get_capture_session,
       commands::cancel_capture_session,
       commands::render_capture_output,
       commands::output_capture,

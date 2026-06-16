@@ -25,6 +25,13 @@ export interface CaptureSessionView {
   monitors: MonitorSnapshotView[];
 }
 
+export type CaptureMode = 'screenshot' | 'screenshot-ocr' | 'screenshot-translate';
+
+export interface CaptureLaunch {
+  mode: CaptureMode;
+  sessionId?: string;
+}
+
 export interface Point {
   x: number;
   y: number;

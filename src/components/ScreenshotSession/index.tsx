@@ -1,22 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { useAppStore } from '../../stores/appStore';
 import { normalizeSelection } from './selection';
-import type { CaptureSessionView, LogicalRect, OcrResult, Point } from './types';
+import { parseCaptureLaunchPayload } from './windowMode';
+import type {
+  CaptureMode,
+  CaptureSessionView,
+  LogicalRect,
+  OcrResult,
+  Point,
+} from './types';
 
-type CaptureMode = 'screenshot' | 'screenshot-ocr' | 'screenshot-translate';
 type SessionStatus = 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
 
 const MIN_SELECTION_SIZE = 10;
-
-function isCaptureMode(value: unknown): value is CaptureMode {
-  return (
-    value === 'screenshot' ||
-    value === 'screenshot-ocr' ||
-    value === 'screenshot-translate'
-  );
-}
 
 function rectStyle(rect: LogicalRect) {
   return {
@@ -66,7 +63,17 @@ function DimMask({ rect }: { rect: LogicalRect }) {
   );
 }
 
-export default function ScreenshotSession() {
+interface ScreenshotSessionProps {
+  initialMode?: CaptureMode;
+  initialSessionId?: string;
+  onInactive?: () => void;
+}
+
+export default function ScreenshotSession({
+  initialMode,
+  initialSessionId,
+  onInactive,
+}: ScreenshotSessionProps) {
   const [status, setStatus] = useState<SessionStatus>('idle');
   const [mode, setMode] = useState<CaptureMode>('screenshot');
   const [session, setSession] = useState<CaptureSessionView | null>(null);
@@ -75,8 +82,7 @@ export default function ScreenshotSession() {
   const [previewImageBase64, setPreviewImageBase64] = useState<string | null>(null);
   const [isRenderingOutput, setIsRenderingOutput] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const setSourceText = useAppStore((state) => state.setSourceText);
-  const showResultWindow = useAppStore((state) => state.showResultWindow);
+  const [hasStartedInitialSession, setHasStartedInitialSession] = useState(false);
 
   const monitor = session?.monitors[0] ?? null;
   const isActive = status !== 'idle';
@@ -105,9 +111,11 @@ export default function ScreenshotSession() {
         console.error('Failed to cancel capture session:', err);
       }
     }
-  }, [resetSessionState, session?.id]);
 
-  const startSession = useCallback(async (nextMode: CaptureMode) => {
+    onInactive?.();
+  }, [onInactive, resetSessionState, session?.id]);
+
+  const startSession = useCallback(async (nextMode: CaptureMode, sessionId?: string) => {
     setStatus('loading');
     setMode(nextMode);
     setStartPoint(null);
@@ -117,7 +125,9 @@ export default function ScreenshotSession() {
     setError(null);
 
     try {
-      const nextSession = await invoke<CaptureSessionView>('create_capture_session');
+      const nextSession = sessionId
+        ? await invoke<CaptureSessionView>('get_capture_session', { sessionId })
+        : await invoke<CaptureSessionView>('create_capture_session');
       setSession(nextSession);
       setStatus('selecting');
     } catch (err) {
@@ -146,10 +156,10 @@ export default function ScreenshotSession() {
             sessionId: session.id,
             rect,
           });
-          setSourceText(ocrResult.text);
-          showResultWindow();
+          await invoke('open_result_window', { text: ocrResult.text });
           await invoke('cancel_capture_session', { sessionId: session.id });
           resetSessionState();
+          onInactive?.();
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
@@ -158,16 +168,24 @@ export default function ScreenshotSession() {
         setIsRenderingOutput(false);
       }
     },
-    [mode, resetSessionState, session, setSourceText, showResultWindow],
+    [mode, onInactive, resetSessionState, session],
   );
+
+  useEffect(() => {
+    if (!initialMode || hasStartedInitialSession) return;
+
+    setHasStartedInitialSession(true);
+    void startSession(initialMode, initialSessionId);
+  }, [hasStartedInitialSession, initialMode, initialSessionId, startSession]);
 
   useEffect(() => {
     let disposed = false;
     let unlisten: (() => void) | undefined;
 
     listen<unknown>('hotkey-triggered', (event) => {
-      if (isCaptureMode(event.payload)) {
-        void startSession(event.payload);
+      const launch = parseCaptureLaunchPayload(event.payload);
+      if (launch) {
+        void startSession(launch.mode, launch.sessionId);
       }
     })
       .then((nextUnlisten) => {

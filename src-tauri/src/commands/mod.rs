@@ -16,7 +16,7 @@ pub use workflow_commands::*;
 pub use screenshot_window_commands::*;
 pub use capture_session_commands::*;
 
-use tauri::{Emitter, Manager};
+use tauri::{Emitter, Manager, State};
 
 #[tauri::command]
 pub fn open_result_window(
@@ -35,13 +35,9 @@ pub fn open_result_window(
 }
 
 #[tauri::command]
-pub fn trigger_screenshot(app: tauri::AppHandle) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window("main") {
-        window
-            .emit("hotkey-triggered", "screenshot")
-            .map_err(|e| e.to_string())?;
-        Ok(())
-    } else {
-        Err("Main window not found".to_string())
-    }
+pub async fn trigger_screenshot(
+    app: tauri::AppHandle,
+    state: State<'_, crate::AppState>,
+) -> Result<(), String> {
+    open_capture_window_for_mode(&app, &state, "screenshot").await
 }
