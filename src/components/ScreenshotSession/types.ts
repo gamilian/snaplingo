@@ -66,4 +66,12 @@ export interface RectangleAnnotationCommand {
   stroke_width: number;
 }
 
-export type AnnotationCommand = RectangleAnnotationCommand;
+export interface ArrowAnnotationCommand {
+  type: 'arrow';
+  start: Point;
+  end: Point;
+  color: [number, number, number, number];
+  stroke_width: number;
+}
+
+export type AnnotationCommand = RectangleAnnotationCommand | ArrowAnnotationCommand;

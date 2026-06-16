@@ -1,6 +1,7 @@
+use std::f64::consts::PI;
 use std::io::Cursor;
 
-use crate::domain::capture::PhysicalRect;
+use crate::domain::capture::{PhysicalPoint, PhysicalRect};
 use crate::error::{AppError, Result};
 
 pub struct PngPlacement<'a> {
@@ -9,10 +10,19 @@ pub struct PngPlacement<'a> {
     pub destination_rect: PhysicalRect,
 }
 
-pub struct ImageAnnotation {
-    pub rect: PhysicalRect,
-    pub color: [u8; 4],
-    pub stroke_width: u32,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ImageAnnotation {
+    Rectangle {
+        rect: PhysicalRect,
+        color: [u8; 4],
+        stroke_width: u32,
+    },
+    Arrow {
+        start: PhysicalPoint,
+        end: PhysicalPoint,
+        color: [u8; 4],
+        stroke_width: u32,
+    },
 }
 
 pub struct ImageCompositionService;
@@ -147,7 +157,7 @@ impl ImageCompositionService {
             );
         }
         for annotation in annotations {
-            draw_rectangle_annotation(&mut output, annotation);
+            draw_annotation(&mut output, annotation);
         }
 
         let mut output_png = Vec::new();
@@ -158,19 +168,40 @@ impl ImageCompositionService {
     }
 }
 
-fn draw_rectangle_annotation(output: &mut image::RgbaImage, annotation: &ImageAnnotation) {
-    if annotation.rect.width == 0 || annotation.rect.height == 0 {
+fn draw_annotation(output: &mut image::RgbaImage, annotation: &ImageAnnotation) {
+    match annotation {
+        ImageAnnotation::Rectangle {
+            rect,
+            color,
+            stroke_width,
+        } => draw_rectangle_annotation(output, rect, *color, *stroke_width),
+        ImageAnnotation::Arrow {
+            start,
+            end,
+            color,
+            stroke_width,
+        } => draw_arrow_annotation(output, start, end, *color, *stroke_width),
+    }
+}
+
+fn draw_rectangle_annotation(
+    output: &mut image::RgbaImage,
+    rect: &PhysicalRect,
+    color: [u8; 4],
+    stroke_width: u32,
+) {
+    if rect.width == 0 || rect.height == 0 {
         return;
     }
 
-    let stroke_width = annotation.stroke_width.max(1);
-    let color = image::Rgba(annotation.color);
+    let stroke_width = stroke_width.max(1);
+    let color = image::Rgba(color);
     let output_width = output.width() as i64;
     let output_height = output.height() as i64;
-    let left = annotation.rect.x as i64;
-    let top = annotation.rect.y as i64;
-    let right = left + annotation.rect.width as i64 - 1;
-    let bottom = top + annotation.rect.height as i64 - 1;
+    let left = rect.x as i64;
+    let top = rect.y as i64;
+    let right = left + rect.width as i64 - 1;
+    let bottom = top + rect.height as i64 - 1;
 
     for stroke in 0..stroke_width as i64 {
         draw_horizontal_line(
@@ -209,6 +240,108 @@ fn draw_rectangle_annotation(output: &mut image::RgbaImage, annotation: &ImageAn
             output_height,
             color,
         );
+    }
+}
+
+fn draw_arrow_annotation(
+    output: &mut image::RgbaImage,
+    start: &PhysicalPoint,
+    end: &PhysicalPoint,
+    color: [u8; 4],
+    stroke_width: u32,
+) {
+    let color = image::Rgba(color);
+    let stroke_width = stroke_width.max(1);
+    draw_line(output, start.x, start.y, end.x, end.y, color, stroke_width);
+
+    let dx = (end.x - start.x) as f64;
+    let dy = (end.y - start.y) as f64;
+    let length = dx.hypot(dy);
+    if length <= f64::EPSILON {
+        return;
+    }
+
+    let head_length = ((stroke_width as f64) * 6.0).max(6.0).min(length * 0.8);
+    let line_angle = dy.atan2(dx);
+    let head_angle = 35.0_f64.to_radians();
+    for wing_angle in [line_angle + PI - head_angle, line_angle + PI + head_angle] {
+        let wing_end = PhysicalPoint {
+            x: (end.x as f64 + wing_angle.cos() * head_length).round() as i32,
+            y: (end.y as f64 + wing_angle.sin() * head_length).round() as i32,
+        };
+        draw_line(
+            output,
+            end.x,
+            end.y,
+            wing_end.x,
+            wing_end.y,
+            color,
+            stroke_width,
+        );
+    }
+}
+
+fn draw_line(
+    output: &mut image::RgbaImage,
+    start_x: i32,
+    start_y: i32,
+    end_x: i32,
+    end_y: i32,
+    color: image::Rgba<u8>,
+    stroke_width: u32,
+) {
+    let mut x = start_x;
+    let mut y = start_y;
+    let dx = (end_x - start_x).abs();
+    let sx = if start_x < end_x { 1 } else { -1 };
+    let dy = -(end_y - start_y).abs();
+    let sy = if start_y < end_y { 1 } else { -1 };
+    let mut err = dx + dy;
+
+    loop {
+        draw_stroked_point(output, x, y, color, stroke_width);
+        if x == end_x && y == end_y {
+            break;
+        }
+        let e2 = err * 2;
+        if e2 >= dy {
+            err += dy;
+            x += sx;
+        }
+        if e2 <= dx {
+            err += dx;
+            y += sy;
+        }
+    }
+}
+
+fn draw_stroked_point(
+    output: &mut image::RgbaImage,
+    x: i32,
+    y: i32,
+    color: image::Rgba<u8>,
+    stroke_width: u32,
+) {
+    let stroke_width = stroke_width.max(1) as i32;
+    let min_offset = -(stroke_width / 2);
+    let max_offset = (stroke_width - 1) / 2;
+
+    for offset_y in min_offset..=max_offset {
+        for offset_x in min_offset..=max_offset {
+            put_pixel_if_in_bounds(output, x + offset_x, y + offset_y, color);
+        }
+    }
+}
+
+fn put_pixel_if_in_bounds(output: &mut image::RgbaImage, x: i32, y: i32, color: image::Rgba<u8>) {
+    if x < 0 || y < 0 {
+        return;
+    }
+
+    let x = x as u32;
+    let y = y as u32;
+    if x < output.width() && y < output.height() {
+        output.put_pixel(x, y, color);
     }
 }
 

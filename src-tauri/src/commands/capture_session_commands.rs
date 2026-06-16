@@ -8,8 +8,8 @@ use tauri::{
 
 use crate::application::services::image_composition_service::{ImageAnnotation, PngPlacement};
 use crate::domain::capture::{
-    AnnotationCommand, CaptureOutputAction, CaptureSessionId, CaptureSessionView, LogicalRect,
-    MonitorSnapshotView, PhysicalRect, PinnedImageView,
+    AnnotationCommand, CaptureOutputAction, CaptureSessionId, CaptureSessionView, LogicalPoint,
+    LogicalRect, MonitorSnapshotView, PhysicalPoint, PhysicalRect, PinnedImageView,
 };
 use crate::domain::ocr::{OcrRequest, OcrResult};
 use crate::infrastructure::system::screenshot::MonitorSnapshot;
@@ -385,8 +385,19 @@ fn image_annotations_from_commands(
                 rect,
                 color,
                 stroke_width,
-            } => Ok(ImageAnnotation {
+            } => Ok(ImageAnnotation::Rectangle {
                 rect: scaled_logical_rect_relative_to(rect, &annotation_origin, output_scale)?,
+                color: *color,
+                stroke_width: ((*stroke_width).max(1) as f64 * output_scale).ceil() as u32,
+            }),
+            AnnotationCommand::Arrow {
+                start,
+                end,
+                color,
+                stroke_width,
+            } => Ok(ImageAnnotation::Arrow {
+                start: scaled_logical_point_relative_to(start, &annotation_origin, output_scale)?,
+                end: scaled_logical_point_relative_to(end, &annotation_origin, output_scale)?,
                 color: *color,
                 stroke_width: ((*stroke_width).max(1) as f64 * output_scale).ceil() as u32,
             }),
@@ -545,6 +556,24 @@ fn scaled_logical_rect_relative_to(
     })
 }
 
+fn scaled_logical_point_relative_to(
+    point: &LogicalPoint,
+    origin: &LogicalRect,
+    scale: f64,
+) -> Result<PhysicalPoint, String> {
+    let x = ((point.x - origin.x) * scale).round();
+    let y = ((point.y - origin.y) * scale).round();
+
+    if x < 0.0 || y < 0.0 {
+        return Err("Annotation has invalid scaled capture point".to_string());
+    }
+
+    Ok(PhysicalPoint {
+        x: x as i32,
+        y: y as i32,
+    })
+}
+
 fn scaled_extent(value: f64, scale: f64) -> Result<u32, String> {
     let scaled = (value * scale).ceil();
     if scaled <= 0.0 {
@@ -556,8 +585,10 @@ fn scaled_extent(value: f64, scale: f64) -> Result<u32, String> {
 
 #[cfg(test)]
 mod tests {
+    use crate::application::services::image_composition_service::ImageAnnotation;
     use crate::domain::capture::{
-        AnnotationCommand, LogicalRect, MonitorSnapshotView, PhysicalRect,
+        AnnotationCommand, LogicalPoint, LogicalRect, MonitorSnapshotView, PhysicalPoint,
+        PhysicalRect,
     };
     use crate::infrastructure::system::screenshot::MonitorSnapshot;
 
@@ -740,16 +771,24 @@ mod tests {
     #[test]
     fn scales_selection_local_annotations_to_output_pixels() {
         let annotations = super::image_annotations_from_commands(
-            &[AnnotationCommand::Rectangle {
-                rect: LogicalRect {
-                    x: 1.0,
-                    y: 2.0,
-                    width: 3.0,
-                    height: 4.0,
+            &[
+                AnnotationCommand::Rectangle {
+                    rect: LogicalRect {
+                        x: 1.0,
+                        y: 2.0,
+                        width: 3.0,
+                        height: 4.0,
+                    },
+                    color: [255, 77, 79, 255],
+                    stroke_width: 2,
                 },
-                color: [255, 77, 79, 255],
-                stroke_width: 2,
-            }],
+                AnnotationCommand::Arrow {
+                    start: LogicalPoint { x: 2.0, y: 3.0 },
+                    end: LogicalPoint { x: 5.0, y: 7.0 },
+                    color: [255, 77, 79, 255],
+                    stroke_width: 2,
+                },
+            ],
             &LogicalRect {
                 x: 100.0,
                 y: 200.0,
@@ -760,17 +799,29 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(annotations.len(), 1);
+        assert_eq!(annotations.len(), 2);
         assert_eq!(
-            annotations[0].rect,
-            PhysicalRect {
-                x: 2,
-                y: 4,
-                width: 6,
-                height: 8,
+            annotations[0],
+            ImageAnnotation::Rectangle {
+                rect: PhysicalRect {
+                    x: 2,
+                    y: 4,
+                    width: 6,
+                    height: 8,
+                },
+                color: [255, 77, 79, 255],
+                stroke_width: 4,
             }
         );
-        assert_eq!(annotations[0].stroke_width, 4);
+        assert_eq!(
+            annotations[1],
+            ImageAnnotation::Arrow {
+                start: PhysicalPoint { x: 4, y: 6 },
+                end: PhysicalPoint { x: 10, y: 14 },
+                color: [255, 77, 79, 255],
+                stroke_width: 4,
+            }
+        );
     }
 
     #[test]

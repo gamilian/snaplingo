@@ -46,7 +46,7 @@ import type {
 } from './types';
 
 type SessionStatus = 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
-type AnnotationTool = 'rectangle';
+type AnnotationTool = 'rectangle' | 'arrow';
 type EditGesture =
   | {
       type: 'move';
@@ -70,7 +70,7 @@ const EDGE_SNAP_THRESHOLD = 6;
 const KEYBOARD_NUDGE_STEP = 1;
 const KEYBOARD_FAST_NUDGE_STEP = 10;
 const TOOLBAR_GAP = 8;
-const TOOLBAR_SIZE = { width: 320, height: 36 };
+const TOOLBAR_SIZE = { width: 372, height: 36 };
 const MAGNIFIER_GAP = 14;
 const MAGNIFIER_SIZE = { width: 120, height: 96 };
 const MAGNIFIER_ZOOM = 4;
@@ -131,6 +131,65 @@ function rectangleAnnotation(rect: LogicalRect): AnnotationCommand {
     color: [255, 77, 79, 255],
     stroke_width: 2,
   };
+}
+
+function arrowAnnotation(start: Point, end: Point): AnnotationCommand {
+  return {
+    type: 'arrow',
+    start,
+    end,
+    color: [255, 77, 79, 255],
+    stroke_width: 2,
+  };
+}
+
+function annotationFromGesture(
+  tool: AnnotationTool,
+  startPoint: Point,
+  currentPoint: Point,
+): AnnotationCommand {
+  if (tool === 'rectangle') {
+    return rectangleAnnotation(normalizeSelection(startPoint, currentPoint));
+  }
+
+  return arrowAnnotation(startPoint, currentPoint);
+}
+
+function isCommittedAnnotation(annotation: AnnotationCommand) {
+  if (annotation.type === 'rectangle') {
+    return (
+      annotation.rect.width >= MIN_ANNOTATION_SIZE &&
+      annotation.rect.height >= MIN_ANNOTATION_SIZE
+    );
+  }
+
+  return (
+    Math.hypot(
+      annotation.end.x - annotation.start.x,
+      annotation.end.y - annotation.start.y,
+    ) >= MIN_ANNOTATION_SIZE
+  );
+}
+
+function arrowHeadPoints(start: Point, end: Point) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const length = Math.hypot(dx, dy);
+  if (length === 0) return null;
+
+  const headLength = Math.min(Math.max(6, 2 * 6), length * 0.8);
+  const lineAngle = Math.atan2(dy, dx);
+  const headAngle = (35 * Math.PI) / 180;
+  const wingA = {
+    x: end.x + Math.cos(lineAngle + Math.PI - headAngle) * headLength,
+    y: end.y + Math.sin(lineAngle + Math.PI - headAngle) * headLength,
+  };
+  const wingB = {
+    x: end.x + Math.cos(lineAngle + Math.PI + headAngle) * headLength,
+    y: end.y + Math.sin(lineAngle + Math.PI + headAngle) * headLength,
+  };
+
+  return `${end.x},${end.y} ${wingA.x},${wingA.y} ${wingB.x},${wingB.y}`;
 }
 
 function DimMask({ rect }: { rect: LogicalRect }) {
@@ -388,6 +447,10 @@ export default function ScreenshotSession({
     setSelection(null);
     setHoverSelection(null);
     setEditGesture(null);
+    setActiveAnnotationTool(null);
+    setAnnotationGesture(null);
+    setDraftAnnotation(null);
+    setAnnotations([]);
     setPreviewImageBase64(null);
     setCursorColor(null);
     setSampleCanvasVersion(0);
@@ -745,7 +808,11 @@ export default function ScreenshotSession({
         selection,
       );
       setDraftAnnotation(
-        rectangleAnnotation(normalizeSelection(annotationGesture.startPoint, localPoint)),
+        annotationFromGesture(
+          annotationGesture.tool,
+          annotationGesture.startPoint,
+          localPoint,
+        ),
       );
       return;
     }
@@ -781,11 +848,15 @@ export default function ScreenshotSession({
         { x: point.x - selection.x, y: point.y - selection.y },
         selection,
       );
-      const nextRect = normalizeSelection(annotationGesture.startPoint, localPoint);
+      const nextAnnotation = annotationFromGesture(
+        annotationGesture.tool,
+        annotationGesture.startPoint,
+        localPoint,
+      );
       setAnnotationGesture(null);
       setDraftAnnotation(null);
-      if (nextRect.width >= MIN_ANNOTATION_SIZE && nextRect.height >= MIN_ANNOTATION_SIZE) {
-        const nextAnnotations = [...annotations, rectangleAnnotation(nextRect)];
+      if (isCommittedAnnotation(nextAnnotation)) {
+        const nextAnnotations = [...annotations, nextAnnotation];
         setAnnotations(nextAnnotations);
         void renderSelectionPreview(selection, nextAnnotations);
       }
@@ -841,16 +912,18 @@ export default function ScreenshotSession({
       selectionBounds,
     );
     setCursorPoint(point);
-    if (activeAnnotationTool === 'rectangle') {
+    if (activeAnnotationTool) {
       const localPoint = clampPointToRect(
         { x: point.x - selection.x, y: point.y - selection.y },
         selection,
       );
       setAnnotationGesture({
-        tool: 'rectangle',
+        tool: activeAnnotationTool,
         startPoint: localPoint,
       });
-      setDraftAnnotation(rectangleAnnotation(normalizeSelection(localPoint, localPoint)));
+      setDraftAnnotation(
+        annotationFromGesture(activeAnnotationTool, localPoint, localPoint),
+      );
       return;
     }
 
@@ -862,8 +935,8 @@ export default function ScreenshotSession({
     setPreviewImageBase64(null);
   };
 
-  const toggleRectangleTool = () => {
-    setActiveAnnotationTool((tool) => (tool === 'rectangle' ? null : 'rectangle'));
+  const toggleAnnotationTool = (nextTool: AnnotationTool) => {
+    setActiveAnnotationTool((tool) => (tool === nextTool ? null : nextTool));
     setAnnotationGesture(null);
     setDraftAnnotation(null);
   };
@@ -972,10 +1045,34 @@ export default function ScreenshotSession({
               )}
             />
           )}
+          {draftAnnotation?.type === 'arrow' && (
+            <svg
+              className="pointer-events-none absolute overflow-visible text-red-400"
+              style={rectStyle(selectionViewportRect)}
+              viewBox={`0 0 ${selectionViewportRect.width} ${selectionViewportRect.height}`}
+              fill="none"
+            >
+              <line
+                x1={draftAnnotation.start.x}
+                y1={draftAnnotation.start.y}
+                x2={draftAnnotation.end.x}
+                y2={draftAnnotation.end.y}
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+              />
+              {arrowHeadPoints(draftAnnotation.start, draftAnnotation.end) && (
+                <polygon
+                  points={arrowHeadPoints(draftAnnotation.start, draftAnnotation.end) ?? ''}
+                  fill="currentColor"
+                />
+              )}
+            </svg>
+          )}
           <div
             className={`absolute border ${overlayClassName} bg-transparent ${
               status === 'preview'
-                ? activeAnnotationTool === 'rectangle'
+                ? activeAnnotationTool
                   ? 'cursor-crosshair'
                   : 'cursor-move'
                 : ''
@@ -1007,13 +1104,27 @@ export default function ScreenshotSession({
             >
               <button
                 type="button"
-                className="h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50"
+                className={`h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50 ${
+                  activeAnnotationTool === 'rectangle' ? 'bg-white/15' : ''
+                }`}
                 disabled={isRenderingOutput}
                 title="Rectangle"
                 aria-label="Draw rectangle annotation"
-                onClick={toggleRectangleTool}
+                onClick={() => toggleAnnotationTool('rectangle')}
               >
                 Rect
+              </button>
+              <button
+                type="button"
+                className={`h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50 ${
+                  activeAnnotationTool === 'arrow' ? 'bg-white/15' : ''
+                }`}
+                disabled={isRenderingOutput}
+                title="Arrow"
+                aria-label="Draw arrow annotation"
+                onClick={() => toggleAnnotationTool('arrow')}
+              >
+                Arrow
               </button>
               <button
                 type="button"
