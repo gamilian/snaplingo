@@ -7,6 +7,9 @@ import {
   normalizeSelection,
   nudgeSelection,
   resizeSelectionByHandle,
+  snapMovedSelectionToRects,
+  snapPointToRects,
+  snapResizedSelectionToRects,
   type ArrowKey,
   type SelectionHandle,
 } from './selection';
@@ -56,6 +59,7 @@ type EditGesture =
     };
 
 const MIN_SELECTION_SIZE = 10;
+const EDGE_SNAP_THRESHOLD = 6;
 const KEYBOARD_NUDGE_STEP = 1;
 const KEYBOARD_FAST_NUDGE_STEP = 10;
 const TOOLBAR_GAP = 8;
@@ -244,6 +248,10 @@ export default function ScreenshotSession({
 
     return buildCaptureCandidates(session.monitors, session.candidates);
   }, [session]);
+  const snapTargetRects = useMemo(
+    () => captureCandidates.map((candidate) => candidate.rect),
+    [captureCandidates],
+  );
   const selectionBounds = useMemo<LogicalRect | null>(() => {
     if (!session) return null;
 
@@ -597,10 +605,11 @@ export default function ScreenshotSession({
       { x: event.clientX, y: event.clientY },
       selectionBounds,
     );
+    const snappedPoint = snapPointToRects(point, snapTargetRects, EDGE_SNAP_THRESHOLD);
     setCursorPoint(point);
     event.currentTarget.setPointerCapture(event.pointerId);
-    setStartPoint(point);
-    setSelection(normalizeSelection(point, point));
+    setStartPoint(snappedPoint);
+    setSelection(normalizeSelection(snappedPoint, snappedPoint));
     setPreviewImageBase64(null);
     setIsRenderingOutput(false);
     setStatus('selecting');
@@ -616,18 +625,38 @@ export default function ScreenshotSession({
       };
 
       if (gesture.type === 'move') {
-        return moveSelectionByDelta(gesture.startSelection, delta, selectionBounds);
+        const movedSelection = moveSelectionByDelta(
+          gesture.startSelection,
+          delta,
+          selectionBounds,
+        );
+
+        return snapMovedSelectionToRects(
+          movedSelection,
+          snapTargetRects,
+          selectionBounds,
+          EDGE_SNAP_THRESHOLD,
+        );
       }
 
-      return resizeSelectionByHandle(
+      const resizedSelection = resizeSelectionByHandle(
         gesture.startSelection,
         gesture.handle,
         delta,
         selectionBounds,
         MIN_SELECTION_SIZE,
       );
+
+      return snapResizedSelectionToRects(
+        resizedSelection,
+        gesture.handle,
+        snapTargetRects,
+        selectionBounds,
+        MIN_SELECTION_SIZE,
+        EDGE_SNAP_THRESHOLD,
+      );
     },
-    [selectionBounds],
+    [selectionBounds, snapTargetRects],
   );
 
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -655,7 +684,12 @@ export default function ScreenshotSession({
 
     if (!startPoint || status !== 'selecting') return;
 
-    setSelection(normalizeSelection(startPoint, point));
+    setSelection(
+      normalizeSelection(
+        startPoint,
+        snapPointToRects(point, snapTargetRects, EDGE_SNAP_THRESHOLD),
+      ),
+    );
   };
 
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -678,7 +712,10 @@ export default function ScreenshotSession({
 
     if (!startPoint || status !== 'selecting') return;
 
-    const nextSelection = normalizeSelection(startPoint, point);
+    const nextSelection = normalizeSelection(
+      startPoint,
+      snapPointToRects(point, snapTargetRects, EDGE_SNAP_THRESHOLD),
+    );
     setStartPoint(null);
 
     if (

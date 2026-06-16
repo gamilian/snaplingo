@@ -89,6 +89,85 @@ export function nudgeSelection(
   return moveSelectionByDelta(rect, deltaByDirection[direction], bounds);
 }
 
+export function snapPointToRects(
+  point: Point,
+  targets: LogicalRect[],
+  threshold: number,
+): Point {
+  return {
+    x: snapValueToEdges(point.x, targetXEdges(targets), threshold),
+    y: snapValueToEdges(point.y, targetYEdges(targets), threshold),
+  };
+}
+
+export function snapMovedSelectionToRects(
+  rect: LogicalRect,
+  targets: LogicalRect[],
+  bounds: LogicalRect,
+  threshold: number,
+): LogicalRect {
+  const xOffset = nearestEdgeOffset(
+    [rect.x, rect.x + rect.width],
+    targetXEdges(targets),
+    threshold,
+  );
+  const yOffset = nearestEdgeOffset(
+    [rect.y, rect.y + rect.height],
+    targetYEdges(targets),
+    threshold,
+  );
+
+  return {
+    ...rect,
+    x: clamp(rect.x + xOffset, bounds.x, bounds.x + bounds.width - rect.width),
+    y: clamp(rect.y + yOffset, bounds.y, bounds.y + bounds.height - rect.height),
+  };
+}
+
+export function snapResizedSelectionToRects(
+  rect: LogicalRect,
+  handle: SelectionHandle,
+  targets: LogicalRect[],
+  bounds: LogicalRect,
+  minSize: number,
+  threshold: number,
+): LogicalRect {
+  let left = rect.x;
+  let top = rect.y;
+  let right = rect.x + rect.width;
+  let bottom = rect.y + rect.height;
+  const xEdges = targetXEdges(targets);
+  const yEdges = targetYEdges(targets);
+
+  if (handle.includes('w')) {
+    left = clamp(snapValueToEdges(left, xEdges, threshold), bounds.x, right - minSize);
+  }
+  if (handle.includes('e')) {
+    right = clamp(
+      snapValueToEdges(right, xEdges, threshold),
+      left + minSize,
+      bounds.x + bounds.width,
+    );
+  }
+  if (handle.includes('n')) {
+    top = clamp(snapValueToEdges(top, yEdges, threshold), bounds.y, bottom - minSize);
+  }
+  if (handle.includes('s')) {
+    bottom = clamp(
+      snapValueToEdges(bottom, yEdges, threshold),
+      top + minSize,
+      bounds.y + bounds.height,
+    );
+  }
+
+  return {
+    x: left,
+    y: top,
+    width: right - left,
+    height: bottom - top,
+  };
+}
+
 export function getToolbarPosition(
   rect: LogicalRect,
   bounds: LogicalRect,
@@ -106,4 +185,35 @@ export function getToolbarPosition(
     x: clamp(preferredX, bounds.x, boundsRight - toolbarSize.width),
     y: hasRoomBelow ? belowY : clamp(aboveY, bounds.y, boundsBottom - toolbarSize.height),
   };
+}
+
+function targetXEdges(targets: LogicalRect[]) {
+  return targets.flatMap((target) => [target.x, target.x + target.width]);
+}
+
+function targetYEdges(targets: LogicalRect[]) {
+  return targets.flatMap((target) => [target.y, target.y + target.height]);
+}
+
+function snapValueToEdges(value: number, edges: number[], threshold: number) {
+  const offset = nearestEdgeOffset([value], edges, threshold);
+  return value + offset;
+}
+
+function nearestEdgeOffset(values: number[], edges: number[], threshold: number) {
+  let bestOffset = 0;
+  let bestDistance = threshold;
+
+  values.forEach((value) => {
+    edges.forEach((edge) => {
+      const offset = edge - value;
+      const distance = Math.abs(offset);
+      if (distance <= bestDistance) {
+        bestDistance = distance;
+        bestOffset = offset;
+      }
+    });
+  });
+
+  return bestOffset;
 }

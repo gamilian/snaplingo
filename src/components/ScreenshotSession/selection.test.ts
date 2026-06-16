@@ -4,6 +4,9 @@ import {
   moveSelectionByDelta,
   nudgeSelection,
   resizeSelectionByHandle,
+  snapMovedSelectionToRects,
+  snapPointToRects,
+  snapResizedSelectionToRects,
 } from './selection';
 import type { LogicalRect } from './types';
 
@@ -98,5 +101,48 @@ describe('selection editing', () => {
         8,
       ),
     ).toEqual({ x: 180, y: 120 });
+  });
+
+  it('snaps a drawn point to nearby target edges', () => {
+    const targets: LogicalRect[] = [
+      { x: 100, y: 50, width: 80, height: 60 },
+    ];
+
+    expect(snapPointToRects({ x: 97, y: 112 }, targets, 5)).toEqual({
+      x: 100,
+      y: 110,
+    });
+    expect(snapPointToRects({ x: 92, y: 112 }, targets, 5)).toEqual({
+      x: 92,
+      y: 110,
+    });
+  });
+
+  it('snaps moved selection edges to nearby target edges', () => {
+    const targets: LogicalRect[] = [
+      { x: 150, y: 90, width: 80, height: 60 },
+    ];
+    const rect: LogicalRect = { x: 46, y: 33, width: 100, height: 60 };
+
+    expect(snapMovedSelectionToRects(rect, targets, bounds, 5)).toEqual({
+      x: 50,
+      y: 30,
+      width: 100,
+      height: 60,
+    });
+  });
+
+  it('snaps resized selection dragged edges without moving fixed edges', () => {
+    const targets: LogicalRect[] = [
+      { x: 150, y: 90, width: 80, height: 60 },
+    ];
+    const rect: LogicalRect = { x: 40, y: 30, width: 106, height: 58 };
+
+    expect(snapResizedSelectionToRects(rect, 'se', targets, bounds, 10, 5)).toEqual({
+      x: 40,
+      y: 30,
+      width: 110,
+      height: 60,
+    });
   });
 });
