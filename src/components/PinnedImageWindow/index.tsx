@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import type { PinnedImageView } from '../ScreenshotSession/types';
+import {
+  getPinnedDisplaySize,
+  getPinnedOpacityFromWheel,
+  getPinnedZoomFromWheel,
+} from './pinControls';
 
 const appWindow = getCurrentWindow();
 const webviewWindow = getCurrentWebviewWindow();
@@ -20,6 +25,8 @@ interface PinnedImageWindowProps {
 
 export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
   const [image, setImage] = useState<PinnedImageView | null>(null);
+  const [, setZoom] = useState(1);
+  const [opacity, setOpacity] = useState(1);
   const [error, setError] = useState<string | null>(null);
 
   const closePinnedImage = useCallback(async () => {
@@ -64,6 +71,36 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [closePinnedImage]);
 
+  const resizePinnedWindow = useCallback(
+    async (nextZoom: number, nextImage = image) => {
+      if (!nextImage) return;
+
+      const size = getPinnedDisplaySize(nextImage, nextZoom);
+      await appWindow.setSize(new LogicalSize(size.width, size.height));
+    },
+    [image],
+  );
+
+  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    if (!image) return;
+
+    event.preventDefault();
+    const wheelDirection = Math.sign(event.deltaY) || 1;
+
+    if (event.shiftKey) {
+      setOpacity((currentOpacity) =>
+        getPinnedOpacityFromWheel(currentOpacity, wheelDirection),
+      );
+      return;
+    }
+
+    setZoom((currentZoom) => {
+      const nextZoom = getPinnedZoomFromWheel(currentZoom, wheelDirection);
+      void resizePinnedWindow(nextZoom);
+      return nextZoom;
+    });
+  };
+
   if (error) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-neutral-950 p-3 text-xs text-red-100">
@@ -73,11 +110,15 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
   }
 
   return (
-    <div className="group relative h-screen w-screen overflow-hidden bg-transparent">
+    <div
+      className="group relative h-screen w-screen overflow-hidden bg-transparent"
+      onWheel={handleWheel}
+    >
       {image && (
         <img
           src={`data:image/png;base64,${image.image_base64}`}
           className="h-full w-full object-fill"
+          style={{ opacity }}
           draggable={false}
           onPointerDown={() => {
             void appWindow.startDragging();
