@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { AnnotationStyle } from './annotationStyle';
 import type { AnnotationHistory } from './annotationHistory';
+import type { TextAnnotationCommand } from './types';
 import {
   annotationFromTextDraft,
   commitTextAnnotationDraft,
+  startTextAnnotationDraftFromAnnotation,
   startTextAnnotationDraft,
   updateTextAnnotationDraft,
 } from './textAnnotationDraft';
@@ -39,6 +41,22 @@ describe('text annotation draft', () => {
       position: { x: 12, y: 18 },
       text: '',
       fontSize: 28,
+    });
+  });
+
+  it('starts a text draft from an existing text annotation', () => {
+    expect(
+      startTextAnnotationDraftFromAnnotation({
+        type: 'text',
+        position: { x: 10, y: 20 },
+        text: 'Existing',
+        color: [255, 255, 255, 255],
+        font_size: 18,
+      }),
+    ).toEqual({
+      position: { x: 10, y: 20 },
+      text: 'Existing',
+      fontSize: 18,
     });
   });
 
@@ -95,6 +113,65 @@ describe('text annotation draft', () => {
       ],
       undoneAnnotations: [],
       undoSnapshots: [history.annotations],
+      redoSnapshots: [],
+    });
+  });
+
+  it('commits text draft edits by replacing the existing annotation', () => {
+    const textAnnotation: TextAnnotationCommand = {
+      type: 'text' as const,
+      position: { x: 4, y: 9 },
+      text: 'Old',
+      color: [255, 255, 255, 255],
+      font_size: 24,
+    };
+    const editHistory: AnnotationHistory = {
+      annotations: [history.annotations[0], textAnnotation],
+      undoneAnnotations: [],
+    };
+    const draft = updateTextAnnotationDraft(
+      startTextAnnotationDraftFromAnnotation(textAnnotation),
+      'New',
+    );
+
+    expect(commitTextAnnotationDraft(editHistory, draft, style, 1)).toEqual({
+      annotations: [
+        history.annotations[0],
+        {
+          type: 'text',
+          position: { x: 4, y: 9 },
+          text: 'New',
+          color: [24, 144, 255, 255],
+          font_size: 24,
+        },
+      ],
+      undoneAnnotations: [],
+      undoSnapshots: [editHistory.annotations],
+      redoSnapshots: [],
+    });
+  });
+
+  it('removes the existing text annotation when committing a blank edit', () => {
+    const textAnnotation: TextAnnotationCommand = {
+      type: 'text' as const,
+      position: { x: 4, y: 9 },
+      text: 'Old',
+      color: [255, 255, 255, 255],
+      font_size: 24,
+    };
+    const editHistory: AnnotationHistory = {
+      annotations: [history.annotations[0], textAnnotation],
+      undoneAnnotations: [],
+    };
+    const draft = updateTextAnnotationDraft(
+      startTextAnnotationDraftFromAnnotation(textAnnotation),
+      ' ',
+    );
+
+    expect(commitTextAnnotationDraft(editHistory, draft, style, 1)).toEqual({
+      annotations: [history.annotations[0]],
+      undoneAnnotations: [],
+      undoSnapshots: [editHistory.annotations],
       redoSnapshots: [],
     });
   });

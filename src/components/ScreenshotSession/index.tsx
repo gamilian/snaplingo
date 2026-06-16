@@ -52,6 +52,7 @@ import {
 } from './annotationStyle';
 import {
   commitTextAnnotationDraft,
+  startTextAnnotationDraftFromAnnotation,
   startTextAnnotationDraft,
   updateTextAnnotationDraft,
   type TextAnnotationDraft,
@@ -327,6 +328,8 @@ export default function ScreenshotSession({
   const [annotationMoveGesture, setAnnotationMoveGesture] =
     useState<AnnotationMoveGesture | null>(null);
   const [textDraft, setTextDraft] = useState<TextAnnotationDraft | null>(null);
+  const [textDraftAnnotationIndex, setTextDraftAnnotationIndex] =
+    useState<number | null>(null);
   const [annotationStyle, setAnnotationStyle] = useState<AnnotationStyle>(
     DEFAULT_ANNOTATION_STYLE,
   );
@@ -349,6 +352,7 @@ export default function ScreenshotSession({
     annotationHistory.redoSnapshots !== undefined
       ? annotationHistory.redoSnapshots.length > 0
       : annotationHistory.undoneAnnotations.length > 0;
+  const isTextSizingActive = activeAnnotationTool === 'text' || Boolean(textDraft);
   const sizeLabel = selection
     ? `${Math.round(selection.width)} x ${Math.round(selection.height)}`
     : '';
@@ -438,6 +442,7 @@ export default function ScreenshotSession({
     setSelectedAnnotationIndex(null);
     setAnnotationMoveGesture(null);
     setTextDraft(null);
+    setTextDraftAnnotationIndex(null);
     setAnnotationHistory(emptyAnnotationHistory());
     setPreviewImageBase64(null);
     setCursorColor(null);
@@ -475,6 +480,7 @@ export default function ScreenshotSession({
     setSelectedAnnotationIndex(null);
     setAnnotationMoveGesture(null);
     setTextDraft(null);
+    setTextDraftAnnotationIndex(null);
     setAnnotationHistory(emptyAnnotationHistory());
     setPreviewImageBase64(null);
     setCursorColor(null);
@@ -537,15 +543,17 @@ export default function ScreenshotSession({
       annotationHistory,
       textDraft,
       annotationStyle,
+      textDraftAnnotationIndex ?? undefined,
     );
     setTextDraft(null);
+    setTextDraftAnnotationIndex(null);
     if (nextHistory !== annotationHistory) {
       setSelectedAnnotationIndex(null);
       setAnnotationHistory(nextHistory);
     }
 
     return nextHistory;
-  }, [annotationHistory, annotationStyle, textDraft]);
+  }, [annotationHistory, annotationStyle, textDraft, textDraftAnnotationIndex]);
 
   const copySelection = useCallback(async () => {
     if (!session || !selection) return;
@@ -787,6 +795,7 @@ export default function ScreenshotSession({
         event.preventDefault();
         if (textDraft) {
           setTextDraft(null);
+          setTextDraftAnnotationIndex(null);
         } else if (annotationMoveGesture) {
           setAnnotationMoveGesture(null);
           setDraftAnnotation(null);
@@ -894,6 +903,7 @@ export default function ScreenshotSession({
     setSelectedAnnotationIndex(null);
     setAnnotationMoveGesture(null);
     setTextDraft(null);
+    setTextDraftAnnotationIndex(null);
     setAnnotationHistory(emptyAnnotationHistory());
   };
 
@@ -1139,6 +1149,7 @@ export default function ScreenshotSession({
       if (activeAnnotationTool === 'text') {
         if (textDraft) return;
         setTextDraft(startTextAnnotationDraft(localPoint, textFontSize));
+        setTextDraftAnnotationIndex(null);
         return;
       }
 
@@ -1168,11 +1179,31 @@ export default function ScreenshotSession({
     );
     const hitAnnotationIndex = hitTestAnnotations(annotations, localPoint);
     if (hitAnnotationIndex !== null) {
+      const hitAnnotation = annotations[hitAnnotationIndex];
+      if (event.detail >= 2 && hitAnnotation.type === 'text') {
+        setSelectedAnnotationIndex(hitAnnotationIndex);
+        setAnnotationMoveGesture(null);
+        setDraftAnnotation(null);
+        setTextDraft(startTextAnnotationDraftFromAnnotation(hitAnnotation));
+        setTextDraftAnnotationIndex(hitAnnotationIndex);
+        setAnnotationStyle((style) => ({
+          ...style,
+          color: hitAnnotation.color,
+        }));
+        setTextFontSize(hitAnnotation.font_size);
+        setPreviewImageBase64(null);
+        void renderSelectionPreview(
+          selection,
+          annotations.filter((_, index) => index !== hitAnnotationIndex),
+        );
+        return;
+      }
+
       setSelectedAnnotationIndex(hitAnnotationIndex);
       setAnnotationMoveGesture({
         annotationIndex: hitAnnotationIndex,
         startPoint: localPoint,
-        startAnnotation: annotations[hitAnnotationIndex],
+        startAnnotation: hitAnnotation,
       });
       return;
     }
@@ -1468,6 +1499,10 @@ export default function ScreenshotSession({
                 if (event.key === 'Escape') {
                   event.preventDefault();
                   setTextDraft(null);
+                  setTextDraftAnnotationIndex(null);
+                  if (textDraftAnnotationIndex !== null && selection) {
+                    void renderSelectionPreview(selection, annotations);
+                  }
                 } else if (
                   event.key === 'Enter' &&
                   (event.metaKey || event.ctrlKey)
@@ -1671,28 +1706,28 @@ export default function ScreenshotSession({
               <input
                 className="h-7 w-20 accent-white disabled:opacity-50"
                 type="range"
-                min={activeAnnotationTool === 'text' ? 12 : 1}
-                max={activeAnnotationTool === 'text' ? 48 : 8}
+                min={isTextSizingActive ? 12 : 1}
+                max={isTextSizingActive ? 48 : 8}
                 step={1}
                 value={
-                  activeAnnotationTool === 'text'
+                  isTextSizingActive
                     ? textFontSize
                     : annotationStyle.strokeWidth
                 }
                 disabled={isRenderingOutput}
                 title={
-                  activeAnnotationTool === 'text'
+                  isTextSizingActive
                     ? 'Text font size'
                     : 'Annotation stroke width'
                 }
                 aria-label={
-                  activeAnnotationTool === 'text'
+                  isTextSizingActive
                     ? 'Text font size'
                     : 'Annotation stroke width'
                 }
                 onChange={(event) => {
                   const value = Number(event.currentTarget.value);
-                  if (activeAnnotationTool === 'text') {
+                  if (isTextSizingActive) {
                     setTextFontSize(value);
                     setTextDraft((draft) =>
                       draft ? { ...draft, fontSize: value } : draft,

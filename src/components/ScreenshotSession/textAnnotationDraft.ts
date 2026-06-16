@@ -5,6 +5,8 @@ import {
 } from './annotationStyle';
 import {
   addAnnotationToHistory,
+  removeAnnotationFromHistory,
+  replaceAnnotationInHistory,
   type AnnotationHistory,
 } from './annotationHistory';
 import type { TextAnnotationCommand, Point } from './types';
@@ -23,6 +25,16 @@ export function startTextAnnotationDraft(
     position,
     text: '',
     fontSize,
+  };
+}
+
+export function startTextAnnotationDraftFromAnnotation(
+  annotation: TextAnnotationCommand,
+): TextAnnotationDraft {
+  return {
+    position: annotation.position,
+    text: annotation.text,
+    fontSize: annotation.font_size,
   };
 }
 
@@ -54,9 +66,17 @@ export function commitTextAnnotationDraft(
   history: AnnotationHistory,
   draft: TextAnnotationDraft,
   style: AnnotationStyle,
+  replaceIndex?: number,
 ): AnnotationHistory {
   const annotation = annotationFromTextDraft(draft, style);
+  if (!annotation && replaceIndex !== undefined) {
+    return removeAnnotationFromHistory(history, replaceIndex);
+  }
   if (!annotation) return history;
+
+  if (replaceIndex !== undefined) {
+    return replaceAnnotationInHistory(history, replaceIndex, annotation);
+  }
 
   return addAnnotationToHistory(history, annotation);
 }
