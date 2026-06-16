@@ -5,6 +5,7 @@ mod capture_commands;
 mod history_commands;
 mod workflow_commands;
 mod screenshot_window_commands;
+mod capture_session_commands;
 
 pub use translation_commands::*;
 pub use provider_commands::*;
@@ -13,6 +14,7 @@ pub use capture_commands::*;
 pub use history_commands::*;
 pub use workflow_commands::*;
 pub use screenshot_window_commands::*;
+pub use capture_session_commands::*;
 
 use tauri::{Emitter, Manager};
 
