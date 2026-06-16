@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getToolbarPosition,
   moveSelectionByDelta,
+  moveDraftSelectionByDelta,
   nudgeSelection,
   resizeSelectionByHandle,
   snapMovedSelectionToRects,
@@ -33,6 +34,28 @@ describe('selection editing', () => {
       y: 0,
       width: 100,
       height: 80,
+    });
+  });
+
+  it('moves an in-progress drawn selection and its resize anchor together', () => {
+    const rect: LogicalRect = { x: 40, y: 30, width: 100, height: 80 };
+
+    expect(
+      moveDraftSelectionByDelta(rect, { x: 40, y: 30 }, { x: 25, y: 10 }, bounds),
+    ).toEqual({
+      selection: { x: 65, y: 40, width: 100, height: 80 },
+      anchorPoint: { x: 65, y: 40 },
+    });
+  });
+
+  it('updates the in-progress resize anchor by the clamped movement', () => {
+    const rect: LogicalRect = { x: 40, y: 30, width: 100, height: 80 };
+
+    expect(
+      moveDraftSelectionByDelta(rect, { x: 40, y: 30 }, { x: -100, y: -100 }, bounds),
+    ).toEqual({
+      selection: { x: 0, y: 0, width: 100, height: 80 },
+      anchorPoint: { x: 0, y: 0 },
     });
   });
 

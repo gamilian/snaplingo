@@ -33,6 +33,27 @@ export function moveSelectionByDelta(
   };
 }
 
+export function moveDraftSelectionByDelta(
+  rect: LogicalRect,
+  anchorPoint: Point,
+  delta: Point,
+  bounds: LogicalRect,
+) {
+  const selection = moveSelectionByDelta(rect, delta, bounds);
+  const appliedDelta = {
+    x: selection.x - rect.x,
+    y: selection.y - rect.y,
+  };
+
+  return {
+    selection,
+    anchorPoint: {
+      x: anchorPoint.x + appliedDelta.x,
+      y: anchorPoint.y + appliedDelta.y,
+    },
+  };
+}
+
 export function resizeSelectionByHandle(
   rect: LogicalRect,
   handle: SelectionHandle,

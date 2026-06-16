@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import {
   getToolbarPosition,
+  moveDraftSelectionByDelta,
   moveSelectionByDelta,
   normalizeSelection,
   nudgeSelection,
@@ -105,6 +106,11 @@ type AnnotationMoveGesture = {
   annotationIndex: number;
   startPoint: Point;
   startAnnotation: AnnotationCommand;
+};
+type DraftSelectionMoveGesture = {
+  startPoint: Point;
+  startSelection: LogicalRect;
+  startAnchorPoint: Point;
 };
 
 const MIN_SELECTION_SIZE = 10;
@@ -333,6 +339,8 @@ export default function ScreenshotSession({
   );
   const [annotationMoveGesture, setAnnotationMoveGesture] =
     useState<AnnotationMoveGesture | null>(null);
+  const [draftSelectionMoveGesture, setDraftSelectionMoveGesture] =
+    useState<DraftSelectionMoveGesture | null>(null);
   const [textDraft, setTextDraft] = useState<TextAnnotationDraft | null>(null);
   const [textDraftAnnotationIndex, setTextDraftAnnotationIndex] =
     useState<number | null>(null);
@@ -452,6 +460,7 @@ export default function ScreenshotSession({
     setDraftAnnotation(null);
     setSelectedAnnotationIndex(null);
     setAnnotationMoveGesture(null);
+    setDraftSelectionMoveGesture(null);
     setTextDraft(null);
     setTextDraftAnnotationIndex(null);
     setAnnotationHistory(emptyAnnotationHistory());
@@ -490,6 +499,7 @@ export default function ScreenshotSession({
     setDraftAnnotation(null);
     setSelectedAnnotationIndex(null);
     setAnnotationMoveGesture(null);
+    setDraftSelectionMoveGesture(null);
     setTextDraft(null);
     setTextDraftAnnotationIndex(null);
     setAnnotationHistory(emptyAnnotationHistory());
@@ -898,6 +908,8 @@ export default function ScreenshotSession({
           if (selection) {
             void renderSelectionPreview(selection, annotations);
           }
+        } else if (draftSelectionMoveGesture) {
+          setDraftSelectionMoveGesture(null);
         } else if (selectedAnnotationIndex !== null) {
           setSelectedAnnotationIndex(null);
         } else if (activeAnnotationTool || annotationGesture) {
@@ -949,6 +961,20 @@ export default function ScreenshotSession({
       } else if (status === 'preview' && isSaveCaptureShortcut(event)) {
         event.preventDefault();
         void saveSelection();
+      } else if (
+        event.key === ' ' &&
+        status === 'selecting' &&
+        startPoint &&
+        selection &&
+        cursorPoint &&
+        !draftSelectionMoveGesture
+      ) {
+        event.preventDefault();
+        setDraftSelectionMoveGesture({
+          startPoint: cursorPoint,
+          startSelection: selection,
+          startAnchorPoint: startPoint,
+        });
       } else if (status === 'preview' && selection && selectionBounds && isArrowKey(event.key)) {
         event.preventDefault();
         const step = event.shiftKey ? KEYBOARD_FAST_NUDGE_STEP : KEYBOARD_NUDGE_STEP;
@@ -959,8 +985,19 @@ export default function ScreenshotSession({
       }
     };
 
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.key === ' ' && draftSelectionMoveGesture) {
+        event.preventDefault();
+        setDraftSelectionMoveGesture(null);
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
   }, [
     cancelSession,
     copyCurrentColor,
@@ -969,6 +1006,8 @@ export default function ScreenshotSession({
     annotationGesture,
     annotationMoveGesture,
     annotations,
+    cursorPoint,
+    draftSelectionMoveGesture,
     textDraft,
     deleteSelectedAnnotation,
     redoAnnotation,
@@ -978,6 +1017,7 @@ export default function ScreenshotSession({
     selection,
     selectionBounds,
     selectedAnnotationIndex,
+    startPoint,
     status,
     cursorColor,
     undoAnnotation,
@@ -1011,6 +1051,7 @@ export default function ScreenshotSession({
     setDraftAnnotation(null);
     setSelectedAnnotationIndex(null);
     setAnnotationMoveGesture(null);
+    setDraftSelectionMoveGesture(null);
     setTextDraft(null);
     setTextDraftAnnotationIndex(null);
     setAnnotationHistory(emptyAnnotationHistory());
@@ -1118,6 +1159,23 @@ export default function ScreenshotSession({
       return;
     }
 
+    if (draftSelectionMoveGesture && status === 'selecting') {
+      const result = moveDraftSelectionByDelta(
+        draftSelectionMoveGesture.startSelection,
+        draftSelectionMoveGesture.startAnchorPoint,
+        {
+          x: point.x - draftSelectionMoveGesture.startPoint.x,
+          y: point.y - draftSelectionMoveGesture.startPoint.y,
+        },
+        selectionBounds,
+      );
+      setSelection(result.selection);
+      setStartPoint(result.anchorPoint);
+      setPreviewImageBase64(null);
+      setIsRenderingOutput(false);
+      return;
+    }
+
     if (editGesture) {
       setSelection(applyEditGesture(editGesture, point));
       setPreviewImageBase64(null);
@@ -1143,6 +1201,7 @@ export default function ScreenshotSession({
       selectionBounds,
     );
     setCursorPoint(point);
+    setDraftSelectionMoveGesture(null);
 
     if (annotationGesture && selection) {
       const localPoint = clampPointToRect(
