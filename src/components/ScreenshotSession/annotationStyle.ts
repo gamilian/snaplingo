@@ -1,7 +1,7 @@
 import { normalizeSelection } from './selection';
 import type { AnnotationCommand, Point } from './types';
 
-export type AnnotationTool = 'rectangle' | 'arrow' | 'pen';
+export type AnnotationTool = 'rectangle' | 'arrow' | 'pen' | 'mosaic';
 export type AnnotationColor = [number, number, number, number];
 
 export interface AnnotationStyle {
@@ -52,6 +52,14 @@ export function annotationFromGesture(
     };
   }
 
+  if (tool === 'mosaic') {
+    return {
+      type: 'mosaic',
+      rect: normalizeSelection(startPoint, currentPoint),
+      block_size: style.strokeWidth,
+    };
+  }
+
   return {
     type: 'arrow',
     start: startPoint,
@@ -62,7 +70,7 @@ export function annotationFromGesture(
 }
 
 export function isCommittedAnnotation(annotation: AnnotationCommand) {
-  if (annotation.type === 'rectangle') {
+  if (annotation.type === 'rectangle' || annotation.type === 'mosaic') {
     return (
       annotation.rect.width >= MIN_ANNOTATION_SIZE &&
       annotation.rect.height >= MIN_ANNOTATION_SIZE

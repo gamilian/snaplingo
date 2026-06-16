@@ -28,6 +28,10 @@ pub enum ImageAnnotation {
         color: [u8; 4],
         stroke_width: u32,
     },
+    Mosaic {
+        rect: PhysicalRect,
+        block_size: u32,
+    },
 }
 
 pub struct ImageCompositionService;
@@ -191,6 +195,9 @@ fn draw_annotation(output: &mut image::RgbaImage, annotation: &ImageAnnotation) 
             color,
             stroke_width,
         } => draw_freehand_annotation(output, points, *color, *stroke_width),
+        ImageAnnotation::Mosaic { rect, block_size } => {
+            draw_mosaic_annotation(output, rect, *block_size)
+        }
     }
 }
 
@@ -313,6 +320,71 @@ fn draw_freehand_annotation(
         let end = &segment[1];
         draw_line(output, start.x, start.y, end.x, end.y, color, stroke_width);
     }
+}
+
+fn draw_mosaic_annotation(output: &mut image::RgbaImage, rect: &PhysicalRect, block_size: u32) {
+    if rect.width == 0 || rect.height == 0 {
+        return;
+    }
+
+    let output_width = output.width() as i64;
+    let output_height = output.height() as i64;
+    let left = (rect.x as i64).max(0);
+    let top = (rect.y as i64).max(0);
+    let right = (rect.x as i64 + rect.width as i64).min(output_width);
+    let bottom = (rect.y as i64 + rect.height as i64).min(output_height);
+    if left >= right || top >= bottom {
+        return;
+    }
+
+    let block_size = block_size.max(1) as i64;
+    let mut y = top;
+    while y < bottom {
+        let block_bottom = (y + block_size).min(bottom);
+        let mut x = left;
+        while x < right {
+            let block_right = (x + block_size).min(right);
+            let color = average_block_color(output, x, y, block_right, block_bottom);
+
+            for pixel_y in y..block_bottom {
+                for pixel_x in x..block_right {
+                    output.put_pixel(pixel_x as u32, pixel_y as u32, color);
+                }
+            }
+
+            x += block_size;
+        }
+
+        y += block_size;
+    }
+}
+
+fn average_block_color(
+    output: &image::RgbaImage,
+    left: i64,
+    top: i64,
+    right: i64,
+    bottom: i64,
+) -> image::Rgba<u8> {
+    let mut totals = [0_u64; 4];
+    let mut count = 0_u64;
+
+    for y in top..bottom {
+        for x in left..right {
+            let pixel = output.get_pixel(x as u32, y as u32).0;
+            for channel in 0..4 {
+                totals[channel] += pixel[channel] as u64;
+            }
+            count += 1;
+        }
+    }
+
+    image::Rgba([
+        (totals[0] / count) as u8,
+        (totals[1] / count) as u8,
+        (totals[2] / count) as u8,
+        (totals[3] / count) as u8,
+    ])
 }
 
 fn draw_line(

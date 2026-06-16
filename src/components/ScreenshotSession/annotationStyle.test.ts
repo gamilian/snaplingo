@@ -61,7 +61,32 @@ describe('annotation style', () => {
     });
   });
 
+  it('creates mosaic annotations with the selected block size', () => {
+    expect(
+      annotationFromGesture(
+        'mosaic',
+        { x: 12, y: 20 },
+        { x: 4, y: 6 },
+        style,
+      ),
+    ).toEqual({
+      type: 'mosaic',
+      rect: { x: 4, y: 6, width: 8, height: 14 },
+      block_size: 5,
+    });
+  });
+
   it('rejects tiny annotations', () => {
+    expect(
+      isCommittedAnnotation(
+        annotationFromGesture(
+          'mosaic',
+          { x: 1, y: 1 },
+          { x: 2, y: 2 },
+          style,
+        ),
+      ),
+    ).toBe(false);
     expect(
       isCommittedAnnotation(
         annotationFromGesture(

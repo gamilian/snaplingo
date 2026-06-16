@@ -137,6 +137,10 @@ pub enum AnnotationCommand {
         color: [u8; 4],
         stroke_width: u32,
     },
+    Mosaic {
+        rect: LogicalRect,
+        block_size: u32,
+    },
 }
 
 /// Supported image formats
@@ -225,5 +229,24 @@ mod tests {
         assert_eq!(serialized["points"][0]["x"], 1.0);
         assert_eq!(serialized["points"][1]["y"], 4.0);
         assert_eq!(serialized["stroke_width"], 2);
+    }
+
+    #[test]
+    fn mosaic_annotation_serializes_with_type_tag() {
+        let annotation = AnnotationCommand::Mosaic {
+            rect: LogicalRect {
+                x: 1.0,
+                y: 2.0,
+                width: 3.0,
+                height: 4.0,
+            },
+            block_size: 6,
+        };
+
+        let serialized = serde_json::to_value(&annotation).unwrap();
+
+        assert_eq!(serialized["type"], "mosaic");
+        assert_eq!(serialized["rect"]["x"], 1.0);
+        assert_eq!(serialized["block_size"], 6);
     }
 }

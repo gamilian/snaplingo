@@ -415,6 +415,10 @@ fn image_annotations_from_commands(
                 color: *color,
                 stroke_width: ((*stroke_width).max(1) as f64 * output_scale).ceil() as u32,
             }),
+            AnnotationCommand::Mosaic { rect, block_size } => Ok(ImageAnnotation::Mosaic {
+                rect: scaled_logical_rect_relative_to(rect, &annotation_origin, output_scale)?,
+                block_size: ((*block_size).max(1) as f64 * output_scale).ceil() as u32,
+            }),
         })
         .collect()
 }
@@ -810,6 +814,15 @@ mod tests {
                     color: [24, 144, 255, 255],
                     stroke_width: 1,
                 },
+                AnnotationCommand::Mosaic {
+                    rect: LogicalRect {
+                        x: 2.0,
+                        y: 3.0,
+                        width: 4.0,
+                        height: 5.0,
+                    },
+                    block_size: 3,
+                },
             ],
             &LogicalRect {
                 x: 100.0,
@@ -821,7 +834,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(annotations.len(), 3);
+        assert_eq!(annotations.len(), 4);
         assert_eq!(
             annotations[0],
             ImageAnnotation::Rectangle {
@@ -850,6 +863,18 @@ mod tests {
                 points: vec![PhysicalPoint { x: 2, y: 3 }, PhysicalPoint { x: 6, y: 8 }],
                 color: [24, 144, 255, 255],
                 stroke_width: 2,
+            }
+        );
+        assert_eq!(
+            annotations[3],
+            ImageAnnotation::Mosaic {
+                rect: PhysicalRect {
+                    x: 4,
+                    y: 6,
+                    width: 8,
+                    height: 10,
+                },
+                block_size: 6,
             }
         );
     }

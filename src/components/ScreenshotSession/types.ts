@@ -81,7 +81,14 @@ export interface FreehandAnnotationCommand {
   stroke_width: number;
 }
 
+export interface MosaicAnnotationCommand {
+  type: 'mosaic';
+  rect: LogicalRect;
+  block_size: number;
+}
+
 export type AnnotationCommand =
   | RectangleAnnotationCommand
   | ArrowAnnotationCommand
-  | FreehandAnnotationCommand;
+  | FreehandAnnotationCommand
+  | MosaicAnnotationCommand;

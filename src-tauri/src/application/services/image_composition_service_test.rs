@@ -9,6 +9,10 @@ mod tests {
 
     fn make_solid_png(width: u32, height: u32, rgba: [u8; 4]) -> Vec<u8> {
         let pixels = rgba.repeat((width * height) as usize);
+        make_png_from_pixels(width, height, &pixels)
+    }
+
+    fn make_png_from_pixels(width: u32, height: u32, pixels: &[u8]) -> Vec<u8> {
         let mut png = Vec::new();
         let encoder = image::codecs::png::PngEncoder::new(&mut png);
         encoder
@@ -220,5 +224,55 @@ mod tests {
         assert_eq!(png_pixel(&output, 4, 1), [255, 0, 0, 255]);
         assert_eq!(png_pixel(&output, 4, 5), [255, 0, 0, 255]);
         assert_eq!(png_pixel(&output, 2, 4), [255, 255, 255, 255]);
+    }
+
+    #[test]
+    fn composes_png_with_mosaic_annotation() {
+        let service = ImageCompositionService::new();
+        let png = make_png_from_pixels(
+            4,
+            3,
+            &[
+                255, 0, 0, 255, 0, 255, 0, 255, 10, 20, 30, 255, 11, 21, 31, 255, 0, 0, 255, 255,
+                255, 255, 255, 255, 12, 22, 32, 255, 13, 23, 33, 255, 90, 91, 92, 255, 91, 92, 93,
+                255, 92, 93, 94, 255, 93, 94, 95, 255,
+            ],
+        );
+
+        let output = service
+            .compose_png_with_annotations(
+                4,
+                3,
+                &[PngPlacement {
+                    png_data: png.as_slice(),
+                    source_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 4,
+                        height: 3,
+                    },
+                    destination_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 4,
+                        height: 3,
+                    },
+                }],
+                &[ImageAnnotation::Mosaic {
+                    rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 2,
+                        height: 2,
+                    },
+                    block_size: 2,
+                }],
+            )
+            .unwrap();
+
+        assert_eq!(png_pixel(&output, 0, 0), [127, 127, 127, 255]);
+        assert_eq!(png_pixel(&output, 1, 1), [127, 127, 127, 255]);
+        assert_eq!(png_pixel(&output, 2, 0), [10, 20, 30, 255]);
+        assert_eq!(png_pixel(&output, 0, 2), [90, 91, 92, 255]);
     }
 }

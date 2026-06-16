@@ -86,7 +86,7 @@ const EDGE_SNAP_THRESHOLD = 6;
 const KEYBOARD_NUDGE_STEP = 1;
 const KEYBOARD_FAST_NUDGE_STEP = 10;
 const TOOLBAR_GAP = 8;
-const TOOLBAR_SIZE = { width: 720, height: 36 };
+const TOOLBAR_SIZE = { width: 780, height: 36 };
 const MAGNIFIER_GAP = 14;
 const MAGNIFIER_SIZE = { width: 120, height: 96 };
 const MAGNIFIER_ZOOM = 4;
@@ -1083,6 +1083,23 @@ export default function ScreenshotSession({
               }}
             />
           )}
+          {draftAnnotation?.type === 'mosaic' && (
+            <div
+              className="pointer-events-none absolute border border-white/70 bg-black/35"
+              style={{
+                ...rectStyle(
+                  annotationRectToViewportRect(
+                    draftAnnotation.rect,
+                    selectionViewportRect,
+                  ),
+                ),
+                backgroundImage:
+                  'linear-gradient(45deg, rgba(255,255,255,0.2) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.2) 75%), linear-gradient(45deg, rgba(255,255,255,0.2) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.2) 75%)',
+                backgroundPosition: '0 0, 4px 4px',
+                backgroundSize: '8px 8px',
+              }}
+            />
+          )}
           {draftAnnotation?.type === 'arrow' && (
             <svg
               className="pointer-events-none absolute overflow-visible"
@@ -1221,6 +1238,18 @@ export default function ScreenshotSession({
                 onClick={() => toggleAnnotationTool('pen')}
               >
                 Pen
+              </button>
+              <button
+                type="button"
+                className={`h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50 ${
+                  activeAnnotationTool === 'mosaic' ? 'bg-white/15' : ''
+                }`}
+                disabled={isRenderingOutput}
+                title="Mosaic"
+                aria-label="Draw mosaic annotation"
+                onClick={() => toggleAnnotationTool('mosaic')}
+              >
+                Mosaic
               </button>
               <div className="flex h-7 items-center gap-1 px-1">
                 {ANNOTATION_COLORS.map((color) => (
