@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use base64::Engine;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
@@ -84,6 +84,21 @@ pub async fn render_capture_output(
     let png_data = render_capture_png(&session_id, &rect, &state)?;
 
     Ok(base64::engine::general_purpose::STANDARD.encode(png_data))
+}
+
+#[tauri::command]
+pub fn default_capture_save_path() -> Result<String, String> {
+    let base_dir = dirs::download_dir()
+        .or_else(dirs::picture_dir)
+        .or_else(dirs::home_dir)
+        .unwrap_or_else(std::env::temp_dir);
+    let timestamp = chrono::Local::now()
+        .format("%Y%m%d-%H%M%S")
+        .to_string();
+
+    Ok(capture_save_path(&base_dir, &timestamp)
+        .to_string_lossy()
+        .to_string())
 }
 
 #[tauri::command]
@@ -322,6 +337,10 @@ fn pinned_window_size(width: u32, height: u32) -> (f64, f64) {
     ((width * scale).max(80.0), (height * scale).max(60.0))
 }
 
+fn capture_save_path(base_dir: &Path, timestamp: &str) -> PathBuf {
+    base_dir.join(format!("SnapLingo-{}.png", timestamp))
+}
+
 fn normalized_capture_mode(mode: &str) -> &'static str {
     match mode {
         "screenshot" | "screenshot-ocr" | "screenshot-translate" => match mode {
@@ -414,5 +433,18 @@ mod tests {
     fn pinned_window_size_preserves_aspect_ratio_with_cap() {
         assert_eq!(super::pinned_window_size(300, 200), (300.0, 200.0));
         assert_eq!(super::pinned_window_size(1800, 900), (900.0, 450.0));
+    }
+
+    #[test]
+    fn capture_save_path_uses_timestamped_png_name() {
+        let path = super::capture_save_path(
+            std::path::Path::new("/tmp"),
+            "20260617-023000",
+        );
+
+        assert_eq!(
+            path.to_string_lossy(),
+            "/tmp/SnapLingo-20260617-023000.png"
+        );
     }
 }

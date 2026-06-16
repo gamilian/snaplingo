@@ -442,6 +442,7 @@ pub fn run() {
       commands::get_capture_session,
       commands::cancel_capture_session,
       commands::render_capture_output,
+      commands::default_capture_save_path,
       commands::output_capture,
       commands::get_pinned_image,
       commands::remove_pinned_image,
