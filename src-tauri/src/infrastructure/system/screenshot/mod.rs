@@ -6,7 +6,7 @@ mod linux;
 mod macos;
 #[cfg(target_os = "windows")]
 mod windows;
-#[cfg(any(target_os = "windows", target_os = "linux"))]
+#[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
 mod xcap_common;
 
 pub use backend::{MonitorSnapshot, ScreenRegion, ScreenshotBackend};

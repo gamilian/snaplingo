@@ -1,5 +1,5 @@
 use super::backend::{MonitorSnapshot, ScreenRegion, ScreenshotBackend};
-use crate::domain::capture::{LogicalRect, PhysicalRect};
+use super::xcap_common;
 use crate::error::AppError;
 use core_graphics::display::{CGDisplay, CGRect};
 use core_graphics::image::CGImage;
@@ -60,31 +60,7 @@ fn image_to_png(cg_image: CGImage) -> Result<Vec<u8>, AppError> {
 #[async_trait::async_trait]
 impl ScreenshotBackend for MacOSScreenshotBackend {
     async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError> {
-        let display = CGDisplay::main();
-        let image = display
-            .image()
-            .ok_or_else(|| AppError::System("Failed to capture screenshot".to_string()))?;
-        let width = image.width() as u32;
-        let height = image.height() as u32;
-        let png_data = image_to_png(image)?;
-
-        Ok(vec![MonitorSnapshot {
-            id: "primary".to_string(),
-            logical_bounds: LogicalRect {
-                x: 0.0,
-                y: 0.0,
-                width: width as f64,
-                height: height as f64,
-            },
-            physical_bounds: PhysicalRect {
-                x: 0,
-                y: 0,
-                width,
-                height,
-            },
-            scale_factor: 1.0,
-            png_data,
-        }])
+        xcap_common::capture_all_monitor_snapshots()
     }
 
     async fn capture_full_screen(&self) -> Result<Vec<u8>, AppError> {

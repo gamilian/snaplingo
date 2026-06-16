@@ -19,7 +19,7 @@ impl ScreenshotBackend for LinuxScreenshotBackend {
     async fn capture_monitor_snapshots(
         &self,
     ) -> Result<Vec<super::backend::MonitorSnapshot>, AppError> {
-        Ok(vec![xcap_common::capture_primary_monitor_snapshot()?])
+        xcap_common::capture_all_monitor_snapshots()
     }
 
     async fn capture_full_screen(&self) -> Result<Vec<u8>, AppError> {

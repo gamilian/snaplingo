@@ -24,6 +24,40 @@ pub struct MonitorSnapshot {
     pub png_data: Vec<u8>,
 }
 
+pub fn monitor_snapshot_from_physical_geometry(
+    id: String,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+    scale_factor: f64,
+    png_data: Vec<u8>,
+) -> MonitorSnapshot {
+    let scale_factor = if scale_factor > 0.0 {
+        scale_factor
+    } else {
+        1.0
+    };
+
+    MonitorSnapshot {
+        id,
+        logical_bounds: LogicalRect {
+            x: x as f64 / scale_factor,
+            y: y as f64 / scale_factor,
+            width: width as f64 / scale_factor,
+            height: height as f64 / scale_factor,
+        },
+        physical_bounds: PhysicalRect {
+            x,
+            y,
+            width,
+            height,
+        },
+        scale_factor,
+        png_data,
+    }
+}
+
 /// Encode an RGBA image to PNG bytes.
 ///
 /// Platform-agnostic helper shared by backends that produce `image::RgbaImage`
@@ -95,5 +129,40 @@ mod tests {
         assert_eq!(snapshot.physical_bounds.width, 200);
         assert_eq!(snapshot.scale_factor, 2.0);
         assert_eq!(snapshot.png_data, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn monitor_snapshot_from_physical_geometry_derives_logical_bounds() {
+        let snapshot = super::monitor_snapshot_from_physical_geometry(
+            "monitor-2".to_string(),
+            -2560,
+            0,
+            2560,
+            1440,
+            2.0,
+            vec![4, 5, 6],
+        );
+
+        assert_eq!(snapshot.id, "monitor-2");
+        assert_eq!(
+            snapshot.logical_bounds,
+            crate::domain::capture::LogicalRect {
+                x: -1280.0,
+                y: 0.0,
+                width: 1280.0,
+                height: 720.0,
+            }
+        );
+        assert_eq!(
+            snapshot.physical_bounds,
+            crate::domain::capture::PhysicalRect {
+                x: -2560,
+                y: 0,
+                width: 2560,
+                height: 1440,
+            }
+        );
+        assert_eq!(snapshot.scale_factor, 2.0);
+        assert_eq!(snapshot.png_data, vec![4, 5, 6]);
     }
 }

@@ -67,6 +67,7 @@ parking_lot = { version = "0.12.5", features = ["send_guard"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-graphics = "0.23"
+xcap = "0.9"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.51", features = ["Win32_UI_Input_KeyboardAndMouse"] }

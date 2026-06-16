@@ -1,14 +1,16 @@
-use super::backend::{rgba_image_to_png, MonitorSnapshot, ScreenRegion};
-use crate::domain::capture::{LogicalRect, PhysicalRect};
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+use super::backend::ScreenRegion;
+use super::backend::{monitor_snapshot_from_physical_geometry, rgba_image_to_png, MonitorSnapshot};
 use crate::error::AppError;
 use xcap::Monitor;
 
 /// Get the primary monitor (not just the first enumerated one).
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 fn get_primary_monitor() -> Result<Monitor, AppError> {
     Monitor::all()
         .map_err(|e| with_platform_hint(format!("Failed to enumerate monitors: {}", e)))?
         .into_iter()
-        .find(|m| m.is_primary())
+        .find(|monitor| monitor.is_primary().unwrap_or(false))
         .ok_or_else(|| AppError::System("No primary monitor found".to_string()))
 }
 
@@ -23,6 +25,7 @@ fn with_platform_hint(msg: String) -> AppError {
 }
 
 /// Capture the primary monitor's full screen as PNG bytes.
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 pub fn capture_full_screen_png() -> Result<Vec<u8>, AppError> {
     let primary = get_primary_monitor()?;
     let image = primary
@@ -31,39 +34,62 @@ pub fn capture_full_screen_png() -> Result<Vec<u8>, AppError> {
     rgba_image_to_png(image)
 }
 
-/// Capture the primary monitor as a session snapshot.
-pub fn capture_primary_monitor_snapshot() -> Result<MonitorSnapshot, AppError> {
-    let primary = get_primary_monitor()?;
-    let image = primary
+pub fn capture_all_monitor_snapshots() -> Result<Vec<MonitorSnapshot>, AppError> {
+    let mut monitors = Monitor::all()
+        .map_err(|e| with_platform_hint(format!("Failed to enumerate monitors: {}", e)))?;
+    monitors.sort_by_key(|monitor| {
+        if monitor.is_primary().unwrap_or(false) {
+            0
+        } else {
+            1
+        }
+    });
+
+    monitors
+        .iter()
+        .enumerate()
+        .map(|(index, monitor)| capture_monitor_snapshot(monitor, index))
+        .collect()
+}
+
+fn capture_monitor_snapshot(
+    monitor: &Monitor,
+    fallback_index: usize,
+) -> Result<MonitorSnapshot, AppError> {
+    let image = monitor
         .capture_image()
         .map_err(|e| with_platform_hint(format!("Screenshot failed: {}", e)))?;
     let width = image.width();
     let height = image.height();
     let png_data = rgba_image_to_png(image)?;
+    let x = monitor
+        .x()
+        .map_err(|e| with_platform_hint(format!("Failed to read monitor x: {}", e)))?;
+    let y = monitor
+        .y()
+        .map_err(|e| with_platform_hint(format!("Failed to read monitor y: {}", e)))?;
+    let scale_factor = monitor.scale_factor().unwrap_or(1.0).max(1.0) as f64;
+    let id = monitor
+        .id()
+        .map(|id| format!("monitor-{}", id))
+        .unwrap_or_else(|_| format!("monitor-{}", fallback_index));
 
-    Ok(MonitorSnapshot {
-        id: "primary".to_string(),
-        logical_bounds: LogicalRect {
-            x: 0.0,
-            y: 0.0,
-            width: width as f64,
-            height: height as f64,
-        },
-        physical_bounds: PhysicalRect {
-            x: 0,
-            y: 0,
-            width,
-            height,
-        },
-        scale_factor: 1.0,
+    Ok(monitor_snapshot_from_physical_geometry(
+        id,
+        x,
+        y,
+        width,
+        height,
+        scale_factor,
         png_data,
-    })
+    ))
 }
 
 /// Capture a region of the primary monitor as PNG bytes.
 ///
 /// Uses XCap's native `capture_region`, which handles global-to-local
 /// coordinate mapping internally.
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 pub fn capture_region_png(region: ScreenRegion) -> Result<Vec<u8>, AppError> {
     let primary = get_primary_monitor()?;
     let image = primary

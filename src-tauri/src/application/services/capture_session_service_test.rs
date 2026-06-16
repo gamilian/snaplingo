@@ -10,21 +10,21 @@ mod tests {
     use crate::application::services::capture_session_service::CaptureSessionService;
 
     struct MockScreenshotBackend {
-        snapshot: MonitorSnapshot,
+        snapshots: Vec<MonitorSnapshot>,
     }
 
     #[async_trait::async_trait]
     impl ScreenshotBackend for MockScreenshotBackend {
         async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError> {
-            Ok(vec![self.snapshot.clone()])
+            Ok(self.snapshots.clone())
         }
 
         async fn capture_full_screen(&self) -> Result<Vec<u8>, AppError> {
-            Ok(self.snapshot.png_data.clone())
+            Ok(self.snapshots[0].png_data.clone())
         }
 
         async fn capture_region(&self, _region: ScreenRegion) -> Result<Vec<u8>, AppError> {
-            Ok(self.snapshot.png_data.clone())
+            Ok(self.snapshots[0].png_data.clone())
         }
     }
 
@@ -34,7 +34,7 @@ mod tests {
 
     fn make_backend_with_scale(scale_factor: f64) -> MockScreenshotBackend {
         MockScreenshotBackend {
-            snapshot: MonitorSnapshot {
+            snapshots: vec![MonitorSnapshot {
                 id: "primary".to_string(),
                 logical_bounds: crate::domain::capture::LogicalRect {
                     x: 0.0,
@@ -50,7 +50,48 @@ mod tests {
                 },
                 scale_factor,
                 png_data: vec![1, 2, 3],
-            },
+            }],
+        }
+    }
+
+    fn make_multi_monitor_backend() -> MockScreenshotBackend {
+        MockScreenshotBackend {
+            snapshots: vec![
+                MonitorSnapshot {
+                    id: "primary".to_string(),
+                    logical_bounds: crate::domain::capture::LogicalRect {
+                        x: 0.0,
+                        y: 0.0,
+                        width: 100.0,
+                        height: 80.0,
+                    },
+                    physical_bounds: crate::domain::capture::PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 200,
+                        height: 160,
+                    },
+                    scale_factor: 2.0,
+                    png_data: vec![1, 2, 3],
+                },
+                MonitorSnapshot {
+                    id: "left".to_string(),
+                    logical_bounds: crate::domain::capture::LogicalRect {
+                        x: -120.0,
+                        y: 0.0,
+                        width: 120.0,
+                        height: 90.0,
+                    },
+                    physical_bounds: crate::domain::capture::PhysicalRect {
+                        x: -120,
+                        y: 0,
+                        width: 120,
+                        height: 90,
+                    },
+                    scale_factor: 1.0,
+                    png_data: vec![4, 5, 6],
+                },
+            ],
         }
     }
 
@@ -120,5 +161,33 @@ mod tests {
         assert_eq!(physical.y, 0);
         assert_eq!(physical.width, 6);
         assert_eq!(physical.height, 6);
+    }
+
+    #[tokio::test]
+    async fn converts_logical_rect_on_secondary_monitor_to_that_monitor_physical_space() {
+        let service = CaptureSessionService::new(Arc::new(make_multi_monitor_backend()));
+        let view = service.create_session().await.unwrap();
+
+        let physical = service
+            .logical_rect_to_physical(
+                &view.id,
+                &crate::domain::capture::LogicalRect {
+                    x: -110.0,
+                    y: 10.0,
+                    width: 20.0,
+                    height: 30.0,
+                },
+            )
+            .unwrap();
+
+        assert_eq!(
+            physical,
+            crate::domain::capture::PhysicalRect {
+                x: -110,
+                y: 10,
+                width: 20,
+                height: 30,
+            }
+        );
     }
 }
