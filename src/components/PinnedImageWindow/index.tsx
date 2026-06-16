@@ -10,7 +10,11 @@ import {
   getPinnedOpacityPreset,
   getPinnedZoomFromWheel,
 } from './pinControls';
-import { savePinnedImage } from './pinActions';
+import {
+  isCopyPinnedImageShortcut,
+  isSavePinnedImageShortcut,
+  savePinnedImage,
+} from './pinActions';
 
 const appWindow = getCurrentWindow();
 const webviewWindow = getCurrentWebviewWindow();
@@ -117,6 +121,24 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
       setError(err instanceof Error ? err.message : String(err));
     }
   }, [imageId]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (isCopyPinnedImageShortcut(event)) {
+        event.preventDefault();
+        void copyPinnedImage();
+        return;
+      }
+
+      if (isSavePinnedImageShortcut(event)) {
+        event.preventDefault();
+        void savePinnedImageAs();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [copyPinnedImage, savePinnedImageAs]);
 
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
     if (!image) return;

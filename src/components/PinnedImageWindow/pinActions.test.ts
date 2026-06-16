@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  isCopyPinnedImageShortcut,
+  isSavePinnedImageShortcut,
   type PinInvoke,
   type PinInvokeArgs,
   savePinnedImage,
@@ -31,5 +33,53 @@ describe('pinned image actions', () => {
         },
       },
     ]);
+  });
+
+  it('uses Cmd/Ctrl+C for copying a pinned image', () => {
+    expect(
+      isCopyPinnedImageShortcut({
+        key: 'c',
+        metaKey: true,
+        ctrlKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isCopyPinnedImageShortcut({
+        key: 'C',
+        metaKey: false,
+        ctrlKey: true,
+      }),
+    ).toBe(true);
+    expect(
+      isCopyPinnedImageShortcut({
+        key: 'c',
+        metaKey: false,
+        ctrlKey: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('uses Cmd/Ctrl+S for saving a pinned image', () => {
+    expect(
+      isSavePinnedImageShortcut({
+        key: 's',
+        metaKey: true,
+        ctrlKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isSavePinnedImageShortcut({
+        key: 'S',
+        metaKey: false,
+        ctrlKey: true,
+      }),
+    ).toBe(true);
+    expect(
+      isSavePinnedImageShortcut({
+        key: 's',
+        metaKey: false,
+        ctrlKey: false,
+      }),
+    ).toBe(false);
   });
 });
