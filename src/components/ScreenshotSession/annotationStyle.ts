@@ -7,6 +7,7 @@ export type AnnotationTool =
   | 'arrow'
   | 'line'
   | 'pen'
+  | 'highlight'
   | 'mosaic';
 export type AnnotationColor = [number, number, number, number];
 
@@ -32,6 +33,7 @@ export const DEFAULT_ANNOTATION_STYLE: AnnotationStyle = {
 };
 
 const MIN_ANNOTATION_SIZE = 4;
+const HIGHLIGHT_ALPHA = 96;
 
 export function annotationFromGesture(
   tool: AnnotationTool,
@@ -63,6 +65,15 @@ export function annotationFromGesture(
       type: 'freehand',
       points: points ?? [startPoint, currentPoint],
       color: style.color,
+      stroke_width: style.strokeWidth,
+    };
+  }
+
+  if (tool === 'highlight') {
+    return {
+      type: 'highlight',
+      points: points ?? [startPoint, currentPoint],
+      color: [style.color[0], style.color[1], style.color[2], HIGHLIGHT_ALPHA],
       stroke_width: style.strokeWidth,
     };
   }
@@ -106,7 +117,7 @@ export function isCommittedAnnotation(annotation: AnnotationCommand) {
     );
   }
 
-  if (annotation.type === 'freehand') {
+  if (annotation.type === 'freehand' || annotation.type === 'highlight') {
     if (annotation.points.length < 2) return false;
 
     const pathLength = annotation.points.slice(1).reduce((total, point, index) => {

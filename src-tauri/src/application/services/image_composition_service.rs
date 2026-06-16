@@ -39,6 +39,11 @@ pub enum ImageAnnotation {
         color: [u8; 4],
         stroke_width: u32,
     },
+    Highlight {
+        points: Vec<PhysicalPoint>,
+        color: [u8; 4],
+        stroke_width: u32,
+    },
     Mosaic {
         rect: PhysicalRect,
         block_size: u32,
@@ -217,6 +222,11 @@ fn draw_annotation(output: &mut image::RgbaImage, annotation: &ImageAnnotation) 
             color,
             stroke_width,
         } => draw_freehand_annotation(output, points, *color, *stroke_width),
+        ImageAnnotation::Highlight {
+            points,
+            color,
+            stroke_width,
+        } => draw_highlight_annotation(output, points, *color, *stroke_width),
         ImageAnnotation::Mosaic { rect, block_size } => {
             draw_mosaic_annotation(output, rect, *block_size)
         }
@@ -392,6 +402,30 @@ fn draw_freehand_annotation(
     }
 }
 
+fn draw_highlight_annotation(
+    output: &mut image::RgbaImage,
+    points: &[PhysicalPoint],
+    color: [u8; 4],
+    stroke_width: u32,
+) {
+    if points.is_empty() {
+        return;
+    }
+
+    let color = image::Rgba(color);
+    let stroke_width = stroke_width.max(1);
+    if points.len() == 1 {
+        draw_alpha_stroked_point(output, points[0].x, points[0].y, color, stroke_width);
+        return;
+    }
+
+    for segment in points.windows(2) {
+        let start = &segment[0];
+        let end = &segment[1];
+        draw_alpha_line(output, start.x, start.y, end.x, end.y, color, stroke_width);
+    }
+}
+
 fn draw_mosaic_annotation(output: &mut image::RgbaImage, rect: &PhysicalRect, block_size: u32) {
     if rect.width == 0 || rect.height == 0 {
         return;
@@ -455,6 +489,82 @@ fn average_block_color(
         (totals[2] / count) as u8,
         (totals[3] / count) as u8,
     ])
+}
+
+fn draw_alpha_line(
+    output: &mut image::RgbaImage,
+    start_x: i32,
+    start_y: i32,
+    end_x: i32,
+    end_y: i32,
+    color: image::Rgba<u8>,
+    stroke_width: u32,
+) {
+    let mut x = start_x;
+    let mut y = start_y;
+    let dx = (end_x - start_x).abs();
+    let sx = if start_x < end_x { 1 } else { -1 };
+    let dy = -(end_y - start_y).abs();
+    let sy = if start_y < end_y { 1 } else { -1 };
+    let mut err = dx + dy;
+
+    loop {
+        draw_alpha_stroked_point(output, x, y, color, stroke_width);
+        if x == end_x && y == end_y {
+            break;
+        }
+        let e2 = err * 2;
+        if e2 >= dy {
+            err += dy;
+            x += sx;
+        }
+        if e2 <= dx {
+            err += dx;
+            y += sy;
+        }
+    }
+}
+
+fn draw_alpha_stroked_point(
+    output: &mut image::RgbaImage,
+    x: i32,
+    y: i32,
+    color: image::Rgba<u8>,
+    stroke_width: u32,
+) {
+    let stroke_width = stroke_width.max(1) as i32;
+    let min_offset = -(stroke_width / 2);
+    let max_offset = (stroke_width - 1) / 2;
+
+    for offset_y in min_offset..=max_offset {
+        for offset_x in min_offset..=max_offset {
+            blend_pixel_if_in_bounds(output, x + offset_x, y + offset_y, color);
+        }
+    }
+}
+
+fn blend_pixel_if_in_bounds(output: &mut image::RgbaImage, x: i32, y: i32, color: image::Rgba<u8>) {
+    if x < 0 || y < 0 {
+        return;
+    }
+
+    let x = x as u32;
+    let y = y as u32;
+    if x >= output.width() || y >= output.height() {
+        return;
+    }
+
+    let source = color.0;
+    let destination = output.get_pixel(x, y).0;
+    let source_alpha = source[3] as u32;
+    let inverse_alpha = 255_u32.saturating_sub(source_alpha);
+    let blended = image::Rgba([
+        (((source[0] as u32 * source_alpha) + (destination[0] as u32 * inverse_alpha)) / 255) as u8,
+        (((source[1] as u32 * source_alpha) + (destination[1] as u32 * inverse_alpha)) / 255) as u8,
+        (((source[2] as u32 * source_alpha) + (destination[2] as u32 * inverse_alpha)) / 255) as u8,
+        (source_alpha + (destination[3] as u32 * inverse_alpha) / 255).min(255) as u8,
+    ]);
+    output.put_pixel(x, y, blended);
 }
 
 fn draw_line(

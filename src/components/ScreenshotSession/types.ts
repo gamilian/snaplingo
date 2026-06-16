@@ -96,6 +96,13 @@ export interface FreehandAnnotationCommand {
   stroke_width: number;
 }
 
+export interface HighlightAnnotationCommand {
+  type: 'highlight';
+  points: Point[];
+  color: [number, number, number, number];
+  stroke_width: number;
+}
+
 export interface MosaicAnnotationCommand {
   type: 'mosaic';
   rect: LogicalRect;
@@ -108,4 +115,5 @@ export type AnnotationCommand =
   | ArrowAnnotationCommand
   | LineAnnotationCommand
   | FreehandAnnotationCommand
+  | HighlightAnnotationCommand
   | MosaicAnnotationCommand;

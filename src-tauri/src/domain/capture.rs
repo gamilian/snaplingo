@@ -148,6 +148,11 @@ pub enum AnnotationCommand {
         color: [u8; 4],
         stroke_width: u32,
     },
+    Highlight {
+        points: Vec<LogicalPoint>,
+        color: [u8; 4],
+        stroke_width: u32,
+    },
     Mosaic {
         rect: LogicalRect,
         block_size: u32,
@@ -257,6 +262,26 @@ mod tests {
         assert_eq!(serialized["points"][0]["x"], 1.0);
         assert_eq!(serialized["points"][1]["y"], 4.0);
         assert_eq!(serialized["stroke_width"], 2);
+    }
+
+    #[test]
+    fn highlight_annotation_serializes_with_type_tag() {
+        let annotation = AnnotationCommand::Highlight {
+            points: vec![
+                LogicalPoint { x: 1.0, y: 2.0 },
+                LogicalPoint { x: 3.0, y: 4.0 },
+            ],
+            color: [255, 230, 0, 96],
+            stroke_width: 6,
+        };
+
+        let serialized = serde_json::to_value(&annotation).unwrap();
+
+        assert_eq!(serialized["type"], "highlight");
+        assert_eq!(serialized["points"][0]["x"], 1.0);
+        assert_eq!(serialized["points"][1]["y"], 4.0);
+        assert_eq!(serialized["color"][3], 96);
+        assert_eq!(serialized["stroke_width"], 6);
     }
 
     #[test]

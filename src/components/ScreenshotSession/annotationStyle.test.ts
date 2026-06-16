@@ -94,6 +94,23 @@ describe('annotation style', () => {
     });
   });
 
+  it('creates highlight annotations from the captured stroke points', () => {
+    expect(
+      annotationFromGesture(
+        'highlight',
+        { x: 1, y: 2 },
+        { x: 9, y: 10 },
+        style,
+        [{ x: 1, y: 2 }, { x: 4, y: 6 }, { x: 9, y: 10 }],
+      ),
+    ).toEqual({
+      type: 'highlight',
+      points: [{ x: 1, y: 2 }, { x: 4, y: 6 }, { x: 9, y: 10 }],
+      color: [40, 167, 69, 96],
+      stroke_width: 5,
+    });
+  });
+
   it('creates mosaic annotations with the selected block size', () => {
     expect(
       annotationFromGesture(
@@ -147,6 +164,17 @@ describe('annotation style', () => {
           { x: 1, y: 1 },
           { x: 2, y: 2 },
           style,
+        ),
+      ),
+    ).toBe(false);
+    expect(
+      isCommittedAnnotation(
+        annotationFromGesture(
+          'highlight',
+          { x: 1, y: 1 },
+          { x: 2, y: 2 },
+          style,
+          [{ x: 1, y: 1 }, { x: 2, y: 2 }],
         ),
       ),
     ).toBe(false);

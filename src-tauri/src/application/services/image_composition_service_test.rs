@@ -310,6 +310,44 @@ mod tests {
     }
 
     #[test]
+    fn composes_png_with_highlight_annotation() {
+        let service = ImageCompositionService::new();
+        let white = make_solid_png(8, 6, [255, 255, 255, 255]);
+
+        let output = service
+            .compose_png_with_annotations(
+                8,
+                6,
+                &[PngPlacement {
+                    png_data: white.as_slice(),
+                    source_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 8,
+                        height: 6,
+                    },
+                    destination_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 8,
+                        height: 6,
+                    },
+                }],
+                &[ImageAnnotation::Highlight {
+                    points: vec![PhysicalPoint { x: 1, y: 3 }, PhysicalPoint { x: 6, y: 3 }],
+                    color: [255, 0, 0, 128],
+                    stroke_width: 1,
+                }],
+            )
+            .unwrap();
+
+        assert_eq!(png_pixel(&output, 1, 3), [255, 127, 127, 255]);
+        assert_eq!(png_pixel(&output, 6, 3), [255, 127, 127, 255]);
+        assert_eq!(png_pixel(&output, 4, 3), [255, 127, 127, 255]);
+        assert_eq!(png_pixel(&output, 4, 1), [255, 255, 255, 255]);
+    }
+
+    #[test]
     fn composes_png_with_mosaic_annotation() {
         let service = ImageCompositionService::new();
         let png = make_png_from_pixels(
