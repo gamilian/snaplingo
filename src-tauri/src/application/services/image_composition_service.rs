@@ -52,6 +52,10 @@ pub enum ImageAnnotation {
         rect: PhysicalRect,
         block_size: u32,
     },
+    Blur {
+        rect: PhysicalRect,
+        radius: u32,
+    },
     Text {
         position: PhysicalPoint,
         text: String,
@@ -240,6 +244,7 @@ fn draw_annotation(output: &mut image::RgbaImage, annotation: &ImageAnnotation) 
         ImageAnnotation::Mosaic { rect, block_size } => {
             draw_mosaic_annotation(output, rect, *block_size)
         }
+        ImageAnnotation::Blur { rect, radius } => draw_blur_annotation(output, rect, *radius),
         ImageAnnotation::Text {
             position,
             text,
@@ -477,6 +482,29 @@ fn draw_mosaic_annotation(output: &mut image::RgbaImage, rect: &PhysicalRect, bl
 
         y += block_size;
     }
+}
+
+fn draw_blur_annotation(output: &mut image::RgbaImage, rect: &PhysicalRect, radius: u32) {
+    if rect.width == 0 || rect.height == 0 {
+        return;
+    }
+
+    let output_width = output.width() as i64;
+    let output_height = output.height() as i64;
+    let left = (rect.x as i64).max(0);
+    let top = (rect.y as i64).max(0);
+    let right = (rect.x as i64 + rect.width as i64).min(output_width);
+    let bottom = (rect.y as i64 + rect.height as i64).min(output_height);
+    if left >= right || top >= bottom {
+        return;
+    }
+
+    let width = (right - left) as u32;
+    let height = (bottom - top) as u32;
+    let region = image::imageops::crop_imm(output, left as u32, top as u32, width, height)
+        .to_image();
+    let blurred = image::imageops::blur(&region, radius.max(1) as f32);
+    image::imageops::overlay(output, &blurred, left, top);
 }
 
 fn draw_text_annotation(

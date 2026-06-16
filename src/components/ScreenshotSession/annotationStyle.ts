@@ -9,6 +9,7 @@ export type AnnotationTool =
   | 'pen'
   | 'highlight'
   | 'mosaic'
+  | 'blur'
   | 'text';
 export type AnnotationColor = [number, number, number, number];
 
@@ -88,6 +89,14 @@ export function annotationFromGesture(
     };
   }
 
+  if (tool === 'blur') {
+    return {
+      type: 'blur',
+      rect: normalizeSelection(startPoint, currentPoint),
+      radius: style.strokeWidth,
+    };
+  }
+
   if (tool === 'line') {
     return {
       type: 'line',
@@ -134,6 +143,13 @@ export function applyAnnotationStyle(
     };
   }
 
+  if (annotation.type === 'blur') {
+    return {
+      ...annotation,
+      radius: style.strokeWidth,
+    };
+  }
+
   if (annotation.type === 'text') {
     return {
       ...annotation,
@@ -165,7 +181,8 @@ export function isCommittedAnnotation(annotation: AnnotationCommand) {
   if (
     annotation.type === 'rectangle' ||
     annotation.type === 'ellipse' ||
-    annotation.type === 'mosaic'
+    annotation.type === 'mosaic' ||
+    annotation.type === 'blur'
   ) {
     return (
       annotation.rect.width >= MIN_ANNOTATION_SIZE &&

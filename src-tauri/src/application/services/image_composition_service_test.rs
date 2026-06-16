@@ -407,6 +407,56 @@ mod tests {
     }
 
     #[test]
+    fn composes_png_with_blur_annotation() {
+        let service = ImageCompositionService::new();
+        let png = make_png_from_pixels(
+            5,
+            1,
+            &[
+                10, 10, 10, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255, 20, 20, 20,
+                255,
+            ],
+        );
+
+        let output = service
+            .compose_png_with_annotations(
+                5,
+                1,
+                &[PngPlacement {
+                    png_data: png.as_slice(),
+                    source_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 5,
+                        height: 1,
+                    },
+                    destination_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 5,
+                        height: 1,
+                    },
+                }],
+                &[ImageAnnotation::Blur {
+                    rect: PhysicalRect {
+                        x: 1,
+                        y: 0,
+                        width: 3,
+                        height: 1,
+                    },
+                    radius: 2,
+                }],
+            )
+            .unwrap();
+
+        let blurred_center = png_pixel(&output, 2, 0);
+        assert_ne!(blurred_center, [255, 255, 255, 255]);
+        assert!(blurred_center[0] > 0);
+        assert_eq!(png_pixel(&output, 0, 0), [10, 10, 10, 255]);
+        assert_eq!(png_pixel(&output, 4, 0), [20, 20, 20, 255]);
+    }
+
+    #[test]
     fn composes_png_with_text_annotation() {
         let service = ImageCompositionService::new();
         let white = make_solid_png(80, 32, [255, 255, 255, 255]);

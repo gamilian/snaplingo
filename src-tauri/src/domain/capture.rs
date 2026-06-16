@@ -157,6 +157,10 @@ pub enum AnnotationCommand {
         rect: LogicalRect,
         block_size: u32,
     },
+    Blur {
+        rect: LogicalRect,
+        radius: u32,
+    },
     Text {
         position: LogicalPoint,
         text: String,
@@ -307,6 +311,25 @@ mod tests {
         assert_eq!(serialized["type"], "mosaic");
         assert_eq!(serialized["rect"]["x"], 1.0);
         assert_eq!(serialized["block_size"], 6);
+    }
+
+    #[test]
+    fn blur_annotation_serializes_with_type_tag() {
+        let annotation = AnnotationCommand::Blur {
+            rect: LogicalRect {
+                x: 1.0,
+                y: 2.0,
+                width: 3.0,
+                height: 4.0,
+            },
+            radius: 6,
+        };
+
+        let serialized = serde_json::to_value(&annotation).unwrap();
+
+        assert_eq!(serialized["type"], "blur");
+        assert_eq!(serialized["rect"]["x"], 1.0);
+        assert_eq!(serialized["radius"], 6);
     }
 
     #[test]

@@ -29,6 +29,12 @@ const text: AnnotationCommand = {
   font_size: 20,
 };
 
+const blur: AnnotationCommand = {
+  type: 'blur',
+  rect: { x: 30, y: 40, width: 20, height: 10 },
+  radius: 6,
+};
+
 describe('annotation geometry', () => {
   it('bounds rectangular and endpoint annotations', () => {
     expect(getAnnotationBounds(rectangle)).toEqual({
@@ -42,6 +48,12 @@ describe('annotation geometry', () => {
       y: 18,
       width: 44,
       height: 44,
+    });
+    expect(getAnnotationBounds(blur)).toEqual({
+      x: 30,
+      y: 40,
+      width: 20,
+      height: 10,
     });
   });
 
@@ -87,6 +99,10 @@ describe('annotation geometry', () => {
     expect(moveAnnotationByDelta(text, { x: 4, y: -6 })).toEqual({
       ...text,
       position: { x: 16, y: 84 },
+    });
+    expect(moveAnnotationByDelta(blur, { x: 4, y: -6 })).toEqual({
+      ...blur,
+      rect: { x: 34, y: 34, width: 20, height: 10 },
     });
   });
 });

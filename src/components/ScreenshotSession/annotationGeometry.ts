@@ -36,7 +36,8 @@ export function getAnnotationBounds(annotation: AnnotationCommand): LogicalRect 
   if (
     annotation.type === 'rectangle' ||
     annotation.type === 'ellipse' ||
-    annotation.type === 'mosaic'
+    annotation.type === 'mosaic' ||
+    annotation.type === 'blur'
   ) {
     return annotation.rect;
   }
@@ -92,7 +93,8 @@ export function moveAnnotationByDelta(
   if (
     annotation.type === 'rectangle' ||
     annotation.type === 'ellipse' ||
-    annotation.type === 'mosaic'
+    annotation.type === 'mosaic' ||
+    annotation.type === 'blur'
   ) {
     return {
       ...annotation,

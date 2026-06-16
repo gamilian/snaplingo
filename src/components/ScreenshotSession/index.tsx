@@ -107,7 +107,7 @@ const EDGE_SNAP_THRESHOLD = 6;
 const KEYBOARD_NUDGE_STEP = 1;
 const KEYBOARD_FAST_NUDGE_STEP = 10;
 const TOOLBAR_GAP = 8;
-const TOOLBAR_SIZE = { width: 1040, height: 36 };
+const TOOLBAR_SIZE = { width: 1110, height: 36 };
 const MAGNIFIER_GAP = 14;
 const MAGNIFIER_SIZE = { width: 120, height: 96 };
 const MAGNIFIER_ZOOM = 4;
@@ -705,6 +705,14 @@ export default function ScreenshotSession({
         setAnnotationStyle((style) => ({
           ...style,
           strokeWidth: annotation.block_size,
+        }));
+        return;
+      }
+
+      if (annotation.type === 'blur') {
+        setAnnotationStyle((style) => ({
+          ...style,
+          strokeWidth: annotation.radius,
         }));
         return;
       }
@@ -1442,6 +1450,20 @@ export default function ScreenshotSession({
               }}
             />
           )}
+          {draftAnnotation?.type === 'blur' && (
+            <div
+              className="pointer-events-none absolute border border-white/70 bg-white/10"
+              style={{
+                ...rectStyle(
+                  annotationRectToViewportRect(
+                    draftAnnotation.rect,
+                    selectionViewportRect,
+                  ),
+                ),
+                backdropFilter: `blur(${draftAnnotation.radius}px)`,
+              }}
+            />
+          )}
           {draftAnnotation?.type === 'line' && (
             <svg
               className="pointer-events-none absolute overflow-visible"
@@ -1736,6 +1758,18 @@ export default function ScreenshotSession({
                 onClick={() => toggleAnnotationTool('mosaic')}
               >
                 Mosaic
+              </button>
+              <button
+                type="button"
+                className={`h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50 ${
+                  activeAnnotationTool === 'blur' ? 'bg-white/15' : ''
+                }`}
+                disabled={isRenderingOutput}
+                title="Blur"
+                aria-label="Draw blur annotation"
+                onClick={() => toggleAnnotationTool('blur')}
+              >
+                Blur
               </button>
               <button
                 type="button"

@@ -109,6 +109,12 @@ export interface MosaicAnnotationCommand {
   block_size: number;
 }
 
+export interface BlurAnnotationCommand {
+  type: 'blur';
+  rect: LogicalRect;
+  radius: number;
+}
+
 export interface TextAnnotationCommand {
   type: 'text';
   position: Point;
@@ -125,4 +131,5 @@ export type AnnotationCommand =
   | FreehandAnnotationCommand
   | HighlightAnnotationCommand
   | MosaicAnnotationCommand
+  | BlurAnnotationCommand
   | TextAnnotationCommand;

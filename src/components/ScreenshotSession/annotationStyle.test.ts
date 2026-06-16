@@ -128,6 +128,21 @@ describe('annotation style', () => {
     });
   });
 
+  it('creates blur annotations with the selected radius', () => {
+    expect(
+      annotationFromGesture(
+        'blur',
+        { x: 12, y: 20 },
+        { x: 4, y: 6 },
+        style,
+      ),
+    ).toEqual({
+      type: 'blur',
+      rect: { x: 4, y: 6, width: 8, height: 14 },
+      radius: 5,
+    });
+  });
+
   it('creates text annotations with the selected color and font size', () => {
     expect(
       annotationFromText({ x: 6, y: 8 }, 'Snap text', style, 24),
@@ -189,6 +204,21 @@ describe('annotation style', () => {
       rect: { x: 1, y: 2, width: 10, height: 8 },
       block_size: 5,
     });
+
+    expect(
+      applyAnnotationStyle(
+        {
+          type: 'blur',
+          rect: { x: 1, y: 2, width: 10, height: 8 },
+          radius: 2,
+        },
+        style,
+      ),
+    ).toEqual({
+      type: 'blur',
+      rect: { x: 1, y: 2, width: 10, height: 8 },
+      radius: 5,
+    });
   });
 
   it('updates text annotations with the selected color and font size', () => {
@@ -218,6 +248,16 @@ describe('annotation style', () => {
       isCommittedAnnotation(
         annotationFromGesture(
           'mosaic',
+          { x: 1, y: 1 },
+          { x: 2, y: 2 },
+          style,
+        ),
+      ),
+    ).toBe(false);
+    expect(
+      isCommittedAnnotation(
+        annotationFromGesture(
+          'blur',
           { x: 1, y: 1 },
           { x: 2, y: 2 },
           style,

@@ -507,6 +507,10 @@ fn image_annotations_from_commands(
                 rect: scaled_logical_rect_relative_to(rect, &annotation_origin, output_scale)?,
                 block_size: ((*block_size).max(1) as f64 * output_scale).ceil() as u32,
             }),
+            AnnotationCommand::Blur { rect, radius } => Ok(ImageAnnotation::Blur {
+                rect: scaled_logical_rect_relative_to(rect, &annotation_origin, output_scale)?,
+                radius: ((*radius).max(1) as f64 * output_scale).ceil() as u32,
+            }),
             AnnotationCommand::Text {
                 position,
                 text,
@@ -945,6 +949,15 @@ mod tests {
                     },
                     block_size: 3,
                 },
+                AnnotationCommand::Blur {
+                    rect: LogicalRect {
+                        x: 1.0,
+                        y: 2.0,
+                        width: 3.0,
+                        height: 4.0,
+                    },
+                    radius: 3,
+                },
                 AnnotationCommand::Ellipse {
                     rect: LogicalRect {
                         x: 0.5,
@@ -972,7 +985,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(annotations.len(), 8);
+        assert_eq!(annotations.len(), 9);
         assert_eq!(
             annotations[0],
             ImageAnnotation::Rectangle {
@@ -1034,6 +1047,18 @@ mod tests {
         );
         assert_eq!(
             annotations[6],
+            ImageAnnotation::Blur {
+                rect: PhysicalRect {
+                    x: 2,
+                    y: 4,
+                    width: 6,
+                    height: 8,
+                },
+                radius: 6,
+            }
+        );
+        assert_eq!(
+            annotations[7],
             ImageAnnotation::Ellipse {
                 rect: PhysicalRect {
                     x: 1,
@@ -1046,7 +1071,7 @@ mod tests {
             }
         );
         assert_eq!(
-            annotations[7],
+            annotations[8],
             ImageAnnotation::Text {
                 position: PhysicalPoint { x: 7, y: 9 },
                 text: "Snap".to_string(),
