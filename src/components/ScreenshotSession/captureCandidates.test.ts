@@ -1,0 +1,94 @@
+import { describe, expect, it } from 'vitest';
+import {
+  buildMonitorCandidates,
+  getBestCandidateAtPoint,
+  type CaptureCandidate,
+} from './captureCandidates';
+import type { MonitorSnapshotView } from './types';
+
+const monitors: MonitorSnapshotView[] = [
+  {
+    id: 'left',
+    logical_bounds: { x: -1280, y: 0, width: 1280, height: 720 },
+    physical_bounds: { x: -2560, y: 0, width: 2560, height: 1440 },
+    scale_factor: 2,
+    image_base64: 'left-image',
+  },
+  {
+    id: 'primary',
+    logical_bounds: { x: 0, y: 0, width: 1440, height: 900 },
+    physical_bounds: { x: 0, y: 0, width: 2880, height: 1800 },
+    scale_factor: 2,
+    image_base64: 'primary-image',
+  },
+];
+
+describe('capture candidates', () => {
+  it('builds monitor candidates from frozen monitor bounds', () => {
+    expect(buildMonitorCandidates(monitors)).toEqual([
+      {
+        id: 'monitor:left',
+        kind: 'monitor',
+        rect: { x: -1280, y: 0, width: 1280, height: 720 },
+        priority: 0,
+      },
+      {
+        id: 'monitor:primary',
+        kind: 'monitor',
+        rect: { x: 0, y: 0, width: 1440, height: 900 },
+        priority: 0,
+      },
+    ]);
+  });
+
+  it('returns the highest priority candidate under a point', () => {
+    const candidates: CaptureCandidate[] = [
+      {
+        id: 'monitor:primary',
+        kind: 'monitor',
+        rect: { x: 0, y: 0, width: 1440, height: 900 },
+        priority: 0,
+      },
+      {
+        id: 'window:settings',
+        kind: 'window',
+        rect: { x: 100, y: 100, width: 500, height: 400 },
+        priority: 10,
+      },
+    ];
+
+    expect(getBestCandidateAtPoint(candidates, { x: 120, y: 120 })?.id).toBe(
+      'window:settings',
+    );
+  });
+
+  it('uses the smallest candidate when priorities match', () => {
+    const candidates: CaptureCandidate[] = [
+      {
+        id: 'window:outer',
+        kind: 'window',
+        rect: { x: 0, y: 0, width: 500, height: 500 },
+        priority: 10,
+      },
+      {
+        id: 'window:inner',
+        kind: 'window',
+        rect: { x: 100, y: 100, width: 200, height: 150 },
+        priority: 10,
+      },
+    ];
+
+    expect(getBestCandidateAtPoint(candidates, { x: 120, y: 120 })?.id).toBe(
+      'window:inner',
+    );
+  });
+
+  it('returns null when no candidate contains the point', () => {
+    expect(
+      getBestCandidateAtPoint(buildMonitorCandidates(monitors), {
+        x: 2000,
+        y: 20,
+      }),
+    ).toBeNull();
+  });
+});

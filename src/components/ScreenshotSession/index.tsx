@@ -18,6 +18,10 @@ import {
   type ColorSample,
   sampleCanvasColor,
 } from './colorSampler';
+import {
+  buildMonitorCandidates,
+  getBestCandidateAtPoint,
+} from './captureCandidates';
 import { saveCaptureSelection } from './captureActions';
 import { parseCaptureLaunchPayload } from './windowMode';
 import {
@@ -219,6 +223,7 @@ export default function ScreenshotSession({
   const [startPoint, setStartPoint] = useState<Point | null>(null);
   const [cursorPoint, setCursorPoint] = useState<Point | null>(null);
   const [selection, setSelection] = useState<LogicalRect | null>(null);
+  const [hoverSelection, setHoverSelection] = useState<LogicalRect | null>(null);
   const [editGesture, setEditGesture] = useState<EditGesture | null>(null);
   const [previewImageBase64, setPreviewImageBase64] = useState<string | null>(null);
   const [cursorColor, setCursorColor] = useState<ColorSample | null>(null);
@@ -231,6 +236,14 @@ export default function ScreenshotSession({
   const sizeLabel = selection
     ? `${Math.round(selection.width)} x ${Math.round(selection.height)}`
     : '';
+  const hoverSizeLabel = hoverSelection
+    ? `${Math.round(hoverSelection.width)} x ${Math.round(hoverSelection.height)}`
+    : '';
+  const captureCandidates = useMemo(() => {
+    if (!session) return [];
+
+    return buildMonitorCandidates(session.monitors);
+  }, [session]);
   const selectionBounds = useMemo<LogicalRect | null>(() => {
     if (!session) return null;
 
@@ -251,6 +264,11 @@ export default function ScreenshotSession({
 
     return virtualRectToViewportRect(selection, selectionBounds);
   }, [selection, selectionBounds]);
+  const hoverSelectionViewportRect = useMemo<LogicalRect | null>(() => {
+    if (!hoverSelection || !selectionBounds || selection) return null;
+
+    return virtualRectToViewportRect(hoverSelection, selectionBounds);
+  }, [hoverSelection, selection, selectionBounds]);
   const cursorViewportPoint = useMemo<Point | null>(() => {
     if (!cursorPoint || !selectionBounds) return null;
 
@@ -281,6 +299,7 @@ export default function ScreenshotSession({
     setStartPoint(null);
     setCursorPoint(null);
     setSelection(null);
+    setHoverSelection(null);
     setEditGesture(null);
     setPreviewImageBase64(null);
     setCursorColor(null);
@@ -310,6 +329,7 @@ export default function ScreenshotSession({
     setStartPoint(null);
     setCursorPoint(null);
     setSelection(null);
+    setHoverSelection(null);
     setEditGesture(null);
     setPreviewImageBase64(null);
     setCursorColor(null);
@@ -622,6 +642,10 @@ export default function ScreenshotSession({
       setCursorPoint(point);
     }
 
+    if (!startPoint && !editGesture && status === 'selecting') {
+      setHoverSelection(getBestCandidateAtPoint(captureCandidates, point)?.rect ?? null);
+    }
+
     if (editGesture) {
       setSelection(applyEditGesture(editGesture, point));
       setPreviewImageBase64(null);
@@ -661,11 +685,20 @@ export default function ScreenshotSession({
       nextSelection.width < MIN_SELECTION_SIZE ||
       nextSelection.height < MIN_SELECTION_SIZE
     ) {
+      if (hoverSelection) {
+        setSelection(hoverSelection);
+        setHoverSelection(null);
+        setStatus('preview');
+        void renderSelectionPreview(hoverSelection);
+        return;
+      }
+
       setSelection(null);
       return;
     }
 
     setSelection(nextSelection);
+    setHoverSelection(null);
     setStatus('preview');
     void renderSelectionPreview(nextSelection);
   };
@@ -749,6 +782,25 @@ export default function ScreenshotSession({
         <div className="absolute left-4 top-4 max-w-md rounded bg-red-950/90 px-3 py-2 text-sm text-red-100 shadow-lg">
           {error}
         </div>
+      )}
+
+      {hoverSelectionViewportRect && status === 'selecting' && (
+        <>
+          <DimMask rect={hoverSelectionViewportRect} />
+          <div
+            className="pointer-events-none absolute border border-white/80 bg-white/5"
+            style={rectStyle(hoverSelectionViewportRect)}
+          />
+          <div
+            className="pointer-events-none absolute rounded bg-black/80 px-2 py-1 text-xs leading-none text-white shadow"
+            style={{
+              left: `${hoverSelectionViewportRect.x}px`,
+              top: `${Math.max(0, hoverSelectionViewportRect.y - 24)}px`,
+            }}
+          >
+            {hoverSizeLabel}
+          </div>
+        </>
       )}
 
       {selection && selectionViewportRect && (
@@ -877,7 +929,7 @@ export default function ScreenshotSession({
             width: cursorMonitor.logical_bounds.width,
             height: cursorMonitor.logical_bounds.height,
           }}
-          selection={selection}
+          selection={selection ?? hoverSelection}
           color={cursorColor}
         />
       )}
