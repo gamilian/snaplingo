@@ -23,6 +23,16 @@ export interface MonitorSnapshotView {
 export interface CaptureSessionView {
   id: string;
   monitors: MonitorSnapshotView[];
+  candidates: CaptureCandidateView[];
+}
+
+export type CaptureCandidateKind = 'monitor' | 'window' | 'control';
+
+export interface CaptureCandidateView {
+  id: string;
+  kind: CaptureCandidateKind;
+  rect: LogicalRect;
+  priority: number;
 }
 
 export interface PinnedImageView {

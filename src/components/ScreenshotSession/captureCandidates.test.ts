@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildCaptureCandidates,
   buildMonitorCandidates,
   getBestCandidateAtPoint,
   type CaptureCandidate,
 } from './captureCandidates';
-import type { MonitorSnapshotView } from './types';
+import type { CaptureCandidateView, MonitorSnapshotView } from './types';
 
 const monitors: MonitorSnapshotView[] = [
   {
@@ -37,6 +38,38 @@ describe('capture candidates', () => {
         kind: 'monitor',
         rect: { x: 0, y: 0, width: 1440, height: 900 },
         priority: 0,
+      },
+    ]);
+  });
+
+  it('combines backend candidates with monitor candidates', () => {
+    const backendCandidates: CaptureCandidateView[] = [
+      {
+        id: 'window:settings',
+        kind: 'window',
+        rect: { x: 100, y: 100, width: 500, height: 400 },
+        priority: 10,
+      },
+    ];
+
+    expect(buildCaptureCandidates(monitors, backendCandidates)).toEqual([
+      {
+        id: 'monitor:left',
+        kind: 'monitor',
+        rect: { x: -1280, y: 0, width: 1280, height: 720 },
+        priority: 0,
+      },
+      {
+        id: 'monitor:primary',
+        kind: 'monitor',
+        rect: { x: 0, y: 0, width: 1440, height: 900 },
+        priority: 0,
+      },
+      {
+        id: 'window:settings',
+        kind: 'window',
+        rect: { x: 100, y: 100, width: 500, height: 400 },
+        priority: 10,
       },
     ]);
   });

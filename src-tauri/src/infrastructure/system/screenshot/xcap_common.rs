@@ -1,8 +1,11 @@
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use super::backend::ScreenRegion;
-use super::backend::{monitor_snapshot_from_physical_geometry, rgba_image_to_png, MonitorSnapshot};
+use super::backend::{
+    monitor_snapshot_from_physical_geometry, rgba_image_to_png,
+    window_candidate_from_physical_geometry, MonitorSnapshot, WindowCandidate,
+};
 use crate::error::AppError;
-use xcap::Monitor;
+use xcap::{Monitor, Window};
 
 /// Get the primary monitor (not just the first enumerated one).
 #[cfg(any(target_os = "windows", target_os = "linux"))]
@@ -50,6 +53,68 @@ pub fn capture_all_monitor_snapshots() -> Result<Vec<MonitorSnapshot>, AppError>
         .enumerate()
         .map(|(index, monitor)| capture_monitor_snapshot(monitor, index))
         .collect()
+}
+
+pub fn capture_window_candidates(
+    monitors: &[MonitorSnapshot],
+) -> Result<Vec<WindowCandidate>, AppError> {
+    let windows = Window::all()
+        .map_err(|e| with_platform_hint(format!("Failed to enumerate windows: {}", e)))?;
+
+    let mut candidates = Vec::new();
+    for (index, window) in windows.iter().enumerate() {
+        let Ok(is_minimized) = window.is_minimized() else {
+            continue;
+        };
+        if is_minimized {
+            continue;
+        }
+
+        let title = window.title().unwrap_or_default();
+        let app_name = window.app_name().unwrap_or_default();
+        if should_skip_window_candidate(&title, &app_name) {
+            continue;
+        }
+
+        let Ok(width) = window.width() else {
+            continue;
+        };
+        let Ok(height) = window.height() else {
+            continue;
+        };
+        if width < 2 || height < 2 {
+            continue;
+        }
+
+        let Ok(x) = window.x() else {
+            continue;
+        };
+        let Ok(y) = window.y() else {
+            continue;
+        };
+        let id = window
+            .id()
+            .map(|id| format!("window-{}", id))
+            .unwrap_or_else(|_| format!("window-{}", index));
+
+        if let Some(candidate) = window_candidate_from_physical_geometry(
+            id, title, app_name, x, y, width, height, monitors,
+        ) {
+            candidates.push(candidate);
+        }
+    }
+
+    Ok(candidates)
+}
+
+fn should_skip_window_candidate(title: &str, app_name: &str) -> bool {
+    let title = title.to_ascii_lowercase();
+    let app_name = app_name.to_ascii_lowercase();
+
+    title == "snaplingo capture"
+        || title == "snaplingo pin"
+        || app_name == "snaplingo capture"
+        || app_name == "snaplingo pin"
 }
 
 fn capture_monitor_snapshot(

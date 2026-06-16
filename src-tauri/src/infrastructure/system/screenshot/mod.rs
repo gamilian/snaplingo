@@ -9,7 +9,7 @@ mod windows;
 #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
 mod xcap_common;
 
-pub use backend::{MonitorSnapshot, ScreenRegion, ScreenshotBackend};
+pub use backend::{MonitorSnapshot, ScreenRegion, ScreenshotBackend, WindowCandidate};
 
 use std::sync::Arc;
 

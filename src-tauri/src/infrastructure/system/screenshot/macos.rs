@@ -1,4 +1,4 @@
-use super::backend::{MonitorSnapshot, ScreenRegion, ScreenshotBackend};
+use super::backend::{MonitorSnapshot, ScreenRegion, ScreenshotBackend, WindowCandidate};
 use super::xcap_common;
 use crate::error::AppError;
 use core_graphics::display::{CGDisplay, CGRect};
@@ -61,6 +61,13 @@ fn image_to_png(cg_image: CGImage) -> Result<Vec<u8>, AppError> {
 impl ScreenshotBackend for MacOSScreenshotBackend {
     async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError> {
         xcap_common::capture_all_monitor_snapshots()
+    }
+
+    async fn capture_window_candidates(
+        &self,
+        monitors: &[MonitorSnapshot],
+    ) -> Result<Vec<WindowCandidate>, AppError> {
+        xcap_common::capture_window_candidates(monitors)
     }
 
     async fn capture_full_screen(&self) -> Result<Vec<u8>, AppError> {

@@ -68,11 +68,21 @@ pub struct MonitorSnapshotView {
     pub image_base64: String,
 }
 
+/// Frontend hover target candidate captured at session start.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CaptureCandidateView {
+    pub id: String,
+    pub kind: String,
+    pub rect: LogicalRect,
+    pub priority: i32,
+}
+
 /// View returned to the frontend after a capture session is created.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CaptureSessionView {
     pub id: CaptureSessionId,
     pub monitors: Vec<MonitorSnapshotView>,
+    pub candidates: Vec<CaptureCandidateView>,
 }
 
 /// Frontend-safe pinned image metadata and image data.

@@ -1,6 +1,10 @@
-import type { LogicalRect, MonitorSnapshotView, Point } from './types';
-
-export type CaptureCandidateKind = 'monitor' | 'window' | 'control';
+import type {
+  CaptureCandidateKind,
+  CaptureCandidateView,
+  LogicalRect,
+  MonitorSnapshotView,
+  Point,
+} from './types';
 
 export interface CaptureCandidate {
   id: string;
@@ -18,6 +22,13 @@ export function buildMonitorCandidates(
     rect: monitor.logical_bounds,
     priority: 0,
   }));
+}
+
+export function buildCaptureCandidates(
+  monitors: MonitorSnapshotView[],
+  candidates: CaptureCandidateView[] = [],
+): CaptureCandidate[] {
+  return [...buildMonitorCandidates(monitors), ...candidates];
 }
 
 export function getBestCandidateAtPoint(

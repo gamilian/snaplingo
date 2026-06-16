@@ -24,6 +24,14 @@ pub struct MonitorSnapshot {
     pub png_data: Vec<u8>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct WindowCandidate {
+    pub id: String,
+    pub title: String,
+    pub app_name: String,
+    pub logical_bounds: LogicalRect,
+}
+
 pub fn monitor_snapshot_from_physical_geometry(
     id: String,
     x: i32,
@@ -58,6 +66,63 @@ pub fn monitor_snapshot_from_physical_geometry(
     }
 }
 
+pub fn window_candidate_from_physical_geometry(
+    id: String,
+    title: String,
+    app_name: String,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+    monitors: &[MonitorSnapshot],
+) -> Option<WindowCandidate> {
+    if width == 0 || height == 0 {
+        return None;
+    }
+
+    let physical_bounds = PhysicalRect {
+        x,
+        y,
+        width,
+        height,
+    };
+    let monitor = monitors.iter().max_by_key(|monitor| {
+        physical_intersection_area(&physical_bounds, &monitor.physical_bounds)
+    })?;
+
+    if physical_intersection_area(&physical_bounds, &monitor.physical_bounds) == 0 {
+        return None;
+    }
+
+    let scale = monitor.scale_factor.max(1.0);
+    let logical_bounds = LogicalRect {
+        x: monitor.logical_bounds.x + (x - monitor.physical_bounds.x) as f64 / scale,
+        y: monitor.logical_bounds.y + (y - monitor.physical_bounds.y) as f64 / scale,
+        width: width as f64 / scale,
+        height: height as f64 / scale,
+    };
+
+    Some(WindowCandidate {
+        id,
+        title,
+        app_name,
+        logical_bounds,
+    })
+}
+
+fn physical_intersection_area(a: &PhysicalRect, b: &PhysicalRect) -> u64 {
+    let left = a.x.max(b.x);
+    let top = a.y.max(b.y);
+    let right = (a.x as i64 + a.width as i64).min(b.x as i64 + b.width as i64);
+    let bottom = (a.y as i64 + a.height as i64).min(b.y as i64 + b.height as i64);
+
+    if right <= left as i64 || bottom <= top as i64 {
+        return 0;
+    }
+
+    ((right - left as i64) * (bottom - top as i64)) as u64
+}
+
 /// Encode an RGBA image to PNG bytes.
 ///
 /// Platform-agnostic helper shared by backends that produce `image::RgbaImage`
@@ -79,6 +144,13 @@ pub trait ScreenshotBackend: Send + Sync {
     /// Capture all monitor snapshots needed to start a capture session.
     /// First implementations may return only the primary monitor.
     async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError>;
+
+    async fn capture_window_candidates(
+        &self,
+        _monitors: &[MonitorSnapshot],
+    ) -> Result<Vec<WindowCandidate>, AppError> {
+        Ok(Vec::new())
+    }
 
     /// Capture the entire screen
     /// Returns PNG-encoded image data
@@ -164,5 +236,68 @@ mod tests {
         );
         assert_eq!(snapshot.scale_factor, 2.0);
         assert_eq!(snapshot.png_data, vec![4, 5, 6]);
+    }
+
+    #[test]
+    fn window_candidate_from_physical_geometry_uses_matching_monitor_scale() {
+        let monitors = vec![monitor_snapshot_from_physical_geometry(
+            "retina".to_string(),
+            -2560,
+            0,
+            2560,
+            1440,
+            2.0,
+            vec![],
+        )];
+
+        let candidate = super::window_candidate_from_physical_geometry(
+            "window-7".to_string(),
+            "Settings".to_string(),
+            "System Settings".to_string(),
+            -2360,
+            100,
+            800,
+            600,
+            &monitors,
+        )
+        .unwrap();
+
+        assert_eq!(candidate.id, "window-7");
+        assert_eq!(candidate.title, "Settings");
+        assert_eq!(
+            candidate.logical_bounds,
+            crate::domain::capture::LogicalRect {
+                x: -1180.0,
+                y: 50.0,
+                width: 400.0,
+                height: 300.0,
+            }
+        );
+    }
+
+    #[test]
+    fn window_candidate_from_physical_geometry_rejects_offscreen_windows() {
+        let monitors = vec![monitor_snapshot_from_physical_geometry(
+            "primary".to_string(),
+            0,
+            0,
+            1000,
+            800,
+            1.0,
+            vec![],
+        )];
+
+        let candidate = super::window_candidate_from_physical_geometry(
+            "window-8".to_string(),
+            "Hidden".to_string(),
+            "Example".to_string(),
+            1200,
+            100,
+            400,
+            300,
+            &monitors,
+        );
+
+        assert!(candidate.is_none());
     }
 }

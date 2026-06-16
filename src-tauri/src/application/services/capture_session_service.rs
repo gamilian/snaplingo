@@ -6,10 +6,13 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use base64::Engine;
 
 use crate::domain::capture::{
-    CaptureSessionId, CaptureSessionView, LogicalRect, MonitorSnapshotView, PhysicalRect,
+    CaptureCandidateView, CaptureSessionId, CaptureSessionView, LogicalRect, MonitorSnapshotView,
+    PhysicalRect,
 };
 use crate::error::{AppError, Result};
-use crate::infrastructure::system::screenshot::{MonitorSnapshot, ScreenshotBackend};
+use crate::infrastructure::system::screenshot::{
+    MonitorSnapshot, ScreenshotBackend, WindowCandidate,
+};
 
 static NEXT_SESSION_COUNTER: AtomicU64 = AtomicU64::new(1);
 
@@ -17,6 +20,7 @@ static NEXT_SESSION_COUNTER: AtomicU64 = AtomicU64::new(1);
 pub struct CaptureSession {
     pub id: CaptureSessionId,
     pub snapshots: Vec<MonitorSnapshot>,
+    pub candidates: Vec<CaptureCandidateView>,
     pub created_at: SystemTime,
 }
 
@@ -41,15 +45,30 @@ impl CaptureSessionService {
                 "Cannot create capture session without monitor snapshots".to_string(),
             ));
         }
+        let window_candidates = self
+            .screenshot_backend
+            .capture_window_candidates(&snapshots)
+            .await
+            .map_err(|err| {
+                log::warn!("Failed to capture window candidates: {}", err);
+                err
+            })
+            .unwrap_or_default();
+        let candidates = window_candidates
+            .iter()
+            .map(window_candidate_to_view)
+            .collect::<Vec<_>>();
 
         let id = CaptureSessionId(generate_session_id());
         let view = CaptureSessionView {
             id: id.clone(),
             monitors: snapshots.iter().map(snapshot_to_view).collect(),
+            candidates: candidates.clone(),
         };
         let session = CaptureSession {
             id: id.clone(),
             snapshots,
+            candidates,
             created_at: SystemTime::now(),
         };
 
@@ -104,6 +123,15 @@ impl CaptureSessionService {
             })?;
 
         logical_rect_to_snapshot_physical(rect, snapshot)
+    }
+}
+
+fn window_candidate_to_view(candidate: &WindowCandidate) -> CaptureCandidateView {
+    CaptureCandidateView {
+        id: candidate.id.clone(),
+        kind: "window".to_string(),
+        rect: candidate.logical_bounds.clone(),
+        priority: 10,
     }
 }
 

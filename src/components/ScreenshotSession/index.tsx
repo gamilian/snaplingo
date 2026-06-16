@@ -19,7 +19,7 @@ import {
   sampleCanvasColor,
 } from './colorSampler';
 import {
-  buildMonitorCandidates,
+  buildCaptureCandidates,
   getBestCandidateAtPoint,
 } from './captureCandidates';
 import { saveCaptureSelection } from './captureActions';
@@ -242,7 +242,7 @@ export default function ScreenshotSession({
   const captureCandidates = useMemo(() => {
     if (!session) return [];
 
-    return buildMonitorCandidates(session.monitors);
+    return buildCaptureCandidates(session.monitors, session.candidates);
   }, [session]);
   const selectionBounds = useMemo<LogicalRect | null>(() => {
     if (!session) return null;

@@ -80,6 +80,7 @@ pub fn get_capture_session(
     Ok(CaptureSessionView {
         id: session.id,
         monitors: session.snapshots.iter().map(snapshot_to_view).collect(),
+        candidates: session.candidates,
     })
 }
 
