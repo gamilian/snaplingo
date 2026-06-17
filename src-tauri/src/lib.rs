@@ -517,6 +517,7 @@ pub fn run() {
       commands::toggle_pinned_images_visibility,
       commands::switch_pinned_image_group,
       commands::move_pinned_image_to_next_group,
+      commands::hide_pinned_image_group,
       commands::destroy_pinned_image_group,
       commands::run_capture_ocr,
       commands::get_translation_history,

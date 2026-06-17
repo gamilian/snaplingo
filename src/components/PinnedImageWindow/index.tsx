@@ -16,6 +16,7 @@ import {
   destroyPinnedImage,
   destroyPinnedImageGroup,
   hidePinnedImage,
+  hidePinnedImageGroup,
   isCopyPinnedImageShortcut,
   isDestroyPinnedImageShortcut,
   isSavePinnedImageShortcut,
@@ -25,7 +26,7 @@ import {
 
 const appWindow = getCurrentWindow();
 const webviewWindow = getCurrentWebviewWindow();
-const PIN_CONTEXT_MENU_SIZE = { width: 132, height: 304 };
+const PIN_CONTEXT_MENU_SIZE = { width: 132, height: 332 };
 
 function readPinnedImageId(search: string) {
   const params = new URLSearchParams(search);
@@ -67,6 +68,15 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
   const destroyCurrentPinnedImageGroup = useCallback(async () => {
     try {
       await destroyPinnedImageGroup(invoke, imageId);
+      setContextMenuPosition(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [imageId]);
+
+  const hideCurrentPinnedImageGroup = useCallback(async () => {
+    try {
+      await hidePinnedImageGroup(invoke, imageId);
       setContextMenuPosition(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -313,6 +323,13 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
             onClick={hideCurrentPinnedImage}
           >
             Hide
+          </button>
+          <button
+            type="button"
+            className="h-7 w-full rounded px-2 text-left hover:bg-white/15"
+            onClick={hideCurrentPinnedImageGroup}
+          >
+            Hide Group
           </button>
           <button
             type="button"

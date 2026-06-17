@@ -54,6 +54,10 @@ export async function hidePinnedImage(window: PinWindow) {
   await window.hide?.();
 }
 
+export async function hidePinnedImageGroup(invoke: PinInvoke, imageId: string) {
+  await invoke('hide_pinned_image_group', { imageId });
+}
+
 export async function destroyPinnedImage(
   invoke: PinInvoke,
   imageId: string,

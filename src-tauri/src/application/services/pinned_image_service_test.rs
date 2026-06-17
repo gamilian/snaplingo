@@ -150,4 +150,25 @@ mod tests {
         assert!(service.get_pinned_image(&second_group_image).is_ok());
         assert!(service.switch_to_next_group().is_none());
     }
+
+    #[test]
+    fn finds_every_pinned_image_in_the_same_group() {
+        let service = PinnedImageService::new();
+        let first_group_image = service.pin_png(make_test_png(1, 1)).unwrap();
+        let first_group_peer = service.pin_png(make_test_png(1, 1)).unwrap();
+        let second_group_image = service.pin_png(make_test_png(1, 1)).unwrap();
+
+        service
+            .move_pinned_image_to_group(&second_group_image, 1)
+            .unwrap();
+
+        let membership = service
+            .pinned_image_group_containing(&first_group_image)
+            .unwrap();
+        let mut expected_image_ids = vec![first_group_image, first_group_peer];
+        expected_image_ids.sort();
+
+        assert_eq!(membership.group, 0);
+        assert_eq!(membership.image_ids, expected_image_ids);
+    }
 }

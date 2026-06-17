@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   destroyPinnedImage,
   destroyPinnedImageGroup,
+  hidePinnedImageGroup,
   hidePinnedImage,
   isCopyPinnedImageShortcut,
   isDestroyPinnedImageShortcut,
@@ -160,6 +161,26 @@ describe('pinned image actions', () => {
     expect(calls).toEqual([
       {
         command: 'destroy_pinned_image_group',
+        args: { imageId: 'pin-1' },
+      },
+    ]);
+  });
+
+  it('hides the group containing a pinned image', async () => {
+    const calls: Array<{ command: string; args?: unknown }> = [];
+    const invoke: PinInvoke = async <T>(
+      command: string,
+      args?: PinInvokeArgs,
+    ): Promise<T> => {
+      calls.push({ command, args });
+      return undefined as T;
+    };
+
+    await hidePinnedImageGroup(invoke, 'pin-1');
+
+    expect(calls).toEqual([
+      {
+        command: 'hide_pinned_image_group',
         args: { imageId: 'pin-1' },
       },
     ]);

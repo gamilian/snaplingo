@@ -317,6 +317,27 @@ pub fn move_pinned_image_to_next_group(
 }
 
 #[tauri::command]
+pub fn hide_pinned_image_group(
+    image_id: String,
+    app: AppHandle,
+    state: State<'_, crate::AppState>,
+) -> Result<Vec<String>, String> {
+    let membership = state
+        .inner()
+        .pinned_image_service
+        .pinned_image_group_containing(&image_id)
+        .map_err(|e| e.to_string())?;
+
+    for change in hidden_pinned_group_window_visibility_changes(&membership.image_ids) {
+        if let Some(window) = app.get_webview_window(&change.label) {
+            window.hide().map_err(|e| e.to_string())?;
+        }
+    }
+
+    Ok(membership.image_ids)
+}
+
+#[tauri::command]
 pub fn destroy_pinned_image_group(
     image_id: String,
     app: AppHandle,
@@ -727,6 +748,18 @@ fn moved_pinned_image_window_visibility_change(image_id: &str) -> PinnedWindowVi
         label: pinned_window_label(image_id),
         visible: false,
     }
+}
+
+fn hidden_pinned_group_window_visibility_changes(
+    image_ids: &[String],
+) -> Vec<PinnedWindowVisibilityChange> {
+    image_ids
+        .iter()
+        .map(|image_id| PinnedWindowVisibilityChange {
+            label: pinned_window_label(image_id),
+            visible: false,
+        })
+        .collect()
 }
 
 fn destroyed_pinned_group_window_labels(image_ids: &[String]) -> Vec<String> {
@@ -1335,6 +1368,26 @@ mod tests {
                 "pin-1".to_string(),
             ]),
             vec!["pin-pin-2".to_string(), "pin-pin-1".to_string()]
+        );
+    }
+
+    #[test]
+    fn plans_hidden_pinned_group_windows_to_hide() {
+        assert_eq!(
+            super::hidden_pinned_group_window_visibility_changes(&[
+                "pin-2".to_string(),
+                "pin-1".to_string(),
+            ]),
+            vec![
+                super::PinnedWindowVisibilityChange {
+                    label: "pin-pin-2".to_string(),
+                    visible: false,
+                },
+                super::PinnedWindowVisibilityChange {
+                    label: "pin-pin-1".to_string(),
+                    visible: false,
+                },
+            ]
         );
     }
 

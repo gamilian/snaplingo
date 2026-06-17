@@ -25,6 +25,7 @@ pub use history_service::HistoryService;
 pub use hotkey_service::HotkeyService;
 pub use image_composition_service::ImageCompositionService;
 pub use pinned_image_service::{
-    PinnedImageGroupRemoval, PinnedImageGroupSwitch, PinnedImageService,
+    PinnedImageGroupMembership, PinnedImageGroupRemoval, PinnedImageGroupSwitch,
+    PinnedImageService,
 };
 pub use workflow_service::{WorkflowOutcome, WorkflowService};

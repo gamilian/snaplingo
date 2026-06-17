@@ -29,6 +29,12 @@ pub struct PinnedImageGroupRemoval {
     pub removed_image_ids: Vec<String>,
 }
 
+#[derive(Debug, PartialEq)]
+pub struct PinnedImageGroupMembership {
+    pub group: u32,
+    pub image_ids: Vec<String>,
+}
+
 pub struct PinnedImageService {
     images: Mutex<HashMap<String, PinnedImage>>,
     active_group: Mutex<u32>,
@@ -171,6 +177,22 @@ impl PinnedImageService {
             removed_group,
             removed_image_ids,
         })
+    }
+
+    pub fn pinned_image_group_containing(
+        &self,
+        image_id: &str,
+    ) -> Result<PinnedImageGroupMembership> {
+        let images = self.images.lock().unwrap();
+        let group = images
+            .get(image_id)
+            .ok_or_else(|| AppError::System(format!("Pinned image not found: {}", image_id)))?
+            .group;
+        let mut image_ids = image_ids_in_group(&images, group);
+
+        image_ids.sort();
+
+        Ok(PinnedImageGroupMembership { group, image_ids })
     }
 
     pub fn switch_to_next_group(&self) -> Option<PinnedImageGroupSwitch> {
