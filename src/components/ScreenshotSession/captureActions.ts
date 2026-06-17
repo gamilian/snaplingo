@@ -98,7 +98,10 @@ export function isCopyCaptureKeyboardShortcut(event: CaptureShortcutEvent) {
 
   return (
     isPlainEnter ||
-    (event.key.toLowerCase() === 'c' && (event.metaKey || event.ctrlKey))
+    (event.key.toLowerCase() === 'c' &&
+      (event.metaKey || event.ctrlKey) &&
+      !event.altKey &&
+      !event.shiftKey)
   );
 }
 

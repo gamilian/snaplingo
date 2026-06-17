@@ -712,6 +712,24 @@ describe('capture session actions', () => {
     ).toBe(false);
     expect(
       isCopyCaptureKeyboardShortcut({
+        key: 'c',
+        metaKey: false,
+        ctrlKey: true,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(false);
+    expect(
+      isCopyCaptureKeyboardShortcut({
+        key: 'c',
+        metaKey: false,
+        ctrlKey: true,
+        altKey: true,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      isCopyCaptureKeyboardShortcut({
         key: ' ',
         metaKey: false,
         ctrlKey: false,
