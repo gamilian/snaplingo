@@ -35,6 +35,7 @@ import {
   quickSaveCaptureSelection,
   refreshCaptureSession,
   saveCaptureSelection,
+  shouldRestoreLastSelectionFromShortcut,
   shouldCancelCaptureOnBlur,
 } from './captureActions';
 
@@ -237,6 +238,44 @@ describe('capture session actions', () => {
         altKey: false,
         shiftKey: true,
       }),
+    ).toBe(false);
+  });
+
+  it('restores the last selection from selecting and preview states only when not editing', () => {
+    const plainRestore = {
+      key: 'r',
+      metaKey: false,
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: false,
+    };
+
+    expect(
+      shouldRestoreLastSelectionFromShortcut(plainRestore, {
+        status: 'selecting',
+      }),
+    ).toBe(true);
+    expect(
+      shouldRestoreLastSelectionFromShortcut(plainRestore, {
+        status: 'preview',
+      }),
+    ).toBe(true);
+    expect(
+      shouldRestoreLastSelectionFromShortcut(plainRestore, {
+        status: 'preview',
+        editing: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldRestoreLastSelectionFromShortcut(plainRestore, {
+        status: 'idle',
+      }),
+    ).toBe(false);
+    expect(
+      shouldRestoreLastSelectionFromShortcut(
+        { ...plainRestore, metaKey: true },
+        { status: 'preview' },
+      ),
     ).toBe(false);
   });
 

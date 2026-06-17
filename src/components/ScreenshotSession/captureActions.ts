@@ -44,6 +44,10 @@ interface SelectionArrowActionOptions {
 interface ConfirmHoverSelectionOptions {
   drafting?: boolean;
 }
+interface RestoreLastSelectionOptions {
+  status: 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
+  editing?: boolean;
+}
 export type UndoRedoAction = 'undo' | 'redo';
 export type CaptureKeyboardToolbarAction = 'toggle' | 'hide';
 export type CancelCapturePointerAction =
@@ -90,6 +94,16 @@ export function isRestoreLastSelectionShortcut(event: CaptureShortcutEvent) {
     !event.altKey &&
     !event.shiftKey
   );
+}
+
+export function shouldRestoreLastSelectionFromShortcut(
+  event: CaptureShortcutEvent,
+  options: RestoreLastSelectionOptions,
+) {
+  if (options.editing) return false;
+  if (options.status !== 'selecting' && options.status !== 'preview') return false;
+
+  return isRestoreLastSelectionShortcut(event);
 }
 
 export function isRefreshCaptureShortcut(event: CaptureShortcutEvent) {

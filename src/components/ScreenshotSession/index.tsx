@@ -118,7 +118,6 @@ import {
   isPrintCaptureShortcut,
   isQuickSaveCaptureShortcut,
   isRefreshCaptureShortcut,
-  isRestoreLastSelectionShortcut,
   isSaveCaptureShortcut,
   isSelectAllCaptureShortcut,
   isToggleCapturedCursorShortcut,
@@ -128,6 +127,7 @@ import {
   refreshCaptureSession,
   saveCaptureSelection,
   shouldCancelCaptureOnBlur,
+  shouldRestoreLastSelectionFromShortcut,
 } from './captureActions';
 import { printBase64PngImage } from './capturePrint';
 import {
@@ -1568,9 +1568,14 @@ export default function ScreenshotSession({
         event.preventDefault();
         restoreSelectionFromHistory(selectionHistoryStep);
       } else if (
-        status === 'selecting' &&
-        !textDraft &&
-        isRestoreLastSelectionShortcut(event)
+        shouldRestoreLastSelectionFromShortcut(event, {
+          status,
+          editing:
+            hasAnnotationEditingContext ||
+            annotationGesture !== null ||
+            annotationMoveGesture !== null ||
+            textDraft !== null,
+        })
       ) {
         event.preventDefault();
         restoreLastSelection();
