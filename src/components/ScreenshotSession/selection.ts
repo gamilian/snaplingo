@@ -166,6 +166,36 @@ export function nudgeSelection(
   return moveSelectionByDelta(rect, deltaByDirection[direction], bounds);
 }
 
+export function resizeSelectionBoundaryByArrow(
+  rect: LogicalRect,
+  direction: ArrowKey,
+  mode: 'expand' | 'shrink',
+  bounds: LogicalRect,
+  minSize: number,
+): LogicalRect {
+  const step = mode === 'expand' ? 1 : -1;
+  const handleByDirection: Record<ArrowKey, SelectionHandle> = {
+    ArrowUp: 'n',
+    ArrowRight: 'e',
+    ArrowDown: 's',
+    ArrowLeft: 'w',
+  };
+  const deltaByDirection: Record<ArrowKey, Point> = {
+    ArrowUp: { x: 0, y: -step },
+    ArrowRight: { x: step, y: 0 },
+    ArrowDown: { x: 0, y: step },
+    ArrowLeft: { x: -step, y: 0 },
+  };
+
+  return resizeSelectionByHandle(
+    rect,
+    handleByDirection[direction],
+    deltaByDirection[direction],
+    bounds,
+    minSize,
+  );
+}
+
 export function snapPointToRects(
   point: Point,
   targets: LogicalRect[],

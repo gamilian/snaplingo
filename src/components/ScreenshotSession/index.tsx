@@ -8,6 +8,7 @@ import {
   moveSelectionByDelta,
   normalizeSelection,
   nudgeSelection,
+  resizeSelectionBoundaryByArrow,
   resizeSelectionByHandle,
   snapMovedSelectionToRects,
   snapPointToRects,
@@ -1211,9 +1212,35 @@ export default function ScreenshotSession({
           nudgeSelectedAnnotation(delta);
         }
       } else if (status === 'preview' && selection && selectionBounds && isArrowKey(event.key)) {
+        const isExpandShortcut = (event.metaKey || event.ctrlKey) && !event.shiftKey;
+        const isShrinkShortcut = event.shiftKey && !event.metaKey && !event.ctrlKey;
+        if (
+          event.altKey ||
+          ((event.metaKey || event.ctrlKey || event.shiftKey) &&
+            !isExpandShortcut &&
+            !isShrinkShortcut)
+        ) {
+          return;
+        }
+
         event.preventDefault();
-        const step = event.shiftKey ? KEYBOARD_FAST_NUDGE_STEP : KEYBOARD_NUDGE_STEP;
-        const nextSelection = nudgeSelection(selection, event.key, selectionBounds, step);
+        const nextSelection = isExpandShortcut
+          ? resizeSelectionBoundaryByArrow(
+              selection,
+              event.key,
+              'expand',
+              selectionBounds,
+              MIN_SELECTION_SIZE,
+            )
+          : isShrinkShortcut
+            ? resizeSelectionBoundaryByArrow(
+                selection,
+                event.key,
+                'shrink',
+                selectionBounds,
+                MIN_SELECTION_SIZE,
+              )
+            : nudgeSelection(selection, event.key, selectionBounds, KEYBOARD_NUDGE_STEP);
         setSelection(nextSelection);
         setPreviewImageBase64(null);
         void renderSelectionPreview(nextSelection);

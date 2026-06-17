@@ -5,6 +5,7 @@ import {
   moveSelectionByDelta,
   moveDraftSelectionByDelta,
   nudgeSelection,
+  resizeSelectionBoundaryByArrow,
   resizeSelectionByHandle,
   snapMovedSelectionToRects,
   snapPointToRects,
@@ -136,6 +137,85 @@ describe('selection editing', () => {
       width: 100,
       height: 80,
     });
+  });
+
+  it('expands the corresponding selection boundary by keyboard direction', () => {
+    const rect: LogicalRect = { x: 40, y: 30, width: 100, height: 80 };
+
+    expect(resizeSelectionBoundaryByArrow(rect, 'ArrowLeft', 'expand', bounds, 10)).toEqual({
+      x: 39,
+      y: 30,
+      width: 101,
+      height: 80,
+    });
+    expect(resizeSelectionBoundaryByArrow(rect, 'ArrowRight', 'expand', bounds, 10)).toEqual({
+      x: 40,
+      y: 30,
+      width: 101,
+      height: 80,
+    });
+    expect(resizeSelectionBoundaryByArrow(rect, 'ArrowUp', 'expand', bounds, 10)).toEqual({
+      x: 40,
+      y: 29,
+      width: 100,
+      height: 81,
+    });
+    expect(resizeSelectionBoundaryByArrow(rect, 'ArrowDown', 'expand', bounds, 10)).toEqual({
+      x: 40,
+      y: 30,
+      width: 100,
+      height: 81,
+    });
+  });
+
+  it('shrinks the corresponding selection boundary by keyboard direction', () => {
+    const rect: LogicalRect = { x: 40, y: 30, width: 100, height: 80 };
+
+    expect(resizeSelectionBoundaryByArrow(rect, 'ArrowLeft', 'shrink', bounds, 10)).toEqual({
+      x: 41,
+      y: 30,
+      width: 99,
+      height: 80,
+    });
+    expect(resizeSelectionBoundaryByArrow(rect, 'ArrowRight', 'shrink', bounds, 10)).toEqual({
+      x: 40,
+      y: 30,
+      width: 99,
+      height: 80,
+    });
+    expect(resizeSelectionBoundaryByArrow(rect, 'ArrowUp', 'shrink', bounds, 10)).toEqual({
+      x: 40,
+      y: 31,
+      width: 100,
+      height: 79,
+    });
+    expect(resizeSelectionBoundaryByArrow(rect, 'ArrowDown', 'shrink', bounds, 10)).toEqual({
+      x: 40,
+      y: 30,
+      width: 100,
+      height: 79,
+    });
+  });
+
+  it('keeps keyboard boundary resizing within bounds and minimum size', () => {
+    expect(
+      resizeSelectionBoundaryByArrow(
+        { x: 0, y: 0, width: 20, height: 20 },
+        'ArrowLeft',
+        'expand',
+        bounds,
+        10,
+      ),
+    ).toEqual({ x: 0, y: 0, width: 20, height: 20 });
+    expect(
+      resizeSelectionBoundaryByArrow(
+        { x: 40, y: 30, width: 10, height: 20 },
+        'ArrowLeft',
+        'shrink',
+        bounds,
+        10,
+      ),
+    ).toEqual({ x: 40, y: 30, width: 10, height: 20 });
   });
 
   it('positions the toolbar near the selection within capture bounds', () => {
