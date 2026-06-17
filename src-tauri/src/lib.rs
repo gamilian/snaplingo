@@ -480,6 +480,7 @@ pub fn run() {
     })
     .invoke_handler(tauri::generate_handler![
       commands::open_result_window,
+      commands::open_translation_result_window,
       commands::trigger_screenshot,
       commands::open_capture_window,
       commands::create_screenshot_window,

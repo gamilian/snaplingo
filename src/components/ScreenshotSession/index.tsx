@@ -99,6 +99,7 @@ import {
   copyCaptureSelection,
   type HoverSelectionCompletionAction,
   getCaptureKeyboardToolbarAction,
+  getCaptureSelectionFlowForMode,
   getCandidateCycleDirectionFromShortcut,
   getCancelCapturePointerAction,
   getCursorNudgeDeltaFromShortcut,
@@ -637,12 +638,18 @@ export default function ScreenshotSession({
         });
         setPreviewImageBase64(base64);
 
-        if (mode === 'screenshot-ocr') {
+        const selectionFlow = getCaptureSelectionFlowForMode(mode);
+        if (selectionFlow !== 'preview') {
           const ocrResult = await invoke<OcrResult>('run_capture_ocr', {
             sessionId: session.id,
             rect,
           });
-          await invoke('open_result_window', { text: ocrResult.text });
+          await invoke(
+            selectionFlow === 'ocr-translate'
+              ? 'open_translation_result_window'
+              : 'open_result_window',
+            { text: ocrResult.text },
+          );
           recordSuccessfulSelection('ocr', rect);
           await invoke('cancel_capture_session', { sessionId: session.id });
           resetSessionState();

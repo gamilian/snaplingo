@@ -6,6 +6,7 @@ import {
   canToggleCapturedCursor,
   copyCaptureSelection,
   getCaptureKeyboardToolbarAction,
+  getCaptureSelectionFlowForMode,
   getCandidateCycleDirectionFromShortcut,
   getCancelCapturePointerAction,
   getSelectionArrowActionFromShortcut,
@@ -175,6 +176,14 @@ describe('capture session actions', () => {
     expect(shouldRecordSuccessfulCaptureSelection('ocr')).toBe(false);
     expect(shouldRecordSuccessfulCaptureSelection('print')).toBe(false);
     expect(shouldRecordSuccessfulCaptureSelection('cancel')).toBe(false);
+  });
+
+  it('chooses the completion flow from the capture mode', () => {
+    expect(getCaptureSelectionFlowForMode('screenshot')).toBe('preview');
+    expect(getCaptureSelectionFlowForMode('screenshot-ocr')).toBe('ocr');
+    expect(getCaptureSelectionFlowForMode('screenshot-translate')).toBe(
+      'ocr-translate',
+    );
   });
 
   it('uses Cmd/Ctrl+Shift+S for quick saving the current selection', () => {

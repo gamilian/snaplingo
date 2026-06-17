@@ -16,7 +16,15 @@ pub use workflow_commands::*;
 pub use screenshot_window_commands::*;
 pub use capture_session_commands::*;
 
+use serde::Serialize;
 use tauri::{Emitter, Manager, State};
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TranslationInputPayload {
+    text: String,
+    auto_translate: bool,
+}
 
 #[tauri::command]
 pub fn open_result_window(
@@ -29,6 +37,28 @@ pub fn open_result_window(
 
         // Emit event to frontend with text
         window.emit("input-translation", text)
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn open_translation_result_window(
+    text: String,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        window.show().map_err(|e| e.to_string())?;
+        window.set_focus().map_err(|e| e.to_string())?;
+
+        window
+            .emit(
+                "input-translation",
+                TranslationInputPayload {
+                    text,
+                    auto_translate: true,
+                },
+            )
             .map_err(|e| e.to_string())?;
     }
     Ok(())

@@ -1,6 +1,7 @@
 import type {
   AnnotationCommand,
   ArrowKey,
+  CaptureMode,
   CaptureSessionView,
   LogicalRect,
   Point,
@@ -56,6 +57,7 @@ interface RestoreLastSelectionOptions {
 }
 export type UndoRedoAction = 'undo' | 'redo';
 export type CaptureKeyboardToolbarAction = 'toggle';
+export type CaptureSelectionFlow = 'preview' | 'ocr' | 'ocr-translate';
 export type SaveCapturePointerAction = 'save' | 'quick-save';
 export type CaptureCompletionAction =
   | 'copy'
@@ -92,6 +94,14 @@ export function shouldRecordSuccessfulCaptureSelection(
     action === 'quick-save' ||
     action === 'pin'
   );
+}
+
+export function getCaptureSelectionFlowForMode(
+  mode: CaptureMode,
+): CaptureSelectionFlow {
+  if (mode === 'screenshot-ocr') return 'ocr';
+  if (mode === 'screenshot-translate') return 'ocr-translate';
+  return 'preview';
 }
 
 export function isSaveCaptureShortcut(event: CaptureShortcutEvent) {

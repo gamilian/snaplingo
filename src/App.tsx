@@ -3,6 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { SettingsWindow } from './components/SettingsWindow';
 import ResultWindow from './components/ResultWindow';
+import { parseInputTranslationPayload } from './components/ResultWindow/translationInput';
 import {
   PinnedImageWindow,
   readPinnedImageLaunch,
@@ -21,6 +22,7 @@ const pinnedImageId = readPinnedImageLaunch(window.location.search);
 function App() {
   const resultWindowVisible = useAppStore((state) => state.resultWindowVisible);
   const setSourceText = useAppStore((state) => state.setSourceText);
+  const requestAutoTranslate = useAppStore((state) => state.requestAutoTranslate);
   const showResultWindow = useAppStore((state) => state.showResultWindow);
   const isCaptureWindow =
     currentWindow.label === CAPTURE_WINDOW_LABEL || captureLaunch !== null;
@@ -32,8 +34,14 @@ function App() {
     let disposed = false;
     let unlisten: (() => void) | undefined;
 
-    listen<string>('input-translation', (event) => {
-      setSourceText(event.payload);
+    listen<unknown>('input-translation', (event) => {
+      const input = parseInputTranslationPayload(event.payload);
+      if (!input) return;
+
+      setSourceText(input.text);
+      if (input.autoTranslate) {
+        requestAutoTranslate();
+      }
       showResultWindow();
     })
       .then((nextUnlisten) => {
@@ -51,7 +59,13 @@ function App() {
       disposed = true;
       unlisten?.();
     };
-  }, [isCaptureWindow, isPinnedImageWindow, setSourceText, showResultWindow]);
+  }, [
+    isCaptureWindow,
+    isPinnedImageWindow,
+    requestAutoTranslate,
+    setSourceText,
+    showResultWindow,
+  ]);
 
   if (isCaptureWindow) {
     return (

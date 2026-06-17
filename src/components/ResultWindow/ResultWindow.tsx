@@ -25,9 +25,11 @@ export default function ResultWindow() {
     translations,
     isTranslating,
     resultWindowVisible,
+    pendingAutoTranslate,
     setSourceText,
     setSourceLang,
     setTargetLang,
+    consumeAutoTranslateRequest,
     hideResultWindow,
   } = useAppStore();
 
@@ -43,6 +45,23 @@ export default function ResultWindow() {
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
   }, [resultWindowVisible, hideResultWindow]);
+
+  useEffect(() => {
+    if (!resultWindowVisible || !pendingAutoTranslate || !sourceText.trim()) {
+      return;
+    }
+
+    consumeAutoTranslateRequest();
+    void translate(sourceText, sourceLang, targetLang);
+  }, [
+    consumeAutoTranslateRequest,
+    pendingAutoTranslate,
+    resultWindowVisible,
+    sourceLang,
+    sourceText,
+    targetLang,
+    translate,
+  ]);
 
   if (!resultWindowVisible) return null;
 
