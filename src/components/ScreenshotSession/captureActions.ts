@@ -24,7 +24,12 @@ interface CapturePointerEvent {
 }
 
 export function isSaveCaptureShortcut(event: CaptureShortcutEvent) {
-  return event.key.toLowerCase() === 's' && (event.metaKey || event.ctrlKey);
+  return (
+    event.key.toLowerCase() === 's' &&
+    (event.metaKey || event.ctrlKey) &&
+    !event.altKey &&
+    !event.shiftKey
+  );
 }
 
 export function isCopyCaptureKeyboardShortcut(event: CaptureShortcutEvent) {

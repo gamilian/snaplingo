@@ -125,6 +125,24 @@ describe('capture session actions', () => {
         ctrlKey: false,
       }),
     ).toBe(false);
+    expect(
+      isSaveCaptureShortcut({
+        key: 's',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(false);
+    expect(
+      isSaveCaptureShortcut({
+        key: 's',
+        metaKey: false,
+        ctrlKey: true,
+        altKey: true,
+        shiftKey: false,
+      }),
+    ).toBe(false);
   });
 
   it('uses Cmd/Ctrl+T for pinning the current selection', () => {
