@@ -119,6 +119,7 @@ import {
   isSelectAllCaptureShortcut,
   isToggleToolbarShortcut,
   isToggleCapturedCursorShortcut,
+  isUndoAnnotationGesturePointShortcut,
   printCaptureSelection,
   quickSaveCaptureSelection,
   refreshCaptureSession,
@@ -1489,6 +1490,13 @@ export default function ScreenshotSession({
         } else {
           redoAnnotation();
         }
+      } else if (
+        status === 'preview' &&
+        annotationGesture?.tool === 'polyline' &&
+        isUndoAnnotationGesturePointShortcut(event)
+      ) {
+        event.preventDefault();
+        undoPolylineGesturePoint();
       } else if (
         status === 'preview' &&
         selectedAnnotationIndex !== null &&

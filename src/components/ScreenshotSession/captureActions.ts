@@ -157,6 +157,18 @@ export function isDeleteSelectedAnnotationShortcut(
   );
 }
 
+export function isUndoAnnotationGesturePointShortcut(
+  event: CaptureShortcutEvent,
+) {
+  return (
+    (event.key === 'Backspace' || event.key === 'Delete') &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !event.shiftKey
+  );
+}
+
 export function getSelectionArrowActionFromShortcut(
   event: CaptureShortcutEvent,
   options: SelectionArrowActionOptions = {},

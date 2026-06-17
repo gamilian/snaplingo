@@ -16,6 +16,7 @@ import {
   isCopyCaptureKeyboardShortcut,
   isConfirmHoverSelectionShortcut,
   isDeleteSelectedAnnotationShortcut,
+  isUndoAnnotationGesturePointShortcut,
   getCursorNudgeDeltaFromShortcut,
   isMagnifierShortcut,
   isPinCaptureShortcut,
@@ -385,6 +386,36 @@ describe('capture session actions', () => {
     expect(
       isDeleteSelectedAnnotationShortcut({
         key: 'Delete',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('uses plain Backspace or Delete for undoing an active annotation gesture point', () => {
+    expect(
+      isUndoAnnotationGesturePointShortcut({
+        key: 'Backspace',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isUndoAnnotationGesturePointShortcut({
+        key: 'Delete',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isUndoAnnotationGesturePointShortcut({
+        key: 'Backspace',
         metaKey: true,
         ctrlKey: false,
         altKey: false,
