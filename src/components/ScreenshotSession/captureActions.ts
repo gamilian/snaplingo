@@ -45,7 +45,7 @@ interface ConfirmHoverSelectionOptions {
   drafting?: boolean;
 }
 export type UndoRedoAction = 'undo' | 'redo';
-export type CaptureKeyboardToolbarAction = 'toggle';
+export type CaptureKeyboardToolbarAction = 'toggle' | 'hide';
 export type CancelCapturePointerAction =
   | 'finish-edit'
   | 'finish-annotation'
@@ -235,12 +235,14 @@ export function isConfirmHoverSelectionShortcut(
 
 export function getCaptureKeyboardToolbarAction(
   event: CaptureShortcutEvent,
+  toolbarVisible = false,
 ): CaptureKeyboardToolbarAction | null {
   if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
     return null;
   }
 
   if (event.key === ' ') return 'toggle';
+  if (event.key === 'Escape' && toolbarVisible) return 'hide';
 
   return null;
 }

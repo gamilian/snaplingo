@@ -1118,31 +1118,64 @@ describe('capture session actions', () => {
 
   it('uses Space for toggling the capture annotation toolbar', () => {
     expect(
-      getCaptureKeyboardToolbarAction({
-        key: ' ',
-        metaKey: false,
-        ctrlKey: false,
-        altKey: false,
-        shiftKey: false,
-      }),
+      getCaptureKeyboardToolbarAction(
+        {
+          key: ' ',
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          shiftKey: false,
+        },
+        false,
+      ),
     ).toBe('toggle');
     expect(
-      getCaptureKeyboardToolbarAction({
-        key: ' ',
-        metaKey: true,
-        ctrlKey: false,
-        altKey: false,
-        shiftKey: false,
-      }),
+      getCaptureKeyboardToolbarAction(
+        {
+          key: 'Escape',
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          shiftKey: false,
+        },
+        true,
+      ),
+    ).toBe('hide');
+    expect(
+      getCaptureKeyboardToolbarAction(
+        {
+          key: 'Escape',
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          shiftKey: false,
+        },
+        false,
+      ),
     ).toBeNull();
     expect(
-      getCaptureKeyboardToolbarAction({
-        key: 'Enter',
-        metaKey: false,
-        ctrlKey: false,
-        altKey: false,
-        shiftKey: false,
-      }),
+      getCaptureKeyboardToolbarAction(
+        {
+          key: ' ',
+          metaKey: true,
+          ctrlKey: false,
+          altKey: false,
+          shiftKey: false,
+        },
+        false,
+      ),
+    ).toBeNull();
+    expect(
+      getCaptureKeyboardToolbarAction(
+        {
+          key: 'Enter',
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          shiftKey: false,
+        },
+        false,
+      ),
     ).toBeNull();
   });
 

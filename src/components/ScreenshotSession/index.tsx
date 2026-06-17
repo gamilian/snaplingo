@@ -1449,7 +1449,17 @@ export default function ScreenshotSession({
         getCandidateCycleDirectionFromShortcut(event);
       const selectionHistoryStep = getSelectionHistoryStepFromShortcut(event);
       const undoRedoAction = getUndoRedoActionFromShortcut(event);
-      const toolbarAction = getCaptureKeyboardToolbarAction(event);
+      const toolbarAction = getCaptureKeyboardToolbarAction(
+        event,
+        isAnnotationToolbarVisible,
+      );
+      const hasDismissibleCaptureLayer =
+        textDraft !== null ||
+        annotationMoveGesture !== null ||
+        draftSelectionMoveGesture !== null ||
+        selectedAnnotationIndex !== null ||
+        activeAnnotationTool !== null ||
+        annotationGesture !== null;
       const selectionArrowAction = getSelectionArrowActionFromShortcut(event, {
         editing:
           hasAnnotationEditingContext ||
@@ -1462,7 +1472,14 @@ export default function ScreenshotSession({
         activeAnnotationTool,
       );
 
-      if (event.key === 'Escape') {
+      if (
+        status === 'preview' &&
+        toolbarAction === 'hide' &&
+        !hasDismissibleCaptureLayer
+      ) {
+        event.preventDefault();
+        setIsAnnotationToolbarVisible(false);
+      } else if (event.key === 'Escape') {
         event.preventDefault();
         dismissCaptureLayer();
       } else if (
@@ -1830,6 +1847,7 @@ export default function ScreenshotSession({
     hasAnnotationEditingContext,
     hoverSelection,
     includeCapturedCursor,
+    isAnnotationToolbarVisible,
     isMagnifierShown,
     isFillModeActive,
     textDraft,
