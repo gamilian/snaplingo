@@ -7,6 +7,13 @@ use crate::domain::capture::{PhysicalPoint, PhysicalRect};
 use crate::error::{AppError, Result};
 
 const TEXT_FONT_BYTES: &[u8] = include_bytes!("../../../assets/fonts/NotoSans-Regular.ttf");
+const TEXT_PIN_FONT_SIZE: f32 = 20.0;
+const TEXT_PIN_MAX_TEXT_WIDTH: f32 = 640.0;
+const TEXT_PIN_PADDING: f32 = 16.0;
+const TEXT_PIN_MIN_WIDTH: u32 = 160;
+const TEXT_PIN_MIN_HEIGHT: u32 = 60;
+const TEXT_PIN_BACKGROUND: [u8; 4] = [255, 255, 255, 255];
+const TEXT_PIN_FOREGROUND: [u8; 4] = [32, 32, 32, 255];
 
 pub struct PngPlacement<'a> {
     pub png_data: &'a [u8],
@@ -212,6 +219,93 @@ impl ImageCompositionService {
             .map_err(|e| AppError::System(format!("Failed to encode composed PNG: {}", e)))?;
         Ok(output_png)
     }
+
+    pub fn render_text_png(&self, text: &str) -> Result<Vec<u8>> {
+        let normalized_text = text.replace("\r\n", "\n").replace('\r', "\n");
+        if normalized_text.trim().is_empty() {
+            return Err(AppError::System(
+                "Cannot pin empty clipboard text".to_string(),
+            ));
+        }
+
+        let font = FontArc::try_from_slice(TEXT_FONT_BYTES)
+            .map_err(|_| AppError::System("Failed to load text pin font".to_string()))?;
+        let lines = wrap_text_for_png(&font, &normalized_text, TEXT_PIN_MAX_TEXT_WIDTH);
+        let line_height = text_line_height(&font, TEXT_PIN_FONT_SIZE);
+        let text_width = lines
+            .iter()
+            .map(|line| text_width(&font, TEXT_PIN_FONT_SIZE, line))
+            .fold(0.0, f32::max);
+        let width = ((text_width + TEXT_PIN_PADDING * 2.0).ceil() as u32).max(TEXT_PIN_MIN_WIDTH);
+        let height = ((line_height * lines.len() as f32 + TEXT_PIN_PADDING * 2.0).ceil() as u32)
+            .max(TEXT_PIN_MIN_HEIGHT);
+        let mut output =
+            image::RgbaImage::from_pixel(width, height, image::Rgba(TEXT_PIN_BACKGROUND));
+
+        for (index, line) in lines.iter().enumerate() {
+            draw_text_annotation(
+                &mut output,
+                &PhysicalPoint {
+                    x: TEXT_PIN_PADDING as i32,
+                    y: (TEXT_PIN_PADDING + TEXT_PIN_FONT_SIZE + line_height * index as f32).round()
+                        as i32,
+                },
+                line,
+                TEXT_PIN_FOREGROUND,
+                TEXT_PIN_FONT_SIZE as u32,
+            );
+        }
+
+        let mut output_png = Vec::new();
+        image::DynamicImage::ImageRgba8(output)
+            .write_to(&mut Cursor::new(&mut output_png), image::ImageFormat::Png)
+            .map_err(|e| AppError::System(format!("Failed to encode text pin PNG: {}", e)))?;
+        Ok(output_png)
+    }
+}
+
+fn wrap_text_for_png(font: &FontArc, text: &str, max_width: f32) -> Vec<String> {
+    let mut lines = Vec::new();
+
+    for hard_line in text.split('\n') {
+        if hard_line.is_empty() {
+            lines.push(String::new());
+            continue;
+        }
+
+        let mut current_line = String::new();
+        for character in hard_line.chars() {
+            let mut candidate = current_line.clone();
+            candidate.push(character);
+
+            if !current_line.is_empty()
+                && text_width(font, TEXT_PIN_FONT_SIZE, &candidate) > max_width
+            {
+                lines.push(current_line);
+                current_line = character.to_string();
+            } else {
+                current_line = candidate;
+            }
+        }
+
+        lines.push(current_line);
+    }
+
+    lines
+}
+
+fn text_line_height(font: &FontArc, font_size: f32) -> f32 {
+    font.as_scaled(PxScale::from(font_size))
+        .height()
+        .max(font_size)
+}
+
+fn text_width(font: &FontArc, font_size: f32, text: &str) -> f32 {
+    let scaled_font = font.as_scaled(PxScale::from(font_size));
+
+    text.chars()
+        .map(|character| scaled_font.h_advance(font.glyph_id(character)))
+        .sum()
 }
 
 fn draw_annotation(output: &mut image::RgbaImage, annotation: &ImageAnnotation) {
@@ -595,6 +689,7 @@ fn draw_text_annotation(
         caret.x += scaled_font.h_advance(glyph_id);
 
         if let Some(outlined_glyph) = font.outline_glyph(glyph) {
+            let bounds = outlined_glyph.px_bounds();
             outlined_glyph.draw(|x, y, coverage| {
                 let alpha = ((color[3] as f32) * coverage).round() as u8;
                 if alpha == 0 {
@@ -603,8 +698,8 @@ fn draw_text_annotation(
 
                 blend_pixel_if_in_bounds(
                     output,
-                    x as i32,
-                    y as i32,
+                    bounds.min.x as i32 + x as i32,
+                    bounds.min.y as i32 + y as i32,
                     image::Rgba([color[0], color[1], color[2], alpha]),
                 );
             });

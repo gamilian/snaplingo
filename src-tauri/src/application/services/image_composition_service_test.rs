@@ -44,6 +44,24 @@ mod tests {
             .count()
     }
 
+    fn count_pixels_matching(png: &[u8], matches: impl Fn([u8; 4]) -> bool) -> usize {
+        image::load_from_memory(png)
+            .unwrap()
+            .to_rgba8()
+            .pixels()
+            .filter(|pixel| matches(pixel.0))
+            .count()
+    }
+
+    fn count_non_white_pixels(png: &[u8]) -> usize {
+        image::load_from_memory(png)
+            .unwrap()
+            .to_rgba8()
+            .pixels()
+            .filter(|pixel| pixel.0 != [255, 255, 255, 255])
+            .count()
+    }
+
     #[test]
     fn crops_png_to_physical_rect() {
         let service = ImageCompositionService::new();
@@ -617,5 +635,80 @@ mod tests {
 
         assert!(count_pixels_with_color(&output, [255, 0, 0, 255]) > 8);
         assert_eq!(png_pixel(&output, 79, 31), [255, 255, 255, 255]);
+    }
+
+    #[test]
+    fn text_annotation_respects_position() {
+        let service = ImageCompositionService::new();
+        let white = make_solid_png(120, 60, [255, 255, 255, 255]);
+
+        let output = service
+            .compose_png_with_annotations(
+                120,
+                60,
+                &[PngPlacement {
+                    png_data: white.as_slice(),
+                    source_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 120,
+                        height: 60,
+                    },
+                    destination_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 120,
+                        height: 60,
+                    },
+                }],
+                &[ImageAnnotation::Text {
+                    position: PhysicalPoint { x: 40, y: 42 },
+                    text: "Snap".to_string(),
+                    color: [255, 0, 0, 255],
+                    font_size: 18,
+                }],
+            )
+            .unwrap();
+
+        let decoded = image::load_from_memory(&output).unwrap().to_rgba8();
+        let mut left_edge_red_pixels = 0;
+        for x in 0..20 {
+            for y in 0..60 {
+                let pixel = decoded.get_pixel(x, y).0;
+                if pixel[0] > 200 && pixel[1] < 80 && pixel[2] < 80 {
+                    left_edge_red_pixels += 1;
+                }
+            }
+        }
+
+        assert_eq!(left_edge_red_pixels, 0);
+        assert!(
+            count_pixels_matching(&output, |pixel| pixel[0] > 200
+                && pixel[1] < 80
+                && pixel[2] < 80)
+                > 8
+        );
+    }
+
+    #[test]
+    fn renders_clipboard_text_as_pinned_png() {
+        let service = ImageCompositionService::new();
+
+        let output = service
+            .render_text_png("Hello from clipboard\nSnapLingo")
+            .unwrap();
+        let (width, height) = png_dimensions(&output);
+
+        assert!(width >= 160);
+        assert!(height >= 60);
+        assert_eq!(png_pixel(&output, 0, 0), [255, 255, 255, 255]);
+        assert!(count_non_white_pixels(&output) > 16);
+    }
+
+    #[test]
+    fn rejects_blank_clipboard_text_pngs() {
+        let service = ImageCompositionService::new();
+
+        assert!(service.render_text_png(" \n\t ").is_err());
     }
 }

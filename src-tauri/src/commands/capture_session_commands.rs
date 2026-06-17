@@ -7,7 +7,7 @@ use tauri::{
 };
 
 use crate::application::services::{
-    image_composition_service::{ImageAnnotation, PngPlacement},
+    image_composition_service::{ImageAnnotation, ImageCompositionService, PngPlacement},
     CaptureOutputService, PinnedImageGroupSwitch, PinnedImageService,
 };
 use crate::domain::capture::{
@@ -202,12 +202,23 @@ pub fn pin_clipboard_image_for_state(
     app: &AppHandle,
     state: &crate::AppState,
 ) -> Result<(), String> {
-    let png_data = state
-        .capture_output_service
-        .read_clipboard_png()
-        .map_err(|e| e.to_string())?;
+    match state.capture_output_service.read_clipboard_png() {
+        Ok(png_data) => return pin_capture_png(app, state, png_data),
+        Err(image_error) => {
+            let text =
+                state
+                    .capture_output_service
+                    .read_clipboard_text()
+                    .map_err(|text_error| {
+                        format!(
+                            "{}; also failed to read text from clipboard: {}",
+                            image_error, text_error
+                        )
+                    })?;
 
-    pin_capture_png(app, state, png_data)
+            pin_text_as_png(app, state, &text)
+        }
+    }
 }
 
 #[tauri::command]
@@ -623,6 +634,33 @@ fn pin_capture_png(
         .map_err(|e| e.to_string())?;
 
     open_pinned_image_window(app, &image)
+}
+
+fn pin_text_as_png(app: &AppHandle, state: &crate::AppState, text: &str) -> Result<(), String> {
+    let image = pin_text_as_png_by_services(
+        &state.pinned_image_service,
+        &state.image_composition_service,
+        text,
+    )?;
+
+    open_pinned_image_window(app, &image)
+}
+
+fn pin_text_as_png_by_services(
+    pinned_images: &PinnedImageService,
+    image_composition: &ImageCompositionService,
+    text: &str,
+) -> Result<PinnedImageView, String> {
+    let png_data = image_composition
+        .render_text_png(text)
+        .map_err(|e| e.to_string())?;
+    let image_id = pinned_images
+        .pin_png_with_source_text(png_data, Some(text.to_string()))
+        .map_err(|e| e.to_string())?;
+
+    pinned_images
+        .get_pinned_image(&image_id)
+        .map_err(|e| e.to_string())
 }
 
 fn open_pinned_image_window(app: &AppHandle, image: &PinnedImageView) -> Result<(), String> {
@@ -1163,7 +1201,9 @@ mod tests {
 
     use image::ImageEncoder;
 
-    use crate::application::services::image_composition_service::ImageAnnotation;
+    use crate::application::services::image_composition_service::{
+        ImageAnnotation, ImageCompositionService,
+    };
     use crate::application::services::{
         CaptureOutputService, PinnedImageGroupSwitch, PinnedImageService,
     };
@@ -1853,6 +1893,21 @@ mod tests {
             pinned_images.get_pinned_png(&image_id).unwrap(),
             replacement
         );
+    }
+
+    #[test]
+    fn pin_text_as_png_returns_text_backed_view() {
+        let pinned_images = PinnedImageService::new();
+        let image_composition = ImageCompositionService::new();
+
+        let view =
+            super::pin_text_as_png_by_services(&pinned_images, &image_composition, "Hello pin")
+                .unwrap();
+
+        assert_eq!(view.source_text, Some("Hello pin".to_string()));
+        assert!(view.width >= 80);
+        assert!(view.height >= 60);
+        assert!(!pinned_images.get_pinned_png(&view.id).unwrap().is_empty());
     }
 
     fn make_test_png(width: u32, height: u32) -> Vec<u8> {

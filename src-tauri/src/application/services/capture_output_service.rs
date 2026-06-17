@@ -42,6 +42,15 @@ impl CaptureOutputService {
         Self::clipboard_image_to_png(image)
     }
 
+    pub fn read_clipboard_text(&self) -> Result<String> {
+        let mut clipboard = Clipboard::new()
+            .map_err(|e| AppError::System(format!("Failed to open clipboard: {}", e)))?;
+
+        clipboard
+            .get_text()
+            .map_err(|e| AppError::System(format!("Failed to read text from clipboard: {}", e)))
+    }
+
     pub fn png_to_clipboard_image(data: &[u8]) -> Result<ImageData<'static>> {
         let image = image::load_from_memory(data)
             .map_err(|e| AppError::System(format!("Failed to decode PNG for clipboard: {}", e)))?
