@@ -56,6 +56,19 @@ export function removeAnnotationFromHistory(
   );
 }
 
+export function clearAnnotationHistory(history: AnnotationHistory): AnnotationHistory {
+  if (
+    history.annotations.length === 0 &&
+    history.undoneAnnotations.length === 0 &&
+    (history.undoSnapshots?.length ?? 0) === 0 &&
+    (history.redoSnapshots?.length ?? 0) === 0
+  ) {
+    return history;
+  }
+
+  return emptyAnnotationHistory();
+}
+
 export function replaceAnnotationInHistory(
   history: AnnotationHistory,
   annotationIndex: number,

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { AnnotationCommand } from './types';
 import {
   addAnnotationToHistory,
+  clearAnnotationHistory,
   removeAnnotationFromHistory,
   replaceAnnotationInHistory,
   redoAnnotationHistory,
@@ -85,6 +86,26 @@ describe('annotation history', () => {
       undoSnapshots: [],
       redoSnapshots: [[arrow]],
     });
+  });
+
+  it('clears all annotations without leaving undo or redo history', () => {
+    const history = {
+      annotations: [rectangle, arrow],
+      undoneAnnotations: [rectangle],
+      undoSnapshots: [[rectangle]],
+      redoSnapshots: [[rectangle, arrow]],
+    };
+
+    const cleared = clearAnnotationHistory(history);
+
+    expect(cleared).toEqual({
+      annotations: [],
+      undoneAnnotations: [],
+      undoSnapshots: [],
+      redoSnapshots: [],
+    });
+    expect(undoAnnotationHistory(cleared)).toBe(cleared);
+    expect(redoAnnotationHistory(cleared)).toBe(cleared);
   });
 
   it('replaces annotations with undo and redo support', () => {

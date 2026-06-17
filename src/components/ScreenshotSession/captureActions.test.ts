@@ -7,6 +7,7 @@ import {
   getCandidateCycleDirectionFromShortcut,
   getSelectionHistoryStepFromShortcut,
   isCancelCapturePointer,
+  isClearAnnotationsShortcut,
   isCopyCaptureDoubleClick,
   isCopyCaptureKeyboardShortcut,
   isConfirmHoverSelectionShortcut,
@@ -230,6 +231,45 @@ describe('capture session actions', () => {
         shiftKey: true,
       }),
     ).toBeNull();
+  });
+
+  it('uses Cmd/Ctrl+Shift+Z for clearing all annotations', () => {
+    expect(
+      isClearAnnotationsShortcut({
+        key: 'z',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(true);
+    expect(
+      isClearAnnotationsShortcut({
+        key: 'Z',
+        metaKey: false,
+        ctrlKey: true,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(true);
+    expect(
+      isClearAnnotationsShortcut({
+        key: 'z',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      isClearAnnotationsShortcut({
+        key: 'z',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: true,
+        shiftKey: true,
+      }),
+    ).toBe(false);
   });
 
   it('copies the current frozen selection to the clipboard', async () => {

@@ -66,6 +66,15 @@ export function getSelectionHistoryStepFromShortcut(
   return null;
 }
 
+export function isClearAnnotationsShortcut(event: CaptureShortcutEvent) {
+  return (
+    event.key.toLowerCase() === 'z' &&
+    (event.metaKey || event.ctrlKey) &&
+    !event.altKey &&
+    !!event.shiftKey
+  );
+}
+
 export function isCopyCaptureKeyboardShortcut(event: CaptureShortcutEvent) {
   const isPlainEnter =
     event.key === 'Enter' &&

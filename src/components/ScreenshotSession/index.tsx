@@ -35,6 +35,7 @@ import {
 } from './captureCandidates';
 import {
   addAnnotationToHistory,
+  clearAnnotationHistory,
   emptyAnnotationHistory,
   removeAnnotationFromHistory,
   replaceAnnotationInHistory,
@@ -85,6 +86,7 @@ import {
   getCursorNudgeDeltaFromShortcut,
   getSelectionHistoryStepFromShortcut,
   isCancelCapturePointer,
+  isClearAnnotationsShortcut,
   isConfirmHoverSelectionShortcut,
   isCopyCaptureDoubleClick,
   isCopyCaptureKeyboardShortcut,
@@ -839,6 +841,23 @@ export default function ScreenshotSession({
     void renderSelectionPreview(selection, nextHistory.annotations);
   }, [annotationHistory, canRedoAnnotation, renderSelectionPreview, selection]);
 
+  const clearAnnotations = useCallback(() => {
+    if (!selection) return;
+
+    const nextHistory = clearAnnotationHistory(annotationHistory);
+    if (nextHistory === annotationHistory) return;
+
+    setActiveAnnotationTool(null);
+    setAnnotationGesture(null);
+    setDraftAnnotation(null);
+    setSelectedAnnotationIndex(null);
+    setAnnotationMoveGesture(null);
+    setTextDraft(null);
+    setTextDraftAnnotationIndex(null);
+    setAnnotationHistory(nextHistory);
+    void renderSelectionPreview(selection, nextHistory.annotations);
+  }, [annotationHistory, renderSelectionPreview, selection]);
+
   const deleteSelectedAnnotation = useCallback(() => {
     if (!selection || selectedAnnotationIndex === null) return;
 
@@ -1224,6 +1243,12 @@ export default function ScreenshotSession({
         dismissCaptureLayer();
       } else if (
         status === 'preview' &&
+        isClearAnnotationsShortcut(event)
+      ) {
+        event.preventDefault();
+        clearAnnotations();
+      } else if (
+        status === 'preview' &&
         (event.metaKey || event.ctrlKey) &&
         event.key.toLowerCase() === 'z'
       ) {
@@ -1440,6 +1465,7 @@ export default function ScreenshotSession({
     };
   }, [
     adjustAnnotationSize,
+    clearAnnotations,
     copyCurrentColor,
     copySelection,
     annotationGesture,
