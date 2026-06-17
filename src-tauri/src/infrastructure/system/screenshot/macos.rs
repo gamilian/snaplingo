@@ -2,7 +2,7 @@ use super::backend::{
     CapturedCursor, MonitorSnapshot, ScreenRegion, ScreenshotBackend, WindowCandidate,
 };
 use super::xcap_common;
-use crate::domain::capture::LogicalPoint;
+use crate::domain::capture::{LogicalPoint, LogicalRect};
 use crate::error::AppError;
 use core_graphics::display::{CGDisplay, CGRect};
 use core_graphics::image::CGImage;
@@ -64,7 +64,7 @@ fn image_to_png(cg_image: CGImage) -> Result<Vec<u8>, AppError> {
 fn captured_cursor_from_appkit_geometry(
     mouse_x: f64,
     mouse_y_from_bottom: f64,
-    primary_screen_height: f64,
+    primary_screen_bounds: &LogicalRect,
     hotspot_x: f64,
     hotspot_y: f64,
     image_width_points: f64,
@@ -77,16 +77,14 @@ fn captured_cursor_from_appkit_geometry(
         || image_height_points <= 0.0
         || image_width_pixels == 0
         || image_height_pixels == 0
-        || primary_screen_height <= 0.0
     {
         return None;
     }
+    let logical_position =
+        appkit_mouse_to_logical_point(mouse_x, mouse_y_from_bottom, primary_screen_bounds)?;
 
     Some(CapturedCursor {
-        logical_position: LogicalPoint {
-            x: mouse_x,
-            y: primary_screen_height - mouse_y_from_bottom,
-        },
+        logical_position,
         hotspot: LogicalPoint {
             x: hotspot_x,
             y: hotspot_y,
@@ -98,12 +96,27 @@ fn captured_cursor_from_appkit_geometry(
     })
 }
 
-fn primary_screen_height(monitors: &[MonitorSnapshot]) -> Option<f64> {
+fn appkit_mouse_to_logical_point(
+    mouse_x: f64,
+    mouse_y_from_bottom: f64,
+    primary_screen_bounds: &LogicalRect,
+) -> Option<LogicalPoint> {
+    if primary_screen_bounds.height <= 0.0 {
+        return None;
+    }
+
+    Some(LogicalPoint {
+        x: primary_screen_bounds.x + mouse_x,
+        y: primary_screen_bounds.y + primary_screen_bounds.height - mouse_y_from_bottom,
+    })
+}
+
+fn primary_screen_bounds(monitors: &[MonitorSnapshot]) -> Option<LogicalRect> {
     monitors
         .iter()
         .find(|monitor| monitor.physical_bounds.x == 0 && monitor.physical_bounds.y == 0)
         .or_else(|| monitors.first())
-        .map(|monitor| monitor.logical_bounds.height)
+        .map(|monitor| monitor.logical_bounds.clone())
 }
 
 fn cursor_tiff_to_png_and_dimensions(tiff_data: &[u8]) -> Result<(Vec<u8>, u32, u32), AppError> {
@@ -140,7 +153,7 @@ impl ScreenshotBackend for MacOSScreenshotBackend {
         &self,
         monitors: &[MonitorSnapshot],
     ) -> Result<Option<CapturedCursor>, AppError> {
-        let Some(primary_height) = primary_screen_height(monitors) else {
+        let Some(primary_bounds) = primary_screen_bounds(monitors) else {
             return Ok(None);
         };
         #[allow(deprecated)]
@@ -162,7 +175,7 @@ impl ScreenshotBackend for MacOSScreenshotBackend {
         Ok(captured_cursor_from_appkit_geometry(
             mouse.x,
             mouse.y,
-            primary_height,
+            &primary_bounds,
             hotspot.x,
             hotspot.y,
             size.width,
@@ -201,10 +214,16 @@ mod tests {
 
     #[test]
     fn builds_captured_cursor_from_appkit_bottom_left_coordinates() {
+        let primary_bounds = crate::domain::capture::LogicalRect {
+            x: 0.0,
+            y: 0.0,
+            width: 120.0,
+            height: 100.0,
+        };
         let cursor = captured_cursor_from_appkit_geometry(
             18.0,
             73.0,
-            100.0,
+            &primary_bounds,
             2.0,
             3.0,
             10.0,
@@ -231,10 +250,16 @@ mod tests {
 
     #[test]
     fn rejects_cursor_geometry_without_point_size() {
+        let primary_bounds = crate::domain::capture::LogicalRect {
+            x: 0.0,
+            y: 0.0,
+            width: 120.0,
+            height: 100.0,
+        };
         assert!(captured_cursor_from_appkit_geometry(
             18.0,
             73.0,
-            100.0,
+            &primary_bounds,
             2.0,
             3.0,
             0.0,
@@ -247,7 +272,22 @@ mod tests {
     }
 
     #[test]
-    fn finds_primary_screen_height_from_monitor_snapshots() {
+    fn maps_appkit_mouse_position_through_primary_logical_origin() {
+        let primary_bounds = crate::domain::capture::LogicalRect {
+            x: -200.0,
+            y: 50.0,
+            width: 120.0,
+            height: 80.0,
+        };
+
+        assert_eq!(
+            appkit_mouse_to_logical_point(25.0, 70.0, &primary_bounds),
+            Some(crate::domain::capture::LogicalPoint { x: -175.0, y: 60.0 })
+        );
+    }
+
+    #[test]
+    fn finds_primary_screen_bounds_from_monitor_snapshots() {
         let monitors = vec![
             MonitorSnapshot {
                 id: "secondary".to_string(),
@@ -285,7 +325,15 @@ mod tests {
             },
         ];
 
-        assert_eq!(primary_screen_height(&monitors), Some(80.0));
+        assert_eq!(
+            primary_screen_bounds(&monitors),
+            Some(crate::domain::capture::LogicalRect {
+                x: 0.0,
+                y: 0.0,
+                width: 120.0,
+                height: 80.0,
+            })
+        );
     }
 
     #[test]
