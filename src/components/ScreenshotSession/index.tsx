@@ -63,6 +63,7 @@ import {
   MIN_ANNOTATION_STROKE_WIDTH,
   MIN_TEXT_FONT_SIZE,
   applyAnnotationStyle,
+  appendAnnotationGesturePoint,
   appendAnnotationPoint,
   annotationColorFromShortcut,
   annotationFromGestureDraft,
@@ -179,7 +180,7 @@ const EDGE_SNAP_THRESHOLD = 6;
 const KEYBOARD_NUDGE_STEP = 1;
 const KEYBOARD_FAST_NUDGE_STEP = 10;
 const TOOLBAR_GAP = 8;
-const TOOLBAR_SIZE = { width: 1180, height: 36 };
+const TOOLBAR_SIZE = { width: 1250, height: 36 };
 const MAGNIFIER_GAP = 14;
 const MAGNIFIER_SIZE = { width: 120, height: 96 };
 const MAGNIFIER_ZOOM = 4;
@@ -2027,6 +2028,8 @@ export default function ScreenshotSession({
         { x: point.x - selection.x, y: point.y - selection.y },
         selection,
       );
+      if (annotationGesture.tool === 'polyline') return;
+
       commitAnnotationGestureAtPoint(localPoint, event.shiftKey);
       return;
     }
@@ -2133,6 +2136,28 @@ export default function ScreenshotSession({
         { x: point.x - selection.x, y: point.y - selection.y },
         selection,
       );
+      if (annotationGesture?.tool === 'polyline') {
+        const points = appendAnnotationGesturePoint(
+          annotationGesture,
+          localPoint,
+          event.shiftKey,
+        );
+        const nextGesture = {
+          ...annotationGesture,
+          points,
+        };
+        setAnnotationGesture(nextGesture);
+        setDraftAnnotation(
+          annotationFromGestureDraft(
+            nextGesture,
+            localPoint,
+            annotationStyle,
+            event.shiftKey,
+          ),
+        );
+        return;
+      }
+
       if (activeAnnotationTool === 'text') {
         if (textDraft) return;
         setTextDraft(startTextAnnotationDraft(localPoint, textFontSize));
@@ -2151,9 +2176,11 @@ export default function ScreenshotSession({
         return;
       }
 
-      const points = isPointStrokeAnnotationTool(activeAnnotationTool)
-        ? [localPoint]
-        : undefined;
+      const points =
+        isPointStrokeAnnotationTool(activeAnnotationTool) ||
+        activeAnnotationTool === 'polyline'
+          ? [localPoint]
+          : undefined;
       setAnnotationGesture({
         tool: activeAnnotationTool,
         startPoint: localPoint,
@@ -2672,6 +2699,18 @@ export default function ScreenshotSession({
                 onClick={() => toggleAnnotationTool('line')}
               >
                 Line
+              </button>
+              <button
+                type="button"
+                className={`h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50 ${
+                  activeAnnotationTool === 'polyline' ? 'bg-white/15' : ''
+                }`}
+                disabled={isRenderingOutput}
+                title="Polyline"
+                aria-label="Draw polyline annotation"
+                onClick={() => toggleAnnotationTool('polyline')}
+              >
+                Polyline
               </button>
               <button
                 type="button"

@@ -38,6 +38,13 @@ const blur: AnnotationCommand = {
   radius: 6,
 };
 
+const polyline: AnnotationCommand = {
+  type: 'polyline',
+  points: [{ x: 12, y: 18 }, { x: 40, y: 18 }, { x: 40, y: 50 }],
+  color: [24, 144, 255, 255],
+  stroke_width: 4,
+};
+
 describe('annotation geometry', () => {
   it('bounds rectangular and endpoint annotations', () => {
     expect(getAnnotationBounds(rectangle)).toEqual({
@@ -57,6 +64,12 @@ describe('annotation geometry', () => {
       y: 40,
       width: 20,
       height: 10,
+    });
+    expect(getAnnotationBounds(polyline)).toEqual({
+      x: 10,
+      y: 16,
+      width: 32,
+      height: 36,
     });
   });
 
@@ -106,6 +119,10 @@ describe('annotation geometry', () => {
     expect(moveAnnotationByDelta(blur, { x: 4, y: -6 })).toEqual({
       ...blur,
       rect: { x: 34, y: 34, width: 20, height: 10 },
+    });
+    expect(moveAnnotationByDelta(polyline, { x: 4, y: -6 })).toEqual({
+      ...polyline,
+      points: [{ x: 16, y: 12 }, { x: 44, y: 12 }, { x: 44, y: 44 }],
     });
   });
 

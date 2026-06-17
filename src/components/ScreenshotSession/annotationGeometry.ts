@@ -49,7 +49,11 @@ export function getAnnotationBounds(annotation: AnnotationCommand): LogicalRect 
     );
   }
 
-  if (annotation.type === 'freehand' || annotation.type === 'highlight') {
+  if (
+    annotation.type === 'freehand' ||
+    annotation.type === 'highlight' ||
+    annotation.type === 'polyline'
+  ) {
     return boundsFromPoints(annotation.points, annotation.stroke_width / 2);
   }
 
@@ -114,7 +118,11 @@ export function moveAnnotationByDelta(
     };
   }
 
-  if (annotation.type === 'freehand' || annotation.type === 'highlight') {
+  if (
+    annotation.type === 'freehand' ||
+    annotation.type === 'highlight' ||
+    annotation.type === 'polyline'
+  ) {
     return {
       ...annotation,
       points: annotation.points.map((point) => movePointByDelta(point, delta)),

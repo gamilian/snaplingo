@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ANNOTATION_COLORS,
+  appendAnnotationGesturePoint,
   annotationColorFromShortcut,
   annotationFromGestureDraft,
   annotationFromText,
@@ -123,6 +124,23 @@ describe('annotation style', () => {
     });
   });
 
+  it('creates polyline annotations from clicked vertices', () => {
+    expect(
+      annotationFromGesture(
+        'polyline',
+        { x: 1, y: 2 },
+        { x: 14, y: 9 },
+        style,
+        [{ x: 1, y: 2 }, { x: 8, y: 2 }, { x: 14, y: 9 }],
+      ),
+    ).toEqual({
+      type: 'polyline',
+      points: [{ x: 1, y: 2 }, { x: 8, y: 2 }, { x: 14, y: 9 }],
+      color: [40, 167, 69, 255],
+      stroke_width: 5,
+    });
+  });
+
   it('creates freehand annotations from the captured stroke points', () => {
     expect(
       annotationFromGesture(
@@ -219,6 +237,39 @@ describe('annotation style', () => {
     });
 
     expect(
+      annotationFromGestureDraft(
+        {
+          tool: 'polyline',
+          startPoint: { x: 1, y: 2 },
+          points: [{ x: 1, y: 2 }, { x: 8, y: 2 }],
+        },
+        { x: 14, y: 9 },
+        style,
+      ),
+    ).toEqual({
+      type: 'polyline',
+      points: [{ x: 1, y: 2 }, { x: 8, y: 2 }, { x: 14, y: 9 }],
+      color: [40, 167, 69, 255],
+      stroke_width: 5,
+    });
+
+    expect(
+      annotationFromGestureDraft(
+        {
+          tool: 'polyline',
+          startPoint: { x: 1, y: 2 },
+          points: [{ x: 1, y: 2 }, { x: 8, y: 2 }],
+        },
+        { x: 14, y: 9 },
+        style,
+        true,
+      ),
+    ).toMatchObject({
+      type: 'polyline',
+      points: [{ x: 1, y: 2 }, { x: 8, y: 2 }, { x: 14, y: 8 }],
+    });
+
+    expect(
       completeAnnotationGesture(
         {
           tool: 'pen',
@@ -295,6 +346,20 @@ describe('annotation style', () => {
     });
   });
 
+  it('appends constrained polyline vertices while holding shift', () => {
+    expect(
+      appendAnnotationGesturePoint(
+        {
+          tool: 'polyline',
+          startPoint: { x: 1, y: 2 },
+          points: [{ x: 1, y: 2 }, { x: 8, y: 2 }],
+        },
+        { x: 14, y: 9 },
+        true,
+      ),
+    ).toEqual([{ x: 1, y: 2 }, { x: 8, y: 2 }, { x: 14, y: 8 }]);
+  });
+
   it('constrains annotation gestures while holding shift', () => {
     expect(
       constrainAnnotationGesturePoint(
@@ -320,6 +385,13 @@ describe('annotation style', () => {
     expect(
       constrainAnnotationGesturePoint(
         'line',
+        { x: 10, y: 10 },
+        { x: 20, y: 40 },
+      ),
+    ).toEqual({ x: 10, y: 40 });
+    expect(
+      constrainAnnotationGesturePoint(
+        'polyline',
         { x: 10, y: 10 },
         { x: 20, y: 40 },
       ),

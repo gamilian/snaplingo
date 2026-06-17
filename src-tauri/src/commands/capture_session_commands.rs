@@ -755,6 +755,20 @@ fn image_annotations_from_commands(
                 color: *color,
                 stroke_width: ((*stroke_width).max(1) as f64 * output_scale).ceil() as u32,
             }),
+            AnnotationCommand::Polyline {
+                points,
+                color,
+                stroke_width,
+            } => Ok(ImageAnnotation::Polyline {
+                points: points
+                    .iter()
+                    .map(|point| {
+                        scaled_logical_point_relative_to(point, &annotation_origin, output_scale)
+                    })
+                    .collect::<Result<Vec<_>, String>>()?,
+                color: *color,
+                stroke_width: ((*stroke_width).max(1) as f64 * output_scale).ceil() as u32,
+            }),
             AnnotationCommand::Freehand {
                 points,
                 color,
@@ -1487,6 +1501,15 @@ mod tests {
                     color: [250, 219, 20, 255],
                     stroke_width: 3,
                 },
+                AnnotationCommand::Polyline {
+                    points: vec![
+                        LogicalPoint { x: 1.5, y: 2.0 },
+                        LogicalPoint { x: 4.0, y: 2.0 },
+                        LogicalPoint { x: 4.0, y: 6.0 },
+                    ],
+                    color: [24, 144, 255, 255],
+                    stroke_width: 2,
+                },
                 AnnotationCommand::Freehand {
                     points: vec![
                         LogicalPoint { x: 1.0, y: 1.5 },
@@ -1549,7 +1572,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(annotations.len(), 9);
+        assert_eq!(annotations.len(), 10);
         assert_eq!(
             annotations[0],
             ImageAnnotation::Rectangle {
@@ -1584,6 +1607,18 @@ mod tests {
         );
         assert_eq!(
             annotations[3],
+            ImageAnnotation::Polyline {
+                points: vec![
+                    PhysicalPoint { x: 3, y: 4 },
+                    PhysicalPoint { x: 8, y: 4 },
+                    PhysicalPoint { x: 8, y: 12 },
+                ],
+                color: [24, 144, 255, 255],
+                stroke_width: 4,
+            }
+        );
+        assert_eq!(
+            annotations[4],
             ImageAnnotation::Freehand {
                 points: vec![PhysicalPoint { x: 2, y: 3 }, PhysicalPoint { x: 6, y: 8 }],
                 color: [24, 144, 255, 255],
@@ -1591,7 +1626,7 @@ mod tests {
             }
         );
         assert_eq!(
-            annotations[4],
+            annotations[5],
             ImageAnnotation::Highlight {
                 points: vec![PhysicalPoint { x: 4, y: 5 }, PhysicalPoint { x: 8, y: 10 }],
                 color: [250, 219, 20, 96],
@@ -1599,7 +1634,7 @@ mod tests {
             }
         );
         assert_eq!(
-            annotations[5],
+            annotations[6],
             ImageAnnotation::Mosaic {
                 rect: PhysicalRect {
                     x: 4,
@@ -1611,7 +1646,7 @@ mod tests {
             }
         );
         assert_eq!(
-            annotations[6],
+            annotations[7],
             ImageAnnotation::Blur {
                 rect: PhysicalRect {
                     x: 2,
@@ -1623,7 +1658,7 @@ mod tests {
             }
         );
         assert_eq!(
-            annotations[7],
+            annotations[8],
             ImageAnnotation::Ellipse {
                 rect: PhysicalRect {
                     x: 1,
@@ -1637,7 +1672,7 @@ mod tests {
             }
         );
         assert_eq!(
-            annotations[8],
+            annotations[9],
             ImageAnnotation::Text {
                 position: PhysicalPoint { x: 7, y: 9 },
                 text: "Snap".to_string(),

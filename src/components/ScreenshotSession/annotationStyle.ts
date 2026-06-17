@@ -6,6 +6,7 @@ export type AnnotationTool =
   | 'ellipse'
   | 'arrow'
   | 'line'
+  | 'polyline'
   | 'pen'
   | 'highlight'
   | 'mosaic'
@@ -221,6 +222,7 @@ export function constrainAnnotationGesturePoint(
 
   if (
     tool === 'line' ||
+    tool === 'polyline' ||
     tool === 'arrow' ||
     tool === 'pen' ||
     tool === 'highlight'
@@ -249,13 +251,29 @@ function annotationGesturePoint(
   currentPoint: Point,
   constrainGesture: boolean,
 ) {
+  const constraintStartPoint =
+    gesture.tool === 'polyline'
+      ? gesture.points?.[gesture.points.length - 1] ?? gesture.startPoint
+      : gesture.startPoint;
+
   return constrainGesture
     ? constrainAnnotationGesturePoint(
         gesture.tool,
-        gesture.startPoint,
+        constraintStartPoint,
         currentPoint,
       )
     : currentPoint;
+}
+
+export function appendAnnotationGesturePoint(
+  gesture: AnnotationGestureDraft,
+  currentPoint: Point,
+  constrainGesture = false,
+) {
+  return appendAnnotationPoint(
+    gesture.points ?? [gesture.startPoint],
+    annotationGesturePoint(gesture, currentPoint, constrainGesture),
+  );
 }
 
 function annotationGesturePoints(
@@ -263,13 +281,16 @@ function annotationGesturePoints(
   currentPoint: Point,
   constrainGesture: boolean,
 ) {
-  if (!isPointStrokeAnnotationTool(gesture.tool)) return undefined;
-
   const gesturePoint = annotationGesturePoint(
     gesture,
     currentPoint,
     constrainGesture,
   );
+  if (gesture.tool === 'polyline') {
+    return appendAnnotationGesturePoint(gesture, currentPoint, constrainGesture);
+  }
+
+  if (!isPointStrokeAnnotationTool(gesture.tool)) return undefined;
   if (constrainGesture) return [gesture.startPoint, gesturePoint];
 
   return appendAnnotationPoint(gesture.points ?? [gesture.startPoint], currentPoint);
@@ -316,6 +337,15 @@ export function annotationFromGesture(
       type: 'highlight',
       points: points ?? [startPoint, currentPoint],
       color: [style.color[0], style.color[1], style.color[2], HIGHLIGHT_ALPHA],
+      stroke_width: style.strokeWidth,
+    };
+  }
+
+  if (tool === 'polyline') {
+    return {
+      type: 'polyline',
+      points: points ?? [startPoint, currentPoint],
+      color: style.color,
       stroke_width: style.strokeWidth,
     };
   }
@@ -475,7 +505,11 @@ export function isCommittedAnnotation(annotation: AnnotationCommand) {
     );
   }
 
-  if (annotation.type === 'freehand' || annotation.type === 'highlight') {
+  if (
+    annotation.type === 'freehand' ||
+    annotation.type === 'highlight' ||
+    annotation.type === 'polyline'
+  ) {
     if (annotation.points.length < 2) return false;
 
     const pathLength = annotation.points.slice(1).reduce((total, point, index) => {
