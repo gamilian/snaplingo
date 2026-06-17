@@ -80,6 +80,7 @@ import {
   isConfirmHoverSelectionShortcut,
   isCopyCaptureDoubleClick,
   isCopyCaptureKeyboardShortcut,
+  isMoveDraftSelectionShortcut,
   isPinCaptureShortcut,
   isSaveCaptureShortcut,
   isSelectAllCaptureShortcut,
@@ -1161,7 +1162,7 @@ export default function ScreenshotSession({
           }
         }
       } else if (
-        event.key === ' ' &&
+        isMoveDraftSelectionShortcut(event) &&
         status === 'selecting' &&
         startPoint &&
         selection &&

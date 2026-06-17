@@ -68,6 +68,15 @@ export function isToggleToolbarShortcut(event: CaptureShortcutEvent) {
   );
 }
 
+export function isMoveDraftSelectionShortcut(event: CaptureShortcutEvent) {
+  return (
+    event.key === ' ' &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey
+  );
+}
+
 export function isPinCaptureShortcut(event: CaptureShortcutEvent) {
   return (
     event.key === 'F3' &&

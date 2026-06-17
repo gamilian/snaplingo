@@ -8,6 +8,7 @@ import {
   isCopyCaptureKeyboardShortcut,
   isConfirmHoverSelectionShortcut,
   isPinCaptureShortcut,
+  isMoveDraftSelectionShortcut,
   isSaveCaptureShortcut,
   isSelectAllCaptureShortcut,
   isToggleToolbarShortcut,
@@ -351,6 +352,45 @@ describe('capture session actions', () => {
         metaKey: false,
         ctrlKey: false,
         altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('uses Space for moving an in-progress selection without system modifiers', () => {
+    expect(
+      isMoveDraftSelectionShortcut({
+        key: ' ',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isMoveDraftSelectionShortcut({
+        key: ' ',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(true);
+    expect(
+      isMoveDraftSelectionShortcut({
+        key: ' ',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      isMoveDraftSelectionShortcut({
+        key: ' ',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: true,
         shiftKey: false,
       }),
     ).toBe(false);
