@@ -103,6 +103,15 @@ impl PinnedImageService {
     }
 
     pub fn replace_pinned_png(&self, image_id: &str, png_data: Vec<u8>) -> Result<()> {
+        self.replace_pinned_png_with_source_text(image_id, png_data, None)
+    }
+
+    pub fn replace_pinned_png_with_source_text(
+        &self,
+        image_id: &str,
+        png_data: Vec<u8>,
+        source_text: Option<String>,
+    ) -> Result<()> {
         let decoded = image::load_from_memory(&png_data)
             .map_err(|e| AppError::System(format!("Failed to decode pinned PNG: {}", e)))?;
         let mut images = self.images.lock().unwrap();
@@ -113,7 +122,7 @@ impl PinnedImageService {
         image.png_data = png_data;
         image.width = decoded.width();
         image.height = decoded.height();
-        image.source_text = None;
+        image.source_text = source_text;
 
         Ok(())
     }

@@ -269,13 +269,31 @@ pub fn replace_pinned_image_from_clipboard(
     image_id: String,
     state: State<'_, crate::AppState>,
 ) -> Result<PinnedImageView, String> {
-    let png_data = state
-        .inner()
-        .capture_output_service
-        .read_clipboard_png()
-        .map_err(|e| e.to_string())?;
+    match state.inner().capture_output_service.read_clipboard_png() {
+        Ok(png_data) => {
+            replace_pinned_png_by_id(&state.inner().pinned_image_service, &image_id, png_data)
+        }
+        Err(image_error) => {
+            let text =
+                state
+                    .inner()
+                    .capture_output_service
+                    .read_clipboard_text()
+                    .map_err(|text_error| {
+                        format!(
+                            "{}; also failed to read text from clipboard: {}",
+                            image_error, text_error
+                        )
+                    })?;
 
-    replace_pinned_png_by_id(&state.inner().pinned_image_service, &image_id, png_data)
+            replace_pinned_text_as_png_by_services(
+                &state.inner().pinned_image_service,
+                &state.inner().image_composition_service,
+                &image_id,
+                &text,
+            )
+        }
+    }
 }
 
 #[tauri::command]
@@ -437,6 +455,24 @@ fn replace_pinned_png_by_id(
 ) -> Result<PinnedImageView, String> {
     pinned_images
         .replace_pinned_png(image_id, png_data)
+        .map_err(|e| e.to_string())?;
+
+    pinned_images
+        .get_pinned_image(image_id)
+        .map_err(|e| e.to_string())
+}
+
+fn replace_pinned_text_as_png_by_services(
+    pinned_images: &PinnedImageService,
+    image_composition: &ImageCompositionService,
+    image_id: &str,
+    text: &str,
+) -> Result<PinnedImageView, String> {
+    let png_data = image_composition
+        .render_text_png(text)
+        .map_err(|e| e.to_string())?;
+    pinned_images
+        .replace_pinned_png_with_source_text(image_id, png_data, Some(text.to_string()))
         .map_err(|e| e.to_string())?;
 
     pinned_images
@@ -1893,6 +1929,27 @@ mod tests {
             pinned_images.get_pinned_png(&image_id).unwrap(),
             replacement
         );
+    }
+
+    #[test]
+    fn replace_pinned_text_as_png_returns_text_backed_view() {
+        let pinned_images = PinnedImageService::new();
+        let image_composition = ImageCompositionService::new();
+        let image_id = pinned_images.pin_png(make_test_png(2, 2)).unwrap();
+
+        let view = super::replace_pinned_text_as_png_by_services(
+            &pinned_images,
+            &image_composition,
+            &image_id,
+            "Replacement text",
+        )
+        .unwrap();
+
+        assert_eq!(view.id, image_id);
+        assert_eq!(view.source_text, Some("Replacement text".to_string()));
+        assert!(view.width >= 80);
+        assert!(view.height >= 60);
+        assert!(!pinned_images.get_pinned_png(&image_id).unwrap().is_empty());
     }
 
     #[test]
