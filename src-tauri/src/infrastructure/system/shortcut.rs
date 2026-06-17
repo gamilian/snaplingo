@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, Once, OnceLock};
 
-use global_hotkey::{
-    hotkey::HotKey, GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState,
-};
+use global_hotkey::{hotkey::HotKey, GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
 use tauri::AppHandle;
 
 use crate::error::{AppError, Result};
@@ -133,6 +131,13 @@ mod tests {
     #[test]
     fn parses_pin_toggle_shortcut_accelerator() {
         let hotkey = super::parse_shortcut("Shift+F3").unwrap();
+
+        assert!(hotkey.id() > 0);
+    }
+
+    #[test]
+    fn parses_pin_group_switch_shortcut_accelerator() {
+        let hotkey = super::parse_shortcut("Cmd+F3").unwrap();
 
         assert!(hotkey.id() > 0);
     }

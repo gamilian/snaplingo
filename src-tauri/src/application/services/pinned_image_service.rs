@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -12,16 +12,27 @@ struct PinnedImage {
     png_data: Vec<u8>,
     width: u32,
     height: u32,
+    group: u32,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct PinnedImageGroupSwitch {
+    pub previous_group: u32,
+    pub next_group: u32,
+    pub hide_image_ids: Vec<String>,
+    pub show_image_ids: Vec<String>,
 }
 
 pub struct PinnedImageService {
     images: Mutex<HashMap<String, PinnedImage>>,
+    active_group: Mutex<u32>,
 }
 
 impl PinnedImageService {
     pub fn new() -> Self {
         Self {
             images: Mutex::new(HashMap::new()),
+            active_group: Mutex::new(0),
         }
     }
 
@@ -29,10 +40,12 @@ impl PinnedImageService {
         let image = image::load_from_memory(&png_data)
             .map_err(|e| AppError::System(format!("Failed to decode pinned PNG: {}", e)))?;
         let id = next_pinned_image_id();
+        let group = *self.active_group.lock().unwrap();
         let pinned_image = PinnedImage {
             png_data,
             width: image.width(),
             height: image.height(),
+            group,
         };
 
         self.images.lock().unwrap().insert(id.clone(), pinned_image);
@@ -74,6 +87,53 @@ impl PinnedImageService {
             .map(|_| ())
             .ok_or_else(|| AppError::System(format!("Pinned image not found: {}", image_id)))
     }
+
+    pub fn move_pinned_image_to_group(&self, image_id: &str, group: u32) -> Result<()> {
+        let mut images = self.images.lock().unwrap();
+        let image = images
+            .get_mut(image_id)
+            .ok_or_else(|| AppError::System(format!("Pinned image not found: {}", image_id)))?;
+
+        image.group = group;
+
+        Ok(())
+    }
+
+    pub fn switch_to_next_group(&self) -> Option<PinnedImageGroupSwitch> {
+        let previous_group = *self.active_group.lock().unwrap();
+        let images = self.images.lock().unwrap();
+        let groups = images
+            .values()
+            .map(|image| image.group)
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
+
+        if groups.is_empty() || (groups.len() == 1 && groups[0] == previous_group) {
+            return None;
+        }
+
+        let next_group = groups
+            .iter()
+            .copied()
+            .find(|group| *group > previous_group)
+            .unwrap_or(groups[0]);
+        let mut hide_image_ids = image_ids_in_group(&images, previous_group);
+        let mut show_image_ids = image_ids_in_group(&images, next_group);
+
+        drop(images);
+        *self.active_group.lock().unwrap() = next_group;
+
+        hide_image_ids.sort();
+        show_image_ids.sort();
+
+        Some(PinnedImageGroupSwitch {
+            previous_group,
+            next_group,
+            hide_image_ids,
+            show_image_ids,
+        })
+    }
 }
 
 impl Default for PinnedImageService {
@@ -89,4 +149,12 @@ fn next_pinned_image_id() -> String {
         .as_nanos();
 
     format!("pin-{}-{}", std::process::id(), nanos)
+}
+
+fn image_ids_in_group(images: &HashMap<String, PinnedImage>, group: u32) -> Vec<String> {
+    images
+        .iter()
+        .filter(|(_, image)| image.group == group)
+        .map(|(image_id, _)| image_id.clone())
+        .collect()
 }

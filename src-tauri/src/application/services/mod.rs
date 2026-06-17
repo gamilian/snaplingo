@@ -24,5 +24,5 @@ pub use capture_session_service::CaptureSessionService;
 pub use history_service::HistoryService;
 pub use hotkey_service::HotkeyService;
 pub use image_composition_service::ImageCompositionService;
-pub use pinned_image_service::PinnedImageService;
+pub use pinned_image_service::{PinnedImageGroupSwitch, PinnedImageService};
 pub use workflow_service::{WorkflowOutcome, WorkflowService};

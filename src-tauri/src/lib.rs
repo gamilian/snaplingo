@@ -375,6 +375,22 @@ fn register_pin_toggle_shortcut(app: &tauri::AppHandle) -> Result<()> {
     Ok(())
 }
 
+/// Register pinned image group switch shortcut
+fn register_pin_group_switch_shortcut(app: &tauri::AppHandle) -> Result<()> {
+    let app_clone = app.clone();
+
+    infrastructure::system::register_shortcut(app, "Cmd+F3", move || {
+        log::info!("Pinned image group switch shortcut triggered!");
+
+        let state = app_clone.state::<AppState>();
+        if let Err(err) = commands::switch_pinned_image_group_for_state(&app_clone, state.inner()) {
+            log::error!("Failed to switch pinned image group: {}", err);
+        }
+    })?;
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   let config_dir = dirs::home_dir()
@@ -428,6 +444,12 @@ pub fn run() {
           } else {
               log::info!("Pinned image toggle shortcut registered: Shift+F3");
           }
+
+          if let Err(e) = register_pin_group_switch_shortcut(&app_handle) {
+              log::error!("Failed to register pinned image group switch shortcut: {}", e);
+          } else {
+              log::info!("Pinned image group switch shortcut registered: Cmd+F3");
+          }
       });
 
       // TODO: Create system tray
@@ -470,6 +492,7 @@ pub fn run() {
       commands::save_pinned_image,
       commands::remove_pinned_image,
       commands::toggle_pinned_images_visibility,
+      commands::switch_pinned_image_group,
       commands::run_capture_ocr,
       commands::get_translation_history,
       commands::get_ocr_history,

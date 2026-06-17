@@ -8,7 +8,7 @@ use tauri::{
 
 use crate::application::services::{
     image_composition_service::{ImageAnnotation, PngPlacement},
-    CaptureOutputService, PinnedImageService,
+    CaptureOutputService, PinnedImageGroupSwitch, PinnedImageService,
 };
 use crate::domain::capture::{
     AnnotationCommand, CaptureOutputAction, CaptureSessionId, CaptureSessionView, LogicalPoint,
@@ -33,6 +33,12 @@ struct CaptureImagePlacement {
     snapshot_index: usize,
     source_rect: PhysicalRect,
     destination_rect: PhysicalRect,
+}
+
+#[derive(Debug, PartialEq)]
+struct PinnedWindowVisibilityChange {
+    label: String,
+    visible: bool,
 }
 
 #[tauri::command]
@@ -237,6 +243,37 @@ pub fn toggle_pinned_images_visibility(app: AppHandle) -> Result<Option<bool>, S
     }
 
     Ok(Some(next_visible))
+}
+
+#[tauri::command]
+pub fn switch_pinned_image_group(
+    app: AppHandle,
+    state: State<'_, crate::AppState>,
+) -> Result<Option<u32>, String> {
+    switch_pinned_image_group_for_state(&app, state.inner())
+}
+
+pub fn switch_pinned_image_group_for_state(
+    app: &AppHandle,
+    state: &crate::AppState,
+) -> Result<Option<u32>, String> {
+    let Some(group_switch) = state.pinned_image_service.switch_to_next_group() else {
+        return Ok(None);
+    };
+
+    for change in pinned_group_window_visibility_changes(&group_switch) {
+        let Some(window) = app.get_webview_window(&change.label) else {
+            continue;
+        };
+
+        if change.visible {
+            window.show().map_err(|e| e.to_string())?;
+        } else {
+            window.hide().map_err(|e| e.to_string())?;
+        }
+    }
+
+    Ok(Some(group_switch.next_group))
 }
 
 async fn save_pinned_png_by_id(
@@ -602,6 +639,28 @@ fn next_pinned_windows_visible_state(current_visibility: &[bool]) -> Option<bool
     Some(!current_visibility.iter().any(|is_visible| *is_visible))
 }
 
+fn pinned_group_window_visibility_changes(
+    group_switch: &PinnedImageGroupSwitch,
+) -> Vec<PinnedWindowVisibilityChange> {
+    group_switch
+        .hide_image_ids
+        .iter()
+        .map(|image_id| PinnedWindowVisibilityChange {
+            label: pinned_window_label(image_id),
+            visible: false,
+        })
+        .chain(
+            group_switch
+                .show_image_ids
+                .iter()
+                .map(|image_id| PinnedWindowVisibilityChange {
+                    label: pinned_window_label(image_id),
+                    visible: true,
+                }),
+        )
+        .collect()
+}
+
 fn pinned_window_size(width: u32, height: u32) -> (f64, f64) {
     let width = width.max(1) as f64;
     let height = height.max(1) as f64;
@@ -754,7 +813,9 @@ mod tests {
     use image::ImageEncoder;
 
     use crate::application::services::image_composition_service::ImageAnnotation;
-    use crate::application::services::{CaptureOutputService, PinnedImageService};
+    use crate::application::services::{
+        CaptureOutputService, PinnedImageGroupSwitch, PinnedImageService,
+    };
     use crate::domain::capture::{
         AnnotationCommand, LogicalPoint, LogicalRect, MonitorSnapshotView, PhysicalPoint,
         PhysicalRect,
@@ -1137,9 +1198,43 @@ mod tests {
 
     #[test]
     fn toggles_pinned_windows_based_on_current_visibility() {
-        assert_eq!(super::next_pinned_windows_visible_state(&[true, false]), Some(false));
-        assert_eq!(super::next_pinned_windows_visible_state(&[false, false]), Some(true));
+        assert_eq!(
+            super::next_pinned_windows_visible_state(&[true, false]),
+            Some(false)
+        );
+        assert_eq!(
+            super::next_pinned_windows_visible_state(&[false, false]),
+            Some(true)
+        );
         assert_eq!(super::next_pinned_windows_visible_state(&[]), None);
+    }
+
+    #[test]
+    fn plans_pinned_group_window_visibility_changes() {
+        let group_switch = PinnedImageGroupSwitch {
+            previous_group: 0,
+            next_group: 1,
+            hide_image_ids: vec!["pin-1".to_string()],
+            show_image_ids: vec!["pin-2".to_string(), "pin-3".to_string()],
+        };
+
+        assert_eq!(
+            super::pinned_group_window_visibility_changes(&group_switch),
+            vec![
+                super::PinnedWindowVisibilityChange {
+                    label: "pin-pin-1".to_string(),
+                    visible: false,
+                },
+                super::PinnedWindowVisibilityChange {
+                    label: "pin-pin-2".to_string(),
+                    visible: true,
+                },
+                super::PinnedWindowVisibilityChange {
+                    label: "pin-pin-3".to_string(),
+                    visible: true,
+                },
+            ]
+        );
     }
 
     #[test]

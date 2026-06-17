@@ -50,4 +50,38 @@ mod tests {
         service.remove_pinned_image(&image_id).unwrap();
         assert!(service.get_pinned_png(&image_id).is_err());
     }
+
+    #[test]
+    fn switches_between_existing_pinned_image_groups() {
+        let service = PinnedImageService::new();
+        let first_group_image = service.pin_png(make_test_png(1, 1)).unwrap();
+        let second_group_image = service.pin_png(make_test_png(1, 1)).unwrap();
+
+        service
+            .move_pinned_image_to_group(&second_group_image, 1)
+            .unwrap();
+
+        let switch = service.switch_to_next_group().unwrap();
+
+        assert_eq!(switch.previous_group, 0);
+        assert_eq!(switch.next_group, 1);
+        assert_eq!(switch.hide_image_ids, vec![first_group_image.clone()]);
+        assert_eq!(switch.show_image_ids, vec![second_group_image.clone()]);
+
+        let switch = service.switch_to_next_group().unwrap();
+
+        assert_eq!(switch.previous_group, 1);
+        assert_eq!(switch.next_group, 0);
+        assert_eq!(switch.hide_image_ids, vec![second_group_image]);
+        assert_eq!(switch.show_image_ids, vec![first_group_image]);
+    }
+
+    #[test]
+    fn does_not_switch_groups_when_only_one_group_exists() {
+        let service = PinnedImageService::new();
+
+        service.pin_png(make_test_png(1, 1)).unwrap();
+
+        assert!(service.switch_to_next_group().is_none());
+    }
 }
