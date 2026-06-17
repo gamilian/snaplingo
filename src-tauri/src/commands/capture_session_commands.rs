@@ -656,7 +656,7 @@ fn next_pinned_windows_visible_state(current_visibility: &[bool]) -> Option<bool
         return None;
     }
 
-    Some(!current_visibility.iter().any(|is_visible| *is_visible))
+    Some(current_visibility.iter().any(|is_visible| !*is_visible))
 }
 
 fn pinned_group_window_visibility_changes(
@@ -1227,6 +1227,10 @@ mod tests {
     fn toggles_pinned_windows_based_on_current_visibility() {
         assert_eq!(
             super::next_pinned_windows_visible_state(&[true, false]),
+            Some(true)
+        );
+        assert_eq!(
+            super::next_pinned_windows_visible_state(&[true, true]),
             Some(false)
         );
         assert_eq!(
