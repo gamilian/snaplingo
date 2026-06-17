@@ -16,6 +16,7 @@ import {
   isCommittedAnnotation,
   nextAnnotationStrokeWidth,
   nextTextFontSize,
+  undoAnnotationGesturePoint,
   type AnnotationStyle,
 } from './annotationStyle';
 
@@ -358,6 +359,34 @@ describe('annotation style', () => {
         true,
       ),
     ).toEqual([{ x: 1, y: 2 }, { x: 8, y: 2 }, { x: 14, y: 8 }]);
+  });
+
+  it('undoes fixed polyline vertices from the active gesture', () => {
+    expect(
+      undoAnnotationGesturePoint({
+        tool: 'polyline',
+        startPoint: { x: 1, y: 2 },
+        points: [{ x: 1, y: 2 }, { x: 8, y: 2 }, { x: 14, y: 8 }],
+      }),
+    ).toEqual({
+      tool: 'polyline',
+      startPoint: { x: 1, y: 2 },
+      points: [{ x: 1, y: 2 }, { x: 8, y: 2 }],
+    });
+
+    expect(
+      undoAnnotationGesturePoint({
+        tool: 'polyline',
+        startPoint: { x: 1, y: 2 },
+        points: [{ x: 1, y: 2 }],
+      }),
+    ).toBeNull();
+    expect(
+      undoAnnotationGesturePoint({
+        tool: 'line',
+        startPoint: { x: 1, y: 2 },
+      }),
+    ).toBeNull();
   });
 
   it('constrains annotation gestures while holding shift', () => {

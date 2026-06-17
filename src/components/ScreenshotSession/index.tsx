@@ -78,6 +78,7 @@ import {
   nextAnnotationToolFromCycleShortcut,
   nextAnnotationStrokeWidth,
   nextTextFontSize,
+  undoAnnotationGesturePoint,
   type AnnotationColor,
   type AnnotationGestureDraft,
   type AnnotationStyle,
@@ -948,6 +949,34 @@ export default function ScreenshotSession({
     void renderSelectionPreview(selection, nextHistory.annotations);
   }, [annotationHistory, canRedoAnnotation, renderSelectionPreview, selection]);
 
+  const undoPolylineGesturePoint = useCallback(() => {
+    if (!annotationGesture || annotationGesture.tool !== 'polyline' || !selection) {
+      return false;
+    }
+
+    const nextGesture = undoAnnotationGesturePoint(annotationGesture);
+    if (!nextGesture) {
+      setAnnotationGesture(null);
+      setDraftAnnotation(null);
+      return true;
+    }
+
+    const fallbackPoint =
+      nextGesture.points?.[nextGesture.points.length - 1] ?? nextGesture.startPoint;
+    const localPoint = cursorPoint
+      ? clampPointToRect(
+          { x: cursorPoint.x - selection.x, y: cursorPoint.y - selection.y },
+          selection,
+        )
+      : fallbackPoint;
+
+    setAnnotationGesture(nextGesture);
+    setDraftAnnotation(
+      annotationFromGestureDraft(nextGesture, localPoint, annotationStyle),
+    );
+    return true;
+  }, [annotationGesture, annotationStyle, cursorPoint, selection]);
+
   const clearAnnotations = useCallback(() => {
     if (!selection) return;
 
@@ -1445,6 +1474,13 @@ export default function ScreenshotSession({
         clearAnnotations();
       } else if (
         status === 'preview' &&
+        undoRedoAction === 'undo' &&
+        annotationGesture?.tool === 'polyline'
+      ) {
+        event.preventDefault();
+        undoPolylineGesturePoint();
+      } else if (
+        status === 'preview' &&
         undoRedoAction
       ) {
         event.preventDefault();
@@ -1778,6 +1814,7 @@ export default function ScreenshotSession({
     cursorColor,
     toggleAnnotationTool,
     undoAnnotation,
+    undoPolylineGesturePoint,
   ]);
 
   useEffect(() => {

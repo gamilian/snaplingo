@@ -277,6 +277,20 @@ export function appendAnnotationGesturePoint(
   );
 }
 
+export function undoAnnotationGesturePoint(
+  gesture: AnnotationGestureDraft,
+): AnnotationGestureDraft | null {
+  if (gesture.tool !== 'polyline') return null;
+
+  const points = gesture.points ?? [gesture.startPoint];
+  if (points.length <= 1) return null;
+
+  return {
+    ...gesture,
+    points: points.slice(0, -1),
+  };
+}
+
 function annotationGesturePoints(
   gesture: AnnotationGestureDraft,
   currentPoint: Point,
