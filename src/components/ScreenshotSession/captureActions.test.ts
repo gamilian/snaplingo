@@ -14,6 +14,7 @@ import {
   isPinCapturePointer,
   isMoveDraftSelectionShortcut,
   isQuickSaveCaptureShortcut,
+  isRestoreLastSelectionShortcut,
   isSaveCaptureShortcut,
   isSelectAllCaptureShortcut,
   isToggleToolbarShortcut,
@@ -147,6 +148,45 @@ describe('capture session actions', () => {
         metaKey: true,
         ctrlKey: false,
         altKey: true,
+        shiftKey: true,
+      }),
+    ).toBe(false);
+  });
+
+  it('uses plain R for restoring the last selection', () => {
+    expect(
+      isRestoreLastSelectionShortcut({
+        key: 'r',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isRestoreLastSelectionShortcut({
+        key: 'R',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isRestoreLastSelectionShortcut({
+        key: 'r',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      isRestoreLastSelectionShortcut({
+        key: 'r',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
         shiftKey: true,
       }),
     ).toBe(false);

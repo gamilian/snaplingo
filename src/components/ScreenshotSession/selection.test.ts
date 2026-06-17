@@ -7,6 +7,7 @@ import {
   nudgeSelection,
   resizeSelectionBoundaryByArrow,
   resizeSelectionByHandle,
+  restoreSelectionWithinBounds,
   snapMovedSelectionToRects,
   snapPointToRects,
   snapResizedSelectionToRects,
@@ -216,6 +217,64 @@ describe('selection editing', () => {
         10,
       ),
     ).toEqual({ x: 40, y: 30, width: 10, height: 20 });
+  });
+
+  it('restores a previous selection inside the capture bounds', () => {
+    expect(
+      restoreSelectionWithinBounds(
+        { x: 40, y: 30, width: 100, height: 80 },
+        bounds,
+        10,
+      ),
+    ).toEqual({ x: 40, y: 30, width: 100, height: 80 });
+  });
+
+  it('moves a previous selection back inside the capture bounds', () => {
+    expect(
+      restoreSelectionWithinBounds(
+        { x: 260, y: 170, width: 100, height: 80 },
+        bounds,
+        10,
+      ),
+    ).toEqual({ x: 200, y: 120, width: 100, height: 80 });
+    expect(
+      restoreSelectionWithinBounds(
+        { x: -20, y: -10, width: 100, height: 80 },
+        bounds,
+        10,
+      ),
+    ).toEqual({ x: 0, y: 0, width: 100, height: 80 });
+  });
+
+  it('drops previous selections that are too small or larger than the capture bounds', () => {
+    expect(
+      restoreSelectionWithinBounds(
+        { x: 40, y: 30, width: 9, height: 80 },
+        bounds,
+        10,
+      ),
+    ).toBeNull();
+    expect(
+      restoreSelectionWithinBounds(
+        { x: 40, y: 30, width: 100, height: 9 },
+        bounds,
+        10,
+      ),
+    ).toBeNull();
+    expect(
+      restoreSelectionWithinBounds(
+        { x: 0, y: 0, width: 400, height: 80 },
+        bounds,
+        10,
+      ),
+    ).toBeNull();
+    expect(
+      restoreSelectionWithinBounds(
+        { x: 0, y: 0, width: 100, height: 240 },
+        bounds,
+        10,
+      ),
+    ).toBeNull();
   });
 
   it('positions the toolbar near the selection within capture bounds', () => {

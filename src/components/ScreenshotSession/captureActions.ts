@@ -41,6 +41,16 @@ export function isQuickSaveCaptureShortcut(event: CaptureShortcutEvent) {
   );
 }
 
+export function isRestoreLastSelectionShortcut(event: CaptureShortcutEvent) {
+  return (
+    event.key.toLowerCase() === 'r' &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !event.shiftKey
+  );
+}
+
 export function isCopyCaptureKeyboardShortcut(event: CaptureShortcutEvent) {
   const isPlainEnter =
     event.key === 'Enter' &&

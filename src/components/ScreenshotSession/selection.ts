@@ -44,6 +44,23 @@ export function moveSelectionByDelta(
   };
 }
 
+export function restoreSelectionWithinBounds(
+  rect: LogicalRect,
+  bounds: LogicalRect,
+  minSize: number,
+): LogicalRect | null {
+  if (
+    rect.width < minSize ||
+    rect.height < minSize ||
+    rect.width > bounds.width ||
+    rect.height > bounds.height
+  ) {
+    return null;
+  }
+
+  return moveSelectionByDelta(rect, { x: 0, y: 0 }, bounds);
+}
+
 export function moveDraftSelectionByDelta(
   rect: LogicalRect,
   anchorPoint: Point,

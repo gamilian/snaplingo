@@ -11,6 +11,7 @@ import {
   nudgeSelection,
   resizeSelectionBoundaryByArrow,
   resizeSelectionByHandle,
+  restoreSelectionWithinBounds,
   snapMovedSelectionToRects,
   snapPointToRects,
   snapResizedSelectionToRects,
@@ -90,12 +91,17 @@ import {
   isPinCapturePointer,
   isPinCaptureShortcut,
   isQuickSaveCaptureShortcut,
+  isRestoreLastSelectionShortcut,
   isSaveCaptureShortcut,
   isSelectAllCaptureShortcut,
   isToggleToolbarShortcut,
   quickSaveCaptureSelection,
   saveCaptureSelection,
 } from './captureActions';
+import {
+  loadLastCaptureSelection,
+  saveLastCaptureSelection,
+} from './selectionMemory';
 import { parseCaptureLaunchPayload } from './windowMode';
 import {
   getMonitorAtVirtualPoint,
@@ -557,6 +563,14 @@ export default function ScreenshotSession({
     }
   }, []);
 
+  const recordLastSelection = useCallback((rect: LogicalRect) => {
+    try {
+      saveLastCaptureSelection(window.localStorage, rect);
+    } catch (err) {
+      console.warn('Failed to remember capture selection:', err);
+    }
+  }, []);
+
   const renderSelectionPreview = useCallback(
     async (rect: LogicalRect, nextAnnotations: AnnotationCommand[] = annotations) => {
       if (!session) return;
@@ -579,6 +593,7 @@ export default function ScreenshotSession({
             rect,
           });
           await invoke('open_result_window', { text: ocrResult.text });
+          recordLastSelection(rect);
           await invoke('cancel_capture_session', { sessionId: session.id });
           resetSessionState();
           onInactive?.();
@@ -590,7 +605,7 @@ export default function ScreenshotSession({
         setIsRenderingOutput(false);
       }
     },
-    [annotations, mode, onInactive, resetSessionState, session],
+    [annotations, mode, onInactive, recordLastSelection, resetSessionState, session],
   );
 
   const commitTextDraftToHistory = useCallback(() => {
@@ -626,6 +641,7 @@ export default function ScreenshotSession({
         selection,
         outputHistory.annotations,
       );
+      recordLastSelection(selection);
       await invoke('cancel_capture_session', { sessionId: session.id });
       resetSessionState();
       onInactive?.();
@@ -635,7 +651,14 @@ export default function ScreenshotSession({
     } finally {
       setIsRenderingOutput(false);
     }
-  }, [commitTextDraftToHistory, onInactive, resetSessionState, selection, session]);
+  }, [
+    commitTextDraftToHistory,
+    onInactive,
+    recordLastSelection,
+    resetSessionState,
+    selection,
+    session,
+  ]);
 
   const copyCandidateSelection = useCallback(async (rect: LogicalRect) => {
     if (!session) return;
@@ -645,6 +668,7 @@ export default function ScreenshotSession({
 
     try {
       await copyCaptureSelection(invoke, session.id, rect);
+      recordLastSelection(rect);
       await invoke('cancel_capture_session', { sessionId: session.id });
       resetSessionState();
       onInactive?.();
@@ -654,7 +678,7 @@ export default function ScreenshotSession({
     } finally {
       setIsRenderingOutput(false);
     }
-  }, [onInactive, resetSessionState, session]);
+  }, [onInactive, recordLastSelection, resetSessionState, session]);
 
   const copyCurrentColor = useCallback(async () => {
     if (!cursorColor) return;
@@ -681,6 +705,7 @@ export default function ScreenshotSession({
         selection,
         outputHistory.annotations,
       );
+      recordLastSelection(selection);
       await invoke('cancel_capture_session', { sessionId: session.id });
       resetSessionState();
       onInactive?.();
@@ -690,7 +715,14 @@ export default function ScreenshotSession({
     } finally {
       setIsRenderingOutput(false);
     }
-  }, [commitTextDraftToHistory, onInactive, resetSessionState, selection, session]);
+  }, [
+    commitTextDraftToHistory,
+    onInactive,
+    recordLastSelection,
+    resetSessionState,
+    selection,
+    session,
+  ]);
 
   const quickSaveSelection = useCallback(async () => {
     if (!session || !selection) return;
@@ -707,6 +739,7 @@ export default function ScreenshotSession({
         outputHistory.annotations,
         screenshotSavePath,
       );
+      recordLastSelection(selection);
       await invoke('cancel_capture_session', { sessionId: session.id });
       resetSessionState();
       onInactive?.();
@@ -719,6 +752,7 @@ export default function ScreenshotSession({
   }, [
     commitTextDraftToHistory,
     onInactive,
+    recordLastSelection,
     resetSessionState,
     screenshotSavePath,
     selection,
@@ -737,6 +771,7 @@ export default function ScreenshotSession({
         rect: selection,
       });
       await invoke('open_result_window', { text: ocrResult.text });
+      recordLastSelection(selection);
       await invoke('cancel_capture_session', { sessionId: session.id });
       resetSessionState();
       onInactive?.();
@@ -746,7 +781,7 @@ export default function ScreenshotSession({
     } finally {
       setIsRenderingOutput(false);
     }
-  }, [onInactive, resetSessionState, selection, session]);
+  }, [onInactive, recordLastSelection, resetSessionState, selection, session]);
 
   const pinSelection = useCallback(async () => {
     if (!session || !selection) return;
@@ -762,6 +797,7 @@ export default function ScreenshotSession({
         annotations: outputHistory.annotations,
         action: { type: 'pin' },
       });
+      recordLastSelection(selection);
       await invoke('cancel_capture_session', { sessionId: session.id });
       resetSessionState();
       onInactive?.();
@@ -771,7 +807,14 @@ export default function ScreenshotSession({
     } finally {
       setIsRenderingOutput(false);
     }
-  }, [commitTextDraftToHistory, onInactive, resetSessionState, selection, session]);
+  }, [
+    commitTextDraftToHistory,
+    onInactive,
+    recordLastSelection,
+    resetSessionState,
+    selection,
+    session,
+  ]);
 
   const undoAnnotation = useCallback(() => {
     if (!selection || !canUndoAnnotation) return;
@@ -1039,6 +1082,37 @@ export default function ScreenshotSession({
     void renderSelectionPreview(selectionBounds, []);
   }, [renderSelectionPreview, selectionBounds]);
 
+  const restoreLastSelection = useCallback(() => {
+    if (!selectionBounds) return;
+
+    const savedSelection = loadLastCaptureSelection(window.localStorage);
+    if (!savedSelection) return;
+
+    const restoredSelection = restoreSelectionWithinBounds(
+      savedSelection,
+      selectionBounds,
+      MIN_SELECTION_SIZE,
+    );
+    if (!restoredSelection) return;
+
+    setStartPoint(null);
+    setSelection(restoredSelection);
+    setHoverSelection(null);
+    setEditGesture(null);
+    setActiveAnnotationTool(null);
+    setAnnotationGesture(null);
+    setDraftAnnotation(null);
+    setSelectedAnnotationIndex(null);
+    setAnnotationMoveGesture(null);
+    setDraftSelectionMoveGesture(null);
+    setTextDraft(null);
+    setTextDraftAnnotationIndex(null);
+    setAnnotationHistory(emptyAnnotationHistory());
+    setIsToolbarHidden(false);
+    setStatus('preview');
+    void renderSelectionPreview(restoredSelection, []);
+  }, [renderSelectionPreview, selectionBounds]);
+
   useEffect(() => {
     if (!initialMode || hasStartedInitialSession) return;
 
@@ -1164,6 +1238,13 @@ export default function ScreenshotSession({
       ) {
         event.preventDefault();
         void copyCurrentColor();
+      } else if (
+        status === 'selecting' &&
+        !textDraft &&
+        isRestoreLastSelectionShortcut(event)
+      ) {
+        event.preventDefault();
+        restoreLastSelection();
       } else if (
         status === 'selecting' &&
         !textDraft &&
@@ -1352,6 +1433,7 @@ export default function ScreenshotSession({
     nudgeSelectedAnnotation,
     pinSelection,
     quickSaveSelection,
+    restoreLastSelection,
     saveSelection,
     selectAnnotationColor,
     selection,
