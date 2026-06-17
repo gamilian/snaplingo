@@ -4,6 +4,7 @@ import {
   destroyPinnedImageGroup,
   hidePinnedImageGroup,
   hidePinnedImage,
+  isClosePinnedImageShortcut,
   isCopyPinnedImageShortcut,
   isDestroyPinnedImageShortcut,
   isSavePinnedImageShortcut,
@@ -85,6 +86,50 @@ describe('pinned image actions', () => {
         key: 's',
         metaKey: false,
         ctrlKey: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('uses Cmd/Ctrl+W for closing a pinned image window', () => {
+    expect(
+      isClosePinnedImageShortcut({
+        key: 'w',
+        metaKey: true,
+        ctrlKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isClosePinnedImageShortcut({
+        key: 'W',
+        metaKey: false,
+        ctrlKey: true,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isClosePinnedImageShortcut({
+        key: 'w',
+        metaKey: false,
+        ctrlKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      isClosePinnedImageShortcut({
+        key: 'w',
+        metaKey: true,
+        ctrlKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(false);
+    expect(
+      isClosePinnedImageShortcut({
+        key: 'w',
+        metaKey: false,
+        ctrlKey: true,
+        altKey: true,
+        shiftKey: false,
       }),
     ).toBe(false);
   });

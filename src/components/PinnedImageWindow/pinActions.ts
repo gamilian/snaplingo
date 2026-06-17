@@ -8,6 +8,8 @@ interface PinShortcutEvent {
   key: string;
   metaKey: boolean;
   ctrlKey: boolean;
+  altKey?: boolean;
+  shiftKey?: boolean;
 }
 
 interface PinDestroyShortcutEvent {
@@ -26,6 +28,15 @@ export function isCopyPinnedImageShortcut(event: PinShortcutEvent) {
 
 export function isSavePinnedImageShortcut(event: PinShortcutEvent) {
   return event.key.toLowerCase() === 's' && (event.metaKey || event.ctrlKey);
+}
+
+export function isClosePinnedImageShortcut(event: PinShortcutEvent) {
+  return (
+    event.key.toLowerCase() === 'w' &&
+    (event.metaKey || event.ctrlKey) &&
+    !event.altKey &&
+    !event.shiftKey
+  );
 }
 
 export function isDestroyPinnedImageShortcut(event: PinDestroyShortcutEvent) {

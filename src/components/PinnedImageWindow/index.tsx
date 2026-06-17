@@ -17,6 +17,7 @@ import {
   destroyPinnedImageGroup,
   hidePinnedImage,
   hidePinnedImageGroup,
+  isClosePinnedImageShortcut,
   isCopyPinnedImageShortcut,
   isDestroyPinnedImageShortcut,
   isSavePinnedImageShortcut,
@@ -194,6 +195,12 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
         return;
       }
 
+      if (isClosePinnedImageShortcut(event)) {
+        event.preventDefault();
+        void hideCurrentPinnedImage();
+        return;
+      }
+
       const zoomAction = getPinnedKeyboardZoomAction(event);
       if (zoomAction) {
         event.preventDefault();
@@ -217,6 +224,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
   }, [
     adjustPinnedZoom,
     copyPinnedImage,
+    hideCurrentPinnedImage,
     resetPinnedSize,
     savePinnedImageAs,
     setPinnedOpacityPreset,
