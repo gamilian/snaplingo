@@ -33,7 +33,14 @@ interface PinnedKeyboardEvent {
   shiftKey?: boolean;
 }
 
+interface PinnedWheelEvent {
+  metaKey: boolean;
+  ctrlKey: boolean;
+  altKey?: boolean;
+}
+
 export type PinnedKeyboardZoomAction = 'zoom-in' | 'zoom-out' | 'reset';
+export type PinnedWheelAction = 'zoom' | 'opacity';
 export type PinnedKeyboardTransformAction =
   | 'rotate-clockwise'
   | 'rotate-counterclockwise'
@@ -116,6 +123,15 @@ export function getPinnedOpacityFromWheel(
 
 export function getPinnedOpacityPreset(opacity: number) {
   return roundToTwoDecimals(clamp(opacity, MIN_OPACITY, MAX_OPACITY));
+}
+
+export function getPinnedWheelAction(
+  event: PinnedWheelEvent,
+): PinnedWheelAction | null {
+  if (event.altKey) return null;
+  if (event.metaKey || event.ctrlKey) return 'opacity';
+
+  return 'zoom';
 }
 
 export function getPinnedDisplaySize(originalSize: PinnedSize, zoom: number) {

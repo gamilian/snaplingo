@@ -12,6 +12,7 @@ import {
   getPinnedOpacityFromWheel,
   getPinnedOpacityPreset,
   getPinnedTransformStyle,
+  getPinnedWheelAction,
   getPinnedZoomFromWheel,
   nextPinnedTransform,
 } from './pinControls';
@@ -288,15 +289,18 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     event.preventDefault();
     setContextMenuPosition(null);
     const wheelDirection = Math.sign(event.deltaY) || 1;
+    const wheelAction = getPinnedWheelAction(event);
 
-    if (event.shiftKey) {
+    if (wheelAction === 'opacity') {
       setOpacity((currentOpacity) =>
         getPinnedOpacityFromWheel(currentOpacity, wheelDirection),
       );
       return;
     }
 
-    adjustPinnedZoom(wheelDirection);
+    if (wheelAction === 'zoom') {
+      adjustPinnedZoom(wheelDirection);
+    }
   };
 
   const handleContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {

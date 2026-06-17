@@ -8,6 +8,7 @@ import {
   getPinnedOpacityFromWheel,
   getPinnedOpacityPreset,
   getPinnedTransformStyle,
+  getPinnedWheelAction,
   getPinnedZoomFromWheel,
   nextPinnedTransform,
 } from './pinControls';
@@ -112,6 +113,30 @@ describe('pinned image controls', () => {
     expect(getPinnedOpacityFromWheel(0.8, 1)).toBe(0.75);
     expect(getPinnedOpacityFromWheel(0.98, -1)).toBe(1);
     expect(getPinnedOpacityFromWheel(0.22, 1)).toBe(0.2);
+  });
+
+  it('uses Snipaste wheel modifiers for pinned zoom and opacity', () => {
+    expect(
+      getPinnedWheelAction({
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+      }),
+    ).toBe('zoom');
+    expect(
+      getPinnedWheelAction({
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+      }),
+    ).toBe('opacity');
+    expect(
+      getPinnedWheelAction({
+        metaKey: false,
+        ctrlKey: true,
+        altKey: false,
+      }),
+    ).toBe('opacity');
   });
 
   it('keeps pinned display size proportional to its initial fit', () => {
