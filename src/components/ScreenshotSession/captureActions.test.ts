@@ -5,6 +5,7 @@ import {
   type CaptureInvokeArgs,
   copyCaptureSelection,
   getCandidateCycleDirectionFromShortcut,
+  getSelectionHistoryStepFromShortcut,
   isCancelCapturePointer,
   isCopyCaptureDoubleClick,
   isCopyCaptureKeyboardShortcut,
@@ -190,6 +191,45 @@ describe('capture session actions', () => {
         shiftKey: true,
       }),
     ).toBe(false);
+  });
+
+  it('uses comma and period for cycling capture selection history', () => {
+    expect(
+      getSelectionHistoryStepFromShortcut({
+        key: ',',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe('previous');
+    expect(
+      getSelectionHistoryStepFromShortcut({
+        key: '.',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe('next');
+    expect(
+      getSelectionHistoryStepFromShortcut({
+        key: ',',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBeNull();
+    expect(
+      getSelectionHistoryStepFromShortcut({
+        key: '.',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBeNull();
   });
 
   it('copies the current frozen selection to the clipboard', async () => {

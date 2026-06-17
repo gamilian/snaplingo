@@ -83,6 +83,7 @@ import {
   copyCaptureSelection,
   getCandidateCycleDirectionFromShortcut,
   getCursorNudgeDeltaFromShortcut,
+  getSelectionHistoryStepFromShortcut,
   isCancelCapturePointer,
   isConfirmHoverSelectionShortcut,
   isCopyCaptureDoubleClick,
@@ -99,6 +100,8 @@ import {
   saveCaptureSelection,
 } from './captureActions';
 import {
+  getSelectionHistoryEntry,
+  loadCaptureSelectionHistory,
   loadLastCaptureSelection,
   saveLastCaptureSelection,
 } from './selectionMemory';
@@ -1061,11 +1064,9 @@ export default function ScreenshotSession({
     textDraft,
   ]);
 
-  const selectFullCaptureArea = useCallback(() => {
-    if (!selectionBounds) return;
-
+  const previewSelection = useCallback((rect: LogicalRect) => {
     setStartPoint(null);
-    setSelection(selectionBounds);
+    setSelection(rect);
     setHoverSelection(null);
     setEditGesture(null);
     setActiveAnnotationTool(null);
@@ -1079,8 +1080,14 @@ export default function ScreenshotSession({
     setAnnotationHistory(emptyAnnotationHistory());
     setIsToolbarHidden(false);
     setStatus('preview');
-    void renderSelectionPreview(selectionBounds, []);
-  }, [renderSelectionPreview, selectionBounds]);
+    void renderSelectionPreview(rect, []);
+  }, [renderSelectionPreview]);
+
+  const selectFullCaptureArea = useCallback(() => {
+    if (!selectionBounds) return;
+
+    previewSelection(selectionBounds);
+  }, [previewSelection, selectionBounds]);
 
   const restoreLastSelection = useCallback(() => {
     if (!selectionBounds) return;
@@ -1095,23 +1102,31 @@ export default function ScreenshotSession({
     );
     if (!restoredSelection) return;
 
-    setStartPoint(null);
-    setSelection(restoredSelection);
-    setHoverSelection(null);
-    setEditGesture(null);
-    setActiveAnnotationTool(null);
-    setAnnotationGesture(null);
-    setDraftAnnotation(null);
-    setSelectedAnnotationIndex(null);
-    setAnnotationMoveGesture(null);
-    setDraftSelectionMoveGesture(null);
-    setTextDraft(null);
-    setTextDraftAnnotationIndex(null);
-    setAnnotationHistory(emptyAnnotationHistory());
-    setIsToolbarHidden(false);
-    setStatus('preview');
-    void renderSelectionPreview(restoredSelection, []);
-  }, [renderSelectionPreview, selectionBounds]);
+    previewSelection(restoredSelection);
+  }, [previewSelection, selectionBounds]);
+
+  const restoreSelectionFromHistory = useCallback(
+    (step: ReturnType<typeof getSelectionHistoryStepFromShortcut>) => {
+      if (!step || !selectionBounds) return;
+
+      const historySelection = getSelectionHistoryEntry(
+        loadCaptureSelectionHistory(window.localStorage),
+        selection,
+        step,
+      );
+      if (!historySelection) return;
+
+      const restoredSelection = restoreSelectionWithinBounds(
+        historySelection,
+        selectionBounds,
+        MIN_SELECTION_SIZE,
+      );
+      if (!restoredSelection) return;
+
+      previewSelection(restoredSelection);
+    },
+    [previewSelection, selection, selectionBounds],
+  );
 
   useEffect(() => {
     if (!initialMode || hasStartedInitialSession) return;
@@ -1202,6 +1217,7 @@ export default function ScreenshotSession({
       const cursorNudgeDelta = getCursorNudgeDeltaFromShortcut(event);
       const candidateCycleDirection =
         getCandidateCycleDirectionFromShortcut(event);
+      const selectionHistoryStep = getSelectionHistoryStepFromShortcut(event);
 
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -1238,6 +1254,13 @@ export default function ScreenshotSession({
       ) {
         event.preventDefault();
         void copyCurrentColor();
+      } else if (
+        (status === 'selecting' || status === 'preview') &&
+        !textDraft &&
+        selectionHistoryStep
+      ) {
+        event.preventDefault();
+        restoreSelectionFromHistory(selectionHistoryStep);
       } else if (
         status === 'selecting' &&
         !textDraft &&
@@ -1434,6 +1457,7 @@ export default function ScreenshotSession({
     pinSelection,
     quickSaveSelection,
     restoreLastSelection,
+    restoreSelectionFromHistory,
     saveSelection,
     selectAnnotationColor,
     selection,

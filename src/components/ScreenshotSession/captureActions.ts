@@ -23,6 +23,8 @@ interface CapturePointerEvent {
   shiftKey: boolean;
 }
 
+export type SelectionHistoryStep = 'previous' | 'next';
+
 export function isSaveCaptureShortcut(event: CaptureShortcutEvent) {
   return (
     event.key.toLowerCase() === 's' &&
@@ -49,6 +51,19 @@ export function isRestoreLastSelectionShortcut(event: CaptureShortcutEvent) {
     !event.altKey &&
     !event.shiftKey
   );
+}
+
+export function getSelectionHistoryStepFromShortcut(
+  event: CaptureShortcutEvent,
+): SelectionHistoryStep | null {
+  if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
+    return null;
+  }
+
+  if (event.key === ',') return 'previous';
+  if (event.key === '.') return 'next';
+
+  return null;
 }
 
 export function isCopyCaptureKeyboardShortcut(event: CaptureShortcutEvent) {
