@@ -128,6 +128,7 @@ import {
   refreshCaptureSession,
   saveCaptureSelection,
   shouldCancelCaptureOnBlur,
+  shouldRecordSuccessfulCaptureSelection,
   shouldRestoreLastSelectionFromShortcut,
 } from './captureActions';
 import { printBase64PngImage } from './capturePrint';
@@ -603,6 +604,17 @@ export default function ScreenshotSession({
     }
   }, []);
 
+  const recordSuccessfulSelection = useCallback(
+    (
+      action: Parameters<typeof shouldRecordSuccessfulCaptureSelection>[0],
+      rect: LogicalRect,
+    ) => {
+      if (!shouldRecordSuccessfulCaptureSelection(action)) return;
+      recordLastSelection(rect);
+    },
+    [recordLastSelection],
+  );
+
   const renderSelectionPreview = useCallback(
     async (
       rect: LogicalRect,
@@ -630,7 +642,7 @@ export default function ScreenshotSession({
             rect,
           });
           await invoke('open_result_window', { text: ocrResult.text });
-          recordLastSelection(rect);
+          recordSuccessfulSelection('ocr', rect);
           await invoke('cancel_capture_session', { sessionId: session.id });
           resetSessionState();
           onInactive?.();
@@ -646,7 +658,7 @@ export default function ScreenshotSession({
       annotations,
       mode,
       onInactive,
-      recordLastSelection,
+      recordSuccessfulSelection,
       resetSessionState,
       session,
       shouldIncludeCapturedCursor,
@@ -687,7 +699,7 @@ export default function ScreenshotSession({
         outputHistory.annotations,
         shouldIncludeCapturedCursor,
       );
-      recordLastSelection(selection);
+      recordSuccessfulSelection('copy', selection);
       await invoke('cancel_capture_session', { sessionId: session.id });
       resetSessionState();
       onInactive?.();
@@ -700,7 +712,7 @@ export default function ScreenshotSession({
   }, [
     commitTextDraftToHistory,
     onInactive,
-    recordLastSelection,
+    recordSuccessfulSelection,
     resetSessionState,
     selection,
     session,
@@ -721,7 +733,7 @@ export default function ScreenshotSession({
         [],
         shouldIncludeCapturedCursor,
       );
-      recordLastSelection(rect);
+      recordSuccessfulSelection('copy', rect);
       await invoke('cancel_capture_session', { sessionId: session.id });
       resetSessionState();
       onInactive?.();
@@ -733,7 +745,7 @@ export default function ScreenshotSession({
     }
   }, [
     onInactive,
-    recordLastSelection,
+    recordSuccessfulSelection,
     resetSessionState,
     session,
     shouldIncludeCapturedCursor,
@@ -767,7 +779,7 @@ export default function ScreenshotSession({
         outputHistory.annotations,
         shouldIncludeCapturedCursor,
       );
-      recordLastSelection(selection);
+      recordSuccessfulSelection('save', selection);
       await invoke('cancel_capture_session', { sessionId: session.id });
       resetSessionState();
       onInactive?.();
@@ -780,7 +792,7 @@ export default function ScreenshotSession({
   }, [
     commitTextDraftToHistory,
     onInactive,
-    recordLastSelection,
+    recordSuccessfulSelection,
     resetSessionState,
     selection,
     session,
@@ -803,7 +815,7 @@ export default function ScreenshotSession({
         screenshotSavePath,
         shouldIncludeCapturedCursor,
       );
-      recordLastSelection(selection);
+      recordSuccessfulSelection('quick-save', selection);
       await invoke('cancel_capture_session', { sessionId: session.id });
       resetSessionState();
       onInactive?.();
@@ -816,7 +828,7 @@ export default function ScreenshotSession({
   }, [
     commitTextDraftToHistory,
     onInactive,
-    recordLastSelection,
+    recordSuccessfulSelection,
     resetSessionState,
     screenshotSavePath,
     selection,
@@ -836,7 +848,7 @@ export default function ScreenshotSession({
         rect: selection,
       });
       await invoke('open_result_window', { text: ocrResult.text });
-      recordLastSelection(selection);
+      recordSuccessfulSelection('ocr', selection);
       await invoke('cancel_capture_session', { sessionId: session.id });
       resetSessionState();
       onInactive?.();
@@ -846,7 +858,13 @@ export default function ScreenshotSession({
     } finally {
       setIsRenderingOutput(false);
     }
-  }, [onInactive, recordLastSelection, resetSessionState, selection, session]);
+  }, [
+    onInactive,
+    recordSuccessfulSelection,
+    resetSessionState,
+    selection,
+    session,
+  ]);
 
   const pinSelection = useCallback(async () => {
     if (!session || !selection) return;
@@ -863,7 +881,7 @@ export default function ScreenshotSession({
         ...(shouldIncludeCapturedCursor ? { includeCursor: true } : {}),
         action: { type: 'pin' },
       });
-      recordLastSelection(selection);
+      recordSuccessfulSelection('pin', selection);
       await invoke('cancel_capture_session', { sessionId: session.id });
       resetSessionState();
       onInactive?.();
@@ -876,7 +894,7 @@ export default function ScreenshotSession({
   }, [
     commitTextDraftToHistory,
     onInactive,
-    recordLastSelection,
+    recordSuccessfulSelection,
     resetSessionState,
     selection,
     session,
@@ -899,7 +917,7 @@ export default function ScreenshotSession({
         printBase64PngImage,
         shouldIncludeCapturedCursor,
       );
-      recordLastSelection(selection);
+      recordSuccessfulSelection('print', selection);
       await invoke('cancel_capture_session', { sessionId: session.id });
       resetSessionState();
       onInactive?.();
@@ -912,7 +930,7 @@ export default function ScreenshotSession({
   }, [
     commitTextDraftToHistory,
     onInactive,
-    recordLastSelection,
+    recordSuccessfulSelection,
     resetSessionState,
     selection,
     session,

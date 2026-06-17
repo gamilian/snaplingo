@@ -51,6 +51,14 @@ interface RestoreLastSelectionOptions {
 export type UndoRedoAction = 'undo' | 'redo';
 export type CaptureKeyboardToolbarAction = 'toggle' | 'hide';
 export type SaveCapturePointerAction = 'save' | 'quick-save';
+export type CaptureCompletionAction =
+  | 'copy'
+  | 'save'
+  | 'quick-save'
+  | 'pin'
+  | 'ocr'
+  | 'print'
+  | 'cancel';
 export type CancelCapturePointerAction =
   | 'finish-edit'
   | 'finish-annotation'
@@ -67,6 +75,17 @@ interface CancelCapturePointerState {
 }
 interface CancelCaptureBlurState {
   status: 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
+}
+
+export function shouldRecordSuccessfulCaptureSelection(
+  action: CaptureCompletionAction,
+) {
+  return (
+    action === 'copy' ||
+    action === 'save' ||
+    action === 'quick-save' ||
+    action === 'pin'
+  );
 }
 
 export function isSaveCaptureShortcut(event: CaptureShortcutEvent) {

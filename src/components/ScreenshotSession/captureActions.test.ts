@@ -38,6 +38,7 @@ import {
   saveCaptureSelection,
   shouldRestoreLastSelectionFromShortcut,
   shouldCancelCaptureOnBlur,
+  shouldRecordSuccessfulCaptureSelection,
 } from './captureActions';
 
 describe('capture session actions', () => {
@@ -162,6 +163,17 @@ describe('capture session actions', () => {
         args: { sessionId: 'session-prev' },
       },
     ]);
+  });
+
+  it('records only Snipaste-defined successful screenshot actions in selection history', () => {
+    expect(shouldRecordSuccessfulCaptureSelection('copy')).toBe(true);
+    expect(shouldRecordSuccessfulCaptureSelection('save')).toBe(true);
+    expect(shouldRecordSuccessfulCaptureSelection('quick-save')).toBe(true);
+    expect(shouldRecordSuccessfulCaptureSelection('pin')).toBe(true);
+
+    expect(shouldRecordSuccessfulCaptureSelection('ocr')).toBe(false);
+    expect(shouldRecordSuccessfulCaptureSelection('print')).toBe(false);
+    expect(shouldRecordSuccessfulCaptureSelection('cancel')).toBe(false);
   });
 
   it('uses Cmd/Ctrl+Shift+S for quick saving the current selection', () => {
