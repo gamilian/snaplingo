@@ -5,6 +5,7 @@ import {
   annotationFromText,
   annotationFromGesture,
   applyAnnotationStyle,
+  completeAnnotationGesture,
   constrainAnnotationGesturePoint,
   nextAnnotationToolFromCycleShortcut,
   annotationSizeDirectionFromShortcut,
@@ -161,6 +162,44 @@ describe('annotation style', () => {
       text: 'Snap text',
       color: [40, 167, 69, 255],
       font_size: 24,
+    });
+  });
+
+  it('completes annotation gestures from the current pointer position', () => {
+    expect(
+      completeAnnotationGesture(
+        {
+          tool: 'arrow',
+          startPoint: { x: 10, y: 10 },
+        },
+        { x: 34, y: 18 },
+        style,
+        true,
+      ),
+    ).toEqual({
+      type: 'arrow',
+      start: { x: 10, y: 10 },
+      end: { x: 34, y: 10 },
+      color: [40, 167, 69, 255],
+      stroke_width: 5,
+    });
+
+    expect(
+      completeAnnotationGesture(
+        {
+          tool: 'pen',
+          startPoint: { x: 1, y: 2 },
+          points: [{ x: 1, y: 2 }, { x: 6, y: 4 }],
+        },
+        { x: 9, y: 10 },
+        style,
+        false,
+      ),
+    ).toEqual({
+      type: 'freehand',
+      points: [{ x: 1, y: 2 }, { x: 6, y: 4 }, { x: 9, y: 10 }],
+      color: [40, 167, 69, 255],
+      stroke_width: 5,
     });
   });
 

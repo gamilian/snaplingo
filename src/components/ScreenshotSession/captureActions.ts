@@ -44,6 +44,7 @@ interface SelectionArrowActionOptions {
 export type UndoRedoAction = 'undo' | 'redo';
 export type CancelCapturePointerAction =
   | 'finish-edit'
+  | 'finish-annotation'
   | 'dismiss-layer'
   | 'reset-selection'
   | 'cancel-session';
@@ -52,6 +53,7 @@ interface CancelCapturePointerState {
   status: 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
   hasSelection: boolean;
   hasTextDraft?: boolean;
+  hasAnnotationGesture?: boolean;
   hasDismissibleLayer: boolean;
 }
 
@@ -325,6 +327,7 @@ export function getCancelCapturePointerAction(
   state: CancelCapturePointerState,
 ): CancelCapturePointerAction {
   if (state.hasTextDraft) return 'finish-edit';
+  if (state.hasAnnotationGesture) return 'finish-annotation';
   if (state.hasDismissibleLayer) return 'dismiss-layer';
   if (state.status === 'preview' && state.hasSelection) return 'reset-selection';
   return 'cancel-session';

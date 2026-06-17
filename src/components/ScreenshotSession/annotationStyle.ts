@@ -18,6 +18,12 @@ export interface AnnotationStyle {
   strokeWidth: number;
 }
 
+export interface AnnotationGestureDraft {
+  tool: AnnotationTool;
+  startPoint: Point;
+  points?: Point[];
+}
+
 interface AnnotationToolShortcutEvent {
   key: string;
   metaKey: boolean;
@@ -215,6 +221,19 @@ export function constrainAnnotationGesturePoint(
   return currentPoint;
 }
 
+export function appendAnnotationPoint(points: Point[], point: Point) {
+  const previousPoint = points[points.length - 1];
+  if (previousPoint && previousPoint.x === point.x && previousPoint.y === point.y) {
+    return points;
+  }
+
+  return [...points, point];
+}
+
+export function isPointStrokeAnnotationTool(tool: AnnotationTool) {
+  return tool === 'pen' || tool === 'highlight';
+}
+
 export function annotationFromGesture(
   tool: AnnotationTool,
   startPoint: Point,
@@ -291,6 +310,29 @@ export function annotationFromGesture(
     color: style.color,
     stroke_width: style.strokeWidth,
   };
+}
+
+export function completeAnnotationGesture(
+  gesture: AnnotationGestureDraft,
+  currentPoint: Point,
+  style: AnnotationStyle,
+  constrainGesture = false,
+) {
+  const points = isPointStrokeAnnotationTool(gesture.tool)
+    ? appendAnnotationPoint(gesture.points ?? [gesture.startPoint], currentPoint)
+    : undefined;
+  const gesturePoint = constrainGesture
+    ? constrainAnnotationGesturePoint(gesture.tool, gesture.startPoint, currentPoint)
+    : currentPoint;
+  const annotation = annotationFromGesture(
+    gesture.tool,
+    gesture.startPoint,
+    gesturePoint,
+    style,
+    points,
+  );
+
+  return isCommittedAnnotation(annotation) ? annotation : null;
 }
 
 export function annotationFromText(

@@ -1241,6 +1241,17 @@ describe('capture session actions', () => {
     ).toBe('dismiss-layer');
   });
 
+  it('finishes active annotation gestures before dismissing capture layers', () => {
+    expect(
+      getCancelCapturePointerAction({
+        status: 'preview',
+        hasSelection: true,
+        hasAnnotationGesture: true,
+        hasDismissibleLayer: true,
+      }),
+    ).toBe('finish-annotation');
+  });
+
   it('finishes text annotation edits before dismissing other capture layers', () => {
     expect(
       getCancelCapturePointerAction({

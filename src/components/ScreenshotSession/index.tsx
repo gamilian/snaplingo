@@ -62,19 +62,22 @@ import {
   MIN_ANNOTATION_STROKE_WIDTH,
   MIN_TEXT_FONT_SIZE,
   applyAnnotationStyle,
+  appendAnnotationPoint,
   annotationColorFromShortcut,
   annotationSizeDirectionFromShortcut,
   annotationSizeDirectionFromWheel,
   annotationToolFromShortcut,
   annotationColorToCss,
+  completeAnnotationGesture,
   constrainAnnotationGesturePoint,
   annotationFromGesture,
   arrowHeadPoints,
-  isCommittedAnnotation,
+  isPointStrokeAnnotationTool,
   nextAnnotationToolFromCycleShortcut,
   nextAnnotationStrokeWidth,
   nextTextFontSize,
   type AnnotationColor,
+  type AnnotationGestureDraft,
   type AnnotationStyle,
   type AnnotationSizeDirection,
   type AnnotationTool,
@@ -159,11 +162,6 @@ type EditGesture =
       startPoint: Point;
       startSelection: LogicalRect;
     };
-type AnnotationGesture = {
-  tool: AnnotationTool;
-  startPoint: Point;
-  points?: Point[];
-};
 type AnnotationMoveGesture = {
   annotationIndex: number;
   startPoint: Point;
@@ -238,21 +236,8 @@ function sameAnnotationColor(a: AnnotationColor, b: AnnotationColor) {
   return a.every((channel, index) => channel === b[index]);
 }
 
-function appendAnnotationPoint(points: Point[], point: Point) {
-  const previousPoint = points[points.length - 1];
-  if (previousPoint && previousPoint.x === point.x && previousPoint.y === point.y) {
-    return points;
-  }
-
-  return [...points, point];
-}
-
 function svgPolylinePoints(points: Point[]) {
   return points.map((point) => `${point.x},${point.y}`).join(' ');
-}
-
-function isPointStrokeAnnotationTool(tool: AnnotationTool) {
-  return tool === 'pen' || tool === 'highlight';
 }
 
 function DimMask({ rect }: { rect: LogicalRect }) {
@@ -400,7 +385,7 @@ export default function ScreenshotSession({
   const [activeAnnotationTool, setActiveAnnotationTool] =
     useState<AnnotationTool | null>(null);
   const [annotationGesture, setAnnotationGesture] =
-    useState<AnnotationGesture | null>(null);
+    useState<AnnotationGestureDraft | null>(null);
   const [draftAnnotation, setDraftAnnotation] = useState<AnnotationCommand | null>(null);
   const [selectedAnnotationIndex, setSelectedAnnotationIndex] = useState<number | null>(
     null,
@@ -1164,6 +1149,35 @@ export default function ScreenshotSession({
     selection,
   ]);
 
+  const commitAnnotationGestureAtPoint = useCallback(
+    (localPoint: Point, constrainGesture: boolean) => {
+      if (!annotationGesture || !selection) return false;
+
+      const nextAnnotation = completeAnnotationGesture(
+        annotationGesture,
+        localPoint,
+        annotationStyle,
+        constrainGesture,
+      );
+      setAnnotationGesture(null);
+      setDraftAnnotation(null);
+      if (!nextAnnotation) return true;
+
+      const nextHistory = addAnnotationToHistory(annotationHistory, nextAnnotation);
+      setSelectedAnnotationIndex(null);
+      setAnnotationHistory(nextHistory);
+      void renderSelectionPreview(selection, nextHistory.annotations);
+      return true;
+    },
+    [
+      annotationGesture,
+      annotationHistory,
+      annotationStyle,
+      renderSelectionPreview,
+      selection,
+    ],
+  );
+
   const dismissCaptureLayer = useCallback(() => {
     if (textDraft) {
       setTextDraft(null);
@@ -1771,6 +1785,7 @@ export default function ScreenshotSession({
         status,
         hasSelection: selection !== null,
         hasTextDraft: textDraft !== null,
+        hasAnnotationGesture: annotationGesture !== null,
         hasDismissibleLayer:
           textDraft !== null ||
           annotationMoveGesture !== null ||
@@ -1782,6 +1797,20 @@ export default function ScreenshotSession({
 
       if (action === 'finish-edit') {
         commitTextDraft();
+      } else if (action === 'finish-annotation') {
+        if (selection && selectionBounds && annotationGesture) {
+          const point = viewportPointToVirtualPoint(
+            { x: event.clientX, y: event.clientY },
+            selectionBounds,
+          );
+          const localPoint = clampPointToRect(
+            { x: point.x - selection.x, y: point.y - selection.y },
+            selection,
+          );
+          commitAnnotationGestureAtPoint(localPoint, event.shiftKey);
+        } else {
+          dismissCaptureLayer();
+        }
       } else if (action === 'dismiss-layer') {
         dismissCaptureLayer();
       } else if (action === 'reset-selection') {
@@ -1996,31 +2025,7 @@ export default function ScreenshotSession({
         { x: point.x - selection.x, y: point.y - selection.y },
         selection,
       );
-      const points = isPointStrokeAnnotationTool(annotationGesture.tool)
-        ? appendAnnotationPoint(annotationGesture.points ?? [], localPoint)
-        : undefined;
-      const gesturePoint = event.shiftKey
-        ? constrainAnnotationGesturePoint(
-            annotationGesture.tool,
-            annotationGesture.startPoint,
-            localPoint,
-          )
-        : localPoint;
-      const nextAnnotation = annotationFromGesture(
-        annotationGesture.tool,
-        annotationGesture.startPoint,
-        gesturePoint,
-        annotationStyle,
-        points,
-      );
-      setAnnotationGesture(null);
-      setDraftAnnotation(null);
-      if (isCommittedAnnotation(nextAnnotation)) {
-        const nextHistory = addAnnotationToHistory(annotationHistory, nextAnnotation);
-        setSelectedAnnotationIndex(null);
-        setAnnotationHistory(nextHistory);
-        void renderSelectionPreview(selection, nextHistory.annotations);
-      }
+      commitAnnotationGestureAtPoint(localPoint, event.shiftKey);
       return;
     }
 
