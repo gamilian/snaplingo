@@ -1,4 +1,4 @@
-import type { AnnotationCommand, LogicalRect } from './types';
+import type { AnnotationCommand, LogicalRect, Point } from './types';
 
 export type CaptureInvokeArgs = Record<string, unknown>;
 export type CaptureInvoke = <T>(
@@ -77,6 +77,21 @@ export function isPinCaptureShortcut(event: CaptureShortcutEvent) {
     !event.altKey &&
     !event.shiftKey
   );
+}
+
+export function getCursorNudgeDeltaFromShortcut(
+  event: CaptureShortcutEvent,
+): Point | null {
+  if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return null;
+
+  const deltaByKey: Record<string, Point> = {
+    w: { x: 0, y: -1 },
+    a: { x: -1, y: 0 },
+    s: { x: 0, y: 1 },
+    d: { x: 1, y: 0 },
+  };
+
+  return deltaByKey[event.key.toLowerCase()] ?? null;
 }
 
 export function isSelectAllCaptureShortcut(event: CaptureShortcutEvent) {

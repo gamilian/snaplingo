@@ -8,6 +8,7 @@ import {
   isCopyCaptureDoubleClick,
   isCopyCaptureKeyboardShortcut,
   isConfirmHoverSelectionShortcut,
+  getCursorNudgeDeltaFromShortcut,
   isPinCaptureShortcut,
   isPinCapturePointer,
   isMoveDraftSelectionShortcut,
@@ -162,6 +163,54 @@ describe('capture session actions', () => {
         shiftKey: false,
       }),
     ).toBe(false);
+  });
+
+  it('maps plain WASD keys to one-pixel cursor movement', () => {
+    expect(
+      getCursorNudgeDeltaFromShortcut({
+        key: 'w',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toEqual({ x: 0, y: -1 });
+    expect(
+      getCursorNudgeDeltaFromShortcut({
+        key: 'A',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toEqual({ x: -1, y: 0 });
+    expect(
+      getCursorNudgeDeltaFromShortcut({
+        key: 's',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toEqual({ x: 0, y: 1 });
+    expect(
+      getCursorNudgeDeltaFromShortcut({
+        key: 'd',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toEqual({ x: 1, y: 0 });
+    expect(
+      getCursorNudgeDeltaFromShortcut({
+        key: 'w',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBeNull();
   });
 
   it('uses Cmd/Ctrl+A for selecting the full capture area', () => {

@@ -78,6 +78,7 @@ import {
 } from './textAnnotationDraft';
 import {
   copyCaptureSelection,
+  getCursorNudgeDeltaFromShortcut,
   isCancelCapturePointer,
   isConfirmHoverSelectionShortcut,
   isCopyCaptureDoubleClick,
@@ -95,6 +96,7 @@ import {
   getMonitorAtVirtualPoint,
   getMonitorViewportRect,
   getVirtualDesktopBounds,
+  nudgeVirtualPoint,
   viewportPointToVirtualPoint,
   virtualPointToViewportPoint,
   virtualRectToViewportRect,
@@ -1084,6 +1086,8 @@ export default function ScreenshotSession({
     if (!isActive) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      const cursorNudgeDelta = getCursorNudgeDeltaFromShortcut(event);
+
       if (event.key === 'Escape') {
         event.preventDefault();
         dismissCaptureLayer();
@@ -1119,6 +1123,17 @@ export default function ScreenshotSession({
       ) {
         event.preventDefault();
         void copyCurrentColor();
+      } else if (
+        status === 'selecting' &&
+        !textDraft &&
+        cursorPoint &&
+        selectionBounds &&
+        cursorNudgeDelta
+      ) {
+        event.preventDefault();
+        setCursorPoint(
+          nudgeVirtualPoint(cursorPoint, cursorNudgeDelta, selectionBounds),
+        );
       } else if (
         (status === 'selecting' || status === 'preview') &&
         !textDraft &&

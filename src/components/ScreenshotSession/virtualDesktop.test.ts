@@ -3,6 +3,7 @@ import {
   getMonitorAtVirtualPoint,
   getMonitorViewportRect,
   getVirtualDesktopBounds,
+  nudgeVirtualPoint,
   virtualPointToViewportPoint,
   virtualRectToViewportRect,
   viewportPointToVirtualPoint,
@@ -78,5 +79,22 @@ describe('virtual desktop geometry', () => {
     expect(getMonitorAtVirtualPoint(monitors, { x: 20, y: -20 })?.id).toBe('top');
     expect(getMonitorAtVirtualPoint(monitors, { x: 20, y: 20 })?.id).toBe('primary');
     expect(getMonitorAtVirtualPoint(monitors, { x: 2000, y: 20 })).toBeNull();
+  });
+
+  it('nudges virtual cursor points while keeping them inside desktop bounds', () => {
+    const bounds = getVirtualDesktopBounds(monitors);
+
+    expect(nudgeVirtualPoint({ x: 10, y: 10 }, { x: -1, y: 0 }, bounds)).toEqual({
+      x: 9,
+      y: 10,
+    });
+    expect(nudgeVirtualPoint({ x: -1280, y: -600 }, { x: -1, y: -1 }, bounds)).toEqual({
+      x: -1280,
+      y: -600,
+    });
+    expect(nudgeVirtualPoint({ x: 1439, y: 899 }, { x: 1, y: 1 }, bounds)).toEqual({
+      x: 1439,
+      y: 899,
+    });
   });
 });

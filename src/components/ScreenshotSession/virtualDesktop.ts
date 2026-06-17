@@ -48,6 +48,21 @@ export function viewportPointToVirtualPoint(
   };
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+export function nudgeVirtualPoint(
+  point: Point,
+  delta: Point,
+  bounds: LogicalRect,
+): Point {
+  return {
+    x: clamp(point.x + delta.x, bounds.x, bounds.x + bounds.width - 1),
+    y: clamp(point.y + delta.y, bounds.y, bounds.y + bounds.height - 1),
+  };
+}
+
 export function virtualRectToViewportRect(
   rect: LogicalRect,
   bounds: LogicalRect,
