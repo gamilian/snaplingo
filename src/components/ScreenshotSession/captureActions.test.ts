@@ -5,6 +5,7 @@ import {
   type CaptureInvokeArgs,
   copyCaptureSelection,
   getCandidateCycleDirectionFromShortcut,
+  getCancelCapturePointerAction,
   getSelectionHistoryStepFromShortcut,
   isCancelCapturePointer,
   isClearAnnotationsShortcut,
@@ -710,6 +711,33 @@ describe('capture session actions', () => {
         shiftKey: false,
       }),
     ).toBe(false);
+  });
+
+  it('resets an existing preview selection before canceling the capture session', () => {
+    expect(
+      getCancelCapturePointerAction({
+        status: 'preview',
+        hasSelection: true,
+        hasDismissibleLayer: false,
+      }),
+    ).toBe('reset-selection');
+    expect(
+      getCancelCapturePointerAction({
+        status: 'selecting',
+        hasSelection: false,
+        hasDismissibleLayer: false,
+      }),
+    ).toBe('cancel-session');
+  });
+
+  it('dismisses active edit layers before resetting the preview selection', () => {
+    expect(
+      getCancelCapturePointerAction({
+        status: 'preview',
+        hasSelection: true,
+        hasDismissibleLayer: true,
+      }),
+    ).toBe('dismiss-layer');
   });
 
   it('uses plain Space for toggling the capture toolbar visibility', () => {

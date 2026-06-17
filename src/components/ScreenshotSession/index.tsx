@@ -83,6 +83,7 @@ import {
 import {
   copyCaptureSelection,
   getCandidateCycleDirectionFromShortcut,
+  getCancelCapturePointerAction,
   getCursorNudgeDeltaFromShortcut,
   getSelectionHistoryStepFromShortcut,
   isCancelCapturePointer,
@@ -1083,6 +1084,26 @@ export default function ScreenshotSession({
     textDraft,
   ]);
 
+  const resetPreviewSelection = useCallback(() => {
+    setStartPoint(null);
+    setSelection(null);
+    setHoverSelection(null);
+    setEditGesture(null);
+    setPreviewImageBase64(null);
+    setIsRenderingOutput(false);
+    setActiveAnnotationTool(null);
+    setAnnotationGesture(null);
+    setDraftAnnotation(null);
+    setSelectedAnnotationIndex(null);
+    setAnnotationMoveGesture(null);
+    setDraftSelectionMoveGesture(null);
+    setTextDraft(null);
+    setTextDraftAnnotationIndex(null);
+    setAnnotationHistory(emptyAnnotationHistory());
+    setIsToolbarHidden(false);
+    setStatus('selecting');
+  }, []);
+
   const previewSelection = useCallback((rect: LogicalRect) => {
     setStartPoint(null);
     setSelection(rect);
@@ -1509,7 +1530,25 @@ export default function ScreenshotSession({
     if (isCancelCapturePointer(event)) {
       event.preventDefault();
       event.stopPropagation();
-      dismissCaptureLayer();
+      const action = getCancelCapturePointerAction({
+        status,
+        hasSelection: selection !== null,
+        hasDismissibleLayer:
+          textDraft !== null ||
+          annotationMoveGesture !== null ||
+          draftSelectionMoveGesture !== null ||
+          selectedAnnotationIndex !== null ||
+          activeAnnotationTool !== null ||
+          annotationGesture !== null,
+      });
+
+      if (action === 'dismiss-layer') {
+        dismissCaptureLayer();
+      } else if (action === 'reset-selection') {
+        resetPreviewSelection();
+      } else {
+        void cancelSession();
+      }
       return;
     }
 

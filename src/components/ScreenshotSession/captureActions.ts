@@ -24,6 +24,16 @@ interface CapturePointerEvent {
 }
 
 export type SelectionHistoryStep = 'previous' | 'next';
+export type CancelCapturePointerAction =
+  | 'dismiss-layer'
+  | 'reset-selection'
+  | 'cancel-session';
+
+interface CancelCapturePointerState {
+  status: 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
+  hasSelection: boolean;
+  hasDismissibleLayer: boolean;
+}
 
 export function isSaveCaptureShortcut(event: CaptureShortcutEvent) {
   return (
@@ -190,6 +200,14 @@ export function isCancelCapturePointer(event: CapturePointerEvent) {
     !event.altKey &&
     !event.shiftKey
   );
+}
+
+export function getCancelCapturePointerAction(
+  state: CancelCapturePointerState,
+): CancelCapturePointerAction {
+  if (state.hasDismissibleLayer) return 'dismiss-layer';
+  if (state.status === 'preview' && state.hasSelection) return 'reset-selection';
+  return 'cancel-session';
 }
 
 export async function saveCaptureSelection(
