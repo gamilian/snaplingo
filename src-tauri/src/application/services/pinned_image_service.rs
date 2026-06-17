@@ -23,6 +23,12 @@ pub struct PinnedImageGroupSwitch {
     pub show_image_ids: Vec<String>,
 }
 
+#[derive(Debug, PartialEq)]
+pub struct PinnedImageGroupRemoval {
+    pub removed_group: u32,
+    pub removed_image_ids: Vec<String>,
+}
+
 pub struct PinnedImageService {
     images: Mutex<HashMap<String, PinnedImage>>,
     active_group: Mutex<u32>,
@@ -129,6 +135,42 @@ impl PinnedImageService {
         image.group = next_group;
 
         Ok(next_group)
+    }
+
+    pub fn remove_pinned_image_group_containing(
+        &self,
+        image_id: &str,
+    ) -> Result<PinnedImageGroupRemoval> {
+        let mut images = self.images.lock().unwrap();
+        let removed_group = images
+            .get(image_id)
+            .ok_or_else(|| AppError::System(format!("Pinned image not found: {}", image_id)))?
+            .group;
+        let mut removed_image_ids = image_ids_in_group(&images, removed_group);
+
+        for removed_image_id in &removed_image_ids {
+            images.remove(removed_image_id);
+        }
+
+        let next_active_group = images
+            .values()
+            .map(|image| image.group)
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .next()
+            .unwrap_or(0);
+
+        drop(images);
+        if *self.active_group.lock().unwrap() == removed_group {
+            *self.active_group.lock().unwrap() = next_active_group;
+        }
+
+        removed_image_ids.sort();
+
+        Ok(PinnedImageGroupRemoval {
+            removed_group,
+            removed_image_ids,
+        })
     }
 
     pub fn switch_to_next_group(&self) -> Option<PinnedImageGroupSwitch> {

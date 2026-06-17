@@ -14,6 +14,7 @@ import {
 } from './pinControls';
 import {
   destroyPinnedImage,
+  destroyPinnedImageGroup,
   hidePinnedImage,
   isCopyPinnedImageShortcut,
   isDestroyPinnedImageShortcut,
@@ -24,7 +25,7 @@ import {
 
 const appWindow = getCurrentWindow();
 const webviewWindow = getCurrentWebviewWindow();
-const PIN_CONTEXT_MENU_SIZE = { width: 132, height: 276 };
+const PIN_CONTEXT_MENU_SIZE = { width: 132, height: 304 };
 
 function readPinnedImageId(search: string) {
   const params = new URLSearchParams(search);
@@ -60,6 +61,15 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
       await destroyPinnedImage(invoke, imageId, webviewWindow);
     } catch (err) {
       console.error('Failed to destroy pinned image:', err);
+    }
+  }, [imageId]);
+
+  const destroyCurrentPinnedImageGroup = useCallback(async () => {
+    try {
+      await destroyPinnedImageGroup(invoke, imageId);
+      setContextMenuPosition(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     }
   }, [imageId]);
 
@@ -324,6 +334,13 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
             onClick={destroyCurrentPinnedImage}
           >
             Destroy
+          </button>
+          <button
+            type="button"
+            className="h-7 w-full rounded px-2 text-left text-red-100 hover:bg-red-500/20"
+            onClick={destroyCurrentPinnedImageGroup}
+          >
+            Destroy Group
           </button>
         </div>
       )}

@@ -62,3 +62,10 @@ export async function destroyPinnedImage(
   await invoke('remove_pinned_image', { imageId });
   await window.close?.();
 }
+
+export async function destroyPinnedImageGroup(
+  invoke: PinInvoke,
+  imageId: string,
+) {
+  await invoke('destroy_pinned_image_group', { imageId });
+}

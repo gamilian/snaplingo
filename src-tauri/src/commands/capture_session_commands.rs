@@ -316,6 +316,27 @@ pub fn move_pinned_image_to_next_group(
     Ok(next_group)
 }
 
+#[tauri::command]
+pub fn destroy_pinned_image_group(
+    image_id: String,
+    app: AppHandle,
+    state: State<'_, crate::AppState>,
+) -> Result<Vec<String>, String> {
+    let removal = state
+        .inner()
+        .pinned_image_service
+        .remove_pinned_image_group_containing(&image_id)
+        .map_err(|e| e.to_string())?;
+
+    for label in destroyed_pinned_group_window_labels(&removal.removed_image_ids) {
+        if let Some(window) = app.get_webview_window(&label) {
+            window.close().map_err(|e| e.to_string())?;
+        }
+    }
+
+    Ok(removal.removed_image_ids)
+}
+
 async fn save_pinned_png_by_id(
     pinned_images: &PinnedImageService,
     output: &CaptureOutputService,
@@ -706,6 +727,13 @@ fn moved_pinned_image_window_visibility_change(image_id: &str) -> PinnedWindowVi
         label: pinned_window_label(image_id),
         visible: false,
     }
+}
+
+fn destroyed_pinned_group_window_labels(image_ids: &[String]) -> Vec<String> {
+    image_ids
+        .iter()
+        .map(|image_id| pinned_window_label(image_id))
+        .collect()
 }
 
 fn pinned_window_size(width: u32, height: u32) -> (f64, f64) {
@@ -1296,6 +1324,17 @@ mod tests {
                 label: "pin-pin-1".to_string(),
                 visible: false,
             }
+        );
+    }
+
+    #[test]
+    fn plans_destroyed_pinned_group_windows_to_close() {
+        assert_eq!(
+            super::destroyed_pinned_group_window_labels(&[
+                "pin-2".to_string(),
+                "pin-1".to_string(),
+            ]),
+            vec!["pin-pin-2".to_string(), "pin-pin-1".to_string()]
         );
     }
 

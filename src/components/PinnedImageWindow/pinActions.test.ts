@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   destroyPinnedImage,
+  destroyPinnedImageGroup,
   hidePinnedImage,
   isCopyPinnedImageShortcut,
   isDestroyPinnedImageShortcut,
@@ -141,6 +142,26 @@ describe('pinned image actions', () => {
         args: { imageId: 'pin-1' },
       },
       { window: 'close' },
+    ]);
+  });
+
+  it('destroys the group containing a pinned image', async () => {
+    const calls: Array<{ command: string; args?: unknown }> = [];
+    const invoke: PinInvoke = async <T>(
+      command: string,
+      args?: PinInvokeArgs,
+    ): Promise<T> => {
+      calls.push({ command, args });
+      return undefined as T;
+    };
+
+    await destroyPinnedImageGroup(invoke, 'pin-1');
+
+    expect(calls).toEqual([
+      {
+        command: 'destroy_pinned_image_group',
+        args: { imageId: 'pin-1' },
+      },
     ]);
   });
 
