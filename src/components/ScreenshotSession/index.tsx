@@ -46,6 +46,7 @@ import {
   redoAnnotationHistory,
   undoAnnotationHistory,
 } from './annotationHistory';
+import { eraseAnnotationAtPoint } from './annotationEraser';
 import {
   constrainAnnotationMoveDelta,
   getAnnotationKeyboardNudgeDelta,
@@ -178,7 +179,7 @@ const EDGE_SNAP_THRESHOLD = 6;
 const KEYBOARD_NUDGE_STEP = 1;
 const KEYBOARD_FAST_NUDGE_STEP = 10;
 const TOOLBAR_GAP = 8;
-const TOOLBAR_SIZE = { width: 1110, height: 36 };
+const TOOLBAR_SIZE = { width: 1180, height: 36 };
 const MAGNIFIER_GAP = 14;
 const MAGNIFIER_SIZE = { width: 120, height: 96 };
 const MAGNIFIER_ZOOM = 4;
@@ -2139,6 +2140,17 @@ export default function ScreenshotSession({
         return;
       }
 
+      if (activeAnnotationTool === 'eraser') {
+        const nextHistory = eraseAnnotationAtPoint(annotationHistory, localPoint);
+        setAnnotationMoveGesture(null);
+        setDraftAnnotation(null);
+        if (nextHistory !== annotationHistory) {
+          setAnnotationHistory(nextHistory);
+          void renderSelectionPreview(selection, nextHistory.annotations);
+        }
+        return;
+      }
+
       const points = isPointStrokeAnnotationTool(activeAnnotationTool)
         ? [localPoint]
         : undefined;
@@ -2720,6 +2732,18 @@ export default function ScreenshotSession({
                 onClick={() => toggleAnnotationTool('text')}
               >
                 Text
+              </button>
+              <button
+                type="button"
+                className={`h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50 ${
+                  activeAnnotationTool === 'eraser' ? 'bg-white/15' : ''
+                }`}
+                disabled={isRenderingOutput}
+                title="Eraser"
+                aria-label="Erase annotation"
+                onClick={() => toggleAnnotationTool('eraser')}
+              >
+                Erase
               </button>
               <div className="flex h-7 items-center gap-1 px-1">
                 {ANNOTATION_COLORS.map((color) => (

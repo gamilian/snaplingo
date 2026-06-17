@@ -10,7 +10,9 @@ export type AnnotationTool =
   | 'highlight'
   | 'mosaic'
   | 'blur'
-  | 'text';
+  | 'text'
+  | 'eraser';
+export type DrawingAnnotationTool = Exclude<AnnotationTool, 'text' | 'eraser'>;
 export type AnnotationColor = [number, number, number, number];
 
 export interface AnnotationStyle {
@@ -20,7 +22,7 @@ export interface AnnotationStyle {
 }
 
 export interface AnnotationGestureDraft {
-  tool: AnnotationTool;
+  tool: DrawingAnnotationTool;
   startPoint: Point;
   points?: Point[];
 }
@@ -203,7 +205,7 @@ function constrainToStraightLine(startPoint: Point, currentPoint: Point): Point 
 }
 
 export function constrainAnnotationGesturePoint(
-  tool: AnnotationTool,
+  tool: DrawingAnnotationTool,
   startPoint: Point,
   currentPoint: Point,
 ): Point {
@@ -273,7 +275,7 @@ function annotationGesturePoints(
 }
 
 export function annotationFromGesture(
-  tool: AnnotationTool,
+  tool: DrawingAnnotationTool,
   startPoint: Point,
   currentPoint: Point,
   style: AnnotationStyle,
