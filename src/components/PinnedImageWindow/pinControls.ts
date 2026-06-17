@@ -39,6 +39,14 @@ interface PinnedWheelEvent {
   altKey?: boolean;
 }
 
+interface PinnedPointerEvent {
+  button: number;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  altKey?: boolean;
+  shiftKey?: boolean;
+}
+
 export type PinnedKeyboardZoomAction = 'zoom-in' | 'zoom-out' | 'reset';
 export type PinnedKeyboardOpacityAction = 'decrease' | 'increase';
 export type PinnedWheelAction = 'zoom' | 'opacity';
@@ -145,6 +153,16 @@ export function getPinnedWheelAction(
   if (event.metaKey || event.ctrlKey) return 'opacity';
 
   return 'zoom';
+}
+
+export function isResetPinnedImagePointer(event: PinnedPointerEvent) {
+  return (
+    event.button === 1 &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !event.shiftKey
+  );
 }
 
 export function getPinnedDisplaySize(originalSize: PinnedSize, zoom: number) {

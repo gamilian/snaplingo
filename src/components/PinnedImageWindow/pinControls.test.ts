@@ -11,6 +11,7 @@ import {
   getPinnedTransformStyle,
   getPinnedWheelAction,
   getPinnedZoomFromWheel,
+  isResetPinnedImagePointer,
   nextPinnedTransform,
 } from './pinControls';
 
@@ -161,6 +162,36 @@ describe('pinned image controls', () => {
         altKey: false,
       }),
     ).toBe('opacity');
+  });
+
+  it('uses an unmodified middle-button press for resetting pinned size and opacity', () => {
+    expect(
+      isResetPinnedImagePointer({
+        button: 1,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isResetPinnedImagePointer({
+        button: 0,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      isResetPinnedImagePointer({
+        button: 1,
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
   });
 
   it('keeps pinned display size proportional to its initial fit', () => {

@@ -15,6 +15,7 @@ import {
   getPinnedTransformStyle,
   getPinnedWheelAction,
   getPinnedZoomFromWheel,
+  isResetPinnedImagePointer,
   nextPinnedTransform,
 } from './pinControls';
 import {
@@ -153,6 +154,13 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
 
   const resetPinnedSize = useCallback(() => {
     setZoom(1);
+    setContextMenuPosition(null);
+    void resizePinnedWindow(1);
+  }, [resizePinnedWindow]);
+
+  const resetPinnedSizeAndOpacity = useCallback(() => {
+    setZoom(1);
+    setOpacity(1);
     setContextMenuPosition(null);
     void resizePinnedWindow(1);
   }, [resizePinnedWindow]);
@@ -363,6 +371,12 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
             }}
             draggable={false}
             onPointerDown={(event) => {
+              if (isResetPinnedImagePointer(event)) {
+                event.preventDefault();
+                resetPinnedSizeAndOpacity();
+                return;
+              }
+
               if (event.button !== 0) return;
               void appWindow.startDragging();
             }}
