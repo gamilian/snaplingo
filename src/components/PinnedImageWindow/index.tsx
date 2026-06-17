@@ -6,6 +6,7 @@ import type { PinnedImageView } from '../ScreenshotSession/types';
 import {
   getPinnedContextMenuPosition,
   getPinnedDisplaySize,
+  getPinnedKeyboardOpacityPreset,
   getPinnedKeyboardZoomAction,
   getPinnedOpacityFromWheel,
   getPinnedOpacityPreset,
@@ -157,12 +158,25 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
         } else {
           adjustPinnedZoom(zoomAction === 'zoom-in' ? -1 : 1);
         }
+        return;
+      }
+
+      const opacityPreset = getPinnedKeyboardOpacityPreset(event);
+      if (opacityPreset !== null) {
+        event.preventDefault();
+        setPinnedOpacityPreset(opacityPreset);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [adjustPinnedZoom, copyPinnedImage, resetPinnedSize, savePinnedImageAs]);
+  }, [
+    adjustPinnedZoom,
+    copyPinnedImage,
+    resetPinnedSize,
+    savePinnedImageAs,
+    setPinnedOpacityPreset,
+  ]);
 
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
     if (!image) return;

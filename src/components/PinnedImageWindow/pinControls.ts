@@ -53,6 +53,17 @@ export function getPinnedKeyboardZoomAction(
   return null;
 }
 
+export function getPinnedKeyboardOpacityPreset(
+  event: PinnedKeyboardEvent,
+): number | null {
+  if (event.metaKey || event.ctrlKey) return null;
+  if (event.key === '1') return 1;
+  if (event.key === '2') return 0.75;
+  if (event.key === '3') return 0.5;
+
+  return null;
+}
+
 export function getPinnedOpacityFromWheel(
   currentOpacity: number,
   wheelDirection: number,
