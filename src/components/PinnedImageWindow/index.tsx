@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
+import {
+  getCurrentWindow,
+  LogicalSize,
+  PhysicalPosition,
+} from '@tauri-apps/api/window';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { useSettingsStore } from '../../stores/settingsStore';
 import type { PinnedImageView } from '../ScreenshotSession/types';
@@ -8,6 +12,7 @@ import {
   getPinnedContextMenuPosition,
   getPinnedDisplaySize,
   getPinnedDisplaySizeForTransform,
+  getPinnedKeyboardMoveDelta,
   getPinnedKeyboardOpacityAction,
   getPinnedKeyboardTransformAction,
   getPinnedKeyboardZoomAction,
@@ -243,6 +248,21 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     [resizePinnedWindow],
   );
 
+  const movePinnedWindowByKeyboard = useCallback(
+    async (delta: { x: number; y: number }) => {
+      try {
+        setContextMenuPosition(null);
+        const position = await appWindow.outerPosition();
+        await appWindow.setPosition(
+          new PhysicalPosition(position.x + delta.x, position.y + delta.y),
+        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isCopyPinnedImageShortcut(event)) {
@@ -272,6 +292,13 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
       if (isReplacePinnedImageShortcut(event)) {
         event.preventDefault();
         void replacePinnedFromClipboard();
+        return;
+      }
+
+      const moveDelta = getPinnedKeyboardMoveDelta(event);
+      if (moveDelta) {
+        event.preventDefault();
+        void movePinnedWindowByKeyboard(moveDelta);
         return;
       }
 
@@ -320,6 +347,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     adjustPinnedZoom,
     copyPinnedImage,
     hideCurrentPinnedImage,
+    movePinnedWindowByKeyboard,
     quickSavePinnedImageToDirectory,
     replacePinnedFromClipboard,
     resetPinnedSize,

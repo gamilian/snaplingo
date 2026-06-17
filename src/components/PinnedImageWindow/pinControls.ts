@@ -107,6 +107,21 @@ export function getPinnedKeyboardTransformAction(
   return null;
 }
 
+export function getPinnedKeyboardMoveDelta(
+  event: PinnedKeyboardEvent,
+): PinnedPoint | null {
+  if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return null;
+
+  const deltaByKey: Record<string, PinnedPoint> = {
+    ArrowUp: { x: 0, y: -1 },
+    ArrowRight: { x: 1, y: 0 },
+    ArrowDown: { x: 0, y: 1 },
+    ArrowLeft: { x: -1, y: 0 },
+  };
+
+  return deltaByKey[event.key] ?? null;
+}
+
 export function nextPinnedTransform(
   transform: PinnedTransform,
   action: PinnedKeyboardTransformAction,

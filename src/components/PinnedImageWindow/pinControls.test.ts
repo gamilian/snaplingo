@@ -3,6 +3,7 @@ import {
   getPinnedContextMenuPosition,
   getPinnedDisplaySize,
   getPinnedDisplaySizeForTransform,
+  getPinnedKeyboardMoveDelta,
   getPinnedKeyboardOpacityAction,
   getPinnedKeyboardTransformAction,
   getPinnedKeyboardZoomAction,
@@ -98,6 +99,59 @@ describe('pinned image controls', () => {
     ).toBeNull();
     expect(
       getPinnedKeyboardTransformAction({ key: '5', metaKey: false, ctrlKey: false }),
+    ).toBeNull();
+  });
+
+  it('maps plain arrow keys to one-pixel pinned window movement', () => {
+    expect(
+      getPinnedKeyboardMoveDelta({
+        key: 'ArrowUp',
+        metaKey: false,
+        ctrlKey: false,
+      }),
+    ).toEqual({ x: 0, y: -1 });
+    expect(
+      getPinnedKeyboardMoveDelta({
+        key: 'ArrowRight',
+        metaKey: false,
+        ctrlKey: false,
+      }),
+    ).toEqual({ x: 1, y: 0 });
+    expect(
+      getPinnedKeyboardMoveDelta({
+        key: 'ArrowDown',
+        metaKey: false,
+        ctrlKey: false,
+      }),
+    ).toEqual({ x: 0, y: 1 });
+    expect(
+      getPinnedKeyboardMoveDelta({
+        key: 'ArrowLeft',
+        metaKey: false,
+        ctrlKey: false,
+      }),
+    ).toEqual({ x: -1, y: 0 });
+    expect(
+      getPinnedKeyboardMoveDelta({
+        key: 'ArrowUp',
+        metaKey: true,
+        ctrlKey: false,
+      }),
+    ).toBeNull();
+    expect(
+      getPinnedKeyboardMoveDelta({
+        key: 'ArrowUp',
+        metaKey: false,
+        ctrlKey: false,
+        shiftKey: true,
+      }),
+    ).toBeNull();
+    expect(
+      getPinnedKeyboardMoveDelta({
+        key: 'w',
+        metaKey: false,
+        ctrlKey: false,
+      }),
     ).toBeNull();
   });
 
