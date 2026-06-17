@@ -6,11 +6,13 @@ import type { PinnedImageView } from '../ScreenshotSession/types';
 import {
   getPinnedContextMenuPosition,
   getPinnedDisplaySize,
-  getPinnedKeyboardOpacityPreset,
+  getPinnedKeyboardTransformAction,
   getPinnedKeyboardZoomAction,
   getPinnedOpacityFromWheel,
   getPinnedOpacityPreset,
+  getPinnedTransformStyle,
   getPinnedZoomFromWheel,
+  nextPinnedTransform,
 } from './pinControls';
 import {
   destroyPinnedImage,
@@ -44,6 +46,11 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
   const [image, setImage] = useState<PinnedImageView | null>(null);
   const [zoom, setZoom] = useState(1);
   const [opacity, setOpacity] = useState(1);
+  const [transform, setTransform] = useState({
+    rotation: 0,
+    flipX: false,
+    flipY: false,
+  });
   const [contextMenuPosition, setContextMenuPosition] = useState<{
     x: number;
     y: number;
@@ -212,10 +219,13 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
         return;
       }
 
-      const opacityPreset = getPinnedKeyboardOpacityPreset(event);
-      if (opacityPreset !== null) {
+      const transformAction = getPinnedKeyboardTransformAction(event);
+      if (transformAction) {
         event.preventDefault();
-        setPinnedOpacityPreset(opacityPreset);
+        setContextMenuPosition(null);
+        setTransform((currentTransform) =>
+          nextPinnedTransform(currentTransform, transformAction),
+        );
       }
     };
 
@@ -277,7 +287,10 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
         <img
           src={`data:image/png;base64,${image.image_base64}`}
           className="h-full w-full object-fill"
-          style={{ opacity }}
+          style={{
+            opacity,
+            transform: getPinnedTransformStyle(transform),
+          }}
           draggable={false}
           onPointerDown={(event) => {
             if (event.button !== 0) return;

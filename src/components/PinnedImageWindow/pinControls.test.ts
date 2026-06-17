@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   getPinnedContextMenuPosition,
   getPinnedDisplaySize,
-  getPinnedKeyboardOpacityPreset,
+  getPinnedKeyboardTransformAction,
   getPinnedKeyboardZoomAction,
   getPinnedOpacityFromWheel,
   getPinnedOpacityPreset,
+  getPinnedTransformStyle,
   getPinnedZoomFromWheel,
+  nextPinnedTransform,
 } from './pinControls';
 
 describe('pinned image controls', () => {
@@ -34,22 +36,74 @@ describe('pinned image controls', () => {
     expect(getPinnedKeyboardZoomAction({ key: 'x', metaKey: false, ctrlKey: false })).toBeNull();
   });
 
-  it('maps number keys to pinned opacity presets', () => {
+  it('maps number keys to Snipaste pinned image transform actions', () => {
     expect(
-      getPinnedKeyboardOpacityPreset({ key: '1', metaKey: false, ctrlKey: false }),
-    ).toBe(1);
+      getPinnedKeyboardTransformAction({ key: '1', metaKey: false, ctrlKey: false }),
+    ).toBe('rotate-clockwise');
     expect(
-      getPinnedKeyboardOpacityPreset({ key: '2', metaKey: false, ctrlKey: false }),
-    ).toBe(0.75);
+      getPinnedKeyboardTransformAction({ key: '2', metaKey: false, ctrlKey: false }),
+    ).toBe('rotate-counterclockwise');
     expect(
-      getPinnedKeyboardOpacityPreset({ key: '3', metaKey: false, ctrlKey: false }),
-    ).toBe(0.5);
+      getPinnedKeyboardTransformAction({ key: '3', metaKey: false, ctrlKey: false }),
+    ).toBe('flip-horizontal');
     expect(
-      getPinnedKeyboardOpacityPreset({ key: '1', metaKey: true, ctrlKey: false }),
+      getPinnedKeyboardTransformAction({ key: '4', metaKey: false, ctrlKey: false }),
+    ).toBe('flip-vertical');
+    expect(
+      getPinnedKeyboardTransformAction({ key: '1', metaKey: true, ctrlKey: false }),
     ).toBeNull();
     expect(
-      getPinnedKeyboardOpacityPreset({ key: '4', metaKey: false, ctrlKey: false }),
+      getPinnedKeyboardTransformAction({
+        key: '1',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: true,
+      }),
     ).toBeNull();
+    expect(
+      getPinnedKeyboardTransformAction({
+        key: '1',
+        metaKey: false,
+        ctrlKey: false,
+        shiftKey: true,
+      }),
+    ).toBeNull();
+    expect(
+      getPinnedKeyboardTransformAction({ key: '5', metaKey: false, ctrlKey: false }),
+    ).toBeNull();
+  });
+
+  it('updates pinned image transform state from Snipaste actions', () => {
+    expect(
+      nextPinnedTransform(
+        { rotation: 0, flipX: false, flipY: false },
+        'rotate-clockwise',
+      ),
+    ).toEqual({ rotation: 90, flipX: false, flipY: false });
+    expect(
+      nextPinnedTransform(
+        { rotation: 0, flipX: false, flipY: false },
+        'rotate-counterclockwise',
+      ),
+    ).toEqual({ rotation: 270, flipX: false, flipY: false });
+    expect(
+      nextPinnedTransform(
+        { rotation: 90, flipX: false, flipY: true },
+        'flip-horizontal',
+      ),
+    ).toEqual({ rotation: 90, flipX: true, flipY: true });
+    expect(
+      nextPinnedTransform(
+        { rotation: 90, flipX: true, flipY: true },
+        'flip-vertical',
+      ),
+    ).toEqual({ rotation: 90, flipX: true, flipY: false });
+  });
+
+  it('formats pinned image transforms for CSS rendering', () => {
+    expect(
+      getPinnedTransformStyle({ rotation: 90, flipX: true, flipY: false }),
+    ).toBe('rotate(90deg) scale(-1, 1)');
   });
 
   it('adjusts opacity with wheel direction and clamps the range', () => {

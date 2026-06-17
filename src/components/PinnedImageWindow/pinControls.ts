@@ -19,13 +19,26 @@ export interface PinnedPoint {
   y: number;
 }
 
+export interface PinnedTransform {
+  rotation: number;
+  flipX: boolean;
+  flipY: boolean;
+}
+
 interface PinnedKeyboardEvent {
   key: string;
   metaKey: boolean;
   ctrlKey: boolean;
+  altKey?: boolean;
+  shiftKey?: boolean;
 }
 
 export type PinnedKeyboardZoomAction = 'zoom-in' | 'zoom-out' | 'reset';
+export type PinnedKeyboardTransformAction =
+  | 'rotate-clockwise'
+  | 'rotate-counterclockwise'
+  | 'flip-horizontal'
+  | 'flip-vertical';
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -53,15 +66,42 @@ export function getPinnedKeyboardZoomAction(
   return null;
 }
 
-export function getPinnedKeyboardOpacityPreset(
+export function getPinnedKeyboardTransformAction(
   event: PinnedKeyboardEvent,
-): number | null {
-  if (event.metaKey || event.ctrlKey) return null;
-  if (event.key === '1') return 1;
-  if (event.key === '2') return 0.75;
-  if (event.key === '3') return 0.5;
+): PinnedKeyboardTransformAction | null {
+  if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return null;
+  if (event.key === '1') return 'rotate-clockwise';
+  if (event.key === '2') return 'rotate-counterclockwise';
+  if (event.key === '3') return 'flip-horizontal';
+  if (event.key === '4') return 'flip-vertical';
 
   return null;
+}
+
+export function nextPinnedTransform(
+  transform: PinnedTransform,
+  action: PinnedKeyboardTransformAction,
+): PinnedTransform {
+  if (action === 'rotate-clockwise') {
+    return { ...transform, rotation: (transform.rotation + 90) % 360 };
+  }
+
+  if (action === 'rotate-counterclockwise') {
+    return { ...transform, rotation: (transform.rotation + 270) % 360 };
+  }
+
+  if (action === 'flip-horizontal') {
+    return { ...transform, flipX: !transform.flipX };
+  }
+
+  return { ...transform, flipY: !transform.flipY };
+}
+
+export function getPinnedTransformStyle(transform: PinnedTransform) {
+  const scaleX = transform.flipX ? -1 : 1;
+  const scaleY = transform.flipY ? -1 : 1;
+
+  return `rotate(${transform.rotation}deg) scale(${scaleX}, ${scaleY})`;
 }
 
 export function getPinnedOpacityFromWheel(
