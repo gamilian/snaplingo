@@ -109,7 +109,8 @@ export function nextAnnotationToolFromCycleShortcut(
     return null;
   }
 
-  if (currentTool === 'line') return 'arrow';
+  if (currentTool === 'line') return 'polyline';
+  if (currentTool === 'polyline') return 'arrow';
   if (currentTool === 'arrow') return 'line';
 
   return null;

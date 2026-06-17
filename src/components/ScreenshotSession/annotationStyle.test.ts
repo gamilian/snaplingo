@@ -463,7 +463,7 @@ describe('annotation style', () => {
     ).toBeNull();
   });
 
-  it('cycles between line and arrow tools with plain Tab', () => {
+  it('cycles between line, polyline, and arrow tools with plain Tab', () => {
     const plainTab = {
       key: 'Tab',
       metaKey: false,
@@ -471,7 +471,8 @@ describe('annotation style', () => {
       altKey: false,
     };
 
-    expect(nextAnnotationToolFromCycleShortcut(plainTab, 'line')).toBe('arrow');
+    expect(nextAnnotationToolFromCycleShortcut(plainTab, 'line')).toBe('polyline');
+    expect(nextAnnotationToolFromCycleShortcut(plainTab, 'polyline')).toBe('arrow');
     expect(nextAnnotationToolFromCycleShortcut(plainTab, 'arrow')).toBe('line');
     expect(nextAnnotationToolFromCycleShortcut(plainTab, 'rectangle')).toBeNull();
     expect(
