@@ -16,6 +16,7 @@ import {
   isCopyCaptureKeyboardShortcut,
   isConfirmHoverSelectionShortcut,
   isDeleteSelectedAnnotationShortcut,
+  isFinishAnnotationGestureDoubleClick,
   isUndoAnnotationGesturePointShortcut,
   getCursorNudgeDeltaFromShortcut,
   isMagnifierShortcut,
@@ -1038,6 +1039,49 @@ describe('capture session actions', () => {
         ctrlKey: true,
         altKey: false,
         shiftKey: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('uses an unmodified primary-button double click for finishing an annotation gesture', () => {
+    expect(
+      isFinishAnnotationGestureDoubleClick({
+        detail: 2,
+        button: 0,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isFinishAnnotationGestureDoubleClick({
+        detail: 1,
+        button: 0,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      isFinishAnnotationGestureDoubleClick({
+        detail: 2,
+        button: 2,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      isFinishAnnotationGestureDoubleClick({
+        detail: 2,
+        button: 0,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: true,
       }),
     ).toBe(false);
   });

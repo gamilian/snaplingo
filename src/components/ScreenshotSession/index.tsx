@@ -107,6 +107,7 @@ import {
   isCopyCaptureDoubleClick,
   isCopyCaptureKeyboardShortcut,
   isDeleteSelectedAnnotationShortcut,
+  isFinishAnnotationGestureDoubleClick,
   isMoveDraftSelectionShortcut,
   isMagnifierShortcut,
   isPinCapturePointer,
@@ -2182,6 +2183,11 @@ export default function ScreenshotSession({
         selection,
       );
       if (annotationGesture?.tool === 'polyline') {
+        if (isFinishAnnotationGestureDoubleClick(event)) {
+          commitAnnotationGestureAtPoint(localPoint, false);
+          return;
+        }
+
         const points = appendAnnotationGesturePoint(
           annotationGesture,
           localPoint,

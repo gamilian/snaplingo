@@ -313,6 +313,14 @@ export function isSelectAllCaptureShortcut(event: CaptureShortcutEvent) {
 }
 
 export function isCopyCaptureDoubleClick(event: CapturePointerEvent) {
+  return isUnmodifiedPrimaryDoubleClick(event);
+}
+
+export function isFinishAnnotationGestureDoubleClick(event: CapturePointerEvent) {
+  return isUnmodifiedPrimaryDoubleClick(event);
+}
+
+function isUnmodifiedPrimaryDoubleClick(event: CapturePointerEvent) {
   return (
     (event.detail ?? 0) >= 2 &&
     event.button === 0 &&
