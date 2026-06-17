@@ -278,10 +278,10 @@ describe('capture session actions', () => {
     ).toBeNull();
   });
 
-  it('uses Cmd/Ctrl+Shift+Z for clearing all annotations', () => {
+  it('uses Cmd/Ctrl+Shift+Backspace or Delete for clearing all annotations', () => {
     expect(
       isClearAnnotationsShortcut({
-        key: 'z',
+        key: 'Backspace',
         metaKey: true,
         ctrlKey: false,
         altKey: false,
@@ -290,7 +290,7 @@ describe('capture session actions', () => {
     ).toBe(true);
     expect(
       isClearAnnotationsShortcut({
-        key: 'Z',
+        key: 'Delete',
         metaKey: false,
         ctrlKey: true,
         altKey: false,
@@ -303,7 +303,7 @@ describe('capture session actions', () => {
         metaKey: true,
         ctrlKey: false,
         altKey: false,
-        shiftKey: false,
+        shiftKey: true,
       }),
     ).toBe(false);
     expect(
@@ -353,7 +353,7 @@ describe('capture session actions', () => {
         altKey: false,
         shiftKey: true,
       }),
-    ).toBeNull();
+    ).toBe('redo');
     expect(
       getUndoRedoActionFromShortcut({
         key: 'y',
