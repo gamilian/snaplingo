@@ -25,6 +25,13 @@ interface PinWindow {
   close?: () => Promise<void>;
 }
 
+interface PinMainWindow {
+  show?: () => Promise<void>;
+  setFocus?: () => Promise<void>;
+}
+
+type PinMainWindowResolver = () => Promise<PinMainWindow | null>;
+
 export type PinnedHoverToolbarActionId = 'copy' | 'save' | 'close';
 
 export interface PinnedHoverToolbarAction {
@@ -78,6 +85,15 @@ export function isSavePinnedImageShortcut(event: PinShortcutEvent) {
 export function isQuickSavePinnedImageShortcut(event: PinShortcutEvent) {
   return (
     event.key.toLowerCase() === 's' &&
+    (event.metaKey || event.ctrlKey) &&
+    !event.altKey &&
+    !!event.shiftKey
+  );
+}
+
+export function isOpenPinnedPreferencesShortcut(event: PinShortcutEvent) {
+  return (
+    event.key.toLowerCase() === 'p' &&
     (event.metaKey || event.ctrlKey) &&
     !event.altKey &&
     !!event.shiftKey
@@ -148,6 +164,14 @@ export async function replacePinnedImageFromClipboard<T>(
   imageId: string,
 ) {
   return invoke<T>('replace_pinned_image_from_clipboard', { imageId });
+}
+
+export async function openPinnedPreferences(
+  getMainWindow: PinMainWindowResolver,
+) {
+  const mainWindow = await getMainWindow();
+  await mainWindow?.show?.();
+  await mainWindow?.setFocus?.();
 }
 
 export async function hidePinnedImage(window: PinWindow) {

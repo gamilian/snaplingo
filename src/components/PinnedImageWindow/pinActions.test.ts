@@ -8,10 +8,12 @@ import {
   isClosePinnedImageShortcut,
   isCopyPinnedImageShortcut,
   isDestroyPinnedImageShortcut,
+  isOpenPinnedPreferencesShortcut,
   isQuickSavePinnedImageShortcut,
   isReplacePinnedImageShortcut,
   isSavePinnedImageShortcut,
   movePinnedImageToNextGroup,
+  openPinnedPreferences,
   quickSavePinnedImage,
   replacePinnedImageFromClipboard,
   type PinInvoke,
@@ -216,6 +218,50 @@ describe('pinned image actions', () => {
     ).toBe(false);
   });
 
+  it('uses Cmd/Ctrl+Shift+P for opening preferences from a pinned image', () => {
+    expect(
+      isOpenPinnedPreferencesShortcut({
+        key: 'p',
+        metaKey: true,
+        ctrlKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(true);
+    expect(
+      isOpenPinnedPreferencesShortcut({
+        key: 'P',
+        metaKey: false,
+        ctrlKey: true,
+        shiftKey: true,
+      }),
+    ).toBe(true);
+    expect(
+      isOpenPinnedPreferencesShortcut({
+        key: 'p',
+        metaKey: true,
+        ctrlKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      isOpenPinnedPreferencesShortcut({
+        key: 'p',
+        metaKey: false,
+        ctrlKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(false);
+    expect(
+      isOpenPinnedPreferencesShortcut({
+        key: 'p',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: true,
+        shiftKey: true,
+      }),
+    ).toBe(false);
+  });
+
   it('uses Cmd/Ctrl+W for closing a pinned image window', () => {
     expect(
       isClosePinnedImageShortcut({
@@ -340,6 +386,25 @@ describe('pinned image actions', () => {
         args: { imageId: 'pin-1' },
       },
     ]);
+  });
+
+  it('opens preferences by showing and focusing the main window', async () => {
+    const calls: string[] = [];
+
+    await openPinnedPreferences(async () => ({
+      show: async () => {
+        calls.push('show');
+      },
+      setFocus: async () => {
+        calls.push('focus');
+      },
+    }));
+
+    expect(calls).toEqual(['show', 'focus']);
+  });
+
+  it('ignores opening preferences when the main window is unavailable', async () => {
+    await expect(openPinnedPreferences(async () => null)).resolves.toBeUndefined();
   });
 
   it('hides a pinned image window without removing the image', async () => {

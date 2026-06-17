@@ -5,7 +5,10 @@ import {
   LogicalSize,
   PhysicalPosition,
 } from '@tauri-apps/api/window';
-import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
+import {
+  getCurrentWebviewWindow,
+  WebviewWindow,
+} from '@tauri-apps/api/webviewWindow';
 import { useSettingsStore } from '../../stores/settingsStore';
 import type { PinnedImageView } from '../ScreenshotSession/types';
 import {
@@ -40,10 +43,12 @@ import {
   isClosePinnedImageShortcut,
   isCopyPinnedImageShortcut,
   isDestroyPinnedImageShortcut,
+  isOpenPinnedPreferencesShortcut,
   isQuickSavePinnedImageShortcut,
   isReplacePinnedImageShortcut,
   isSavePinnedImageShortcut,
   movePinnedImageToNextGroup,
+  openPinnedPreferences,
   quickSavePinnedImage,
   replacePinnedImageFromClipboard,
   savePinnedImage,
@@ -248,6 +253,15 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     }
   }, [imageId, screenshotSavePath]);
 
+  const openPreferencesWindow = useCallback(async () => {
+    try {
+      await openPinnedPreferences(() => WebviewWindow.getByLabel('main'));
+      setContextMenuPosition(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
   const replacePinnedFromClipboard = useCallback(async () => {
     try {
       const nextImage = await replacePinnedImageFromClipboard<PinnedImageView>(
@@ -330,6 +344,12 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
       if (isQuickSavePinnedImageShortcut(event)) {
         event.preventDefault();
         void quickSavePinnedImageToDirectory();
+        return;
+      }
+
+      if (isOpenPinnedPreferencesShortcut(event)) {
+        event.preventDefault();
+        void openPreferencesWindow();
         return;
       }
 
@@ -421,6 +441,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     isHoverToolbarForcedVisible,
     isThumbnailMode,
     movePinnedWindowByKeyboard,
+    openPreferencesWindow,
     quickSavePinnedImageToDirectory,
     replacePinnedFromClipboard,
     resetPinnedSize,
