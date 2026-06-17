@@ -27,6 +27,13 @@ export function isSaveCaptureShortcut(event: CaptureShortcutEvent) {
   return event.key.toLowerCase() === 's' && (event.metaKey || event.ctrlKey);
 }
 
+export function isCopyCaptureKeyboardShortcut(event: CaptureShortcutEvent) {
+  return (
+    event.key === 'Enter' ||
+    (event.key.toLowerCase() === 'c' && (event.metaKey || event.ctrlKey))
+  );
+}
+
 export function isToggleToolbarShortcut(event: CaptureShortcutEvent) {
   return (
     event.key === 'Tab' &&

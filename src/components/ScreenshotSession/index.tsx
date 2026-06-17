@@ -78,6 +78,7 @@ import {
 import {
   isCancelCapturePointer,
   isCopyCaptureDoubleClick,
+  isCopyCaptureKeyboardShortcut,
   isPinCaptureShortcut,
   isSaveCaptureShortcut,
   isSelectAllCaptureShortcut,
@@ -1103,8 +1104,7 @@ export default function ScreenshotSession({
         selectFullCaptureArea();
       } else if (
         status === 'preview' &&
-        (event.key === 'Enter' ||
-          ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'c'))
+        isCopyCaptureKeyboardShortcut(event)
       ) {
         event.preventDefault();
         void copySelection();

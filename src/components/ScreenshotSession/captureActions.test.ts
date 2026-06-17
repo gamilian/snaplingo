@@ -5,6 +5,7 @@ import {
   type CaptureInvokeArgs,
   isCancelCapturePointer,
   isCopyCaptureDoubleClick,
+  isCopyCaptureKeyboardShortcut,
   isPinCaptureShortcut,
   isSaveCaptureShortcut,
   isSelectAllCaptureShortcut,
@@ -202,6 +203,37 @@ describe('capture session actions', () => {
         ctrlKey: true,
         altKey: false,
         shiftKey: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('uses Enter or Cmd/Ctrl+C for copying the current selection', () => {
+    expect(
+      isCopyCaptureKeyboardShortcut({
+        key: 'Enter',
+        metaKey: false,
+        ctrlKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isCopyCaptureKeyboardShortcut({
+        key: 'c',
+        metaKey: true,
+        ctrlKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isCopyCaptureKeyboardShortcut({
+        key: 'C',
+        metaKey: false,
+        ctrlKey: true,
+      }),
+    ).toBe(true);
+    expect(
+      isCopyCaptureKeyboardShortcut({
+        key: 'c',
+        metaKey: false,
+        ctrlKey: false,
       }),
     ).toBe(false);
   });
