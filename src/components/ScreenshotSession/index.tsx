@@ -107,7 +107,6 @@ import {
   getUndoRedoActionFromShortcut,
   isCancelCapturePointer,
   isClearAnnotationsShortcut,
-  isConfirmHoverSelectionShortcut,
   isCopyCaptureDoubleClick,
   isCopyCaptureKeyboardShortcut,
   isDeleteSelectedAnnotationShortcut,
@@ -129,6 +128,7 @@ import {
   saveCaptureSelection,
   shouldCancelCaptureOnBlur,
   shouldRecordSuccessfulCaptureSelection,
+  shouldCopyHoverSelectionFromShortcut,
   shouldRestoreLastSelectionFromShortcut,
 } from './captureActions';
 import { printBase64PngImage } from './capturePrint';
@@ -1710,15 +1710,10 @@ export default function ScreenshotSession({
       } else if (
         status === 'selecting' &&
         hoverSelection &&
-        isConfirmHoverSelectionShortcut(event, { drafting: startPoint !== null })
+        shouldCopyHoverSelectionFromShortcut(event, { drafting: startPoint !== null })
       ) {
         event.preventDefault();
-        setSelection(hoverSelection);
-        setHoverSelection(null);
-        setIsAnnotationToolbarVisible(true);
-        setStatus('preview');
-        setAnnotationHistory(emptyAnnotationHistory());
-        void renderSelectionPreview(hoverSelection, []);
+        void copyCandidateSelection(hoverSelection);
       } else if (
         status === 'preview' &&
         !textDraft &&
@@ -1892,6 +1887,7 @@ export default function ScreenshotSession({
     adjustAnnotationSize,
     clearAnnotations,
     cancelSession,
+    copyCandidateSelection,
     copyCurrentColor,
     copySelection,
     colorSampleFormat,

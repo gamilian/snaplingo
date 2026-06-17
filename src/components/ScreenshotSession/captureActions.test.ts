@@ -15,7 +15,6 @@ import {
   isClearAnnotationsShortcut,
   isCopyCaptureDoubleClick,
   isCopyCaptureKeyboardShortcut,
-  isConfirmHoverSelectionShortcut,
   isDeleteSelectedAnnotationShortcut,
   isFinishAnnotationGestureDoubleClick,
   isUndoAnnotationGesturePointShortcut,
@@ -39,6 +38,7 @@ import {
   shouldRestoreLastSelectionFromShortcut,
   shouldCancelCaptureOnBlur,
   shouldRecordSuccessfulCaptureSelection,
+  shouldCopyHoverSelectionFromShortcut,
 } from './captureActions';
 
 describe('capture session actions', () => {
@@ -1338,9 +1338,9 @@ describe('capture session actions', () => {
     ).toBe(false);
   });
 
-  it('uses unmodified Enter for confirming a hovered capture candidate', () => {
+  it('uses copy shortcuts for completing a hovered capture candidate', () => {
     expect(
-      isConfirmHoverSelectionShortcut({
+      shouldCopyHoverSelectionFromShortcut({
         key: 'Enter',
         metaKey: false,
         ctrlKey: false,
@@ -1349,16 +1349,25 @@ describe('capture session actions', () => {
       }),
     ).toBe(true);
     expect(
-      isConfirmHoverSelectionShortcut({
-        key: 'Enter',
+      shouldCopyHoverSelectionFromShortcut({
+        key: 'c',
         metaKey: true,
         ctrlKey: false,
         altKey: false,
         shiftKey: false,
       }),
-    ).toBe(false);
+    ).toBe(true);
     expect(
-      isConfirmHoverSelectionShortcut({
+      shouldCopyHoverSelectionFromShortcut({
+        key: 'C',
+        metaKey: false,
+        ctrlKey: true,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldCopyHoverSelectionFromShortcut({
         key: ' ',
         metaKey: false,
         ctrlKey: false,
@@ -1367,7 +1376,7 @@ describe('capture session actions', () => {
       }),
     ).toBe(false);
     expect(
-      isConfirmHoverSelectionShortcut({
+      shouldCopyHoverSelectionFromShortcut({
         key: ' ',
         metaKey: false,
         ctrlKey: false,
@@ -1377,9 +1386,9 @@ describe('capture session actions', () => {
     ).toBe(false);
   });
 
-  it('does not confirm a hovered candidate while drafting a selection', () => {
+  it('does not complete a hovered candidate while drafting a selection', () => {
     expect(
-      isConfirmHoverSelectionShortcut(
+      shouldCopyHoverSelectionFromShortcut(
         {
           key: 'Enter',
           metaKey: false,
@@ -1391,10 +1400,10 @@ describe('capture session actions', () => {
       ),
     ).toBe(false);
     expect(
-      isConfirmHoverSelectionShortcut(
+      shouldCopyHoverSelectionFromShortcut(
         {
-          key: ' ',
-          metaKey: false,
+          key: 'c',
+          metaKey: true,
           ctrlKey: false,
           altKey: false,
           shiftKey: false,

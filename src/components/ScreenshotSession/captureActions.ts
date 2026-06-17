@@ -41,7 +41,7 @@ export interface SelectionArrowAction {
 interface SelectionArrowActionOptions {
   editing?: boolean;
 }
-interface ConfirmHoverSelectionOptions {
+interface HoverSelectionShortcutOptions {
   drafting?: boolean;
 }
 interface RestoreLastSelectionOptions {
@@ -271,19 +271,13 @@ export function isCopyCaptureKeyboardShortcut(event: CaptureShortcutEvent) {
   );
 }
 
-export function isConfirmHoverSelectionShortcut(
+export function shouldCopyHoverSelectionFromShortcut(
   event: CaptureShortcutEvent,
-  options: ConfirmHoverSelectionOptions = {},
+  options: HoverSelectionShortcutOptions = {},
 ) {
   if (options.drafting) return false;
 
-  return (
-    event.key === 'Enter' &&
-    !event.metaKey &&
-    !event.ctrlKey &&
-    !event.altKey &&
-    !event.shiftKey
-  );
+  return isCopyCaptureKeyboardShortcut(event);
 }
 
 export function getCaptureKeyboardToolbarAction(
