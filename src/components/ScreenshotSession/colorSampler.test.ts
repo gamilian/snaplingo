@@ -3,6 +3,7 @@ import {
   colorSampleToClipboardText,
   getImageSamplePoint,
   isColorSampleCopyShortcut,
+  isColorSampleFormatToggleShortcut,
   rgbaToHex,
 } from './colorSampler';
 
@@ -40,6 +41,20 @@ describe('capture color sampler', () => {
     ).toBe('#0A141E');
   });
 
+  it('copies sampled colors as rgb text when requested', () => {
+    expect(
+      colorSampleToClipboardText(
+        {
+          hex: '#0A141E',
+          red: 10,
+          green: 20,
+          blue: 30,
+        },
+        'rgb',
+      ),
+    ).toBe('rgb(10, 20, 30)');
+  });
+
   it('uses plain C for copying the sampled color without replacing selection copy', () => {
     expect(
       isColorSampleCopyShortcut({
@@ -55,6 +70,25 @@ describe('capture color sampler', () => {
         metaKey: true,
         ctrlKey: false,
         altKey: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('uses plain Shift for toggling sampled color format', () => {
+    expect(
+      isColorSampleFormatToggleShortcut({
+        key: 'Shift',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isColorSampleFormatToggleShortcut({
+        key: 'Shift',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: true,
       }),
     ).toBe(false);
   });

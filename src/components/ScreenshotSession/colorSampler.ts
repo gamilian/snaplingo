@@ -12,6 +12,8 @@ export interface ColorSample {
   blue: number;
 }
 
+export type ColorSampleFormat = 'hex' | 'rgb';
+
 interface ColorSampleCopyShortcutEvent {
   key: string;
   metaKey: boolean;
@@ -48,13 +50,31 @@ export function rgbaToHex(red: number, green: number, blue: number) {
   return `#${channelToHex(red)}${channelToHex(green)}${channelToHex(blue)}`;
 }
 
-export function colorSampleToClipboardText(sample: ColorSample) {
+export function colorSampleToClipboardText(
+  sample: ColorSample,
+  format: ColorSampleFormat = 'hex',
+) {
+  if (format === 'rgb') {
+    return `rgb(${sample.red}, ${sample.green}, ${sample.blue})`;
+  }
+
   return sample.hex;
 }
 
 export function isColorSampleCopyShortcut(event: ColorSampleCopyShortcutEvent) {
   return (
     event.key.toLowerCase() === 'c' &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey
+  );
+}
+
+export function isColorSampleFormatToggleShortcut(
+  event: ColorSampleCopyShortcutEvent,
+) {
+  return (
+    event.key === 'Shift' &&
     !event.metaKey &&
     !event.ctrlKey &&
     !event.altKey

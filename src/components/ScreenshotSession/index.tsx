@@ -25,7 +25,9 @@ import {
 import {
   colorSampleToClipboardText,
   type ColorSample,
+  type ColorSampleFormat,
   isColorSampleCopyShortcut,
+  isColorSampleFormatToggleShortcut,
   sampleCanvasColor,
 } from './colorSampler';
 import {
@@ -284,6 +286,7 @@ function Magnifier({
   imageSize,
   selection,
   color,
+  colorFormat,
 }: {
   imageBase64: string;
   viewportCursor: Point;
@@ -292,6 +295,7 @@ function Magnifier({
   imageSize: { width: number; height: number };
   selection: LogicalRect | null;
   color: ColorSample | null;
+  colorFormat: ColorSampleFormat;
 }) {
   const position = getMagnifierPosition(
     viewportCursor,
@@ -309,6 +313,7 @@ function Magnifier({
   const sizeText = selection
     ? `${Math.round(selection.width)} x ${Math.round(selection.height)}`
     : '';
+  const colorText = color ? colorSampleToClipboardText(color, colorFormat) : '';
 
   return (
     <div
@@ -342,7 +347,7 @@ function Magnifier({
                 className="h-2.5 w-2.5 border border-white/60"
                 style={{ backgroundColor: color.hex }}
               />
-              <span>{color.hex}</span>
+              <span>{colorText}</span>
             </>
           )}
           {sizeText && <span>{sizeText}</span>}
@@ -396,6 +401,8 @@ export default function ScreenshotSession({
   const [annotationHistory, setAnnotationHistory] = useState(emptyAnnotationHistory);
   const [previewImageBase64, setPreviewImageBase64] = useState<string | null>(null);
   const [cursorColor, setCursorColor] = useState<ColorSample | null>(null);
+  const [colorSampleFormat, setColorSampleFormat] =
+    useState<ColorSampleFormat>('hex');
   const [sampleCanvasVersion, setSampleCanvasVersion] = useState(0);
   const [isRenderingOutput, setIsRenderingOutput] = useState(false);
   const [isToolbarHidden, setIsToolbarHidden] = useState(false);
@@ -512,6 +519,7 @@ export default function ScreenshotSession({
     setAnnotationHistory(emptyAnnotationHistory());
     setPreviewImageBase64(null);
     setCursorColor(null);
+    setColorSampleFormat('hex');
     setSampleCanvasVersion(0);
     setIsRenderingOutput(false);
     setIsToolbarHidden(false);
@@ -552,6 +560,7 @@ export default function ScreenshotSession({
     setAnnotationHistory(emptyAnnotationHistory());
     setPreviewImageBase64(null);
     setCursorColor(null);
+    setColorSampleFormat('hex');
     setSampleCanvasVersion(0);
     setIsRenderingOutput(false);
     setIsToolbarHidden(false);
@@ -690,12 +699,14 @@ export default function ScreenshotSession({
     if (!cursorColor) return;
 
     try {
-      await navigator.clipboard.writeText(colorSampleToClipboardText(cursorColor));
+      await navigator.clipboard.writeText(
+        colorSampleToClipboardText(cursorColor, colorSampleFormat),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setStatus('error');
     }
-  }, [cursorColor]);
+  }, [colorSampleFormat, cursorColor]);
 
   const saveSelection = useCallback(async () => {
     if (!session || !selection) return;
@@ -1301,6 +1312,14 @@ export default function ScreenshotSession({
         event.preventDefault();
         void copyCurrentColor();
       } else if (
+        !textDraft &&
+        cursorColor &&
+        !event.repeat &&
+        isColorSampleFormatToggleShortcut(event)
+      ) {
+        event.preventDefault();
+        setColorSampleFormat((format) => (format === 'hex' ? 'rgb' : 'hex'));
+      } else if (
         (status === 'selecting' || status === 'preview') &&
         !textDraft &&
         selectionHistoryStep
@@ -1489,6 +1508,7 @@ export default function ScreenshotSession({
     clearAnnotations,
     copyCurrentColor,
     copySelection,
+    colorSampleFormat,
     annotationGesture,
     annotationMoveGesture,
     captureCandidates,
@@ -2600,6 +2620,7 @@ export default function ScreenshotSession({
           }}
           selection={selection ?? hoverSelection}
           color={cursorColor}
+          colorFormat={colorSampleFormat}
         />
       )}
     </div>
