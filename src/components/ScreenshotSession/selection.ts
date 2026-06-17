@@ -17,6 +17,17 @@ export function normalizeSelection(start: Point, current: Point): LogicalRect {
   };
 }
 
+export function constrainSelectionPoint(start: Point, current: Point): Point {
+  const deltaX = current.x - start.x;
+  const deltaY = current.y - start.y;
+  const size = Math.min(Math.abs(deltaX), Math.abs(deltaY));
+
+  return {
+    x: start.x + Math.sign(deltaX) * size,
+    y: start.y + Math.sign(deltaY) * size,
+  };
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }

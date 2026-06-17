@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import {
   getToolbarPosition,
+  constrainSelectionPoint,
   moveDraftSelectionByDelta,
   moveSelectionByDelta,
   normalizeSelection,
@@ -1372,10 +1373,11 @@ export default function ScreenshotSession({
 
     if (!startPoint || status !== 'selecting') return;
 
+    const currentPoint = snapPointToRects(point, snapTargetRects, EDGE_SNAP_THRESHOLD);
     setSelection(
       normalizeSelection(
         startPoint,
-        snapPointToRects(point, snapTargetRects, EDGE_SNAP_THRESHOLD),
+        event.shiftKey ? constrainSelectionPoint(startPoint, currentPoint) : currentPoint,
       ),
     );
   };
@@ -1464,9 +1466,10 @@ export default function ScreenshotSession({
 
     if (!startPoint || status !== 'selecting') return;
 
+    const currentPoint = snapPointToRects(point, snapTargetRects, EDGE_SNAP_THRESHOLD);
     const nextSelection = normalizeSelection(
       startPoint,
-      snapPointToRects(point, snapTargetRects, EDGE_SNAP_THRESHOLD),
+      event.shiftKey ? constrainSelectionPoint(startPoint, currentPoint) : currentPoint,
     );
     setStartPoint(null);
 

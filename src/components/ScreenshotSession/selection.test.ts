@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  constrainSelectionPoint,
   getToolbarPosition,
   moveSelectionByDelta,
   moveDraftSelectionByDelta,
@@ -45,6 +46,17 @@ describe('selection editing', () => {
     ).toEqual({
       selection: { x: 65, y: 40, width: 100, height: 80 },
       anchorPoint: { x: 65, y: 40 },
+    });
+  });
+
+  it('constrains a drawn selection point to a square from its anchor', () => {
+    expect(constrainSelectionPoint({ x: 10, y: 10 }, { x: 40, y: 25 })).toEqual({
+      x: 25,
+      y: 25,
+    });
+    expect(constrainSelectionPoint({ x: 40, y: 40 }, { x: 15, y: 20 })).toEqual({
+      x: 20,
+      y: 20,
     });
   });
 
