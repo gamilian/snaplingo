@@ -245,7 +245,7 @@ describe('capture session actions', () => {
     ).toBe(false);
   });
 
-  it('uses Enter, Space, or Cmd/Ctrl+C for copying the current selection', () => {
+  it('uses Enter or Cmd/Ctrl+C for copying the current selection', () => {
     expect(
       isCopyCaptureKeyboardShortcut({
         key: 'Enter',
@@ -275,7 +275,7 @@ describe('capture session actions', () => {
         altKey: false,
         shiftKey: false,
       }),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       isCopyCaptureKeyboardShortcut({
         key: 'c',
@@ -363,10 +363,10 @@ describe('capture session actions', () => {
     ).toBe(false);
   });
 
-  it('uses plain Tab for toggling the capture toolbar visibility', () => {
+  it('uses plain Space for toggling the capture toolbar visibility', () => {
     expect(
       isToggleToolbarShortcut({
-        key: 'Tab',
+        key: ' ',
         metaKey: false,
         ctrlKey: false,
         altKey: false,
@@ -375,7 +375,7 @@ describe('capture session actions', () => {
     ).toBe(true);
     expect(
       isToggleToolbarShortcut({
-        key: 'Tab',
+        key: ' ',
         metaKey: false,
         ctrlKey: false,
         altKey: false,

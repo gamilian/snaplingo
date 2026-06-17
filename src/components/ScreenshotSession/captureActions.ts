@@ -34,16 +34,9 @@ export function isCopyCaptureKeyboardShortcut(event: CaptureShortcutEvent) {
     !event.ctrlKey &&
     !event.altKey &&
     !event.shiftKey;
-  const isPlainSpace =
-    event.key === ' ' &&
-    !event.metaKey &&
-    !event.ctrlKey &&
-    !event.altKey &&
-    !event.shiftKey;
 
   return (
     isPlainEnter ||
-    isPlainSpace ||
     (event.key.toLowerCase() === 'c' && (event.metaKey || event.ctrlKey))
   );
 }
@@ -60,7 +53,7 @@ export function isConfirmHoverSelectionShortcut(event: CaptureShortcutEvent) {
 
 export function isToggleToolbarShortcut(event: CaptureShortcutEvent) {
   return (
-    event.key === 'Tab' &&
+    event.key === ' ' &&
     !event.metaKey &&
     !event.ctrlKey &&
     !event.altKey &&
