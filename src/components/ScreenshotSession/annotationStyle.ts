@@ -75,7 +75,6 @@ const MIN_ANNOTATION_SIZE = 4;
 const HIGHLIGHT_ALPHA = 96;
 
 const ANNOTATION_TOOL_SHORTCUTS: Record<string, AnnotationTool> = {
-  r: 'rectangle',
   o: 'ellipse',
   a: 'arrow',
   l: 'line',

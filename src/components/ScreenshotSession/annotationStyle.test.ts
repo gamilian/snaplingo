@@ -438,7 +438,6 @@ describe('annotation style', () => {
   it('maps plain tool shortcut keys to annotation tools', () => {
     const plainKey = { metaKey: false, ctrlKey: false, altKey: false };
 
-    expect(annotationToolFromShortcut({ ...plainKey, key: 'r' })).toBe('rectangle');
     expect(annotationToolFromShortcut({ ...plainKey, key: 'O' })).toBe('ellipse');
     expect(annotationToolFromShortcut({ ...plainKey, key: 'a' })).toBe('arrow');
     expect(annotationToolFromShortcut({ ...plainKey, key: 'l' })).toBe('line');
@@ -448,6 +447,25 @@ describe('annotation style', () => {
     expect(annotationToolFromShortcut({ ...plainKey, key: 'b' })).toBe('blur');
     expect(annotationToolFromShortcut({ ...plainKey, key: 't' })).toBe('text');
     expect(annotationToolFromShortcut({ ...plainKey, key: 'E' })).toBe('eraser');
+  });
+
+  it('does not use R as a rectangle shortcut because capture uses it to restore the last selection', () => {
+    expect(
+      annotationToolFromShortcut({
+        key: 'r',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+      }),
+    ).toBeNull();
+    expect(
+      annotationToolFromShortcut({
+        key: 'R',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+      }),
+    ).toBeNull();
   });
 
   it('does not map modified or unknown tool shortcut keys', () => {
