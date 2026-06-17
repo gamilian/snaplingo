@@ -149,6 +149,15 @@ export function isPrintCaptureShortcut(event: CaptureShortcutEvent) {
   );
 }
 
+export function isMagnifierShortcut(event: CaptureShortcutEvent) {
+  return (
+    event.key === 'Alt' &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.shiftKey
+  );
+}
+
 export function getCursorNudgeDeltaFromShortcut(
   event: CaptureShortcutEvent,
 ): Point | null {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getMagnifierImageStyle,
   getMagnifierPosition,
+  shouldShowMagnifier,
 } from './magnifier';
 import type { LogicalRect, Point } from './types';
 
@@ -37,5 +38,35 @@ describe('capture magnifier', () => {
       backgroundSize: '1200px 800px',
       backgroundPosition: '-60px -32px',
     });
+  });
+
+  it('only shows after the user requests it and all cursor context is available', () => {
+    expect(
+      shouldShowMagnifier({
+        requested: true,
+        hasCursorMonitor: true,
+        hasViewportCursor: true,
+        hasImageCursor: true,
+        hasViewportBounds: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldShowMagnifier({
+        requested: false,
+        hasCursorMonitor: true,
+        hasViewportCursor: true,
+        hasImageCursor: true,
+        hasViewportBounds: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldShowMagnifier({
+        requested: true,
+        hasCursorMonitor: false,
+        hasViewportCursor: true,
+        hasImageCursor: true,
+        hasViewportBounds: true,
+      }),
+    ).toBe(false);
   });
 });

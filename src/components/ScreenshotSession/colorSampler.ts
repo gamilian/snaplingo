@@ -65,8 +65,7 @@ export function isColorSampleCopyShortcut(event: ColorSampleCopyShortcutEvent) {
   return (
     event.key.toLowerCase() === 'c' &&
     !event.metaKey &&
-    !event.ctrlKey &&
-    !event.altKey
+    !event.ctrlKey
   );
 }
 
@@ -76,8 +75,7 @@ export function isColorSampleFormatToggleShortcut(
   return (
     event.key === 'Shift' &&
     !event.metaKey &&
-    !event.ctrlKey &&
-    !event.altKey
+    !event.ctrlKey
   );
 }
 

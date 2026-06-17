@@ -13,6 +13,7 @@ import {
   isCopyCaptureKeyboardShortcut,
   isConfirmHoverSelectionShortcut,
   getCursorNudgeDeltaFromShortcut,
+  isMagnifierShortcut,
   isPinCaptureShortcut,
   isPinCapturePointer,
   isPrintCaptureShortcut,
@@ -527,6 +528,36 @@ describe('capture session actions', () => {
         shiftKey: false,
       }),
     ).toBeNull();
+  });
+
+  it('uses plain Alt for showing the magnifier', () => {
+    expect(
+      isMagnifierShortcut({
+        key: 'Alt',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: true,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isMagnifierShortcut({
+        key: 'Alt',
+        metaKey: false,
+        ctrlKey: true,
+        altKey: true,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      isMagnifierShortcut({
+        key: 'Shift',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(false);
   });
 
   it('uses Cmd/Ctrl+A for selecting the full capture area', () => {

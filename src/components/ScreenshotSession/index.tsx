@@ -21,6 +21,7 @@ import {
 import {
   getMagnifierImageStyle,
   getMagnifierPosition,
+  shouldShowMagnifier,
 } from './magnifier';
 import {
   colorSampleToClipboardText,
@@ -95,6 +96,7 @@ import {
   isCopyCaptureDoubleClick,
   isCopyCaptureKeyboardShortcut,
   isMoveDraftSelectionShortcut,
+  isMagnifierShortcut,
   isPinCapturePointer,
   isPinCaptureShortcut,
   isPrintCaptureShortcut,
@@ -407,6 +409,7 @@ export default function ScreenshotSession({
   const [cursorColor, setCursorColor] = useState<ColorSample | null>(null);
   const [colorSampleFormat, setColorSampleFormat] =
     useState<ColorSampleFormat>('hex');
+  const [isMagnifierRequested, setIsMagnifierRequested] = useState(false);
   const [sampleCanvasVersion, setSampleCanvasVersion] = useState(0);
   const [isRenderingOutput, setIsRenderingOutput] = useState(false);
   const [isToolbarHidden, setIsToolbarHidden] = useState(false);
@@ -503,6 +506,13 @@ export default function ScreenshotSession({
 
     return getToolbarPosition(selectionViewportRect, viewportBounds, TOOLBAR_SIZE, TOOLBAR_GAP);
   }, [selectionViewportRect, status, viewportBounds]);
+  const isMagnifierShown = shouldShowMagnifier({
+    requested: isMagnifierRequested,
+    hasCursorMonitor: Boolean(cursorMonitor),
+    hasViewportCursor: Boolean(cursorViewportPoint),
+    hasImageCursor: Boolean(cursorInMonitorPoint),
+    hasViewportBounds: Boolean(viewportBounds),
+  });
 
   const resetSessionState = useCallback(() => {
     setStatus('idle');
@@ -524,6 +534,7 @@ export default function ScreenshotSession({
     setPreviewImageBase64(null);
     setCursorColor(null);
     setColorSampleFormat('hex');
+    setIsMagnifierRequested(false);
     setSampleCanvasVersion(0);
     setIsRenderingOutput(false);
     setIsToolbarHidden(false);
@@ -565,6 +576,7 @@ export default function ScreenshotSession({
     setPreviewImageBase64(null);
     setCursorColor(null);
     setColorSampleFormat('hex');
+    setIsMagnifierRequested(false);
     setSampleCanvasVersion(0);
     setIsRenderingOutput(false);
     setIsToolbarHidden(false);
@@ -1150,6 +1162,7 @@ export default function ScreenshotSession({
     setTextDraftAnnotationIndex(null);
     setAnnotationHistory(emptyAnnotationHistory());
     setIsToolbarHidden(false);
+    setIsMagnifierRequested(false);
     setStatus('selecting');
   }, []);
 
@@ -1168,6 +1181,7 @@ export default function ScreenshotSession({
     setTextDraftAnnotationIndex(null);
     setAnnotationHistory(emptyAnnotationHistory());
     setIsToolbarHidden(false);
+    setIsMagnifierRequested(false);
     setStatus('preview');
     void renderSelectionPreview(rect, []);
   }, [renderSelectionPreview]);
@@ -1311,6 +1325,9 @@ export default function ScreenshotSession({
       if (event.key === 'Escape') {
         event.preventDefault();
         dismissCaptureLayer();
+      } else if (isMagnifierShortcut(event)) {
+        event.preventDefault();
+        setIsMagnifierRequested(true);
       } else if (
         status === 'preview' &&
         isClearAnnotationsShortcut(event)
@@ -1344,6 +1361,7 @@ export default function ScreenshotSession({
         deleteSelectedAnnotation();
       } else if (
         !textDraft &&
+        isMagnifierShown &&
         cursorColor &&
         isColorSampleCopyShortcut(event)
       ) {
@@ -1351,6 +1369,7 @@ export default function ScreenshotSession({
         void copyCurrentColor();
       } else if (
         !textDraft &&
+        isMagnifierShown &&
         cursorColor &&
         !event.repeat &&
         isColorSampleFormatToggleShortcut(event)
@@ -1532,17 +1551,27 @@ export default function ScreenshotSession({
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.key === 'Alt') {
+        setIsMagnifierRequested(false);
+      }
+
       if (event.key === ' ' && draftSelectionMoveGesture) {
         event.preventDefault();
         setDraftSelectionMoveGesture(null);
       }
     };
 
+    const handleWindowBlur = () => {
+      setIsMagnifierRequested(false);
+    };
+
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleWindowBlur);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleWindowBlur);
     };
   }, [
     adjustAnnotationSize,
@@ -1557,6 +1586,7 @@ export default function ScreenshotSession({
     draftSelectionMoveGesture,
     dismissCaptureLayer,
     hoverSelection,
+    isMagnifierShown,
     textDraft,
     deleteSelectedAnnotation,
     redoAnnotation,
@@ -2665,7 +2695,8 @@ export default function ScreenshotSession({
           )}
         </>
       )}
-      {cursorMonitor &&
+      {isMagnifierShown &&
+        cursorMonitor &&
         cursorViewportPoint &&
         cursorInMonitorPoint &&
         viewportBounds && (

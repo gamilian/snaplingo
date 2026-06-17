@@ -5,8 +5,26 @@ interface Size {
   height: number;
 }
 
+interface MagnifierVisibilityState {
+  requested: boolean;
+  hasCursorMonitor: boolean;
+  hasViewportCursor: boolean;
+  hasImageCursor: boolean;
+  hasViewportBounds: boolean;
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+export function shouldShowMagnifier(state: MagnifierVisibilityState) {
+  return (
+    state.requested &&
+    state.hasCursorMonitor &&
+    state.hasViewportCursor &&
+    state.hasImageCursor &&
+    state.hasViewportBounds
+  );
 }
 
 export function getMagnifierPosition(

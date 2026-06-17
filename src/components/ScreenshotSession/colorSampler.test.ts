@@ -72,6 +72,14 @@ describe('capture color sampler', () => {
         altKey: false,
       }),
     ).toBe(false);
+    expect(
+      isColorSampleCopyShortcut({
+        key: 'c',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: true,
+      }),
+    ).toBe(true);
   });
 
   it('uses plain Shift for toggling sampled color format', () => {
@@ -90,6 +98,6 @@ describe('capture color sampler', () => {
         ctrlKey: false,
         altKey: true,
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 });
