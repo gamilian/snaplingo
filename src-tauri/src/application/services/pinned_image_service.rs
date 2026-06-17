@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, VecDeque};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -6,6 +6,8 @@ use base64::Engine;
 
 use crate::domain::capture::PinnedImageView;
 use crate::error::{AppError, Result};
+
+const MAX_RECOVERABLE_CLOSED_IMAGES: usize = 1;
 
 #[derive(Clone)]
 struct PinnedImage {
@@ -39,6 +41,7 @@ pub struct PinnedImageGroupMembership {
 pub struct PinnedImageService {
     images: Mutex<HashMap<String, PinnedImage>>,
     active_group: Mutex<u32>,
+    recoverable_closed_image_ids: Mutex<VecDeque<String>>,
 }
 
 impl PinnedImageService {
@@ -46,6 +49,7 @@ impl PinnedImageService {
         Self {
             images: Mutex::new(HashMap::new()),
             active_group: Mutex::new(0),
+            recoverable_closed_image_ids: Mutex::new(VecDeque::new()),
         }
     }
 
@@ -133,7 +137,40 @@ impl PinnedImageService {
             .unwrap()
             .remove(image_id)
             .map(|_| ())
-            .ok_or_else(|| AppError::System(format!("Pinned image not found: {}", image_id)))
+            .ok_or_else(|| AppError::System(format!("Pinned image not found: {}", image_id)))?;
+        self.forget_recoverable_pinned_image(image_id);
+
+        Ok(())
+    }
+
+    pub fn close_pinned_image(&self, image_id: &str) -> Result<()> {
+        if !self.images.lock().unwrap().contains_key(image_id) {
+            return Err(AppError::System(format!(
+                "Pinned image not found: {}",
+                image_id
+            )));
+        }
+
+        let mut recoverable = self.recoverable_closed_image_ids.lock().unwrap();
+        recoverable.retain(|closed_image_id| closed_image_id != image_id);
+        recoverable.push_front(image_id.to_string());
+
+        while recoverable.len() > MAX_RECOVERABLE_CLOSED_IMAGES {
+            recoverable.pop_back();
+        }
+
+        Ok(())
+    }
+
+    pub fn pop_recoverable_pinned_image(&self) -> Option<String> {
+        let mut recoverable = self.recoverable_closed_image_ids.lock().unwrap();
+        while let Some(image_id) = recoverable.pop_front() {
+            if self.images.lock().unwrap().contains_key(&image_id) {
+                return Some(image_id);
+            }
+        }
+
+        None
     }
 
     pub fn move_pinned_image_to_group(&self, image_id: &str, group: u32) -> Result<()> {
@@ -206,6 +243,9 @@ impl PinnedImageService {
         if *self.active_group.lock().unwrap() == removed_group {
             *self.active_group.lock().unwrap() = next_active_group;
         }
+        for removed_image_id in &removed_image_ids {
+            self.forget_recoverable_pinned_image(removed_image_id);
+        }
 
         removed_image_ids.sort();
 
@@ -213,6 +253,13 @@ impl PinnedImageService {
             removed_group,
             removed_image_ids,
         })
+    }
+
+    fn forget_recoverable_pinned_image(&self, image_id: &str) {
+        self.recoverable_closed_image_ids
+            .lock()
+            .unwrap()
+            .retain(|closed_image_id| closed_image_id != image_id);
     }
 
     pub fn pinned_image_group_containing(

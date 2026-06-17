@@ -198,8 +198,11 @@ export async function openPinnedPreferences(
   await mainWindow?.setFocus?.();
 }
 
-export async function hidePinnedImage(window: PinWindow) {
-  await window.hide?.();
+export async function closePinnedImage(
+  invoke: PinInvoke,
+  imageId: string,
+) {
+  await invoke('close_pinned_image', { imageId });
 }
 
 export async function hidePinnedImageGroup(invoke: PinInvoke, imageId: string) {

@@ -36,10 +36,10 @@ import {
 } from './pinControls';
 import {
   copyPinnedText,
+  closePinnedImage,
   destroyPinnedImage,
   destroyPinnedImageGroup,
   getPinnedHoverToolbarActions,
-  hidePinnedImage,
   hidePinnedImageGroup,
   isClosePinnedImageShortcut,
   isCopyPinnedImageShortcut,
@@ -105,11 +105,11 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
 
   const hideCurrentPinnedImage = useCallback(async () => {
     try {
-      await hidePinnedImage(webviewWindow);
+      await closePinnedImage(invoke, imageId);
     } catch (err) {
       console.error('Failed to hide pinned image:', err);
     }
-  }, []);
+  }, [imageId]);
 
   const destroyCurrentPinnedImage = useCallback(async () => {
     try {

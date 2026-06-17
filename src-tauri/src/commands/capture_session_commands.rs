@@ -202,6 +202,14 @@ pub fn pin_clipboard_image_for_state(
     app: &AppHandle,
     state: &crate::AppState,
 ) -> Result<(), String> {
+    if let Some(image_id) = state.pinned_image_service.pop_recoverable_pinned_image() {
+        let image = state
+            .pinned_image_service
+            .get_pinned_image(&image_id)
+            .map_err(|e| e.to_string())?;
+        return show_or_open_pinned_image_window(app, &image);
+    }
+
     match state.capture_output_service.read_clipboard_png() {
         Ok(png_data) => return pin_capture_png(app, state, png_data),
         Err(image_error) => {
@@ -219,6 +227,32 @@ pub fn pin_clipboard_image_for_state(
             pin_text_as_png(app, state, &text)
         }
     }
+}
+
+#[tauri::command]
+pub fn close_pinned_image(
+    image_id: String,
+    app: AppHandle,
+    state: State<'_, crate::AppState>,
+) -> Result<(), String> {
+    close_pinned_image_for_state(&image_id, &app, state.inner())
+}
+
+pub fn close_pinned_image_for_state(
+    image_id: &str,
+    app: &AppHandle,
+    state: &crate::AppState,
+) -> Result<(), String> {
+    state
+        .pinned_image_service
+        .close_pinned_image(image_id)
+        .map_err(|e| e.to_string())?;
+
+    if let Some(window) = app.get_webview_window(&pinned_window_label(image_id)) {
+        window.hide().map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -717,6 +751,20 @@ fn open_pinned_image_window(app: &AppHandle, image: &PinnedImageView) -> Result<
         .map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+fn show_or_open_pinned_image_window(
+    app: &AppHandle,
+    image: &PinnedImageView,
+) -> Result<(), String> {
+    let label = pinned_window_label(&image.id);
+    if let Some(window) = app.get_webview_window(&label) {
+        window.show().map_err(|e| e.to_string())?;
+        window.set_focus().map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+
+    open_pinned_image_window(app, image)
 }
 
 fn render_capture_png(

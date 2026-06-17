@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   copyPinnedText,
+  closePinnedImage,
   destroyPinnedImage,
   destroyPinnedImageGroup,
   hidePinnedImageGroup,
-  hidePinnedImage,
   getPinnedHoverToolbarActions,
   isClosePinnedImageShortcut,
   isCopyPinnedImageShortcut,
@@ -492,16 +492,24 @@ describe('pinned image actions', () => {
     await expect(openPinnedPreferences(async () => null)).resolves.toBeUndefined();
   });
 
-  it('hides a pinned image window without removing the image', async () => {
-    const calls: string[] = [];
+  it('closes a pinned image through the backend recovery path', async () => {
+    const calls: Array<{ command?: string; args?: unknown }> = [];
+    const invoke: PinInvoke = async <T>(
+      command: string,
+      args?: PinInvokeArgs,
+    ): Promise<T> => {
+      calls.push({ command, args });
+      return undefined as T;
+    };
 
-    await hidePinnedImage({
-      hide: async () => {
-        calls.push('hide');
+    await closePinnedImage(invoke, 'pin-1');
+
+    expect(calls).toEqual([
+      {
+        command: 'close_pinned_image',
+        args: { imageId: 'pin-1' },
       },
-    });
-
-    expect(calls).toEqual(['hide']);
+    ]);
   });
 
   it('destroys a pinned image by removing it before closing the window', async () => {

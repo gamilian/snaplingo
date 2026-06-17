@@ -53,6 +53,29 @@ mod tests {
     }
 
     #[test]
+    fn closing_pinned_image_keeps_it_recoverable_once() {
+        let service = PinnedImageService::new();
+        let image_id = service.pin_png(make_test_png(2, 2)).unwrap();
+
+        service.close_pinned_image(&image_id).unwrap();
+
+        assert!(service.get_pinned_image(&image_id).is_ok());
+        assert_eq!(service.pop_recoverable_pinned_image(), Some(image_id));
+        assert_eq!(service.pop_recoverable_pinned_image(), None);
+    }
+
+    #[test]
+    fn removing_pinned_image_clears_it_from_recovery() {
+        let service = PinnedImageService::new();
+        let image_id = service.pin_png(make_test_png(2, 2)).unwrap();
+
+        service.close_pinned_image(&image_id).unwrap();
+        service.remove_pinned_image(&image_id).unwrap();
+
+        assert_eq!(service.pop_recoverable_pinned_image(), None);
+    }
+
+    #[test]
     fn returns_original_pinned_png_data() {
         let service = PinnedImageService::new();
         let png = make_test_png(2, 2);
