@@ -1459,7 +1459,7 @@ describe('capture session actions', () => {
         altKey: false,
         shiftKey: false,
       }),
-    ).toBeNull();
+    ).toBe('print');
   });
 
   it('maps Tab shortcuts to capture candidate cycle direction', () => {

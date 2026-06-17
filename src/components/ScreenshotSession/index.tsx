@@ -755,6 +755,15 @@ export default function ScreenshotSession({
           screenshotSavePath,
           shouldIncludeCapturedCursor,
         );
+      } else if (action === 'print') {
+        await printCaptureSelection(
+          invoke,
+          session.id,
+          rect,
+          [],
+          printBase64PngImage,
+          shouldIncludeCapturedCursor,
+        );
       } else {
         await invoke('output_capture', {
           sessionId: session.id,

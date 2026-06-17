@@ -44,7 +44,12 @@ interface SelectionArrowActionOptions {
 interface HoverSelectionShortcutOptions {
   drafting?: boolean;
 }
-export type HoverSelectionCompletionAction = 'copy' | 'save' | 'quick-save' | 'pin';
+export type HoverSelectionCompletionAction =
+  | 'copy'
+  | 'save'
+  | 'quick-save'
+  | 'pin'
+  | 'print';
 interface RestoreLastSelectionOptions {
   status: 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
   editing?: boolean;
@@ -289,6 +294,7 @@ export function getHoverSelectionCompletionActionFromShortcut(
   if (isQuickSaveCaptureShortcut(event)) return 'quick-save';
   if (isSaveCaptureShortcut(event)) return 'save';
   if (isPinCaptureShortcut(event)) return 'pin';
+  if (isPrintCaptureShortcut(event)) return 'print';
 
   return null;
 }
