@@ -7,6 +7,7 @@ import {
   getCandidateCycleDirectionFromShortcut,
   getCancelCapturePointerAction,
   getSelectionHistoryStepFromShortcut,
+  getUndoRedoActionFromShortcut,
   isCancelCapturePointer,
   isClearAnnotationsShortcut,
   isCopyCaptureDoubleClick,
@@ -274,6 +275,54 @@ describe('capture session actions', () => {
         shiftKey: true,
       }),
     ).toBe(false);
+  });
+
+  it('maps Snipaste undo and redo shortcuts without stealing clear annotations', () => {
+    expect(
+      getUndoRedoActionFromShortcut({
+        key: 'z',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe('undo');
+    expect(
+      getUndoRedoActionFromShortcut({
+        key: 'Z',
+        metaKey: false,
+        ctrlKey: true,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe('undo');
+    expect(
+      getUndoRedoActionFromShortcut({
+        key: 'y',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe('redo');
+    expect(
+      getUndoRedoActionFromShortcut({
+        key: 'z',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBeNull();
+    expect(
+      getUndoRedoActionFromShortcut({
+        key: 'y',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: true,
+        shiftKey: false,
+      }),
+    ).toBeNull();
   });
 
   it('copies the current frozen selection to the clipboard', async () => {

@@ -27,6 +27,7 @@ interface CapturePointerEvent {
 }
 
 export type SelectionHistoryStep = 'previous' | 'next';
+export type UndoRedoAction = 'undo' | 'redo';
 export type CancelCapturePointerAction =
   | 'dismiss-layer'
   | 'reset-selection'
@@ -86,6 +87,19 @@ export function isClearAnnotationsShortcut(event: CaptureShortcutEvent) {
     !event.altKey &&
     !!event.shiftKey
   );
+}
+
+export function getUndoRedoActionFromShortcut(
+  event: CaptureShortcutEvent,
+): UndoRedoAction | null {
+  if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) {
+    return null;
+  }
+
+  if (event.key.toLowerCase() === 'z') return 'undo';
+  if (event.key.toLowerCase() === 'y') return 'redo';
+
+  return null;
 }
 
 export function isCopyCaptureKeyboardShortcut(event: CaptureShortcutEvent) {

@@ -92,6 +92,7 @@ import {
   getCancelCapturePointerAction,
   getCursorNudgeDeltaFromShortcut,
   getSelectionHistoryStepFromShortcut,
+  getUndoRedoActionFromShortcut,
   isCancelCapturePointer,
   isClearAnnotationsShortcut,
   isConfirmHoverSelectionShortcut,
@@ -1327,6 +1328,7 @@ export default function ScreenshotSession({
       const candidateCycleDirection =
         getCandidateCycleDirectionFromShortcut(event);
       const selectionHistoryStep = getSelectionHistoryStepFromShortcut(event);
+      const undoRedoAction = getUndoRedoActionFromShortcut(event);
 
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -1342,22 +1344,14 @@ export default function ScreenshotSession({
         clearAnnotations();
       } else if (
         status === 'preview' &&
-        (event.metaKey || event.ctrlKey) &&
-        event.key.toLowerCase() === 'z'
+        undoRedoAction
       ) {
         event.preventDefault();
-        if (event.shiftKey) {
-          redoAnnotation();
-        } else {
+        if (undoRedoAction === 'undo') {
           undoAnnotation();
+        } else {
+          redoAnnotation();
         }
-      } else if (
-        status === 'preview' &&
-        (event.metaKey || event.ctrlKey) &&
-        event.key.toLowerCase() === 'y'
-      ) {
-        event.preventDefault();
-        redoAnnotation();
       } else if (
         status === 'preview' &&
         selectedAnnotationIndex !== null &&
