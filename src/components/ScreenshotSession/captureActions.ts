@@ -38,6 +38,9 @@ export interface SelectionArrowAction {
   mode: SelectionArrowActionMode;
   direction: ArrowKey;
 }
+interface SelectionArrowActionOptions {
+  editing?: boolean;
+}
 export type UndoRedoAction = 'undo' | 'redo';
 export type CancelCapturePointerAction =
   | 'finish-edit'
@@ -151,7 +154,10 @@ export function isDeleteSelectedAnnotationShortcut(
 
 export function getSelectionArrowActionFromShortcut(
   event: CaptureShortcutEvent,
+  options: SelectionArrowActionOptions = {},
 ): SelectionArrowAction | null {
+  if (options.editing) return null;
+
   if (
     event.key !== 'ArrowUp' &&
     event.key !== 'ArrowRight' &&

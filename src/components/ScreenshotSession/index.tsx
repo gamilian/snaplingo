@@ -1375,7 +1375,13 @@ export default function ScreenshotSession({
         getCandidateCycleDirectionFromShortcut(event);
       const selectionHistoryStep = getSelectionHistoryStepFromShortcut(event);
       const undoRedoAction = getUndoRedoActionFromShortcut(event);
-      const selectionArrowAction = getSelectionArrowActionFromShortcut(event);
+      const selectionArrowAction = getSelectionArrowActionFromShortcut(event, {
+        editing:
+          hasAnnotationEditingContext ||
+          annotationGesture !== null ||
+          annotationMoveGesture !== null ||
+          textDraft !== null,
+      });
       const cycledAnnotationTool = nextAnnotationToolFromCycleShortcut(
         event,
         activeAnnotationTool,

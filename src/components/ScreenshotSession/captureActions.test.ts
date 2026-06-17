@@ -457,6 +457,45 @@ describe('capture session actions', () => {
     ).toBeNull();
   });
 
+  it('does not move the capture region with arrow keys while editing annotations', () => {
+    expect(
+      getSelectionArrowActionFromShortcut(
+        {
+          key: 'ArrowUp',
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          shiftKey: false,
+        },
+        { editing: true },
+      ),
+    ).toBeNull();
+    expect(
+      getSelectionArrowActionFromShortcut(
+        {
+          key: 'ArrowRight',
+          metaKey: true,
+          ctrlKey: false,
+          altKey: false,
+          shiftKey: false,
+        },
+        { editing: true },
+      ),
+    ).toBeNull();
+    expect(
+      getSelectionArrowActionFromShortcut(
+        {
+          key: 'ArrowLeft',
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          shiftKey: true,
+        },
+        { editing: true },
+      ),
+    ).toBeNull();
+  });
+
   it('copies the current frozen selection to the clipboard', async () => {
     const calls: Array<{ command: string; args?: unknown }> = [];
     const invoke: CaptureInvoke = async <T>(
