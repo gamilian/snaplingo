@@ -195,6 +195,39 @@ describe('pinned image controls', () => {
     ).toBe(false);
   });
 
+  it('uses Shift plus left-button double click for resetting pinned size and opacity', () => {
+    expect(
+      isResetPinnedImagePointer({
+        detail: 2,
+        button: 0,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(true);
+    expect(
+      isResetPinnedImagePointer({
+        detail: 1,
+        button: 0,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(false);
+    expect(
+      isResetPinnedImagePointer({
+        detail: 2,
+        button: 0,
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(false);
+  });
+
   it('uses an unmodified left-button double click for closing a pinned image', () => {
     expect(
       isClosePinnedImageDoubleClick({

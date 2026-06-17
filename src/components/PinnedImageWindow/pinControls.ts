@@ -157,13 +157,21 @@ export function getPinnedWheelAction(
 }
 
 export function isResetPinnedImagePointer(event: PinnedPointerEvent) {
-  return (
+  const isUnmodifiedMiddleClick =
     event.button === 1 &&
     !event.metaKey &&
     !event.ctrlKey &&
     !event.altKey &&
-    !event.shiftKey
-  );
+    !event.shiftKey;
+  const isShiftLeftDoubleClick =
+    (event.detail ?? 0) >= 2 &&
+    event.button === 0 &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !!event.shiftKey;
+
+  return isUnmodifiedMiddleClick || isShiftLeftDoubleClick;
 }
 
 export function isClosePinnedImageDoubleClick(event: PinnedPointerEvent) {
