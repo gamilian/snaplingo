@@ -513,6 +513,7 @@ pub fn run() {
       commands::pin_clipboard_image,
       commands::get_pinned_image,
       commands::copy_pinned_image,
+      commands::replace_pinned_image_from_clipboard,
       commands::save_pinned_image,
       commands::remove_pinned_image,
       commands::toggle_pinned_images_visibility,

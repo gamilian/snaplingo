@@ -39,6 +39,15 @@ export function isClosePinnedImageShortcut(event: PinShortcutEvent) {
   );
 }
 
+export function isReplacePinnedImageShortcut(event: PinShortcutEvent) {
+  return (
+    event.key.toLowerCase() === 'v' &&
+    (event.metaKey || event.ctrlKey) &&
+    !event.altKey &&
+    !event.shiftKey
+  );
+}
+
 export function isDestroyPinnedImageShortcut(event: PinDestroyShortcutEvent) {
   return event.key === 'Escape' && event.shiftKey;
 }
@@ -59,6 +68,13 @@ export async function movePinnedImageToNextGroup(
   await invoke('move_pinned_image_to_next_group', {
     imageId,
   });
+}
+
+export async function replacePinnedImageFromClipboard<T>(
+  invoke: PinInvoke,
+  imageId: string,
+) {
+  return invoke<T>('replace_pinned_image_from_clipboard', { imageId });
 }
 
 export async function hidePinnedImage(window: PinWindow) {

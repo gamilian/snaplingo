@@ -7,8 +7,10 @@ import {
   isClosePinnedImageShortcut,
   isCopyPinnedImageShortcut,
   isDestroyPinnedImageShortcut,
+  isReplacePinnedImageShortcut,
   isSavePinnedImageShortcut,
   movePinnedImageToNextGroup,
+  replacePinnedImageFromClipboard,
   type PinInvoke,
   type PinInvokeArgs,
   savePinnedImage,
@@ -132,6 +134,68 @@ describe('pinned image actions', () => {
         shiftKey: false,
       }),
     ).toBe(false);
+  });
+
+  it('uses Cmd/Ctrl+V for replacing a pinned image from the clipboard', () => {
+    expect(
+      isReplacePinnedImageShortcut({
+        key: 'v',
+        metaKey: true,
+        ctrlKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isReplacePinnedImageShortcut({
+        key: 'V',
+        metaKey: false,
+        ctrlKey: true,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isReplacePinnedImageShortcut({
+        key: 'v',
+        metaKey: true,
+        ctrlKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(false);
+    expect(
+      isReplacePinnedImageShortcut({
+        key: 'v',
+        metaKey: false,
+        ctrlKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('replaces a pinned image with clipboard content', async () => {
+    const calls: Array<{ command: string; args?: unknown }> = [];
+    const nextImage = {
+      id: 'pin-1',
+      image_base64: 'updated',
+      width: 4,
+      height: 3,
+    };
+    const invoke: PinInvoke = async <T>(
+      command: string,
+      args?: PinInvokeArgs,
+    ): Promise<T> => {
+      calls.push({ command, args });
+      return nextImage as T;
+    };
+
+    await expect(replacePinnedImageFromClipboard(invoke, 'pin-1')).resolves.toEqual(
+      nextImage,
+    );
+    expect(calls).toEqual([
+      {
+        command: 'replace_pinned_image_from_clipboard',
+        args: { imageId: 'pin-1' },
+      },
+    ]);
   });
 
   it('moves a pinned image to another group', async () => {

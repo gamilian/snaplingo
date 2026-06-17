@@ -91,6 +91,21 @@ impl PinnedImageService {
             .ok_or_else(|| AppError::System(format!("Pinned image not found: {}", image_id)))
     }
 
+    pub fn replace_pinned_png(&self, image_id: &str, png_data: Vec<u8>) -> Result<()> {
+        let decoded = image::load_from_memory(&png_data)
+            .map_err(|e| AppError::System(format!("Failed to decode pinned PNG: {}", e)))?;
+        let mut images = self.images.lock().unwrap();
+        let image = images
+            .get_mut(image_id)
+            .ok_or_else(|| AppError::System(format!("Pinned image not found: {}", image_id)))?;
+
+        image.png_data = png_data;
+        image.width = decoded.width();
+        image.height = decoded.height();
+
+        Ok(())
+    }
+
     pub fn remove_pinned_image(&self, image_id: &str) -> Result<()> {
         self.images
             .lock()

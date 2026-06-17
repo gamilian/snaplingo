@@ -23,14 +23,24 @@ import {
   isClosePinnedImageShortcut,
   isCopyPinnedImageShortcut,
   isDestroyPinnedImageShortcut,
+  isReplacePinnedImageShortcut,
   isSavePinnedImageShortcut,
   movePinnedImageToNextGroup,
+  replacePinnedImageFromClipboard,
   savePinnedImage,
 } from './pinActions';
 
 const appWindow = getCurrentWindow();
 const webviewWindow = getCurrentWebviewWindow();
 const PIN_CONTEXT_MENU_SIZE = { width: 132, height: 332 };
+
+function createDefaultPinnedTransform() {
+  return {
+    rotation: 0,
+    flipX: false,
+    flipY: false,
+  };
+}
 
 function readPinnedImageId(search: string) {
   const params = new URLSearchParams(search);
@@ -47,11 +57,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
   const [image, setImage] = useState<PinnedImageView | null>(null);
   const [zoom, setZoom] = useState(1);
   const [opacity, setOpacity] = useState(1);
-  const [transform, setTransform] = useState({
-    rotation: 0,
-    flipX: false,
-    flipY: false,
-  });
+  const [transform, setTransform] = useState(createDefaultPinnedTransform);
   const [contextMenuPosition, setContextMenuPosition] = useState<{
     x: number;
     y: number;
@@ -172,6 +178,24 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     }
   }, [imageId]);
 
+  const replacePinnedFromClipboard = useCallback(async () => {
+    try {
+      const nextImage = await replacePinnedImageFromClipboard<PinnedImageView>(
+        invoke,
+        imageId,
+      );
+      const nextTransform = createDefaultPinnedTransform();
+
+      setImage(nextImage);
+      setZoom(1);
+      setTransform(nextTransform);
+      setContextMenuPosition(null);
+      await resizePinnedWindow(1, nextTransform, nextImage);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [imageId, resizePinnedWindow]);
+
   const movePinnedToAnotherGroup = useCallback(async () => {
     try {
       await movePinnedImageToNextGroup(invoke, imageId);
@@ -213,6 +237,12 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
         return;
       }
 
+      if (isReplacePinnedImageShortcut(event)) {
+        event.preventDefault();
+        void replacePinnedFromClipboard();
+        return;
+      }
+
       const zoomAction = getPinnedKeyboardZoomAction(event);
       if (zoomAction) {
         event.preventDefault();
@@ -245,6 +275,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     adjustPinnedZoom,
     copyPinnedImage,
     hideCurrentPinnedImage,
+    replacePinnedFromClipboard,
     resetPinnedSize,
     resizePinnedWindow,
     savePinnedImageAs,

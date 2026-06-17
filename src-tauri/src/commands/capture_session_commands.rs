@@ -232,6 +232,20 @@ pub async fn copy_pinned_image(
 }
 
 #[tauri::command]
+pub fn replace_pinned_image_from_clipboard(
+    image_id: String,
+    state: State<'_, crate::AppState>,
+) -> Result<PinnedImageView, String> {
+    let png_data = state
+        .inner()
+        .capture_output_service
+        .read_clipboard_png()
+        .map_err(|e| e.to_string())?;
+
+    replace_pinned_png_by_id(&state.inner().pinned_image_service, &image_id, png_data)
+}
+
+#[tauri::command]
 pub async fn save_pinned_image(
     image_id: String,
     path: String,
@@ -380,6 +394,20 @@ async fn save_pinned_png_by_id(
         .save_png(&png_data, path)
         .await
         .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
+fn replace_pinned_png_by_id(
+    pinned_images: &PinnedImageService,
+    image_id: &str,
+    png_data: Vec<u8>,
+) -> Result<PinnedImageView, String> {
+    pinned_images
+        .replace_pinned_png(image_id, png_data)
+        .map_err(|e| e.to_string())?;
+
+    pinned_images
+        .get_pinned_image(image_id)
         .map_err(|e| e.to_string())
 }
 
@@ -1598,6 +1626,24 @@ mod tests {
         assert_eq!(std::fs::read(&path).unwrap(), png);
 
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn replace_pinned_png_by_id_returns_updated_view() {
+        let pinned_images = PinnedImageService::new();
+        let image_id = pinned_images.pin_png(make_test_png(2, 2)).unwrap();
+        let replacement = make_test_png(4, 3);
+
+        let view = super::replace_pinned_png_by_id(&pinned_images, &image_id, replacement.clone())
+            .unwrap();
+
+        assert_eq!(view.id, image_id);
+        assert_eq!(view.width, 4);
+        assert_eq!(view.height, 3);
+        assert_eq!(
+            pinned_images.get_pinned_png(&image_id).unwrap(),
+            replacement
+        );
     }
 
     fn make_test_png(width: u32, height: u32) -> Vec<u8> {

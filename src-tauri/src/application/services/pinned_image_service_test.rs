@@ -52,6 +52,30 @@ mod tests {
     }
 
     #[test]
+    fn replaces_pinned_png_while_preserving_image_id_and_group() {
+        let service = PinnedImageService::new();
+        let image_id = service.pin_png(make_test_png(2, 2)).unwrap();
+        let peer_id = service.pin_png(make_test_png(1, 1)).unwrap();
+        let replacement = make_test_png(4, 3);
+
+        service.move_pinned_image_to_group(&image_id, 1).unwrap();
+        service
+            .replace_pinned_png(&image_id, replacement.clone())
+            .unwrap();
+
+        let view = service.get_pinned_image(&image_id).unwrap();
+        let membership = service.pinned_image_group_containing(&image_id).unwrap();
+
+        assert_eq!(view.id, image_id);
+        assert_eq!(view.width, 4);
+        assert_eq!(view.height, 3);
+        assert_eq!(service.get_pinned_png(&image_id).unwrap(), replacement);
+        assert_eq!(membership.group, 1);
+        assert_eq!(membership.image_ids, vec![image_id]);
+        assert!(service.get_pinned_image(&peer_id).is_ok());
+    }
+
+    #[test]
     fn switches_between_existing_pinned_image_groups() {
         let service = PinnedImageService::new();
         let first_group_image = service.pin_png(make_test_png(1, 1)).unwrap();
