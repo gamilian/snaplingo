@@ -20,6 +20,7 @@ import {
   isUndoAnnotationGesturePointShortcut,
   getCursorNudgeDeltaFromShortcut,
   getSaveCapturePointerAction,
+  getHoverSelectionCompletionActionFromShortcut,
   isMagnifierShortcut,
   isPinCaptureShortcut,
   isPinCapturePointer,
@@ -1411,6 +1412,54 @@ describe('capture session actions', () => {
         { drafting: true },
       ),
     ).toBe(false);
+  });
+
+  it('maps successful capture shortcuts to hovered candidate completion actions', () => {
+    expect(
+      getHoverSelectionCompletionActionFromShortcut({
+        key: 'Enter',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe('copy');
+    expect(
+      getHoverSelectionCompletionActionFromShortcut({
+        key: 's',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe('save');
+    expect(
+      getHoverSelectionCompletionActionFromShortcut({
+        key: 'S',
+        metaKey: false,
+        ctrlKey: true,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBe('quick-save');
+    expect(
+      getHoverSelectionCompletionActionFromShortcut({
+        key: 't',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe('pin');
+    expect(
+      getHoverSelectionCompletionActionFromShortcut({
+        key: 'p',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBeNull();
   });
 
   it('maps Tab shortcuts to capture candidate cycle direction', () => {

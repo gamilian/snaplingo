@@ -97,10 +97,12 @@ import {
 import {
   canToggleCapturedCursor,
   copyCaptureSelection,
+  type HoverSelectionCompletionAction,
   getCaptureKeyboardToolbarAction,
   getCandidateCycleDirectionFromShortcut,
   getCancelCapturePointerAction,
   getCursorNudgeDeltaFromShortcut,
+  getHoverSelectionCompletionActionFromShortcut,
   getSaveCapturePointerAction,
   getSelectionArrowActionFromShortcut,
   getSelectionHistoryStepFromShortcut,
@@ -128,7 +130,6 @@ import {
   saveCaptureSelection,
   shouldCancelCaptureOnBlur,
   shouldRecordSuccessfulCaptureSelection,
-  shouldCopyHoverSelectionFromShortcut,
   shouldRestoreLastSelectionFromShortcut,
 } from './captureActions';
 import { printBase64PngImage } from './capturePrint';
@@ -719,21 +720,52 @@ export default function ScreenshotSession({
     shouldIncludeCapturedCursor,
   ]);
 
-  const copyCandidateSelection = useCallback(async (rect: LogicalRect) => {
+  const completeCandidateSelection = useCallback(async (
+    rect: LogicalRect,
+    action: HoverSelectionCompletionAction,
+  ) => {
     if (!session) return;
 
     setIsRenderingOutput(true);
     setError(null);
 
     try {
-      await copyCaptureSelection(
-        invoke,
-        session.id,
-        rect,
-        [],
-        shouldIncludeCapturedCursor,
-      );
-      recordSuccessfulSelection('copy', rect);
+      if (action === 'copy') {
+        await copyCaptureSelection(
+          invoke,
+          session.id,
+          rect,
+          [],
+          shouldIncludeCapturedCursor,
+        );
+      } else if (action === 'save') {
+        await saveCaptureSelection(
+          invoke,
+          session.id,
+          rect,
+          [],
+          shouldIncludeCapturedCursor,
+        );
+      } else if (action === 'quick-save') {
+        await quickSaveCaptureSelection(
+          invoke,
+          session.id,
+          rect,
+          [],
+          screenshotSavePath,
+          shouldIncludeCapturedCursor,
+        );
+      } else {
+        await invoke('output_capture', {
+          sessionId: session.id,
+          rect,
+          annotations: [],
+          ...(shouldIncludeCapturedCursor ? { includeCursor: true } : {}),
+          action: { type: 'pin' },
+        });
+      }
+
+      recordSuccessfulSelection(action, rect);
       await invoke('cancel_capture_session', { sessionId: session.id });
       resetSessionState();
       onInactive?.();
@@ -747,6 +779,7 @@ export default function ScreenshotSession({
     onInactive,
     recordSuccessfulSelection,
     resetSessionState,
+    screenshotSavePath,
     session,
     shouldIncludeCapturedCursor,
   ]);
@@ -1468,6 +1501,10 @@ export default function ScreenshotSession({
       const cursorNudgeDelta = getCursorNudgeDeltaFromShortcut(event);
       const candidateCycleDirection =
         getCandidateCycleDirectionFromShortcut(event);
+      const hoverSelectionCompletionAction =
+        getHoverSelectionCompletionActionFromShortcut(event, {
+          drafting: startPoint !== null,
+        });
       const selectionHistoryStep = getSelectionHistoryStepFromShortcut(event);
       const undoRedoAction = getUndoRedoActionFromShortcut(event);
       const toolbarAction = getCaptureKeyboardToolbarAction(
@@ -1710,10 +1747,13 @@ export default function ScreenshotSession({
       } else if (
         status === 'selecting' &&
         hoverSelection &&
-        shouldCopyHoverSelectionFromShortcut(event, { drafting: startPoint !== null })
+        hoverSelectionCompletionAction
       ) {
         event.preventDefault();
-        void copyCandidateSelection(hoverSelection);
+        void completeCandidateSelection(
+          hoverSelection,
+          hoverSelectionCompletionAction,
+        );
       } else if (
         status === 'preview' &&
         !textDraft &&
@@ -1887,7 +1927,7 @@ export default function ScreenshotSession({
     adjustAnnotationSize,
     clearAnnotations,
     cancelSession,
-    copyCandidateSelection,
+    completeCandidateSelection,
     copyCurrentColor,
     copySelection,
     colorSampleFormat,
@@ -1986,7 +2026,7 @@ export default function ScreenshotSession({
     if (status === 'selecting' && hoverSelection && isCopyCaptureDoubleClick(event)) {
       event.preventDefault();
       event.stopPropagation();
-      void copyCandidateSelection(hoverSelection);
+      void completeCandidateSelection(hoverSelection, 'copy');
       return;
     }
 

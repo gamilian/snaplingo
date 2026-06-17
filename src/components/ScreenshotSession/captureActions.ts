@@ -44,6 +44,7 @@ interface SelectionArrowActionOptions {
 interface HoverSelectionShortcutOptions {
   drafting?: boolean;
 }
+export type HoverSelectionCompletionAction = 'copy' | 'save' | 'quick-save' | 'pin';
 interface RestoreLastSelectionOptions {
   status: 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
   editing?: boolean;
@@ -275,9 +276,21 @@ export function shouldCopyHoverSelectionFromShortcut(
   event: CaptureShortcutEvent,
   options: HoverSelectionShortcutOptions = {},
 ) {
-  if (options.drafting) return false;
+  return getHoverSelectionCompletionActionFromShortcut(event, options) === 'copy';
+}
 
-  return isCopyCaptureKeyboardShortcut(event);
+export function getHoverSelectionCompletionActionFromShortcut(
+  event: CaptureShortcutEvent,
+  options: HoverSelectionShortcutOptions = {},
+): HoverSelectionCompletionAction | null {
+  if (options.drafting) return null;
+
+  if (isCopyCaptureKeyboardShortcut(event)) return 'copy';
+  if (isQuickSaveCaptureShortcut(event)) return 'quick-save';
+  if (isSaveCaptureShortcut(event)) return 'save';
+  if (isPinCaptureShortcut(event)) return 'pin';
+
+  return null;
 }
 
 export function getCaptureKeyboardToolbarAction(
