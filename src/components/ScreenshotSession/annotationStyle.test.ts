@@ -9,6 +9,7 @@ import {
   applyAnnotationStyle,
   completeAnnotationGesture,
   constrainAnnotationGesturePoint,
+  isAnnotationFillToggleShortcut,
   nextAnnotationToolFromCycleShortcut,
   annotationSizeDirectionFromShortcut,
   annotationSizeDirectionFromWheel,
@@ -548,6 +549,22 @@ describe('annotation style', () => {
         altKey: false,
       }),
     ).toBeNull();
+  });
+
+  it('uses plain F for toggling geometric annotation fill', () => {
+    const plainKey = { metaKey: false, ctrlKey: false, altKey: false };
+
+    expect(isAnnotationFillToggleShortcut({ ...plainKey, key: 'f' })).toBe(true);
+    expect(isAnnotationFillToggleShortcut({ ...plainKey, key: 'F' })).toBe(true);
+    expect(
+      isAnnotationFillToggleShortcut({
+        key: 'f',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+      }),
+    ).toBe(false);
+    expect(isAnnotationFillToggleShortcut({ ...plainKey, key: 'r' })).toBe(false);
   });
 
   it('maps bracket shortcuts to annotation size directions', () => {

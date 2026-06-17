@@ -74,6 +74,7 @@ import {
   completeAnnotationGesture,
   annotationFromGesture,
   arrowHeadPoints,
+  isAnnotationFillToggleShortcut,
   isPointStrokeAnnotationTool,
   nextAnnotationToolFromCycleShortcut,
   nextAnnotationStrokeWidth,
@@ -1179,6 +1180,24 @@ export default function ScreenshotSession({
     ],
   );
 
+  const toggleAnnotationFill = useCallback(() => {
+    if (textDraft || !isFillModeActive) return;
+
+    applySelectedAnnotationStyle(
+      {
+        ...annotationStyle,
+        filled: !annotationStyle.filled,
+      },
+      textFontSize,
+    );
+  }, [
+    annotationStyle,
+    applySelectedAnnotationStyle,
+    isFillModeActive,
+    textDraft,
+    textFontSize,
+  ]);
+
   const commitTextDraft = useCallback(() => {
     const nextHistory = commitTextDraftToHistory();
     if (selection && nextHistory !== annotationHistory) {
@@ -1670,6 +1689,16 @@ export default function ScreenshotSession({
       } else if (
         status === 'preview' &&
         !textDraft &&
+        isFillModeActive &&
+        !annotationGesture &&
+        !annotationMoveGesture &&
+        isAnnotationFillToggleShortcut(event)
+      ) {
+        event.preventDefault();
+        toggleAnnotationFill();
+      } else if (
+        status === 'preview' &&
+        !textDraft &&
         cycledAnnotationTool &&
         !annotationGesture &&
         !annotationMoveGesture
@@ -1801,6 +1830,7 @@ export default function ScreenshotSession({
     hoverSelection,
     includeCapturedCursor,
     isMagnifierShown,
+    isFillModeActive,
     textDraft,
     deleteSelectedAnnotation,
     redoAnnotation,
@@ -1822,6 +1852,7 @@ export default function ScreenshotSession({
     status,
     cursorColor,
     toggleAnnotationTool,
+    toggleAnnotationFill,
     undoAnnotation,
     undoPolylineGesturePoint,
   ]);

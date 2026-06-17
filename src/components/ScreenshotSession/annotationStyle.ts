@@ -126,6 +126,17 @@ export function annotationColorFromShortcut(
   return ANNOTATION_COLORS[colorIndex] ?? null;
 }
 
+export function isAnnotationFillToggleShortcut(
+  event: AnnotationToolShortcutEvent,
+) {
+  return (
+    event.key.toLowerCase() === 'f' &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey
+  );
+}
+
 export function annotationSizeDirectionFromShortcut(
   event: AnnotationToolShortcutEvent,
   options: AnnotationSizeShortcutOptions = {},
