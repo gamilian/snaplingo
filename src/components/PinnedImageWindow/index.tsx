@@ -6,6 +6,7 @@ import type { PinnedImageView } from '../ScreenshotSession/types';
 import {
   getPinnedContextMenuPosition,
   getPinnedDisplaySize,
+  getPinnedKeyboardZoomAction,
   getPinnedOpacityFromWheel,
   getPinnedOpacityPreset,
   getPinnedZoomFromWheel,
@@ -122,6 +123,18 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     }
   }, [imageId]);
 
+  const adjustPinnedZoom = useCallback(
+    (wheelDirection: number) => {
+      setContextMenuPosition(null);
+      setZoom((currentZoom) => {
+        const nextZoom = getPinnedZoomFromWheel(currentZoom, wheelDirection);
+        void resizePinnedWindow(nextZoom);
+        return nextZoom;
+      });
+    },
+    [resizePinnedWindow],
+  );
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isCopyPinnedImageShortcut(event)) {
@@ -133,12 +146,23 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
       if (isSavePinnedImageShortcut(event)) {
         event.preventDefault();
         void savePinnedImageAs();
+        return;
+      }
+
+      const zoomAction = getPinnedKeyboardZoomAction(event);
+      if (zoomAction) {
+        event.preventDefault();
+        if (zoomAction === 'reset') {
+          resetPinnedSize();
+        } else {
+          adjustPinnedZoom(zoomAction === 'zoom-in' ? -1 : 1);
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [copyPinnedImage, savePinnedImageAs]);
+  }, [adjustPinnedZoom, copyPinnedImage, resetPinnedSize, savePinnedImageAs]);
 
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
     if (!image) return;
@@ -154,11 +178,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
       return;
     }
 
-    setZoom((currentZoom) => {
-      const nextZoom = getPinnedZoomFromWheel(currentZoom, wheelDirection);
-      void resizePinnedWindow(nextZoom);
-      return nextZoom;
-    });
+    adjustPinnedZoom(wheelDirection);
   };
 
   const handleContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {

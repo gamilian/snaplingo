@@ -19,6 +19,14 @@ export interface PinnedPoint {
   y: number;
 }
 
+interface PinnedKeyboardEvent {
+  key: string;
+  metaKey: boolean;
+  ctrlKey: boolean;
+}
+
+export type PinnedKeyboardZoomAction = 'zoom-in' | 'zoom-out' | 'reset';
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
@@ -32,6 +40,17 @@ export function getPinnedZoomFromWheel(currentZoom: number, wheelDirection: numb
     currentZoom + (wheelDirection < 0 ? ZOOM_STEP : -ZOOM_STEP);
 
   return roundToTwoDecimals(clamp(nextZoom, MIN_ZOOM, MAX_ZOOM));
+}
+
+export function getPinnedKeyboardZoomAction(
+  event: PinnedKeyboardEvent,
+): PinnedKeyboardZoomAction | null {
+  if (event.metaKey || event.ctrlKey) return null;
+  if (event.key === '+' || event.key === '=') return 'zoom-in';
+  if (event.key === '-') return 'zoom-out';
+  if (event.key === '0') return 'reset';
+
+  return null;
 }
 
 export function getPinnedOpacityFromWheel(

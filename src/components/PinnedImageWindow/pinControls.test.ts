@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getPinnedContextMenuPosition,
   getPinnedDisplaySize,
+  getPinnedKeyboardZoomAction,
   getPinnedOpacityFromWheel,
   getPinnedOpacityPreset,
   getPinnedZoomFromWheel,
@@ -13,6 +14,23 @@ describe('pinned image controls', () => {
     expect(getPinnedZoomFromWheel(1, 1)).toBe(0.9);
     expect(getPinnedZoomFromWheel(3.95, -1)).toBe(4);
     expect(getPinnedZoomFromWheel(0.3, 1)).toBe(0.25);
+  });
+
+  it('maps keyboard shortcuts to pinned zoom actions', () => {
+    expect(getPinnedKeyboardZoomAction({ key: '+', metaKey: false, ctrlKey: false })).toBe(
+      'zoom-in',
+    );
+    expect(getPinnedKeyboardZoomAction({ key: '=', metaKey: false, ctrlKey: false })).toBe(
+      'zoom-in',
+    );
+    expect(getPinnedKeyboardZoomAction({ key: '-', metaKey: false, ctrlKey: false })).toBe(
+      'zoom-out',
+    );
+    expect(getPinnedKeyboardZoomAction({ key: '0', metaKey: false, ctrlKey: false })).toBe(
+      'reset',
+    );
+    expect(getPinnedKeyboardZoomAction({ key: '+', metaKey: true, ctrlKey: false })).toBeNull();
+    expect(getPinnedKeyboardZoomAction({ key: 'x', metaKey: false, ctrlKey: false })).toBeNull();
   });
 
   it('adjusts opacity with wheel direction and clamps the range', () => {
