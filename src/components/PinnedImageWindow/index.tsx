@@ -16,15 +16,18 @@ import {
   getPinnedKeyboardOpacityAction,
   getPinnedKeyboardToolbarAction,
   getPinnedKeyboardTransformAction,
+  getPinnedKeyboardVisualFilterAction,
   getPinnedKeyboardZoomAction,
   getPinnedOpacityFromWheel,
   getPinnedOpacityPreset,
   getPinnedTransformStyle,
+  getPinnedVisualFilterStyle,
   getPinnedWheelAction,
   getPinnedZoomFromWheel,
   isClosePinnedImageDoubleClick,
   isResetPinnedImagePointer,
   nextPinnedTransform,
+  nextPinnedVisualFilter,
 } from './pinControls';
 import {
   destroyPinnedImage,
@@ -57,6 +60,13 @@ function createDefaultPinnedTransform() {
   };
 }
 
+function createDefaultPinnedVisualFilter() {
+  return {
+    grayscale: false,
+    inverted: false,
+  };
+}
+
 function readPinnedImageId(search: string) {
   const params = new URLSearchParams(search);
   if (params.get('window') !== 'pin') return null;
@@ -74,6 +84,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
   const [zoom, setZoom] = useState(1);
   const [opacity, setOpacity] = useState(1);
   const [transform, setTransform] = useState(createDefaultPinnedTransform);
+  const [visualFilter, setVisualFilter] = useState(createDefaultPinnedVisualFilter);
   const [contextMenuPosition, setContextMenuPosition] = useState<{
     x: number;
     y: number;
@@ -366,6 +377,16 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
           void resizePinnedWindow(zoom, nextTransform);
           return nextTransform;
         });
+        return;
+      }
+
+      const visualFilterAction = getPinnedKeyboardVisualFilterAction(event);
+      if (visualFilterAction) {
+        event.preventDefault();
+        setContextMenuPosition(null);
+        setVisualFilter((currentFilter) =>
+          nextPinnedVisualFilter(currentFilter, visualFilterAction),
+        );
       }
     };
 
@@ -465,6 +486,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
             className="h-full w-full object-fill"
             style={{
               opacity,
+              filter: getPinnedVisualFilterStyle(visualFilter),
               transform: getPinnedTransformStyle(transform),
             }}
             draggable={false}

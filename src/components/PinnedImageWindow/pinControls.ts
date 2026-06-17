@@ -25,6 +25,11 @@ export interface PinnedTransform {
   flipY: boolean;
 }
 
+export interface PinnedVisualFilter {
+  grayscale: boolean;
+  inverted: boolean;
+}
+
 interface PinnedKeyboardEvent {
   key: string;
   metaKey: boolean;
@@ -57,6 +62,9 @@ export type PinnedKeyboardTransformAction =
   | 'rotate-counterclockwise'
   | 'flip-horizontal'
   | 'flip-vertical';
+export type PinnedKeyboardVisualFilterAction =
+  | 'toggle-grayscale'
+  | 'toggle-invert';
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -104,6 +112,16 @@ export function getPinnedKeyboardTransformAction(
   if (event.key === '2') return 'rotate-counterclockwise';
   if (event.key === '3') return 'flip-horizontal';
   if (event.key === '4') return 'flip-vertical';
+
+  return null;
+}
+
+export function getPinnedKeyboardVisualFilterAction(
+  event: PinnedKeyboardEvent,
+): PinnedKeyboardVisualFilterAction | null {
+  if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return null;
+  if (event.key === '5') return 'toggle-grayscale';
+  if (event.key === '6') return 'toggle-invert';
 
   return null;
 }
@@ -158,6 +176,26 @@ export function getPinnedTransformStyle(transform: PinnedTransform) {
   const scaleY = transform.flipY ? -1 : 1;
 
   return `rotate(${transform.rotation}deg) scale(${scaleX}, ${scaleY})`;
+}
+
+export function nextPinnedVisualFilter(
+  filter: PinnedVisualFilter,
+  action: PinnedKeyboardVisualFilterAction,
+): PinnedVisualFilter {
+  if (action === 'toggle-grayscale') {
+    return { ...filter, grayscale: !filter.grayscale };
+  }
+
+  return { ...filter, inverted: !filter.inverted };
+}
+
+export function getPinnedVisualFilterStyle(filter: PinnedVisualFilter) {
+  const filters = [
+    filter.grayscale ? 'grayscale(1)' : null,
+    filter.inverted ? 'invert(1)' : null,
+  ].filter(Boolean);
+
+  return filters.length > 0 ? filters.join(' ') : 'none';
 }
 
 export function getPinnedOpacityFromWheel(

@@ -5,9 +5,11 @@ import {
   getPinnedDisplaySizeForTransform,
   getPinnedKeyboardMoveDelta,
   getPinnedKeyboardOpacityAction,
+  getPinnedKeyboardVisualFilterAction,
   getPinnedKeyboardToolbarAction,
   getPinnedKeyboardTransformAction,
   getPinnedKeyboardZoomAction,
+  getPinnedVisualFilterStyle,
   getPinnedOpacityFromWheel,
   getPinnedOpacityPreset,
   getPinnedTransformStyle,
@@ -16,6 +18,7 @@ import {
   isClosePinnedImageDoubleClick,
   isResetPinnedImagePointer,
   nextPinnedTransform,
+  nextPinnedVisualFilter,
 } from './pinControls';
 
 describe('pinned image controls', () => {
@@ -100,6 +103,38 @@ describe('pinned image controls', () => {
     ).toBeNull();
     expect(
       getPinnedKeyboardTransformAction({ key: '5', metaKey: false, ctrlKey: false }),
+    ).toBeNull();
+  });
+
+  it('maps number keys to Snipaste pinned image visual filter actions', () => {
+    expect(
+      getPinnedKeyboardVisualFilterAction({
+        key: '5',
+        metaKey: false,
+        ctrlKey: false,
+      }),
+    ).toBe('toggle-grayscale');
+    expect(
+      getPinnedKeyboardVisualFilterAction({
+        key: '6',
+        metaKey: false,
+        ctrlKey: false,
+      }),
+    ).toBe('toggle-invert');
+    expect(
+      getPinnedKeyboardVisualFilterAction({
+        key: '5',
+        metaKey: true,
+        ctrlKey: false,
+      }),
+    ).toBeNull();
+    expect(
+      getPinnedKeyboardVisualFilterAction({
+        key: '6',
+        metaKey: false,
+        ctrlKey: false,
+        shiftKey: true,
+      }),
     ).toBeNull();
   });
 
@@ -241,6 +276,27 @@ describe('pinned image controls', () => {
     expect(
       getPinnedTransformStyle({ rotation: 90, flipX: true, flipY: false }),
     ).toBe('rotate(90deg) scale(-1, 1)');
+  });
+
+  it('updates and formats pinned visual filter state from Snipaste actions', () => {
+    expect(
+      nextPinnedVisualFilter(
+        { grayscale: false, inverted: false },
+        'toggle-grayscale',
+      ),
+    ).toEqual({ grayscale: true, inverted: false });
+    expect(
+      nextPinnedVisualFilter(
+        { grayscale: true, inverted: false },
+        'toggle-invert',
+      ),
+    ).toEqual({ grayscale: true, inverted: true });
+    expect(getPinnedVisualFilterStyle({ grayscale: false, inverted: false })).toBe(
+      'none',
+    );
+    expect(getPinnedVisualFilterStyle({ grayscale: true, inverted: true })).toBe(
+      'grayscale(1) invert(1)',
+    );
   });
 
   it('adjusts opacity with wheel direction and clamps the range', () => {
