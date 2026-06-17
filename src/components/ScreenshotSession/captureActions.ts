@@ -32,6 +32,15 @@ export function isSaveCaptureShortcut(event: CaptureShortcutEvent) {
   );
 }
 
+export function isQuickSaveCaptureShortcut(event: CaptureShortcutEvent) {
+  return (
+    event.key.toLowerCase() === 's' &&
+    (event.metaKey || event.ctrlKey) &&
+    !event.altKey &&
+    !!event.shiftKey
+  );
+}
+
 export function isCopyCaptureKeyboardShortcut(event: CaptureShortcutEvent) {
   const isPlainEnter =
     event.key === 'Enter' &&
@@ -156,6 +165,26 @@ export async function saveCaptureSelection(
   annotations: AnnotationCommand[] = [],
 ) {
   const path = await invoke<string>('default_capture_save_path');
+
+  await invoke('output_capture', {
+    sessionId,
+    rect,
+    annotations,
+    action: {
+      type: 'save',
+      path,
+    },
+  });
+}
+
+export async function quickSaveCaptureSelection(
+  invoke: CaptureInvoke,
+  sessionId: string,
+  rect: LogicalRect,
+  annotations: AnnotationCommand[] = [],
+  directory?: string,
+) {
+  const path = await invoke<string>('quick_capture_save_path', { directory });
 
   await invoke('output_capture', {
     sessionId,

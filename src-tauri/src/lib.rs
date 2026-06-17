@@ -508,6 +508,7 @@ pub fn run() {
       commands::cancel_capture_session,
       commands::render_capture_output,
       commands::default_capture_save_path,
+      commands::quick_capture_save_path,
       commands::output_capture,
       commands::pin_clipboard_image,
       commands::get_pinned_image,

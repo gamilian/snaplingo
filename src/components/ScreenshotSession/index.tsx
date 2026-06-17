@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { useSettingsStore } from '../../stores/settingsStore';
 import {
   getToolbarPosition,
   constrainSelectionPoint,
@@ -88,9 +89,11 @@ import {
   isMoveDraftSelectionShortcut,
   isPinCapturePointer,
   isPinCaptureShortcut,
+  isQuickSaveCaptureShortcut,
   isSaveCaptureShortcut,
   isSelectAllCaptureShortcut,
   isToggleToolbarShortcut,
+  quickSaveCaptureSelection,
   saveCaptureSelection,
 } from './captureActions';
 import { parseCaptureLaunchPayload } from './windowMode';
@@ -348,6 +351,7 @@ export default function ScreenshotSession({
   initialSessionId,
   onInactive,
 }: ScreenshotSessionProps) {
+  const screenshotSavePath = useSettingsStore((state) => state.screenshotSavePath);
   const sampleCanvasByMonitorRef = useRef<Map<string, HTMLCanvasElement>>(new Map());
   const textDraftInputRef = useRef<HTMLTextAreaElement | null>(null);
   const [status, setStatus] = useState<SessionStatus>('idle');
@@ -687,6 +691,39 @@ export default function ScreenshotSession({
       setIsRenderingOutput(false);
     }
   }, [commitTextDraftToHistory, onInactive, resetSessionState, selection, session]);
+
+  const quickSaveSelection = useCallback(async () => {
+    if (!session || !selection) return;
+
+    setIsRenderingOutput(true);
+    setError(null);
+
+    try {
+      const outputHistory = commitTextDraftToHistory();
+      await quickSaveCaptureSelection(
+        invoke,
+        session.id,
+        selection,
+        outputHistory.annotations,
+        screenshotSavePath,
+      );
+      await invoke('cancel_capture_session', { sessionId: session.id });
+      resetSessionState();
+      onInactive?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setStatus('error');
+    } finally {
+      setIsRenderingOutput(false);
+    }
+  }, [
+    commitTextDraftToHistory,
+    onInactive,
+    resetSessionState,
+    screenshotSavePath,
+    selection,
+    session,
+  ]);
 
   const runOcrSelection = useCallback(async () => {
     if (!session || !selection) return;
@@ -1177,6 +1214,9 @@ export default function ScreenshotSession({
       ) {
         event.preventDefault();
         void copySelection();
+      } else if (status === 'preview' && isQuickSaveCaptureShortcut(event)) {
+        event.preventDefault();
+        void quickSaveSelection();
       } else if (status === 'preview' && isSaveCaptureShortcut(event)) {
         event.preventDefault();
         void saveSelection();
@@ -1311,6 +1351,7 @@ export default function ScreenshotSession({
     isActive,
     nudgeSelectedAnnotation,
     pinSelection,
+    quickSaveSelection,
     saveSelection,
     selectAnnotationColor,
     selection,

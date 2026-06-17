@@ -124,6 +124,21 @@ pub fn default_capture_save_path() -> Result<String, String> {
 }
 
 #[tauri::command]
+pub fn quick_capture_save_path(directory: Option<String>) -> Result<String, String> {
+    let base_dir = directory
+        .as_deref()
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .map(|path| configured_capture_save_dir_for_system(path))
+        .unwrap_or_else(default_quick_capture_save_dir);
+    let timestamp = chrono::Local::now().format("%Y%m%d-%H%M%S").to_string();
+
+    Ok(quick_capture_save_file_path(&base_dir, &timestamp)
+        .to_string_lossy()
+        .to_string())
+}
+
+#[tauri::command]
 pub async fn output_capture(
     session_id: String,
     rect: LogicalRect,
@@ -854,6 +869,39 @@ fn capture_save_path(base_dir: &Path, timestamp: &str) -> PathBuf {
     base_dir.join(format!("SnapLingo-{}.png", timestamp))
 }
 
+fn quick_capture_save_file_path(base_dir: &Path, timestamp: &str) -> PathBuf {
+    capture_save_path(base_dir, timestamp)
+}
+
+fn default_quick_capture_save_dir() -> PathBuf {
+    dirs::picture_dir()
+        .or_else(dirs::home_dir)
+        .unwrap_or_else(std::env::temp_dir)
+        .join("SnapLingo")
+}
+
+fn configured_capture_save_dir(configured: &str, home_dir: &Path) -> PathBuf {
+    if configured == "~" {
+        return home_dir.to_path_buf();
+    }
+
+    if let Some(relative) = configured.strip_prefix("~/") {
+        return home_dir.join(relative);
+    }
+
+    PathBuf::from(configured)
+}
+
+fn configured_capture_save_dir_for_system(configured: &str) -> PathBuf {
+    if configured == "~" || configured.starts_with("~/") {
+        if let Some(home) = dirs::home_dir() {
+            return configured_capture_save_dir(configured, &home);
+        }
+    }
+
+    PathBuf::from(configured)
+}
+
 fn normalized_capture_mode(mode: &str) -> &'static str {
     match mode {
         "screenshot" | "screenshot-ocr" | "screenshot-translate" => match mode {
@@ -1510,6 +1558,29 @@ mod tests {
         let path = super::capture_save_path(std::path::Path::new("/tmp"), "20260617-023000");
 
         assert_eq!(path.to_string_lossy(), "/tmp/SnapLingo-20260617-023000.png");
+    }
+
+    #[test]
+    fn quick_capture_save_path_uses_configured_directory() {
+        let path = super::quick_capture_save_file_path(
+            std::path::Path::new("/tmp/SnapLingo"),
+            "20260617-023000",
+        );
+
+        assert_eq!(
+            path.to_string_lossy(),
+            "/tmp/SnapLingo/SnapLingo-20260617-023000.png"
+        );
+    }
+
+    #[test]
+    fn configured_capture_save_dir_expands_home_prefix() {
+        let dir = super::configured_capture_save_dir(
+            "~/Pictures/SnapLingo",
+            std::path::Path::new("/Users/alice"),
+        );
+
+        assert_eq!(dir, std::path::PathBuf::from("/Users/alice/Pictures/SnapLingo"));
     }
 
     #[tokio::test]
