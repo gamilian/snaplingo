@@ -6,6 +6,8 @@ const MAX_OPACITY = 1;
 const OPACITY_STEP = 0.05;
 const MAX_INITIAL_WIDTH = 900;
 const MAX_INITIAL_HEIGHT = 700;
+const MAX_THUMBNAIL_WIDTH = 220;
+const MAX_THUMBNAIL_HEIGHT = 160;
 const MIN_WIDTH = 80;
 const MIN_HEIGHT = 60;
 
@@ -242,6 +244,19 @@ export function isClosePinnedImageDoubleClick(event: PinnedPointerEvent) {
   );
 }
 
+export function isTogglePinnedThumbnailModeDoubleClick(
+  event: PinnedPointerEvent,
+) {
+  return (
+    (event.detail ?? 0) >= 2 &&
+    event.button === 0 &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !!event.shiftKey
+  );
+}
+
 export function getPinnedDisplaySize(originalSize: PinnedSize, zoom: number) {
   const originalWidth = Math.max(1, originalSize.width);
   const originalHeight = Math.max(1, originalSize.height);
@@ -257,12 +272,30 @@ export function getPinnedDisplaySize(originalSize: PinnedSize, zoom: number) {
   };
 }
 
+export function getPinnedThumbnailDisplaySize(originalSize: PinnedSize) {
+  const originalWidth = Math.max(1, originalSize.width);
+  const originalHeight = Math.max(1, originalSize.height);
+  const thumbnailScale = Math.min(
+    MAX_THUMBNAIL_WIDTH / originalWidth,
+    MAX_THUMBNAIL_HEIGHT / originalHeight,
+    1,
+  );
+
+  return {
+    width: Math.max(MIN_WIDTH, Math.round(originalWidth * thumbnailScale)),
+    height: Math.max(MIN_HEIGHT, Math.round(originalHeight * thumbnailScale)),
+  };
+}
+
 export function getPinnedDisplaySizeForTransform(
   originalSize: PinnedSize,
   zoom: number,
   transform: PinnedTransform,
+  thumbnailMode = false,
 ) {
-  const size = getPinnedDisplaySize(originalSize, zoom);
+  const size = thumbnailMode
+    ? getPinnedThumbnailDisplaySize(originalSize)
+    : getPinnedDisplaySize(originalSize, zoom);
   const normalizedRotation = ((transform.rotation % 360) + 360) % 360;
 
   if (normalizedRotation === 90 || normalizedRotation === 270) {

@@ -3,6 +3,7 @@ import {
   getPinnedContextMenuPosition,
   getPinnedDisplaySize,
   getPinnedDisplaySizeForTransform,
+  getPinnedThumbnailDisplaySize,
   getPinnedKeyboardMoveDelta,
   getPinnedKeyboardOpacityAction,
   getPinnedKeyboardVisualFilterAction,
@@ -17,6 +18,7 @@ import {
   getPinnedZoomFromWheel,
   isClosePinnedImageDoubleClick,
   isResetPinnedImagePointer,
+  isTogglePinnedThumbnailModeDoubleClick,
   nextPinnedTransform,
   nextPinnedVisualFilter,
 } from './pinControls';
@@ -393,6 +395,39 @@ describe('pinned image controls', () => {
     ).toBe(false);
   });
 
+  it('uses Shift plus left-button double click for toggling thumbnail mode', () => {
+    expect(
+      isTogglePinnedThumbnailModeDoubleClick({
+        detail: 2,
+        button: 0,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(true);
+    expect(
+      isTogglePinnedThumbnailModeDoubleClick({
+        detail: 1,
+        button: 0,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(false);
+    expect(
+      isTogglePinnedThumbnailModeDoubleClick({
+        detail: 2,
+        button: 0,
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(false);
+  });
+
   it('uses an unmodified left-button double click for closing a pinned image', () => {
     expect(
       isClosePinnedImageDoubleClick({
@@ -465,6 +500,25 @@ describe('pinned image controls', () => {
         { rotation: 180, flipX: true, flipY: true },
       ),
     ).toEqual({ width: 300, height: 200 });
+  });
+
+  it('keeps thumbnail mode compact while preserving aspect ratio and rotation', () => {
+    expect(getPinnedThumbnailDisplaySize({ width: 1200, height: 600 })).toEqual({
+      width: 220,
+      height: 110,
+    });
+    expect(getPinnedThumbnailDisplaySize({ width: 600, height: 1200 })).toEqual({
+      width: 80,
+      height: 160,
+    });
+    expect(
+      getPinnedDisplaySizeForTransform(
+        { width: 1200, height: 600 },
+        2,
+        { rotation: 90, flipX: false, flipY: false },
+        true,
+      ),
+    ).toEqual({ width: 110, height: 220 });
   });
 
   it('keeps context menus inside the pinned window', () => {

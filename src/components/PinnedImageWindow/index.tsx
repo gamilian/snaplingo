@@ -20,12 +20,14 @@ import {
   getPinnedKeyboardZoomAction,
   getPinnedOpacityFromWheel,
   getPinnedOpacityPreset,
+  getPinnedThumbnailDisplaySize,
   getPinnedTransformStyle,
   getPinnedVisualFilterStyle,
   getPinnedWheelAction,
   getPinnedZoomFromWheel,
   isClosePinnedImageDoubleClick,
   isResetPinnedImagePointer,
+  isTogglePinnedThumbnailModeDoubleClick,
   nextPinnedTransform,
   nextPinnedVisualFilter,
 } from './pinControls';
@@ -83,6 +85,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
   const [image, setImage] = useState<PinnedImageView | null>(null);
   const [zoom, setZoom] = useState(1);
   const [opacity, setOpacity] = useState(1);
+  const [isThumbnailMode, setIsThumbnailMode] = useState(false);
   const [transform, setTransform] = useState(createDefaultPinnedTransform);
   const [visualFilter, setVisualFilter] = useState(createDefaultPinnedVisualFilter);
   const [contextMenuPosition, setContextMenuPosition] = useState<{
@@ -179,31 +182,39 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
   ]);
 
   const resizePinnedWindow = useCallback(
-    async (nextZoom: number, nextTransform = transform, nextImage = image) => {
+    async (
+      nextZoom: number,
+      nextTransform = transform,
+      nextImage = image,
+      nextThumbnailMode = isThumbnailMode,
+    ) => {
       if (!nextImage) return;
 
       const size = getPinnedDisplaySizeForTransform(
         nextImage,
         nextZoom,
         nextTransform,
+        nextThumbnailMode,
       );
       await appWindow.setSize(new LogicalSize(size.width, size.height));
     },
-    [image, transform],
+    [image, isThumbnailMode, transform],
   );
 
   const resetPinnedSize = useCallback(() => {
     setZoom(1);
+    setIsThumbnailMode(false);
     setContextMenuPosition(null);
-    void resizePinnedWindow(1);
-  }, [resizePinnedWindow]);
+    void resizePinnedWindow(1, transform, image, false);
+  }, [image, resizePinnedWindow, transform]);
 
   const resetPinnedSizeAndOpacity = useCallback(() => {
     setZoom(1);
     setOpacity(1);
+    setIsThumbnailMode(false);
     setContextMenuPosition(null);
-    void resizePinnedWindow(1);
-  }, [resizePinnedWindow]);
+    void resizePinnedWindow(1, transform, image, false);
+  }, [image, resizePinnedWindow, transform]);
 
   const setPinnedOpacityPreset = useCallback((nextOpacity: number) => {
     setOpacity(getPinnedOpacityPreset(nextOpacity));
@@ -247,9 +258,10 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
 
       setImage(nextImage);
       setZoom(1);
+      setIsThumbnailMode(false);
       setTransform(nextTransform);
       setContextMenuPosition(null);
-      await resizePinnedWindow(1, nextTransform, nextImage);
+      await resizePinnedWindow(1, nextTransform, nextImage, false);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -266,15 +278,25 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
 
   const adjustPinnedZoom = useCallback(
     (wheelDirection: number) => {
+      setIsThumbnailMode(false);
       setContextMenuPosition(null);
       setZoom((currentZoom) => {
         const nextZoom = getPinnedZoomFromWheel(currentZoom, wheelDirection);
-        void resizePinnedWindow(nextZoom);
+        void resizePinnedWindow(nextZoom, transform, image, false);
         return nextZoom;
       });
     },
-    [resizePinnedWindow],
+    [image, resizePinnedWindow, transform],
   );
+
+  const togglePinnedThumbnailMode = useCallback(() => {
+    setContextMenuPosition(null);
+    setIsThumbnailMode((currentThumbnailMode) => {
+      const nextThumbnailMode = !currentThumbnailMode;
+      void resizePinnedWindow(zoom, transform, image, nextThumbnailMode);
+      return nextThumbnailMode;
+    });
+  }, [image, resizePinnedWindow, transform, zoom]);
 
   const movePinnedWindowByKeyboard = useCallback(
     async (delta: { x: number; y: number }) => {
@@ -374,7 +396,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
             currentTransform,
             transformAction,
           );
-          void resizePinnedWindow(zoom, nextTransform);
+          void resizePinnedWindow(zoom, nextTransform, image, isThumbnailMode);
           return nextTransform;
         });
         return;
@@ -397,12 +419,14 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     copyPinnedImage,
     hideCurrentPinnedImage,
     isHoverToolbarForcedVisible,
+    isThumbnailMode,
     movePinnedWindowByKeyboard,
     quickSavePinnedImageToDirectory,
     replacePinnedFromClipboard,
     resetPinnedSize,
     resizePinnedWindow,
     savePinnedImageAs,
+    image,
     zoom,
   ]);
 
@@ -445,7 +469,11 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     );
   }
 
-  const imageFrameSize = image ? getPinnedDisplaySize(image, zoom) : null;
+  const imageFrameSize = image
+    ? isThumbnailMode
+      ? getPinnedThumbnailDisplaySize(image)
+      : getPinnedDisplaySize(image, zoom)
+    : null;
   const runHoverToolbarAction = (actionId: typeof PIN_HOVER_TOOLBAR_ACTIONS[number]['id']) => {
     setIsHoverToolbarForcedVisible(false);
 
@@ -491,6 +519,12 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
             }}
             draggable={false}
             onPointerDown={(event) => {
+              if (isTogglePinnedThumbnailModeDoubleClick(event)) {
+                event.preventDefault();
+                togglePinnedThumbnailMode();
+                return;
+              }
+
               if (isClosePinnedImageDoubleClick(event)) {
                 event.preventDefault();
                 void hideCurrentPinnedImage();
