@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  copyPinnedText,
   destroyPinnedImage,
   destroyPinnedImageGroup,
   hidePinnedImageGroup,
@@ -7,6 +8,7 @@ import {
   getPinnedHoverToolbarActions,
   isClosePinnedImageShortcut,
   isCopyPinnedImageShortcut,
+  isCopyPinnedTextShortcut,
   isDestroyPinnedImageShortcut,
   isOpenPinnedPreferencesShortcut,
   isQuickSavePinnedImageShortcut,
@@ -140,6 +142,89 @@ describe('pinned image actions', () => {
         altKey: true,
       }),
     ).toBe(false);
+  });
+
+  it('uses Cmd/Ctrl+Shift+C for copying source text when a pin has text', () => {
+    expect(
+      isCopyPinnedTextShortcut(
+        {
+          key: 'c',
+          metaKey: true,
+          ctrlKey: false,
+          shiftKey: true,
+        },
+        'Hello from clipboard',
+      ),
+    ).toBe(true);
+    expect(
+      isCopyPinnedTextShortcut(
+        {
+          key: 'C',
+          metaKey: false,
+          ctrlKey: true,
+          shiftKey: true,
+        },
+        'Hello from clipboard',
+      ),
+    ).toBe(true);
+    expect(
+      isCopyPinnedTextShortcut(
+        {
+          key: 'c',
+          metaKey: true,
+          ctrlKey: false,
+          shiftKey: true,
+        },
+        null,
+      ),
+    ).toBe(false);
+    expect(
+      isCopyPinnedTextShortcut(
+        {
+          key: 'c',
+          metaKey: true,
+          ctrlKey: false,
+          shiftKey: false,
+        },
+        'Hello from clipboard',
+      ),
+    ).toBe(false);
+    expect(
+      isCopyPinnedTextShortcut(
+        {
+          key: 'c',
+          metaKey: true,
+          ctrlKey: false,
+          altKey: true,
+          shiftKey: true,
+        },
+        'Hello from clipboard',
+      ),
+    ).toBe(false);
+  });
+
+  it('copies pinned source text to the text clipboard', async () => {
+    const calls: string[] = [];
+
+    await expect(
+      copyPinnedText(async (text) => {
+        calls.push(text);
+      }, 'Hello from clipboard'),
+    ).resolves.toBe(true);
+
+    expect(calls).toEqual(['Hello from clipboard']);
+  });
+
+  it('does not copy pinned source text when the pin has no text', async () => {
+    const calls: string[] = [];
+
+    await expect(
+      copyPinnedText(async (text) => {
+        calls.push(text);
+      }, null),
+    ).resolves.toBe(false);
+
+    expect(calls).toEqual([]);
   });
 
   it('uses Cmd/Ctrl+S for saving a pinned image', () => {

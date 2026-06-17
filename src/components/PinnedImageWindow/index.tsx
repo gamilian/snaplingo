@@ -35,6 +35,7 @@ import {
   nextPinnedVisualFilter,
 } from './pinControls';
 import {
+  copyPinnedText,
   destroyPinnedImage,
   destroyPinnedImageGroup,
   getPinnedHoverToolbarActions,
@@ -42,6 +43,7 @@ import {
   hidePinnedImageGroup,
   isClosePinnedImageShortcut,
   isCopyPinnedImageShortcut,
+  isCopyPinnedTextShortcut,
   isDestroyPinnedImageShortcut,
   isOpenPinnedPreferencesShortcut,
   isQuickSavePinnedImageShortcut,
@@ -235,6 +237,18 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     }
   }, [imageId]);
 
+  const copyPinnedSourceText = useCallback(async () => {
+    try {
+      await copyPinnedText(
+        (text) => navigator.clipboard.writeText(text),
+        image?.source_text,
+      );
+      setContextMenuPosition(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [image?.source_text]);
+
   const savePinnedImageAs = useCallback(async () => {
     try {
       await savePinnedImage(invoke, imageId);
@@ -329,6 +343,12 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (isCopyPinnedTextShortcut(event, image?.source_text)) {
+        event.preventDefault();
+        void copyPinnedSourceText();
+        return;
+      }
+
       if (isCopyPinnedImageShortcut(event)) {
         event.preventDefault();
         void copyPinnedImage();
@@ -437,7 +457,9 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
   }, [
     adjustPinnedZoom,
     copyPinnedImage,
+    copyPinnedSourceText,
     hideCurrentPinnedImage,
+    image?.source_text,
     isHoverToolbarForcedVisible,
     isThumbnailMode,
     movePinnedWindowByKeyboard,

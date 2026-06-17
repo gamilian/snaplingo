@@ -13,6 +13,7 @@ struct PinnedImage {
     width: u32,
     height: u32,
     group: u32,
+    source_text: Option<String>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -49,6 +50,14 @@ impl PinnedImageService {
     }
 
     pub fn pin_png(&self, png_data: Vec<u8>) -> Result<String> {
+        self.pin_png_with_source_text(png_data, None)
+    }
+
+    pub fn pin_png_with_source_text(
+        &self,
+        png_data: Vec<u8>,
+        source_text: Option<String>,
+    ) -> Result<String> {
         let image = image::load_from_memory(&png_data)
             .map_err(|e| AppError::System(format!("Failed to decode pinned PNG: {}", e)))?;
         let id = next_pinned_image_id();
@@ -58,6 +67,7 @@ impl PinnedImageService {
             width: image.width(),
             height: image.height(),
             group,
+            source_text,
         };
 
         self.images.lock().unwrap().insert(id.clone(), pinned_image);
@@ -79,6 +89,7 @@ impl PinnedImageService {
             image_base64: base64::engine::general_purpose::STANDARD.encode(image.png_data),
             width: image.width,
             height: image.height,
+            source_text: image.source_text,
         })
     }
 
@@ -102,6 +113,7 @@ impl PinnedImageService {
         image.png_data = png_data;
         image.width = decoded.width();
         image.height = decoded.height();
+        image.source_text = None;
 
         Ok(())
     }

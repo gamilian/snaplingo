@@ -3,6 +3,7 @@ export type PinInvoke = <T>(
   command: string,
   args?: PinInvokeArgs,
 ) => Promise<T>;
+export type PinWriteText = (text: string) => Promise<void>;
 
 interface PinShortcutEvent {
   key: string;
@@ -71,6 +72,29 @@ export function isCopyPinnedImageShortcut(event: PinShortcutEvent) {
     !event.altKey &&
     !event.shiftKey
   );
+}
+
+export function isCopyPinnedTextShortcut(
+  event: PinShortcutEvent,
+  sourceText?: string | null,
+) {
+  return (
+    hasPinnedSourceText(sourceText) &&
+    event.key.toLowerCase() === 'c' &&
+    (event.metaKey || event.ctrlKey) &&
+    !event.altKey &&
+    !!event.shiftKey
+  );
+}
+
+export async function copyPinnedText(
+  writeText: PinWriteText,
+  sourceText?: string | null,
+) {
+  if (!hasPinnedSourceText(sourceText)) return false;
+
+  await writeText(sourceText);
+  return true;
 }
 
 export function isSavePinnedImageShortcut(event: PinShortcutEvent) {
@@ -196,4 +220,8 @@ export async function destroyPinnedImageGroup(
   imageId: string,
 ) {
   await invoke('destroy_pinned_image_group', { imageId });
+}
+
+function hasPinnedSourceText(sourceText?: string | null): sourceText is string {
+  return typeof sourceText === 'string' && sourceText.length > 0;
 }

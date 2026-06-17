@@ -118,6 +118,7 @@ pub struct PinnedImageView {
     pub image_base64: String,
     pub width: u32,
     pub height: u32,
+    pub source_text: Option<String>,
 }
 
 /// Output action requested for a capture session selection.

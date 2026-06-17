@@ -25,7 +25,21 @@ mod tests {
         assert_eq!(view.id, image_id);
         assert_eq!(view.width, 3);
         assert_eq!(view.height, 2);
+        assert_eq!(view.source_text, None);
         assert!(!view.image_base64.is_empty());
+    }
+
+    #[test]
+    fn stores_optional_source_text_for_text_backed_pins() {
+        let service = PinnedImageService::new();
+        let png = make_test_png(3, 2);
+
+        let image_id = service
+            .pin_png_with_source_text(png, Some("Hello from clipboard".to_string()))
+            .unwrap();
+        let view = service.get_pinned_image(&image_id).unwrap();
+
+        assert_eq!(view.source_text, Some("Hello from clipboard".to_string()));
     }
 
     #[test]
@@ -69,6 +83,7 @@ mod tests {
         assert_eq!(view.id, image_id);
         assert_eq!(view.width, 4);
         assert_eq!(view.height, 3);
+        assert_eq!(view.source_text, None);
         assert_eq!(service.get_pinned_png(&image_id).unwrap(), replacement);
         assert_eq!(membership.group, 1);
         assert_eq!(membership.image_ids, vec![image_id]);

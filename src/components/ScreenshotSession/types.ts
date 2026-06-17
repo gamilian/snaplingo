@@ -50,6 +50,7 @@ export interface PinnedImageView {
   image_base64: string;
   width: number;
   height: number;
+  source_text?: string | null;
 }
 
 export type CaptureMode = 'screenshot' | 'screenshot-ocr' | 'screenshot-translate';
