@@ -127,6 +127,7 @@ import {
   quickSaveCaptureSelection,
   refreshCaptureSession,
   saveCaptureSelection,
+  shouldCancelCaptureOnBlur,
 } from './captureActions';
 import { printBase64PngImage } from './capturePrint';
 import {
@@ -1850,6 +1851,9 @@ export default function ScreenshotSession({
 
     const handleWindowBlur = () => {
       setIsMagnifierRequested(false);
+      if (shouldCancelCaptureOnBlur({ status })) {
+        void cancelSession();
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -1863,6 +1867,7 @@ export default function ScreenshotSession({
   }, [
     adjustAnnotationSize,
     clearAnnotations,
+    cancelSession,
     copyCurrentColor,
     copySelection,
     colorSampleFormat,

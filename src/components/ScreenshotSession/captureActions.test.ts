@@ -35,6 +35,7 @@ import {
   quickSaveCaptureSelection,
   refreshCaptureSession,
   saveCaptureSelection,
+  shouldCancelCaptureOnBlur,
 } from './captureActions';
 
 describe('capture session actions', () => {
@@ -1437,6 +1438,14 @@ describe('capture session actions', () => {
         hasDismissibleLayer: true,
       }),
     ).toBe('finish-edit');
+  });
+
+  it('cancels an active capture when another window is activated', () => {
+    expect(shouldCancelCaptureOnBlur({ status: 'selecting' })).toBe(true);
+    expect(shouldCancelCaptureOnBlur({ status: 'preview' })).toBe(true);
+    expect(shouldCancelCaptureOnBlur({ status: 'idle' })).toBe(false);
+    expect(shouldCancelCaptureOnBlur({ status: 'loading' })).toBe(false);
+    expect(shouldCancelCaptureOnBlur({ status: 'error' })).toBe(false);
   });
 
   it('uses Space for moving an in-progress selection without system modifiers', () => {

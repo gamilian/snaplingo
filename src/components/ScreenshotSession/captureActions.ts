@@ -60,6 +60,9 @@ interface CancelCapturePointerState {
   hasAnnotationGesture?: boolean;
   hasDismissibleLayer: boolean;
 }
+interface CancelCaptureBlurState {
+  status: 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
+}
 
 export function isSaveCaptureShortcut(event: CaptureShortcutEvent) {
   return (
@@ -364,6 +367,10 @@ export function getCancelCapturePointerAction(
   if (state.hasDismissibleLayer) return 'dismiss-layer';
   if (state.status === 'preview' && state.hasSelection) return 'reset-selection';
   return 'cancel-session';
+}
+
+export function shouldCancelCaptureOnBlur(state: CancelCaptureBlurState) {
+  return state.status === 'selecting' || state.status === 'preview';
 }
 
 export async function saveCaptureSelection(
