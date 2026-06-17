@@ -304,7 +304,7 @@ describe('pinned image controls', () => {
     ).toBe(false);
   });
 
-  it('uses Shift plus left-button double click for resetting pinned size and opacity', () => {
+  it('does not use the Snipaste thumbnail gesture for resetting pinned size and opacity', () => {
     expect(
       isResetPinnedImagePointer({
         detail: 2,
@@ -314,7 +314,7 @@ describe('pinned image controls', () => {
         altKey: false,
         shiftKey: true,
       }),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       isResetPinnedImagePointer({
         detail: 1,
