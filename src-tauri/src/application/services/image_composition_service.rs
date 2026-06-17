@@ -14,6 +14,8 @@ const TEXT_PIN_MIN_WIDTH: u32 = 160;
 const TEXT_PIN_MIN_HEIGHT: u32 = 60;
 const TEXT_PIN_BACKGROUND: [u8; 4] = [255, 255, 255, 255];
 const TEXT_PIN_FOREGROUND: [u8; 4] = [32, 32, 32, 255];
+const COLOR_PIN_WIDTH: u32 = 160;
+const COLOR_PIN_HEIGHT: u32 = 100;
 
 pub struct PngPlacement<'a> {
     pub png_data: &'a [u8],
@@ -262,6 +264,86 @@ impl ImageCompositionService {
             .map_err(|e| AppError::System(format!("Failed to encode text pin PNG: {}", e)))?;
         Ok(output_png)
     }
+
+    pub fn render_clipboard_text_png(&self, text: &str) -> Result<Vec<u8>> {
+        if let Some(color) = parse_clipboard_color(text) {
+            return render_color_png(color);
+        }
+
+        self.render_text_png(text)
+    }
+}
+
+fn render_color_png(color: [u8; 4]) -> Result<Vec<u8>> {
+    let output =
+        image::RgbaImage::from_pixel(COLOR_PIN_WIDTH, COLOR_PIN_HEIGHT, image::Rgba(color));
+    let mut output_png = Vec::new();
+    image::DynamicImage::ImageRgba8(output)
+        .write_to(&mut Cursor::new(&mut output_png), image::ImageFormat::Png)
+        .map_err(|e| AppError::System(format!("Failed to encode color pin PNG: {}", e)))?;
+    Ok(output_png)
+}
+
+fn parse_clipboard_color(text: &str) -> Option<[u8; 4]> {
+    let value = text.trim();
+    if value.is_empty() {
+        return None;
+    }
+
+    parse_hex_color(value)
+        .or_else(|| parse_rgb_color(value))
+        .map(|[red, green, blue]| [red, green, blue, 255])
+}
+
+fn parse_hex_color(value: &str) -> Option<[u8; 3]> {
+    let hex = value.strip_prefix('#')?;
+    let expanded = match hex.len() {
+        3 => hex
+            .chars()
+            .flat_map(|character| [character, character])
+            .collect::<String>(),
+        6 => hex.to_string(),
+        _ => return None,
+    };
+
+    let red = u8::from_str_radix(&expanded[0..2], 16).ok()?;
+    let green = u8::from_str_radix(&expanded[2..4], 16).ok()?;
+    let blue = u8::from_str_radix(&expanded[4..6], 16).ok()?;
+
+    Some([red, green, blue])
+}
+
+fn parse_rgb_color(value: &str) -> Option<[u8; 3]> {
+    let lower = value.to_lowercase();
+    let body = lower
+        .strip_prefix("rgb(")
+        .and_then(|rgb| rgb.strip_suffix(')'))
+        .unwrap_or(value);
+    let parts = body
+        .split(|character: char| character == ',' || character.is_whitespace())
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>();
+    if parts.len() != 3 {
+        return None;
+    }
+
+    Some([
+        parse_color_channel(parts[0])?,
+        parse_color_channel(parts[1])?,
+        parse_color_channel(parts[2])?,
+    ])
+}
+
+fn parse_color_channel(value: &str) -> Option<u8> {
+    if value.contains('.') {
+        let channel = value.parse::<f32>().ok()?;
+        if !(0.0..=1.0).contains(&channel) {
+            return None;
+        }
+        return Some((channel * 255.0).round() as u8);
+    }
+
+    value.parse::<u8>().ok()
 }
 
 fn wrap_text_for_png(font: &FontArc, text: &str, max_width: f32) -> Vec<String> {

@@ -706,6 +706,40 @@ mod tests {
     }
 
     #[test]
+    fn renders_clipboard_hex_color_as_pinned_png() {
+        let service = ImageCompositionService::new();
+
+        let output = service.render_clipboard_text_png("#0A141E").unwrap();
+        let (width, height) = png_dimensions(&output);
+
+        assert!(width >= 160);
+        assert!(height >= 100);
+        assert_eq!(png_pixel(&output, width / 2, height / 2), [10, 20, 30, 255]);
+    }
+
+    #[test]
+    fn renders_clipboard_rgb_color_as_pinned_png() {
+        let service = ImageCompositionService::new();
+
+        let output = service
+            .render_clipboard_text_png("rgb(10, 20, 30)")
+            .unwrap();
+        let (width, height) = png_dimensions(&output);
+
+        assert_eq!(png_pixel(&output, width / 2, height / 2), [10, 20, 30, 255]);
+    }
+
+    #[test]
+    fn renders_clipboard_decimal_rgb_color_as_pinned_png() {
+        let service = ImageCompositionService::new();
+
+        let output = service.render_clipboard_text_png("0.5 0.25 1.0").unwrap();
+        let (width, height) = png_dimensions(&output);
+
+        assert_eq!(png_pixel(&output, width / 2, height / 2), [128, 64, 255, 255]);
+    }
+
+    #[test]
     fn rejects_blank_clipboard_text_pngs() {
         let service = ImageCompositionService::new();
 

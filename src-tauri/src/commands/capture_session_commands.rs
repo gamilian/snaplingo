@@ -469,7 +469,7 @@ fn replace_pinned_text_as_png_by_services(
     text: &str,
 ) -> Result<PinnedImageView, String> {
     let png_data = image_composition
-        .render_text_png(text)
+        .render_clipboard_text_png(text)
         .map_err(|e| e.to_string())?;
     pinned_images
         .replace_pinned_png_with_source_text(image_id, png_data, Some(text.to_string()))
@@ -688,7 +688,7 @@ fn pin_text_as_png_by_services(
     text: &str,
 ) -> Result<PinnedImageView, String> {
     let png_data = image_composition
-        .render_text_png(text)
+        .render_clipboard_text_png(text)
         .map_err(|e| e.to_string())?;
     let image_id = pinned_images
         .pin_png_with_source_text(png_data, Some(text.to_string()))
