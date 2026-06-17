@@ -88,6 +88,18 @@ export function isRefreshCaptureShortcut(event: CaptureShortcutEvent) {
   );
 }
 
+export function isToggleCapturedCursorShortcut(event: CaptureShortcutEvent) {
+  if (event.metaKey || event.ctrlKey || event.altKey) return false;
+  return (
+    (event.key === '`' && !event.shiftKey) ||
+    (event.key === '!' && !!event.shiftKey)
+  );
+}
+
+export function canToggleCapturedCursor(session: CaptureSessionView | null) {
+  return Boolean(session?.captured_cursor);
+}
+
 export function getSelectionHistoryStepFromShortcut(
   event: CaptureShortcutEvent,
 ): SelectionHistoryStep | null {

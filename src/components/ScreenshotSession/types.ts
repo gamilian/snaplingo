@@ -20,10 +20,20 @@ export interface MonitorSnapshotView {
   image_base64: string;
 }
 
+export interface CapturedCursorView {
+  logical_position: Point;
+  hotspot: Point;
+  image_width: number;
+  image_height: number;
+  scale_factor: number;
+  image_base64: string;
+}
+
 export interface CaptureSessionView {
   id: string;
   monitors: MonitorSnapshotView[];
   candidates: CaptureCandidateView[];
+  captured_cursor?: CapturedCursorView | null;
 }
 
 export type CaptureCandidateKind = 'monitor' | 'window' | 'control';

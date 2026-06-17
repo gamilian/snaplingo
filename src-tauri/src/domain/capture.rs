@@ -82,6 +82,17 @@ pub struct MonitorSnapshotView {
     pub image_base64: String,
 }
 
+/// Frontend-safe cursor image captured with a frozen screenshot session.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CapturedCursorView {
+    pub logical_position: LogicalPoint,
+    pub hotspot: LogicalPoint,
+    pub image_width: u32,
+    pub image_height: u32,
+    pub scale_factor: f64,
+    pub image_base64: String,
+}
+
 /// Frontend hover target candidate captured at session start.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CaptureCandidateView {
@@ -97,6 +108,7 @@ pub struct CaptureSessionView {
     pub id: CaptureSessionId,
     pub monitors: Vec<MonitorSnapshotView>,
     pub candidates: Vec<CaptureCandidateView>,
+    pub captured_cursor: Option<CapturedCursorView>,
 }
 
 /// Frontend-safe pinned image metadata and image data.

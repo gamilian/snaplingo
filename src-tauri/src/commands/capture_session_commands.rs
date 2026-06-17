@@ -11,11 +11,12 @@ use crate::application::services::{
     CaptureOutputService, PinnedImageGroupSwitch, PinnedImageService,
 };
 use crate::domain::capture::{
-    AnnotationCommand, CaptureOutputAction, CaptureSessionId, CaptureSessionView, LogicalPoint,
-    LogicalRect, MonitorSnapshotView, PhysicalPoint, PhysicalRect, PinnedImageView,
+    AnnotationCommand, CaptureOutputAction, CaptureSessionId, CaptureSessionView,
+    CapturedCursorView, LogicalPoint, LogicalRect, MonitorSnapshotView, PhysicalPoint,
+    PhysicalRect, PinnedImageView,
 };
 use crate::domain::ocr::{OcrRequest, OcrResult};
-use crate::infrastructure::system::screenshot::MonitorSnapshot;
+use crate::infrastructure::system::screenshot::{CapturedCursor, MonitorSnapshot};
 
 const CAPTURE_WINDOW_LABEL: &str = "capture";
 const PIN_WINDOW_MAX_WIDTH: f64 = 900.0;
@@ -83,6 +84,7 @@ pub fn get_capture_session(
         id: session.id,
         monitors: session.snapshots.iter().map(snapshot_to_view).collect(),
         candidates: session.candidates,
+        captured_cursor: session.captured_cursor.as_ref().map(captured_cursor_to_view),
     })
 }
 
@@ -777,6 +779,17 @@ fn snapshot_to_view(snapshot: &MonitorSnapshot) -> MonitorSnapshotView {
         physical_bounds: snapshot.physical_bounds.clone(),
         scale_factor: snapshot.scale_factor,
         image_base64: base64::engine::general_purpose::STANDARD.encode(&snapshot.png_data),
+    }
+}
+
+fn captured_cursor_to_view(cursor: &CapturedCursor) -> CapturedCursorView {
+    CapturedCursorView {
+        logical_position: cursor.logical_position.clone(),
+        hotspot: cursor.hotspot.clone(),
+        image_width: cursor.image_width,
+        image_height: cursor.image_height,
+        scale_factor: cursor.scale_factor,
+        image_base64: base64::engine::general_purpose::STANDARD.encode(&cursor.png_data),
     }
 }
 

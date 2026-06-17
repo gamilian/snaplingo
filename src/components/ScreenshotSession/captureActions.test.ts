@@ -3,6 +3,7 @@ import type { AnnotationCommand, CaptureSessionView, LogicalRect } from './types
 import {
   type CaptureInvoke,
   type CaptureInvokeArgs,
+  canToggleCapturedCursor,
   copyCaptureSelection,
   getCandidateCycleDirectionFromShortcut,
   getCancelCapturePointerAction,
@@ -27,6 +28,7 @@ import {
   isSaveCaptureShortcut,
   isSelectAllCaptureShortcut,
   isToggleToolbarShortcut,
+  isToggleCapturedCursorShortcut,
   printCaptureSelection,
   quickSaveCaptureSelection,
   refreshCaptureSession,
@@ -765,6 +767,59 @@ describe('capture session actions', () => {
         ctrlKey: false,
         altKey: false,
         shiftKey: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('uses Snipaste cursor capture toggle shortcuts only when cursor data exists', () => {
+    expect(
+      isToggleCapturedCursorShortcut({
+        key: '`',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isToggleCapturedCursorShortcut({
+        key: '!',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(true);
+    expect(
+      isToggleCapturedCursorShortcut({
+        key: '`',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      canToggleCapturedCursor({
+        id: 'session-1',
+        monitors: [],
+        candidates: [],
+        captured_cursor: {
+          logical_position: { x: 4, y: 5 },
+          hotspot: { x: 1, y: 2 },
+          image_width: 16,
+          image_height: 20,
+          scale_factor: 2,
+          image_base64: 'CQgH',
+        },
+      }),
+    ).toBe(true);
+    expect(
+      canToggleCapturedCursor({
+        id: 'session-1',
+        monitors: [],
+        candidates: [],
+        captured_cursor: null,
       }),
     ).toBe(false);
   });

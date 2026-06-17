@@ -5,7 +5,7 @@ mod tests {
     use crate::domain::capture::LogicalRect;
     use crate::error::AppError;
     use crate::infrastructure::system::screenshot::{
-        MonitorSnapshot, ScreenRegion, ScreenshotBackend, WindowCandidate,
+        CapturedCursor, MonitorSnapshot, ScreenRegion, ScreenshotBackend, WindowCandidate,
     };
 
     use crate::application::services::capture_session_service::CaptureSessionService;
@@ -13,6 +13,7 @@ mod tests {
     struct MockScreenshotBackend {
         snapshots: Vec<MonitorSnapshot>,
         window_candidates: Vec<WindowCandidate>,
+        captured_cursor: Option<CapturedCursor>,
     }
 
     #[async_trait::async_trait]
@@ -26,6 +27,13 @@ mod tests {
             _monitors: &[MonitorSnapshot],
         ) -> Result<Vec<WindowCandidate>, AppError> {
             Ok(self.window_candidates.clone())
+        }
+
+        async fn capture_cursor(
+            &self,
+            _monitors: &[MonitorSnapshot],
+        ) -> Result<Option<CapturedCursor>, AppError> {
+            Ok(self.captured_cursor.clone())
         }
 
         async fn capture_full_screen(&self) -> Result<Vec<u8>, AppError> {
@@ -61,6 +69,7 @@ mod tests {
                 png_data: vec![1, 2, 3],
             }],
             window_candidates: Vec::new(),
+            captured_cursor: None,
         }
     }
 
@@ -103,6 +112,7 @@ mod tests {
                 },
             ],
             window_candidates: Vec::new(),
+            captured_cursor: None,
         }
     }
 
@@ -119,6 +129,19 @@ mod tests {
                 height: 5.0,
             },
         }];
+        backend
+    }
+
+    fn make_backend_with_captured_cursor() -> MockScreenshotBackend {
+        let mut backend = make_backend();
+        backend.captured_cursor = Some(CapturedCursor {
+            logical_position: crate::domain::capture::LogicalPoint { x: 4.0, y: 5.0 },
+            hotspot: crate::domain::capture::LogicalPoint { x: 1.0, y: 2.0 },
+            image_width: 16,
+            image_height: 20,
+            scale_factor: 2.0,
+            png_data: vec![9, 8, 7],
+        });
         backend
     }
 
@@ -154,6 +177,30 @@ mod tests {
             }
         );
         assert_eq!(view.candidates[0].priority, 10);
+    }
+
+    #[tokio::test]
+    async fn create_session_returns_captured_cursor_for_output_composition() {
+        let service = CaptureSessionService::new(Arc::new(make_backend_with_captured_cursor()));
+
+        let view = service.create_session().await.unwrap();
+
+        let captured_cursor = view.captured_cursor.unwrap();
+        assert_eq!(
+            captured_cursor.logical_position,
+            crate::domain::capture::LogicalPoint { x: 4.0, y: 5.0 }
+        );
+        assert_eq!(
+            captured_cursor.hotspot,
+            crate::domain::capture::LogicalPoint { x: 1.0, y: 2.0 }
+        );
+        assert_eq!(captured_cursor.image_width, 16);
+        assert_eq!(captured_cursor.image_height, 20);
+        assert_eq!(captured_cursor.scale_factor, 2.0);
+        assert_eq!(captured_cursor.image_base64, "CQgH");
+
+        let session = service.get_session(&view.id).unwrap();
+        assert!(session.captured_cursor.is_some());
     }
 
     #[tokio::test]

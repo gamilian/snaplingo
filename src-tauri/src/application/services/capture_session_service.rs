@@ -6,12 +6,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use base64::Engine;
 
 use crate::domain::capture::{
-    CaptureCandidateView, CaptureSessionId, CaptureSessionView, LogicalRect, MonitorSnapshotView,
-    PhysicalRect,
+    CaptureCandidateView, CaptureSessionId, CaptureSessionView, CapturedCursorView, LogicalRect,
+    MonitorSnapshotView, PhysicalRect,
 };
 use crate::error::{AppError, Result};
 use crate::infrastructure::system::screenshot::{
-    MonitorSnapshot, ScreenshotBackend, WindowCandidate,
+    CapturedCursor, MonitorSnapshot, ScreenshotBackend, WindowCandidate,
 };
 
 static NEXT_SESSION_COUNTER: AtomicU64 = AtomicU64::new(1);
@@ -21,6 +21,7 @@ pub struct CaptureSession {
     pub id: CaptureSessionId,
     pub snapshots: Vec<MonitorSnapshot>,
     pub candidates: Vec<CaptureCandidateView>,
+    pub captured_cursor: Option<CapturedCursor>,
     pub created_at: SystemTime,
 }
 
@@ -54,6 +55,15 @@ impl CaptureSessionService {
                 err
             })
             .unwrap_or_default();
+        let captured_cursor = self
+            .screenshot_backend
+            .capture_cursor(&snapshots)
+            .await
+            .map_err(|err| {
+                log::warn!("Failed to capture cursor: {}", err);
+                err
+            })
+            .unwrap_or_default();
         let candidates = window_candidates
             .iter()
             .map(window_candidate_to_view)
@@ -64,11 +74,13 @@ impl CaptureSessionService {
             id: id.clone(),
             monitors: snapshots.iter().map(snapshot_to_view).collect(),
             candidates: candidates.clone(),
+            captured_cursor: captured_cursor.as_ref().map(captured_cursor_to_view),
         };
         let session = CaptureSession {
             id: id.clone(),
             snapshots,
             candidates,
+            captured_cursor,
             created_at: SystemTime::now(),
         };
 
@@ -142,6 +154,17 @@ fn snapshot_to_view(snapshot: &MonitorSnapshot) -> MonitorSnapshotView {
         physical_bounds: snapshot.physical_bounds.clone(),
         scale_factor: snapshot.scale_factor,
         image_base64: base64::engine::general_purpose::STANDARD.encode(&snapshot.png_data),
+    }
+}
+
+fn captured_cursor_to_view(cursor: &CapturedCursor) -> CapturedCursorView {
+    CapturedCursorView {
+        logical_position: cursor.logical_position.clone(),
+        hotspot: cursor.hotspot.clone(),
+        image_width: cursor.image_width,
+        image_height: cursor.image_height,
+        scale_factor: cursor.scale_factor,
+        image_base64: base64::engine::general_purpose::STANDARD.encode(&cursor.png_data),
     }
 }
 

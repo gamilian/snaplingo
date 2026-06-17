@@ -1,4 +1,4 @@
-use crate::domain::capture::{LogicalRect, PhysicalRect};
+use crate::domain::capture::{LogicalPoint, LogicalRect, PhysicalRect};
 use crate::error::AppError;
 
 /// Rectangle region for partial screenshot capture.
@@ -20,6 +20,16 @@ pub struct MonitorSnapshot {
     pub id: String,
     pub logical_bounds: LogicalRect,
     pub physical_bounds: PhysicalRect,
+    pub scale_factor: f64,
+    pub png_data: Vec<u8>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CapturedCursor {
+    pub logical_position: LogicalPoint,
+    pub hotspot: LogicalPoint,
+    pub image_width: u32,
+    pub image_height: u32,
     pub scale_factor: f64,
     pub png_data: Vec<u8>,
 }
@@ -150,6 +160,13 @@ pub trait ScreenshotBackend: Send + Sync {
         _monitors: &[MonitorSnapshot],
     ) -> Result<Vec<WindowCandidate>, AppError> {
         Ok(Vec::new())
+    }
+
+    async fn capture_cursor(
+        &self,
+        _monitors: &[MonitorSnapshot],
+    ) -> Result<Option<CapturedCursor>, AppError> {
+        Ok(None)
     }
 
     /// Capture the entire screen
