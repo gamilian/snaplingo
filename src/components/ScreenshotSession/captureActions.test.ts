@@ -7,6 +7,7 @@ import {
   isCopyCaptureDoubleClick,
   isPinCaptureShortcut,
   isSaveCaptureShortcut,
+  isSelectAllCaptureShortcut,
   isToggleToolbarShortcut,
   saveCaptureSelection,
 } from './captureActions';
@@ -119,6 +120,45 @@ describe('capture session actions', () => {
         ctrlKey: false,
         altKey: false,
         shiftKey: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('uses Cmd/Ctrl+A for selecting the full capture area', () => {
+    expect(
+      isSelectAllCaptureShortcut({
+        key: 'a',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isSelectAllCaptureShortcut({
+        key: 'A',
+        metaKey: false,
+        ctrlKey: true,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isSelectAllCaptureShortcut({
+        key: 'a',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      isSelectAllCaptureShortcut({
+        key: 'a',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: true,
       }),
     ).toBe(false);
   });

@@ -80,6 +80,7 @@ import {
   isCopyCaptureDoubleClick,
   isPinCaptureShortcut,
   isSaveCaptureShortcut,
+  isSelectAllCaptureShortcut,
   isToggleToolbarShortcut,
   saveCaptureSelection,
 } from './captureActions';
@@ -951,6 +952,27 @@ export default function ScreenshotSession({
     textDraft,
   ]);
 
+  const selectFullCaptureArea = useCallback(() => {
+    if (!selectionBounds) return;
+
+    setStartPoint(null);
+    setSelection(selectionBounds);
+    setHoverSelection(null);
+    setEditGesture(null);
+    setActiveAnnotationTool(null);
+    setAnnotationGesture(null);
+    setDraftAnnotation(null);
+    setSelectedAnnotationIndex(null);
+    setAnnotationMoveGesture(null);
+    setDraftSelectionMoveGesture(null);
+    setTextDraft(null);
+    setTextDraftAnnotationIndex(null);
+    setAnnotationHistory(emptyAnnotationHistory());
+    setIsToolbarHidden(false);
+    setStatus('preview');
+    void renderSelectionPreview(selectionBounds, []);
+  }, [renderSelectionPreview, selectionBounds]);
+
   useEffect(() => {
     if (!initialMode || hasStartedInitialSession) return;
 
@@ -1073,6 +1095,13 @@ export default function ScreenshotSession({
         event.preventDefault();
         void copyCurrentColor();
       } else if (
+        (status === 'selecting' || status === 'preview') &&
+        !textDraft &&
+        isSelectAllCaptureShortcut(event)
+      ) {
+        event.preventDefault();
+        selectFullCaptureArea();
+      } else if (
         status === 'preview' &&
         (event.key === 'Enter' ||
           ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'c'))
@@ -1190,6 +1219,7 @@ export default function ScreenshotSession({
     selection,
     selectionBounds,
     selectedAnnotationIndex,
+    selectFullCaptureArea,
     startPoint,
     status,
     cursorColor,

@@ -47,6 +47,15 @@ export function isPinCaptureShortcut(event: CaptureShortcutEvent) {
   );
 }
 
+export function isSelectAllCaptureShortcut(event: CaptureShortcutEvent) {
+  return (
+    event.key.toLowerCase() === 'a' &&
+    (event.metaKey || event.ctrlKey) &&
+    !event.altKey &&
+    !event.shiftKey
+  );
+}
+
 export function isCopyCaptureDoubleClick(event: CapturePointerEvent) {
   return (
     (event.detail ?? 0) >= 2 &&
