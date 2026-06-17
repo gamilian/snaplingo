@@ -40,6 +40,7 @@ interface PinnedWheelEvent {
 }
 
 export type PinnedKeyboardZoomAction = 'zoom-in' | 'zoom-out' | 'reset';
+export type PinnedKeyboardOpacityAction = 'decrease' | 'increase';
 export type PinnedWheelAction = 'zoom' | 'opacity';
 export type PinnedKeyboardTransformAction =
   | 'rotate-clockwise'
@@ -69,6 +70,18 @@ export function getPinnedKeyboardZoomAction(
   if (event.key === '+' || event.key === '=') return 'zoom-in';
   if (event.key === '-') return 'zoom-out';
   if (event.key === '0') return 'reset';
+
+  return null;
+}
+
+export function getPinnedKeyboardOpacityAction(
+  event: PinnedKeyboardEvent,
+): PinnedKeyboardOpacityAction | null {
+  if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) {
+    return null;
+  }
+  if (event.key === '+' || event.key === '=') return 'increase';
+  if (event.key === '-') return 'decrease';
 
   return null;
 }

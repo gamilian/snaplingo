@@ -3,6 +3,7 @@ import {
   getPinnedContextMenuPosition,
   getPinnedDisplaySize,
   getPinnedDisplaySizeForTransform,
+  getPinnedKeyboardOpacityAction,
   getPinnedKeyboardTransformAction,
   getPinnedKeyboardZoomAction,
   getPinnedOpacityFromWheel,
@@ -36,6 +37,29 @@ describe('pinned image controls', () => {
     );
     expect(getPinnedKeyboardZoomAction({ key: '+', metaKey: true, ctrlKey: false })).toBeNull();
     expect(getPinnedKeyboardZoomAction({ key: 'x', metaKey: false, ctrlKey: false })).toBeNull();
+  });
+
+  it('maps Snipaste keyboard shortcuts to pinned opacity actions', () => {
+    expect(
+      getPinnedKeyboardOpacityAction({ key: '+', metaKey: true, ctrlKey: false }),
+    ).toBe('increase');
+    expect(
+      getPinnedKeyboardOpacityAction({ key: '=', metaKey: false, ctrlKey: true }),
+    ).toBe('increase');
+    expect(
+      getPinnedKeyboardOpacityAction({ key: '-', metaKey: false, ctrlKey: true }),
+    ).toBe('decrease');
+    expect(
+      getPinnedKeyboardOpacityAction({ key: '+', metaKey: false, ctrlKey: false }),
+    ).toBeNull();
+    expect(
+      getPinnedKeyboardOpacityAction({
+        key: '+',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: true,
+      }),
+    ).toBeNull();
   });
 
   it('maps number keys to Snipaste pinned image transform actions', () => {

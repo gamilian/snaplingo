@@ -7,6 +7,7 @@ import {
   getPinnedContextMenuPosition,
   getPinnedDisplaySize,
   getPinnedDisplaySizeForTransform,
+  getPinnedKeyboardOpacityAction,
   getPinnedKeyboardTransformAction,
   getPinnedKeyboardZoomAction,
   getPinnedOpacityFromWheel,
@@ -241,6 +242,19 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
       if (isReplacePinnedImageShortcut(event)) {
         event.preventDefault();
         void replacePinnedFromClipboard();
+        return;
+      }
+
+      const opacityAction = getPinnedKeyboardOpacityAction(event);
+      if (opacityAction) {
+        event.preventDefault();
+        setContextMenuPosition(null);
+        setOpacity((currentOpacity) =>
+          getPinnedOpacityFromWheel(
+            currentOpacity,
+            opacityAction === 'increase' ? -1 : 1,
+          ),
+        );
         return;
       }
 
