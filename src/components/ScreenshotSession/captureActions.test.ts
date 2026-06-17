@@ -1200,7 +1200,7 @@ describe('capture session actions', () => {
     ).toBe(false);
   });
 
-  it('uses Space for toggling the capture annotation toolbar', () => {
+  it('uses Space for toggling the capture annotation toolbar without stealing Escape', () => {
     expect(
       getCaptureKeyboardToolbarAction(
         {
@@ -1224,7 +1224,7 @@ describe('capture session actions', () => {
         },
         true,
       ),
-    ).toBe('hide');
+    ).toBeNull();
     expect(
       getCaptureKeyboardToolbarAction(
         {

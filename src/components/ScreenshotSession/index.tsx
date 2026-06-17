@@ -1520,13 +1520,6 @@ export default function ScreenshotSession({
         event,
         isAnnotationToolbarVisible,
       );
-      const hasDismissibleCaptureLayer =
-        textDraft !== null ||
-        annotationMoveGesture !== null ||
-        draftSelectionMoveGesture !== null ||
-        selectedAnnotationIndex !== null ||
-        activeAnnotationTool !== null ||
-        annotationGesture !== null;
       const selectionArrowAction = getSelectionArrowActionFromShortcut(event, {
         editing:
           hasAnnotationEditingContext ||
@@ -1539,14 +1532,7 @@ export default function ScreenshotSession({
         activeAnnotationTool,
       );
 
-      if (
-        status === 'preview' &&
-        toolbarAction === 'hide' &&
-        !hasDismissibleCaptureLayer
-      ) {
-        event.preventDefault();
-        setIsAnnotationToolbarVisible(false);
-      } else if (event.key === 'Escape') {
+      if (event.key === 'Escape') {
         event.preventDefault();
         dismissCaptureLayer();
       } else if (
