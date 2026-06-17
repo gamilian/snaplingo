@@ -5,6 +5,9 @@ export type CaptureInvoke = <T>(
   command: string,
   args?: CaptureInvokeArgs,
 ) => Promise<T>;
+export type CaptureImagePrinter = (
+  imageBase64: string,
+) => Promise<void> | void;
 
 interface CaptureShortcutEvent {
   key: string;
@@ -137,6 +140,15 @@ export function isPinCaptureShortcut(event: CaptureShortcutEvent) {
   );
 }
 
+export function isPrintCaptureShortcut(event: CaptureShortcutEvent) {
+  return (
+    event.key.toLowerCase() === 'p' &&
+    (event.metaKey || event.ctrlKey) &&
+    !event.altKey &&
+    !event.shiftKey
+  );
+}
+
 export function getCursorNudgeDeltaFromShortcut(
   event: CaptureShortcutEvent,
 ): Point | null {
@@ -261,4 +273,20 @@ export async function copyCaptureSelection(
     annotations,
     action: { type: 'copy' },
   });
+}
+
+export async function printCaptureSelection(
+  invoke: CaptureInvoke,
+  sessionId: string,
+  rect: LogicalRect,
+  annotations: AnnotationCommand[],
+  printImage: CaptureImagePrinter,
+) {
+  const imageBase64 = await invoke<string>('render_capture_output', {
+    sessionId,
+    rect,
+    annotations,
+  });
+
+  await printImage(imageBase64);
 }

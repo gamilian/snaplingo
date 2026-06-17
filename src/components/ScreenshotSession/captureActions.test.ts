@@ -15,12 +15,14 @@ import {
   getCursorNudgeDeltaFromShortcut,
   isPinCaptureShortcut,
   isPinCapturePointer,
+  isPrintCaptureShortcut,
   isMoveDraftSelectionShortcut,
   isQuickSaveCaptureShortcut,
   isRestoreLastSelectionShortcut,
   isSaveCaptureShortcut,
   isSelectAllCaptureShortcut,
   isToggleToolbarShortcut,
+  printCaptureSelection,
   quickSaveCaptureSelection,
   saveCaptureSelection,
 } from './captureActions';
@@ -306,6 +308,89 @@ describe('capture session actions', () => {
         },
       },
     ]);
+  });
+
+  it('prints the rendered current frozen selection', async () => {
+    const calls: Array<{ command: string; args?: unknown }> = [];
+    const printedImages: string[] = [];
+    const invoke: CaptureInvoke = async <T>(
+      command: string,
+      args?: CaptureInvokeArgs,
+    ): Promise<T> => {
+      calls.push({ command, args });
+      return 'rendered-png-base64' as T;
+    };
+    const rect: LogicalRect = { x: 12, y: 24, width: 120, height: 80 };
+    const annotations: AnnotationCommand[] = [
+      {
+        type: 'arrow',
+        start: { x: 4, y: 8 },
+        end: { x: 48, y: 32 },
+        color: [0, 128, 255, 255],
+        stroke_width: 3,
+      },
+    ];
+
+    await printCaptureSelection(
+      invoke,
+      'session-2',
+      rect,
+      annotations,
+      async (imageBase64) => {
+        printedImages.push(imageBase64);
+      },
+    );
+
+    expect(calls).toEqual([
+      {
+        command: 'render_capture_output',
+        args: {
+          sessionId: 'session-2',
+          rect,
+          annotations,
+        },
+      },
+    ]);
+    expect(printedImages).toEqual(['rendered-png-base64']);
+  });
+
+  it('uses Cmd/Ctrl+P for printing the current selection', () => {
+    expect(
+      isPrintCaptureShortcut({
+        key: 'p',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isPrintCaptureShortcut({
+        key: 'P',
+        metaKey: false,
+        ctrlKey: true,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isPrintCaptureShortcut({
+        key: 'p',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(false);
+    expect(
+      isPrintCaptureShortcut({
+        key: 'p',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
   });
 
   it('uses Cmd/Ctrl+S for saving the current selection', () => {

@@ -97,14 +97,17 @@ import {
   isMoveDraftSelectionShortcut,
   isPinCapturePointer,
   isPinCaptureShortcut,
+  isPrintCaptureShortcut,
   isQuickSaveCaptureShortcut,
   isRestoreLastSelectionShortcut,
   isSaveCaptureShortcut,
   isSelectAllCaptureShortcut,
   isToggleToolbarShortcut,
+  printCaptureSelection,
   quickSaveCaptureSelection,
   saveCaptureSelection,
 } from './captureActions';
+import { printBase64PngImage } from './capturePrint';
 import {
   getSelectionHistoryEntry,
   loadCaptureSelectionHistory,
@@ -834,6 +837,40 @@ export default function ScreenshotSession({
     session,
   ]);
 
+  const printSelection = useCallback(async () => {
+    if (!session || !selection) return;
+
+    setIsRenderingOutput(true);
+    setError(null);
+
+    try {
+      const outputHistory = commitTextDraftToHistory();
+      await printCaptureSelection(
+        invoke,
+        session.id,
+        selection,
+        outputHistory.annotations,
+        printBase64PngImage,
+      );
+      recordLastSelection(selection);
+      await invoke('cancel_capture_session', { sessionId: session.id });
+      resetSessionState();
+      onInactive?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setStatus('error');
+    } finally {
+      setIsRenderingOutput(false);
+    }
+  }, [
+    commitTextDraftToHistory,
+    onInactive,
+    recordLastSelection,
+    resetSessionState,
+    selection,
+    session,
+  ]);
+
   const undoAnnotation = useCallback(() => {
     if (!selection || !canUndoAnnotation) return;
 
@@ -1393,6 +1430,9 @@ export default function ScreenshotSession({
       } else if (status === 'preview' && isPinCaptureShortcut(event)) {
         event.preventDefault();
         void pinSelection();
+      } else if (status === 'preview' && isPrintCaptureShortcut(event)) {
+        event.preventDefault();
+        void printSelection();
       } else if (
         status === 'preview' &&
         !textDraft &&
@@ -1523,6 +1563,7 @@ export default function ScreenshotSession({
     isActive,
     nudgeSelectedAnnotation,
     pinSelection,
+    printSelection,
     quickSaveSelection,
     restoreLastSelection,
     restoreSelectionFromHistory,
