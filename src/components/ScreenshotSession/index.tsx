@@ -76,6 +76,7 @@ import {
   type TextAnnotationDraft,
 } from './textAnnotationDraft';
 import {
+  copyCaptureSelection,
   isCancelCapturePointer,
   isConfirmHoverSelectionShortcut,
   isCopyCaptureDoubleClick,
@@ -609,12 +610,12 @@ export default function ScreenshotSession({
 
     try {
       const outputHistory = commitTextDraftToHistory();
-      await invoke('output_capture', {
-        sessionId: session.id,
-        rect: selection,
-        annotations: outputHistory.annotations,
-        action: { type: 'copy' },
-      });
+      await copyCaptureSelection(
+        invoke,
+        session.id,
+        selection,
+        outputHistory.annotations,
+      );
       await invoke('cancel_capture_session', { sessionId: session.id });
       resetSessionState();
       onInactive?.();
@@ -625,6 +626,25 @@ export default function ScreenshotSession({
       setIsRenderingOutput(false);
     }
   }, [commitTextDraftToHistory, onInactive, resetSessionState, selection, session]);
+
+  const copyCandidateSelection = useCallback(async (rect: LogicalRect) => {
+    if (!session) return;
+
+    setIsRenderingOutput(true);
+    setError(null);
+
+    try {
+      await copyCaptureSelection(invoke, session.id, rect);
+      await invoke('cancel_capture_session', { sessionId: session.id });
+      resetSessionState();
+      onInactive?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setStatus('error');
+    } finally {
+      setIsRenderingOutput(false);
+    }
+  }, [onInactive, resetSessionState, session]);
 
   const copyCurrentColor = useCallback(async () => {
     if (!cursorColor) return;
@@ -1254,6 +1274,13 @@ export default function ScreenshotSession({
       event.preventDefault();
       event.stopPropagation();
       dismissCaptureLayer();
+      return;
+    }
+
+    if (status === 'selecting' && hoverSelection && isCopyCaptureDoubleClick(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+      void copyCandidateSelection(hoverSelection);
       return;
     }
 

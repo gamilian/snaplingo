@@ -3,6 +3,7 @@ import type { AnnotationCommand, LogicalRect } from './types';
 import {
   type CaptureInvoke,
   type CaptureInvokeArgs,
+  copyCaptureSelection,
   isCancelCapturePointer,
   isCopyCaptureDoubleClick,
   isCopyCaptureKeyboardShortcut,
@@ -52,6 +53,41 @@ describe('capture session actions', () => {
             path: '/tmp/SnapLingo-20260617-023000.png',
           },
           annotations,
+        },
+      },
+    ]);
+  });
+
+  it('copies the current frozen selection to the clipboard', async () => {
+    const calls: Array<{ command: string; args?: unknown }> = [];
+    const invoke: CaptureInvoke = async <T>(
+      command: string,
+      args?: CaptureInvokeArgs,
+    ): Promise<T> => {
+      calls.push({ command, args });
+      return undefined as T;
+    };
+    const rect: LogicalRect = { x: 12, y: 24, width: 120, height: 80 };
+    const annotations: AnnotationCommand[] = [
+      {
+        type: 'arrow',
+        start: { x: 4, y: 8 },
+        end: { x: 48, y: 32 },
+        color: [0, 128, 255, 255],
+        stroke_width: 3,
+      },
+    ];
+
+    await copyCaptureSelection(invoke, 'session-2', rect, annotations);
+
+    expect(calls).toEqual([
+      {
+        command: 'output_capture',
+        args: {
+          sessionId: 'session-2',
+          rect,
+          annotations,
+          action: { type: 'copy' },
         },
       },
     ]);

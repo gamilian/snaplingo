@@ -135,3 +135,17 @@ export async function saveCaptureSelection(
     },
   });
 }
+
+export async function copyCaptureSelection(
+  invoke: CaptureInvoke,
+  sessionId: string,
+  rect: LogicalRect,
+  annotations: AnnotationCommand[] = [],
+) {
+  await invoke('output_capture', {
+    sessionId,
+    rect,
+    annotations,
+    action: { type: 'copy' },
+  });
+}
