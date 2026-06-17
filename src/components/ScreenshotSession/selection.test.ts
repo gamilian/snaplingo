@@ -5,6 +5,7 @@ import {
   moveSelectionByDelta,
   moveDraftSelectionByDelta,
   nudgeDraftSelection,
+  nudgeMovedSelection,
   nudgeSelection,
   resizeSelectionBoundaryByArrow,
   resizeSelectionByHandle,
@@ -88,6 +89,34 @@ describe('selection editing', () => {
     ).toEqual({
       cursorPoint: { x: 0, y: 0 },
       selection: { x: 0, y: 0, width: 40, height: 30 },
+    });
+  });
+
+  it('nudges a dragged selection and its active cursor point together', () => {
+    expect(
+      nudgeMovedSelection(
+        { x: 40, y: 30, width: 100, height: 80 },
+        { x: 90, y: 70 },
+        { x: 1, y: 0 },
+        bounds,
+      ),
+    ).toEqual({
+      cursorPoint: { x: 91, y: 70 },
+      selection: { x: 41, y: 30, width: 100, height: 80 },
+    });
+  });
+
+  it('only moves a dragged selection cursor by the clamped movement', () => {
+    expect(
+      nudgeMovedSelection(
+        { x: 0, y: 0, width: 100, height: 80 },
+        { x: 20, y: 20 },
+        { x: -1, y: -1 },
+        bounds,
+      ),
+    ).toEqual({
+      cursorPoint: { x: 20, y: 20 },
+      selection: { x: 0, y: 0, width: 100, height: 80 },
     });
   });
 

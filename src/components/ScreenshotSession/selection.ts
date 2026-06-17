@@ -99,6 +99,27 @@ export function nudgeDraftSelection(
   };
 }
 
+export function nudgeMovedSelection(
+  rect: LogicalRect,
+  cursorPoint: Point,
+  delta: Point,
+  bounds: LogicalRect,
+): { cursorPoint: Point; selection: LogicalRect } {
+  const selection = moveSelectionByDelta(rect, delta, bounds);
+  const appliedDelta = {
+    x: selection.x - rect.x,
+    y: selection.y - rect.y,
+  };
+
+  return {
+    cursorPoint: {
+      x: cursorPoint.x + appliedDelta.x,
+      y: cursorPoint.y + appliedDelta.y,
+    },
+    selection,
+  };
+}
+
 export function resizeSelectionByHandle(
   rect: LogicalRect,
   handle: SelectionHandle,

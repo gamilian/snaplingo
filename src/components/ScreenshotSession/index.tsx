@@ -9,6 +9,7 @@ import {
   moveSelectionByDelta,
   normalizeSelection,
   nudgeDraftSelection,
+  nudgeMovedSelection,
   nudgeSelection,
   resizeSelectionBoundaryByArrow,
   resizeSelectionByHandle,
@@ -379,6 +380,7 @@ export default function ScreenshotSession({
   const sampleCanvasByMonitorRef = useRef<Map<string, HTMLCanvasElement>>(new Map());
   const textDraftInputRef = useRef<HTMLTextAreaElement | null>(null);
   const keyboardDraftCursorPointRef = useRef<Point | null>(null);
+  const keyboardEditCursorPointRef = useRef<Point | null>(null);
   const [status, setStatus] = useState<SessionStatus>('idle');
   const [mode, setMode] = useState<CaptureMode>('screenshot');
   const [session, setSession] = useState<CaptureSessionView | null>(null);
@@ -1416,6 +1418,32 @@ export default function ScreenshotSession({
         setPreviewImageBase64(null);
         setIsRenderingOutput(false);
       } else if (
+        status === 'preview' &&
+        !textDraft &&
+        editGesture?.type === 'move' &&
+        selection &&
+        cursorPoint &&
+        selectionBounds &&
+        cursorNudgeDelta
+      ) {
+        event.preventDefault();
+        const result = nudgeMovedSelection(
+          selection,
+          cursorPoint,
+          cursorNudgeDelta,
+          selectionBounds,
+        );
+        keyboardEditCursorPointRef.current = result.cursorPoint;
+        setCursorPoint(result.cursorPoint);
+        setSelection(result.selection);
+        setEditGesture({
+          ...editGesture,
+          startPoint: result.cursorPoint,
+          startSelection: result.selection,
+        });
+        setPreviewImageBase64(null);
+        setIsRenderingOutput(false);
+      } else if (
         status === 'selecting' &&
         !textDraft &&
         cursorPoint &&
@@ -1615,6 +1643,7 @@ export default function ScreenshotSession({
     cursorPoint,
     draftSelectionMoveGesture,
     dismissCaptureLayer,
+    editGesture,
     hasAnnotationEditingContext,
     hoverSelection,
     isMagnifierShown,
@@ -1703,6 +1732,7 @@ export default function ScreenshotSession({
     setAnnotationMoveGesture(null);
     setDraftSelectionMoveGesture(null);
     keyboardDraftCursorPointRef.current = null;
+    keyboardEditCursorPointRef.current = null;
     setTextDraft(null);
     setTextDraftAnnotationIndex(null);
     setAnnotationHistory(emptyAnnotationHistory());
@@ -1840,6 +1870,7 @@ export default function ScreenshotSession({
     }
 
     if (editGesture) {
+      keyboardEditCursorPointRef.current = null;
       setSelection(applyEditGesture(editGesture, point, event.shiftKey));
       setPreviewImageBase64(null);
       setIsRenderingOutput(false);
@@ -1866,9 +1897,11 @@ export default function ScreenshotSession({
       selectionBounds,
     );
     const selectionReleasePoint = keyboardDraftCursorPointRef.current ?? point;
+    const editReleasePoint = keyboardEditCursorPointRef.current ?? point;
     setCursorPoint(point);
     setDraftSelectionMoveGesture(null);
     keyboardDraftCursorPointRef.current = null;
+    keyboardEditCursorPointRef.current = null;
 
     if (annotationGesture && selection) {
       const localPoint = clampPointToRect(
@@ -1935,7 +1968,11 @@ export default function ScreenshotSession({
     }
 
     if (editGesture) {
-      const nextSelection = applyEditGesture(editGesture, point, event.shiftKey);
+      const nextSelection = applyEditGesture(
+        editGesture,
+        editReleasePoint,
+        event.shiftKey,
+      );
       setEditGesture(null);
       setSelection(nextSelection);
       setStatus('preview');
