@@ -14,6 +14,7 @@ import {
   getPinnedDisplaySizeForTransform,
   getPinnedKeyboardMoveDelta,
   getPinnedKeyboardOpacityAction,
+  getPinnedKeyboardToolbarAction,
   getPinnedKeyboardTransformAction,
   getPinnedKeyboardZoomAction,
   getPinnedOpacityFromWheel,
@@ -77,6 +78,8 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     x: number;
     y: number;
   } | null>(null);
+  const [isHoverToolbarForcedVisible, setIsHoverToolbarForcedVisible] =
+    useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const hideCurrentPinnedImage = useCallback(async () => {
@@ -137,6 +140,16 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
 
+      const toolbarAction = getPinnedKeyboardToolbarAction(
+        event,
+        isHoverToolbarForcedVisible,
+      );
+      if (toolbarAction === 'hide') {
+        event.preventDefault();
+        setIsHoverToolbarForcedVisible(false);
+        return;
+      }
+
       event.preventDefault();
       if (isDestroyPinnedImageShortcut(event)) {
         void destroyCurrentPinnedImage();
@@ -148,7 +161,11 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [destroyCurrentPinnedImage, hideCurrentPinnedImage]);
+  }, [
+    destroyCurrentPinnedImage,
+    hideCurrentPinnedImage,
+    isHoverToolbarForcedVisible,
+  ]);
 
   const resizePinnedWindow = useCallback(
     async (nextZoom: number, nextTransform = transform, nextImage = image) => {
@@ -295,6 +312,17 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
         return;
       }
 
+      const toolbarAction = getPinnedKeyboardToolbarAction(
+        event,
+        isHoverToolbarForcedVisible,
+      );
+      if (toolbarAction === 'toggle') {
+        event.preventDefault();
+        setContextMenuPosition(null);
+        setIsHoverToolbarForcedVisible((currentVisible) => !currentVisible);
+        return;
+      }
+
       const moveDelta = getPinnedKeyboardMoveDelta(event);
       if (moveDelta) {
         event.preventDefault();
@@ -347,6 +375,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     adjustPinnedZoom,
     copyPinnedImage,
     hideCurrentPinnedImage,
+    isHoverToolbarForcedVisible,
     movePinnedWindowByKeyboard,
     quickSavePinnedImageToDirectory,
     replacePinnedFromClipboard,
@@ -397,6 +426,8 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
 
   const imageFrameSize = image ? getPinnedDisplaySize(image, zoom) : null;
   const runHoverToolbarAction = (actionId: typeof PIN_HOVER_TOOLBAR_ACTIONS[number]['id']) => {
+    setIsHoverToolbarForcedVisible(false);
+
     if (actionId === 'copy') {
       void copyPinnedImage();
       return;
@@ -409,6 +440,9 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
 
     void hideCurrentPinnedImage();
   };
+  const hoverToolbarVisibilityClassName = isHoverToolbarForcedVisible
+    ? 'opacity-100'
+    : 'opacity-0 focus-within:opacity-100 group-hover:opacity-100';
 
   return (
     <div
@@ -538,7 +572,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
         </div>
       )}
       <div
-        className="absolute right-1 top-1 flex gap-1 rounded bg-black/70 p-1 text-xs text-white opacity-0 shadow transition-opacity focus-within:opacity-100 group-hover:opacity-100"
+        className={`absolute right-1 top-1 flex gap-1 rounded bg-black/70 p-1 text-xs text-white shadow transition-opacity ${hoverToolbarVisibilityClassName}`}
         onPointerDown={(event) => event.stopPropagation()}
       >
         {PIN_HOVER_TOOLBAR_ACTIONS.map((action) => (

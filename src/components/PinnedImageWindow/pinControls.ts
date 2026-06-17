@@ -50,6 +50,7 @@ interface PinnedPointerEvent {
 
 export type PinnedKeyboardZoomAction = 'zoom-in' | 'zoom-out' | 'reset';
 export type PinnedKeyboardOpacityAction = 'decrease' | 'increase';
+export type PinnedKeyboardToolbarAction = 'toggle' | 'hide';
 export type PinnedWheelAction = 'zoom' | 'opacity';
 export type PinnedKeyboardTransformAction =
   | 'rotate-clockwise'
@@ -120,6 +121,17 @@ export function getPinnedKeyboardMoveDelta(
   };
 
   return deltaByKey[event.key] ?? null;
+}
+
+export function getPinnedKeyboardToolbarAction(
+  event: PinnedKeyboardEvent,
+  toolbarVisible: boolean,
+): PinnedKeyboardToolbarAction | null {
+  if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return null;
+  if (event.key === ' ') return 'toggle';
+  if (event.key === 'Escape' && toolbarVisible) return 'hide';
+
+  return null;
 }
 
 export function nextPinnedTransform(

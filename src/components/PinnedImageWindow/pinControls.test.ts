@@ -5,6 +5,7 @@ import {
   getPinnedDisplaySizeForTransform,
   getPinnedKeyboardMoveDelta,
   getPinnedKeyboardOpacityAction,
+  getPinnedKeyboardToolbarAction,
   getPinnedKeyboardTransformAction,
   getPinnedKeyboardZoomAction,
   getPinnedOpacityFromWheel,
@@ -152,6 +153,60 @@ describe('pinned image controls', () => {
         metaKey: false,
         ctrlKey: false,
       }),
+    ).toBeNull();
+  });
+
+  it('maps Snipaste toolbar visibility shortcuts for pinned images', () => {
+    expect(
+      getPinnedKeyboardToolbarAction(
+        {
+          key: ' ',
+          metaKey: false,
+          ctrlKey: false,
+        },
+        false,
+      ),
+    ).toBe('toggle');
+    expect(
+      getPinnedKeyboardToolbarAction(
+        {
+          key: 'Escape',
+          metaKey: false,
+          ctrlKey: false,
+        },
+        true,
+      ),
+    ).toBe('hide');
+    expect(
+      getPinnedKeyboardToolbarAction(
+        {
+          key: 'Escape',
+          metaKey: false,
+          ctrlKey: false,
+        },
+        false,
+      ),
+    ).toBeNull();
+    expect(
+      getPinnedKeyboardToolbarAction(
+        {
+          key: 'Escape',
+          metaKey: false,
+          ctrlKey: false,
+          shiftKey: true,
+        },
+        true,
+      ),
+    ).toBeNull();
+    expect(
+      getPinnedKeyboardToolbarAction(
+        {
+          key: ' ',
+          metaKey: true,
+          ctrlKey: false,
+        },
+        false,
+      ),
     ).toBeNull();
   });
 
