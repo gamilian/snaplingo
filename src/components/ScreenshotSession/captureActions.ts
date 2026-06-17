@@ -28,6 +28,12 @@ export function isSaveCaptureShortcut(event: CaptureShortcutEvent) {
 }
 
 export function isCopyCaptureKeyboardShortcut(event: CaptureShortcutEvent) {
+  const isPlainEnter =
+    event.key === 'Enter' &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !event.shiftKey;
   const isPlainSpace =
     event.key === ' ' &&
     !event.metaKey &&
@@ -36,7 +42,7 @@ export function isCopyCaptureKeyboardShortcut(event: CaptureShortcutEvent) {
     !event.shiftKey;
 
   return (
-    event.key === 'Enter' ||
+    isPlainEnter ||
     isPlainSpace ||
     (event.key.toLowerCase() === 'c' && (event.metaKey || event.ctrlKey))
   );

@@ -255,6 +255,15 @@ describe('capture session actions', () => {
         shiftKey: true,
       }),
     ).toBe(false);
+    expect(
+      isCopyCaptureKeyboardShortcut({
+        key: 'Enter',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
   });
 
   it('uses unmodified Enter for confirming a hovered capture candidate', () => {
