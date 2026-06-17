@@ -55,11 +55,7 @@ pub async fn open_capture_window_for_mode(
     state: &crate::AppState,
     mode: &str,
 ) -> Result<(), String> {
-    let session = state
-        .capture_session_service
-        .create_session()
-        .await
-        .map_err(|e| e.to_string())?;
+    let session = create_capture_session_without_app_windows(app, state).await?;
     let bounds = capture_window_bounds(&session.monitors)
         .ok_or_else(|| "Cannot open capture window without monitor bounds".to_string())?;
     open_capture_window_for_session(app, mode, &session.id.0, &bounds)
@@ -398,11 +394,8 @@ pub async fn run_capture_ocr(
 pub async fn open_capture_window_from_shortcut(app: AppHandle, mode: &'static str) {
     let result = async {
         let state = app.state::<crate::AppState>();
-        let session = state.capture_session_service.create_session().await?;
-        let bounds = capture_window_bounds(&session.monitors).ok_or_else(|| {
-            crate::AppError::System("Cannot open capture window without monitor bounds".to_string())
-        })?;
-        open_capture_window_for_session(&app, mode, &session.id.0, &bounds)
+        open_capture_window_for_mode(&app, state.inner(), mode)
+            .await
             .map_err(crate::AppError::from)
     }
     .await;
@@ -410,6 +403,62 @@ pub async fn open_capture_window_from_shortcut(app: AppHandle, mode: &'static st
     if let Err(err) = result {
         log::error!("Failed to open capture window: {}", err);
     }
+}
+
+async fn create_capture_session_without_app_windows(
+    app: &AppHandle,
+    state: &crate::AppState,
+) -> Result<CaptureSessionView, String> {
+    let hidden_window_labels = hide_capture_snapshot_windows(app)?;
+    let session_result = state
+        .capture_session_service
+        .create_session()
+        .await
+        .map_err(|e| e.to_string());
+    let restore_result = restore_capture_snapshot_windows(app, &hidden_window_labels);
+
+    match (session_result, restore_result) {
+        (Ok(session), Ok(())) => Ok(session),
+        (Err(session_err), Ok(())) => Err(session_err),
+        (Ok(_), Err(restore_err)) => Err(restore_err),
+        (Err(session_err), Err(restore_err)) => Err(format!(
+            "{}; also failed to restore hidden windows: {}",
+            session_err, restore_err
+        )),
+    }
+}
+
+fn hide_capture_snapshot_windows(app: &AppHandle) -> Result<Vec<String>, String> {
+    let visible_window_labels = app
+        .webview_windows()
+        .into_iter()
+        .filter_map(|(label, window)| match window.is_visible() {
+            Ok(true) => Some(label),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let labels_to_hide = capture_snapshot_window_labels_to_hide(&visible_window_labels);
+
+    for label in &labels_to_hide {
+        if let Some(window) = app.get_webview_window(label) {
+            window.hide().map_err(|e| e.to_string())?;
+        }
+    }
+
+    Ok(labels_to_hide)
+}
+
+fn restore_capture_snapshot_windows(
+    app: &AppHandle,
+    hidden_window_labels: &[String],
+) -> Result<(), String> {
+    for label in capture_snapshot_window_labels_to_restore(hidden_window_labels) {
+        if let Some(window) = app.get_webview_window(&label) {
+            window.show().map_err(|e| e.to_string())?;
+        }
+    }
+
+    Ok(())
 }
 
 pub fn open_capture_window_for_session(
@@ -701,6 +750,18 @@ fn capture_window_url_with_session(mode: &str, session_id: &str) -> PathBuf {
     ))
 }
 
+fn capture_snapshot_window_labels_to_hide(visible_window_labels: &[String]) -> Vec<String> {
+    visible_window_labels.to_vec()
+}
+
+fn capture_snapshot_window_labels_to_restore(hidden_window_labels: &[String]) -> Vec<String> {
+    hidden_window_labels
+        .iter()
+        .filter(|label| label.as_str() != CAPTURE_WINDOW_LABEL)
+        .cloned()
+        .collect()
+}
+
 fn pinned_window_url(image_id: &str) -> PathBuf {
     PathBuf::from(format!("index.html?window=pin&imageId={}", image_id))
 }
@@ -943,6 +1004,34 @@ mod tests {
         assert_eq!(
             super::capture_window_url("unknown").to_string_lossy(),
             "index.html?window=capture&mode=screenshot"
+        );
+    }
+
+    #[test]
+    fn plans_visible_app_windows_to_hide_before_capture_snapshot() {
+        assert_eq!(
+            super::capture_snapshot_window_labels_to_hide(&[
+                "main".to_string(),
+                "capture".to_string(),
+                "pin-pin-1".to_string(),
+            ]),
+            vec![
+                "main".to_string(),
+                "capture".to_string(),
+                "pin-pin-1".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn plans_hidden_app_windows_to_restore_after_capture_snapshot() {
+        assert_eq!(
+            super::capture_snapshot_window_labels_to_restore(&[
+                "main".to_string(),
+                "capture".to_string(),
+                "pin-pin-1".to_string(),
+            ]),
+            vec!["main".to_string(), "pin-pin-1".to_string()]
         );
     }
 
