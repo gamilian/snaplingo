@@ -201,15 +201,15 @@ export function getSelectionArrowActionFromShortcut(
 }
 
 export function isCopyCaptureKeyboardShortcut(event: CaptureShortcutEvent) {
-  const isPlainEnter =
-    event.key === 'Enter' &&
+  const isPlainCompletionKey =
+    (event.key === 'Enter' || event.key === ' ') &&
     !event.metaKey &&
     !event.ctrlKey &&
     !event.altKey &&
     !event.shiftKey;
 
   return (
-    isPlainEnter ||
+    isPlainCompletionKey ||
     (event.key.toLowerCase() === 'c' &&
       (event.metaKey || event.ctrlKey) &&
       !event.altKey &&
@@ -225,16 +225,6 @@ export function isConfirmHoverSelectionShortcut(
 
   return (
     (event.key === 'Enter' || event.key === ' ') &&
-    !event.metaKey &&
-    !event.ctrlKey &&
-    !event.altKey &&
-    !event.shiftKey
-  );
-}
-
-export function isToggleToolbarShortcut(event: CaptureShortcutEvent) {
-  return (
-    event.key === ' ' &&
     !event.metaKey &&
     !event.ctrlKey &&
     !event.altKey &&

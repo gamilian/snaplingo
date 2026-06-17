@@ -29,7 +29,6 @@ import {
   isRestoreLastSelectionShortcut,
   isSaveCaptureShortcut,
   isSelectAllCaptureShortcut,
-  isToggleToolbarShortcut,
   isToggleCapturedCursorShortcut,
   printCaptureSelection,
   quickSaveCaptureSelection,
@@ -1116,7 +1115,7 @@ describe('capture session actions', () => {
     ).toBe(false);
   });
 
-  it('uses Enter or Cmd/Ctrl+C for copying the current selection', () => {
+  it('uses Enter, Space, or Cmd/Ctrl+C for copying the current selection', () => {
     expect(
       isCopyCaptureKeyboardShortcut({
         key: 'Enter',
@@ -1146,7 +1145,7 @@ describe('capture session actions', () => {
         altKey: false,
         shiftKey: false,
       }),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       isCopyCaptureKeyboardShortcut({
         key: 'c',
@@ -1374,36 +1373,6 @@ describe('capture session actions', () => {
         hasDismissibleLayer: true,
       }),
     ).toBe('finish-edit');
-  });
-
-  it('uses plain Space for toggling the capture toolbar visibility', () => {
-    expect(
-      isToggleToolbarShortcut({
-        key: ' ',
-        metaKey: false,
-        ctrlKey: false,
-        altKey: false,
-        shiftKey: false,
-      }),
-    ).toBe(true);
-    expect(
-      isToggleToolbarShortcut({
-        key: ' ',
-        metaKey: false,
-        ctrlKey: false,
-        altKey: false,
-        shiftKey: true,
-      }),
-    ).toBe(false);
-    expect(
-      isToggleToolbarShortcut({
-        key: 't',
-        metaKey: false,
-        ctrlKey: false,
-        altKey: false,
-        shiftKey: false,
-      }),
-    ).toBe(false);
   });
 
   it('uses Space for moving an in-progress selection without system modifiers', () => {

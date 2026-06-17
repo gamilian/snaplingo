@@ -119,7 +119,6 @@ import {
   isRestoreLastSelectionShortcut,
   isSaveCaptureShortcut,
   isSelectAllCaptureShortcut,
-  isToggleToolbarShortcut,
   isToggleCapturedCursorShortcut,
   isUndoAnnotationGesturePointShortcut,
   printCaptureSelection,
@@ -415,7 +414,6 @@ export default function ScreenshotSession({
   const [isMagnifierRequested, setIsMagnifierRequested] = useState(false);
   const [sampleCanvasVersion, setSampleCanvasVersion] = useState(0);
   const [isRenderingOutput, setIsRenderingOutput] = useState(false);
-  const [isToolbarHidden, setIsToolbarHidden] = useState(false);
   const [includeCapturedCursor, setIncludeCapturedCursor] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasStartedInitialSession, setHasStartedInitialSession] = useState(false);
@@ -549,7 +547,6 @@ export default function ScreenshotSession({
     setIsMagnifierRequested(false);
     setSampleCanvasVersion(0);
     setIsRenderingOutput(false);
-    setIsToolbarHidden(false);
     setIncludeCapturedCursor(false);
     setError(null);
   }, []);
@@ -1289,7 +1286,6 @@ export default function ScreenshotSession({
     setTextDraft(null);
     setTextDraftAnnotationIndex(null);
     setAnnotationHistory(emptyAnnotationHistory());
-    setIsToolbarHidden(false);
     setIsMagnifierRequested(false);
     setStatus('selecting');
   }, []);
@@ -1308,7 +1304,6 @@ export default function ScreenshotSession({
     setTextDraft(null);
     setTextDraftAnnotationIndex(null);
     setAnnotationHistory(emptyAnnotationHistory());
-    setIsToolbarHidden(false);
     setIsMagnifierRequested(false);
     setStatus('preview');
     void renderSelectionPreview(rect, []);
@@ -1667,13 +1662,6 @@ export default function ScreenshotSession({
       } else if (
         status === 'preview' &&
         !textDraft &&
-        isToggleToolbarShortcut(event)
-      ) {
-        event.preventDefault();
-        setIsToolbarHidden((isHidden) => !isHidden);
-      } else if (
-        status === 'preview' &&
-        !textDraft &&
         (event.key === '[' ||
           event.key === ']' ||
           (hasAnnotationEditingContext &&
@@ -1941,7 +1929,6 @@ export default function ScreenshotSession({
     setTextDraft(null);
     setTextDraftAnnotationIndex(null);
     setAnnotationHistory(emptyAnnotationHistory());
-    setIsToolbarHidden(false);
   };
 
   const applyEditGesture = useCallback(
@@ -2698,7 +2685,7 @@ export default function ScreenshotSession({
               ))}
             </div>
           )}
-          {toolbarPosition && !isToolbarHidden && (
+          {toolbarPosition && (
             <div
               className="absolute flex h-9 items-center gap-1 rounded bg-neutral-950/90 p-1 text-xs text-white shadow-lg ring-1 ring-white/15"
               style={{
