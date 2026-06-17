@@ -10,12 +10,26 @@ interface PinShortcutEvent {
   ctrlKey: boolean;
 }
 
+interface PinDestroyShortcutEvent {
+  key: string;
+  shiftKey: boolean;
+}
+
+interface PinWindow {
+  hide?: () => Promise<void>;
+  close?: () => Promise<void>;
+}
+
 export function isCopyPinnedImageShortcut(event: PinShortcutEvent) {
   return event.key.toLowerCase() === 'c' && (event.metaKey || event.ctrlKey);
 }
 
 export function isSavePinnedImageShortcut(event: PinShortcutEvent) {
   return event.key.toLowerCase() === 's' && (event.metaKey || event.ctrlKey);
+}
+
+export function isDestroyPinnedImageShortcut(event: PinDestroyShortcutEvent) {
+  return event.key === 'Escape' && event.shiftKey;
 }
 
 export async function savePinnedImage(invoke: PinInvoke, imageId: string) {
@@ -34,4 +48,17 @@ export async function movePinnedImageToNextGroup(
   await invoke('move_pinned_image_to_next_group', {
     imageId,
   });
+}
+
+export async function hidePinnedImage(window: PinWindow) {
+  await window.hide?.();
+}
+
+export async function destroyPinnedImage(
+  invoke: PinInvoke,
+  imageId: string,
+  window: PinWindow,
+) {
+  await invoke('remove_pinned_image', { imageId });
+  await window.close?.();
 }

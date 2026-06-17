@@ -13,7 +13,10 @@ import {
   getPinnedZoomFromWheel,
 } from './pinControls';
 import {
+  destroyPinnedImage,
+  hidePinnedImage,
   isCopyPinnedImageShortcut,
+  isDestroyPinnedImageShortcut,
   isSavePinnedImageShortcut,
   movePinnedImageToNextGroup,
   savePinnedImage,
@@ -21,7 +24,7 @@ import {
 
 const appWindow = getCurrentWindow();
 const webviewWindow = getCurrentWebviewWindow();
-const PIN_CONTEXT_MENU_SIZE = { width: 132, height: 248 };
+const PIN_CONTEXT_MENU_SIZE = { width: 132, height: 276 };
 
 function readPinnedImageId(search: string) {
   const params = new URLSearchParams(search);
@@ -44,14 +47,20 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const closePinnedImage = useCallback(async () => {
+  const hideCurrentPinnedImage = useCallback(async () => {
     try {
-      await invoke('remove_pinned_image', { imageId });
+      await hidePinnedImage(webviewWindow);
     } catch (err) {
-      console.error('Failed to remove pinned image:', err);
+      console.error('Failed to hide pinned image:', err);
     }
+  }, []);
 
-    await webviewWindow.close();
+  const destroyCurrentPinnedImage = useCallback(async () => {
+    try {
+      await destroyPinnedImage(invoke, imageId, webviewWindow);
+    } catch (err) {
+      console.error('Failed to destroy pinned image:', err);
+    }
   }, [imageId]);
 
   useEffect(() => {
@@ -79,12 +88,17 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
       if (event.key !== 'Escape') return;
 
       event.preventDefault();
-      void closePinnedImage();
+      if (isDestroyPinnedImageShortcut(event)) {
+        void destroyCurrentPinnedImage();
+        return;
+      }
+
+      void hideCurrentPinnedImage();
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [closePinnedImage]);
+  }, [destroyCurrentPinnedImage, hideCurrentPinnedImage]);
 
   const resizePinnedWindow = useCallback(
     async (nextZoom: number, nextImage = image) => {
@@ -286,6 +300,13 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
           <button
             type="button"
             className="h-7 w-full rounded px-2 text-left hover:bg-white/15"
+            onClick={hideCurrentPinnedImage}
+          >
+            Hide
+          </button>
+          <button
+            type="button"
+            className="h-7 w-full rounded px-2 text-left hover:bg-white/15"
             onClick={copyPinnedImage}
           >
             Copy
@@ -300,18 +321,18 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
           <button
             type="button"
             className="h-7 w-full rounded px-2 text-left text-red-100 hover:bg-red-500/20"
-            onClick={closePinnedImage}
+            onClick={destroyCurrentPinnedImage}
           >
-            Close
+            Destroy
           </button>
         </div>
       )}
       <button
         type="button"
         className="absolute right-1 top-1 h-6 w-6 rounded bg-black/70 text-xs leading-6 text-white opacity-0 shadow hover:bg-black/90 focus:opacity-100 group-hover:opacity-100"
-        aria-label="Close pinned image"
-        title="Close"
-        onClick={closePinnedImage}
+        aria-label="Hide pinned image"
+        title="Hide"
+        onClick={hideCurrentPinnedImage}
       >
         X
       </button>

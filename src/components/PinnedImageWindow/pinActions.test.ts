@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  destroyPinnedImage,
+  hidePinnedImage,
   isCopyPinnedImageShortcut,
+  isDestroyPinnedImageShortcut,
   isSavePinnedImageShortcut,
   movePinnedImageToNextGroup,
   type PinInvoke,
@@ -102,5 +105,54 @@ describe('pinned image actions', () => {
         args: { imageId: 'pin-1' },
       },
     ]);
+  });
+
+  it('hides a pinned image window without removing the image', async () => {
+    const calls: string[] = [];
+
+    await hidePinnedImage({
+      hide: async () => {
+        calls.push('hide');
+      },
+    });
+
+    expect(calls).toEqual(['hide']);
+  });
+
+  it('destroys a pinned image by removing it before closing the window', async () => {
+    const calls: Array<{ command?: string; args?: unknown; window?: string }> = [];
+    const invoke: PinInvoke = async <T>(
+      command: string,
+      args?: PinInvokeArgs,
+    ): Promise<T> => {
+      calls.push({ command, args });
+      return undefined as T;
+    };
+
+    await destroyPinnedImage(invoke, 'pin-1', {
+      close: async () => {
+        calls.push({ window: 'close' });
+      },
+    });
+
+    expect(calls).toEqual([
+      {
+        command: 'remove_pinned_image',
+        args: { imageId: 'pin-1' },
+      },
+      { window: 'close' },
+    ]);
+  });
+
+  it('uses Shift+Escape for destroying a pinned image', () => {
+    expect(isDestroyPinnedImageShortcut({ key: 'Escape', shiftKey: true })).toBe(
+      true,
+    );
+    expect(isDestroyPinnedImageShortcut({ key: 'Escape', shiftKey: false })).toBe(
+      false,
+    );
+    expect(isDestroyPinnedImageShortcut({ key: 'x', shiftKey: true })).toBe(
+      false,
+    );
   });
 });
