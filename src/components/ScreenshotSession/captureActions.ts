@@ -94,6 +94,16 @@ export function getCursorNudgeDeltaFromShortcut(
   return deltaByKey[event.key.toLowerCase()] ?? null;
 }
 
+export function getCandidateCycleDirectionFromShortcut(
+  event: CaptureShortcutEvent,
+): 1 | -1 | null {
+  if (event.key !== 'Tab' || event.metaKey || event.ctrlKey || event.altKey) {
+    return null;
+  }
+
+  return event.shiftKey ? -1 : 1;
+}
+
 export function isSelectAllCaptureShortcut(event: CaptureShortcutEvent) {
   return (
     event.key.toLowerCase() === 'a' &&

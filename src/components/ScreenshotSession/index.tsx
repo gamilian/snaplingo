@@ -29,6 +29,7 @@ import {
 import {
   buildCaptureCandidates,
   getBestCandidateAtPoint,
+  getNextCandidateAtPoint,
 } from './captureCandidates';
 import {
   addAnnotationToHistory,
@@ -78,6 +79,7 @@ import {
 } from './textAnnotationDraft';
 import {
   copyCaptureSelection,
+  getCandidateCycleDirectionFromShortcut,
   getCursorNudgeDeltaFromShortcut,
   isCancelCapturePointer,
   isConfirmHoverSelectionShortcut,
@@ -1087,6 +1089,8 @@ export default function ScreenshotSession({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       const cursorNudgeDelta = getCursorNudgeDeltaFromShortcut(event);
+      const candidateCycleDirection =
+        getCandidateCycleDirectionFromShortcut(event);
 
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -1133,6 +1137,21 @@ export default function ScreenshotSession({
         event.preventDefault();
         setCursorPoint(
           nudgeVirtualPoint(cursorPoint, cursorNudgeDelta, selectionBounds),
+        );
+      } else if (
+        status === 'selecting' &&
+        !textDraft &&
+        cursorPoint &&
+        candidateCycleDirection
+      ) {
+        event.preventDefault();
+        setHoverSelection(
+          getNextCandidateAtPoint(
+            captureCandidates,
+            cursorPoint,
+            hoverSelection,
+            candidateCycleDirection,
+          )?.rect ?? null,
         );
       } else if (
         (status === 'selecting' || status === 'preview') &&
@@ -1281,6 +1300,7 @@ export default function ScreenshotSession({
     copySelection,
     annotationGesture,
     annotationMoveGesture,
+    captureCandidates,
     cursorPoint,
     draftSelectionMoveGesture,
     dismissCaptureLayer,

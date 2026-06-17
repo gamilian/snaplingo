@@ -4,6 +4,7 @@ import {
   type CaptureInvoke,
   type CaptureInvokeArgs,
   copyCaptureSelection,
+  getCandidateCycleDirectionFromShortcut,
   isCancelCapturePointer,
   isCopyCaptureDoubleClick,
   isCopyCaptureKeyboardShortcut,
@@ -411,6 +412,45 @@ describe('capture session actions', () => {
         shiftKey: false,
       }),
     ).toBe(false);
+  });
+
+  it('maps Tab shortcuts to capture candidate cycle direction', () => {
+    expect(
+      getCandidateCycleDirectionFromShortcut({
+        key: 'Tab',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(1);
+    expect(
+      getCandidateCycleDirectionFromShortcut({
+        key: 'Tab',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(-1);
+    expect(
+      getCandidateCycleDirectionFromShortcut({
+        key: 'Tab',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBeNull();
+    expect(
+      getCandidateCycleDirectionFromShortcut({
+        key: 'Enter',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBeNull();
   });
 
   it('uses an unmodified secondary-button press for canceling the current capture layer', () => {
