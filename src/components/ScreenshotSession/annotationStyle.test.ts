@@ -21,6 +21,12 @@ import {
 const style: AnnotationStyle = {
   color: [40, 167, 69, 255],
   strokeWidth: 5,
+  filled: false,
+};
+
+const filledStyle: AnnotationStyle = {
+  ...style,
+  filled: true,
 };
 
 describe('annotation style', () => {
@@ -37,6 +43,7 @@ describe('annotation style', () => {
       rect: { x: 4, y: 6, width: 8, height: 14 },
       color: [40, 167, 69, 255],
       stroke_width: 5,
+      filled: false,
     });
   });
 
@@ -53,6 +60,32 @@ describe('annotation style', () => {
       rect: { x: 4, y: 6, width: 8, height: 14 },
       color: [40, 167, 69, 255],
       stroke_width: 5,
+      filled: false,
+    });
+  });
+
+  it('creates filled geometric annotations from the selected fill style', () => {
+    expect(
+      annotationFromGesture(
+        'rectangle',
+        { x: 2, y: 3 },
+        { x: 12, y: 11 },
+        filledStyle,
+      ),
+    ).toMatchObject({
+      type: 'rectangle',
+      filled: true,
+    });
+    expect(
+      annotationFromGesture(
+        'ellipse',
+        { x: 2, y: 3 },
+        { x: 12, y: 11 },
+        filledStyle,
+      ),
+    ).toMatchObject({
+      type: 'ellipse',
+      filled: true,
     });
   });
 
@@ -513,14 +546,16 @@ describe('annotation style', () => {
           rect: { x: 1, y: 2, width: 10, height: 8 },
           color: [255, 77, 79, 255],
           stroke_width: 2,
+          filled: false,
         },
-        style,
+        filledStyle,
       ),
     ).toEqual({
       type: 'rectangle',
       rect: { x: 1, y: 2, width: 10, height: 8 },
       color: [40, 167, 69, 255],
       stroke_width: 5,
+      filled: true,
     });
 
     expect(

@@ -434,6 +434,11 @@ export default function ScreenshotSession({
     activeAnnotationTool === 'text' ||
     Boolean(textDraft) ||
     selectedAnnotation?.type === 'text';
+  const isFillModeActive =
+    activeAnnotationTool === 'rectangle' ||
+    activeAnnotationTool === 'ellipse' ||
+    selectedAnnotation?.type === 'rectangle' ||
+    selectedAnnotation?.type === 'ellipse';
   const sizeLabel = selection
     ? `${Math.round(selection.width)} x ${Math.round(selection.height)}`
     : '';
@@ -1041,6 +1046,10 @@ export default function ScreenshotSession({
       setAnnotationStyle({
         color: annotation.color,
         strokeWidth: annotation.stroke_width,
+        filled:
+          annotation.type === 'rectangle' || annotation.type === 'ellipse'
+            ? annotation.filled
+            : false,
       });
     },
     [],
@@ -2335,6 +2344,9 @@ export default function ScreenshotSession({
                 border: `${draftAnnotation.stroke_width}px solid ${annotationColorToCss(
                   draftAnnotation.color,
                 )}`,
+                backgroundColor: draftAnnotation.filled
+                  ? annotationColorToCss(draftAnnotation.color)
+                  : 'transparent',
               }}
             />
           )}
@@ -2343,7 +2355,11 @@ export default function ScreenshotSession({
               className="pointer-events-none absolute overflow-visible"
               style={rectStyle(selectionViewportRect)}
               viewBox={`0 0 ${selectionViewportRect.width} ${selectionViewportRect.height}`}
-              fill="none"
+              fill={
+                draftAnnotation.filled
+                  ? annotationColorToCss(draftAnnotation.color)
+                  : 'none'
+              }
             >
               <ellipse
                 cx={draftAnnotation.rect.x + draftAnnotation.rect.width / 2}
@@ -2778,6 +2794,23 @@ export default function ScreenshotSession({
                     {
                       ...annotationStyle,
                       strokeWidth: value,
+                    },
+                    textFontSize,
+                  );
+                }}
+              />
+              <input
+                className="h-5 w-5 accent-white disabled:opacity-50"
+                type="checkbox"
+                checked={annotationStyle.filled}
+                disabled={isRenderingOutput || !isFillModeActive}
+                title="Fill shape"
+                aria-label="Fill shape"
+                onChange={(event) => {
+                  applySelectedAnnotationStyle(
+                    {
+                      ...annotationStyle,
+                      filled: event.currentTarget.checked,
                     },
                     textFontSize,
                   );

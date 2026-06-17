@@ -13,6 +13,7 @@ import {
 const style: AnnotationStyle = {
   color: [24, 144, 255, 255],
   strokeWidth: 4,
+  filled: false,
 };
 
 const history: AnnotationHistory = {
@@ -22,6 +23,7 @@ const history: AnnotationHistory = {
       rect: { x: 1, y: 2, width: 3, height: 4 },
       color: [255, 77, 79, 255],
       stroke_width: 2,
+      filled: false,
     },
   ],
   undoneAnnotations: [

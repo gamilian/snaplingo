@@ -20,11 +20,13 @@ pub enum ImageAnnotation {
         rect: PhysicalRect,
         color: [u8; 4],
         stroke_width: u32,
+        filled: bool,
     },
     Ellipse {
         rect: PhysicalRect,
         color: [u8; 4],
         stroke_width: u32,
+        filled: bool,
     },
     Arrow {
         start: PhysicalPoint,
@@ -213,12 +215,14 @@ fn draw_annotation(output: &mut image::RgbaImage, annotation: &ImageAnnotation) 
             rect,
             color,
             stroke_width,
-        } => draw_rectangle_annotation(output, rect, *color, *stroke_width),
+            filled,
+        } => draw_rectangle_annotation(output, rect, *color, *stroke_width, *filled),
         ImageAnnotation::Ellipse {
             rect,
             color,
             stroke_width,
-        } => draw_ellipse_annotation(output, rect, *color, *stroke_width),
+            filled,
+        } => draw_ellipse_annotation(output, rect, *color, *stroke_width, *filled),
         ImageAnnotation::Arrow {
             start,
             end,
@@ -259,6 +263,7 @@ fn draw_rectangle_annotation(
     rect: &PhysicalRect,
     color: [u8; 4],
     stroke_width: u32,
+    filled: bool,
 ) {
     if rect.width == 0 || rect.height == 0 {
         return;
@@ -272,6 +277,13 @@ fn draw_rectangle_annotation(
     let top = rect.y as i64;
     let right = left + rect.width as i64 - 1;
     let bottom = top + rect.height as i64 - 1;
+
+    if filled {
+        for y in top..=bottom {
+            draw_horizontal_line(output, left, right, y, output_width, output_height, color);
+        }
+        return;
+    }
 
     for stroke in 0..stroke_width as i64 {
         draw_horizontal_line(
@@ -318,6 +330,7 @@ fn draw_ellipse_annotation(
     rect: &PhysicalRect,
     color: [u8; 4],
     stroke_width: u32,
+    filled: bool,
 ) {
     if rect.width == 0 || rect.height == 0 {
         return;
@@ -330,7 +343,30 @@ fn draw_ellipse_annotation(
     let center_x = rect.x as f64 + radius_x;
     let center_y = rect.y as f64 + radius_y;
     if radius_x <= f64::EPSILON || radius_y <= f64::EPSILON {
-        draw_rectangle_annotation(output, rect, color.0, stroke_width);
+        draw_rectangle_annotation(output, rect, color.0, stroke_width, filled);
+        return;
+    }
+
+    if filled {
+        let output_width = output.width() as i64;
+        let output_height = output.height() as i64;
+        let top = rect.y as i64;
+        let bottom = top + rect.height as i64 - 1;
+        for y in top..=bottom {
+            let normalized_y = (y as f64 - center_y) / radius_y;
+            let x_extent = (1.0 - normalized_y.powi(2)).max(0.0).sqrt() * radius_x;
+            let left = (center_x - x_extent).ceil() as i64;
+            let right = (center_x + x_extent).floor() as i64;
+            draw_horizontal_line(
+                output,
+                left,
+                right,
+                y as i64,
+                output_width,
+                output_height,
+                color,
+            );
+        }
         return;
     }
 

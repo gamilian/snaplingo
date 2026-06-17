@@ -14,6 +14,7 @@ const rectangle: AnnotationCommand = {
   rect: { x: 1, y: 2, width: 10, height: 8 },
   color: [255, 77, 79, 255],
   stroke_width: 2,
+  filled: false,
 };
 
 const arrow: AnnotationCommand = {

@@ -76,6 +76,7 @@ export interface RectangleAnnotationCommand {
   rect: LogicalRect;
   color: [number, number, number, number];
   stroke_width: number;
+  filled: boolean;
 }
 
 export interface EllipseAnnotationCommand {
@@ -83,6 +84,7 @@ export interface EllipseAnnotationCommand {
   rect: LogicalRect;
   color: [number, number, number, number];
   stroke_width: number;
+  filled: boolean;
 }
 
 export interface ArrowAnnotationCommand {

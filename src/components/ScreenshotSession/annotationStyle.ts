@@ -16,6 +16,7 @@ export type AnnotationColor = [number, number, number, number];
 export interface AnnotationStyle {
   color: AnnotationColor;
   strokeWidth: number;
+  filled: boolean;
 }
 
 export interface AnnotationGestureDraft {
@@ -64,6 +65,7 @@ export const MAX_TEXT_FONT_SIZE = 48;
 export const DEFAULT_ANNOTATION_STYLE: AnnotationStyle = {
   color: ANNOTATION_COLORS[0],
   strokeWidth: 2,
+  filled: false,
 };
 
 const MIN_ANNOTATION_SIZE = 4;
@@ -283,6 +285,7 @@ export function annotationFromGesture(
       rect: normalizeSelection(startPoint, currentPoint),
       color: style.color,
       stroke_width: style.strokeWidth,
+      filled: style.filled,
     };
   }
 
@@ -292,6 +295,7 @@ export function annotationFromGesture(
       rect: normalizeSelection(startPoint, currentPoint),
       color: style.color,
       stroke_width: style.strokeWidth,
+      filled: style.filled,
     };
   }
 
@@ -432,6 +436,15 @@ export function applyAnnotationStyle(
       ...annotation,
       color: [style.color[0], style.color[1], style.color[2], HIGHLIGHT_ALPHA],
       stroke_width: style.strokeWidth,
+    };
+  }
+
+  if (annotation.type === 'rectangle' || annotation.type === 'ellipse') {
+    return {
+      ...annotation,
+      color: style.color,
+      stroke_width: style.strokeWidth,
+      filled: style.filled,
     };
   }
 

@@ -55,6 +55,7 @@ describe('capture session actions', () => {
         rect: { x: 12, y: 24, width: 10, height: 8 },
         color: [255, 0, 0, 255],
         stroke_width: 2,
+        filled: false,
       },
     ];
 
@@ -96,6 +97,7 @@ describe('capture session actions', () => {
         rect: { x: 12, y: 24, width: 10, height: 8 },
         color: [255, 0, 0, 255],
         stroke_width: 2,
+        filled: false,
       },
     ];
 

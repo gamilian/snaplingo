@@ -145,6 +145,7 @@ mod tests {
                     },
                     color: [255, 0, 0, 255],
                     stroke_width: 1,
+                    filled: false,
                 }],
             )
             .unwrap();
@@ -152,6 +153,47 @@ mod tests {
         assert_eq!(png_pixel(&output, 1, 1), [255, 0, 0, 255]);
         assert_eq!(png_pixel(&output, 4, 3), [255, 0, 0, 255]);
         assert_eq!(png_pixel(&output, 2, 2), [255, 255, 255, 255]);
+    }
+
+    #[test]
+    fn composes_png_with_filled_rectangle_annotation() {
+        let service = ImageCompositionService::new();
+        let white = make_solid_png(6, 6, [255, 255, 255, 255]);
+
+        let output = service
+            .compose_png_with_annotations(
+                6,
+                6,
+                &[PngPlacement {
+                    png_data: white.as_slice(),
+                    source_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 6,
+                        height: 6,
+                    },
+                    destination_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 6,
+                        height: 6,
+                    },
+                }],
+                &[ImageAnnotation::Rectangle {
+                    rect: PhysicalRect {
+                        x: 1,
+                        y: 1,
+                        width: 4,
+                        height: 3,
+                    },
+                    color: [255, 0, 0, 255],
+                    stroke_width: 1,
+                    filled: true,
+                }],
+            )
+            .unwrap();
+
+        assert_eq!(png_pixel(&output, 2, 2), [255, 0, 0, 255]);
     }
 
     #[test]
@@ -187,6 +229,7 @@ mod tests {
                     },
                     color: [255, 0, 0, 255],
                     stroke_width: 1,
+                    filled: false,
                 }],
             )
             .unwrap();
@@ -196,6 +239,47 @@ mod tests {
         assert_eq!(png_pixel(&output, 4, 1), [255, 0, 0, 255]);
         assert_eq!(png_pixel(&output, 4, 5), [255, 0, 0, 255]);
         assert_eq!(png_pixel(&output, 4, 3), [255, 255, 255, 255]);
+    }
+
+    #[test]
+    fn composes_png_with_filled_ellipse_annotation() {
+        let service = ImageCompositionService::new();
+        let white = make_solid_png(9, 7, [255, 255, 255, 255]);
+
+        let output = service
+            .compose_png_with_annotations(
+                9,
+                7,
+                &[PngPlacement {
+                    png_data: white.as_slice(),
+                    source_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 9,
+                        height: 7,
+                    },
+                    destination_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 9,
+                        height: 7,
+                    },
+                }],
+                &[ImageAnnotation::Ellipse {
+                    rect: PhysicalRect {
+                        x: 1,
+                        y: 1,
+                        width: 7,
+                        height: 5,
+                    },
+                    color: [255, 0, 0, 255],
+                    stroke_width: 1,
+                    filled: true,
+                }],
+            )
+            .unwrap();
+
+        assert_eq!(png_pixel(&output, 4, 3), [255, 0, 0, 255]);
     }
 
     #[test]

@@ -6,13 +6,14 @@ import {
   hitTestAnnotations,
   moveAnnotationByDelta,
 } from './annotationGeometry';
-import type { AnnotationCommand } from './types';
+import type { AnnotationCommand, RectangleAnnotationCommand } from './types';
 
-const rectangle: AnnotationCommand = {
+const rectangle: RectangleAnnotationCommand = {
   type: 'rectangle',
   rect: { x: 10, y: 20, width: 30, height: 40 },
   color: [255, 77, 79, 255],
   stroke_width: 2,
+  filled: false,
 };
 
 const arrow: AnnotationCommand = {

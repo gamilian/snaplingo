@@ -715,19 +715,23 @@ fn image_annotations_from_commands(
                 rect,
                 color,
                 stroke_width,
+                filled,
             } => Ok(ImageAnnotation::Rectangle {
                 rect: scaled_logical_rect_relative_to(rect, &annotation_origin, output_scale)?,
                 color: *color,
                 stroke_width: ((*stroke_width).max(1) as f64 * output_scale).ceil() as u32,
+                filled: *filled,
             }),
             AnnotationCommand::Ellipse {
                 rect,
                 color,
                 stroke_width,
+                filled,
             } => Ok(ImageAnnotation::Ellipse {
                 rect: scaled_logical_rect_relative_to(rect, &annotation_origin, output_scale)?,
                 color: *color,
                 stroke_width: ((*stroke_width).max(1) as f64 * output_scale).ceil() as u32,
+                filled: *filled,
             }),
             AnnotationCommand::Arrow {
                 start,
@@ -1469,6 +1473,7 @@ mod tests {
                     },
                     color: [255, 77, 79, 255],
                     stroke_width: 2,
+                    filled: true,
                 },
                 AnnotationCommand::Arrow {
                     start: LogicalPoint { x: 2.0, y: 3.0 },
@@ -1525,6 +1530,7 @@ mod tests {
                     },
                     color: [40, 167, 69, 255],
                     stroke_width: 2,
+                    filled: false,
                 },
                 AnnotationCommand::Text {
                     position: LogicalPoint { x: 3.5, y: 4.5 },
@@ -1555,6 +1561,7 @@ mod tests {
                 },
                 color: [255, 77, 79, 255],
                 stroke_width: 4,
+                filled: true,
             }
         );
         assert_eq!(
@@ -1626,6 +1633,7 @@ mod tests {
                 },
                 color: [40, 167, 69, 255],
                 stroke_width: 4,
+                filled: false,
             }
         );
         assert_eq!(

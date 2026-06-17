@@ -137,11 +137,15 @@ pub enum AnnotationCommand {
         rect: LogicalRect,
         color: [u8; 4],
         stroke_width: u32,
+        #[serde(default)]
+        filled: bool,
     },
     Ellipse {
         rect: LogicalRect,
         color: [u8; 4],
         stroke_width: u32,
+        #[serde(default)]
+        filled: bool,
     },
     Arrow {
         start: LogicalPoint,
@@ -225,12 +229,14 @@ mod tests {
             },
             color: [255, 0, 0, 255],
             stroke_width: 2,
+            filled: true,
         };
 
         let serialized = serde_json::to_value(&annotation).unwrap();
 
         assert_eq!(serialized["type"], "rectangle");
         assert_eq!(serialized["stroke_width"], 2);
+        assert_eq!(serialized["filled"], true);
     }
 
     #[test]
@@ -355,6 +361,7 @@ mod tests {
             },
             color: [255, 0, 0, 255],
             stroke_width: 2,
+            filled: false,
         };
 
         let serialized = serde_json::to_value(&annotation).unwrap();
@@ -362,6 +369,7 @@ mod tests {
         assert_eq!(serialized["type"], "ellipse");
         assert_eq!(serialized["rect"]["width"], 6.0);
         assert_eq!(serialized["stroke_width"], 2);
+        assert_eq!(serialized["filled"], false);
     }
 
     #[test]
