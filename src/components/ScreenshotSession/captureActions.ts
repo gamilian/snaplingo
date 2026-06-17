@@ -1,4 +1,10 @@
-import type { AnnotationCommand, ArrowKey, LogicalRect, Point } from './types';
+import type {
+  AnnotationCommand,
+  ArrowKey,
+  CaptureSessionView,
+  LogicalRect,
+  Point,
+} from './types';
 
 export type CaptureInvokeArgs = Record<string, unknown>;
 export type CaptureInvoke = <T>(
@@ -65,6 +71,16 @@ export function isQuickSaveCaptureShortcut(event: CaptureShortcutEvent) {
 export function isRestoreLastSelectionShortcut(event: CaptureShortcutEvent) {
   return (
     event.key.toLowerCase() === 'r' &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !event.shiftKey
+  );
+}
+
+export function isRefreshCaptureShortcut(event: CaptureShortcutEvent) {
+  return (
+    event.key === 'F5' &&
     !event.metaKey &&
     !event.ctrlKey &&
     !event.altKey &&
@@ -330,6 +346,15 @@ export async function quickSaveCaptureSelection(
       path,
     },
   });
+}
+
+export async function refreshCaptureSession(
+  invoke: CaptureInvoke,
+  previousSessionId: string,
+) {
+  const session = await invoke<CaptureSessionView>('create_capture_session');
+  await invoke('cancel_capture_session', { sessionId: previousSessionId });
+  return session;
 }
 
 export async function copyCaptureSelection(

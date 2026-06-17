@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AnnotationCommand, LogicalRect } from './types';
+import type { AnnotationCommand, CaptureSessionView, LogicalRect } from './types';
 import {
   type CaptureInvoke,
   type CaptureInvokeArgs,
@@ -20,6 +20,7 @@ import {
   isPinCaptureShortcut,
   isPinCapturePointer,
   isPrintCaptureShortcut,
+  isRefreshCaptureShortcut,
   isMoveDraftSelectionShortcut,
   isQuickSaveCaptureShortcut,
   isRestoreLastSelectionShortcut,
@@ -28,6 +29,7 @@ import {
   isToggleToolbarShortcut,
   printCaptureSelection,
   quickSaveCaptureSelection,
+  refreshCaptureSession,
   saveCaptureSelection,
 } from './captureActions';
 
@@ -119,6 +121,36 @@ describe('capture session actions', () => {
           },
           annotations,
         },
+      },
+    ]);
+  });
+
+  it('refreshes the frozen capture session before removing the previous one', async () => {
+    const calls: Array<{ command: string; args?: unknown }> = [];
+    const nextSession: CaptureSessionView = {
+      id: 'session-next',
+      monitors: [],
+      candidates: [],
+    };
+    const invoke: CaptureInvoke = async <T>(
+      command: string,
+      args?: CaptureInvokeArgs,
+    ): Promise<T> => {
+      calls.push({ command, args });
+      if (command === 'create_capture_session') {
+        return nextSession as T;
+      }
+      return undefined as T;
+    };
+
+    const session = await refreshCaptureSession(invoke, 'session-prev');
+
+    expect(session).toBe(nextSession);
+    expect(calls).toEqual([
+      { command: 'create_capture_session', args: undefined },
+      {
+        command: 'cancel_capture_session',
+        args: { sessionId: 'session-prev' },
       },
     ]);
   });
@@ -703,6 +735,36 @@ describe('capture session actions', () => {
         ctrlKey: false,
         altKey: false,
         shiftKey: true,
+      }),
+    ).toBe(false);
+  });
+
+  it('uses plain F5 for refreshing the frozen screenshot', () => {
+    expect(
+      isRefreshCaptureShortcut({
+        key: 'F5',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isRefreshCaptureShortcut({
+        key: 'F5',
+        metaKey: false,
+        ctrlKey: true,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      isRefreshCaptureShortcut({
+        key: 'r',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
       }),
     ).toBe(false);
   });

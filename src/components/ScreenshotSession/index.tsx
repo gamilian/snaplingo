@@ -105,12 +105,14 @@ import {
   isPinCaptureShortcut,
   isPrintCaptureShortcut,
   isQuickSaveCaptureShortcut,
+  isRefreshCaptureShortcut,
   isRestoreLastSelectionShortcut,
   isSaveCaptureShortcut,
   isSelectAllCaptureShortcut,
   isToggleToolbarShortcut,
   printCaptureSelection,
   quickSaveCaptureSelection,
+  refreshCaptureSession,
   saveCaptureSelection,
 } from './captureActions';
 import { printBase64PngImage } from './capturePrint';
@@ -523,9 +525,7 @@ export default function ScreenshotSession({
     hasViewportBounds: Boolean(viewportBounds),
   });
 
-  const resetSessionState = useCallback(() => {
-    setStatus('idle');
-    setSession(null);
+  const resetCaptureInteractionState = useCallback(() => {
     setStartPoint(null);
     setCursorPoint(null);
     setSelection(null);
@@ -549,6 +549,12 @@ export default function ScreenshotSession({
     setIsToolbarHidden(false);
     setError(null);
   }, []);
+
+  const resetSessionState = useCallback(() => {
+    setStatus('idle');
+    setSession(null);
+    resetCaptureInteractionState();
+  }, [resetCaptureInteractionState]);
 
   const cancelSession = useCallback(async () => {
     const sessionId = session?.id;
@@ -568,28 +574,7 @@ export default function ScreenshotSession({
   const startSession = useCallback(async (nextMode: CaptureMode, sessionId?: string) => {
     setStatus('loading');
     setMode(nextMode);
-    setStartPoint(null);
-    setCursorPoint(null);
-    setSelection(null);
-    setHoverSelection(null);
-    setEditGesture(null);
-    setActiveAnnotationTool(null);
-    setAnnotationGesture(null);
-    setDraftAnnotation(null);
-    setSelectedAnnotationIndex(null);
-    setAnnotationMoveGesture(null);
-    setDraftSelectionMoveGesture(null);
-    setTextDraft(null);
-    setTextDraftAnnotationIndex(null);
-    setAnnotationHistory(emptyAnnotationHistory());
-    setPreviewImageBase64(null);
-    setCursorColor(null);
-    setColorSampleFormat('hex');
-    setIsMagnifierRequested(false);
-    setSampleCanvasVersion(0);
-    setIsRenderingOutput(false);
-    setIsToolbarHidden(false);
-    setError(null);
+    resetCaptureInteractionState();
 
     try {
       const nextSession = sessionId
@@ -601,7 +586,7 @@ export default function ScreenshotSession({
       setError(err instanceof Error ? err.message : String(err));
       setStatus('error');
     }
-  }, []);
+  }, [resetCaptureInteractionState]);
 
   const recordLastSelection = useCallback((rect: LogicalRect) => {
     try {
@@ -891,6 +876,22 @@ export default function ScreenshotSession({
     selection,
     session,
   ]);
+
+  const refreshSession = useCallback(async () => {
+    if (!session) return;
+
+    setStatus('loading');
+    resetCaptureInteractionState();
+
+    try {
+      const nextSession = await refreshCaptureSession(invoke, session.id);
+      setSession(nextSession);
+      setStatus('selecting');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setStatus('error');
+    }
+  }, [resetCaptureInteractionState, session]);
 
   const undoAnnotation = useCallback(() => {
     if (!selection || !canUndoAnnotation) return;
@@ -1336,6 +1337,12 @@ export default function ScreenshotSession({
       if (event.key === 'Escape') {
         event.preventDefault();
         dismissCaptureLayer();
+      } else if (
+        (status === 'selecting' || status === 'preview') &&
+        isRefreshCaptureShortcut(event)
+      ) {
+        event.preventDefault();
+        void refreshSession();
       } else if (isMagnifierShortcut(event)) {
         event.preventDefault();
         setIsMagnifierRequested(true);
@@ -1651,6 +1658,7 @@ export default function ScreenshotSession({
     pinSelection,
     printSelection,
     quickSaveSelection,
+    refreshSession,
     restoreLastSelection,
     restoreSelectionFromHistory,
     saveSelection,
