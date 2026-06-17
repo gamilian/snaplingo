@@ -23,11 +23,21 @@ interface PinWindow {
 }
 
 export function isCopyPinnedImageShortcut(event: PinShortcutEvent) {
-  return event.key.toLowerCase() === 'c' && (event.metaKey || event.ctrlKey);
+  return (
+    event.key.toLowerCase() === 'c' &&
+    (event.metaKey || event.ctrlKey) &&
+    !event.altKey &&
+    !event.shiftKey
+  );
 }
 
 export function isSavePinnedImageShortcut(event: PinShortcutEvent) {
-  return event.key.toLowerCase() === 's' && (event.metaKey || event.ctrlKey);
+  return (
+    event.key.toLowerCase() === 's' &&
+    (event.metaKey || event.ctrlKey) &&
+    !event.altKey &&
+    !event.shiftKey
+  );
 }
 
 export function isClosePinnedImageShortcut(event: PinShortcutEvent) {

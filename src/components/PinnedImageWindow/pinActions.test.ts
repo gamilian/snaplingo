@@ -66,6 +66,22 @@ describe('pinned image actions', () => {
         ctrlKey: false,
       }),
     ).toBe(false);
+    expect(
+      isCopyPinnedImageShortcut({
+        key: 'c',
+        metaKey: true,
+        ctrlKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(false);
+    expect(
+      isCopyPinnedImageShortcut({
+        key: 'c',
+        metaKey: false,
+        ctrlKey: true,
+        altKey: true,
+      }),
+    ).toBe(false);
   });
 
   it('uses Cmd/Ctrl+S for saving a pinned image', () => {
@@ -88,6 +104,22 @@ describe('pinned image actions', () => {
         key: 's',
         metaKey: false,
         ctrlKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      isSavePinnedImageShortcut({
+        key: 's',
+        metaKey: true,
+        ctrlKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(false);
+    expect(
+      isSavePinnedImageShortcut({
+        key: 's',
+        metaKey: false,
+        ctrlKey: true,
+        altKey: true,
       }),
     ).toBe(false);
   });
