@@ -102,6 +102,18 @@ export function getUndoRedoActionFromShortcut(
   return null;
 }
 
+export function isDeleteSelectedAnnotationShortcut(
+  event: CaptureShortcutEvent,
+) {
+  return (
+    (event.key === 'Backspace' || event.key === 'Delete') &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !event.shiftKey
+  );
+}
+
 export function isCopyCaptureKeyboardShortcut(event: CaptureShortcutEvent) {
   const isPlainEnter =
     event.key === 'Enter' &&

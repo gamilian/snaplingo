@@ -98,6 +98,7 @@ import {
   isConfirmHoverSelectionShortcut,
   isCopyCaptureDoubleClick,
   isCopyCaptureKeyboardShortcut,
+  isDeleteSelectedAnnotationShortcut,
   isMoveDraftSelectionShortcut,
   isMagnifierShortcut,
   isPinCapturePointer,
@@ -1355,7 +1356,7 @@ export default function ScreenshotSession({
       } else if (
         status === 'preview' &&
         selectedAnnotationIndex !== null &&
-        (event.key === 'Backspace' || event.key === 'Delete')
+        isDeleteSelectedAnnotationShortcut(event)
       ) {
         event.preventDefault();
         deleteSelectedAnnotation();

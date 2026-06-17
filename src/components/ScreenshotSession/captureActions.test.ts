@@ -13,6 +13,7 @@ import {
   isCopyCaptureDoubleClick,
   isCopyCaptureKeyboardShortcut,
   isConfirmHoverSelectionShortcut,
+  isDeleteSelectedAnnotationShortcut,
   getCursorNudgeDeltaFromShortcut,
   isMagnifierShortcut,
   isPinCaptureShortcut,
@@ -323,6 +324,36 @@ describe('capture session actions', () => {
         shiftKey: false,
       }),
     ).toBeNull();
+  });
+
+  it('uses plain Backspace or Delete for deleting the selected annotation', () => {
+    expect(
+      isDeleteSelectedAnnotationShortcut({
+        key: 'Backspace',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isDeleteSelectedAnnotationShortcut({
+        key: 'Delete',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isDeleteSelectedAnnotationShortcut({
+        key: 'Delete',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
   });
 
   it('copies the current frozen selection to the clipboard', async () => {
