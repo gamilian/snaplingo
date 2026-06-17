@@ -83,6 +83,7 @@ const ANNOTATION_TOOL_SHORTCUTS: Record<string, AnnotationTool> = {
   m: 'mosaic',
   b: 'blur',
   t: 'text',
+  e: 'eraser',
 };
 
 export function annotationToolFromShortcut(

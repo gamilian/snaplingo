@@ -345,11 +345,10 @@ describe('annotation style', () => {
     expect(annotationToolFromShortcut({ ...plainKey, key: 'm' })).toBe('mosaic');
     expect(annotationToolFromShortcut({ ...plainKey, key: 'b' })).toBe('blur');
     expect(annotationToolFromShortcut({ ...plainKey, key: 't' })).toBe('text');
+    expect(annotationToolFromShortcut({ ...plainKey, key: 'E' })).toBe('eraser');
   });
 
   it('does not map modified or unknown tool shortcut keys', () => {
-    const plainKey = { metaKey: false, ctrlKey: false, altKey: false };
-
     expect(
       annotationToolFromShortcut({
         key: 'r',
@@ -382,7 +381,14 @@ describe('annotation style', () => {
         altKey: false,
       }),
     ).toBeNull();
-    expect(annotationToolFromShortcut({ ...plainKey, key: 'e' })).toBeNull();
+    expect(
+      annotationToolFromShortcut({
+        key: 'e',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+      }),
+    ).toBeNull();
   });
 
   it('cycles between line and arrow tools with plain Tab', () => {
