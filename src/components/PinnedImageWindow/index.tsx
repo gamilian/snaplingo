@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
   getCurrentWindow,
@@ -15,6 +15,7 @@ import {
   getPinnedContextMenuPosition,
   getPinnedDisplaySize,
   getPinnedDisplaySizeForTransform,
+  getPinnedImagePointFromPointer,
   getPinnedKeyboardMoveDelta,
   getPinnedKeyboardOpacityAction,
   getPinnedKeyboardToolbarAction,
@@ -29,11 +30,24 @@ import {
   getPinnedWheelAction,
   getPinnedZoomFromWheel,
   isClosePinnedImageDoubleClick,
+  isPinnedMagnifierShortcut,
   isResetPinnedImagePointer,
   isTogglePinnedThumbnailModeDoubleClick,
   nextPinnedTransform,
   nextPinnedVisualFilter,
 } from './pinControls';
+import {
+  colorSampleToClipboardText,
+  isColorSampleCopyShortcut,
+  isColorSampleFormatToggleShortcut,
+  sampleCanvasColor,
+  type ColorSample,
+  type ColorSampleFormat,
+} from '../ScreenshotSession/colorSampler';
+import {
+  getMagnifierImageStyle,
+  getMagnifierPosition,
+} from '../ScreenshotSession/magnifier';
 import {
   copyPinnedText,
   closePinnedImage,
@@ -60,6 +74,9 @@ const appWindow = getCurrentWindow();
 const webviewWindow = getCurrentWebviewWindow();
 const PIN_CONTEXT_MENU_SIZE = { width: 132, height: 332 };
 const PIN_HOVER_TOOLBAR_ACTIONS = getPinnedHoverToolbarActions();
+const PIN_MAGNIFIER_SIZE = { width: 160, height: 112 };
+const PIN_MAGNIFIER_GAP = 14;
+const PIN_MAGNIFIER_ZOOM = 8;
 
 function createDefaultPinnedTransform() {
   return {
@@ -99,9 +116,31 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     x: number;
     y: number;
   } | null>(null);
+  const imageFrameRef = useRef<HTMLDivElement | null>(null);
+  const sampleCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [imagePointerPoint, setImagePointerPoint] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [viewportPointerPoint, setViewportPointerPoint] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [cursorColor, setCursorColor] = useState<ColorSample | null>(null);
+  const [colorSampleFormat, setColorSampleFormat] =
+    useState<ColorSampleFormat>('hex');
+  const [isMagnifierRequested, setIsMagnifierRequested] = useState(false);
+  const [sampleCanvasVersion, setSampleCanvasVersion] = useState(0);
   const [isHoverToolbarForcedVisible, setIsHoverToolbarForcedVisible] =
     useState(false);
   const [error, setError] = useState<string | null>(null);
+  const imageFrameSize = useMemo(() => {
+    if (!image) return null;
+
+    return isThumbnailMode
+      ? getPinnedThumbnailDisplaySize(image)
+      : getPinnedDisplaySize(image, zoom);
+  }, [image, isThumbnailMode, zoom]);
 
   const hideCurrentPinnedImage = useCallback(async () => {
     try {
@@ -156,6 +195,61 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
       disposed = true;
     };
   }, [imageId]);
+
+  useEffect(() => {
+    sampleCanvasRef.current = null;
+    setCursorColor(null);
+    setSampleCanvasVersion((version) => version + 1);
+
+    if (!image) return;
+
+    let disposed = false;
+    const imageElement = new Image();
+    imageElement.onload = () => {
+      if (disposed) return;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = imageElement.naturalWidth;
+      canvas.height = imageElement.naturalHeight;
+      canvas.getContext('2d')?.drawImage(imageElement, 0, 0);
+      sampleCanvasRef.current = canvas;
+      setSampleCanvasVersion((version) => version + 1);
+    };
+    imageElement.src = `data:image/png;base64,${image.image_base64}`;
+
+    return () => {
+      disposed = true;
+    };
+  }, [image]);
+
+  useEffect(() => {
+    if (!imagePointerPoint || !imageFrameSize) {
+      setCursorColor(null);
+      return;
+    }
+
+    const canvas = sampleCanvasRef.current;
+    if (!canvas) {
+      setCursorColor(null);
+      return;
+    }
+
+    setCursorColor(
+      sampleCanvasColor(canvas, imagePointerPoint, imageFrameSize),
+    );
+  }, [imageFrameSize, imagePointerPoint, sampleCanvasVersion]);
+
+  const copyCurrentColor = useCallback(async () => {
+    if (!cursorColor) return;
+
+    try {
+      await navigator.clipboard.writeText(
+        colorSampleToClipboardText(cursorColor, colorSampleFormat),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [colorSampleFormat, cursorColor]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -343,6 +437,32 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (isPinnedMagnifierShortcut(event)) {
+        event.preventDefault();
+        setIsMagnifierRequested(true);
+        return;
+      }
+
+      if (
+        isMagnifierRequested &&
+        cursorColor &&
+        isColorSampleCopyShortcut(event)
+      ) {
+        event.preventDefault();
+        void copyCurrentColor();
+        return;
+      }
+
+      if (
+        isMagnifierRequested &&
+        cursorColor &&
+        isColorSampleFormatToggleShortcut(event)
+      ) {
+        event.preventDefault();
+        setColorSampleFormat((format) => (format === 'hex' ? 'rgb' : 'hex'));
+        return;
+      }
+
       if (isCopyPinnedTextShortcut(event, image?.source_text)) {
         event.preventDefault();
         void copyPinnedSourceText();
@@ -452,14 +572,27 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
       }
     };
 
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.key === 'Alt') {
+        setIsMagnifierRequested(false);
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
   }, [
     adjustPinnedZoom,
+    copyCurrentColor,
     copyPinnedImage,
     copyPinnedSourceText,
+    cursorColor,
     hideCurrentPinnedImage,
     image?.source_text,
+    isMagnifierRequested,
     isHoverToolbarForcedVisible,
     isThumbnailMode,
     movePinnedWindowByKeyboard,
@@ -504,6 +637,26 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     );
   };
 
+  const handlePinnedImagePointerMove = (
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
+    const frame = imageFrameRef.current?.getBoundingClientRect();
+    if (!frame) return;
+
+    setViewportPointerPoint({ x: event.clientX, y: event.clientY });
+    setImagePointerPoint(
+      getPinnedImagePointFromPointer(
+        { x: event.clientX, y: event.clientY },
+        frame,
+      ),
+    );
+  };
+
+  const handlePinnedImagePointerLeave = () => {
+    setViewportPointerPoint(null);
+    setImagePointerPoint(null);
+  };
+
   if (error) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-neutral-950 p-3 text-xs text-red-100">
@@ -512,11 +665,41 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     );
   }
 
-  const imageFrameSize = image
-    ? isThumbnailMode
-      ? getPinnedThumbnailDisplaySize(image)
-      : getPinnedDisplaySize(image, zoom)
-    : null;
+  const isMagnifierShown = Boolean(
+    isMagnifierRequested &&
+      image &&
+      imageFrameSize &&
+      imagePointerPoint &&
+      viewportPointerPoint &&
+      cursorColor,
+  );
+  const magnifierPosition =
+    isMagnifierShown && viewportPointerPoint
+      ? getMagnifierPosition(
+          viewportPointerPoint,
+          {
+            x: 0,
+            y: 0,
+            width: window.innerWidth,
+            height: window.innerHeight,
+          },
+          PIN_MAGNIFIER_SIZE,
+          PIN_MAGNIFIER_GAP,
+        )
+      : null;
+  const magnifierImageStyle =
+    isMagnifierShown && image && imageFrameSize && imagePointerPoint
+      ? getMagnifierImageStyle(
+          image.image_base64,
+          imagePointerPoint,
+          imageFrameSize,
+          PIN_MAGNIFIER_SIZE,
+          PIN_MAGNIFIER_ZOOM,
+        )
+      : null;
+  const colorText = cursorColor
+    ? colorSampleToClipboardText(cursorColor, colorSampleFormat)
+    : '';
   const runHoverToolbarAction = (actionId: typeof PIN_HOVER_TOOLBAR_ACTIONS[number]['id']) => {
     setIsHoverToolbarForcedVisible(false);
 
@@ -545,12 +728,15 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     >
       {image && imageFrameSize && (
         <div
+          ref={imageFrameRef}
           className="absolute left-1/2 top-1/2"
           style={{
             width: `${imageFrameSize.width}px`,
             height: `${imageFrameSize.height}px`,
             transform: 'translate(-50%, -50%)',
           }}
+          onPointerMove={handlePinnedImagePointerMove}
+          onPointerLeave={handlePinnedImagePointerLeave}
         >
           <img
             src={`data:image/png;base64,${image.image_base64}`}
@@ -586,6 +772,39 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
           />
         </div>
       )}
+      {isMagnifierShown &&
+        magnifierPosition &&
+        magnifierImageStyle &&
+        cursorColor && (
+          <div
+            className="pointer-events-none absolute overflow-hidden rounded border border-white/70 bg-neutral-950 text-[10px] text-white shadow-2xl ring-1 ring-black/50"
+            style={{
+              left: `${magnifierPosition.x}px`,
+              top: `${magnifierPosition.y}px`,
+              width: `${PIN_MAGNIFIER_SIZE.width}px`,
+              height: `${PIN_MAGNIFIER_SIZE.height}px`,
+            }}
+          >
+            <div className="relative h-full w-full">
+              <div
+                className="absolute inset-0"
+                style={{
+                  ...magnifierImageStyle,
+                  imageRendering: 'pixelated',
+                }}
+              />
+              <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-white/65" />
+              <div className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-white/65" />
+              <div className="absolute bottom-1 left-1 flex items-center gap-1 rounded bg-black/70 px-1.5 py-0.5">
+                <span
+                  className="h-2.5 w-2.5 rounded-sm border border-white/50"
+                  style={{ backgroundColor: cursorColor.hex }}
+                />
+                <span>{colorText}</span>
+              </div>
+            </div>
+          </div>
+        )}
       {contextMenuPosition && (
         <div
           className="absolute z-10 w-[132px] rounded bg-neutral-950/95 p-1 text-xs text-white shadow-xl ring-1 ring-white/15"
@@ -631,7 +850,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
             className="h-7 w-full rounded px-2 text-left hover:bg-white/15"
             onClick={hideCurrentPinnedImage}
           >
-            Hide
+            Close
           </button>
           <button
             type="button"

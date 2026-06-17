@@ -5,6 +5,7 @@ import {
   getPinnedDisplaySizeForTransform,
   getPinnedThumbnailDisplaySize,
   getPinnedKeyboardMoveDelta,
+  getPinnedImagePointFromPointer,
   getPinnedKeyboardOpacityAction,
   getPinnedKeyboardVisualFilterAction,
   getPinnedKeyboardToolbarAction,
@@ -16,6 +17,7 @@ import {
   getPinnedTransformStyle,
   getPinnedWheelAction,
   getPinnedZoomFromWheel,
+  isPinnedMagnifierShortcut,
   isClosePinnedImageDoubleClick,
   isResetPinnedImagePointer,
   isTogglePinnedThumbnailModeDoubleClick,
@@ -191,6 +193,51 @@ describe('pinned image controls', () => {
         ctrlKey: false,
       }),
     ).toBeNull();
+  });
+
+  it('uses plain Alt for showing the pinned image magnifier', () => {
+    expect(
+      isPinnedMagnifierShortcut({
+        key: 'Alt',
+        metaKey: false,
+        ctrlKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isPinnedMagnifierShortcut({
+        key: 'Alt',
+        metaKey: true,
+        ctrlKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      isPinnedMagnifierShortcut({
+        key: 'Shift',
+        metaKey: false,
+        ctrlKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(false);
+  });
+
+  it('maps pointer positions into pinned image-local coordinates', () => {
+    const frameRect = {
+      left: 100,
+      top: 50,
+      width: 200,
+      height: 100,
+    };
+
+    expect(getPinnedImagePointFromPointer({ x: 150, y: 75 }, frameRect)).toEqual({
+      x: 50,
+      y: 25,
+    });
+    expect(getPinnedImagePointFromPointer({ x: 20, y: 500 }, frameRect)).toEqual({
+      x: 0,
+      y: 99,
+    });
   });
 
   it('maps Snipaste toolbar visibility shortcuts for pinned images', () => {

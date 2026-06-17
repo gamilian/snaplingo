@@ -21,6 +21,13 @@ export interface PinnedPoint {
   y: number;
 }
 
+export interface PinnedFrameRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
 export interface PinnedTransform {
   rotation: number;
   flipX: boolean;
@@ -141,6 +148,25 @@ export function getPinnedKeyboardMoveDelta(
   };
 
   return deltaByKey[event.key] ?? null;
+}
+
+export function isPinnedMagnifierShortcut(event: PinnedKeyboardEvent) {
+  return (
+    event.key === 'Alt' &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.shiftKey
+  );
+}
+
+export function getPinnedImagePointFromPointer(
+  point: PinnedPoint,
+  frame: PinnedFrameRect,
+): PinnedPoint {
+  return {
+    x: Math.floor(clamp(point.x - frame.left, 0, frame.width - 1)),
+    y: Math.floor(clamp(point.y - frame.top, 0, frame.height - 1)),
+  };
 }
 
 export function getPinnedKeyboardToolbarAction(
