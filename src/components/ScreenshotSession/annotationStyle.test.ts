@@ -585,24 +585,50 @@ describe('annotation style', () => {
     expect(isAnnotationFillToggleShortcut({ ...plainKey, key: 'r' })).toBe(false);
   });
 
-  it('maps bracket shortcuts to annotation size directions', () => {
+  it('maps bracket shortcuts to annotation size directions only in editing mode', () => {
     const plainKey = { metaKey: false, ctrlKey: false, altKey: false };
 
-    expect(annotationSizeDirectionFromShortcut({ ...plainKey, key: '[' })).toBe(
-      'decrease',
-    );
-    expect(annotationSizeDirectionFromShortcut({ ...plainKey, key: ']' })).toBe(
-      'increase',
-    );
     expect(
-      annotationSizeDirectionFromShortcut({
-        key: ']',
-        metaKey: true,
-        ctrlKey: false,
-        altKey: false,
-      }),
+      annotationSizeDirectionFromShortcut(
+        { ...plainKey, key: '[' },
+        { editing: true },
+      ),
+    ).toBe('decrease');
+    expect(
+      annotationSizeDirectionFromShortcut(
+        { ...plainKey, key: ']' },
+        { editing: true },
+      ),
+    ).toBe('increase');
+    expect(
+      annotationSizeDirectionFromShortcut(
+        { ...plainKey, key: '[' },
+        { editing: false },
+      ),
     ).toBeNull();
-    expect(annotationSizeDirectionFromShortcut({ ...plainKey, key: 'r' })).toBeNull();
+    expect(
+      annotationSizeDirectionFromShortcut(
+        { ...plainKey, key: ']' },
+        { editing: false },
+      ),
+    ).toBeNull();
+    expect(
+      annotationSizeDirectionFromShortcut(
+        {
+          key: ']',
+          metaKey: true,
+          ctrlKey: false,
+          altKey: false,
+        },
+        { editing: true },
+      ),
+    ).toBeNull();
+    expect(
+      annotationSizeDirectionFromShortcut(
+        { ...plainKey, key: 'r' },
+        { editing: true },
+      ),
+    ).toBeNull();
   });
 
   it('maps 1 and 2 to annotation size directions only in editing mode', () => {
@@ -639,38 +665,61 @@ describe('annotation style', () => {
     ).toBeNull();
   });
 
-  it('maps unmodified mouse wheel movement to annotation size directions', () => {
+  it('maps unmodified mouse wheel movement to annotation size directions only in editing mode', () => {
     expect(
-      annotationSizeDirectionFromWheel({
-        deltaY: -1,
-        metaKey: false,
-        ctrlKey: false,
-        altKey: false,
-      }),
+      annotationSizeDirectionFromWheel(
+        {
+          deltaY: -1,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+        },
+        { editing: true },
+      ),
     ).toBe('increase');
     expect(
-      annotationSizeDirectionFromWheel({
-        deltaY: 1,
-        metaKey: false,
-        ctrlKey: false,
-        altKey: false,
-      }),
+      annotationSizeDirectionFromWheel(
+        {
+          deltaY: 1,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+        },
+        { editing: true },
+      ),
     ).toBe('decrease');
     expect(
-      annotationSizeDirectionFromWheel({
-        deltaY: -1,
-        metaKey: false,
-        ctrlKey: true,
-        altKey: false,
-      }),
+      annotationSizeDirectionFromWheel(
+        {
+          deltaY: 1,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+        },
+        { editing: false },
+      ),
     ).toBeNull();
     expect(
-      annotationSizeDirectionFromWheel({
-        deltaY: 0,
-        metaKey: false,
-        ctrlKey: false,
-        altKey: false,
-      }),
+      annotationSizeDirectionFromWheel(
+        {
+          deltaY: -1,
+          metaKey: false,
+          ctrlKey: true,
+          altKey: false,
+        },
+        { editing: true },
+      ),
+    ).toBeNull();
+    expect(
+      annotationSizeDirectionFromWheel(
+        {
+          deltaY: 0,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+        },
+        { editing: true },
+      ),
     ).toBeNull();
   });
 

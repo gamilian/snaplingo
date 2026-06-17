@@ -140,8 +140,9 @@ export function annotationSizeDirectionFromShortcut(
   options: AnnotationSizeShortcutOptions = {},
 ): AnnotationSizeDirection | null {
   if (event.metaKey || event.ctrlKey || event.altKey) return null;
-  if (options.editing && event.key === '1') return 'decrease';
-  if (options.editing && event.key === '2') return 'increase';
+  if (!options.editing) return null;
+  if (event.key === '1') return 'decrease';
+  if (event.key === '2') return 'increase';
   if (event.key === '[') return 'decrease';
   if (event.key === ']') return 'increase';
 
@@ -150,8 +151,15 @@ export function annotationSizeDirectionFromShortcut(
 
 export function annotationSizeDirectionFromWheel(
   event: AnnotationSizeWheelEvent,
+  options: AnnotationSizeShortcutOptions = {},
 ): AnnotationSizeDirection | null {
-  if (event.metaKey || event.ctrlKey || event.altKey || event.deltaY === 0) {
+  if (
+    !options.editing ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.altKey ||
+    event.deltaY === 0
+  ) {
     return null;
   }
 

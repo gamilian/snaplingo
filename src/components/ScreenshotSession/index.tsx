@@ -2505,7 +2505,9 @@ export default function ScreenshotSession({
       return;
     }
 
-    const sizeDirection = annotationSizeDirectionFromWheel(event);
+    const sizeDirection = annotationSizeDirectionFromWheel(event, {
+      editing: hasAnnotationEditingContext,
+    });
     if (!sizeDirection) return;
 
     event.preventDefault();
