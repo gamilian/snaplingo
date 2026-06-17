@@ -63,13 +63,10 @@ pub async fn open_capture_window_for_mode(
 
 #[tauri::command]
 pub async fn create_capture_session(
+    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<CaptureSessionView, String> {
-    state
-        .capture_session_service
-        .create_session()
-        .await
-        .map_err(|e| e.to_string())
+    create_capture_session_without_app_windows(&app, &state).await
 }
 
 #[tauri::command]
