@@ -40,6 +40,7 @@ interface PinnedWheelEvent {
 }
 
 interface PinnedPointerEvent {
+  detail?: number;
   button: number;
   metaKey: boolean;
   ctrlKey: boolean;
@@ -158,6 +159,17 @@ export function getPinnedWheelAction(
 export function isResetPinnedImagePointer(event: PinnedPointerEvent) {
   return (
     event.button === 1 &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !event.shiftKey
+  );
+}
+
+export function isClosePinnedImageDoubleClick(event: PinnedPointerEvent) {
+  return (
+    (event.detail ?? 0) >= 2 &&
+    event.button === 0 &&
     !event.metaKey &&
     !event.ctrlKey &&
     !event.altKey &&

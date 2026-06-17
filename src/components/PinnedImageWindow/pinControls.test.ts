@@ -11,6 +11,7 @@ import {
   getPinnedTransformStyle,
   getPinnedWheelAction,
   getPinnedZoomFromWheel,
+  isClosePinnedImageDoubleClick,
   isResetPinnedImagePointer,
   nextPinnedTransform,
 } from './pinControls';
@@ -188,6 +189,39 @@ describe('pinned image controls', () => {
         button: 1,
         metaKey: true,
         ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('uses an unmodified left-button double click for closing a pinned image', () => {
+    expect(
+      isClosePinnedImageDoubleClick({
+        detail: 2,
+        button: 0,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isClosePinnedImageDoubleClick({
+        detail: 1,
+        button: 0,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      isClosePinnedImageDoubleClick({
+        detail: 2,
+        button: 0,
+        metaKey: false,
+        ctrlKey: true,
         altKey: false,
         shiftKey: false,
       }),

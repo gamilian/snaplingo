@@ -15,6 +15,7 @@ import {
   getPinnedTransformStyle,
   getPinnedWheelAction,
   getPinnedZoomFromWheel,
+  isClosePinnedImageDoubleClick,
   isResetPinnedImagePointer,
   nextPinnedTransform,
 } from './pinControls';
@@ -371,6 +372,12 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
             }}
             draggable={false}
             onPointerDown={(event) => {
+              if (isClosePinnedImageDoubleClick(event)) {
+                event.preventDefault();
+                void hideCurrentPinnedImage();
+                return;
+              }
+
               if (isResetPinnedImagePointer(event)) {
                 event.preventDefault();
                 resetPinnedSizeAndOpacity();
