@@ -1542,6 +1542,13 @@ describe('capture session actions', () => {
     expect(
       getCancelCapturePointerAction({
         status: 'selecting',
+        hasSelection: true,
+        hasDismissibleLayer: false,
+      }),
+    ).toBe('reset-selection');
+    expect(
+      getCancelCapturePointerAction({
+        status: 'selecting',
         hasSelection: false,
         hasDismissibleLayer: false,
       }),

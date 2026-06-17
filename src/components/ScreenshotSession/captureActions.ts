@@ -428,7 +428,13 @@ export function getCancelCapturePointerAction(
   if (state.hasTextDraft) return 'finish-edit';
   if (state.hasAnnotationGesture) return 'finish-annotation';
   if (state.hasDismissibleLayer) return 'dismiss-layer';
-  if (state.status === 'preview' && state.hasSelection) return 'reset-selection';
+  if (
+    (state.status === 'selecting' || state.status === 'preview') &&
+    state.hasSelection
+  ) {
+    return 'reset-selection';
+  }
+
   return 'cancel-session';
 }
 
