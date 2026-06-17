@@ -492,6 +492,33 @@ describe('capture session actions', () => {
     ]);
   });
 
+  it('requests cursor composition when copying with captured cursor enabled', async () => {
+    const calls: Array<{ command: string; args?: unknown }> = [];
+    const invoke: CaptureInvoke = async <T>(
+      command: string,
+      args?: CaptureInvokeArgs,
+    ): Promise<T> => {
+      calls.push({ command, args });
+      return undefined as T;
+    };
+    const rect: LogicalRect = { x: 12, y: 24, width: 120, height: 80 };
+
+    await copyCaptureSelection(invoke, 'session-2', rect, [], true);
+
+    expect(calls).toEqual([
+      {
+        command: 'output_capture',
+        args: {
+          sessionId: 'session-2',
+          rect,
+          annotations: [],
+          includeCursor: true,
+          action: { type: 'copy' },
+        },
+      },
+    ]);
+  });
+
   it('prints the rendered current frozen selection', async () => {
     const calls: Array<{ command: string; args?: unknown }> = [];
     const printedImages: string[] = [];
@@ -530,6 +557,43 @@ describe('capture session actions', () => {
           sessionId: 'session-2',
           rect,
           annotations,
+        },
+      },
+    ]);
+    expect(printedImages).toEqual(['rendered-png-base64']);
+  });
+
+  it('requests cursor composition when printing with captured cursor enabled', async () => {
+    const calls: Array<{ command: string; args?: unknown }> = [];
+    const printedImages: string[] = [];
+    const invoke: CaptureInvoke = async <T>(
+      command: string,
+      args?: CaptureInvokeArgs,
+    ): Promise<T> => {
+      calls.push({ command, args });
+      return 'rendered-png-base64' as T;
+    };
+    const rect: LogicalRect = { x: 12, y: 24, width: 120, height: 80 };
+
+    await printCaptureSelection(
+      invoke,
+      'session-2',
+      rect,
+      [],
+      async (imageBase64) => {
+        printedImages.push(imageBase64);
+      },
+      true,
+    );
+
+    expect(calls).toEqual([
+      {
+        command: 'render_capture_output',
+        args: {
+          sessionId: 'session-2',
+          rect,
+          annotations: [],
+          includeCursor: true,
         },
       },
     ]);

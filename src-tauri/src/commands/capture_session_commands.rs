@@ -37,6 +37,12 @@ struct CaptureImagePlacement {
 }
 
 #[derive(Debug, PartialEq)]
+struct CaptureCursorPlacement {
+    source_rect: PhysicalRect,
+    destination_rect: PhysicalRect,
+}
+
+#[derive(Debug, PartialEq)]
 struct PinnedWindowVisibilityChange {
     label: String,
     visible: bool,
@@ -104,10 +110,17 @@ pub async fn render_capture_output(
     session_id: String,
     rect: LogicalRect,
     annotations: Vec<AnnotationCommand>,
+    include_cursor: Option<bool>,
     state: State<'_, crate::AppState>,
 ) -> Result<String, String> {
     let session_id = CaptureSessionId(session_id);
-    let png_data = render_capture_png(&session_id, &rect, &annotations, &state)?;
+    let png_data = render_capture_png(
+        &session_id,
+        &rect,
+        &annotations,
+        include_cursor.unwrap_or(false),
+        &state,
+    )?;
 
     Ok(base64::engine::general_purpose::STANDARD.encode(png_data))
 }
@@ -145,12 +158,19 @@ pub async fn output_capture(
     session_id: String,
     rect: LogicalRect,
     annotations: Vec<AnnotationCommand>,
+    include_cursor: Option<bool>,
     action: CaptureOutputAction,
     app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     let session_id = CaptureSessionId(session_id);
-    let png_data = render_capture_png(&session_id, &rect, &annotations, &state)?;
+    let png_data = render_capture_png(
+        &session_id,
+        &rect,
+        &annotations,
+        include_cursor.unwrap_or(false),
+        &state,
+    )?;
 
     match action {
         CaptureOutputAction::Save { path } => {
@@ -420,7 +440,7 @@ pub async fn run_capture_ocr(
     state: State<'_, crate::AppState>,
 ) -> Result<OcrResult, String> {
     let session_id = CaptureSessionId(session_id);
-    let png_data = render_capture_png(&session_id, &rect, &[], &state)?;
+    let png_data = render_capture_png(&session_id, &rect, &[], false, &state)?;
     let request = OcrRequest {
         image_data: png_data,
         language: None,
@@ -629,6 +649,7 @@ fn render_capture_png(
     session_id: &CaptureSessionId,
     rect: &LogicalRect,
     annotations: &[AnnotationCommand],
+    include_cursor: bool,
     state: &crate::AppState,
 ) -> Result<Vec<u8>, String> {
     let session = state
@@ -637,7 +658,7 @@ fn render_capture_png(
         .map_err(|e| e.to_string())?;
 
     let plan = capture_image_composition_plan(rect, &session.snapshots)?;
-    let placements = plan
+    let mut placements = plan
         .placements
         .iter()
         .map(|placement| PngPlacement {
@@ -648,6 +669,19 @@ fn render_capture_png(
             destination_rect: placement.destination_rect.clone(),
         })
         .collect::<Vec<_>>();
+    if include_cursor {
+        if let Some(cursor) = session.captured_cursor.as_ref() {
+            if let Some(placement) =
+                captured_cursor_placement_for_selection(cursor, rect, plan.width)?
+            {
+                placements.push(PngPlacement {
+                    png_data: cursor.png_data.as_slice(),
+                    source_rect: placement.source_rect,
+                    destination_rect: placement.destination_rect,
+                });
+            }
+        }
+    }
 
     let image_annotations = image_annotations_from_commands(annotations, rect, plan.width)?;
 
@@ -1025,6 +1059,37 @@ fn logical_rect_intersection(a: &LogicalRect, b: &LogicalRect) -> Option<Logical
     })
 }
 
+fn captured_cursor_placement_for_selection(
+    cursor: &CapturedCursor,
+    selection_rect: &LogicalRect,
+    output_width: u32,
+) -> Result<Option<CaptureCursorPlacement>, String> {
+    if output_width == 0 || selection_rect.width <= 0.0 || selection_rect.height <= 0.0 {
+        return Err("Selection has invalid cursor output size".to_string());
+    }
+
+    let cursor_scale = cursor.scale_factor.max(1.0);
+    let cursor_rect = LogicalRect {
+        x: cursor.logical_position.x - cursor.hotspot.x,
+        y: cursor.logical_position.y - cursor.hotspot.y,
+        width: cursor.image_width as f64 / cursor_scale,
+        height: cursor.image_height as f64 / cursor_scale,
+    };
+    let Some(visible_rect) = logical_rect_intersection(&cursor_rect, selection_rect) else {
+        return Ok(None);
+    };
+
+    let output_scale = output_width as f64 / selection_rect.width;
+    Ok(Some(CaptureCursorPlacement {
+        source_rect: scaled_logical_rect_relative_to(&visible_rect, &cursor_rect, cursor_scale)?,
+        destination_rect: scaled_logical_rect_relative_to(
+            &visible_rect,
+            selection_rect,
+            output_scale,
+        )?,
+    }))
+}
+
 fn scaled_logical_rect_relative_to(
     rect: &LogicalRect,
     origin: &LogicalRect,
@@ -1088,7 +1153,7 @@ mod tests {
         AnnotationCommand, LogicalPoint, LogicalRect, MonitorSnapshotView, PhysicalPoint,
         PhysicalRect,
     };
-    use crate::infrastructure::system::screenshot::MonitorSnapshot;
+    use crate::infrastructure::system::screenshot::{CapturedCursor, MonitorSnapshot};
 
     #[test]
     fn capture_window_url_encodes_supported_mode() {
@@ -1299,6 +1364,94 @@ mod tests {
                 y: 0,
                 width: 2,
                 height: 2,
+            }
+        );
+    }
+
+    #[test]
+    fn plans_captured_cursor_placement_inside_selection() {
+        let cursor = CapturedCursor {
+            logical_position: LogicalPoint { x: 18.0, y: 27.0 },
+            hotspot: LogicalPoint { x: 2.0, y: 3.0 },
+            image_width: 20,
+            image_height: 24,
+            scale_factor: 2.0,
+            png_data: Vec::new(),
+        };
+
+        let placement = super::captured_cursor_placement_for_selection(
+            &cursor,
+            &LogicalRect {
+                x: 10.0,
+                y: 20.0,
+                width: 40.0,
+                height: 30.0,
+            },
+            80,
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(
+            placement.source_rect,
+            PhysicalRect {
+                x: 0,
+                y: 0,
+                width: 20,
+                height: 24,
+            }
+        );
+        assert_eq!(
+            placement.destination_rect,
+            PhysicalRect {
+                x: 12,
+                y: 8,
+                width: 20,
+                height: 24,
+            }
+        );
+    }
+
+    #[test]
+    fn clips_captured_cursor_placement_to_selection() {
+        let cursor = CapturedCursor {
+            logical_position: LogicalPoint { x: 11.0, y: 21.0 },
+            hotspot: LogicalPoint { x: 4.0, y: 4.0 },
+            image_width: 10,
+            image_height: 10,
+            scale_factor: 1.0,
+            png_data: Vec::new(),
+        };
+
+        let placement = super::captured_cursor_placement_for_selection(
+            &cursor,
+            &LogicalRect {
+                x: 10.0,
+                y: 20.0,
+                width: 20.0,
+                height: 20.0,
+            },
+            20,
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(
+            placement.source_rect,
+            PhysicalRect {
+                x: 3,
+                y: 3,
+                width: 7,
+                height: 7,
+            }
+        );
+        assert_eq!(
+            placement.destination_rect,
+            PhysicalRect {
+                x: 0,
+                y: 0,
+                width: 7,
+                height: 7,
             }
         );
     }

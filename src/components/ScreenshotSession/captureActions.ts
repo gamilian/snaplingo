@@ -326,6 +326,7 @@ export async function saveCaptureSelection(
   sessionId: string,
   rect: LogicalRect,
   annotations: AnnotationCommand[] = [],
+  includeCursor = false,
 ) {
   const path = await invoke<string>('default_capture_save_path');
 
@@ -333,6 +334,7 @@ export async function saveCaptureSelection(
     sessionId,
     rect,
     annotations,
+    ...(includeCursor ? { includeCursor } : {}),
     action: {
       type: 'save',
       path,
@@ -346,6 +348,7 @@ export async function quickSaveCaptureSelection(
   rect: LogicalRect,
   annotations: AnnotationCommand[] = [],
   directory?: string,
+  includeCursor = false,
 ) {
   const path = await invoke<string>('quick_capture_save_path', { directory });
 
@@ -353,6 +356,7 @@ export async function quickSaveCaptureSelection(
     sessionId,
     rect,
     annotations,
+    ...(includeCursor ? { includeCursor } : {}),
     action: {
       type: 'save',
       path,
@@ -374,11 +378,13 @@ export async function copyCaptureSelection(
   sessionId: string,
   rect: LogicalRect,
   annotations: AnnotationCommand[] = [],
+  includeCursor = false,
 ) {
   await invoke('output_capture', {
     sessionId,
     rect,
     annotations,
+    ...(includeCursor ? { includeCursor } : {}),
     action: { type: 'copy' },
   });
 }
@@ -389,11 +395,13 @@ export async function printCaptureSelection(
   rect: LogicalRect,
   annotations: AnnotationCommand[],
   printImage: CaptureImagePrinter,
+  includeCursor = false,
 ) {
   const imageBase64 = await invoke<string>('render_capture_output', {
     sessionId,
     rect,
     annotations,
+    ...(includeCursor ? { includeCursor } : {}),
   });
 
   await printImage(imageBase64);

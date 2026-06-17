@@ -86,6 +86,7 @@ import {
   type TextAnnotationDraft,
 } from './textAnnotationDraft';
 import {
+  canToggleCapturedCursor,
   copyCaptureSelection,
   getCandidateCycleDirectionFromShortcut,
   getCancelCapturePointerAction,
@@ -110,6 +111,7 @@ import {
   isSaveCaptureShortcut,
   isSelectAllCaptureShortcut,
   isToggleToolbarShortcut,
+  isToggleCapturedCursorShortcut,
   printCaptureSelection,
   quickSaveCaptureSelection,
   refreshCaptureSession,
@@ -422,11 +424,14 @@ export default function ScreenshotSession({
   const [sampleCanvasVersion, setSampleCanvasVersion] = useState(0);
   const [isRenderingOutput, setIsRenderingOutput] = useState(false);
   const [isToolbarHidden, setIsToolbarHidden] = useState(false);
+  const [includeCapturedCursor, setIncludeCapturedCursor] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasStartedInitialSession, setHasStartedInitialSession] = useState(false);
 
   const isActive = status !== 'idle';
   const annotations = annotationHistory.annotations;
+  const shouldIncludeCapturedCursor =
+    includeCapturedCursor && canToggleCapturedCursor(session);
   const selectedAnnotation =
     selectedAnnotationIndex === null ? null : annotations[selectedAnnotationIndex] ?? null;
   const hasAnnotationEditingContext =
@@ -547,6 +552,7 @@ export default function ScreenshotSession({
     setSampleCanvasVersion(0);
     setIsRenderingOutput(false);
     setIsToolbarHidden(false);
+    setIncludeCapturedCursor(false);
     setError(null);
   }, []);
 
@@ -597,7 +603,11 @@ export default function ScreenshotSession({
   }, []);
 
   const renderSelectionPreview = useCallback(
-    async (rect: LogicalRect, nextAnnotations: AnnotationCommand[] = annotations) => {
+    async (
+      rect: LogicalRect,
+      nextAnnotations: AnnotationCommand[] = annotations,
+      includeCursor = shouldIncludeCapturedCursor,
+    ) => {
       if (!session) return;
 
       setIsRenderingOutput(true);
@@ -609,6 +619,7 @@ export default function ScreenshotSession({
           sessionId: session.id,
           rect,
           annotations: nextAnnotations,
+          ...(includeCursor ? { includeCursor } : {}),
         });
         setPreviewImageBase64(base64);
 
@@ -630,7 +641,15 @@ export default function ScreenshotSession({
         setIsRenderingOutput(false);
       }
     },
-    [annotations, mode, onInactive, recordLastSelection, resetSessionState, session],
+    [
+      annotations,
+      mode,
+      onInactive,
+      recordLastSelection,
+      resetSessionState,
+      session,
+      shouldIncludeCapturedCursor,
+    ],
   );
 
   const commitTextDraftToHistory = useCallback(() => {
@@ -665,6 +684,7 @@ export default function ScreenshotSession({
         session.id,
         selection,
         outputHistory.annotations,
+        shouldIncludeCapturedCursor,
       );
       recordLastSelection(selection);
       await invoke('cancel_capture_session', { sessionId: session.id });
@@ -683,6 +703,7 @@ export default function ScreenshotSession({
     resetSessionState,
     selection,
     session,
+    shouldIncludeCapturedCursor,
   ]);
 
   const copyCandidateSelection = useCallback(async (rect: LogicalRect) => {
@@ -692,7 +713,13 @@ export default function ScreenshotSession({
     setError(null);
 
     try {
-      await copyCaptureSelection(invoke, session.id, rect);
+      await copyCaptureSelection(
+        invoke,
+        session.id,
+        rect,
+        [],
+        shouldIncludeCapturedCursor,
+      );
       recordLastSelection(rect);
       await invoke('cancel_capture_session', { sessionId: session.id });
       resetSessionState();
@@ -703,7 +730,13 @@ export default function ScreenshotSession({
     } finally {
       setIsRenderingOutput(false);
     }
-  }, [onInactive, recordLastSelection, resetSessionState, session]);
+  }, [
+    onInactive,
+    recordLastSelection,
+    resetSessionState,
+    session,
+    shouldIncludeCapturedCursor,
+  ]);
 
   const copyCurrentColor = useCallback(async () => {
     if (!cursorColor) return;
@@ -731,6 +764,7 @@ export default function ScreenshotSession({
         session.id,
         selection,
         outputHistory.annotations,
+        shouldIncludeCapturedCursor,
       );
       recordLastSelection(selection);
       await invoke('cancel_capture_session', { sessionId: session.id });
@@ -749,6 +783,7 @@ export default function ScreenshotSession({
     resetSessionState,
     selection,
     session,
+    shouldIncludeCapturedCursor,
   ]);
 
   const quickSaveSelection = useCallback(async () => {
@@ -765,6 +800,7 @@ export default function ScreenshotSession({
         selection,
         outputHistory.annotations,
         screenshotSavePath,
+        shouldIncludeCapturedCursor,
       );
       recordLastSelection(selection);
       await invoke('cancel_capture_session', { sessionId: session.id });
@@ -784,6 +820,7 @@ export default function ScreenshotSession({
     screenshotSavePath,
     selection,
     session,
+    shouldIncludeCapturedCursor,
   ]);
 
   const runOcrSelection = useCallback(async () => {
@@ -822,6 +859,7 @@ export default function ScreenshotSession({
         sessionId: session.id,
         rect: selection,
         annotations: outputHistory.annotations,
+        ...(shouldIncludeCapturedCursor ? { includeCursor: true } : {}),
         action: { type: 'pin' },
       });
       recordLastSelection(selection);
@@ -841,6 +879,7 @@ export default function ScreenshotSession({
     resetSessionState,
     selection,
     session,
+    shouldIncludeCapturedCursor,
   ]);
 
   const printSelection = useCallback(async () => {
@@ -857,6 +896,7 @@ export default function ScreenshotSession({
         selection,
         outputHistory.annotations,
         printBase64PngImage,
+        shouldIncludeCapturedCursor,
       );
       recordLastSelection(selection);
       await invoke('cancel_capture_session', { sessionId: session.id });
@@ -875,6 +915,7 @@ export default function ScreenshotSession({
     resetSessionState,
     selection,
     session,
+    shouldIncludeCapturedCursor,
   ]);
 
   const refreshSession = useCallback(async () => {
@@ -1343,6 +1384,19 @@ export default function ScreenshotSession({
       ) {
         event.preventDefault();
         void refreshSession();
+      } else if (
+        (status === 'selecting' || status === 'preview') &&
+        !textDraft &&
+        canToggleCapturedCursor(session) &&
+        isToggleCapturedCursorShortcut(event)
+      ) {
+        event.preventDefault();
+        const nextIncludeCursor = !includeCapturedCursor;
+        setIncludeCapturedCursor(nextIncludeCursor);
+        if (status === 'preview' && selection) {
+          setPreviewImageBase64(null);
+          void renderSelectionPreview(selection, annotations, nextIncludeCursor);
+        }
       } else if (isMagnifierShortcut(event)) {
         event.preventDefault();
         setIsMagnifierRequested(true);
@@ -1649,6 +1703,7 @@ export default function ScreenshotSession({
     editGesture,
     hasAnnotationEditingContext,
     hoverSelection,
+    includeCapturedCursor,
     isMagnifierShown,
     textDraft,
     deleteSelectedAnnotation,
