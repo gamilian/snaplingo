@@ -9,6 +9,7 @@ import {
   isCopyCaptureKeyboardShortcut,
   isConfirmHoverSelectionShortcut,
   isPinCaptureShortcut,
+  isPinCapturePointer,
   isMoveDraftSelectionShortcut,
   isSaveCaptureShortcut,
   isSelectAllCaptureShortcut,
@@ -239,6 +240,36 @@ describe('capture session actions', () => {
         button: 0,
         metaKey: false,
         ctrlKey: true,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('uses an unmodified middle-button press for pinning the current selection', () => {
+    expect(
+      isPinCapturePointer({
+        button: 1,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isPinCapturePointer({
+        button: 0,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      isPinCapturePointer({
+        button: 1,
+        metaKey: true,
+        ctrlKey: false,
         altKey: false,
         shiftKey: false,
       }),

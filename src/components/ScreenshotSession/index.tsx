@@ -82,6 +82,7 @@ import {
   isCopyCaptureDoubleClick,
   isCopyCaptureKeyboardShortcut,
   isMoveDraftSelectionShortcut,
+  isPinCapturePointer,
   isPinCaptureShortcut,
   isSaveCaptureShortcut,
   isSelectAllCaptureShortcut,
@@ -1574,6 +1575,13 @@ export default function ScreenshotSession({
 
   const startMoveGesture = (event: React.PointerEvent<HTMLDivElement>) => {
     if (status !== 'preview' || !selection || !selectionBounds) return;
+
+    if (isPinCapturePointer(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+      void pinSelection();
+      return;
+    }
 
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);

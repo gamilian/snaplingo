@@ -99,6 +99,16 @@ export function isCopyCaptureDoubleClick(event: CapturePointerEvent) {
   );
 }
 
+export function isPinCapturePointer(event: CapturePointerEvent) {
+  return (
+    event.button === 1 &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !event.shiftKey
+  );
+}
+
 export function isCancelCapturePointer(event: CapturePointerEvent) {
   return (
     event.button === 2 &&
