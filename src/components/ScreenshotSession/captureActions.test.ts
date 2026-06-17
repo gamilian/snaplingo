@@ -124,11 +124,11 @@ describe('capture session actions', () => {
     ).toBe(false);
   });
 
-  it('uses plain F3 for pinning the current selection', () => {
+  it('uses Cmd/Ctrl+T for pinning the current selection', () => {
     expect(
       isPinCaptureShortcut({
-        key: 'F3',
-        metaKey: false,
+        key: 't',
+        metaKey: true,
         ctrlKey: false,
         altKey: false,
         shiftKey: false,
@@ -136,13 +136,13 @@ describe('capture session actions', () => {
     ).toBe(true);
     expect(
       isPinCaptureShortcut({
-        key: 'F3',
-        metaKey: true,
-        ctrlKey: false,
+        key: 'T',
+        metaKey: false,
+        ctrlKey: true,
         altKey: false,
         shiftKey: false,
       }),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       isPinCaptureShortcut({
         key: 'F3',
@@ -154,7 +154,7 @@ describe('capture session actions', () => {
     ).toBe(false);
     expect(
       isPinCaptureShortcut({
-        key: 'p',
+        key: 'F3',
         metaKey: false,
         ctrlKey: false,
         altKey: false,

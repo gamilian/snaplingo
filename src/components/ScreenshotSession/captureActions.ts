@@ -72,9 +72,8 @@ export function isMoveDraftSelectionShortcut(event: CaptureShortcutEvent) {
 
 export function isPinCaptureShortcut(event: CaptureShortcutEvent) {
   return (
-    event.key === 'F3' &&
-    !event.metaKey &&
-    !event.ctrlKey &&
+    event.key.toLowerCase() === 't' &&
+    (event.metaKey || event.ctrlKey) &&
     !event.altKey &&
     !event.shiftKey
   );
