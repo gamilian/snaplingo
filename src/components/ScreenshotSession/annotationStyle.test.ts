@@ -337,7 +337,7 @@ describe('annotation style', () => {
     const plainKey = { metaKey: false, ctrlKey: false, altKey: false };
 
     expect(annotationToolFromShortcut({ ...plainKey, key: 'r' })).toBe('rectangle');
-    expect(annotationToolFromShortcut({ ...plainKey, key: 'E' })).toBe('ellipse');
+    expect(annotationToolFromShortcut({ ...plainKey, key: 'O' })).toBe('ellipse');
     expect(annotationToolFromShortcut({ ...plainKey, key: 'a' })).toBe('arrow');
     expect(annotationToolFromShortcut({ ...plainKey, key: 'l' })).toBe('line');
     expect(annotationToolFromShortcut({ ...plainKey, key: 'p' })).toBe('pen');
@@ -348,6 +348,8 @@ describe('annotation style', () => {
   });
 
   it('does not map modified or unknown tool shortcut keys', () => {
+    const plainKey = { metaKey: false, ctrlKey: false, altKey: false };
+
     expect(
       annotationToolFromShortcut({
         key: 'r',
@@ -380,6 +382,7 @@ describe('annotation style', () => {
         altKey: false,
       }),
     ).toBeNull();
+    expect(annotationToolFromShortcut({ ...plainKey, key: 'e' })).toBeNull();
   });
 
   it('cycles between line and arrow tools with plain Tab', () => {
