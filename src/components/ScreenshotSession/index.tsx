@@ -1745,6 +1745,7 @@ export default function ScreenshotSession({
       const action = getCancelCapturePointerAction({
         status,
         hasSelection: selection !== null,
+        hasTextDraft: textDraft !== null,
         hasDismissibleLayer:
           textDraft !== null ||
           annotationMoveGesture !== null ||
@@ -1754,7 +1755,9 @@ export default function ScreenshotSession({
           annotationGesture !== null,
       });
 
-      if (action === 'dismiss-layer') {
+      if (action === 'finish-edit') {
+        commitTextDraft();
+      } else if (action === 'dismiss-layer') {
         dismissCaptureLayer();
       } else if (action === 'reset-selection') {
         resetPreviewSelection();

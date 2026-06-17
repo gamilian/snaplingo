@@ -1202,6 +1202,17 @@ describe('capture session actions', () => {
     ).toBe('dismiss-layer');
   });
 
+  it('finishes text annotation edits before dismissing other capture layers', () => {
+    expect(
+      getCancelCapturePointerAction({
+        status: 'preview',
+        hasSelection: true,
+        hasTextDraft: true,
+        hasDismissibleLayer: true,
+      }),
+    ).toBe('finish-edit');
+  });
+
   it('uses plain Space for toggling the capture toolbar visibility', () => {
     expect(
       isToggleToolbarShortcut({
