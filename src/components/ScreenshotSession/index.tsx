@@ -96,6 +96,7 @@ import {
 import {
   canToggleCapturedCursor,
   copyCaptureSelection,
+  getCaptureKeyboardToolbarAction,
   getCandidateCycleDirectionFromShortcut,
   getCancelCapturePointerAction,
   getCursorNudgeDeltaFromShortcut,
@@ -408,6 +409,7 @@ export default function ScreenshotSession({
   const [textFontSize, setTextFontSize] = useState(DEFAULT_TEXT_FONT_SIZE);
   const [annotationHistory, setAnnotationHistory] = useState(emptyAnnotationHistory);
   const [previewImageBase64, setPreviewImageBase64] = useState<string | null>(null);
+  const [isAnnotationToolbarVisible, setIsAnnotationToolbarVisible] = useState(true);
   const [cursorColor, setCursorColor] = useState<ColorSample | null>(null);
   const [colorSampleFormat, setColorSampleFormat] =
     useState<ColorSampleFormat>('hex');
@@ -542,6 +544,7 @@ export default function ScreenshotSession({
     setTextDraftAnnotationIndex(null);
     setAnnotationHistory(emptyAnnotationHistory());
     setPreviewImageBase64(null);
+    setIsAnnotationToolbarVisible(true);
     setCursorColor(null);
     setColorSampleFormat('hex');
     setIsMagnifierRequested(false);
@@ -1305,6 +1308,7 @@ export default function ScreenshotSession({
     setTextDraftAnnotationIndex(null);
     setAnnotationHistory(emptyAnnotationHistory());
     setIsMagnifierRequested(false);
+    setIsAnnotationToolbarVisible(true);
     setStatus('preview');
     void renderSelectionPreview(rect, []);
   }, [renderSelectionPreview]);
@@ -1445,6 +1449,7 @@ export default function ScreenshotSession({
         getCandidateCycleDirectionFromShortcut(event);
       const selectionHistoryStep = getSelectionHistoryStepFromShortcut(event);
       const undoRedoAction = getUndoRedoActionFromShortcut(event);
+      const toolbarAction = getCaptureKeyboardToolbarAction(event);
       const selectionArrowAction = getSelectionArrowActionFromShortcut(event, {
         editing:
           hasAnnotationEditingContext ||
@@ -1638,9 +1643,17 @@ export default function ScreenshotSession({
         event.preventDefault();
         setSelection(hoverSelection);
         setHoverSelection(null);
+        setIsAnnotationToolbarVisible(true);
         setStatus('preview');
         setAnnotationHistory(emptyAnnotationHistory());
         void renderSelectionPreview(hoverSelection, []);
+      } else if (
+        status === 'preview' &&
+        !textDraft &&
+        toolbarAction === 'toggle'
+      ) {
+        event.preventDefault();
+        setIsAnnotationToolbarVisible((visible) => !visible);
       } else if (
         status === 'preview' &&
         isCopyCaptureKeyboardShortcut(event)
@@ -2162,6 +2175,7 @@ export default function ScreenshotSession({
       if (hoverSelection) {
         setSelection(hoverSelection);
         setHoverSelection(null);
+        setIsAnnotationToolbarVisible(true);
         setStatus('preview');
         void renderSelectionPreview(hoverSelection, []);
         return;
@@ -2173,6 +2187,7 @@ export default function ScreenshotSession({
 
     setSelection(nextSelection);
     setHoverSelection(null);
+    setIsAnnotationToolbarVisible(true);
     setStatus('preview');
     void renderSelectionPreview(nextSelection, []);
   };
@@ -2685,7 +2700,7 @@ export default function ScreenshotSession({
               ))}
             </div>
           )}
-          {toolbarPosition && (
+          {toolbarPosition && isAnnotationToolbarVisible && (
             <div
               className="absolute flex h-9 items-center gap-1 rounded bg-neutral-950/90 p-1 text-xs text-white shadow-lg ring-1 ring-white/15"
               style={{

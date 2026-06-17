@@ -5,6 +5,7 @@ import {
   type CaptureInvokeArgs,
   canToggleCapturedCursor,
   copyCaptureSelection,
+  getCaptureKeyboardToolbarAction,
   getCandidateCycleDirectionFromShortcut,
   getCancelCapturePointerAction,
   getSelectionArrowActionFromShortcut,
@@ -1115,7 +1116,37 @@ describe('capture session actions', () => {
     ).toBe(false);
   });
 
-  it('uses Enter, Space, or Cmd/Ctrl+C for copying the current selection', () => {
+  it('uses Space for toggling the capture annotation toolbar', () => {
+    expect(
+      getCaptureKeyboardToolbarAction({
+        key: ' ',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe('toggle');
+    expect(
+      getCaptureKeyboardToolbarAction({
+        key: ' ',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBeNull();
+    expect(
+      getCaptureKeyboardToolbarAction({
+        key: 'Enter',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBeNull();
+  });
+
+  it('uses Enter or Cmd/Ctrl+C for copying the current selection', () => {
     expect(
       isCopyCaptureKeyboardShortcut({
         key: 'Enter',
@@ -1145,7 +1176,7 @@ describe('capture session actions', () => {
         altKey: false,
         shiftKey: false,
       }),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       isCopyCaptureKeyboardShortcut({
         key: 'c',
@@ -1191,7 +1222,7 @@ describe('capture session actions', () => {
     ).toBe(false);
   });
 
-  it('uses unmodified Enter or Space for confirming a hovered capture candidate', () => {
+  it('uses unmodified Enter for confirming a hovered capture candidate', () => {
     expect(
       isConfirmHoverSelectionShortcut({
         key: 'Enter',
@@ -1218,7 +1249,7 @@ describe('capture session actions', () => {
         altKey: false,
         shiftKey: false,
       }),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       isConfirmHoverSelectionShortcut({
         key: ' ',

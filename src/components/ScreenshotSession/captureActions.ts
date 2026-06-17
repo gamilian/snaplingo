@@ -45,6 +45,7 @@ interface ConfirmHoverSelectionOptions {
   drafting?: boolean;
 }
 export type UndoRedoAction = 'undo' | 'redo';
+export type CaptureKeyboardToolbarAction = 'toggle';
 export type CancelCapturePointerAction =
   | 'finish-edit'
   | 'finish-annotation'
@@ -202,7 +203,7 @@ export function getSelectionArrowActionFromShortcut(
 
 export function isCopyCaptureKeyboardShortcut(event: CaptureShortcutEvent) {
   const isPlainCompletionKey =
-    (event.key === 'Enter' || event.key === ' ') &&
+    event.key === 'Enter' &&
     !event.metaKey &&
     !event.ctrlKey &&
     !event.altKey &&
@@ -224,12 +225,24 @@ export function isConfirmHoverSelectionShortcut(
   if (options.drafting) return false;
 
   return (
-    (event.key === 'Enter' || event.key === ' ') &&
+    event.key === 'Enter' &&
     !event.metaKey &&
     !event.ctrlKey &&
     !event.altKey &&
     !event.shiftKey
   );
+}
+
+export function getCaptureKeyboardToolbarAction(
+  event: CaptureShortcutEvent,
+): CaptureKeyboardToolbarAction | null {
+  if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
+    return null;
+  }
+
+  if (event.key === ' ') return 'toggle';
+
+  return null;
 }
 
 export function isMoveDraftSelectionShortcut(event: CaptureShortcutEvent) {
