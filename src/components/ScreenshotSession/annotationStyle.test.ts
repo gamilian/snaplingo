@@ -7,6 +7,7 @@ import {
   applyAnnotationStyle,
   constrainAnnotationGesturePoint,
   annotationSizeDirectionFromShortcut,
+  annotationSizeDirectionFromWheel,
   annotationToolFromShortcut,
   isCommittedAnnotation,
   nextAnnotationStrokeWidth,
@@ -305,6 +306,41 @@ describe('annotation style', () => {
       }),
     ).toBeNull();
     expect(annotationSizeDirectionFromShortcut({ ...plainKey, key: 'r' })).toBeNull();
+  });
+
+  it('maps unmodified mouse wheel movement to annotation size directions', () => {
+    expect(
+      annotationSizeDirectionFromWheel({
+        deltaY: -1,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+      }),
+    ).toBe('increase');
+    expect(
+      annotationSizeDirectionFromWheel({
+        deltaY: 1,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+      }),
+    ).toBe('decrease');
+    expect(
+      annotationSizeDirectionFromWheel({
+        deltaY: -1,
+        metaKey: false,
+        ctrlKey: true,
+        altKey: false,
+      }),
+    ).toBeNull();
+    expect(
+      annotationSizeDirectionFromWheel({
+        deltaY: 0,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+      }),
+    ).toBeNull();
   });
 
   it('steps annotation stroke width and text font size within toolbar bounds', () => {

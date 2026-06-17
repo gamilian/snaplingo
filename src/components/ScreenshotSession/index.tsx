@@ -62,6 +62,7 @@ import {
   applyAnnotationStyle,
   annotationColorFromShortcut,
   annotationSizeDirectionFromShortcut,
+  annotationSizeDirectionFromWheel,
   annotationToolFromShortcut,
   annotationColorToCss,
   constrainAnnotationGesturePoint,
@@ -1999,6 +2000,23 @@ export default function ScreenshotSession({
     setPreviewImageBase64(null);
   };
 
+  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    if (
+      status !== 'preview' ||
+      textDraft ||
+      annotationGesture ||
+      annotationMoveGesture
+    ) {
+      return;
+    }
+
+    const sizeDirection = annotationSizeDirectionFromWheel(event);
+    if (!sizeDirection) return;
+
+    event.preventDefault();
+    adjustAnnotationSize(sizeDirection);
+  };
+
   const overlayClassName = useMemo(() => {
     if (mode === 'screenshot-ocr') return 'border-sky-300';
     if (mode === 'screenshot-translate') return 'border-emerald-300';
@@ -2017,6 +2035,7 @@ export default function ScreenshotSession({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onWheel={handleWheel}
       onContextMenu={(event) => event.preventDefault()}
     >
       {session &&

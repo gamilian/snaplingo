@@ -25,6 +25,13 @@ interface AnnotationToolShortcutEvent {
   altKey: boolean;
 }
 
+interface AnnotationSizeWheelEvent {
+  deltaY: number;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  altKey: boolean;
+}
+
 export type AnnotationSizeDirection = 'decrease' | 'increase';
 
 export const ANNOTATION_COLORS: AnnotationColor[] = [
@@ -89,6 +96,16 @@ export function annotationSizeDirectionFromShortcut(
   if (event.key === ']') return 'increase';
 
   return null;
+}
+
+export function annotationSizeDirectionFromWheel(
+  event: AnnotationSizeWheelEvent,
+): AnnotationSizeDirection | null {
+  if (event.metaKey || event.ctrlKey || event.altKey || event.deltaY === 0) {
+    return null;
+  }
+
+  return event.deltaY < 0 ? 'increase' : 'decrease';
 }
 
 function stepBoundedValue(
