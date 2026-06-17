@@ -25,6 +25,10 @@ interface AnnotationToolShortcutEvent {
   altKey: boolean;
 }
 
+interface AnnotationSizeShortcutOptions {
+  editing?: boolean;
+}
+
 interface AnnotationSizeWheelEvent {
   deltaY: number;
   metaKey: boolean;
@@ -90,8 +94,11 @@ export function annotationColorFromShortcut(
 
 export function annotationSizeDirectionFromShortcut(
   event: AnnotationToolShortcutEvent,
+  options: AnnotationSizeShortcutOptions = {},
 ): AnnotationSizeDirection | null {
   if (event.metaKey || event.ctrlKey || event.altKey) return null;
+  if (options.editing && event.key === '1') return 'decrease';
+  if (options.editing && event.key === '2') return 'increase';
   if (event.key === '[') return 'decrease';
   if (event.key === ']') return 'increase';
 

@@ -308,6 +308,40 @@ describe('annotation style', () => {
     expect(annotationSizeDirectionFromShortcut({ ...plainKey, key: 'r' })).toBeNull();
   });
 
+  it('maps 1 and 2 to annotation size directions only in editing mode', () => {
+    const plainKey = { metaKey: false, ctrlKey: false, altKey: false };
+
+    expect(
+      annotationSizeDirectionFromShortcut(
+        { ...plainKey, key: '1' },
+        { editing: true },
+      ),
+    ).toBe('decrease');
+    expect(
+      annotationSizeDirectionFromShortcut(
+        { ...plainKey, key: '2' },
+        { editing: true },
+      ),
+    ).toBe('increase');
+    expect(
+      annotationSizeDirectionFromShortcut(
+        { ...plainKey, key: '1' },
+        { editing: false },
+      ),
+    ).toBeNull();
+    expect(
+      annotationSizeDirectionFromShortcut(
+        {
+          key: '1',
+          metaKey: true,
+          ctrlKey: false,
+          altKey: false,
+        },
+        { editing: true },
+      ),
+    ).toBeNull();
+  });
+
   it('maps unmodified mouse wheel movement to annotation size directions', () => {
     expect(
       annotationSizeDirectionFromWheel({

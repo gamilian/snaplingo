@@ -420,6 +420,8 @@ export default function ScreenshotSession({
   const annotations = annotationHistory.annotations;
   const selectedAnnotation =
     selectedAnnotationIndex === null ? null : annotations[selectedAnnotationIndex] ?? null;
+  const hasAnnotationEditingContext =
+    activeAnnotationTool !== null || selectedAnnotationIndex !== null;
   const canUndoAnnotation =
     annotationHistory.undoSnapshots !== undefined
       ? annotationHistory.undoSnapshots.length > 0
@@ -1462,9 +1464,14 @@ export default function ScreenshotSession({
       } else if (
         status === 'preview' &&
         !textDraft &&
-        (event.key === '[' || event.key === ']')
+        (event.key === '[' ||
+          event.key === ']' ||
+          (hasAnnotationEditingContext &&
+            (event.key === '1' || event.key === '2')))
       ) {
-        const sizeDirection = annotationSizeDirectionFromShortcut(event);
+        const sizeDirection = annotationSizeDirectionFromShortcut(event, {
+          editing: hasAnnotationEditingContext,
+        });
         if (sizeDirection) {
           event.preventDefault();
           adjustAnnotationSize(sizeDirection);
@@ -1585,6 +1592,7 @@ export default function ScreenshotSession({
     cursorPoint,
     draftSelectionMoveGesture,
     dismissCaptureLayer,
+    hasAnnotationEditingContext,
     hoverSelection,
     isMagnifierShown,
     textDraft,
