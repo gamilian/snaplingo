@@ -493,6 +493,7 @@ pub fn run() {
       commands::remove_pinned_image,
       commands::toggle_pinned_images_visibility,
       commands::switch_pinned_image_group,
+      commands::move_pinned_image_to_next_group,
       commands::run_capture_ocr,
       commands::get_translation_history,
       commands::get_ocr_history,

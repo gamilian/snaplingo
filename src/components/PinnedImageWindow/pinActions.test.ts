@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isCopyPinnedImageShortcut,
   isSavePinnedImageShortcut,
+  movePinnedImageToNextGroup,
   type PinInvoke,
   type PinInvokeArgs,
   savePinnedImage,
@@ -81,5 +82,25 @@ describe('pinned image actions', () => {
         ctrlKey: false,
       }),
     ).toBe(false);
+  });
+
+  it('moves a pinned image to another group', async () => {
+    const calls: Array<{ command: string; args?: unknown }> = [];
+    const invoke: PinInvoke = async <T>(
+      command: string,
+      args?: PinInvokeArgs,
+    ): Promise<T> => {
+      calls.push({ command, args });
+      return undefined as T;
+    };
+
+    await movePinnedImageToNextGroup(invoke, 'pin-1');
+
+    expect(calls).toEqual([
+      {
+        command: 'move_pinned_image_to_next_group',
+        args: { imageId: 'pin-1' },
+      },
+    ]);
   });
 });

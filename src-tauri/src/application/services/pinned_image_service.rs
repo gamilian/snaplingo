@@ -99,6 +99,38 @@ impl PinnedImageService {
         Ok(())
     }
 
+    pub fn move_pinned_image_to_next_group(&self, image_id: &str) -> Result<u32> {
+        let mut images = self.images.lock().unwrap();
+        let current_group = images
+            .get(image_id)
+            .ok_or_else(|| AppError::System(format!("Pinned image not found: {}", image_id)))?
+            .group;
+        let groups = images
+            .values()
+            .map(|image| image.group)
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
+        let next_group = if groups.len() == 1 {
+            current_group
+                .checked_add(1)
+                .ok_or_else(|| AppError::System("No next pinned image group".to_string()))?
+        } else {
+            groups
+                .iter()
+                .copied()
+                .find(|group| *group > current_group)
+                .unwrap_or(groups[0])
+        };
+
+        let image = images
+            .get_mut(image_id)
+            .ok_or_else(|| AppError::System(format!("Pinned image not found: {}", image_id)))?;
+        image.group = next_group;
+
+        Ok(next_group)
+    }
+
     pub fn switch_to_next_group(&self) -> Option<PinnedImageGroupSwitch> {
         let previous_group = *self.active_group.lock().unwrap();
         let images = self.images.lock().unwrap();

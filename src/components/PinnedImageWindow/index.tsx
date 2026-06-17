@@ -15,12 +15,13 @@ import {
 import {
   isCopyPinnedImageShortcut,
   isSavePinnedImageShortcut,
+  movePinnedImageToNextGroup,
   savePinnedImage,
 } from './pinActions';
 
 const appWindow = getCurrentWindow();
 const webviewWindow = getCurrentWebviewWindow();
-const PIN_CONTEXT_MENU_SIZE = { width: 132, height: 220 };
+const PIN_CONTEXT_MENU_SIZE = { width: 132, height: 248 };
 
 function readPinnedImageId(search: string) {
   const params = new URLSearchParams(search);
@@ -118,6 +119,15 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
   const savePinnedImageAs = useCallback(async () => {
     try {
       await savePinnedImage(invoke, imageId);
+      setContextMenuPosition(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [imageId]);
+
+  const movePinnedToAnotherGroup = useCallback(async () => {
+    try {
+      await movePinnedImageToNextGroup(invoke, imageId);
       setContextMenuPosition(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -266,6 +276,13 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
             </button>
           ))}
           <div className="my-1 h-px bg-white/10" />
+          <button
+            type="button"
+            className="h-7 w-full rounded px-2 text-left hover:bg-white/15"
+            onClick={movePinnedToAnotherGroup}
+          >
+            Move Group
+          </button>
           <button
             type="button"
             className="h-7 w-full rounded px-2 text-left hover:bg-white/15"

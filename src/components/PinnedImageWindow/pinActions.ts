@@ -26,3 +26,12 @@ export async function savePinnedImage(invoke: PinInvoke, imageId: string) {
     path,
   });
 }
+
+export async function movePinnedImageToNextGroup(
+  invoke: PinInvoke,
+  imageId: string,
+) {
+  await invoke('move_pinned_image_to_next_group', {
+    imageId,
+  });
+}

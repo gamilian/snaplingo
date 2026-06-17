@@ -276,6 +276,26 @@ pub fn switch_pinned_image_group_for_state(
     Ok(Some(group_switch.next_group))
 }
 
+#[tauri::command]
+pub fn move_pinned_image_to_next_group(
+    image_id: String,
+    app: AppHandle,
+    state: State<'_, crate::AppState>,
+) -> Result<u32, String> {
+    let next_group = state
+        .inner()
+        .pinned_image_service
+        .move_pinned_image_to_next_group(&image_id)
+        .map_err(|e| e.to_string())?;
+    let change = moved_pinned_image_window_visibility_change(&image_id);
+
+    if let Some(window) = app.get_webview_window(&change.label) {
+        window.hide().map_err(|e| e.to_string())?;
+    }
+
+    Ok(next_group)
+}
+
 async fn save_pinned_png_by_id(
     pinned_images: &PinnedImageService,
     output: &CaptureOutputService,
@@ -659,6 +679,13 @@ fn pinned_group_window_visibility_changes(
                 }),
         )
         .collect()
+}
+
+fn moved_pinned_image_window_visibility_change(image_id: &str) -> PinnedWindowVisibilityChange {
+    PinnedWindowVisibilityChange {
+        label: pinned_window_label(image_id),
+        visible: false,
+    }
 }
 
 fn pinned_window_size(width: u32, height: u32) -> (f64, f64) {
@@ -1234,6 +1261,17 @@ mod tests {
                     visible: true,
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn plans_moved_pinned_image_to_hide_current_window() {
+        assert_eq!(
+            super::moved_pinned_image_window_visibility_change("pin-1"),
+            super::PinnedWindowVisibilityChange {
+                label: "pin-pin-1".to_string(),
+                visible: false,
+            }
         );
     }
 

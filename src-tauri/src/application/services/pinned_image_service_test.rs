@@ -84,4 +84,44 @@ mod tests {
 
         assert!(service.switch_to_next_group().is_none());
     }
+
+    #[test]
+    fn moves_a_pinned_image_to_the_next_group() {
+        let service = PinnedImageService::new();
+        let first_group_image = service.pin_png(make_test_png(1, 1)).unwrap();
+        let second_group_image = service.pin_png(make_test_png(1, 1)).unwrap();
+
+        service
+            .move_pinned_image_to_group(&second_group_image, 1)
+            .unwrap();
+
+        let next_group = service
+            .move_pinned_image_to_next_group(&first_group_image)
+            .unwrap();
+
+        assert_eq!(next_group, 1);
+
+        let switch = service.switch_to_next_group().unwrap();
+
+        assert_eq!(switch.next_group, 1);
+        assert_eq!(switch.hide_image_ids, Vec::<String>::new());
+        assert_eq!(
+            switch.show_image_ids,
+            vec![first_group_image, second_group_image]
+        );
+    }
+
+    #[test]
+    fn moving_a_pinned_image_creates_another_group_when_needed() {
+        let service = PinnedImageService::new();
+        let image_id = service.pin_png(make_test_png(1, 1)).unwrap();
+
+        let next_group = service.move_pinned_image_to_next_group(&image_id).unwrap();
+
+        assert_eq!(next_group, 1);
+        assert_eq!(
+            service.switch_to_next_group().unwrap().show_image_ids,
+            vec![image_id]
+        );
+    }
 }
