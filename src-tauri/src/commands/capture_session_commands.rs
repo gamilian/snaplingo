@@ -212,6 +212,33 @@ pub async fn save_pinned_image(
     .await
 }
 
+#[tauri::command]
+pub fn toggle_pinned_images_visibility(app: AppHandle) -> Result<Option<bool>, String> {
+    let pinned_windows: Vec<_> = app
+        .webview_windows()
+        .into_iter()
+        .filter(|(label, _)| is_pinned_window_label(label))
+        .map(|(_, window)| window)
+        .collect();
+    let visibility: Vec<bool> = pinned_windows
+        .iter()
+        .map(|window| window.is_visible().unwrap_or(false))
+        .collect();
+    let Some(next_visible) = next_pinned_windows_visible_state(&visibility) else {
+        return Ok(None);
+    };
+
+    for window in pinned_windows {
+        if next_visible {
+            window.show().map_err(|e| e.to_string())?;
+        } else {
+            window.hide().map_err(|e| e.to_string())?;
+        }
+    }
+
+    Ok(Some(next_visible))
+}
+
 async fn save_pinned_png_by_id(
     pinned_images: &PinnedImageService,
     output: &CaptureOutputService,
@@ -561,6 +588,18 @@ fn pinned_window_url(image_id: &str) -> PathBuf {
 
 fn pinned_window_label(image_id: &str) -> String {
     format!("pin-{}", image_id)
+}
+
+fn is_pinned_window_label(label: &str) -> bool {
+    label.starts_with("pin-")
+}
+
+fn next_pinned_windows_visible_state(current_visibility: &[bool]) -> Option<bool> {
+    if current_visibility.is_empty() {
+        return None;
+    }
+
+    Some(!current_visibility.iter().any(|is_visible| *is_visible))
 }
 
 fn pinned_window_size(width: u32, height: u32) -> (f64, f64) {
@@ -1087,6 +1126,20 @@ mod tests {
             super::pinned_window_url("pin-1").to_string_lossy(),
             "index.html?window=pin&imageId=pin-1"
         );
+    }
+
+    #[test]
+    fn identifies_pinned_window_labels() {
+        assert!(super::is_pinned_window_label("pin-pin-1"));
+        assert!(!super::is_pinned_window_label("capture"));
+        assert!(!super::is_pinned_window_label("main"));
+    }
+
+    #[test]
+    fn toggles_pinned_windows_based_on_current_visibility() {
+        assert_eq!(super::next_pinned_windows_visible_state(&[true, false]), Some(false));
+        assert_eq!(super::next_pinned_windows_visible_state(&[false, false]), Some(true));
+        assert_eq!(super::next_pinned_windows_visible_state(&[]), None);
     }
 
     #[test]

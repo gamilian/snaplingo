@@ -360,6 +360,21 @@ fn register_screenshot_ocr_shortcut(app: &tauri::AppHandle) -> Result<()> {
     Ok(())
 }
 
+/// Register pinned image toggle shortcut
+fn register_pin_toggle_shortcut(app: &tauri::AppHandle) -> Result<()> {
+    let app_clone = app.clone();
+
+    infrastructure::system::register_shortcut(app, "Shift+F3", move || {
+        log::info!("Pinned image toggle shortcut triggered!");
+
+        if let Err(err) = commands::toggle_pinned_images_visibility(app_clone.clone()) {
+            log::error!("Failed to toggle pinned images: {}", err);
+        }
+    })?;
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   let config_dir = dirs::home_dir()
@@ -407,6 +422,12 @@ pub fn run() {
           } else {
               log::info!("Screenshot OCR shortcut registered: Cmd+Shift+S");
           }
+
+          if let Err(e) = register_pin_toggle_shortcut(&app_handle) {
+              log::error!("Failed to register pinned image toggle shortcut: {}", e);
+          } else {
+              log::info!("Pinned image toggle shortcut registered: Shift+F3");
+          }
       });
 
       // TODO: Create system tray
@@ -448,6 +469,7 @@ pub fn run() {
       commands::copy_pinned_image,
       commands::save_pinned_image,
       commands::remove_pinned_image,
+      commands::toggle_pinned_images_visibility,
       commands::run_capture_ocr,
       commands::get_translation_history,
       commands::get_ocr_history,
