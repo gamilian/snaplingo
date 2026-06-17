@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { useSettingsStore } from '../../stores/settingsStore';
 import type { PinnedImageView } from '../ScreenshotSession/types';
 import {
   getPinnedContextMenuPosition,
@@ -27,9 +28,11 @@ import {
   isClosePinnedImageShortcut,
   isCopyPinnedImageShortcut,
   isDestroyPinnedImageShortcut,
+  isQuickSavePinnedImageShortcut,
   isReplacePinnedImageShortcut,
   isSavePinnedImageShortcut,
   movePinnedImageToNextGroup,
+  quickSavePinnedImage,
   replacePinnedImageFromClipboard,
   savePinnedImage,
 } from './pinActions';
@@ -58,6 +61,7 @@ interface PinnedImageWindowProps {
 }
 
 export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
+  const screenshotSavePath = useSettingsStore((state) => state.screenshotSavePath);
   const [image, setImage] = useState<PinnedImageView | null>(null);
   const [zoom, setZoom] = useState(1);
   const [opacity, setOpacity] = useState(1);
@@ -189,6 +193,15 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     }
   }, [imageId]);
 
+  const quickSavePinnedImageToDirectory = useCallback(async () => {
+    try {
+      await quickSavePinnedImage(invoke, imageId, screenshotSavePath);
+      setContextMenuPosition(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [imageId, screenshotSavePath]);
+
   const replacePinnedFromClipboard = useCallback(async () => {
     try {
       const nextImage = await replacePinnedImageFromClipboard<PinnedImageView>(
@@ -239,6 +252,12 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
       if (isSavePinnedImageShortcut(event)) {
         event.preventDefault();
         void savePinnedImageAs();
+        return;
+      }
+
+      if (isQuickSavePinnedImageShortcut(event)) {
+        event.preventDefault();
+        void quickSavePinnedImageToDirectory();
         return;
       }
 
@@ -299,6 +318,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     adjustPinnedZoom,
     copyPinnedImage,
     hideCurrentPinnedImage,
+    quickSavePinnedImageToDirectory,
     replacePinnedFromClipboard,
     resetPinnedSize,
     resizePinnedWindow,

@@ -7,9 +7,11 @@ import {
   isClosePinnedImageShortcut,
   isCopyPinnedImageShortcut,
   isDestroyPinnedImageShortcut,
+  isQuickSavePinnedImageShortcut,
   isReplacePinnedImageShortcut,
   isSavePinnedImageShortcut,
   movePinnedImageToNextGroup,
+  quickSavePinnedImage,
   replacePinnedImageFromClipboard,
   type PinInvoke,
   type PinInvokeArgs,
@@ -39,6 +41,36 @@ describe('pinned image actions', () => {
         args: {
           imageId: 'pin-1',
           path: '/tmp/SnapLingo-20260617-023000.png',
+        },
+      },
+    ]);
+  });
+
+  it('quick saves a pinned image to the configured capture path', async () => {
+    const calls: Array<{ command: string; args?: unknown }> = [];
+    const invoke: PinInvoke = async <T>(
+      command: string,
+      args?: PinInvokeArgs,
+    ): Promise<T> => {
+      calls.push({ command, args });
+      if (command === 'quick_capture_save_path') {
+        return '/tmp/SnapLingo/SnapLingo-20260617-023000.png' as T;
+      }
+      return undefined as T;
+    };
+
+    await quickSavePinnedImage(invoke, 'pin-1', '~/Pictures/SnapLingo');
+
+    expect(calls).toEqual([
+      {
+        command: 'quick_capture_save_path',
+        args: { directory: '~/Pictures/SnapLingo' },
+      },
+      {
+        command: 'save_pinned_image',
+        args: {
+          imageId: 'pin-1',
+          path: '/tmp/SnapLingo/SnapLingo-20260617-023000.png',
         },
       },
     ]);
@@ -120,6 +152,42 @@ describe('pinned image actions', () => {
         metaKey: false,
         ctrlKey: true,
         altKey: true,
+      }),
+    ).toBe(false);
+  });
+
+  it('uses Cmd/Ctrl+Shift+S for quick saving a pinned image', () => {
+    expect(
+      isQuickSavePinnedImageShortcut({
+        key: 's',
+        metaKey: true,
+        ctrlKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(true);
+    expect(
+      isQuickSavePinnedImageShortcut({
+        key: 'S',
+        metaKey: false,
+        ctrlKey: true,
+        shiftKey: true,
+      }),
+    ).toBe(true);
+    expect(
+      isQuickSavePinnedImageShortcut({
+        key: 's',
+        metaKey: true,
+        ctrlKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      isQuickSavePinnedImageShortcut({
+        key: 's',
+        metaKey: false,
+        ctrlKey: true,
+        altKey: true,
+        shiftKey: true,
       }),
     ).toBe(false);
   });

@@ -40,6 +40,15 @@ export function isSavePinnedImageShortcut(event: PinShortcutEvent) {
   );
 }
 
+export function isQuickSavePinnedImageShortcut(event: PinShortcutEvent) {
+  return (
+    event.key.toLowerCase() === 's' &&
+    (event.metaKey || event.ctrlKey) &&
+    !event.altKey &&
+    !!event.shiftKey
+  );
+}
+
 export function isClosePinnedImageShortcut(event: PinShortcutEvent) {
   return (
     event.key.toLowerCase() === 'w' &&
@@ -64,6 +73,19 @@ export function isDestroyPinnedImageShortcut(event: PinDestroyShortcutEvent) {
 
 export async function savePinnedImage(invoke: PinInvoke, imageId: string) {
   const path = await invoke<string>('default_capture_save_path');
+
+  await invoke('save_pinned_image', {
+    imageId,
+    path,
+  });
+}
+
+export async function quickSavePinnedImage(
+  invoke: PinInvoke,
+  imageId: string,
+  directory?: string,
+) {
+  const path = await invoke<string>('quick_capture_save_path', { directory });
 
   await invoke('save_pinned_image', {
     imageId,
