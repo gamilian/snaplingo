@@ -20,6 +20,7 @@ import {
   isFinishAnnotationGestureDoubleClick,
   isUndoAnnotationGesturePointShortcut,
   getCursorNudgeDeltaFromShortcut,
+  getSaveCapturePointerAction,
   isMagnifierShortcut,
   isPinCaptureShortcut,
   isPinCapturePointer,
@@ -799,6 +800,36 @@ describe('capture session actions', () => {
         shiftKey: false,
       }),
     ).toBe(false);
+  });
+
+  it('uses Shift plus toolbar save click for quick saving', () => {
+    expect(
+      getSaveCapturePointerAction({
+        button: 0,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe('save');
+    expect(
+      getSaveCapturePointerAction({
+        button: 0,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBe('quick-save');
+    expect(
+      getSaveCapturePointerAction({
+        button: 0,
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBe('save');
   });
 
   it('uses Cmd/Ctrl+T for pinning the current selection', () => {

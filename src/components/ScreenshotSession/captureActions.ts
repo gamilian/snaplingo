@@ -50,6 +50,7 @@ interface RestoreLastSelectionOptions {
 }
 export type UndoRedoAction = 'undo' | 'redo';
 export type CaptureKeyboardToolbarAction = 'toggle' | 'hide';
+export type SaveCapturePointerAction = 'save' | 'quick-save';
 export type CancelCapturePointerAction =
   | 'finish-edit'
   | 'finish-annotation'
@@ -75,6 +76,22 @@ export function isSaveCaptureShortcut(event: CaptureShortcutEvent) {
     !event.altKey &&
     !event.shiftKey
   );
+}
+
+export function getSaveCapturePointerAction(
+  event: CapturePointerEvent,
+): SaveCapturePointerAction {
+  if (
+    event.button === 0 &&
+    event.shiftKey &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey
+  ) {
+    return 'quick-save';
+  }
+
+  return 'save';
 }
 
 export function isQuickSaveCaptureShortcut(event: CaptureShortcutEvent) {

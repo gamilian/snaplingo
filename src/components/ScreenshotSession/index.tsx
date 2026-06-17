@@ -101,6 +101,7 @@ import {
   getCandidateCycleDirectionFromShortcut,
   getCancelCapturePointerAction,
   getCursorNudgeDeltaFromShortcut,
+  getSaveCapturePointerAction,
   getSelectionArrowActionFromShortcut,
   getSelectionHistoryStepFromShortcut,
   getUndoRedoActionFromShortcut,
@@ -3047,7 +3048,14 @@ export default function ScreenshotSession({
                 disabled={isRenderingOutput}
                 title="Save"
                 aria-label="Save selection"
-                onClick={saveSelection}
+                onClick={(event) => {
+                  const action = getSaveCapturePointerAction(event);
+                  if (action === 'quick-save') {
+                    void quickSaveSelection();
+                  } else {
+                    void saveSelection();
+                  }
+                }}
               >
                 Save
               </button>
