@@ -54,6 +54,8 @@ export interface Point {
   y: number;
 }
 
+export type ArrowKey = 'ArrowUp' | 'ArrowRight' | 'ArrowDown' | 'ArrowLeft';
+
 export interface OcrResult {
   text: string;
   confidence: number | null;

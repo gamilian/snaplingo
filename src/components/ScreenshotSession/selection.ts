@@ -1,7 +1,6 @@
-import type { LogicalRect, Point } from './types';
+import type { ArrowKey, LogicalRect, Point } from './types';
 
 export type SelectionHandle = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw';
-export type ArrowKey = 'ArrowUp' | 'ArrowRight' | 'ArrowDown' | 'ArrowLeft';
 
 interface Size {
   width: number;

@@ -17,7 +17,6 @@ import {
   snapMovedSelectionToRects,
   snapPointToRects,
   snapResizedSelectionToRects,
-  type ArrowKey,
   type SelectionHandle,
 } from './selection';
 import {
@@ -91,6 +90,7 @@ import {
   getCandidateCycleDirectionFromShortcut,
   getCancelCapturePointerAction,
   getCursorNudgeDeltaFromShortcut,
+  getSelectionArrowActionFromShortcut,
   getSelectionHistoryStepFromShortcut,
   getUndoRedoActionFromShortcut,
   isCancelCapturePointer,
@@ -134,6 +134,7 @@ import type {
   AnnotationCommand,
   CaptureMode,
   CaptureSessionView,
+  ArrowKey,
   LogicalRect,
   MonitorSnapshotView,
   OcrResult,
@@ -1330,6 +1331,7 @@ export default function ScreenshotSession({
         getCandidateCycleDirectionFromShortcut(event);
       const selectionHistoryStep = getSelectionHistoryStepFromShortcut(event);
       const undoRedoAction = getUndoRedoActionFromShortcut(event);
+      const selectionArrowAction = getSelectionArrowActionFromShortcut(event);
 
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -1567,36 +1569,35 @@ export default function ScreenshotSession({
         if (delta) {
           nudgeSelectedAnnotation(delta);
         }
-      } else if (status === 'preview' && selection && selectionBounds && isArrowKey(event.key)) {
-        const isExpandShortcut = (event.metaKey || event.ctrlKey) && !event.shiftKey;
-        const isShrinkShortcut = event.shiftKey && !event.metaKey && !event.ctrlKey;
-        if (
-          event.altKey ||
-          ((event.metaKey || event.ctrlKey || event.shiftKey) &&
-            !isExpandShortcut &&
-            !isShrinkShortcut)
-        ) {
-          return;
-        }
-
+      } else if (
+        status === 'preview' &&
+        selection &&
+        selectionBounds &&
+        selectionArrowAction
+      ) {
         event.preventDefault();
-        const nextSelection = isExpandShortcut
+        const nextSelection = selectionArrowAction.mode === 'expand'
           ? resizeSelectionBoundaryByArrow(
               selection,
-              event.key,
+              selectionArrowAction.direction,
               'expand',
               selectionBounds,
               MIN_SELECTION_SIZE,
             )
-          : isShrinkShortcut
+          : selectionArrowAction.mode === 'shrink'
             ? resizeSelectionBoundaryByArrow(
                 selection,
-                event.key,
+                selectionArrowAction.direction,
                 'shrink',
                 selectionBounds,
                 MIN_SELECTION_SIZE,
               )
-            : nudgeSelection(selection, event.key, selectionBounds, KEYBOARD_NUDGE_STEP);
+            : nudgeSelection(
+                selection,
+                selectionArrowAction.direction,
+                selectionBounds,
+                KEYBOARD_NUDGE_STEP,
+              );
         setSelection(nextSelection);
         setPreviewImageBase64(null);
         void renderSelectionPreview(nextSelection);

@@ -6,6 +6,7 @@ import {
   copyCaptureSelection,
   getCandidateCycleDirectionFromShortcut,
   getCancelCapturePointerAction,
+  getSelectionArrowActionFromShortcut,
   getSelectionHistoryStepFromShortcut,
   getUndoRedoActionFromShortcut,
   isCancelCapturePointer,
@@ -354,6 +355,72 @@ describe('capture session actions', () => {
         shiftKey: false,
       }),
     ).toBe(false);
+  });
+
+  it('maps Snipaste selection arrow shortcuts to move, expand, or shrink', () => {
+    expect(
+      getSelectionArrowActionFromShortcut({
+        key: 'ArrowUp',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toEqual({ mode: 'move', direction: 'ArrowUp' });
+    expect(
+      getSelectionArrowActionFromShortcut({
+        key: 'ArrowRight',
+        metaKey: false,
+        ctrlKey: true,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toEqual({ mode: 'expand', direction: 'ArrowRight' });
+    expect(
+      getSelectionArrowActionFromShortcut({
+        key: 'ArrowRight',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toEqual({ mode: 'expand', direction: 'ArrowRight' });
+    expect(
+      getSelectionArrowActionFromShortcut({
+        key: 'ArrowLeft',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toEqual({ mode: 'shrink', direction: 'ArrowLeft' });
+    expect(
+      getSelectionArrowActionFromShortcut({
+        key: 'ArrowDown',
+        metaKey: false,
+        ctrlKey: true,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBeNull();
+    expect(
+      getSelectionArrowActionFromShortcut({
+        key: 'ArrowDown',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: true,
+        shiftKey: false,
+      }),
+    ).toBeNull();
+    expect(
+      getSelectionArrowActionFromShortcut({
+        key: 'w',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBeNull();
   });
 
   it('copies the current frozen selection to the clipboard', async () => {

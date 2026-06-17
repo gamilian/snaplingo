@@ -1,4 +1,4 @@
-import type { AnnotationCommand, LogicalRect, Point } from './types';
+import type { AnnotationCommand, ArrowKey, LogicalRect, Point } from './types';
 
 export type CaptureInvokeArgs = Record<string, unknown>;
 export type CaptureInvoke = <T>(
@@ -27,6 +27,11 @@ interface CapturePointerEvent {
 }
 
 export type SelectionHistoryStep = 'previous' | 'next';
+export type SelectionArrowActionMode = 'move' | 'expand' | 'shrink';
+export interface SelectionArrowAction {
+  mode: SelectionArrowActionMode;
+  direction: ArrowKey;
+}
 export type UndoRedoAction = 'undo' | 'redo';
 export type CancelCapturePointerAction =
   | 'dismiss-layer'
@@ -112,6 +117,34 @@ export function isDeleteSelectedAnnotationShortcut(
     !event.altKey &&
     !event.shiftKey
   );
+}
+
+export function getSelectionArrowActionFromShortcut(
+  event: CaptureShortcutEvent,
+): SelectionArrowAction | null {
+  if (
+    event.key !== 'ArrowUp' &&
+    event.key !== 'ArrowRight' &&
+    event.key !== 'ArrowDown' &&
+    event.key !== 'ArrowLeft'
+  ) {
+    return null;
+  }
+
+  if (event.altKey) return null;
+
+  const hasPrimaryModifier = event.metaKey || event.ctrlKey;
+  if (hasPrimaryModifier && !event.shiftKey) {
+    return { mode: 'expand', direction: event.key };
+  }
+  if (event.shiftKey && !hasPrimaryModifier) {
+    return { mode: 'shrink', direction: event.key };
+  }
+  if (!hasPrimaryModifier && !event.shiftKey) {
+    return { mode: 'move', direction: event.key };
+  }
+
+  return null;
 }
 
 export function isCopyCaptureKeyboardShortcut(event: CaptureShortcutEvent) {
