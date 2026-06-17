@@ -42,6 +42,16 @@ export function isCopyCaptureKeyboardShortcut(event: CaptureShortcutEvent) {
   );
 }
 
+export function isConfirmHoverSelectionShortcut(event: CaptureShortcutEvent) {
+  return (
+    event.key === 'Enter' &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !event.shiftKey
+  );
+}
+
 export function isToggleToolbarShortcut(event: CaptureShortcutEvent) {
   return (
     event.key === 'Tab' &&

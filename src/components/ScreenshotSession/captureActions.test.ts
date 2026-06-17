@@ -6,6 +6,7 @@ import {
   isCancelCapturePointer,
   isCopyCaptureDoubleClick,
   isCopyCaptureKeyboardShortcut,
+  isConfirmHoverSelectionShortcut,
   isPinCaptureShortcut,
   isSaveCaptureShortcut,
   isSelectAllCaptureShortcut,
@@ -252,6 +253,36 @@ describe('capture session actions', () => {
         ctrlKey: false,
         altKey: false,
         shiftKey: true,
+      }),
+    ).toBe(false);
+  });
+
+  it('uses unmodified Enter for confirming a hovered capture candidate', () => {
+    expect(
+      isConfirmHoverSelectionShortcut({
+        key: 'Enter',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isConfirmHoverSelectionShortcut({
+        key: 'Enter',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      isConfirmHoverSelectionShortcut({
+        key: ' ',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
       }),
     ).toBe(false);
   });

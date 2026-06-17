@@ -77,6 +77,7 @@ import {
 } from './textAnnotationDraft';
 import {
   isCancelCapturePointer,
+  isConfirmHoverSelectionShortcut,
   isCopyCaptureDoubleClick,
   isCopyCaptureKeyboardShortcut,
   isPinCaptureShortcut,
@@ -1103,6 +1104,17 @@ export default function ScreenshotSession({
         event.preventDefault();
         selectFullCaptureArea();
       } else if (
+        status === 'selecting' &&
+        hoverSelection &&
+        isConfirmHoverSelectionShortcut(event)
+      ) {
+        event.preventDefault();
+        setSelection(hoverSelection);
+        setHoverSelection(null);
+        setStatus('preview');
+        setAnnotationHistory(emptyAnnotationHistory());
+        void renderSelectionPreview(hoverSelection, []);
+      } else if (
         status === 'preview' &&
         isCopyCaptureKeyboardShortcut(event)
       ) {
@@ -1208,6 +1220,7 @@ export default function ScreenshotSession({
     cursorPoint,
     draftSelectionMoveGesture,
     dismissCaptureLayer,
+    hoverSelection,
     textDraft,
     deleteSelectedAnnotation,
     redoAnnotation,
