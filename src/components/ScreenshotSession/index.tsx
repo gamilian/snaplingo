@@ -8,6 +8,7 @@ import {
   moveDraftSelectionByDelta,
   moveSelectionByDelta,
   normalizeSelection,
+  nudgeDraftSelection,
   nudgeSelection,
   resizeSelectionBoundaryByArrow,
   resizeSelectionByHandle,
@@ -377,6 +378,7 @@ export default function ScreenshotSession({
   const screenshotSavePath = useSettingsStore((state) => state.screenshotSavePath);
   const sampleCanvasByMonitorRef = useRef<Map<string, HTMLCanvasElement>>(new Map());
   const textDraftInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const keyboardDraftCursorPointRef = useRef<Point | null>(null);
   const [status, setStatus] = useState<SessionStatus>('idle');
   const [mode, setMode] = useState<CaptureMode>('screenshot');
   const [session, setSession] = useState<CaptureSessionView | null>(null);
@@ -1395,6 +1397,27 @@ export default function ScreenshotSession({
       } else if (
         status === 'selecting' &&
         !textDraft &&
+        startPoint &&
+        selection &&
+        cursorPoint &&
+        selectionBounds &&
+        cursorNudgeDelta
+      ) {
+        event.preventDefault();
+        const result = nudgeDraftSelection(
+          startPoint,
+          cursorPoint,
+          cursorNudgeDelta,
+          selectionBounds,
+        );
+        keyboardDraftCursorPointRef.current = result.cursorPoint;
+        setCursorPoint(result.cursorPoint);
+        setSelection(result.selection);
+        setPreviewImageBase64(null);
+        setIsRenderingOutput(false);
+      } else if (
+        status === 'selecting' &&
+        !textDraft &&
         cursorPoint &&
         selectionBounds &&
         cursorNudgeDelta
@@ -1679,6 +1702,7 @@ export default function ScreenshotSession({
     setSelectedAnnotationIndex(null);
     setAnnotationMoveGesture(null);
     setDraftSelectionMoveGesture(null);
+    keyboardDraftCursorPointRef.current = null;
     setTextDraft(null);
     setTextDraftAnnotationIndex(null);
     setAnnotationHistory(emptyAnnotationHistory());
@@ -1824,6 +1848,7 @@ export default function ScreenshotSession({
 
     if (!startPoint || status !== 'selecting') return;
 
+    keyboardDraftCursorPointRef.current = null;
     const currentPoint = snapPointToRects(point, snapTargetRects, EDGE_SNAP_THRESHOLD);
     setSelection(
       normalizeSelection(
@@ -1840,8 +1865,10 @@ export default function ScreenshotSession({
       { x: event.clientX, y: event.clientY },
       selectionBounds,
     );
+    const selectionReleasePoint = keyboardDraftCursorPointRef.current ?? point;
     setCursorPoint(point);
     setDraftSelectionMoveGesture(null);
+    keyboardDraftCursorPointRef.current = null;
 
     if (annotationGesture && selection) {
       const localPoint = clampPointToRect(
@@ -1918,7 +1945,11 @@ export default function ScreenshotSession({
 
     if (!startPoint || status !== 'selecting') return;
 
-    const currentPoint = snapPointToRects(point, snapTargetRects, EDGE_SNAP_THRESHOLD);
+    const currentPoint = snapPointToRects(
+      selectionReleasePoint,
+      snapTargetRects,
+      EDGE_SNAP_THRESHOLD,
+    );
     const nextSelection = normalizeSelection(
       startPoint,
       event.shiftKey ? constrainSelectionPoint(startPoint, currentPoint) : currentPoint,

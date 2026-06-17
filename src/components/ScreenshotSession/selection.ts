@@ -82,6 +82,23 @@ export function moveDraftSelectionByDelta(
   };
 }
 
+export function nudgeDraftSelection(
+  anchorPoint: Point,
+  cursorPoint: Point,
+  delta: Point,
+  bounds: LogicalRect,
+): { cursorPoint: Point; selection: LogicalRect } {
+  const nextCursorPoint = {
+    x: clamp(cursorPoint.x + delta.x, bounds.x, bounds.x + bounds.width - 1),
+    y: clamp(cursorPoint.y + delta.y, bounds.y, bounds.y + bounds.height - 1),
+  };
+
+  return {
+    cursorPoint: nextCursorPoint,
+    selection: normalizeSelection(anchorPoint, nextCursorPoint),
+  };
+}
+
 export function resizeSelectionByHandle(
   rect: LogicalRect,
   handle: SelectionHandle,

@@ -4,6 +4,7 @@ import {
   getToolbarPosition,
   moveSelectionByDelta,
   moveDraftSelectionByDelta,
+  nudgeDraftSelection,
   nudgeSelection,
   resizeSelectionBoundaryByArrow,
   resizeSelectionByHandle,
@@ -48,6 +49,45 @@ describe('selection editing', () => {
     ).toEqual({
       selection: { x: 65, y: 40, width: 100, height: 80 },
       anchorPoint: { x: 65, y: 40 },
+    });
+  });
+
+  it('nudges an in-progress drawn selection from its active cursor point', () => {
+    expect(
+      nudgeDraftSelection(
+        { x: 40, y: 30 },
+        { x: 90, y: 70 },
+        { x: 1, y: 0 },
+        bounds,
+      ),
+    ).toEqual({
+      cursorPoint: { x: 91, y: 70 },
+      selection: { x: 40, y: 30, width: 51, height: 40 },
+    });
+    expect(
+      nudgeDraftSelection(
+        { x: 90, y: 70 },
+        { x: 40, y: 30 },
+        { x: -1, y: 0 },
+        bounds,
+      ),
+    ).toEqual({
+      cursorPoint: { x: 39, y: 30 },
+      selection: { x: 39, y: 30, width: 51, height: 40 },
+    });
+  });
+
+  it('keeps an in-progress drawn selection cursor inside capture bounds', () => {
+    expect(
+      nudgeDraftSelection(
+        { x: 40, y: 30 },
+        { x: 0, y: 0 },
+        { x: -1, y: -1 },
+        bounds,
+      ),
+    ).toEqual({
+      cursorPoint: { x: 0, y: 0 },
+      selection: { x: 0, y: 0, width: 40, height: 30 },
     });
   });
 
