@@ -405,5 +405,19 @@ describe('pinned image actions', () => {
     expect(isDestroyPinnedImageShortcut({ key: 'x', shiftKey: true })).toBe(
       false,
     );
+    expect(
+      isDestroyPinnedImageShortcut({
+        key: 'Escape',
+        shiftKey: true,
+        ctrlKey: true,
+      }),
+    ).toBe(false);
+    expect(
+      isDestroyPinnedImageShortcut({
+        key: 'Escape',
+        shiftKey: true,
+        altKey: true,
+      }),
+    ).toBe(false);
   });
 });

@@ -15,6 +15,9 @@ interface PinShortcutEvent {
 interface PinDestroyShortcutEvent {
   key: string;
   shiftKey: boolean;
+  metaKey?: boolean;
+  ctrlKey?: boolean;
+  altKey?: boolean;
 }
 
 interface PinWindow {
@@ -68,7 +71,13 @@ export function isReplacePinnedImageShortcut(event: PinShortcutEvent) {
 }
 
 export function isDestroyPinnedImageShortcut(event: PinDestroyShortcutEvent) {
-  return event.key === 'Escape' && event.shiftKey;
+  return (
+    event.key === 'Escape' &&
+    event.shiftKey &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey
+  );
 }
 
 export async function savePinnedImage(invoke: PinInvoke, imageId: string) {
