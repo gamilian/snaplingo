@@ -125,7 +125,7 @@ export function getSelectionHistoryStepFromShortcut(
 
 export function isClearAnnotationsShortcut(event: CaptureShortcutEvent) {
   return (
-    (event.key === 'Backspace' || event.key === 'Delete') &&
+    event.key.toLowerCase() === 'z' &&
     (event.metaKey || event.ctrlKey) &&
     !event.altKey &&
     !!event.shiftKey
@@ -139,7 +139,7 @@ export function getUndoRedoActionFromShortcut(
     return null;
   }
 
-  if (event.key.toLowerCase() === 'z') return event.shiftKey ? 'redo' : 'undo';
+  if (event.key.toLowerCase() === 'z') return event.shiftKey ? null : 'undo';
   if (event.key.toLowerCase() === 'y' && !event.shiftKey) return 'redo';
 
   return null;
