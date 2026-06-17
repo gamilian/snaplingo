@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  constrainAnnotationMoveDelta,
   getAnnotationBounds,
   getAnnotationKeyboardNudgeDelta,
   hitTestAnnotations,
@@ -119,5 +120,20 @@ describe('annotation geometry', () => {
       y: 10,
     });
     expect(getAnnotationKeyboardNudgeDelta('Enter', 1)).toBeNull();
+  });
+
+  it('constrains annotation move deltas to the dominant axis', () => {
+    expect(constrainAnnotationMoveDelta({ x: 24, y: 8 })).toEqual({
+      x: 24,
+      y: 0,
+    });
+    expect(constrainAnnotationMoveDelta({ x: -6, y: 18 })).toEqual({
+      x: 0,
+      y: 18,
+    });
+    expect(constrainAnnotationMoveDelta({ x: 10, y: 10 })).toEqual({
+      x: 10,
+      y: 10,
+    });
   });
 });

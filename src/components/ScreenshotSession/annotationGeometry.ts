@@ -138,3 +138,12 @@ export function getAnnotationKeyboardNudgeDelta(
 
   return null;
 }
+
+export function constrainAnnotationMoveDelta(delta: Point): Point {
+  const absX = Math.abs(delta.x);
+  const absY = Math.abs(delta.y);
+  if (absX > absY) return { x: delta.x, y: 0 };
+  if (absY > absX) return { x: 0, y: delta.y };
+
+  return delta;
+}

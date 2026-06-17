@@ -38,6 +38,7 @@ import {
   undoAnnotationHistory,
 } from './annotationHistory';
 import {
+  constrainAnnotationMoveDelta,
   getAnnotationKeyboardNudgeDelta,
   getAnnotationBounds,
   hitTestAnnotations,
@@ -1343,9 +1344,10 @@ export default function ScreenshotSession({
         x: localPoint.x - annotationMoveGesture.startPoint.x,
         y: localPoint.y - annotationMoveGesture.startPoint.y,
       };
+      const moveDelta = event.shiftKey ? constrainAnnotationMoveDelta(delta) : delta;
       setPreviewImageBase64(null);
       setDraftAnnotation(
-        moveAnnotationByDelta(annotationMoveGesture.startAnnotation, delta),
+        moveAnnotationByDelta(annotationMoveGesture.startAnnotation, moveDelta),
       );
       return;
     }
@@ -1437,9 +1439,10 @@ export default function ScreenshotSession({
         x: localPoint.x - annotationMoveGesture.startPoint.x,
         y: localPoint.y - annotationMoveGesture.startPoint.y,
       };
+      const moveDelta = event.shiftKey ? constrainAnnotationMoveDelta(delta) : delta;
       const nextAnnotation = moveAnnotationByDelta(
         annotationMoveGesture.startAnnotation,
-        delta,
+        moveDelta,
       );
       const nextHistory = replaceAnnotationInHistory(
         annotationHistory,
