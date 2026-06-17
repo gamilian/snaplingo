@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getPinnedContextMenuPosition,
   getPinnedDisplaySize,
+  getPinnedDisplaySizeForTransform,
   getPinnedKeyboardTransformAction,
   getPinnedKeyboardZoomAction,
   getPinnedOpacityFromWheel,
@@ -126,6 +127,32 @@ describe('pinned image controls', () => {
       width: 1800,
       height: 900,
     });
+  });
+
+  it('swaps pinned display size for quarter-turn rotations', () => {
+    expect(
+      getPinnedDisplaySizeForTransform(
+        { width: 300, height: 200 },
+        1,
+        { rotation: 90, flipX: false, flipY: false },
+      ),
+    ).toEqual({ width: 200, height: 300 });
+
+    expect(
+      getPinnedDisplaySizeForTransform(
+        { width: 300, height: 200 },
+        1,
+        { rotation: 270, flipX: true, flipY: false },
+      ),
+    ).toEqual({ width: 200, height: 300 });
+
+    expect(
+      getPinnedDisplaySizeForTransform(
+        { width: 300, height: 200 },
+        1,
+        { rotation: 180, flipX: true, flipY: true },
+      ),
+    ).toEqual({ width: 300, height: 200 });
   });
 
   it('keeps context menus inside the pinned window', () => {

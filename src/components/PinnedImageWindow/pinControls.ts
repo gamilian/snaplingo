@@ -133,6 +133,24 @@ export function getPinnedDisplaySize(originalSize: PinnedSize, zoom: number) {
   };
 }
 
+export function getPinnedDisplaySizeForTransform(
+  originalSize: PinnedSize,
+  zoom: number,
+  transform: PinnedTransform,
+) {
+  const size = getPinnedDisplaySize(originalSize, zoom);
+  const normalizedRotation = ((transform.rotation % 360) + 360) % 360;
+
+  if (normalizedRotation === 90 || normalizedRotation === 270) {
+    return {
+      width: size.height,
+      height: size.width,
+    };
+  }
+
+  return size;
+}
+
 export function getPinnedContextMenuPosition(
   point: PinnedPoint,
   menuSize: PinnedSize,

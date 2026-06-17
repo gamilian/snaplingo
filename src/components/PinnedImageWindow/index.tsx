@@ -6,6 +6,7 @@ import type { PinnedImageView } from '../ScreenshotSession/types';
 import {
   getPinnedContextMenuPosition,
   getPinnedDisplaySize,
+  getPinnedDisplaySizeForTransform,
   getPinnedKeyboardTransformAction,
   getPinnedKeyboardZoomAction,
   getPinnedOpacityFromWheel,
@@ -129,13 +130,17 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
   }, [destroyCurrentPinnedImage, hideCurrentPinnedImage]);
 
   const resizePinnedWindow = useCallback(
-    async (nextZoom: number, nextImage = image) => {
+    async (nextZoom: number, nextTransform = transform, nextImage = image) => {
       if (!nextImage) return;
 
-      const size = getPinnedDisplaySize(nextImage, nextZoom);
+      const size = getPinnedDisplaySizeForTransform(
+        nextImage,
+        nextZoom,
+        nextTransform,
+      );
       await appWindow.setSize(new LogicalSize(size.width, size.height));
     },
-    [image],
+    [image, transform],
   );
 
   const resetPinnedSize = useCallback(() => {
@@ -223,9 +228,14 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
       if (transformAction) {
         event.preventDefault();
         setContextMenuPosition(null);
-        setTransform((currentTransform) =>
-          nextPinnedTransform(currentTransform, transformAction),
-        );
+        setTransform((currentTransform) => {
+          const nextTransform = nextPinnedTransform(
+            currentTransform,
+            transformAction,
+          );
+          void resizePinnedWindow(zoom, nextTransform);
+          return nextTransform;
+        });
       }
     };
 
@@ -236,8 +246,9 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     copyPinnedImage,
     hideCurrentPinnedImage,
     resetPinnedSize,
+    resizePinnedWindow,
     savePinnedImageAs,
-    setPinnedOpacityPreset,
+    zoom,
   ]);
 
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
@@ -276,6 +287,8 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     );
   }
 
+  const imageFrameSize = image ? getPinnedDisplaySize(image, zoom) : null;
+
   return (
     <div
       className="group relative h-screen w-screen overflow-hidden bg-transparent"
@@ -283,20 +296,29 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
       onContextMenu={handleContextMenu}
       onPointerDown={() => setContextMenuPosition(null)}
     >
-      {image && (
-        <img
-          src={`data:image/png;base64,${image.image_base64}`}
-          className="h-full w-full object-fill"
+      {image && imageFrameSize && (
+        <div
+          className="absolute left-1/2 top-1/2"
           style={{
-            opacity,
-            transform: getPinnedTransformStyle(transform),
+            width: `${imageFrameSize.width}px`,
+            height: `${imageFrameSize.height}px`,
+            transform: 'translate(-50%, -50%)',
           }}
-          draggable={false}
-          onPointerDown={(event) => {
-            if (event.button !== 0) return;
-            void appWindow.startDragging();
-          }}
-        />
+        >
+          <img
+            src={`data:image/png;base64,${image.image_base64}`}
+            className="h-full w-full object-fill"
+            style={{
+              opacity,
+              transform: getPinnedTransformStyle(transform),
+            }}
+            draggable={false}
+            onPointerDown={(event) => {
+              if (event.button !== 0) return;
+              void appWindow.startDragging();
+            }}
+          />
+        </div>
       )}
       {contextMenuPosition && (
         <div
