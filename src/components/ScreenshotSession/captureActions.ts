@@ -44,13 +44,16 @@ interface SelectionArrowActionOptions {
 }
 interface HoverSelectionShortcutOptions {
   drafting?: boolean;
+  mode?: CaptureMode;
 }
 export type HoverSelectionCompletionAction =
   | 'copy'
   | 'save'
   | 'quick-save'
   | 'pin'
-  | 'print';
+  | 'print'
+  | 'ocr'
+  | 'ocr-translate';
 interface RestoreLastSelectionOptions {
   status: 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
   editing?: boolean;
@@ -65,6 +68,7 @@ export type CaptureCompletionAction =
   | 'quick-save'
   | 'pin'
   | 'ocr'
+  | 'ocr-translate'
   | 'print'
   | 'cancel';
 export type CancelCapturePointerAction =
@@ -271,19 +275,22 @@ export function getSelectionArrowActionFromShortcut(
 }
 
 export function isCopyCaptureKeyboardShortcut(event: CaptureShortcutEvent) {
-  const isPlainCompletionKey =
-    event.key === 'Enter' &&
-    !event.metaKey &&
-    !event.ctrlKey &&
-    !event.altKey &&
-    !event.shiftKey;
-
   return (
-    isPlainCompletionKey ||
+    isPlainCaptureCompletionShortcut(event) ||
     (event.key.toLowerCase() === 'c' &&
       (event.metaKey || event.ctrlKey) &&
       !event.altKey &&
       !event.shiftKey)
+  );
+}
+
+export function isPlainCaptureCompletionShortcut(event: CaptureShortcutEvent) {
+  return (
+    event.key === 'Enter' &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !event.shiftKey
   );
 }
 
@@ -300,6 +307,11 @@ export function getHoverSelectionCompletionActionFromShortcut(
 ): HoverSelectionCompletionAction | null {
   if (options.drafting) return null;
 
+  if (isPlainCaptureCompletionShortcut(event)) {
+    const flow = getCaptureSelectionFlowForMode(options.mode ?? 'screenshot');
+    if (flow === 'ocr' || flow === 'ocr-translate') return flow;
+    return 'copy';
+  }
   if (isCopyCaptureKeyboardShortcut(event)) return 'copy';
   if (isQuickSaveCaptureShortcut(event)) return 'quick-save';
   if (isSaveCaptureShortcut(event)) return 'save';

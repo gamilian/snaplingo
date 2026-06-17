@@ -1471,6 +1471,45 @@ describe('capture session actions', () => {
     ).toBe('print');
   });
 
+  it('uses the capture mode for hovered candidate Enter completion', () => {
+    expect(
+      getHoverSelectionCompletionActionFromShortcut(
+        {
+          key: 'Enter',
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          shiftKey: false,
+        },
+        { mode: 'screenshot-ocr' },
+      ),
+    ).toBe('ocr');
+    expect(
+      getHoverSelectionCompletionActionFromShortcut(
+        {
+          key: 'Enter',
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          shiftKey: false,
+        },
+        { mode: 'screenshot-translate' },
+      ),
+    ).toBe('ocr-translate');
+    expect(
+      getHoverSelectionCompletionActionFromShortcut(
+        {
+          key: 'c',
+          metaKey: true,
+          ctrlKey: false,
+          altKey: false,
+          shiftKey: false,
+        },
+        { mode: 'screenshot-translate' },
+      ),
+    ).toBe('copy');
+  });
+
   it('maps Tab shortcuts to capture candidate cycle direction', () => {
     expect(
       getCandidateCycleDirectionFromShortcut({

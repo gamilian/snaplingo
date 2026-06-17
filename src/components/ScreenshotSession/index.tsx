@@ -771,6 +771,17 @@ export default function ScreenshotSession({
           printBase64PngImage,
           shouldIncludeCapturedCursor,
         );
+      } else if (action === 'ocr' || action === 'ocr-translate') {
+        const ocrResult = await invoke<OcrResult>('run_capture_ocr', {
+          sessionId: session.id,
+          rect,
+        });
+        await invoke(
+          action === 'ocr-translate'
+            ? 'open_translation_result_window'
+            : 'open_result_window',
+          { text: ocrResult.text },
+        );
       } else {
         await invoke('output_capture', {
           sessionId: session.id,
@@ -1520,6 +1531,7 @@ export default function ScreenshotSession({
       const hoverSelectionCompletionAction =
         getHoverSelectionCompletionActionFromShortcut(event, {
           drafting: startPoint !== null,
+          mode,
         });
       const selectionHistoryStep = getSelectionHistoryStepFromShortcut(event);
       const undoRedoAction = getUndoRedoActionFromShortcut(event);
