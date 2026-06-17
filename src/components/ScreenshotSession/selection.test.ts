@@ -4,6 +4,7 @@ import {
   getToolbarPosition,
   moveSelectionByDelta,
   moveDraftSelectionByDelta,
+  nudgeResizedSelection,
   nudgeDraftSelection,
   nudgeMovedSelection,
   nudgeSelection,
@@ -103,6 +104,51 @@ describe('selection editing', () => {
     ).toEqual({
       cursorPoint: { x: 91, y: 70 },
       selection: { x: 41, y: 30, width: 100, height: 80 },
+    });
+  });
+
+  it('nudges a resized selection from its active handle point', () => {
+    expect(
+      nudgeResizedSelection(
+        { x: 40, y: 30, width: 100, height: 80 },
+        { x: 140, y: 110 },
+        'se',
+        { x: 1, y: 0 },
+        bounds,
+        10,
+      ),
+    ).toEqual({
+      cursorPoint: { x: 141, y: 110 },
+      selection: { x: 40, y: 30, width: 101, height: 80 },
+    });
+    expect(
+      nudgeResizedSelection(
+        { x: 40, y: 30, width: 100, height: 80 },
+        { x: 40, y: 30 },
+        'nw',
+        { x: -1, y: -1 },
+        bounds,
+        10,
+      ),
+    ).toEqual({
+      cursorPoint: { x: 39, y: 29 },
+      selection: { x: 39, y: 29, width: 101, height: 81 },
+    });
+  });
+
+  it('only moves a resized selection cursor by the clamped handle movement', () => {
+    expect(
+      nudgeResizedSelection(
+        { x: 200, y: 120, width: 100, height: 80 },
+        { x: 300, y: 200 },
+        'se',
+        { x: 1, y: 1 },
+        bounds,
+        10,
+      ),
+    ).toEqual({
+      cursorPoint: { x: 300, y: 200 },
+      selection: { x: 200, y: 120, width: 100, height: 80 },
     });
   });
 

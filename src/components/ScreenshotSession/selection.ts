@@ -119,6 +119,50 @@ export function nudgeMovedSelection(
   };
 }
 
+function getSelectionHandlePoint(rect: LogicalRect, handle: SelectionHandle): Point {
+  const horizontal = handle.includes('w')
+    ? rect.x
+    : handle.includes('e')
+      ? rect.x + rect.width
+      : rect.x + rect.width / 2;
+  const vertical = handle.includes('n')
+    ? rect.y
+    : handle.includes('s')
+      ? rect.y + rect.height
+      : rect.y + rect.height / 2;
+
+  return { x: horizontal, y: vertical };
+}
+
+export function nudgeResizedSelection(
+  rect: LogicalRect,
+  cursorPoint: Point,
+  handle: SelectionHandle,
+  delta: Point,
+  bounds: LogicalRect,
+  minSize: number,
+  preserveAspect = false,
+): { cursorPoint: Point; selection: LogicalRect } {
+  const selection = resizeSelectionByHandle(
+    rect,
+    handle,
+    delta,
+    bounds,
+    minSize,
+    preserveAspect,
+  );
+  const previousHandlePoint = getSelectionHandlePoint(rect, handle);
+  const nextHandlePoint = getSelectionHandlePoint(selection, handle);
+
+  return {
+    cursorPoint: {
+      x: cursorPoint.x + nextHandlePoint.x - previousHandlePoint.x,
+      y: cursorPoint.y + nextHandlePoint.y - previousHandlePoint.y,
+    },
+    selection,
+  };
+}
+
 export function resizeSelectionByHandle(
   rect: LogicalRect,
   handle: SelectionHandle,

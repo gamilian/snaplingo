@@ -10,6 +10,7 @@ import {
   normalizeSelection,
   nudgeDraftSelection,
   nudgeMovedSelection,
+  nudgeResizedSelection,
   nudgeSelection,
   resizeSelectionBoundaryByArrow,
   resizeSelectionByHandle,
@@ -1608,6 +1609,35 @@ export default function ScreenshotSession({
           cursorPoint,
           cursorNudgeDelta,
           selectionBounds,
+        );
+        keyboardEditCursorPointRef.current = result.cursorPoint;
+        setCursorPoint(result.cursorPoint);
+        setSelection(result.selection);
+        setEditGesture({
+          ...editGesture,
+          startPoint: result.cursorPoint,
+          startSelection: result.selection,
+        });
+        setPreviewImageBase64(null);
+        setIsRenderingOutput(false);
+      } else if (
+        status === 'preview' &&
+        !textDraft &&
+        editGesture?.type === 'resize' &&
+        selection &&
+        cursorPoint &&
+        selectionBounds &&
+        cursorNudgeDelta
+      ) {
+        event.preventDefault();
+        const result = nudgeResizedSelection(
+          selection,
+          cursorPoint,
+          editGesture.handle,
+          cursorNudgeDelta,
+          selectionBounds,
+          MIN_SELECTION_SIZE,
+          event.shiftKey,
         );
         keyboardEditCursorPointRef.current = result.cursorPoint;
         setCursorPoint(result.cursorPoint);
