@@ -44,6 +44,7 @@ describe('capture magnifier', () => {
     expect(
       shouldShowMagnifier({
         requested: true,
+        automatic: false,
         hasCursorMonitor: true,
         hasViewportCursor: true,
         hasImageCursor: true,
@@ -53,6 +54,7 @@ describe('capture magnifier', () => {
     expect(
       shouldShowMagnifier({
         requested: false,
+        automatic: false,
         hasCursorMonitor: true,
         hasViewportCursor: true,
         hasImageCursor: true,
@@ -62,11 +64,25 @@ describe('capture magnifier', () => {
     expect(
       shouldShowMagnifier({
         requested: true,
+        automatic: false,
         hasCursorMonitor: false,
         hasViewportCursor: true,
         hasImageCursor: true,
         hasViewportBounds: true,
       }),
     ).toBe(false);
+  });
+
+  it('shows automatically when the capture interaction asks for it and context is available', () => {
+    expect(
+      shouldShowMagnifier({
+        requested: false,
+        automatic: true,
+        hasCursorMonitor: true,
+        hasViewportCursor: true,
+        hasImageCursor: true,
+        hasViewportBounds: true,
+      }),
+    ).toBe(true);
   });
 });

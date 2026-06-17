@@ -7,6 +7,7 @@ interface Size {
 
 interface MagnifierVisibilityState {
   requested: boolean;
+  automatic: boolean;
   hasCursorMonitor: boolean;
   hasViewportCursor: boolean;
   hasImageCursor: boolean;
@@ -19,7 +20,7 @@ function clamp(value: number, min: number, max: number) {
 
 export function shouldShowMagnifier(state: MagnifierVisibilityState) {
   return (
-    state.requested &&
+    (state.requested || state.automatic) &&
     state.hasCursorMonitor &&
     state.hasViewportCursor &&
     state.hasImageCursor &&

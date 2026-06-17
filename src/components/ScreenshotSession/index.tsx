@@ -524,6 +524,7 @@ export default function ScreenshotSession({
   }, [selectionViewportRect, status, viewportBounds]);
   const isMagnifierShown = shouldShowMagnifier({
     requested: isMagnifierRequested,
+    automatic: status === 'selecting',
     hasCursorMonitor: Boolean(cursorMonitor),
     hasViewportCursor: Boolean(cursorViewportPoint),
     hasImageCursor: Boolean(cursorInMonitorPoint),
