@@ -410,6 +410,11 @@ async fn create_capture_session_without_app_windows(
     state: &crate::AppState,
 ) -> Result<CaptureSessionView, String> {
     let hidden_window_labels = hide_capture_snapshot_windows(app)?;
+    let settle_delay_ms = capture_snapshot_hide_settle_delay_ms(&hidden_window_labels);
+    if settle_delay_ms > 0 {
+        tokio::time::sleep(tokio::time::Duration::from_millis(settle_delay_ms)).await;
+    }
+
     let session_result = state
         .capture_session_service
         .create_session()
@@ -762,6 +767,14 @@ fn capture_snapshot_window_labels_to_restore(hidden_window_labels: &[String]) ->
         .collect()
 }
 
+fn capture_snapshot_hide_settle_delay_ms(hidden_window_labels: &[String]) -> u64 {
+    if hidden_window_labels.is_empty() {
+        return 0;
+    }
+
+    100
+}
+
 fn pinned_window_url(image_id: &str) -> PathBuf {
     PathBuf::from(format!("index.html?window=pin&imageId={}", image_id))
 }
@@ -1033,6 +1046,15 @@ mod tests {
             ]),
             vec!["main".to_string(), "pin-pin-1".to_string()]
         );
+    }
+
+    #[test]
+    fn plans_capture_snapshot_settle_delay_after_hiding_windows() {
+        assert_eq!(
+            super::capture_snapshot_hide_settle_delay_ms(&["main".to_string()]),
+            100
+        );
+        assert_eq!(super::capture_snapshot_hide_settle_delay_ms(&[]), 0);
     }
 
     #[test]
