@@ -23,6 +23,7 @@ interface AnnotationToolShortcutEvent {
   metaKey: boolean;
   ctrlKey: boolean;
   altKey: boolean;
+  shiftKey?: boolean;
 }
 
 interface AnnotationSizeShortcutOptions {
@@ -80,6 +81,26 @@ export function annotationToolFromShortcut(
   if (event.metaKey || event.ctrlKey || event.altKey) return null;
 
   return ANNOTATION_TOOL_SHORTCUTS[event.key.toLowerCase()] ?? null;
+}
+
+export function nextAnnotationToolFromCycleShortcut(
+  event: AnnotationToolShortcutEvent,
+  currentTool: AnnotationTool | null,
+): AnnotationTool | null {
+  if (
+    event.key !== 'Tab' ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.altKey ||
+    event.shiftKey
+  ) {
+    return null;
+  }
+
+  if (currentTool === 'line') return 'arrow';
+  if (currentTool === 'arrow') return 'line';
+
+  return null;
 }
 
 export function annotationColorFromShortcut(

@@ -71,6 +71,7 @@ import {
   annotationFromGesture,
   arrowHeadPoints,
   isCommittedAnnotation,
+  nextAnnotationToolFromCycleShortcut,
   nextAnnotationStrokeWidth,
   nextTextFontSize,
   type AnnotationColor,
@@ -1375,6 +1376,10 @@ export default function ScreenshotSession({
       const selectionHistoryStep = getSelectionHistoryStepFromShortcut(event);
       const undoRedoAction = getUndoRedoActionFromShortcut(event);
       const selectionArrowAction = getSelectionArrowActionFromShortcut(event);
+      const cycledAnnotationTool = nextAnnotationToolFromCycleShortcut(
+        event,
+        activeAnnotationTool,
+      );
 
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -1589,6 +1594,19 @@ export default function ScreenshotSession({
       } else if (
         status === 'preview' &&
         !textDraft &&
+        cycledAnnotationTool &&
+        !annotationGesture &&
+        !annotationMoveGesture
+      ) {
+        event.preventDefault();
+        setActiveAnnotationTool(cycledAnnotationTool);
+        setSelectedAnnotationIndex(null);
+        setAnnotationGesture(null);
+        setAnnotationMoveGesture(null);
+        setDraftAnnotation(null);
+      } else if (
+        status === 'preview' &&
+        !textDraft &&
         !annotationGesture &&
         !annotationMoveGesture
       ) {
@@ -1695,6 +1713,7 @@ export default function ScreenshotSession({
     copyCurrentColor,
     copySelection,
     colorSampleFormat,
+    activeAnnotationTool,
     annotationGesture,
     annotationMoveGesture,
     captureCandidates,

@@ -6,6 +6,7 @@ import {
   annotationFromGesture,
   applyAnnotationStyle,
   constrainAnnotationGesturePoint,
+  nextAnnotationToolFromCycleShortcut,
   annotationSizeDirectionFromShortcut,
   annotationSizeDirectionFromWheel,
   annotationToolFromShortcut,
@@ -247,6 +248,25 @@ describe('annotation style', () => {
         ctrlKey: false,
         altKey: false,
       }),
+    ).toBeNull();
+  });
+
+  it('cycles between line and arrow tools with plain Tab', () => {
+    const plainTab = {
+      key: 'Tab',
+      metaKey: false,
+      ctrlKey: false,
+      altKey: false,
+    };
+
+    expect(nextAnnotationToolFromCycleShortcut(plainTab, 'line')).toBe('arrow');
+    expect(nextAnnotationToolFromCycleShortcut(plainTab, 'arrow')).toBe('line');
+    expect(nextAnnotationToolFromCycleShortcut(plainTab, 'rectangle')).toBeNull();
+    expect(
+      nextAnnotationToolFromCycleShortcut(
+        { ...plainTab, key: 'Tab', ctrlKey: true },
+        'line',
+      ),
     ).toBeNull();
   });
 
