@@ -1117,7 +1117,7 @@ describe('capture session actions', () => {
     ).toBe(false);
   });
 
-  it('uses unmodified Enter for confirming a hovered capture candidate', () => {
+  it('uses unmodified Enter or Space for confirming a hovered capture candidate', () => {
     expect(
       isConfirmHoverSelectionShortcut({
         key: 'Enter',
@@ -1144,6 +1144,42 @@ describe('capture session actions', () => {
         altKey: false,
         shiftKey: false,
       }),
+    ).toBe(true);
+    expect(
+      isConfirmHoverSelectionShortcut({
+        key: ' ',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBe(false);
+  });
+
+  it('does not confirm a hovered candidate while drafting a selection', () => {
+    expect(
+      isConfirmHoverSelectionShortcut(
+        {
+          key: 'Enter',
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          shiftKey: false,
+        },
+        { drafting: true },
+      ),
+    ).toBe(false);
+    expect(
+      isConfirmHoverSelectionShortcut(
+        {
+          key: ' ',
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          shiftKey: false,
+        },
+        { drafting: true },
+      ),
     ).toBe(false);
   });
 

@@ -41,6 +41,9 @@ export interface SelectionArrowAction {
 interface SelectionArrowActionOptions {
   editing?: boolean;
 }
+interface ConfirmHoverSelectionOptions {
+  drafting?: boolean;
+}
 export type UndoRedoAction = 'undo' | 'redo';
 export type CancelCapturePointerAction =
   | 'finish-edit'
@@ -202,9 +205,14 @@ export function isCopyCaptureKeyboardShortcut(event: CaptureShortcutEvent) {
   );
 }
 
-export function isConfirmHoverSelectionShortcut(event: CaptureShortcutEvent) {
+export function isConfirmHoverSelectionShortcut(
+  event: CaptureShortcutEvent,
+  options: ConfirmHoverSelectionOptions = {},
+) {
+  if (options.drafting) return false;
+
   return (
-    event.key === 'Enter' &&
+    (event.key === 'Enter' || event.key === ' ') &&
     !event.metaKey &&
     !event.ctrlKey &&
     !event.altKey &&

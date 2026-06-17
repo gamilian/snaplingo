@@ -1573,7 +1573,7 @@ export default function ScreenshotSession({
       } else if (
         status === 'selecting' &&
         hoverSelection &&
-        isConfirmHoverSelectionShortcut(event)
+        isConfirmHoverSelectionShortcut(event, { drafting: startPoint !== null })
       ) {
         event.preventDefault();
         setSelection(hoverSelection);
