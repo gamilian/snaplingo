@@ -108,6 +108,14 @@ export function getCaptureSelectionFlowForMode(
   return 'preview';
 }
 
+function getPrimaryHoverSelectionCompletionActionForMode(
+  mode: CaptureMode = 'screenshot',
+): HoverSelectionCompletionAction {
+  const flow = getCaptureSelectionFlowForMode(mode);
+  if (flow === 'ocr' || flow === 'ocr-translate') return flow;
+  return 'copy';
+}
+
 export function isSaveCaptureShortcut(event: CaptureShortcutEvent) {
   return (
     event.key.toLowerCase() === 's' &&
@@ -308,9 +316,7 @@ export function getHoverSelectionCompletionActionFromShortcut(
   if (options.drafting) return null;
 
   if (isPlainCaptureCompletionShortcut(event)) {
-    const flow = getCaptureSelectionFlowForMode(options.mode ?? 'screenshot');
-    if (flow === 'ocr' || flow === 'ocr-translate') return flow;
-    return 'copy';
+    return getPrimaryHoverSelectionCompletionActionForMode(options.mode);
   }
   if (isCopyCaptureKeyboardShortcut(event)) return 'copy';
   if (isQuickSaveCaptureShortcut(event)) return 'quick-save';
@@ -406,6 +412,16 @@ export function isSelectAllCaptureShortcut(event: CaptureShortcutEvent) {
 
 export function isCopyCaptureDoubleClick(event: CapturePointerEvent) {
   return isUnmodifiedPrimaryDoubleClick(event);
+}
+
+export function getHoverSelectionCompletionActionFromPointer(
+  event: CapturePointerEvent,
+  options: HoverSelectionShortcutOptions = {},
+): HoverSelectionCompletionAction | null {
+  if (options.drafting) return null;
+  if (!isCopyCaptureDoubleClick(event)) return null;
+
+  return getPrimaryHoverSelectionCompletionActionForMode(options.mode);
 }
 
 export function isFinishAnnotationGestureDoubleClick(event: CapturePointerEvent) {

@@ -9,6 +9,7 @@ import {
   getCaptureSelectionFlowForMode,
   getCandidateCycleDirectionFromShortcut,
   getCancelCapturePointerAction,
+  getHoverSelectionCompletionActionFromPointer,
   getSelectionArrowActionFromShortcut,
   getSelectionHistoryStepFromShortcut,
   getUndoRedoActionFromShortcut,
@@ -1508,6 +1509,35 @@ describe('capture session actions', () => {
         { mode: 'screenshot-translate' },
       ),
     ).toBe('copy');
+  });
+
+  it('uses the capture mode for hovered candidate primary double click completion', () => {
+    const event = {
+      detail: 2,
+      button: 0,
+      metaKey: false,
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: false,
+    };
+
+    expect(getHoverSelectionCompletionActionFromPointer(event)).toBe('copy');
+    expect(
+      getHoverSelectionCompletionActionFromPointer(event, {
+        mode: 'screenshot-ocr',
+      }),
+    ).toBe('ocr');
+    expect(
+      getHoverSelectionCompletionActionFromPointer(event, {
+        mode: 'screenshot-translate',
+      }),
+    ).toBe('ocr-translate');
+    expect(
+      getHoverSelectionCompletionActionFromPointer({
+        ...event,
+        metaKey: true,
+      }),
+    ).toBeNull();
   });
 
   it('maps Tab shortcuts to capture candidate cycle direction', () => {

@@ -104,6 +104,7 @@ import {
   getCancelCapturePointerAction,
   getCursorNudgeDeltaFromShortcut,
   getHoverSelectionCompletionActionFromShortcut,
+  getHoverSelectionCompletionActionFromPointer,
   getSaveCapturePointerAction,
   getSelectionArrowActionFromShortcut,
   getSelectionHistoryStepFromShortcut,
@@ -2037,10 +2038,13 @@ export default function ScreenshotSession({
       return;
     }
 
-    if (status === 'selecting' && hoverSelection && isCopyCaptureDoubleClick(event)) {
+    const hoverSelectionPointerAction =
+      getHoverSelectionCompletionActionFromPointer(event, { mode });
+
+    if (status === 'selecting' && hoverSelection && hoverSelectionPointerAction) {
       event.preventDefault();
       event.stopPropagation();
-      void completeCandidateSelection(hoverSelection, 'copy');
+      void completeCandidateSelection(hoverSelection, hoverSelectionPointerAction);
       return;
     }
 
