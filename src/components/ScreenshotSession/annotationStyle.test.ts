@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ANNOTATION_COLORS,
   annotationColorFromShortcut,
+  annotationFromGestureDraft,
   annotationFromText,
   annotationFromGesture,
   applyAnnotationStyle,
@@ -203,7 +204,65 @@ describe('annotation style', () => {
     });
   });
 
-  it('constrains geometric annotation gestures while holding shift', () => {
+  it('converts pen and highlight gestures to straight strokes while holding shift', () => {
+    expect(
+      completeAnnotationGesture(
+        {
+          tool: 'pen',
+          startPoint: { x: 10, y: 10 },
+          points: [{ x: 10, y: 10 }, { x: 14, y: 18 }, { x: 22, y: 16 }],
+        },
+        { x: 36, y: 19 },
+        style,
+        true,
+      ),
+    ).toEqual({
+      type: 'freehand',
+      points: [{ x: 10, y: 10 }, { x: 36, y: 10 }],
+      color: [40, 167, 69, 255],
+      stroke_width: 5,
+    });
+
+    expect(
+      completeAnnotationGesture(
+        {
+          tool: 'highlight',
+          startPoint: { x: 10, y: 10 },
+          points: [{ x: 10, y: 10 }, { x: 15, y: 19 }, { x: 21, y: 30 }],
+        },
+        { x: 20, y: 40 },
+        style,
+        true,
+      ),
+    ).toEqual({
+      type: 'highlight',
+      points: [{ x: 10, y: 10 }, { x: 10, y: 40 }],
+      color: [40, 167, 69, 96],
+      stroke_width: 5,
+    });
+  });
+
+  it('previews shifted point strokes as straight gesture drafts', () => {
+    expect(
+      annotationFromGestureDraft(
+        {
+          tool: 'pen',
+          startPoint: { x: 4, y: 4 },
+          points: [{ x: 4, y: 4 }, { x: 9, y: 15 }],
+        },
+        { x: 20, y: 12 },
+        style,
+        true,
+      ),
+    ).toEqual({
+      type: 'freehand',
+      points: [{ x: 4, y: 4 }, { x: 20, y: 4 }],
+      color: [40, 167, 69, 255],
+      stroke_width: 5,
+    });
+  });
+
+  it('constrains annotation gestures while holding shift', () => {
     expect(
       constrainAnnotationGesturePoint(
         'rectangle',
@@ -238,7 +297,7 @@ describe('annotation style', () => {
         { x: 10, y: 10 },
         { x: 30, y: 18 },
       ),
-    ).toEqual({ x: 30, y: 18 });
+    ).toEqual({ x: 30, y: 10 });
   });
 
   it('maps plain tool shortcut keys to annotation tools', () => {

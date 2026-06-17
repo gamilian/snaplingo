@@ -214,7 +214,12 @@ export function constrainAnnotationGesturePoint(
     return constrainToSquare(startPoint, currentPoint);
   }
 
-  if (tool === 'line' || tool === 'arrow') {
+  if (
+    tool === 'line' ||
+    tool === 'arrow' ||
+    tool === 'pen' ||
+    tool === 'highlight'
+  ) {
     return constrainToStraightLine(startPoint, currentPoint);
   }
 
@@ -232,6 +237,37 @@ export function appendAnnotationPoint(points: Point[], point: Point) {
 
 export function isPointStrokeAnnotationTool(tool: AnnotationTool) {
   return tool === 'pen' || tool === 'highlight';
+}
+
+function annotationGesturePoint(
+  gesture: AnnotationGestureDraft,
+  currentPoint: Point,
+  constrainGesture: boolean,
+) {
+  return constrainGesture
+    ? constrainAnnotationGesturePoint(
+        gesture.tool,
+        gesture.startPoint,
+        currentPoint,
+      )
+    : currentPoint;
+}
+
+function annotationGesturePoints(
+  gesture: AnnotationGestureDraft,
+  currentPoint: Point,
+  constrainGesture: boolean,
+) {
+  if (!isPointStrokeAnnotationTool(gesture.tool)) return undefined;
+
+  const gesturePoint = annotationGesturePoint(
+    gesture,
+    currentPoint,
+    constrainGesture,
+  );
+  if (constrainGesture) return [gesture.startPoint, gesturePoint];
+
+  return appendAnnotationPoint(gesture.points ?? [gesture.startPoint], currentPoint);
 }
 
 export function annotationFromGesture(
@@ -312,24 +348,38 @@ export function annotationFromGesture(
   };
 }
 
+export function annotationFromGestureDraft(
+  gesture: AnnotationGestureDraft,
+  currentPoint: Point,
+  style: AnnotationStyle,
+  constrainGesture = false,
+) {
+  const gesturePoint = annotationGesturePoint(
+    gesture,
+    currentPoint,
+    constrainGesture,
+  );
+
+  return annotationFromGesture(
+    gesture.tool,
+    gesture.startPoint,
+    gesturePoint,
+    style,
+    annotationGesturePoints(gesture, currentPoint, constrainGesture),
+  );
+}
+
 export function completeAnnotationGesture(
   gesture: AnnotationGestureDraft,
   currentPoint: Point,
   style: AnnotationStyle,
   constrainGesture = false,
 ) {
-  const points = isPointStrokeAnnotationTool(gesture.tool)
-    ? appendAnnotationPoint(gesture.points ?? [gesture.startPoint], currentPoint)
-    : undefined;
-  const gesturePoint = constrainGesture
-    ? constrainAnnotationGesturePoint(gesture.tool, gesture.startPoint, currentPoint)
-    : currentPoint;
-  const annotation = annotationFromGesture(
-    gesture.tool,
-    gesture.startPoint,
-    gesturePoint,
+  const annotation = annotationFromGestureDraft(
+    gesture,
+    currentPoint,
     style,
-    points,
+    constrainGesture,
   );
 
   return isCommittedAnnotation(annotation) ? annotation : null;
