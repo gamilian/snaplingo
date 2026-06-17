@@ -161,6 +161,26 @@ pub async fn output_capture(
 }
 
 #[tauri::command]
+pub fn pin_clipboard_image(
+    app: AppHandle,
+    state: State<'_, crate::AppState>,
+) -> Result<(), String> {
+    pin_clipboard_image_for_state(&app, state.inner())
+}
+
+pub fn pin_clipboard_image_for_state(
+    app: &AppHandle,
+    state: &crate::AppState,
+) -> Result<(), String> {
+    let png_data = state
+        .capture_output_service
+        .read_clipboard_png()
+        .map_err(|e| e.to_string())?;
+
+    pin_capture_png(app, state, png_data)
+}
+
+#[tauri::command]
 pub fn get_pinned_image(
     image_id: String,
     state: State<'_, crate::AppState>,

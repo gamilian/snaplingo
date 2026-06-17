@@ -360,6 +360,22 @@ fn register_screenshot_ocr_shortcut(app: &tauri::AppHandle) -> Result<()> {
     Ok(())
 }
 
+/// Register pinned image shortcut
+fn register_pin_shortcut(app: &tauri::AppHandle) -> Result<()> {
+    let app_clone = app.clone();
+
+    infrastructure::system::register_shortcut(app, "F3", move || {
+        log::info!("Pinned image shortcut triggered!");
+
+        let state = app_clone.state::<AppState>();
+        if let Err(err) = commands::pin_clipboard_image_for_state(&app_clone, state.inner()) {
+            log::error!("Failed to pin clipboard image: {}", err);
+        }
+    })?;
+
+    Ok(())
+}
+
 /// Register pinned image toggle shortcut
 fn register_pin_toggle_shortcut(app: &tauri::AppHandle) -> Result<()> {
     let app_clone = app.clone();
@@ -439,6 +455,12 @@ pub fn run() {
               log::info!("Screenshot OCR shortcut registered: Cmd+Shift+S");
           }
 
+          if let Err(e) = register_pin_shortcut(&app_handle) {
+              log::error!("Failed to register pinned image shortcut: {}", e);
+          } else {
+              log::info!("Pinned image shortcut registered: F3");
+          }
+
           if let Err(e) = register_pin_toggle_shortcut(&app_handle) {
               log::error!("Failed to register pinned image toggle shortcut: {}", e);
           } else {
@@ -487,6 +509,7 @@ pub fn run() {
       commands::render_capture_output,
       commands::default_capture_save_path,
       commands::output_capture,
+      commands::pin_clipboard_image,
       commands::get_pinned_image,
       commands::copy_pinned_image,
       commands::save_pinned_image,

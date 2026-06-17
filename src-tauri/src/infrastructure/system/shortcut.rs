@@ -143,6 +143,13 @@ mod tests {
     }
 
     #[test]
+    fn parses_pin_from_clipboard_shortcut_accelerator() {
+        let hotkey = super::parse_shortcut("F3").unwrap();
+
+        assert!(hotkey.id() > 0);
+    }
+
+    #[test]
     fn rejects_unknown_shortcut_key() {
         assert!(super::parse_shortcut("Cmd+Shift+DefinitelyNotAKey").is_err());
     }

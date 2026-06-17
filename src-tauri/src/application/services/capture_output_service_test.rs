@@ -2,6 +2,7 @@
 mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    use arboard::ImageData;
     use image::ImageEncoder;
 
     use crate::application::services::capture_output_service::CaptureOutputService;
@@ -49,5 +50,21 @@ mod tests {
         assert_eq!(image.width, 3);
         assert_eq!(image.height, 2);
         assert_eq!(image.bytes.len(), 3 * 2 * 4);
+    }
+
+    #[test]
+    fn encodes_clipboard_image_data_to_png() {
+        let image = ImageData {
+            width: 2,
+            height: 1,
+            bytes: std::borrow::Cow::Owned(vec![255, 0, 0, 255, 0, 255, 0, 255]),
+        };
+
+        let png = CaptureOutputService::clipboard_image_to_png(image).unwrap();
+        let decoded = image::load_from_memory(&png).unwrap().to_rgba8();
+
+        assert_eq!(decoded.width(), 2);
+        assert_eq!(decoded.height(), 1);
+        assert_eq!(decoded.into_raw(), vec![255, 0, 0, 255, 0, 255, 0, 255]);
     }
 }
