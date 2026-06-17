@@ -207,7 +207,7 @@ describe('capture session actions', () => {
     ).toBe(false);
   });
 
-  it('uses Enter or Cmd/Ctrl+C for copying the current selection', () => {
+  it('uses Enter, Space, or Cmd/Ctrl+C for copying the current selection', () => {
     expect(
       isCopyCaptureKeyboardShortcut({
         key: 'Enter',
@@ -231,9 +231,27 @@ describe('capture session actions', () => {
     ).toBe(true);
     expect(
       isCopyCaptureKeyboardShortcut({
+        key: ' ',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe(true);
+    expect(
+      isCopyCaptureKeyboardShortcut({
         key: 'c',
         metaKey: false,
         ctrlKey: false,
+      }),
+    ).toBe(false);
+    expect(
+      isCopyCaptureKeyboardShortcut({
+        key: ' ',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: true,
       }),
     ).toBe(false);
   });

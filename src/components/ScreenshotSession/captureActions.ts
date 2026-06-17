@@ -28,8 +28,16 @@ export function isSaveCaptureShortcut(event: CaptureShortcutEvent) {
 }
 
 export function isCopyCaptureKeyboardShortcut(event: CaptureShortcutEvent) {
+  const isPlainSpace =
+    event.key === ' ' &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !event.shiftKey;
+
   return (
     event.key === 'Enter' ||
+    isPlainSpace ||
     (event.key.toLowerCase() === 'c' && (event.metaKey || event.ctrlKey))
   );
 }
