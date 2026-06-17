@@ -23,6 +23,7 @@ import {
 import {
   destroyPinnedImage,
   destroyPinnedImageGroup,
+  getPinnedHoverToolbarActions,
   hidePinnedImage,
   hidePinnedImageGroup,
   isClosePinnedImageShortcut,
@@ -40,6 +41,7 @@ import {
 const appWindow = getCurrentWindow();
 const webviewWindow = getCurrentWebviewWindow();
 const PIN_CONTEXT_MENU_SIZE = { width: 132, height: 332 };
+const PIN_HOVER_TOOLBAR_ACTIONS = getPinnedHoverToolbarActions();
 
 function createDefaultPinnedTransform() {
   return {
@@ -366,6 +368,19 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
   }
 
   const imageFrameSize = image ? getPinnedDisplaySize(image, zoom) : null;
+  const runHoverToolbarAction = (actionId: typeof PIN_HOVER_TOOLBAR_ACTIONS[number]['id']) => {
+    if (actionId === 'copy') {
+      void copyPinnedImage();
+      return;
+    }
+
+    if (actionId === 'save') {
+      void savePinnedImageAs();
+      return;
+    }
+
+    void hideCurrentPinnedImage();
+  };
 
   return (
     <div
@@ -494,15 +509,23 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
           </button>
         </div>
       )}
-      <button
-        type="button"
-        className="absolute right-1 top-1 h-6 w-6 rounded bg-black/70 text-xs leading-6 text-white opacity-0 shadow hover:bg-black/90 focus:opacity-100 group-hover:opacity-100"
-        aria-label="Hide pinned image"
-        title="Hide"
-        onClick={hideCurrentPinnedImage}
+      <div
+        className="absolute right-1 top-1 flex gap-1 rounded bg-black/70 p-1 text-xs text-white opacity-0 shadow transition-opacity focus-within:opacity-100 group-hover:opacity-100"
+        onPointerDown={(event) => event.stopPropagation()}
       >
-        X
-      </button>
+        {PIN_HOVER_TOOLBAR_ACTIONS.map((action) => (
+          <button
+            key={action.id}
+            type="button"
+            className="h-6 rounded px-2 leading-6 hover:bg-white/15 focus:bg-white/15"
+            aria-label={action.ariaLabel}
+            title={action.title}
+            onClick={() => runHoverToolbarAction(action.id)}
+          >
+            {action.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import {
   destroyPinnedImageGroup,
   hidePinnedImageGroup,
   hidePinnedImage,
+  getPinnedHoverToolbarActions,
   isClosePinnedImageShortcut,
   isCopyPinnedImageShortcut,
   isDestroyPinnedImageShortcut,
@@ -19,6 +20,29 @@ import {
 } from './pinActions';
 
 describe('pinned image actions', () => {
+  it('exposes Snipaste-style hover toolbar actions for pinned images', () => {
+    expect(getPinnedHoverToolbarActions()).toEqual([
+      {
+        id: 'copy',
+        label: 'Copy',
+        title: 'Copy',
+        ariaLabel: 'Copy pinned image',
+      },
+      {
+        id: 'save',
+        label: 'Save',
+        title: 'Save',
+        ariaLabel: 'Save pinned image',
+      },
+      {
+        id: 'close',
+        label: 'X',
+        title: 'Close',
+        ariaLabel: 'Close pinned image',
+      },
+    ]);
+  });
+
   it('saves a pinned image to the default capture path', async () => {
     const calls: Array<{ command: string; args?: unknown }> = [];
     const invoke: PinInvoke = async <T>(

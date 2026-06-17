@@ -25,6 +25,38 @@ interface PinWindow {
   close?: () => Promise<void>;
 }
 
+export type PinnedHoverToolbarActionId = 'copy' | 'save' | 'close';
+
+export interface PinnedHoverToolbarAction {
+  id: PinnedHoverToolbarActionId;
+  label: string;
+  title: string;
+  ariaLabel: string;
+}
+
+export function getPinnedHoverToolbarActions() {
+  return [
+    {
+      id: 'copy',
+      label: 'Copy',
+      title: 'Copy',
+      ariaLabel: 'Copy pinned image',
+    },
+    {
+      id: 'save',
+      label: 'Save',
+      title: 'Save',
+      ariaLabel: 'Save pinned image',
+    },
+    {
+      id: 'close',
+      label: 'X',
+      title: 'Close',
+      ariaLabel: 'Close pinned image',
+    },
+  ] satisfies PinnedHoverToolbarAction[];
+}
+
 export function isCopyPinnedImageShortcut(event: PinShortcutEvent) {
   return (
     event.key.toLowerCase() === 'c' &&
