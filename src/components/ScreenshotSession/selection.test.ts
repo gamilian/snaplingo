@@ -94,6 +94,27 @@ describe('selection editing', () => {
     });
   });
 
+  it('preserves selection aspect ratio when resizing from a corner handle', () => {
+    const rect: LogicalRect = { x: 40, y: 30, width: 100, height: 50 };
+
+    expect(
+      resizeSelectionByHandle(rect, 'se', { x: 60, y: 5 }, bounds, 10, true),
+    ).toEqual({
+      x: 40,
+      y: 30,
+      width: 160,
+      height: 80,
+    });
+    expect(
+      resizeSelectionByHandle(rect, 'nw', { x: -40, y: -5 }, bounds, 10, true),
+    ).toEqual({
+      x: 0,
+      y: 10,
+      width: 140,
+      height: 70,
+    });
+  });
+
   it('nudges a selection by keyboard direction and keeps it in bounds', () => {
     const rect: LogicalRect = { x: 40, y: 30, width: 100, height: 80 };
 

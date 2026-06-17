@@ -71,6 +71,7 @@ export function resizeSelectionByHandle(
   delta: Point,
   bounds: LogicalRect,
   minSize: number,
+  preserveAspect = false,
 ): LogicalRect {
   const originalLeft = rect.x;
   const originalTop = rect.y;
@@ -95,6 +96,50 @@ export function resizeSelectionByHandle(
   }
   if (handle.includes('s')) {
     bottom = clamp(originalBottom + delta.y, originalTop + minSize, boundsBottom);
+  }
+
+  if (preserveAspect && handle.length === 2) {
+    const aspectRatio = rect.width / rect.height;
+    const freeWidth = right - left;
+    const freeHeight = bottom - top;
+    const useWidth =
+      Math.abs(freeWidth - rect.width) >=
+      Math.abs((freeHeight - rect.height) * aspectRatio);
+    let nextWidth = useWidth ? freeWidth : freeHeight * aspectRatio;
+    let nextHeight = useWidth ? freeWidth / aspectRatio : freeHeight;
+    const maxWidth = handle.includes('w')
+      ? originalRight - bounds.x
+      : boundsRight - originalLeft;
+    const maxHeight = handle.includes('n')
+      ? originalBottom - bounds.y
+      : boundsBottom - originalTop;
+
+    nextWidth = clamp(nextWidth, minSize, maxWidth);
+    nextHeight = nextWidth / aspectRatio;
+    if (nextHeight > maxHeight) {
+      nextHeight = maxHeight;
+      nextWidth = nextHeight * aspectRatio;
+    }
+    if (nextHeight < minSize) {
+      nextHeight = minSize;
+      nextWidth = nextHeight * aspectRatio;
+    }
+
+    if (handle.includes('w')) {
+      left = originalRight - nextWidth;
+      right = originalRight;
+    } else {
+      left = originalLeft;
+      right = originalLeft + nextWidth;
+    }
+
+    if (handle.includes('n')) {
+      top = originalBottom - nextHeight;
+      bottom = originalBottom;
+    } else {
+      top = originalTop;
+      bottom = originalTop + nextHeight;
+    }
   }
 
   return {

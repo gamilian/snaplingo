@@ -1239,7 +1239,7 @@ export default function ScreenshotSession({
   };
 
   const applyEditGesture = useCallback(
-    (gesture: EditGesture, point: Point) => {
+    (gesture: EditGesture, point: Point, preserveAspect = false) => {
       if (!selectionBounds) return gesture.startSelection;
 
       const delta = {
@@ -1262,13 +1262,16 @@ export default function ScreenshotSession({
         );
       }
 
+      const shouldPreserveAspect = preserveAspect && gesture.handle.length === 2;
       const resizedSelection = resizeSelectionByHandle(
         gesture.startSelection,
         gesture.handle,
         delta,
         selectionBounds,
         MIN_SELECTION_SIZE,
+        shouldPreserveAspect,
       );
+      if (shouldPreserveAspect) return resizedSelection;
 
       return snapResizedSelectionToRects(
         resizedSelection,
@@ -1365,7 +1368,7 @@ export default function ScreenshotSession({
     }
 
     if (editGesture) {
-      setSelection(applyEditGesture(editGesture, point));
+      setSelection(applyEditGesture(editGesture, point, event.shiftKey));
       setPreviewImageBase64(null);
       setIsRenderingOutput(false);
       return;
@@ -1456,7 +1459,7 @@ export default function ScreenshotSession({
     }
 
     if (editGesture) {
-      const nextSelection = applyEditGesture(editGesture, point);
+      const nextSelection = applyEditGesture(editGesture, point, event.shiftKey);
       setEditGesture(null);
       setSelection(nextSelection);
       setStatus('preview');
