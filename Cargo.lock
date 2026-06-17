@@ -6458,6 +6458,8 @@ dependencies = [
  "log",
  "md5",
  "mockito",
+ "objc2-app-kit",
+ "objc2-foundation",
  "parking_lot",
  "reqwest 0.11.27",
  "rusqlite",
