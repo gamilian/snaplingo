@@ -108,7 +108,7 @@ export function HotkeyRecorderDialog({ isOpen, onClose, onSave, currentHotkey, l
           >
             {recording ? (
               <div>
-                <div className="text-sm text-blue-600 mb-2">按下快捷键...</div>
+                <div className="text-sm text-primary-600 mb-2">按下快捷键...</div>
                 <div className="text-2xl font-mono text-gray-800 min-h-[32px]">
                   {recordedKeys.length > 0 ? recordedKeys.join('') : '等待输入'}
                 </div>
@@ -116,7 +116,7 @@ export function HotkeyRecorderDialog({ isOpen, onClose, onSave, currentHotkey, l
             ) : (
               <button
                 onClick={handleStartRecording}
-                className="text-blue-600 hover:text-blue-700 font-medium"
+                className="text-primary-600 hover:text-blue-700 font-medium"
               >
                 点击开始录制
               </button>
@@ -143,7 +143,7 @@ export function HotkeyRecorderDialog({ isOpen, onClose, onSave, currentHotkey, l
             <button
               onClick={handleSave}
               disabled={recordedKeys.length === 0}
-              className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm bg-primary-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
               保存
             </button>

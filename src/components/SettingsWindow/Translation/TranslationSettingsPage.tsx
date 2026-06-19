@@ -1,8 +1,13 @@
+import { useState } from 'react';
 import { useSettingsStore } from '../../../stores/settingsStore';
+import { CustomSelect } from '../../common/CustomSelect';
 
 export function TranslationSettingsPage() {
   const defaultSourceLang = useSettingsStore((state) => state.defaultSourceLang);
   const defaultTargetLang = useSettingsStore((state) => state.defaultTargetLang);
+
+  const [sourceLang, setSourceLang] = useState(defaultSourceLang);
+  const [targetLang, setTargetLang] = useState(defaultTargetLang);
 
   return (
     <div className="max-w-4xl space-y-8">
@@ -18,39 +23,41 @@ export function TranslationSettingsPage() {
         {/* 源语言 */}
         <div>
           <label className="block font-medium text-gray-700 mb-2">源语言</label>
-          <select
-            value={defaultSourceLang}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="auto">自动检测</option>
-            <option value="zh-CN">中文简体</option>
-            <option value="zh-TW">中文繁體</option>
-            <option value="en">English</option>
-            <option value="ja">日本語</option>
-            <option value="ko">한국어</option>
-            <option value="fr">Français</option>
-            <option value="de">Deutsch</option>
-            <option value="es">Español</option>
-          </select>
+          <CustomSelect
+            options={[
+              { value: 'auto', label: '自动检测' },
+              { value: 'zh-CN', label: '中文简体' },
+              { value: 'zh-TW', label: '中文繁體' },
+              { value: 'en', label: 'English' },
+              { value: 'ja', label: '日本語' },
+              { value: 'ko', label: '한국어' },
+              { value: 'fr', label: 'Français' },
+              { value: 'de', label: 'Deutsch' },
+              { value: 'es', label: 'Español' },
+            ]}
+            value={sourceLang}
+            onChange={setSourceLang}
+          />
           <p className="text-sm text-gray-500 mt-2">翻译窗口默认的源语言</p>
         </div>
 
         {/* 目标语言 */}
         <div className="pt-6 border-t border-gray-100">
           <label className="block font-medium text-gray-700 mb-2">目标语言</label>
-          <select
-            value={defaultTargetLang}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="zh-CN">中文简体</option>
-            <option value="zh-TW">中文繁體</option>
-            <option value="en">English</option>
-            <option value="ja">日本語</option>
-            <option value="ko">한국어</option>
-            <option value="fr">Français</option>
-            <option value="de">Deutsch</option>
-            <option value="es">Español</option>
-          </select>
+          <CustomSelect
+            options={[
+              { value: 'zh-CN', label: '中文简体' },
+              { value: 'zh-TW', label: '中文繁體' },
+              { value: 'en', label: 'English' },
+              { value: 'ja', label: '日本語' },
+              { value: 'ko', label: '한국어' },
+              { value: 'fr', label: 'Français' },
+              { value: 'de', label: 'Deutsch' },
+              { value: 'es', label: 'Español' },
+            ]}
+            value={targetLang}
+            onChange={setTargetLang}
+          />
           <p className="text-sm text-gray-500 mt-2">翻译窗口默认的目标语言</p>
         </div>
       </div>
@@ -65,7 +72,7 @@ export function TranslationSettingsPage() {
             <div className="font-medium text-gray-700">自动翻译</div>
             <div className="text-sm text-gray-500 mt-1">输入文本后自动开始翻译，无需点击按钮</div>
           </div>
-          <button className="relative w-12 h-6 rounded-full bg-blue-600 transition-colors">
+          <button className="relative w-12 h-6 rounded-full bg-primary-600 transition-colors">
             <span className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow translate-x-6 transition-transform" />
           </button>
         </div>
@@ -87,7 +94,7 @@ export function TranslationSettingsPage() {
             <div className="font-medium text-gray-700">保留原文换行</div>
             <div className="text-sm text-gray-500 mt-1">翻译时保留原文的换行和段落格式</div>
           </div>
-          <button className="relative w-12 h-6 rounded-full bg-blue-600 transition-colors">
+          <button className="relative w-12 h-6 rounded-full bg-primary-600 transition-colors">
             <span className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow translate-x-6 transition-transform" />
           </button>
         </div>
@@ -114,7 +121,7 @@ export function TranslationSettingsPage() {
             <div className="font-medium text-gray-700">翻译窗口置顶</div>
             <div className="text-sm text-gray-500 mt-1">翻译窗口始终显示在最前面</div>
           </div>
-          <button className="relative w-12 h-6 rounded-full bg-blue-600 transition-colors">
+          <button className="relative w-12 h-6 rounded-full bg-primary-600 transition-colors">
             <span className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow translate-x-6 transition-transform" />
           </button>
         </div>

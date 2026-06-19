@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useTranslate } from '../../hooks/useTranslate';
 import TranslationCard from './TranslationCard';
+import { CustomSelect } from '../common/CustomSelect';
 
 const LANGUAGES = [
   { code: 'auto', name: 'Auto Detect' },
@@ -66,19 +67,19 @@ export default function ResultWindow() {
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/25 backdrop-blur-sm flex items-center justify-center z-50 p-8"
       onClick={handleOverlayClick}
     >
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-[slideIn_0.3s_ease-out]">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">Translation</h2>
+        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+          <h2 className="text-lg font-bold text-gray-900">翻译</h2>
           <button
             onClick={hideResultWindow}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-150"
           >
             <svg
-              className="w-6 h-6"
+              className="w-5 h-5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -115,17 +116,11 @@ export default function ResultWindow() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 From
               </label>
-              <select
+              <CustomSelect
+                options={LANGUAGES.map(lang => ({ value: lang.code, label: lang.name }))}
                 value={sourceLang}
-                onChange={(e) => setSourceLang(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                {LANGUAGES.map((lang) => (
-                  <option key={lang.code} value={lang.code}>
-                    {lang.name}
-                  </option>
-                ))}
-              </select>
+                onChange={setSourceLang}
+              />
             </div>
 
             <button
@@ -153,19 +148,11 @@ export default function ResultWindow() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 To
               </label>
-              <select
+              <CustomSelect
+                options={LANGUAGES.filter(lang => lang.code !== 'auto').map(lang => ({ value: lang.code, label: lang.name }))}
                 value={targetLang}
-                onChange={(e) => setTargetLang(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                {LANGUAGES.filter((lang) => lang.code !== 'auto').map(
-                  (lang) => (
-                    <option key={lang.code} value={lang.code}>
-                      {lang.name}
-                    </option>
-                  )
-                )}
-              </select>
+                onChange={setTargetLang}
+              />
             </div>
           </div>
 

@@ -1,6 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { HotkeyRow } from '../Hotkey/HotkeyRow';
-import { HotkeyRecorderDialog } from '../Hotkey/HotkeyRecorderDialog';
 import { useSettingsStore } from '../../../stores/settingsStore';
 
 export function HotkeysPage() {
@@ -10,31 +9,95 @@ export function HotkeysPage() {
   const resetHotkeys = useSettingsStore((state) => state.resetHotkeys);
 
   const [recordingKey, setRecordingKey] = useState<string | null>(null);
-  const [recordingLabel, setRecordingLabel] = useState<string>('');
 
-  const hotkeyLabels: Record<string, string> = {
-    screenshot: '截屏',
-    'screenshot-copy': '截屏并自动复制',
-    'screenshot-custom': '自定义截屏',
-    pin: '贴图',
-    'pin-toggle-all': '隐藏/显示所有贴图',
-    'pin-switch-group': '切换到另一贴图组',
+  // 默认快捷键配置
+  const defaultHotkeys: Record<string, string> = {
+    'screenshot': '⇧⌘R',
+    'screenshot-copy': '⌘⇧S',
+    'screenshot-custom': '⌘⇧X',
+    'pin': '⌘⇧P',
+    'pin-toggle-all': '⌘⇧H',
+    'pin-switch-group': '⌘⇧G',
   };
+
+  // 监听键盘事件进行录制
+  useEffect(() => {
+    if (!recordingKey) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // ESC取消录制
+      if (e.key === 'Escape') {
+        setRecordingKey(null);
+        return;
+      }
+
+      // 构建快捷键字符串
+      const modifiers = [];
+      if (e.shiftKey) modifiers.push('⇧');
+      if (e.altKey) modifiers.push('⌥');
+      if (e.metaKey) modifiers.push('⌘');
+      if (e.ctrlKey) modifiers.push('⌃');
+
+      // 使用 e.code 来获取物理按键，避免 Option 键导致的字符转换问题
+      let mainKey = '';
+
+      // 处理字母键 (KeyA-KeyZ)
+      if (e.code.startsWith('Key')) {
+        mainKey = e.code.replace('Key', '');
+      }
+      // 处理数字键 (Digit0-Digit9)
+      else if (e.code.startsWith('Digit')) {
+        mainKey = e.code.replace('Digit', '');
+      }
+      // 处理功能键 (F1-F12)
+      else if (e.code.startsWith('F') && /^F\d+$/.test(e.code)) {
+        mainKey = e.code;
+      }
+
+      if (mainKey) {
+        const hotkeyString = modifiers.join('') + mainKey;
+        setHotkey('screenshot', recordingKey, hotkeyString);
+        setRecordingKey(null);
+      }
+    };
+
+    // 点击空白处取消录制
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('button') && !target.closest('.hotkey-display')) {
+        setRecordingKey(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    document.addEventListener('mousedown', handleClickOutside, true);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+      document.removeEventListener('mousedown', handleClickOutside, true);
+    };
+  }, [recordingKey, setHotkey]);
 
   const handleRecord = (key: string) => {
-    setRecordingKey(key);
-    setRecordingLabel(hotkeyLabels[key] || key);
-  };
-
-  const handleSaveHotkey = (newHotkey: string) => {
-    if (recordingKey) {
-      setHotkey('screenshot', recordingKey, newHotkey);
+    // 如果已经在录制这个键，点击取消录制
+    if (recordingKey === key) {
+      setRecordingKey(null);
+    } else {
+      setRecordingKey(key);
     }
-    setRecordingKey(null);
   };
 
   const handleClear = (key: string) => {
     clearHotkey('screenshot', key);
+  };
+
+  const handleReset = (key: string) => {
+    const defaultValue = defaultHotkeys[key];
+    if (defaultValue) {
+      setHotkey('screenshot', key, defaultValue);
+    }
   };
 
   const handleResetAll = () => {
@@ -44,7 +107,6 @@ export function HotkeysPage() {
   };
 
   const handleDetectConflicts = () => {
-    // 检测冲突逻辑
     const allHotkeys = Object.values(hotkeys);
     const duplicates = allHotkeys.filter((key, index) =>
       key !== '未设置' && allHotkeys.indexOf(key) !== index
@@ -61,7 +123,9 @@ export function HotkeysPage() {
     <div className="max-w-4xl space-y-8">
       <div>
         <h2 className="text-3xl font-bold text-gray-900 mb-2">快捷键</h2>
-        <p className="text-gray-600">配置截图相关的全局快捷键。点击快捷键框进行录制。</p>
+        <p className="text-gray-600">
+          配置截图相关的全局快捷键。点击快捷键框直接录制，按 ESC 取消。
+        </p>
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">
@@ -70,36 +134,54 @@ export function HotkeysPage() {
           value={hotkeys['screenshot']}
           onRecord={() => handleRecord('screenshot')}
           onClear={() => handleClear('screenshot')}
+          onReset={() => handleReset('screenshot')}
+          isRecording={recordingKey === 'screenshot'}
+          defaultValue={defaultHotkeys['screenshot']}
         />
         <HotkeyRow
           label="截屏并自动复制"
           value={hotkeys['screenshot-copy']}
           onRecord={() => handleRecord('screenshot-copy')}
           onClear={() => handleClear('screenshot-copy')}
+          onReset={() => handleReset('screenshot-copy')}
+          isRecording={recordingKey === 'screenshot-copy'}
+          defaultValue={defaultHotkeys['screenshot-copy']}
         />
         <HotkeyRow
           label="自定义截屏"
           value={hotkeys['screenshot-custom']}
           onRecord={() => handleRecord('screenshot-custom')}
           onClear={() => handleClear('screenshot-custom')}
+          onReset={() => handleReset('screenshot-custom')}
+          isRecording={recordingKey === 'screenshot-custom'}
+          defaultValue={defaultHotkeys['screenshot-custom']}
         />
         <HotkeyRow
           label="贴图"
           value={hotkeys['pin']}
           onRecord={() => handleRecord('pin')}
           onClear={() => handleClear('pin')}
+          onReset={() => handleReset('pin')}
+          isRecording={recordingKey === 'pin'}
+          defaultValue={defaultHotkeys['pin']}
         />
         <HotkeyRow
           label="隐藏/显示所有贴图"
           value={hotkeys['pin-toggle-all']}
           onRecord={() => handleRecord('pin-toggle-all')}
           onClear={() => handleClear('pin-toggle-all')}
+          onReset={() => handleReset('pin-toggle-all')}
+          isRecording={recordingKey === 'pin-toggle-all'}
+          defaultValue={defaultHotkeys['pin-toggle-all']}
         />
         <HotkeyRow
           label="切换到另一贴图组"
           value={hotkeys['pin-switch-group']}
           onRecord={() => handleRecord('pin-switch-group')}
           onClear={() => handleClear('pin-switch-group')}
+          onReset={() => handleReset('pin-switch-group')}
+          isRecording={recordingKey === 'pin-switch-group'}
+          defaultValue={defaultHotkeys['pin-switch-group']}
         />
       </div>
 
@@ -112,20 +194,11 @@ export function HotkeysPage() {
         </button>
         <button
           onClick={handleDetectConflicts}
-          className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          className="px-4 py-2 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
         >
           检测冲突
         </button>
       </div>
-
-      {/* 快捷键录制对话框 */}
-      <HotkeyRecorderDialog
-        isOpen={recordingKey !== null}
-        onClose={() => setRecordingKey(null)}
-        onSave={handleSaveHotkey}
-        currentHotkey={recordingKey ? hotkeys[recordingKey] : ''}
-        label={recordingLabel}
-      />
     </div>
   );
 }

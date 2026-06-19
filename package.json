@@ -9,12 +9,13 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build && node script/fix-macos-release-signing.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "tauri-plugin-screenshots-api": "^2.2.0",
     "zustand": "^5.0.14"
   },
   "devDependencies": {

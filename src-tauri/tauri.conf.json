@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "SnapLingo",
   "version": "0.1.0",
-  "identifier": "com.tauri.dev",
+  "identifier": "com.snaplingo.app",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -10,6 +10,7 @@
     "beforeBuildCommand": "npm run build"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "title": "SnapLingo",
@@ -35,6 +36,16 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "macOS": {
+      "entitlements": "entitlements.plist",
+      "exceptionDomain": null,
+      "frameworks": [],
+      "hardenedRuntime": false,
+      "providerShortName": null,
+      "signingIdentity": "-",
+      "minimumSystemVersion": "10.13"
+    },
+    "iOS": {},
     "android": {
       "debugApplicationIdSuffix": ".debug"
     }

@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SnapLingo - 优化版设计</title>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+  <style>
+    :root {
+      /* 品牌色 - 自定义蓝紫色系 */
+      --primary-50: #f0f4ff;
+      --primary-100: #e0e7ff;
+      --primary-500: #5b7fff;
+      --primary-600: #4a6fe8;
+      --primary-700: #3a5fd1;
+
+      /* 中性色 */
+      --gray-50: #fafbfc;
+      --gray-100: #f4f6f8;
+      --gray-200: #e8ecf0;
+      --gray-300: #dde2e8;
+      --gray-400: #9ca3af;
+      --gray-500: #6b7280;
+      --gray-600: #4b5563;
+      --gray-700: #374151;
+      --gray-800: #1f2937;
+      --gray-900: #111827;
+
+      /* 语义色 */
+      --success: #10b981;
+      --success-light: #d1fae5;
+      --warning: #f59e0b;
+      --warning-light: #fef3c7;
+      --danger: #ef4444;
+      --danger-light: #fee2e2;
+
+      /* Provider品牌色 */
+      --google: #4285f4;
+      --deepl: #0f2b46;
+      --baidu: #2932e1;
+      --openai: #10a37f;
+
+      /* 间距系统 */
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-6: 24px;
+      --space-8: 32px;
+      --space-12: 48px;
+
+      /* 圆角系统 */
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --radius-xl: 18px;
+      --radius-2xl: 24px;
+
+      /* 阴影系统 */
+      --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+      --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.06);
+      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+      --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+      --shadow-xl: 0 12px 40px rgba(0, 0, 0, 0.16);
+
+      /* 过渡 */
+      --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+      --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+      --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "SF Pro", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--gray-50);
+      color: var(--gray-900);
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    #root {
+      width: 100vw;
+      height: 100vh;
+    }
+
+    button {
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+      outline: none;
+    }
+
+    input, textarea, select {
+      font-family: inherit;
+      outline: none;
+    }
+
+    /* 自定义滚动条 */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--gray-300);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--gray-400);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState } = React;
+
+    // 图标组件
+    const Icons = {
+      Screenshot: () => (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="14" height="14" rx="2"/>
+          <path d="M3 9h14M9 3v14"/>
+        </svg>
+      ),
+      Translation: () => (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 5h7M10 3v2m-4 13h11m-5 0l5-10 5 10M12 5C11.24 8.37 8.69 11.07 5.5 12.25"/>
+        </svg>
+      ),
+      OCR: () => (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="10" cy="10" r="7"/>
+          <path d="M10 6v4l3 3"/>
+        </svg>
+      ),
+      Services: () => (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="4" y="4" width="5" height="5" rx="1"/>
+          <rect x="11" y="4" width="5" height="5" rx="1"/>
+          <rect x="4" y="11" width="5" height="5" rx="1"/>
+          <rect x="11" y="11" width="5" height="5" rx="1"/>
+        </svg>
+      ),
+      Settings: () => (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="10" cy="10" r="3"/>
+          <path d="M10 1v2m0 14v2M3.93 3.93l1.41 1.41m9.9 9.9l1.41 1.41M1 10h2m14 0h2M3.93 16.07l1.41-1.41m9.9-9.9l1.41-1.41"/>
+        </svg>
+      ),
+      Advanced: () => (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 2l3 7h5l-4 6 2 5-8-5-8 5 2-5-4-6h5l3-7z"/>
+        </svg>
+      ),
+      Copy: () => (
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="4" y="4" width="8" height="8" rx="1"/>
+          <path d="M8 4V2a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-2"/>
+        </svg>
+      ),
+      Speaker: () => (
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M7 4L4 7H2v2h2l3 3V4zM13 8c0-1.5-1-3-2-3M15 8c0-2.5-1.5-5-3-5"/>
+        </svg>
+      ),
+      ChevronDown: () => (
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 6l4 4 4-4"/>
+        </svg>
+      ),
+      Close: () => (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M15 5L5 15M5 5l10 10"/>
+        </svg>
+      ),
+      Swap: () => (
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 7h12l-3-3M15 11H3l3 3"/>
+        </svg>
+      ),
+    };
+
+    // Logo组件
+    function Logo() {
+      return (
+        <div style={{
+          width: '48px',
+          height: '48px',
+          background: 'linear-gradient(135deg, var(--primary-500) 0%, var(--primary-700) 100%)',
+          borderRadius: 'var(--radius-xl)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 4px 12px rgba(91, 127, 255, 0.25)',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <path d="M8 10L14 16L20 10" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M14 8v8" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+            <circle cx="14" cy="20" r="2" fill="white"/>
+          </svg>
+        </div>
+      );
+    }
+
+    // 主应用
+    function App() {
+      const [view, setView] = useState('settings');
+
+      return (
+        <div style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          background: 'var(--gray-50)'
+        }}>
+          {/* 顶部预览切换栏 */}
+          <div style={{
+            background: 'white',
+            borderBottom: '1px solid var(--gray-200)',
+            padding: 'var(--space-3) var(--space-6)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-3)',
+            boxShadow: 'var(--shadow-xs)'
+          }}>
+            <div style={{
+              fontSize: '15px',
+              fontWeight: 600,
+              color: 'var(--gray-900)',
+              marginRight: 'var(--space-6)'
+            }}>
+              SnapLingo 优化版
+            </div>
+            {[
+              { id: 'settings', label: '⚙️ 主设置' },
+              { id: 'result', label: '💬 翻译结果' },
+              { id: 'editor', label: '✂️ 截图编辑' },
+              { id: 'tray', label: '📍  系统托盘' }
+            ].map(v => (
+              <button
+                key={v.id}
+                onClick={() => setView(v.id)}
+                style={{
+                  padding: '6px 14px',
+                  background: view === v.id ? 'var(--primary-50)' : 'transparent',
+                  border: view === v.id ? '1px solid var(--primary-500)' : '1px solid var(--gray-200)',
+                  borderRadius: 'var(--radius-md)',
+                  color: view === v.id ? 'var(--primary-600)' : 'var(--gray-600)',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  transition: 'all var(--transition-fast)',
+                  cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => {
+                  if (view !== v.id) {
+                    e.currentTarget.style.background = 'var(--gray-100)';
+                    e.currentTarget.style.borderColor = 'var(--gray-300)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (view !== v.id) {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.borderColor = 'var(--gray-200)';
+                  }
+                }}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
+
+          {/* 内容区 */}
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            {view === 'settings' && <SettingsView />}
+            {view === 'result' && <ResultView />}
+            {view === 'editor' && <EditorView />}
+            {view === 'tray' && <TrayView />}
+          </div>
+        </div>
+      );
+    }
+
+    // 主设置窗口
+    function SettingsView() {
+      const [mainTab, setMainTab] = useState('translation');
+      const [subTab, setSubTab] = useState('hotkeys');
+
+      return (
+        <div style={{ display: 'flex', height: '100%', background: 'var(--gray-50)' }}>
+          {/* 主导航 */}
+          <MainNav activeTab={mainTab} onChange={setMainTab} />
+
+          {/* 二级导航 */}
+          {['screenshot', 'translation', 'ocr'].includes(mainTab) && (
+            <SecondaryNav mainTab={mainTab} activeTab={subTab} onChange={setSubTab} />
+          )}
+
+          {/* 内容区 */}
+          <ContentArea mainTab={mainTab} subTab={subTab} />
+        </div>
+      );
+    }
+
+    // 主导航组件
+    function MainNav({ activeTab, onChange }) {
+      const navItems = [
+        { id: 'screenshot', icon: <Icons.Screenshot />, label: '截图' },
+        { id: 'translation', icon: <Icons.Translation />, label: '翻译' },
+        { id: 'ocr', icon: <Icons.OCR />, label: 'OCR' },
+        { id: 'services', icon: <Icons.Services />, label: '服务' },
+        { id: 'general', icon: <Icons.Settings />, label: '通用' },
+        { id: 'advanced', icon: <Icons.Advanced />, label: '高级' },
+      ];
+
+      return (
+        <div style={{
+          width: '88px',
+          background: 'white',
+          borderRight: '1px solid var(--gray-200)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          padding: 'var(--space-6) 0',
+          gap: 'var(--space-4)'
+        }}>
+          {/* Logo */}
+          <Logo />
+
+          {/* 分隔线 */}
+          <div style={{
+            width: '40px',
+            height: '1px',
+            background: 'var(--gray-200)',
+            margin: 'var(--space-2) 0'
+          }} />
+
+          {/* 导航按钮 */}
+          <nav style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--space-2)',
+            width: '100%',
+            padding: '0 var(--space-3)'
+          }}>
+            {navItems.map(item => (
+              <NavButton
+                key={item.id}
+                icon={item.icon}
+                label={item.label}
+                active={activeTab === item.id}
+                onClick={() => onChange(item.id)}
+              />
+            ))}
+          </nav>
+        </div>
+      );
+    }
+
+    // 导航按钮组件
+    function NavButton({ icon, label, active, onClick }) {
+      const [isHovered, setIsHovered] = useState(false);
+
+      return (
+        <button
+          onClick={onClick}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          style={{
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 'var(--space-3) var(--space-2)',
+            background: active ? 'var(--primary-50)' : (isHovered ? 'var(--gray-100)' : 'transparent'),
+            borderRadius: 'var(--radius-lg)',
+            border: 'none',
+            color: active ? 'var(--primary-600)' : 'var(--gray-500)',
+            transition: 'all var(--transition-fast)',
+            cursor: 'pointer',
+            position: 'relative',
+            transform: isHovered && !active ? 'translateY(-1px)' : 'none',
+            boxShadow: active ? 'var(--shadow-xs)' : 'none'
+          }}
+        >
+          {/* 左侧指示器 */}
+          {active && (
+            <div style={{
+              position: 'absolute',
+              left: 0,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: '3px',
+              height: '24px',
+              background: 'var(--primary-600)',
+              borderRadius: '0 2px 2px 0'
+            }} />
+          )}
+
+          <div style={{ marginBottom: 'var(--space-1)' }}>{icon}</div>
+          <span style={{
+            fontSize: '11px',
+            fontWeight: active ? 600 : 500,
+            textAlign: 'center',
+            whiteSpace: 'nowrap'
+          }}>
+            {label}
+          </span>
+        </button>
+      );
+    }
+
+    // 二级导航
+    function SecondaryNav({ mainTab, activeTab, onChange }) {
+      const subNavMap = {
+        screenshot: [
+          { id: 'hotkeys', label: '快捷键' },
+          { id: 'save', label: '保存设置' },
+          { id: 'editor', label: '编辑器' },
+          { id: 'favorites', label: '收藏夹' },
+        ],
+        translation: [
+          { id: 'hotkeys', label: '快捷键' },
+          { id: 'settings', label: '翻译设置' },
+          { id: 'history', label: '历史记录' },
+          { id: 'favorites', label: '收藏夹' },
+        ],
+        ocr: [
+          { id: 'hotkeys', label: '快捷键' },
+          { id: 'settings', label: 'OCR 设置' },
+          { id: 'history', label: '历史记录' },
+          { id: 'favorites', label: '收藏夹' },
+        ],
+      };
+
+      const items = subNavMap[mainTab] || [];
+
+      return (
+        <div style={{
+          width: '200px',
+          background: 'var(--gray-50)',
+          borderRight: '1px solid var(--gray-200)',
+          padding: 'var(--space-6) var(--space-4)'
+        }}>
+          <nav style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+            {items.map(item => (
+              <SubNavButton
+                key={item.id}
+                label={item.label}
+                active={activeTab === item.id}
+                onClick={() => onChange(item.id)}
+              />
+            ))}
+          </nav>
+        </div>
+      );
+    }
+
+    // 二级导航按钮
+    function SubNavButton({ label, active, onClick }) {
+      const [isHovered, setIsHovered] = useState(false);
+
+      return (
+        <button
+          onClick={onClick}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          style={{
+            width: '100%',
+            padding: 'var(--space-2) var(--space-3)',
+            background: active ? 'white' : (isHovered ? 'white' : 'transparent'),
+            border: 'none',
+            borderLeft: '2px solid',
+            borderLeftColor: active ? 'var(--primary-500)' : (isHovered ? 'var(--gray-300)' : 'transparent'),
+            borderRadius: 'var(--radius-md)',
+            color: active ? 'var(--gray-900)' : 'var(--gray-600)',
+            fontSize: '13px',
+            fontWeight: active ? 600 : 400,
+            textAlign: 'left',
+            cursor: 'pointer',
+            transition: 'all var(--transition-fast)',
+            boxShadow: active ? 'var(--shadow-xs)' : 'none'
+          }}
+        >
+          {label}
+        </button>
+      );
+    }
+
+    // 内容区
+    function ContentArea({ mainTab, subTab }) {
+      if (mainTab === 'translation' && subTab === 'hotkeys') {
+        return <TranslationHotkeysContent />;
+      }
+      return (
+        <div style={{
+          flex: 1,
+          padding: 'var(--space-8)',
+          color: 'var(--gray-500)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          其他页面内容...
+        </div>
+      );
+    }
+
+    // 翻译快捷键内容
+    function TranslationHotkeysContent() {
+      return (
+        <div style={{
+          flex: 1,
+          padding: 'var(--space-8)',
+          overflowY: 'auto',
+          background: 'white'
+        }}>
+          <div style={{ maxWidth: '800px' }}>
+            <h1 style={{
+              fontSize: '28px',
+              fontWeight: 700,
+              color: 'var(--gray-900)',
+              marginBottom: 'var(--space-2)'
+            }}>
+              翻译快捷键
+            </h1>
+            <p style={{
+              fontSize: '14px',
+              color: 'var(--gray-500)',
+              marginBottom: 'var(--space-8)',
+              lineHeight: 1.6
+            }}>
+              配置全局快捷键以快速触发各种翻译功能
+            </p>
+
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'var(--space-4)'
+            }}>
+              <HotkeyRow
+                label="划词翻译"
+                description="选中文本后按快捷键快速翻译"
+                hotkey="Ctrl+Shift+D"
+              />
+              <HotkeyRow
+                label="截图翻译"
+                description="截图区域后自动OCR并翻译"
+                hotkey="Ctrl+Shift+S"
+              />
+              <HotkeyRow
+                label="输入翻译"
+                description="打开翻译窗口手动输入文本"
+                hotkey="Ctrl+Shift+T"
+              />
+              <HotkeyRow
+                label="显示翻译窗口"
+                description="直接显示翻译窗口"
+                hotkey="未设置"
+              />
+            </div>
+
+            <div style={{
+              marginTop: 'var(--space-8)',
+              paddingTop: 'var(--space-6)',
+              borderTop: '1px solid var(--gray-200)',
+              display: 'flex',
+              gap: 'var(--space-3)'
+            }}>
+              <button style={{
+                padding: '10px 20px',
+                background: 'var(--primary-600)',
+                border: 'none',
+                borderRadius: 'var(--radius-md)',
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all var(--transition-fast)',
+                boxShadow: 'var(--shadow-sm)'
+              }}>
+                保存设置
+              </button>
+              <button style={{
+                padding: '10px 20px',
+                background: 'white',
+                border: '1px solid var(--gray-300)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--gray-700)',
+                fontSize: '14px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all var(--transition-fast)'
+              }}>
+                重置为默认
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 快捷键行组件
+    function HotkeyRow({ label, description, hotkey }) {
+      const [isHovered, setIsHovered] = useState(false);
+
+      return (
+        <div
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-4)',
+            padding: 'var(--space-4)',
+            background: isHovered ? 'var(--gray-50)' : 'white',
+            border: '1px solid var(--gray-200)',
+            borderRadius: 'var(--radius-lg)',
+            transition: 'all var(--transition-fast)',
+            boxShadow: isHovered ? 'var(--shadow-sm)' : 'none'
+          }}
+        >
+          <div style={{ flex: 1 }}>
+            <div style={{
+              fontSize: '15px',
+              fontWeight: 600,
+              color: 'var(--gray-900)',
+              marginBottom: 'var(--space-1)'
+            }}>
+              {label}
+            </div>
+            <div style={{
+              fontSize: '13px',
+              color: 'var(--gray-500)',
+              lineHeight: 1.5
+            }}>
+              {description}
+            </div>
+          </div>
+          <div style={{
+            padding: '8px 16px',
+            background: 'var(--gray-100)',
+            border: '1px solid var(--gray-200)',
+            borderRadius: 'var(--radius-sm)',
+            color: 'var(--gray-700)',
+            fontSize: '13px',
+            fontWeight: 500,
+            fontFamily: 'monospace',
+            minWidth: '140px',
+            textAlign: 'center'
+          }}>
+            {hotkey}
+          </div>
+          <button style={{
+            padding: '8px 16px',
+            background: 'white',
+            border: '1px solid var(--gray-300)',
+            borderRadius: 'var(--radius-md)',
+            color: 'var(--gray-700)',
+            fontSize: '13px',
+            fontWeight: 500,
+            cursor: 'pointer',
+            transition: 'all var(--transition-fast)'
+          }}>
+            录制
+          </button>
+        </div>
+      );
+    }
+
+    // 翻译结果窗口
+    function ResultView() {
+      const [sourceText, setSourceText] = useState('Hello, world!');
+      const [expanded, setExpanded] = useState({ google: true, deepl: true, baidu: false });
+
+      const translations = [
+        { id: 'google', name: 'Google Translate', color: 'var(--google)', text: '你好，世界！' },
+        { id: 'deepl', name: 'DeepL', color: 'var(--deepl)', text: '你好，世界！' },
+        { id: 'baidu', name: 'Baidu Translate', color: 'var(--baidu)', text: '你好，世界！' },
+      ];
+
+      return (
+        <div style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(0, 0, 0, 0.25)',
+          backdropFilter: 'blur(8px)',
+          padding: 'var(--space-8)'
+        }}>
+          <div style={{
+            width: '100%',
+            maxWidth: '800px',
+            background: 'white',
+            borderRadius: 'var(--radius-2xl)',
+            boxShadow: 'var(--shadow-xl)',
+            overflow: 'hidden',
+            animation: 'slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+          }}>
+            {/* 头部 */}
+            <div style={{
+              padding: 'var(--space-4) var(--space-6)',
+              borderBottom: '1px solid var(--gray-200)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'var(--gray-50)'
+            }}>
+              <h2 style={{
+                fontSize: '18px',
+                fontWeight: 700,
+                color: 'var(--gray-900)'
+              }}>
+                翻译
+              </h2>
+              <button style={{
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'transparent',
+                border: 'none',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--gray-500)',
+                cursor: 'pointer',
+                transition: 'all var(--transition-fast)'
+              }}>
+                <Icons.Close />
+              </button>
+            </div>
+
+            {/* 内容 */}
+            <div style={{ padding: 'var(--space-6)' }}>
+              {/* 源文本 */}
+              <textarea
+                value={sourceText}
+                onChange={(e) => setSourceText(e.target.value)}
+                placeholder="输入要翻译的文本..."
+                style={{
+                  width: '100%',
+                  minHeight: '120px',
+                  padding: 'var(--space-4)',
+                  background: 'var(--gray-50)',
+                  border: '2px solid var(--gray-200)',
+                  borderRadius: 'var(--radius-lg)',
+                  color: 'var(--gray-900)',
+                  fontSize: '15px',
+                  lineHeight: 1.6,
+                  resize: 'vertical',
+                  transition: 'all var(--transition-fast)',
+                  marginBottom: 'var(--space-4)'
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = 'var(--primary-500)';
+                  e.target.style.background = 'white';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = 'var(--gray-200)';
+                  e.target.style.background = 'var(--gray-50)';
+                }}
+              />
+
+              {/* 语言选择 */}
+              <div style={{
+                display: 'flex',
+                gap: 'var(--space-3)',
+                alignItems: 'center',
+                marginBottom: 'var(--space-4)'
+              }}>
+                <select style={{
+                  flex: 1,
+                  padding: 'var(--space-3)',
+                  background: 'white',
+                  border: '1px solid var(--gray-200)',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'var(--gray-900)',
+                  fontSize: '14px',
+                  cursor: 'pointer'
+                }}>
+                  <option>自动检测</option>
+                  <option>英语</option>
+                  <option>中文</option>
+                </select>
+
+                <button style={{
+                  padding: 'var(--space-2)',
+                  background: 'white',
+                  border: '1px solid var(--gray-200)',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'var(--gray-600)',
+                  cursor: 'pointer',
+                  transition: 'all var(--transition-fast)'
+                }}>
+                  <Icons.Swap />
+                </button>
+
+                <select style={{
+                  flex: 1,
+                  padding: 'var(--space-3)',
+                  background: 'white',
+                  border: '1px solid var(--gray-200)',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'var(--gray-900)',
+                  fontSize: '14px',
+                  cursor: 'pointer'
+                }}>
+                  <option>中文（简体）</option>
+                  <option>英语</option>
+                  <option>日语</option>
+                </select>
+              </div>
+
+              {/* 翻译按钮 */}
+              <button style={{
+                width: '100%',
+                padding: 'var(--space-3)',
+                background: 'linear-gradient(135deg, var(--primary-500) 0%, var(--primary-600) 100%)',
+                border: 'none',
+                borderRadius: 'var(--radius-lg)',
+                color: 'white',
+                fontSize: '15px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all var(--transition-fast)',
+                boxShadow: 'var(--shadow-sm)',
+                marginBottom: 'var(--space-6)'
+              }}>
+                翻译
+              </button>
+
+              {/* 翻译卡片 */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 'var(--space-3)'
+              }}>
+                {translations.map(t => (
+                  <TranslationCard
+                    key={t.id}
+                    {...t}
+                    expanded={expanded[t.id]}
+                    onToggle={() => setExpanded({ ...expanded, [t.id]: !expanded[t.id] })}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 翻译卡片
+    function TranslationCard({ id, name, color, text, expanded, onToggle }) {
+      const [isHovered, setIsHovered] = useState(false);
+
+      return (
+        <div
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          style={{
+            border: '1px solid var(--gray-200)',
+            borderRadius: 'var(--radius-lg)',
+            overflow: 'hidden',
+            transition: 'all var(--transition-fast)',
+            boxShadow: isHovered ? 'var(--shadow-sm)' : 'none'
+          }}
+        >
+          {/* 卡片头 */}
+          <div
+            onClick={onToggle}
+            style={{
+              padding: 'var(--space-3) var(--space-4)',
+              background: 'var(--gray-50)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              transition: 'all var(--transition-fast)'
+            }}
+          >
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)'
+            }}>
+              <div style={{
+                width: '4px',
+                height: '16px',
+                background: color,
+                borderRadius: '2px'
+              }} />
+              <span style={{
+                fontSize: '14px',
+                fontWeight: 600,
+                color: 'var(--gray-900)'
+              }}>
+                {name}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <button style={{
+                padding: 'var(--space-1) var(--space-2)',
+                background: 'white',
+                border: '1px solid var(--gray-200)',
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--gray-600)',
+                fontSize: '12px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-1)'
+              }}
+              onClick={(e) => e.stopPropagation()}
+              >
+                <Icons.Speaker />
+              </button>
+              <button style={{
+                padding: 'var(--space-1) var(--space-2)',
+                background: 'white',
+                border: '1px solid var(--gray-200)',
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--gray-600)',
+                fontSize: '12px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-1)'
+              }}
+              onClick={(e) => e.stopPropagation()}
+              >
+                <Icons.Copy />
+              </button>
+              <div style={{
+                transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform var(--transition-fast)',
+                display: 'flex',
+                color: 'var(--gray-400)'
+              }}>
+                <Icons.ChevronDown />
+              </div>
+            </div>
+          </div>
+
+          {/* 卡片内容 */}
+          {expanded && (
+            <div style={{
+              padding: 'var(--space-4)',
+              background: 'white',
+              color: 'var(--gray-900)',
+              fontSize: '15px',
+              lineHeight: 1.6,
+              animation: 'expandIn 0.2s ease-out'
+            }}>
+              {text}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // 截图编辑器
+    function EditorView() {
+      const [selectedTool, setSelectedTool] = useState('select');
+
+      // 键盘快捷键处理
+      React.useEffect(() => {
+        const handleKeyDown = (e) => {
+          // Command+C 或 Ctrl+C 复制
+          if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
+            e.preventDefault();
+            console.log('复制截图');
+            alert('截图已复制到剪贴板');
+          }
+          // Esc 取消
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            console.log('取消截图');
+          }
+          // Enter 完成
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            console.log('完成截图');
+          }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+      }, []);
+
+      const tools = [
+        { id: 'select', icon: '↖️', label: '选择' },
+        { id: 'rectangle', icon: '▭', label: '矩形' },
+        { id: 'ellipse', icon: '○', label: '椭圆' },
+        { id: 'arrow', icon: '→', label: '箭头' },
+        { id: 'pen', icon: '✏️', label: '画笔' },
+        { id: 'text', icon: 'T', label: '文字' },
+        { id: 'mosaic', icon: '▦', label: '马赛克' },
+        { id: 'blur', icon: '◐', label: '模糊' },
+      ];
+
+      return (
+        <div style={{
+          width: '100%',
+          height: '100%',
+          background: 'rgba(0, 0, 0, 0.95)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          position: 'relative',
+          gap: 'var(--space-3)'
+        }}>
+          {/* 截图区域 */}
+          <div style={{
+            width: '900px',
+            height: '550px',
+            background: 'linear-gradient(135deg, var(--gray-100) 0%, var(--gray-200) 100%)',
+            borderRadius: 'var(--radius-md)',
+            border: '3px solid var(--primary-500)',
+            boxShadow: 'var(--shadow-xl)',
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--gray-400)',
+            fontSize: '15px'
+          }}>
+            截图区域 900 × 550
+          </div>
+
+          {/* 工具栏 + 操作栏（合并在一起） */}
+          <div style={{
+            background: 'white',
+            borderRadius: 'var(--radius-lg)',
+            padding: 'var(--space-2)',
+            display: 'flex',
+            gap: 'var(--space-3)',
+            alignItems: 'center',
+            boxShadow: 'var(--shadow-lg)',
+            border: '1px solid var(--gray-200)'
+          }}>
+            {/* 左侧工具栏 */}
+            <div style={{
+              display: 'flex',
+              gap: 'var(--space-1)',
+              alignItems: 'center'
+            }}>
+              {tools.map(tool => (
+                <button
+                  key={tool.id}
+                  onClick={() => setSelectedTool(tool.id)}
+                  title={tool.label}
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: selectedTool === tool.id ? 'var(--primary-50)' : 'transparent',
+                    border: selectedTool === tool.id ? '2px solid var(--primary-500)' : '2px solid transparent',
+                    borderRadius: 'var(--radius-md)',
+                    color: selectedTool === tool.id ? 'var(--primary-600)' : 'var(--gray-600)',
+                    fontSize: '18px',
+                    cursor: 'pointer',
+                    transition: 'all var(--transition-fast)'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedTool !== tool.id) {
+                      e.currentTarget.style.background = 'var(--gray-100)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedTool !== tool.id) {
+                      e.currentTarget.style.background = 'transparent';
+                    }
+                  }}
+                >
+                  {tool.icon}
+                </button>
+              ))}
+
+              {/* 颜色选择器 */}
+              <div style={{
+                width: '36px',
+                height: '36px',
+                background: 'var(--primary-500)',
+                borderRadius: 'var(--radius-md)',
+                border: '2px solid white',
+                boxShadow: '0 0 0 1px var(--gray-300)',
+                cursor: 'pointer',
+                marginLeft: 'var(--space-1)'
+              }} />
+            </div>
+
+            {/* 分隔线 */}
+            <div style={{
+              width: '1px',
+              height: '36px',
+              background: 'var(--gray-200)'
+            }} />
+
+            {/* 右侧操作按钮 */}
+            <div style={{
+              display: 'flex',
+              gap: 'var(--space-2)',
+              alignItems: 'center'
+            }}>
+              <button
+                onClick={() => console.log('取消')}
+                style={{
+                  padding: '8px 16px',
+                  background: 'white',
+                  border: '1px solid var(--gray-300)',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'var(--gray-700)',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all var(--transition-fast)'
+                }}>
+                取消 (Esc)
+              </button>
+              <button
+                onClick={() => console.log('OCR')}
+                style={{
+                  padding: '8px 16px',
+                  background: 'white',
+                  border: '1px solid var(--gray-300)',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'var(--gray-700)',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all var(--transition-fast)'
+                }}>
+                OCR
+              </button>
+              <button
+                onClick={() => {
+                  console.log('复制');
+                  alert('截图已复制到剪贴板');
+                }}
+                style={{
+                  padding: '8px 16px',
+                  background: 'white',
+                  border: '1px solid var(--gray-300)',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'var(--gray-700)',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all var(--transition-fast)'
+                }}>
+                复制 (⌘C)
+              </button>
+              <button
+                onClick={() => console.log('保存')}
+                style={{
+                  padding: '8px 16px',
+                  background: 'white',
+                  border: '1px solid var(--gray-300)',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'var(--gray-700)',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all var(--transition-fast)'
+                }}>
+                保存
+              </button>
+              <button
+                onClick={() => console.log('完成')}
+                style={{
+                  padding: '8px 20px',
+                  background: 'linear-gradient(135deg, var(--primary-500) 0%, var(--primary-600) 100%)',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'white',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all var(--transition-fast)',
+                  boxShadow: 'var(--shadow-sm)'
+                }}>
+                完成 (Enter)
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 系统托盘
+    function TrayView() {
+      const menuItems = [
+        { type: 'header', label: 'SnapLingo' },
+        { type: 'divider' },
+        { type: 'item', icon: '📸', label: '截图', shortcut: 'F1' },
+        { type: 'item', icon: '🔍', label: '截图OCR', shortcut: 'Shift+Alt+S' },
+        { type: 'item', icon: '🌐', label: '截图翻译', shortcut: 'Ctrl+Shift+C' },
+        { type: 'divider' },
+        { type: 'item', icon: '💬', label: '快捷翻译', shortcut: 'Ctrl+Shift+T' },
+        { type: 'item', icon: '📝', label: '划词翻译', shortcut: 'Ctrl+Shift+D' },
+        { type: 'divider' },
+        { type: 'item', icon: '🕐', label: '历史记录' },
+        { type: 'item', icon: '⚙️', label: '打开设置' },
+        { type: 'divider' },
+        { type: 'item', icon: 'ℹ️', label: '关于' },
+        { type: 'item', icon: '🚪', label: '退出', danger: true },
+      ];
+
+      return (
+        <div style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--gray-100)',
+          padding: 'var(--space-8)'
+        }}>
+          <div style={{
+            width: '320px',
+            background: 'white',
+            borderRadius: 'var(--radius-xl)',
+            boxShadow: 'var(--shadow-xl)',
+            overflow: 'hidden',
+            border: '1px solid var(--gray-200)'
+          }}>
+            {menuItems.map((item, i) => {
+              if (item.type === 'header') {
+                return (
+                  <div key={i} style={{
+                    padding: 'var(--space-4) var(--space-4)',
+                    fontSize: '15px',
+                    fontWeight: 700,
+                    color: 'var(--gray-900)',
+                    background: 'var(--gray-50)',
+                    borderBottom: '1px solid var(--gray-200)'
+                  }}>
+                    {item.label}
+                  </div>
+                );
+              }
+
+              if (item.type === 'divider') {
+                return (
+                  <div key={i} style={{
+                    height: '1px',
+                    background: 'var(--gray-200)',
+                    margin: 'var(--space-2) 0'
+                  }} />
+                );
+              }
+
+              return <TrayMenuItem key={i} {...item} />;
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // 托盘菜单项
+    function TrayMenuItem({ icon, label, shortcut, danger }) {
+      const [isHovered, setIsHovered] = useState(false);
+
+      return (
+        <button
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          style={{
+            width: '100%',
+            padding: 'var(--space-2) var(--space-4)',
+            background: isHovered ? (danger ? 'var(--danger-light)' : 'var(--gray-50)') : 'transparent',
+            border: 'none',
+            color: danger ? 'var(--danger)' : 'var(--gray-900)',
+            fontSize: '14px',
+            textAlign: 'left',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            cursor: 'pointer',
+            transition: 'all var(--transition-fast)'
+          }}
+        >
+          <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <span style={{ fontSize: '16px', width: '20px' }}>{icon}</span>
+            <span style={{ fontWeight: 500 }}>{label}</span>
+          </span>
+          {shortcut && (
+            <span style={{
+              fontSize: '11px',
+              color: 'var(--gray-500)',
+              fontFamily: 'monospace',
+              background: 'var(--gray-100)',
+              padding: '2px 6px',
+              borderRadius: 'var(--radius-sm)'
+            }}>
+              {shortcut}
+            </span>
+          )}
+        </button>
+      );
+    }
+
+    // 添加动画
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: scale(0.95) translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1) translateY(0);
+        }
+      }
+
+      @keyframes expandIn {
+        from {
+          opacity: 0;
+          max-height: 0;
+        }
+        to {
+          opacity: 1;
+          max-height: 500px;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+
+    // 渲染
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>

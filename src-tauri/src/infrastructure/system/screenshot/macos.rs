@@ -14,6 +14,28 @@ impl MacOSScreenshotBackend {
     }
 }
 
+#[link(name = "CoreGraphics", kind = "framework")]
+extern "C" {
+    fn CGPreflightScreenCaptureAccess() -> bool;
+    fn CGRequestScreenCaptureAccess() -> bool;
+}
+
+fn ensure_screen_capture_access() -> Result<(), AppError> {
+    if unsafe { CGPreflightScreenCaptureAccess() } {
+        return Ok(());
+    }
+
+    let _ = unsafe { CGRequestScreenCaptureAccess() };
+
+    if unsafe { CGPreflightScreenCaptureAccess() } {
+        return Ok(());
+    }
+
+    Err(AppError::System(
+        "SnapLingo 没有当前版本的 macOS 屏幕录制权限。请在“系统设置 > 隐私与安全性 > 屏幕录制”中允许 SnapLingo，然后退出并重新打开 SnapLingo。".to_string(),
+    ))
+}
+
 /// Convert CGImage to PNG bytes
 fn image_to_png(cg_image: CGImage) -> Result<Vec<u8>, AppError> {
     let width = cg_image.width();
@@ -57,6 +79,8 @@ fn image_to_png(cg_image: CGImage) -> Result<Vec<u8>, AppError> {
 #[async_trait::async_trait]
 impl ScreenshotBackend for MacOSScreenshotBackend {
     async fn capture_full_screen(&self) -> Result<Vec<u8>, AppError> {
+        ensure_screen_capture_access()?;
+
         let display = CGDisplay::main();
         let image = display.image()
             .ok_or_else(|| AppError::System("Failed to capture screenshot".to_string()))?;
@@ -65,6 +89,8 @@ impl ScreenshotBackend for MacOSScreenshotBackend {
     }
 
     async fn capture_region(&self, region: ScreenRegion) -> Result<Vec<u8>, AppError> {
+        ensure_screen_capture_access()?;
+
         let rect = CGRect::new(
             &core_graphics::geometry::CGPoint::new(region.x as f64, region.y as f64),
             &core_graphics::geometry::CGSize::new(region.width as f64, region.height as f64),

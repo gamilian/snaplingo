@@ -52,7 +52,7 @@ export function HistoryPage() {
               onClick={() => setFilter(type)}
               className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
                 filter === type
-                  ? 'bg-white text-blue-600 shadow-sm font-medium'
+                  ? 'bg-white text-primary-600 shadow-sm font-medium'
                   : 'text-gray-600 hover:text-gray-800'
               }`}
             >
@@ -66,7 +66,7 @@ export function HistoryPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="搜索识别文本..."
-          className="flex-1 max-w-xs px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 max-w-xs px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
       </div>
 

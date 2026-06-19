@@ -117,6 +117,28 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 - **Input Translation Mode（输入翻译模式）**  
   快捷键触发，弹出翻译窗口，用户直接在窗口中输入文字。按回车或点击"翻译"按钮执行翻译。
 
+### Capture Session（截图会话）
+一次截图从快捷键触发到输出完成或取消的完整生命周期。Capture Session 不是简单的截图 API 调用，而是 SnapLingo 截图链路的核心领域对象。
+
+**职责：**
+- 创建时冻结当前桌面画面，保存每个显示器的截图、位置、尺寸和缩放信息
+- 为前端提供可渲染的冻结画面和统一坐标元数据
+- 接收用户选择的区域和标注命令
+- 为 OCR 提供未标注的原始图像裁剪
+- 为复制、保存、贴图提供合成后的输出图像
+- 只有输出成功后，才把截图记为成功截图并写入历史
+
+**坐标规则：**
+- 前端交互使用 Logical Pixels
+- 后端裁剪和图像处理使用 Physical Pixels
+- 所有跨层传递的区域必须显式标注坐标空间，不能裸传 `x/y/width/height`
+
+**与 Capture Mode 的关系：**
+- Screenshot Mode：Capture Session → 选区/标注 → 复制/保存/贴图
+- OCR Mode：Capture Session → 选区 → OCR
+- OCR + Translation Mode：Capture Session → 选区 → OCR → 翻译
+- Screenshot Mode 中的 OCR 按钮复用同一个 Capture Session 的原始图像
+
 ### Provider（能力提供者）
 实现某个能力的内置模块，不区分本地实现还是远程 API 调用。用户视角看到的是能力名称（如"DeepL 翻译"），而非技术实现细节。
 
@@ -465,4 +487,3 @@ pub struct TranslationCoordinator {
 - 需要动态激活/停用（运行时配置）
 - 需要并发执行或并发配置
 - 需要持久化状态
-

@@ -90,7 +90,7 @@ export function CustomTranslationProviderDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="例如：我的 GPT-4"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-blue-500"
             />
           </div>
 
@@ -99,7 +99,7 @@ export function CustomTranslationProviderDialog({
             <select
               value={protocol}
               onChange={(e) => handleProtocolChange(e.target.value as any)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-blue-500"
             >
               <option value="openai">OpenAI</option>
               <option value="anthropic">Anthropic (Claude)</option>
@@ -114,7 +114,7 @@ export function CustomTranslationProviderDialog({
               value={endpoint}
               onChange={(e) => setEndpoint(e.target.value)}
               placeholder="https://api.openai.com"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-blue-500"
             />
           </div>
 
@@ -125,7 +125,7 @@ export function CustomTranslationProviderDialog({
               value={model}
               onChange={(e) => setModel(e.target.value)}
               placeholder="gpt-4o / claude-3-5-sonnet-latest / gemini-1.5-flash"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-blue-500"
             />
           </div>
 
@@ -136,7 +136,7 @@ export function CustomTranslationProviderDialog({
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="sk-..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-blue-500"
             />
           </div>
 
@@ -147,7 +147,7 @@ export function CustomTranslationProviderDialog({
             <select
               value={reasoningLevel}
               onChange={(e) => setReasoningLevel(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-blue-500"
             >
               <option value="">无（默认）</option>
               <option value="minimal">Minimal</option>
@@ -172,7 +172,7 @@ export function CustomTranslationProviderDialog({
           <button
             onClick={handleSave}
             disabled={!name.trim() || !apiKey.trim() || !endpoint.trim() || !model.trim()}
-            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
             添加
           </button>

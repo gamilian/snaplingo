@@ -219,7 +219,7 @@ export function TranslationProvidersPage() {
       <div className="pt-4 border-t border-gray-200">
         <button
           onClick={handleAddCustom}
-          className="px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors font-medium"
+          className="px-4 py-2 text-sm text-primary-600 hover:bg-blue-50 rounded-lg transition-colors font-medium"
         >
           + 添加自定义服务
         </button>

@@ -26,7 +26,7 @@ export function ProviderCard({ provider, onActivate, onDeactivate, onConfigure, 
     const firstChar = provider.name.charAt(0).toUpperCase();
     return (
       <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-        <span className="text-blue-600 font-semibold text-lg">{firstChar}</span>
+        <span className="text-primary-600 font-semibold text-lg">{firstChar}</span>
       </div>
     );
   };
@@ -41,7 +41,7 @@ export function ProviderCard({ provider, onActivate, onDeactivate, onConfigure, 
             <h3 className="font-semibold text-gray-800">{provider.name}</h3>
             {getStatusBadge()}
             {provider.isBuiltin && (
-              <span className="px-2 py-0.5 text-xs bg-blue-50 text-blue-600 rounded font-medium">内置</span>
+              <span className="px-2 py-0.5 text-xs bg-blue-50 text-primary-600 rounded font-medium">内置</span>
             )}
           </div>
           <p className="text-sm text-gray-600 mb-3">{provider.description}</p>
@@ -50,7 +50,7 @@ export function ProviderCard({ provider, onActivate, onDeactivate, onConfigure, 
             {provider.status === 'unconfigured' && onConfigure && (
               <button
                 onClick={onConfigure}
-                className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                className="px-3 py-1.5 text-sm bg-primary-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
               >
                 配置
               </button>

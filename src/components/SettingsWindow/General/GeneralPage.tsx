@@ -1,4 +1,5 @@
 import { useSettingsStore } from '../../../stores/settingsStore';
+import { CustomSelect } from '../../common/CustomSelect';
 
 export function GeneralPage() {
   const language = useSettingsStore((state) => state.language);
@@ -25,16 +26,18 @@ export function GeneralPage() {
             <div className="font-medium text-gray-700">界面语言</div>
             <div className="text-sm text-gray-500 mt-1">选择应用显示的语言</div>
           </div>
-          <select
-            value={language}
-            onChange={(e) => setLanguage(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="zh-CN">中文简体</option>
-            <option value="zh-TW">中文繁體</option>
-            <option value="en">English</option>
-            <option value="ja">日本語</option>
-          </select>
+          <div className="w-48">
+            <CustomSelect
+              options={[
+                { value: 'zh-CN', label: '中文简体' },
+                { value: 'zh-TW', label: '中文繁體' },
+                { value: 'en', label: 'English' },
+                { value: 'ja', label: '日本語' },
+              ]}
+              value={language}
+              onChange={setLanguage}
+            />
+          </div>
         </div>
 
         {/* 主题 */}
@@ -43,15 +46,17 @@ export function GeneralPage() {
             <div className="font-medium text-gray-700">主题</div>
             <div className="text-sm text-gray-500 mt-1">选择应用的外观主题</div>
           </div>
-          <select
-            value={theme}
-            onChange={(e) => setTheme(e.target.value as any)}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="system">跟随系统</option>
-            <option value="light">浅色</option>
-            <option value="dark">深色</option>
-          </select>
+          <div className="w-48">
+            <CustomSelect
+              options={[
+                { value: 'system', label: '跟随系统' },
+                { value: 'light', label: '浅色' },
+                { value: 'dark', label: '深色' },
+              ]}
+              value={theme}
+              onChange={(value) => setTheme(value as any)}
+            />
+          </div>
         </div>
 
         {/* 开机自启 */}
@@ -63,7 +68,7 @@ export function GeneralPage() {
           <button
             onClick={() => setStartOnBoot(!startOnBoot)}
             className={`relative w-12 h-6 rounded-full transition-colors ${
-              startOnBoot ? 'bg-blue-600' : 'bg-gray-300'
+              startOnBoot ? 'bg-primary-600' : 'bg-gray-300'
             }`}
           >
             <span
@@ -107,7 +112,7 @@ export function GeneralPage() {
               href="https://github.com/gamilian/snaplingo"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-700 font-medium"
+              className="text-primary-600 hover:text-blue-700 font-medium"
             >
               查看仓库 →
             </a>
@@ -115,7 +120,7 @@ export function GeneralPage() {
         </div>
 
         <div className="pt-4 border-t border-gray-100">
-          <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors">
+          <button className="px-4 py-2 bg-primary-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors">
             检查更新
           </button>
         </div>

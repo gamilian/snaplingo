@@ -54,7 +54,7 @@ export function OcrProvidersPage() {
       <div>
         <h2 className="text-3xl font-bold text-gray-900 mb-2">OCR 服务</h2>
         <p className="text-gray-600">
-          当前激活：<span className="font-medium text-blue-600">
+          当前激活：<span className="font-medium text-primary-600">
             {providers.find((p) => p.id === activeProvider)?.name || '无'}
           </span>
         </p>

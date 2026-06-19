@@ -102,7 +102,7 @@ export function ProviderConfigDialog({ isOpen, onClose, onSave, provider }: Prov
                     value={credentials[field.name] || ''}
                     onChange={(e) => updateCredential(field.name, e.target.value)}
                     placeholder={`请输入 ${field.label}`}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
               ))}
@@ -110,19 +110,19 @@ export function ProviderConfigDialog({ isOpen, onClose, onSave, provider }: Prov
               {/* Baidu 特殊提示 */}
               {provider.id === 'baidu-translate' && (
                 <p className="text-xs text-gray-500">
-                  获取地址：<a href="https://fanyi-api.baidu.com/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">https://fanyi-api.baidu.com/</a>
+                  获取地址：<a href="https://fanyi-api.baidu.com/" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">https://fanyi-api.baidu.com/</a>
                 </p>
               )}
 
               {provider.id === 'baidu-ocr' && (
                 <p className="text-xs text-gray-500">
-                  获取地址：<a href="https://cloud.baidu.com/product/ocr" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">https://cloud.baidu.com/product/ocr</a>
+                  获取地址：<a href="https://cloud.baidu.com/product/ocr" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">https://cloud.baidu.com/product/ocr</a>
                 </p>
               )}
 
               {provider.id === 'deepl' && (
                 <p className="text-xs text-gray-500">
-                  获取地址：<a href="https://www.deepl.com/pro-api" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">https://www.deepl.com/pro-api</a>
+                  获取地址：<a href="https://www.deepl.com/pro-api" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">https://www.deepl.com/pro-api</a>
                 </p>
               )}
 
@@ -130,7 +130,7 @@ export function ProviderConfigDialog({ isOpen, onClose, onSave, provider }: Prov
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div className="flex items-start space-x-3">
                   <svg
-                    className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5"
+                    className="w-5 h-5 text-primary-600 flex-shrink-0 mt-0.5"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -162,7 +162,7 @@ export function ProviderConfigDialog({ isOpen, onClose, onSave, provider }: Prov
           <button
             onClick={handleSave}
             disabled={loading || fields.some((f) => !credentials[f.name]?.trim())}
-            className="px-6 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+            className="px-6 py-2 text-sm bg-primary-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
             保存配置
           </button>

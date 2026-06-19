@@ -142,7 +142,7 @@ function ServicesContent() {
             onClick={() => setActiveServiceTab('ocr')}
             className={`pb-4 text-sm font-medium transition-colors border-b-2 ${
               activeServiceTab === 'ocr'
-                ? 'border-blue-500 text-blue-600'
+                ? 'border-blue-500 text-primary-600'
                 : 'border-transparent text-gray-600 hover:text-gray-800'
             }`}
           >
@@ -152,7 +152,7 @@ function ServicesContent() {
             onClick={() => setActiveServiceTab('translation')}
             className={`pb-4 text-sm font-medium transition-colors border-b-2 ${
               activeServiceTab === 'translation'
-                ? 'border-blue-500 text-blue-600'
+                ? 'border-blue-500 text-primary-600'
                 : 'border-transparent text-gray-600 hover:text-gray-800'
             }`}
           >
@@ -162,7 +162,7 @@ function ServicesContent() {
             onClick={() => setActiveServiceTab('tts')}
             className={`pb-4 text-sm font-medium transition-colors border-b-2 ${
               activeServiceTab === 'tts'
-                ? 'border-blue-500 text-blue-600'
+                ? 'border-blue-500 text-primary-600'
                 : 'border-transparent text-gray-600 hover:text-gray-800'
             }`}
           >

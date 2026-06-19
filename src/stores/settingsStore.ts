@@ -36,6 +36,7 @@ interface SettingsState {
   screenshotSavePath: string;
   screenshotFormat: 'png' | 'jpg' | 'webp';
   screenshotQuality: number;
+  capturedScreenshot: string | null;
 
   // 翻译设置
   defaultSourceLang: string;
@@ -58,12 +59,13 @@ interface SettingsState {
   setScreenshotSavePath: (path: string) => void;
   setScreenshotFormat: (format: SettingsState['screenshotFormat']) => void;
   setScreenshotQuality: (quality: number) => void;
+  setCapturedScreenshot: (dataUrl: string | null) => void;
 }
 
 // 默认快捷键
 const defaultHotkeys = {
   screenshot: {
-    screenshot: 'F1',
+    screenshot: '⇧⌘R',
     'screenshot-copy': '⌘F1',
     'screenshot-custom': '⇧F1',
     pin: 'F3',
@@ -102,6 +104,7 @@ export const useSettingsStore = create<SettingsState>()(
       screenshotSavePath: '~/Pictures/SnapLingo',
       screenshotFormat: 'png',
       screenshotQuality: 90,
+      capturedScreenshot: null,
 
       defaultSourceLang: 'auto',
       defaultTargetLang: 'zh-CN',
@@ -149,6 +152,7 @@ export const useSettingsStore = create<SettingsState>()(
       setScreenshotSavePath: (path) => set({ screenshotSavePath: path }),
       setScreenshotFormat: (format) => set({ screenshotFormat: format }),
       setScreenshotQuality: (quality) => set({ screenshotQuality: quality }),
+      setCapturedScreenshot: (dataUrl) => set({ capturedScreenshot: dataUrl }),
     }),
     {
       name: 'snaplingo-settings',

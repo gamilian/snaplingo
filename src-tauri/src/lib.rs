@@ -43,6 +43,9 @@ use domain::HotkeyAction;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
+const SCREENSHOT_SHORTCUT: &str = "CmdOrCtrl+Shift+KeyR";
+const SCREENSHOT_OCR_SHORTCUT: &str = "CmdOrCtrl+Shift+KeyS";
+
 /// Custom translation provider definition (for persistence)
 #[derive(Clone, Serialize, Deserialize)]
 pub struct CustomTranslationProviderDef {
@@ -314,22 +317,23 @@ impl AppState {
 /// Register screenshot shortcut
 fn register_screenshot_shortcut(app: &tauri::AppHandle) -> Result<()> {
     let app_clone = app.clone();
+    let state = app.state::<AppState>();
+    let capture_service = state.capture_service.clone();
+    let screenshot_state = state.screenshot_state.clone();
 
-    infrastructure::system::register_shortcut(app, "Cmd+Shift+R", move || {
+    infrastructure::system::register_shortcut(app, SCREENSHOT_SHORTCUT, move || {
         log::info!("Screenshot shortcut triggered!");
 
         let app = app_clone.clone();
+        let capture_service = capture_service.clone();
+        let screenshot_state = screenshot_state.clone();
 
-        // Emit event to frontend to trigger screenshot workflow
-        if let Some(window) = app.get_webview_window("main") {
-            if let Err(e) = window.emit("hotkey-triggered", "screenshot") {
-                log::error!("Failed to emit hotkey-triggered event: {}", e);
-            } else {
-                log::info!("Screenshot hotkey event emitted successfully");
+        tauri::async_runtime::spawn(async move {
+            if let Err(e) = commands::start_screenshot_overlay(app.clone(), capture_service, screenshot_state).await {
+                log::error!("Failed to start screenshot overlay: {}", e);
+                commands::emit_screenshot_error(app, e);
             }
-        } else {
-            log::error!("Main window not found");
-        }
+        });
     })?;
 
     Ok(())
@@ -338,22 +342,23 @@ fn register_screenshot_shortcut(app: &tauri::AppHandle) -> Result<()> {
 /// Register screenshot OCR shortcut
 fn register_screenshot_ocr_shortcut(app: &tauri::AppHandle) -> Result<()> {
     let app_clone = app.clone();
+    let state = app.state::<AppState>();
+    let capture_service = state.capture_service.clone();
+    let screenshot_state = state.screenshot_state.clone();
 
-    infrastructure::system::register_shortcut(app, "Cmd+Shift+S", move || {
+    infrastructure::system::register_shortcut(app, SCREENSHOT_OCR_SHORTCUT, move || {
         log::info!("Screenshot OCR shortcut triggered!");
 
         let app = app_clone.clone();
+        let capture_service = capture_service.clone();
+        let screenshot_state = screenshot_state.clone();
 
-        // Emit event to frontend to trigger screenshot OCR workflow
-        if let Some(window) = app.get_webview_window("main") {
-            if let Err(e) = window.emit("hotkey-triggered", "screenshot-ocr") {
-                log::error!("Failed to emit hotkey-triggered event: {}", e);
-            } else {
-                log::info!("Screenshot OCR hotkey event emitted successfully");
+        tauri::async_runtime::spawn(async move {
+            if let Err(e) = commands::start_screenshot_overlay(app.clone(), capture_service, screenshot_state).await {
+                log::error!("Failed to start screenshot OCR overlay: {}", e);
+                commands::emit_screenshot_error(app, e);
             }
-        } else {
-            log::error!("Main window not found");
-        }
+        });
     })?;
 
     Ok(())
@@ -372,15 +377,10 @@ pub fn run() {
     .plugin(tauri_plugin_shell::init())
     .plugin(tauri_plugin_global_shortcut::Builder::new().build())
     .plugin(tauri_plugin_screenshots::init())
+    .plugin(tauri_plugin_log::Builder::default()
+      .level(log::LevelFilter::Info)
+      .build())
     .setup(|app| {
-      if cfg!(debug_assertions) {
-        app.handle().plugin(
-          tauri_plugin_log::Builder::default()
-            .level(log::LevelFilter::Info)
-            .build(),
-        )?;
-      }
-
       let app_state = AppState::new(config_path, app.handle().clone());
 
       // Subscribe history service to event bus (must be done after Tokio runtime is ready)
@@ -400,13 +400,13 @@ pub fn run() {
           if let Err(e) = register_screenshot_shortcut(&app_handle) {
               log::error!("Failed to register screenshot shortcut: {}", e);
           } else {
-              log::info!("Screenshot shortcut registered: Cmd+Shift+R");
+              log::info!("Screenshot shortcut registered: {}", SCREENSHOT_SHORTCUT);
           }
 
           if let Err(e) = register_screenshot_ocr_shortcut(&app_handle) {
               log::error!("Failed to register screenshot OCR shortcut: {}", e);
           } else {
-              log::info!("Screenshot OCR shortcut registered: Cmd+Shift+S");
+              log::info!("Screenshot OCR shortcut registered: {}", SCREENSHOT_OCR_SHORTCUT);
           }
       });
 
@@ -419,6 +419,7 @@ pub fn run() {
       commands::trigger_screenshot,
       commands::create_screenshot_window,
       commands::create_screenshot_window_simple,
+      commands::screenshot_overlay_ready,
       commands::close_screenshot_window,
       commands::crop_screenshot,
       commands::translate_text_v2,

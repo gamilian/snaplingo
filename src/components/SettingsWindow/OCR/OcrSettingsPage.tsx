@@ -1,4 +1,13 @@
+import { useState } from 'react';
+import { CustomSelect } from '../../common/CustomSelect';
+import { CustomNumberInput } from '../../common/CustomNumberInput';
+
 export function OcrSettingsPage() {
+  const [recognitionLang, setRecognitionLang] = useState('auto');
+  const [accuracy, setAccuracy] = useState('balanced');
+  const [threads, setThreads] = useState('auto');
+  const [dpi, setDpi] = useState(300);
+
   return (
     <div className="max-w-4xl space-y-8">
       <div>
@@ -13,26 +22,34 @@ export function OcrSettingsPage() {
         {/* 识别语言 */}
         <div>
           <label className="block font-medium text-gray-700 mb-2">识别语言</label>
-          <select className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="auto">自动检测</option>
-            <option value="chi_sim">中文简体</option>
-            <option value="chi_tra">中文繁体</option>
-            <option value="eng">English</option>
-            <option value="jpn">日本語</option>
-            <option value="kor">한국어</option>
-            <option value="multi">多语言混合</option>
-          </select>
+          <CustomSelect
+            options={[
+              { value: 'auto', label: '自动检测' },
+              { value: 'chi_sim', label: '中文简体' },
+              { value: 'chi_tra', label: '中文繁体' },
+              { value: 'eng', label: 'English' },
+              { value: 'jpn', label: '日本語' },
+              { value: 'kor', label: '한국어' },
+              { value: 'multi', label: '多语言混合' },
+            ]}
+            value={recognitionLang}
+            onChange={setRecognitionLang}
+          />
           <p className="text-sm text-gray-500 mt-2">选择 OCR 识别的主要语言</p>
         </div>
 
         {/* 识别精度 */}
         <div className="pt-6 border-t border-gray-100">
           <label className="block font-medium text-gray-700 mb-2">识别精度</label>
-          <select className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="fast">快速（速度优先）</option>
-            <option value="balanced">平衡（默认）</option>
-            <option value="accurate">精确（质量优先）</option>
-          </select>
+          <CustomSelect
+            options={[
+              { value: 'fast', label: '快速（速度优先）' },
+              { value: 'balanced', label: '平衡（默认）' },
+              { value: 'accurate', label: '精确（质量优先）' },
+            ]}
+            value={accuracy}
+            onChange={setAccuracy}
+          />
           <p className="text-sm text-gray-500 mt-2">速度越快精度越低，根据需求选择</p>
         </div>
 
@@ -44,7 +61,7 @@ export function OcrSettingsPage() {
               <input
                 type="checkbox"
                 defaultChecked
-                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
               />
               <span className="text-sm text-gray-700">自动旋转校正</span>
             </label>
@@ -52,14 +69,14 @@ export function OcrSettingsPage() {
               <input
                 type="checkbox"
                 defaultChecked
-                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
               />
               <span className="text-sm text-gray-700">对比度增强</span>
             </label>
             <label className="flex items-center space-x-3 cursor-pointer">
               <input
                 type="checkbox"
-                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
               />
               <span className="text-sm text-gray-700">去除噪点</span>
             </label>
@@ -78,7 +95,7 @@ export function OcrSettingsPage() {
             <div className="font-medium text-gray-700">识别后自动复制</div>
             <div className="text-sm text-gray-500 mt-1">OCR 完成后自动复制结果到剪贴板</div>
           </div>
-          <button className="relative w-12 h-6 rounded-full bg-blue-600 transition-colors">
+          <button className="relative w-12 h-6 rounded-full bg-primary-600 transition-colors">
             <span className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow translate-x-6 transition-transform" />
           </button>
         </div>
@@ -89,7 +106,7 @@ export function OcrSettingsPage() {
             <div className="font-medium text-gray-700">保留文本格式</div>
             <div className="text-sm text-gray-500 mt-1">尝试保留原文的换行和段落结构</div>
           </div>
-          <button className="relative w-12 h-6 rounded-full bg-blue-600 transition-colors">
+          <button className="relative w-12 h-6 rounded-full bg-primary-600 transition-colors">
             <span className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow translate-x-6 transition-transform" />
           </button>
         </div>
@@ -100,7 +117,7 @@ export function OcrSettingsPage() {
             <div className="font-medium text-gray-700">中文自动去除空格</div>
             <div className="text-sm text-gray-500 mt-1">识别中文时自动去除多余空格</div>
           </div>
-          <button className="relative w-12 h-6 rounded-full bg-blue-600 transition-colors">
+          <button className="relative w-12 h-6 rounded-full bg-primary-600 transition-colors">
             <span className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow translate-x-6 transition-transform" />
           </button>
         </div>
@@ -124,25 +141,29 @@ export function OcrSettingsPage() {
         {/* 线程数 */}
         <div>
           <label className="block font-medium text-gray-700 mb-2">处理线程数</label>
-          <select className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="auto">自动（推荐）</option>
-            <option value="1">1 线程</option>
-            <option value="2">2 线程</option>
-            <option value="4">4 线程</option>
-            <option value="8">8 线程</option>
-          </select>
+          <CustomSelect
+            options={[
+              { value: 'auto', label: '自动（推荐）' },
+              { value: '1', label: '1 线程' },
+              { value: '2', label: '2 线程' },
+              { value: '4', label: '4 线程' },
+              { value: '8', label: '8 线程' },
+            ]}
+            value={threads}
+            onChange={setThreads}
+          />
           <p className="text-sm text-gray-500 mt-2">更多线程可能提升速度，但会占用更多 CPU</p>
         </div>
 
         {/* DPI */}
         <div className="pt-6 border-t border-gray-100">
           <label className="block font-medium text-gray-700 mb-2">图像 DPI 设置</label>
-          <input
-            type="number"
-            defaultValue={300}
+          <CustomNumberInput
+            value={dpi}
+            onChange={setDpi}
             min={72}
             max={600}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            step={1}
           />
           <p className="text-sm text-gray-500 mt-2">默认 300，较高的 DPI 可以提高小字识别率</p>
         </div>

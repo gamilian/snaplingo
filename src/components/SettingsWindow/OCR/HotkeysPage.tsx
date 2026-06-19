@@ -1,6 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { HotkeyRow } from '../Hotkey/HotkeyRow';
-import { HotkeyRecorderDialog } from '../Hotkey/HotkeyRecorderDialog';
 import { useSettingsStore } from '../../../stores/settingsStore';
 
 export function HotkeysPage() {
@@ -10,29 +9,91 @@ export function HotkeysPage() {
   const resetHotkeys = useSettingsStore((state) => state.resetHotkeys);
 
   const [recordingKey, setRecordingKey] = useState<string | null>(null);
-  const [recordingLabel, setRecordingLabel] = useState<string>('');
 
-  const hotkeyLabels: Record<string, string> = {
-    'screenshot-ocr': '截图 OCR',
-    'silent-screenshot-ocr': '静默截图 OCR',
-    'file-ocr': '访问选图 OCR',
-    'show-window': '显示 OCR 窗口',
+  // 默认快捷键配置
+  const defaultHotkeys: Record<string, string> = {
+    'screenshot-ocr': '⌘⇧O',
+    'silent-screenshot-ocr': '⌘⇧I',
+    'file-ocr': '⌘⇧F',
+    'show-window': '⌘⇧R',
   };
+
+  // 监听键盘事件进行录制
+  useEffect(() => {
+    if (!recordingKey) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (e.key === 'Escape') {
+        setRecordingKey(null);
+        return;
+      }
+
+      const modifiers = [];
+      if (e.shiftKey) modifiers.push('⇧');
+      if (e.altKey) modifiers.push('⌥');
+      if (e.metaKey) modifiers.push('⌘');
+      if (e.ctrlKey) modifiers.push('⌃');
+
+      // 使用 e.code 来获取物理按键，避免 Option 键导致的字符转换问题
+      let mainKey = '';
+
+      // 处理字母键 (KeyA-KeyZ)
+      if (e.code.startsWith('Key')) {
+        mainKey = e.code.replace('Key', '');
+      }
+      // 处理数字键 (Digit0-Digit9)
+      else if (e.code.startsWith('Digit')) {
+        mainKey = e.code.replace('Digit', '');
+      }
+      // 处理功能键 (F1-F12)
+      else if (e.code.startsWith('F') && /^F\d+$/.test(e.code)) {
+        mainKey = e.code;
+      }
+
+      if (mainKey) {
+        const hotkeyString = modifiers.join('') + mainKey;
+        setHotkey('ocr', recordingKey, hotkeyString);
+        setRecordingKey(null);
+      }
+    };
+
+    // 点击空白处取消录制
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('button') && !target.closest('.hotkey-display')) {
+        setRecordingKey(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    document.addEventListener('mousedown', handleClickOutside, true);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+      document.removeEventListener('mousedown', handleClickOutside, true);
+    };
+  }, [recordingKey, setHotkey]);
 
   const handleRecord = (key: string) => {
-    setRecordingKey(key);
-    setRecordingLabel(hotkeyLabels[key] || key);
-  };
-
-  const handleSaveHotkey = (newHotkey: string) => {
-    if (recordingKey) {
-      setHotkey('ocr', recordingKey, newHotkey);
+    // 如果已经在录制这个键，点击取消录制
+    if (recordingKey === key) {
+      setRecordingKey(null);
+    } else {
+      setRecordingKey(key);
     }
-    setRecordingKey(null);
   };
 
   const handleClear = (key: string) => {
     clearHotkey('ocr', key);
+  };
+
+  const handleReset = (key: string) => {
+    const defaultValue = defaultHotkeys[key];
+    if (defaultValue) {
+      setHotkey('ocr', key, defaultValue);
+    }
   };
 
   const handleResetAll = () => {
@@ -58,7 +119,7 @@ export function HotkeysPage() {
     <div className="max-w-4xl space-y-8">
       <div>
         <h2 className="text-3xl font-bold text-gray-900 mb-2">快捷键</h2>
-        <p className="text-gray-600">配置 OCR 相关的全局快捷键。点击快捷键框进行录制。</p>
+        <p className="text-gray-600">配置 OCR 相关的全局快捷键。点击快捷键框直接录制，按 ESC 取消。</p>
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">
@@ -68,6 +129,9 @@ export function HotkeysPage() {
           description="截图区域 → 自动 OCR → 显示识别结果"
           onRecord={() => handleRecord('screenshot-ocr')}
           onClear={() => handleClear('screenshot-ocr')}
+          onReset={() => handleReset('screenshot-ocr')}
+          isRecording={recordingKey === 'screenshot-ocr'}
+          defaultValue={defaultHotkeys['screenshot-ocr']}
         />
         <HotkeyRow
           label="静默截图 OCR"
@@ -75,6 +139,9 @@ export function HotkeysPage() {
           description="后台识别，自动将结果拷贝到剪切板"
           onRecord={() => handleRecord('silent-screenshot-ocr')}
           onClear={() => handleClear('silent-screenshot-ocr')}
+          onReset={() => handleReset('silent-screenshot-ocr')}
+          isRecording={recordingKey === 'silent-screenshot-ocr'}
+          defaultValue={defaultHotkeys['silent-screenshot-ocr']}
         />
         <HotkeyRow
           label="访问选图 OCR"
@@ -82,6 +149,9 @@ export function HotkeysPage() {
           description="通过文件选择器选择图片进行 OCR"
           onRecord={() => handleRecord('file-ocr')}
           onClear={() => handleClear('file-ocr')}
+          onReset={() => handleReset('file-ocr')}
+          isRecording={recordingKey === 'file-ocr'}
+          defaultValue={defaultHotkeys['file-ocr']}
         />
         <HotkeyRow
           label="显示 OCR 窗口"
@@ -89,6 +159,9 @@ export function HotkeysPage() {
           description="直接显示 OCR 窗口"
           onRecord={() => handleRecord('show-window')}
           onClear={() => handleClear('show-window')}
+          onReset={() => handleReset('show-window')}
+          isRecording={recordingKey === 'show-window'}
+          defaultValue={defaultHotkeys['show-window']}
         />
       </div>
 
@@ -101,19 +174,11 @@ export function HotkeysPage() {
         </button>
         <button
           onClick={handleDetectConflicts}
-          className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          className="px-4 py-2 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
         >
           检测冲突
         </button>
       </div>
-
-      <HotkeyRecorderDialog
-        isOpen={recordingKey !== null}
-        onClose={() => setRecordingKey(null)}
-        onSave={handleSaveHotkey}
-        currentHotkey={recordingKey ? hotkeys[recordingKey] : ''}
-        label={recordingLabel}
-      />
     </div>
   );
 }

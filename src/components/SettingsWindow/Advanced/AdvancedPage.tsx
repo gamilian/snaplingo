@@ -1,9 +1,48 @@
+import { useState } from 'react';
+import { CustomSelect } from '../../common/CustomSelect';
+import { CustomNumberInput } from '../../common/CustomNumberInput';
+import { invoke } from '@tauri-apps/api/core';
+
 export function AdvancedPage() {
+  const [proxyMode, setProxyMode] = useState('none');
+  const [retryCount, setRetryCount] = useState('3');
+  const [logLevel, setLogLevel] = useState('error');
+  const [timeout, setTimeout] = useState(10);
+  const [historyDays, setHistoryDays] = useState(30);
+
+  const handleTestScreenshot = async () => {
+    try {
+      console.log('Calling trigger_screenshot command...');
+      await invoke('trigger_screenshot');
+      console.log('Screenshot triggered successfully');
+    } catch (error) {
+      console.error('Failed to trigger screenshot:', error);
+      alert(`触发截图失败: ${error}`);
+    }
+  };
+
   return (
     <div className="max-w-4xl space-y-8">
       <div>
         <h2 className="text-3xl font-bold text-gray-900 mb-2">高级设置</h2>
         <p className="text-gray-600">面向高级用户的配置选项</p>
+      </div>
+
+      {/* 测试工具 */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+        <h3 className="text-lg font-semibold text-gray-800">测试工具</h3>
+
+        <div>
+          <button
+            onClick={handleTestScreenshot}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          >
+            测试截图功能（后端事件）
+          </button>
+          <p className="text-sm text-gray-500 mt-2">
+            通过后端触发截图事件，测试 Tauri 事件系统是否正常工作
+          </p>
+        </div>
       </div>
 
       {/* 网络设置 */}
@@ -13,32 +52,38 @@ export function AdvancedPage() {
         {/* 代理设置 */}
         <div>
           <label className="block font-medium text-gray-700 mb-2">代理设置</label>
-          <select className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3">
-            <option value="none">不使用代理</option>
-            <option value="system">使用系统代理</option>
-            <option value="custom">自定义代理</option>
-          </select>
+          <CustomSelect
+            options={[
+              { value: 'none', label: '不使用代理' },
+              { value: 'system', label: '使用系统代理' },
+              { value: 'custom', label: '自定义代理' },
+            ]}
+            value={proxyMode}
+            onChange={setProxyMode}
+          />
 
           {/* 自定义代理输入框（条件显示） */}
-          <div className="space-y-3 pl-4 border-l-2 border-gray-200">
-            <input
-              type="text"
-              placeholder="http://127.0.0.1:7890"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="text-sm text-gray-500">格式：http://host:port 或 socks5://host:port</p>
-          </div>
+          {proxyMode === 'custom' && (
+            <div className="mt-3 space-y-3 pl-4 border-l-2 border-gray-200">
+              <input
+                type="text"
+                placeholder="http://127.0.0.1:7890"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-150"
+              />
+              <p className="text-sm text-gray-500">格式：http://host:port 或 socks5://host:port</p>
+            </div>
+          )}
         </div>
 
         {/* 超时时间 */}
         <div className="pt-6 border-t border-gray-100">
           <label className="block font-medium text-gray-700 mb-2">请求超时时间（秒）</label>
-          <input
-            type="number"
-            defaultValue={10}
+          <CustomNumberInput
+            value={timeout}
+            onChange={setTimeout}
             min={5}
             max={60}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            step={1}
           />
           <p className="text-sm text-gray-500 mt-2">API 请求超时时间，默认 10 秒</p>
         </div>
@@ -46,13 +91,17 @@ export function AdvancedPage() {
         {/* 重试次数 */}
         <div className="pt-6 border-t border-gray-100">
           <label className="block font-medium text-gray-700 mb-2">失败重试次数</label>
-          <select className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="0">不重试</option>
-            <option value="1">1 次</option>
-            <option value="2">2 次</option>
-            <option value="3">3 次（推荐）</option>
-            <option value="5">5 次</option>
-          </select>
+          <CustomSelect
+            options={[
+              { value: '0', label: '不重试' },
+              { value: '1', label: '1 次' },
+              { value: '2', label: '2 次' },
+              { value: '3', label: '3 次（推荐）' },
+              { value: '5', label: '5 次' },
+            ]}
+            value={retryCount}
+            onChange={setRetryCount}
+          />
           <p className="text-sm text-gray-500 mt-2">网络请求失败时的重试次数</p>
         </div>
       </div>
@@ -64,12 +113,16 @@ export function AdvancedPage() {
         {/* 日志级别 */}
         <div>
           <label className="block font-medium text-gray-700 mb-2">日志级别</label>
-          <select className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="error">错误（Error）</option>
-            <option value="warn">警告（Warn）</option>
-            <option value="info">信息（Info）</option>
-            <option value="debug">调试（Debug）</option>
-          </select>
+          <CustomSelect
+            options={[
+              { value: 'error', label: '错误（Error）' },
+              { value: 'warn', label: '警告（Warn）' },
+              { value: 'info', label: '信息（Info）' },
+              { value: 'debug', label: '调试（Debug）' },
+            ]}
+            value={logLevel}
+            onChange={setLogLevel}
+          />
           <p className="text-sm text-gray-500 mt-2">日志级别越高记录的信息越详细</p>
         </div>
 
@@ -79,14 +132,14 @@ export function AdvancedPage() {
             <div className="font-medium text-gray-700">保存日志到文件</div>
             <div className="text-sm text-gray-500 mt-1">将日志输出到文件，便于排查问题</div>
           </div>
-          <button className="relative w-12 h-6 rounded-full bg-blue-600 transition-colors">
+          <button className="relative w-12 h-6 rounded-full bg-primary-600 transition-colors">
             <span className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow translate-x-6 transition-transform" />
           </button>
         </div>
 
         {/* 打开日志目录 */}
         <div className="pt-6 border-t border-gray-100">
-          <button className="px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+          <button className="px-4 py-2 text-sm text-primary-600 hover:bg-blue-50 rounded-lg transition-colors">
             打开日志目录
           </button>
         </div>
@@ -102,7 +155,7 @@ export function AdvancedPage() {
             <div className="font-medium text-gray-700">自动清理历史记录</div>
             <div className="text-sm text-gray-500 mt-1">自动删除超过一定天数的历史记录</div>
           </div>
-          <button className="relative w-12 h-6 rounded-full bg-blue-600 transition-colors">
+          <button className="relative w-12 h-6 rounded-full bg-primary-600 transition-colors">
             <span className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow translate-x-6 transition-transform" />
           </button>
         </div>
@@ -110,12 +163,12 @@ export function AdvancedPage() {
         {/* 保留天数 */}
         <div className="pt-6 border-t border-gray-100">
           <label className="block font-medium text-gray-700 mb-2">历史记录保留天数</label>
-          <input
-            type="number"
-            defaultValue={30}
+          <CustomNumberInput
+            value={historyDays}
+            onChange={setHistoryDays}
             min={1}
             max={365}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            step={1}
           />
           <p className="text-sm text-gray-500 mt-2">超过此天数的历史记录将被自动删除</p>
         </div>

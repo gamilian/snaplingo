@@ -53,7 +53,7 @@ echo ""
 
 # Step 4: Build Tauri release
 echo -e "${GREEN}🦀 构建 Tauri Release...${NC}"
-npm run tauri build
+npm run tauri:build
 echo ""
 
 # Step 5: Verify build artifacts
