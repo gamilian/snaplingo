@@ -8,12 +8,15 @@ interface AppState {
   translations: TranslationResult[];
   isTranslating: boolean;
   resultWindowVisible: boolean;
+  pendingAutoTranslate: boolean;
 
   setSourceText: (text: string) => void;
   setSourceLang: (lang: string) => void;
   setTargetLang: (lang: string) => void;
   setTranslations: (results: TranslationResult[]) => void;
   setTranslating: (value: boolean) => void;
+  requestAutoTranslate: () => void;
+  consumeAutoTranslateRequest: () => void;
   showResultWindow: () => void;
   hideResultWindow: () => void;
   reset: () => void;
@@ -26,12 +29,15 @@ export const useAppStore = create<AppState>((set) => ({
   translations: [],
   isTranslating: false,
   resultWindowVisible: false,
+  pendingAutoTranslate: false,
 
   setSourceText: (text) => set({ sourceText: text }),
   setSourceLang: (lang) => set({ sourceLang: lang }),
   setTargetLang: (lang) => set({ targetLang: lang }),
   setTranslations: (results) => set({ translations: results }),
   setTranslating: (value) => set({ isTranslating: value }),
+  requestAutoTranslate: () => set({ pendingAutoTranslate: true }),
+  consumeAutoTranslateRequest: () => set({ pendingAutoTranslate: false }),
   showResultWindow: () => set({ resultWindowVisible: true }),
   hideResultWindow: () => set({ resultWindowVisible: false }),
   reset: () => set({
@@ -40,5 +46,6 @@ export const useAppStore = create<AppState>((set) => ({
     targetLang: 'zh-CN',
     translations: [],
     isTranslating: false,
+    pendingAutoTranslate: false,
   }),
 }));

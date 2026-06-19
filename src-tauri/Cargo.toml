@@ -34,6 +34,7 @@ async-trait = "0.1"
 
 # Image processing
 image = "0.25"
+ab_glyph = "0.2"
 
 # Clipboard and keyboard
 arboard = "3.2"
@@ -68,6 +69,9 @@ parking_lot = { version = "0.12.5", features = ["send_guard"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-graphics = "0.23"
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSCursor", "NSEvent", "NSImage"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSData", "NSGeometry", "objc2-core-foundation"] }
+xcap = "0.9"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.51", features = ["Win32_UI_Input_KeyboardAndMouse"] }

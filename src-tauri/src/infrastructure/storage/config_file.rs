@@ -2,8 +2,11 @@ use crate::error::{AppError, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
+
+static TEMP_PATH_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// ConfigFile provides a simple JSON-based key-value store for application configuration.
 /// It uses a Mutex for thread-safe access.
@@ -49,13 +52,7 @@ impl ConfigFile {
             fs::create_dir_all(parent)?;
         }
 
-        // Generate unique temp filename (handle concurrent tests)
-        use std::time::{SystemTime, UNIX_EPOCH};
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let temp_path = parent.join(format!(".config.tmp.{}.{}", std::process::id(), nanos));
+        let temp_path = unique_temp_write_path(parent);
 
         // Write to temp file
         fs::write(&temp_path, &content)?;
@@ -89,12 +86,29 @@ impl ConfigFile {
     /// The file is created in the system's temp directory and will be cleaned up automatically.
     #[cfg(test)]
     pub fn new_temp() -> Self {
-        use std::time::{SystemTime, UNIX_EPOCH};
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let temp_path = std::env::temp_dir().join(format!("snaplingo_test_{}.json", nanos));
+        let temp_path = unique_temp_write_path(&std::env::temp_dir())
+            .with_extension("json");
         Self::new(temp_path)
     }
+}
+
+pub(super) fn unique_temp_write_path(parent: &Path) -> PathBuf {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let counter = TEMP_PATH_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let thread_id = format!("{:?}", std::thread::current().id())
+        .replace("ThreadId(", "")
+        .replace(')', "");
+
+    parent.join(format!(
+        ".config.tmp.{}.{}.{}.{}",
+        std::process::id(),
+        thread_id,
+        nanos,
+        counter
+    ))
 }

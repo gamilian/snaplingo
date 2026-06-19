@@ -2,4 +2,7 @@ pub mod providers;
 pub mod services;
 
 pub use providers::Provider;
-pub use services::{CaptureService, HotkeyService, HistoryService, WorkflowService, WorkflowOutcome};
+pub use services::{
+    CaptureOutputService, CaptureService, CaptureSessionService, HistoryService, HotkeyService,
+    ImageCompositionService, PinnedImageService, WorkflowOutcome, WorkflowService,
+};

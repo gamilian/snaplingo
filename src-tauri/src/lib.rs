@@ -14,7 +14,7 @@ pub use application::*;
 use std::sync::Arc;
 use parking_lot::Mutex as ParkingLotMutex;
 use std::path::PathBuf;
-use tauri::{Manager, Emitter};
+use tauri::Manager;
 use serde::{Deserialize, Serialize};
 
 // Phase 1, 2 & 3 imports
@@ -35,7 +35,10 @@ use application::providers::ocr::{
     OcrCoordinator,
     impls::{TesseractProvider, BaiduOcrProvider},
 };
-use application::{CaptureService, HistoryService, WorkflowService};
+use application::{
+    CaptureOutputService, CaptureService, CaptureSessionService, HistoryService,
+    ImageCompositionService, PinnedImageService, WorkflowService,
+};
 use infrastructure::system::screenshot::get_screenshot_backend;
 use infrastructure::system::paths::get_history_db_path;
 use domain::HotkeyAction;
@@ -115,6 +118,10 @@ pub struct AppState {
 
     // Phase 4: Capture
     pub capture_service: Arc<CaptureService>,
+    pub capture_session_service: Arc<CaptureSessionService>,
+    pub image_composition_service: Arc<ImageCompositionService>,
+    pub capture_output_service: Arc<CaptureOutputService>,
+    pub pinned_image_service: Arc<PinnedImageService>,
     pub screenshot_state: Arc<ParkingLotMutex<ScreenshotState>>,
 
     // Phase 5: History
@@ -274,7 +281,11 @@ impl AppState {
 
         // Phase 4: Capture
         let screenshot_backend = get_screenshot_backend();
-        let capture_service = Arc::new(CaptureService::new(screenshot_backend));
+        let capture_service = Arc::new(CaptureService::new(screenshot_backend.clone()));
+        let capture_session_service = Arc::new(CaptureSessionService::new(screenshot_backend));
+        let image_composition_service = Arc::new(ImageCompositionService::new());
+        let capture_output_service = Arc::new(CaptureOutputService::new());
+        let pinned_image_service = Arc::new(PinnedImageService::new());
         let screenshot_state = Arc::new(ParkingLotMutex::new(ScreenshotState::default()));
 
         // Phase 6: Workflows
@@ -291,6 +302,10 @@ impl AppState {
             translation_coordinator,
             ocr_coordinator,
             capture_service,
+            capture_session_service,
+            image_composition_service,
+            capture_output_service,
+            pinned_image_service,
             screenshot_state,
             history_service,
             event_bus,
@@ -317,23 +332,15 @@ impl AppState {
 /// Register screenshot shortcut
 fn register_screenshot_shortcut(app: &tauri::AppHandle) -> Result<()> {
     let app_clone = app.clone();
-    let state = app.state::<AppState>();
-    let capture_service = state.capture_service.clone();
-    let screenshot_state = state.screenshot_state.clone();
 
     infrastructure::system::register_shortcut(app, SCREENSHOT_SHORTCUT, move || {
         log::info!("Screenshot shortcut triggered!");
 
         let app = app_clone.clone();
-        let capture_service = capture_service.clone();
-        let screenshot_state = screenshot_state.clone();
-
-        tauri::async_runtime::spawn(async move {
-            if let Err(e) = commands::start_screenshot_overlay(app.clone(), capture_service, screenshot_state).await {
-                log::error!("Failed to start screenshot overlay: {}", e);
-                commands::emit_screenshot_error(app, e);
-            }
-        });
+        tauri::async_runtime::spawn(commands::open_capture_window_from_shortcut(
+            app,
+            "screenshot",
+        ));
     })?;
 
     Ok(())
@@ -342,23 +349,62 @@ fn register_screenshot_shortcut(app: &tauri::AppHandle) -> Result<()> {
 /// Register screenshot OCR shortcut
 fn register_screenshot_ocr_shortcut(app: &tauri::AppHandle) -> Result<()> {
     let app_clone = app.clone();
-    let state = app.state::<AppState>();
-    let capture_service = state.capture_service.clone();
-    let screenshot_state = state.screenshot_state.clone();
 
     infrastructure::system::register_shortcut(app, SCREENSHOT_OCR_SHORTCUT, move || {
         log::info!("Screenshot OCR shortcut triggered!");
 
         let app = app_clone.clone();
-        let capture_service = capture_service.clone();
-        let screenshot_state = screenshot_state.clone();
+        tauri::async_runtime::spawn(commands::open_capture_window_from_shortcut(
+            app,
+            "screenshot-ocr",
+        ));
+    })?;
 
-        tauri::async_runtime::spawn(async move {
-            if let Err(e) = commands::start_screenshot_overlay(app.clone(), capture_service, screenshot_state).await {
-                log::error!("Failed to start screenshot OCR overlay: {}", e);
-                commands::emit_screenshot_error(app, e);
-            }
-        });
+    Ok(())
+}
+
+/// Register pinned image shortcut
+fn register_pin_shortcut(app: &tauri::AppHandle) -> Result<()> {
+    let app_clone = app.clone();
+
+    infrastructure::system::register_shortcut(app, "F3", move || {
+        log::info!("Pinned image shortcut triggered!");
+
+        let state = app_clone.state::<AppState>();
+        if let Err(err) = commands::pin_clipboard_image_for_state(&app_clone, state.inner()) {
+            log::error!("Failed to pin clipboard image: {}", err);
+        }
+    })?;
+
+    Ok(())
+}
+
+/// Register pinned image toggle shortcut
+fn register_pin_toggle_shortcut(app: &tauri::AppHandle) -> Result<()> {
+    let app_clone = app.clone();
+
+    infrastructure::system::register_shortcut(app, "Shift+F3", move || {
+        log::info!("Pinned image toggle shortcut triggered!");
+
+        if let Err(err) = commands::toggle_pinned_images_visibility(app_clone.clone()) {
+            log::error!("Failed to toggle pinned images: {}", err);
+        }
+    })?;
+
+    Ok(())
+}
+
+/// Register pinned image group switch shortcut
+fn register_pin_group_switch_shortcut(app: &tauri::AppHandle) -> Result<()> {
+    let app_clone = app.clone();
+
+    infrastructure::system::register_shortcut(app, "Cmd+F3", move || {
+        log::info!("Pinned image group switch shortcut triggered!");
+
+        let state = app_clone.state::<AppState>();
+        if let Err(err) = commands::switch_pinned_image_group_for_state(&app_clone, state.inner()) {
+            log::error!("Failed to switch pinned image group: {}", err);
+        }
     })?;
 
     Ok(())
@@ -408,6 +454,24 @@ pub fn run() {
           } else {
               log::info!("Screenshot OCR shortcut registered: {}", SCREENSHOT_OCR_SHORTCUT);
           }
+
+          if let Err(e) = register_pin_shortcut(&app_handle) {
+              log::error!("Failed to register pinned image shortcut: {}", e);
+          } else {
+              log::info!("Pinned image shortcut registered: F3");
+          }
+
+          if let Err(e) = register_pin_toggle_shortcut(&app_handle) {
+              log::error!("Failed to register pinned image toggle shortcut: {}", e);
+          } else {
+              log::info!("Pinned image toggle shortcut registered: Shift+F3");
+          }
+
+          if let Err(e) = register_pin_group_switch_shortcut(&app_handle) {
+              log::error!("Failed to register pinned image group switch shortcut: {}", e);
+          } else {
+              log::info!("Pinned image group switch shortcut registered: Cmd+F3");
+          }
       });
 
       // TODO: Create system tray
@@ -416,7 +480,9 @@ pub fn run() {
     })
     .invoke_handler(tauri::generate_handler![
       commands::open_result_window,
+      commands::open_translation_result_window,
       commands::trigger_screenshot,
+      commands::open_capture_window,
       commands::create_screenshot_window,
       commands::create_screenshot_window_simple,
       commands::screenshot_overlay_ready,
@@ -439,6 +505,27 @@ pub fn run() {
       commands::capture_full_screen,
       commands::capture_region,
       commands::save_screenshot,
+      commands::create_capture_session,
+      commands::get_capture_session,
+      commands::cancel_capture_session,
+      commands::restore_capture_snapshot_windows_for_session,
+      commands::render_capture_output,
+      commands::default_capture_save_path,
+      commands::quick_capture_save_path,
+      commands::output_capture,
+      commands::pin_clipboard_image,
+      commands::get_pinned_image,
+      commands::copy_pinned_image,
+      commands::replace_pinned_image_from_clipboard,
+      commands::save_pinned_image,
+      commands::close_pinned_image,
+      commands::remove_pinned_image,
+      commands::toggle_pinned_images_visibility,
+      commands::switch_pinned_image_group,
+      commands::move_pinned_image_to_next_group,
+      commands::hide_pinned_image_group,
+      commands::destroy_pinned_image_group,
+      commands::run_capture_ocr,
       commands::get_translation_history,
       commands::get_ocr_history,
       commands::search_history,
