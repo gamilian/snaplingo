@@ -11,7 +11,7 @@ Commands Layer (接口层)
     ↓
 Application Layer (应用层)
     ├─ Providers (垂直切片：OCR/Translation/TTS)
-    └─ Services (其他业务服务)
+    └─ Application Modules (Capture Session、Pinned Image、History、Workflow)
     ↓
 Domain Layer (领域层)
     ↓
@@ -183,7 +183,7 @@ providers/ocr/
 
 ---
 
-#### 2.2 Services（应用服务）
+#### 2.2 Application Modules（应用模块）
 
 **示例：**
 - `capture_session_runtime.rs`：统一编排截图会话渲染、输出、OCR
@@ -562,7 +562,7 @@ Commands → Application → Domain
 
 - Frontend runtime 已通过 `src/tauri/*` 适配器集中调用 Tauri commands。
 - Backend runtime 已通过 `src-tauri/src/commands/*` 保持 Tauri command seam。
-- Provider Registry/Service 已合并为 `TranslationCoordinator` 和 `OcrCoordinator`。
+- Provider 当前由 `TranslationCoordinator` 和 `OcrCoordinator` 统一管理激活、持久化、执行和运行时重配置。
 - Provider Configuration Module 负责凭证校验、自定义 Translation Provider 定义和运行时重配置配合。
 - Capture Session Runtime 已集中截图会话的 render/output/OCR 编排。
 - Application Composition 已从 `lib.rs` 抽到 `src-tauri/src/composition.rs`。
@@ -573,6 +573,8 @@ Commands → Application → Domain
 
 - **CONTEXT.md**：领域语言定义
 - **ADR 0002**：主窗口架构（功能域独立）
-- **ADR 0003**：Provider 架构设计
+- **ADR 0003**：Provider 架构设计（当前 Coordinator 结构）
+- **ADR 0004**：Coordinator Consolidation
+- **ADR 0005**：Runtime Provider Reconfiguration
 - **Clean Architecture**：依赖倒置原则
 - **Strategy Pattern**：Provider 是策略模式的实现

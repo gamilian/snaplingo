@@ -25,11 +25,14 @@ snaplingo/
 ├── src/                    # React frontend
 │   ├── components/         # UI components
 │   ├── hooks/             # React hooks
-│   └── utils/             # Frontend utilities
+│   ├── stores/            # Zustand stores
+│   └── tauri/             # Frontend Tauri Adapter seam
 ├── src-tauri/             # Rust backend
-│   └── src/               # Rust source code
+│   └── src/               # Tauri commands, application, domain, infrastructure
 ├── docs/                  # Documentation
+│   ├── architecture/      # Runtime maps
 │   └── adr/              # Architecture Decision Records
+├── ARCHITECTURE.md        # Current architecture overview
 ├── CONTEXT.md            # Domain language and design decisions
 └── SnapLingo-PRD.md      # Product Requirements Document
 
@@ -62,6 +65,8 @@ npm run tauri build
 ## Documentation
 
 - **[CONTEXT.md](./CONTEXT.md)** - Core concepts and domain language
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Current architecture overview
+- **[docs/architecture/runtime-map.md](./docs/architecture/runtime-map.md)** - Runtime map
 - **[SnapLingo-PRD.md](./SnapLingo-PRD.md)** - Product requirements and specifications
 - **[docs/adr/](./docs/adr/)** - Architecture decisions
 
