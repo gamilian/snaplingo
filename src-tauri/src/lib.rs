@@ -4,6 +4,7 @@ mod domain;
 mod infrastructure;
 mod application;
 mod commands;
+mod composition;
 
 // Public exports for new infrastructure layer
 pub use error::{AppError, Result};
@@ -19,22 +20,9 @@ use tauri::Manager;
 // Phase 1, 2 & 3 imports
 use infrastructure::storage::{ConfigFile, Keychain, HistoryDatabase};
 use infrastructure::http::{HttpClient, ReqwestHttpClient};
-use infrastructure::events::{EventBus, EventSubscriber};
-use infrastructure::llm::{
-    LLMClient, LLMProtocol, OpenAILLMClient, AnthropicLLMClient, GeminiLLMClient,
-};
-use application::providers::translation::{
-    TranslationCoordinator,
-    GoogleTranslateProvider as GoogleTranslateProviderV2,
-    DeepLProvider,
-    BaiduTranslateProvider,
-    LLMTranslationProvider,
-};
-use application::providers::CustomTranslationProviderDef;
-use application::providers::ocr::{
-    OcrCoordinator,
-    impls::{TesseractProvider, BaiduOcrProvider},
-};
+use infrastructure::events::EventBus;
+use application::providers::translation::TranslationCoordinator;
+use application::providers::ocr::OcrCoordinator;
 use application::{
     CaptureOutputService, CaptureService, CaptureSessionRuntime, CaptureSessionService,
     HistoryService, ImageCompositionService, PinnedImageService, WorkflowService,
@@ -104,134 +92,17 @@ impl AppState {
         // Subscribe history service to events (will be done in setup hook)
         // Note: Cannot block_on here as Tokio runtime may not be ready yet
 
-        // Phase 2: Translation
-        let translation_coordinator = TranslationCoordinator::new(config_file.clone());
-
-        // Register Google Translate (no credentials needed)
-        let google_provider = GoogleTranslateProviderV2::new(http_client.clone());
-        if let Err(e) = translation_coordinator.register(google_provider) {
-            log::warn!("Failed to register Google Translate provider: {}", e);
-        }
-
-        // Register DeepL (load credentials from keychain using provider ID)
-        let mut deepl_provider = DeepLProvider::new(http_client.clone());
-        if let Ok(api_key) = keychain.load_provider_credential("deepl") {
-            deepl_provider.set_api_key(api_key);
-        }
-        if let Err(e) = translation_coordinator.register(deepl_provider) {
-            log::warn!("Failed to register DeepL provider: {}", e);
-        }
-
-        // Register Baidu (load credentials from keychain)
-        // Try new multi-field format first, fallback to legacy keys for backward compatibility
-        let mut baidu_provider = BaiduTranslateProvider::new(http_client.clone());
-
-        // Try new format: provider:baidu-translate:credential:{app_id,secret_key}
-        let credentials_result = keychain.load_provider_credentials(
-            "baidu-translate",
-            &["app_id".to_string(), "secret_key".to_string()],
+        let translation_coordinator = composition::build_translation_coordinator(
+            config_file.clone(),
+            keychain.clone(),
+            http_client.clone(),
+            event_bus.clone(),
         );
-
-        if let Ok(creds) = credentials_result {
-            let _ = baidu_provider.configure_from_map(&creds);
-        } else {
-            // Fallback to legacy keys: provider:baidu_app_id:api_key, provider:baidu_secret_key:api_key
-            if let Ok(app_id) = keychain.load_provider_credential("baidu_app_id") {
-                if let Ok(secret_key) = keychain.load_provider_credential("baidu_secret_key") {
-                    baidu_provider.configure(app_id, secret_key);
-                }
-            }
-        }
-
-        translation_coordinator.register(baidu_provider)
-            .map_err(|e| log::warn!("Failed to register Baidu Translate provider: {}", e))
-            .ok();
-
-        // Load and register custom LLM providers
-        if let Ok(custom_defs) = config_file.load::<Vec<CustomTranslationProviderDef>>("custom_translation_providers") {
-            for def in custom_defs {
-                // Load API key from keychain
-                if let Ok(api_key) = keychain.load_provider_credential(&def.id) {
-                    let llm_client: Arc<dyn LLMClient> = match def.protocol {
-                        LLMProtocol::OpenAI => Arc::new(OpenAILLMClient::new(
-                            http_client.clone(),
-                            def.endpoint.clone(),
-                            def.model.clone(),
-                            api_key,
-                        )),
-                        LLMProtocol::Anthropic => Arc::new(AnthropicLLMClient::new(
-                            http_client.clone(),
-                            def.endpoint.clone(),
-                            def.model.clone(),
-                            api_key,
-                        )),
-                        LLMProtocol::Gemini => Arc::new(GeminiLLMClient::new(
-                            http_client.clone(),
-                            def.endpoint.clone(),
-                            def.model.clone(),
-                            api_key,
-                        )),
-                    };
-
-                    let provider = LLMTranslationProvider::new(
-                        llm_client,
-                        def.id.clone(),
-                        def.name.clone(),
-                        def.reasoning_level,
-                    );
-                    if let Err(e) = translation_coordinator.register(provider) {
-                        log::warn!("Failed to register custom LLM provider '{}': {}", def.name, e);
-                    }
-                }
-            }
-        }
-
-        // Restore active providers from config
-        if let Err(e) = translation_coordinator.restore_from_config() {
-            log::warn!("Failed to restore active providers from config: {}", e);
-        }
-
-        // Attach event bus to coordinator
-        let translation_coordinator = Arc::new(
-            translation_coordinator.with_event_bus(event_bus.clone())
-        );
-
-        // Phase 3: OCR
-        let ocr_coordinator = OcrCoordinator::new(config_file.clone());
-
-        // Register Tesseract (no credentials needed)
-        let tesseract_provider = TesseractProvider::new();
-        ocr_coordinator.register(tesseract_provider).ok();
-
-        // Register Baidu OCR (load credentials from keychain)
-        // Try new multi-field format first, fallback to legacy keys for backward compatibility
-        let mut baidu_ocr_provider = BaiduOcrProvider::new(http_client.clone());
-
-        // Try new format: provider:baidu-ocr:credential:{api_key,secret_key}
-        let credentials_result = keychain.load_provider_credentials(
-            "baidu-ocr",
-            &["api_key".to_string(), "secret_key".to_string()],
-        );
-
-        if let Ok(creds) = credentials_result {
-            let _ = baidu_ocr_provider.reconfigure_credentials(&creds);
-        } else {
-            // Fallback to legacy keys: provider:baidu_ocr_api_key:api_key, provider:baidu_ocr_secret_key:api_key
-            if let Ok(api_key) = keychain.load_provider_credential("baidu_ocr_api_key") {
-                if let Ok(secret_key) = keychain.load_provider_credential("baidu_ocr_secret_key") {
-                    baidu_ocr_provider.configure(api_key, secret_key);
-                }
-            }
-        }
-
-        ocr_coordinator.register(baidu_ocr_provider).ok();
-
-        // Restore active OCR provider from config
-        ocr_coordinator.restore_from_config().ok();
-
-        // Attach event bus to coordinator
-        let ocr_coordinator = Arc::new(
-            ocr_coordinator.with_event_bus(event_bus.clone())
+        let ocr_coordinator = composition::build_ocr_coordinator(
+            config_file.clone(),
+            keychain.clone(),
+            http_client.clone(),
+            event_bus.clone(),
         );
 
         // Phase 4: Capture
@@ -389,14 +260,8 @@ pub fn run() {
       .level(log::LevelFilter::Info)
       .build())
     .setup(|app| {
-      let app_state = AppState::new(config_path, app.handle().clone());
-
-      // Subscribe history service to event bus (must be done after Tokio runtime is ready)
-      let history_service_subscriber = app_state.history_service.clone() as Arc<dyn EventSubscriber>;
-      let event_bus = app_state.event_bus.clone();
-      tauri::async_runtime::spawn(async move {
-        event_bus.subscribe(history_service_subscriber).await;
-      });
+      let app_state = composition::build_app_state(config_path, app.handle().clone());
+      composition::subscribe_history_service(&app_state);
 
       app.manage(app_state);
 

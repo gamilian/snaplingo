@@ -995,7 +995,7 @@ git commit -m "refactor(providers): centralize provider configuration lifecycle"
 - Create: `src-tauri/src/composition.rs`
 - Modify: `src-tauri/src/lib.rs`
 
-- [ ] **Step 1: Create composition module**
+- [x] **Step 1: Create composition module**
 
 Create `src-tauri/src/composition.rs` with functions that build runtime dependencies but do not run Tauri:
 
@@ -1013,7 +1013,7 @@ pub fn build_app_state(config_path: PathBuf, app: AppHandle) -> AppState {
 
 This starts as a pass-through. Later steps move construction internals out of `AppState::new`.
 
-- [ ] **Step 2: Move Provider registration helpers**
+- [x] **Step 2: Move Provider registration helpers**
 
 Move Provider registration blocks from `AppState::new` into private functions in `composition.rs`:
 
@@ -1024,7 +1024,7 @@ Move Provider registration blocks from `AppState::new` into private functions in
 
 Keep `AppState` struct definition in `lib.rs` for now.
 
-- [ ] **Step 3: Update `run()` setup hook**
+- [x] **Step 3: Update `run()` setup hook**
 
 Modify `src-tauri/src/lib.rs` setup:
 
@@ -1032,7 +1032,7 @@ Modify `src-tauri/src/lib.rs` setup:
 let app_state = composition::build_app_state(config_path, app.handle().clone());
 ```
 
-- [ ] **Step 4: Run Rust tests**
+- [x] **Step 4: Run Rust tests**
 
 Run:
 
@@ -1042,7 +1042,9 @@ cargo test --manifest-path src-tauri/Cargo.toml --lib
 
 Expected: PASS.
 
-- [ ] **Step 5: Inspect `lib.rs` diff**
+Current status: PASS. `cargo test --manifest-path src-tauri/Cargo.toml --lib` passed 194 tests with the existing warning class.
+
+- [x] **Step 5: Inspect `lib.rs` diff**
 
 Run:
 
@@ -1053,7 +1055,9 @@ git diff -- src-tauri/src/lib.rs src-tauri/src/composition.rs
 
 Expected: `lib.rs` loses provider construction detail and keeps Tauri builder, command registration, and AppState shape.
 
-- [ ] **Step 6: Commit**
+Current status: PASS. `lib.rs` is 365 lines, `composition.rs` is 171 lines, and `git diff --check` passed.
+
+- [x] **Step 6: Commit**
 
 ```bash
 git add src-tauri/src/lib.rs src-tauri/src/composition.rs
