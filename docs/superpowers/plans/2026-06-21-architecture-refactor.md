@@ -848,7 +848,7 @@ git commit -m "refactor(capture): add capture session runtime module"
 - Modify: `src-tauri/src/application/providers/ocr/coordinator_test.rs`
 - Modify: `src-tauri/src/lib.rs`
 
-- [ ] **Step 1: Add failing OCR reconfiguration test**
+- [x] **Step 1: Add failing OCR reconfiguration test**
 
 In `src-tauri/src/application/providers/ocr/coordinator_test.rs`, extend `MockOcrProvider` so it supports `reconfigure_credentials` and records received credentials:
 
@@ -887,7 +887,9 @@ fn test_reconfigure_provider_updates_runtime_provider() {
 
 Expected failure: current `OcrCoordinator::reconfigure_provider` returns the fixed restart-only error.
 
-- [ ] **Step 2: Run failing test**
+Current status: added `test_reconfigure_provider_updates_runtime_provider` with a mock OCR provider that changes recognized text after credential reconfiguration.
+
+- [x] **Step 2: Run failing test**
 
 Run:
 
@@ -897,7 +899,9 @@ cargo test --manifest-path src-tauri/Cargo.toml test_reconfigure_provider_update
 
 Expected: FAIL with restart-only error.
 
-- [ ] **Step 3: Update OcrCoordinator provider storage**
+Current status: failed as expected with `Runtime reconfiguration requires restart for OCR providers...`.
+
+- [x] **Step 3: Update OcrCoordinator provider storage**
 
 Modify `src-tauri/src/application/providers/ocr/coordinator.rs` so OCR mirrors Translation's mutable provider seam:
 
@@ -908,7 +912,9 @@ Modify `src-tauri/src/application/providers/ocr/coordinator.rs` so OCR mirrors T
 
 Keep the public Coordinator Interface stable unless a test proves a change is needed.
 
-- [ ] **Step 4: Add Provider configuration module shell**
+Current status: OCR providers now use `Arc<RwLock<dyn OcrProvider>>`; `reconfigure_provider` takes a write lock and calls `Provider::reconfigure_credentials`.
+
+- [x] **Step 4: Add Provider configuration module shell**
 
 Create `src-tauri/src/application/providers/configuration.rs` and move these definitions out of `src-tauri/src/lib.rs`:
 
@@ -919,7 +925,9 @@ Export them through `src-tauri/src/application/providers/mod.rs`.
 
 Update imports in `lib.rs` and `provider_commands.rs`.
 
-- [ ] **Step 5: Move credential validation helpers**
+Current status: added `src-tauri/src/application/providers/configuration.rs` and moved `CustomTranslationProviderDef` plus `create_llm_translation_provider` out of `lib.rs`.
+
+- [x] **Step 5: Move credential validation helpers**
 
 Move repeated credential validation from `provider_commands.rs` and `ocr_commands.rs` into `configuration.rs`:
 
@@ -943,7 +951,9 @@ pub fn validate_required_credentials(
 }
 ```
 
-- [ ] **Step 6: Update commands to use Provider configuration module**
+Current status: added `validate_required_credentials` with a focused unit test for blank credential rejection.
+
+- [x] **Step 6: Update commands to use Provider configuration module**
 
 Modify:
 
@@ -954,7 +964,9 @@ Modify:
 
 Expected: commands stay as Tauri adapters; validation and provider construction knowledge moves to the Provider configuration Module.
 
-- [ ] **Step 7: Run Provider tests**
+Current status: translation and OCR configure commands now call the shared Provider configuration validator before saving credentials.
+
+- [x] **Step 7: Run Provider tests**
 
 Run:
 
@@ -965,6 +977,8 @@ cargo test --manifest-path src-tauri/Cargo.toml translation::coordinator --lib
 ```
 
 Expected: PASS.
+
+Current status: PASS. `cargo test --manifest-path src-tauri/Cargo.toml provider --lib` passed 58 tests. `cargo test --manifest-path src-tauri/Cargo.toml ocr::coordinator --lib` passed 10 tests. `cargo test --manifest-path src-tauri/Cargo.toml translation::coordinator --lib` passed 14 tests. Full `cargo test --manifest-path src-tauri/Cargo.toml --lib` passed 194 tests with existing warnings. `rg "Runtime reconfiguration requires restart" src-tauri/src -n` found no matches.
 
 - [ ] **Step 8: Commit**
 

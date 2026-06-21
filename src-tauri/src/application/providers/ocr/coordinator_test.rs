@@ -66,6 +66,17 @@ mod tests {
         fn requires_api_key(&self) -> bool {
             false
         }
+
+        fn reconfigure_credentials(
+            &mut self,
+            credentials: &std::collections::HashMap<String, String>,
+        ) -> Result<()> {
+            self.text_to_return = credentials
+                .get("text_to_return")
+                .cloned()
+                .unwrap_or_else(|| self.text_to_return.clone());
+            Ok(())
+        }
     }
 
     #[async_trait]
@@ -101,7 +112,7 @@ mod tests {
 
         let all = coordinator.list_all();
         assert_eq!(all.len(), 1);
-        assert_eq!(all[0].id(), "tesseract");
+        assert_eq!(all[0].read().id(), "tesseract");
     }
 
     #[test]
@@ -116,7 +127,7 @@ mod tests {
 
         let active = coordinator.get_active();
         assert!(active.is_some());
-        assert_eq!(active.unwrap().id(), "tesseract");
+        assert_eq!(active.unwrap().read().id(), "tesseract");
     }
 
     #[test]
@@ -132,11 +143,11 @@ mod tests {
 
         // Activate first provider
         coordinator.activate("tesseract").unwrap();
-        assert_eq!(coordinator.get_active().unwrap().id(), "tesseract");
+        assert_eq!(coordinator.get_active().unwrap().read().id(), "tesseract");
 
         // Switch to second provider (should replace the first)
         coordinator.activate("baidu").unwrap();
-        assert_eq!(coordinator.get_active().unwrap().id(), "baidu");
+        assert_eq!(coordinator.get_active().unwrap().read().id(), "baidu");
     }
 
     #[test]
@@ -203,6 +214,31 @@ mod tests {
 
         assert_eq!(result.text, "Hello World");
         assert_eq!(result.confidence, Some(0.95));
+    }
+
+    #[tokio::test]
+    async fn test_reconfigure_provider_updates_runtime_provider() {
+        let config = Arc::new(ConfigFile::new_temp());
+        let coordinator = OcrCoordinator::new(config);
+        coordinator
+            .register(MockOcrProvider::with_text(
+                "mock",
+                "Mock OCR",
+                "before",
+            ))
+            .unwrap();
+        coordinator.activate("mock").unwrap();
+
+        let mut credentials = std::collections::HashMap::new();
+        credentials.insert("text_to_return".to_string(), "after".to_string());
+
+        coordinator
+            .reconfigure_provider("mock", &credentials)
+            .unwrap();
+
+        let result = coordinator.recognize(&sample_request()).await.unwrap();
+
+        assert_eq!(result.text, "after");
     }
 
     #[tokio::test]

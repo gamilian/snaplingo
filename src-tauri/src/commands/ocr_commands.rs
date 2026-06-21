@@ -1,3 +1,4 @@
+use crate::application::providers::validate_required_credentials;
 use crate::domain::ocr::{OcrRequest, OcrResult};
 use serde::{Deserialize, Serialize};
 use tauri::State;
@@ -40,20 +41,20 @@ pub async fn list_ocr_providers(
 ) -> Result<Vec<OcrProviderInfo>, String> {
     let all_providers = state.ocr_coordinator.list_all();
     let active = state.ocr_coordinator.get_active();
+    let active_id = active.as_ref().map(|active_p| active_p.read().id().to_string());
 
     let info: Vec<_> = all_providers
         .iter()
         .map(|p| {
-            let is_active = active
-                .as_ref()
-                .map_or(false, |active_p| active_p.id() == p.id());
+            let provider = p.read();
+            let id = provider.id().to_string();
 
             OcrProviderInfo {
-                id: p.id().to_string(),
-                name: p.name().to_string(),
-                is_configured: p.is_configured(),
-                requires_api_key: p.requires_api_key(),
-                is_active,
+                id: id.clone(),
+                name: provider.name().to_string(),
+                is_configured: provider.is_configured(),
+                requires_api_key: provider.requires_api_key(),
+                is_active: active_id.as_ref() == Some(&id),
             }
         })
         .collect();
@@ -86,6 +87,14 @@ pub async fn configure_ocr_provider(
     if let Some(secret) = secret_key {
         credentials.insert("secret_key".to_string(), secret);
     }
+
+    let provider_lock = state
+        .ocr_coordinator
+        .get(&provider_id)
+        .ok_or_else(|| format!("Provider not found: {}", provider_id))?;
+    let expected_fields = provider_lock.read().credential_fields();
+    validate_required_credentials(&expected_fields, &credentials)
+        .map_err(|e| e.to_string())?;
 
     // Save credentials using new format
     state

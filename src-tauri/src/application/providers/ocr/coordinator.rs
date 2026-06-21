@@ -4,6 +4,7 @@ use crate::domain::events::DomainEvent;
 use crate::infrastructure::storage::ConfigFile;
 use crate::infrastructure::events::EventBus;
 use crate::Result;
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
@@ -23,7 +24,7 @@ use chrono::Utc;
 pub struct OcrCoordinator {
     /// Map of provider ID to provider instance
     /// Providers are responsible for their own thread-safety
-    providers: Mutex<HashMap<String, Arc<dyn OcrProvider>>>,
+    providers: Mutex<HashMap<String, Arc<RwLock<dyn OcrProvider>>>>,
     /// Currently active provider ID (single-select)
     active_provider_id: Arc<Mutex<Option<String>>>,
     /// Configuration file for persisting active provider
@@ -64,7 +65,7 @@ impl OcrCoordinator {
         if providers.contains_key(&id) {
             return Err(format!("Provider already registered: {}", id).into());
         }
-        providers.insert(id, Arc::new(provider));
+        providers.insert(id, Arc::new(RwLock::new(provider)));
         Ok(())
     }
 
@@ -98,8 +99,8 @@ impl OcrCoordinator {
     ///
     /// # Returns
     ///
-    /// * `Option<Arc<dyn OcrProvider>>` - The active provider if one is set, None otherwise
-    pub fn get_active(&self) -> Option<Arc<dyn OcrProvider>> {
+    /// * `Option<Arc<RwLock<dyn OcrProvider>>>` - The active provider if one is set, None otherwise
+    pub fn get_active(&self) -> Option<Arc<RwLock<dyn OcrProvider>>> {
         let active_id = self.active_provider_id.lock().unwrap();
         let providers = self.providers.lock().unwrap();
         active_id
@@ -111,8 +112,8 @@ impl OcrCoordinator {
     ///
     /// # Returns
     ///
-    /// * `Vec<Arc<dyn OcrProvider>>` - List of all registered providers
-    pub fn list_all(&self) -> Vec<Arc<dyn OcrProvider>> {
+    /// * `Vec<Arc<RwLock<dyn OcrProvider>>>` - List of all registered providers
+    pub fn list_all(&self) -> Vec<Arc<RwLock<dyn OcrProvider>>> {
         let providers = self.providers.lock().unwrap();
         providers.values().cloned().collect()
     }
@@ -125,8 +126,8 @@ impl OcrCoordinator {
     ///
     /// # Returns
     ///
-    /// * `Option<Arc<dyn OcrProvider>>` - The provider if found, None otherwise
-    pub fn get(&self, id: &str) -> Option<Arc<dyn OcrProvider>> {
+    /// * `Option<Arc<RwLock<dyn OcrProvider>>>` - The provider if found, None otherwise
+    pub fn get(&self, id: &str) -> Option<Arc<RwLock<dyn OcrProvider>>> {
         let providers = self.providers.lock().unwrap();
         providers.get(id).cloned()
     }
@@ -167,13 +168,16 @@ impl OcrCoordinator {
         let start = Instant::now();
 
         // Get active provider (cloned Arc, no lock held)
-        let provider = self.get_active()
+        let provider_lock = self.get_active()
             .ok_or_else(|| "No active OCR provider".to_string())?;
 
-        let provider_id = provider.id().to_string();
+        let provider_id = provider_lock.read().id().to_string();
 
         // Call provider's recognize method
-        let result = provider.recognize(request).await?;
+        let result = {
+            let provider = provider_lock.read();
+            provider.recognize(request).await?
+        };
 
         // Publish domain event if event bus is attached
         if let Some(event_bus) = &self.event_bus {
@@ -200,8 +204,7 @@ impl OcrCoordinator {
 
     /// Reconfigures a provider's credentials at runtime.
     ///
-    /// Note: This method requires the provider to implement interior mutability
-    /// for its credentials. Most providers use Mutex/RwLock internally for this.
+    /// This allows hot-reloading of credentials without restarting the application.
     ///
     /// # Arguments
     ///
@@ -214,14 +217,27 @@ impl OcrCoordinator {
     pub fn reconfigure_provider(&self, provider_id: &str, credentials: &HashMap<String, String>) -> Result<()> {
         let providers = self.providers.lock().unwrap();
 
-        let provider = providers.get(provider_id)
-            .ok_or_else(|| format!("Provider not found: {}", provider_id))?;
+        let provider_lock = providers
+            .get(provider_id)
+            .ok_or_else(|| format!("Provider not found: {}", provider_id))?
+            .clone();
+        drop(providers);
 
-        // Provider must implement reconfigure_credentials with interior mutability
-        // This is a limitation - we cannot call mutable methods on trait objects through Arc
-        // Providers should handle their own internal mutability for configuration
-        Err(crate::AppError::Other(
-            "Runtime reconfiguration requires restart for OCR providers. This will be fixed in a future update.".to_string()
-        ))
+        let result = {
+            let mut provider = provider_lock.write();
+            provider.reconfigure_credentials(credentials)
+        };
+
+        if let Err(ref e) = result {
+            if let Some(event_bus) = &self.event_bus {
+                event_bus.publish(DomainEvent::ProviderConfigurationFailed {
+                    provider_id: provider_id.to_string(),
+                    error_message: e.to_string(),
+                    timestamp: Utc::now(),
+                });
+            }
+        }
+
+        result
     }
 }

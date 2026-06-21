@@ -1,4 +1,6 @@
-use crate::CustomTranslationProviderDef;
+use crate::application::providers::{
+    validate_required_credentials, CustomTranslationProviderDef,
+};
 use crate::application::providers::common::CredentialField;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -152,18 +154,8 @@ pub async fn configure_translation_provider_credentials(
     // Get expected fields
     let expected_fields = provider_lock.read().credential_fields();
 
-    // Validate all required fields are present
-    for field in &expected_fields {
-        if !credentials.contains_key(&field.name) {
-            return Err(format!("Missing required field: {}", field.label));
-        }
-        let value = credentials
-            .get(&field.name)
-            .ok_or_else(|| format!("Missing field: {}", field.name))?;
-        if value.trim().is_empty() {
-            return Err(format!("Field cannot be empty: {}", field.label));
-        }
-    }
+    validate_required_credentials(&expected_fields, &credentials)
+        .map_err(|e| e.to_string())?;
 
     // Save to keychain
     state

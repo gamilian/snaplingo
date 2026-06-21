@@ -15,22 +15,22 @@ use std::sync::Arc;
 use parking_lot::Mutex as ParkingLotMutex;
 use std::path::PathBuf;
 use tauri::Manager;
-use serde::{Deserialize, Serialize};
 
 // Phase 1, 2 & 3 imports
 use infrastructure::storage::{ConfigFile, Keychain, HistoryDatabase};
 use infrastructure::http::{HttpClient, ReqwestHttpClient};
 use infrastructure::events::{EventBus, EventSubscriber};
 use infrastructure::llm::{
-    LLMClient, LLMProtocol, OpenAILLMClient, AnthropicLLMClient, GeminiLLMClient, ReasoningLevel,
+    LLMClient, LLMProtocol, OpenAILLMClient, AnthropicLLMClient, GeminiLLMClient,
 };
 use application::providers::translation::{
-    TranslationCoordinator, TranslationProvider,
+    TranslationCoordinator,
     GoogleTranslateProvider as GoogleTranslateProviderV2,
     DeepLProvider,
     BaiduTranslateProvider,
     LLMTranslationProvider,
 };
+use application::providers::CustomTranslationProviderDef;
 use application::providers::ocr::{
     OcrCoordinator,
     impls::{TesseractProvider, BaiduOcrProvider},
@@ -48,52 +48,6 @@ use std::sync::Mutex;
 
 const SCREENSHOT_SHORTCUT: &str = "CmdOrCtrl+Shift+KeyR";
 const SCREENSHOT_OCR_SHORTCUT: &str = "CmdOrCtrl+Shift+KeyS";
-
-/// Custom translation provider definition (for persistence)
-#[derive(Clone, Serialize, Deserialize)]
-pub struct CustomTranslationProviderDef {
-    pub id: String,
-    pub name: String,
-    pub protocol: LLMProtocol,
-    pub endpoint: String,
-    pub model: String,
-    pub reasoning_level: Option<ReasoningLevel>,
-}
-
-/// Factory function to create LLM translation provider
-pub fn create_llm_translation_provider(
-    def: &CustomTranslationProviderDef,
-    http_client: Arc<dyn HttpClient>,
-    api_key: String,
-) -> Arc<dyn TranslationProvider> {
-    let llm_client: Arc<dyn LLMClient> = match def.protocol {
-        LLMProtocol::OpenAI => Arc::new(OpenAILLMClient::new(
-            http_client,
-            def.endpoint.clone(),
-            def.model.clone(),
-            api_key,
-        )),
-        LLMProtocol::Anthropic => Arc::new(AnthropicLLMClient::new(
-            http_client,
-            def.endpoint.clone(),
-            def.model.clone(),
-            api_key,
-        )),
-        LLMProtocol::Gemini => Arc::new(GeminiLLMClient::new(
-            http_client,
-            def.endpoint.clone(),
-            def.model.clone(),
-            api_key,
-        )),
-    };
-
-    Arc::new(LLMTranslationProvider::new(
-        llm_client,
-        def.id.clone(),
-        def.name.clone(),
-        def.reasoning_level,
-    ))
-}
 
 /// Screenshot state for storing captured image data
 #[derive(Default)]
