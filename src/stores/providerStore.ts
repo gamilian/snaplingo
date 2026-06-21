@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { invoke } from '@tauri-apps/api/core';
+import * as providerApi from '../tauri/providers';
+import type {
+  AddCustomTranslationProviderRequest,
+  OcrProviderInfo,
+  ProviderInfo,
+} from '../tauri/providers';
 
 export interface Provider {
   id: string;
@@ -21,28 +26,6 @@ export interface Provider {
   endpoint?: string;
   model?: string;
   reasoningLevel?: string;
-}
-
-interface ProviderInfo {
-  id: string;
-  name: string;
-  is_configured: boolean;
-  requires_api_key: boolean;
-  is_active: boolean;
-  is_builtin: boolean;
-  protocol?: string;
-  endpoint?: string;
-  model?: string;
-  reasoning_level?: string;
-}
-
-interface AddCustomTranslationProviderRequest {
-  name: string;
-  protocol: string;
-  endpoint: string;
-  model: string;
-  api_key: string;
-  reasoning_level?: string;
 }
 
 interface ProviderState {
@@ -119,7 +102,7 @@ export const useProviderStore = create<ProviderState>()(
       // 从后端加载翻译 Providers
       loadTranslationProviders: async () => {
         try {
-          const providers = await invoke<ProviderInfo[]>('list_translation_providers');
+          const providers = await providerApi.listTranslationProviders();
           const converted = providers.map(convertProviderInfo);
           const activeIds = converted.filter(p => p.status === 'active').map(p => p.id);
 
@@ -135,7 +118,7 @@ export const useProviderStore = create<ProviderState>()(
       // 激活翻译 Provider
       activateTranslationProvider: async (id: string) => {
         try {
-          await invoke('activate_translation_provider', { providerId: id });
+          await providerApi.activateTranslationProvider(id);
           await get().loadTranslationProviders();
         } catch (error) {
           console.error('Failed to activate provider:', error);
@@ -146,7 +129,7 @@ export const useProviderStore = create<ProviderState>()(
       // 停用翻译 Provider
       deactivateTranslationProvider: async (id: string) => {
         try {
-          await invoke('deactivate_translation_provider', { providerId: id });
+          await providerApi.deactivateTranslationProvider(id);
           await get().loadTranslationProviders();
         } catch (error) {
           console.error('Failed to deactivate provider:', error);
@@ -157,7 +140,7 @@ export const useProviderStore = create<ProviderState>()(
       // 添加自定义翻译 Provider
       addCustomTranslationProvider: async (request: AddCustomTranslationProviderRequest) => {
         try {
-          await invoke('add_custom_translation_provider', { request });
+          await providerApi.addCustomTranslationProvider(request);
           await get().loadTranslationProviders();
         } catch (error) {
           console.error('Failed to add custom provider:', error);
@@ -168,7 +151,7 @@ export const useProviderStore = create<ProviderState>()(
       // 删除翻译 Provider
       removeTranslationProvider: async (id: string) => {
         try {
-          await invoke('remove_custom_translation_provider', { providerId: id });
+          await providerApi.removeCustomTranslationProvider(id);
           await get().loadTranslationProviders();
         } catch (error) {
           console.error('Failed to remove provider:', error);
@@ -179,8 +162,8 @@ export const useProviderStore = create<ProviderState>()(
       // 从后端加载 OCR Providers
       loadOcrProviders: async () => {
         try {
-          const providers = await invoke<any[]>('list_ocr_providers');
-          const converted = providers.map((p: any) => ({
+          const providers = await providerApi.listOcrProviders();
+          const converted = providers.map((p: OcrProviderInfo) => ({
             id: p.id,
             name: p.name,
             type: 'ocr' as const,
@@ -203,7 +186,7 @@ export const useProviderStore = create<ProviderState>()(
       // OCR Provider 激活
       activateOcrProvider: async (id: string) => {
         try {
-          await invoke('activate_ocr_provider', { providerId: id });
+          await providerApi.activateOcrProvider(id);
           await get().loadOcrProviders();
         } catch (error) {
           console.error('Failed to activate OCR provider:', error);
@@ -214,11 +197,7 @@ export const useProviderStore = create<ProviderState>()(
       // 配置 OCR Provider
       configureOcrProvider: async (providerId: string, apiKey: string, secretKey?: string) => {
         try {
-          await invoke('configure_ocr_provider', {
-            providerId,
-            apiKey,
-            secretKey: secretKey || null,
-          });
+          await providerApi.configureOcrProvider(providerId, apiKey, secretKey);
           await get().loadOcrProviders();
         } catch (error) {
           console.error('Failed to configure OCR provider:', error);
@@ -241,16 +220,10 @@ export const useProviderStore = create<ProviderState>()(
           // Check if config is a credentials map (new format)
           if (typeof config === 'object' && !config.apiKey) {
             // New format: HashMap<String, String>
-            await invoke('configure_translation_provider_credentials', {
-              providerId,
-              credentials: config,
-            });
+            await providerApi.configureTranslationProviderCredentials(providerId, config);
           } else if (config.apiKey) {
             // Legacy format: single api_key
-            await invoke('configure_translation_provider', {
-              providerId,
-              apiKey: config.apiKey,
-            });
+            await providerApi.configureTranslationProvider(providerId, config.apiKey);
           }
           await get().loadTranslationProviders();
         } catch (error) {
@@ -272,9 +245,7 @@ export const useProviderStore = create<ProviderState>()(
           }
 
           // 调用后端命令更新顺序
-          await invoke('reorder_active_translation_providers', {
-            providerIds: reorderedActiveIds,
-          });
+          await providerApi.reorderActiveTranslationProviders(reorderedActiveIds);
 
           // 重新加载以同步状态
           await get().loadTranslationProviders();

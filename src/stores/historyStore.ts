@@ -1,30 +1,10 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { invoke } from '@tauri-apps/api/core';
-
-// 后端返回的原始结构
-interface BackendTranslationEntry {
-  id: number;
-  timestamp: string;
-  source_text: string;
-  source_lang: string;
-  target_lang: string;
-  providers_used: string[];
-  results: Array<{
-    provider_id?: string;
-    translated_text: string;
-    detected_language?: string;
-    confidence?: number;
-  }>;
-  duration_ms: number;
-}
-
-interface BackendOcrEntry {
-  id: number;
-  timestamp: string;
-  recognized_text: string;
-  language?: string;
-}
+import * as historyApi from '../tauri/history';
+import type {
+  BackendOcrEntry,
+  BackendTranslationEntry,
+} from '../tauri/history';
 
 // 前端展示用的扁平结构
 export interface TranslationHistoryItem {
@@ -115,7 +95,7 @@ export const useHistoryStore = create<HistoryState>()(
       // 从后端加载翻译历史
       loadTranslationHistory: async (limit = 100, offset = 0) => {
         try {
-          const entries = await invoke<BackendTranslationEntry[]>('get_translation_history', { limit, offset });
+          const entries = await historyApi.getTranslationHistory(limit, offset);
           set({
             rawTranslationEntries: entries,
             translationHistory: flattenTranslationEntries(entries),
@@ -128,7 +108,7 @@ export const useHistoryStore = create<HistoryState>()(
       // 从后端加载 OCR 历史
       loadOcrHistory: async (limit = 100, offset = 0) => {
         try {
-          const entries = await invoke<BackendOcrEntry[]>('get_ocr_history', { limit, offset });
+          const entries = await historyApi.getOcrHistory(limit, offset);
           const converted = entries.map((entry) => ({
             id: String(entry.id),
             type: 'screenshot' as const,
@@ -180,7 +160,7 @@ export const useHistoryStore = create<HistoryState>()(
             throw new Error(`Invalid history ID: ${id}`);
           }
 
-          await invoke('delete_history', { id: entryId });
+          await historyApi.deleteHistory(entryId);
 
           // 从原始数据中移除
           const newRawEntries = get().rawTranslationEntries.filter(e => e.id !== entryId);
@@ -197,7 +177,7 @@ export const useHistoryStore = create<HistoryState>()(
       // 删除整个 entry（提供给需要明确删除整个翻译请求的场景）
       deleteTranslationEntry: async (entryId: number) => {
         try {
-          await invoke('delete_history', { id: entryId });
+          await historyApi.deleteHistory(entryId);
 
           const newRawEntries = get().rawTranslationEntries.filter(e => e.id !== entryId);
           set({
@@ -226,7 +206,7 @@ export const useHistoryStore = create<HistoryState>()(
 
       clearTranslationHistory: async () => {
         try {
-          await invoke('clear_all_history');
+          await historyApi.clearAllHistory();
           set({
             rawTranslationEntries: [],
             rawOcrEntries: [],
@@ -256,7 +236,7 @@ export const useHistoryStore = create<HistoryState>()(
       deleteOcrHistory: async (id: string) => {
         try {
           const dbId = parseInt(id);
-          await invoke('delete_history', { id: dbId });
+          await historyApi.deleteHistory(dbId);
 
           const newRawEntries = get().rawOcrEntries.filter(e => e.id !== dbId);
           const converted = newRawEntries.map((entry) => ({
@@ -294,7 +274,7 @@ export const useHistoryStore = create<HistoryState>()(
 
       clearOcrHistory: async () => {
         try {
-          await invoke('clear_all_history');
+          await historyApi.clearAllHistory();
           set({
             rawTranslationEntries: [],
             rawOcrEntries: [],

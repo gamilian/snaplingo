@@ -1,6 +1,5 @@
-import { invoke } from '@tauri-apps/api/core';
 import { useAppStore } from '../stores/appStore';
-import { TranslationResult } from '../types';
+import { translateText } from '../tauri/translation';
 
 export function useTranslate() {
   const {
@@ -21,12 +20,10 @@ export function useTranslate() {
     setTranslating(true);
 
     try {
-      const results = await invoke<TranslationResult[]>('translate_text_v2', {
-        request: {
-          text: textToTranslate,
-          source_lang: fromLang === 'auto' ? null : fromLang,
-          target_lang: toLang,
-        }
+      const results = await translateText({
+        text: textToTranslate,
+        sourceLang: fromLang,
+        targetLang: toLang,
       });
 
       setTranslations(results);

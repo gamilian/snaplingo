@@ -258,8 +258,9 @@ git commit -m "chore(architecture): document runtime map and remove stale shadow
 - Modify: `src/hooks/useTranslate.ts`
 - Modify: `src/stores/providerStore.ts`
 - Modify: `src/stores/historyStore.ts`
+- Modify: `src/components/SettingsWindow/Services/ProviderConfigDialog.tsx`
 
-- [ ] **Step 1: Add failing translation adapter test**
+- [x] **Step 1: Add failing translation adapter test**
 
 Create `src/tauri/__tests__/translation.test.ts`:
 
@@ -288,7 +289,7 @@ describe('translation tauri adapter', () => {
 });
 ```
 
-- [ ] **Step 2: Run test and verify it fails**
+- [x] **Step 2: Run test and verify it fails**
 
 Run:
 
@@ -298,7 +299,9 @@ npm test -- --run src/tauri/__tests__/translation.test.ts
 
 Expected: FAIL because `src/tauri/translation.ts` does not exist.
 
-- [ ] **Step 3: Implement translation adapter**
+Current status: failed as expected with `Cannot find module '/src/tauri/translation'`.
+
+- [x] **Step 3: Implement translation adapter**
 
 Create `src/tauri/translation.ts`:
 
@@ -323,7 +326,7 @@ export async function translateText(input: TranslateTextInput) {
 }
 ```
 
-- [ ] **Step 4: Replace `useTranslate` raw invoke**
+- [x] **Step 4: Replace `useTranslate` raw invoke**
 
 In `src/hooks/useTranslate.ts`, remove the direct `invoke` import and call:
 
@@ -335,7 +338,7 @@ const results = await translateText({
 });
 ```
 
-- [ ] **Step 5: Add Provider adapter tests**
+- [x] **Step 5: Add Provider adapter tests**
 
 Create `src/tauri/__tests__/providers.test.ts` with at least these tests:
 
@@ -375,7 +378,7 @@ describe('providers tauri adapter', () => {
 });
 ```
 
-- [ ] **Step 6: Implement Provider and History adapters**
+- [x] **Step 6: Implement Provider and History adapters**
 
 Create `src/tauri/providers.ts` with functions matching current backend commands:
 
@@ -400,13 +403,15 @@ Create `src/tauri/history.ts` with functions matching current backend commands:
 - `deleteHistory`
 - `clearAllHistory`
 
-- [ ] **Step 7: Replace store raw invokes**
+Current status: implemented `src/tauri/providers.ts` and `src/tauri/history.ts`. Also moved `ProviderConfigDialog` credential schema loading to the Provider adapter because it is part of the same frontend/backend seam.
+
+- [x] **Step 7: Replace store raw invokes**
 
 Modify `src/stores/providerStore.ts` and `src/stores/historyStore.ts` so they import from `src/tauri/providers.ts` and `src/tauri/history.ts`.
 
 Expected: no direct `invoke(` remains in these two store files.
 
-- [ ] **Step 8: Run frontend tests and build**
+- [x] **Step 8: Run frontend tests and build**
 
 Run:
 
@@ -417,7 +422,9 @@ npm run build
 
 Expected: PASS.
 
-- [ ] **Step 9: Inspect direct invoke usage**
+Current status: PASS. Focused Vitest run passed 6 tests across 3 files. `npm run build` passed.
+
+- [x] **Step 9: Inspect direct invoke usage**
 
 Run:
 
@@ -427,7 +434,9 @@ rg "invoke<|invoke\\(" src -n
 
 Expected: remaining direct invocations only in Capture Session, Pinned Image, legacy prototypes, or files scheduled for later tasks.
 
-- [ ] **Step 10: Commit**
+Current status: confirmed. Translation, Provider, History stores/hooks/dialogs no longer call raw `invoke`. Remaining direct calls are in `src/tauri/*`, Capture Session, Pinned Image, legacy `ScreenshotWorkflow`, and `AdvancedPage` screenshot trigger. The `AdvancedPage` trigger is capture-related and added to Task 3.
+
+- [x] **Step 10: Commit**
 
 ```bash
 git add src/tauri src/hooks/useTranslate.ts src/stores/providerStore.ts src/stores/historyStore.ts
@@ -448,6 +457,7 @@ git commit -m "refactor(frontend): add typed tauri adapters for providers and hi
 - Modify: `src/components/ScreenshotSession/captureWindowVisibility.ts`
 - Modify: `src/components/PinnedImageWindow/index.tsx`
 - Modify: `src/components/PinnedImageWindow/pinActions.ts`
+- Modify: `src/components/SettingsWindow/Advanced/AdvancedPage.tsx`
 
 - [ ] **Step 1: Add failing Capture Session adapter tests**
 

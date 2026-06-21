@@ -1,12 +1,7 @@
 import { useEffect, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { getProviderCredentialSchema } from '../../../tauri/providers';
+import type { CredentialField } from '../../../tauri/providers';
 import { Provider } from '../../../stores/providerStore';
-
-interface CredentialField {
-  name: string;
-  label: string;
-  secret: boolean;
-}
 
 interface ProviderConfigDialogProps {
   isOpen: boolean;
@@ -25,9 +20,7 @@ export function ProviderConfigDialog({ isOpen, onClose, onSave, provider }: Prov
 
     // Load credential schema for this provider
     setLoading(true);
-    invoke<CredentialField[]>('get_provider_credential_schema', {
-      providerId: provider.id,
-    })
+    getProviderCredentialSchema(provider.id)
       .then((schema) => {
         setFields(schema);
 
