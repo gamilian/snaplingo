@@ -1,7 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-
-export type MainTab = 'screenshot' | 'translation' | 'ocr' | 'services' | 'general' | 'advanced';
+import type {
+  MainTab,
+  OcrSubTab,
+  ScreenshotSubTab,
+  ServicesSubTab,
+  TranslationSubTab,
+} from '../components/SettingsWindow/navigationModel';
 
 interface HotkeyMap {
   [key: string]: string;
@@ -12,13 +17,16 @@ interface SettingsState {
   activeMainTab: MainTab;
 
   // 截图子页面
-  screenshotSubTab: 'hotkeys' | 'save-settings' | 'editor' | 'favorites';
+  screenshotSubTab: ScreenshotSubTab;
 
   // 翻译子页面
-  translationSubTab: 'hotkeys' | 'translation-settings' | 'history' | 'favorites';
+  translationSubTab: TranslationSubTab;
 
   // OCR 子页面
-  ocrSubTab: 'hotkeys' | 'ocr-settings' | 'history' | 'favorites';
+  ocrSubTab: OcrSubTab;
+
+  // 服务子页面
+  servicesSubTab: ServicesSubTab;
 
   // 快捷键配置
   hotkeys: {
@@ -47,6 +55,7 @@ interface SettingsState {
   setScreenshotSubTab: (tab: SettingsState['screenshotSubTab']) => void;
   setTranslationSubTab: (tab: SettingsState['translationSubTab']) => void;
   setOcrSubTab: (tab: SettingsState['ocrSubTab']) => void;
+  setServicesSubTab: (tab: SettingsState['servicesSubTab']) => void;
 
   setHotkey: (category: 'screenshot' | 'translation' | 'ocr', key: string, value: string) => void;
   clearHotkey: (category: 'screenshot' | 'translation' | 'ocr', key: string) => void;
@@ -94,6 +103,7 @@ export const useSettingsStore = create<SettingsState>()(
       screenshotSubTab: 'hotkeys',
       translationSubTab: 'hotkeys',
       ocrSubTab: 'hotkeys',
+      servicesSubTab: 'ocr',
 
       hotkeys: defaultHotkeys,
 
@@ -114,6 +124,7 @@ export const useSettingsStore = create<SettingsState>()(
       setScreenshotSubTab: (tab) => set({ screenshotSubTab: tab }),
       setTranslationSubTab: (tab) => set({ translationSubTab: tab }),
       setOcrSubTab: (tab) => set({ ocrSubTab: tab }),
+      setServicesSubTab: (tab) => set({ servicesSubTab: tab }),
 
       setHotkey: (category, key, value) =>
         set((state) => ({

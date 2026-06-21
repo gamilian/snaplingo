@@ -7,8 +7,7 @@ import {
   SettingsIcon,
   AdvancedIcon,
 } from '../Icons';
-
-export type MainTab = 'screenshot' | 'translation' | 'ocr' | 'services' | 'general' | 'advanced';
+import { settingsSections, type MainTab } from '../navigationModel';
 
 interface MainNavProps {
   activeTab: MainTab;
@@ -49,6 +48,15 @@ function NavButton({ icon, label, active, onClick }: NavButtonProps) {
 }
 
 export function MainNav({ activeTab, onTabChange }: MainNavProps) {
+  const icons: Record<MainTab, React.ReactNode> = {
+    screenshot: <ScreenshotIcon />,
+    translation: <TranslationIcon />,
+    ocr: <OcrIcon />,
+    services: <ServicesIcon />,
+    general: <SettingsIcon />,
+    advanced: <AdvancedIcon />,
+  };
+
   return (
     <div className="w-[88px] bg-white border-r border-gray-200 flex flex-col items-center py-6 gap-4">
       {/* Logo */}
@@ -73,42 +81,15 @@ export function MainNav({ activeTab, onTabChange }: MainNavProps) {
 
       {/* 主导航按钮 */}
       <nav className="flex-1 flex flex-col gap-2 w-full px-3">
-        <NavButton
-          icon={<ScreenshotIcon />}
-          label="截图"
-          active={activeTab === 'screenshot'}
-          onClick={() => onTabChange('screenshot')}
-        />
-        <NavButton
-          icon={<TranslationIcon />}
-          label="翻译"
-          active={activeTab === 'translation'}
-          onClick={() => onTabChange('translation')}
-        />
-        <NavButton
-          icon={<OcrIcon />}
-          label="OCR"
-          active={activeTab === 'ocr'}
-          onClick={() => onTabChange('ocr')}
-        />
-        <NavButton
-          icon={<ServicesIcon />}
-          label="服务"
-          active={activeTab === 'services'}
-          onClick={() => onTabChange('services')}
-        />
-        <NavButton
-          icon={<SettingsIcon />}
-          label="通用"
-          active={activeTab === 'general'}
-          onClick={() => onTabChange('general')}
-        />
-        <NavButton
-          icon={<AdvancedIcon />}
-          label="高级"
-          active={activeTab === 'advanced'}
-          onClick={() => onTabChange('advanced')}
-        />
+        {settingsSections.map((section) => (
+          <NavButton
+            key={section.key}
+            icon={icons[section.key]}
+            label={section.label}
+            active={activeTab === section.key}
+            onClick={() => onTabChange(section.key)}
+          />
+        ))}
       </nav>
     </div>
   );

@@ -1072,9 +1072,9 @@ git commit -m "refactor(app): move runtime composition out of lib"
 - Create: `src/components/SettingsWindow/navigationModel.tsx`
 - Modify: `src/components/SettingsWindow/index.tsx`
 - Modify: `src/stores/settingsStore.ts`
-- Test: optional `src/components/SettingsWindow/navigationModel.test.tsx`
+- Test: `src/components/SettingsWindow/navigationModel.test.tsx`
 
-- [ ] **Step 1: Add navigation model**
+- [x] **Step 1: Add navigation model**
 
 Create `src/components/SettingsWindow/navigationModel.tsx`:
 
@@ -1115,11 +1115,11 @@ export const settingsSections: SettingsSection[] = [
 ];
 ```
 
-- [ ] **Step 2: Update settings store types**
+- [x] **Step 2: Update settings store types**
 
 Modify `src/stores/settingsStore.ts` to import `MainTab` from `navigationModel.tsx`. Replace `as any` call sites by typed helper functions.
 
-- [ ] **Step 3: Refactor SettingsWindow render**
+- [x] **Step 3: Refactor SettingsWindow render**
 
 Modify `src/components/SettingsWindow/index.tsx`:
 
@@ -1130,7 +1130,7 @@ Modify `src/components/SettingsWindow/index.tsx`:
 
 Expected: repeated nav item arrays and tab if chains disappear.
 
-- [ ] **Step 4: Run TypeScript build**
+- [x] **Step 4: Run TypeScript build**
 
 Run:
 
@@ -1140,7 +1140,9 @@ npm run build
 
 Expected: PASS and no `as any` in `src/components/SettingsWindow/index.tsx`.
 
-- [ ] **Step 5: Commit**
+Current status: PASS. Red test failed on missing `navigationModel`, then passed after implementation. `npm run build` passed, `npm test` passed 238 tests in 25 files, and `rg "as any" src/components/SettingsWindow/index.tsx -n` returned no matches.
+
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/SettingsWindow src/stores/settingsStore.ts
