@@ -15,7 +15,7 @@ SnapLingo 目前缺少一个主设置窗口（Settings Window），用户无法�
 
 实现一个功能域独立的主设置窗口（Settings Window），采用 6 个主标签页结构：截图、翻译、OCR、服务、通用、高级。每个功能域拥有完整的二级导航，包含该域的快捷键、设置、历史、收藏。
 
-设计已通过交互式 UI 原型验证（`src/App.PROTOTYPE_UI.tsx`），确认布局合理、交互流畅、图标识别度高。
+设计已通过交互式 UI 原型验证（`designs/prototypes/App.PROTOTYPE_UI.tsx`），确认布局合理、交互流畅、图标识别度高。
 
 ## User Stories
 
@@ -380,7 +380,7 @@ The following are explicitly out of scope for this PRD:
 
 ### Design Validation
 
-This PRD is based on a fully interactive prototype (`src/App.PROTOTYPE_UI.tsx`) that was validated through browser testing. Key findings:
+This PRD is based on a fully interactive prototype (`designs/prototypes/App.PROTOTYPE_UI.tsx`) that was validated through browser testing. Key findings:
 
 - 6 main tabs is the right number (not too many, not too few)
 - Secondary navigation works well as a left sidebar
@@ -404,7 +404,7 @@ Recommended implementation order:
 
 ### Code Reuse from Prototype
 
-The prototype file `src/App.PROTOTYPE_UI.tsx` contains production-ready code for:
+The prototype file `designs/prototypes/App.PROTOTYPE_UI.tsx` contains production-ready code for:
 - Icon components (copy as-is)
 - HotkeyDisplay component structure
 - Layout and styling patterns
