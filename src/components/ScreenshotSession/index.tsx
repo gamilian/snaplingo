@@ -1,8 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { useSettingsStore } from '../../stores/settingsStore';
+import {
+  cancelCaptureSession,
+  createCaptureSession,
+  getCaptureSession,
+  openResultWindow,
+  openTranslationResultWindow,
+  outputCapture,
+  renderCaptureOutput,
+  runCaptureOcr,
+} from '../../tauri/captureSession';
 import {
   getToolbarPosition,
   constrainSelectionPoint,
@@ -178,7 +187,6 @@ import type {
   ArrowKey,
   LogicalRect,
   MonitorSnapshotView,
-  OcrResult,
   Point,
 } from './types';
 
@@ -787,7 +795,6 @@ export default function ScreenshotSession({
   const finishCurrentCaptureSession = useCallback(
     async (sessionId: string) => {
       await finishCaptureSession({
-        invoke,
         sessionId,
         onInactive,
         resetSessionState,
@@ -801,7 +808,7 @@ export default function ScreenshotSession({
 
     if (sessionId) {
       try {
-        await invoke('cancel_capture_session', { sessionId });
+        await cancelCaptureSession(sessionId);
       } catch (err) {
         console.error('Failed to cancel capture session:', err);
       }
@@ -823,8 +830,8 @@ export default function ScreenshotSession({
 
     try {
       const nextSession = sessionId
-        ? await invoke<CaptureSessionView>('get_capture_session', { sessionId })
-        : await invoke<CaptureSessionView>('create_capture_session');
+        ? await getCaptureSession(sessionId)
+        : await createCaptureSession();
       setSession(nextSession);
       setStatus('selecting');
     } catch (err) {
@@ -865,7 +872,7 @@ export default function ScreenshotSession({
       setError(null);
 
       try {
-        const base64 = await invoke<string>('render_capture_output', {
+        const base64 = await renderCaptureOutput({
           sessionId: session.id,
           rect,
           annotations: nextAnnotations,
@@ -875,16 +882,12 @@ export default function ScreenshotSession({
 
         const selectionFlow = getCaptureSelectionFlowForMode(mode);
         if (selectionFlow !== 'preview') {
-          const ocrResult = await invoke<OcrResult>('run_capture_ocr', {
-            sessionId: session.id,
-            rect,
-          });
-          await invoke(
-            selectionFlow === 'ocr-translate'
-              ? 'open_translation_result_window'
-              : 'open_result_window',
-            { text: ocrResult.text },
-          );
+          const ocrResult = await runCaptureOcr(session.id, rect);
+          if (selectionFlow === 'ocr-translate') {
+            await openTranslationResultWindow(ocrResult.text);
+          } else {
+            await openResultWindow(ocrResult.text);
+          }
           recordSuccessfulSelection('ocr', rect);
           await finishCurrentCaptureSession(session.id);
         }
@@ -933,7 +936,6 @@ export default function ScreenshotSession({
     try {
       const outputHistory = commitTextDraftToHistory();
       await copyCaptureSelection(
-        invoke,
         session.id,
         selection,
         outputHistory.annotations,
@@ -968,7 +970,6 @@ export default function ScreenshotSession({
     try {
       if (action === 'copy') {
         await copyCaptureSelection(
-          invoke,
           session.id,
           rect,
           [],
@@ -976,7 +977,6 @@ export default function ScreenshotSession({
         );
       } else if (action === 'save') {
         await saveCaptureSelection(
-          invoke,
           session.id,
           rect,
           [],
@@ -984,7 +984,6 @@ export default function ScreenshotSession({
         );
       } else if (action === 'quick-save') {
         await quickSaveCaptureSelection(
-          invoke,
           session.id,
           rect,
           [],
@@ -993,7 +992,6 @@ export default function ScreenshotSession({
         );
       } else if (action === 'print') {
         await printCaptureSelection(
-          invoke,
           session.id,
           rect,
           [],
@@ -1001,18 +999,14 @@ export default function ScreenshotSession({
           shouldIncludeCapturedCursor,
         );
       } else if (action === 'ocr' || action === 'ocr-translate') {
-        const ocrResult = await invoke<OcrResult>('run_capture_ocr', {
-          sessionId: session.id,
-          rect,
-        });
-        await invoke(
-          action === 'ocr-translate'
-            ? 'open_translation_result_window'
-            : 'open_result_window',
-          { text: ocrResult.text },
-        );
+        const ocrResult = await runCaptureOcr(session.id, rect);
+        if (action === 'ocr-translate') {
+          await openTranslationResultWindow(ocrResult.text);
+        } else {
+          await openResultWindow(ocrResult.text);
+        }
       } else {
-        await invoke('output_capture', {
+        await outputCapture({
           sessionId: session.id,
           rect,
           annotations: [],
@@ -1059,7 +1053,6 @@ export default function ScreenshotSession({
     try {
       const outputHistory = commitTextDraftToHistory();
       await saveCaptureSelection(
-        invoke,
         session.id,
         selection,
         outputHistory.annotations,
@@ -1091,7 +1084,6 @@ export default function ScreenshotSession({
     try {
       const outputHistory = commitTextDraftToHistory();
       await quickSaveCaptureSelection(
-        invoke,
         session.id,
         selection,
         outputHistory.annotations,
@@ -1123,11 +1115,8 @@ export default function ScreenshotSession({
     setError(null);
 
     try {
-      const ocrResult = await invoke<OcrResult>('run_capture_ocr', {
-        sessionId: session.id,
-        rect: selection,
-      });
-      await invoke('open_result_window', { text: ocrResult.text });
+      const ocrResult = await runCaptureOcr(session.id, selection);
+      await openResultWindow(ocrResult.text);
       recordSuccessfulSelection('ocr', selection);
       await finishCurrentCaptureSession(session.id);
     } catch (err) {
@@ -1151,7 +1140,7 @@ export default function ScreenshotSession({
 
     try {
       const outputHistory = commitTextDraftToHistory();
-      await invoke('output_capture', {
+      await outputCapture({
         sessionId: session.id,
         rect: selection,
         annotations: outputHistory.annotations,
@@ -1184,7 +1173,6 @@ export default function ScreenshotSession({
     try {
       const outputHistory = commitTextDraftToHistory();
       await printCaptureSelection(
-        invoke,
         session.id,
         selection,
         outputHistory.annotations,
@@ -1216,7 +1204,7 @@ export default function ScreenshotSession({
     resetCaptureInteractionState();
 
     try {
-      const nextSession = await refreshCaptureSession(invoke, session.id);
+      const nextSession = await refreshCaptureSession(session.id);
       setSession(nextSession);
       setStatus('selecting');
     } catch (err) {
@@ -1684,7 +1672,6 @@ export default function ScreenshotSession({
 
     void revealCaptureWindowForSession({
       window: captureWindow,
-      invoke,
       sessionId: session.id,
     })
       .then(() => waitForCaptureSurfacePaint())

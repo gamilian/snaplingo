@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { CustomSelect } from '../../common/CustomSelect';
 import { CustomNumberInput } from '../../common/CustomNumberInput';
-import { invoke } from '@tauri-apps/api/core';
+import { triggerScreenshot } from '../../../tauri/captureSession';
 
 export function AdvancedPage() {
   const [proxyMode, setProxyMode] = useState('none');
@@ -13,7 +13,7 @@ export function AdvancedPage() {
   const handleTestScreenshot = async () => {
     try {
       console.log('Calling trigger_screenshot command...');
-      await invoke('trigger_screenshot');
+      await triggerScreenshot();
       console.log('Screenshot triggered successfully');
     } catch (error) {
       console.error('Failed to trigger screenshot:', error);

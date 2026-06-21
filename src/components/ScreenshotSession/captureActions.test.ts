@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AnnotationCommand, CaptureSessionView, LogicalRect } from './types';
 import {
-  type CaptureInvoke,
-  type CaptureInvokeArgs,
+  type CaptureActionClient,
   canToggleCapturedCursor,
   copyCaptureSelection,
   getCaptureKeyboardToolbarAction,
@@ -44,19 +43,59 @@ import {
   shouldCopyHoverSelectionFromShortcut,
 } from './captureActions';
 
+function createCaptureActionClient(
+  calls: Array<{ command: string; args?: unknown }>,
+  options: {
+    defaultPath?: string;
+    quickPath?: string;
+    nextSession?: CaptureSessionView;
+    renderedImage?: string;
+  } = {},
+): CaptureActionClient {
+  return {
+    defaultCaptureSavePath: async () => {
+      calls.push({ command: 'default_capture_save_path', args: undefined });
+      return options.defaultPath ?? '';
+    },
+    quickCaptureSavePath: async (directory) => {
+      calls.push({
+        command: 'quick_capture_save_path',
+        args: { directory },
+      });
+      return options.quickPath ?? '';
+    },
+    outputCapture: async (input) => {
+      calls.push({ command: 'output_capture', args: input });
+    },
+    createCaptureSession: async () => {
+      calls.push({ command: 'create_capture_session', args: undefined });
+      return (
+        options.nextSession ?? {
+          id: 'session-next',
+          monitors: [],
+          candidates: [],
+        }
+      );
+    },
+    cancelCaptureSession: async (sessionId) => {
+      calls.push({
+        command: 'cancel_capture_session',
+        args: { sessionId },
+      });
+    },
+    renderCaptureOutput: async (input) => {
+      calls.push({ command: 'render_capture_output', args: input });
+      return options.renderedImage ?? '';
+    },
+  };
+}
+
 describe('capture session actions', () => {
   it('saves the current frozen selection to the default capture path', async () => {
     const calls: Array<{ command: string; args?: unknown }> = [];
-    const invoke: CaptureInvoke = async <T>(
-      command: string,
-      args?: CaptureInvokeArgs,
-    ): Promise<T> => {
-      calls.push({ command, args });
-      if (command === 'default_capture_save_path') {
-        return '/tmp/SnapLingo-20260617-023000.png' as T;
-      }
-      return undefined as T;
-    };
+    const client = createCaptureActionClient(calls, {
+      defaultPath: '/tmp/SnapLingo-20260617-023000.png',
+    });
     const rect: LogicalRect = { x: 10, y: 20, width: 30, height: 40 };
     const annotations: AnnotationCommand[] = [
       {
@@ -68,7 +107,7 @@ describe('capture session actions', () => {
       },
     ];
 
-    await saveCaptureSelection(invoke, 'session-1', rect, annotations);
+    await saveCaptureSelection('session-1', rect, annotations, false, client);
 
     expect(calls).toEqual([
       { command: 'default_capture_save_path', args: undefined },
@@ -89,16 +128,10 @@ describe('capture session actions', () => {
 
   it('quick saves the current frozen selection to the configured capture path', async () => {
     const calls: Array<{ command: string; args?: unknown }> = [];
-    const invoke: CaptureInvoke = async <T>(
-      command: string,
-      args?: CaptureInvokeArgs,
-    ): Promise<T> => {
-      calls.push({ command, args });
-      if (command === 'quick_capture_save_path') {
-        return '/Users/alice/Pictures/SnapLingo/SnapLingo-20260617-023000.png' as T;
-      }
-      return undefined as T;
-    };
+    const client = createCaptureActionClient(calls, {
+      quickPath:
+        '/Users/alice/Pictures/SnapLingo/SnapLingo-20260617-023000.png',
+    });
     const rect: LogicalRect = { x: 10, y: 20, width: 30, height: 40 };
     const annotations: AnnotationCommand[] = [
       {
@@ -111,11 +144,12 @@ describe('capture session actions', () => {
     ];
 
     await quickSaveCaptureSelection(
-      invoke,
       'session-1',
       rect,
       annotations,
       '~/Pictures/SnapLingo',
+      false,
+      client,
     );
 
     expect(calls).toEqual([
@@ -145,18 +179,9 @@ describe('capture session actions', () => {
       monitors: [],
       candidates: [],
     };
-    const invoke: CaptureInvoke = async <T>(
-      command: string,
-      args?: CaptureInvokeArgs,
-    ): Promise<T> => {
-      calls.push({ command, args });
-      if (command === 'create_capture_session') {
-        return nextSession as T;
-      }
-      return undefined as T;
-    };
+    const client = createCaptureActionClient(calls, { nextSession });
 
-    const session = await refreshCaptureSession(invoke, 'session-prev');
+    const session = await refreshCaptureSession('session-prev', client);
 
     expect(session).toBe(nextSession);
     expect(calls).toEqual([
@@ -596,13 +621,7 @@ describe('capture session actions', () => {
 
   it('copies the current frozen selection to the clipboard', async () => {
     const calls: Array<{ command: string; args?: unknown }> = [];
-    const invoke: CaptureInvoke = async <T>(
-      command: string,
-      args?: CaptureInvokeArgs,
-    ): Promise<T> => {
-      calls.push({ command, args });
-      return undefined as T;
-    };
+    const client = createCaptureActionClient(calls);
     const rect: LogicalRect = { x: 12, y: 24, width: 120, height: 80 };
     const annotations: AnnotationCommand[] = [
       {
@@ -614,7 +633,7 @@ describe('capture session actions', () => {
       },
     ];
 
-    await copyCaptureSelection(invoke, 'session-2', rect, annotations);
+    await copyCaptureSelection('session-2', rect, annotations, false, client);
 
     expect(calls).toEqual([
       {
@@ -631,16 +650,10 @@ describe('capture session actions', () => {
 
   it('requests cursor composition when copying with captured cursor enabled', async () => {
     const calls: Array<{ command: string; args?: unknown }> = [];
-    const invoke: CaptureInvoke = async <T>(
-      command: string,
-      args?: CaptureInvokeArgs,
-    ): Promise<T> => {
-      calls.push({ command, args });
-      return undefined as T;
-    };
+    const client = createCaptureActionClient(calls);
     const rect: LogicalRect = { x: 12, y: 24, width: 120, height: 80 };
 
-    await copyCaptureSelection(invoke, 'session-2', rect, [], true);
+    await copyCaptureSelection('session-2', rect, [], true, client);
 
     expect(calls).toEqual([
       {
@@ -659,13 +672,9 @@ describe('capture session actions', () => {
   it('prints the rendered current frozen selection', async () => {
     const calls: Array<{ command: string; args?: unknown }> = [];
     const printedImages: string[] = [];
-    const invoke: CaptureInvoke = async <T>(
-      command: string,
-      args?: CaptureInvokeArgs,
-    ): Promise<T> => {
-      calls.push({ command, args });
-      return 'rendered-png-base64' as T;
-    };
+    const client = createCaptureActionClient(calls, {
+      renderedImage: 'rendered-png-base64',
+    });
     const rect: LogicalRect = { x: 12, y: 24, width: 120, height: 80 };
     const annotations: AnnotationCommand[] = [
       {
@@ -678,13 +687,14 @@ describe('capture session actions', () => {
     ];
 
     await printCaptureSelection(
-      invoke,
       'session-2',
       rect,
       annotations,
       async (imageBase64) => {
         printedImages.push(imageBase64);
       },
+      false,
+      client,
     );
 
     expect(calls).toEqual([
@@ -703,17 +713,12 @@ describe('capture session actions', () => {
   it('requests cursor composition when printing with captured cursor enabled', async () => {
     const calls: Array<{ command: string; args?: unknown }> = [];
     const printedImages: string[] = [];
-    const invoke: CaptureInvoke = async <T>(
-      command: string,
-      args?: CaptureInvokeArgs,
-    ): Promise<T> => {
-      calls.push({ command, args });
-      return 'rendered-png-base64' as T;
-    };
+    const client = createCaptureActionClient(calls, {
+      renderedImage: 'rendered-png-base64',
+    });
     const rect: LogicalRect = { x: 12, y: 24, width: 120, height: 80 };
 
     await printCaptureSelection(
-      invoke,
       'session-2',
       rect,
       [],
@@ -721,6 +726,7 @@ describe('capture session actions', () => {
         printedImages.push(imageBase64);
       },
       true,
+      client,
     );
 
     expect(calls).toEqual([

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { ScreenshotCapture } from '../ScreenshotCapture';
 import { ScreenshotEditor } from '../ScreenshotEditor';
-import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { captureFullScreen } from '../../tauri/captureSession';
 
 type WorkflowState = 'idle' | 'selecting' | 'editing';
 
@@ -59,7 +59,7 @@ export function ScreenshotWorkflow() {
 
   const startScreenshotSelection = async () => {
     try {
-      const base64Data = await invoke<string>('capture_full_screen');
+      const base64Data = await captureFullScreen();
       setScreenImage(`data:image/png;base64,${base64Data}`);
       setCapturedImage(null);
       setSelectedRegion(null);

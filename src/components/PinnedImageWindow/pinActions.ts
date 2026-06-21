@@ -1,9 +1,48 @@
-export type PinInvokeArgs = Record<string, unknown>;
-export type PinInvoke = <T>(
-  command: string,
-  args?: PinInvokeArgs,
-) => Promise<T>;
+import {
+  defaultCaptureSavePath,
+  quickCaptureSavePath,
+} from '../../tauri/captureSession';
+import {
+  closePinnedImage as closePinnedImageCommand,
+  copyPinnedImage as copyPinnedImageCommand,
+  destroyPinnedImageGroup as destroyPinnedImageGroupCommand,
+  hidePinnedImageGroup as hidePinnedImageGroupCommand,
+  movePinnedImageToNextGroup as movePinnedImageToNextGroupCommand,
+  removePinnedImage,
+  replacePinnedImageFromClipboard as replacePinnedImageFromClipboardCommand,
+  savePinnedImage as savePinnedImageCommand,
+} from '../../tauri/pinnedImage';
+import type { PinnedImageView } from '../ScreenshotSession/types';
+
 export type PinWriteText = (text: string) => Promise<void>;
+
+export interface PinActionClient {
+  defaultCaptureSavePath: () => Promise<string>;
+  quickCaptureSavePath: (directory?: string) => Promise<string>;
+  copyPinnedImage: (imageId: string) => Promise<void>;
+  replacePinnedImageFromClipboard: (
+    imageId: string,
+  ) => Promise<PinnedImageView>;
+  savePinnedImage: (imageId: string, path: string) => Promise<void>;
+  closePinnedImage: (imageId: string) => Promise<void>;
+  removePinnedImage: (imageId: string) => Promise<void>;
+  movePinnedImageToNextGroup: (imageId: string) => Promise<number>;
+  hidePinnedImageGroup: (imageId: string) => Promise<string[]>;
+  destroyPinnedImageGroup: (imageId: string) => Promise<string[]>;
+}
+
+const tauriPinActionClient: PinActionClient = {
+  defaultCaptureSavePath,
+  quickCaptureSavePath,
+  copyPinnedImage: copyPinnedImageCommand,
+  replacePinnedImageFromClipboard: replacePinnedImageFromClipboardCommand,
+  savePinnedImage: savePinnedImageCommand,
+  closePinnedImage: closePinnedImageCommand,
+  removePinnedImage,
+  movePinnedImageToNextGroup: movePinnedImageToNextGroupCommand,
+  hidePinnedImageGroup: hidePinnedImageGroupCommand,
+  destroyPinnedImageGroup: destroyPinnedImageGroupCommand,
+};
 
 interface PinShortcutEvent {
   key: string;
@@ -97,8 +136,11 @@ export async function copyPinnedText(
   return true;
 }
 
-export async function copyPinnedImage(invoke: PinInvoke, imageId: string) {
-  await invoke('copy_pinned_image', { imageId });
+export async function copyPinnedImage(
+  imageId: string,
+  client: PinActionClient = tauriPinActionClient,
+) {
+  await client.copyPinnedImage(imageId);
 }
 
 export function isSavePinnedImageShortcut(event: PinShortcutEvent) {
@@ -156,42 +198,37 @@ export function isDestroyPinnedImageShortcut(event: PinDestroyShortcutEvent) {
   );
 }
 
-export async function savePinnedImage(invoke: PinInvoke, imageId: string) {
-  const path = await invoke<string>('default_capture_save_path');
+export async function savePinnedImage(
+  imageId: string,
+  client: PinActionClient = tauriPinActionClient,
+) {
+  const path = await client.defaultCaptureSavePath();
 
-  await invoke('save_pinned_image', {
-    imageId,
-    path,
-  });
+  await client.savePinnedImage(imageId, path);
 }
 
 export async function quickSavePinnedImage(
-  invoke: PinInvoke,
   imageId: string,
   directory?: string,
+  client: PinActionClient = tauriPinActionClient,
 ) {
-  const path = await invoke<string>('quick_capture_save_path', { directory });
+  const path = await client.quickCaptureSavePath(directory);
 
-  await invoke('save_pinned_image', {
-    imageId,
-    path,
-  });
+  await client.savePinnedImage(imageId, path);
 }
 
 export async function movePinnedImageToNextGroup(
-  invoke: PinInvoke,
   imageId: string,
+  client: PinActionClient = tauriPinActionClient,
 ) {
-  await invoke('move_pinned_image_to_next_group', {
-    imageId,
-  });
+  await client.movePinnedImageToNextGroup(imageId);
 }
 
 export async function replacePinnedImageFromClipboard<T>(
-  invoke: PinInvoke,
   imageId: string,
+  client: PinActionClient = tauriPinActionClient,
 ) {
-  return invoke<T>('replace_pinned_image_from_clipboard', { imageId });
+  return client.replacePinnedImageFromClipboard(imageId) as Promise<T>;
 }
 
 export async function openPinnedPreferences(
@@ -203,30 +240,33 @@ export async function openPinnedPreferences(
 }
 
 export async function closePinnedImage(
-  invoke: PinInvoke,
   imageId: string,
+  client: PinActionClient = tauriPinActionClient,
 ) {
-  await invoke('close_pinned_image', { imageId });
+  await client.closePinnedImage(imageId);
 }
 
-export async function hidePinnedImageGroup(invoke: PinInvoke, imageId: string) {
-  await invoke('hide_pinned_image_group', { imageId });
+export async function hidePinnedImageGroup(
+  imageId: string,
+  client: PinActionClient = tauriPinActionClient,
+) {
+  await client.hidePinnedImageGroup(imageId);
 }
 
 export async function destroyPinnedImage(
-  invoke: PinInvoke,
   imageId: string,
   window: PinWindow,
+  client: PinActionClient = tauriPinActionClient,
 ) {
-  await invoke('remove_pinned_image', { imageId });
+  await client.removePinnedImage(imageId);
   await window.close?.();
 }
 
 export async function destroyPinnedImageGroup(
-  invoke: PinInvoke,
   imageId: string,
+  client: PinActionClient = tauriPinActionClient,
 ) {
-  await invoke('destroy_pinned_image_group', { imageId });
+  await client.destroyPinnedImageGroup(imageId);
 }
 
 function hasPinnedSourceText(sourceText?: string | null): sourceText is string {

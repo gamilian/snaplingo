@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import {
   getCurrentWindow,
   LogicalSize,
@@ -10,6 +9,7 @@ import {
   WebviewWindow,
 } from '@tauri-apps/api/webviewWindow';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { getPinnedImage } from '../../tauri/pinnedImage';
 import type { PinnedImageView } from '../ScreenshotSession/types';
 import {
   getPinnedContextMenuPosition,
@@ -145,7 +145,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
 
   const hideCurrentPinnedImage = useCallback(async () => {
     try {
-      await closePinnedImage(invoke, imageId);
+      await closePinnedImage(imageId);
     } catch (err) {
       console.error('Failed to hide pinned image:', err);
     }
@@ -153,7 +153,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
 
   const destroyCurrentPinnedImage = useCallback(async () => {
     try {
-      await destroyPinnedImage(invoke, imageId, webviewWindow);
+      await destroyPinnedImage(imageId, webviewWindow);
     } catch (err) {
       console.error('Failed to destroy pinned image:', err);
     }
@@ -161,7 +161,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
 
   const destroyCurrentPinnedImageGroup = useCallback(async () => {
     try {
-      await destroyPinnedImageGroup(invoke, imageId);
+      await destroyPinnedImageGroup(imageId);
       setContextMenuPosition(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -170,7 +170,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
 
   const hideCurrentPinnedImageGroup = useCallback(async () => {
     try {
-      await hidePinnedImageGroup(invoke, imageId);
+      await hidePinnedImageGroup(imageId);
       setContextMenuPosition(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -180,7 +180,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
   useEffect(() => {
     let disposed = false;
 
-    invoke<PinnedImageView>('get_pinned_image', { imageId })
+    getPinnedImage(imageId)
       .then((nextImage) => {
         if (!disposed) {
           setImage(nextImage);
@@ -325,7 +325,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
 
   const copyCurrentPinnedImage = useCallback(async () => {
     try {
-      await copyPinnedImage(invoke, imageId);
+      await copyPinnedImage(imageId);
       setContextMenuPosition(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -346,7 +346,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
 
   const savePinnedImageAs = useCallback(async () => {
     try {
-      await savePinnedImage(invoke, imageId);
+      await savePinnedImage(imageId);
       setContextMenuPosition(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -355,7 +355,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
 
   const quickSavePinnedImageToDirectory = useCallback(async () => {
     try {
-      await quickSavePinnedImage(invoke, imageId, screenshotSavePath);
+      await quickSavePinnedImage(imageId, screenshotSavePath);
       setContextMenuPosition(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -374,7 +374,6 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
   const replacePinnedFromClipboard = useCallback(async () => {
     try {
       const nextImage = await replacePinnedImageFromClipboard<PinnedImageView>(
-        invoke,
         imageId,
       );
       const nextTransform = createDefaultPinnedTransform();
@@ -392,7 +391,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
 
   const movePinnedToAnotherGroup = useCallback(async () => {
     try {
-      await movePinnedImageToNextGroup(invoke, imageId);
+      await movePinnedImageToNextGroup(imageId);
       setContextMenuPosition(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

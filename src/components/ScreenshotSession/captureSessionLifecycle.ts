@@ -1,20 +1,26 @@
-export type CaptureLifecycleInvokeArgs = Record<string, unknown>;
-export type CaptureLifecycleInvoke = (
-  command: string,
-  args?: CaptureLifecycleInvokeArgs,
-) => Promise<unknown>;
+import { cancelCaptureSession } from '../../tauri/captureSession';
+
 export type CaptureInactiveHandler = () => void | Promise<void>;
 export interface CaptureInactiveWindow {
   hide: () => Promise<void>;
 }
+
+export interface CaptureLifecycleClient {
+  cancelCaptureSession: (sessionId: string) => Promise<void>;
+}
+
+const tauriCaptureLifecycleClient: CaptureLifecycleClient = {
+  cancelCaptureSession,
+};
 
 interface CloseInactiveCaptureSessionOptions {
   onInactive?: CaptureInactiveHandler;
   resetSessionState: () => void;
 }
 
-interface FinishCaptureSessionOptions extends CloseInactiveCaptureSessionOptions {
-  invoke: CaptureLifecycleInvoke;
+interface FinishCaptureSessionOptions
+  extends CloseInactiveCaptureSessionOptions {
+  client?: CaptureLifecycleClient;
   sessionId: string;
 }
 
@@ -31,12 +37,12 @@ export async function closeInactiveCaptureSession({
 }
 
 export async function finishCaptureSession({
-  invoke,
+  client = tauriCaptureLifecycleClient,
   sessionId,
   onInactive,
   resetSessionState,
 }: FinishCaptureSessionOptions) {
-  await invoke('cancel_capture_session', { sessionId });
+  await client.cancelCaptureSession(sessionId);
   await closeInactiveCaptureSession({ onInactive, resetSessionState });
 }
 

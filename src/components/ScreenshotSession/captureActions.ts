@@ -6,15 +6,38 @@ import type {
   LogicalRect,
   Point,
 } from './types';
+import {
+  cancelCaptureSession,
+  createCaptureSession,
+  defaultCaptureSavePath,
+  outputCapture,
+  quickCaptureSavePath,
+  renderCaptureOutput,
+  type OutputCaptureInput,
+  type RenderCaptureOutputInput,
+} from '../../tauri/captureSession';
 
-export type CaptureInvokeArgs = Record<string, unknown>;
-export type CaptureInvoke = <T>(
-  command: string,
-  args?: CaptureInvokeArgs,
-) => Promise<T>;
 export type CaptureImagePrinter = (
   imageBase64: string,
 ) => Promise<void> | void;
+
+export interface CaptureActionClient {
+  defaultCaptureSavePath: () => Promise<string>;
+  quickCaptureSavePath: (directory?: string) => Promise<string>;
+  outputCapture: (input: OutputCaptureInput) => Promise<void>;
+  createCaptureSession: () => Promise<CaptureSessionView>;
+  cancelCaptureSession: (sessionId: string) => Promise<void>;
+  renderCaptureOutput: (input: RenderCaptureOutputInput) => Promise<string>;
+}
+
+const tauriCaptureActionClient: CaptureActionClient = {
+  defaultCaptureSavePath,
+  quickCaptureSavePath,
+  outputCapture,
+  createCaptureSession,
+  cancelCaptureSession,
+  renderCaptureOutput,
+};
 
 interface CaptureShortcutEvent {
   key: string;
@@ -480,15 +503,15 @@ export function shouldCancelCaptureOnBlur(state: CancelCaptureBlurState) {
 }
 
 export async function saveCaptureSelection(
-  invoke: CaptureInvoke,
   sessionId: string,
   rect: LogicalRect,
   annotations: AnnotationCommand[] = [],
   includeCursor = false,
+  client: CaptureActionClient = tauriCaptureActionClient,
 ) {
-  const path = await invoke<string>('default_capture_save_path');
+  const path = await client.defaultCaptureSavePath();
 
-  await invoke('output_capture', {
+  await client.outputCapture({
     sessionId,
     rect,
     annotations,
@@ -501,16 +524,16 @@ export async function saveCaptureSelection(
 }
 
 export async function quickSaveCaptureSelection(
-  invoke: CaptureInvoke,
   sessionId: string,
   rect: LogicalRect,
   annotations: AnnotationCommand[] = [],
   directory?: string,
   includeCursor = false,
+  client: CaptureActionClient = tauriCaptureActionClient,
 ) {
-  const path = await invoke<string>('quick_capture_save_path', { directory });
+  const path = await client.quickCaptureSavePath(directory);
 
-  await invoke('output_capture', {
+  await client.outputCapture({
     sessionId,
     rect,
     annotations,
@@ -523,22 +546,22 @@ export async function quickSaveCaptureSelection(
 }
 
 export async function refreshCaptureSession(
-  invoke: CaptureInvoke,
   previousSessionId: string,
+  client: CaptureActionClient = tauriCaptureActionClient,
 ) {
-  const session = await invoke<CaptureSessionView>('create_capture_session');
-  await invoke('cancel_capture_session', { sessionId: previousSessionId });
+  const session = await client.createCaptureSession();
+  await client.cancelCaptureSession(previousSessionId);
   return session;
 }
 
 export async function copyCaptureSelection(
-  invoke: CaptureInvoke,
   sessionId: string,
   rect: LogicalRect,
   annotations: AnnotationCommand[] = [],
   includeCursor = false,
+  client: CaptureActionClient = tauriCaptureActionClient,
 ) {
-  await invoke('output_capture', {
+  await client.outputCapture({
     sessionId,
     rect,
     annotations,
@@ -548,14 +571,14 @@ export async function copyCaptureSelection(
 }
 
 export async function printCaptureSelection(
-  invoke: CaptureInvoke,
   sessionId: string,
   rect: LogicalRect,
   annotations: AnnotationCommand[],
   printImage: CaptureImagePrinter,
   includeCursor = false,
+  client: CaptureActionClient = tauriCaptureActionClient,
 ) {
-  const imageBase64 = await invoke<string>('render_capture_output', {
+  const imageBase64 = await client.renderCaptureOutput({
     sessionId,
     rect,
     annotations,

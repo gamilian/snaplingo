@@ -94,8 +94,10 @@ describe('capture window visibility', () => {
     await revealCaptureWindowForSession({
       window,
       sessionId: 'capture-1',
-      invoke: async (command, args) => {
-        calls.push(`${command}:${String(args?.sessionId)}`);
+      client: {
+        restoreCaptureSnapshotWindowsForSession: async (sessionId) => {
+          calls.push(`restore_capture_snapshot_windows_for_session:${sessionId}`);
+        },
       },
     });
 

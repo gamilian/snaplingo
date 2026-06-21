@@ -451,6 +451,7 @@ git commit -m "refactor(frontend): add typed tauri adapters for providers and hi
 - Create: `src/tauri/captureSession.ts`
 - Create: `src/tauri/pinnedImage.ts`
 - Create: `src/tauri/__tests__/captureSession.test.ts`
+- Create: `src/tauri/__tests__/pinnedImage.test.ts`
 - Modify: `src/components/ScreenshotSession/index.tsx`
 - Modify: `src/components/ScreenshotSession/captureActions.ts`
 - Modify: `src/components/ScreenshotSession/captureSessionLifecycle.ts`
@@ -458,8 +459,9 @@ git commit -m "refactor(frontend): add typed tauri adapters for providers and hi
 - Modify: `src/components/PinnedImageWindow/index.tsx`
 - Modify: `src/components/PinnedImageWindow/pinActions.ts`
 - Modify: `src/components/SettingsWindow/Advanced/AdvancedPage.tsx`
+- Modify: `src/components/ScreenshotWorkflow/index.tsx`
 
-- [ ] **Step 1: Add failing Capture Session adapter tests**
+- [x] **Step 1: Add failing Capture Session adapter tests**
 
 Create `src/tauri/__tests__/captureSession.test.ts`:
 
@@ -512,7 +514,7 @@ describe('capture session tauri adapter', () => {
 });
 ```
 
-- [ ] **Step 2: Run test and verify it fails**
+- [x] **Step 2: Run test and verify it fails**
 
 Run:
 
@@ -522,7 +524,9 @@ npm test -- --run src/tauri/__tests__/captureSession.test.ts
 
 Expected: FAIL because `src/tauri/captureSession.ts` does not exist.
 
-- [ ] **Step 3: Implement Capture Session adapter**
+Current status: failed as expected with `Cannot find module '/src/tauri/captureSession'`.
+
+- [x] **Step 3: Implement Capture Session adapter**
 
 Create `src/tauri/captureSession.ts` with functions:
 
@@ -539,7 +543,9 @@ Create `src/tauri/captureSession.ts` with functions:
 
 Use existing frontend types from `src/components/ScreenshotSession/types.ts` at first. Do not create new shared type systems in this task.
 
-- [ ] **Step 4: Implement Pinned Image adapter**
+Current status: implemented. Also included `openResultWindow`, `openTranslationResultWindow`, `triggerScreenshot`, and legacy `captureFullScreen` so UI files no longer call raw `invoke`.
+
+- [x] **Step 4: Implement Pinned Image adapter**
 
 Create `src/tauri/pinnedImage.ts` with functions:
 
@@ -555,7 +561,9 @@ Create `src/tauri/pinnedImage.ts` with functions:
 - `hidePinnedImageGroup`
 - `destroyPinnedImageGroup`
 
-- [ ] **Step 5: Replace raw invokes in Capture Session files**
+Current status: implemented with focused adapter tests for `getPinnedImage` and `savePinnedImage`.
+
+- [x] **Step 5: Replace raw invokes in Capture Session files**
 
 Replace direct calls in:
 
@@ -566,7 +574,9 @@ Replace direct calls in:
 
 Expected: these files import adapter functions instead of `invoke` from `@tauri-apps/api/core`.
 
-- [ ] **Step 6: Replace raw invokes in Pinned Image files**
+Current status: done. `src/components/ScreenshotWorkflow/index.tsx` and `src/components/SettingsWindow/Advanced/AdvancedPage.tsx` were also moved to adapter calls to make the frontend seam check clean.
+
+- [x] **Step 6: Replace raw invokes in Pinned Image files**
 
 Replace direct calls in:
 
@@ -575,7 +585,9 @@ Replace direct calls in:
 
 Expected: these files import adapter functions from `src/tauri/pinnedImage.ts`.
 
-- [ ] **Step 7: Run focused frontend tests**
+Current status: done. Pinned image helper functions now call a typed adapter client instead of raw command strings.
+
+- [x] **Step 7: Run focused frontend tests**
 
 Run:
 
@@ -590,7 +602,9 @@ npm test -- --run \
 
 Expected: PASS.
 
-- [ ] **Step 8: Verify command seam is explicit**
+Current status: PASS. Focused Vitest run passed 86 tests across 6 files. `npm run build` passed. Full `npm test` passed 235 tests across 24 files.
+
+- [x] **Step 8: Verify command seam is explicit**
 
 Run:
 
@@ -599,6 +613,8 @@ rg "invoke<|invoke\\(" src -n
 ```
 
 Expected: direct runtime command calls are concentrated under `src/tauri/`. Direct invokes in prototype files are acceptable only if those files were intentionally kept as design artifacts.
+
+Current status: PASS. `rg "invoke<|invoke\\(" src -n` reports direct runtime calls only under `src/tauri/`.
 
 - [ ] **Step 9: Commit**
 

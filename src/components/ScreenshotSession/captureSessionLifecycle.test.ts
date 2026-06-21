@@ -3,19 +3,20 @@ import {
   closeInactiveCaptureSession,
   finishCaptureSession,
   hideInactiveCaptureWindow,
-  type CaptureLifecycleInvoke,
+  type CaptureLifecycleClient,
 } from './captureSessionLifecycle';
 
 describe('capture session lifecycle', () => {
   it('waits for the inactive handler instead of clearing the visible capture UI', async () => {
     const events: string[] = [];
-    const invoke: CaptureLifecycleInvoke = async (command, args) => {
-      events.push(`${command}:${String(args?.sessionId)}`);
-      return undefined;
+    const client: CaptureLifecycleClient = {
+      cancelCaptureSession: async (sessionId) => {
+        events.push(`cancel_capture_session:${sessionId}`);
+      },
     };
 
     await finishCaptureSession({
-      invoke,
+      client,
       sessionId: 'session-1',
       onInactive: async () => {
         events.push('close-start');
@@ -36,13 +37,14 @@ describe('capture session lifecycle', () => {
 
   it('clears the capture UI only when no inactive handler is available', async () => {
     const events: string[] = [];
-    const invoke: CaptureLifecycleInvoke = async (command, args) => {
-      events.push(`${command}:${String(args?.sessionId)}`);
-      return undefined;
+    const client: CaptureLifecycleClient = {
+      cancelCaptureSession: async (sessionId) => {
+        events.push(`cancel_capture_session:${sessionId}`);
+      },
     };
 
     await finishCaptureSession({
-      invoke,
+      client,
       sessionId: 'session-2',
       resetSessionState: () => {
         events.push('reset');
@@ -54,14 +56,15 @@ describe('capture session lifecycle', () => {
 
   it('does not clear state if closing the capture window fails', async () => {
     const events: string[] = [];
-    const invoke: CaptureLifecycleInvoke = async (command, args) => {
-      events.push(`${command}:${String(args?.sessionId)}`);
-      return undefined;
+    const client: CaptureLifecycleClient = {
+      cancelCaptureSession: async (sessionId) => {
+        events.push(`cancel_capture_session:${sessionId}`);
+      },
     };
 
     await expect(
       finishCaptureSession({
-        invoke,
+        client,
         sessionId: 'session-3',
         onInactive: async () => {
           events.push('close-start');

@@ -19,10 +19,78 @@ import {
   openPinnedPreferences,
   quickSavePinnedImage,
   replacePinnedImageFromClipboard,
-  type PinInvoke,
-  type PinInvokeArgs,
+  type PinActionClient,
   savePinnedImage,
 } from './pinActions';
+import type { PinnedImageView } from '../ScreenshotSession/types';
+
+function createPinActionClient(
+  calls: Array<{ command: string; args?: unknown }>,
+  options: {
+    defaultPath?: string;
+    quickPath?: string;
+    nextImage?: PinnedImageView;
+  } = {},
+): PinActionClient {
+  return {
+    defaultCaptureSavePath: async () => {
+      calls.push({ command: 'default_capture_save_path', args: undefined });
+      return options.defaultPath ?? '';
+    },
+    quickCaptureSavePath: async (directory) => {
+      calls.push({
+        command: 'quick_capture_save_path',
+        args: { directory },
+      });
+      return options.quickPath ?? '';
+    },
+    copyPinnedImage: async (imageId) => {
+      calls.push({ command: 'copy_pinned_image', args: { imageId } });
+    },
+    replacePinnedImageFromClipboard: async (imageId) => {
+      calls.push({
+        command: 'replace_pinned_image_from_clipboard',
+        args: { imageId },
+      });
+      return (
+        options.nextImage ?? {
+          id: imageId,
+          image_base64: '',
+          width: 0,
+          height: 0,
+          source_text: null,
+        }
+      );
+    },
+    savePinnedImage: async (imageId, path) => {
+      calls.push({ command: 'save_pinned_image', args: { imageId, path } });
+    },
+    closePinnedImage: async (imageId) => {
+      calls.push({ command: 'close_pinned_image', args: { imageId } });
+    },
+    removePinnedImage: async (imageId) => {
+      calls.push({ command: 'remove_pinned_image', args: { imageId } });
+    },
+    movePinnedImageToNextGroup: async (imageId) => {
+      calls.push({
+        command: 'move_pinned_image_to_next_group',
+        args: { imageId },
+      });
+      return 1;
+    },
+    hidePinnedImageGroup: async (imageId) => {
+      calls.push({ command: 'hide_pinned_image_group', args: { imageId } });
+      return [imageId];
+    },
+    destroyPinnedImageGroup: async (imageId) => {
+      calls.push({
+        command: 'destroy_pinned_image_group',
+        args: { imageId },
+      });
+      return [imageId];
+    },
+  };
+}
 
 describe('pinned image actions', () => {
   it('exposes Snipaste-style hover toolbar actions for pinned images', () => {
@@ -50,18 +118,11 @@ describe('pinned image actions', () => {
 
   it('saves a pinned image to the default capture path', async () => {
     const calls: Array<{ command: string; args?: unknown }> = [];
-    const invoke: PinInvoke = async <T>(
-      command: string,
-      args?: PinInvokeArgs,
-    ): Promise<T> => {
-      calls.push({ command, args });
-      if (command === 'default_capture_save_path') {
-        return '/tmp/SnapLingo-20260617-023000.png' as T;
-      }
-      return undefined as T;
-    };
+    const client = createPinActionClient(calls, {
+      defaultPath: '/tmp/SnapLingo-20260617-023000.png',
+    });
 
-    await savePinnedImage(invoke, 'pin-1');
+    await savePinnedImage('pin-1', client);
 
     expect(calls).toEqual([
       { command: 'default_capture_save_path', args: undefined },
@@ -77,18 +138,11 @@ describe('pinned image actions', () => {
 
   it('quick saves a pinned image to the configured capture path', async () => {
     const calls: Array<{ command: string; args?: unknown }> = [];
-    const invoke: PinInvoke = async <T>(
-      command: string,
-      args?: PinInvokeArgs,
-    ): Promise<T> => {
-      calls.push({ command, args });
-      if (command === 'quick_capture_save_path') {
-        return '/tmp/SnapLingo/SnapLingo-20260617-023000.png' as T;
-      }
-      return undefined as T;
-    };
+    const client = createPinActionClient(calls, {
+      quickPath: '/tmp/SnapLingo/SnapLingo-20260617-023000.png',
+    });
 
-    await quickSavePinnedImage(invoke, 'pin-1', '~/Pictures/SnapLingo');
+    await quickSavePinnedImage('pin-1', '~/Pictures/SnapLingo', client);
 
     expect(calls).toEqual([
       {
@@ -147,15 +201,9 @@ describe('pinned image actions', () => {
 
   it('copies a pinned image to the image clipboard', async () => {
     const calls: Array<{ command: string; args?: unknown }> = [];
-    const invoke: PinInvoke = async <T>(
-      command: string,
-      args?: PinInvokeArgs,
-    ): Promise<T> => {
-      calls.push({ command, args });
-      return undefined as T;
-    };
+    const client = createPinActionClient(calls);
 
-    await copyPinnedImage(invoke, 'pin-1');
+    await copyPinnedImage('pin-1', client);
 
     expect(calls).toEqual([
       {
@@ -449,21 +497,15 @@ describe('pinned image actions', () => {
 
   it('replaces a pinned image with clipboard content', async () => {
     const calls: Array<{ command: string; args?: unknown }> = [];
-    const nextImage = {
+    const nextImage: PinnedImageView = {
       id: 'pin-1',
       image_base64: 'updated',
       width: 4,
       height: 3,
     };
-    const invoke: PinInvoke = async <T>(
-      command: string,
-      args?: PinInvokeArgs,
-    ): Promise<T> => {
-      calls.push({ command, args });
-      return nextImage as T;
-    };
+    const client = createPinActionClient(calls, { nextImage });
 
-    await expect(replacePinnedImageFromClipboard(invoke, 'pin-1')).resolves.toEqual(
+    await expect(replacePinnedImageFromClipboard('pin-1', client)).resolves.toEqual(
       nextImage,
     );
     expect(calls).toEqual([
@@ -476,15 +518,9 @@ describe('pinned image actions', () => {
 
   it('moves a pinned image to another group', async () => {
     const calls: Array<{ command: string; args?: unknown }> = [];
-    const invoke: PinInvoke = async <T>(
-      command: string,
-      args?: PinInvokeArgs,
-    ): Promise<T> => {
-      calls.push({ command, args });
-      return undefined as T;
-    };
+    const client = createPinActionClient(calls);
 
-    await movePinnedImageToNextGroup(invoke, 'pin-1');
+    await movePinnedImageToNextGroup('pin-1', client);
 
     expect(calls).toEqual([
       {
@@ -515,15 +551,11 @@ describe('pinned image actions', () => {
 
   it('closes a pinned image through the backend recovery path', async () => {
     const calls: Array<{ command?: string; args?: unknown }> = [];
-    const invoke: PinInvoke = async <T>(
-      command: string,
-      args?: PinInvokeArgs,
-    ): Promise<T> => {
-      calls.push({ command, args });
-      return undefined as T;
-    };
+    const client = createPinActionClient(
+      calls as Array<{ command: string; args?: unknown }>,
+    );
 
-    await closePinnedImage(invoke, 'pin-1');
+    await closePinnedImage('pin-1', client);
 
     expect(calls).toEqual([
       {
@@ -535,19 +567,15 @@ describe('pinned image actions', () => {
 
   it('destroys a pinned image by removing it before closing the window', async () => {
     const calls: Array<{ command?: string; args?: unknown; window?: string }> = [];
-    const invoke: PinInvoke = async <T>(
-      command: string,
-      args?: PinInvokeArgs,
-    ): Promise<T> => {
-      calls.push({ command, args });
-      return undefined as T;
-    };
+    const client = createPinActionClient(
+      calls as Array<{ command: string; args?: unknown }>,
+    );
 
-    await destroyPinnedImage(invoke, 'pin-1', {
+    await destroyPinnedImage('pin-1', {
       close: async () => {
         calls.push({ window: 'close' });
       },
-    });
+    }, client);
 
     expect(calls).toEqual([
       {
@@ -560,15 +588,9 @@ describe('pinned image actions', () => {
 
   it('destroys the group containing a pinned image', async () => {
     const calls: Array<{ command: string; args?: unknown }> = [];
-    const invoke: PinInvoke = async <T>(
-      command: string,
-      args?: PinInvokeArgs,
-    ): Promise<T> => {
-      calls.push({ command, args });
-      return undefined as T;
-    };
+    const client = createPinActionClient(calls);
 
-    await destroyPinnedImageGroup(invoke, 'pin-1');
+    await destroyPinnedImageGroup('pin-1', client);
 
     expect(calls).toEqual([
       {
@@ -580,15 +602,9 @@ describe('pinned image actions', () => {
 
   it('hides the group containing a pinned image', async () => {
     const calls: Array<{ command: string; args?: unknown }> = [];
-    const invoke: PinInvoke = async <T>(
-      command: string,
-      args?: PinInvokeArgs,
-    ): Promise<T> => {
-      calls.push({ command, args });
-      return undefined as T;
-    };
+    const client = createPinActionClient(calls);
 
-    await hidePinnedImageGroup(invoke, 'pin-1');
+    await hidePinnedImageGroup('pin-1', client);
 
     expect(calls).toEqual([
       {
