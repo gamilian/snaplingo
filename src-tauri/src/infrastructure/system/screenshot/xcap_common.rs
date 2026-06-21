@@ -1,8 +1,8 @@
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use super::backend::ScreenRegion;
 use super::backend::{
-    monitor_snapshot_from_physical_geometry, rgba_image_to_png,
-    window_candidate_from_physical_geometry, MonitorSnapshot, WindowCandidate,
+    MonitorSnapshot, WindowCandidate, monitor_snapshot_from_physical_geometry, rgba_image_to_png,
+    window_candidate_from_physical_geometry,
 };
 use crate::error::AppError;
 use xcap::{Monitor, Window};

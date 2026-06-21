@@ -2,8 +2,8 @@
 mod tests {
     use super::super::HistoryService;
     use crate::domain::events::DomainEvent;
-    use crate::domain::translation::{TranslationRequest, TranslationResult};
     use crate::domain::ocr::{OcrRequest, OcrResult};
+    use crate::domain::translation::{TranslationRequest, TranslationResult};
     use crate::infrastructure::events::EventSubscriber;
     use crate::infrastructure::storage::HistoryDatabase;
     use chrono::Utc;

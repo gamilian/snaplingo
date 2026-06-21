@@ -41,7 +41,8 @@ impl CaptureSessionService {
     }
 
     pub async fn create_session(&self) -> Result<CaptureSessionView> {
-        self.create_session_with_hidden_window_labels(Vec::new()).await
+        self.create_session_with_hidden_window_labels(Vec::new())
+            .await
     }
 
     pub async fn create_session_with_hidden_window_labels(
@@ -78,12 +79,6 @@ impl CaptureSessionService {
             .collect::<Vec<_>>();
 
         let id = CaptureSessionId(generate_session_id());
-        let view = CaptureSessionView {
-            id: id.clone(),
-            monitors: snapshots.iter().map(snapshot_to_view).collect(),
-            candidates: candidates.clone(),
-            captured_cursor: captured_cursor.as_ref().map(captured_cursor_to_view),
-        };
         let session = CaptureSession {
             id: id.clone(),
             snapshots,
@@ -92,6 +87,7 @@ impl CaptureSessionService {
             hidden_window_labels,
             created_at: SystemTime::now(),
         };
+        let view = session_to_view(&session);
 
         let mut sessions = self
             .sessions
@@ -134,6 +130,12 @@ impl CaptureSessionService {
             .ok_or_else(|| AppError::System(format!("Capture session not found: {}", id.0)))
     }
 
+    pub fn get_session_view(&self, id: &CaptureSessionId) -> Result<CaptureSessionView> {
+        let session = self.get_session(id)?;
+
+        Ok(session_to_view(&session))
+    }
+
     pub fn has_session(&self, id: &CaptureSessionId) -> bool {
         self.sessions
             .lock()
@@ -156,6 +158,18 @@ impl CaptureSessionService {
             })?;
 
         logical_rect_to_snapshot_physical(rect, snapshot)
+    }
+}
+
+fn session_to_view(session: &CaptureSession) -> CaptureSessionView {
+    CaptureSessionView {
+        id: session.id.clone(),
+        monitors: session.snapshots.iter().map(snapshot_to_view).collect(),
+        candidates: session.candidates.clone(),
+        captured_cursor: session
+            .captured_cursor
+            .as_ref()
+            .map(captured_cursor_to_view),
     }
 }
 

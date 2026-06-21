@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   closeInactiveCaptureSession,
   finishCaptureSession,
+  hideInactiveCaptureWindow,
   type CaptureLifecycleInvoke,
 } from './captureSessionLifecycle';
 
@@ -88,5 +89,17 @@ describe('capture session lifecycle', () => {
     });
 
     expect(events).toEqual(['close']);
+  });
+
+  it('hides the capture window for reuse when it becomes inactive', async () => {
+    const events: string[] = [];
+
+    await hideInactiveCaptureWindow({
+      hide: async () => {
+        events.push('hide');
+      },
+    });
+
+    expect(events).toEqual(['hide']);
   });
 });

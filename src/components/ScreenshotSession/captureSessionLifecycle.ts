@@ -4,6 +4,9 @@ export type CaptureLifecycleInvoke = (
   args?: CaptureLifecycleInvokeArgs,
 ) => Promise<unknown>;
 export type CaptureInactiveHandler = () => void | Promise<void>;
+export interface CaptureInactiveWindow {
+  hide: () => Promise<void>;
+}
 
 interface CloseInactiveCaptureSessionOptions {
   onInactive?: CaptureInactiveHandler;
@@ -35,4 +38,8 @@ export async function finishCaptureSession({
 }: FinishCaptureSessionOptions) {
   await invoke('cancel_capture_session', { sessionId });
   await closeInactiveCaptureSession({ onInactive, resetSessionState });
+}
+
+export async function hideInactiveCaptureWindow(window: CaptureInactiveWindow) {
+  await window.hide();
 }

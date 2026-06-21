@@ -732,8 +732,8 @@ fn draw_blur_annotation(output: &mut image::RgbaImage, rect: &PhysicalRect, radi
 
     let width = (right - left) as u32;
     let height = (bottom - top) as u32;
-    let region = image::imageops::crop_imm(output, left as u32, top as u32, width, height)
-        .to_image();
+    let region =
+        image::imageops::crop_imm(output, left as u32, top as u32, width, height).to_image();
     let blurred = image::imageops::blur(&region, radius.max(1) as f32);
     image::imageops::overlay(output, &blurred, left, top);
 }

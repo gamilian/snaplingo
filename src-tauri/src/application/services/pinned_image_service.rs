@@ -1,14 +1,17 @@
 use std::collections::{BTreeSet, HashMap, VecDeque};
+use std::path::Path;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
 
+use crate::application::services::{
+    CaptureOutputService, ClipboardCaptureOutput, ImageCompositionService,
+};
 use crate::domain::capture::PinnedImageView;
 use crate::error::{AppError, Result};
 
 const MAX_RECOVERABLE_CLOSED_IMAGES: usize = 1;
-
 #[derive(Clone)]
 struct PinnedImage {
     png_data: Vec<u8>,
@@ -38,6 +41,12 @@ pub struct PinnedImageGroupMembership {
     pub image_ids: Vec<String>,
 }
 
+#[derive(Debug, PartialEq)]
+pub enum PinnedImageOpenRequest {
+    Reopen(PinnedImageView),
+    Open(PinnedImageView),
+}
+
 pub struct PinnedImageService {
     images: Mutex<HashMap<String, PinnedImage>>,
     active_group: Mutex<u32>,
@@ -55,6 +64,41 @@ impl PinnedImageService {
 
     pub fn pin_png(&self, png_data: Vec<u8>) -> Result<String> {
         self.pin_png_with_source_text(png_data, None)
+    }
+
+    pub fn pin_png_view(&self, png_data: Vec<u8>) -> Result<PinnedImageView> {
+        let image_id = self.pin_png(png_data)?;
+
+        self.get_pinned_image(&image_id)
+    }
+
+    pub fn pin_capture_output_view(
+        &self,
+        image_composition: &ImageCompositionService,
+        output: ClipboardCaptureOutput,
+    ) -> Result<PinnedImageView> {
+        match output {
+            ClipboardCaptureOutput::Png(png_data) => self.pin_png_view(png_data),
+            ClipboardCaptureOutput::Text(text) => {
+                self.pin_text_as_png_view(image_composition, &text)
+            }
+        }
+    }
+
+    pub fn pin_clipboard_capture_output(
+        &self,
+        image_composition: &ImageCompositionService,
+        output: &CaptureOutputService,
+    ) -> Result<PinnedImageOpenRequest> {
+        if let Some(image_id) = self.pop_recoverable_pinned_image() {
+            let image = self.get_pinned_image(&image_id)?;
+            return Ok(PinnedImageOpenRequest::Reopen(image));
+        }
+
+        let output = output.read_clipboard_capture_output()?;
+        let image = self.pin_capture_output_view(image_composition, output)?;
+
+        Ok(PinnedImageOpenRequest::Open(image))
     }
 
     pub fn pin_png_with_source_text(
@@ -77,6 +121,17 @@ impl PinnedImageService {
         self.images.lock().unwrap().insert(id.clone(), pinned_image);
 
         Ok(id)
+    }
+
+    pub fn pin_text_as_png_view(
+        &self,
+        image_composition: &ImageCompositionService,
+        text: &str,
+    ) -> Result<PinnedImageView> {
+        let png_data = image_composition.render_clipboard_text_png(text)?;
+        let image_id = self.pin_png_with_source_text(png_data, Some(text.to_string()))?;
+
+        self.get_pinned_image(&image_id)
     }
 
     pub fn get_pinned_image(&self, image_id: &str) -> Result<PinnedImageView> {
@@ -106,8 +161,78 @@ impl PinnedImageService {
             .ok_or_else(|| AppError::System(format!("Pinned image not found: {}", image_id)))
     }
 
+    pub async fn save_pinned_png_to_path(
+        &self,
+        output: &CaptureOutputService,
+        image_id: &str,
+        path: &Path,
+    ) -> Result<()> {
+        let png_data = self.get_pinned_png(image_id)?;
+
+        output.save_png(&png_data, path).await.map(|_| ())
+    }
+
+    pub async fn copy_pinned_png_to_clipboard(
+        &self,
+        output: &CaptureOutputService,
+        image_id: &str,
+    ) -> Result<()> {
+        let png_data = self.get_pinned_png(image_id)?;
+
+        output.copy_png(&png_data).await
+    }
+
     pub fn replace_pinned_png(&self, image_id: &str, png_data: Vec<u8>) -> Result<()> {
         self.replace_pinned_png_with_source_text(image_id, png_data, None)
+    }
+
+    pub fn replace_pinned_png_view(
+        &self,
+        image_id: &str,
+        png_data: Vec<u8>,
+    ) -> Result<PinnedImageView> {
+        self.replace_pinned_png(image_id, png_data)?;
+
+        self.get_pinned_image(image_id)
+    }
+
+    pub fn replace_capture_output_view(
+        &self,
+        image_composition: &ImageCompositionService,
+        image_id: &str,
+        output: ClipboardCaptureOutput,
+    ) -> Result<PinnedImageView> {
+        match output {
+            ClipboardCaptureOutput::Png(png_data) => {
+                self.replace_pinned_png_view(image_id, png_data)
+            }
+            ClipboardCaptureOutput::Text(text) => {
+                self.replace_pinned_text_as_png_view(image_composition, image_id, &text)
+            }
+        }
+    }
+
+    pub fn replace_clipboard_capture_output_view(
+        &self,
+        image_composition: &ImageCompositionService,
+        output: &CaptureOutputService,
+        image_id: &str,
+    ) -> Result<PinnedImageView> {
+        let output = output.read_clipboard_capture_output()?;
+
+        self.replace_capture_output_view(image_composition, image_id, output)
+    }
+
+    pub fn replace_pinned_text_as_png_view(
+        &self,
+        image_composition: &ImageCompositionService,
+        image_id: &str,
+        text: &str,
+    ) -> Result<PinnedImageView> {
+        let png_data = image_composition.render_clipboard_text_png(text)?;
+        self.replace_pinned_png_with_source_text(image_id, png_data, Some(text.to_string()))?;
+
+        self.get_pinned_image(image_id)
     }
 
     pub fn replace_pinned_png_with_source_text(

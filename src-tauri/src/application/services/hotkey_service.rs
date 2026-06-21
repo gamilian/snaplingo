@@ -169,10 +169,7 @@ mod tests {
 
         // Assert
         assert_ne!(id1, id2);
-        assert_eq!(
-            service.get_callback(id1).await,
-            Some("capture".to_string())
-        );
+        assert_eq!(service.get_callback(id1).await, Some("capture".to_string()));
         assert_eq!(
             service.get_callback(id2).await,
             Some("translate".to_string())

@@ -1,19 +1,63 @@
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
+    use std::time::{SystemTime, UNIX_EPOCH};
 
-    use crate::domain::capture::LogicalRect;
+    use base64::Engine;
+    use image::ImageEncoder;
+
+    use crate::application::providers::common::Provider;
+    use crate::application::providers::ocr::{OcrCoordinator, OcrProvider};
+    use crate::application::services::{CaptureOutputService, CaptureSessionOutput};
+    use crate::domain::capture::{CaptureOutputAction, LogicalRect};
+    use crate::domain::ocr::{OcrRequest, OcrResult};
     use crate::error::AppError;
+    use crate::infrastructure::storage::ConfigFile;
     use crate::infrastructure::system::screenshot::{
         CapturedCursor, MonitorSnapshot, ScreenRegion, ScreenshotBackend, WindowCandidate,
     };
 
     use crate::application::services::capture_session_service::CaptureSessionService;
+    use crate::application::services::image_composition_service::ImageCompositionService;
 
     struct MockScreenshotBackend {
         snapshots: Vec<MonitorSnapshot>,
         window_candidates: Vec<WindowCandidate>,
         captured_cursor: Option<CapturedCursor>,
+    }
+
+    struct RecordingOcrProvider {
+        observed_request: Arc<Mutex<Option<OcrRequest>>>,
+    }
+
+    impl Provider for RecordingOcrProvider {
+        fn id(&self) -> &str {
+            "recording"
+        }
+
+        fn name(&self) -> &str {
+            "Recording OCR"
+        }
+
+        fn is_configured(&self) -> bool {
+            true
+        }
+
+        fn requires_api_key(&self) -> bool {
+            false
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl OcrProvider for RecordingOcrProvider {
+        async fn recognize(&self, request: &OcrRequest) -> crate::Result<OcrResult> {
+            *self.observed_request.lock().unwrap() = Some(request.clone());
+
+            Ok(OcrResult {
+                text: "recorded".to_string(),
+                confidence: Some(1.0),
+            })
+        }
     }
 
     #[async_trait::async_trait]
@@ -145,6 +189,44 @@ mod tests {
         backend
     }
 
+    fn make_backend_with_renderable_png() -> MockScreenshotBackend {
+        let mut backend = make_backend();
+        backend.snapshots[0].logical_bounds = crate::domain::capture::LogicalRect {
+            x: 0.0,
+            y: 0.0,
+            width: 4.0,
+            height: 4.0,
+        };
+        backend.snapshots[0].physical_bounds = crate::domain::capture::PhysicalRect {
+            x: 0,
+            y: 0,
+            width: 4,
+            height: 4,
+        };
+        backend.snapshots[0].png_data = make_solid_png(4, 4, [10, 20, 30, 255]);
+        backend
+    }
+
+    fn make_solid_png(width: u32, height: u32, rgba: [u8; 4]) -> Vec<u8> {
+        let pixels = rgba.repeat((width * height) as usize);
+        let mut png = Vec::new();
+        let encoder = image::codecs::png::PngEncoder::new(&mut png);
+        encoder
+            .write_image(&pixels, width, height, image::ExtendedColorType::Rgba8)
+            .unwrap();
+        png
+    }
+
+    fn temp_png_path() -> std::path::PathBuf {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir()
+            .join("snaplingo-capture-session-output-tests")
+            .join(format!("capture-{}.png", suffix))
+    }
+
     #[tokio::test]
     async fn create_session_stores_snapshot_and_returns_view() {
         let service = CaptureSessionService::new(Arc::new(make_backend()));
@@ -156,6 +238,16 @@ mod tests {
         assert_eq!(view.monitors[0].image_base64, "AQID");
         assert!(view.candidates.is_empty());
         assert!(service.has_session(&view.id));
+    }
+
+    #[tokio::test]
+    async fn get_session_view_returns_stored_view() {
+        let service = CaptureSessionService::new(Arc::new(make_backend_with_captured_cursor()));
+
+        let created_view = service.create_session().await.unwrap();
+        let stored_view = service.get_session_view(&created_view.id).unwrap();
+
+        assert_eq!(stored_view, created_view);
     }
 
     #[tokio::test]
@@ -228,7 +320,10 @@ mod tests {
             service.take_hidden_window_labels(&view.id).unwrap(),
             vec!["main".to_string(), "pin-pin-1".to_string()]
         );
-        assert!(service.take_hidden_window_labels(&view.id).unwrap().is_empty());
+        assert!(service
+            .take_hidden_window_labels(&view.id)
+            .unwrap()
+            .is_empty());
         assert!(service.has_session(&view.id));
     }
 
@@ -304,5 +399,151 @@ mod tests {
                 height: 30,
             }
         );
+    }
+
+    #[tokio::test]
+    async fn recognize_selection_text_sends_raw_selection_png_to_ocr() {
+        let observed_request = Arc::new(Mutex::new(None));
+        let ocr = OcrCoordinator::new(Arc::new(ConfigFile::new_temp()));
+        ocr.register(RecordingOcrProvider {
+            observed_request: observed_request.clone(),
+        })
+        .unwrap();
+        ocr.activate("recording").unwrap();
+
+        let mut backend = make_backend_with_renderable_png();
+        backend.captured_cursor = Some(CapturedCursor {
+            logical_position: crate::domain::capture::LogicalPoint { x: 1.0, y: 1.0 },
+            hotspot: crate::domain::capture::LogicalPoint { x: 0.0, y: 0.0 },
+            image_width: 2,
+            image_height: 2,
+            scale_factor: 1.0,
+            png_data: make_solid_png(2, 2, [255, 0, 0, 255]),
+        });
+
+        let service = CaptureSessionService::new(Arc::new(backend));
+        let view = service.create_session().await.unwrap();
+
+        let result = service
+            .recognize_selection_text(
+                &ImageCompositionService::new(),
+                &ocr,
+                &view.id,
+                &LogicalRect {
+                    x: 1.0,
+                    y: 1.0,
+                    width: 2.0,
+                    height: 2.0,
+                },
+            )
+            .await
+            .unwrap();
+
+        let request = observed_request.lock().unwrap().clone().unwrap();
+        let decoded = image::load_from_memory(&request.image_data)
+            .unwrap()
+            .to_rgba8();
+
+        assert_eq!(result.text, "recorded");
+        assert_eq!(request.language, None);
+        assert_eq!((decoded.width(), decoded.height()), (2, 2));
+        assert!(decoded.pixels().all(|pixel| pixel.0 == [10, 20, 30, 255]));
+    }
+
+    #[tokio::test]
+    async fn output_selection_save_writes_rendered_png_to_path() {
+        let service = CaptureSessionService::new(Arc::new(make_backend_with_renderable_png()));
+        let view = service.create_session().await.unwrap();
+        let path = temp_png_path();
+
+        let output = service
+            .output_selection(
+                &ImageCompositionService::new(),
+                &CaptureOutputService::new(),
+                &view.id,
+                &LogicalRect {
+                    x: 1.0,
+                    y: 1.0,
+                    width: 2.0,
+                    height: 2.0,
+                },
+                &[],
+                false,
+                CaptureOutputAction::Save {
+                    path: path.to_string_lossy().to_string(),
+                },
+            )
+            .await
+            .unwrap();
+
+        let saved = std::fs::read(&path).unwrap();
+        let decoded = image::load_from_memory(&saved).unwrap().to_rgba8();
+
+        assert!(matches!(output, CaptureSessionOutput::Completed));
+        assert_eq!((decoded.width(), decoded.height()), (2, 2));
+        assert!(decoded.pixels().all(|pixel| pixel.0 == [10, 20, 30, 255]));
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn render_png_base64_returns_rendered_selection_as_base64() {
+        let service = CaptureSessionService::new(Arc::new(make_backend_with_renderable_png()));
+        let view = service.create_session().await.unwrap();
+
+        let encoded = service
+            .render_png_base64(
+                &ImageCompositionService::new(),
+                &view.id,
+                &LogicalRect {
+                    x: 1.0,
+                    y: 1.0,
+                    width: 2.0,
+                    height: 2.0,
+                },
+                &[],
+                false,
+            )
+            .unwrap();
+
+        let png_data = base64::engine::general_purpose::STANDARD
+            .decode(encoded)
+            .unwrap();
+        let decoded = image::load_from_memory(&png_data).unwrap().to_rgba8();
+
+        assert_eq!((decoded.width(), decoded.height()), (2, 2));
+        assert!(decoded.pixels().all(|pixel| pixel.0 == [10, 20, 30, 255]));
+    }
+
+    #[tokio::test]
+    async fn output_selection_pin_returns_rendered_png() {
+        let service = CaptureSessionService::new(Arc::new(make_backend_with_renderable_png()));
+        let view = service.create_session().await.unwrap();
+
+        let output = service
+            .output_selection(
+                &ImageCompositionService::new(),
+                &CaptureOutputService::new(),
+                &view.id,
+                &LogicalRect {
+                    x: 1.0,
+                    y: 1.0,
+                    width: 2.0,
+                    height: 2.0,
+                },
+                &[],
+                false,
+                CaptureOutputAction::Pin,
+            )
+            .await
+            .unwrap();
+
+        let CaptureSessionOutput::Pin(png_data) = output else {
+            panic!("expected pin output");
+        };
+        let decoded = image::load_from_memory(&png_data).unwrap().to_rgba8();
+
+        assert_eq!((decoded.width(), decoded.height()), (2, 2));
+        assert!(decoded.pixels().all(|pixel| pixel.0 == [10, 20, 30, 255]));
     }
 }

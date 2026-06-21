@@ -3,6 +3,7 @@ import {
   getCaptureWindowRevealPermissions,
   revealCaptureWindow,
   revealCaptureWindowForSession,
+  waitForCaptureSurfacePaint,
   shouldRevealCaptureWindow,
   type CaptureWindowHandle,
 } from './captureWindowVisibility';
@@ -13,6 +14,18 @@ describe('capture window visibility', () => {
       shouldRevealCaptureWindow({
         status: 'loading',
         hasSession: false,
+        hasCaptureImagesReady: false,
+        hasRevealed: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('keeps the capture window hidden until frozen screen images are decoded', () => {
+    expect(
+      shouldRevealCaptureWindow({
+        status: 'selecting',
+        hasSession: true,
+        hasCaptureImagesReady: false,
         hasRevealed: false,
       }),
     ).toBe(false);
@@ -23,6 +36,7 @@ describe('capture window visibility', () => {
       shouldRevealCaptureWindow({
         status: 'selecting',
         hasSession: true,
+        hasCaptureImagesReady: true,
         hasRevealed: false,
       }),
     ).toBe(true);
@@ -33,6 +47,7 @@ describe('capture window visibility', () => {
       shouldRevealCaptureWindow({
         status: 'error',
         hasSession: false,
+        hasCaptureImagesReady: false,
         hasRevealed: false,
       }),
     ).toBe(true);
@@ -43,6 +58,7 @@ describe('capture window visibility', () => {
       shouldRevealCaptureWindow({
         status: 'selecting',
         hasSession: true,
+        hasCaptureImagesReady: true,
         hasRevealed: true,
       }),
     ).toBe(false);
@@ -88,6 +104,26 @@ describe('capture window visibility', () => {
       'setFocus',
       'restore_capture_snapshot_windows_for_session:capture-1',
     ]);
+  });
+
+  it('waits for two animation frames before fading in the capture surface', async () => {
+    const calls: string[] = [];
+    const pendingFrameCallbacks: FrameRequestCallback[] = [];
+    const requestAnimationFrame = (callback: FrameRequestCallback) => {
+      calls.push('requestAnimationFrame');
+      pendingFrameCallbacks.push(callback);
+      return pendingFrameCallbacks.length;
+    };
+
+    const wait = waitForCaptureSurfacePaint(requestAnimationFrame);
+    expect(calls).toEqual(['requestAnimationFrame']);
+
+    pendingFrameCallbacks.shift()?.(1);
+    await Promise.resolve();
+    expect(calls).toEqual(['requestAnimationFrame', 'requestAnimationFrame']);
+
+    pendingFrameCallbacks.shift()?.(2);
+    await wait;
   });
 
   it('declares the Tauri permissions required for delayed capture reveal', () => {

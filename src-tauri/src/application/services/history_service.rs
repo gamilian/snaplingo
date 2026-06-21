@@ -1,6 +1,8 @@
 use crate::domain::events::DomainEvent;
 use crate::infrastructure::events::EventSubscriber;
-use crate::infrastructure::storage::{HistoryDatabase, TranslationHistoryEntry, OcrHistoryEntry, HistoryEntry};
+use crate::infrastructure::storage::{
+    HistoryDatabase, HistoryEntry, OcrHistoryEntry, TranslationHistoryEntry,
+};
 use crate::Result;
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -65,13 +67,11 @@ impl EventSubscriber for HistoryService {
                 timestamp,
                 duration_ms,
             } => {
-                if let Err(e) = self.db.insert_translation(
-                    request,
-                    results,
-                    providers_used,
-                    *timestamp,
-                    *duration_ms,
-                ).await {
+                if let Err(e) = self
+                    .db
+                    .insert_translation(request, results, providers_used, *timestamp, *duration_ms)
+                    .await
+                {
                     eprintln!("[HistoryService] Failed to record translation: {}", e);
                 }
             }
@@ -82,13 +82,11 @@ impl EventSubscriber for HistoryService {
                 timestamp,
                 duration_ms,
             } => {
-                if let Err(e) = self.db.insert_ocr(
-                    request,
-                    result,
-                    provider_used,
-                    *timestamp,
-                    *duration_ms,
-                ).await {
+                if let Err(e) = self
+                    .db
+                    .insert_ocr(request, result, provider_used, *timestamp, *duration_ms)
+                    .await
+                {
                     eprintln!("[HistoryService] Failed to record OCR: {}", e);
                 }
             }
@@ -98,7 +96,10 @@ impl EventSubscriber for HistoryService {
                 ..
             } => {
                 // Log the error but don't persist to history database
-                eprintln!("[HistoryService] Provider configuration failed: {} - {}", provider_id, error_message);
+                eprintln!(
+                    "[HistoryService] Provider configuration failed: {} - {}",
+                    provider_id, error_message
+                );
             }
         }
     }

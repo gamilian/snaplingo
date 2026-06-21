@@ -7,13 +7,14 @@ mod tests {
     use crate::infrastructure::storage::ConfigFile;
     use crate::Result;
     use async_trait::async_trait;
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
 
     // Mock OCR Provider for testing
     struct MockOcrProvider {
         id: String,
         name: String,
         text_to_return: String,
+        observed_request: Option<Arc<Mutex<Option<OcrRequest>>>>,
     }
 
     impl MockOcrProvider {
@@ -22,6 +23,7 @@ mod tests {
                 id: id.to_string(),
                 name: name.to_string(),
                 text_to_return: "recognized".to_string(),
+                observed_request: None,
             }
         }
 
@@ -30,6 +32,20 @@ mod tests {
                 id: id.to_string(),
                 name: name.to_string(),
                 text_to_return: text_to_return.to_string(),
+                observed_request: None,
+            }
+        }
+
+        fn with_request_recorder(
+            id: &str,
+            name: &str,
+            observed_request: Arc<Mutex<Option<OcrRequest>>>,
+        ) -> Self {
+            Self {
+                id: id.to_string(),
+                name: name.to_string(),
+                text_to_return: "recognized".to_string(),
+                observed_request: Some(observed_request),
             }
         }
     }
@@ -54,7 +70,11 @@ mod tests {
 
     #[async_trait]
     impl OcrProvider for MockOcrProvider {
-        async fn recognize(&self, _request: &OcrRequest) -> Result<OcrResult> {
+        async fn recognize(&self, request: &OcrRequest) -> Result<OcrResult> {
+            if let Some(observed_request) = &self.observed_request {
+                *observed_request.lock().unwrap() = Some(request.clone());
+            }
+
             Ok(OcrResult {
                 text: self.text_to_return.clone(),
                 confidence: Some(0.95),
@@ -183,6 +203,28 @@ mod tests {
 
         assert_eq!(result.text, "Hello World");
         assert_eq!(result.confidence, Some(0.95));
+    }
+
+    #[tokio::test]
+    async fn test_recognize_image_builds_default_request() {
+        let config = Arc::new(ConfigFile::new_temp());
+        let coordinator = OcrCoordinator::new(config);
+        let observed_request = Arc::new(Mutex::new(None));
+        coordinator
+            .register(MockOcrProvider::with_request_recorder(
+                "tesseract",
+                "Tesseract OCR",
+                observed_request.clone(),
+            ))
+            .unwrap();
+        coordinator.activate("tesseract").unwrap();
+
+        let result = coordinator.recognize_image(vec![7, 8, 9]).await.unwrap();
+
+        let request = observed_request.lock().unwrap().clone().unwrap();
+        assert_eq!(result.text, "recognized");
+        assert_eq!(request.image_data, vec![7, 8, 9]);
+        assert_eq!(request.language, None);
     }
 
     #[tokio::test]

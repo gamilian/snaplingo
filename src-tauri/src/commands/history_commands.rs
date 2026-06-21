@@ -1,5 +1,5 @@
 use crate::AppState;
-use crate::infrastructure::storage::{TranslationHistoryEntry, OcrHistoryEntry, HistoryEntry};
+use crate::infrastructure::storage::{HistoryEntry, OcrHistoryEntry, TranslationHistoryEntry};
 use tauri::State;
 
 /// Get translation history with pagination
@@ -24,10 +24,8 @@ pub async fn get_ocr_history(
     offset: usize,
     state: State<'_, AppState>,
 ) -> Result<Vec<OcrHistoryEntry>, String> {
-    let result: crate::Result<Vec<OcrHistoryEntry>> = state
-        .history_service
-        .get_ocr_history(limit, offset)
-        .await;
+    let result: crate::Result<Vec<OcrHistoryEntry>> =
+        state.history_service.get_ocr_history(limit, offset).await;
 
     result.map_err(|e| e.to_string())
 }
@@ -38,37 +36,24 @@ pub async fn search_history(
     query: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<HistoryEntry>, String> {
-    let result: crate::Result<Vec<HistoryEntry>> = state
-        .history_service
-        .search_history(&query)
-        .await;
+    let result: crate::Result<Vec<HistoryEntry>> =
+        state.history_service.search_history(&query).await;
 
     result.map_err(|e| e.to_string())
 }
 
 /// Delete a history entry by ID
 #[tauri::command]
-pub async fn delete_history(
-    id: i64,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    let result: crate::Result<()> = state
-        .history_service
-        .delete_history(id)
-        .await;
+pub async fn delete_history(id: i64, state: State<'_, AppState>) -> Result<(), String> {
+    let result: crate::Result<()> = state.history_service.delete_history(id).await;
 
     result.map_err(|e| e.to_string())
 }
 
 /// Clear all history
 #[tauri::command]
-pub async fn clear_all_history(
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    let result: crate::Result<()> = state
-        .history_service
-        .clear_all_history()
-        .await;
+pub async fn clear_all_history(state: State<'_, AppState>) -> Result<(), String> {
+    let result: crate::Result<()> = state.history_service.clear_all_history().await;
 
     result.map_err(|e| e.to_string())
 }

@@ -9,6 +9,7 @@ import {
   readPinnedImageLaunch,
 } from './components/PinnedImageWindow';
 import ScreenshotSession from './components/ScreenshotSession';
+import { hideInactiveCaptureWindow } from './components/ScreenshotSession/captureSessionLifecycle';
 import {
   CAPTURE_WINDOW_LABEL,
   readCaptureLaunch,
@@ -100,7 +101,7 @@ function App() {
       <ScreenshotSession
         initialMode={captureLaunch?.mode ?? 'screenshot'}
         initialSessionId={captureLaunch?.sessionId}
-        onInactive={() => currentWindow.close()}
+        onInactive={() => hideInactiveCaptureWindow(currentWindow)}
       />
     );
   }

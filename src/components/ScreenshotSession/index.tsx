@@ -140,6 +140,11 @@ import {
   finishCaptureSession,
 } from './captureSessionLifecycle';
 import {
+  getCaptureEditorCommandButtonClassName,
+  getCaptureEditorDividerClassName,
+  getCaptureEditorIconButtonClassName,
+  getCaptureEditorSelectionClassName,
+  getCaptureEditorToolbarClassName,
   getCaptureRootClassName,
   shouldShowCaptureLoadingMask,
 } from './capturePresentation';
@@ -147,6 +152,7 @@ import {
   revealCaptureWindow,
   revealCaptureWindowForSession,
   shouldRevealCaptureWindow,
+  waitForCaptureSurfacePaint,
 } from './captureWindowVisibility';
 import { printBase64PngImage } from './capturePrint';
 import {
@@ -201,13 +207,17 @@ type DraftSelectionMoveGesture = {
   startSelection: LogicalRect;
   startAnchorPoint: Point;
 };
+type CaptureImageReadiness = {
+  sessionId: string | null;
+  monitorIds: Set<string>;
+};
 
 const MIN_SELECTION_SIZE = 10;
 const EDGE_SNAP_THRESHOLD = 6;
 const KEYBOARD_NUDGE_STEP = 1;
 const KEYBOARD_FAST_NUDGE_STEP = 10;
-const TOOLBAR_GAP = 8;
-const TOOLBAR_SIZE = { width: 1250, height: 36 };
+const TOOLBAR_GAP = 14;
+const TOOLBAR_SIZE = { width: 1220, height: 56 };
 const MAGNIFIER_GAP = 14;
 const MAGNIFIER_SIZE = { width: 120, height: 96 };
 const MAGNIFIER_ZOOM = 4;
@@ -305,6 +315,156 @@ function DimMask({ rect }: { rect: LogicalRect }) {
         }}
       />
     </>
+  );
+}
+
+function PointerIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+      <path
+        d="M7 4.8v13.9l3.2-3.5 2.4 4.9 2.3-1.1-2.4-4.8h5.1L7 4.8Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function RectangleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+      <rect
+        x="5"
+        y="8"
+        width="14"
+        height="8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+    </svg>
+  );
+}
+
+function EllipseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+      <circle
+        cx="12"
+        cy="12"
+        r="7"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+    </svg>
+  );
+}
+
+function ArrowIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+      <path
+        d="M5 12h13m-5-5 5 5-5 5"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+      />
+    </svg>
+  );
+}
+
+function LineIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+      <path
+        d="M5 12h14"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="2"
+      />
+    </svg>
+  );
+}
+
+function PenIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+      <path
+        d="M5 17.5 15.7 6.8l2.5 2.5L7.5 20H5v-2.5Z"
+        fill="none"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="2"
+      />
+      <path
+        d="m14.5 8 1.5-1.5a1.8 1.8 0 0 1 2.5 2.5L17 10.5"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="2"
+      />
+    </svg>
+  );
+}
+
+function TextIcon() {
+  return (
+    <span className="text-lg font-semibold leading-none" aria-hidden="true">
+      T
+    </span>
+  );
+}
+
+function MosaicIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+      <path
+        d="M5 5h14v14H5V5Zm4 0v14M15 5v14M5 9h14M5 15h14"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      />
+    </svg>
+  );
+}
+
+function BlurIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+      <circle
+        cx="12"
+        cy="12"
+        r="7"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+      <path d="M12 5a7 7 0 0 1 0 14V5Z" fill="currentColor" opacity="0.45" />
+    </svg>
+  );
+}
+
+function EraserIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+      <path
+        d="m5 15 8.6-8.6a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L12 18H8l-3-3Z"
+        fill="none"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="2"
+      />
+      <path
+        d="M12 18h7"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="2"
+      />
+    </svg>
   );
 }
 
@@ -442,6 +602,12 @@ export default function ScreenshotSession({
   const [includeCapturedCursor, setIncludeCapturedCursor] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasStartedInitialSession, setHasStartedInitialSession] = useState(false);
+  const [isCaptureSurfaceVisible, setIsCaptureSurfaceVisible] = useState(false);
+  const [captureImageReadiness, setCaptureImageReadiness] =
+    useState<CaptureImageReadiness>(() => ({
+      sessionId: null,
+      monitorIds: new Set(),
+    }));
   const hasRevealedCaptureWindowRef = useRef(false);
 
   const isActive = status !== 'idle';
@@ -480,6 +646,15 @@ export default function ScreenshotSession({
 
     return buildCaptureCandidates(session.monitors, session.candidates);
   }, [session]);
+  const areCaptureImagesReady = useMemo(() => {
+    if (!session) return false;
+    if (session.monitors.length === 0) return true;
+    if (captureImageReadiness.sessionId !== session.id) return false;
+
+    return session.monitors.every((monitor) =>
+      captureImageReadiness.monitorIds.has(monitor.id),
+    );
+  }, [captureImageReadiness, session]);
   const snapTargetRects = useMemo(
     () => captureCandidates.map((candidate) => candidate.rect),
     [captureCandidates],
@@ -552,6 +727,29 @@ export default function ScreenshotSession({
     hasViewportBounds: Boolean(viewportBounds),
   });
 
+  const resetCaptureImageReadiness = useCallback(() => {
+    setCaptureImageReadiness({
+      sessionId: null,
+      monitorIds: new Set(),
+    });
+  }, []);
+
+  const markCaptureImageReady = useCallback((sessionId: string, monitorId: string) => {
+    setCaptureImageReadiness((previous) => {
+      const monitorIds =
+        previous.sessionId === sessionId ? previous.monitorIds : new Set<string>();
+      if (monitorIds.has(monitorId)) return previous;
+
+      const nextMonitorIds = new Set(monitorIds);
+      nextMonitorIds.add(monitorId);
+
+      return {
+        sessionId,
+        monitorIds: nextMonitorIds,
+      };
+    });
+  }, []);
+
   const resetCaptureInteractionState = useCallback(() => {
     setStartPoint(null);
     setCursorPoint(null);
@@ -576,7 +774,9 @@ export default function ScreenshotSession({
     setIsRenderingOutput(false);
     setIncludeCapturedCursor(false);
     setError(null);
-  }, []);
+    setIsCaptureSurfaceVisible(false);
+    resetCaptureImageReadiness();
+  }, [resetCaptureImageReadiness]);
 
   const resetSessionState = useCallback(() => {
     setStatus('idle');
@@ -1463,6 +1663,7 @@ export default function ScreenshotSession({
       !shouldRevealCaptureWindow({
         status,
         hasSession: Boolean(session),
+        hasCaptureImagesReady: areCaptureImagesReady,
         hasRevealed: hasRevealedCaptureWindowRef.current,
       })
     ) {
@@ -1471,10 +1672,13 @@ export default function ScreenshotSession({
 
     hasRevealedCaptureWindowRef.current = true;
     if (!session) {
-      void revealCaptureWindow(captureWindow).catch((err) => {
-        setError(err instanceof Error ? err.message : String(err));
-        setStatus('error');
-      });
+      void revealCaptureWindow(captureWindow)
+        .then(() => waitForCaptureSurfacePaint())
+        .then(() => setIsCaptureSurfaceVisible(true))
+        .catch((err) => {
+          setError(err instanceof Error ? err.message : String(err));
+          setStatus('error');
+        });
       return;
     }
 
@@ -1482,11 +1686,14 @@ export default function ScreenshotSession({
       window: captureWindow,
       invoke,
       sessionId: session.id,
-    }).catch((err) => {
-      setError(err instanceof Error ? err.message : String(err));
-      setStatus('error');
-    });
-  }, [session, status]);
+    })
+      .then(() => waitForCaptureSurfacePaint())
+      .then(() => setIsCaptureSurfaceVisible(true))
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : String(err));
+        setStatus('error');
+      });
+  }, [areCaptureImagesReady, session, status]);
 
   useEffect(() => {
     let disposed = false;
@@ -2555,17 +2762,13 @@ export default function ScreenshotSession({
     adjustAnnotationSize(sizeDirection);
   };
 
-  const overlayClassName = useMemo(() => {
-    if (mode === 'screenshot-ocr') return 'border-sky-300';
-    if (mode === 'screenshot-translate') return 'border-emerald-300';
-    return 'border-white';
-  }, [mode]);
-
   if (!isActive) return null;
 
   return (
     <div
-      className={getCaptureRootClassName(status)}
+      className={getCaptureRootClassName(status, {
+        isSurfaceVisible: isCaptureSurfaceVisible,
+      })}
       style={{
         width: `${viewportBounds?.width ?? window.innerWidth}px`,
         height: `${viewportBounds?.height ?? window.innerHeight}px`,
@@ -2584,6 +2787,11 @@ export default function ScreenshotSession({
             src={`data:image/png;base64,${monitor.image_base64}`}
             className="absolute object-fill"
             style={rectStyle(getMonitorViewportRect(monitor, selectionBounds))}
+            onLoad={() => markCaptureImageReady(session.id, monitor.id)}
+            onError={() => {
+              setError('Failed to load capture snapshot');
+              setStatus('error');
+            }}
             draggable={false}
           />
         ))}
@@ -2852,13 +3060,10 @@ export default function ScreenshotSession({
             />
           )}
           <div
-            className={`absolute border ${overlayClassName} bg-transparent ${
-              status === 'preview'
-                ? activeAnnotationTool
-                  ? 'cursor-crosshair'
-                  : 'cursor-move'
-                : ''
-            }`}
+            className={getCaptureEditorSelectionClassName(
+              status,
+              Boolean(activeAnnotationTool),
+            )}
             style={rectStyle(selectionViewportRect)}
             onPointerDown={startMoveGesture}
           />
@@ -2867,7 +3072,7 @@ export default function ScreenshotSession({
               {SELECTION_HANDLES.map((handle) => (
                 <button
                   key={handle}
-                  className={`pointer-events-auto absolute h-3 w-3 rounded-full border border-black/70 bg-white shadow ${handleClassNames[handle]}`}
+                  className={`pointer-events-auto absolute h-3 w-3 rounded-full border border-[#5b7fff] bg-white shadow-[0_2px_7px_rgba(91,127,255,0.35)] ${handleClassNames[handle]}`}
                   aria-label={`Resize selection ${handle}`}
                   onPointerDown={(event) => startResizeGesture(handle, event)}
                 />
@@ -2876,7 +3081,7 @@ export default function ScreenshotSession({
           )}
           {toolbarPosition && isAnnotationToolbarVisible && (
             <div
-              className="absolute flex h-9 items-center gap-1 rounded bg-neutral-950/90 p-1 text-xs text-white shadow-lg ring-1 ring-white/15"
+              className={getCaptureEditorToolbarClassName()}
               style={{
                 left: `${toolbarPosition.x}px`,
                 top: `${toolbarPosition.y}px`,
@@ -2892,182 +3097,149 @@ export default function ScreenshotSession({
             >
               <button
                 type="button"
-                className="h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50"
-                disabled={isRenderingOutput || !canUndoAnnotation}
-                title="Undo"
-                aria-label="Undo annotation"
-                onClick={undoAnnotation}
+                className={getCaptureEditorIconButtonClassName(!activeAnnotationTool)}
+                disabled={isRenderingOutput}
+                title="Select and move"
+                aria-label="Select and move"
+                onClick={() => setActiveAnnotationTool(null)}
               >
-                Undo
+                <PointerIcon />
               </button>
               <button
                 type="button"
-                className="h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50"
-                disabled={isRenderingOutput || !canRedoAnnotation}
-                title="Redo"
-                aria-label="Redo annotation"
-                onClick={redoAnnotation}
-              >
-                Redo
-              </button>
-              <button
-                type="button"
-                className={`h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50 ${
-                  activeAnnotationTool === 'rectangle' ? 'bg-white/15' : ''
-                }`}
+                className={getCaptureEditorIconButtonClassName(
+                  activeAnnotationTool === 'rectangle',
+                )}
                 disabled={isRenderingOutput}
                 title="Rectangle"
                 aria-label="Draw rectangle annotation"
                 onClick={() => toggleAnnotationTool('rectangle')}
               >
-                Rect
+                <RectangleIcon />
               </button>
               <button
                 type="button"
-                className={`h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50 ${
-                  activeAnnotationTool === 'ellipse' ? 'bg-white/15' : ''
-                }`}
+                className={getCaptureEditorIconButtonClassName(
+                  activeAnnotationTool === 'ellipse',
+                )}
                 disabled={isRenderingOutput}
                 title="Ellipse"
                 aria-label="Draw ellipse annotation"
                 onClick={() => toggleAnnotationTool('ellipse')}
               >
-                Ellipse
+                <EllipseIcon />
               </button>
               <button
                 type="button"
-                className={`h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50 ${
-                  activeAnnotationTool === 'arrow' ? 'bg-white/15' : ''
-                }`}
+                className={getCaptureEditorIconButtonClassName(
+                  activeAnnotationTool === 'arrow',
+                )}
                 disabled={isRenderingOutput}
                 title="Arrow"
                 aria-label="Draw arrow annotation"
                 onClick={() => toggleAnnotationTool('arrow')}
               >
-                Arrow
+                <ArrowIcon />
               </button>
               <button
                 type="button"
-                className={`h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50 ${
-                  activeAnnotationTool === 'line' ? 'bg-white/15' : ''
-                }`}
+                className={getCaptureEditorIconButtonClassName(
+                  activeAnnotationTool === 'line',
+                )}
                 disabled={isRenderingOutput}
                 title="Line"
                 aria-label="Draw line annotation"
                 onClick={() => toggleAnnotationTool('line')}
               >
-                Line
+                <LineIcon />
               </button>
               <button
                 type="button"
-                className={`h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50 ${
-                  activeAnnotationTool === 'polyline' ? 'bg-white/15' : ''
-                }`}
-                disabled={isRenderingOutput}
-                title="Polyline"
-                aria-label="Draw polyline annotation"
-                onClick={() => toggleAnnotationTool('polyline')}
-              >
-                Polyline
-              </button>
-              <button
-                type="button"
-                className={`h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50 ${
-                  activeAnnotationTool === 'pen' ? 'bg-white/15' : ''
-                }`}
+                className={getCaptureEditorIconButtonClassName(
+                  activeAnnotationTool === 'pen',
+                )}
                 disabled={isRenderingOutput}
                 title="Pen"
                 aria-label="Draw freehand annotation"
                 onClick={() => toggleAnnotationTool('pen')}
               >
-                Pen
+                <PenIcon />
               </button>
               <button
                 type="button"
-                className={`h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50 ${
-                  activeAnnotationTool === 'highlight' ? 'bg-white/15' : ''
-                }`}
-                disabled={isRenderingOutput}
-                title="Highlight"
-                aria-label="Draw highlight annotation"
-                onClick={() => toggleAnnotationTool('highlight')}
-              >
-                Highlight
-              </button>
-              <button
-                type="button"
-                className={`h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50 ${
-                  activeAnnotationTool === 'mosaic' ? 'bg-white/15' : ''
-                }`}
-                disabled={isRenderingOutput}
-                title="Mosaic"
-                aria-label="Draw mosaic annotation"
-                onClick={() => toggleAnnotationTool('mosaic')}
-              >
-                Mosaic
-              </button>
-              <button
-                type="button"
-                className={`h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50 ${
-                  activeAnnotationTool === 'blur' ? 'bg-white/15' : ''
-                }`}
-                disabled={isRenderingOutput}
-                title="Blur"
-                aria-label="Draw blur annotation"
-                onClick={() => toggleAnnotationTool('blur')}
-              >
-                Blur
-              </button>
-              <button
-                type="button"
-                className={`h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50 ${
-                  activeAnnotationTool === 'text' ? 'bg-white/15' : ''
-                }`}
+                className={getCaptureEditorIconButtonClassName(
+                  activeAnnotationTool === 'text',
+                )}
                 disabled={isRenderingOutput}
                 title="Text"
                 aria-label="Add text annotation"
                 onClick={() => toggleAnnotationTool('text')}
               >
-                Text
+                <TextIcon />
               </button>
               <button
                 type="button"
-                className={`h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50 ${
-                  activeAnnotationTool === 'eraser' ? 'bg-white/15' : ''
-                }`}
+                className={getCaptureEditorIconButtonClassName(
+                  activeAnnotationTool === 'mosaic',
+                )}
+                disabled={isRenderingOutput}
+                title="Mosaic"
+                aria-label="Draw mosaic annotation"
+                onClick={() => toggleAnnotationTool('mosaic')}
+              >
+                <MosaicIcon />
+              </button>
+              <button
+                type="button"
+                className={getCaptureEditorIconButtonClassName(
+                  activeAnnotationTool === 'blur',
+                )}
+                disabled={isRenderingOutput}
+                title="Blur"
+                aria-label="Draw blur annotation"
+                onClick={() => toggleAnnotationTool('blur')}
+              >
+                <BlurIcon />
+              </button>
+              <button
+                type="button"
+                className={getCaptureEditorIconButtonClassName(
+                  activeAnnotationTool === 'eraser',
+                )}
                 disabled={isRenderingOutput}
                 title="Eraser"
                 aria-label="Erase annotation"
                 onClick={() => toggleAnnotationTool('eraser')}
               >
-                Erase
+                <EraserIcon />
               </button>
-              <div className="flex h-7 items-center gap-1 px-1">
-                {ANNOTATION_COLORS.map((color) => (
-                  <button
-                    key={color.join('-')}
-                    type="button"
-                    className={`h-5 w-5 rounded border border-white/40 ${
-                      sameAnnotationColor(annotationStyle.color, color)
-                        ? 'ring-2 ring-white'
-                        : ''
-                    }`}
-                    style={{ backgroundColor: annotationColorToCss(color) }}
-                    disabled={isRenderingOutput}
-                    title="Annotation color"
-                    aria-label="Annotation color"
-                    onClick={() => {
-                      const nextStyle = {
-                        ...annotationStyle,
-                        color,
-                      };
-                      applySelectedAnnotationStyle(nextStyle, textFontSize);
-                    }}
-                  />
-                ))}
-              </div>
+              <div className={getCaptureEditorDividerClassName()} />
+              <button
+                type="button"
+                className="h-9 w-9 shrink-0 rounded-[10px] border border-slate-200 bg-[#5b7fff] shadow-[0_0_0_2px_rgba(91,127,255,0.15)] disabled:cursor-not-allowed disabled:opacity-40"
+                style={{ backgroundColor: annotationColorToCss(annotationStyle.color) }}
+                disabled={isRenderingOutput}
+                title="Annotation color"
+                aria-label="Annotation color"
+                onClick={() => {
+                  const currentIndex = ANNOTATION_COLORS.findIndex((color) =>
+                    sameAnnotationColor(annotationStyle.color, color),
+                  );
+                  const nextColor =
+                    ANNOTATION_COLORS[
+                      (Math.max(0, currentIndex) + 1) % ANNOTATION_COLORS.length
+                    ];
+                  applySelectedAnnotationStyle(
+                    {
+                      ...annotationStyle,
+                      color: nextColor,
+                    },
+                    textFontSize,
+                  );
+                }}
+              />
               <input
-                className="h-7 w-20 accent-white disabled:opacity-50"
+                className="h-9 w-20 accent-[#5b7fff] disabled:opacity-40"
                 type="range"
                 min={
                   isTextSizingActive
@@ -3121,7 +3293,7 @@ export default function ScreenshotSession({
                 }}
               />
               <input
-                className="h-5 w-5 accent-white disabled:opacity-50"
+                className="h-5 w-5 accent-[#5b7fff] disabled:opacity-40"
                 type="checkbox"
                 checked={annotationStyle.filled}
                 disabled={isRenderingOutput || !isFillModeActive}
@@ -3137,19 +3309,20 @@ export default function ScreenshotSession({
                   );
                 }}
               />
+              <div className={getCaptureEditorDividerClassName()} />
               <button
                 type="button"
-                className="h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50"
+                className={getCaptureEditorCommandButtonClassName()}
                 disabled={isRenderingOutput}
-                title="Copy"
-                aria-label="Copy selection"
-                onClick={copySelection}
+                title="Cancel"
+                aria-label="Cancel capture"
+                onClick={cancelSession}
               >
-                Copy
+                取消 (Esc)
               </button>
               <button
                 type="button"
-                className="h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50"
+                className={getCaptureEditorCommandButtonClassName()}
                 disabled={isRenderingOutput}
                 title="OCR"
                 aria-label="Run OCR"
@@ -3159,7 +3332,17 @@ export default function ScreenshotSession({
               </button>
               <button
                 type="button"
-                className="h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50"
+                className={getCaptureEditorCommandButtonClassName()}
+                disabled={isRenderingOutput}
+                title="Copy"
+                aria-label="Copy selection"
+                onClick={copySelection}
+              >
+                复制 (⌘C)
+              </button>
+              <button
+                type="button"
+                className={getCaptureEditorCommandButtonClassName()}
                 disabled={isRenderingOutput}
                 title="Save"
                 aria-label="Save selection"
@@ -3172,35 +3355,26 @@ export default function ScreenshotSession({
                   }
                 }}
               >
-                Save
+                保存
               </button>
               <button
                 type="button"
-                className="h-7 flex-1 rounded px-2 text-center leading-7 hover:bg-white/15 disabled:opacity-50"
+                className={getCaptureEditorCommandButtonClassName('primary')}
                 disabled={isRenderingOutput}
-                title="Pin"
-                aria-label="Pin selection"
-                onClick={pinSelection}
+                title="Finish"
+                aria-label="Finish capture"
+                onClick={copySelection}
               >
-                Pin
-              </button>
-              <button
-                type="button"
-                className="h-7 w-7 rounded text-center leading-7 hover:bg-white/15 disabled:opacity-50"
-                disabled={isRenderingOutput}
-                title="Cancel"
-                aria-label="Cancel capture"
-                onClick={cancelSession}
-              >
-                X
+                完成 (Enter)
               </button>
             </div>
           )}
           <div
-            className="absolute rounded bg-black/80 px-2 py-1 text-xs leading-none text-white shadow"
+            className="pointer-events-none absolute rounded bg-white/90 px-2 py-1 text-xs font-semibold leading-none text-slate-500 shadow-sm ring-1 ring-slate-200"
             style={{
-              left: `${selectionViewportRect.x}px`,
-              top: `${Math.max(0, selectionViewportRect.y - 24)}px`,
+              left: `${selectionViewportRect.x + selectionViewportRect.width / 2}px`,
+              top: `${selectionViewportRect.y + selectionViewportRect.height / 2}px`,
+              transform: 'translate(-50%, -50%)',
             }}
           >
             {sizeLabel}

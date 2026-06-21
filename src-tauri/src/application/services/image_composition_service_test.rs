@@ -557,8 +557,7 @@ mod tests {
             5,
             1,
             &[
-                10, 10, 10, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255, 20, 20, 20,
-                255,
+                10, 10, 10, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255, 20, 20, 20, 255,
             ],
         );
 
@@ -736,7 +735,10 @@ mod tests {
         let output = service.render_clipboard_text_png("0.5 0.25 1.0").unwrap();
         let (width, height) = png_dimensions(&output);
 
-        assert_eq!(png_pixel(&output, width / 2, height / 2), [128, 64, 255, 255]);
+        assert_eq!(
+            png_pixel(&output, width / 2, height / 2),
+            [128, 64, 255, 255]
+        );
     }
 
     #[test]

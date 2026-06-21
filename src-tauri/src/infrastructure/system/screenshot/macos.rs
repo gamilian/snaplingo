@@ -282,19 +282,21 @@ mod tests {
             width: 120.0,
             height: 100.0,
         };
-        assert!(captured_cursor_from_appkit_geometry(
-            18.0,
-            73.0,
-            &primary_bounds,
-            2.0,
-            3.0,
-            0.0,
-            12.0,
-            20,
-            24,
-            vec![9, 8, 7],
-        )
-        .is_none());
+        assert!(
+            captured_cursor_from_appkit_geometry(
+                18.0,
+                73.0,
+                &primary_bounds,
+                2.0,
+                3.0,
+                0.0,
+                12.0,
+                20,
+                24,
+                vec![9, 8, 7],
+            )
+            .is_none()
+        );
     }
 
     #[test]

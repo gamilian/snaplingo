@@ -1,6 +1,6 @@
-use tauri::State;
-use crate::domain::HotkeyAction;
 use crate::application::WorkflowOutcome;
+use crate::domain::HotkeyAction;
+use tauri::State;
 
 /// Trigger a workflow manually (for testing or frontend invocation)
 #[tauri::command]

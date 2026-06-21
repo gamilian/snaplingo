@@ -1,8 +1,15 @@
 #[cfg(test)]
 mod tests {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
     use image::ImageEncoder;
 
-    use crate::application::services::pinned_image_service::PinnedImageService;
+    use crate::application::services::capture_output_service::CaptureOutputService;
+    use crate::application::services::capture_output_service::ClipboardCaptureOutput;
+    use crate::application::services::image_composition_service::ImageCompositionService;
+    use crate::application::services::pinned_image_service::{
+        PinnedImageOpenRequest, PinnedImageService,
+    };
 
     fn make_test_png(width: u32, height: u32) -> Vec<u8> {
         let pixels = vec![255; (width * height * 4) as usize];
@@ -43,6 +50,35 @@ mod tests {
     }
 
     #[test]
+    fn pin_png_view_returns_stored_view() {
+        let service = PinnedImageService::new();
+        let png = make_test_png(3, 2);
+
+        let view = service.pin_png_view(png.clone()).unwrap();
+
+        assert_eq!(view.width, 3);
+        assert_eq!(view.height, 2);
+        assert_eq!(view.source_text, None);
+        assert_eq!(service.get_pinned_png(&view.id).unwrap(), png);
+    }
+
+    #[test]
+    fn pin_capture_output_view_stores_png_output() {
+        let service = PinnedImageService::new();
+        let image_composition = ImageCompositionService::new();
+        let png = make_test_png(3, 2);
+
+        let view = service
+            .pin_capture_output_view(&image_composition, ClipboardCaptureOutput::Png(png.clone()))
+            .unwrap();
+
+        assert_eq!(view.width, 3);
+        assert_eq!(view.height, 2);
+        assert_eq!(view.source_text, None);
+        assert_eq!(service.get_pinned_png(&view.id).unwrap(), png);
+    }
+
+    #[test]
     fn removing_pinned_image_makes_it_unavailable() {
         let service = PinnedImageService::new();
         let image_id = service.pin_png(make_test_png(1, 1)).unwrap();
@@ -62,6 +98,24 @@ mod tests {
         assert!(service.get_pinned_image(&image_id).is_ok());
         assert_eq!(service.pop_recoverable_pinned_image(), Some(image_id));
         assert_eq!(service.pop_recoverable_pinned_image(), None);
+    }
+
+    #[test]
+    fn pin_clipboard_capture_output_reopens_recoverable_image_first() {
+        let service = PinnedImageService::new();
+        let image_composition = ImageCompositionService::new();
+        let output = CaptureOutputService::new();
+        let image_id = service.pin_png(make_test_png(2, 2)).unwrap();
+        service.close_pinned_image(&image_id).unwrap();
+
+        let request = service
+            .pin_clipboard_capture_output(&image_composition, &output)
+            .unwrap();
+
+        let PinnedImageOpenRequest::Reopen(image) = request else {
+            panic!("expected recoverable pinned image to reopen");
+        };
+        assert_eq!(image.id, image_id);
     }
 
     #[test]
@@ -88,6 +142,39 @@ mod tests {
         assert!(service.get_pinned_png(&image_id).is_err());
     }
 
+    #[tokio::test]
+    async fn save_pinned_png_to_path_writes_original_png() {
+        let service = PinnedImageService::new();
+        let output = CaptureOutputService::new();
+        let png = make_test_png(2, 3);
+        let image_id = service.pin_png(png.clone()).unwrap();
+        let path = temp_png_path();
+
+        service
+            .save_pinned_png_to_path(&output, &image_id, &path)
+            .await
+            .unwrap();
+
+        assert_eq!(std::fs::read(&path).unwrap(), png);
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn copy_pinned_png_to_clipboard_returns_missing_image_before_clipboard() {
+        let service = PinnedImageService::new();
+        let output = CaptureOutputService::new();
+
+        let error = service
+            .copy_pinned_png_to_clipboard(&output, "missing")
+            .await
+            .unwrap_err();
+
+        assert!(error
+            .to_string()
+            .contains("Pinned image not found: missing"));
+    }
+
     #[test]
     fn replaces_pinned_png_while_preserving_image_id_and_group() {
         let service = PinnedImageService::new();
@@ -111,6 +198,75 @@ mod tests {
         assert_eq!(membership.group, 1);
         assert_eq!(membership.image_ids, vec![image_id]);
         assert!(service.get_pinned_image(&peer_id).is_ok());
+    }
+
+    #[test]
+    fn replace_pinned_png_view_returns_updated_view() {
+        let service = PinnedImageService::new();
+        let image_id = service.pin_png(make_test_png(2, 2)).unwrap();
+        let replacement = make_test_png(4, 3);
+
+        let view = service
+            .replace_pinned_png_view(&image_id, replacement.clone())
+            .unwrap();
+
+        assert_eq!(view.id, image_id);
+        assert_eq!(view.width, 4);
+        assert_eq!(view.height, 3);
+        assert_eq!(service.get_pinned_png(&image_id).unwrap(), replacement);
+    }
+
+    #[test]
+    fn replace_pinned_text_as_png_returns_text_backed_view() {
+        let service = PinnedImageService::new();
+        let image_composition = ImageCompositionService::new();
+        let image_id = service.pin_png(make_test_png(2, 2)).unwrap();
+
+        let view = service
+            .replace_pinned_text_as_png_view(&image_composition, &image_id, "Replacement text")
+            .unwrap();
+
+        assert_eq!(view.id, image_id);
+        assert_eq!(view.source_text, Some("Replacement text".to_string()));
+        assert!(view.width >= 80);
+        assert!(view.height >= 60);
+        assert!(!service.get_pinned_png(&image_id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn replace_capture_output_view_stores_text_output_as_png() {
+        let service = PinnedImageService::new();
+        let image_composition = ImageCompositionService::new();
+        let image_id = service.pin_png(make_test_png(2, 2)).unwrap();
+
+        let view = service
+            .replace_capture_output_view(
+                &image_composition,
+                &image_id,
+                ClipboardCaptureOutput::Text("Replacement text".to_string()),
+            )
+            .unwrap();
+
+        assert_eq!(view.id, image_id);
+        assert_eq!(view.source_text, Some("Replacement text".to_string()));
+        assert!(view.width >= 80);
+        assert!(view.height >= 60);
+        assert!(!service.get_pinned_png(&image_id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn pin_text_as_png_returns_text_backed_view() {
+        let service = PinnedImageService::new();
+        let image_composition = ImageCompositionService::new();
+
+        let view = service
+            .pin_text_as_png_view(&image_composition, "Hello pin")
+            .unwrap();
+
+        assert_eq!(view.source_text, Some("Hello pin".to_string()));
+        assert!(view.width >= 80);
+        assert!(view.height >= 60);
+        assert!(!service.get_pinned_png(&view.id).unwrap().is_empty());
     }
 
     #[test]
@@ -232,5 +388,15 @@ mod tests {
 
         assert_eq!(membership.group, 0);
         assert_eq!(membership.image_ids, expected_image_ids);
+    }
+
+    fn temp_png_path() -> std::path::PathBuf {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir()
+            .join("snaplingo-pinned-output-tests")
+            .join(format!("pin-{}.png", suffix))
     }
 }

@@ -189,6 +189,15 @@ impl OcrCoordinator {
         Ok(result)
     }
 
+    pub async fn recognize_image(&self, image_data: Vec<u8>) -> Result<OcrResult> {
+        let request = OcrRequest {
+            image_data,
+            language: None,
+        };
+
+        self.recognize(&request).await
+    }
+
     /// Reconfigures a provider's credentials at runtime.
     ///
     /// Note: This method requires the provider to implement interior mutability

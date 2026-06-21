@@ -1,6 +1,6 @@
 use crate::domain::ocr::{OcrRequest, OcrResult};
+use serde::{Deserialize, Serialize};
 use tauri::State;
-use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct RecognizeImageRequest {
@@ -27,7 +27,8 @@ pub async fn recognize_image(
         language: request.language,
     };
 
-    state.ocr_coordinator
+    state
+        .ocr_coordinator
         .recognize(&ocr_request)
         .await
         .map_err(|e| e.to_string())
@@ -40,19 +41,22 @@ pub async fn list_ocr_providers(
     let all_providers = state.ocr_coordinator.list_all();
     let active = state.ocr_coordinator.get_active();
 
-    let info: Vec<_> = all_providers.iter().map(|p| {
-        let is_active = active.as_ref().map_or(false, |active_p| {
-            active_p.id() == p.id()
-        });
+    let info: Vec<_> = all_providers
+        .iter()
+        .map(|p| {
+            let is_active = active
+                .as_ref()
+                .map_or(false, |active_p| active_p.id() == p.id());
 
-        OcrProviderInfo {
-            id: p.id().to_string(),
-            name: p.name().to_string(),
-            is_configured: p.is_configured(),
-            requires_api_key: p.requires_api_key(),
-            is_active,
-        }
-    }).collect();
+            OcrProviderInfo {
+                id: p.id().to_string(),
+                name: p.name().to_string(),
+                is_configured: p.is_configured(),
+                requires_api_key: p.requires_api_key(),
+                is_active,
+            }
+        })
+        .collect();
 
     Ok(info)
 }
@@ -62,7 +66,8 @@ pub async fn activate_ocr_provider(
     provider_id: String,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    state.ocr_coordinator
+    state
+        .ocr_coordinator
         .activate(&provider_id)
         .map_err(|e| e.to_string())
 }
@@ -83,12 +88,14 @@ pub async fn configure_ocr_provider(
     }
 
     // Save credentials using new format
-    state.keychain
+    state
+        .keychain
         .save_provider_credentials(&provider_id, &credentials)
         .map_err(|e| e.to_string())?;
 
     // Reconfigure provider at runtime
-    state.ocr_coordinator
+    state
+        .ocr_coordinator
         .reconfigure_provider(&provider_id, &credentials)
         .map_err(|e| e.to_string())?;
 

@@ -1,6 +1,6 @@
 use crate::domain::translation::{TranslationRequest, TranslationResult};
+use serde::{Deserialize, Serialize};
 use tauri::State;
-use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct TranslateTextRequest {
@@ -20,7 +20,8 @@ pub async fn translate_text_v2(
         target_lang: request.target_lang,
     };
 
-    state.translation_coordinator
+    state
+        .translation_coordinator
         .translate(&translation_request)
         .await
         .map_err(|e| e.to_string())

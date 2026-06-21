@@ -8,6 +8,7 @@ type CaptureWindowVisibilityStatus =
 interface CaptureWindowRevealState {
   status: CaptureWindowVisibilityStatus;
   hasSession: boolean;
+  hasCaptureImagesReady: boolean;
   hasRevealed: boolean;
 }
 
@@ -34,17 +35,33 @@ export function getCaptureWindowRevealPermissions() {
 export function shouldRevealCaptureWindow({
   status,
   hasSession,
+  hasCaptureImagesReady,
   hasRevealed,
 }: CaptureWindowRevealState) {
   if (hasRevealed) return false;
   if (status === 'error') return true;
 
-  return hasSession && (status === 'selecting' || status === 'preview');
+  return (
+    hasSession &&
+    hasCaptureImagesReady &&
+    (status === 'selecting' || status === 'preview')
+  );
 }
 
 export async function revealCaptureWindow(window: CaptureWindowHandle) {
   await window.show();
   await window.setFocus();
+}
+
+export async function waitForCaptureSurfacePaint(
+  requestAnimationFrame: typeof globalThis.requestAnimationFrame =
+    globalThis.requestAnimationFrame,
+) {
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve());
+    });
+  });
 }
 
 export async function revealCaptureWindowForSession({

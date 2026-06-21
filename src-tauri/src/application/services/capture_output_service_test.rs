@@ -42,6 +42,42 @@ mod tests {
     }
 
     #[test]
+    fn capture_save_path_uses_timestamped_png_name() {
+        let path = super::super::capture_output_service::capture_save_path(
+            std::path::Path::new("/tmp"),
+            "20260617-023000",
+        );
+
+        assert_eq!(path.to_string_lossy(), "/tmp/SnapLingo-20260617-023000.png");
+    }
+
+    #[test]
+    fn quick_capture_save_path_uses_configured_directory() {
+        let path = super::super::capture_output_service::quick_capture_save_file_path(
+            std::path::Path::new("/tmp/SnapLingo"),
+            "20260617-023000",
+        );
+
+        assert_eq!(
+            path.to_string_lossy(),
+            "/tmp/SnapLingo/SnapLingo-20260617-023000.png"
+        );
+    }
+
+    #[test]
+    fn configured_capture_save_dir_expands_home_prefix() {
+        let dir = super::super::capture_output_service::configured_capture_save_dir(
+            "~/Pictures/SnapLingo",
+            std::path::Path::new("/Users/alice"),
+        );
+
+        assert_eq!(
+            dir,
+            std::path::PathBuf::from("/Users/alice/Pictures/SnapLingo")
+        );
+    }
+
+    #[test]
     fn decodes_png_to_clipboard_image_data() {
         let png = make_test_png(3, 2);
 

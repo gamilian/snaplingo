@@ -25,9 +25,8 @@ pub fn get_config_dir() -> Result<PathBuf> {
 
     // Create directory if it doesn't exist
     if !config_dir.exists() {
-        std::fs::create_dir_all(&config_dir).map_err(|e| {
-            AppError::System(format!("Failed to create config directory: {}", e))
-        })?;
+        std::fs::create_dir_all(&config_dir)
+            .map_err(|e| AppError::System(format!("Failed to create config directory: {}", e)))?;
     }
 
     Ok(config_dir)

@@ -1,10 +1,10 @@
-use crate::domain::hotkey::HotkeyAction;
-use crate::domain::translation::{TranslationRequest, TranslationResult};
-use crate::domain::ocr::{OcrRequest, OcrResult};
-use crate::domain::capture::CaptureRegion;
-use crate::application::CaptureService;
 use crate::application::providers::ocr::OcrCoordinator;
 use crate::application::providers::translation::TranslationCoordinator;
+use crate::application::CaptureService;
+use crate::domain::capture::CaptureRegion;
+use crate::domain::hotkey::HotkeyAction;
+use crate::domain::ocr::{OcrRequest, OcrResult};
+use crate::domain::translation::{TranslationRequest, TranslationResult};
 use crate::Result;
 use std::sync::Arc;
 
@@ -14,9 +14,7 @@ use std::sync::Arc;
 #[derive(Debug, Clone)]
 pub enum WorkflowOutcome {
     /// Show screenshot image
-    ShowScreenshot {
-        image_data: Vec<u8>,
-    },
+    ShowScreenshot { image_data: Vec<u8> },
 
     /// Show OCR result
     ShowOcrResult {
@@ -123,11 +121,12 @@ impl WorkflowService {
         // Translate the OCR result
         let translation_request = TranslationRequest {
             text: ocr_result.text.clone(),
-            source_lang: "auto".to_string(), // Auto-detect
+            source_lang: "auto".to_string(),  // Auto-detect
             target_lang: "zh-CN".to_string(), // TODO: Get from user preferences
         };
 
-        let translations = self.translation_coordinator
+        let translations = self
+            .translation_coordinator
             .translate(&translation_request)
             .await?;
 
@@ -143,7 +142,8 @@ impl WorkflowService {
     async fn workflow_selection_translate(&self) -> Result<WorkflowOutcome> {
         // TODO: Get selected text from system clipboard or accessibility API
         Err(crate::AppError::Other(
-            "Selection translate not yet implemented. Use Input Translate as workaround.".to_string()
+            "Selection translate not yet implemented. Use Input Translate as workaround."
+                .to_string(),
         ))
     }
 

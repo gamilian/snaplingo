@@ -1,15 +1,13 @@
-use tauri::{Manager, Emitter, WebviewUrl, WebviewWindowBuilder, State};
 use crate::AppState;
 use base64::Engine;
 use std::io::Cursor;
 use std::process::Command;
+use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 
 /// Simple approach: Use macOS native screencapture tool
 /// This is how many screenshot apps work on macOS - they wrap the native tool
 #[tauri::command]
-pub fn create_screenshot_window_simple(
-    app: tauri::AppHandle,
-) -> Result<(), String> {
+pub fn create_screenshot_window_simple(app: tauri::AppHandle) -> Result<(), String> {
     log::info!("Starting screenshot using macOS native screencapture");
 
     // Use macOS native screencapture command in interactive mode
@@ -17,10 +15,7 @@ pub fn create_screenshot_window_simple(
     // -c = copy result to clipboard
     // This gives the user the familiar macOS screenshot crosshair
 
-    let result = Command::new("screencapture")
-        .arg("-i")
-        .arg("-c")
-        .spawn();
+    let result = Command::new("screencapture").arg("-i").arg("-c").spawn();
 
     match result {
         Ok(mut child) => {
@@ -47,9 +42,7 @@ pub fn create_screenshot_window_simple(
 }
 
 #[tauri::command]
-pub fn create_screenshot_window_simple_custom(
-    app: tauri::AppHandle,
-) -> Result<(), String> {
+pub fn create_screenshot_window_simple_custom(app: tauri::AppHandle) -> Result<(), String> {
     log::info!("Creating screenshot window (simple mode - plugin handles capture)");
 
     // CRITICAL: Hide ALL existing windows first
@@ -69,7 +62,8 @@ pub fn create_screenshot_window_simple_custom(
     }
 
     // Get primary monitor position and size
-    let monitor = app.primary_monitor()
+    let monitor = app
+        .primary_monitor()
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "No monitor found".to_string())?;
 
@@ -77,8 +71,14 @@ pub fn create_screenshot_window_simple_custom(
     let size = monitor.size();
     let scale = monitor.scale_factor();
 
-    log::info!("Monitor: pos=({}, {}), size={}x{}, scale={}",
-               position.x, position.y, size.width, size.height, scale);
+    log::info!(
+        "Monitor: pos=({}, {}), size={}x{}, scale={}",
+        position.x,
+        position.y,
+        size.width,
+        size.height,
+        scale
+    );
 
     // Create an independent overlay window that covers the entire screen
     let window = WebviewWindowBuilder::new(
@@ -141,21 +141,22 @@ pub fn create_screenshot_window(
     log::info!("Creating screenshot window");
 
     // Get primary monitor position and size
-    let (x, y, width, height) = if let Some(monitor) = app.primary_monitor().map_err(|e| e.to_string())? {
-        let position = monitor.position();
-        let size = monitor.size();
-        let scale_factor = monitor.scale_factor();
-        let logical_position = position.to_logical::<f64>(scale_factor);
-        let logical_size = size.to_logical::<f64>(scale_factor);
-        (
-            logical_position.x,
-            logical_position.y,
-            logical_size.width,
-            logical_size.height,
-        )
-    } else {
-        return Err("No monitor found".to_string());
-    };
+    let (x, y, width, height) =
+        if let Some(monitor) = app.primary_monitor().map_err(|e| e.to_string())? {
+            let position = monitor.position();
+            let size = monitor.size();
+            let scale_factor = monitor.scale_factor();
+            let logical_position = position.to_logical::<f64>(scale_factor);
+            let logical_size = size.to_logical::<f64>(scale_factor);
+            (
+                logical_position.x,
+                logical_position.y,
+                logical_size.width,
+                logical_size.height,
+            )
+        } else {
+            return Err("No monitor found".to_string());
+        };
 
     // Create a fullscreen overlay window (not fullscreen mode, but screen-sized)
     WebviewWindowBuilder::new(
@@ -164,7 +165,7 @@ pub fn create_screenshot_window(
         WebviewUrl::App("screenshot.html".into()),
     )
     .title("Screenshot")
-    .inner_size(width, height)  // ← Use screen size, not fullscreen mode
+    .inner_size(width, height) // ← Use screen size, not fullscreen mode
     .position(x, y)
     .decorations(false)
     .resizable(false)
@@ -186,7 +187,8 @@ pub fn screenshot_overlay_ready(
 ) -> Result<(), String> {
     log::info!("Screenshot overlay page is ready");
 
-    let window = app.get_webview_window("screenshot")
+    let window = app
+        .get_webview_window("screenshot")
         .ok_or_else(|| "Screenshot window not found".to_string())?;
 
     #[derive(serde::Serialize, Clone)]
@@ -197,7 +199,9 @@ pub fn screenshot_overlay_ready(
 
     let data = {
         let screenshot_state = state.screenshot_state.lock();
-        let screenshot_bytes = screenshot_state.data.as_ref()
+        let screenshot_bytes = screenshot_state
+            .data
+            .as_ref()
             .ok_or_else(|| "No screenshot data available".to_string())?;
 
         ScreenshotData {
@@ -206,9 +210,11 @@ pub fn screenshot_overlay_ready(
         }
     };
 
-    window.set_focus()
+    window
+        .set_focus()
         .map_err(|e| format!("Failed to focus screenshot window: {}", e))?;
-    window.emit("screenshot-data", data)
+    window
+        .emit("screenshot-data", data)
         .map_err(|e| format!("Failed to emit screenshot data: {}", e))?;
 
     Ok(())
@@ -219,7 +225,8 @@ pub fn close_screenshot_window(app: tauri::AppHandle) -> Result<(), String> {
     log::info!("Closing screenshot window");
 
     if let Some(window) = app.get_webview_window("screenshot") {
-        window.close()
+        window
+            .close()
             .map_err(|e| format!("Failed to close screenshot window: {}", e))?;
     }
 
@@ -248,12 +255,20 @@ pub fn crop_screenshot(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
-    log::info!("Cropping screenshot: x={}, y={}, width={}, height={}", x, y, width, height);
+    log::info!(
+        "Cropping screenshot: x={}, y={}, width={}, height={}",
+        x,
+        y,
+        width,
+        height
+    );
 
     let screenshot_state = state.screenshot_state.lock();
 
     // Check if we have screenshot data
-    let data = screenshot_state.data.as_ref()
+    let data = screenshot_state
+        .data
+        .as_ref()
         .ok_or_else(|| "No screenshot data available".to_string())?;
 
     let scale_factor = screenshot_state.scale_factor;
@@ -264,18 +279,24 @@ pub fn crop_screenshot(
     let pw = (width * scale_factor) as u32;
     let ph = (height * scale_factor) as u32;
 
-    log::info!("Physical coordinates: x={}, y={}, width={}, height={} (scale={})",
-               px, py, pw, ph, scale_factor);
+    log::info!(
+        "Physical coordinates: x={}, y={}, width={}, height={} (scale={})",
+        px,
+        py,
+        pw,
+        ph,
+        scale_factor
+    );
 
     // Load and crop image
-    let img = image::load_from_memory(data)
-        .map_err(|e| format!("Failed to load image: {}", e))?;
+    let img = image::load_from_memory(data).map_err(|e| format!("Failed to load image: {}", e))?;
 
     let cropped = img.crop_imm(px, py, pw, ph);
 
     // Encode to PNG
     let mut buf = Vec::new();
-    cropped.write_to(&mut Cursor::new(&mut buf), image::ImageFormat::Png)
+    cropped
+        .write_to(&mut Cursor::new(&mut buf), image::ImageFormat::Png)
         .map_err(|e| format!("Failed to encode PNG: {}", e))?;
 
     // Convert to base64
@@ -283,11 +304,14 @@ pub fn crop_screenshot(
     let base64 = general_purpose::STANDARD.encode(&buf);
 
     if let Some(main_window) = app.get_webview_window("main") {
-        main_window.show()
+        main_window
+            .show()
             .map_err(|e| format!("Failed to show main window: {}", e))?;
-        main_window.set_focus()
+        main_window
+            .set_focus()
             .map_err(|e| format!("Failed to focus main window: {}", e))?;
-        main_window.emit("screenshot-captured", base64.clone())
+        main_window
+            .emit("screenshot-captured", base64.clone())
             .map_err(|e| format!("Failed to emit screenshot-captured: {}", e))?;
     }
 

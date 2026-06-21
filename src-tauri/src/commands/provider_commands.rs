@@ -1,9 +1,9 @@
-use tauri::State;
-use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
-use std::sync::Arc;
 use crate::CustomTranslationProviderDef;
 use crate::application::providers::common::CredentialField;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tauri::State;
 
 #[derive(Serialize, Deserialize)]
 pub struct ProviderInfo {
@@ -29,33 +29,41 @@ pub async fn list_translation_providers(
     let active_ids: Vec<_> = active.iter().map(|p| p.read().id().to_string()).collect();
 
     // Load custom provider definitions for extra metadata
-    let custom_defs = state.config_file
+    let custom_defs = state
+        .config_file
         .load::<Vec<CustomTranslationProviderDef>>("custom_translation_providers")
         .unwrap_or_default();
 
-    let info: Vec<_> = all_providers.iter().map(|p| {
-        let provider = p.read();
-        let id = provider.id().to_string();
-        let is_builtin = matches!(id.as_str(), "google-translate" | "deepl" | "baidu-translate");
+    let info: Vec<_> = all_providers
+        .iter()
+        .map(|p| {
+            let provider = p.read();
+            let id = provider.id().to_string();
+            let is_builtin = matches!(
+                id.as_str(),
+                "google-translate" | "deepl" | "baidu-translate"
+            );
 
-        // Find matching custom def
-        let custom_def = custom_defs.iter().find(|def| def.id == id);
+            // Find matching custom def
+            let custom_def = custom_defs.iter().find(|def| def.id == id);
 
-        ProviderInfo {
-            id: id.clone(),
-            name: provider.name().to_string(),
-            is_configured: provider.is_configured(),
-            requires_api_key: provider.requires_api_key(),
-            is_active: active_ids.contains(&id),
-            is_builtin,
-            protocol: custom_def.map(|def| format!("{:?}", def.protocol).to_lowercase()),
-            endpoint: custom_def.map(|def| def.endpoint.clone()),
-            model: custom_def.map(|def| def.model.clone()),
-            reasoning_level: custom_def.and_then(|def|
-                def.reasoning_level.map(|level| format!("{:?}", level).to_lowercase())
-            ),
-        }
-    }).collect();
+            ProviderInfo {
+                id: id.clone(),
+                name: provider.name().to_string(),
+                is_configured: provider.is_configured(),
+                requires_api_key: provider.requires_api_key(),
+                is_active: active_ids.contains(&id),
+                is_builtin,
+                protocol: custom_def.map(|def| format!("{:?}", def.protocol).to_lowercase()),
+                endpoint: custom_def.map(|def| def.endpoint.clone()),
+                model: custom_def.map(|def| def.model.clone()),
+                reasoning_level: custom_def.and_then(|def| {
+                    def.reasoning_level
+                        .map(|level| format!("{:?}", level).to_lowercase())
+                }),
+            }
+        })
+        .collect();
 
     Ok(info)
 }
@@ -65,7 +73,8 @@ pub async fn activate_translation_provider(
     provider_id: String,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    state.translation_coordinator
+    state
+        .translation_coordinator
         .activate(&provider_id)
         .map_err(|e| e.to_string())
 }
@@ -75,7 +84,8 @@ pub async fn deactivate_translation_provider(
     provider_id: String,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    state.translation_coordinator
+    state
+        .translation_coordinator
         .deactivate(&provider_id)
         .map_err(|e| e.to_string())
 }
@@ -87,7 +97,8 @@ pub async fn configure_translation_provider(
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     // Save to keychain
-    state.keychain
+    state
+        .keychain
         .save_provider_credential(&provider_id, &api_key)
         .map_err(|e| e.to_string())?;
 
@@ -104,7 +115,8 @@ pub async fn reorder_active_translation_providers(
     provider_ids: Vec<String>,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    state.translation_coordinator
+    state
+        .translation_coordinator
         .reorder_active(provider_ids)
         .map_err(|e| e.to_string())
 }
@@ -145,7 +157,8 @@ pub async fn configure_translation_provider_credentials(
         if !credentials.contains_key(&field.name) {
             return Err(format!("Missing required field: {}", field.label));
         }
-        let value = credentials.get(&field.name)
+        let value = credentials
+            .get(&field.name)
             .ok_or_else(|| format!("Missing field: {}", field.name))?;
         if value.trim().is_empty() {
             return Err(format!("Field cannot be empty: {}", field.label));
@@ -153,12 +166,14 @@ pub async fn configure_translation_provider_credentials(
     }
 
     // Save to keychain
-    state.keychain
+    state
+        .keychain
         .save_provider_credentials(&provider_id, &credentials)
         .map_err(|e| e.to_string())?;
 
     // Reconfigure provider at runtime (hot-reload)
-    state.translation_coordinator
+    state
+        .translation_coordinator
         .reconfigure_provider(&provider_id, &credentials)
         .map_err(|e| e.to_string())?;
 
@@ -225,7 +240,8 @@ pub async fn add_custom_translation_provider(
     );
 
     // Step 1: Save API key to keychain
-    state.keychain
+    state
+        .keychain
         .save_provider_credential(&id, &request.api_key)
         .map_err(|e| format!("Failed to save API key: {}", e))?;
 
@@ -240,13 +256,15 @@ pub async fn add_custom_translation_provider(
     };
 
     // Step 3: Load existing custom providers and append
-    let mut custom_defs = state.config_file
+    let mut custom_defs = state
+        .config_file
         .load::<Vec<CustomTranslationProviderDef>>("custom_translation_providers")
         .unwrap_or_default();
     custom_defs.push(def.clone());
 
     // Step 4: Save to ConfigFile
-    state.config_file
+    state
+        .config_file
         .save("custom_translation_providers", &custom_defs)
         .map_err(|e| {
             // Rollback: delete keychain entry
@@ -283,18 +301,22 @@ pub async fn add_custom_translation_provider(
         def.reasoning_level,
     );
 
-    state.translation_coordinator
+    state
+        .translation_coordinator
         .register(provider)
         .map_err(|e| {
             // Rollback: remove from config and keychain
             custom_defs.pop();
-            let _ = state.config_file.save("custom_translation_providers", &custom_defs);
+            let _ = state
+                .config_file
+                .save("custom_translation_providers", &custom_defs);
             let _ = state.keychain.delete_provider_credential(&id);
             format!("Failed to register provider: {}", e)
         })?;
 
     // Step 6: Activate immediately
-    state.translation_coordinator
+    state
+        .translation_coordinator
         .activate(&id)
         .map_err(|e| format!("Failed to activate provider: {}", e))?;
 
@@ -319,7 +341,8 @@ pub async fn remove_custom_translation_provider(
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     // Step 1: Load existing custom providers
-    let mut custom_defs = state.config_file
+    let mut custom_defs = state
+        .config_file
         .load::<Vec<CustomTranslationProviderDef>>("custom_translation_providers")
         .unwrap_or_default();
 
@@ -329,22 +352,27 @@ pub async fn remove_custom_translation_provider(
         return Err("Cannot remove builtin provider".into());
     }
 
-    let index = custom_defs.iter().position(|def| def.id == provider_id)
+    let index = custom_defs
+        .iter()
+        .position(|def| def.id == provider_id)
         .ok_or_else(|| format!("Provider not found: {}", provider_id))?;
 
     // Step 3: Deactivate and unregister
-    state.translation_coordinator
+    state
+        .translation_coordinator
         .unregister(&provider_id)
         .map_err(|e| format!("Failed to unregister: {}", e))?;
 
     // Step 4: Remove from config
     custom_defs.remove(index);
-    state.config_file
+    state
+        .config_file
         .save("custom_translation_providers", &custom_defs)
         .map_err(|e| format!("Failed to save config: {}", e))?;
 
     // Step 5: Delete keychain entry
-    state.keychain
+    state
+        .keychain
         .delete_provider_credential(&provider_id)
         .map_err(|e| format!("Failed to delete credential: {}", e))?;
 
