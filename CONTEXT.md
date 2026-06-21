@@ -30,7 +30,25 @@
 **设计原则：**
 - 使用内部细粒度锁（`Arc<Mutex<Vec<String>>>`）实现并发安全
 - Builder 模式初始化：构建时可变（`&mut self`），使用时不可变（`Arc<Self>`）
-- `providers` 在初始化后不变（无需锁），`active` 运行时可变（需要锁）
+- Provider 注册表由 Coordinator 管理；Provider 凭证可通过 Coordinator Interface 在运行时重配置
+- `active` 运行时可变（需要锁），调用方不直接持有 Provider 的可变状态
+
+### Frontend Tauri Adapter（前端 Tauri 适配器）
+`src/tauri/*` 中的 TypeScript 模块，封装前端到 Tauri command 的调用细节。
+
+**职责：**
+- 集中维护 command 名称和 payload 形状
+- 为 UI、hooks、stores 提供 typed function，而不是让它们直接调用 `invoke()`
+- 让前端/后端 seam 在代码导航时清晰可见
+
+### Application Composition（应用组合）
+`src-tauri/src/composition.rs` 中的运行时装配模块。
+
+**职责：**
+- 构建 Provider Coordinators 并注册内置 Provider
+- 恢复自定义 Translation Provider 和 Provider 激活状态
+- 将 EventBus 注入 Coordinator，并在 Tauri runtime 就绪后订阅 HistoryService
+- 让 `lib.rs` 保持在 AppState 形状、Tauri builder、command 注册这些启动职责上
 
 ### Provider Activation（Provider 激活）
 使 Provider 可用的过程。SnapLingo 支持两种激活模型：
@@ -67,6 +85,15 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 - `active` 状态用 `Arc<Mutex<Vec<String>>>` 或 `Arc<Mutex<Option<String>>>` 包装
 - 短锁：只在修改 `active` 列表时锁定，读取后立即释放
 - `translate()` 和 `recognize()` 可以并发调用，互不阻塞
+
+### Provider Configuration Module（Provider 配置模块）
+`src-tauri/src/application/providers/configuration.rs` 中的配置生命周期模块。
+
+**职责：**
+- 校验 Provider 必填凭证字段
+- 保存自定义 Translation Provider 定义
+- 构造自定义 LLM Translation Provider
+- 与 Coordinator 的运行时重配置能力配合，使配置命令保存凭证后立即更新已注册 Provider，无需重启应用
 
 ### Capture Mode（捕获模式）
 用户触发的五种独立功能入口：
@@ -138,6 +165,16 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 - OCR Mode：Capture Session → 选区 → OCR
 - OCR + Translation Mode：Capture Session → 选区 → OCR → 翻译
 - Screenshot Mode 中的 OCR 按钮复用同一个 Capture Session 的原始图像
+
+### Capture Session Runtime（截图会话运行时）
+`CaptureSessionRuntime` 是 Application 层的深模块，统一编排 Capture Session 的输出和 OCR 路径。
+
+**职责：**
+- 调用 `CaptureSessionService` 读取冻结桌面和选区
+- 调用 `ImageCompositionService` 渲染复制、保存、贴图所需的最终图像
+- 调用 `CaptureOutputService` 处理剪贴板、文件输出和输出结果判断
+- 调用 `OcrCoordinator` 对原始选区图像执行 OCR
+- 让 Commands 层通过一个 Interface 完成 render/output/OCR，而不是了解多个服务的调用顺序
 
 ### Provider（能力提供者）
 实现某个能力的内置模块，不区分本地实现还是远程 API 调用。用户视角看到的是能力名称（如"DeepL 翻译"），而非技术实现细节。

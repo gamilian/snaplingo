@@ -12,12 +12,13 @@ Design prototypes live under `designs/` so the production frontend tree stays fo
 
 ## Frontend/Backend Seam
 
-Frontend code should call backend behavior through `src/tauri/*` adapters. Those adapters call Tauri commands declared under `src-tauri/src/commands/`.
+Frontend code calls backend behavior through `src/tauri/*` adapters. Those adapters own command names and payload mapping, then call Tauri commands declared under `src-tauri/src/commands/`.
 
-During the migration, some existing runtime files still call Tauri commands directly. New frontend command calls should go through the adapter seam.
+`src-tauri/src/composition.rs` owns runtime dependency construction: Provider registration, Coordinator construction, custom Translation Provider restoration, and startup event subscriptions.
 
 ## Deep Modules
 
 - Provider Coordinators: provider activation, persistence, and execution.
-- Capture Session: frozen desktop, selection rendering, output, and OCR handoff.
+- Provider Configuration Module: credential validation, custom Translation Provider definitions, and runtime Provider reconfiguration support.
+- Capture Session Runtime: frozen desktop, selection rendering, output, and OCR handoff behind one Application interface.
 - Pinned Image: in-memory pinned image state and window adapter behavior.

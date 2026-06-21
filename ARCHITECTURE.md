@@ -1,6 +1,6 @@
 # SnapLingo 架构设计文档
 
-> 最终版本 - 2026-06-13
+> 当前版本 - 2026-06-21
 
 ## 📐 架构概览
 
@@ -27,47 +27,74 @@ Infrastructure Layer (基础设施层)
 3. **平台差异在 Infrastructure 隔离**（应用层无感知）
 4. **依赖注入实现可测试性**（HttpClient, TtsBackend 等）
 
+**运行时 seam：**
+- `src/tauri/*` 是前端 Tauri Adapter seam，集中维护 command 名称和 payload 形状。
+- `src-tauri/src/commands/*` 是后端 Tauri command seam，负责把 IPC 请求转给 Application 层。
+- `src-tauri/src/composition.rs` 是应用组合入口，负责 Provider 注册、Coordinator 构建和启动期订阅。
+- `application/services/capture_session_runtime.rs` 是 Capture Session Runtime，统一编排截图输出和 OCR。
+
 ---
 
 ## 📁 目录结构
 
 ```
 snaplingo/
+├─ src/                                 # React/Vite Frontend Runtime
+│   ├─ tauri/                           # ⭐ Frontend Tauri Adapter seam
+│   │   ├─ translation.ts
+│   │   ├─ providers.ts
+│   │   ├─ history.ts
+│   │   ├─ captureSession.ts
+│   │   └─ pinnedImage.ts
+│   │
+│   ├─ components/
+│   │   ├─ SettingsWindow/              # 设置窗口
+│   │   ├─ ScreenshotSession/           # 截图会话 UI
+│   │   ├─ ResultWindow/                # 结果窗口
+│   │   └─ PinnedImageWindow/           # 贴图窗口
+│   │
+│   ├─ hooks/
+│   └─ stores/                          # Zustand 状态管理
+│
 ├─ src-tauri/src/
-│   ├─ main.rs                          # 入口 + 依赖注入
+│   ├─ main.rs                          # Tauri binary 入口
+│   ├─ lib.rs                           # AppState 形状 + Tauri builder + command 注册
+│   ├─ composition.rs                   # ⭐ Runtime composition
 │   ├─ error.rs                         # 统一错误类型
 │   │
-│   ├─ commands/                        # ⭐ Commands Layer
-│   │   ├─ config_commands.rs
+│   ├─ commands/                        # ⭐ Backend Tauri command seam
 │   │   ├─ provider_commands.rs
 │   │   ├─ ocr_commands.rs
 │   │   ├─ translation_commands.rs
+│   │   ├─ capture_session_commands.rs
+│   │   ├─ pinned_image_commands.rs
+│   │   ├─ history_commands.rs
 │   │   └─ ...
 │   │
 │   ├─ application/                     # ⭐ Application Layer
 │   │   ├─ providers/                   # Provider 垂直切片
 │   │   │   ├─ common/                  # 共享基础
 │   │   │   │   ├─ provider.rs          # Provider Trait
-│   │   │   │   └─ registry.rs          # Registry 共享逻辑
+│   │   │   ├─ configuration.rs         # Provider 配置生命周期
 │   │   │   │
 │   │   │   ├─ ocr/                     # OCR Providers
-│   │   │   │   ├─ trait.rs
-│   │   │   │   ├─ registry.rs          # 单选
-│   │   │   │   ├─ service.rs
-│   │   │   │   └─ impls/               # 6 个实现
+│   │   │   │   ├─ trait_def.rs
+│   │   │   │   ├─ coordinator.rs       # 单选 + 运行时重配置
+│   │   │   │   └─ impls/               # 具体实现
 │   │   │   │
 │   │   │   ├─ translation/             # Translation Providers
-│   │   │   │   ├─ trait.rs
-│   │   │   │   ├─ registry.rs          # 多选
-│   │   │   │   ├─ service.rs
-│   │   │   │   └─ impls/               # 9 个实现
-│   │   │   │
-│   │   │   └─ tts/                     # TTS Providers
-│   │   │       └─ ...
+│   │   │   │   ├─ trait_def.rs
+│   │   │   │   ├─ coordinator.rs       # 多选 + 并发执行
+│   │   │   │   └─ impls/               # 具体实现
 │   │   │
-│   │   └─ services/                    # 其他应用服务
-│   │       ├─ hotkey_conflict.rs
-│   │       └─ history_cleanup.rs
+│   │   └─ services/
+│   │       ├─ capture_session_runtime.rs # ⭐ Capture Session Runtime
+│   │       ├─ capture_session_service.rs
+│   │       ├─ image_composition_service.rs
+│   │       ├─ capture_output_service.rs
+│   │       ├─ pinned_image_service.rs
+│   │       ├─ history_service.rs
+│   │       └─ workflow_service.rs
 │   │
 │   ├─ domain/                          # ⭐ Domain Layer
 │   │   ├─ capture.rs                   # 纯数据结构
@@ -93,12 +120,6 @@ snaplingo/
 │       └─ http/
 │           ├─ client.rs                # HttpClient Trait
 │           └─ reqwest_impl.rs
-│
-└─ src/                                 # React Frontend
-    ├─ components/
-    │   ├─ SettingsWindow/              # 设置窗口（21 个页面）
-    │   └─ ResultWindow/                # 结果窗口
-    └─ stores/                          # Zustand 状态管理
 ```
 
 ---
@@ -121,14 +142,7 @@ pub async fn activate_ocr_provider(
     provider_id: String,
     state: State<'_, AppState>
 ) -> Result<()> {
-    // 1. 激活
-    state.ocr_registry.lock().unwrap()
-        .activate(&provider_id)?;
-    
-    // 2. 持久化
-    state.config_file.save("active_ocr", &provider_id)?;
-    
-    Ok(())
+    state.ocr_coordinator.activate(&provider_id)
 }
 ```
 
@@ -145,12 +159,10 @@ pub async fn activate_ocr_provider(
 **OCR Provider 结构：**
 ```
 providers/ocr/
-├─ trait.rs         # OcrProvider Trait 定义
-├─ registry.rs      # OcrRegistry（管理激活状态，单选）
-├─ service.rs       # OcrService（业务编排）
+├─ trait_def.rs     # OcrProvider Trait 定义
+├─ coordinator.rs   # OcrCoordinator（单选、持久化、执行、运行时重配置）
 └─ impls/           # 具体实现
     ├─ tesseract.rs      # 本地
-    ├─ paddleocr.rs      # 本地
     ├─ baidu_ocr.rs      # 远程（依赖 HttpClient）
     └─ ...
 ```
@@ -160,22 +172,26 @@ providers/ocr/
 | 模块 | 职责 | 不负责 |
 |------|------|--------|
 | **Trait** | 定义 Provider 接口 | 不管理实例、不执行业务 |
-| **Registry** | 管理 Provider 列表、激活状态 | 不执行 Provider、不记录历史 |
-| **Service** | 调用 Provider + 记录历史 | 不管理激活状态 |
+| **Coordinator** | 管理 Provider 列表、激活状态、持久化、执行协调和运行时重配置 | 不实现具体 OCR/翻译 API |
+| **configuration.rs** | 校验凭证、保存自定义 Provider 定义、构造自定义 LLM Provider | 不执行 Provider |
 | **impls/** | 实现具体能力（OCR 识别） | 不管理自己的激活状态 |
 
 **Translation Provider 特殊性：**
-- Registry 是**多选**（可同时激活多个）
-- Service **并发调用**所有激活的 Provider
+- TranslationCoordinator 是**多选**（可同时激活多个）
+- TranslationCoordinator **并发调用**所有激活的 Provider
 - 返回 `Vec<TranslationResult>` 供用户对比
 
 ---
 
-#### 2.2 Services（其他应用服务）
+#### 2.2 Services（应用服务）
 
 **示例：**
-- `hotkey_conflict.rs`：快捷键冲突检测（跨 Provider 类型）
-- `history_cleanup.rs`：历史记录自动清理
+- `capture_session_runtime.rs`：统一编排截图会话渲染、输出、OCR
+- `capture_session_service.rs`：创建和读取冻结桌面会话
+- `image_composition_service.rs`：裁剪、标注、合成图像
+- `capture_output_service.rs`：保存、复制、贴图输出
+- `pinned_image_service.rs`：贴图状态和恢复
+- `history_service.rs`：订阅领域事件并写入历史
 
 ---
 
@@ -305,13 +321,15 @@ pub struct ReqwestHttpClient {
 ```
 用户点击"激活百度 OCR"
     ↓
-React: invoke('activate_ocr_provider', {provider_id: 'baidu_ocr'})
+Frontend Adapter: activateOcrProvider('baidu-ocr')
+    ↓
+src/tauri/providers.ts: invoke('activate_ocr_provider', { providerId })
     ↓ Tauri IPC
 Commands: activate_ocr_provider(provider_id, State)
     ↓
-Application: OcrRegistry.activate(provider_id)
+Application: OcrCoordinator.activate(provider_id)
     ↓ 持久化
-Infrastructure: ConfigFile.save('active_ocr', provider_id)
+Infrastructure: ConfigFile.save('active_ocr_provider', provider_id)
     ↓
 File System: ~/.snaplingo/config.json
 ```
@@ -323,9 +341,9 @@ File System: ~/.snaplingo/config.json
 ```
 用户输入 API Key → 点击保存
     ↓
-React: invoke('configure_provider', {provider_id: 'deepl', api_key: 'xxx'})
+Frontend Adapter: configureTranslationProviderCredentials(...)
     ↓
-Commands: configure_provider(provider_id, api_key, State)
+Commands: configure_translation_provider_credentials(provider_id, credentials, State)
     ↓ 分两路
     │
     ├─→ Infrastructure: Keychain.save_provider_credential(provider_id, api_key)
@@ -334,9 +352,9 @@ Commands: configure_provider(provider_id, api_key, State)
     │       ├─ Windows: Credential Manager API
     │       └─ Linux: Secret Service API
     │
-    └─→ Application: TranslationRegistry.configure_provider(provider_id, api_key)
+    └─→ Application: TranslationCoordinator.reconfigure_provider(provider_id, credentials)
             ↓
-            DeepLProvider.api_key = Some(api_key)
+            已注册 Provider 立即更新运行时凭证
 ```
 
 ---
@@ -346,13 +364,15 @@ Commands: configure_provider(provider_id, api_key, State)
 ```
 用户输入文本 → 点击翻译
     ↓
-React: invoke('translate_text', {text: 'hello', source: 'en', target: 'zh'})
+Frontend Adapter: translateText(...)
     ↓
-Commands: translate_text(text, source, target, State)
+src/tauri/translation.ts: invoke('translate_text_v2', payload)
     ↓
-Application: TranslationService.translate(request)
+Commands: translate_text_v2(request, State)
+    ↓
+Application: TranslationCoordinator.translate(request)
     ↓ 获取激活的 Providers
-    TranslationRegistry.get_active_providers()
+    TranslationCoordinator.get_active()
     → [DeepL, Google, 百度] (3 个激活)
     ↓ 并发调用 (tokio::join!)
     ┌─────────────┬─────────────┬─────────────┐
@@ -390,8 +410,9 @@ struct TesseractProvider { ... }
 struct BaiduOcrProvider { ... }
 
 // 上下文（运行时选择策略）
-struct OcrService {
-    registry: Arc<Mutex<OcrRegistry>>,  // 管理所有策略
+struct OcrCoordinator {
+    providers: Mutex<HashMap<String, Arc<RwLock<dyn OcrProvider>>>>,
+    active: Arc<Mutex<Option<String>>>,
 }
 ```
 
@@ -411,45 +432,48 @@ struct BaiduOcrProvider {
     http_client: Arc<dyn HttpClient>,  // 依赖抽象
 }
 
-// 在 main.rs 注入
+// 在 composition.rs 注入
 let http_client = Arc::new(ReqwestHttpClient::new());
 let provider = BaiduOcrProvider::new(Arc::clone(&http_client));
 ```
 
 ---
 
-### 3. 注册表模式（Registry Pattern）
+### 3. 协调器模式（Coordinator Pattern）
 
-**集中管理 Provider 实例和激活状态：**
+**集中管理 Provider 实例、激活状态、持久化和执行：**
 ```rust
-struct OcrRegistry {
-    providers: HashMap<String, Arc<Mutex<dyn OcrProvider>>>,
-    active: Option<String>,  // 单选
+struct OcrCoordinator {
+    providers: Mutex<HashMap<String, Arc<RwLock<dyn OcrProvider>>>>,
+    active: Arc<Mutex<Option<String>>>,  // 单选
+    config: Arc<ConfigFile>,
 }
 
-impl OcrRegistry {
-    pub fn register(&mut self, provider: Arc<Mutex<dyn OcrProvider>>) { ... }
-    pub fn activate(&mut self, id: &str) -> Result<()> { ... }
-    pub fn get_active(&self) -> Option<Arc<Mutex<dyn OcrProvider>>> { ... }
+impl OcrCoordinator {
+    pub fn register<T: OcrProvider + 'static>(&self, provider: T) -> Result<()> { ... }
+    pub fn activate(&self, id: &str) -> Result<()> { ... }
+    pub fn get_active(&self) -> Option<Arc<RwLock<dyn OcrProvider>>> { ... }
+    pub fn reconfigure_provider(&self, id: &str, credentials: &HashMap<String, String>) -> Result<()> { ... }
 }
 ```
 
 ---
 
-### 4. 门面模式（Facade Pattern）
+### 4. 运行时门面（Runtime Facade）
 
-**Service 简化复杂子系统的使用：**
+**Capture Session Runtime 简化截图会话输出路径：**
 ```rust
 // 对外暴露简单接口
-struct OcrService {
-    registry: Arc<Mutex<OcrRegistry>>,
-    history_db: Arc<HistoryDb>,
+struct CaptureSessionRuntime {
+    sessions: Arc<CaptureSessionService>,
+    composer: Arc<ImageCompositionService>,
+    output: Arc<CaptureOutputService>,
+    ocr: Arc<OcrCoordinator>,
 }
 
-impl OcrService {
-    pub async fn recognize(&self, image: &[u8]) -> Result<OcrResult> {
-        // 隐藏复杂的 Registry 操作和历史记录逻辑
-    }
+impl CaptureSessionRuntime {
+    pub fn output_selection(&self, input: CaptureOutputInput) -> Result<CaptureOutputOutcome> { ... }
+    pub async fn recognize_selection_text(&self, input: CaptureOcrInput) -> Result<String> { ... }
 }
 ```
 
@@ -461,7 +485,7 @@ impl OcrService {
 
 | 方案 | 优点 | 缺点 |
 |------|------|------|
-| **垂直切片**（采用） | 功能内聚、易导航、独立演进 | 有重复代码（Registry 模式） |
+| **垂直切片**（采用） | 功能内聚、易导航、独立演进 | 有少量 Coordinator 结构重复 |
 | **水平分层** | 无重复 | Trait 和 impl 分离、跨目录查找 |
 
 **决策：** 垂直切片，通过 `common/` 减少重复
@@ -481,14 +505,14 @@ impl OcrService {
 
 ---
 
-### 权衡 3：三个 Registry vs 泛型 Registry
+### 权衡 3：独立 Coordinator vs 泛型 Coordinator
 
 | 方案 | 优点 | 缺点 |
 |------|------|------|
-| **三个独立**（采用） | 类型安全、激活逻辑独立 | 代码重复 |
-| **泛型 Registry** | 无重复 | Rust 泛型 + dyn Trait 复杂 |
+| **独立 Coordinator**（采用） | 类型安全、激活逻辑独立、测试直接 | 少量重复 |
+| **泛型 Coordinator** | 无重复 | Rust 泛型 + dyn Trait 复杂，接口更浅 |
 
-**决策：** 独立 Registry，通过 `common/registry.rs` 共享基础逻辑
+**决策：** 独立 Coordinator。OCR 是单选，Translation 是多选且并发执行，合并成泛型会把差异推给调用者。
 
 ---
 
@@ -499,8 +523,9 @@ impl OcrService {
 | 模块 | 如何测试 |
 |------|---------|
 | **Provider** | Mock HttpClient，单元测试 recognize() |
-| **Registry** | 纯逻辑，单元测试激活/查询 |
-| **Service** | Mock Registry + HistoryDb，集成测试 |
+| **Coordinator** | 单元测试激活、恢复、重配置和执行协调 |
+| **Capture Session Runtime** | 通过一个 Interface 测试 render/output/OCR 编排 |
+| **Frontend Tauri Adapter** | Vitest 测 command 名称和 payload 映射 |
 | **Commands** | Mock AppState，端到端测试 |
 
 ---
@@ -509,9 +534,9 @@ impl OcrService {
 
 | 扩展场景 | 需要改动 |
 |---------|---------|
-| **加新 Provider** | 1. 实现 Trait<br>2. main.rs 注册 |
+| **加新 Provider** | 1. 实现 Trait<br>2. 在 `composition.rs` 注册<br>3. 如需凭证，接入 Provider Configuration Module |
 | **加新平台** | 1. 实现 Backend Trait<br>2. 添加 `#[cfg]` |
-| **OCR 改为多选** | 只改 OcrRegistry，其他不变 |
+| **OCR 改为多选** | 改 OcrCoordinator 激活模型和对应前端 adapter/store |
 
 ---
 
@@ -533,35 +558,14 @@ Commands → Application → Domain
 
 ---
 
-## 🚀 实现路线图
+## 🚀 当前演进状态
 
-### Phase 1: Infrastructure（1-2 天）
-- [ ] ConfigFile + 文件锁
-- [ ] Keychain（macOS/Windows/Linux）
-- [ ] HistoryDb
-- [ ] HttpClient Trait + Reqwest
-- [ ] 错误类型（thiserror）
-
-### Phase 2: OCR Providers（3-4 天）
-- [ ] OcrProvider Trait
-- [ ] OcrRegistry（单选）
-- [ ] OcrService
-- [ ] Tesseract（本地）
-- [ ] 百度 OCR（远程）
-- [ ] Tauri Commands
-
-### Phase 3: Translation Providers（3-4 天）
-- [ ] TranslationProvider Trait
-- [ ] TranslationRegistry（多选）
-- [ ] TranslationService（并发）
-- [ ] Google Translate
-- [ ] DeepL
-- [ ] OpenAI 兼容
-
-### Phase 4: TTS + 集成（2-3 天）
-- [ ] TtsProvider
-- [ ] TtsBackend（平台适配）
-- [ ] 集成测试
+- Frontend runtime 已通过 `src/tauri/*` 适配器集中调用 Tauri commands。
+- Backend runtime 已通过 `src-tauri/src/commands/*` 保持 Tauri command seam。
+- Provider Registry/Service 已合并为 `TranslationCoordinator` 和 `OcrCoordinator`。
+- Provider Configuration Module 负责凭证校验、自定义 Translation Provider 定义和运行时重配置配合。
+- Capture Session Runtime 已集中截图会话的 render/output/OCR 编排。
+- Application Composition 已从 `lib.rs` 抽到 `src-tauri/src/composition.rs`。
 
 ---
 

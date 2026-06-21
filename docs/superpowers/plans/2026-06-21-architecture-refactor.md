@@ -1158,7 +1158,7 @@ git commit -m "refactor(settings): centralize settings navigation model"
 - Modify: `ARCHITECTURE.md`
 - Possibly create: `docs/adr/0005-runtime-seams-and-composition.md`
 
-- [ ] **Step 1: Update domain language**
+- [x] **Step 1: Update domain language**
 
 Update `CONTEXT.md` if these Module names become stable:
 
@@ -1169,7 +1169,7 @@ Update `CONTEXT.md` if these Module names become stable:
 
 Keep wording consistent with existing Capture Session and Provider language.
 
-- [ ] **Step 2: Update architecture doc**
+- [x] **Step 2: Update architecture doc**
 
 Update `ARCHITECTURE.md` to reflect the actual current directories:
 
@@ -1178,7 +1178,7 @@ Update `ARCHITECTURE.md` to reflect the actual current directories:
 - `src-tauri/src/composition.rs` as runtime composition.
 - Capture Session Runtime as Application module.
 
-- [ ] **Step 3: Add ADR if a durable decision was made**
+- [x] **Step 3: Add ADR if a durable decision was made**
 
 If Task 5 chooses runtime OCR reconfiguration as required behavior, create `docs/adr/0005-runtime-provider-reconfiguration.md`:
 
@@ -1198,7 +1198,7 @@ Provider configuration must update the runtime Provider instance when the Provid
 Provider Coordinators need a mutable Provider seam. Configuration tests target the Coordinator Interface instead of command internals.
 ```
 
-- [ ] **Step 4: Run full verification**
+- [x] **Step 4: Run full verification**
 
 Run:
 
@@ -1211,7 +1211,9 @@ cargo test --manifest-path src-tauri/Cargo.toml --tests
 
 Expected: PASS, or documented pre-existing failures only.
 
-- [ ] **Step 5: Inspect final architecture diff**
+Current status: PASS. `npm test` passed 238 tests in 25 files. `npm run build` passed. `cargo test --manifest-path src-tauri/Cargo.toml --lib` passed 194 tests. `cargo test --manifest-path src-tauri/Cargo.toml --tests` passed lib tests plus integration tests, with existing warning classes only.
+
+- [x] **Step 5: Inspect final architecture diff**
 
 Run:
 
@@ -1227,7 +1229,9 @@ Expected:
 - The OCR restart-only configuration message is gone if Task 5 was implemented.
 - Stale TODOs from deleted files no longer appear.
 
-- [ ] **Step 6: Commit**
+Current status: PASS. `rg "invoke<|invoke\\(" src -n` only reported `src/tauri/*`. The restart-only and stale TODO scan returned no matches.
+
+- [x] **Step 6: Commit**
 
 ```bash
 git add CONTEXT.md ARCHITECTURE.md docs/adr docs/architecture
