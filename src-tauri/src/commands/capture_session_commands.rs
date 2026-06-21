@@ -147,9 +147,8 @@ pub async fn render_capture_output(
 ) -> Result<String, String> {
     let session_id = CaptureSessionId(session_id);
     state
-        .capture_session_service
+        .capture_session_runtime
         .render_png_base64(
-            &state.image_composition_service,
             &session_id,
             &rect,
             &annotations,
@@ -191,10 +190,8 @@ pub async fn output_capture(
 ) -> Result<(), String> {
     let session_id = CaptureSessionId(session_id);
     let output = state
-        .capture_session_service
+        .capture_session_runtime
         .output_selection(
-            &state.image_composition_service,
-            &state.capture_output_service,
             &session_id,
             &rect,
             &annotations,
@@ -226,13 +223,8 @@ pub async fn run_capture_ocr(
 ) -> Result<OcrResult, String> {
     let session_id = CaptureSessionId(session_id);
     state
-        .capture_session_service
-        .recognize_selection_text(
-            &state.image_composition_service,
-            &state.ocr_coordinator,
-            &session_id,
-            &rect,
-        )
+        .capture_session_runtime
+        .recognize_selection_text(&session_id, &rect)
         .await
         .map_err(|e| e.to_string())
 }

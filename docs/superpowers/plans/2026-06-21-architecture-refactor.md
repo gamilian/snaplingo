@@ -635,7 +635,7 @@ git commit -m "refactor(frontend): centralize capture and pin tauri adapters"
 - Modify: `src-tauri/src/commands/capture_session_commands.rs`
 - Test: `src-tauri/src/application/services/capture_session_service_test.rs`
 
-- [ ] **Step 1: Add failing runtime test**
+- [x] **Step 1: Add failing runtime test**
 
 Add a focused test to `src-tauri/src/application/services/capture_session_service_test.rs` or create `capture_session_runtime_test.rs` if the existing file becomes too large:
 
@@ -657,7 +657,9 @@ async fn runtime_recognizes_selection_text_through_one_interface() {
 
 Expected failure: missing `CaptureSessionRuntime`.
 
-- [ ] **Step 2: Run test and verify it fails**
+Current status: added `capture_session_runtime_recognizes_selection_text_through_one_interface` to the existing Capture Session service tests.
+
+- [x] **Step 2: Run test and verify it fails**
 
 Run:
 
@@ -667,7 +669,9 @@ cargo test --manifest-path src-tauri/Cargo.toml capture_session_runtime --lib
 
 Expected: FAIL because the runtime module does not exist.
 
-- [ ] **Step 3: Implement runtime module**
+Current status: failed as expected with unresolved import `crate::application::services::CaptureSessionRuntime`.
+
+- [x] **Step 3: Implement runtime module**
 
 Create `src-tauri/src/application/services/capture_session_runtime.rs`:
 
@@ -755,7 +759,9 @@ impl CaptureSessionRuntime {
 }
 ```
 
-- [ ] **Step 4: Export runtime module**
+Current status: implemented `src-tauri/src/application/services/capture_session_runtime.rs`.
+
+- [x] **Step 4: Export runtime module**
 
 Modify `src-tauri/src/application/services/mod.rs`:
 
@@ -766,7 +772,7 @@ pub use capture_session_runtime::CaptureSessionRuntime;
 
 Modify `src-tauri/src/application/mod.rs` export list to include `CaptureSessionRuntime`.
 
-- [ ] **Step 5: Add runtime to AppState**
+- [x] **Step 5: Add runtime to AppState**
 
 Modify `src-tauri/src/lib.rs`:
 
@@ -784,7 +790,9 @@ let capture_session_runtime = Arc::new(CaptureSessionRuntime::new(
 ));
 ```
 
-- [ ] **Step 6: Thin capture session commands**
+Current status: `AppState` now owns `capture_session_runtime` built from existing Capture Session, Image Composition, Capture Output, and OCR services.
+
+- [x] **Step 6: Thin capture session commands**
 
 Modify `src-tauri/src/commands/capture_session_commands.rs`:
 
@@ -794,7 +802,9 @@ Modify `src-tauri/src/commands/capture_session_commands.rs`:
 
 Keep pinned image window opening in the command module for now because it is Tauri window adapter behavior.
 
-- [ ] **Step 7: Run focused Rust tests**
+Current status: `render_capture_output`, `output_capture`, and `run_capture_ocr` now call `state.capture_session_runtime`. Pin window opening remains in the command adapter.
+
+- [x] **Step 7: Run focused Rust tests**
 
 Run:
 
@@ -804,7 +814,9 @@ cargo test --manifest-path src-tauri/Cargo.toml capture_session --lib
 
 Expected: PASS.
 
-- [ ] **Step 8: Inspect command Module shrinkage**
+Current status: PASS. `cargo test --manifest-path src-tauri/Cargo.toml capture_session_runtime --lib` ran 1 matching test and passed. `cargo test --manifest-path src-tauri/Cargo.toml capture_session --lib` passed 19 tests. `cargo test --manifest-path src-tauri/Cargo.toml --lib` passed 192 tests with existing warnings.
+
+- [x] **Step 8: Inspect command Module shrinkage**
 
 Run:
 
@@ -813,6 +825,8 @@ git diff -- src-tauri/src/commands/capture_session_commands.rs src-tauri/src/app
 ```
 
 Expected: command module no longer passes `image_composition_service`, `capture_output_service`, and `ocr_coordinator` separately for selection operations.
+
+Current status: confirmed by diff. `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check` still reports broad pre-existing formatting differences across unrelated Rust files, so no full-crate rustfmt was applied.
 
 - [ ] **Step 9: Commit**
 

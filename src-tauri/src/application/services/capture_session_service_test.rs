@@ -8,7 +8,9 @@ mod tests {
 
     use crate::application::providers::common::Provider;
     use crate::application::providers::ocr::{OcrCoordinator, OcrProvider};
-    use crate::application::services::{CaptureOutputService, CaptureSessionOutput};
+    use crate::application::services::{
+        CaptureOutputService, CaptureSessionOutput, CaptureSessionRuntime,
+    };
     use crate::domain::capture::{CaptureOutputAction, LogicalRect};
     use crate::domain::ocr::{OcrRequest, OcrResult};
     use crate::error::AppError;
@@ -448,6 +450,44 @@ mod tests {
         assert_eq!(request.language, None);
         assert_eq!((decoded.width(), decoded.height()), (2, 2));
         assert!(decoded.pixels().all(|pixel| pixel.0 == [10, 20, 30, 255]));
+    }
+
+    #[tokio::test]
+    async fn capture_session_runtime_recognizes_selection_text_through_one_interface() {
+        let observed_request = Arc::new(Mutex::new(None));
+        let ocr = OcrCoordinator::new(Arc::new(ConfigFile::new_temp()));
+        ocr.register(RecordingOcrProvider {
+            observed_request: observed_request.clone(),
+        })
+        .unwrap();
+        ocr.activate("recording").unwrap();
+
+        let sessions = Arc::new(CaptureSessionService::new(Arc::new(
+            make_backend_with_renderable_png(),
+        )));
+        let runtime = CaptureSessionRuntime::new(
+            sessions.clone(),
+            Arc::new(ImageCompositionService::new()),
+            Arc::new(CaptureOutputService::new()),
+            Arc::new(ocr),
+        );
+        let view = sessions.create_session().await.unwrap();
+
+        let result = runtime
+            .recognize_selection_text(
+                &view.id,
+                &LogicalRect {
+                    x: 1.0,
+                    y: 1.0,
+                    width: 2.0,
+                    height: 2.0,
+                },
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(result.text, "recorded");
+        assert!(observed_request.lock().unwrap().is_some());
     }
 
     #[tokio::test]

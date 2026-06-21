@@ -36,8 +36,8 @@ use application::providers::ocr::{
     impls::{TesseractProvider, BaiduOcrProvider},
 };
 use application::{
-    CaptureOutputService, CaptureService, CaptureSessionService, HistoryService,
-    ImageCompositionService, PinnedImageService, WorkflowService,
+    CaptureOutputService, CaptureService, CaptureSessionRuntime, CaptureSessionService,
+    HistoryService, ImageCompositionService, PinnedImageService, WorkflowService,
 };
 use infrastructure::system::screenshot::get_screenshot_backend;
 use infrastructure::system::paths::get_history_db_path;
@@ -121,6 +121,7 @@ pub struct AppState {
     pub capture_session_service: Arc<CaptureSessionService>,
     pub image_composition_service: Arc<ImageCompositionService>,
     pub capture_output_service: Arc<CaptureOutputService>,
+    pub capture_session_runtime: Arc<CaptureSessionRuntime>,
     pub pinned_image_service: Arc<PinnedImageService>,
     pub screenshot_state: Arc<ParkingLotMutex<ScreenshotState>>,
 
@@ -285,6 +286,12 @@ impl AppState {
         let capture_session_service = Arc::new(CaptureSessionService::new(screenshot_backend));
         let image_composition_service = Arc::new(ImageCompositionService::new());
         let capture_output_service = Arc::new(CaptureOutputService::new());
+        let capture_session_runtime = Arc::new(CaptureSessionRuntime::new(
+            capture_session_service.clone(),
+            image_composition_service.clone(),
+            capture_output_service.clone(),
+            ocr_coordinator.clone(),
+        ));
         let pinned_image_service = Arc::new(PinnedImageService::new());
         let screenshot_state = Arc::new(ParkingLotMutex::new(ScreenshotState::default()));
 
@@ -305,6 +312,7 @@ impl AppState {
             capture_session_service,
             image_composition_service,
             capture_output_service,
+            capture_session_runtime,
             pinned_image_service,
             screenshot_state,
             history_service,
