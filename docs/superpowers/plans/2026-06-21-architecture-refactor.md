@@ -616,12 +616,14 @@ Expected: direct runtime command calls are concentrated under `src/tauri/`. Dire
 
 Current status: PASS. `rg "invoke<|invoke\\(" src -n` reports direct runtime calls only under `src/tauri/`.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/tauri src/components/ScreenshotSession src/components/PinnedImageWindow
 git commit -m "refactor(frontend): centralize capture and pin tauri adapters"
 ```
+
+Current status: committed as `26b4f9e refactor(frontend): centralize capture and pin tauri adapters`.
 
 ---
 
@@ -828,12 +830,14 @@ Expected: command module no longer passes `image_composition_service`, `capture_
 
 Current status: confirmed by diff. `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check` still reports broad pre-existing formatting differences across unrelated Rust files, so no full-crate rustfmt was applied.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src-tauri/src/application src-tauri/src/commands/capture_session_commands.rs src-tauri/src/lib.rs
 git commit -m "refactor(capture): add capture session runtime module"
 ```
+
+Current status: committed as `2a3ecbb refactor(capture): add capture session runtime module`.
 
 ---
 
@@ -980,12 +984,14 @@ Expected: PASS.
 
 Current status: PASS. `cargo test --manifest-path src-tauri/Cargo.toml provider --lib` passed 58 tests. `cargo test --manifest-path src-tauri/Cargo.toml ocr::coordinator --lib` passed 10 tests. `cargo test --manifest-path src-tauri/Cargo.toml translation::coordinator --lib` passed 14 tests. Full `cargo test --manifest-path src-tauri/Cargo.toml --lib` passed 194 tests with existing warnings. `rg "Runtime reconfiguration requires restart" src-tauri/src -n` found no matches.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src-tauri/src/application/providers src-tauri/src/commands src-tauri/src/lib.rs
 git commit -m "refactor(providers): centralize provider configuration lifecycle"
 ```
+
+Current status: committed as `b8f7da6 refactor(providers): centralize provider configuration lifecycle`.
 
 ---
 
