@@ -116,7 +116,7 @@ let coordinator = Arc::new(coordinator);
 
 - `src-tauri/src/application/providers/translation/coordinator.rs` 是 Translation Provider 的当前 module。
 - `src-tauri/src/application/providers/ocr/coordinator.rs` 是 OCR Provider 的当前 module。
-- 旧的 Registry/Service module 已删除。
+- 旧的双模块 Provider 管理文件已删除。
 - ADR 0003 已更新为当前 Provider 架构，并明确本 ADR 对旧设计的修正。
 
 ## Consequences
@@ -172,7 +172,7 @@ let coordinator = Arc::new(coordinator);
 1. `CONTEXT.md`、`ARCHITECTURE.md`、ADR 0003 已对齐 Coordinator 架构。
 2. `TranslationCoordinator` 和 `OcrCoordinator` 已作为当前 Provider modules。
 3. Commands 和 AppState 已改为使用 Coordinator。
-4. 旧 Registry/Service 文件和历史快照文档已删除。
+4. 旧双模块 Provider 管理文件和历史快照文档已删除。
 
 ## Related
 

@@ -46,9 +46,17 @@
 
 **职责：**
 - 构建 Provider Coordinators 并注册内置 Provider
-- 恢复自定义 Translation Provider 和 Provider 激活状态
+- 通过 Provider Configuration Module 恢复自定义 Translation Provider，并恢复 Provider 激活状态
 - 将 EventBus 注入 Coordinator，并在 Tauri runtime 就绪后订阅 HistoryService
-- 让 `lib.rs` 保持在 AppState 形状、Tauri builder、command 注册这些启动职责上
+- 让 `lib.rs` 保持为 Tauri builder/plugin setup、command 注册和启动模块调用的启动壳
+
+### App State（应用状态）
+`src-tauri/src/app_state.rs` 中的运行时状态形状。
+
+**职责：**
+- 聚合 ConfigFile、Keychain、HttpClient、Coordinators、Capture Runtime、History、EventBus 等运行时依赖
+- 定义应用关闭时的清理顺序
+- 不负责依赖构建；依赖构建由 Application Composition 完成
 
 ### Provider Activation（Provider 激活）
 使 Provider 可用的过程。SnapLingo 支持两种激活模型：
@@ -93,7 +101,16 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 - 校验 Provider 必填凭证字段
 - 保存自定义 Translation Provider 定义
 - 构造自定义 LLM Translation Provider
+- 处理自定义 Translation Provider 的运行时新增、注册、激活和失败回滚
 - 与 Coordinator 的运行时重配置能力配合，使配置命令保存凭证后立即更新已注册 Provider，无需重启应用
+
+### Settings Navigation State（设置导航状态）
+`src/components/SettingsWindow/settingsNavigationState.ts` 中的前端纯模型。
+
+**职责：**
+- 根据当前 Settings section 和持久化 secondary key 解析实际 active secondary item
+- 当持久化 key 过期时回退到该 section 的第一个 secondary item
+- 对用户点击的 secondary key 做 section 内合法性校验，避免 UI 调用方散落 switch 逻辑
 
 ### Capture Mode（捕获模式）
 用户触发的五种独立功能入口：
@@ -175,6 +192,14 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 - 调用 `CaptureOutputService` 处理剪贴板、文件输出和输出结果判断
 - 调用 `OcrCoordinator` 对原始选区图像执行 OCR
 - 让 Commands 层通过一个 Interface 完成 render/output/OCR，而不是了解多个服务的调用顺序
+
+### Capture Interaction Model（截图交互模型）
+`src/components/ScreenshotSession/captureInteractionModel.ts` 中的前端纯模型。
+
+**职责：**
+- 根据 Capture Mode 决定选区完成后的 flow（预览、OCR、OCR + 翻译）
+- 根据完成动作决定是否记录成功截图、是否结束 session、OCR 结果进入哪个窗口
+- 不调用 Tauri、DOM 或 React hooks；`ScreenshotSession/index.tsx` 仍负责执行副作用
 
 ### Provider（能力提供者）
 实现某个能力的内置模块，不区分本地实现还是远程 API 调用。用户视角看到的是能力名称（如"DeepL 翻译"），而非技术实现细节。

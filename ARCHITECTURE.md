@@ -1,6 +1,6 @@
 # SnapLingo 架构设计文档
 
-> 当前版本 - 2026-06-21
+> 当前版本 - 2026-06-22
 
 ## 📐 架构概览
 
@@ -30,7 +30,9 @@ Infrastructure Layer (基础设施层)
 **运行时 seam：**
 - `src/tauri/*` 是前端 Tauri Adapter seam，集中维护 command 名称和 payload 形状。
 - `src-tauri/src/commands/*` 是后端 Tauri command seam，负责把 IPC 请求转给 Application 层。
-- `src-tauri/src/composition.rs` 是应用组合入口，负责 Provider 注册、Coordinator 构建和启动期订阅。
+- `src-tauri/src/app_state.rs` 拥有 AppState 形状和关闭顺序。
+- `src-tauri/src/composition.rs` 是应用组合入口，负责运行时依赖构建、Provider 注册、Coordinator 构建和启动期订阅。
+- `src-tauri/src/startup_shortcuts.rs` 拥有启动期全局快捷键注册。
 - `application/services/capture_session_runtime.rs` 是 Capture Session Runtime，统一编排截图输出和 OCR。
 
 ---
@@ -48,8 +50,8 @@ snaplingo/
 │   │   └─ pinnedImage.ts
 │   │
 │   ├─ components/
-│   │   ├─ SettingsWindow/              # 设置窗口
-│   │   ├─ ScreenshotSession/           # 截图会话 UI
+│   │   ├─ SettingsWindow/              # 设置窗口 + 纯导航状态模型
+│   │   ├─ ScreenshotSession/           # 截图会话 UI + 交互规则模型
 │   │   ├─ ResultWindow/                # 结果窗口
 │   │   └─ PinnedImageWindow/           # 贴图窗口
 │   │
@@ -58,8 +60,10 @@ snaplingo/
 │
 ├─ src-tauri/src/
 │   ├─ main.rs                          # Tauri binary 入口
-│   ├─ lib.rs                           # AppState 形状 + Tauri builder + command 注册
+│   ├─ lib.rs                           # Tauri builder/plugin setup + command 注册
+│   ├─ app_state.rs                     # AppState 形状 + shutdown
 │   ├─ composition.rs                   # ⭐ Runtime composition
+│   ├─ startup_shortcuts.rs             # 启动期全局快捷键注册
 │   ├─ error.rs                         # 统一错误类型
 │   │
 │   ├─ commands/                        # ⭐ Backend Tauri command seam
@@ -173,7 +177,7 @@ providers/ocr/
 |------|------|--------|
 | **Trait** | 定义 Provider 接口 | 不管理实例、不执行业务 |
 | **Coordinator** | 管理 Provider 列表、激活状态、持久化、执行协调和运行时重配置 | 不实现具体 OCR/翻译 API |
-| **configuration.rs** | 校验凭证、保存自定义 Provider 定义、构造自定义 LLM Provider | 不执行 Provider |
+| **configuration.rs** | 校验凭证、自定义 Translation Provider 生命周期、构造自定义 LLM Provider | 不执行翻译/OCR 请求 |
 | **impls/** | 实现具体能力（OCR 识别） | 不管理自己的激活状态 |
 
 **Translation Provider 特殊性：**
@@ -563,9 +567,12 @@ Commands → Application → Domain
 - Frontend runtime 已通过 `src/tauri/*` 适配器集中调用 Tauri commands。
 - Backend runtime 已通过 `src-tauri/src/commands/*` 保持 Tauri command seam。
 - Provider 当前由 `TranslationCoordinator` 和 `OcrCoordinator` 统一管理激活、持久化、执行和运行时重配置。
-- Provider Configuration Module 负责凭证校验、自定义 Translation Provider 定义和运行时重配置配合。
+- Provider Configuration Module 负责凭证校验、自定义 Translation Provider 定义、运行时新增/注册/激活和回滚。
 - Capture Session Runtime 已集中截图会话的 render/output/OCR 编排。
-- Application Composition 已从 `lib.rs` 抽到 `src-tauri/src/composition.rs`。
+- AppState 形状位于 `src-tauri/src/app_state.rs`；`lib.rs` 只保留 Tauri builder/plugin setup、command 注册和启动模块调用。
+- Application Composition 位于 `src-tauri/src/composition.rs`，负责运行时依赖构建。
+- 启动期快捷键注册位于 `src-tauri/src/startup_shortcuts.rs`。
+- Settings navigation state 和 Capture interaction model 是前端纯模块 seam，可用 Vitest 直接覆盖交互规则。
 
 ---
 

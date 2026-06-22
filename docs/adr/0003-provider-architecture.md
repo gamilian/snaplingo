@@ -45,7 +45,7 @@ application/providers/
 - Coordinator module，负责 Provider 注册、激活状态、持久化、执行协调和运行时重配置
 - `impls/` 下的具体 Provider implementation
 
-早期的 Registry/Service 拆分不再是当前架构。ADR 0004 已将这两个 module 合并为 `OcrCoordinator` 和 `TranslationCoordinator`。
+早期的双模块拆分不再是当前架构。ADR 0004 已将这两个 module 合并为 `OcrCoordinator` 和 `TranslationCoordinator`。
 
 ## Current Module Responsibilities
 
@@ -84,7 +84,7 @@ Application modules 通过 composition 使用这些 infrastructure interface 或
 
 - OCR 和 Translation Coordinator 有少量重复，这是为了保留各自不同的激活模型。
 - 自定义 Translation Provider 生命周期横跨凭证、配置、运行时注册和 Coordinator 状态；ADR 0005 记录了运行时重配置决策。
-- 提到 Registry/Service 的历史文档不再作为当前架构指导。
+- 提到旧双模块拆分的历史文档不再作为当前架构指导。
 
 ## Related
 
