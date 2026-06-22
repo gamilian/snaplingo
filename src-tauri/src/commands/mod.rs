@@ -19,6 +19,8 @@ pub use translation_commands::*;
 pub use workflow_commands::*;
 
 use serde::Serialize;
+use std::future::Future;
+use std::time::Duration;
 use tauri::{Emitter, Manager, State};
 
 #[derive(Clone, Serialize)]
@@ -117,17 +119,51 @@ fn emit_main_window_event(app: tauri::AppHandle, event: &str) -> Result<(), Stri
 }
 
 pub async fn open_selection_translation_window(app: tauri::AppHandle) -> Result<(), String> {
-    let text = tauri::async_runtime::spawn_blocking(copy_selected_text)
-        .await
-        .map_err(|e| e.to_string())??;
-
+    let text = copy_selected_text(&app).await?;
     open_translation_result_window(text, app)
 }
 
-fn copy_selected_text() -> Result<String, String> {
-    use arboard::Clipboard;
+async fn copy_selected_text(app: &tauri::AppHandle) -> Result<String, String> {
+    copy_selected_text_with(
+        || press_selection_copy_shortcut_on_main_thread(app),
+        read_clipboard_text,
+        Duration::from_millis(120),
+    )
+    .await
+}
+
+async fn copy_selected_text_with<Press, PressFuture, Read>(
+    press_copy_shortcut: Press,
+    read_clipboard_text: Read,
+    delay: Duration,
+) -> Result<String, String>
+where
+    Press: FnOnce() -> PressFuture,
+    PressFuture: Future<Output = Result<(), String>>,
+    Read: FnOnce() -> Result<String, String>,
+{
+    press_copy_shortcut().await?;
+    tokio::time::sleep(delay).await;
+    let text = read_clipboard_text()?;
+    validate_selected_text(text)
+}
+
+async fn press_selection_copy_shortcut_on_main_thread(
+    app: &tauri::AppHandle,
+) -> Result<(), String> {
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    app.run_on_main_thread(move || {
+        let _ = sender.send(press_selection_copy_shortcut());
+    })
+    .map_err(|e| format!("Failed to dispatch selection copy shortcut: {}", e))?;
+
+    receiver
+        .await
+        .map_err(|e| format!("Failed to receive selection copy shortcut result: {}", e))?
+}
+
+fn press_selection_copy_shortcut() -> Result<(), String> {
     use enigo::{Enigo, Key, KeyboardControllable};
-    use std::time::Duration;
 
     let mut enigo = Enigo::new();
     #[cfg(target_os = "macos")]
@@ -139,13 +175,19 @@ fn copy_selected_text() -> Result<String, String> {
     enigo.key_click(Key::Layout('c'));
     enigo.key_up(modifier);
 
-    std::thread::sleep(Duration::from_millis(120));
+    Ok(())
+}
 
-    let mut clipboard =
-        Clipboard::new().map_err(|e| format!("Failed to open clipboard: {}", e))?;
-    let text = clipboard
+fn read_clipboard_text() -> Result<String, String> {
+    use arboard::Clipboard;
+
+    let mut clipboard = Clipboard::new().map_err(|e| format!("Failed to open clipboard: {}", e))?;
+    clipboard
         .get_text()
-        .map_err(|e| format!("Failed to read selected text from clipboard: {}", e))?;
+        .map_err(|e| format!("Failed to read selected text from clipboard: {}", e))
+}
+
+fn validate_selected_text(text: String) -> Result<String, String> {
     if text.trim().is_empty() {
         return Err("Selected text is empty".to_string());
     }
@@ -180,4 +222,61 @@ pub async fn trigger_screenshot(
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     open_capture_window_for_mode(&app, &state, "screenshot").await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::copy_selected_text_with;
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
+
+    #[tokio::test]
+    async fn selection_copy_reads_clipboard_after_copy_shortcut() {
+        let steps = Arc::new(Mutex::new(Vec::new()));
+        let copy_steps = steps.clone();
+        let read_steps = steps.clone();
+
+        let text = copy_selected_text_with(
+            move || async move {
+                copy_steps.lock().unwrap().push("copy");
+                Ok(())
+            },
+            move || {
+                read_steps.lock().unwrap().push("read");
+                Ok("selected text".to_string())
+            },
+            Duration::ZERO,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(text, "selected text");
+        assert_eq!(*steps.lock().unwrap(), vec!["copy", "read"]);
+    }
+
+    #[tokio::test]
+    async fn selection_copy_does_not_read_clipboard_when_copy_shortcut_fails() {
+        let err = copy_selected_text_with(
+            || async { Err("copy failed".to_string()) },
+            || panic!("clipboard should not be read after copy failure"),
+            Duration::ZERO,
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(err, "copy failed");
+    }
+
+    #[tokio::test]
+    async fn selection_copy_rejects_empty_clipboard_text() {
+        let err = copy_selected_text_with(
+            || async { Ok(()) },
+            || Ok("   ".to_string()),
+            Duration::ZERO,
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(err, "Selected text is empty");
+    }
 }
