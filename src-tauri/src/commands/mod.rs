@@ -165,6 +165,8 @@ async fn press_selection_copy_shortcut_on_main_thread(
 fn press_selection_copy_shortcut() -> Result<(), String> {
     use enigo::{Enigo, Key, KeyboardControllable};
 
+    ensure_selection_copy_permission()?;
+
     let mut enigo = Enigo::new();
     #[cfg(target_os = "macos")]
     let modifier = Key::Meta;
@@ -176,6 +178,32 @@ fn press_selection_copy_shortcut() -> Result<(), String> {
     enigo.key_up(modifier);
 
     Ok(())
+}
+
+fn ensure_selection_copy_permission() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        if !macos_accessibility_permission_granted() {
+            return Err(
+                "划词翻译需要 macOS 辅助功能权限。请在 系统设置 > 隐私与安全性 > 辅助功能 中允许 SnapLingo，然后重启应用。"
+                    .to_string(),
+            );
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn macos_accessibility_permission_granted() -> bool {
+    use std::os::raw::c_uchar;
+
+    #[link(name = "ApplicationServices", kind = "framework")]
+    extern "C" {
+        fn AXIsProcessTrusted() -> c_uchar;
+    }
+
+    unsafe { AXIsProcessTrusted() != 0 }
 }
 
 fn read_clipboard_text() -> Result<String, String> {

@@ -185,6 +185,12 @@ fn register_hotkey_action(
     let action = action.to_string();
     let app_clone = app.clone();
 
+    if category == TRANSLATION_CATEGORY && action == SELECTION_TRANSLATE_ACTION {
+        return infrastructure::system::register_shortcut_on_release(app, accelerator, move || {
+            trigger_hotkey_action(app_clone.clone(), category.clone(), action.clone());
+        });
+    }
+
     infrastructure::system::register_shortcut(app, accelerator, move || {
         trigger_hotkey_action(app_clone.clone(), category.clone(), action.clone());
     })
@@ -225,8 +231,9 @@ fn trigger_hotkey_action(app: tauri::AppHandle, category: String, action: String
         }
         (TRANSLATION_CATEGORY, SELECTION_TRANSLATE_ACTION) => {
             tauri::async_runtime::spawn(async move {
-                if let Err(err) = commands::open_selection_translation_window(app).await {
+                if let Err(err) = commands::open_selection_translation_window(app.clone()).await {
                     log::error!("Failed to open selection translation window: {}", err);
+                    commands::emit_screenshot_error(app, format!("划词翻译失败：{}", err));
                 }
             });
         }

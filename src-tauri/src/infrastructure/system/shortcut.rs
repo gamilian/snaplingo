@@ -3,8 +3,34 @@ use std::str::FromStr;
 use tauri::AppHandle;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ShortcutTriggerTiming {
+    Pressed,
+    Released,
+}
+
 /// Register a global shortcut
 pub fn register_shortcut<F>(app: &AppHandle, accelerator: &str, handler: F) -> Result<()>
+where
+    F: Fn() + Send + Sync + 'static,
+{
+    register_shortcut_with_timing(app, accelerator, ShortcutTriggerTiming::Pressed, handler)
+}
+
+/// Register a global shortcut that runs after the user releases the key combo.
+pub fn register_shortcut_on_release<F>(app: &AppHandle, accelerator: &str, handler: F) -> Result<()>
+where
+    F: Fn() + Send + Sync + 'static,
+{
+    register_shortcut_with_timing(app, accelerator, ShortcutTriggerTiming::Released, handler)
+}
+
+fn register_shortcut_with_timing<F>(
+    app: &AppHandle,
+    accelerator: &str,
+    timing: ShortcutTriggerTiming,
+    handler: F,
+) -> Result<()>
 where
     F: Fn() + Send + Sync + 'static,
 {
@@ -20,7 +46,7 @@ where
                 shortcut_label,
                 event.state
             );
-            if event.state == ShortcutState::Pressed {
+            if should_trigger_shortcut(timing, event.state) {
                 handler();
             }
         })
@@ -32,6 +58,14 @@ where
         normalized_accelerator
     );
     Ok(())
+}
+
+fn should_trigger_shortcut(timing: ShortcutTriggerTiming, state: ShortcutState) -> bool {
+    matches!(
+        (timing, state),
+        (ShortcutTriggerTiming::Pressed, ShortcutState::Pressed)
+            | (ShortcutTriggerTiming::Released, ShortcutState::Released)
+    )
 }
 
 /// Unregister a global shortcut
@@ -53,4 +87,34 @@ pub fn is_shortcut_registered(app: &AppHandle, accelerator: &str) -> Result<bool
         .map_err(|e| AppError::Other(format!("Invalid shortcut: {}", e)))?;
 
     Ok(app.global_shortcut().is_registered(shortcut))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{should_trigger_shortcut, ShortcutTriggerTiming};
+    use tauri_plugin_global_shortcut::ShortcutState;
+
+    #[test]
+    fn pressed_timing_only_triggers_on_pressed_events() {
+        assert!(should_trigger_shortcut(
+            ShortcutTriggerTiming::Pressed,
+            ShortcutState::Pressed
+        ));
+        assert!(!should_trigger_shortcut(
+            ShortcutTriggerTiming::Pressed,
+            ShortcutState::Released
+        ));
+    }
+
+    #[test]
+    fn released_timing_only_triggers_on_released_events() {
+        assert!(should_trigger_shortcut(
+            ShortcutTriggerTiming::Released,
+            ShortcutState::Released
+        ));
+        assert!(!should_trigger_shortcut(
+            ShortcutTriggerTiming::Released,
+            ShortcutState::Pressed
+        ));
+    }
 }
