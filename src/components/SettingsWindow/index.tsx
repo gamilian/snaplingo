@@ -4,15 +4,10 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { MainNav } from './Navigation/MainNav';
 import { SecondaryNav } from './Navigation/SecondaryNav';
 import {
-  findSecondaryNavItem,
   findSettingsSection,
-  isOcrSubTab,
-  isScreenshotSubTab,
-  isServicesSubTab,
-  isTranslationSubTab,
-  type MainTab,
   type SettingsSection,
 } from './navigationModel';
+import { createSettingsNavigationState } from './settingsNavigationState';
 
 export function SettingsWindow() {
   const activeMainTab = useSettingsStore((state) => state.activeMainTab);
@@ -44,94 +39,34 @@ function SettingsSectionContent({ section }: { section: SettingsSection }) {
     return <ContentFrame>{section.render()}</ContentFrame>;
   }
 
-  const activeKey = getActiveSecondaryKey(section.key, {
-    screenshot: screenshotSubTab,
-    translation: translationSubTab,
-    ocr: ocrSubTab,
-    services: servicesSubTab,
-  });
-  const activeItem = findSecondaryNavItem(section, activeKey);
+  const navigationState = createSettingsNavigationState(
+    section,
+    {
+      screenshot: screenshotSubTab,
+      translation: translationSubTab,
+      ocr: ocrSubTab,
+      services: servicesSubTab,
+    },
+    {
+      screenshot: setScreenshotSubTab,
+      translation: setTranslationSubTab,
+      ocr: setOcrSubTab,
+      services: setServicesSubTab,
+    },
+  );
 
   return (
     <>
       <SecondaryNav
         items={section.secondary}
-        activeItem={activeItem?.key ?? ''}
-        onItemChange={(key) =>
-          setSecondaryTab(section.key, key, {
-            screenshot: setScreenshotSubTab,
-            translation: setTranslationSubTab,
-            ocr: setOcrSubTab,
-            services: setServicesSubTab,
-          })
-        }
+        activeItem={navigationState.activeKey}
+        onItemChange={navigationState.setActiveKey}
       />
-      <ContentFrame>{activeItem?.render()}</ContentFrame>
+      <ContentFrame>{navigationState.activeItem?.render()}</ContentFrame>
     </>
   );
 }
 
 function ContentFrame({ children }: { children: ReactNode }) {
   return <div className="flex-1 overflow-y-auto p-12">{children}</div>;
-}
-
-function getActiveSecondaryKey(
-  section: MainTab,
-  activeKeys: {
-    screenshot: string;
-    translation: string;
-    ocr: string;
-    services: string;
-  },
-): string {
-  switch (section) {
-    case 'screenshot':
-      return activeKeys.screenshot;
-    case 'translation':
-      return activeKeys.translation;
-    case 'ocr':
-      return activeKeys.ocr;
-    case 'services':
-      return activeKeys.services;
-    case 'general':
-    case 'advanced':
-      return '';
-  }
-}
-
-function setSecondaryTab(
-  section: MainTab,
-  key: string,
-  setTab: {
-    screenshot: ReturnType<typeof useSettingsStore.getState>['setScreenshotSubTab'];
-    translation: ReturnType<typeof useSettingsStore.getState>['setTranslationSubTab'];
-    ocr: ReturnType<typeof useSettingsStore.getState>['setOcrSubTab'];
-    services: ReturnType<typeof useSettingsStore.getState>['setServicesSubTab'];
-  },
-) {
-  switch (section) {
-    case 'screenshot':
-      if (isScreenshotSubTab(key)) {
-        setTab.screenshot(key);
-      }
-      return;
-    case 'translation':
-      if (isTranslationSubTab(key)) {
-        setTab.translation(key);
-      }
-      return;
-    case 'ocr':
-      if (isOcrSubTab(key)) {
-        setTab.ocr(key);
-      }
-      return;
-    case 'services':
-      if (isServicesSubTab(key)) {
-        setTab.services(key);
-      }
-      return;
-    case 'general':
-    case 'advanced':
-      return;
-  }
 }
