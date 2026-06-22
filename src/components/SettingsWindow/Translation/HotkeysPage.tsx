@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { HotkeyRow } from '../Hotkey/HotkeyRow';
 import { DEFAULT_HOTKEYS, useSettingsStore } from '../../../stores/settingsStore';
+import { configureHotkey } from '../../../tauri/hotkeys';
+import { saveHotkeyWithRegistration } from '../Hotkey/hotkeyRegistration';
 
 export function HotkeysPage() {
   const hotkeys = useSettingsStore((state) => state.hotkeys.translation);
@@ -66,8 +68,17 @@ export function HotkeysPage() {
       if (mainKey) {
         const hotkeyString = modifiers.join('') + mainKey;
         addDebugLog(`✅ 保存: ${hotkeyString}`);
-        setHotkey('translation', recordingKey, hotkeyString);
-        setRecordingKey(null);
+        void saveHotkeyWithRegistration({
+          category: 'translation',
+          action: recordingKey,
+          hotkey: hotkeyString,
+          configureHotkey,
+          setHotkey,
+          reportError: (message) => {
+            addDebugLog(`❌ ${message}`);
+            alert(message);
+          },
+        }).then(() => setRecordingKey(null));
       } else {
         addDebugLog(`❌ 未识别: ${e.key} (code: ${e.code})`);
       }

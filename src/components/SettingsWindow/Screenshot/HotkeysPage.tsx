@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { HotkeyRow } from '../Hotkey/HotkeyRow';
 import { DEFAULT_HOTKEYS, useSettingsStore } from '../../../stores/settingsStore';
+import { configureHotkey } from '../../../tauri/hotkeys';
+import { saveHotkeyWithRegistration } from '../Hotkey/hotkeyRegistration';
 
 export function HotkeysPage() {
   const hotkeys = useSettingsStore((state) => state.hotkeys.screenshot);
@@ -51,8 +53,14 @@ export function HotkeysPage() {
 
       if (mainKey) {
         const hotkeyString = modifiers.join('') + mainKey;
-        setHotkey('screenshot', recordingKey, hotkeyString);
-        setRecordingKey(null);
+        void saveHotkeyWithRegistration({
+          category: 'screenshot',
+          action: recordingKey,
+          hotkey: hotkeyString,
+          configureHotkey,
+          setHotkey,
+          reportError: alert,
+        }).then(() => setRecordingKey(null));
       }
     };
 

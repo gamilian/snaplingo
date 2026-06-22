@@ -377,6 +377,16 @@ mod tests {
     }
 
     #[test]
+    fn converts_recorded_multi_modifier_hotkeys() {
+        assert_eq!(
+            display_hotkey_to_accelerator("⇧⌥⌘⌃D").unwrap(),
+            Some("Shift+Alt+CmdOrCtrl+Ctrl+KeyD".to_string())
+        );
+        let accelerator = display_hotkey_to_accelerator("⇧⌥⌘⌃D").unwrap().unwrap();
+        Shortcut::from_str(&accelerator).unwrap();
+    }
+
+    #[test]
     fn treats_unset_display_hotkeys_as_unregistered() {
         assert_eq!(display_hotkey_to_accelerator("未设置").unwrap(), None);
         assert_eq!(display_hotkey_to_accelerator("  ").unwrap(), None);

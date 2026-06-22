@@ -40,6 +40,7 @@ function App() {
   const setScreenshotSubTab = useSettingsStore((state) => state.setScreenshotSubTab);
   const setCapturedScreenshot = useSettingsStore((state) => state.setCapturedScreenshot);
   const hotkeys = useSettingsStore((state) => state.hotkeys);
+  const setHotkey = useSettingsStore((state) => state.setHotkey);
   const isCaptureWindow =
     currentWindow.label === CAPTURE_WINDOW_LABEL || captureLaunch !== null;
   const isPinnedImageWindow = pinnedImageId !== null;
@@ -207,11 +208,12 @@ function App() {
         Object.entries(actionHotkeys).forEach(([action, hotkey]) => {
           void configureHotkey(category, action, hotkey).catch((err) => {
             console.warn(`Failed to configure hotkey ${category}:${action}:`, err);
+            setHotkey(category, action, '未设置');
           });
         });
       },
     );
-  }, [hotkeys, isCaptureWindow, isPinnedImageWindow]);
+  }, [hotkeys, isCaptureWindow, isPinnedImageWindow, setHotkey]);
 
   useEffect(() => {
     if (isCaptureWindow || isPinnedImageWindow) return;
