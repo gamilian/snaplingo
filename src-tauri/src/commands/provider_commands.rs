@@ -1,10 +1,9 @@
-use crate::application::providers::{
-    validate_required_credentials, CustomTranslationProviderDef,
-};
 use crate::application::providers::common::CredentialField;
+use crate::application::providers::{
+    create_llm_translation_provider, validate_required_credentials, CustomTranslationProviderDef,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Arc;
 use tauri::State;
 
 #[derive(Serialize, Deserialize)]
@@ -154,8 +153,7 @@ pub async fn configure_translation_provider_credentials(
     // Get expected fields
     let expected_fields = provider_lock.read().credential_fields();
 
-    validate_required_credentials(&expected_fields, &credentials)
-        .map_err(|e| e.to_string())?;
+    validate_required_credentials(&expected_fields, &credentials).map_err(|e| e.to_string())?;
 
     // Save to keychain
     state
@@ -265,33 +263,8 @@ pub async fn add_custom_translation_provider(
         })?;
 
     // Step 5: Create and register provider at runtime
-    let llm_client: Arc<dyn crate::infrastructure::llm::LLMClient> = match protocol {
-        LLMProtocol::OpenAI => Arc::new(crate::infrastructure::llm::OpenAILLMClient::new(
-            state.http_client.clone(),
-            def.endpoint.clone(),
-            def.model.clone(),
-            request.api_key.clone(),
-        )),
-        LLMProtocol::Anthropic => Arc::new(crate::infrastructure::llm::AnthropicLLMClient::new(
-            state.http_client.clone(),
-            def.endpoint.clone(),
-            def.model.clone(),
-            request.api_key.clone(),
-        )),
-        LLMProtocol::Gemini => Arc::new(crate::infrastructure::llm::GeminiLLMClient::new(
-            state.http_client.clone(),
-            def.endpoint.clone(),
-            def.model.clone(),
-            request.api_key.clone(),
-        )),
-    };
-
-    let provider = crate::application::providers::translation::LLMTranslationProvider::new(
-        llm_client,
-        def.id.clone(),
-        def.name.clone(),
-        def.reasoning_level,
-    );
+    let provider =
+        create_llm_translation_provider(&def, state.http_client.clone(), request.api_key.clone());
 
     state
         .translation_coordinator

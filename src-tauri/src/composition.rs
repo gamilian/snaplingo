@@ -10,15 +10,14 @@ use crate::application::providers::ocr::{
 };
 use crate::application::providers::translation::{
     BaiduTranslateProvider, DeepLProvider, GoogleTranslateProvider as GoogleTranslateProviderV2,
-    LLMTranslationProvider, TranslationCoordinator,
+    TranslationCoordinator,
 };
-use crate::application::providers::CustomTranslationProviderDef;
 use crate::application::providers::Provider;
+use crate::application::providers::{
+    create_llm_translation_provider, CustomTranslationProviderDef,
+};
 use crate::infrastructure::events::{EventBus, EventSubscriber};
 use crate::infrastructure::http::{HttpClient, ReqwestHttpClient};
-use crate::infrastructure::llm::{
-    AnthropicLLMClient, GeminiLLMClient, LLMClient, LLMProtocol, OpenAILLMClient,
-};
 use crate::infrastructure::storage::{ConfigFile, HistoryDatabase, Keychain};
 use crate::infrastructure::system::paths::get_history_db_path;
 use crate::infrastructure::system::screenshot::get_screenshot_backend;
@@ -207,33 +206,7 @@ fn register_custom_translation_providers(
             continue;
         };
 
-        let llm_client: Arc<dyn LLMClient> = match def.protocol {
-            LLMProtocol::OpenAI => Arc::new(OpenAILLMClient::new(
-                http_client.clone(),
-                def.endpoint.clone(),
-                def.model.clone(),
-                api_key,
-            )),
-            LLMProtocol::Anthropic => Arc::new(AnthropicLLMClient::new(
-                http_client.clone(),
-                def.endpoint.clone(),
-                def.model.clone(),
-                api_key,
-            )),
-            LLMProtocol::Gemini => Arc::new(GeminiLLMClient::new(
-                http_client.clone(),
-                def.endpoint.clone(),
-                def.model.clone(),
-                api_key,
-            )),
-        };
-
-        let provider = LLMTranslationProvider::new(
-            llm_client,
-            def.id.clone(),
-            def.name.clone(),
-            def.reasoning_level,
-        );
+        let provider = create_llm_translation_provider(&def, http_client.clone(), api_key);
         if let Err(e) = translation_coordinator.register(provider) {
             log::warn!(
                 "Failed to register custom LLM provider '{}': {}",
