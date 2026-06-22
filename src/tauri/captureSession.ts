@@ -83,8 +83,16 @@ export async function openResultWindow(text: string) {
   return invoke<void>('open_result_window', { text });
 }
 
+export async function openOcrResultWindow(text: string) {
+  return invoke<void>('open_ocr_result_window', { text });
+}
+
 export async function openTranslationResultWindow(text: string) {
   return invoke<void>('open_translation_result_window', { text });
+}
+
+export async function copyTextToClipboard(text: string) {
+  return invoke<void>('copy_text_to_clipboard', { text });
 }
 
 export async function triggerScreenshot() {

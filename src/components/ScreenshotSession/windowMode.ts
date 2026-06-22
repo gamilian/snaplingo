@@ -6,6 +6,7 @@ export function isCaptureMode(value: unknown): value is CaptureMode {
   return (
     value === 'screenshot' ||
     value === 'screenshot-ocr' ||
+    value === 'silent-screenshot-ocr' ||
     value === 'screenshot-translate'
   );
 }

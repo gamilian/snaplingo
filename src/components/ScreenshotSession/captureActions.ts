@@ -76,6 +76,7 @@ export type HoverSelectionCompletionAction =
   | 'pin'
   | 'print'
   | 'ocr'
+  | 'silent-ocr'
   | 'ocr-translate';
 interface RestoreLastSelectionOptions {
   status: 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
@@ -83,7 +84,11 @@ interface RestoreLastSelectionOptions {
 }
 export type UndoRedoAction = 'undo' | 'redo';
 export type CaptureKeyboardToolbarAction = 'toggle';
-export type CaptureSelectionFlow = 'preview' | 'ocr' | 'ocr-translate';
+export type CaptureSelectionFlow =
+  | 'preview'
+  | 'ocr'
+  | 'silent-ocr'
+  | 'ocr-translate';
 export type SaveCapturePointerAction = 'save' | 'quick-save';
 export type CaptureCompletionAction =
   | 'copy'
@@ -91,6 +96,7 @@ export type CaptureCompletionAction =
   | 'quick-save'
   | 'pin'
   | 'ocr'
+  | 'silent-ocr'
   | 'ocr-translate'
   | 'print'
   | 'cancel';
@@ -127,6 +133,7 @@ export function getCaptureSelectionFlowForMode(
   mode: CaptureMode,
 ): CaptureSelectionFlow {
   if (mode === 'screenshot-ocr') return 'ocr';
+  if (mode === 'silent-screenshot-ocr') return 'silent-ocr';
   if (mode === 'screenshot-translate') return 'ocr-translate';
   return 'preview';
 }
@@ -135,7 +142,9 @@ function getPrimaryHoverSelectionCompletionActionForMode(
   mode: CaptureMode = 'screenshot',
 ): HoverSelectionCompletionAction {
   const flow = getCaptureSelectionFlowForMode(mode);
-  if (flow === 'ocr' || flow === 'ocr-translate') return flow;
+  if (flow === 'ocr' || flow === 'silent-ocr' || flow === 'ocr-translate') {
+    return flow;
+  }
   return 'copy';
 }
 

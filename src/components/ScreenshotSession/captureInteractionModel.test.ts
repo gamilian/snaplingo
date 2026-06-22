@@ -17,12 +17,16 @@ describe('capture interaction model', () => {
   it('chooses the selection flow from the capture mode', () => {
     expect(getCaptureModeSelectionFlow('screenshot')).toBe('preview');
     expect(getCaptureModeSelectionFlow('screenshot-ocr')).toBe('ocr');
+    expect(getCaptureModeSelectionFlow('silent-screenshot-ocr')).toBe('silent-ocr');
     expect(getCaptureModeSelectionFlow('screenshot-translate')).toBe('ocr-translate');
   });
 
   it('chooses the primary completion action from the capture mode', () => {
     expect(getPrimaryCaptureCompletionActionForMode('screenshot')).toBe('copy');
     expect(getPrimaryCaptureCompletionActionForMode('screenshot-ocr')).toBe('ocr');
+    expect(getPrimaryCaptureCompletionActionForMode('silent-screenshot-ocr')).toBe(
+      'silent-ocr',
+    );
     expect(getPrimaryCaptureCompletionActionForMode('screenshot-translate')).toBe(
       'ocr-translate',
     );
@@ -35,6 +39,7 @@ describe('capture interaction model', () => {
       'quick-save': 'quick-save',
       pin: 'pin',
       ocr: 'ocr',
+      'silent-ocr': 'ocr',
       'ocr-translate': 'ocr',
       print: 'print',
       cancel: 'cancel',
@@ -50,6 +55,10 @@ describe('capture interaction model', () => {
       resultWindow: 'translation',
       shouldFinishSession: true,
     });
+    expect(getCaptureCompletionPlan('silent-ocr')).toMatchObject({
+      resultWindow: null,
+      shouldFinishSession: true,
+    });
     expect(getCaptureCompletionPlan('cancel')).toMatchObject({
       resultWindow: null,
       shouldFinishSession: false,
@@ -63,6 +72,7 @@ const actions: CaptureCompletionAction[] = [
   'quick-save',
   'pin',
   'ocr',
+  'silent-ocr',
   'ocr-translate',
   'print',
   'cancel',

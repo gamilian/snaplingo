@@ -28,6 +28,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_screenshots::init())
         .plugin(
             tauri_plugin_log::Builder::default()
@@ -49,7 +50,9 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::open_result_window,
+            commands::open_ocr_result_window,
             commands::open_translation_result_window,
+            commands::copy_text_to_clipboard,
             commands::configure_hotkey,
             commands::configure_translation_hotkey,
             commands::trigger_screenshot,
@@ -70,6 +73,7 @@ pub fn run() {
             commands::add_custom_translation_provider,
             commands::remove_custom_translation_provider,
             commands::recognize_image,
+            commands::recognize_image_file,
             commands::list_ocr_providers,
             commands::activate_ocr_provider,
             commands::configure_ocr_provider,

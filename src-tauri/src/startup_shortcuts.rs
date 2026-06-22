@@ -153,12 +153,6 @@ fn hotkey_registration_key(category: &str, action: &str) -> String {
 
 fn is_known_hotkey_action(category: &str, action: &str) -> bool {
     is_implemented_hotkey_action(category, action)
-        || matches!(
-            (category, action),
-            (OCR_CATEGORY, SILENT_SCREENSHOT_OCR_ACTION)
-                | (OCR_CATEGORY, FILE_OCR_ACTION)
-                | (OCR_CATEGORY, SHOW_OCR_WINDOW_ACTION)
-        )
 }
 
 fn is_implemented_hotkey_action(category: &str, action: &str) -> bool {
@@ -175,6 +169,9 @@ fn is_implemented_hotkey_action(category: &str, action: &str) -> bool {
             | (TRANSLATION_CATEGORY, INPUT_TRANSLATE_ACTION)
             | (TRANSLATION_CATEGORY, SHOW_TRANSLATION_WINDOW_ACTION)
             | (OCR_CATEGORY, SCREENSHOT_OCR_ACTION)
+            | (OCR_CATEGORY, SILENT_SCREENSHOT_OCR_ACTION)
+            | (OCR_CATEGORY, FILE_OCR_ACTION)
+            | (OCR_CATEGORY, SHOW_OCR_WINDOW_ACTION)
     )
 }
 
@@ -248,6 +245,22 @@ fn trigger_hotkey_action(app: tauri::AppHandle, category: String, action: String
                 app,
                 "screenshot-ocr",
             ));
+        }
+        (OCR_CATEGORY, SILENT_SCREENSHOT_OCR_ACTION) => {
+            tauri::async_runtime::spawn(commands::open_capture_window_from_shortcut(
+                app,
+                "silent-screenshot-ocr",
+            ));
+        }
+        (OCR_CATEGORY, FILE_OCR_ACTION) => {
+            if let Err(err) = commands::start_file_ocr(app) {
+                log::error!("Failed to start file OCR: {}", err);
+            }
+        }
+        (OCR_CATEGORY, SHOW_OCR_WINDOW_ACTION) => {
+            if let Err(err) = commands::show_ocr_window(app) {
+                log::error!("Failed to show OCR window: {}", err);
+            }
         }
         _ => {
             log::warn!("Unknown hotkey action: {}:{}", category, action);
@@ -334,7 +347,7 @@ fn accelerator_key(main_key: &str) -> Result<String> {
 mod tests {
     use super::{
         display_hotkey_to_accelerator, resolve_hotkey_accelerator, FILE_OCR_ACTION, OCR_CATEGORY,
-        SCREENSHOT_CATEGORY, SILENT_SCREENSHOT_OCR_ACTION,
+        SCREENSHOT_CATEGORY, SHOW_OCR_WINDOW_ACTION, SILENT_SCREENSHOT_OCR_ACTION,
     };
     use std::str::FromStr;
     use tauri_plugin_global_shortcut::Shortcut;
@@ -388,17 +401,19 @@ mod tests {
     }
 
     #[test]
-    fn allows_unset_known_unimplemented_hotkey_actions() {
+    fn resolves_ocr_hotkey_actions() {
         assert_eq!(
-            resolve_hotkey_accelerator(OCR_CATEGORY, SILENT_SCREENSHOT_OCR_ACTION, "未设置")
+            resolve_hotkey_accelerator(OCR_CATEGORY, SILENT_SCREENSHOT_OCR_ACTION, "⌘F5")
                 .unwrap(),
-            None
+            Some("CmdOrCtrl+F5".to_string())
         );
-    }
-
-    #[test]
-    fn rejects_non_empty_unimplemented_hotkey_actions() {
-        let err = resolve_hotkey_accelerator(OCR_CATEGORY, FILE_OCR_ACTION, "⌘F").unwrap_err();
-        assert!(err.to_string().contains("not implemented"));
+        assert_eq!(
+            resolve_hotkey_accelerator(OCR_CATEGORY, FILE_OCR_ACTION, "⌘F").unwrap(),
+            Some("CmdOrCtrl+KeyF".to_string())
+        );
+        assert_eq!(
+            resolve_hotkey_accelerator(OCR_CATEGORY, SHOW_OCR_WINDOW_ACTION, "⌘O").unwrap(),
+            Some("CmdOrCtrl+KeyO".to_string())
+        );
     }
 }

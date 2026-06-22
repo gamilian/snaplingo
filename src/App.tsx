@@ -3,6 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { SettingsWindow } from './components/SettingsWindow';
 import ResultWindow from './components/ResultWindow';
+import { runOcrFileWorkflow } from './components/ResultWindow/ocrFileWorkflow';
 import { parseInputTranslationPayload } from './components/ResultWindow/translationInput';
 import {
   PinnedImageWindow,
@@ -20,6 +21,7 @@ import {
   configureHotkey,
   type HotkeyCategory,
 } from './tauri/hotkeys';
+import { recognizeImageFile, selectImageFile } from './tauri/ocr';
 
 const currentWindow = getCurrentWebviewWindow();
 const captureLaunch = readCaptureLaunch(window.location.search);
@@ -28,8 +30,12 @@ const pinnedImageId = readPinnedImageLaunch(window.location.search);
 function App() {
   const resultWindowVisible = useAppStore((state) => state.resultWindowVisible);
   const setSourceText = useAppStore((state) => state.setSourceText);
+  const setOcrText = useAppStore((state) => state.setOcrText);
+  const setOcrRunning = useAppStore((state) => state.setOcrRunning);
+  const setOcrError = useAppStore((state) => state.setOcrError);
   const requestAutoTranslate = useAppStore((state) => state.requestAutoTranslate);
   const showResultWindow = useAppStore((state) => state.showResultWindow);
+  const showOcrWindow = useAppStore((state) => state.showOcrWindow);
   const setActiveMainTab = useSettingsStore((state) => state.setActiveMainTab);
   const setScreenshotSubTab = useSettingsStore((state) => state.setScreenshotSubTab);
   const setCapturedScreenshot = useSettingsStore((state) => state.setCapturedScreenshot);
@@ -99,6 +105,98 @@ function App() {
     requestAutoTranslate,
     setSourceText,
     showResultWindow,
+  ]);
+
+  useEffect(() => {
+    if (isCaptureWindow || isPinnedImageWindow) return;
+
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+
+    listen<string>('input-ocr', (event) => {
+      setOcrText(event.payload);
+      setOcrError(null);
+      showOcrWindow();
+    })
+      .then((nextUnlisten) => {
+        if (disposed) {
+          nextUnlisten();
+        } else {
+          unlisten = nextUnlisten;
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to listen for OCR input:', err);
+      });
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [
+    isCaptureWindow,
+    isPinnedImageWindow,
+    setOcrError,
+    setOcrText,
+    showOcrWindow,
+  ]);
+
+  useEffect(() => {
+    if (isCaptureWindow || isPinnedImageWindow) return;
+
+    let disposed = false;
+    let unlistenShow: (() => void) | undefined;
+    let unlistenFile: (() => void) | undefined;
+
+    const startFileOcr = () => {
+      showOcrWindow();
+      void runOcrFileWorkflow({
+        selectImageFile,
+        recognizeImageFile,
+        setText: setOcrText,
+        setRunning: setOcrRunning,
+        setError: setOcrError,
+      });
+    };
+
+    listen('show-ocr-window', () => {
+      showOcrWindow();
+    })
+      .then((nextUnlisten) => {
+        if (disposed) {
+          nextUnlisten();
+        } else {
+          unlistenShow = nextUnlisten;
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to listen for OCR window show events:', err);
+      });
+
+    listen('start-file-ocr', startFileOcr)
+      .then((nextUnlisten) => {
+        if (disposed) {
+          nextUnlisten();
+        } else {
+          unlistenFile = nextUnlisten;
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to listen for file OCR events:', err);
+      });
+
+    return () => {
+      disposed = true;
+      unlistenShow?.();
+      unlistenFile?.();
+    };
+  }, [
+    isCaptureWindow,
+    isPinnedImageWindow,
+    setOcrError,
+    setOcrRunning,
+    setOcrText,
+    showOcrWindow,
   ]);
 
   useEffect(() => {

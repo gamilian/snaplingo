@@ -22,6 +22,7 @@ tauri = { version = "2.0", features = ["macos-private-api"] }
 tauri-plugin-log = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-global-shortcut = "2"
+tauri-plugin-dialog = "2"
 tauri-plugin-screenshots = { git = "https://github.com/ayangweb/tauri-plugin-screenshots" }
 log = "0.4"
 

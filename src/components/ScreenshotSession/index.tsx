@@ -4,9 +4,10 @@ import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { useSettingsStore } from '../../stores/settingsStore';
 import {
   cancelCaptureSession,
+  copyTextToClipboard,
   createCaptureSession,
   getCaptureSession,
-  openResultWindow,
+  openOcrResultWindow,
   openTranslationResultWindow,
   outputCapture,
   renderCaptureOutput,
@@ -889,8 +890,10 @@ export default function ScreenshotSession({
           const ocrResult = await runCaptureOcr(session.id, rect);
           if (selectionFlow === 'ocr-translate') {
             await openTranslationResultWindow(ocrResult.text);
+          } else if (selectionFlow === 'silent-ocr') {
+            await copyTextToClipboard(ocrResult.text);
           } else {
-            await openResultWindow(ocrResult.text);
+            await openOcrResultWindow(ocrResult.text);
           }
           recordSuccessfulSelection('ocr', rect);
           await finishCurrentCaptureSession(session.id);
@@ -1007,8 +1010,10 @@ export default function ScreenshotSession({
         const ocrResult = await runCaptureOcr(session.id, rect);
         if (completion.resultWindow === 'translation') {
           await openTranslationResultWindow(ocrResult.text);
+        } else if (completion.resultWindow === 'ocr') {
+          await openOcrResultWindow(ocrResult.text);
         } else {
-          await openResultWindow(ocrResult.text);
+          await copyTextToClipboard(ocrResult.text);
         }
       } else if (completion.effect === 'pin') {
         await outputCapture({
@@ -1125,7 +1130,7 @@ export default function ScreenshotSession({
 
     try {
       const ocrResult = await runCaptureOcr(session.id, selection);
-      await openResultWindow(ocrResult.text);
+      await openOcrResultWindow(ocrResult.text);
       recordSuccessfulSelection('ocr', selection);
       await finishCurrentCaptureSession(session.id);
     } catch (err) {

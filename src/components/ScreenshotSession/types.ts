@@ -53,7 +53,11 @@ export interface PinnedImageView {
   source_text?: string | null;
 }
 
-export type CaptureMode = 'screenshot' | 'screenshot-ocr' | 'screenshot-translate';
+export type CaptureMode =
+  | 'screenshot'
+  | 'screenshot-ocr'
+  | 'silent-screenshot-ocr'
+  | 'screenshot-translate';
 
 export interface CaptureLaunch {
   mode: CaptureMode;

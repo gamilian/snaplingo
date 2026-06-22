@@ -36,6 +36,24 @@ pub async fn recognize_image(
 }
 
 #[tauri::command]
+pub async fn recognize_image_file(
+    path: String,
+    state: State<'_, crate::AppState>,
+) -> Result<OcrResult, String> {
+    let image_data = std::fs::read(path).map_err(|e| e.to_string())?;
+    let ocr_request = OcrRequest {
+        image_data,
+        language: None,
+    };
+
+    state
+        .ocr_coordinator
+        .recognize(&ocr_request)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn list_ocr_providers(
     state: State<'_, crate::AppState>,
 ) -> Result<Vec<OcrProviderInfo>, String> {

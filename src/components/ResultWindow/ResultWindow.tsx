@@ -3,6 +3,8 @@ import { useAppStore } from '../../stores/appStore';
 import { useTranslate } from '../../hooks/useTranslate';
 import TranslationCard from './TranslationCard';
 import { CustomSelect } from '../common/CustomSelect';
+import { recognizeImageFile, selectImageFile } from '../../tauri/ocr';
+import { runOcrFileWorkflow } from './ocrFileWorkflow';
 
 const LANGUAGES = [
   { code: 'auto', name: 'Auto Detect' },
@@ -25,11 +27,18 @@ export default function ResultWindow() {
     targetLang,
     translations,
     isTranslating,
+    ocrText,
+    isOcrRunning,
+    ocrError,
     resultWindowVisible,
+    resultWindowMode,
     pendingAutoTranslate,
     setSourceText,
     setSourceLang,
     setTargetLang,
+    setOcrText,
+    setOcrRunning,
+    setOcrError,
     consumeAutoTranslateRequest,
     hideResultWindow,
   } = useAppStore();
@@ -84,6 +93,18 @@ export default function ResultWindow() {
     translate();
   };
 
+  const handleUploadImage = () => {
+    void runOcrFileWorkflow({
+      selectImageFile,
+      recognizeImageFile,
+      setText: setOcrText,
+      setRunning: setOcrRunning,
+      setError: setOcrError,
+    });
+  };
+
+  const isOcrMode = resultWindowMode === 'ocr';
+
   return (
     <div
       className="fixed inset-0 bg-black/25 backdrop-blur-sm flex items-center justify-center z-50 p-8"
@@ -92,7 +113,9 @@ export default function ResultWindow() {
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-[slideIn_0.3s_ease-out]">
         {/* Header */}
         <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-gray-900">翻译</h2>
+          <h2 className="text-lg font-bold text-gray-900">
+            {isOcrMode ? 'OCR' : '翻译'}
+          </h2>
           <button
             onClick={hideResultWindow}
             className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-150"
@@ -114,7 +137,38 @@ export default function ResultWindow() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        {isOcrMode ? (
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <button
+              type="button"
+              onClick={handleUploadImage}
+              disabled={isOcrRunning}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+            >
+              {isOcrRunning ? '识别中...' : '上传图片 OCR'}
+            </button>
+
+            {ocrError && (
+              <div className="px-3 py-2 rounded-lg bg-red-50 text-sm text-red-700 border border-red-100">
+                {ocrError}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                OCR Text
+              </label>
+              <textarea
+                value={ocrText}
+                readOnly
+                placeholder="上传图片后显示识别文本..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 resize-none"
+                rows={8}
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {/* Source Text */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -198,7 +252,8 @@ export default function ResultWindow() {
               ))}
             </div>
           )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -41,7 +41,9 @@ export function getPrimaryCaptureCompletionActionForMode(
   mode: CaptureMode,
 ): CaptureCompletionAction {
   const flow = getCaptureModeSelectionFlow(mode);
-  if (flow === 'ocr' || flow === 'ocr-translate') return flow;
+  if (flow === 'ocr' || flow === 'silent-ocr' || flow === 'ocr-translate') {
+    return flow;
+  }
   return 'copy';
 }
 
@@ -60,7 +62,7 @@ export function getCaptureCompletionPlan(
 function getCaptureCompletionEffect(
   action: CaptureCompletionAction,
 ): CaptureCompletionEffect {
-  if (action === 'ocr-translate') return 'ocr';
+  if (action === 'silent-ocr' || action === 'ocr-translate') return 'ocr';
   return action;
 }
 

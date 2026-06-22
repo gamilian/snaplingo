@@ -42,6 +42,25 @@ pub fn open_result_window(text: String, app: tauri::AppHandle) -> Result<(), Str
     Ok(())
 }
 
+#[tauri::command]
+pub fn open_ocr_result_window(text: String, app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        window.show().map_err(|e| e.to_string())?;
+        window.set_focus().map_err(|e| e.to_string())?;
+        window.emit("input-ocr", text).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn copy_text_to_clipboard(text: String) -> Result<(), String> {
+    let mut clipboard =
+        arboard::Clipboard::new().map_err(|e| format!("Failed to open clipboard: {}", e))?;
+    clipboard
+        .set_text(text)
+        .map_err(|e| format!("Failed to write text to clipboard: {}", e))
+}
+
 pub fn emit_screenshot_error(app: tauri::AppHandle, message: String) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
@@ -76,6 +95,23 @@ pub fn show_translation_window(app: tauri::AppHandle) -> Result<(), String> {
         window
             .emit("show-translation-window", ())
             .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+pub fn show_ocr_window(app: tauri::AppHandle) -> Result<(), String> {
+    emit_main_window_event(app, "show-ocr-window")
+}
+
+pub fn start_file_ocr(app: tauri::AppHandle) -> Result<(), String> {
+    emit_main_window_event(app, "start-file-ocr")
+}
+
+fn emit_main_window_event(app: tauri::AppHandle, event: &str) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        window.show().map_err(|e| e.to_string())?;
+        window.set_focus().map_err(|e| e.to_string())?;
+        window.emit(event, ()).map_err(|e| e.to_string())?;
     }
     Ok(())
 }
