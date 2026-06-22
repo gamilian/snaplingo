@@ -4,14 +4,16 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::application::providers::common::CredentialField;
-use crate::application::providers::translation::LLMTranslationProvider;
+use crate::application::providers::translation::{LLMTranslationProvider, TranslationCoordinator};
 use crate::infrastructure::http::HttpClient;
 use crate::infrastructure::llm::{
     AnthropicLLMClient, GeminiLLMClient, LLMClient, LLMProtocol, OpenAILLMClient, ReasoningLevel,
 };
+use crate::infrastructure::storage::{ConfigFile, Keychain};
+use crate::AppError;
 
 /// Custom translation provider definition persisted in the user config.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CustomTranslationProviderDef {
     pub id: String,
     pub name: String,
@@ -19,6 +21,145 @@ pub struct CustomTranslationProviderDef {
     pub endpoint: String,
     pub model: String,
     pub reasoning_level: Option<ReasoningLevel>,
+}
+
+pub struct AddCustomTranslationProviderInput {
+    pub name: String,
+    pub protocol: String,
+    pub endpoint: String,
+    pub model: String,
+    pub api_key: String,
+    pub reasoning_level: Option<String>,
+}
+
+pub struct CustomTranslationProviderView {
+    pub id: String,
+    pub name: String,
+    pub protocol: String,
+    pub endpoint: String,
+    pub model: String,
+    pub reasoning_level: Option<String>,
+}
+
+pub fn add_custom_translation_provider(
+    input: AddCustomTranslationProviderInput,
+    config_file: &ConfigFile,
+    keychain: &Keychain,
+    http_client: Arc<dyn HttpClient>,
+    translation_coordinator: &TranslationCoordinator,
+) -> crate::Result<CustomTranslationProviderView> {
+    let id = create_custom_translation_provider_id();
+    let def = build_custom_translation_provider_def(id.clone(), &input)?;
+
+    keychain
+        .save_provider_credential(&id, &input.api_key)
+        .map_err(|e| AppError::Other(format!("Failed to save API key: {}", e)))?;
+
+    let mut custom_defs = config_file
+        .load::<Vec<CustomTranslationProviderDef>>("custom_translation_providers")
+        .unwrap_or_default();
+    custom_defs.push(def.clone());
+
+    config_file
+        .save("custom_translation_providers", &custom_defs)
+        .map_err(|e| {
+            let _ = keychain.delete_provider_credential(&id);
+            AppError::Other(format!("Failed to save config: {}", e))
+        })?;
+
+    let provider = create_llm_translation_provider(&def, http_client, input.api_key);
+    translation_coordinator.register(provider).map_err(|e| {
+        custom_defs.pop();
+        let _ = config_file.save("custom_translation_providers", &custom_defs);
+        let _ = keychain.delete_provider_credential(&id);
+        AppError::Other(format!("Failed to register provider: {}", e))
+    })?;
+
+    translation_coordinator.activate(&id).map_err(|e| {
+        let _ = translation_coordinator.unregister(&id);
+        custom_defs.pop();
+        let _ = config_file.save("custom_translation_providers", &custom_defs);
+        let _ = keychain.delete_provider_credential(&id);
+        AppError::Other(format!("Failed to activate provider: {}", e))
+    })?;
+
+    Ok(custom_translation_provider_view(&def))
+}
+
+fn build_custom_translation_provider_def(
+    id: String,
+    input: &AddCustomTranslationProviderInput,
+) -> crate::Result<CustomTranslationProviderDef> {
+    if input.name.trim().is_empty() {
+        return Err(AppError::Other("Name cannot be empty".into()));
+    }
+    if input.endpoint.trim().is_empty() {
+        return Err(AppError::Other("Endpoint cannot be empty".into()));
+    }
+    if input.model.trim().is_empty() {
+        return Err(AppError::Other("Model cannot be empty".into()));
+    }
+    if input.api_key.trim().is_empty() {
+        return Err(AppError::Other("API key cannot be empty".into()));
+    }
+
+    Ok(CustomTranslationProviderDef {
+        id,
+        name: input.name.clone(),
+        protocol: parse_llm_protocol(&input.protocol)?,
+        endpoint: input.endpoint.clone(),
+        model: input.model.clone(),
+        reasoning_level: parse_reasoning_level(input.reasoning_level.as_deref())?,
+    })
+}
+
+fn parse_llm_protocol(protocol: &str) -> crate::Result<LLMProtocol> {
+    match protocol {
+        "openai" => Ok(LLMProtocol::OpenAI),
+        "anthropic" => Ok(LLMProtocol::Anthropic),
+        "gemini" => Ok(LLMProtocol::Gemini),
+        _ => Err(AppError::Other(format!("Invalid protocol: {}", protocol))),
+    }
+}
+
+fn parse_reasoning_level(reasoning_level: Option<&str>) -> crate::Result<Option<ReasoningLevel>> {
+    match reasoning_level {
+        Some("minimal") => Ok(Some(ReasoningLevel::Minimal)),
+        Some("low") => Ok(Some(ReasoningLevel::Low)),
+        Some("medium") => Ok(Some(ReasoningLevel::Medium)),
+        Some("high") => Ok(Some(ReasoningLevel::High)),
+        Some("xhigh") => Ok(Some(ReasoningLevel::XHigh)),
+        Some(other) => Err(AppError::Other(format!(
+            "Invalid reasoning level: {}",
+            other
+        ))),
+        None => Ok(None),
+    }
+}
+
+fn create_custom_translation_provider_id() -> String {
+    format!(
+        "custom-llm-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    )
+}
+
+fn custom_translation_provider_view(
+    def: &CustomTranslationProviderDef,
+) -> CustomTranslationProviderView {
+    CustomTranslationProviderView {
+        id: def.id.clone(),
+        name: def.name.clone(),
+        protocol: format!("{:?}", def.protocol).to_lowercase(),
+        endpoint: def.endpoint.clone(),
+        model: def.model.clone(),
+        reasoning_level: def
+            .reasoning_level
+            .map(|level| format!("{:?}", level).to_lowercase()),
+    }
 }
 
 pub fn create_llm_translation_provider(
@@ -89,7 +230,8 @@ mod tests {
     use async_trait::async_trait;
 
     use super::{
-        create_llm_translation_provider, validate_required_credentials,
+        build_custom_translation_provider_def, create_llm_translation_provider,
+        validate_required_credentials, AddCustomTranslationProviderInput,
         CustomTranslationProviderDef,
     };
 
@@ -143,6 +285,92 @@ mod tests {
             },
             post_bodies: Arc::new(Mutex::new(Vec::new())),
         })
+    }
+
+    fn valid_add_input() -> AddCustomTranslationProviderInput {
+        AddCustomTranslationProviderInput {
+            name: "Custom LLM".to_string(),
+            protocol: "openai".to_string(),
+            endpoint: "https://llm.example.test".to_string(),
+            model: "gpt-test".to_string(),
+            api_key: "test-key".to_string(),
+            reasoning_level: Some("high".to_string()),
+        }
+    }
+
+    #[test]
+    fn custom_translation_provider_input_rejects_blank_name() {
+        let input = AddCustomTranslationProviderInput {
+            name: "  ".to_string(),
+            ..valid_add_input()
+        };
+
+        let result = build_custom_translation_provider_def("custom-id".to_string(), &input);
+
+        assert_eq!(result.unwrap_err().to_string(), "Name cannot be empty");
+    }
+
+    #[test]
+    fn custom_translation_provider_input_rejects_blank_endpoint() {
+        let input = AddCustomTranslationProviderInput {
+            endpoint: "  ".to_string(),
+            ..valid_add_input()
+        };
+
+        let result = build_custom_translation_provider_def("custom-id".to_string(), &input);
+
+        assert_eq!(result.unwrap_err().to_string(), "Endpoint cannot be empty");
+    }
+
+    #[test]
+    fn custom_translation_provider_input_rejects_blank_model() {
+        let input = AddCustomTranslationProviderInput {
+            model: "  ".to_string(),
+            ..valid_add_input()
+        };
+
+        let result = build_custom_translation_provider_def("custom-id".to_string(), &input);
+
+        assert_eq!(result.unwrap_err().to_string(), "Model cannot be empty");
+    }
+
+    #[test]
+    fn custom_translation_provider_input_rejects_blank_api_key() {
+        let input = AddCustomTranslationProviderInput {
+            api_key: "  ".to_string(),
+            ..valid_add_input()
+        };
+
+        let result = build_custom_translation_provider_def("custom-id".to_string(), &input);
+
+        assert_eq!(result.unwrap_err().to_string(), "API key cannot be empty");
+    }
+
+    #[test]
+    fn custom_translation_provider_input_rejects_invalid_protocol() {
+        let input = AddCustomTranslationProviderInput {
+            protocol: "ollama".to_string(),
+            ..valid_add_input()
+        };
+
+        let result = build_custom_translation_provider_def("custom-id".to_string(), &input);
+
+        assert_eq!(result.unwrap_err().to_string(), "Invalid protocol: ollama");
+    }
+
+    #[test]
+    fn custom_translation_provider_input_rejects_invalid_reasoning_level() {
+        let input = AddCustomTranslationProviderInput {
+            reasoning_level: Some("huge".to_string()),
+            ..valid_add_input()
+        };
+
+        let result = build_custom_translation_provider_def("custom-id".to_string(), &input);
+
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Invalid reasoning level: huge"
+        );
     }
 
     #[test]

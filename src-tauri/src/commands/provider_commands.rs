@@ -1,6 +1,8 @@
 use crate::application::providers::common::CredentialField;
 use crate::application::providers::{
-    create_llm_translation_provider, validate_required_credentials, CustomTranslationProviderDef,
+    add_custom_translation_provider as add_custom_translation_provider_to_config,
+    validate_required_credentials, AddCustomTranslationProviderInput, CustomTranslationProviderDef,
+    CustomTranslationProviderView,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -19,6 +21,23 @@ pub struct ProviderInfo {
     pub endpoint: Option<String>,
     pub model: Option<String>,
     pub reasoning_level: Option<String>,
+}
+
+impl From<CustomTranslationProviderView> for ProviderInfo {
+    fn from(view: CustomTranslationProviderView) -> Self {
+        Self {
+            id: view.id,
+            name: view.name,
+            is_configured: true,
+            requires_api_key: true,
+            is_active: true,
+            is_builtin: false,
+            protocol: Some(view.protocol),
+            endpoint: Some(view.endpoint),
+            model: Some(view.model),
+            reasoning_level: view.reasoning_level,
+        }
+    }
 }
 
 #[tauri::command]
@@ -185,119 +204,25 @@ pub async fn add_custom_translation_provider(
     request: AddCustomTranslationProviderRequest,
     state: State<'_, crate::AppState>,
 ) -> Result<ProviderInfo, String> {
-    use crate::infrastructure::llm::{LLMProtocol, ReasoningLevel};
-
-    // Validate fields
-    if request.name.trim().is_empty() {
-        return Err("Name cannot be empty".into());
-    }
-    if request.endpoint.trim().is_empty() {
-        return Err("Endpoint cannot be empty".into());
-    }
-    if request.model.trim().is_empty() {
-        return Err("Model cannot be empty".into());
-    }
-    if request.api_key.trim().is_empty() {
-        return Err("API key cannot be empty".into());
-    }
-
-    // Parse protocol
-    let protocol = match request.protocol.as_str() {
-        "openai" => LLMProtocol::OpenAI,
-        "anthropic" => LLMProtocol::Anthropic,
-        "gemini" => LLMProtocol::Gemini,
-        _ => return Err(format!("Invalid protocol: {}", request.protocol)),
-    };
-
-    // Parse reasoning level
-    let reasoning_level = match request.reasoning_level.as_deref() {
-        Some("minimal") => Some(ReasoningLevel::Minimal),
-        Some("low") => Some(ReasoningLevel::Low),
-        Some("medium") => Some(ReasoningLevel::Medium),
-        Some("high") => Some(ReasoningLevel::High),
-        Some("xhigh") => Some(ReasoningLevel::XHigh),
-        Some(other) => return Err(format!("Invalid reasoning level: {}", other)),
-        None => None,
-    };
-
-    // Generate unique ID
-    let id = format!(
-        "custom-llm-{}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    );
-
-    // Step 1: Save API key to keychain
-    state
-        .keychain
-        .save_provider_credential(&id, &request.api_key)
-        .map_err(|e| format!("Failed to save API key: {}", e))?;
-
-    // Step 2: Create provider definition
-    let def = CustomTranslationProviderDef {
-        id: id.clone(),
-        name: request.name.clone(),
-        protocol,
-        endpoint: request.endpoint.clone(),
-        model: request.model.clone(),
-        reasoning_level,
-    };
-
-    // Step 3: Load existing custom providers and append
-    let mut custom_defs = state
-        .config_file
-        .load::<Vec<CustomTranslationProviderDef>>("custom_translation_providers")
-        .unwrap_or_default();
-    custom_defs.push(def.clone());
-
-    // Step 4: Save to ConfigFile
-    state
-        .config_file
-        .save("custom_translation_providers", &custom_defs)
-        .map_err(|e| {
-            // Rollback: delete keychain entry
-            let _ = state.keychain.delete_provider_credential(&id);
-            format!("Failed to save config: {}", e)
-        })?;
-
-    // Step 5: Create and register provider at runtime
-    let provider =
-        create_llm_translation_provider(&def, state.http_client.clone(), request.api_key.clone());
-
-    state
-        .translation_coordinator
-        .register(provider)
-        .map_err(|e| {
-            // Rollback: remove from config and keychain
-            custom_defs.pop();
-            let _ = state
-                .config_file
-                .save("custom_translation_providers", &custom_defs);
-            let _ = state.keychain.delete_provider_credential(&id);
-            format!("Failed to register provider: {}", e)
-        })?;
-
-    // Step 6: Activate immediately
-    state
-        .translation_coordinator
-        .activate(&id)
-        .map_err(|e| format!("Failed to activate provider: {}", e))?;
-
-    // Step 7: Return ProviderInfo
-    Ok(ProviderInfo {
-        id: id.clone(),
+    let input = AddCustomTranslationProviderInput {
         name: request.name,
-        is_configured: true,
-        requires_api_key: true,
-        is_active: true,
-        is_builtin: false,
-        protocol: Some(request.protocol),
-        endpoint: Some(request.endpoint),
-        model: Some(request.model),
-        reasoning_level: reasoning_level.map(|level| format!("{:?}", level).to_lowercase()),
-    })
+        protocol: request.protocol,
+        endpoint: request.endpoint,
+        model: request.model,
+        api_key: request.api_key,
+        reasoning_level: request.reasoning_level,
+    };
+
+    let view = add_custom_translation_provider_to_config(
+        input,
+        &state.config_file,
+        &state.keychain,
+        state.http_client.clone(),
+        &state.translation_coordinator,
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(ProviderInfo::from(view))
 }
 
 #[tauri::command]
