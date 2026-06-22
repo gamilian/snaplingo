@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { HotkeyRow } from '../Hotkey/HotkeyRow';
-import { useSettingsStore } from '../../../stores/settingsStore';
+import { DEFAULT_HOTKEYS, useSettingsStore } from '../../../stores/settingsStore';
 
 export function HotkeysPage() {
   const hotkeys = useSettingsStore((state) => state.hotkeys.ocr);
@@ -10,13 +10,7 @@ export function HotkeysPage() {
 
   const [recordingKey, setRecordingKey] = useState<string | null>(null);
 
-  // 默认快捷键配置
-  const defaultHotkeys: Record<string, string> = {
-    'screenshot-ocr': '⌘⇧O',
-    'silent-screenshot-ocr': '⌘⇧I',
-    'file-ocr': '⌘⇧F',
-    'show-window': '⌘⇧R',
-  };
+  const defaultHotkeys: Record<string, string> = DEFAULT_HOTKEYS.ocr;
 
   // 监听键盘事件进行录制
   useEffect(() => {

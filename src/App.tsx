@@ -16,6 +16,10 @@ import {
 } from './components/ScreenshotSession/windowMode';
 import { useAppStore } from './stores/appStore';
 import { useSettingsStore } from './stores/settingsStore';
+import {
+  configureHotkey,
+  type HotkeyCategory,
+} from './tauri/hotkeys';
 
 const currentWindow = getCurrentWebviewWindow();
 const captureLaunch = readCaptureLaunch(window.location.search);
@@ -29,6 +33,7 @@ function App() {
   const setActiveMainTab = useSettingsStore((state) => state.setActiveMainTab);
   const setScreenshotSubTab = useSettingsStore((state) => state.setScreenshotSubTab);
   const setCapturedScreenshot = useSettingsStore((state) => state.setCapturedScreenshot);
+  const hotkeys = useSettingsStore((state) => state.hotkeys);
   const isCaptureWindow =
     currentWindow.label === CAPTURE_WINDOW_LABEL || captureLaunch !== null;
   const isPinnedImageWindow = pinnedImageId !== null;
@@ -95,6 +100,46 @@ function App() {
     setSourceText,
     showResultWindow,
   ]);
+
+  useEffect(() => {
+    if (isCaptureWindow || isPinnedImageWindow) return;
+
+    (Object.entries(hotkeys) as [HotkeyCategory, Record<string, string>][]).forEach(
+      ([category, actionHotkeys]) => {
+        Object.entries(actionHotkeys).forEach(([action, hotkey]) => {
+          void configureHotkey(category, action, hotkey).catch((err) => {
+            console.warn(`Failed to configure hotkey ${category}:${action}:`, err);
+          });
+        });
+      },
+    );
+  }, [hotkeys, isCaptureWindow, isPinnedImageWindow]);
+
+  useEffect(() => {
+    if (isCaptureWindow || isPinnedImageWindow) return;
+
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+
+    listen('show-translation-window', () => {
+      showResultWindow();
+    })
+      .then((nextUnlisten) => {
+        if (disposed) {
+          nextUnlisten();
+        } else {
+          unlisten = nextUnlisten;
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to listen for translation window show events:', err);
+      });
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [isCaptureWindow, isPinnedImageWindow, showResultWindow]);
 
   if (isCaptureWindow) {
     return (

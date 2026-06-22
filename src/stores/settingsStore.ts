@@ -72,7 +72,7 @@ interface SettingsState {
 }
 
 // 默认快捷键
-const defaultHotkeys = {
+export const DEFAULT_HOTKEYS = {
   screenshot: {
     screenshot: '⇧⌘R',
     'screenshot-copy': '⌘F1',
@@ -105,7 +105,7 @@ export const useSettingsStore = create<SettingsState>()(
       ocrSubTab: 'hotkeys',
       servicesSubTab: 'ocr',
 
-      hotkeys: defaultHotkeys,
+      hotkeys: DEFAULT_HOTKEYS,
 
       language: 'zh-CN',
       theme: 'system',
@@ -152,7 +152,7 @@ export const useSettingsStore = create<SettingsState>()(
         set((state) => ({
           hotkeys: {
             ...state.hotkeys,
-            [category]: defaultHotkeys[category],
+            [category]: { ...DEFAULT_HOTKEYS[category] },
           },
         })),
 

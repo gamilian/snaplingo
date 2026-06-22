@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { HotkeyRow } from '../Hotkey/HotkeyRow';
-import { useSettingsStore } from '../../../stores/settingsStore';
+import { DEFAULT_HOTKEYS, useSettingsStore } from '../../../stores/settingsStore';
 
 export function HotkeysPage() {
   const hotkeys = useSettingsStore((state) => state.hotkeys.translation);
@@ -16,13 +16,7 @@ export function HotkeysPage() {
     setDebugLogs(prev => [...prev.slice(-10), `${timestamp}: ${message}`]);
   };
 
-  // 默认快捷键配置
-  const defaultHotkeys: Record<string, string> = {
-    'selection-translate': '⌘⇧D',
-    'screenshot-translate': '⌘⇧S',
-    'input-translate': '⌘⇧T',
-    'show-window': '⌘⇧W',
-  };
+  const defaultHotkeys: Record<string, string> = DEFAULT_HOTKEYS.translation;
 
   // 监听键盘事件进行录制
   useEffect(() => {

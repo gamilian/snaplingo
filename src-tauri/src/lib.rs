@@ -50,6 +50,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::open_result_window,
             commands::open_translation_result_window,
+            commands::configure_hotkey,
+            commands::configure_translation_hotkey,
             commands::trigger_screenshot,
             commands::open_capture_window,
             commands::create_screenshot_window,
