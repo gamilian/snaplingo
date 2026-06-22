@@ -107,9 +107,9 @@ import {
 import {
   canToggleCapturedCursor,
   copyCaptureSelection,
+  type CaptureCompletionAction,
   type HoverSelectionCompletionAction,
   getCaptureKeyboardToolbarAction,
-  getCaptureSelectionFlowForMode,
   getCandidateCycleDirectionFromShortcut,
   getCancelCapturePointerAction,
   getCursorNudgeDeltaFromShortcut,
@@ -141,9 +141,13 @@ import {
   refreshCaptureSession,
   saveCaptureSelection,
   shouldCancelCaptureOnBlur,
-  shouldRecordSuccessfulCaptureSelection,
   shouldRestoreLastSelectionFromShortcut,
 } from './captureActions';
+import {
+  getCaptureCompletionPlan,
+  getCaptureModeSelectionFlow,
+  shouldRecordSuccessfulCaptureCompletion,
+} from './captureInteractionModel';
 import {
   closeInactiveCaptureSession,
   finishCaptureSession,
@@ -850,10 +854,10 @@ export default function ScreenshotSession({
 
   const recordSuccessfulSelection = useCallback(
     (
-      action: Parameters<typeof shouldRecordSuccessfulCaptureSelection>[0],
+      action: CaptureCompletionAction,
       rect: LogicalRect,
     ) => {
-      if (!shouldRecordSuccessfulCaptureSelection(action)) return;
+      if (!shouldRecordSuccessfulCaptureCompletion(action)) return;
       recordLastSelection(rect);
     },
     [recordLastSelection],
@@ -880,7 +884,7 @@ export default function ScreenshotSession({
         });
         setPreviewImageBase64(base64);
 
-        const selectionFlow = getCaptureSelectionFlowForMode(mode);
+        const selectionFlow = getCaptureModeSelectionFlow(mode);
         if (selectionFlow !== 'preview') {
           const ocrResult = await runCaptureOcr(session.id, rect);
           if (selectionFlow === 'ocr-translate') {
@@ -968,21 +972,22 @@ export default function ScreenshotSession({
     setError(null);
 
     try {
-      if (action === 'copy') {
+      const completion = getCaptureCompletionPlan(action);
+      if (completion.effect === 'copy') {
         await copyCaptureSelection(
           session.id,
           rect,
           [],
           shouldIncludeCapturedCursor,
         );
-      } else if (action === 'save') {
+      } else if (completion.effect === 'save') {
         await saveCaptureSelection(
           session.id,
           rect,
           [],
           shouldIncludeCapturedCursor,
         );
-      } else if (action === 'quick-save') {
+      } else if (completion.effect === 'quick-save') {
         await quickSaveCaptureSelection(
           session.id,
           rect,
@@ -990,7 +995,7 @@ export default function ScreenshotSession({
           screenshotSavePath,
           shouldIncludeCapturedCursor,
         );
-      } else if (action === 'print') {
+      } else if (completion.effect === 'print') {
         await printCaptureSelection(
           session.id,
           rect,
@@ -998,14 +1003,14 @@ export default function ScreenshotSession({
           printBase64PngImage,
           shouldIncludeCapturedCursor,
         );
-      } else if (action === 'ocr' || action === 'ocr-translate') {
+      } else if (completion.effect === 'ocr') {
         const ocrResult = await runCaptureOcr(session.id, rect);
-        if (action === 'ocr-translate') {
+        if (completion.resultWindow === 'translation') {
           await openTranslationResultWindow(ocrResult.text);
         } else {
           await openResultWindow(ocrResult.text);
         }
-      } else {
+      } else if (completion.effect === 'pin') {
         await outputCapture({
           sessionId: session.id,
           rect,
@@ -1015,8 +1020,12 @@ export default function ScreenshotSession({
         });
       }
 
-      recordSuccessfulSelection(action, rect);
-      await finishCurrentCaptureSession(session.id);
+      if (completion.shouldRecordSelection) {
+        recordSuccessfulSelection(completion.action, rect);
+      }
+      if (completion.shouldFinishSession) {
+        await finishCurrentCaptureSession(session.id);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setStatus('error');
