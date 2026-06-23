@@ -7,6 +7,7 @@ pub mod history_service;
 pub mod hotkey_service;
 pub mod image_composition_service;
 pub mod pinned_image_service;
+pub mod selected_text_acquirer;
 pub mod workflow_service;
 
 #[cfg(test)]
@@ -32,4 +33,5 @@ pub use pinned_image_service::{
     PinnedImageGroupMembership, PinnedImageGroupRemoval, PinnedImageGroupSwitch,
     PinnedImageOpenRequest, PinnedImageService,
 };
+pub use selected_text_acquirer::{SelectedTextAcquirer, SelectionScheme};
 pub use workflow_service::{WorkflowOutcome, WorkflowService};

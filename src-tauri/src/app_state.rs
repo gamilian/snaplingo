@@ -6,7 +6,8 @@ use crate::application::providers::ocr::OcrCoordinator;
 use crate::application::providers::translation::TranslationCoordinator;
 use crate::application::{
     CaptureOutputService, CaptureService, CaptureSessionRuntime, CaptureSessionService,
-    HistoryService, ImageCompositionService, PinnedImageService, WorkflowService,
+    HistoryService, ImageCompositionService, PinnedImageService, SelectedTextAcquirer,
+    WorkflowService,
 };
 use crate::infrastructure::events::EventBus;
 use crate::infrastructure::http::HttpClient;
@@ -49,6 +50,9 @@ pub struct AppState {
 
     // Phase 6: Workflows
     pub workflow_service: Arc<WorkflowService>,
+
+    // Phase 7: Selected text acquisition
+    pub selected_text_acquirer: Arc<SelectedTextAcquirer>,
 }
 
 impl AppState {

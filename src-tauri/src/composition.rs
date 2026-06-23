@@ -21,9 +21,13 @@ use crate::infrastructure::http::{HttpClient, ReqwestHttpClient};
 use crate::infrastructure::storage::{ConfigFile, HistoryDatabase, Keychain};
 use crate::infrastructure::system::paths::get_history_db_path;
 use crate::infrastructure::system::screenshot::get_screenshot_backend;
+use crate::infrastructure::system::selection::{
+    platform_selection_provider, SelectionMethodRegistry, SystemSelectionProvider,
+};
 use crate::{
     AppState, CaptureOutputService, CaptureService, CaptureSessionRuntime, CaptureSessionService,
-    HistoryService, ImageCompositionService, PinnedImageService, ScreenshotState, WorkflowService,
+    HistoryService, ImageCompositionService, PinnedImageService, ScreenshotState,
+    SelectedTextAcquirer, SelectionScheme, WorkflowService,
 };
 
 pub(crate) fn build_app_state(config_path: PathBuf, _app: AppHandle) -> AppState {
@@ -79,6 +83,16 @@ pub(crate) fn build_app_state(config_path: PathBuf, _app: AppHandle) -> AppState
         translation_coordinator.clone(),
     ));
 
+    // Phase 7: Selected text acquisition
+    let self_bundle_id = Some(_app.config().identifier.clone());
+    let selection_provider = Arc::new(platform_selection_provider(_app.clone(), self_bundle_id));
+    let selection_scheme = SelectionScheme::new(selection_provider.default_scheme());
+    let selected_text_acquirer = Arc::new(SelectedTextAcquirer::new(
+        selection_scheme,
+        SelectionMethodRegistry::new(selection_provider.methods()),
+        selection_provider,
+    ));
+
     AppState {
         config_file,
         keychain,
@@ -95,6 +109,7 @@ pub(crate) fn build_app_state(config_path: PathBuf, _app: AppHandle) -> AppState
         history_service,
         event_bus,
         workflow_service,
+        selected_text_acquirer,
     }
 }
 

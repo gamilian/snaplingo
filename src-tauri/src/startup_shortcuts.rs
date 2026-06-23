@@ -231,7 +231,13 @@ fn trigger_hotkey_action(app: tauri::AppHandle, category: String, action: String
         }
         (TRANSLATION_CATEGORY, SELECTION_TRANSLATE_ACTION) => {
             tauri::async_runtime::spawn(async move {
-                if let Err(err) = commands::open_selection_translation_window(app.clone()).await {
+                let state = app.state::<AppState>();
+                if let Err(err) = commands::open_selection_translation_window_for_state(
+                    app.clone(),
+                    state.inner(),
+                )
+                .await
+                {
                     log::error!("Failed to open selection translation window: {}", err);
                     commands::emit_screenshot_error(app, format!("划词翻译失败：{}", err));
                 }

@@ -3,6 +3,7 @@ pub mod hotkey;
 pub mod paths;
 pub mod pinned_window;
 pub mod screenshot;
+pub mod selection;
 pub mod shortcut;
 
 pub use hotkey::{HotkeyBackend, HotkeyId, get_hotkey_backend};

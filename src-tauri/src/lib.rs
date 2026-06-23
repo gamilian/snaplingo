@@ -52,6 +52,7 @@ pub fn run() {
             commands::open_result_window,
             commands::open_ocr_result_window,
             commands::open_translation_result_window,
+            commands::open_selection_translation_window,
             commands::copy_text_to_clipboard,
             commands::configure_hotkey,
             commands::configure_translation_hotkey,

@@ -1,13 +1,18 @@
-pub mod translation;
-pub mod ocr;
 pub mod capture;
 pub mod config;
 pub mod events;
 pub mod hotkey;
+pub mod ocr;
+pub mod selection;
+pub mod translation;
 
-pub use translation::{TranslationRequest, TranslationResult};
-pub use ocr::{OcrRequest, OcrResult};
-pub use capture::{CaptureMode, CaptureConfig, CaptureRegion, ImageFormat};
+pub use capture::{CaptureConfig, CaptureMode, CaptureRegion, ImageFormat};
 pub use config::AppConfig;
 pub use events::DomainEvent;
 pub use hotkey::HotkeyAction;
+pub use ocr::{OcrRequest, OcrResult};
+pub use selection::{
+    FrontmostApp, MethodAvailability, SelectedTextSnapshot, SelectionAttempt,
+    SelectionAttemptStatus, SelectionContext, SelectionMethodKind, SelectionSource,
+};
+pub use translation::{TranslationRequest, TranslationResult};

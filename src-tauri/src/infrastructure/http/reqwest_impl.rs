@@ -16,6 +16,10 @@ impl ReqwestHttpClient {
             client: reqwest::Client::new(),
         }
     }
+
+    pub fn with_client(client: reqwest::Client) -> Self {
+        Self { client }
+    }
 }
 
 #[async_trait]
