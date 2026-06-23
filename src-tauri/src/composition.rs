@@ -27,7 +27,7 @@ use crate::infrastructure::system::selection::{
 use crate::{
     AppState, CaptureOutputService, CaptureService, CaptureSessionRuntime, CaptureSessionService,
     HistoryService, ImageCompositionService, PinnedImageService, ScreenshotState,
-    SelectedTextAcquirer, SelectionScheme, WorkflowService,
+    SelectedTextAcquirer, SelectionScheme,
 };
 
 pub(crate) fn build_app_state(config_path: PathBuf, _app: AppHandle) -> AppState {
@@ -76,14 +76,7 @@ pub(crate) fn build_app_state(config_path: PathBuf, _app: AppHandle) -> AppState
     let pinned_image_service = Arc::new(PinnedImageService::new());
     let screenshot_state = Arc::new(ParkingLotMutex::new(ScreenshotState::default()));
 
-    // Phase 6: Workflows
-    let workflow_service = Arc::new(WorkflowService::new(
-        capture_service.clone(),
-        ocr_coordinator.clone(),
-        translation_coordinator.clone(),
-    ));
-
-    // Phase 7: Selected text acquisition
+    // Phase 6: Selected text acquisition
     let self_bundle_id = Some(_app.config().identifier.clone());
     let selection_provider = Arc::new(platform_selection_provider(_app.clone(), self_bundle_id));
     let selection_scheme = SelectionScheme::new(selection_provider.default_scheme());
@@ -108,7 +101,6 @@ pub(crate) fn build_app_state(config_path: PathBuf, _app: AppHandle) -> AppState
         screenshot_state,
         history_service,
         event_bus,
-        workflow_service,
         selected_text_acquirer,
     }
 }

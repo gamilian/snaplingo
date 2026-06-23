@@ -107,7 +107,6 @@ pub fn run() {
             commands::search_history,
             commands::delete_history,
             commands::clear_all_history,
-            commands::trigger_workflow,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

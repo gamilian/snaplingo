@@ -7,7 +7,6 @@ use crate::application::providers::translation::TranslationCoordinator;
 use crate::application::{
     CaptureOutputService, CaptureService, CaptureSessionRuntime, CaptureSessionService,
     HistoryService, ImageCompositionService, PinnedImageService, SelectedTextAcquirer,
-    WorkflowService,
 };
 use crate::infrastructure::events::EventBus;
 use crate::infrastructure::http::HttpClient;
@@ -48,10 +47,7 @@ pub struct AppState {
     pub history_service: Arc<HistoryService>,
     pub event_bus: Arc<EventBus>,
 
-    // Phase 6: Workflows
-    pub workflow_service: Arc<WorkflowService>,
-
-    // Phase 7: Selected text acquisition
+    // Phase 6: Selected text acquisition
     pub selected_text_acquirer: Arc<SelectedTextAcquirer>,
 }
 
