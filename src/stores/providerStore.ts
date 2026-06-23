@@ -87,6 +87,19 @@ function convertProviderInfo(info: ProviderInfo): Provider {
   };
 }
 
+function normalizeTranslationCredentials(config: unknown): Record<string, string> {
+  if (
+    config &&
+    typeof config === 'object' &&
+    'apiKey' in config &&
+    typeof (config as { apiKey?: unknown }).apiKey === 'string'
+  ) {
+    return { api_key: (config as { apiKey: string }).apiKey };
+  }
+
+  return config as Record<string, string>;
+}
+
 export const useProviderStore = create<ProviderState>()(
   persist(
     (set, get) => ({
@@ -217,14 +230,8 @@ export const useProviderStore = create<ProviderState>()(
       // 更新 Provider 配置
       updateProviderConfig: async (_id: string, providerId: string, config: any) => {
         try {
-          // Check if config is a credentials map (new format)
-          if (typeof config === 'object' && !config.apiKey) {
-            // New format: HashMap<String, String>
-            await providerApi.configureTranslationProviderCredentials(providerId, config);
-          } else if (config.apiKey) {
-            // Legacy format: single api_key
-            await providerApi.configureTranslationProvider(providerId, config.apiKey);
-          }
+          const credentials = normalizeTranslationCredentials(config);
+          await providerApi.configureTranslationProviderCredentials(providerId, credentials);
           await get().loadTranslationProviders();
         } catch (error) {
           console.error('Failed to update provider config:', error);

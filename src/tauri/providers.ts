@@ -56,10 +56,6 @@ export function getProviderCredentialSchema(providerId: string) {
   return invoke<CredentialField[]>('get_provider_credential_schema', { providerId });
 }
 
-export function configureTranslationProvider(providerId: string, apiKey: string) {
-  return invoke<void>('configure_translation_provider', { providerId, apiKey });
-}
-
 export function configureTranslationProviderCredentials(
   providerId: string,
   credentials: Record<string, string>,

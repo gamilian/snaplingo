@@ -116,18 +116,9 @@ pub async fn configure_translation_provider(
     api_key: String,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    // Save to keychain
-    state
-        .keychain
-        .save_provider_credential(&provider_id, &api_key)
-        .map_err(|e| e.to_string())?;
-
-    // Update provider configuration
-    // Note: This requires provider to support set_api_key, which would need
-    // interior mutability or a different pattern. For now, providers are
-    // recreated on startup with credentials from keychain.
-
-    Ok(())
+    let mut credentials = HashMap::new();
+    credentials.insert("api_key".to_string(), api_key);
+    configure_translation_provider_credentials_inner(&provider_id, &credentials, state.inner())
 }
 
 #[tauri::command]
@@ -162,28 +153,39 @@ pub async fn configure_translation_provider_credentials(
     credentials: HashMap<String, String>,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    // Validate provider exists
+    configure_translation_provider_credentials_inner(&provider_id, &credentials, state.inner())
+}
+
+fn configure_translation_provider_credentials_inner(
+    provider_id: &str,
+    credentials: &HashMap<String, String>,
+    state: &crate::AppState,
+) -> Result<(), String> {
     let providers = state.translation_coordinator.list_all();
     let provider_lock = providers
         .iter()
         .find(|p| p.read().id() == provider_id)
-        .ok_or_else(|| format!("Provider not found: {}", provider_id))?;
+        .ok_or_else(|| format!("Provider not found: {provider_id}"))?;
 
-    // Get expected fields
     let expected_fields = provider_lock.read().credential_fields();
 
-    validate_required_credentials(&expected_fields, &credentials).map_err(|e| e.to_string())?;
+    validate_required_credentials(&expected_fields, credentials).map_err(|e| e.to_string())?;
 
-    // Save to keychain
     state
         .keychain
-        .save_provider_credentials(&provider_id, &credentials)
+        .save_provider_credentials(provider_id, credentials)
         .map_err(|e| e.to_string())?;
 
-    // Reconfigure provider at runtime (hot-reload)
+    if let Some(api_key) = credentials.get("api_key") {
+        state
+            .keychain
+            .save_provider_credential(provider_id, api_key)
+            .map_err(|e| e.to_string())?;
+    }
+
     state
         .translation_coordinator
-        .reconfigure_provider(&provider_id, &credentials)
+        .reconfigure_provider(provider_id, credentials)
         .map_err(|e| e.to_string())?;
 
     Ok(())
