@@ -1,10 +1,8 @@
-import { useEffect } from 'react';
-import { listen } from '@tauri-apps/api/event';
+import { useCallback, useEffect } from 'react';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { SettingsWindow } from './components/SettingsWindow';
 import ResultWindow from './components/ResultWindow';
 import { runOcrFileWorkflow } from './components/ResultWindow/ocrFileWorkflow';
-import { parseInputTranslationPayload } from './components/ResultWindow/translationInput';
 import {
   PinnedImageWindow,
   readPinnedImageLaunch,
@@ -21,6 +19,7 @@ import {
   configureHotkey,
   type HotkeyCategory,
 } from './tauri/hotkeys';
+import { subscribeMainWindowEvents } from './tauri/appEvents';
 import { recognizeImageFile, selectImageFile } from './tauri/ocr';
 
 const currentWindow = getCurrentWebviewWindow();
@@ -45,28 +44,20 @@ function App() {
     currentWindow.label === CAPTURE_WINDOW_LABEL || captureLaunch !== null;
   const isPinnedImageWindow = pinnedImageId !== null;
 
-  useEffect(() => {
-    if (isCaptureWindow || isPinnedImageWindow) return;
-
-    const unlistenCapturedPromise = listen<string>('screenshot-captured', (event) => {
-      setCapturedScreenshot(`data:image/png;base64,${event.payload}`);
-      setActiveMainTab('screenshot');
-      setScreenshotSubTab('editor');
+  const startFileOcr = useCallback(() => {
+    showOcrWindow();
+    void runOcrFileWorkflow({
+      selectImageFile,
+      recognizeImageFile,
+      setText: setOcrText,
+      setRunning: setOcrRunning,
+      setError: setOcrError,
     });
-    const unlistenErrorPromise = listen<string>('screenshot-error', (event) => {
-      alert(event.payload);
-    });
-
-    return () => {
-      unlistenCapturedPromise.then((unlisten) => unlisten());
-      unlistenErrorPromise.then((unlisten) => unlisten());
-    };
   }, [
-    isCaptureWindow,
-    isPinnedImageWindow,
-    setActiveMainTab,
-    setCapturedScreenshot,
-    setScreenshotSubTab,
+    setOcrError,
+    setOcrRunning,
+    setOcrText,
+    showOcrWindow,
   ]);
 
   useEffect(() => {
@@ -75,15 +66,30 @@ function App() {
     let disposed = false;
     let unlisten: (() => void) | undefined;
 
-    listen<unknown>('input-translation', (event) => {
-      const input = parseInputTranslationPayload(event.payload);
-      if (!input) return;
-
-      setSourceText(input.text);
-      if (input.autoTranslate) {
-        requestAutoTranslate();
-      }
-      showResultWindow();
+    subscribeMainWindowEvents({
+      onScreenshotCaptured: (base64) => {
+        setCapturedScreenshot(`data:image/png;base64,${base64}`);
+        setActiveMainTab('screenshot');
+        setScreenshotSubTab('editor');
+      },
+      onScreenshotError: (message) => {
+        alert(message);
+      },
+      onInputTranslation: (input) => {
+        setSourceText(input.text);
+        if (input.autoTranslate) {
+          requestAutoTranslate();
+        }
+        showResultWindow();
+      },
+      onInputOcr: (text) => {
+        setOcrText(text);
+        setOcrError(null);
+        showOcrWindow();
+      },
+      onShowOcrWindow: showOcrWindow,
+      onStartFileOcr: startFileOcr,
+      onShowTranslationWindow: showResultWindow,
     })
       .then((nextUnlisten) => {
         if (disposed) {
@@ -93,7 +99,7 @@ function App() {
         }
       })
       .catch((err) => {
-        console.error('Failed to listen for translation input:', err);
+        console.error('Failed to subscribe to main window events:', err);
       });
 
     return () => {
@@ -104,100 +110,15 @@ function App() {
     isCaptureWindow,
     isPinnedImageWindow,
     requestAutoTranslate,
+    setActiveMainTab,
+    setCapturedScreenshot,
+    setOcrError,
+    setOcrText,
+    setScreenshotSubTab,
     setSourceText,
+    showOcrWindow,
     showResultWindow,
-  ]);
-
-  useEffect(() => {
-    if (isCaptureWindow || isPinnedImageWindow) return;
-
-    let disposed = false;
-    let unlisten: (() => void) | undefined;
-
-    listen<string>('input-ocr', (event) => {
-      setOcrText(event.payload);
-      setOcrError(null);
-      showOcrWindow();
-    })
-      .then((nextUnlisten) => {
-        if (disposed) {
-          nextUnlisten();
-        } else {
-          unlisten = nextUnlisten;
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to listen for OCR input:', err);
-      });
-
-    return () => {
-      disposed = true;
-      unlisten?.();
-    };
-  }, [
-    isCaptureWindow,
-    isPinnedImageWindow,
-    setOcrError,
-    setOcrText,
-    showOcrWindow,
-  ]);
-
-  useEffect(() => {
-    if (isCaptureWindow || isPinnedImageWindow) return;
-
-    let disposed = false;
-    let unlistenShow: (() => void) | undefined;
-    let unlistenFile: (() => void) | undefined;
-
-    const startFileOcr = () => {
-      showOcrWindow();
-      void runOcrFileWorkflow({
-        selectImageFile,
-        recognizeImageFile,
-        setText: setOcrText,
-        setRunning: setOcrRunning,
-        setError: setOcrError,
-      });
-    };
-
-    listen('show-ocr-window', () => {
-      showOcrWindow();
-    })
-      .then((nextUnlisten) => {
-        if (disposed) {
-          nextUnlisten();
-        } else {
-          unlistenShow = nextUnlisten;
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to listen for OCR window show events:', err);
-      });
-
-    listen('start-file-ocr', startFileOcr)
-      .then((nextUnlisten) => {
-        if (disposed) {
-          nextUnlisten();
-        } else {
-          unlistenFile = nextUnlisten;
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to listen for file OCR events:', err);
-      });
-
-    return () => {
-      disposed = true;
-      unlistenShow?.();
-      unlistenFile?.();
-    };
-  }, [
-    isCaptureWindow,
-    isPinnedImageWindow,
-    setOcrError,
-    setOcrRunning,
-    setOcrText,
-    showOcrWindow,
+    startFileOcr,
   ]);
 
   useEffect(() => {
@@ -214,32 +135,6 @@ function App() {
       },
     );
   }, [hotkeys, isCaptureWindow, isPinnedImageWindow, setHotkey]);
-
-  useEffect(() => {
-    if (isCaptureWindow || isPinnedImageWindow) return;
-
-    let disposed = false;
-    let unlisten: (() => void) | undefined;
-
-    listen('show-translation-window', () => {
-      showResultWindow();
-    })
-      .then((nextUnlisten) => {
-        if (disposed) {
-          nextUnlisten();
-        } else {
-          unlisten = nextUnlisten;
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to listen for translation window show events:', err);
-      });
-
-    return () => {
-      disposed = true;
-      unlisten?.();
-    };
-  }, [isCaptureWindow, isPinnedImageWindow, showResultWindow]);
 
   if (isCaptureWindow) {
     return (
