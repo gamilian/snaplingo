@@ -2,7 +2,6 @@ use super::backend::{
     monitor_snapshot_from_physical_geometry, CapturedCursor, MonitorSnapshot, ScreenRegion,
     ScreenshotBackend, WindowCandidate,
 };
-use super::xcap_common;
 use crate::domain::capture::{LogicalPoint, LogicalRect};
 use crate::error::AppError;
 use core_graphics::display::{CGDisplay, CGRect};
@@ -11,7 +10,7 @@ use image::codecs::png::PngEncoder;
 use image::{ExtendedColorType, ImageEncoder};
 use objc2_app_kit::{NSCursor, NSEvent};
 use std::io::Cursor;
-use xcap::Monitor;
+use xcap::{Monitor, Window};
 
 pub struct MacOSScreenshotBackend;
 
@@ -212,14 +211,140 @@ fn capture_visible_display_snapshot(monitor: &Monitor) -> Result<MonitorSnapshot
 
 fn monitor_snapshot_from_visible_display_capture(
     id: String,
+    logical_x: i32,
+    logical_y: i32,
+    physical_width: u32,
+    physical_height: u32,
+    scale_factor: f64,
+    png_data: Vec<u8>,
+) -> MonitorSnapshot {
+    let scale_factor = scale_factor.max(1.0);
+    monitor_snapshot_from_physical_geometry(
+        id,
+        logical_to_physical_origin(logical_x, scale_factor),
+        logical_to_physical_origin(logical_y, scale_factor),
+        physical_width,
+        physical_height,
+        scale_factor,
+        png_data,
+    )
+}
+
+fn logical_to_physical_origin(value: i32, scale_factor: f64) -> i32 {
+    (value as f64 * scale_factor).round() as i32
+}
+
+fn capture_visible_window_candidates(
+    monitors: &[MonitorSnapshot],
+) -> Result<Vec<WindowCandidate>, AppError> {
+    let windows = Window::all()
+        .map_err(|e| AppError::System(format!("Failed to enumerate windows: {}", e)))?;
+
+    let mut candidates = Vec::new();
+    for (index, window) in windows.iter().enumerate() {
+        let Ok(is_minimized) = window.is_minimized() else {
+            continue;
+        };
+        if is_minimized {
+            continue;
+        }
+
+        let title = window.title().unwrap_or_default();
+        let app_name = window.app_name().unwrap_or_default();
+        if should_skip_window_candidate(&title, &app_name) {
+            continue;
+        }
+
+        let Ok(width) = window.width() else {
+            continue;
+        };
+        let Ok(height) = window.height() else {
+            continue;
+        };
+        if width < 2 || height < 2 {
+            continue;
+        }
+
+        let Ok(x) = window.x() else {
+            continue;
+        };
+        let Ok(y) = window.y() else {
+            continue;
+        };
+        let id = window
+            .id()
+            .map(|id| format!("window-{}", id))
+            .unwrap_or_else(|_| format!("window-{}", index));
+
+        if let Some(candidate) = window_candidate_from_logical_geometry(
+            id, title, app_name, x, y, width, height, monitors,
+        ) {
+            candidates.push(candidate);
+        }
+    }
+
+    Ok(candidates)
+}
+
+fn window_candidate_from_logical_geometry(
+    id: String,
+    title: String,
+    app_name: String,
     x: i32,
     y: i32,
     width: u32,
     height: u32,
-    scale_factor: f64,
-    png_data: Vec<u8>,
-) -> MonitorSnapshot {
-    monitor_snapshot_from_physical_geometry(id, x, y, width, height, scale_factor, png_data)
+    monitors: &[MonitorSnapshot],
+) -> Option<WindowCandidate> {
+    if width == 0 || height == 0 {
+        return None;
+    }
+
+    let bounds = LogicalRect {
+        x: x as f64,
+        y: y as f64,
+        width: width as f64,
+        height: height as f64,
+    };
+    let monitor = monitors.iter().max_by(|a, b| {
+        logical_intersection_area(&bounds, &a.logical_bounds)
+            .partial_cmp(&logical_intersection_area(&bounds, &b.logical_bounds))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    })?;
+
+    if logical_intersection_area(&bounds, &monitor.logical_bounds) <= 0.0 {
+        return None;
+    }
+
+    Some(WindowCandidate {
+        id,
+        title,
+        app_name,
+        logical_bounds: bounds,
+    })
+}
+
+fn logical_intersection_area(a: &LogicalRect, b: &LogicalRect) -> f64 {
+    let left = a.x.max(b.x);
+    let top = a.y.max(b.y);
+    let right = (a.x + a.width).min(b.x + b.width);
+    let bottom = (a.y + a.height).min(b.y + b.height);
+
+    if right <= left || bottom <= top {
+        return 0.0;
+    }
+
+    (right - left) * (bottom - top)
+}
+
+fn should_skip_window_candidate(title: &str, app_name: &str) -> bool {
+    let title = title.to_ascii_lowercase();
+    let app_name = app_name.to_ascii_lowercase();
+
+    title == "snaplingo capture"
+        || title == "snaplingo pin"
+        || app_name == "snaplingo capture"
+        || app_name == "snaplingo pin"
 }
 
 #[async_trait::async_trait]
@@ -232,7 +357,7 @@ impl ScreenshotBackend for MacOSScreenshotBackend {
         &self,
         monitors: &[MonitorSnapshot],
     ) -> Result<Vec<WindowCandidate>, AppError> {
-        xcap_common::capture_window_candidates(monitors)
+        capture_visible_window_candidates(monitors)
     }
 
     async fn capture_cursor(
@@ -440,10 +565,10 @@ mod tests {
     }
 
     #[test]
-    fn builds_monitor_snapshot_from_visible_display_capture() {
+    fn builds_monitor_snapshot_from_logical_display_origin_and_physical_capture() {
         let snapshot = monitor_snapshot_from_visible_display_capture(
             "monitor-42".to_string(),
-            -2560,
+            -1280,
             0,
             2560,
             1440,
@@ -469,6 +594,41 @@ mod tests {
                 y: 0.0,
                 width: 1280.0,
                 height: 720.0,
+            }
+        );
+    }
+
+    #[test]
+    fn builds_window_candidate_from_logical_window_geometry() {
+        let monitors = vec![monitor_snapshot_from_visible_display_capture(
+            "monitor-42".to_string(),
+            -1280,
+            0,
+            2560,
+            1440,
+            2.0,
+            Vec::new(),
+        )];
+
+        let candidate = window_candidate_from_logical_geometry(
+            "window-7".to_string(),
+            "Editor".to_string(),
+            "Code".to_string(),
+            -1200,
+            100,
+            400,
+            300,
+            &monitors,
+        )
+        .unwrap();
+
+        assert_eq!(
+            candidate.logical_bounds,
+            crate::domain::capture::LogicalRect {
+                x: -1200.0,
+                y: 100.0,
+                width: 400.0,
+                height: 300.0,
             }
         );
     }

@@ -76,6 +76,7 @@ pub fn monitor_snapshot_from_physical_geometry(
     }
 }
 
+#[cfg(any(target_os = "windows", target_os = "linux", test))]
 pub fn window_candidate_from_physical_geometry(
     id: String,
     title: String,
@@ -120,6 +121,7 @@ pub fn window_candidate_from_physical_geometry(
     })
 }
 
+#[cfg(any(target_os = "windows", target_os = "linux", test))]
 fn physical_intersection_area(a: &PhysicalRect, b: &PhysicalRect) -> u64 {
     let left = a.x.max(b.x);
     let top = a.y.max(b.y);

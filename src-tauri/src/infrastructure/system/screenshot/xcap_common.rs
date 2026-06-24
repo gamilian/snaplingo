@@ -1,12 +1,14 @@
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use super::backend::ScreenRegion;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
-use super::backend::{monitor_snapshot_from_physical_geometry, rgba_image_to_png};
-use super::backend::{window_candidate_from_physical_geometry, MonitorSnapshot, WindowCandidate};
+use super::backend::{
+    monitor_snapshot_from_physical_geometry, rgba_image_to_png,
+    window_candidate_from_physical_geometry, MonitorSnapshot, WindowCandidate,
+};
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 use crate::error::AppError;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
-use xcap::Monitor;
-use xcap::Window;
+use xcap::{Monitor, Window};
 
 /// Get the primary monitor (not just the first enumerated one).
 #[cfg(any(target_os = "windows", target_os = "linux"))]
@@ -19,6 +21,7 @@ fn get_primary_monitor() -> Result<Monitor, AppError> {
 }
 
 /// Wrap an error message with a platform-specific troubleshooting hint.
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 fn with_platform_hint(msg: String) -> AppError {
     let hint = if cfg!(target_os = "linux") {
         " (Linux: ensure xdg-desktop-portal is running for Wayland support)"
@@ -57,6 +60,7 @@ pub fn capture_all_monitor_snapshots() -> Result<Vec<MonitorSnapshot>, AppError>
         .collect()
 }
 
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 pub fn capture_window_candidates(
     monitors: &[MonitorSnapshot],
 ) -> Result<Vec<WindowCandidate>, AppError> {
@@ -109,6 +113,7 @@ pub fn capture_window_candidates(
     Ok(candidates)
 }
 
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 fn should_skip_window_candidate(title: &str, app_name: &str) -> bool {
     let title = title.to_ascii_lowercase();
     let app_name = app_name.to_ascii_lowercase();
