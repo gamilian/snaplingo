@@ -1,5 +1,6 @@
 use super::backend::{
-    CapturedCursor, MonitorSnapshot, ScreenRegion, ScreenshotBackend, WindowCandidate,
+    monitor_snapshot_from_physical_geometry, CapturedCursor, MonitorSnapshot, ScreenRegion,
+    ScreenshotBackend, WindowCandidate,
 };
 use super::xcap_common;
 use crate::domain::capture::{LogicalPoint, LogicalRect};
@@ -10,6 +11,7 @@ use image::codecs::png::PngEncoder;
 use image::{ExtendedColorType, ImageEncoder};
 use objc2_app_kit::{NSCursor, NSEvent};
 use std::io::Cursor;
+use xcap::Monitor;
 
 pub struct MacOSScreenshotBackend;
 
@@ -158,10 +160,72 @@ fn cursor_tiff_to_png_and_dimensions(tiff_data: &[u8]) -> Result<(Vec<u8>, u32, 
     Ok((png_data, width, height))
 }
 
+fn capture_visible_display_snapshots() -> Result<Vec<MonitorSnapshot>, AppError> {
+    ensure_screen_capture_access()?;
+
+    let mut monitors = Monitor::all()
+        .map_err(|e| AppError::System(format!("Failed to enumerate monitors: {}", e)))?;
+    monitors.sort_by_key(|monitor| {
+        if monitor.is_primary().unwrap_or(false) {
+            0
+        } else {
+            1
+        }
+    });
+
+    monitors
+        .iter()
+        .map(capture_visible_display_snapshot)
+        .collect()
+}
+
+fn capture_visible_display_snapshot(monitor: &Monitor) -> Result<MonitorSnapshot, AppError> {
+    let display_id = monitor
+        .id()
+        .map_err(|e| AppError::System(format!("Failed to read monitor id: {}", e)))?;
+    let display = CGDisplay::new(display_id);
+    let image = display
+        .image()
+        .ok_or_else(|| AppError::System("Failed to capture visible display".to_string()))?;
+    let width = image.width() as u32;
+    let height = image.height() as u32;
+    let png_data = image_to_png(image)?;
+    let x = monitor
+        .x()
+        .map_err(|e| AppError::System(format!("Failed to read monitor x: {}", e)))?;
+    let y = monitor
+        .y()
+        .map_err(|e| AppError::System(format!("Failed to read monitor y: {}", e)))?;
+    let scale_factor = monitor.scale_factor().unwrap_or(1.0).max(1.0) as f64;
+    let id = format!("monitor-{}", display_id);
+
+    Ok(monitor_snapshot_from_visible_display_capture(
+        id,
+        x,
+        y,
+        width,
+        height,
+        scale_factor,
+        png_data,
+    ))
+}
+
+fn monitor_snapshot_from_visible_display_capture(
+    id: String,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+    scale_factor: f64,
+    png_data: Vec<u8>,
+) -> MonitorSnapshot {
+    monitor_snapshot_from_physical_geometry(id, x, y, width, height, scale_factor, png_data)
+}
+
 #[async_trait::async_trait]
 impl ScreenshotBackend for MacOSScreenshotBackend {
     async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError> {
-        xcap_common::capture_all_monitor_snapshots()
+        capture_visible_display_snapshots()
     }
 
     async fn capture_window_candidates(
@@ -282,21 +346,19 @@ mod tests {
             width: 120.0,
             height: 100.0,
         };
-        assert!(
-            captured_cursor_from_appkit_geometry(
-                18.0,
-                73.0,
-                &primary_bounds,
-                2.0,
-                3.0,
-                0.0,
-                12.0,
-                20,
-                24,
-                vec![9, 8, 7],
-            )
-            .is_none()
-        );
+        assert!(captured_cursor_from_appkit_geometry(
+            18.0,
+            73.0,
+            &primary_bounds,
+            2.0,
+            3.0,
+            0.0,
+            12.0,
+            20,
+            24,
+            vec![9, 8, 7],
+        )
+        .is_none());
     }
 
     #[test]
@@ -375,5 +437,39 @@ mod tests {
         assert_eq!(&png[..8], &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
         assert_eq!(width, 2);
         assert_eq!(height, 3);
+    }
+
+    #[test]
+    fn builds_monitor_snapshot_from_visible_display_capture() {
+        let snapshot = monitor_snapshot_from_visible_display_capture(
+            "monitor-42".to_string(),
+            -2560,
+            0,
+            2560,
+            1440,
+            2.0,
+            vec![1, 2, 3],
+        );
+
+        assert_eq!(snapshot.id, "monitor-42");
+        assert_eq!(snapshot.png_data, vec![1, 2, 3]);
+        assert_eq!(
+            snapshot.physical_bounds,
+            crate::domain::capture::PhysicalRect {
+                x: -2560,
+                y: 0,
+                width: 2560,
+                height: 1440,
+            }
+        );
+        assert_eq!(
+            snapshot.logical_bounds,
+            crate::domain::capture::LogicalRect {
+                x: -1280.0,
+                y: 0.0,
+                width: 1280.0,
+                height: 720.0,
+            }
+        );
     }
 }

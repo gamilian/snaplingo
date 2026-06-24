@@ -1,11 +1,12 @@
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use super::backend::ScreenRegion;
-use super::backend::{
-    MonitorSnapshot, WindowCandidate, monitor_snapshot_from_physical_geometry, rgba_image_to_png,
-    window_candidate_from_physical_geometry,
-};
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+use super::backend::{monitor_snapshot_from_physical_geometry, rgba_image_to_png};
+use super::backend::{window_candidate_from_physical_geometry, MonitorSnapshot, WindowCandidate};
 use crate::error::AppError;
-use xcap::{Monitor, Window};
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+use xcap::Monitor;
+use xcap::Window;
 
 /// Get the primary monitor (not just the first enumerated one).
 #[cfg(any(target_os = "windows", target_os = "linux"))]
@@ -37,6 +38,7 @@ pub fn capture_full_screen_png() -> Result<Vec<u8>, AppError> {
     rgba_image_to_png(image)
 }
 
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 pub fn capture_all_monitor_snapshots() -> Result<Vec<MonitorSnapshot>, AppError> {
     let mut monitors = Monitor::all()
         .map_err(|e| with_platform_hint(format!("Failed to enumerate monitors: {}", e)))?;
@@ -117,6 +119,7 @@ fn should_skip_window_candidate(title: &str, app_name: &str) -> bool {
         || app_name == "snaplingo pin"
 }
 
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 fn capture_monitor_snapshot(
     monitor: &Monitor,
     fallback_index: usize,
