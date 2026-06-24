@@ -5,9 +5,8 @@ use tauri::{
 use crate::domain::capture::LogicalRect;
 
 use super::backend::{
-    CAPTURE_WINDOW_LABEL, capture_snapshot_window_labels_to_hide,
-    capture_snapshot_window_labels_to_restore, capture_window_url_with_session,
-    normalized_capture_mode,
+    capture_snapshot_window_labels_to_hide, capture_snapshot_window_labels_to_restore,
+    capture_window_url_with_session, normalized_capture_mode, CAPTURE_WINDOW_LABEL,
 };
 
 pub fn hide_capture_snapshot_windows(app: &AppHandle) -> Result<Vec<String>, String> {
@@ -59,6 +58,7 @@ pub fn open_capture_window_for_session(
         window
             .set_size(LogicalSize::new(bounds.width, bounds.height))
             .map_err(|e| e.to_string())?;
+        configure_capture_window_for_current_space(&window)?;
         window
             .emit(
                 "hotkey-triggered",
@@ -71,7 +71,7 @@ pub fn open_capture_window_for_session(
         return Ok(());
     }
 
-    WebviewWindowBuilder::new(
+    let window = WebviewWindowBuilder::new(
         app,
         CAPTURE_WINDOW_LABEL,
         WebviewUrl::App(capture_window_url_with_session(mode, session_id)),
@@ -89,6 +89,21 @@ pub fn open_capture_window_for_session(
     .shadow(false)
     .build()
     .map_err(|e| e.to_string())?;
+    configure_capture_window_for_current_space(&window)?;
+
+    Ok(())
+}
+
+fn configure_capture_window_for_current_space(window: &tauri::WebviewWindow) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        super::macos::configure_capture_window_for_current_space(window)?;
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = window;
+    }
 
     Ok(())
 }
