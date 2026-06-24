@@ -145,10 +145,14 @@ import {
   shouldRestoreLastSelectionFromShortcut,
 } from './captureActions';
 import {
-  getCaptureCompletionPlan,
   getCaptureModeSelectionFlow,
   shouldRecordSuccessfulCaptureCompletion,
 } from './captureInteractionModel';
+import {
+  planCandidateSelectionCompletion,
+  planSelectionFlowCompletion,
+  type CaptureRuntimeEffect,
+} from './captureInteractionRuntime';
 import {
   closeInactiveCaptureSession,
   finishCaptureSession,
@@ -864,6 +868,81 @@ export default function ScreenshotSession({
     [recordLastSelection],
   );
 
+  const executeCaptureRuntimeEffect = useCallback(
+    async (effect: CaptureRuntimeEffect, rect: LogicalRect) => {
+      if (!session) return;
+
+      if (effect.type === 'output-capture') {
+        if (effect.action === 'copy') {
+          await copyCaptureSelection(
+            session.id,
+            rect,
+            [],
+            shouldIncludeCapturedCursor,
+          );
+        } else if (effect.action === 'save') {
+          await saveCaptureSelection(
+            session.id,
+            rect,
+            [],
+            shouldIncludeCapturedCursor,
+          );
+        } else if (effect.action === 'quick-save') {
+          await quickSaveCaptureSelection(
+            session.id,
+            rect,
+            [],
+            screenshotSavePath,
+            shouldIncludeCapturedCursor,
+          );
+        } else if (effect.action === 'print') {
+          await printCaptureSelection(
+            session.id,
+            rect,
+            [],
+            printBase64PngImage,
+            shouldIncludeCapturedCursor,
+          );
+        } else if (effect.action === 'pin') {
+          await outputCapture({
+            sessionId: session.id,
+            rect,
+            annotations: [],
+            ...(shouldIncludeCapturedCursor ? { includeCursor: true } : {}),
+            action: { type: 'pin' },
+          });
+        }
+        return;
+      }
+
+      if (effect.type === 'run-ocr') {
+        const ocrResult = await runCaptureOcr(session.id, rect);
+        if (effect.resultWindow === 'translation') {
+          await openTranslationResultWindow(ocrResult.text);
+        } else if (effect.resultWindow === 'ocr') {
+          await openOcrResultWindow(ocrResult.text);
+        } else {
+          await copyTextToClipboard(ocrResult.text);
+        }
+        return;
+      }
+
+      if (effect.type === 'record-selection') {
+        recordSuccessfulSelection(effect.action, rect);
+        return;
+      }
+
+      await finishCurrentCaptureSession(session.id);
+    },
+    [
+      finishCurrentCaptureSession,
+      recordSuccessfulSelection,
+      screenshotSavePath,
+      session,
+      shouldIncludeCapturedCursor,
+    ],
+  );
+
   const renderSelectionPreview = useCallback(
     async (
       rect: LogicalRect,
@@ -886,17 +965,8 @@ export default function ScreenshotSession({
         setPreviewImageBase64(base64);
 
         const selectionFlow = getCaptureModeSelectionFlow(mode);
-        if (selectionFlow !== 'preview') {
-          const ocrResult = await runCaptureOcr(session.id, rect);
-          if (selectionFlow === 'ocr-translate') {
-            await openTranslationResultWindow(ocrResult.text);
-          } else if (selectionFlow === 'silent-ocr') {
-            await copyTextToClipboard(ocrResult.text);
-          } else {
-            await openOcrResultWindow(ocrResult.text);
-          }
-          recordSuccessfulSelection('ocr', rect);
-          await finishCurrentCaptureSession(session.id);
+        for (const effect of planSelectionFlowCompletion(selectionFlow)) {
+          await executeCaptureRuntimeEffect(effect, rect);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
@@ -907,9 +977,8 @@ export default function ScreenshotSession({
     },
     [
       annotations,
-      finishCurrentCaptureSession,
+      executeCaptureRuntimeEffect,
       mode,
-      recordSuccessfulSelection,
       session,
       shouldIncludeCapturedCursor,
     ],
@@ -975,61 +1044,8 @@ export default function ScreenshotSession({
     setError(null);
 
     try {
-      const completion = getCaptureCompletionPlan(action);
-      if (completion.effect === 'copy') {
-        await copyCaptureSelection(
-          session.id,
-          rect,
-          [],
-          shouldIncludeCapturedCursor,
-        );
-      } else if (completion.effect === 'save') {
-        await saveCaptureSelection(
-          session.id,
-          rect,
-          [],
-          shouldIncludeCapturedCursor,
-        );
-      } else if (completion.effect === 'quick-save') {
-        await quickSaveCaptureSelection(
-          session.id,
-          rect,
-          [],
-          screenshotSavePath,
-          shouldIncludeCapturedCursor,
-        );
-      } else if (completion.effect === 'print') {
-        await printCaptureSelection(
-          session.id,
-          rect,
-          [],
-          printBase64PngImage,
-          shouldIncludeCapturedCursor,
-        );
-      } else if (completion.effect === 'ocr') {
-        const ocrResult = await runCaptureOcr(session.id, rect);
-        if (completion.resultWindow === 'translation') {
-          await openTranslationResultWindow(ocrResult.text);
-        } else if (completion.resultWindow === 'ocr') {
-          await openOcrResultWindow(ocrResult.text);
-        } else {
-          await copyTextToClipboard(ocrResult.text);
-        }
-      } else if (completion.effect === 'pin') {
-        await outputCapture({
-          sessionId: session.id,
-          rect,
-          annotations: [],
-          ...(shouldIncludeCapturedCursor ? { includeCursor: true } : {}),
-          action: { type: 'pin' },
-        });
-      }
-
-      if (completion.shouldRecordSelection) {
-        recordSuccessfulSelection(completion.action, rect);
-      }
-      if (completion.shouldFinishSession) {
-        await finishCurrentCaptureSession(session.id);
+      for (const effect of planCandidateSelectionCompletion(action)) {
+        await executeCaptureRuntimeEffect(effect, rect);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -1038,11 +1054,8 @@ export default function ScreenshotSession({
       setIsRenderingOutput(false);
     }
   }, [
-    finishCurrentCaptureSession,
-    recordSuccessfulSelection,
-    screenshotSavePath,
+    executeCaptureRuntimeEffect,
     session,
-    shouldIncludeCapturedCursor,
   ]);
 
   const copyCurrentColor = useCallback(async () => {

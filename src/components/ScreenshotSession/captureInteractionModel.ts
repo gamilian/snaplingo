@@ -1,9 +1,13 @@
 import {
-  getCaptureSelectionFlowForMode,
   shouldRecordSuccessfulCaptureSelection,
   type CaptureCompletionAction,
   type CaptureSelectionFlow,
 } from './captureActions';
+import {
+  getCaptureModeSelectionFlow as getRuntimeCaptureModeSelectionFlow,
+  getPrimaryCaptureCompletionActionForMode as getRuntimePrimaryCaptureCompletionActionForMode,
+  planCandidateSelectionCompletion,
+} from './captureInteractionRuntime';
 import type { CaptureMode } from './types';
 
 export type CaptureCompletionEffect =
@@ -34,42 +38,27 @@ export function shouldRecordSuccessfulCaptureCompletion(
 export function getCaptureModeSelectionFlow(
   mode: CaptureMode,
 ): CaptureSelectionFlow {
-  return getCaptureSelectionFlowForMode(mode);
+  return getRuntimeCaptureModeSelectionFlow(mode);
 }
 
 export function getPrimaryCaptureCompletionActionForMode(
   mode: CaptureMode,
 ): CaptureCompletionAction {
-  const flow = getCaptureModeSelectionFlow(mode);
-  if (flow === 'ocr' || flow === 'silent-ocr' || flow === 'ocr-translate') {
-    return flow;
-  }
-  return 'copy';
+  return getRuntimePrimaryCaptureCompletionActionForMode(mode);
 }
 
 export function getCaptureCompletionPlan(
   action: CaptureCompletionAction,
 ): CaptureCompletionPlan {
+  const effects = planCandidateSelectionCompletion(action);
+  const outputEffect = effects.find((effect) => effect.type === 'output-capture');
+  const ocrEffect = effects.find((effect) => effect.type === 'run-ocr');
+
   return {
     action,
-    effect: getCaptureCompletionEffect(action),
-    resultWindow: getCaptureCompletionResultWindow(action),
-    shouldRecordSelection: shouldRecordSuccessfulCaptureCompletion(action),
-    shouldFinishSession: action !== 'cancel',
+    effect: outputEffect?.action ?? (ocrEffect ? 'ocr' : 'cancel'),
+    resultWindow: ocrEffect?.resultWindow ?? null,
+    shouldRecordSelection: effects.some((effect) => effect.type === 'record-selection'),
+    shouldFinishSession: effects.some((effect) => effect.type === 'finish-session'),
   };
-}
-
-function getCaptureCompletionEffect(
-  action: CaptureCompletionAction,
-): CaptureCompletionEffect {
-  if (action === 'silent-ocr' || action === 'ocr-translate') return 'ocr';
-  return action;
-}
-
-function getCaptureCompletionResultWindow(
-  action: CaptureCompletionAction,
-): CaptureResultWindow | null {
-  if (action === 'ocr') return 'ocr';
-  if (action === 'ocr-translate') return 'translation';
-  return null;
 }
