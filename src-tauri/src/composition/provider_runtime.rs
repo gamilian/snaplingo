@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+#[cfg(target_os = "macos")]
+use crate::application::providers::ocr::impls::SystemOcrProvider;
 use crate::application::providers::ocr::{
     impls::{BaiduOcrProvider, TesseractProvider},
     OcrCoordinator,
@@ -79,6 +81,9 @@ pub(crate) fn build_ocr_coordinator(
     let tesseract_provider = TesseractProvider::new();
     ocr_coordinator.register(tesseract_provider).ok();
 
+    #[cfg(target_os = "macos")]
+    ocr_coordinator.register(SystemOcrProvider::new()).ok();
+
     let mut baidu_ocr_provider = BaiduOcrProvider::new(http_client);
     let credentials_result = keychain.load_provider_credentials(
         "baidu-ocr",
@@ -123,5 +128,47 @@ fn register_custom_translation_providers(
                 e
             );
         }
+    }
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+    use super::*;
+    use crate::infrastructure::http::HttpResponse;
+    use async_trait::async_trait;
+    use std::collections::HashMap;
+
+    struct StubHttpClient;
+
+    #[async_trait]
+    impl HttpClient for StubHttpClient {
+        async fn post(
+            &self,
+            _url: &str,
+            _headers: HashMap<String, String>,
+            _body: String,
+        ) -> anyhow::Result<HttpResponse> {
+            unimplemented!("OCR provider registration should not make HTTP requests")
+        }
+
+        async fn get(
+            &self,
+            _url: &str,
+            _headers: HashMap<String, String>,
+        ) -> anyhow::Result<HttpResponse> {
+            unimplemented!("OCR provider registration should not make HTTP requests")
+        }
+    }
+
+    #[test]
+    fn build_ocr_coordinator_registers_system_ocr_provider_on_macos() {
+        let coordinator = build_ocr_coordinator(
+            Arc::new(ConfigFile::new_temp()),
+            Arc::new(Keychain::new()),
+            Arc::new(StubHttpClient),
+            Arc::new(EventBus::new()),
+        );
+
+        assert!(coordinator.get("system-ocr").is_some());
     }
 }
