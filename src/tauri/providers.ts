@@ -56,6 +56,10 @@ export function getProviderCredentialSchema(providerId: string) {
   return invoke<CredentialField[]>('get_provider_credential_schema', { providerId });
 }
 
+export function getOcrProviderCredentialSchema(providerId: string) {
+  return invoke<CredentialField[]>('get_ocr_provider_credential_schema', { providerId });
+}
+
 export function configureTranslationProviderCredentials(
   providerId: string,
   credentials: Record<string, string>,
@@ -93,5 +97,15 @@ export function configureOcrProvider(
     providerId,
     apiKey,
     secretKey: secretKey || null,
+  });
+}
+
+export function configureOcrProviderCredentials(
+  providerId: string,
+  credentials: Record<string, string>,
+) {
+  return invoke<void>('configure_ocr_provider_credentials', {
+    providerId,
+    credentials,
   });
 }

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useProviderStore } from '../../../stores/providerStore';
 import { ProviderCard } from './ProviderCard';
 import { ProviderConfigDialog } from './ProviderConfigDialog';
+import { getOcrProviderCredentialSchema } from '../../../tauri/providers';
 
 export function OcrProvidersPage() {
   const providers = useProviderStore((state) => state.ocrProviders);
@@ -24,15 +25,20 @@ export function OcrProvidersPage() {
     }
   };
 
-  const handleConfigure = (id: string) => {
+  const handleConfigure = async (id: string) => {
+    const provider = providers.find((p) => p.id === id);
+    if (provider && !provider.requiresApiKey) {
+      await activateProvider(id);
+      return;
+    }
+
     setConfiguringProvider(id);
   };
 
-  const handleSaveConfig = async (config: any) => {
+  const handleSaveConfig = async (credentials: Record<string, string>) => {
     if (configuringProvider) {
       try {
-        // OCR providers use api_key and optional secret_key
-        await configureProvider(configuringProvider, config.apiKey, config.secretKey);
+        await configureProvider(configuringProvider, credentials);
         // 配置完成后自动激活
         await activateProvider(configuringProvider);
       } catch (error) {
@@ -77,6 +83,7 @@ export function OcrProvidersPage() {
         onClose={() => setConfiguringProvider(null)}
         onSave={handleSaveConfig}
         provider={currentProvider || null}
+        loadCredentialSchema={getOcrProviderCredentialSchema}
       />
     </div>
   );

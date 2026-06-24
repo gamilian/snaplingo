@@ -49,7 +49,7 @@ interface ProviderState {
   // OCR Actions (后端驱动)
   loadOcrProviders: () => Promise<void>;
   activateOcrProvider: (id: string) => Promise<void>;
-  configureOcrProvider: (providerId: string, apiKey: string, secretKey?: string) => Promise<void>;
+  configureOcrProvider: (providerId: string, credentials: Record<string, string>) => Promise<void>;
 
   // TTS Actions (保留同步)
   activateTtsProvider: (id: string) => void;
@@ -208,9 +208,9 @@ export const useProviderStore = create<ProviderState>()(
       },
 
       // 配置 OCR Provider
-      configureOcrProvider: async (providerId: string, apiKey: string, secretKey?: string) => {
+      configureOcrProvider: async (providerId: string, credentials: Record<string, string>) => {
         try {
-          await providerApi.configureOcrProvider(providerId, apiKey, secretKey);
+          await providerApi.configureOcrProviderCredentials(providerId, credentials);
           await get().loadOcrProviders();
         } catch (error) {
           console.error('Failed to configure OCR provider:', error);

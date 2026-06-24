@@ -8,9 +8,16 @@ interface ProviderConfigDialogProps {
   onClose: () => void;
   onSave: (credentials: Record<string, string>) => void;
   provider: Provider | null;
+  loadCredentialSchema?: (providerId: string) => Promise<CredentialField[]>;
 }
 
-export function ProviderConfigDialog({ isOpen, onClose, onSave, provider }: ProviderConfigDialogProps) {
+export function ProviderConfigDialog({
+  isOpen,
+  onClose,
+  onSave,
+  provider,
+  loadCredentialSchema = getProviderCredentialSchema,
+}: ProviderConfigDialogProps) {
   const [fields, setFields] = useState<CredentialField[]>([]);
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -20,7 +27,7 @@ export function ProviderConfigDialog({ isOpen, onClose, onSave, provider }: Prov
 
     // Load credential schema for this provider
     setLoading(true);
-    getProviderCredentialSchema(provider.id)
+    loadCredentialSchema(provider.id)
       .then((schema) => {
         setFields(schema);
 
@@ -39,7 +46,7 @@ export function ProviderConfigDialog({ isOpen, onClose, onSave, provider }: Prov
       .finally(() => {
         setLoading(false);
       });
-  }, [isOpen, provider]);
+  }, [isOpen, provider, loadCredentialSchema]);
 
   const handleSave = () => {
     // Validate all fields are filled

@@ -10,6 +10,8 @@ interface ProviderCardProps {
 }
 
 export function ProviderCard({ provider, onActivate, onDeactivate, onConfigure, onTest, onRemove }: ProviderCardProps) {
+  const canConfigure = provider.requiresApiKey && onConfigure;
+
   const getStatusBadge = () => {
     switch (provider.status) {
       case 'active':
@@ -47,7 +49,7 @@ export function ProviderCard({ provider, onActivate, onDeactivate, onConfigure, 
           <p className="text-sm text-gray-600 mb-3">{provider.description}</p>
 
           <div className="flex items-center space-x-2">
-            {provider.status === 'unconfigured' && onConfigure && (
+            {provider.status === 'unconfigured' && canConfigure && (
               <button
                 onClick={onConfigure}
                 className="px-3 py-1.5 text-sm bg-primary-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
@@ -74,7 +76,7 @@ export function ProviderCard({ provider, onActivate, onDeactivate, onConfigure, 
               </button>
             )}
 
-            {provider.status !== 'unconfigured' && onConfigure && (
+            {provider.status !== 'unconfigured' && canConfigure && (
               <button
                 onClick={onConfigure}
                 className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"

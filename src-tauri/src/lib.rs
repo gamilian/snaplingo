@@ -78,6 +78,8 @@ pub fn run() {
             commands::list_ocr_providers,
             commands::activate_ocr_provider,
             commands::configure_ocr_provider,
+            commands::get_ocr_provider_credential_schema,
+            commands::configure_ocr_provider_credentials,
             commands::capture_full_screen,
             commands::capture_region,
             commands::save_screenshot,
