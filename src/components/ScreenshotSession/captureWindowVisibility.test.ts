@@ -64,7 +64,7 @@ describe('capture window visibility', () => {
     ).toBe(false);
   });
 
-  it('shows the capture window before focusing it', async () => {
+  it('reveals the capture window through the native capture window client', async () => {
     const calls: string[] = [];
     const window: CaptureWindowHandle = {
       show: async () => {
@@ -75,9 +75,16 @@ describe('capture window visibility', () => {
       },
     };
 
-    await revealCaptureWindow(window);
+    await revealCaptureWindow(window, {
+      revealCaptureWindow: async () => {
+        calls.push('native_reveal_capture_window');
+      },
+      restoreCaptureSnapshotWindowsForSession: async () => {
+        calls.push('restore');
+      },
+    });
 
-    expect(calls).toEqual(['show', 'setFocus']);
+    expect(calls).toEqual(['native_reveal_capture_window']);
   });
 
   it('restores hidden app windows only after the capture window is visible', async () => {
@@ -95,15 +102,19 @@ describe('capture window visibility', () => {
       window,
       sessionId: 'capture-1',
       client: {
+        revealCaptureWindow: async () => {
+          calls.push('native_reveal_capture_window');
+        },
         restoreCaptureSnapshotWindowsForSession: async (sessionId) => {
-          calls.push(`restore_capture_snapshot_windows_for_session:${sessionId}`);
+          calls.push(
+            `restore_capture_snapshot_windows_for_session:${sessionId}`,
+          );
         },
       },
     });
 
     expect(calls).toEqual([
-      'show',
-      'setFocus',
+      'native_reveal_capture_window',
       'restore_capture_snapshot_windows_for_session:capture-1',
     ]);
   });

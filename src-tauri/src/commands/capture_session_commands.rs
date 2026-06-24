@@ -8,6 +8,7 @@ use crate::domain::ocr::OcrResult;
 use crate::infrastructure::system::capture_window::{
     capture_snapshot_hide_settle_delay_ms, capture_window_bounds, hide_capture_snapshot_windows,
     open_capture_window_for_session, restore_capture_snapshot_windows,
+    reveal_capture_window as reveal_capture_window_for_app,
 };
 use crate::infrastructure::system::pinned_window::open_pinned_image_window;
 
@@ -54,6 +55,11 @@ pub async fn create_capture_session(
     state: State<'_, crate::AppState>,
 ) -> Result<CaptureSessionView, String> {
     create_capture_session_from_visible_desktop(&app, state.inner()).await
+}
+
+#[tauri::command]
+pub fn reveal_capture_window(app: AppHandle) -> Result<(), String> {
+    reveal_capture_window_for_app(&app)
 }
 
 async fn create_capture_session_from_visible_desktop(

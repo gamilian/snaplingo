@@ -86,6 +86,7 @@ pub fn run() {
             commands::create_capture_session,
             commands::get_capture_session,
             commands::cancel_capture_session,
+            commands::reveal_capture_window,
             commands::restore_capture_snapshot_windows_for_session,
             commands::render_capture_output,
             commands::default_capture_save_path,

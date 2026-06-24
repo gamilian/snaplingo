@@ -56,6 +56,10 @@ export async function restoreCaptureSnapshotWindowsForSession(
   });
 }
 
+export async function revealCaptureWindow() {
+  return invoke<void>('reveal_capture_window');
+}
+
 export async function renderCaptureOutput(input: RenderCaptureOutputInput) {
   return invoke<string>('render_capture_output', captureOutputArgs(input));
 }

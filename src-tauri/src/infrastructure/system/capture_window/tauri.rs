@@ -42,6 +42,19 @@ pub fn restore_capture_snapshot_windows(
     Ok(())
 }
 
+pub fn reveal_capture_window(app: &AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window(CAPTURE_WINDOW_LABEL)
+        .ok_or_else(|| "Capture window is not open".to_string())?;
+
+    configure_capture_window_for_current_space(&window)?;
+    window.show().map_err(|e| e.to_string())?;
+    window.set_focus().map_err(|e| e.to_string())?;
+    reveal_capture_window_for_current_space(&window)?;
+
+    Ok(())
+}
+
 pub fn open_capture_window_for_session(
     app: &AppHandle,
     mode: &str,
@@ -98,6 +111,20 @@ fn configure_capture_window_for_current_space(window: &tauri::WebviewWindow) -> 
     #[cfg(target_os = "macos")]
     {
         super::macos::configure_capture_window_for_current_space(window)?;
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = window;
+    }
+
+    Ok(())
+}
+
+fn reveal_capture_window_for_current_space(window: &tauri::WebviewWindow) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        super::macos::reveal_capture_window_for_current_space(window)?;
     }
 
     #[cfg(not(target_os = "macos"))]

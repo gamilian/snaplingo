@@ -1,4 +1,7 @@
-import { restoreCaptureSnapshotWindowsForSession } from '../../tauri/captureSession';
+import {
+  restoreCaptureSnapshotWindowsForSession,
+  revealCaptureWindow as revealNativeCaptureWindow,
+} from '../../tauri/captureSession';
 
 type CaptureWindowVisibilityStatus =
   | 'idle'
@@ -20,12 +23,12 @@ export interface CaptureWindowHandle {
 }
 
 export interface CaptureWindowRevealClient {
-  restoreCaptureSnapshotWindowsForSession: (
-    sessionId: string,
-  ) => Promise<void>;
+  revealCaptureWindow: () => Promise<void>;
+  restoreCaptureSnapshotWindowsForSession: (sessionId: string) => Promise<void>;
 }
 
 const tauriCaptureWindowRevealClient: CaptureWindowRevealClient = {
+  revealCaptureWindow: revealNativeCaptureWindow,
   restoreCaptureSnapshotWindowsForSession,
 };
 
@@ -55,9 +58,11 @@ export function shouldRevealCaptureWindow({
   );
 }
 
-export async function revealCaptureWindow(window: CaptureWindowHandle) {
-  await window.show();
-  await window.setFocus();
+export async function revealCaptureWindow(
+  _window: CaptureWindowHandle,
+  client: CaptureWindowRevealClient = tauriCaptureWindowRevealClient,
+) {
+  await client.revealCaptureWindow();
 }
 
 export async function waitForCaptureSurfacePaint(
@@ -76,6 +81,6 @@ export async function revealCaptureWindowForSession({
   client = tauriCaptureWindowRevealClient,
   sessionId,
 }: RevealCaptureWindowForSessionOptions) {
-  await revealCaptureWindow(window);
+  await revealCaptureWindow(window, client);
   await client.restoreCaptureSnapshotWindowsForSession(sessionId);
 }
