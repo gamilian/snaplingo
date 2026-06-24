@@ -55,11 +55,14 @@ function assertDoesNotInclude(text, unexpected, message) {
   }
 }
 
-function parseFirstCodesignIdentity(output, preferredName) {
+function parseFirstCodesignIdentity(output, preferredName, excludedNames = []) {
   const lines = output.split("\n");
   const identityLine = preferredName
     ? lines.find((line) => line.includes(`"${preferredName}"`))
-    : lines.find((line) => /^\s*\d+\)\s+[0-9A-F]+\s+".+"/.test(line));
+    : lines.find((line) => {
+        const name = line.match(/"(.+)"/)?.[1];
+        return /^\s*\d+\)\s+[0-9A-F]+\s+".+"/.test(line) && !excludedNames.includes(name);
+      });
 
   return identityLine?.match(/"(.+)"/)?.[1] ?? null;
 }
@@ -207,6 +210,8 @@ function resolveCodesignIdentity() {
 
   const systemIdentity = parseFirstCodesignIdentity(
     run("/usr/bin/security", ["find-identity", "-v", "-p", "codesigning"]),
+    null,
+    [localIdentityName],
   );
 
   if (systemIdentity) {

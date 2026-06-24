@@ -26,20 +26,77 @@ extern "C" {
     fn CGRequestScreenCaptureAccess() -> bool;
 }
 
-fn ensure_screen_capture_access() -> Result<(), AppError> {
-    if unsafe { CGPreflightScreenCaptureAccess() } {
-        return Ok(());
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ScreenCaptureAccessStatus {
+    initially_granted: bool,
+    request_attempted: bool,
+    granted_after_request: bool,
+}
+
+fn prepare_screen_capture_access() -> ScreenCaptureAccessStatus {
+    prepare_screen_capture_access_with(
+        || unsafe { CGPreflightScreenCaptureAccess() },
+        || unsafe { CGRequestScreenCaptureAccess() },
+    )
+}
+
+fn prepare_screen_capture_access_with(
+    preflight: impl Fn() -> bool,
+    request: impl Fn() -> bool,
+) -> ScreenCaptureAccessStatus {
+    let initially_granted = preflight();
+    if initially_granted {
+        return ScreenCaptureAccessStatus {
+            initially_granted,
+            request_attempted: false,
+            granted_after_request: true,
+        };
     }
 
-    let _ = unsafe { CGRequestScreenCaptureAccess() };
+    let _ = request();
 
-    if unsafe { CGPreflightScreenCaptureAccess() } {
-        return Ok(());
+    ScreenCaptureAccessStatus {
+        initially_granted,
+        request_attempted: true,
+        granted_after_request: preflight(),
     }
+}
 
-    Err(AppError::System(
-        "SnapLingo 没有当前版本的 macOS 屏幕录制权限。请在“系统设置 > 隐私与安全性 > 屏幕录制”中允许 SnapLingo，然后退出并重新打开 SnapLingo。".to_string(),
+fn screen_capture_unavailable_error(
+    operation: &str,
+    access: ScreenCaptureAccessStatus,
+) -> AppError {
+    AppError::System(format!(
+        "无法捕获屏幕：{}。屏幕录制权限预检：初始={}，已请求={}，请求后={}。请确认“系统设置 > 隐私与安全性 > 屏幕录制”中授权的是当前运行的 SnapLingo，然后完全退出并重新打开。{}",
+        operation,
+        access.initially_granted,
+        access.request_attempted,
+        access.granted_after_request,
+        current_process_hint(),
     ))
+}
+
+fn current_process_hint() -> String {
+    let executable_path = std::env::current_exe();
+    let executable = executable_path
+        .as_ref()
+        .map(|path| path.display().to_string())
+        .unwrap_or_else(|e| format!("无法读取当前运行路径：{}", e));
+    let app_bundle = executable_path
+        .as_deref()
+        .ok()
+        .and_then(macos_app_bundle_path)
+        .map(|path| path.display().to_string())
+        .unwrap_or_else(|| "未在 .app bundle 中运行".to_string());
+
+    format!("当前运行路径：{}；App Bundle：{}。", executable, app_bundle)
+}
+
+fn macos_app_bundle_path(executable_path: &std::path::Path) -> Option<std::path::PathBuf> {
+    executable_path
+        .ancestors()
+        .find(|path| path.extension().is_some_and(|extension| extension == "app"))
+        .map(std::path::Path::to_path_buf)
 }
 
 /// Convert CGImage to PNG bytes
@@ -160,7 +217,7 @@ fn cursor_tiff_to_png_and_dimensions(tiff_data: &[u8]) -> Result<(Vec<u8>, u32, 
 }
 
 fn capture_visible_display_snapshots() -> Result<Vec<MonitorSnapshot>, AppError> {
-    ensure_screen_capture_access()?;
+    let access = prepare_screen_capture_access();
 
     let mut monitors = Monitor::all()
         .map_err(|e| AppError::System(format!("Failed to enumerate monitors: {}", e)))?;
@@ -174,18 +231,21 @@ fn capture_visible_display_snapshots() -> Result<Vec<MonitorSnapshot>, AppError>
 
     monitors
         .iter()
-        .map(capture_visible_display_snapshot)
+        .map(|monitor| capture_visible_display_snapshot(monitor, access))
         .collect()
 }
 
-fn capture_visible_display_snapshot(monitor: &Monitor) -> Result<MonitorSnapshot, AppError> {
+fn capture_visible_display_snapshot(
+    monitor: &Monitor,
+    access: ScreenCaptureAccessStatus,
+) -> Result<MonitorSnapshot, AppError> {
     let display_id = monitor
         .id()
         .map_err(|e| AppError::System(format!("Failed to read monitor id: {}", e)))?;
     let display = CGDisplay::new(display_id);
     let image = display
         .image()
-        .ok_or_else(|| AppError::System("Failed to capture visible display".to_string()))?;
+        .ok_or_else(|| screen_capture_unavailable_error("显示器截图返回空图像", access))?;
     let width = image.width() as u32;
     let height = image.height() as u32;
     let png_data = image_to_png(image)?;
@@ -398,18 +458,18 @@ impl ScreenshotBackend for MacOSScreenshotBackend {
     }
 
     async fn capture_full_screen(&self) -> Result<Vec<u8>, AppError> {
-        ensure_screen_capture_access()?;
+        let access = prepare_screen_capture_access();
 
         let display = CGDisplay::main();
         let image = display
             .image()
-            .ok_or_else(|| AppError::System("Failed to capture screenshot".to_string()))?;
+            .ok_or_else(|| screen_capture_unavailable_error("全屏截图返回空图像", access))?;
 
         image_to_png(image)
     }
 
     async fn capture_region(&self, region: ScreenRegion) -> Result<Vec<u8>, AppError> {
-        ensure_screen_capture_access()?;
+        let access = prepare_screen_capture_access();
 
         let rect = CGRect::new(
             &core_graphics::geometry::CGPoint::new(region.x as f64, region.y as f64),
@@ -417,7 +477,7 @@ impl ScreenshotBackend for MacOSScreenshotBackend {
         );
 
         let image = CGDisplay::screenshot(rect, 0, 0, 0)
-            .ok_or_else(|| AppError::System("Failed to capture region screenshot".to_string()))?;
+            .ok_or_else(|| screen_capture_unavailable_error("区域截图返回空图像", access))?;
 
         image_to_png(image)
     }
@@ -562,6 +622,41 @@ mod tests {
         assert_eq!(&png[..8], &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
         assert_eq!(width, 2);
         assert_eq!(height, 3);
+    }
+
+    #[test]
+    fn screen_capture_access_probe_keeps_running_when_preflight_stays_false() {
+        let status = prepare_screen_capture_access_with(|| false, || false);
+
+        assert_eq!(
+            status,
+            ScreenCaptureAccessStatus {
+                initially_granted: false,
+                request_attempted: true,
+                granted_after_request: false,
+            }
+        );
+    }
+
+    #[test]
+    fn capture_failure_error_includes_permission_probe_state() {
+        let error = screen_capture_unavailable_error(
+            "测试截图",
+            ScreenCaptureAccessStatus {
+                initially_granted: false,
+                request_attempted: true,
+                granted_after_request: false,
+            },
+        );
+        let message = match error {
+            AppError::System(message) => message,
+            other => panic!("unexpected error: {other:?}"),
+        };
+
+        assert!(message.contains("测试截图"));
+        assert!(message.contains("屏幕录制权限预检：初始=false，已请求=true，请求后=false"));
+        assert!(message.contains("当前运行路径"));
+        assert!(message.contains("App Bundle"));
     }
 
     #[test]
