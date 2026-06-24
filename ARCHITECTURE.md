@@ -1,6 +1,6 @@
 # SnapLingo 架构设计文档
 
-> 当前版本 - 2026-06-22
+> 当前版本 - 2026-06-24
 
 ## 📐 架构概览
 
@@ -11,7 +11,7 @@ Commands Layer (接口层)
     ↓
 Application Layer (应用层)
     ├─ Providers (垂直切片：OCR/Translation/TTS)
-    └─ Application Modules (Capture Session、Pinned Image、History、Workflow)
+    └─ Application Modules (Capture Session、Pinned Image、History)
     ↓
 Domain Layer (领域层)
     ↓
@@ -29,11 +29,13 @@ Infrastructure Layer (基础设施层)
 
 **运行时 seam：**
 - `src/tauri/*` 是前端 Tauri Adapter seam，集中维护 command 名称和 payload 形状。
+- `src/tauri/appEvents.ts` 是前端 Tauri event Adapter seam，集中维护主窗口 event 名称、payload 解析和订阅清理。
 - `src-tauri/src/commands/*` 是后端 Tauri command seam，负责把 IPC 请求转给 Application 层。
 - `src-tauri/src/app_state.rs` 拥有 AppState 形状和关闭顺序。
-- `src-tauri/src/composition.rs` 是应用组合入口，负责运行时依赖构建、Provider 注册、Coordinator 构建和启动期订阅。
+- `src-tauri/src/composition.rs` 是应用组合入口；`src-tauri/src/composition/*_runtime.rs` 拆分 Provider、Capture、Selection、History 的构造策略。
 - `src-tauri/src/startup_shortcuts.rs` 拥有启动期全局快捷键注册。
 - `application/services/capture_session_runtime.rs` 是 Capture Session Runtime，统一编排截图输出和 OCR。
+- `src/components/ScreenshotSession/captureInteractionRuntime.ts` 是前端 Capture Interaction Runtime，负责纯 effect-plan 决策。
 
 ---
 
@@ -43,6 +45,7 @@ Infrastructure Layer (基础设施层)
 snaplingo/
 ├─ src/                                 # React/Vite Frontend Runtime
 │   ├─ tauri/                           # ⭐ Frontend Tauri Adapter seam
+│   │   ├─ appEvents.ts                  # 主窗口 Tauri event Adapter
 │   │   ├─ translation.ts
 │   │   ├─ providers.ts
 │   │   ├─ history.ts
@@ -51,7 +54,7 @@ snaplingo/
 │   │
 │   ├─ components/
 │   │   ├─ SettingsWindow/              # 设置窗口 + 纯导航状态模型
-│   │   ├─ ScreenshotSession/           # 截图会话 UI + 交互规则模型
+│   │   ├─ ScreenshotSession/           # 截图会话 UI + 交互 runtime/model
 │   │   ├─ ResultWindow/                # 结果窗口
 │   │   └─ PinnedImageWindow/           # 贴图窗口
 │   │
@@ -62,7 +65,12 @@ snaplingo/
 │   ├─ main.rs                          # Tauri binary 入口
 │   ├─ lib.rs                           # Tauri builder/plugin setup + command 注册
 │   ├─ app_state.rs                     # AppState 形状 + shutdown
-│   ├─ composition.rs                   # ⭐ Runtime composition
+│   ├─ composition.rs                   # ⭐ Runtime composition assembly shell
+│   ├─ composition/                     # 构造策略 builders
+│   │   ├─ provider_runtime.rs
+│   │   ├─ capture_runtime.rs
+│   │   ├─ selection_runtime.rs
+│   │   └─ history_runtime.rs
 │   ├─ startup_shortcuts.rs             # 启动期全局快捷键注册
 │   ├─ error.rs                         # 统一错误类型
 │   │
@@ -97,8 +105,7 @@ snaplingo/
 │   │       ├─ image_composition_service.rs
 │   │       ├─ capture_output_service.rs
 │   │       ├─ pinned_image_service.rs
-│   │       ├─ history_service.rs
-│   │       └─ workflow_service.rs
+│   │       └─ history_service.rs
 │   │
 │   ├─ domain/                          # ⭐ Domain Layer
 │   │   ├─ capture.rs                   # 纯数据结构
@@ -350,7 +357,7 @@ Frontend Adapter: configureTranslationProviderCredentials(...)
 Commands: configure_translation_provider_credentials(provider_id, credentials, State)
     ↓ 分两路
     │
-    ├─→ Infrastructure: Keychain.save_provider_credential(provider_id, api_key)
+    ├─→ Infrastructure: Keychain.save_provider_credentials(provider_id, credentials)
     │       ↓ 平台适配
     │       ├─ macOS: Keychain API
     │       ├─ Windows: Credential Manager API
@@ -436,7 +443,7 @@ struct BaiduOcrProvider {
     http_client: Arc<dyn HttpClient>,  // 依赖抽象
 }
 
-// 在 composition.rs 注入
+// 在 composition/provider_runtime.rs 注入
 let http_client = Arc::new(ReqwestHttpClient::new());
 let provider = BaiduOcrProvider::new(Arc::clone(&http_client));
 ```
@@ -529,6 +536,7 @@ impl CaptureSessionRuntime {
 | **Provider** | Mock HttpClient，单元测试 recognize() |
 | **Coordinator** | 单元测试激活、恢复、重配置和执行协调 |
 | **Capture Session Runtime** | 通过一个 Interface 测试 render/output/OCR 编排 |
+| **Capture Interaction Runtime** | Vitest 测选区完成后的 effect plan |
 | **Frontend Tauri Adapter** | Vitest 测 command 名称和 payload 映射 |
 | **Commands** | Mock AppState，端到端测试 |
 
@@ -538,7 +546,7 @@ impl CaptureSessionRuntime {
 
 | 扩展场景 | 需要改动 |
 |---------|---------|
-| **加新 Provider** | 1. 实现 Trait<br>2. 在 `composition.rs` 注册<br>3. 如需凭证，接入 Provider Configuration Module |
+| **加新 Provider** | 1. 实现 Trait<br>2. 在 `composition/provider_runtime.rs` 注册<br>3. 如需凭证，接入 Provider Configuration Module |
 | **加新平台** | 1. 实现 Backend Trait<br>2. 添加 `#[cfg]` |
 | **OCR 改为多选** | 改 OcrCoordinator 激活模型和对应前端 adapter/store |
 
@@ -565,14 +573,15 @@ Commands → Application → Domain
 ## 🚀 当前演进状态
 
 - Frontend runtime 已通过 `src/tauri/*` 适配器集中调用 Tauri commands。
+- 主窗口 Tauri events 已通过 `src/tauri/appEvents.ts` 集中订阅和解析。
 - Backend runtime 已通过 `src-tauri/src/commands/*` 保持 Tauri command seam。
 - Provider 当前由 `TranslationCoordinator` 和 `OcrCoordinator` 统一管理激活、持久化、执行和运行时重配置。
 - Provider Configuration Module 负责凭证校验、自定义 Translation Provider 定义、运行时新增/注册/激活和回滚。
 - Capture Session Runtime 已集中截图会话的 render/output/OCR 编排。
 - AppState 形状位于 `src-tauri/src/app_state.rs`；`lib.rs` 只保留 Tauri builder/plugin setup、command 注册和启动模块调用。
-- Application Composition 位于 `src-tauri/src/composition.rs`，负责运行时依赖构建。
+- Application Composition 由 `src-tauri/src/composition.rs` assembly shell 和 `src-tauri/src/composition/*_runtime.rs` 构造策略 builders 组成。
 - 启动期快捷键注册位于 `src-tauri/src/startup_shortcuts.rs`。
-- Settings navigation state 和 Capture interaction model 是前端纯模块 seam，可用 Vitest 直接覆盖交互规则。
+- Settings navigation state、Capture interaction runtime/model 是前端纯模块 seam，可用 Vitest 直接覆盖交互规则。
 
 ---
 

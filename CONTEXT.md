@@ -38,15 +38,18 @@
 
 **职责：**
 - 集中维护 command 名称和 payload 形状
+- 集中维护 Tauri event 名称、payload 解析和订阅清理（`src/tauri/appEvents.ts`）
 - 为 UI、hooks、stores 提供 typed function，而不是让它们直接调用 `invoke()`
 - 让前端/后端 seam 在代码导航时清晰可见
 
 ### Application Composition（应用组合）
-`src-tauri/src/composition.rs` 中的运行时装配模块。
+`src-tauri/src/composition.rs` 和 `src-tauri/src/composition/*_runtime.rs` 中的运行时装配模块。
 
 **职责：**
+- `composition.rs` 保持为 AppState assembly shell，只创建共享基础设施并调用 builder
 - 构建 Provider Coordinators 并注册内置 Provider
 - 通过 Provider Configuration Module 恢复自定义 Translation Provider，并恢复 Provider 激活状态
+- 构建 Capture、Selection、History 等运行时依赖组合
 - 将 EventBus 注入 Coordinator，并在 Tauri runtime 就绪后订阅 HistoryService
 - 让 `lib.rs` 保持为 Tauri builder/plugin setup、command 注册和启动模块调用的启动壳
 
@@ -193,13 +196,14 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 - 调用 `OcrCoordinator` 对原始选区图像执行 OCR
 - 让 Commands 层通过一个 Interface 完成 render/output/OCR，而不是了解多个服务的调用顺序
 
-### Capture Interaction Model（截图交互模型）
-`src/components/ScreenshotSession/captureInteractionModel.ts` 中的前端纯模型。
+### Capture Interaction Runtime（截图交互运行时）
+`src/components/ScreenshotSession/captureInteractionRuntime.ts` 中的前端纯运行时决策模块。
 
 **职责：**
 - 根据 Capture Mode 决定选区完成后的 flow（预览、OCR、OCR + 翻译）
-- 根据完成动作决定是否记录成功截图、是否结束 session、OCR 结果进入哪个窗口
-- 不调用 Tauri、DOM 或 React hooks；`ScreenshotSession/index.tsx` 仍负责执行副作用
+- 根据完成动作生成有序 effect plan，决定是否记录成功截图、是否结束 session、OCR 结果进入哪个窗口
+- 不调用 Tauri、DOM 或 React hooks；`ScreenshotSession/index.tsx` 仍负责解释 effect 并执行副作用
+- `captureInteractionModel.ts` 只保留兼容 facade 和 Capture Mode 到 flow 的纯规则
 
 ### Provider（能力提供者）
 实现某个能力的内置模块，不区分本地实现还是远程 API 调用。用户视角看到的是能力名称（如"DeepL 翻译"），而非技术实现细节。
