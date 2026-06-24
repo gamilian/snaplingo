@@ -9,6 +9,34 @@ use super::backend::{
     capture_window_url_with_session, normalized_capture_mode, CAPTURE_WINDOW_LABEL,
 };
 
+pub fn begin_capture_presentation(app: &AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        super::macos::begin_capture_presentation(app)?;
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+    }
+
+    Ok(())
+}
+
+pub fn end_capture_presentation(app: &AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        super::macos::end_capture_presentation(app)?;
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+    }
+
+    Ok(())
+}
+
 pub fn hide_capture_snapshot_windows(app: &AppHandle) -> Result<Vec<String>, String> {
     let visible_window_labels = app
         .webview_windows()
@@ -49,7 +77,7 @@ pub fn reveal_capture_window(app: &AppHandle) -> Result<(), String> {
 
     configure_capture_window_for_current_space(&window)?;
     window.show().map_err(|e| e.to_string())?;
-    window.set_focus().map_err(|e| e.to_string())?;
+    focus_capture_window_for_current_space(&window)?;
     reveal_capture_window_for_current_space(&window)?;
 
     Ok(())
@@ -98,7 +126,7 @@ pub fn open_capture_window_for_session(
     .transparent(true)
     .visible(false)
     .skip_taskbar(true)
-    .focused(true)
+    .focused(false)
     .shadow(false)
     .build()
     .map_err(|e| e.to_string())?;
@@ -116,6 +144,20 @@ fn configure_capture_window_for_current_space(window: &tauri::WebviewWindow) -> 
     #[cfg(not(target_os = "macos"))]
     {
         let _ = window;
+    }
+
+    Ok(())
+}
+
+fn focus_capture_window_for_current_space(window: &tauri::WebviewWindow) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = window;
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        window.set_focus().map_err(|e| e.to_string())?;
     }
 
     Ok(())

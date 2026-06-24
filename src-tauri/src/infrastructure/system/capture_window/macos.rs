@@ -1,5 +1,35 @@
-use objc2_app_kit::{NSScreenSaverWindowLevel, NSWindow, NSWindowCollectionBehavior};
-use tauri::WebviewWindow;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use objc2_app_kit::{
+    NSScreenSaverWindowLevel, NSWindow, NSWindowCollectionBehavior, NSWindowStyleMask,
+};
+use tauri::{AppHandle, WebviewWindow};
+
+static CAPTURE_PRESENTATION_DEPTH: AtomicUsize = AtomicUsize::new(0);
+
+pub(super) fn begin_capture_presentation(app: &AppHandle) -> Result<(), String> {
+    let previous_depth = CAPTURE_PRESENTATION_DEPTH.fetch_add(1, Ordering::SeqCst);
+
+    if previous_depth == 0 {
+        if let Err(err) = app.set_activation_policy(tauri::ActivationPolicy::Accessory) {
+            CAPTURE_PRESENTATION_DEPTH.fetch_sub(1, Ordering::SeqCst);
+            return Err(err.to_string());
+        }
+    }
+
+    Ok(())
+}
+
+pub(super) fn end_capture_presentation(app: &AppHandle) -> Result<(), String> {
+    let previous_depth = decrement_capture_presentation_depth();
+
+    if previous_depth == 1 {
+        app.set_activation_policy(tauri::ActivationPolicy::Regular)
+            .map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
 
 pub(super) fn configure_capture_window_for_current_space(
     window: &WebviewWindow,
@@ -10,6 +40,7 @@ pub(super) fn configure_capture_window_for_current_space(
     }
 
     let ns_window: &NSWindow = unsafe { &*ns_window.cast() };
+    ns_window.setStyleMask(capture_overlay_style_mask(ns_window.styleMask()));
     ns_window.setCollectionBehavior(capture_overlay_collection_behavior(
         ns_window.collectionBehavior(),
     ));
@@ -31,10 +62,29 @@ pub(super) fn reveal_capture_window_for_current_space(
     }
 
     let ns_window: &NSWindow = unsafe { &*ns_window.cast() };
-    ns_window.makeKeyAndOrderFront(None);
     ns_window.orderFrontRegardless();
 
     Ok(())
+}
+
+fn decrement_capture_presentation_depth() -> usize {
+    let mut current_depth = CAPTURE_PRESENTATION_DEPTH.load(Ordering::SeqCst);
+
+    loop {
+        if current_depth == 0 {
+            return 0;
+        }
+
+        match CAPTURE_PRESENTATION_DEPTH.compare_exchange(
+            current_depth,
+            current_depth - 1,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        ) {
+            Ok(previous_depth) => return previous_depth,
+            Err(next_depth) => current_depth = next_depth,
+        }
+    }
 }
 
 fn capture_overlay_collection_behavior(
@@ -45,6 +95,10 @@ fn capture_overlay_collection_behavior(
         | NSWindowCollectionBehavior::Stationary
         | NSWindowCollectionBehavior::Transient
         | NSWindowCollectionBehavior::IgnoresCycle
+}
+
+fn capture_overlay_style_mask(base: NSWindowStyleMask) -> NSWindowStyleMask {
+    base | NSWindowStyleMask::NonactivatingPanel
 }
 
 #[cfg(test)]
@@ -68,5 +122,13 @@ mod tests {
 
         assert!(behavior.contains(NSWindowCollectionBehavior::Stationary));
         assert!(behavior.contains(NSWindowCollectionBehavior::FullScreenAuxiliary));
+    }
+
+    #[test]
+    fn capture_overlay_uses_nonactivating_panel_style() {
+        let style = capture_overlay_style_mask(NSWindowStyleMask::Borderless);
+
+        assert!(style.contains(NSWindowStyleMask::Borderless));
+        assert!(style.contains(NSWindowStyleMask::NonactivatingPanel));
     }
 }

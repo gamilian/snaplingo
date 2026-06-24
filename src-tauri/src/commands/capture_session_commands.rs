@@ -6,9 +6,9 @@ use crate::domain::capture::{
 };
 use crate::domain::ocr::OcrResult;
 use crate::infrastructure::system::capture_window::{
-    capture_snapshot_hide_settle_delay_ms, capture_window_bounds, hide_capture_snapshot_windows,
-    open_capture_window_for_session, restore_capture_snapshot_windows,
-    reveal_capture_window as reveal_capture_window_for_app,
+    begin_capture_presentation, capture_snapshot_hide_settle_delay_ms, capture_window_bounds,
+    end_capture_presentation, hide_capture_snapshot_windows, open_capture_window_for_session,
+    restore_capture_snapshot_windows, reveal_capture_window as reveal_capture_window_for_app,
 };
 use crate::infrastructure::system::pinned_window::open_pinned_image_window;
 
@@ -35,11 +35,19 @@ pub async fn open_capture_window_for_mode(
         let restore_result =
             restore_capture_snapshot_windows_for_session_id(app, state, &session.id);
         let _ = state.capture_session_service.cancel_session(&session.id);
+        let presentation_result = end_capture_presentation(app);
 
         if let Err(restore_err) = restore_result {
             return Err(format!(
                 "{}; also failed to restore hidden windows: {}",
                 open_err, restore_err
+            ));
+        }
+
+        if let Err(presentation_err) = presentation_result {
+            return Err(format!(
+                "{}; also failed to end capture presentation: {}",
+                open_err, presentation_err
             ));
         }
 
@@ -66,7 +74,21 @@ async fn create_capture_session_from_visible_desktop(
     app: &AppHandle,
     state: &crate::AppState,
 ) -> Result<CaptureSessionView, String> {
-    let hidden_window_labels = hide_capture_snapshot_windows(app)?;
+    begin_capture_presentation(app)?;
+
+    let hidden_window_labels = match hide_capture_snapshot_windows(app) {
+        Ok(labels) => labels,
+        Err(err) => match end_capture_presentation(app) {
+            Ok(()) => return Err(err),
+            Err(presentation_err) => {
+                return Err(format!(
+                    "{}; also failed to end capture presentation: {}",
+                    err, presentation_err
+                ))
+            }
+        },
+    };
+
     let settle_delay_ms = capture_snapshot_hide_settle_delay_ms(&hidden_window_labels);
     if settle_delay_ms > 0 {
         tokio::time::sleep(tokio::time::Duration::from_millis(settle_delay_ms)).await;
@@ -80,13 +102,26 @@ async fn create_capture_session_from_visible_desktop(
 
     match session_result {
         Ok(session) => Ok(session),
-        Err(session_err) => match restore_capture_snapshot_windows(app, &hidden_window_labels) {
-            Ok(()) => Err(session_err),
-            Err(restore_err) => Err(format!(
-                "{}; also failed to restore hidden windows: {}",
-                session_err, restore_err
-            )),
-        },
+        Err(session_err) => {
+            let restore_result = restore_capture_snapshot_windows(app, &hidden_window_labels);
+            let presentation_result = end_capture_presentation(app);
+
+            match (restore_result, presentation_result) {
+                (Ok(()), Ok(())) => Err(session_err),
+                (Err(restore_err), Ok(())) => Err(format!(
+                    "{}; also failed to restore hidden windows: {}",
+                    session_err, restore_err
+                )),
+                (Ok(()), Err(presentation_err)) => Err(format!(
+                    "{}; also failed to end capture presentation: {}",
+                    session_err, presentation_err
+                )),
+                (Err(restore_err), Err(presentation_err)) => Err(format!(
+                    "{}; also failed to restore hidden windows: {}; also failed to end capture presentation: {}",
+                    session_err, restore_err, presentation_err
+                )),
+            }
+        }
     }
 }
 
@@ -109,12 +144,20 @@ pub async fn cancel_capture_session(
 ) -> Result<(), String> {
     let session_id = CaptureSessionId(session_id);
 
-    restore_capture_snapshot_windows_for_session_id(&app, state.inner(), &session_id)?;
-
-    state
+    let restore_result =
+        restore_capture_snapshot_windows_for_session_id(&app, state.inner(), &session_id);
+    let cancel_result = state
         .capture_session_service
         .cancel_session(&session_id)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string());
+    let presentation_result = end_capture_presentation(&app);
+
+    match (restore_result, cancel_result, presentation_result) {
+        (Ok(()), Ok(()), Ok(())) => Ok(()),
+        (Err(err), _, _) => Err(err),
+        (_, Err(err), _) => Err(err),
+        (_, _, Err(err)) => Err(err),
+    }
 }
 
 #[tauri::command]
@@ -123,11 +166,22 @@ pub fn restore_capture_snapshot_windows_for_session(
     app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    restore_capture_snapshot_windows_for_session_id(
+    let restore_result = restore_capture_snapshot_windows_for_session_id(
         &app,
         state.inner(),
         &CaptureSessionId(session_id),
-    )
+    );
+    let presentation_result = end_capture_presentation(&app);
+
+    match (restore_result, presentation_result) {
+        (Ok(()), Ok(())) => Ok(()),
+        (Err(err), Ok(())) => Err(err),
+        (Ok(()), Err(err)) => Err(err),
+        (Err(restore_err), Err(presentation_err)) => Err(format!(
+            "{}; also failed to end capture presentation: {}",
+            restore_err, presentation_err
+        )),
+    }
 }
 
 fn restore_capture_snapshot_windows_for_session_id(

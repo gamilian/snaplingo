@@ -7,7 +7,7 @@ import {
 } from './captureSessionLifecycle';
 
 describe('capture session lifecycle', () => {
-  it('waits for the inactive handler instead of clearing the visible capture UI', async () => {
+  it('closes the capture window before ending the native session', async () => {
     const events: string[] = [];
     const client: CaptureLifecycleClient = {
       cancelCaptureSession: async (sessionId) => {
@@ -29,9 +29,9 @@ describe('capture session lifecycle', () => {
     });
 
     expect(events).toEqual([
-      'cancel_capture_session:session-1',
       'close-start',
       'close-end',
+      'cancel_capture_session:session-1',
     ]);
   });
 
@@ -51,10 +51,10 @@ describe('capture session lifecycle', () => {
       },
     });
 
-    expect(events).toEqual(['cancel_capture_session:session-2', 'reset']);
+    expect(events).toEqual(['reset', 'cancel_capture_session:session-2']);
   });
 
-  it('does not clear state if closing the capture window fails', async () => {
+  it('does not end the native session if closing the capture window fails', async () => {
     const events: string[] = [];
     const client: CaptureLifecycleClient = {
       cancelCaptureSession: async (sessionId) => {
@@ -76,7 +76,7 @@ describe('capture session lifecycle', () => {
       }),
     ).rejects.toThrow('close failed');
 
-    expect(events).toEqual(['cancel_capture_session:session-3', 'close-start']);
+    expect(events).toEqual(['close-start']);
   });
 
   it('uses the same close-before-reset fallback for explicit cancellation', async () => {

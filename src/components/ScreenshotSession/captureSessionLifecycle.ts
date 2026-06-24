@@ -42,8 +42,8 @@ export async function finishCaptureSession({
   onInactive,
   resetSessionState,
 }: FinishCaptureSessionOptions) {
-  await client.cancelCaptureSession(sessionId);
   await closeInactiveCaptureSession({ onInactive, resetSessionState });
+  await client.cancelCaptureSession(sessionId);
 }
 
 export async function hideInactiveCaptureWindow(window: CaptureInactiveWindow) {

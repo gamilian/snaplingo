@@ -3,7 +3,6 @@ import { listen } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { useSettingsStore } from '../../stores/settingsStore';
 import {
-  cancelCaptureSession,
   copyTextToClipboard,
   createCaptureSession,
   getCaptureSession,
@@ -815,16 +814,16 @@ export default function ScreenshotSession({
   const cancelSession = useCallback(async () => {
     const sessionId = session?.id;
 
-    if (sessionId) {
-      try {
-        await cancelCaptureSession(sessionId);
-      } catch (err) {
-        console.error('Failed to cancel capture session:', err);
-      }
-    }
-
     try {
-      await closeInactiveCaptureSession({ onInactive, resetSessionState });
+      if (sessionId) {
+        await finishCaptureSession({
+          sessionId,
+          onInactive,
+          resetSessionState,
+        });
+      } else {
+        await closeInactiveCaptureSession({ onInactive, resetSessionState });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setStatus('error');

@@ -87,7 +87,7 @@ describe('capture window visibility', () => {
     expect(calls).toEqual(['native_reveal_capture_window']);
   });
 
-  it('restores hidden app windows only after the capture window is visible', async () => {
+  it('keeps the native capture presentation active after reveal', async () => {
     const calls: string[] = [];
     const window: CaptureWindowHandle = {
       show: async () => {
@@ -113,10 +113,7 @@ describe('capture window visibility', () => {
       },
     });
 
-    expect(calls).toEqual([
-      'native_reveal_capture_window',
-      'restore_capture_snapshot_windows_for_session:capture-1',
-    ]);
+    expect(calls).toEqual(['native_reveal_capture_window']);
   });
 
   it('waits for two animation frames before fading in the capture surface', async () => {
