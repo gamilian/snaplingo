@@ -13,5 +13,8 @@ async fn test_ocr_flow() {
     // assert!(result.is_ok());
 
     // Placeholder assertion to make test pass
-    assert!(true, "Integration test placeholder - requires manual frontend verification");
+    assert!(
+        true,
+        "Integration test placeholder - requires manual frontend verification"
+    );
 }

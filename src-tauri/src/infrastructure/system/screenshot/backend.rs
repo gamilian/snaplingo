@@ -171,6 +171,13 @@ pub trait ScreenshotBackend: Send + Sync {
         Ok(None)
     }
 
+    fn current_cursor_position(
+        &self,
+        _monitors: &[MonitorSnapshot],
+    ) -> Result<Option<LogicalPoint>, AppError> {
+        Ok(None)
+    }
+
     /// Capture the entire screen
     /// Returns PNG-encoded image data
     async fn capture_full_screen(&self) -> Result<Vec<u8>, AppError>;

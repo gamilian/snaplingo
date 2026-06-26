@@ -3,7 +3,7 @@ import { virtualRectToViewportRect } from './virtualDesktop';
 
 type CaptureSelectionOverlayStatus = 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
 
-export type CaptureSelectionOverlayVariant = 'draft' | 'hover';
+export type CaptureSelectionOverlayVariant = 'draft' | 'hover' | 'preview';
 
 export interface CaptureSelectionOverlayFrame {
   variant: CaptureSelectionOverlayVariant;
@@ -14,6 +14,7 @@ export interface CaptureSelectionOverlayFrame {
 export interface CaptureSelectionOverlayFrameInput {
   status: CaptureSelectionOverlayStatus;
   selectionBounds: LogicalRect | null;
+  selection: LogicalRect | null;
   draftSelection: LogicalRect | null;
   hoverSelection: LogicalRect | null;
 }
@@ -43,16 +44,39 @@ const LABEL_PADDING_X = 8;
 export function getCaptureSelectionOverlayFrame({
   status,
   selectionBounds,
+  selection,
   draftSelection,
   hoverSelection,
 }: CaptureSelectionOverlayFrameInput): CaptureSelectionOverlayFrame | null {
-  if (status !== 'selecting' || !selectionBounds) return null;
+  if (!selectionBounds) return null;
 
-  const selection = draftSelection ?? hoverSelection;
-  if (!selection) return null;
+  if (status === 'preview' && selection) {
+    return buildCaptureSelectionOverlayFrame(
+      'preview',
+      selection,
+      selectionBounds,
+    );
+  }
 
+  if (status !== 'selecting') return null;
+
+  const activeSelection = draftSelection ?? (selection ? null : hoverSelection);
+  if (!activeSelection) return null;
+
+  return buildCaptureSelectionOverlayFrame(
+    draftSelection ? 'draft' : 'hover',
+    activeSelection,
+    selectionBounds,
+  );
+}
+
+function buildCaptureSelectionOverlayFrame(
+  variant: CaptureSelectionOverlayVariant,
+  selection: LogicalRect,
+  selectionBounds: LogicalRect,
+): CaptureSelectionOverlayFrame {
   return {
-    variant: draftSelection ? 'draft' : 'hover',
+    variant,
     rect: virtualRectToViewportRect(selection, selectionBounds),
     label: `${Math.round(selection.width)} x ${Math.round(selection.height)}`,
   };
@@ -93,18 +117,29 @@ function drawSelectionRect(
   const { rect } = frame;
 
   context.fillStyle = 'rgba(255, 255, 255, 0.05)';
-  context.fillRect(rect.x, rect.y, rect.width, rect.height);
-  context.strokeStyle =
-    frame.variant === 'draft'
-      ? 'rgba(255, 255, 255, 0.9)'
-      : 'rgba(255, 255, 255, 0.78)';
-  context.lineWidth = frame.variant === 'draft' ? 2 : 1;
+  if (frame.variant !== 'preview') {
+    context.fillRect(rect.x, rect.y, rect.width, rect.height);
+  }
+  context.strokeStyle = getSelectionStrokeStyle(frame.variant);
+  context.lineWidth = getSelectionLineWidth(frame.variant);
   context.strokeRect(
     rect.x + 0.5,
     rect.y + 0.5,
     Math.max(0, rect.width - 1),
     Math.max(0, rect.height - 1),
   );
+}
+
+function getSelectionStrokeStyle(variant: CaptureSelectionOverlayVariant) {
+  if (variant === 'preview') return 'rgba(91, 127, 255, 0.95)';
+  if (variant === 'draft') return 'rgba(255, 255, 255, 0.9)';
+  return 'rgba(255, 255, 255, 0.78)';
+}
+
+function getSelectionLineWidth(variant: CaptureSelectionOverlayVariant) {
+  if (variant === 'preview') return 3;
+  if (variant === 'draft') return 2;
+  return 1;
 }
 
 function drawSizeLabel(
@@ -117,8 +152,14 @@ function drawSizeLabel(
   context.textBaseline = 'top';
 
   const labelWidth = Math.ceil(context.measureText(frame.label).width) + LABEL_PADDING_X * 2;
-  const labelX = rect.x;
-  const labelY = Math.max(0, rect.y - LABEL_HEIGHT - LABEL_GAP);
+  const labelX =
+    frame.variant === 'preview'
+      ? rect.x + rect.width / 2 - labelWidth / 2
+      : rect.x;
+  const labelY =
+    frame.variant === 'preview'
+      ? rect.y + rect.height / 2 - LABEL_HEIGHT / 2
+      : Math.max(0, rect.y - LABEL_HEIGHT - LABEL_GAP);
 
   context.fillStyle = 'rgba(0, 0, 0, 0.82)';
   context.fillRect(labelX, labelY, labelWidth, LABEL_HEIGHT);

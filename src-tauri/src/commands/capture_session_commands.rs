@@ -4,7 +4,8 @@ use tauri::{AppHandle, Manager, State};
 
 use crate::application::services::CaptureSessionOutput;
 use crate::domain::capture::{
-    AnnotationCommand, CaptureOutputAction, CaptureSessionId, CaptureSessionView, LogicalRect,
+    AnnotationCommand, CaptureOutputAction, CaptureSessionId, CaptureSessionView, LogicalPoint,
+    LogicalRect,
 };
 use crate::domain::ocr::OcrResult;
 use crate::infrastructure::system::capture_window::{
@@ -200,6 +201,17 @@ pub fn get_capture_session(
     state
         .capture_session_service
         .get_session_view(&CaptureSessionId(session_id))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn current_capture_cursor_position(
+    session_id: String,
+    state: State<'_, crate::AppState>,
+) -> Result<Option<LogicalPoint>, String> {
+    state
+        .capture_session_service
+        .current_cursor_position(&CaptureSessionId(session_id))
         .map_err(|e| e.to_string())
 }
 

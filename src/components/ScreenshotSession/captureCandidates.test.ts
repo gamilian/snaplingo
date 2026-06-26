@@ -137,6 +137,52 @@ describe('capture candidates', () => {
     ).toBeNull();
   });
 
+  it('does not use full-monitor window candidates as automatic hover selections', () => {
+    const candidates: CaptureCandidate[] = [
+      {
+        id: 'monitor:primary',
+        kind: 'monitor',
+        rect: { x: 0, y: 0, width: 1440, height: 900 },
+        priority: 0,
+      },
+      {
+        id: 'window:desktop',
+        kind: 'window',
+        rect: { x: 0, y: 0, width: 1440, height: 900 },
+        priority: 10,
+      },
+    ];
+
+    expect(getBestCandidateAtPoint(candidates, { x: 120, y: 120 })).toBeNull();
+  });
+
+  it('ignores full-monitor window candidates and recommends the real window under the pointer', () => {
+    const candidates: CaptureCandidate[] = [
+      {
+        id: 'monitor:primary',
+        kind: 'monitor',
+        rect: { x: 0, y: 0, width: 1440, height: 900 },
+        priority: 0,
+      },
+      {
+        id: 'window:desktop',
+        kind: 'window',
+        rect: { x: 0, y: 0, width: 1440, height: 900 },
+        priority: 10,
+      },
+      {
+        id: 'window:editor',
+        kind: 'window',
+        rect: { x: 100, y: 100, width: 500, height: 400 },
+        priority: 10,
+      },
+    ];
+
+    expect(getBestCandidateAtPoint(candidates, { x: 120, y: 120 })?.id).toBe(
+      'window:editor',
+    );
+  });
+
   it('cycles candidates under a point by priority and area', () => {
     const candidates: CaptureCandidate[] = [
       {

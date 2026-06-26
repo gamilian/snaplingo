@@ -51,7 +51,7 @@ pub(super) fn end_capture_presentation(app: &AppHandle) -> Result<(), String> {
 }
 
 pub(super) fn suppress_capture_window_activation(app: &AppHandle) -> Result<(), String> {
-    if let Some(activation_policy) = capture_presentation_activation_policy() {
+    if let Some(activation_policy) = capture_presentation_activation_policy(app) {
         app.set_activation_policy(activation_policy)
             .map_err(|e| e.to_string())?;
         mark_capture_window_activation_suppressed();
@@ -149,8 +149,62 @@ fn capture_overlay_style_mask(base: NSWindowStyleMask) -> NSWindowStyleMask {
     base
 }
 
-fn capture_presentation_activation_policy() -> Option<tauri::ActivationPolicy> {
-    Some(tauri::ActivationPolicy::Prohibited)
+fn capture_presentation_activation_policy(app: &AppHandle) -> Option<tauri::ActivationPolicy> {
+    capture_presentation_activation_policy_for_state(
+        current_application_pid(),
+        frontmost_application_pid(),
+        has_active_space_capture_subject_app_window(app),
+    )
+}
+
+fn capture_presentation_activation_policy_for_state(
+    current_pid: i32,
+    frontmost_pid: Option<i32>,
+    has_active_space_app_window: bool,
+) -> Option<tauri::ActivationPolicy> {
+    if has_active_space_app_window {
+        return None;
+    }
+
+    capture_presentation_activation_policy_for_frontmost(current_pid, frontmost_pid)
+}
+
+fn capture_presentation_activation_policy_for_frontmost(
+    current_pid: i32,
+    frontmost_pid: Option<i32>,
+) -> Option<tauri::ActivationPolicy> {
+    match frontmost_pid {
+        Some(pid) if pid == current_pid => None,
+        _ => Some(tauri::ActivationPolicy::Prohibited),
+    }
+}
+
+fn has_active_space_capture_subject_app_window(app: &AppHandle) -> bool {
+    app.webview_windows().into_iter().any(|(label, window)| {
+        label != CAPTURE_WINDOW_LABEL && is_capture_subject_window_on_active_space(&window)
+    })
+}
+
+fn is_capture_subject_window_on_active_space(window: &WebviewWindow) -> bool {
+    let Ok(ns_window) = window.ns_window() else {
+        return false;
+    };
+    if ns_window.is_null() {
+        return false;
+    }
+
+    let ns_window: &NSWindow = unsafe { &*ns_window.cast() };
+    capture_subject_window_is_on_active_space_for_state(
+        ns_window.isVisible(),
+        ns_window.isOnActiveSpace(),
+    )
+}
+
+fn capture_subject_window_is_on_active_space_for_state(
+    is_visible: bool,
+    is_on_active_space: bool,
+) -> bool {
+    is_visible && is_on_active_space
 }
 
 fn mark_capture_window_activation_suppressed() {
@@ -166,7 +220,15 @@ fn capture_overlay_accepts_mouse_moved_events() -> bool {
 }
 
 fn should_make_capture_overlay_key_on_reveal() -> bool {
-    true
+    should_make_capture_overlay_key_on_reveal_for_activation_suppressed(
+        CAPTURE_WINDOW_ACTIVATION_SUPPRESSED.load(Ordering::SeqCst),
+    )
+}
+
+fn should_make_capture_overlay_key_on_reveal_for_activation_suppressed(
+    activation_suppressed: bool,
+) -> bool {
+    !activation_suppressed
 }
 
 fn capture_cancel_shortcut_accelerator() -> &'static str {
@@ -313,10 +375,55 @@ mod tests {
     }
 
     #[test]
-    fn capture_presentation_suppresses_app_activation() {
+    fn capture_presentation_suppresses_activation_for_other_frontmost_apps() {
         assert!(matches!(
-            capture_presentation_activation_policy(),
+            capture_presentation_activation_policy_for_frontmost(9000, Some(4242)),
             Some(tauri::ActivationPolicy::Prohibited)
+        ));
+    }
+
+    #[test]
+    fn capture_presentation_keeps_activation_when_snaplingo_is_frontmost() {
+        assert!(matches!(
+            capture_presentation_activation_policy_for_frontmost(9000, Some(9000)),
+            None
+        ));
+    }
+
+    #[test]
+    fn capture_presentation_keeps_activation_for_active_space_snaplingo_windows() {
+        assert!(matches!(
+            capture_presentation_activation_policy_for_state(9000, Some(4242), true),
+            None
+        ));
+    }
+
+    #[test]
+    fn capture_presentation_keeps_activation_when_snaplingo_is_frontmost_with_active_window() {
+        assert!(matches!(
+            capture_presentation_activation_policy_for_state(9000, Some(9000), true),
+            None
+        ));
+    }
+
+    #[test]
+    fn capture_presentation_suppresses_activation_without_active_space_snaplingo_windows() {
+        assert!(matches!(
+            capture_presentation_activation_policy_for_state(9000, Some(4242), false),
+            Some(tauri::ActivationPolicy::Prohibited)
+        ));
+    }
+
+    #[test]
+    fn capture_subject_window_must_be_visible_on_active_space() {
+        assert!(capture_subject_window_is_on_active_space_for_state(
+            true, true
+        ));
+        assert!(!capture_subject_window_is_on_active_space_for_state(
+            true, false
+        ));
+        assert!(!capture_subject_window_is_on_active_space_for_state(
+            false, true
         ));
     }
 
@@ -335,8 +442,13 @@ mod tests {
     }
 
     #[test]
-    fn capture_overlay_becomes_key_on_reveal() {
-        assert!(should_make_capture_overlay_key_on_reveal());
+    fn capture_overlay_becomes_key_when_activation_is_not_suppressed() {
+        assert!(should_make_capture_overlay_key_on_reveal_for_activation_suppressed(false));
+    }
+
+    #[test]
+    fn capture_overlay_does_not_become_key_when_activation_is_suppressed() {
+        assert!(!should_make_capture_overlay_key_on_reveal_for_activation_suppressed(true));
     }
 
     #[test]

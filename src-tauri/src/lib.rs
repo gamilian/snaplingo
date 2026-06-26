@@ -1,4 +1,5 @@
 // Module declarations
+mod app_lifecycle;
 mod app_state;
 mod application;
 mod commands;
@@ -37,6 +38,18 @@ pub fn run() {
                 .level(log::LevelFilter::Info)
                 .build(),
         )
+        .on_window_event(|window, event| {
+            if !app_lifecycle::should_hide_window_instead_of_close(window.label()) {
+                return;
+            }
+
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                if let Err(err) = window.hide() {
+                    log::warn!("Failed to hide main window on close request: {}", err);
+                }
+            }
+        })
         .setup(|app| {
             let app_state = composition::build_app_state(config_path, app.handle().clone());
             composition::subscribe_history_service(&app_state);
@@ -97,6 +110,7 @@ pub fn run() {
             commands::save_screenshot,
             commands::create_capture_session,
             commands::get_capture_session,
+            commands::current_capture_cursor_position,
             commands::cancel_capture_session,
             commands::reveal_capture_window,
             commands::hide_capture_window,
@@ -124,6 +138,31 @@ pub fn run() {
             commands::delete_history,
             commands::clear_all_history,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            if let tauri::RunEvent::Reopen {
+                has_visible_windows,
+                ..
+            } = event
+            {
+                if !app_lifecycle::should_show_main_window_on_reopen(has_visible_windows) {
+                    return;
+                }
+
+                let Some(window) = app_handle.get_webview_window(app_lifecycle::MAIN_WINDOW_LABEL)
+                else {
+                    return;
+                };
+
+                if let Err(err) = window.show() {
+                    log::warn!("Failed to show main window on app reopen: {}", err);
+                    return;
+                }
+
+                if let Err(err) = window.set_focus() {
+                    log::warn!("Failed to focus main window on app reopen: {}", err);
+                }
+            }
+        });
 }

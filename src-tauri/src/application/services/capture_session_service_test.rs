@@ -11,7 +11,7 @@ mod tests {
     use crate::application::services::{
         CaptureOutputService, CaptureSessionOutput, CaptureSessionRuntime,
     };
-    use crate::domain::capture::{CaptureOutputAction, LogicalRect};
+    use crate::domain::capture::{CaptureOutputAction, LogicalPoint, LogicalRect};
     use crate::domain::ocr::{OcrRequest, OcrResult};
     use crate::error::AppError;
     use crate::infrastructure::storage::ConfigFile;
@@ -26,6 +26,7 @@ mod tests {
         snapshots: Vec<MonitorSnapshot>,
         window_candidates: Vec<WindowCandidate>,
         captured_cursor: Option<CapturedCursor>,
+        current_cursor_position: Option<LogicalPoint>,
     }
 
     struct RecordingOcrProvider {
@@ -82,6 +83,13 @@ mod tests {
             Ok(self.captured_cursor.clone())
         }
 
+        fn current_cursor_position(
+            &self,
+            _monitors: &[MonitorSnapshot],
+        ) -> Result<Option<LogicalPoint>, AppError> {
+            Ok(self.current_cursor_position.clone())
+        }
+
         async fn capture_full_screen(&self) -> Result<Vec<u8>, AppError> {
             Ok(self.snapshots[0].png_data.clone())
         }
@@ -116,6 +124,7 @@ mod tests {
             }],
             window_candidates: Vec::new(),
             captured_cursor: None,
+            current_cursor_position: None,
         }
     }
 
@@ -159,6 +168,7 @@ mod tests {
             ],
             window_candidates: Vec::new(),
             captured_cursor: None,
+            current_cursor_position: None,
         }
     }
 
@@ -188,6 +198,13 @@ mod tests {
             scale_factor: 2.0,
             png_data: vec![9, 8, 7],
         });
+        backend
+    }
+
+    fn make_backend_with_current_cursor_position() -> MockScreenshotBackend {
+        let mut backend = make_backend();
+        backend.current_cursor_position =
+            Some(crate::domain::capture::LogicalPoint { x: 6.0, y: 7.0 });
         backend
     }
 
@@ -295,6 +312,20 @@ mod tests {
 
         let session = service.get_session(&view.id).unwrap();
         assert!(session.captured_cursor.is_some());
+    }
+
+    #[tokio::test]
+    async fn returns_current_cursor_position_for_active_session() {
+        let service =
+            CaptureSessionService::new(Arc::new(make_backend_with_current_cursor_position()));
+        let view = service.create_session().await.unwrap();
+
+        let position = service.current_cursor_position(&view.id).unwrap();
+
+        assert_eq!(
+            position,
+            Some(crate::domain::capture::LogicalPoint { x: 6.0, y: 7.0 })
+        );
     }
 
     #[tokio::test]

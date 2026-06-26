@@ -5,6 +5,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import {
   copyTextToClipboard,
   createCaptureSession,
+  currentCaptureCursorPosition,
   getCaptureSession,
   openCaptureOcrResultWindow,
   openCaptureTranslationResultWindow,
@@ -159,6 +160,10 @@ import {
   subscribeCaptureCancelRequests,
 } from './captureCancelRequest';
 import {
+  getPolledHoverSelection,
+  shouldPollCaptureHoverSelection,
+} from './captureHoverPolling';
+import {
   getCaptureEditorCommandButtonClassName,
   getCaptureEditorDividerClassName,
   getCaptureEditorIconButtonClassName,
@@ -245,6 +250,7 @@ const TOOLBAR_SIZE = { width: 1220, height: 56 };
 const MAGNIFIER_GAP = 14;
 const MAGNIFIER_SIZE = { width: 120, height: 96 };
 const MAGNIFIER_ZOOM = 4;
+const CAPTURE_HOVER_POLL_INTERVAL_MS = 16;
 const ARROW_KEYS: ArrowKey[] = ['ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowLeft'];
 const SELECTION_HANDLES: SelectionHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
@@ -283,6 +289,18 @@ function clampPointToRect(point: Point, rect: LogicalRect): Point {
   };
 }
 
+function areRectsEqual(a: LogicalRect | null, b: LogicalRect | null) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+
+  return (
+    a.x === b.x &&
+    a.y === b.y &&
+    a.width === b.width &&
+    a.height === b.height
+  );
+}
+
 function annotationRectToViewportRect(
   rect: LogicalRect,
   selectionViewportRect: LogicalRect,
@@ -301,45 +319,6 @@ function sameAnnotationColor(a: AnnotationColor, b: AnnotationColor) {
 
 function svgPolylinePoints(points: Point[]) {
   return points.map((point) => `${point.x},${point.y}`).join(' ');
-}
-
-function DimMask({ rect }: { rect: LogicalRect }) {
-  const right = rect.x + rect.width;
-  const bottom = rect.y + rect.height;
-
-  return (
-    <>
-      <div
-        className="absolute left-0 top-0 w-full bg-black/45"
-        style={{ height: `${rect.y}px` }}
-      />
-      <div
-        className="absolute left-0 bg-black/45"
-        style={{
-          top: `${bottom}px`,
-          width: '100%',
-          height: `calc(100% - ${bottom}px)`,
-        }}
-      />
-      <div
-        className="absolute left-0 bg-black/45"
-        style={{
-          top: `${rect.y}px`,
-          width: `${rect.x}px`,
-          height: `${rect.height}px`,
-        }}
-      />
-      <div
-        className="absolute bg-black/45"
-        style={{
-          left: `${right}px`,
-          top: `${rect.y}px`,
-          width: `calc(100% - ${right}px)`,
-          height: `${rect.height}px`,
-        }}
-      />
-    </>
-  );
 }
 
 function PointerIcon() {
@@ -667,9 +646,6 @@ export default function ScreenshotSession({
     activeAnnotationTool === 'ellipse' ||
     selectedAnnotation?.type === 'rectangle' ||
     selectedAnnotation?.type === 'ellipse';
-  const sizeLabel = selection
-    ? `${Math.round(selection.width)} x ${Math.round(selection.height)}`
-    : '';
   const captureCandidates = useMemo(() => {
     if (!session) return [];
 
@@ -775,10 +751,12 @@ export default function ScreenshotSession({
     (
       draftSelection: LogicalRect | null = draftSelectionRef.current,
       hoverSelection: LogicalRect | null = hoverSelectionRef.current,
+      activeSelection: LogicalRect | null = selection,
     ) => {
       selectionOverlayFrameRef.current = getCaptureSelectionOverlayFrame({
         status,
         selectionBounds,
+        selection: activeSelection,
         draftSelection,
         hoverSelection,
       });
@@ -790,12 +768,89 @@ export default function ScreenshotSession({
         paintSelectionOverlayFrame(selectionOverlayFrameRef.current);
       });
     },
-    [paintSelectionOverlayFrame, selectionBounds, status],
+    [paintSelectionOverlayFrame, selection, selectionBounds, status],
   );
 
   useEffect(() => {
     scheduleSelectionOverlayPaint();
-  }, [scheduleSelectionOverlayPaint, viewportBounds]);
+  }, [scheduleSelectionOverlayPaint, selection, viewportBounds]);
+
+  const syncHoverSelection = useCallback(
+    (nextHoverSelection: LogicalRect | null) => {
+      if (areRectsEqual(hoverSelectionRef.current, nextHoverSelection)) return;
+
+      hoverSelectionRef.current = nextHoverSelection;
+      setHoverSelection(nextHoverSelection);
+      scheduleSelectionOverlayPaint(null, nextHoverSelection, null);
+    },
+    [scheduleSelectionOverlayPaint],
+  );
+
+  useEffect(() => {
+    if (!session || !selectionBounds) return;
+
+    let disposed = false;
+    let timeoutId: number | null = null;
+
+    const canPoll = () =>
+      shouldPollCaptureHoverSelection({
+        status,
+        hasSession: Boolean(session),
+        hasSelectionBounds: Boolean(selectionBounds),
+        hasActiveStartPoint: Boolean(startPointRef.current ?? startPoint),
+        hasEditGesture: Boolean(editGesture),
+      });
+
+    const scheduleNextPoll = () => {
+      if (disposed) return;
+
+      timeoutId = window.setTimeout(poll, CAPTURE_HOVER_POLL_INTERVAL_MS);
+    };
+
+    const poll = async () => {
+      if (!canPoll()) return;
+
+      try {
+        const point = await currentCaptureCursorPosition(session.id);
+        if (disposed || !canPoll()) return;
+
+        if (!point) {
+          syncHoverSelection(null);
+          scheduleNextPoll();
+          return;
+        }
+
+        cursorPointRef.current = point;
+        if (isMagnifierRequested) {
+          setCursorPoint(point);
+        }
+        syncHoverSelection(getPolledHoverSelection(captureCandidates, point));
+        scheduleNextPoll();
+      } catch {
+        syncHoverSelection(null);
+      }
+    };
+
+    if (canPoll()) {
+      timeoutId = window.setTimeout(poll, 0);
+    }
+
+    return () => {
+      disposed = true;
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [
+    captureCandidates,
+    editGesture,
+    isMagnifierRequested,
+    selectionBounds,
+    session,
+    startPoint,
+    status,
+    syncHoverSelection,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -1676,11 +1731,15 @@ export default function ScreenshotSession({
   }, [paintSelectionOverlayFrame]);
 
   const completeManualSelection = useCallback((rect: LogicalRect) => {
+    const completion = planManualSelectionCompletion(mode);
+
     startPointRef.current = null;
     draftSelectionRef.current = null;
     hoverSelectionRef.current = null;
-    selectionOverlayFrameRef.current = null;
-    paintSelectionOverlayFrame(null);
+    if (completion.type !== 'preview') {
+      selectionOverlayFrameRef.current = null;
+      paintSelectionOverlayFrame(null);
+    }
     setStartPoint(null);
     setSelection(rect);
     setHoverSelection(null);
@@ -1696,7 +1755,6 @@ export default function ScreenshotSession({
     setAnnotationHistory(emptyAnnotationHistory());
     setIsMagnifierRequested(false);
 
-    const completion = planManualSelectionCompletion(mode);
     if (completion.type === 'preview') {
       setIsAnnotationToolbarVisible(true);
       setStatus('preview');
@@ -2163,9 +2221,7 @@ export default function ScreenshotSession({
             activeHoverSelection,
             candidateCycleDirection,
           )?.rect ?? null;
-        hoverSelectionRef.current = nextHoverSelection;
-        setHoverSelection(nextHoverSelection);
-        scheduleSelectionOverlayPaint(null, nextHoverSelection);
+        syncHoverSelection(nextHoverSelection);
       } else if (
         (status === 'selecting' || status === 'preview') &&
         !textDraft &&
@@ -2393,6 +2449,7 @@ export default function ScreenshotSession({
     selectFullCaptureArea,
     startPoint,
     status,
+    syncHoverSelection,
     cursorColor,
     toggleAnnotationTool,
     toggleAnnotationFill,
@@ -2548,10 +2605,9 @@ export default function ScreenshotSession({
     const activeStartPoint = startPointRef.current ?? startPoint;
 
     if (!activeStartPoint && !editGesture && status === 'selecting') {
-      const nextHoverSelection =
-        getBestCandidateAtPoint(captureCandidates, point)?.rect ?? null;
-      hoverSelectionRef.current = nextHoverSelection;
-      scheduleSelectionOverlayPaint(null, nextHoverSelection);
+      const nextHoverCandidate = getBestCandidateAtPoint(captureCandidates, point);
+      const nextHoverSelection = nextHoverCandidate?.rect ?? null;
+      syncHoverSelection(nextHoverSelection);
     }
 
     if (annotationGesture && selection) {
@@ -2982,16 +3038,6 @@ export default function ScreenshotSession({
         <div className="absolute inset-0 bg-black" aria-label="Loading capture" />
       )}
 
-      {viewportBounds && (
-        <canvas
-          ref={selectionOverlayCanvasRef}
-          width={Math.max(0, Math.round(viewportBounds.width))}
-          height={Math.max(0, Math.round(viewportBounds.height))}
-          className="pointer-events-none absolute left-0 top-0 h-full w-full"
-          aria-hidden="true"
-        />
-      )}
-
       {status === 'error' && (
         <div className="absolute left-4 top-4 max-w-md rounded bg-red-950/90 px-3 py-2 text-sm text-red-100 shadow-lg">
           {error}
@@ -3000,7 +3046,6 @@ export default function ScreenshotSession({
 
       {status === 'preview' && selection && selectionViewportRect && (
         <>
-          <DimMask rect={selectionViewportRect} />
           {previewImageBase64 && status === 'preview' && (
             <img
               src={`data:image/png;base64,${previewImageBase64}`}
@@ -3241,7 +3286,10 @@ export default function ScreenshotSession({
             onPointerDown={startMoveGesture}
           />
           {status === 'preview' && (
-            <div className="absolute pointer-events-none" style={rectStyle(selectionViewportRect)}>
+            <div
+              className="absolute pointer-events-none"
+              style={{ ...rectStyle(selectionViewportRect), zIndex: 2 }}
+            >
               {SELECTION_HANDLES.map((handle) => (
                 <button
                   key={handle}
@@ -3259,6 +3307,7 @@ export default function ScreenshotSession({
                 left: `${toolbarPosition.x}px`,
                 top: `${toolbarPosition.y}px`,
                 width: `${TOOLBAR_SIZE.width}px`,
+                zIndex: 2,
               }}
               onPointerDown={(event) => {
                 event.stopPropagation();
@@ -3542,16 +3591,6 @@ export default function ScreenshotSession({
               </button>
             </div>
           )}
-          <div
-            className="pointer-events-none absolute rounded bg-white/90 px-2 py-1 text-xs font-semibold leading-none text-slate-500 shadow-sm ring-1 ring-slate-200"
-            style={{
-              left: `${selectionViewportRect.x + selectionViewportRect.width / 2}px`,
-              top: `${selectionViewportRect.y + selectionViewportRect.height / 2}px`,
-              transform: 'translate(-50%, -50%)',
-            }}
-          >
-            {sizeLabel}
-          </div>
           {isRenderingOutput && (
             <div
               className="absolute h-1 bg-white/80"
@@ -3559,10 +3598,20 @@ export default function ScreenshotSession({
                 left: `${selectionViewportRect.x}px`,
                 top: `${selectionViewportRect.y + selectionViewportRect.height}px`,
                 width: `${selectionViewportRect.width}px`,
+                zIndex: 2,
               }}
             />
           )}
         </>
+      )}
+      {viewportBounds && (
+        <canvas
+          ref={selectionOverlayCanvasRef}
+          width={Math.max(0, Math.round(viewportBounds.width))}
+          height={Math.max(0, Math.round(viewportBounds.height))}
+          className="pointer-events-none absolute left-0 top-0 h-full w-full"
+          aria-hidden="true"
+        />
       )}
       {isMagnifierShown &&
         cursorMonitor &&

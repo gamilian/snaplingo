@@ -59,9 +59,15 @@ describe('capture presentation', () => {
     );
   });
 
-  it('uses blue selection and primary editor affordances', () => {
+  it('keeps the selection hit layer transparent and primary editor affordances', () => {
     expect(getCaptureEditorSelectionClassName('preview')).toEqual(
-      expect.stringContaining('border-[#5b7fff]'),
+      expect.stringContaining('bg-transparent'),
+    );
+    expect(getCaptureEditorSelectionClassName('preview')).not.toContain(
+      'border-[#5b7fff]',
+    );
+    expect(getCaptureEditorSelectionClassName('preview')).toEqual(
+      expect.stringContaining('cursor-move'),
     );
     expect(getCaptureEditorSelectionClassName('preview')).toEqual(
       expect.stringContaining('rounded-[8px]'),

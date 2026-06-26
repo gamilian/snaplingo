@@ -53,6 +53,7 @@ describe('capture selection canvas overlay', () => {
       getCaptureSelectionOverlayFrame({
         status: 'selecting',
         selectionBounds: bounds,
+        selection: null,
         draftSelection: { x: -20, y: 90, width: 120.4, height: 60.6 },
         hoverSelection: null,
       }),
@@ -68,6 +69,7 @@ describe('capture selection canvas overlay', () => {
       getCaptureSelectionOverlayFrame({
         status: 'selecting',
         selectionBounds: bounds,
+        selection: null,
         draftSelection: null,
         hoverSelection: { x: 0, y: 80, width: 50, height: 40 },
       }),
@@ -78,11 +80,28 @@ describe('capture selection canvas overlay', () => {
     });
   });
 
-  it('does not build a frame outside selecting state', () => {
+  it('builds a viewport preview frame from the committed selection', () => {
     expect(
       getCaptureSelectionOverlayFrame({
         status: 'preview',
         selectionBounds: bounds,
+        selection: { x: 0, y: 80, width: 50.4, height: 40.6 },
+        draftSelection: null,
+        hoverSelection: null,
+      }),
+    ).toEqual({
+      variant: 'preview',
+      rect: { x: 100, y: 30, width: 50.4, height: 40.6 },
+      label: '50 x 41',
+    });
+  });
+
+  it('does not build a frame outside selecting or preview state', () => {
+    expect(
+      getCaptureSelectionOverlayFrame({
+        status: 'loading',
+        selectionBounds: bounds,
+        selection: null,
         draftSelection: { x: 0, y: 80, width: 50, height: 40 },
         hoverSelection: null,
       }),

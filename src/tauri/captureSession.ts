@@ -5,6 +5,7 @@ import type {
   CaptureSessionView,
   LogicalRect,
   OcrResult,
+  Point,
 } from '../components/ScreenshotSession/types';
 
 export type CaptureOutputAction =
@@ -48,6 +49,10 @@ export async function createCaptureSession() {
 
 export async function getCaptureSession(sessionId: string) {
   return invoke<CaptureSessionView>('get_capture_session', { sessionId });
+}
+
+export async function currentCaptureCursorPosition(sessionId: string) {
+  return invoke<Point | null>('current_capture_cursor_position', { sessionId });
 }
 
 export async function cancelCaptureSession(sessionId: string) {

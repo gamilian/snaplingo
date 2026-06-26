@@ -31,7 +31,7 @@ export function getCaptureEditorSelectionClassName(
   hasActiveAnnotationTool = false,
 ) {
   return [
-    'absolute rounded-[8px] border-[3px] border-[#5b7fff] bg-transparent shadow-[0_0_0_1px_rgba(255,255,255,0.38)]',
+    'absolute rounded-[8px] bg-transparent',
     status === 'preview'
       ? hasActiveAnnotationTool
         ? 'cursor-crosshair'

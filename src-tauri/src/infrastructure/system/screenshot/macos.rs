@@ -457,6 +457,22 @@ impl ScreenshotBackend for MacOSScreenshotBackend {
         ))
     }
 
+    fn current_cursor_position(
+        &self,
+        monitors: &[MonitorSnapshot],
+    ) -> Result<Option<LogicalPoint>, AppError> {
+        let Some(primary_bounds) = primary_screen_bounds(monitors) else {
+            return Ok(None);
+        };
+        let mouse = NSEvent::mouseLocation();
+
+        Ok(appkit_mouse_to_logical_point(
+            mouse.x,
+            mouse.y,
+            &primary_bounds,
+        ))
+    }
+
     async fn capture_full_screen(&self) -> Result<Vec<u8>, AppError> {
         let access = prepare_screen_capture_access();
 

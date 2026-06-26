@@ -6,8 +6,8 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use base64::Engine;
 
 use crate::domain::capture::{
-    CaptureCandidateView, CaptureSessionId, CaptureSessionView, CapturedCursorView, LogicalRect,
-    MonitorSnapshotView, PhysicalRect,
+    CaptureCandidateView, CaptureSessionId, CaptureSessionView, CapturedCursorView, LogicalPoint,
+    LogicalRect, MonitorSnapshotView, PhysicalRect,
 };
 use crate::error::{AppError, Result};
 use crate::infrastructure::system::screenshot::{
@@ -166,6 +166,13 @@ impl CaptureSessionService {
         let session = self.get_session(id)?;
 
         Ok(session_to_view(&session))
+    }
+
+    pub fn current_cursor_position(&self, id: &CaptureSessionId) -> Result<Option<LogicalPoint>> {
+        let session = self.get_session(id)?;
+
+        self.screenshot_backend
+            .current_cursor_position(&session.snapshots)
     }
 
     pub fn has_session(&self, id: &CaptureSessionId) -> bool {

@@ -13,6 +13,8 @@ export interface CaptureCandidate {
   priority: number;
 }
 
+const MONITOR_SIZED_WINDOW_TOLERANCE = 1;
+
 export function buildMonitorCandidates(
   monitors: MonitorSnapshotView[],
 ): CaptureCandidate[] {
@@ -95,8 +97,10 @@ function sortCandidatesAtPoint(
   includeMonitorCandidates: boolean,
 ): CaptureCandidate[] {
   return candidates
-    .filter(
-      (candidate) => includeMonitorCandidates || candidate.kind !== 'monitor',
+    .filter((candidate) =>
+      includeMonitorCandidates
+        ? true
+        : isAutomaticHoverCandidate(candidate, candidates),
     )
     .filter((candidate) => containsPoint(candidate.rect, point))
     .sort((a, b) => {
@@ -104,6 +108,28 @@ function sortCandidatesAtPoint(
 
       return area(a.rect) - area(b.rect);
     });
+}
+
+function isAutomaticHoverCandidate(
+  candidate: CaptureCandidate,
+  candidates: CaptureCandidate[],
+) {
+  if (candidate.kind === 'monitor') return false;
+
+  return !isMonitorSizedWindowCandidate(candidate, candidates);
+}
+
+function isMonitorSizedWindowCandidate(
+  candidate: CaptureCandidate,
+  candidates: CaptureCandidate[],
+) {
+  if (candidate.kind !== 'window') return false;
+
+  return candidates.some(
+    (otherCandidate) =>
+      otherCandidate.kind === 'monitor' &&
+      areRectsNearlyEqual(candidate.rect, otherCandidate.rect),
+  );
 }
 
 function containsPoint(rect: LogicalRect, point: Point) {
@@ -125,5 +151,14 @@ function areRectsEqual(a: LogicalRect, b: LogicalRect) {
     a.y === b.y &&
     a.width === b.width &&
     a.height === b.height
+  );
+}
+
+function areRectsNearlyEqual(a: LogicalRect, b: LogicalRect) {
+  return (
+    Math.abs(a.x - b.x) <= MONITOR_SIZED_WINDOW_TOLERANCE &&
+    Math.abs(a.y - b.y) <= MONITOR_SIZED_WINDOW_TOLERANCE &&
+    Math.abs(a.width - b.width) <= MONITOR_SIZED_WINDOW_TOLERANCE &&
+    Math.abs(a.height - b.height) <= MONITOR_SIZED_WINDOW_TOLERANCE
   );
 }
