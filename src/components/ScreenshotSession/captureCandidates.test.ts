@@ -3,6 +3,8 @@ import {
   buildCaptureCandidates,
   buildMonitorCandidates,
   getBestCandidateAtPoint,
+  getCandidateForPointerCompletion,
+  getCandidateForPointerReleaseCompletion,
   getNextCandidateAtPoint,
   type CaptureCandidate,
 } from './captureCandidates';
@@ -126,6 +128,15 @@ describe('capture candidates', () => {
     ).toBeNull();
   });
 
+  it('does not use monitor candidates as automatic hover selections', () => {
+    expect(
+      getBestCandidateAtPoint(buildMonitorCandidates(monitors), {
+        x: 120,
+        y: 120,
+      }),
+    ).toBeNull();
+  });
+
   it('cycles candidates under a point by priority and area', () => {
     const candidates: CaptureCandidate[] = [
       {
@@ -165,5 +176,123 @@ describe('capture candidates', () => {
     expect(
       getNextCandidateAtPoint(candidates, point, candidates[2].rect, -1)?.id,
     ).toBe('monitor:primary');
+  });
+
+  it('falls back to the candidate under the pointer when no hover selection is active', () => {
+    const candidates: CaptureCandidate[] = [
+      {
+        id: 'monitor:primary',
+        kind: 'monitor',
+        rect: { x: 0, y: 0, width: 1440, height: 900 },
+        priority: 0,
+      },
+      {
+        id: 'window:settings',
+        kind: 'window',
+        rect: { x: 100, y: 100, width: 500, height: 400 },
+        priority: 10,
+      },
+    ];
+
+    expect(
+      getCandidateForPointerCompletion(candidates, { x: 120, y: 120 }, null),
+    )?.toMatchObject({ id: 'window:settings' });
+  });
+
+  it('falls back to the candidate under the pointer when the active hover selection moved away', () => {
+    const candidates: CaptureCandidate[] = [
+      {
+        id: 'monitor:primary',
+        kind: 'monitor',
+        rect: { x: 0, y: 0, width: 1440, height: 900 },
+        priority: 0,
+      },
+      {
+        id: 'window:settings',
+        kind: 'window',
+        rect: { x: 100, y: 100, width: 500, height: 400 },
+        priority: 10,
+      },
+      {
+        id: 'window:editor',
+        kind: 'window',
+        rect: { x: 700, y: 100, width: 400, height: 300 },
+        priority: 10,
+      },
+    ];
+
+    expect(
+      getCandidateForPointerCompletion(
+        candidates,
+        { x: 740, y: 140 },
+        candidates[1].rect,
+      ),
+    )?.toMatchObject({ id: 'window:editor' });
+  });
+
+  it('does not complete a candidate when pointer release produced a manual selection', () => {
+    const candidates: CaptureCandidate[] = [
+      {
+        id: 'monitor:primary',
+        kind: 'monitor',
+        rect: { x: 0, y: 0, width: 1440, height: 900 },
+        priority: 0,
+      },
+      {
+        id: 'window:settings',
+        kind: 'window',
+        rect: { x: 100, y: 100, width: 500, height: 400 },
+        priority: 10,
+      },
+    ];
+
+    expect(
+      getCandidateForPointerReleaseCompletion(
+        candidates,
+        { x: 260, y: 220 },
+        null,
+        { x: 120, y: 120, width: 140, height: 100 },
+        6,
+      ),
+    ).toBeNull();
+  });
+
+  it('completes the candidate under a click release when no hover state is active', () => {
+    const candidates: CaptureCandidate[] = [
+      {
+        id: 'monitor:primary',
+        kind: 'monitor',
+        rect: { x: 0, y: 0, width: 1440, height: 900 },
+        priority: 0,
+      },
+      {
+        id: 'window:settings',
+        kind: 'window',
+        rect: { x: 100, y: 100, width: 500, height: 400 },
+        priority: 10,
+      },
+    ];
+
+    expect(
+      getCandidateForPointerReleaseCompletion(
+        candidates,
+        { x: 120, y: 120 },
+        null,
+        { x: 120, y: 120, width: 0, height: 0 },
+        6,
+      ),
+    )?.toMatchObject({ id: 'window:settings' });
+  });
+
+  it('does not complete a full monitor candidate from a plain click release', () => {
+    expect(
+      getCandidateForPointerReleaseCompletion(
+        buildMonitorCandidates(monitors),
+        { x: 120, y: 120 },
+        null,
+        { x: 120, y: 120, width: 0, height: 0 },
+        6,
+      ),
+    ).toBeNull();
   });
 });

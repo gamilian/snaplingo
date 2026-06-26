@@ -1520,9 +1520,9 @@ describe('capture session actions', () => {
     ).toBe('copy');
   });
 
-  it('uses the capture mode for hovered candidate primary double click completion', () => {
+  it('uses the capture mode for hovered candidate primary click completion', () => {
     const event = {
-      detail: 2,
+      detail: 1,
       button: 0,
       metaKey: false,
       ctrlKey: false,

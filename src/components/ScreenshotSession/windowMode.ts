@@ -16,8 +16,10 @@ export function readCaptureLaunch(search: string): CaptureLaunch | null {
   if (params.get('window') !== CAPTURE_WINDOW_LABEL) return null;
 
   const mode = params.get('mode');
+  if (!isCaptureMode(mode)) return null;
+
   return {
-    mode: isCaptureMode(mode) ? mode : 'screenshot',
+    mode,
     sessionId: params.get('sessionId') || undefined,
   };
 }

@@ -2,7 +2,6 @@
 mod tests {
     use super::super::HistoryDatabase;
     use crate::domain::translation::{TranslationRequest, TranslationResult};
-    use crate::domain::ocr::{OcrRequest, OcrResult};
     use chrono::Utc;
     use tempfile::NamedTempFile;
 
@@ -43,13 +42,9 @@ mod tests {
         let timestamp = Utc::now();
 
         // Act
-        let result = db.insert_translation(
-            &request,
-            &results,
-            &providers_used,
-            timestamp,
-            150,
-        ).await;
+        let result = db
+            .insert_translation(&request, &results, &providers_used, timestamp, 150)
+            .await;
 
         // Assert
         assert!(result.is_ok());

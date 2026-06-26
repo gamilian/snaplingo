@@ -32,8 +32,7 @@ impl AnthropicLLMClient {
     /// 判断是否支持 extended thinking（参考 Pi: 按模型检测）
     fn supports_thinking(&self) -> bool {
         // Claude Sonnet 3.7+ / Opus 4.0+ 支持
-        (self.model.contains("sonnet")
-            && (self.model.contains("3.7") || self.model.contains("4.")))
+        (self.model.contains("sonnet") && (self.model.contains("3.7") || self.model.contains("4.")))
             || (self.model.contains("opus") && self.model.contains("4."))
     }
 
@@ -88,10 +87,7 @@ impl LLMClient for AnthropicLLMClient {
         // 发送请求
         let mut headers = HashMap::new();
         headers.insert("x-api-key".to_string(), self.api_key.clone());
-        headers.insert(
-            "anthropic-version".to_string(),
-            "2023-06-01".to_string(),
-        );
+        headers.insert("anthropic-version".to_string(), "2023-06-01".to_string());
         headers.insert("Content-Type".to_string(), "application/json".to_string());
 
         let response = self
@@ -158,11 +154,7 @@ mod tests {
             Ok(self.response.clone())
         }
 
-        async fn get(
-            &self,
-            _url: &str,
-            _headers: HashMap<String, String>,
-        ) -> Result<HttpResponse> {
+        async fn get(&self, _url: &str, _headers: HashMap<String, String>) -> Result<HttpResponse> {
             unimplemented!()
         }
     }

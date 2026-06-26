@@ -35,7 +35,11 @@ const STARTUP_HOTKEYS: &[(&str, &str, &str)] = &[
     (TRANSLATION_CATEGORY, SELECTION_TRANSLATE_ACTION, "⌥D"),
     (TRANSLATION_CATEGORY, SCREENSHOT_TRANSLATE_ACTION, "⌥S"),
     (TRANSLATION_CATEGORY, INPUT_TRANSLATE_ACTION, "⌥A"),
-    (TRANSLATION_CATEGORY, SHOW_TRANSLATION_WINDOW_ACTION, "未设置"),
+    (
+        TRANSLATION_CATEGORY,
+        SHOW_TRANSLATION_WINDOW_ACTION,
+        "未设置",
+    ),
     (OCR_CATEGORY, SCREENSHOT_OCR_ACTION, "⇧⌥S"),
     (OCR_CATEGORY, SILENT_SCREENSHOT_OCR_ACTION, "未设置"),
     (OCR_CATEGORY, FILE_OCR_ACTION, "未设置"),
@@ -131,8 +135,7 @@ fn resolve_hotkey_accelerator(
     if !is_known_hotkey_action(category, action) {
         return Err(crate::AppError::Other(format!(
             "Unknown hotkey action '{}:{}'",
-            category,
-            action
+            category, action
         )));
     }
 
@@ -426,8 +429,7 @@ mod tests {
     #[test]
     fn resolves_ocr_hotkey_actions() {
         assert_eq!(
-            resolve_hotkey_accelerator(OCR_CATEGORY, SILENT_SCREENSHOT_OCR_ACTION, "⌘F5")
-                .unwrap(),
+            resolve_hotkey_accelerator(OCR_CATEGORY, SILENT_SCREENSHOT_OCR_ACTION, "⌘F5").unwrap(),
             Some("CmdOrCtrl+F5".to_string())
         );
         assert_eq!(

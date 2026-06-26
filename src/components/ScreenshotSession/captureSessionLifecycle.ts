@@ -1,4 +1,7 @@
-import { cancelCaptureSession } from '../../tauri/captureSession';
+import {
+  cancelCaptureSession,
+  hideCaptureWindow,
+} from '../../tauri/captureSession';
 
 export type CaptureInactiveHandler = () => void | Promise<void>;
 export interface CaptureInactiveWindow {
@@ -46,6 +49,17 @@ export async function finishCaptureSession({
   await client.cancelCaptureSession(sessionId);
 }
 
-export async function hideInactiveCaptureWindow(window: CaptureInactiveWindow) {
-  await window.hide();
+export interface CaptureWindowHideClient {
+  hideCaptureWindow: () => Promise<void>;
+}
+
+const tauriCaptureWindowHideClient: CaptureWindowHideClient = {
+  hideCaptureWindow,
+};
+
+export async function hideInactiveCaptureWindow(
+  _window: CaptureInactiveWindow,
+  client: CaptureWindowHideClient = tauriCaptureWindowHideClient,
+) {
+  await client.hideCaptureWindow();
 }

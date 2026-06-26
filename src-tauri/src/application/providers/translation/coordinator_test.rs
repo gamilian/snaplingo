@@ -77,7 +77,7 @@ mod tests {
     #[test]
     fn test_register_provider() {
         let config = Arc::new(ConfigFile::new_temp());
-        let mut coordinator = TranslationCoordinator::new(config);
+        let coordinator = TranslationCoordinator::new(config);
         let provider = MockTranslationProvider::new("google", "Google Translate");
 
         coordinator.register(provider).unwrap();
@@ -90,13 +90,12 @@ mod tests {
     #[test]
     fn test_register_duplicate_provider_fails() {
         let config = Arc::new(ConfigFile::new_temp());
-        let mut coordinator = TranslationCoordinator::new(config);
+        let coordinator = TranslationCoordinator::new(config);
 
         coordinator
             .register(MockTranslationProvider::new("google", "Google"))
             .unwrap();
-        let result =
-            coordinator.register(MockTranslationProvider::new("google", "Google"));
+        let result = coordinator.register(MockTranslationProvider::new("google", "Google"));
 
         assert!(result.is_err());
     }
@@ -104,7 +103,7 @@ mod tests {
     #[test]
     fn test_activate_multiple_providers() {
         let config = Arc::new(ConfigFile::new_temp());
-        let mut coordinator = TranslationCoordinator::new(config);
+        let coordinator = TranslationCoordinator::new(config);
         coordinator
             .register(MockTranslationProvider::new("google", "Google Translate"))
             .unwrap();
@@ -124,7 +123,7 @@ mod tests {
     #[test]
     fn test_deactivate_provider() {
         let config = Arc::new(ConfigFile::new_temp());
-        let mut coordinator = TranslationCoordinator::new(config);
+        let coordinator = TranslationCoordinator::new(config);
         coordinator
             .register(MockTranslationProvider::new("google", "Google Translate"))
             .unwrap();
@@ -154,7 +153,7 @@ mod tests {
     #[test]
     fn test_activate_persists() {
         let config = Arc::new(ConfigFile::new_temp());
-        let mut coordinator = TranslationCoordinator::new(config.clone());
+        let coordinator = TranslationCoordinator::new(config.clone());
         coordinator
             .register(MockTranslationProvider::new("google", "Google"))
             .unwrap();
@@ -175,7 +174,7 @@ mod tests {
             )
             .unwrap();
 
-        let mut coordinator = TranslationCoordinator::new(config);
+        let coordinator = TranslationCoordinator::new(config);
         coordinator
             .register(MockTranslationProvider::new("google", "Google"))
             .unwrap();
@@ -253,8 +252,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_coordinator_publishes_event_when_translation_completes() {
-        use crate::infrastructure::events::{EventBus, EventSubscriber};
         use crate::domain::events::DomainEvent;
+        use crate::infrastructure::events::{EventBus, EventSubscriber};
         use tokio::sync::Mutex as TokioMutex;
 
         // Mock subscriber to capture events

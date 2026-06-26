@@ -51,14 +51,16 @@ impl TranslationProvider for GoogleTranslateProvider {
             urlencoding::encode(&request.text)
         );
 
-        let response = self.http_client.get(&url, HashMap::new()).await
+        let response = self
+            .http_client
+            .get(&url, HashMap::new())
+            .await
             .map_err(|e| AppError::Other(format!("HTTP request failed: {}", e)))?;
 
         if response.status != 200 {
             return Err(AppError::Other(format!(
                 "Google Translate API returned status {}: {}",
-                response.status,
-                response.body
+                response.status, response.body
             )));
         }
 
@@ -66,7 +68,9 @@ impl TranslationProvider for GoogleTranslateProvider {
 
         let translated_text = json[0][0][0]
             .as_str()
-            .ok_or_else(|| AppError::Other("Invalid response format from Google Translate".to_string()))?
+            .ok_or_else(|| {
+                AppError::Other("Invalid response format from Google Translate".to_string())
+            })?
             .to_string();
 
         let detected_language = json[2].as_str().map(String::from);
@@ -130,7 +134,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_translate_success() {
-        let mock_response = r#"[[["Hello","Bonjour",null,null,10]],null,"fr",null,null,null,null,[]]"#;
+        let mock_response =
+            r#"[[["Hello","Bonjour",null,null,10]],null,"fr",null,null,null,null,[]]"#;
 
         let mock_client = Arc::new(MockHttpClient {
             response: HttpResponse {

@@ -7,7 +7,7 @@ use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 /// Simple approach: Use macOS native screencapture tool
 /// This is how many screenshot apps work on macOS - they wrap the native tool
 #[tauri::command]
-pub fn create_screenshot_window_simple(app: tauri::AppHandle) -> Result<(), String> {
+pub fn create_screenshot_window_simple(_app: tauri::AppHandle) -> Result<(), String> {
     log::info!("Starting screenshot using macOS native screencapture");
 
     // Use macOS native screencapture command in interactive mode
@@ -42,6 +42,7 @@ pub fn create_screenshot_window_simple(app: tauri::AppHandle) -> Result<(), Stri
 }
 
 #[tauri::command]
+#[allow(dead_code)]
 pub fn create_screenshot_window_simple_custom(app: tauri::AppHandle) -> Result<(), String> {
     log::info!("Creating screenshot window (simple mode - plugin handles capture)");
 
@@ -94,7 +95,8 @@ pub fn create_screenshot_window_simple_custom(app: tauri::AppHandle) -> Result<(
     .closable(true)
     .always_on_top(true)
     .skip_taskbar(true)
-    .focused(true)
+    .focused(legacy_screenshot_window_should_start_focused())
+    .accept_first_mouse(true)
     .visible(false)
     .build()
     .map_err(|e| format!("Failed to create screenshot window: {}", e))?;
@@ -110,19 +112,24 @@ pub fn create_screenshot_window_simple_custom(app: tauri::AppHandle) -> Result<(
         if let Err(e) = window.show() {
             log::error!("Failed to show screenshot window: {}", e);
         }
-        if let Err(e) = window.set_focus() {
-            log::error!("Failed to focus screenshot window: {}", e);
+        if should_focus_legacy_screenshot_window_after_show() {
+            if let Err(e) = window.set_focus() {
+                log::error!("Failed to focus screenshot window: {}", e);
+            }
         }
 
         // Listen for window close to restore other windows
         window.on_window_event(move |event| {
             if let tauri::WindowEvent::Destroyed = event {
-                log::info!("Screenshot window closed, restoring other windows");
-                for (label, win) in app_clone.webview_windows().iter() {
-                    if label != "screenshot" {
+                let visible_window_labels = app_clone
+                    .webview_windows()
+                    .keys()
+                    .cloned()
+                    .collect::<Vec<_>>();
+                for label in legacy_screenshot_window_labels_to_restore(&visible_window_labels) {
+                    if let Some(win) = app_clone.get_webview_window(&label) {
                         log::info!("Showing window: {}", label);
                         let _ = win.show();
-                        let _ = win.set_focus();
                     }
                 }
             }
@@ -171,7 +178,8 @@ pub fn create_screenshot_window(
     .resizable(false)
     .always_on_top(true)
     .skip_taskbar(true)
-    .focused(true)
+    .focused(legacy_screenshot_window_should_start_focused())
+    .accept_first_mouse(true)
     .build()
     .map_err(|e| format!("Failed to create screenshot window: {}", e))?;
 
@@ -210,9 +218,11 @@ pub fn screenshot_overlay_ready(
         }
     };
 
-    window
-        .set_focus()
-        .map_err(|e| format!("Failed to focus screenshot window: {}", e))?;
+    if should_focus_legacy_screenshot_window_when_overlay_ready() {
+        window
+            .set_focus()
+            .map_err(|e| format!("Failed to focus screenshot window: {}", e))?;
+    }
     window
         .emit("screenshot-data", data)
         .map_err(|e| format!("Failed to emit screenshot data: {}", e))?;
@@ -230,15 +240,12 @@ pub fn close_screenshot_window(app: tauri::AppHandle) -> Result<(), String> {
             .map_err(|e| format!("Failed to close screenshot window: {}", e))?;
     }
 
-    // Restore all other windows
-    for (label, window) in app.webview_windows().iter() {
-        if label != "screenshot" {
+    let visible_window_labels = app.webview_windows().keys().cloned().collect::<Vec<_>>();
+    for label in legacy_screenshot_window_labels_to_restore(&visible_window_labels) {
+        if let Some(window) = app.get_webview_window(&label) {
             log::info!("Restoring window: {}", label);
             if let Err(e) = window.show() {
                 log::warn!("Failed to show window {}: {}", label, e);
-            }
-            if let Err(e) = window.set_focus() {
-                log::warn!("Failed to focus window {}: {}", label, e);
             }
         }
     }
@@ -300,20 +307,83 @@ pub fn crop_screenshot(
         .map_err(|e| format!("Failed to encode PNG: {}", e))?;
 
     // Convert to base64
-    use base64::{Engine as _, engine::general_purpose};
+    use base64::{engine::general_purpose, Engine as _};
     let base64 = general_purpose::STANDARD.encode(&buf);
 
-    if let Some(main_window) = app.get_webview_window("main") {
-        main_window
-            .show()
-            .map_err(|e| format!("Failed to show main window: {}", e))?;
-        main_window
-            .set_focus()
-            .map_err(|e| format!("Failed to focus main window: {}", e))?;
+    if should_focus_main_after_legacy_screenshot_crop() {
+        if let Some(main_window) = app.get_webview_window("main") {
+            main_window
+                .show()
+                .map_err(|e| format!("Failed to show main window: {}", e))?;
+            main_window
+                .set_focus()
+                .map_err(|e| format!("Failed to focus main window: {}", e))?;
+            main_window
+                .emit("screenshot-captured", base64.clone())
+                .map_err(|e| format!("Failed to emit screenshot-captured: {}", e))?;
+        }
+    } else if let Some(main_window) = app.get_webview_window("main") {
         main_window
             .emit("screenshot-captured", base64.clone())
             .map_err(|e| format!("Failed to emit screenshot-captured: {}", e))?;
     }
 
     Ok(base64)
+}
+
+fn legacy_screenshot_window_labels_to_restore(_visible_window_labels: &[String]) -> Vec<String> {
+    Vec::new()
+}
+
+fn should_focus_main_after_legacy_screenshot_crop() -> bool {
+    false
+}
+
+fn legacy_screenshot_window_should_start_focused() -> bool {
+    false
+}
+
+#[allow(dead_code)]
+fn should_focus_legacy_screenshot_window_after_show() -> bool {
+    false
+}
+
+fn should_focus_legacy_screenshot_window_when_overlay_ready() -> bool {
+    false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_screenshot_close_does_not_restore_main_window() {
+        let labels = vec![
+            "main".to_string(),
+            "capture".to_string(),
+            "screenshot".to_string(),
+        ];
+
+        assert!(legacy_screenshot_window_labels_to_restore(&labels).is_empty());
+    }
+
+    #[test]
+    fn legacy_screenshot_crop_does_not_focus_main_window() {
+        assert!(!should_focus_main_after_legacy_screenshot_crop());
+    }
+
+    #[test]
+    fn legacy_screenshot_window_does_not_start_focused() {
+        assert!(!legacy_screenshot_window_should_start_focused());
+    }
+
+    #[test]
+    fn legacy_screenshot_window_does_not_focus_after_show() {
+        assert!(!should_focus_legacy_screenshot_window_after_show());
+    }
+
+    #[test]
+    fn legacy_screenshot_overlay_ready_does_not_focus_window() {
+        assert!(!should_focus_legacy_screenshot_window_when_overlay_ready());
+    }
 }

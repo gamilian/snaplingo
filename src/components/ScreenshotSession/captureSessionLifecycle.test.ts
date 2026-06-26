@@ -7,7 +7,7 @@ import {
 } from './captureSessionLifecycle';
 
 describe('capture session lifecycle', () => {
-  it('closes the capture window before ending the native session', async () => {
+  it('closes the capture window before ending the native session for immediate Esc feedback', async () => {
     const events: string[] = [];
     const client: CaptureLifecycleClient = {
       cancelCaptureSession: async (sessionId) => {
@@ -35,7 +35,7 @@ describe('capture session lifecycle', () => {
     ]);
   });
 
-  it('clears the capture UI only when no inactive handler is available', async () => {
+  it('clears the capture UI before ending the native session when no inactive handler is available', async () => {
     const events: string[] = [];
     const client: CaptureLifecycleClient = {
       cancelCaptureSession: async (sessionId) => {
@@ -97,12 +97,19 @@ describe('capture session lifecycle', () => {
   it('hides the capture window for reuse when it becomes inactive', async () => {
     const events: string[] = [];
 
-    await hideInactiveCaptureWindow({
-      hide: async () => {
-        events.push('hide');
+    await hideInactiveCaptureWindow(
+      {
+        hide: async () => {
+          events.push('window.hide');
+        },
       },
-    });
+      {
+        hideCaptureWindow: async () => {
+          events.push('hide_capture_window');
+        },
+      },
+    );
 
-    expect(events).toEqual(['hide']);
+    expect(events).toEqual(['hide_capture_window']);
   });
 });

@@ -1,4 +1,4 @@
-use crate::application::providers::common::{Provider, CredentialField};
+use crate::application::providers::common::{CredentialField, Provider};
 use crate::application::providers::translation::TranslationProvider;
 use crate::domain::translation::{TranslationRequest, TranslationResult};
 use crate::infrastructure::http::HttpClient;
@@ -36,7 +36,10 @@ impl BaiduTranslateProvider {
 
     /// Configures the provider from a HashMap of credentials.
     /// Expected keys: "app_id", "secret_key"
-    pub fn configure_from_map(&mut self, credentials: &HashMap<String, String>) -> crate::Result<()> {
+    pub fn configure_from_map(
+        &mut self,
+        credentials: &HashMap<String, String>,
+    ) -> crate::Result<()> {
         let app_id = credentials
             .get("app_id")
             .ok_or_else(|| crate::AppError::Other("Missing app_id".to_string()))?
@@ -53,9 +56,13 @@ impl BaiduTranslateProvider {
     /// Generates MD5 signature for Baidu API authentication.
     /// Signature formula: MD5(appid + query + salt + secret)
     fn generate_signature(&self, query: &str, salt: &str) -> Result<String> {
-        let app_id = self.app_id.as_ref()
+        let app_id = self
+            .app_id
+            .as_ref()
             .ok_or_else(|| AppError::Other("Baidu APP ID not configured".to_string()))?;
-        let secret_key = self.secret_key.as_ref()
+        let secret_key = self
+            .secret_key
+            .as_ref()
             .ok_or_else(|| AppError::Other("Baidu Secret Key not configured".to_string()))?;
 
         let sign_str = format!("{}{}{}{}", app_id, query, salt, secret_key);
@@ -88,7 +95,10 @@ impl Provider for BaiduTranslateProvider {
         ]
     }
 
-    fn reconfigure_credentials(&mut self, credentials: &HashMap<String, String>) -> crate::Result<()> {
+    fn reconfigure_credentials(
+        &mut self,
+        credentials: &HashMap<String, String>,
+    ) -> crate::Result<()> {
         self.configure_from_map(credentials)
     }
 }
@@ -102,7 +112,6 @@ struct BaiduResponse {
 
 #[derive(Deserialize)]
 struct BaiduTranslation {
-    src: String,
     dst: String,
 }
 
@@ -110,7 +119,9 @@ struct BaiduTranslation {
 impl TranslationProvider for BaiduTranslateProvider {
     async fn translate(&self, request: &TranslationRequest) -> Result<TranslationResult> {
         if !self.is_configured() {
-            return Err(AppError::Other("Baidu Translate not configured with APP ID and Secret Key".to_string()));
+            return Err(AppError::Other(
+                "Baidu Translate not configured with APP ID and Secret Key".to_string(),
+            ));
         }
 
         // Generate salt (random number)
@@ -134,14 +145,16 @@ impl TranslationProvider for BaiduTranslateProvider {
             signature
         );
 
-        let response = self.http_client.get(&url, HashMap::new()).await
+        let response = self
+            .http_client
+            .get(&url, HashMap::new())
+            .await
             .map_err(|e| AppError::Other(format!("HTTP request failed: {}", e)))?;
 
         if response.status != 200 {
             return Err(AppError::Other(format!(
                 "Baidu Translate API returned status {}: {}",
-                response.status,
-                response.body
+                response.status, response.body
             )));
         }
 
@@ -149,18 +162,21 @@ impl TranslationProvider for BaiduTranslateProvider {
 
         // Check for API errors
         if let Some(error_code) = baidu_response.error_code {
-            let error_msg = baidu_response.error_msg.unwrap_or_else(|| "Unknown error".to_string());
+            let error_msg = baidu_response
+                .error_msg
+                .unwrap_or_else(|| "Unknown error".to_string());
             return Err(AppError::Other(format!(
                 "Baidu Translate API error {}: {}",
-                error_code,
-                error_msg
+                error_code, error_msg
             )));
         }
 
-        let translations = baidu_response.trans_result
+        let translations = baidu_response
+            .trans_result
             .ok_or_else(|| AppError::Other("No translation result from Baidu".to_string()))?;
 
-        let translation = translations.first()
+        let translation = translations
+            .first()
             .ok_or_else(|| AppError::Other("Empty translation result from Baidu".to_string()))?;
 
         Ok(TranslationResult {

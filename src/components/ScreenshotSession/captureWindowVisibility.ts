@@ -37,7 +37,7 @@ interface RevealCaptureWindowForSessionOptions {
 }
 
 export function getCaptureWindowRevealPermissions() {
-  return ['core:window:allow-show', 'core:window:allow-set-focus'] as const;
+  return [] as const;
 }
 
 export function shouldRevealCaptureWindow({

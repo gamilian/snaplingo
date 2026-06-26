@@ -2,8 +2,8 @@
 mod tests {
     use super::super::{EventBus, EventSubscriber};
     use crate::domain::events::DomainEvent;
-    use crate::domain::translation::{TranslationRequest, TranslationResult};
     use crate::domain::ocr::{OcrRequest, OcrResult};
+    use crate::domain::translation::{TranslationRequest, TranslationResult};
     use async_trait::async_trait;
     use chrono::Utc;
     use std::sync::Arc;
@@ -115,8 +115,17 @@ mod tests {
         assert_eq!(subscriber2.event_count().await, 1);
         assert_eq!(subscriber3.event_count().await, 1);
 
-        assert_eq!(subscriber1.get_events().await[0].event_type(), "ocr_completed");
-        assert_eq!(subscriber2.get_events().await[0].event_type(), "ocr_completed");
-        assert_eq!(subscriber3.get_events().await[0].event_type(), "ocr_completed");
+        assert_eq!(
+            subscriber1.get_events().await[0].event_type(),
+            "ocr_completed"
+        );
+        assert_eq!(
+            subscriber2.get_events().await[0].event_type(),
+            "ocr_completed"
+        );
+        assert_eq!(
+            subscriber3.get_events().await[0].event_type(),
+            "ocr_completed"
+        );
     }
 }

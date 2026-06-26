@@ -182,7 +182,9 @@ mod tests {
     #[test]
     fn test_restore_from_config_skips_unregistered() {
         let config = Arc::new(ConfigFile::new_temp());
-        config.save("active_ocr_provider", &"ghost".to_string()).unwrap();
+        config
+            .save("active_ocr_provider", &"ghost".to_string())
+            .unwrap();
 
         let coordinator = OcrCoordinator::new(config);
         coordinator
@@ -221,11 +223,7 @@ mod tests {
         let config = Arc::new(ConfigFile::new_temp());
         let coordinator = OcrCoordinator::new(config);
         coordinator
-            .register(MockOcrProvider::with_text(
-                "mock",
-                "Mock OCR",
-                "before",
-            ))
+            .register(MockOcrProvider::with_text("mock", "Mock OCR", "before"))
             .unwrap();
         coordinator.activate("mock").unwrap();
 

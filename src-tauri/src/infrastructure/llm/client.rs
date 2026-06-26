@@ -39,9 +39,9 @@ pub struct LLMOptions {
 impl Default for LLMOptions {
     fn default() -> Self {
         Self {
-            reasoning: None,           // 默认不思考（快速模式）
-            temperature: Some(0.0),    // 确定性翻译
-            max_tokens: Some(8192),    // 足够长文档翻译
+            reasoning: None,        // 默认不思考（快速模式）
+            temperature: Some(0.0), // 确定性翻译
+            max_tokens: Some(8192), // 足够长文档翻译
         }
     }
 }
@@ -50,11 +50,11 @@ impl Default for LLMOptions {
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ReasoningLevel {
-    Minimal,  // 快速，低成本
+    Minimal, // 快速，低成本
     Low,
     Medium,
     High,
-    XHigh,    // 极高（o3-mini high 等）
+    XHigh, // 极高（o3-mini high 等）
 }
 
 /// LLM 协议类型

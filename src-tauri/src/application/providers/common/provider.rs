@@ -82,9 +82,13 @@ pub trait Provider: Send + Sync {
     ///
     /// The default implementation returns an error. Providers that support runtime
     /// reconfiguration should override this method.
-    fn reconfigure_credentials(&mut self, _credentials: &HashMap<String, String>) -> crate::Result<()> {
-        Err(crate::AppError::Other(
-            format!("Provider {} does not support runtime credential reconfiguration", self.id())
-        ))
+    fn reconfigure_credentials(
+        &mut self,
+        _credentials: &HashMap<String, String>,
+    ) -> crate::Result<()> {
+        Err(crate::AppError::Other(format!(
+            "Provider {} does not support runtime credential reconfiguration",
+            self.id()
+        )))
     }
 }

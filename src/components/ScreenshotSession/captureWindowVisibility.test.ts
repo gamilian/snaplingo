@@ -20,7 +20,7 @@ describe('capture window visibility', () => {
     ).toBe(false);
   });
 
-  it('keeps the capture window hidden until frozen screen images are decoded', () => {
+  it('keeps the capture window hidden while frozen screen images are decoding', () => {
     expect(
       shouldRevealCaptureWindow({
         status: 'selecting',
@@ -64,7 +64,7 @@ describe('capture window visibility', () => {
     ).toBe(false);
   });
 
-  it('reveals the capture window through the native capture window client', async () => {
+  it('delegates capture window reveal to the native client', async () => {
     const calls: string[] = [];
     const window: CaptureWindowHandle = {
       show: async () => {
@@ -137,9 +137,6 @@ describe('capture window visibility', () => {
   });
 
   it('declares the Tauri permissions required for delayed capture reveal', () => {
-    expect(getCaptureWindowRevealPermissions()).toEqual([
-      'core:window:allow-show',
-      'core:window:allow-set-focus',
-    ]);
+    expect(getCaptureWindowRevealPermissions()).toEqual([]);
   });
 });

@@ -1,8 +1,8 @@
 use super::ConfigFile;
 use crate::domain::AppConfig;
 use crate::error::{AppError, Result};
-use tempfile::NamedTempFile;
 use std::collections::HashSet;
+use tempfile::NamedTempFile;
 
 #[test]
 fn test_save_and_load() {

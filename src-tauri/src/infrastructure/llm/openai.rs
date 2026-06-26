@@ -51,7 +51,10 @@ impl OpenAILLMClient {
 #[async_trait]
 impl LLMClient for OpenAILLMClient {
     async fn generate(&self, request: &LLMRequest) -> Result<LLMResponse> {
-        let url = format!("{}/v1/chat/completions", self.endpoint.trim_end_matches('/'));
+        let url = format!(
+            "{}/v1/chat/completions",
+            self.endpoint.trim_end_matches('/')
+        );
 
         // 构造 messages
         let mut messages = Vec::new();
@@ -140,11 +143,7 @@ mod tests {
             Ok(self.response.clone())
         }
 
-        async fn get(
-            &self,
-            _url: &str,
-            _headers: HashMap<String, String>,
-        ) -> Result<HttpResponse> {
+        async fn get(&self, _url: &str, _headers: HashMap<String, String>) -> Result<HttpResponse> {
             unimplemented!()
         }
     }

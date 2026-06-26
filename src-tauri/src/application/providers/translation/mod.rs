@@ -1,10 +1,12 @@
-mod trait_def;
 mod coordinator;
 mod impls;
+mod trait_def;
 
 #[cfg(test)]
 mod coordinator_test;
 
-pub use trait_def::TranslationProvider;
 pub use coordinator::TranslationCoordinator;
-pub use impls::{GoogleTranslateProvider, DeepLProvider, BaiduTranslateProvider, LLMTranslationProvider};
+pub use impls::{
+    BaiduTranslateProvider, DeepLProvider, GoogleTranslateProvider, LLMTranslationProvider,
+};
+pub use trait_def::TranslationProvider;

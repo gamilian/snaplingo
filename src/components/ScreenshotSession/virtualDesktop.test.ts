@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  getCurrentMonitorBounds,
   getMonitorAtVirtualPoint,
   getMonitorViewportRect,
   getVirtualDesktopBounds,
@@ -79,6 +80,24 @@ describe('virtual desktop geometry', () => {
     expect(getMonitorAtVirtualPoint(monitors, { x: 20, y: -20 })?.id).toBe('top');
     expect(getMonitorAtVirtualPoint(monitors, { x: 20, y: 20 })?.id).toBe('primary');
     expect(getMonitorAtVirtualPoint(monitors, { x: 2000, y: 20 })).toBeNull();
+  });
+
+  it('uses the monitor under the cursor for current full-screen selection bounds', () => {
+    expect(getCurrentMonitorBounds(monitors, { x: 20, y: -20 })).toEqual({
+      x: 0,
+      y: -600,
+      width: 960,
+      height: 600,
+    });
+  });
+
+  it('falls back to virtual desktop bounds when no current monitor is known', () => {
+    expect(getCurrentMonitorBounds(monitors, null)).toEqual({
+      x: -1280,
+      y: -600,
+      width: 2720,
+      height: 1500,
+    });
   });
 
   it('nudges virtual cursor points while keeping them inside desktop bounds', () => {

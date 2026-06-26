@@ -1,14 +1,14 @@
 use super::TranslationProvider;
-use crate::domain::translation::{TranslationRequest, TranslationResult};
 use crate::domain::events::DomainEvent;
-use crate::infrastructure::storage::ConfigFile;
+use crate::domain::translation::{TranslationRequest, TranslationResult};
 use crate::infrastructure::events::EventBus;
+use crate::infrastructure::storage::ConfigFile;
 use crate::Result;
+use chrono::Utc;
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use parking_lot::RwLock;
 use std::time::Instant;
-use chrono::Utc;
 
 /// Coordinator for managing translation providers and operations.
 ///
@@ -177,13 +177,11 @@ impl TranslationCoordinator {
         new_sorted.sort();
 
         if current_sorted != new_sorted {
-            return Err(
-                format!(
-                    "Reorder validation failed: expected {:?}, got {:?}",
-                    current_sorted, new_sorted
-                )
-                .into(),
-            );
+            return Err(format!(
+                "Reorder validation failed: expected {:?}, got {:?}",
+                current_sorted, new_sorted
+            )
+            .into());
         }
 
         // Update order
@@ -236,7 +234,10 @@ impl TranslationCoordinator {
     ///
     /// Skips any provider IDs that are not registered.
     pub fn restore_from_config(&self) -> Result<()> {
-        if let Ok(active_ids) = self.config.load::<Vec<String>>("active_translation_providers") {
+        if let Ok(active_ids) = self
+            .config
+            .load::<Vec<String>>("active_translation_providers")
+        {
             let mut active = self.active.lock().unwrap();
             let providers = self.providers.read();
             active.clear();
@@ -342,7 +343,11 @@ impl TranslationCoordinator {
     /// # Returns
     ///
     /// * `Result<()>` - Ok if successful, Err if provider not found or reconfiguration fails
-    pub fn reconfigure_provider(&self, provider_id: &str, credentials: &HashMap<String, String>) -> Result<()> {
+    pub fn reconfigure_provider(
+        &self,
+        provider_id: &str,
+        credentials: &HashMap<String, String>,
+    ) -> Result<()> {
         let providers = self.providers.read();
         let provider_lock = providers
             .get(provider_id)

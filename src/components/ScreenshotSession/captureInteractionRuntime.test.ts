@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  planManualSelectionCompletion,
   planCandidateSelectionCompletion,
   planSelectionFlowCompletion,
 } from './captureInteractionRuntime';
@@ -26,5 +27,27 @@ describe('captureInteractionRuntime', () => {
       { type: 'record-selection', action: 'ocr' },
       { type: 'finish-session' },
     ]);
+  });
+
+  it('routes manual selection completion to preview only for screenshot mode', () => {
+    expect(planManualSelectionCompletion('screenshot')).toEqual({
+      type: 'preview',
+    });
+    expect(planManualSelectionCompletion('screenshot-ocr')).toEqual({
+      type: 'effects',
+      effects: [
+        { type: 'run-ocr', resultWindow: 'ocr' },
+        { type: 'record-selection', action: 'ocr' },
+        { type: 'finish-session' },
+      ],
+    });
+    expect(planManualSelectionCompletion('screenshot-translate')).toEqual({
+      type: 'effects',
+      effects: [
+        { type: 'run-ocr', resultWindow: 'translation' },
+        { type: 'record-selection', action: 'ocr' },
+        { type: 'finish-session' },
+      ],
+    });
   });
 });

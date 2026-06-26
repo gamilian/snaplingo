@@ -1,11 +1,11 @@
-use crate::domain::translation::{TranslationRequest, TranslationResult};
 use crate::domain::ocr::{OcrRequest, OcrResult};
+use crate::domain::translation::{TranslationRequest, TranslationResult};
 use crate::Result;
 use chrono::{DateTime, Utc};
-use rusqlite::{Connection, params};
+use rusqlite::{params, Connection};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Mutex;
-use serde::{Serialize, Deserialize};
 
 /// Database for storing history records
 pub struct HistoryDatabase {
@@ -56,7 +56,8 @@ impl HistoryDatabase {
         let conn = Connection::open(path)?;
 
         // Check schema version compatibility
-        let db_version: i32 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))
+        let db_version: i32 = conn
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
             .unwrap_or(0);
 
         if db_version != 0 && db_version != Self::SCHEMA_VERSION {
@@ -112,7 +113,10 @@ impl HistoryDatabase {
         )?;
 
         // Set schema version
-        conn.execute(&format!("PRAGMA user_version = {}", Self::SCHEMA_VERSION), [])?;
+        conn.execute(
+            &format!("PRAGMA user_version = {}", Self::SCHEMA_VERSION),
+            [],
+        )?;
 
         Ok(Self {
             conn: Mutex::new(conn),
@@ -222,11 +226,7 @@ impl HistoryDatabase {
     }
 
     /// Query OCR history with pagination
-    pub async fn query_ocr(
-        &self,
-        limit: usize,
-        offset: usize,
-    ) -> Result<Vec<OcrHistoryEntry>> {
+    pub async fn query_ocr(&self, limit: usize, offset: usize) -> Result<Vec<OcrHistoryEntry>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT id, timestamp, image_hash, language, provider_used, recognized_text, confidence, duration_ms

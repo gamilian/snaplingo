@@ -1,4 +1,5 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { listen } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { SettingsWindow } from './components/SettingsWindow';
 import ResultWindow from './components/ResultWindow';
@@ -21,10 +22,14 @@ import {
 } from './tauri/hotkeys';
 import { subscribeMainWindowEvents } from './tauri/appEvents';
 import { recognizeImageFile, selectImageFile } from './tauri/ocr';
+import { takeCaptureResultWindowPayload } from './tauri/captureSession';
 
 const currentWindow = getCurrentWebviewWindow();
 const captureLaunch = readCaptureLaunch(window.location.search);
 const pinnedImageId = readPinnedImageLaunch(window.location.search);
+const isCaptureResultWindow =
+  new URLSearchParams(window.location.search).get('window') ===
+  'capture-result';
 
 function App() {
   const resultWindowVisible = useAppStore((state) => state.resultWindowVisible);
@@ -43,6 +48,8 @@ function App() {
   const isCaptureWindow =
     currentWindow.label === CAPTURE_WINDOW_LABEL || captureLaunch !== null;
   const isPinnedImageWindow = pinnedImageId !== null;
+  const [hasLoadedCaptureResultPayload, setHasLoadedCaptureResultPayload] =
+    useState(false);
 
   const startFileOcr = useCallback(() => {
     showOcrWindow();
@@ -122,7 +129,7 @@ function App() {
   ]);
 
   useEffect(() => {
-    if (isCaptureWindow || isPinnedImageWindow) return;
+    if (isCaptureWindow || isPinnedImageWindow || isCaptureResultWindow) return;
 
     (Object.entries(hotkeys) as [HotkeyCategory, Record<string, string>][]).forEach(
       ([category, actionHotkeys]) => {
@@ -136,10 +143,86 @@ function App() {
     );
   }, [hotkeys, isCaptureWindow, isPinnedImageWindow, setHotkey]);
 
+  const loadCaptureResultPayload = useCallback(async () => {
+    const payload = await takeCaptureResultWindowPayload();
+    if (!payload) return;
+
+    setHasLoadedCaptureResultPayload(true);
+
+    if (payload.mode === 'translation') {
+      setSourceText(payload.text);
+      if (payload.autoTranslate) {
+        requestAutoTranslate();
+      }
+      showResultWindow();
+      return;
+    }
+
+    setOcrText(payload.text);
+    setOcrError(null);
+    showOcrWindow();
+  }, [
+    requestAutoTranslate,
+    setOcrError,
+    setOcrText,
+    setSourceText,
+    showOcrWindow,
+    showResultWindow,
+  ]);
+
+  useEffect(() => {
+    if (!isCaptureResultWindow) return;
+
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+
+    loadCaptureResultPayload().catch((err) => {
+      console.error('Failed to load capture result window payload:', err);
+    });
+
+    listen('capture-result-payload-ready', () => {
+      if (disposed) return;
+      void loadCaptureResultPayload().catch((err) => {
+        console.error('Failed to reload capture result window payload:', err);
+      });
+    })
+      .then((nextUnlisten) => {
+        if (disposed) {
+          nextUnlisten();
+        } else {
+          unlisten = nextUnlisten;
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to subscribe to capture result payload event:', err);
+      });
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [isCaptureResultWindow, loadCaptureResultPayload]);
+
+  useEffect(() => {
+    if (
+      !isCaptureResultWindow ||
+      !hasLoadedCaptureResultPayload ||
+      resultWindowVisible
+    ) {
+      return;
+    }
+
+    void currentWindow.hide();
+  }, [
+    hasLoadedCaptureResultPayload,
+    isCaptureResultWindow,
+    resultWindowVisible,
+  ]);
+
   if (isCaptureWindow) {
     return (
       <ScreenshotSession
-        initialMode={captureLaunch?.mode ?? 'screenshot'}
+        initialMode={captureLaunch?.mode}
         initialSessionId={captureLaunch?.sessionId}
         onInactive={() => hideInactiveCaptureWindow(currentWindow)}
       />
@@ -148,6 +231,10 @@ function App() {
 
   if (pinnedImageId) {
     return <PinnedImageWindow imageId={pinnedImageId} />;
+  }
+
+  if (isCaptureResultWindow) {
+    return <ResultWindow />;
   }
 
   return (

@@ -95,10 +95,7 @@ impl LLMClient for GeminiLLMClient {
         }
 
         // 发送请求
-        let headers = HashMap::from([(
-            "Content-Type".to_string(),
-            "application/json".to_string(),
-        )]);
+        let headers = HashMap::from([("Content-Type".to_string(), "application/json".to_string())]);
 
         let response = self
             .http_client
@@ -151,11 +148,7 @@ mod tests {
             Ok(self.response.clone())
         }
 
-        async fn get(
-            &self,
-            _url: &str,
-            _headers: HashMap<String, String>,
-        ) -> Result<HttpResponse> {
+        async fn get(&self, _url: &str, _headers: HashMap<String, String>) -> Result<HttpResponse> {
             unimplemented!()
         }
     }
@@ -193,8 +186,7 @@ mod tests {
             Arc::new(MockHttpClient {
                 response: HttpResponse {
                     status: 200,
-                    body: r#"{"candidates":[{"content":{"parts":[{"text":"test"}]}}]}"#
-                        .to_string(),
+                    body: r#"{"candidates":[{"content":{"parts":[{"text":"test"}]}}]}"#.to_string(),
                     headers: HashMap::new(),
                 },
             }),
@@ -212,8 +204,7 @@ mod tests {
             Arc::new(MockHttpClient {
                 response: HttpResponse {
                     status: 200,
-                    body: r#"{"candidates":[{"content":{"parts":[{"text":"test"}]}}]}"#
-                        .to_string(),
+                    body: r#"{"candidates":[{"content":{"parts":[{"text":"test"}]}}]}"#.to_string(),
                     headers: HashMap::new(),
                 },
             }),

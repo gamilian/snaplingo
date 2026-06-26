@@ -1,9 +1,9 @@
-mod trait_def;
 mod coordinator;
 pub mod impls;
+mod trait_def;
 
 #[cfg(test)]
 mod coordinator_test;
 
-pub use trait_def::OcrProvider;
 pub use coordinator::OcrCoordinator;
+pub use trait_def::OcrProvider;

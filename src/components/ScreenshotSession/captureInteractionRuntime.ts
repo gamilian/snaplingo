@@ -21,6 +21,10 @@ export type CaptureRuntimeEffect =
   | { type: 'record-selection'; action: CaptureCompletionAction | 'ocr' }
   | { type: 'finish-session' };
 
+export type ManualSelectionCompletionPlan =
+  | { type: 'preview' }
+  | { type: 'effects'; effects: CaptureRuntimeEffect[] };
+
 export function getCaptureModeSelectionFlow(
   mode: CaptureMode,
 ): CaptureSelectionFlow {
@@ -76,6 +80,18 @@ export function planSelectionFlowCompletion(
     { type: 'record-selection', action: 'ocr' },
     { type: 'finish-session' },
   ];
+}
+
+export function planManualSelectionCompletion(
+  mode: CaptureMode,
+): ManualSelectionCompletionPlan {
+  const flow = getCaptureModeSelectionFlow(mode);
+  if (flow === 'preview') return { type: 'preview' };
+
+  return {
+    type: 'effects',
+    effects: planSelectionFlowCompletion(flow),
+  };
 }
 
 function isOutputCaptureAction(

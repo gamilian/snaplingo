@@ -99,3 +99,12 @@ export function getMonitorAtVirtualPoint(
     }) ?? null
   );
 }
+
+export function getCurrentMonitorBounds(
+  monitors: MonitorSnapshotView[],
+  point: Point | null,
+): LogicalRect {
+  const monitor = point ? getMonitorAtVirtualPoint(monitors, point) : null;
+
+  return monitor?.logical_bounds ?? getVirtualDesktopBounds(monitors);
+}

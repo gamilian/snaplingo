@@ -1,7 +1,7 @@
-use async_trait::async_trait;
 use crate::application::providers::common::Provider;
 use crate::domain::translation::{TranslationRequest, TranslationResult};
 use crate::Result;
+use async_trait::async_trait;
 
 /// Provider trait for translation services.
 ///

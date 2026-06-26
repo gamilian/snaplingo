@@ -49,7 +49,10 @@ impl Provider for DeepLProvider {
         true
     }
 
-    fn reconfigure_credentials(&mut self, credentials: &std::collections::HashMap<String, String>) -> crate::Result<()> {
+    fn reconfigure_credentials(
+        &mut self,
+        credentials: &std::collections::HashMap<String, String>,
+    ) -> crate::Result<()> {
         let api_key = credentials
             .get("api_key")
             .ok_or_else(|| crate::AppError::Other("Missing api_key".to_string()))?
@@ -80,7 +83,9 @@ struct DeepLTranslation {
 #[async_trait]
 impl TranslationProvider for DeepLProvider {
     async fn translate(&self, request: &TranslationRequest) -> Result<TranslationResult> {
-        let api_key = self.api_key.as_ref()
+        let api_key = self
+            .api_key
+            .as_ref()
             .ok_or_else(|| AppError::Other("DeepL API key not configured".to_string()))?;
 
         let url = "https://api-free.deepl.com/v2/translate";
@@ -94,23 +99,30 @@ impl TranslationProvider for DeepLProvider {
         let body = serde_json::to_string(&deepl_request)?;
 
         let mut headers = HashMap::new();
-        headers.insert("Authorization".to_string(), format!("DeepL-Auth-Key {}", api_key));
+        headers.insert(
+            "Authorization".to_string(),
+            format!("DeepL-Auth-Key {}", api_key),
+        );
         headers.insert("Content-Type".to_string(), "application/json".to_string());
 
-        let response = self.http_client.post(&url, headers, body).await
+        let response = self
+            .http_client
+            .post(&url, headers, body)
+            .await
             .map_err(|e| AppError::Other(format!("HTTP request failed: {}", e)))?;
 
         if response.status != 200 {
             return Err(AppError::Other(format!(
                 "DeepL API returned status {}: {}",
-                response.status,
-                response.body
+                response.status, response.body
             )));
         }
 
         let deepl_response: DeepLResponse = serde_json::from_str(&response.body)?;
 
-        let translation = deepl_response.translations.first()
+        let translation = deepl_response
+            .translations
+            .first()
             .ok_or_else(|| AppError::Other("Empty response from DeepL".to_string()))?;
 
         Ok(TranslationResult {
@@ -187,7 +199,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_translate_success() {
-        let mock_response = r#"{"translations":[{"detected_source_language":"FR","text":"Hello"}]}"#;
+        let mock_response =
+            r#"{"translations":[{"detected_source_language":"FR","text":"Hello"}]}"#;
 
         let mock_client = Arc::new(MockHttpClient {
             response: HttpResponse {

@@ -23,6 +23,12 @@ export interface OutputCaptureInput extends RenderCaptureOutputInput {
   action: CaptureOutputAction;
 }
 
+export interface CaptureResultWindowPayload {
+  mode: 'translation' | 'ocr';
+  text: string;
+  autoTranslate: boolean;
+}
+
 function captureOutputArgs(input: RenderCaptureOutputInput) {
   return {
     sessionId: input.sessionId,
@@ -60,6 +66,10 @@ export async function revealCaptureWindow() {
   return invoke<void>('reveal_capture_window');
 }
 
+export async function hideCaptureWindow() {
+  return invoke<void>('hide_capture_window');
+}
+
 export async function renderCaptureOutput(input: RenderCaptureOutputInput) {
   return invoke<string>('render_capture_output', captureOutputArgs(input));
 }
@@ -93,6 +103,20 @@ export async function openOcrResultWindow(text: string) {
 
 export async function openTranslationResultWindow(text: string) {
   return invoke<void>('open_translation_result_window', { text });
+}
+
+export async function openCaptureOcrResultWindow(text: string) {
+  return invoke<void>('open_capture_ocr_result_window', { text });
+}
+
+export async function openCaptureTranslationResultWindow(text: string) {
+  return invoke<void>('open_capture_translation_result_window', { text });
+}
+
+export async function takeCaptureResultWindowPayload() {
+  return invoke<CaptureResultWindowPayload | null>(
+    'take_capture_result_window_payload',
+  );
 }
 
 export async function copyTextToClipboard(text: string) {

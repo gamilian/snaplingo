@@ -26,25 +26,25 @@ describe('capture presentation', () => {
     expect(getCaptureRootClassName('preview')).toContain('bg-transparent');
   });
 
-  it('uses a short linear fade for the first visible capture frame', () => {
+  it('does not hide or animate the first visible capture frame', () => {
     expect(
       getCaptureRootClassName('selecting', { isSurfaceVisible: false }),
-    ).toContain('opacity-0');
+    ).not.toContain('opacity-0');
     expect(
       getCaptureRootClassName('selecting', { isSurfaceVisible: true }),
-    ).toEqual(expect.stringContaining('opacity-100'));
+    ).not.toEqual(expect.stringContaining('opacity-100'));
     expect(
       getCaptureRootClassName('selecting', { isSurfaceVisible: true }),
-    ).toEqual(expect.stringContaining('transition-opacity'));
+    ).not.toEqual(expect.stringContaining('transition-opacity'));
     expect(
       getCaptureRootClassName('selecting', { isSurfaceVisible: true }),
-    ).toEqual(expect.stringContaining('duration-[120ms]'));
+    ).not.toEqual(expect.stringContaining('duration-[120ms]'));
     expect(
       getCaptureRootClassName('selecting', { isSurfaceVisible: true }),
-    ).toEqual(expect.stringContaining('ease-linear'));
+    ).not.toEqual(expect.stringContaining('ease-linear'));
     expect(
       getCaptureRootClassName('selecting', { isSurfaceVisible: true }),
-    ).toEqual(expect.stringContaining('will-change-[opacity]'));
+    ).not.toEqual(expect.stringContaining('will-change-[opacity]'));
   });
 
   it('uses a light floating toolbar for the editing surface', () => {

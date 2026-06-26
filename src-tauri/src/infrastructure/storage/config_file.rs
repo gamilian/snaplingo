@@ -45,7 +45,10 @@ impl ConfigFile {
         let content = serde_json::to_string_pretty(&*store)?;
 
         // Atomic write: write to temp file in same directory, then rename
-        let parent = self.path.parent().unwrap_or_else(|| std::path::Path::new("."));
+        let parent = self
+            .path
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."));
 
         // Ensure parent directory exists
         if !parent.exists() {
@@ -74,9 +77,9 @@ impl ConfigFile {
     pub fn load<T: for<'de> Deserialize<'de>>(&self, key: &str) -> Result<T> {
         let store = self.store.lock().unwrap();
 
-        let json_value = store.get(key).ok_or_else(|| {
-            AppError::Config(format!("Key '{}' not found", key))
-        })?;
+        let json_value = store
+            .get(key)
+            .ok_or_else(|| AppError::Config(format!("Key '{}' not found", key)))?;
 
         let value = serde_json::from_value(json_value.clone())?;
         Ok(value)
@@ -86,8 +89,7 @@ impl ConfigFile {
     /// The file is created in the system's temp directory and will be cleaned up automatically.
     #[cfg(test)]
     pub fn new_temp() -> Self {
-        let temp_path = unique_temp_write_path(&std::env::temp_dir())
-            .with_extension("json");
+        let temp_path = unique_temp_write_path(&std::env::temp_dir()).with_extension("json");
         Self::new(temp_path)
     }
 }

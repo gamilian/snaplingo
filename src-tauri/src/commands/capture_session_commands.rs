@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use tauri::{AppHandle, Manager, State};
 
 use crate::application::services::CaptureSessionOutput;
@@ -7,7 +9,8 @@ use crate::domain::capture::{
 use crate::domain::ocr::OcrResult;
 use crate::infrastructure::system::capture_window::{
     begin_capture_presentation, capture_snapshot_hide_settle_delay_ms, capture_window_bounds,
-    end_capture_presentation, hide_capture_snapshot_windows, open_capture_window_for_session,
+    end_capture_presentation, hide_capture_snapshot_windows,
+    hide_capture_window as hide_capture_window_for_app, open_capture_window_for_session,
     restore_capture_snapshot_windows, reveal_capture_window as reveal_capture_window_for_app,
 };
 use crate::infrastructure::system::pinned_window::open_pinned_image_window;
@@ -26,10 +29,31 @@ pub async fn open_capture_window_for_mode(
     state: &crate::AppState,
     mode: &str,
 ) -> Result<(), String> {
+    let total_start = Instant::now();
+    let session_start = Instant::now();
     let session = create_capture_session_from_visible_desktop(app, state).await?;
+    let session_ms = elapsed_ms(session_start);
+    let monitor_count = session.monitors.len();
+    let candidate_count = session.candidates.len();
+    let view_base64_bytes = capture_session_view_base64_bytes(&session);
+
+    let open_start = Instant::now();
     let open_result = capture_window_bounds(&session.monitors)
         .ok_or_else(|| "Cannot open capture window without monitor bounds".to_string())
         .and_then(|bounds| open_capture_window_for_session(app, mode, &session.id.0, &bounds));
+    let open_ms = elapsed_ms(open_start);
+
+    log::info!(
+        "[capture-perf] open_capture_window mode={} monitors={} candidates={} view_base64_bytes={} create_session_ms={:.1} open_overlay_ms={:.1} total_ms={:.1} success={}",
+        mode,
+        monitor_count,
+        candidate_count,
+        view_base64_bytes,
+        session_ms,
+        open_ms,
+        elapsed_ms(total_start),
+        open_result.is_ok(),
+    );
 
     if let Err(open_err) = open_result {
         let restore_result =
@@ -70,12 +94,21 @@ pub fn reveal_capture_window(app: AppHandle) -> Result<(), String> {
     reveal_capture_window_for_app(&app)
 }
 
+#[tauri::command]
+pub fn hide_capture_window(app: AppHandle) -> Result<(), String> {
+    hide_capture_window_for_app(&app)
+}
+
 async fn create_capture_session_from_visible_desktop(
     app: &AppHandle,
     state: &crate::AppState,
 ) -> Result<CaptureSessionView, String> {
+    let total_start = Instant::now();
+    let begin_start = Instant::now();
     begin_capture_presentation(app)?;
+    let begin_ms = elapsed_ms(begin_start);
 
+    let hide_start = Instant::now();
     let hidden_window_labels = match hide_capture_snapshot_windows(app) {
         Ok(labels) => labels,
         Err(err) => match end_capture_presentation(app) {
@@ -88,17 +121,34 @@ async fn create_capture_session_from_visible_desktop(
             }
         },
     };
+    let hide_ms = elapsed_ms(hide_start);
 
     let settle_delay_ms = capture_snapshot_hide_settle_delay_ms(&hidden_window_labels);
+    let settle_start = Instant::now();
     if settle_delay_ms > 0 {
         tokio::time::sleep(tokio::time::Duration::from_millis(settle_delay_ms)).await;
     }
+    let settle_ms = elapsed_ms(settle_start);
 
+    let session_start = Instant::now();
     let session_result = state
         .capture_session_service
         .create_session_with_hidden_window_labels(hidden_window_labels.clone())
         .await
         .map_err(|e| e.to_string());
+    let session_ms = elapsed_ms(session_start);
+
+    log::info!(
+        "[capture-perf] create_visible_desktop_session hidden_windows={} begin_ms={:.1} hide_ms={:.1} settle_requested_ms={} settle_ms={:.1} capture_session_ms={:.1} total_ms={:.1} success={}",
+        hidden_window_labels.len(),
+        begin_ms,
+        hide_ms,
+        settle_delay_ms,
+        settle_ms,
+        session_ms,
+        elapsed_ms(total_start),
+        session_result.is_ok(),
+    );
 
     match session_result {
         Ok(session) => Ok(session),
@@ -123,6 +173,23 @@ async fn create_capture_session_from_visible_desktop(
             }
         }
     }
+}
+
+fn capture_session_view_base64_bytes(session: &CaptureSessionView) -> usize {
+    session
+        .monitors
+        .iter()
+        .map(|monitor| monitor.image_base64.len())
+        .sum::<usize>()
+        + session
+            .captured_cursor
+            .as_ref()
+            .map(|cursor| cursor.image_base64.len())
+            .unwrap_or_default()
+}
+
+fn elapsed_ms(start: Instant) -> f64 {
+    start.elapsed().as_secs_f64() * 1000.0
 }
 
 #[tauri::command]
@@ -300,6 +367,6 @@ pub async fn open_capture_window_from_shortcut(app: AppHandle, mode: &'static st
 
     if let Err(err) = result {
         log::error!("Failed to open capture window: {}", err);
-        super::emit_screenshot_error(app, err.to_string());
+        super::emit_capture_screenshot_error(app, err.to_string());
     }
 }

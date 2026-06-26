@@ -451,7 +451,7 @@ export function getHoverSelectionCompletionActionFromPointer(
   options: HoverSelectionShortcutOptions = {},
 ): HoverSelectionCompletionAction | null {
   if (options.drafting) return null;
-  if (!isCopyCaptureDoubleClick(event)) return null;
+  if (!isUnmodifiedPrimaryClick(event)) return null;
 
   return getPrimaryHoverSelectionCompletionActionForMode(options.mode);
 }
@@ -463,6 +463,16 @@ export function isFinishAnnotationGestureDoubleClick(event: CapturePointerEvent)
 function isUnmodifiedPrimaryDoubleClick(event: CapturePointerEvent) {
   return (
     (event.detail ?? 0) >= 2 &&
+    event.button === 0 &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !event.shiftKey
+  );
+}
+
+function isUnmodifiedPrimaryClick(event: CapturePointerEvent) {
+  return (
     event.button === 0 &&
     !event.metaKey &&
     !event.ctrlKey &&

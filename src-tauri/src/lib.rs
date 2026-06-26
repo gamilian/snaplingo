@@ -11,8 +11,10 @@ mod startup_shortcuts;
 // Public exports for new infrastructure layer
 pub use app_state::{AppState, ScreenshotState};
 pub use application::*;
+#[allow(ambiguous_glob_reexports)]
 pub use domain::*;
 pub use error::{AppError, Result};
+#[allow(ambiguous_glob_reexports)]
 pub use infrastructure::*;
 
 use tauri::Manager;
@@ -38,11 +40,18 @@ pub fn run() {
         .setup(|app| {
             let app_state = composition::build_app_state(config_path, app.handle().clone());
             composition::subscribe_history_service(&app_state);
+            composition::hydrate_provider_credentials_in_background(&app_state);
 
             app.manage(app_state);
 
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(startup_shortcuts::register_startup_shortcuts(app_handle));
+
+            if let Err(err) =
+                infrastructure::system::capture_window::prewarm_capture_window(app.handle())
+            {
+                log::warn!("Failed to prewarm capture window: {}", err);
+            }
 
             // TODO: Create system tray
 
@@ -52,6 +61,9 @@ pub fn run() {
             commands::open_result_window,
             commands::open_ocr_result_window,
             commands::open_translation_result_window,
+            commands::open_capture_ocr_result_window,
+            commands::open_capture_translation_result_window,
+            commands::take_capture_result_window_payload,
             commands::open_selection_translation_window,
             commands::copy_text_to_clipboard,
             commands::configure_hotkey,
@@ -87,6 +99,7 @@ pub fn run() {
             commands::get_capture_session,
             commands::cancel_capture_session,
             commands::reveal_capture_window,
+            commands::hide_capture_window,
             commands::restore_capture_snapshot_windows_for_session,
             commands::render_capture_output,
             commands::default_capture_save_path,

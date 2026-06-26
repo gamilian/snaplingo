@@ -1,4 +1,4 @@
-use crate::application::providers::common::{Provider, CredentialField};
+use crate::application::providers::common::{CredentialField, Provider};
 use crate::application::providers::ocr::OcrProvider;
 use crate::domain::ocr::{OcrRequest, OcrResult};
 use crate::infrastructure::http::HttpClient;
@@ -38,7 +38,10 @@ impl BaiduOcrProvider {
 
     /// Configures the provider from a HashMap of credentials.
     /// Expected keys: "api_key", "secret_key"
-    pub fn configure_from_map(&mut self, credentials: &std::collections::HashMap<String, String>) -> crate::Result<()> {
+    pub fn configure_from_map(
+        &mut self,
+        credentials: &std::collections::HashMap<String, String>,
+    ) -> crate::Result<()> {
         let api_key = credentials
             .get("api_key")
             .ok_or_else(|| crate::AppError::Other("Missing api_key".to_string()))?
@@ -54,9 +57,13 @@ impl BaiduOcrProvider {
 
     /// Gets an access token from Baidu OAuth API.
     async fn get_access_token(&self) -> Result<String> {
-        let api_key = self.api_key.as_ref()
+        let api_key = self
+            .api_key
+            .as_ref()
             .ok_or_else(|| AppError::Other("Baidu API Key not configured".to_string()))?;
-        let secret_key = self.secret_key.as_ref()
+        let secret_key = self
+            .secret_key
+            .as_ref()
             .ok_or_else(|| AppError::Other("Baidu Secret Key not configured".to_string()))?;
 
         let url = format!(
@@ -65,14 +72,16 @@ impl BaiduOcrProvider {
             secret_key
         );
 
-        let response = self.http_client.get(&url, HashMap::new()).await
+        let response = self
+            .http_client
+            .get(&url, HashMap::new())
+            .await
             .map_err(|e| AppError::Other(format!("Failed to get access token: {}", e)))?;
 
         if response.status != 200 {
             return Err(AppError::Other(format!(
                 "Baidu OAuth API returned status {}: {}",
-                response.status,
-                response.body
+                response.status, response.body
             )));
         }
 
@@ -85,7 +94,8 @@ impl BaiduOcrProvider {
             )));
         }
 
-        token_response.access_token
+        token_response
+            .access_token
             .ok_or_else(|| AppError::Other("No access token in response".to_string()))
     }
 }
@@ -114,7 +124,10 @@ impl Provider for BaiduOcrProvider {
         ]
     }
 
-    fn reconfigure_credentials(&mut self, credentials: &std::collections::HashMap<String, String>) -> crate::Result<()> {
+    fn reconfigure_credentials(
+        &mut self,
+        credentials: &std::collections::HashMap<String, String>,
+    ) -> crate::Result<()> {
         let api_key = credentials
             .get("api_key")
             .ok_or_else(|| crate::AppError::Other("Missing api_key".to_string()))?
@@ -153,7 +166,9 @@ struct BaiduOcrWord {
 impl OcrProvider for BaiduOcrProvider {
     async fn recognize(&self, request: &OcrRequest) -> Result<OcrResult> {
         if !self.is_configured() {
-            return Err(AppError::Other("Baidu OCR not configured with API Key and Secret Key".to_string()));
+            return Err(AppError::Other(
+                "Baidu OCR not configured with API Key and Secret Key".to_string(),
+            ));
         }
 
         // Get access token
@@ -179,16 +194,21 @@ impl OcrProvider for BaiduOcrProvider {
             .join("&");
 
         let mut headers = HashMap::new();
-        headers.insert("Content-Type".to_string(), "application/x-www-form-urlencoded".to_string());
+        headers.insert(
+            "Content-Type".to_string(),
+            "application/x-www-form-urlencoded".to_string(),
+        );
 
-        let response = self.http_client.post(&url, headers, body).await
+        let response = self
+            .http_client
+            .post(&url, headers, body)
+            .await
             .map_err(|e| AppError::Other(format!("HTTP request failed: {}", e)))?;
 
         if response.status != 200 {
             return Err(AppError::Other(format!(
                 "Baidu OCR API returned status {}: {}",
-                response.status,
-                response.body
+                response.status, response.body
             )));
         }
 
@@ -196,15 +216,17 @@ impl OcrProvider for BaiduOcrProvider {
 
         // Check for API errors
         if let Some(error_code) = ocr_response.error_code {
-            let error_msg = ocr_response.error_msg.unwrap_or_else(|| "Unknown error".to_string());
+            let error_msg = ocr_response
+                .error_msg
+                .unwrap_or_else(|| "Unknown error".to_string());
             return Err(AppError::Other(format!(
                 "Baidu OCR API error {}: {}",
-                error_code,
-                error_msg
+                error_code, error_msg
             )));
         }
 
-        let words_result = ocr_response.words_result
+        let words_result = ocr_response
+            .words_result
             .ok_or_else(|| AppError::Other("No OCR result from Baidu".to_string()))?;
 
         // Concatenate all recognized text lines
@@ -291,13 +313,11 @@ mod tests {
     async fn test_get_access_token_success() {
         let token_response = r#"{"access_token":"test-token-123","expires_in":2592000}"#;
 
-        let mock_client = Arc::new(MockHttpClient::new(vec![
-            HttpResponse {
-                status: 200,
-                body: token_response.to_string(),
-                headers: HashMap::new(),
-            },
-        ]));
+        let mock_client = Arc::new(MockHttpClient::new(vec![HttpResponse {
+            status: 200,
+            body: token_response.to_string(),
+            headers: HashMap::new(),
+        }]));
 
         let mut provider = BaiduOcrProvider::new(mock_client);
         provider.configure("test-api-key".to_string(), "test-secret".to_string());
@@ -308,15 +328,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_access_token_error() {
-        let error_response = r#"{"error":"invalid_client","error_description":"Client authentication failed"}"#;
+        let error_response =
+            r#"{"error":"invalid_client","error_description":"Client authentication failed"}"#;
 
-        let mock_client = Arc::new(MockHttpClient::new(vec![
-            HttpResponse {
-                status: 200,
-                body: error_response.to_string(),
-                headers: HashMap::new(),
-            },
-        ]));
+        let mock_client = Arc::new(MockHttpClient::new(vec![HttpResponse {
+            status: 200,
+            body: error_response.to_string(),
+            headers: HashMap::new(),
+        }]));
 
         let mut provider = BaiduOcrProvider::new(mock_client);
         provider.configure("bad-api-key".to_string(), "bad-secret".to_string());
@@ -328,7 +347,8 @@ mod tests {
     #[tokio::test]
     async fn test_recognize_success() {
         let token_response = r#"{"access_token":"test-token-123","expires_in":2592000}"#;
-        let ocr_response = r#"{"words_result":[{"words":"Hello"},{"words":"World"}],"words_result_num":2}"#;
+        let ocr_response =
+            r#"{"words_result":[{"words":"Hello"},{"words":"World"}],"words_result_num":2}"#;
 
         let mock_client = Arc::new(MockHttpClient::new(vec![
             HttpResponse {

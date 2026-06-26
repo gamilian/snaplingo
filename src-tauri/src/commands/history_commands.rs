@@ -1,5 +1,5 @@
-use crate::AppState;
 use crate::infrastructure::storage::{HistoryEntry, OcrHistoryEntry, TranslationHistoryEntry};
+use crate::AppState;
 use tauri::State;
 
 /// Get translation history with pagination

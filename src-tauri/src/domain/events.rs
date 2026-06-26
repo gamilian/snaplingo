@@ -1,7 +1,7 @@
-use crate::domain::translation::{TranslationRequest, TranslationResult};
 use crate::domain::ocr::{OcrRequest, OcrResult};
+use crate::domain::translation::{TranslationRequest, TranslationResult};
 use chrono::{DateTime, Utc};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Domain events representing significant business actions.
 ///

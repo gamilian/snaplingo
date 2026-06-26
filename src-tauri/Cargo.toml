@@ -71,7 +71,7 @@ parking_lot = { version = "0.12.5", features = ["send_guard"] }
 [target.'cfg(target_os = "macos")'.dependencies]
 core-graphics = "0.23"
 objc2 = "0.6.4"
-objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSCursor", "NSEvent", "NSImage", "NSPasteboard", "NSWindow"] }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "libc", "NSCursor", "NSEvent", "NSImage", "NSPasteboard", "NSRunningApplication", "NSWindow", "NSWorkspace"] }
 objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSData", "NSGeometry", "objc2-core-foundation"] }
 objc2-vision = { version = "0.3.2", default-features = false, features = ["std", "VNObservation", "VNRecognizeTextRequest", "VNRequest", "VNRequestHandler", "VNTypes"] }
 xcap = "0.9"

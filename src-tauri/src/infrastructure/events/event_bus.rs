@@ -1,7 +1,7 @@
 use crate::domain::events::DomainEvent;
 use async_trait::async_trait;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use tokio::sync::RwLock;
 
 /// Trait for event subscribers.

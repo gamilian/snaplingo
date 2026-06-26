@@ -35,7 +35,36 @@ export function getBestCandidateAtPoint(
   candidates: CaptureCandidate[],
   point: Point,
 ): CaptureCandidate | null {
-  return sortCandidatesAtPoint(candidates, point)[0] ?? null;
+  return sortCandidatesAtPoint(candidates, point, false)[0] ?? null;
+}
+
+export function getCandidateForPointerCompletion(
+  candidates: CaptureCandidate[],
+  point: Point,
+  activeRect: LogicalRect | null,
+): CaptureCandidate | null {
+  if (activeRect && containsPoint(activeRect, point)) {
+    return candidates.find((candidate) => areRectsEqual(candidate.rect, activeRect)) ?? null;
+  }
+
+  return getBestCandidateAtPoint(candidates, point);
+}
+
+export function getCandidateForPointerReleaseCompletion(
+  candidates: CaptureCandidate[],
+  point: Point,
+  activeRect: LogicalRect | null,
+  selection: LogicalRect,
+  minimumSelectionSize: number,
+): CaptureCandidate | null {
+  if (
+    selection.width >= minimumSelectionSize &&
+    selection.height >= minimumSelectionSize
+  ) {
+    return null;
+  }
+
+  return getCandidateForPointerCompletion(candidates, point, activeRect);
 }
 
 export function getNextCandidateAtPoint(
@@ -44,7 +73,7 @@ export function getNextCandidateAtPoint(
   currentRect: LogicalRect | null,
   direction: 1 | -1,
 ): CaptureCandidate | null {
-  const matches = sortCandidatesAtPoint(candidates, point);
+  const matches = sortCandidatesAtPoint(candidates, point, true);
   if (matches.length === 0) return null;
 
   const currentIndex = currentRect
@@ -63,8 +92,12 @@ export function getNextCandidateAtPoint(
 function sortCandidatesAtPoint(
   candidates: CaptureCandidate[],
   point: Point,
+  includeMonitorCandidates: boolean,
 ): CaptureCandidate[] {
   return candidates
+    .filter(
+      (candidate) => includeMonitorCandidates || candidate.kind !== 'monitor',
+    )
     .filter((candidate) => containsPoint(candidate.rect, point))
     .sort((a, b) => {
       if (a.priority !== b.priority) return b.priority - a.priority;

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
 
@@ -49,12 +49,18 @@ impl CaptureSessionService {
         &self,
         hidden_window_labels: Vec<String>,
     ) -> Result<CaptureSessionView> {
+        let total_start = Instant::now();
+
+        let snapshots_start = Instant::now();
         let snapshots = self.screenshot_backend.capture_monitor_snapshots().await?;
+        let snapshots_ms = elapsed_ms(snapshots_start);
         if snapshots.is_empty() {
             return Err(AppError::System(
                 "Cannot create capture session without monitor snapshots".to_string(),
             ));
         }
+
+        let window_candidates_start = Instant::now();
         let window_candidates = self
             .screenshot_backend
             .capture_window_candidates(&snapshots)
@@ -64,6 +70,9 @@ impl CaptureSessionService {
                 err
             })
             .unwrap_or_default();
+        let window_candidates_ms = elapsed_ms(window_candidates_start);
+
+        let captured_cursor_start = Instant::now();
         let captured_cursor = self
             .screenshot_backend
             .capture_cursor(&snapshots)
@@ -73,6 +82,7 @@ impl CaptureSessionService {
                 err
             })
             .unwrap_or_default();
+        let captured_cursor_ms = elapsed_ms(captured_cursor_start);
         let candidates = window_candidates
             .iter()
             .map(window_candidate_to_view)
@@ -87,13 +97,35 @@ impl CaptureSessionService {
             hidden_window_labels,
             created_at: SystemTime::now(),
         };
-        let view = session_to_view(&session);
 
+        let view_start = Instant::now();
+        let view = session_to_view(&session);
+        let metrics = capture_session_payload_metrics(&session, &view);
+        let view_ms = elapsed_ms(view_start);
+
+        let insert_start = Instant::now();
         let mut sessions = self
             .sessions
             .lock()
             .map_err(|_| AppError::System("Capture session lock poisoned".to_string()))?;
         sessions.insert(id, session);
+        let insert_ms = elapsed_ms(insert_start);
+
+        log::info!(
+            "[capture-perf] create_session monitors={} candidates={} cursor={} snapshot_png_bytes={} cursor_png_bytes={} view_base64_bytes={} snapshots_ms={:.1} candidates_ms={:.1} cursor_ms={:.1} view_ms={:.1} insert_ms={:.1} total_ms={:.1}",
+            view.monitors.len(),
+            view.candidates.len(),
+            view.captured_cursor.is_some(),
+            metrics.snapshot_png_bytes,
+            metrics.cursor_png_bytes,
+            metrics.view_base64_bytes,
+            snapshots_ms,
+            window_candidates_ms,
+            captured_cursor_ms,
+            view_ms,
+            insert_ms,
+            elapsed_ms(total_start),
+        );
 
         Ok(view)
     }
@@ -203,6 +235,41 @@ fn captured_cursor_to_view(cursor: &CapturedCursor) -> CapturedCursorView {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+struct CaptureSessionPayloadMetrics {
+    snapshot_png_bytes: usize,
+    cursor_png_bytes: usize,
+    view_base64_bytes: usize,
+}
+
+fn capture_session_payload_metrics(
+    session: &CaptureSession,
+    view: &CaptureSessionView,
+) -> CaptureSessionPayloadMetrics {
+    CaptureSessionPayloadMetrics {
+        snapshot_png_bytes: session
+            .snapshots
+            .iter()
+            .map(|snapshot| snapshot.png_data.len())
+            .sum(),
+        cursor_png_bytes: session
+            .captured_cursor
+            .as_ref()
+            .map(|cursor| cursor.png_data.len())
+            .unwrap_or_default(),
+        view_base64_bytes: view
+            .monitors
+            .iter()
+            .map(|monitor| monitor.image_base64.len())
+            .sum::<usize>()
+            + view
+                .captured_cursor
+                .as_ref()
+                .map(|cursor| cursor.image_base64.len())
+                .unwrap_or_default(),
+    }
+}
+
 fn generate_session_id() -> String {
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -255,4 +322,78 @@ fn logical_rects_intersect(a: &LogicalRect, b: &LogicalRect) -> bool {
     let b_bottom = b.y + b.height;
 
     a.x < b_right && a_right > b.x && a.y < b_bottom && a_bottom > b.y
+}
+
+fn elapsed_ms(start: Instant) -> f64 {
+    start.elapsed().as_secs_f64() * 1000.0
+}
+
+#[cfg(test)]
+mod payload_metrics_tests {
+    use super::*;
+    use crate::domain::capture::LogicalPoint;
+
+    #[test]
+    fn capture_session_payload_metrics_counts_snapshot_cursor_and_base64_bytes() {
+        let session = CaptureSession {
+            id: CaptureSessionId("capture-test".to_string()),
+            snapshots: vec![
+                MonitorSnapshot {
+                    id: "primary".to_string(),
+                    logical_bounds: LogicalRect {
+                        x: 0.0,
+                        y: 0.0,
+                        width: 10.0,
+                        height: 10.0,
+                    },
+                    physical_bounds: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 10,
+                        height: 10,
+                    },
+                    scale_factor: 1.0,
+                    png_data: vec![1, 2, 3],
+                },
+                MonitorSnapshot {
+                    id: "secondary".to_string(),
+                    logical_bounds: LogicalRect {
+                        x: 10.0,
+                        y: 0.0,
+                        width: 10.0,
+                        height: 10.0,
+                    },
+                    physical_bounds: PhysicalRect {
+                        x: 10,
+                        y: 0,
+                        width: 10,
+                        height: 10,
+                    },
+                    scale_factor: 1.0,
+                    png_data: vec![4, 5],
+                },
+            ],
+            candidates: Vec::new(),
+            captured_cursor: Some(CapturedCursor {
+                logical_position: LogicalPoint { x: 1.0, y: 2.0 },
+                hotspot: LogicalPoint { x: 0.0, y: 0.0 },
+                image_width: 8,
+                image_height: 8,
+                scale_factor: 1.0,
+                png_data: vec![6, 7, 8, 9],
+            }),
+            hidden_window_labels: Vec::new(),
+            created_at: SystemTime::UNIX_EPOCH,
+        };
+        let view = session_to_view(&session);
+
+        assert_eq!(
+            capture_session_payload_metrics(&session, &view),
+            CaptureSessionPayloadMetrics {
+                snapshot_png_bytes: 5,
+                cursor_png_bytes: 4,
+                view_base64_bytes: 16,
+            },
+        );
+    }
 }

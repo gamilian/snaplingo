@@ -10,7 +10,9 @@ mod selection_runtime;
 
 use capture_runtime::build_capture_runtime;
 use history_runtime::build_history_service;
-use provider_runtime::{build_ocr_coordinator, build_translation_coordinator};
+use provider_runtime::{
+    build_ocr_coordinator, build_translation_coordinator, hydrate_provider_credentials,
+};
 use selection_runtime::build_selected_text_acquirer;
 
 pub(crate) use history_runtime::subscribe_history_service;
@@ -61,4 +63,22 @@ pub(crate) fn build_app_state(config_path: PathBuf, app: AppHandle) -> AppState 
         event_bus,
         selected_text_acquirer,
     }
+}
+
+pub(crate) fn hydrate_provider_credentials_in_background(app_state: &AppState) {
+    let config_file = app_state.config_file.clone();
+    let keychain = app_state.keychain.clone();
+    let http_client = app_state.http_client.clone();
+    let translation_coordinator = app_state.translation_coordinator.clone();
+    let ocr_coordinator = app_state.ocr_coordinator.clone();
+
+    tauri::async_runtime::spawn_blocking(move || {
+        hydrate_provider_credentials(
+            config_file,
+            keychain,
+            http_client,
+            translation_coordinator,
+            ocr_coordinator,
+        );
+    });
 }

@@ -40,10 +40,12 @@ impl SelectionMethod for MenuCopySelectionMethod {
     }
 }
 
+#[cfg(test)]
 fn is_copy_identifier(identifier: &str) -> bool {
     identifier == "copy:"
 }
 
+#[cfg(test)]
 fn is_copy_title(title: &str) -> bool {
     matches!(
         title,

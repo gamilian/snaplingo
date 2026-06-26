@@ -22,6 +22,10 @@ fn capture_window_url(mode: &str) -> PathBuf {
     ))
 }
 
+pub(super) fn capture_window_prewarm_url() -> PathBuf {
+    PathBuf::from("index.html?window=capture")
+}
+
 pub(super) fn capture_window_url_with_session(mode: &str, session_id: &str) -> PathBuf {
     PathBuf::from(format!(
         "{}&sessionId={}",
@@ -113,6 +117,14 @@ mod tests {
         assert_eq!(
             super::capture_window_url_with_session("screenshot", "session-1").to_string_lossy(),
             "index.html?window=capture&mode=screenshot&sessionId=session-1"
+        );
+    }
+
+    #[test]
+    fn capture_window_prewarm_url_has_no_launch_mode() {
+        assert_eq!(
+            super::capture_window_prewarm_url().to_string_lossy(),
+            "index.html?window=capture"
         );
     }
 

@@ -19,9 +19,7 @@ pub(crate) struct CaptureRuntimeParts {
     pub screenshot_state: Arc<ParkingLotMutex<ScreenshotState>>,
 }
 
-pub(crate) fn build_capture_runtime(
-    ocr_coordinator: Arc<OcrCoordinator>,
-) -> CaptureRuntimeParts {
+pub(crate) fn build_capture_runtime(ocr_coordinator: Arc<OcrCoordinator>) -> CaptureRuntimeParts {
     let screenshot_backend = get_screenshot_backend();
     let capture_service = Arc::new(CaptureService::new(screenshot_backend.clone()));
     let capture_session_service = Arc::new(CaptureSessionService::new(screenshot_backend));

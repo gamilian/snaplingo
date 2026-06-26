@@ -39,7 +39,9 @@ impl fmt::Display for AppError {
             AppError::RateLimited(msg) => write!(f, "Rate limited: {}", msg),
             AppError::InvalidResponse(msg) => write!(f, "Invalid response: {}", msg),
             AppError::Network(msg) => write!(f, "Network error: {}", msg),
-            AppError::UpstreamStatus(status, body) => write!(f, "Upstream status {}: {}", status, body),
+            AppError::UpstreamStatus(status, body) => {
+                write!(f, "Upstream status {}: {}", status, body)
+            }
         }
     }
 }

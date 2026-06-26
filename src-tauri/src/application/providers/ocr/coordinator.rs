@@ -1,14 +1,14 @@
 use super::OcrProvider;
-use crate::domain::ocr::{OcrRequest, OcrResult};
 use crate::domain::events::DomainEvent;
-use crate::infrastructure::storage::ConfigFile;
+use crate::domain::ocr::{OcrRequest, OcrResult};
 use crate::infrastructure::events::EventBus;
+use crate::infrastructure::storage::ConfigFile;
 use crate::Result;
+use chrono::Utc;
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
-use chrono::Utc;
 
 /// Coordinator for managing OCR providers and operations.
 ///
@@ -103,9 +103,7 @@ impl OcrCoordinator {
     pub fn get_active(&self) -> Option<Arc<RwLock<dyn OcrProvider>>> {
         let active_id = self.active_provider_id.lock().unwrap();
         let providers = self.providers.lock().unwrap();
-        active_id
-            .as_ref()
-            .and_then(|id| providers.get(id).cloned())
+        active_id.as_ref().and_then(|id| providers.get(id).cloned())
     }
 
     /// Returns a list of all registered providers.
@@ -168,7 +166,8 @@ impl OcrCoordinator {
         let start = Instant::now();
 
         // Get active provider (cloned Arc, no lock held)
-        let provider_lock = self.get_active()
+        let provider_lock = self
+            .get_active()
             .ok_or_else(|| "No active OCR provider".to_string())?;
 
         let provider_id = provider_lock.read().id().to_string();
@@ -214,7 +213,11 @@ impl OcrCoordinator {
     /// # Returns
     ///
     /// * `Result<()>` - Ok if successful, Err if provider not found or reconfiguration fails
-    pub fn reconfigure_provider(&self, provider_id: &str, credentials: &HashMap<String, String>) -> Result<()> {
+    pub fn reconfigure_provider(
+        &self,
+        provider_id: &str,
+        credentials: &HashMap<String, String>,
+    ) -> Result<()> {
         let providers = self.providers.lock().unwrap();
 
         let provider_lock = providers

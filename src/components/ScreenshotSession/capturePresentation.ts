@@ -7,14 +7,10 @@ interface CaptureRootClassNameOptions {
 
 export function getCaptureRootClassName(
   _status: CapturePresentationStatus,
-  { isSurfaceVisible = true }: CaptureRootClassNameOptions = {},
+  _options: CaptureRootClassNameOptions = {},
 ) {
-  const opacityClassName = isSurfaceVisible ? 'opacity-100' : 'opacity-0';
-
   return [
     'fixed left-0 top-0 z-[9999] cursor-crosshair select-none overflow-hidden bg-transparent text-white',
-    'transition-opacity duration-[120ms] ease-linear will-change-[opacity]',
-    opacityClassName,
   ].join(' ');
 }
 

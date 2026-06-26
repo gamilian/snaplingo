@@ -43,4 +43,36 @@ describe('capture session tauri adapter', () => {
       action: { type: 'pin' },
     });
   });
+
+  it('opens screenshot OCR results with the capture result command', async () => {
+    const { openCaptureOcrResultWindow } = await import('../captureSession');
+    invoke.mockResolvedValueOnce(undefined);
+
+    await openCaptureOcrResultWindow('ocr text');
+
+    expect(invoke).toHaveBeenCalledWith('open_capture_ocr_result_window', {
+      text: 'ocr text',
+    });
+  });
+
+  it('opens screenshot translation results with the capture result command', async () => {
+    const { openCaptureTranslationResultWindow } = await import('../captureSession');
+    invoke.mockResolvedValueOnce(undefined);
+
+    await openCaptureTranslationResultWindow('text to translate');
+
+    expect(invoke).toHaveBeenCalledWith(
+      'open_capture_translation_result_window',
+      { text: 'text to translate' },
+    );
+  });
+
+  it('hides the capture overlay through the native command', async () => {
+    const { hideCaptureWindow } = await import('../captureSession');
+    invoke.mockResolvedValueOnce(undefined);
+
+    await hideCaptureWindow();
+
+    expect(invoke).toHaveBeenCalledWith('hide_capture_window');
+  });
 });
