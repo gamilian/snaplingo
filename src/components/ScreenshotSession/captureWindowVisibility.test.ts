@@ -101,7 +101,13 @@ describe('capture window visibility', () => {
     await revealCaptureWindowForSession({
       window,
       sessionId: 'capture-1',
+      prepareSurface: async () => {
+        calls.push('prepare_surface');
+      },
       client: {
+        prepareCaptureWindowForReveal: async () => {
+          calls.push('native_prepare_capture_window');
+        },
         revealCaptureWindow: async () => {
           calls.push('native_reveal_capture_window');
         },
@@ -113,10 +119,14 @@ describe('capture window visibility', () => {
       },
     });
 
-    expect(calls).toEqual(['native_reveal_capture_window']);
+    expect(calls).toEqual([
+      'native_prepare_capture_window',
+      'prepare_surface',
+      'native_reveal_capture_window',
+    ]);
   });
 
-  it('waits for two animation frames before fading in the capture surface', async () => {
+  it('waits for two animation frames before fading in the capture overlay', async () => {
     const calls: string[] = [];
     const pendingFrameCallbacks: FrameRequestCallback[] = [];
     const requestAnimationFrame = (callback: FrameRequestCallback) => {

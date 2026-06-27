@@ -95,9 +95,25 @@ pub(super) fn reveal_capture_window_for_current_space(
     }
 
     let ns_window: &NSWindow = unsafe { &*ns_window.cast() };
+    ns_window.setAlphaValue(1.0);
     if should_make_capture_overlay_key_on_reveal() {
         ns_window.makeKeyAndOrderFront(None);
     }
+    ns_window.orderFrontRegardless();
+
+    Ok(())
+}
+
+pub(super) fn prepare_capture_window_for_reveal(window: &WebviewWindow) -> Result<(), String> {
+    configure_capture_window_for_current_space(window)?;
+
+    let ns_window = window.ns_window().map_err(|e| e.to_string())?;
+    if ns_window.is_null() {
+        return Err("Capture window has no native NSWindow".to_string());
+    }
+
+    let ns_window: &NSWindow = unsafe { &*ns_window.cast() };
+    ns_window.setAlphaValue(0.0);
     ns_window.orderFrontRegardless();
 
     Ok(())
@@ -110,6 +126,7 @@ pub(super) fn hide_capture_window_for_current_space(window: &WebviewWindow) -> R
     }
 
     let ns_window: &NSWindow = unsafe { &*ns_window.cast() };
+    ns_window.setAlphaValue(1.0);
     ns_window.orderOut(None);
 
     Ok(())

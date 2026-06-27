@@ -51,6 +51,20 @@ export async function getCaptureSession(sessionId: string) {
   return invoke<CaptureSessionView>('get_capture_session', { sessionId });
 }
 
+export function logCaptureFrontendPerf(input: {
+  event: string;
+  mode: CaptureMode | string;
+  sessionId?: string | null;
+  elapsedMs: number;
+}) {
+  return invoke<void>('log_capture_frontend_perf', {
+    event: input.event,
+    mode: input.mode,
+    sessionId: input.sessionId ?? null,
+    elapsedMs: input.elapsedMs,
+  });
+}
+
 export async function currentCaptureCursorPosition(sessionId: string) {
   return invoke<Point | null>('current_capture_cursor_position', { sessionId });
 }
@@ -69,6 +83,10 @@ export async function restoreCaptureSnapshotWindowsForSession(
 
 export async function revealCaptureWindow() {
   return invoke<void>('reveal_capture_window');
+}
+
+export async function prepareCaptureWindowForReveal() {
+  return invoke<void>('prepare_capture_window_for_reveal');
 }
 
 export async function hideCaptureWindow() {

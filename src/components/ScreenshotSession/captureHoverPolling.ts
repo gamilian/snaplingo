@@ -2,7 +2,7 @@ import {
   getBestCandidateAtPoint,
   type CaptureCandidate,
 } from './captureCandidates';
-import type { LogicalRect, Point } from './types';
+import type { CapturedCursorView, LogicalRect, Point } from './types';
 
 type CaptureHoverPollingStatus = 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
 
@@ -35,4 +35,13 @@ export function getPolledHoverSelection(
   point: Point,
 ): LogicalRect | null {
   return getBestCandidateAtPoint(candidates, point)?.rect ?? null;
+}
+
+export function getInitialHoverSelection(
+  candidates: CaptureCandidate[],
+  capturedCursor: CapturedCursorView | null | undefined,
+): LogicalRect | null {
+  if (!capturedCursor) return null;
+
+  return getPolledHoverSelection(candidates, capturedCursor.logical_position);
 }

@@ -14,6 +14,7 @@ export interface CaptureCandidate {
 }
 
 const MONITOR_SIZED_WINDOW_TOLERANCE = 1;
+const MIN_AUTOMATIC_HOVER_CANDIDATE_SIZE = 48;
 
 export function buildMonitorCandidates(
   monitors: MonitorSnapshotView[],
@@ -115,8 +116,16 @@ function isAutomaticHoverCandidate(
   candidates: CaptureCandidate[],
 ) {
   if (candidate.kind === 'monitor') return false;
+  if (isTinyAutomaticHoverCandidate(candidate)) return false;
 
   return !isMonitorSizedWindowCandidate(candidate, candidates);
+}
+
+function isTinyAutomaticHoverCandidate(candidate: CaptureCandidate) {
+  return (
+    candidate.rect.width < MIN_AUTOMATIC_HOVER_CANDIDATE_SIZE ||
+    candidate.rect.height < MIN_AUTOMATIC_HOVER_CANDIDATE_SIZE
+  );
 }
 
 function isMonitorSizedWindowCandidate(

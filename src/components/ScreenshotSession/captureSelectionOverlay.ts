@@ -103,7 +103,7 @@ function drawDimMask(
   const rectRight = rect.x + rect.width;
   const rectBottom = rect.y + rect.height;
 
-  context.fillStyle = 'rgba(0, 0, 0, 0.38)';
+  context.fillStyle = 'rgba(0, 0, 0, 0.24)';
   context.fillRect(0, 0, size.width, rect.y);
   context.fillRect(0, rectBottom, size.width, size.height - rectBottom);
   context.fillRect(0, rect.y, rect.x, rect.height);

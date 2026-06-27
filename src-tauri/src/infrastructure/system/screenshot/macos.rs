@@ -6,10 +6,13 @@ use crate::domain::capture::{LogicalPoint, LogicalRect};
 use crate::error::AppError;
 use core_graphics::display::{CGDisplay, CGRect};
 use core_graphics::image::CGImage;
-use image::codecs::png::PngEncoder;
+use image::codecs::png::{
+    CompressionType as PngCompressionType, FilterType as PngFilterType, PngEncoder,
+};
 use image::{ExtendedColorType, ImageEncoder};
 use objc2_app_kit::{NSCursor, NSEvent};
 use std::io::Cursor;
+use std::time::Instant;
 use xcap::{Monitor, Window};
 
 pub struct MacOSScreenshotBackend;
@@ -101,33 +104,25 @@ fn macos_app_bundle_path(executable_path: &std::path::Path) -> Option<std::path:
 
 /// Convert CGImage to PNG bytes
 fn image_to_png(cg_image: CGImage) -> Result<Vec<u8>, AppError> {
+    let total_start = Instant::now();
     let width = cg_image.width();
     let height = cg_image.height();
     let bytes_per_row = cg_image.bytes_per_row();
     let data = cg_image.data();
 
-    // CGImage data is in BGRA format, convert to RGBA
-    let mut rgba_data = Vec::with_capacity(width * height * 4);
-    for y in 0..height {
-        let row_start = y * bytes_per_row;
-        for x in 0..width {
-            let pixel_start = row_start + x * 4;
-            let b = data.bytes()[pixel_start];
-            let g = data.bytes()[pixel_start + 1];
-            let r = data.bytes()[pixel_start + 2];
-            let a = data.bytes()[pixel_start + 3];
-
-            rgba_data.push(r);
-            rgba_data.push(g);
-            rgba_data.push(b);
-            rgba_data.push(a);
-        }
-    }
+    let convert_start = Instant::now();
+    let rgba_data = bgra_image_data_to_rgba(data.bytes(), width, height, bytes_per_row)?;
+    let convert_ms = elapsed_ms(convert_start);
 
     // Encode as PNG
+    let encode_start = Instant::now();
     let mut png_data = Vec::new();
     let mut cursor = Cursor::new(&mut png_data);
-    let encoder = PngEncoder::new(&mut cursor);
+    let encoder = PngEncoder::new_with_quality(
+        &mut cursor,
+        capture_png_compression_type(),
+        capture_png_filter_type(),
+    );
 
     encoder
         .write_image(
@@ -137,8 +132,74 @@ fn image_to_png(cg_image: CGImage) -> Result<Vec<u8>, AppError> {
             ExtendedColorType::Rgba8,
         )
         .map_err(|e| AppError::System(format!("Failed to encode PNG: {}", e)))?;
+    let encode_ms = elapsed_ms(encode_start);
+
+    log::info!(
+        "[capture-perf] image_to_png width={} height={} bytes_per_row={} png_bytes={} convert_ms={:.1} encode_ms={:.1} total_ms={:.1}",
+        width,
+        height,
+        bytes_per_row,
+        png_data.len(),
+        convert_ms,
+        encode_ms,
+        elapsed_ms(total_start),
+    );
 
     Ok(png_data)
+}
+
+fn bgra_image_data_to_rgba(
+    data: &[u8],
+    width: usize,
+    height: usize,
+    bytes_per_row: usize,
+) -> Result<Vec<u8>, AppError> {
+    let row_bytes = width
+        .checked_mul(4)
+        .ok_or_else(|| AppError::System("Screen capture row is too wide".to_string()))?;
+    let output_len = row_bytes
+        .checked_mul(height)
+        .ok_or_else(|| AppError::System("Screen capture image is too large".to_string()))?;
+    let required_len = if height == 0 {
+        0
+    } else {
+        bytes_per_row
+            .checked_mul(height - 1)
+            .and_then(|offset| offset.checked_add(row_bytes))
+            .ok_or_else(|| AppError::System("Screen capture buffer is too large".to_string()))?
+    };
+
+    if bytes_per_row < row_bytes || data.len() < required_len {
+        return Err(AppError::System(format!(
+            "Screen capture buffer is too small: row_bytes={}, bytes_per_row={}, height={}, data_len={}",
+            row_bytes,
+            bytes_per_row,
+            height,
+            data.len(),
+        )));
+    }
+
+    let mut rgba_data = vec![0; output_len];
+    for y in 0..height {
+        let src_start = y * bytes_per_row;
+        let dst_start = y * row_bytes;
+        rgba_data[dst_start..dst_start + row_bytes]
+            .copy_from_slice(&data[src_start..src_start + row_bytes]);
+    }
+
+    for pixel in rgba_data.chunks_exact_mut(4) {
+        pixel.swap(0, 2);
+    }
+
+    Ok(rgba_data)
+}
+
+fn capture_png_compression_type() -> PngCompressionType {
+    PngCompressionType::Fast
+}
+
+fn capture_png_filter_type() -> PngFilterType {
+    PngFilterType::NoFilter
 }
 
 fn captured_cursor_from_appkit_geometry(
@@ -208,7 +269,11 @@ fn cursor_tiff_to_png_and_dimensions(tiff_data: &[u8]) -> Result<(Vec<u8>, u32, 
 
     let mut png_data = Vec::new();
     let mut cursor = Cursor::new(&mut png_data);
-    let encoder = PngEncoder::new(&mut cursor);
+    let encoder = PngEncoder::new_with_quality(
+        &mut cursor,
+        capture_png_compression_type(),
+        capture_png_filter_type(),
+    );
     encoder
         .write_image(&rgba_data, width, height, ExtendedColorType::Rgba8)
         .map_err(|e| AppError::System(format!("Failed to encode cursor PNG: {}", e)))?;
@@ -395,6 +460,10 @@ fn logical_intersection_area(a: &LogicalRect, b: &LogicalRect) -> f64 {
     }
 
     (right - left) * (bottom - top)
+}
+
+fn elapsed_ms(start: Instant) -> f64 {
+    start.elapsed().as_secs_f64() * 1000.0
 }
 
 fn should_skip_window_candidate(title: &str, app_name: &str) -> bool {
@@ -638,6 +707,36 @@ mod tests {
         assert_eq!(&png[..8], &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
         assert_eq!(width, 2);
         assert_eq!(height, 3);
+    }
+
+    #[test]
+    fn converts_bgra_display_rows_to_contiguous_rgba() {
+        let rgba = bgra_image_data_to_rgba(
+            &[
+                3, 2, 1, 4, 7, 6, 5, 8, 99, 99, 11, 10, 9, 12, 15, 14, 13, 16, 88, 88,
+            ],
+            2,
+            2,
+            10,
+        )
+        .unwrap();
+
+        assert_eq!(
+            rgba,
+            vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+        );
+    }
+
+    #[test]
+    fn capture_session_png_encoder_uses_low_latency_options() {
+        assert_eq!(
+            capture_png_compression_type(),
+            image::codecs::png::CompressionType::Fast
+        );
+        assert_eq!(
+            capture_png_filter_type(),
+            image::codecs::png::FilterType::NoFilter
+        );
     }
 
     #[test]

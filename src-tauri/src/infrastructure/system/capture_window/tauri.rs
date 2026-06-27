@@ -4,7 +4,8 @@ use std::{
 };
 
 use tauri::{
-    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewUrl, WebviewWindowBuilder,
+    utils::config::Color, AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewUrl,
+    WebviewWindowBuilder,
 };
 
 use crate::domain::capture::LogicalRect;
@@ -97,6 +98,24 @@ pub fn reveal_capture_window(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+pub fn prepare_capture_window_for_reveal(app: &AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window(CAPTURE_WINDOW_LABEL)
+        .ok_or_else(|| "Capture window is not open".to_string())?;
+
+    #[cfg(target_os = "macos")]
+    {
+        super::macos::prepare_capture_window_for_reveal(&window)?;
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = window;
+    }
+
+    Ok(())
+}
+
 pub fn hide_capture_window(app: &AppHandle) -> Result<(), String> {
     let window = app
         .get_webview_window(CAPTURE_WINDOW_LABEL)
@@ -135,7 +154,8 @@ pub fn prewarm_capture_window(app: &AppHandle) -> Result<(), String> {
     .decorations(false)
     .always_on_top(true)
     .visible_on_all_workspaces(true)
-    .transparent(true)
+    .transparent(capture_window_is_transparent())
+    .background_color(capture_window_background_color())
     .visible(false)
     .skip_taskbar(true)
     .focused(false)
@@ -195,7 +215,8 @@ pub fn open_capture_window_for_session(
     .decorations(false)
     .always_on_top(true)
     .visible_on_all_workspaces(true)
-    .transparent(true)
+    .transparent(capture_window_is_transparent())
+    .background_color(capture_window_background_color())
     .visible(false)
     .skip_taskbar(true)
     .focused(false)
@@ -247,6 +268,14 @@ fn capture_window_accepts_first_mouse() -> bool {
     true
 }
 
+fn capture_window_is_transparent() -> bool {
+    false
+}
+
+fn capture_window_background_color() -> Color {
+    Color(0, 0, 0, 255)
+}
+
 fn should_reset_capture_window_fullscreen_before_reuse() -> bool {
     !cfg!(target_os = "macos")
 }
@@ -296,6 +325,11 @@ mod tests {
     #[test]
     fn capture_window_accepts_first_mouse_on_reveal() {
         assert!(capture_window_accepts_first_mouse());
+    }
+
+    #[test]
+    fn capture_window_is_opaque_to_avoid_underlying_window_flash() {
+        assert!(!capture_window_is_transparent());
     }
 
     #[cfg(target_os = "macos")]

@@ -4,16 +4,26 @@ import {
   getCaptureEditorCommandButtonClassName,
   getCaptureEditorIconButtonClassName,
   getCaptureEditorSelectionClassName,
+  getCaptureSelectionOverlayCanvasClassName,
   getCaptureEditorToolbarClassName,
   getCaptureRootClassName,
   shouldShowCaptureLoadingMask,
 } from './capturePresentation';
 
 describe('capture presentation', () => {
-  it('keeps the document canvas transparent before the capture app mounts', () => {
+  it('keeps the default document canvas transparent before the app mounts', () => {
     const css = readFileSync(new URL('../../index.css', import.meta.url), 'utf8');
 
     expect(css).toMatch(/html,\s*body,\s*#root\s*{[^}]*background:\s*transparent/s);
+  });
+
+  it('paints the capture html shell black before React renders screenshots', () => {
+    const html = readFileSync(new URL('../../../index.html', import.meta.url), 'utf8');
+
+    expect(html).toContain('data-window="capture"');
+    expect(html).toMatch(
+      /html\[data-window="capture"\][\s\S]*background:\s*#000/s,
+    );
   });
 
   it('keeps the capture surface transparent while the snapshot session loads', () => {
@@ -26,25 +36,18 @@ describe('capture presentation', () => {
     expect(getCaptureRootClassName('preview')).toContain('bg-transparent');
   });
 
-  it('does not hide or animate the first visible capture frame', () => {
-    expect(
-      getCaptureRootClassName('selecting', { isSurfaceVisible: false }),
-    ).not.toContain('opacity-0');
-    expect(
-      getCaptureRootClassName('selecting', { isSurfaceVisible: true }),
-    ).not.toEqual(expect.stringContaining('opacity-100'));
-    expect(
-      getCaptureRootClassName('selecting', { isSurfaceVisible: true }),
-    ).not.toEqual(expect.stringContaining('transition-opacity'));
-    expect(
-      getCaptureRootClassName('selecting', { isSurfaceVisible: true }),
-    ).not.toEqual(expect.stringContaining('duration-[120ms]'));
-    expect(
-      getCaptureRootClassName('selecting', { isSurfaceVisible: true }),
-    ).not.toEqual(expect.stringContaining('ease-linear'));
-    expect(
-      getCaptureRootClassName('selecting', { isSurfaceVisible: true }),
-    ).not.toEqual(expect.stringContaining('will-change-[opacity]'));
+  it('does not fade the native capture root over underlying windows', () => {
+    const className = getCaptureRootClassName('selecting');
+
+    expect(className).not.toContain('opacity-0');
+    expect(className).not.toContain('transition-opacity');
+  });
+
+  it('keeps the selection overlay canvas visible on the first revealed frame', () => {
+    const className = getCaptureSelectionOverlayCanvasClassName();
+
+    expect(className).not.toContain('opacity-0');
+    expect(className).not.toContain('transition-opacity');
   });
 
   it('uses a light floating toolbar for the editing surface', () => {

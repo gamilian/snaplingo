@@ -1,14 +1,7 @@
 type CapturePresentationStatus = 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
 type CaptureEditorCommandButtonVariant = 'default' | 'primary';
 
-interface CaptureRootClassNameOptions {
-  isSurfaceVisible?: boolean;
-}
-
-export function getCaptureRootClassName(
-  _status: CapturePresentationStatus,
-  _options: CaptureRootClassNameOptions = {},
-) {
+export function getCaptureRootClassName(_status: CapturePresentationStatus) {
   return [
     'fixed left-0 top-0 z-[9999] cursor-crosshair select-none overflow-hidden bg-transparent text-white',
   ].join(' ');
@@ -16,6 +9,10 @@ export function getCaptureRootClassName(
 
 export function shouldShowCaptureLoadingMask(_status: CapturePresentationStatus) {
   return false;
+}
+
+export function getCaptureSelectionOverlayCanvasClassName() {
+  return 'pointer-events-none absolute left-0 top-0 h-full w-full';
 }
 
 export function getCaptureEditorToolbarClassName() {

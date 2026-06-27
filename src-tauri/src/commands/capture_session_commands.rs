@@ -12,6 +12,7 @@ use crate::infrastructure::system::capture_window::{
     begin_capture_presentation, capture_snapshot_hide_settle_delay_ms, capture_window_bounds,
     end_capture_presentation, hide_capture_snapshot_windows,
     hide_capture_window as hide_capture_window_for_app, open_capture_window_for_session,
+    prepare_capture_window_for_reveal as prepare_capture_window_for_reveal_for_app,
     restore_capture_snapshot_windows, reveal_capture_window as reveal_capture_window_for_app,
 };
 use crate::infrastructure::system::pinned_window::open_pinned_image_window;
@@ -93,6 +94,11 @@ pub async fn create_capture_session(
 #[tauri::command]
 pub fn reveal_capture_window(app: AppHandle) -> Result<(), String> {
     reveal_capture_window_for_app(&app)
+}
+
+#[tauri::command]
+pub fn prepare_capture_window_for_reveal(app: AppHandle) -> Result<(), String> {
+    prepare_capture_window_for_reveal_for_app(&app)
 }
 
 #[tauri::command]
@@ -198,10 +204,39 @@ pub fn get_capture_session(
     session_id: String,
     state: State<'_, crate::AppState>,
 ) -> Result<CaptureSessionView, String> {
-    state
+    let start = Instant::now();
+    let view = state
         .capture_session_service
         .get_session_view(&CaptureSessionId(session_id))
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    let view_base64_bytes = capture_session_view_base64_bytes(&view);
+
+    log::info!(
+        "[capture-perf] get_capture_session session_id={} monitors={} candidates={} view_base64_bytes={} total_ms={:.1}",
+        view.id.0,
+        view.monitors.len(),
+        view.candidates.len(),
+        view_base64_bytes,
+        elapsed_ms(start),
+    );
+
+    Ok(view)
+}
+
+#[tauri::command]
+pub fn log_capture_frontend_perf(
+    event: String,
+    mode: String,
+    session_id: Option<String>,
+    elapsed_ms: f64,
+) {
+    log::info!(
+        "[capture-perf] frontend event={} mode={} session_id={} elapsed_ms={:.1}",
+        event,
+        mode,
+        session_id.unwrap_or_else(|| "none".to_string()),
+        elapsed_ms,
+    );
 }
 
 #[tauri::command]

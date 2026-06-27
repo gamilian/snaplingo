@@ -119,6 +119,27 @@ describe('capture candidates', () => {
     );
   });
 
+  it('ignores tiny automatic hover candidates and uses the enclosing window', () => {
+    const candidates: CaptureCandidate[] = [
+      {
+        id: 'window:editor',
+        kind: 'window',
+        rect: { x: 100, y: 100, width: 700, height: 500 },
+        priority: 10,
+      },
+      {
+        id: 'window:tiny-overlay',
+        kind: 'window',
+        rect: { x: 180, y: 140, width: 18, height: 18 },
+        priority: 10,
+      },
+    ];
+
+    expect(getBestCandidateAtPoint(candidates, { x: 185, y: 145 })?.id).toBe(
+      'window:editor',
+    );
+  });
+
   it('returns null when no candidate contains the point', () => {
     expect(
       getBestCandidateAtPoint(buildMonitorCandidates(monitors), {

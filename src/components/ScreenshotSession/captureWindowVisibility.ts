@@ -1,4 +1,5 @@
 import {
+  prepareCaptureWindowForReveal as prepareNativeCaptureWindowForReveal,
   revealCaptureWindow as revealNativeCaptureWindow,
 } from '../../tauri/captureSession';
 
@@ -22,11 +23,13 @@ export interface CaptureWindowHandle {
 }
 
 export interface CaptureWindowRevealClient {
+  prepareCaptureWindowForReveal?: () => Promise<void>;
   revealCaptureWindow: () => Promise<void>;
   restoreCaptureSnapshotWindowsForSession?: (sessionId: string) => Promise<void>;
 }
 
 const tauriCaptureWindowRevealClient: CaptureWindowRevealClient = {
+  prepareCaptureWindowForReveal: prepareNativeCaptureWindowForReveal,
   revealCaptureWindow: revealNativeCaptureWindow,
 };
 
@@ -34,6 +37,7 @@ interface RevealCaptureWindowForSessionOptions {
   window: CaptureWindowHandle;
   client?: CaptureWindowRevealClient;
   sessionId: string;
+  prepareSurface?: () => void | Promise<void>;
 }
 
 export function getCaptureWindowRevealPermissions() {
@@ -66,18 +70,34 @@ export async function revealCaptureWindow(
 export async function waitForCaptureSurfacePaint(
   requestAnimationFrame: typeof globalThis.requestAnimationFrame =
     globalThis.requestAnimationFrame,
+  timeoutMs = 48,
 ) {
-  await new Promise<void>((resolve) => {
+  const paint = new Promise<void>((resolve) => {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => resolve());
     });
   });
+
+  if (timeoutMs <= 0) {
+    await paint;
+    return;
+  }
+
+  await Promise.race([
+    paint,
+    new Promise<void>((resolve) => {
+      globalThis.setTimeout(resolve, timeoutMs);
+    }),
+  ]);
 }
 
 export async function revealCaptureWindowForSession({
   window,
   client = tauriCaptureWindowRevealClient,
   sessionId: _sessionId,
+  prepareSurface,
 }: RevealCaptureWindowForSessionOptions) {
+  await client.prepareCaptureWindowForReveal?.();
+  await prepareSurface?.();
   await revealCaptureWindow(window, client);
 }

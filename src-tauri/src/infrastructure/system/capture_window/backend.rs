@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use crate::app_lifecycle::MAIN_WINDOW_LABEL;
 use crate::domain::capture::{LogicalRect, MonitorSnapshotView};
 
 pub(super) const CAPTURE_WINDOW_LABEL: &str = "capture";
@@ -85,7 +86,7 @@ pub(super) fn capture_snapshot_window_labels_to_restore(
 ) -> Vec<String> {
     hidden_window_labels
         .iter()
-        .filter(|label| label.as_str() != CAPTURE_WINDOW_LABEL)
+        .filter(|label| !matches!(label.as_str(), CAPTURE_WINDOW_LABEL | MAIN_WINDOW_LABEL))
         .cloned()
         .collect()
 }
@@ -170,7 +171,7 @@ mod tests {
                 "capture".to_string(),
                 "pin-pin-1".to_string(),
             ]),
-            vec!["main".to_string(), "pin-pin-1".to_string()]
+            vec!["pin-pin-1".to_string()]
         );
     }
 

@@ -7,6 +7,7 @@ import {
   createCaptureSession,
   currentCaptureCursorPosition,
   getCaptureSession,
+  logCaptureFrontendPerf,
   openCaptureOcrResultWindow,
   openCaptureTranslationResultWindow,
   outputCapture,
@@ -160,6 +161,7 @@ import {
   subscribeCaptureCancelRequests,
 } from './captureCancelRequest';
 import {
+  getInitialHoverSelection,
   getPolledHoverSelection,
   shouldPollCaptureHoverSelection,
 } from './captureHoverPolling';
@@ -168,6 +170,7 @@ import {
   getCaptureEditorDividerClassName,
   getCaptureEditorIconButtonClassName,
   getCaptureEditorSelectionClassName,
+  getCaptureSelectionOverlayCanvasClassName,
   getCaptureEditorToolbarClassName,
   getCaptureRootClassName,
   shouldShowCaptureLoadingMask,
@@ -239,6 +242,12 @@ type DraftSelectionMoveGesture = {
 type CaptureImageReadiness = {
   sessionId: string | null;
   monitorIds: Set<string>;
+};
+type CaptureFrontendPerfState = {
+  mode: CaptureMode;
+  sessionId: string | null;
+  startMs: number;
+  hasLoggedImagesReady: boolean;
 };
 
 const MIN_SELECTION_SIZE = 10;
@@ -613,13 +622,13 @@ export default function ScreenshotSession({
   const [includeCapturedCursor, setIncludeCapturedCursor] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasStartedInitialSession, setHasStartedInitialSession] = useState(false);
-  const [isCaptureSurfaceVisible, setIsCaptureSurfaceVisible] = useState(false);
   const [captureImageReadiness, setCaptureImageReadiness] =
     useState<CaptureImageReadiness>(() => ({
       sessionId: null,
       monitorIds: new Set(),
     }));
   const hasRevealedCaptureWindowRef = useRef(false);
+  const captureFrontendPerfRef = useRef<CaptureFrontendPerfState | null>(null);
 
   const isActive = status !== 'idle';
   const annotations = annotationHistory.annotations;
@@ -913,7 +922,6 @@ export default function ScreenshotSession({
     setIsRenderingOutput(false);
     setIncludeCapturedCursor(false);
     setError(null);
-    setIsCaptureSurfaceVisible(false);
     resetCaptureImageReadiness();
   }, [paintSelectionOverlayFrame, resetCaptureImageReadiness]);
 
@@ -922,6 +930,32 @@ export default function ScreenshotSession({
     setSession(null);
     resetCaptureInteractionState();
   }, [resetCaptureInteractionState]);
+
+  const primeInitialHoverSelection = useCallback((nextSession: CaptureSessionView) => {
+    const initialHoverSelection = getInitialHoverSelection(
+      buildCaptureCandidates(nextSession.monitors, nextSession.candidates),
+      nextSession.captured_cursor,
+    );
+
+    cursorPointRef.current = nextSession.captured_cursor?.logical_position ?? null;
+    hoverSelectionRef.current = initialHoverSelection;
+    setHoverSelection(initialHoverSelection);
+  }, []);
+
+  const markCaptureFrontendPerf = useCallback(
+    (event: string, sessionId?: string | null) => {
+      const perf = captureFrontendPerfRef.current;
+      if (!perf) return;
+
+      void logCaptureFrontendPerf({
+        event,
+        mode: perf.mode,
+        sessionId: sessionId ?? perf.sessionId,
+        elapsedMs: performance.now() - perf.startMs,
+      }).catch(() => undefined);
+    },
+    [],
+  );
 
   const finishCurrentCaptureSession = useCallback(
     async (sessionId: string) => {
@@ -963,18 +997,34 @@ export default function ScreenshotSession({
     setStatus('loading');
     setMode(nextMode);
     resetCaptureInteractionState();
+    captureFrontendPerfRef.current = {
+      mode: nextMode,
+      sessionId: sessionId ?? null,
+      startMs: performance.now(),
+      hasLoggedImagesReady: false,
+    };
+    markCaptureFrontendPerf('start_session', sessionId);
 
     try {
       const nextSession = sessionId
         ? await getCaptureSession(sessionId)
         : await createCaptureSession();
+      if (captureFrontendPerfRef.current) {
+        captureFrontendPerfRef.current.sessionId = nextSession.id;
+      }
+      markCaptureFrontendPerf('session_loaded', nextSession.id);
+      primeInitialHoverSelection(nextSession);
       setSession(nextSession);
       setStatus('selecting');
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setStatus('error');
     }
-  }, [resetCaptureInteractionState]);
+  }, [
+    markCaptureFrontendPerf,
+    primeInitialHoverSelection,
+    resetCaptureInteractionState,
+  ]);
 
   const recordLastSelection = useCallback((rect: LogicalRect) => {
     try {
@@ -1352,13 +1402,14 @@ export default function ScreenshotSession({
 
     try {
       const nextSession = await refreshCaptureSession(session.id);
+      primeInitialHoverSelection(nextSession);
       setSession(nextSession);
       setStatus('selecting');
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setStatus('error');
     }
-  }, [resetCaptureInteractionState, session]);
+  }, [primeInitialHoverSelection, resetCaptureInteractionState, session]);
 
   const undoAnnotation = useCallback(() => {
     if (!selection || !canUndoAnnotation) return;
@@ -1839,12 +1890,28 @@ export default function ScreenshotSession({
     [completeManualSelection, selection, selectionBounds],
   );
 
+  const prepareCaptureSurfaceForReveal = useCallback(async () => {
+    paintSelectionOverlayFrame(selectionOverlayFrameRef.current);
+    await waitForCaptureSurfacePaint();
+  }, [paintSelectionOverlayFrame]);
+
   useEffect(() => {
     if (!initialMode || hasStartedInitialSession) return;
 
     setHasStartedInitialSession(true);
     void startSession(initialMode, initialSessionId);
   }, [hasStartedInitialSession, initialMode, initialSessionId, startSession]);
+
+  useEffect(() => {
+    const perf = captureFrontendPerfRef.current;
+    if (!session || !areCaptureImagesReady || !perf || perf.hasLoggedImagesReady) {
+      return;
+    }
+    if (perf.sessionId !== session.id) return;
+
+    perf.hasLoggedImagesReady = true;
+    markCaptureFrontendPerf('images_ready', session.id);
+  }, [areCaptureImagesReady, markCaptureFrontendPerf, session]);
 
   useEffect(() => {
     if (
@@ -1861,8 +1928,6 @@ export default function ScreenshotSession({
     hasRevealedCaptureWindowRef.current = true;
     if (!session) {
       void revealCaptureWindow(captureWindow)
-        .then(() => waitForCaptureSurfacePaint())
-        .then(() => setIsCaptureSurfaceVisible(true))
         .catch((err) => {
           setError(err instanceof Error ? err.message : String(err));
           setStatus('error');
@@ -1873,14 +1938,22 @@ export default function ScreenshotSession({
     void revealCaptureWindowForSession({
       window: captureWindow,
       sessionId: session.id,
+      prepareSurface: prepareCaptureSurfaceForReveal,
     })
-      .then(() => waitForCaptureSurfacePaint())
-      .then(() => setIsCaptureSurfaceVisible(true))
+      .then(() => {
+        markCaptureFrontendPerf('revealed', session.id);
+      })
       .catch((err) => {
         setError(err instanceof Error ? err.message : String(err));
         setStatus('error');
       });
-  }, [areCaptureImagesReady, session, status]);
+  }, [
+    areCaptureImagesReady,
+    markCaptureFrontendPerf,
+    prepareCaptureSurfaceForReveal,
+    session,
+    status,
+  ]);
 
   useEffect(() => {
     let disposed = false;
@@ -1937,11 +2010,15 @@ export default function ScreenshotSession({
     sampleCanvasByMonitorRef.current = new Map();
     setCursorColor(null);
     setSampleCanvasVersion((version) => version + 1);
+  }, [session?.id]);
 
-    if (!session) return;
+  useEffect(() => {
+    if (!session || !isMagnifierRequested) return;
 
     let disposed = false;
     session.monitors.forEach((monitor) => {
+      if (sampleCanvasByMonitorRef.current.has(monitor.id)) return;
+
       const image = new Image();
       image.onload = () => {
         if (disposed) return;
@@ -1959,7 +2036,7 @@ export default function ScreenshotSession({
     return () => {
       disposed = true;
     };
-  }, [session]);
+  }, [isMagnifierRequested, session]);
 
   useEffect(() => {
     if (!cursorInMonitorPoint || !cursorMonitor) {
@@ -3004,9 +3081,7 @@ export default function ScreenshotSession({
 
   return (
     <div
-      className={getCaptureRootClassName(status, {
-        isSurfaceVisible: isCaptureSurfaceVisible,
-      })}
+      className={getCaptureRootClassName(status)}
       style={{
         width: `${viewportBounds?.width ?? window.innerWidth}px`,
         height: `${viewportBounds?.height ?? window.innerHeight}px`,
@@ -3609,7 +3684,7 @@ export default function ScreenshotSession({
           ref={selectionOverlayCanvasRef}
           width={Math.max(0, Math.round(viewportBounds.width))}
           height={Math.max(0, Math.round(viewportBounds.height))}
-          className="pointer-events-none absolute left-0 top-0 h-full w-full"
+          className={getCaptureSelectionOverlayCanvasClassName()}
           aria-hidden="true"
         />
       )}
