@@ -662,10 +662,11 @@ export default function ScreenshotSession({
   }, [session]);
   const areCaptureImagesReady = useMemo(() => {
     if (!session) return false;
-    if (session.monitors.length === 0) return true;
+    const imageMonitors = session.monitors.filter((monitor) => monitor.image_base64);
+    if (imageMonitors.length === 0) return true;
     if (captureImageReadiness.sessionId !== session.id) return false;
 
-    return session.monitors.every((monitor) =>
+    return imageMonitors.every((monitor) =>
       captureImageReadiness.monitorIds.has(monitor.id),
     );
   }, [captureImageReadiness, session]);
@@ -730,7 +731,7 @@ export default function ScreenshotSession({
   const isMagnifierShown = shouldShowMagnifier({
     requested: isMagnifierRequested,
     automatic: false,
-    hasCursorMonitor: Boolean(cursorMonitor),
+    hasCursorMonitor: Boolean(cursorMonitor?.image_base64),
     hasViewportCursor: Boolean(cursorViewportPoint),
     hasImageCursor: Boolean(cursorInMonitorPoint),
     hasViewportBounds: Boolean(viewportBounds),
@@ -931,13 +932,27 @@ export default function ScreenshotSession({
     resetCaptureInteractionState();
   }, [resetCaptureInteractionState]);
 
-  const primeInitialHoverSelection = useCallback((nextSession: CaptureSessionView) => {
+  const primeInitialHoverSelection = useCallback((
+    nextSession: CaptureSessionView,
+    initialCursorPosition?: Point | null,
+  ) => {
+    const cursorPosition =
+      nextSession.captured_cursor?.logical_position ?? initialCursorPosition ?? null;
     const initialHoverSelection = getInitialHoverSelection(
       buildCaptureCandidates(nextSession.monitors, nextSession.candidates),
-      nextSession.captured_cursor,
+      cursorPosition
+        ? {
+            logical_position: cursorPosition,
+            hotspot: { x: 0, y: 0 },
+            image_width: 0,
+            image_height: 0,
+            scale_factor: 1,
+            image_base64: '',
+          }
+        : null,
     );
 
-    cursorPointRef.current = nextSession.captured_cursor?.logical_position ?? null;
+    cursorPointRef.current = cursorPosition;
     hoverSelectionRef.current = initialHoverSelection;
     setHoverSelection(initialHoverSelection);
   }, []);
@@ -1013,7 +1028,10 @@ export default function ScreenshotSession({
         captureFrontendPerfRef.current.sessionId = nextSession.id;
       }
       markCaptureFrontendPerf('session_loaded', nextSession.id);
-      primeInitialHoverSelection(nextSession);
+      const initialCursorPosition = nextSession.captured_cursor
+        ? null
+        : await currentCaptureCursorPosition(nextSession.id).catch(() => null);
+      primeInitialHoverSelection(nextSession, initialCursorPosition);
       setSession(nextSession);
       setStatus('selecting');
     } catch (err) {
@@ -1402,7 +1420,10 @@ export default function ScreenshotSession({
 
     try {
       const nextSession = await refreshCaptureSession(session.id);
-      primeInitialHoverSelection(nextSession);
+      const initialCursorPosition = nextSession.captured_cursor
+        ? null
+        : await currentCaptureCursorPosition(nextSession.id).catch(() => null);
+      primeInitialHoverSelection(nextSession, initialCursorPosition);
       setSession(nextSession);
       setStatus('selecting');
     } catch (err) {
@@ -3094,7 +3115,7 @@ export default function ScreenshotSession({
     >
       {session &&
         selectionBounds &&
-        session.monitors.map((monitor) => (
+        session.monitors.filter((monitor) => monitor.image_base64).map((monitor) => (
           <img
             key={monitor.id}
             src={`data:image/png;base64,${monitor.image_base64}`}

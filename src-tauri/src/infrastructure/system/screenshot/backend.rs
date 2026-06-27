@@ -24,6 +24,15 @@ pub struct MonitorSnapshot {
     pub png_data: Vec<u8>,
 }
 
+/// Monitor geometry without captured pixels.
+#[derive(Debug, Clone)]
+pub struct MonitorLayout {
+    pub id: String,
+    pub logical_bounds: LogicalRect,
+    pub physical_bounds: PhysicalRect,
+    pub scale_factor: f64,
+}
+
 #[derive(Debug, Clone)]
 pub struct CapturedCursor {
     pub logical_position: LogicalPoint,
@@ -72,6 +81,48 @@ pub fn monitor_snapshot_from_physical_geometry(
             height,
         },
         scale_factor,
+        png_data,
+    }
+}
+
+pub fn monitor_layout_from_physical_geometry(
+    id: String,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+    scale_factor: f64,
+) -> MonitorLayout {
+    let scale_factor = if scale_factor > 0.0 {
+        scale_factor
+    } else {
+        1.0
+    };
+
+    MonitorLayout {
+        id,
+        logical_bounds: LogicalRect {
+            x: x as f64 / scale_factor,
+            y: y as f64 / scale_factor,
+            width: width as f64 / scale_factor,
+            height: height as f64 / scale_factor,
+        },
+        physical_bounds: PhysicalRect {
+            x,
+            y,
+            width,
+            height,
+        },
+        scale_factor,
+    }
+}
+
+pub fn monitor_snapshot_from_layout(layout: MonitorLayout, png_data: Vec<u8>) -> MonitorSnapshot {
+    MonitorSnapshot {
+        id: layout.id,
+        logical_bounds: layout.logical_bounds,
+        physical_bounds: layout.physical_bounds,
+        scale_factor: layout.scale_factor,
         png_data,
     }
 }
@@ -156,6 +207,9 @@ pub trait ScreenshotBackend: Send + Sync {
     /// Capture all monitor snapshots needed to start a capture session.
     /// First implementations may return only the primary monitor.
     async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError>;
+
+    /// Capture monitor geometry without pixel data.
+    async fn capture_monitor_layouts(&self) -> Result<Vec<MonitorLayout>, AppError>;
 
     async fn capture_window_candidates(
         &self,

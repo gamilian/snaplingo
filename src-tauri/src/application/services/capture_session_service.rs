@@ -11,7 +11,8 @@ use crate::domain::capture::{
 };
 use crate::error::{AppError, Result};
 use crate::infrastructure::system::screenshot::{
-    CapturedCursor, MonitorSnapshot, ScreenshotBackend, WindowCandidate,
+    monitor_snapshot_from_layout, CapturedCursor, MonitorSnapshot, ScreenRegion, ScreenshotBackend,
+    WindowCandidate,
 };
 
 static NEXT_SESSION_COUNTER: AtomicU64 = AtomicU64::new(1);
@@ -19,6 +20,7 @@ static NEXT_SESSION_COUNTER: AtomicU64 = AtomicU64::new(1);
 #[derive(Debug, Clone)]
 pub struct CaptureSession {
     pub id: CaptureSessionId,
+    pub layout_snapshots: Vec<MonitorSnapshot>,
     pub snapshots: Vec<MonitorSnapshot>,
     pub candidates: Vec<CaptureCandidateView>,
     pub captured_cursor: Option<CapturedCursor>,
@@ -91,6 +93,11 @@ impl CaptureSessionService {
         let id = CaptureSessionId(generate_session_id());
         let session = CaptureSession {
             id: id.clone(),
+            layout_snapshots: snapshots
+                .iter()
+                .cloned()
+                .map(snapshot_without_pixels)
+                .collect(),
             snapshots,
             candidates,
             captured_cursor,
@@ -128,6 +135,113 @@ impl CaptureSessionService {
         );
 
         Ok(view)
+    }
+
+    pub async fn create_layout_session(&self) -> Result<CaptureSessionView> {
+        self.create_layout_session_with_hidden_window_labels(Vec::new())
+            .await
+    }
+
+    pub async fn create_layout_session_with_hidden_window_labels(
+        &self,
+        hidden_window_labels: Vec<String>,
+    ) -> Result<CaptureSessionView> {
+        let total_start = Instant::now();
+
+        let layouts_start = Instant::now();
+        let layouts = self.screenshot_backend.capture_monitor_layouts().await?;
+        let layouts_ms = elapsed_ms(layouts_start);
+        if layouts.is_empty() {
+            return Err(AppError::System(
+                "Cannot create capture session without monitor layout".to_string(),
+            ));
+        }
+
+        let layout_snapshots = layouts
+            .into_iter()
+            .map(|layout| monitor_snapshot_from_layout(layout, Vec::new()))
+            .collect::<Vec<_>>();
+
+        let window_candidates_start = Instant::now();
+        let window_candidates = self
+            .screenshot_backend
+            .capture_window_candidates(&layout_snapshots)
+            .await
+            .map_err(|err| {
+                log::warn!("Failed to capture window candidates: {}", err);
+                err
+            })
+            .unwrap_or_default();
+        let window_candidates_ms = elapsed_ms(window_candidates_start);
+        let candidates = window_candidates
+            .iter()
+            .map(window_candidate_to_view)
+            .collect::<Vec<_>>();
+
+        let id = CaptureSessionId(generate_session_id());
+        let session = CaptureSession {
+            id: id.clone(),
+            layout_snapshots: layout_snapshots.clone(),
+            snapshots: layout_snapshots,
+            candidates,
+            captured_cursor: None,
+            hidden_window_labels,
+            created_at: SystemTime::now(),
+        };
+
+        let view = session_to_view(&session);
+        let mut sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| AppError::System("Capture session lock poisoned".to_string()))?;
+        sessions.insert(id, session);
+
+        log::info!(
+            "[capture-perf] create_layout_session monitors={} candidates={} layouts_ms={:.1} candidates_ms={:.1} total_ms={:.1}",
+            view.monitors.len(),
+            view.candidates.len(),
+            layouts_ms,
+            window_candidates_ms,
+            elapsed_ms(total_start),
+        );
+
+        Ok(view)
+    }
+
+    pub async fn freeze_session_selection(
+        &self,
+        id: &CaptureSessionId,
+        rect: &LogicalRect,
+    ) -> Result<CaptureSessionView> {
+        let session = self.get_session(id)?;
+        if session_snapshots_cover_rect(&session, rect) {
+            return Ok(session_to_view(&session));
+        }
+
+        let snapshots = self
+            .capture_selection_snapshots(&session.layout_snapshots, rect)
+            .await?;
+
+        let mut sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| AppError::System("Capture session lock poisoned".to_string()))?;
+        let session = sessions
+            .get_mut(id)
+            .ok_or_else(|| AppError::System(format!("Capture session not found: {}", id.0)))?;
+        session.snapshots = snapshots;
+
+        Ok(session_to_view(session))
+    }
+
+    pub fn session_selection_needs_freeze(
+        &self,
+        id: &CaptureSessionId,
+        rect: &LogicalRect,
+    ) -> Result<bool> {
+        let session = self.get_session(id)?;
+
+        Ok(!session_snapshots_cover_rect(&session, rect))
     }
 
     pub fn take_hidden_window_labels(&self, id: &CaptureSessionId) -> Result<Vec<String>> {
@@ -172,7 +286,7 @@ impl CaptureSessionService {
         let session = self.get_session(id)?;
 
         self.screenshot_backend
-            .current_cursor_position(&session.snapshots)
+            .current_cursor_position(&session.layout_snapshots)
     }
 
     pub fn has_session(&self, id: &CaptureSessionId) -> bool {
@@ -189,7 +303,7 @@ impl CaptureSessionService {
     ) -> Result<PhysicalRect> {
         let session = self.get_session(id)?;
         let snapshot = session
-            .snapshots
+            .layout_snapshots
             .iter()
             .find(|snapshot| logical_rects_intersect(rect, &snapshot.logical_bounds))
             .ok_or_else(|| {
@@ -197,6 +311,46 @@ impl CaptureSessionService {
             })?;
 
         logical_rect_to_snapshot_physical(rect, snapshot)
+    }
+
+    async fn capture_selection_snapshots(
+        &self,
+        layout_snapshots: &[MonitorSnapshot],
+        rect: &LogicalRect,
+    ) -> Result<Vec<MonitorSnapshot>> {
+        let mut snapshots = Vec::new();
+
+        for layout in layout_snapshots {
+            let Some(intersection) = logical_rect_intersection(rect, &layout.logical_bounds) else {
+                continue;
+            };
+            let physical_rect = logical_rect_to_snapshot_physical(&intersection, layout)?;
+            let png_data = self
+                .screenshot_backend
+                .capture_region(ScreenRegion {
+                    x: physical_rect.x,
+                    y: physical_rect.y,
+                    width: physical_rect.width,
+                    height: physical_rect.height,
+                })
+                .await?;
+
+            snapshots.push(MonitorSnapshot {
+                id: layout.id.clone(),
+                logical_bounds: intersection,
+                physical_bounds: physical_rect,
+                scale_factor: layout.scale_factor,
+                png_data,
+            });
+        }
+
+        if snapshots.is_empty() {
+            return Err(AppError::System(
+                "Selection does not intersect any captured monitor".to_string(),
+            ));
+        }
+
+        Ok(snapshots)
     }
 }
 
@@ -240,6 +394,53 @@ fn captured_cursor_to_view(cursor: &CapturedCursor) -> CapturedCursorView {
         scale_factor: cursor.scale_factor,
         image_base64: base64::engine::general_purpose::STANDARD.encode(&cursor.png_data),
     }
+}
+
+fn snapshot_without_pixels(mut snapshot: MonitorSnapshot) -> MonitorSnapshot {
+    snapshot.png_data.clear();
+    snapshot
+}
+
+fn session_snapshots_cover_rect(session: &CaptureSession, rect: &LogicalRect) -> bool {
+    let required_area = snapshots_intersection_area(rect, &session.layout_snapshots, false);
+    if required_area <= 0.0 {
+        return false;
+    }
+
+    let captured_area = snapshots_intersection_area(rect, &session.snapshots, true);
+
+    captured_area + f64::EPSILON >= required_area
+}
+
+fn snapshots_intersection_area(
+    rect: &LogicalRect,
+    snapshots: &[MonitorSnapshot],
+    require_pixels: bool,
+) -> f64 {
+    snapshots
+        .iter()
+        .filter(|snapshot| !require_pixels || !snapshot.png_data.is_empty())
+        .filter_map(|snapshot| logical_rect_intersection(rect, &snapshot.logical_bounds))
+        .map(|intersection| intersection.width * intersection.height)
+        .sum()
+}
+
+fn logical_rect_intersection(a: &LogicalRect, b: &LogicalRect) -> Option<LogicalRect> {
+    let left = a.x.max(b.x);
+    let top = a.y.max(b.y);
+    let right = (a.x + a.width).min(b.x + b.width);
+    let bottom = (a.y + a.height).min(b.y + b.height);
+
+    if right <= left || bottom <= top {
+        return None;
+    }
+
+    Some(LogicalRect {
+        x: left,
+        y: top,
+        width: right - left,
+        height: bottom - top,
+    })
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -344,6 +545,7 @@ mod payload_metrics_tests {
     fn capture_session_payload_metrics_counts_snapshot_cursor_and_base64_bytes() {
         let session = CaptureSession {
             id: CaptureSessionId("capture-test".to_string()),
+            layout_snapshots: Vec::new(),
             snapshots: vec![
                 MonitorSnapshot {
                     id: "primary".to_string(),

@@ -269,11 +269,11 @@ fn capture_window_accepts_first_mouse() -> bool {
 }
 
 fn capture_window_is_transparent() -> bool {
-    false
+    true
 }
 
 fn capture_window_background_color() -> Color {
-    Color(0, 0, 0, 255)
+    Color(0, 0, 0, 0)
 }
 
 fn should_reset_capture_window_fullscreen_before_reuse() -> bool {
@@ -328,8 +328,9 @@ mod tests {
     }
 
     #[test]
-    fn capture_window_is_opaque_to_avoid_underlying_window_flash() {
-        assert!(!capture_window_is_transparent());
+    fn capture_window_is_transparent_for_lazy_canvas_overlay() {
+        assert!(capture_window_is_transparent());
+        assert_eq!(capture_window_background_color(), Color(0, 0, 0, 0));
     }
 
     #[cfg(target_os = "macos")]

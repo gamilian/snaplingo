@@ -1,4 +1,6 @@
-use super::backend::{MonitorSnapshot, ScreenRegion, ScreenshotBackend, WindowCandidate};
+use super::backend::{
+    MonitorLayout, MonitorSnapshot, ScreenRegion, ScreenshotBackend, WindowCandidate,
+};
 use super::xcap_common;
 use crate::error::AppError;
 
@@ -15,6 +17,10 @@ impl WindowsScreenshotBackend {
 impl ScreenshotBackend for WindowsScreenshotBackend {
     async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError> {
         xcap_common::capture_all_monitor_snapshots()
+    }
+
+    async fn capture_monitor_layouts(&self) -> Result<Vec<MonitorLayout>, AppError> {
+        xcap_common::capture_all_monitor_layouts()
     }
 
     async fn capture_window_candidates(

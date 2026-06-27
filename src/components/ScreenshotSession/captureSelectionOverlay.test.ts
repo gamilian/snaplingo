@@ -131,7 +131,7 @@ describe('capture selection canvas overlay', () => {
 
     expect(context.calls).toEqual([
       'clearRect:0,0,500,300',
-      'fillStyle:rgba(0, 0, 0, 0.24)',
+      'fillStyle:rgba(0, 0, 0, 0.14)',
       'fillRect:0,0,500,40',
       'fillRect:0,100,500,200',
       'fillRect:0,40,80,60',

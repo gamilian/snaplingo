@@ -17,12 +17,12 @@ describe('capture presentation', () => {
     expect(css).toMatch(/html,\s*body,\s*#root\s*{[^}]*background:\s*transparent/s);
   });
 
-  it('paints the capture html shell black before React renders screenshots', () => {
+  it('keeps the capture html shell transparent before React renders', () => {
     const html = readFileSync(new URL('../../../index.html', import.meta.url), 'utf8');
 
     expect(html).toContain('data-window="capture"');
     expect(html).toMatch(
-      /html\[data-window="capture"\][\s\S]*background:\s*#000/s,
+      /html\[data-window="capture"\][\s\S]*background:\s*transparent/s,
     );
   });
 

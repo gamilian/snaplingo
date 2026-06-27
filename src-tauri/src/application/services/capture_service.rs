@@ -89,6 +89,30 @@ mod tests {
             ])
         }
 
+        async fn capture_monitor_layouts(
+            &self,
+        ) -> Result<Vec<crate::infrastructure::system::screenshot::MonitorLayout>, AppError>
+        {
+            Ok(vec![
+                crate::infrastructure::system::screenshot::MonitorLayout {
+                    id: "primary".to_string(),
+                    logical_bounds: crate::domain::capture::LogicalRect {
+                        x: 0.0,
+                        y: 0.0,
+                        width: 1.0,
+                        height: 1.0,
+                    },
+                    physical_bounds: crate::domain::capture::PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 1,
+                        height: 1,
+                    },
+                    scale_factor: 1.0,
+                },
+            ])
+        }
+
         async fn capture_full_screen(&self) -> Result<Vec<u8>, AppError> {
             Ok(self.full_screen_data.clone())
         }

@@ -1,6 +1,6 @@
 use super::backend::{
-    monitor_snapshot_from_physical_geometry, CapturedCursor, MonitorSnapshot, ScreenRegion,
-    ScreenshotBackend, WindowCandidate,
+    monitor_layout_from_physical_geometry, monitor_snapshot_from_physical_geometry, CapturedCursor,
+    MonitorLayout, MonitorSnapshot, ScreenRegion, ScreenshotBackend, WindowCandidate,
 };
 use crate::domain::capture::{LogicalPoint, LogicalRect};
 use crate::error::AppError;
@@ -300,6 +300,23 @@ fn capture_visible_display_snapshots() -> Result<Vec<MonitorSnapshot>, AppError>
         .collect()
 }
 
+fn capture_visible_display_layouts() -> Result<Vec<MonitorLayout>, AppError> {
+    let mut monitors = Monitor::all()
+        .map_err(|e| AppError::System(format!("Failed to enumerate monitors: {}", e)))?;
+    monitors.sort_by_key(|monitor| {
+        if monitor.is_primary().unwrap_or(false) {
+            0
+        } else {
+            1
+        }
+    });
+
+    monitors
+        .iter()
+        .map(capture_visible_display_layout)
+        .collect()
+}
+
 fn capture_visible_display_snapshot(
     monitor: &Monitor,
     access: ScreenCaptureAccessStatus,
@@ -334,6 +351,35 @@ fn capture_visible_display_snapshot(
     ))
 }
 
+fn capture_visible_display_layout(monitor: &Monitor) -> Result<MonitorLayout, AppError> {
+    let display_id = monitor
+        .id()
+        .map_err(|e| AppError::System(format!("Failed to read monitor id: {}", e)))?;
+    let x = monitor
+        .x()
+        .map_err(|e| AppError::System(format!("Failed to read monitor x: {}", e)))?;
+    let y = monitor
+        .y()
+        .map_err(|e| AppError::System(format!("Failed to read monitor y: {}", e)))?;
+    let logical_width = monitor
+        .width()
+        .map_err(|e| AppError::System(format!("Failed to read monitor width: {}", e)))?;
+    let logical_height = monitor
+        .height()
+        .map_err(|e| AppError::System(format!("Failed to read monitor height: {}", e)))?;
+    let scale_factor = monitor.scale_factor().unwrap_or(1.0).max(1.0) as f64;
+    let id = format!("monitor-{}", display_id);
+
+    Ok(monitor_layout_from_physical_geometry(
+        id,
+        logical_to_physical_origin(x, scale_factor),
+        logical_to_physical_origin(y, scale_factor),
+        logical_to_physical_extent(logical_width, scale_factor),
+        logical_to_physical_extent(logical_height, scale_factor),
+        scale_factor,
+    ))
+}
+
 fn monitor_snapshot_from_visible_display_capture(
     id: String,
     logical_x: i32,
@@ -357,6 +403,10 @@ fn monitor_snapshot_from_visible_display_capture(
 
 fn logical_to_physical_origin(value: i32, scale_factor: f64) -> i32 {
     (value as f64 * scale_factor).round() as i32
+}
+
+fn logical_to_physical_extent(value: u32, scale_factor: f64) -> u32 {
+    (value as f64 * scale_factor).round().max(1.0) as u32
 }
 
 fn capture_visible_window_candidates(
@@ -480,6 +530,10 @@ fn should_skip_window_candidate(title: &str, app_name: &str) -> bool {
 impl ScreenshotBackend for MacOSScreenshotBackend {
     async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError> {
         capture_visible_display_snapshots()
+    }
+
+    async fn capture_monitor_layouts(&self) -> Result<Vec<MonitorLayout>, AppError> {
+        capture_visible_display_layouts()
     }
 
     async fn capture_window_candidates(

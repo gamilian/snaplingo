@@ -10,8 +10,8 @@ use crate::domain::capture::{
 use crate::domain::ocr::OcrResult;
 use crate::infrastructure::system::capture_window::{
     begin_capture_presentation, capture_snapshot_hide_settle_delay_ms, capture_window_bounds,
-    end_capture_presentation, hide_capture_snapshot_windows,
-    hide_capture_window as hide_capture_window_for_app, open_capture_window_for_session,
+    end_capture_presentation, hide_capture_window as hide_capture_window_for_app,
+    open_capture_window_for_session,
     prepare_capture_window_for_reveal as prepare_capture_window_for_reveal_for_app,
     restore_capture_snapshot_windows, reveal_capture_window as reveal_capture_window_for_app,
 };
@@ -115,43 +115,17 @@ async fn create_capture_session_from_visible_desktop(
     begin_capture_presentation(app)?;
     let begin_ms = elapsed_ms(begin_start);
 
-    let hide_start = Instant::now();
-    let hidden_window_labels = match hide_capture_snapshot_windows(app) {
-        Ok(labels) => labels,
-        Err(err) => match end_capture_presentation(app) {
-            Ok(()) => return Err(err),
-            Err(presentation_err) => {
-                return Err(format!(
-                    "{}; also failed to end capture presentation: {}",
-                    err, presentation_err
-                ))
-            }
-        },
-    };
-    let hide_ms = elapsed_ms(hide_start);
-
-    let settle_delay_ms = capture_snapshot_hide_settle_delay_ms(&hidden_window_labels);
-    let settle_start = Instant::now();
-    if settle_delay_ms > 0 {
-        tokio::time::sleep(tokio::time::Duration::from_millis(settle_delay_ms)).await;
-    }
-    let settle_ms = elapsed_ms(settle_start);
-
     let session_start = Instant::now();
     let session_result = state
         .capture_session_service
-        .create_session_with_hidden_window_labels(hidden_window_labels.clone())
+        .create_layout_session_with_hidden_window_labels(Vec::new())
         .await
         .map_err(|e| e.to_string());
     let session_ms = elapsed_ms(session_start);
 
     log::info!(
-        "[capture-perf] create_visible_desktop_session hidden_windows={} begin_ms={:.1} hide_ms={:.1} settle_requested_ms={} settle_ms={:.1} capture_session_ms={:.1} total_ms={:.1} success={}",
-        hidden_window_labels.len(),
+        "[capture-perf] create_visible_desktop_layout_session begin_ms={:.1} capture_session_ms={:.1} total_ms={:.1} success={}",
         begin_ms,
-        hide_ms,
-        settle_delay_ms,
-        settle_ms,
         session_ms,
         elapsed_ms(total_start),
         session_result.is_ok(),
@@ -160,22 +134,13 @@ async fn create_capture_session_from_visible_desktop(
     match session_result {
         Ok(session) => Ok(session),
         Err(session_err) => {
-            let restore_result = restore_capture_snapshot_windows(app, &hidden_window_labels);
             let presentation_result = end_capture_presentation(app);
 
-            match (restore_result, presentation_result) {
-                (Ok(()), Ok(())) => Err(session_err),
-                (Err(restore_err), Ok(())) => Err(format!(
-                    "{}; also failed to restore hidden windows: {}",
-                    session_err, restore_err
-                )),
-                (Ok(()), Err(presentation_err)) => Err(format!(
+            match presentation_result {
+                Ok(()) => Err(session_err),
+                Err(presentation_err) => Err(format!(
                     "{}; also failed to end capture presentation: {}",
                     session_err, presentation_err
-                )),
-                (Err(restore_err), Err(presentation_err)) => Err(format!(
-                    "{}; also failed to restore hidden windows: {}; also failed to end capture presentation: {}",
-                    session_err, restore_err, presentation_err
                 )),
             }
         }
@@ -317,9 +282,13 @@ pub async fn render_capture_output(
     rect: LogicalRect,
     annotations: Vec<AnnotationCommand>,
     include_cursor: Option<bool>,
+    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<String, String> {
     let session_id = CaptureSessionId(session_id);
+    freeze_capture_session_from_visible_desktop(&app, state.inner(), &session_id, &rect, true)
+        .await?;
+
     state
         .capture_session_runtime
         .render_png_base64(
@@ -363,6 +332,9 @@ pub async fn output_capture(
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     let session_id = CaptureSessionId(session_id);
+    freeze_capture_session_from_visible_desktop(&app, state.inner(), &session_id, &rect, false)
+        .await?;
+
     let output = state
         .capture_session_runtime
         .output_selection(
@@ -393,14 +365,71 @@ pub async fn output_capture(
 pub async fn run_capture_ocr(
     session_id: String,
     rect: LogicalRect,
+    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<OcrResult, String> {
     let session_id = CaptureSessionId(session_id);
+    freeze_capture_session_from_visible_desktop(&app, state.inner(), &session_id, &rect, true)
+        .await?;
+
     state
         .capture_session_runtime
         .recognize_selection_text(&session_id, &rect)
         .await
         .map_err(|e| e.to_string())
+}
+
+async fn freeze_capture_session_from_visible_desktop(
+    app: &AppHandle,
+    state: &crate::AppState,
+    session_id: &CaptureSessionId,
+    rect: &LogicalRect,
+    reveal_after_success: bool,
+) -> Result<(), String> {
+    if !state
+        .capture_session_service
+        .session_selection_needs_freeze(session_id, rect)
+        .map_err(|e| e.to_string())?
+    {
+        return Ok(());
+    }
+
+    let hide_result = hide_capture_window_for_app(app);
+    let hidden_capture_window = hide_result.is_ok();
+    if let Err(err) = hide_result {
+        log::warn!(
+            "Failed to hide capture window before freezing selection: {}",
+            err
+        );
+    }
+
+    if hidden_capture_window {
+        let settle_delay_ms = capture_snapshot_hide_settle_delay_ms(&["capture".to_string()]);
+        if settle_delay_ms > 0 {
+            tokio::time::sleep(tokio::time::Duration::from_millis(settle_delay_ms)).await;
+        }
+    }
+
+    let freeze_result = state
+        .capture_session_service
+        .freeze_session_selection(session_id, rect)
+        .await
+        .map_err(|e| e.to_string());
+
+    let should_reveal = reveal_after_success || freeze_result.is_err();
+    if should_reveal && hidden_capture_window {
+        if let Err(reveal_err) = reveal_capture_window_for_app(app) {
+            return match freeze_result {
+                Ok(_) => Err(reveal_err),
+                Err(freeze_err) => Err(format!(
+                    "{}; also failed to reveal capture window: {}",
+                    freeze_err, reveal_err
+                )),
+            };
+        }
+    }
+
+    freeze_result.map(|_| ())
 }
 
 pub async fn open_capture_window_from_shortcut(app: AppHandle, mode: &'static str) {

@@ -10,7 +10,8 @@ mod windows;
 mod xcap_common;
 
 pub use backend::{
-    CapturedCursor, MonitorSnapshot, ScreenRegion, ScreenshotBackend, WindowCandidate,
+    monitor_snapshot_from_layout, CapturedCursor, MonitorLayout, MonitorSnapshot, ScreenRegion,
+    ScreenshotBackend, WindowCandidate,
 };
 
 use std::sync::Arc;

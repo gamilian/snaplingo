@@ -2,8 +2,9 @@
 use super::backend::ScreenRegion;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use super::backend::{
-    monitor_snapshot_from_physical_geometry, rgba_image_to_png,
-    window_candidate_from_physical_geometry, MonitorSnapshot, WindowCandidate,
+    monitor_layout_from_physical_geometry, monitor_snapshot_from_physical_geometry,
+    rgba_image_to_png, window_candidate_from_physical_geometry, MonitorLayout, MonitorSnapshot,
+    WindowCandidate,
 };
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use crate::error::AppError;
@@ -57,6 +58,25 @@ pub fn capture_all_monitor_snapshots() -> Result<Vec<MonitorSnapshot>, AppError>
         .iter()
         .enumerate()
         .map(|(index, monitor)| capture_monitor_snapshot(monitor, index))
+        .collect()
+}
+
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+pub fn capture_all_monitor_layouts() -> Result<Vec<MonitorLayout>, AppError> {
+    let mut monitors = Monitor::all()
+        .map_err(|e| with_platform_hint(format!("Failed to enumerate monitors: {}", e)))?;
+    monitors.sort_by_key(|monitor| {
+        if monitor.is_primary().unwrap_or(false) {
+            0
+        } else {
+            1
+        }
+    });
+
+    monitors
+        .iter()
+        .enumerate()
+        .map(|(index, monitor)| capture_monitor_layout(monitor, index))
         .collect()
 }
 
@@ -155,6 +175,39 @@ fn capture_monitor_snapshot(
         height,
         scale_factor,
         png_data,
+    ))
+}
+
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+fn capture_monitor_layout(
+    monitor: &Monitor,
+    fallback_index: usize,
+) -> Result<MonitorLayout, AppError> {
+    let x = monitor
+        .x()
+        .map_err(|e| with_platform_hint(format!("Failed to read monitor x: {}", e)))?;
+    let y = monitor
+        .y()
+        .map_err(|e| with_platform_hint(format!("Failed to read monitor y: {}", e)))?;
+    let width = monitor
+        .width()
+        .map_err(|e| with_platform_hint(format!("Failed to read monitor width: {}", e)))?;
+    let height = monitor
+        .height()
+        .map_err(|e| with_platform_hint(format!("Failed to read monitor height: {}", e)))?;
+    let scale_factor = monitor.scale_factor().unwrap_or(1.0).max(1.0) as f64;
+    let id = monitor
+        .id()
+        .map(|id| format!("monitor-{}", id))
+        .unwrap_or_else(|_| format!("monitor-{}", fallback_index));
+
+    Ok(monitor_layout_from_physical_geometry(
+        id,
+        x,
+        y,
+        width,
+        height,
+        scale_factor,
     ))
 }
 
