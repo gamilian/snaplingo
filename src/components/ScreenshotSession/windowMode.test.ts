@@ -16,6 +16,12 @@ describe('capture window mode parsing', () => {
       mode: 'screenshot-ocr',
       sessionId: 'session-1',
     });
+    expect(
+      readCaptureLaunch('?window=capture&mode=screenshot-copy&sessionId=session-2'),
+    ).toEqual({
+      mode: 'screenshot-copy',
+      sessionId: 'session-2',
+    });
   });
 
   it('ignores invalid capture launch modes', () => {

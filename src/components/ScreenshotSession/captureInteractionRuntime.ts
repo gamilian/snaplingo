@@ -71,6 +71,7 @@ export function planSelectionFlowCompletion(
   flow: CaptureSelectionFlow,
 ): CaptureRuntimeEffect[] {
   if (flow === 'preview') return [];
+  if (flow === 'copy') return planCandidateSelectionCompletion('copy');
 
   const resultWindow =
     flow === 'ocr-translate' ? 'translation' : flow === 'ocr' ? 'ocr' : null;

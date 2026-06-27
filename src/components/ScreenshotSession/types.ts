@@ -55,6 +55,7 @@ export interface PinnedImageView {
 
 export type CaptureMode =
   | 'screenshot'
+  | 'screenshot-copy'
   | 'screenshot-ocr'
   | 'silent-screenshot-ocr'
   | 'screenshot-translate';

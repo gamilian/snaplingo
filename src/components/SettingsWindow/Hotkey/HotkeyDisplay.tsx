@@ -1,5 +1,3 @@
-import { useEffect } from 'react';
-
 interface HotkeyDisplayProps {
   value: string; // e.g., "⌥S", "⇧⌥S", "未设置"
   onClick?: () => void;
@@ -7,23 +5,7 @@ interface HotkeyDisplayProps {
 }
 
 export function HotkeyDisplay({ value, onClick, isRecording = false }: HotkeyDisplayProps) {
-  // 录制动画效果
-  useEffect(() => {
-    if (isRecording) {
-      const interval = setInterval(() => {
-        // Pulse animation handled by CSS
-      }, 800);
-      return () => clearInterval(interval);
-    }
-  }, [isRecording]);
-
   const handleClick = () => {
-    console.log('[HotkeyDisplay] Clicked!', {
-      value,
-      isRecording,
-      isUnset,
-      hasOnClick: !!onClick
-    });
     onClick?.();
   };
 

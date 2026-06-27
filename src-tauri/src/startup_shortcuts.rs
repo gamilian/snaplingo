@@ -200,15 +200,14 @@ fn register_hotkey_action(
 }
 
 fn trigger_hotkey_action(app: tauri::AppHandle, category: String, action: String) {
-    match (category.as_str(), action.as_str()) {
-        (SCREENSHOT_CATEGORY, SCREENSHOT_ACTION)
-        | (SCREENSHOT_CATEGORY, SCREENSHOT_COPY_ACTION)
-        | (SCREENSHOT_CATEGORY, SCREENSHOT_CUSTOM_ACTION) => {
-            tauri::async_runtime::spawn(commands::open_capture_window_from_shortcut(
-                app,
-                "screenshot",
-            ));
+    if category == SCREENSHOT_CATEGORY {
+        if let Some(mode) = capture_mode_for_screenshot_hotkey_action(&action) {
+            tauri::async_runtime::spawn(commands::open_capture_window_from_shortcut(app, mode));
+            return;
         }
+    }
+
+    match (category.as_str(), action.as_str()) {
         (SCREENSHOT_CATEGORY, PIN_ACTION) => {
             let state = app.state::<AppState>();
             if let Err(err) = commands::pin_clipboard_image_for_state(&app, state.inner()) {
@@ -281,6 +280,14 @@ fn trigger_hotkey_action(app: tauri::AppHandle, category: String, action: String
         _ => {
             log::warn!("Unknown hotkey action: {}:{}", category, action);
         }
+    }
+}
+
+fn capture_mode_for_screenshot_hotkey_action(action: &str) -> Option<&'static str> {
+    match action {
+        SCREENSHOT_ACTION | SCREENSHOT_CUSTOM_ACTION => Some("screenshot"),
+        SCREENSHOT_COPY_ACTION => Some("screenshot-copy"),
+        _ => None,
     }
 }
 
@@ -362,8 +369,10 @@ fn accelerator_key(main_key: &str) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        display_hotkey_to_accelerator, resolve_hotkey_accelerator, FILE_OCR_ACTION, OCR_CATEGORY,
-        SCREENSHOT_CATEGORY, SHOW_OCR_WINDOW_ACTION, SILENT_SCREENSHOT_OCR_ACTION,
+        capture_mode_for_screenshot_hotkey_action, display_hotkey_to_accelerator,
+        resolve_hotkey_accelerator, FILE_OCR_ACTION, OCR_CATEGORY, SCREENSHOT_ACTION,
+        SCREENSHOT_CATEGORY, SCREENSHOT_COPY_ACTION, SCREENSHOT_CUSTOM_ACTION,
+        SHOW_OCR_WINDOW_ACTION, SILENT_SCREENSHOT_OCR_ACTION,
     };
     use std::str::FromStr;
     use tauri_plugin_global_shortcut::Shortcut;
@@ -423,6 +432,22 @@ mod tests {
         assert_eq!(
             resolve_hotkey_accelerator(OCR_CATEGORY, "screenshot-ocr", "⇧⌥S").unwrap(),
             Some("Shift+Alt+KeyS".to_string())
+        );
+    }
+
+    #[test]
+    fn resolves_capture_modes_for_screenshot_hotkey_actions() {
+        assert_eq!(
+            capture_mode_for_screenshot_hotkey_action(SCREENSHOT_ACTION),
+            Some("screenshot")
+        );
+        assert_eq!(
+            capture_mode_for_screenshot_hotkey_action(SCREENSHOT_COPY_ACTION),
+            Some("screenshot-copy")
+        );
+        assert_eq!(
+            capture_mode_for_screenshot_hotkey_action(SCREENSHOT_CUSTOM_ACTION),
+            Some("screenshot")
         );
     }
 

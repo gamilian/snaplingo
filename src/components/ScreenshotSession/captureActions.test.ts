@@ -206,6 +206,7 @@ describe('capture session actions', () => {
 
   it('chooses the completion flow from the capture mode', () => {
     expect(getCaptureSelectionFlowForMode('screenshot')).toBe('preview');
+    expect(getCaptureSelectionFlowForMode('screenshot-copy')).toBe('copy');
     expect(getCaptureSelectionFlowForMode('screenshot-ocr')).toBe('ocr');
     expect(getCaptureSelectionFlowForMode('silent-screenshot-ocr')).toBe(
       'silent-ocr',

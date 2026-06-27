@@ -86,6 +86,7 @@ export type UndoRedoAction = 'undo' | 'redo';
 export type CaptureKeyboardToolbarAction = 'toggle';
 export type CaptureSelectionFlow =
   | 'preview'
+  | 'copy'
   | 'ocr'
   | 'silent-ocr'
   | 'ocr-translate';
@@ -132,6 +133,7 @@ export function shouldRecordSuccessfulCaptureSelection(
 export function getCaptureSelectionFlowForMode(
   mode: CaptureMode,
 ): CaptureSelectionFlow {
+  if (mode === 'screenshot-copy') return 'copy';
   if (mode === 'screenshot-ocr') return 'ocr';
   if (mode === 'silent-screenshot-ocr') return 'silent-ocr';
   if (mode === 'screenshot-translate') return 'ocr-translate';

@@ -16,6 +16,7 @@ describe('capture interaction model', () => {
 
   it('chooses the selection flow from the capture mode', () => {
     expect(getCaptureModeSelectionFlow('screenshot')).toBe('preview');
+    expect(getCaptureModeSelectionFlow('screenshot-copy')).toBe('copy');
     expect(getCaptureModeSelectionFlow('screenshot-ocr')).toBe('ocr');
     expect(getCaptureModeSelectionFlow('silent-screenshot-ocr')).toBe('silent-ocr');
     expect(getCaptureModeSelectionFlow('screenshot-translate')).toBe('ocr-translate');
@@ -23,6 +24,9 @@ describe('capture interaction model', () => {
 
   it('chooses the primary completion action from the capture mode', () => {
     expect(getPrimaryCaptureCompletionActionForMode('screenshot')).toBe('copy');
+    expect(getPrimaryCaptureCompletionActionForMode('screenshot-copy')).toBe(
+      'copy',
+    );
     expect(getPrimaryCaptureCompletionActionForMode('screenshot-ocr')).toBe('ocr');
     expect(getPrimaryCaptureCompletionActionForMode('silent-screenshot-ocr')).toBe(
       'silent-ocr',

@@ -33,6 +33,14 @@ describe('captureInteractionRuntime', () => {
     expect(planManualSelectionCompletion('screenshot')).toEqual({
       type: 'preview',
     });
+    expect(planManualSelectionCompletion('screenshot-copy')).toEqual({
+      type: 'effects',
+      effects: [
+        { type: 'output-capture', action: 'copy' },
+        { type: 'record-selection', action: 'copy' },
+        { type: 'finish-session' },
+      ],
+    });
     expect(planManualSelectionCompletion('screenshot-ocr')).toEqual({
       type: 'effects',
       effects: [

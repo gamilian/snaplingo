@@ -6,8 +6,14 @@ pub(super) const CAPTURE_WINDOW_LABEL: &str = "capture";
 
 pub(super) fn normalized_capture_mode(mode: &str) -> &'static str {
     match mode {
-        "screenshot" | "screenshot-ocr" | "screenshot-translate" => match mode {
+        "screenshot"
+        | "screenshot-copy"
+        | "screenshot-ocr"
+        | "silent-screenshot-ocr"
+        | "screenshot-translate" => match mode {
+            "screenshot-copy" => "screenshot-copy",
             "screenshot-ocr" => "screenshot-ocr",
+            "silent-screenshot-ocr" => "silent-screenshot-ocr",
             "screenshot-translate" => "screenshot-translate",
             _ => "screenshot",
         },
@@ -101,6 +107,22 @@ mod tests {
         assert_eq!(
             super::capture_window_url("screenshot-ocr").to_string_lossy(),
             "index.html?window=capture&mode=screenshot-ocr"
+        );
+    }
+
+    #[test]
+    fn capture_window_url_encodes_screenshot_copy_mode() {
+        assert_eq!(
+            super::capture_window_url("screenshot-copy").to_string_lossy(),
+            "index.html?window=capture&mode=screenshot-copy"
+        );
+    }
+
+    #[test]
+    fn capture_window_url_encodes_silent_screenshot_ocr_mode() {
+        assert_eq!(
+            super::capture_window_url("silent-screenshot-ocr").to_string_lossy(),
+            "index.html?window=capture&mode=silent-screenshot-ocr"
         );
     }
 

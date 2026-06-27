@@ -11,32 +11,18 @@ export function HotkeysPage() {
   const resetHotkeys = useSettingsStore((state) => state.resetHotkeys);
 
   const [recordingKey, setRecordingKey] = useState<string | null>(null);
-  const [debugLogs, setDebugLogs] = useState<string[]>([]);
-
-  const addDebugLog = (message: string) => {
-    const timestamp = new Date().toLocaleTimeString();
-    setDebugLogs(prev => [...prev.slice(-10), `${timestamp}: ${message}`]);
-  };
 
   const defaultHotkeys: Record<string, string> = DEFAULT_HOTKEYS.translation;
 
   // 监听键盘事件进行录制
   useEffect(() => {
-    if (!recordingKey) {
-      addDebugLog('录制已停止');
-      return;
-    }
-
-    addDebugLog(`开始录制: ${recordingKey}`);
+    if (!recordingKey) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      addDebugLog(`按键: ${e.key}, code: ${e.code}, meta:${e.metaKey}, shift:${e.shiftKey}, alt:${e.altKey}, ctrl:${e.ctrlKey}`);
-
       e.preventDefault();
       e.stopPropagation();
 
       if (e.key === 'Escape') {
-        addDebugLog('ESC取消录制');
         setRecordingKey(null);
         return;
       }
@@ -63,24 +49,16 @@ export function HotkeysPage() {
         mainKey = e.code;
       }
 
-      addDebugLog(`主键: ${mainKey}, 修饰键: ${modifiers.join('')}`);
-
       if (mainKey) {
         const hotkeyString = modifiers.join('') + mainKey;
-        addDebugLog(`✅ 保存: ${hotkeyString}`);
         void saveHotkeyWithRegistration({
           category: 'translation',
           action: recordingKey,
           hotkey: hotkeyString,
           configureHotkey,
           setHotkey,
-          reportError: (message) => {
-            addDebugLog(`❌ ${message}`);
-            alert(message);
-          },
+          reportError: alert,
         }).then(() => setRecordingKey(null));
-      } else {
-        addDebugLog(`❌ 未识别: ${e.key} (code: ${e.code})`);
       }
     };
 
@@ -89,30 +67,24 @@ export function HotkeysPage() {
       const target = e.target as HTMLElement;
       // 如果点击的不是快捷键相关元素，取消录制
       if (!target.closest('button') && !target.closest('.hotkey-display')) {
-        addDebugLog('点击空白处，取消录制');
         setRecordingKey(null);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown, true);
     document.addEventListener('mousedown', handleClickOutside, true);
-    addDebugLog('✓ 已添加键盘和鼠标监听器');
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown, true);
       document.removeEventListener('mousedown', handleClickOutside, true);
-      addDebugLog('✗ 已移除监听器');
     };
   }, [recordingKey, setHotkey]);
 
   const handleRecord = (key: string) => {
-    addDebugLog(`点击录制: ${key}, 当前状态: ${recordingKey}`);
     // 如果已经在录制这个键，点击取消录制
     if (recordingKey === key) {
-      addDebugLog('取消录制');
       setRecordingKey(null);
     } else {
-      addDebugLog('开始录制');
       setRecordingKey(key);
     }
   };
@@ -149,29 +121,6 @@ export function HotkeysPage() {
 
   return (
     <div className="max-w-4xl space-y-8">
-      {/* 调试日志 */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="font-semibold text-yellow-900">🐛 调试日志</h3>
-          <button
-            onClick={() => setDebugLogs([])}
-            className="text-xs px-2 py-1 bg-yellow-200 hover:bg-yellow-300 rounded"
-          >
-            清除
-          </button>
-        </div>
-        <div className="bg-gray-900 text-green-400 font-mono text-xs p-2 rounded max-h-32 overflow-y-auto">
-          {debugLogs.length === 0 ? (
-            <div className="text-gray-500">暂无日志...</div>
-          ) : (
-            debugLogs.map((log, i) => <div key={i}>{log}</div>)
-          )}
-        </div>
-        <div className="mt-2 text-xs text-yellow-700">
-          录制状态: <span className="font-bold">{recordingKey || '未录制'}</span>
-        </div>
-      </div>
-
       <div>
         <h2 className="text-3xl font-bold text-gray-900 mb-2">快捷键</h2>
         <p className="text-gray-600">配置翻译相关的全局快捷键。点击快捷键框直接录制，按 ESC 取消。</p>

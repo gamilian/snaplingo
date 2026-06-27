@@ -5,6 +5,7 @@ export const CAPTURE_WINDOW_LABEL = 'capture';
 export function isCaptureMode(value: unknown): value is CaptureMode {
   return (
     value === 'screenshot' ||
+    value === 'screenshot-copy' ||
     value === 'screenshot-ocr' ||
     value === 'silent-screenshot-ocr' ||
     value === 'screenshot-translate'
