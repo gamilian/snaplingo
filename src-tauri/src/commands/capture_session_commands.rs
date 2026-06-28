@@ -10,8 +10,9 @@ use crate::domain::capture::{
 };
 use crate::domain::ocr::OcrResult;
 use crate::infrastructure::system::capture_window::{
-    begin_capture_presentation, capture_window_bounds, end_capture_presentation,
-    hide_capture_window as hide_capture_window_for_app, open_capture_window_for_session,
+    begin_capture_presentation, capture_window_bounds, destroy_inactive_capture_window,
+    end_capture_presentation, hide_capture_window as hide_capture_window_for_app,
+    open_capture_window_for_session,
     prepare_capture_window_for_reveal as prepare_capture_window_for_reveal_for_app,
     restore_capture_snapshot_windows, reveal_capture_window as reveal_capture_window_for_app,
 };
@@ -123,74 +124,7 @@ async fn create_triggered_capture_session_from_visible_desktop(
     app: &AppHandle,
     state: &crate::AppState,
 ) -> Result<CaptureSessionView, String> {
-    let total_start = Instant::now();
-    let cache_start = Instant::now();
-    let cache_future = state
-        .capture_session_service
-        .capture_session_snapshot_cache();
-    let session_future = create_capture_session_from_visible_desktop(app, state);
-    let (cache_result, session_result) = tokio::join!(biased; cache_future, session_future);
-    let cache_ms = elapsed_ms(cache_start);
-    let session = session_result?;
-
-    let cache = match cache_result {
-        Ok(cache) => cache,
-        Err(err) => {
-            cleanup_started_capture_session(app, state, &session.id).await?;
-            return Err(err.to_string());
-        }
-    };
-
-    let store_start = Instant::now();
-    let store_result = state
-        .capture_session_service
-        .store_session_snapshot_cache(&session.id, cache);
-    if let Err(err) = store_result {
-        let _ = cleanup_started_capture_session(app, state, &session.id).await;
-        return Err(err.to_string());
-    }
-    let store_ms = elapsed_ms(store_start);
-    let view_result = state
-        .capture_session_service
-        .get_session_view_without_monitor_images(&session.id);
-    let view = match view_result {
-        Ok(view) => view,
-        Err(err) => {
-            let _ = cleanup_started_capture_session(app, state, &session.id).await;
-            return Err(err.to_string());
-        }
-    };
-
-    log::info!(
-        "[capture-perf] create_triggered_visible_desktop_session cache_ms={:.1} store_ms={:.1} total_ms={:.1} view_base64_bytes={}",
-        cache_ms,
-        store_ms,
-        elapsed_ms(total_start),
-        capture_session_view_base64_bytes(&view),
-    );
-
-    Ok(view)
-}
-
-async fn cleanup_started_capture_session(
-    app: &AppHandle,
-    state: &crate::AppState,
-    session_id: &CaptureSessionId,
-) -> Result<(), String> {
-    let restore_result =
-        restore_capture_snapshot_windows_for_session_id(app, state, session_id).await;
-    let cancel_result = state
-        .capture_session_service
-        .cancel_session(session_id)
-        .map_err(|e| e.to_string());
-    let presentation_result = end_capture_presentation_on_main_thread(app).await;
-
-    match (restore_result, cancel_result, presentation_result) {
-        (Ok(()), Ok(()), Ok(())) => Ok(()),
-        (Err(err), _, _) => Err(err),
-        (_, Err(err), _) => Err(err),
-        (_, _, Err(err)) => Err(err),
-    }
+    create_capture_session_from_visible_desktop(app, state).await
 }
 
 async fn create_capture_session_from_visible_desktop(
@@ -202,17 +136,33 @@ async fn create_capture_session_from_visible_desktop(
     begin_capture_presentation_on_main_thread(app).await?;
     let begin_ms = elapsed_ms(begin_start);
 
+    let hide_overlay_start = Instant::now();
+    if let Err(err) = hide_capture_window_on_main_thread(app).await {
+        if err != "Capture window is not open" {
+            let presentation_result = end_capture_presentation_on_main_thread(app).await;
+            return match presentation_result {
+                Ok(()) => Err(err),
+                Err(presentation_err) => Err(format!(
+                    "{}; also failed to end capture presentation: {}",
+                    err, presentation_err
+                )),
+            };
+        }
+    }
+    let hide_overlay_ms = elapsed_ms(hide_overlay_start);
+
     let session_start = Instant::now();
     let session_result = state
         .capture_session_service
-        .create_layout_session_with_hidden_window_labels(Vec::new())
+        .create_session_without_monitor_images()
         .await
         .map_err(|e| e.to_string());
     let session_ms = elapsed_ms(session_start);
 
     log::info!(
-        "[capture-perf] create_visible_desktop_layout_session begin_ms={:.1} capture_session_ms={:.1} total_ms={:.1} success={}",
+        "[capture-perf] create_visible_desktop_frozen_session begin_ms={:.1} hide_overlay_ms={:.1} capture_session_ms={:.1} total_ms={:.1} success={}",
         begin_ms,
+        hide_overlay_ms,
         session_ms,
         elapsed_ms(total_start),
         session_result.is_ok(),
@@ -323,6 +273,13 @@ async fn hide_capture_window_on_main_thread(app: &AppHandle) -> Result<(), Strin
     .await
 }
 
+async fn destroy_inactive_capture_window_on_main_thread(app: &AppHandle) -> Result<(), String> {
+    run_on_main_thread(app, "destroy inactive capture window", |app| {
+        destroy_inactive_capture_window(&app)
+    })
+    .await
+}
+
 async fn restore_capture_snapshot_windows_on_main_thread(
     app: &AppHandle,
     hidden_window_labels: Vec<String>,
@@ -371,12 +328,11 @@ pub fn get_capture_session(
 pub async fn hydrate_capture_session_snapshots(
     session_id: String,
     state: State<'_, crate::AppState>,
-) -> Result<(), String> {
+) -> Result<CaptureSessionView, String> {
     state
         .capture_session_service
         .hydrate_session_snapshots(&CaptureSessionId(session_id))
         .await
-        .map(|_| ())
         .map_err(|e| e.to_string())
 }
 
@@ -422,12 +378,19 @@ pub async fn cancel_capture_session(
         .cancel_session(&session_id)
         .map_err(|e| e.to_string());
     let presentation_result = end_capture_presentation_on_main_thread(&app).await;
+    let destroy_window_result = destroy_inactive_capture_window_on_main_thread(&app).await;
 
-    match (restore_result, cancel_result, presentation_result) {
-        (Ok(()), Ok(()), Ok(())) => Ok(()),
-        (Err(err), _, _) => Err(err),
-        (_, Err(err), _) => Err(err),
-        (_, _, Err(err)) => Err(err),
+    match (
+        restore_result,
+        cancel_result,
+        presentation_result,
+        destroy_window_result,
+    ) {
+        (Ok(()), Ok(()), Ok(()), Ok(())) => Ok(()),
+        (Err(err), _, _, _) => Err(err),
+        (_, Err(err), _, _) => Err(err),
+        (_, _, Err(err), _) => Err(err),
+        (_, _, _, Err(err)) => Err(err),
     }
 }
 
@@ -444,14 +407,24 @@ pub async fn restore_capture_snapshot_windows_for_session(
     )
     .await;
     let presentation_result = end_capture_presentation_on_main_thread(&app).await;
+    let destroy_window_result = destroy_inactive_capture_window_on_main_thread(&app).await;
 
-    match (restore_result, presentation_result) {
-        (Ok(()), Ok(())) => Ok(()),
-        (Err(err), Ok(())) => Err(err),
-        (Ok(()), Err(err)) => Err(err),
-        (Err(restore_err), Err(presentation_err)) => Err(format!(
+    match (restore_result, presentation_result, destroy_window_result) {
+        (Ok(()), Ok(()), Ok(())) => Ok(()),
+        (Err(err), Ok(()), Ok(())) => Err(err),
+        (Ok(()), Err(err), Ok(())) => Err(err),
+        (Ok(()), Ok(()), Err(err)) => Err(err),
+        (Err(restore_err), Err(presentation_err), _) => Err(format!(
             "{}; also failed to end capture presentation: {}",
             restore_err, presentation_err
+        )),
+        (Err(restore_err), _, Err(destroy_err)) => Err(format!(
+            "{}; also failed to destroy inactive capture window: {}",
+            restore_err, destroy_err
+        )),
+        (_, Err(presentation_err), Err(destroy_err)) => Err(format!(
+            "{}; also failed to destroy inactive capture window: {}",
+            presentation_err, destroy_err
         )),
     }
 }

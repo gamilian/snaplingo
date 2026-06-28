@@ -509,6 +509,59 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn create_session_view_without_monitor_images_keeps_backend_pixels_cached() {
+        let backend = make_backend();
+        let snapshot_calls = backend.capture_monitor_snapshots_calls.clone();
+        let layout_calls = backend.capture_monitor_layouts_calls.clone();
+        let service = CaptureSessionService::new(Arc::new(backend));
+
+        let view = service.create_session().await.unwrap();
+        let frontend_view = service
+            .get_session_view_without_monitor_images(&view.id)
+            .unwrap();
+
+        assert_eq!(*snapshot_calls.lock().unwrap(), 1);
+        assert_eq!(*layout_calls.lock().unwrap(), 0);
+        assert_eq!(frontend_view.monitors[0].image_base64, "");
+        assert!(!service
+            .session_selection_needs_freeze(
+                &view.id,
+                &LogicalRect {
+                    x: 1.0,
+                    y: 1.0,
+                    width: 2.0,
+                    height: 2.0,
+                },
+            )
+            .unwrap());
+    }
+
+    #[tokio::test]
+    async fn create_session_without_monitor_images_returns_metadata_with_cached_pixels() {
+        let backend = make_backend();
+        let snapshot_calls = backend.capture_monitor_snapshots_calls.clone();
+        let layout_calls = backend.capture_monitor_layouts_calls.clone();
+        let service = CaptureSessionService::new(Arc::new(backend));
+
+        let frontend_view = service.create_session_without_monitor_images().await.unwrap();
+
+        assert_eq!(*snapshot_calls.lock().unwrap(), 1);
+        assert_eq!(*layout_calls.lock().unwrap(), 0);
+        assert_eq!(frontend_view.monitors[0].image_base64, "");
+        assert!(!service
+            .session_selection_needs_freeze(
+                &frontend_view.id,
+                &LogicalRect {
+                    x: 1.0,
+                    y: 1.0,
+                    width: 2.0,
+                    height: 2.0,
+                },
+            )
+            .unwrap());
+    }
+
+    #[tokio::test]
     async fn get_session_view_returns_stored_view() {
         let service = CaptureSessionService::new(Arc::new(make_backend_with_captured_cursor()));
 

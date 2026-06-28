@@ -7,6 +7,10 @@ export function getCaptureRootClassName(_status: CapturePresentationStatus) {
   ].join(' ');
 }
 
+export function getCaptureRootCursorStyle(status: CapturePresentationStatus) {
+  return status === 'selecting' ? 'none' : 'crosshair';
+}
+
 export function shouldShowCaptureLoadingMask(_status: CapturePresentationStatus) {
   return false;
 }
@@ -25,14 +29,12 @@ export function getCaptureEditorToolbarClassName() {
 
 export function getCaptureEditorSelectionClassName(
   status: CapturePresentationStatus,
-  hasActiveAnnotationTool = false,
+  _hasActiveAnnotationTool = false,
 ) {
   return [
     'absolute rounded-[8px] bg-transparent',
     status === 'preview'
-      ? hasActiveAnnotationTool
-        ? 'cursor-crosshair'
-        : 'cursor-move'
+      ? 'cursor-crosshair'
       : '',
   ]
     .filter(Boolean)

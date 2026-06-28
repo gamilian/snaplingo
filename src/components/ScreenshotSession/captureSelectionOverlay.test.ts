@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   drawCaptureSelectionOverlayFrame,
+  getCaptureSelectionOverlayCursor,
   getCaptureSelectionOverlayFrame,
   type CaptureSelectionOverlayContext,
 } from './captureSelectionOverlay';
@@ -108,12 +109,54 @@ describe('capture selection canvas overlay', () => {
     ).toBeNull();
   });
 
+  it('builds a viewport cursor only while selecting', () => {
+    expect(
+      getCaptureSelectionOverlayCursor({
+        status: 'selecting',
+        selectionBounds: bounds,
+        cursorPoint: { x: -20, y: 90 },
+      }),
+    ).toEqual({ x: 80, y: 40 });
+    expect(
+      getCaptureSelectionOverlayCursor({
+        status: 'preview',
+        selectionBounds: bounds,
+        cursorPoint: { x: -20, y: 90 },
+      }),
+    ).toBeNull();
+  });
+
   it('draws a clear canvas when there is no active frame', () => {
     const context = createRecordingContext();
 
     drawCaptureSelectionOverlayFrame(context, { width: 500, height: 300 }, null);
 
     expect(context.calls).toEqual(['clearRect:0,0,500,300']);
+  });
+
+  it('draws a custom crosshair cursor even without an active frame', () => {
+    const context = createRecordingContext();
+
+    drawCaptureSelectionOverlayFrame(
+      context,
+      { width: 500, height: 300 },
+      null,
+      { x: 80, y: 40 },
+    );
+
+    expect(context.calls).toEqual([
+      'clearRect:0,0,500,300',
+      'fillStyle:rgba(0, 0, 0, 0.82)',
+      'fillRect:70,38.5,7,3',
+      'fillRect:83,38.5,7,3',
+      'fillRect:78.5,30,3,7',
+      'fillRect:78.5,43,3,7',
+      'fillStyle:rgba(255, 255, 255, 0.96)',
+      'fillRect:70,39.5,7,1',
+      'fillRect:83,39.5,7,1',
+      'fillRect:79.5,30,1,7',
+      'fillRect:79.5,43,1,7',
+    ]);
   });
 
   it('draws dim mask, selection border, and size label onto the canvas', () => {
@@ -141,12 +184,29 @@ describe('capture selection canvas overlay', () => {
       'strokeStyle:rgba(255, 255, 255, 0.9)',
       'lineWidth:2',
       'strokeRect:80.5,40.5,119,59',
-      'font:12px sans-serif',
+      'font:500 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       'textBaseline:top',
       'fillStyle:rgba(0, 0, 0, 0.82)',
-      'fillRect:80,12,64,20',
+      'fillRect:80,40,64,20',
       'fillStyle:rgba(255, 255, 255, 0.95)',
-      'fillText:120 x 60,88,16',
+      'fillText:120 x 60,88,44',
     ]);
+  });
+
+  it('draws the preview size label at the selection top left', () => {
+    const context = createRecordingContext();
+
+    drawCaptureSelectionOverlayFrame(
+      context,
+      { width: 500, height: 300 },
+      {
+        variant: 'preview',
+        rect: { x: 100, y: 30, width: 50, height: 40 },
+        label: '50 x 40',
+      },
+    );
+
+    expect(context.calls).toContain('fillRect:100,30,58,20');
+    expect(context.calls).toContain('fillText:50 x 40,108,34');
   });
 });

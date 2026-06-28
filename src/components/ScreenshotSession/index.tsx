@@ -36,7 +36,9 @@ import {
 import {
   getMagnifierImageStyle,
   getMagnifierPosition,
+  shouldAutoShowCaptureMagnifier,
   shouldShowMagnifier,
+  shouldTrackCaptureCursorForMagnifier,
 } from './magnifier';
 import {
   colorSampleToClipboardText,
@@ -160,6 +162,7 @@ import {
 } from './captureSessionLifecycle';
 import {
   subscribeCaptureCancelRequests,
+  subscribeCaptureCopyRequests,
 } from './captureCancelRequest';
 import {
   getInitialHoverSelection,
@@ -173,11 +176,13 @@ import {
   getCaptureEditorSelectionClassName,
   getCaptureSelectionOverlayCanvasClassName,
   getCaptureEditorToolbarClassName,
+  getCaptureRootCursorStyle,
   getCaptureRootClassName,
   shouldShowCaptureLoadingMask,
 } from './capturePresentation';
 import {
   drawCaptureSelectionOverlayFrame,
+  getCaptureSelectionOverlayCursor,
   getCaptureSelectionOverlayFrame,
   type CaptureSelectionOverlayFrame,
 } from './captureSelectionOverlay';
@@ -277,6 +282,12 @@ function rectStyle(rect: LogicalRect) {
     width: `${rect.width}px`,
     height: `${rect.height}px`,
   };
+}
+
+function getSelectionOverlayPixelRatio() {
+  if (typeof window === 'undefined') return 1;
+
+  return Math.max(1, window.devicePixelRatio || 1);
 }
 
 function isArrowKey(key: string): key is ArrowKey {
@@ -581,8 +592,9 @@ export default function ScreenshotSession({
   const isCancellingSessionRef = useRef(false);
   const captureSnapshotHydrationRef = useRef<{
     sessionId: string;
-    promise: Promise<void>;
+    promise: Promise<CaptureSessionView>;
   } | null>(null);
+  const isCompletingCaptureRef = useRef(false);
   const [status, setStatus] = useState<SessionStatus>('idle');
   const [mode, setMode] = useState<CaptureMode>('screenshot');
   const [session, setSession] = useState<CaptureSessionView | null>(null);
@@ -685,6 +697,15 @@ export default function ScreenshotSession({
       height: selectionBounds.height,
     };
   }, [selectionBounds]);
+  const selectionOverlayCssSize = useMemo(() => {
+    if (!viewportBounds) return null;
+
+    return {
+      width: Math.max(0, Math.round(viewportBounds.width)),
+      height: Math.max(0, Math.round(viewportBounds.height)),
+    };
+  }, [viewportBounds]);
+  const selectionOverlayPixelRatio = getSelectionOverlayPixelRatio();
   const selectionViewportRect = useMemo<LogicalRect | null>(() => {
     if (!selection || !selectionBounds) return null;
 
@@ -695,6 +716,9 @@ export default function ScreenshotSession({
 
     return virtualPointToViewportPoint(cursorPoint, selectionBounds);
   }, [cursorPoint, selectionBounds]);
+  const hasHydratedPixelSource = useMemo(() => {
+    return Boolean(session?.monitors.some((monitor) => monitor.image_base64));
+  }, [session]);
   const selectedAnnotationBounds = useMemo<LogicalRect | null>(() => {
     if (
       annotationMoveGesture ||
@@ -724,10 +748,20 @@ export default function ScreenshotSession({
 
     return getToolbarPosition(selectionViewportRect, viewportBounds, TOOLBAR_SIZE, TOOLBAR_GAP);
   }, [selectionViewportRect, status, viewportBounds]);
+  const hasMagnifierPixelSource = Boolean(cursorMonitor?.image_base64);
+  const isMagnifierAutoRequested = shouldAutoShowCaptureMagnifier({
+    status,
+    hasHydratedPixels: hasMagnifierPixelSource,
+  });
+  const shouldTrackMagnifierCursor = shouldTrackCaptureCursorForMagnifier({
+    status,
+    requested: isMagnifierRequested,
+    hasHydratedPixels: hasHydratedPixelSource,
+  });
   const isMagnifierShown = shouldShowMagnifier({
     requested: isMagnifierRequested,
-    automatic: false,
-    hasCursorMonitor: Boolean(cursorMonitor?.image_base64),
+    automatic: isMagnifierAutoRequested,
+    hasCursorMonitor: hasMagnifierPixelSource,
     hasViewportCursor: Boolean(cursorViewportPoint),
     hasImageCursor: Boolean(cursorInMonitorPoint),
     hasViewportBounds: Boolean(viewportBounds),
@@ -742,15 +776,28 @@ export default function ScreenshotSession({
     (frame: CaptureSelectionOverlayFrame | null) => {
       const canvas = selectionOverlayCanvasRef.current;
       const context = canvas?.getContext('2d');
-      if (!canvas || !context) return;
+      if (!canvas || !context || !selectionOverlayCssSize) return;
 
+      context.setTransform(
+        selectionOverlayPixelRatio,
+        0,
+        0,
+        selectionOverlayPixelRatio,
+        0,
+        0,
+      );
       drawCaptureSelectionOverlayFrame(
         context,
-        { width: canvas.width, height: canvas.height },
+        selectionOverlayCssSize,
         frame,
+        getCaptureSelectionOverlayCursor({
+          status,
+          selectionBounds,
+          cursorPoint: cursorPointRef.current,
+        }),
       );
     },
-    [],
+    [selectionBounds, selectionOverlayCssSize, selectionOverlayPixelRatio, status],
   );
 
   const scheduleSelectionOverlayPaint = useCallback(
@@ -827,9 +874,10 @@ export default function ScreenshotSession({
         }
 
         cursorPointRef.current = point;
-        if (isMagnifierRequested) {
+        if (shouldTrackMagnifierCursor) {
           setCursorPoint(point);
         }
+        scheduleSelectionOverlayPaint();
         syncHoverSelection(getPolledHoverSelection(captureCandidates, point));
         scheduleNextPoll();
       } catch {
@@ -850,9 +898,10 @@ export default function ScreenshotSession({
   }, [
     captureCandidates,
     editGesture,
-    isMagnifierRequested,
     selectionBounds,
     session,
+    scheduleSelectionOverlayPaint,
+    shouldTrackMagnifierCursor,
     startPoint,
     status,
     syncHoverSelection,
@@ -899,6 +948,7 @@ export default function ScreenshotSession({
     setIsMagnifierRequested(false);
     setSampleCanvasVersion(0);
     setRenderingOutput(false);
+    isCompletingCaptureRef.current = false;
     setIncludeCapturedCursor(false);
     setError(null);
     resetCaptureImageReadiness();
@@ -958,11 +1008,17 @@ export default function ScreenshotSession({
 
     setHydratedCaptureSessionId(null);
     const hydrationPromise = hydrateCaptureSessionSnapshots(sessionId)
-      .then(() => {
-        if (captureSnapshotHydrationRef.current?.sessionId !== sessionId) return;
+      .then((hydratedSession) => {
+        if (captureSnapshotHydrationRef.current?.sessionId !== sessionId) {
+          return hydratedSession;
+        }
 
+        setSession((currentSession) =>
+          currentSession?.id === sessionId ? hydratedSession : currentSession,
+        );
         setHydratedCaptureSessionId(sessionId);
         markCaptureFrontendPerf('snapshots_hydrated', sessionId);
+        return hydratedSession;
       })
       .catch((err) => {
         if (captureSnapshotHydrationRef.current?.sessionId === sessionId) {
@@ -1036,10 +1092,6 @@ export default function ScreenshotSession({
         captureFrontendPerfRef.current.sessionId = nextSession.id;
       }
       markCaptureFrontendPerf('session_loaded', nextSession.id);
-      void ensureCaptureSnapshotsHydrated(nextSession.id).catch((err) => {
-        setError(err instanceof Error ? err.message : String(err));
-        setStatus('error');
-      });
       const initialCursorPosition = nextSession.captured_cursor
         ? null
         : await currentCaptureCursorPosition(nextSession.id).catch(() => null);
@@ -1051,7 +1103,6 @@ export default function ScreenshotSession({
       setStatus('error');
     }
   }, [
-    ensureCaptureSnapshotsHydrated,
     markCaptureFrontendPerf,
     primeInitialHoverSelection,
     resetCaptureInteractionState,
@@ -1081,7 +1132,6 @@ export default function ScreenshotSession({
       if (!session) return;
 
       if (effect.type === 'output-capture') {
-        await ensureCaptureSnapshotsHydrated(session.id);
         if (effect.action === 'copy') {
           await copyCaptureSelection(
             session.id,
@@ -1125,7 +1175,6 @@ export default function ScreenshotSession({
       }
 
       if (effect.type === 'run-ocr') {
-        await ensureCaptureSnapshotsHydrated(session.id);
         const ocrResult = await runCaptureOcr(session.id, rect);
         if (effect.resultWindow === 'translation') {
           await openCaptureTranslationResultWindow(ocrResult.text);
@@ -1146,7 +1195,6 @@ export default function ScreenshotSession({
     },
     [
       finishCurrentCaptureSession,
-      ensureCaptureSnapshotsHydrated,
       recordSuccessfulSelection,
       screenshotSavePath,
       session,
@@ -1167,7 +1215,6 @@ export default function ScreenshotSession({
       setError(null);
 
       try {
-        await ensureCaptureSnapshotsHydrated(session.id);
         const base64 = await renderCaptureOutput({
           sessionId: session.id,
           rect,
@@ -1184,7 +1231,6 @@ export default function ScreenshotSession({
     },
     [
       annotations,
-      ensureCaptureSnapshotsHydrated,
       session,
       shouldIncludeCapturedCursor,
     ],
@@ -1211,13 +1257,14 @@ export default function ScreenshotSession({
 
   const copySelection = useCallback(async () => {
     if (!session || !selection) return;
+    if (isCompletingCaptureRef.current) return;
 
+    isCompletingCaptureRef.current = true;
     setRenderingOutput(true);
     setError(null);
 
     try {
       const outputHistory = commitTextDraftToHistory();
-      await ensureCaptureSnapshotsHydrated(session.id);
       await copyCaptureSelection(
         session.id,
         selection,
@@ -1230,11 +1277,11 @@ export default function ScreenshotSession({
       setError(err instanceof Error ? err.message : String(err));
       setStatus('error');
     } finally {
+      isCompletingCaptureRef.current = false;
       setRenderingOutput(false);
     }
   }, [
     commitTextDraftToHistory,
-    ensureCaptureSnapshotsHydrated,
     finishCurrentCaptureSession,
     recordSuccessfulSelection,
     selection,
@@ -1247,7 +1294,9 @@ export default function ScreenshotSession({
     action: HoverSelectionCompletionAction,
   ) => {
     if (!session) return;
+    if (isCompletingCaptureRef.current) return;
 
+    isCompletingCaptureRef.current = true;
     setRenderingOutput(true);
     setError(null);
 
@@ -1259,11 +1308,37 @@ export default function ScreenshotSession({
       setError(err instanceof Error ? err.message : String(err));
       setStatus('error');
     } finally {
+      isCompletingCaptureRef.current = false;
       setRenderingOutput(false);
     }
   }, [
     executeCaptureRuntimeEffect,
     session,
+  ]);
+
+  const handleNativeCopyRequest = useCallback(() => {
+    if (status === 'preview') {
+      void copySelection();
+      return;
+    }
+
+    const activeStartPoint = startPointRef.current ?? startPoint;
+    const activeHoverSelection = hoverSelectionRef.current ?? hoverSelection;
+    if (
+      status === 'selecting' &&
+      !textDraft &&
+      activeStartPoint === null &&
+      activeHoverSelection
+    ) {
+      void completeCandidateSelection(activeHoverSelection, 'copy');
+    }
+  }, [
+    completeCandidateSelection,
+    copySelection,
+    hoverSelection,
+    startPoint,
+    status,
+    textDraft,
   ]);
 
   const copyCurrentColor = useCallback(async () => {
@@ -1287,7 +1362,6 @@ export default function ScreenshotSession({
 
     try {
       const outputHistory = commitTextDraftToHistory();
-      await ensureCaptureSnapshotsHydrated(session.id);
       await saveCaptureSelection(
         session.id,
         selection,
@@ -1304,7 +1378,6 @@ export default function ScreenshotSession({
     }
   }, [
     commitTextDraftToHistory,
-    ensureCaptureSnapshotsHydrated,
     finishCurrentCaptureSession,
     recordSuccessfulSelection,
     selection,
@@ -1320,7 +1393,6 @@ export default function ScreenshotSession({
 
     try {
       const outputHistory = commitTextDraftToHistory();
-      await ensureCaptureSnapshotsHydrated(session.id);
       await quickSaveCaptureSelection(
         session.id,
         selection,
@@ -1338,7 +1410,6 @@ export default function ScreenshotSession({
     }
   }, [
     commitTextDraftToHistory,
-    ensureCaptureSnapshotsHydrated,
     finishCurrentCaptureSession,
     recordSuccessfulSelection,
     screenshotSavePath,
@@ -1354,7 +1425,6 @@ export default function ScreenshotSession({
     setError(null);
 
     try {
-      await ensureCaptureSnapshotsHydrated(session.id);
       const ocrResult = await runCaptureOcr(session.id, selection);
       await openCaptureOcrResultWindow(ocrResult.text);
       recordSuccessfulSelection('ocr', selection);
@@ -1366,7 +1436,6 @@ export default function ScreenshotSession({
       setRenderingOutput(false);
     }
   }, [
-    ensureCaptureSnapshotsHydrated,
     finishCurrentCaptureSession,
     recordSuccessfulSelection,
     selection,
@@ -1381,7 +1450,6 @@ export default function ScreenshotSession({
 
     try {
       const outputHistory = commitTextDraftToHistory();
-      await ensureCaptureSnapshotsHydrated(session.id);
       await outputCapture({
         sessionId: session.id,
         rect: selection,
@@ -1399,7 +1467,6 @@ export default function ScreenshotSession({
     }
   }, [
     commitTextDraftToHistory,
-    ensureCaptureSnapshotsHydrated,
     finishCurrentCaptureSession,
     recordSuccessfulSelection,
     selection,
@@ -1415,7 +1482,6 @@ export default function ScreenshotSession({
 
     try {
       const outputHistory = commitTextDraftToHistory();
-      await ensureCaptureSnapshotsHydrated(session.id);
       await printCaptureSelection(
         session.id,
         selection,
@@ -1433,7 +1499,6 @@ export default function ScreenshotSession({
     }
   }, [
     commitTextDraftToHistory,
-    ensureCaptureSnapshotsHydrated,
     finishCurrentCaptureSession,
     recordSuccessfulSelection,
     selection,
@@ -1450,10 +1515,6 @@ export default function ScreenshotSession({
 
     try {
       const nextSession = await refreshCaptureSession(session.id);
-      void ensureCaptureSnapshotsHydrated(nextSession.id).catch((err) => {
-        setError(err instanceof Error ? err.message : String(err));
-        setStatus('error');
-      });
       const initialCursorPosition = nextSession.captured_cursor
         ? null
         : await currentCaptureCursorPosition(nextSession.id).catch(() => null);
@@ -1465,7 +1526,6 @@ export default function ScreenshotSession({
       setStatus('error');
     }
   }, [
-    ensureCaptureSnapshotsHydrated,
     primeInitialHoverSelection,
     resetCaptureInteractionState,
     session,
@@ -2067,16 +2127,54 @@ export default function ScreenshotSession({
   }, [cancelSession, isActive]);
 
   useEffect(() => {
+    if (!isActive) return;
+
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+
+    subscribeCaptureCopyRequests(handleNativeCopyRequest)
+      .then((nextUnlisten) => {
+        if (disposed) {
+          nextUnlisten();
+        } else {
+          unlisten = nextUnlisten;
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to listen for native capture copy requests:', err);
+      });
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [handleNativeCopyRequest, isActive]);
+
+  useEffect(() => {
     sampleCanvasByMonitorRef.current = new Map();
     setCursorColor(null);
     setSampleCanvasVersion((version) => version + 1);
   }, [session?.id]);
 
   useEffect(() => {
-    if (!session || !isMagnifierRequested) return;
+    if (!session || hasHydratedPixelSource || !isMagnifierRequested) return;
+
+    void ensureCaptureSnapshotsHydrated(session.id).catch((err) => {
+      console.warn('Failed to hydrate capture pixels for magnifier:', err);
+    });
+  }, [
+    ensureCaptureSnapshotsHydrated,
+    hasHydratedPixelSource,
+    isMagnifierRequested,
+    session,
+  ]);
+
+  useEffect(() => {
+    if (!session || !isMagnifierShown) return;
 
     let disposed = false;
     session.monitors.forEach((monitor) => {
+      if (!monitor.image_base64) return;
       if (sampleCanvasByMonitorRef.current.has(monitor.id)) return;
 
       const image = new Image();
@@ -2096,7 +2194,7 @@ export default function ScreenshotSession({
     return () => {
       disposed = true;
     };
-  }, [isMagnifierRequested, session]);
+  }, [isMagnifierShown, session]);
 
   useEffect(() => {
     if (!cursorInMonitorPoint || !cursorMonitor) {
@@ -2740,9 +2838,10 @@ export default function ScreenshotSession({
 
     cursorPointRef.current = point;
 
-    if (status === 'preview' || (status === 'selecting' && isMagnifierRequested)) {
+    if (shouldTrackMagnifierCursor) {
       setCursorPoint(point);
     }
+    scheduleSelectionOverlayPaint();
 
     const activeStartPoint = startPointRef.current ?? startPoint;
 
@@ -3150,6 +3249,7 @@ export default function ScreenshotSession({
       style={{
         width: `${viewportBounds?.width ?? window.innerWidth}px`,
         height: `${viewportBounds?.height ?? window.innerHeight}px`,
+        cursor: getCaptureRootCursorStyle(status),
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -3727,12 +3827,16 @@ export default function ScreenshotSession({
           )}
         </>
       )}
-      {viewportBounds && (
+      {selectionOverlayCssSize && (
         <canvas
           ref={selectionOverlayCanvasRef}
-          width={Math.max(0, Math.round(viewportBounds.width))}
-          height={Math.max(0, Math.round(viewportBounds.height))}
+          width={Math.round(selectionOverlayCssSize.width * selectionOverlayPixelRatio)}
+          height={Math.round(selectionOverlayCssSize.height * selectionOverlayPixelRatio)}
           className={getCaptureSelectionOverlayCanvasClassName()}
+          style={{
+            width: `${selectionOverlayCssSize.width}px`,
+            height: `${selectionOverlayCssSize.height}px`,
+          }}
           aria-hidden="true"
         />
       )}

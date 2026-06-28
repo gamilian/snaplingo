@@ -6,6 +6,7 @@ import {
   getCaptureEditorSelectionClassName,
   getCaptureSelectionOverlayCanvasClassName,
   getCaptureEditorToolbarClassName,
+  getCaptureRootCursorStyle,
   getCaptureRootClassName,
   shouldShowCaptureLoadingMask,
 } from './capturePresentation';
@@ -43,6 +44,11 @@ describe('capture presentation', () => {
     expect(className).not.toContain('transition-opacity');
   });
 
+  it('hides the system cursor while the canvas crosshair is active', () => {
+    expect(getCaptureRootCursorStyle('selecting')).toBe('none');
+    expect(getCaptureRootCursorStyle('preview')).toBe('crosshair');
+  });
+
   it('keeps the selection overlay canvas visible on the first revealed frame', () => {
     const className = getCaptureSelectionOverlayCanvasClassName();
 
@@ -70,7 +76,10 @@ describe('capture presentation', () => {
       'border-[#5b7fff]',
     );
     expect(getCaptureEditorSelectionClassName('preview')).toEqual(
-      expect.stringContaining('cursor-move'),
+      expect.stringContaining('cursor-crosshair'),
+    );
+    expect(getCaptureEditorSelectionClassName('preview')).not.toContain(
+      'cursor-move',
     );
     expect(getCaptureEditorSelectionClassName('preview')).toEqual(
       expect.stringContaining('rounded-[8px]'),

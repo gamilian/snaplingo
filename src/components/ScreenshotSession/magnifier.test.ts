@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   getMagnifierImageStyle,
   getMagnifierPosition,
+  shouldAutoShowCaptureMagnifier,
   shouldShowMagnifier,
+  shouldTrackCaptureCursorForMagnifier,
 } from './magnifier';
 import type { LogicalRect, Point } from './types';
 
@@ -37,6 +39,7 @@ describe('capture magnifier', () => {
       backgroundImage: 'url(data:image/png;base64,frozen-image)',
       backgroundSize: '1200px 800px',
       backgroundPosition: '-60px -32px',
+      imageRendering: 'pixelated',
     });
   });
 
@@ -82,6 +85,58 @@ describe('capture magnifier', () => {
         hasViewportCursor: true,
         hasImageCursor: true,
         hasViewportBounds: true,
+      }),
+    ).toBe(true);
+  });
+
+  it('auto requests magnification while selecting after hydrated pixels are available', () => {
+    expect(
+      shouldAutoShowCaptureMagnifier({
+        status: 'selecting',
+        hasHydratedPixels: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldAutoShowCaptureMagnifier({
+        status: 'selecting',
+        hasHydratedPixels: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldAutoShowCaptureMagnifier({
+        status: 'preview',
+        hasHydratedPixels: true,
+      }),
+    ).toBe(false);
+  });
+
+  it('tracks the cursor while automatic magnification can be shown', () => {
+    expect(
+      shouldTrackCaptureCursorForMagnifier({
+        status: 'selecting',
+        requested: false,
+        hasHydratedPixels: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldTrackCaptureCursorForMagnifier({
+        status: 'selecting',
+        requested: false,
+        hasHydratedPixels: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldTrackCaptureCursorForMagnifier({
+        status: 'selecting',
+        requested: true,
+        hasHydratedPixels: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldTrackCaptureCursorForMagnifier({
+        status: 'preview',
+        requested: false,
+        hasHydratedPixels: false,
       }),
     ).toBe(true);
   });

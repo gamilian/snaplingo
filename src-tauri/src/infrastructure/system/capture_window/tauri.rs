@@ -150,6 +150,18 @@ pub fn hide_capture_window(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+pub fn destroy_inactive_capture_window(app: &AppHandle) -> Result<(), String> {
+    if !should_destroy_capture_window_when_inactive() {
+        return Ok(());
+    }
+
+    let Some(window) = app.get_webview_window(CAPTURE_WINDOW_LABEL) else {
+        return Ok(());
+    };
+
+    window.destroy().map_err(|e| e.to_string())
+}
+
 pub fn prewarm_capture_window(app: &AppHandle) -> Result<(), String> {
     if !should_prewarm_capture_window() {
         return Ok(());
@@ -319,7 +331,11 @@ fn should_prewarm_capture_window() -> bool {
 }
 
 fn should_reuse_capture_window_for_session() -> bool {
-    true
+    !cfg!(target_os = "macos")
+}
+
+fn should_destroy_capture_window_when_inactive() -> bool {
+    !should_reuse_capture_window_for_session()
 }
 
 fn discard_capture_window_before_new_session(
@@ -345,7 +361,7 @@ fn discard_capture_window_before_new_session(
 }
 
 fn capture_window_destroy_timeout() -> Duration {
-    Duration::from_millis(500)
+    Duration::from_millis(2000)
 }
 
 fn capture_window_destroy_poll_interval() -> Duration {
@@ -381,8 +397,20 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn macos_capture_window_is_reused_between_sessions() {
-        assert!(should_reuse_capture_window_for_session());
+    fn macos_capture_window_is_recreated_between_sessions_to_retarget_fullscreen_space() {
+        assert!(!should_reuse_capture_window_for_session());
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_capture_window_is_destroyed_when_inactive() {
+        assert!(should_destroy_capture_window_when_inactive());
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_waits_for_slow_capture_window_label_release() {
+        assert!(capture_window_destroy_timeout() >= Duration::from_millis(1500));
     }
 
     #[cfg(target_os = "macos")]

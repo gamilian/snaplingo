@@ -33,6 +33,12 @@ pub struct CaptureSessionSnapshotCache {
     captured_cursor: Option<CapturedCursor>,
 }
 
+#[derive(Clone, Copy)]
+enum CaptureSessionViewMode {
+    WithMonitorImages,
+    WithoutMonitorImages,
+}
+
 /// Owns frozen screenshot sessions.
 pub struct CaptureSessionService {
     screenshot_backend: Arc<dyn ScreenshotBackend>,
@@ -56,9 +62,29 @@ impl CaptureSessionService {
             .await
     }
 
+    pub async fn create_session_without_monitor_images(&self) -> Result<CaptureSessionView> {
+        self.create_session_with_hidden_window_labels_and_view_mode(
+            Vec::new(),
+            CaptureSessionViewMode::WithoutMonitorImages,
+        )
+        .await
+    }
+
     pub async fn create_session_with_hidden_window_labels(
         &self,
         hidden_window_labels: Vec<String>,
+    ) -> Result<CaptureSessionView> {
+        self.create_session_with_hidden_window_labels_and_view_mode(
+            hidden_window_labels,
+            CaptureSessionViewMode::WithMonitorImages,
+        )
+        .await
+    }
+
+    async fn create_session_with_hidden_window_labels_and_view_mode(
+        &self,
+        hidden_window_labels: Vec<String>,
+        view_mode: CaptureSessionViewMode,
     ) -> Result<CaptureSessionView> {
         let total_start = Instant::now();
 
@@ -116,7 +142,12 @@ impl CaptureSessionService {
         };
 
         let view_start = Instant::now();
-        let view = session_to_view(&session);
+        let view = match view_mode {
+            CaptureSessionViewMode::WithMonitorImages => session_to_view(&session),
+            CaptureSessionViewMode::WithoutMonitorImages => {
+                session_to_view_without_monitor_images(&session)
+            }
+        };
         let metrics = capture_session_payload_metrics(&session, &view);
         let view_ms = elapsed_ms(view_start);
 

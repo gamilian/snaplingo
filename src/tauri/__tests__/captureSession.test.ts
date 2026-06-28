@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { CaptureSessionView } from '../../components/ScreenshotSession/types';
 
 const invoke = vi.fn();
 
@@ -46,13 +47,28 @@ describe('capture session tauri adapter', () => {
 
   it('hydrates capture session snapshots through the native command', async () => {
     const { hydrateCaptureSessionSnapshots } = await import('../captureSession');
-    invoke.mockResolvedValueOnce(undefined);
+    const hydratedSession: CaptureSessionView = {
+      id: 'capture-1',
+      monitors: [
+        {
+          id: 'monitor-1',
+          logical_bounds: { x: 0, y: 0, width: 100, height: 80 },
+          physical_bounds: { x: 0, y: 0, width: 200, height: 160 },
+          scale_factor: 2,
+          image_base64: 'pixels',
+        },
+      ],
+      candidates: [],
+      captured_cursor: null,
+    };
+    invoke.mockResolvedValueOnce(hydratedSession);
 
-    await hydrateCaptureSessionSnapshots('capture-1');
+    const result: CaptureSessionView = await hydrateCaptureSessionSnapshots('capture-1');
 
     expect(invoke).toHaveBeenCalledWith('hydrate_capture_session_snapshots', {
       sessionId: 'capture-1',
     });
+    expect(result.monitors[0].image_base64).toBe('pixels');
   });
 
   it('opens screenshot OCR results with the capture result command', async () => {

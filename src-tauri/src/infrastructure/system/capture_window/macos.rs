@@ -1,8 +1,9 @@
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering};
 
 use objc2_app_kit::{
-    NSApplicationActivationOptions, NSRunningApplication, NSScreenSaverWindowLevel, NSWindow,
-    NSWindowAnimationBehavior, NSWindowCollectionBehavior, NSWindowStyleMask, NSWorkspace,
+    NSApplicationActivationOptions, NSCursor, NSRunningApplication, NSScreenSaverWindowLevel,
+    NSView, NSWindow, NSWindowAnimationBehavior, NSWindowCollectionBehavior, NSWindowStyleMask,
+    NSWorkspace,
 };
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 
@@ -13,11 +14,15 @@ use super::backend::CAPTURE_WINDOW_LABEL;
 static CAPTURE_PRESENTATION_DEPTH: AtomicUsize = AtomicUsize::new(0);
 static CAPTURE_WINDOW_ACTIVATION_SUPPRESSED: AtomicBool = AtomicBool::new(false);
 static CAPTURE_CANCEL_SHORTCUT_REGISTERED: AtomicBool = AtomicBool::new(false);
+static CAPTURE_COPY_SHORTCUT_REGISTERED: AtomicBool = AtomicBool::new(false);
+static CAPTURE_CROSSHAIR_CURSOR_PUSHED: AtomicBool = AtomicBool::new(false);
 static PREVIOUS_FRONTMOST_APP_PID: AtomicI32 = AtomicI32::new(NO_PREVIOUS_FRONTMOST_APP_PID);
 
 const NO_PREVIOUS_FRONTMOST_APP_PID: i32 = -1;
 const CAPTURE_CANCEL_SHORTCUT_ACCELERATOR: &str = "Escape";
+const CAPTURE_COPY_SHORTCUT_ACCELERATOR: &str = "CmdOrCtrl+KeyC";
 const CAPTURE_CANCEL_REQUESTED_EVENT: &str = "capture-cancel-requested";
+const CAPTURE_COPY_REQUESTED_EVENT: &str = "capture-copy-requested";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RestorePreviousFrontmostDisposition {
@@ -39,6 +44,9 @@ pub(super) fn begin_capture_presentation(app: &AppHandle) -> Result<(), String> 
         if let Err(err) = register_capture_cancel_shortcut(app) {
             log::warn!("Failed to register capture cancel shortcut: {}", err);
         }
+        if let Err(err) = register_capture_copy_shortcut(app) {
+            log::warn!("Failed to register capture copy shortcut: {}", err);
+        }
     }
 
     Ok(())
@@ -49,7 +57,9 @@ pub(super) fn end_capture_presentation(app: &AppHandle) -> Result<(), String> {
 
     if previous_depth == 1 {
         let activation_suppressed = take_capture_window_activation_suppressed();
+        restore_native_crosshair_cursor();
         unregister_capture_cancel_shortcut(app);
+        unregister_capture_copy_shortcut(app);
         let activation_policy_result = if activation_suppressed {
             app.set_activation_policy(tauri::ActivationPolicy::Regular)
                 .map_err(|e| e.to_string())
@@ -68,7 +78,7 @@ pub(super) fn is_capture_presentation_active() -> bool {
 }
 
 pub(super) fn suppress_capture_window_activation(app: &AppHandle) -> Result<(), String> {
-    if let Some(activation_policy) = capture_window_activation_suppression_policy() {
+    if let Some(activation_policy) = capture_window_activation_suppression_policy(app) {
         app.set_activation_policy(activation_policy)
             .map_err(|e| e.to_string())?;
         mark_capture_window_activation_suppressed();
@@ -110,6 +120,7 @@ pub(super) fn configure_capture_window_for_current_space(
     if capture_overlay_disables_window_animation() {
         ns_window.setAnimationBehavior(NSWindowAnimationBehavior::None);
     }
+    install_native_crosshair_cursor_rect(window, ns_window)?;
 
     Ok(())
 }
@@ -130,6 +141,7 @@ pub(super) fn reveal_capture_window_for_current_space(
         ns_window.makeKeyAndOrderFront(None);
     }
     ns_window.orderFrontRegardless();
+    push_native_crosshair_cursor();
 
     Ok(())
 }
@@ -158,6 +170,7 @@ pub(super) fn hide_capture_window_for_current_space(window: &WebviewWindow) -> R
     let ns_window: &NSWindow = unsafe { &*ns_window.cast() };
     ns_window.setAlphaValue(1.0);
     ns_window.orderOut(None);
+    restore_native_crosshair_cursor();
 
     Ok(())
 }
@@ -207,31 +220,42 @@ fn capture_presentation_activation_policy() -> Option<tauri::ActivationPolicy> {
     None
 }
 
-fn capture_window_activation_suppression_policy() -> Option<tauri::ActivationPolicy> {
-    should_suppress_capture_window_activation().then_some(tauri::ActivationPolicy::Prohibited)
-}
-
-fn should_suppress_capture_window_activation() -> bool {
+fn capture_window_activation_suppression_policy(
+    app: &AppHandle,
+) -> Option<tauri::ActivationPolicy> {
     should_suppress_capture_window_activation_for_state(
         current_application_pid(),
         frontmost_application_pid(),
-        false,
+        has_visible_non_capture_window_on_active_space(app),
     )
+    .then_some(tauri::ActivationPolicy::Prohibited)
+}
+
+fn has_visible_non_capture_window_on_active_space(app: &AppHandle) -> bool {
+    app.webview_windows()
+        .into_iter()
+        .filter(|(label, _)| label.as_str() != CAPTURE_WINDOW_LABEL)
+        .any(|(_, window)| window_is_visible_on_active_space(&window))
+}
+
+fn window_is_visible_on_active_space(window: &WebviewWindow) -> bool {
+    let Ok(ns_window) = window.ns_window() else {
+        return false;
+    };
+    if ns_window.is_null() {
+        return false;
+    }
+
+    let ns_window: &NSWindow = unsafe { &*ns_window.cast() };
+    ns_window.isVisible() && ns_window.isOnActiveSpace()
 }
 
 fn should_suppress_capture_window_activation_for_state(
     current_pid: i32,
     frontmost_pid: Option<i32>,
-    _has_active_space_app_window: bool,
+    has_active_space_app_window: bool,
 ) -> bool {
-    should_suppress_capture_window_activation_for_frontmost(current_pid, frontmost_pid)
-}
-
-fn should_suppress_capture_window_activation_for_frontmost(
-    _current_pid: i32,
-    _frontmost_pid: Option<i32>,
-) -> bool {
-    true
+    frontmost_pid != Some(current_pid) && !has_active_space_app_window
 }
 
 fn mark_capture_window_activation_suppressed() {
@@ -244,6 +268,67 @@ fn take_capture_window_activation_suppressed() -> bool {
 
 fn capture_overlay_accepts_mouse_moved_events() -> bool {
     true
+}
+
+fn capture_overlay_uses_native_crosshair_cursor() -> bool {
+    true
+}
+
+fn capture_overlay_uses_native_crosshair_cursor_rect() -> bool {
+    true
+}
+
+fn should_restore_native_crosshair_cursor(cursor_pushed: bool) -> bool {
+    cursor_pushed
+}
+
+fn install_native_crosshair_cursor_rect(
+    window: &WebviewWindow,
+    ns_window: &NSWindow,
+) -> Result<(), String> {
+    if !capture_overlay_uses_native_crosshair_cursor_rect() {
+        return Ok(());
+    }
+
+    ns_window.resetCursorRects();
+    let cursor = NSCursor::crosshairCursor();
+
+    if let Some(content_view) = ns_window.contentView() {
+        content_view.discardCursorRects();
+        content_view.addCursorRect_cursor(content_view.bounds(), &cursor);
+    }
+
+    let ns_view = window.ns_view().map_err(|e| e.to_string())?;
+    if ns_view.is_null() {
+        return Err("Capture window has no native NSView".to_string());
+    }
+
+    let ns_view: &NSView = unsafe { &*ns_view.cast() };
+    ns_view.discardCursorRects();
+    ns_view.addCursorRect_cursor(ns_view.bounds(), &cursor);
+
+    Ok(())
+}
+
+fn push_native_crosshair_cursor() {
+    if !capture_overlay_uses_native_crosshair_cursor() {
+        return;
+    }
+
+    if CAPTURE_CROSSHAIR_CURSOR_PUSHED.swap(true, Ordering::SeqCst) {
+        return;
+    }
+
+    let cursor = NSCursor::crosshairCursor();
+    cursor.push();
+    cursor.set();
+}
+
+fn restore_native_crosshair_cursor() {
+    let was_pushed = CAPTURE_CROSSHAIR_CURSOR_PUSHED.swap(false, Ordering::SeqCst);
+    if should_restore_native_crosshair_cursor(was_pushed) {
+        NSCursor::pop_class();
+    }
 }
 
 fn should_make_capture_overlay_key_on_reveal() -> bool {
@@ -262,8 +347,16 @@ fn capture_cancel_shortcut_accelerator() -> &'static str {
     CAPTURE_CANCEL_SHORTCUT_ACCELERATOR
 }
 
+fn capture_copy_shortcut_accelerator() -> &'static str {
+    CAPTURE_COPY_SHORTCUT_ACCELERATOR
+}
+
 fn capture_cancel_requested_event_name() -> &'static str {
     CAPTURE_CANCEL_REQUESTED_EVENT
+}
+
+fn capture_copy_requested_event_name() -> &'static str {
+    CAPTURE_COPY_REQUESTED_EVENT
 }
 
 fn capture_overlay_disables_window_animation() -> bool {
@@ -285,6 +378,21 @@ fn register_capture_cancel_shortcut(app: &AppHandle) -> Result<(), String> {
     })
 }
 
+fn register_capture_copy_shortcut(app: &AppHandle) -> Result<(), String> {
+    if CAPTURE_COPY_SHORTCUT_REGISTERED.swap(true, Ordering::SeqCst) {
+        return Ok(());
+    }
+
+    let app_clone = app.clone();
+    shortcut::register_shortcut(app, capture_copy_shortcut_accelerator(), move || {
+        emit_capture_copy_requested(&app_clone);
+    })
+    .map_err(|e| {
+        CAPTURE_COPY_SHORTCUT_REGISTERED.store(false, Ordering::SeqCst);
+        e.to_string()
+    })
+}
+
 fn unregister_capture_cancel_shortcut(app: &AppHandle) {
     if !CAPTURE_CANCEL_SHORTCUT_REGISTERED.swap(false, Ordering::SeqCst) {
         return;
@@ -295,6 +403,16 @@ fn unregister_capture_cancel_shortcut(app: &AppHandle) {
     }
 }
 
+fn unregister_capture_copy_shortcut(app: &AppHandle) {
+    if !CAPTURE_COPY_SHORTCUT_REGISTERED.swap(false, Ordering::SeqCst) {
+        return;
+    }
+
+    if let Err(err) = shortcut::unregister_shortcut(app, capture_copy_shortcut_accelerator()) {
+        log::warn!("Failed to unregister capture copy shortcut: {}", err);
+    }
+}
+
 fn emit_capture_cancel_requested(app: &AppHandle) {
     let Some(window) = app.get_webview_window(CAPTURE_WINDOW_LABEL) else {
         return;
@@ -302,6 +420,16 @@ fn emit_capture_cancel_requested(app: &AppHandle) {
 
     if let Err(err) = window.emit(capture_cancel_requested_event_name(), ()) {
         log::warn!("Failed to emit capture cancel request: {}", err);
+    }
+}
+
+fn emit_capture_copy_requested(app: &AppHandle) {
+    let Some(window) = app.get_webview_window(CAPTURE_WINDOW_LABEL) else {
+        return;
+    };
+
+    if let Err(err) = window.emit(capture_copy_requested_event_name(), ()) {
+        log::warn!("Failed to emit capture copy request: {}", err);
     }
 }
 
@@ -432,59 +560,34 @@ mod tests {
     }
 
     #[test]
-    fn capture_presentation_suppresses_activation_for_other_frontmost_apps() {
-        assert!(should_suppress_capture_window_activation_for_frontmost(
-            9000,
-            Some(4242)
-        ));
-    }
-
-    #[test]
     fn capture_presentation_does_not_change_activation_policy() {
         assert!(capture_presentation_activation_policy().is_none());
     }
 
     #[test]
-    fn capture_window_activation_suppression_uses_prohibited_policy() {
-        assert!(matches!(
-            capture_window_activation_suppression_policy(),
-            Some(tauri::ActivationPolicy::Prohibited)
-        ));
-    }
-
-    #[test]
-    fn capture_presentation_suppresses_activation_even_when_snaplingo_is_frontmost() {
-        assert!(should_suppress_capture_window_activation_for_frontmost(
+    fn capture_window_activation_suppression_preserves_visible_app_windows() {
+        assert!(!should_suppress_capture_window_activation_for_state(
             9000,
-            Some(9000)
+            Some(4242),
+            true,
         ));
     }
 
     #[test]
-    fn capture_presentation_suppresses_activation_for_active_space_snaplingo_windows_behind_another_app(
-    ) {
+    fn capture_window_activation_suppression_prevents_switching_to_hidden_app_space() {
         assert!(should_suppress_capture_window_activation_for_state(
             9000,
             Some(4242),
-            true
+            false,
         ));
     }
 
     #[test]
-    fn capture_presentation_suppresses_activation_when_snaplingo_is_frontmost_with_active_window() {
-        assert!(should_suppress_capture_window_activation_for_state(
+    fn capture_window_activation_suppression_preserves_snaplingo_frontmost_sessions() {
+        assert!(!should_suppress_capture_window_activation_for_state(
             9000,
             Some(9000),
-            true
-        ));
-    }
-
-    #[test]
-    fn capture_presentation_suppresses_activation_without_active_space_snaplingo_windows() {
-        assert!(should_suppress_capture_window_activation_for_state(
-            9000,
-            Some(4242),
-            false
+            false,
         ));
     }
 
@@ -503,7 +606,23 @@ mod tests {
     }
 
     #[test]
-    fn capture_overlay_never_becomes_key_on_reveal() {
+    fn capture_overlay_declares_native_crosshair_cursor() {
+        assert!(capture_overlay_uses_native_crosshair_cursor());
+    }
+
+    #[test]
+    fn capture_overlay_declares_native_crosshair_cursor_rect() {
+        assert!(capture_overlay_uses_native_crosshair_cursor_rect());
+    }
+
+    #[test]
+    fn capture_overlay_restores_native_crosshair_cursor_only_when_pushed() {
+        assert!(should_restore_native_crosshair_cursor(true));
+        assert!(!should_restore_native_crosshair_cursor(false));
+    }
+
+    #[test]
+    fn capture_overlay_does_not_become_key_on_reveal() {
         assert!(!should_make_capture_overlay_key_on_reveal_for_activation_suppressed(false));
     }
 
@@ -528,6 +647,16 @@ mod tests {
             capture_cancel_requested_event_name(),
             "capture-cancel-requested"
         );
+    }
+
+    #[test]
+    fn capture_copy_shortcut_uses_primary_copy_accelerator() {
+        assert_eq!(capture_copy_shortcut_accelerator(), "CmdOrCtrl+KeyC");
+    }
+
+    #[test]
+    fn capture_copy_event_matches_frontend_listener() {
+        assert_eq!(capture_copy_requested_event_name(), "capture-copy-requested");
     }
 
     #[test]

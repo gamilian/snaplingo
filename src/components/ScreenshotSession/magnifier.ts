@@ -14,6 +14,15 @@ interface MagnifierVisibilityState {
   hasViewportBounds: boolean;
 }
 
+interface AutoMagnifierState {
+  status: 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
+  hasHydratedPixels: boolean;
+}
+
+interface CursorTrackingState extends AutoMagnifierState {
+  requested: boolean;
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
@@ -25,6 +34,18 @@ export function shouldShowMagnifier(state: MagnifierVisibilityState) {
     state.hasViewportCursor &&
     state.hasImageCursor &&
     state.hasViewportBounds
+  );
+}
+
+export function shouldAutoShowCaptureMagnifier(state: AutoMagnifierState) {
+  return state.status === 'selecting' && state.hasHydratedPixels;
+}
+
+export function shouldTrackCaptureCursorForMagnifier(state: CursorTrackingState) {
+  return (
+    state.requested ||
+    state.status === 'preview' ||
+    shouldAutoShowCaptureMagnifier(state)
   );
 }
 
@@ -63,5 +84,6 @@ export function getMagnifierImageStyle(
     backgroundImage: `url(data:image/png;base64,${imageBase64})`,
     backgroundSize: `${backgroundWidth}px ${backgroundHeight}px`,
     backgroundPosition: `${backgroundX}px ${backgroundY}px`,
+    imageRendering: 'pixelated' as const,
   };
 }

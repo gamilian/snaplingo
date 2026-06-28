@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use crate::app_lifecycle::MAIN_WINDOW_LABEL;
 use crate::domain::capture::{LogicalRect, MonitorSnapshotView};
 
 pub(super) const CAPTURE_WINDOW_LABEL: &str = "capture";
@@ -82,13 +81,9 @@ pub(super) fn capture_snapshot_window_labels_to_hide(
 }
 
 pub(super) fn capture_snapshot_window_labels_to_restore(
-    hidden_window_labels: &[String],
+    _hidden_window_labels: &[String],
 ) -> Vec<String> {
-    hidden_window_labels
-        .iter()
-        .filter(|label| !matches!(label.as_str(), CAPTURE_WINDOW_LABEL | MAIN_WINDOW_LABEL))
-        .cloned()
-        .collect()
+    Vec::new()
 }
 
 pub fn capture_snapshot_hide_settle_delay_ms(hidden_window_labels: &[String]) -> u64 {
@@ -152,10 +147,11 @@ mod tests {
     }
 
     #[test]
-    fn plans_visible_app_windows_to_hide_before_capture_snapshot() {
+    fn hides_only_existing_capture_overlay_before_capture_snapshot() {
         assert_eq!(
             super::capture_snapshot_window_labels_to_hide(&[
                 "main".to_string(),
+                "settings".to_string(),
                 "capture".to_string(),
                 "pin-pin-1".to_string(),
             ]),
@@ -164,21 +160,20 @@ mod tests {
     }
 
     #[test]
-    fn plans_hidden_app_windows_to_restore_after_capture_snapshot() {
-        assert_eq!(
-            super::capture_snapshot_window_labels_to_restore(&[
-                "main".to_string(),
-                "capture".to_string(),
-                "pin-pin-1".to_string(),
-            ]),
-            vec!["pin-pin-1".to_string()]
-        );
+    fn does_not_restore_business_windows_after_capture_snapshot() {
+        assert!(super::capture_snapshot_window_labels_to_restore(&[
+            "main".to_string(),
+            "settings".to_string(),
+            "capture".to_string(),
+            "pin-pin-1".to_string(),
+        ])
+        .is_empty());
     }
 
     #[test]
     fn plans_capture_snapshot_settle_delay_after_hiding_windows() {
         assert_eq!(
-            super::capture_snapshot_hide_settle_delay_ms(&["main".to_string()]),
+            super::capture_snapshot_hide_settle_delay_ms(&["capture".to_string()]),
             100
         );
         assert_eq!(super::capture_snapshot_hide_settle_delay_ms(&[]), 0);
