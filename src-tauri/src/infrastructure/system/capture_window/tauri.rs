@@ -98,7 +98,7 @@ pub fn reveal_capture_window(app: &AppHandle) -> Result<(), String> {
     {
         suppress_capture_window_activation(app)?;
         reveal_capture_window_for_current_space(&window)?;
-        restore_suppressed_capture_window_activation();
+        restore_capture_window_activation();
     }
 
     #[cfg(not(target_os = "macos"))]
@@ -121,7 +121,7 @@ pub fn prepare_capture_window_for_reveal(app: &AppHandle) -> Result<(), String> 
     {
         suppress_capture_window_activation(app)?;
         super::macos::prepare_capture_window_for_reveal(&window)?;
-        restore_suppressed_capture_window_activation();
+        restore_capture_window_activation();
     }
 
     #[cfg(not(target_os = "macos"))]
@@ -187,12 +187,13 @@ pub fn prewarm_capture_window(app: &AppHandle) -> Result<(), String> {
     .visible(false)
     .skip_taskbar(true)
     .focused(false)
+    .focusable(capture_window_is_focusable())
     .accept_first_mouse(capture_window_accepts_first_mouse())
     .shadow(false)
     .build()
     .map_err(|e| e.to_string())?;
     configure_capture_window_for_current_space(&window)?;
-    restore_suppressed_capture_window_activation();
+    restore_capture_window_activation();
 
     Ok(())
 }
@@ -217,6 +218,9 @@ pub fn open_capture_window_for_session(
                     .set_visible_on_all_workspaces(true)
                     .map_err(|e| e.to_string())?;
             }
+            window
+                .set_focusable(capture_window_is_focusable())
+                .map_err(|e| e.to_string())?;
             window
                 .set_position(LogicalPosition::new(bounds.x, bounds.y))
                 .map_err(|e| e.to_string())?;
@@ -254,12 +258,13 @@ pub fn open_capture_window_for_session(
     .visible(false)
     .skip_taskbar(true)
     .focused(false)
+    .focusable(capture_window_is_focusable())
     .accept_first_mouse(capture_window_accepts_first_mouse())
     .shadow(false)
     .build()
     .map_err(|e| e.to_string())?;
     configure_capture_window_for_current_space(&window)?;
-    restore_suppressed_capture_window_activation();
+    restore_capture_window_activation();
 
     Ok(())
 }
@@ -279,6 +284,10 @@ fn suppress_capture_window_activation(app: &AppHandle) -> Result<(), String> {
 }
 
 fn configure_capture_window_for_current_space(window: &tauri::WebviewWindow) -> Result<(), String> {
+    window
+        .set_focusable(capture_window_is_focusable())
+        .map_err(|e| e.to_string())?;
+
     #[cfg(target_os = "macos")]
     {
         super::macos::configure_capture_window_for_current_space(window)?;
@@ -292,10 +301,10 @@ fn configure_capture_window_for_current_space(window: &tauri::WebviewWindow) -> 
     Ok(())
 }
 
-fn restore_suppressed_capture_window_activation() {
+fn restore_capture_window_activation() {
     #[cfg(target_os = "macos")]
     {
-        super::macos::restore_suppressed_capture_window_activation();
+        super::macos::restore_capture_window_activation();
     }
 }
 
@@ -308,6 +317,10 @@ fn focus_capture_window_for_current_space(window: &tauri::WebviewWindow) -> Resu
 
 fn capture_window_accepts_first_mouse() -> bool {
     true
+}
+
+fn capture_window_is_focusable() -> bool {
+    false
 }
 
 fn capture_window_is_transparent() -> bool {
@@ -375,6 +388,11 @@ mod tests {
     #[test]
     fn capture_window_accepts_first_mouse_on_reveal() {
         assert!(capture_window_accepts_first_mouse());
+    }
+
+    #[test]
+    fn capture_window_is_not_focusable_on_reveal() {
+        assert!(!capture_window_is_focusable());
     }
 
     #[test]

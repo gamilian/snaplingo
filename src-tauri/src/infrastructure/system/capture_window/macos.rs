@@ -87,8 +87,8 @@ pub(super) fn suppress_capture_window_activation(app: &AppHandle) -> Result<(), 
     Ok(())
 }
 
-pub(super) fn restore_suppressed_capture_window_activation() {
-    if !should_restore_suppressed_capture_window_activation(
+pub(super) fn restore_capture_window_activation() {
+    if !should_restore_capture_window_activation(
         CAPTURE_WINDOW_ACTIVATION_SUPPRESSED.load(Ordering::SeqCst),
         Some(PREVIOUS_FRONTMOST_APP_PID.load(Ordering::SeqCst)),
         current_application_pid(),
@@ -139,8 +139,11 @@ pub(super) fn reveal_capture_window_for_current_space(
     ns_window.setAlphaValue(1.0);
     if should_make_capture_overlay_key_on_reveal() {
         ns_window.makeKeyAndOrderFront(None);
+    } else if capture_overlay_uses_order_front_regardless() {
+        ns_window.orderFrontRegardless();
+    } else {
+        ns_window.orderFront(None);
     }
-    ns_window.orderFrontRegardless();
     push_native_crosshair_cursor();
 
     Ok(())
@@ -156,7 +159,6 @@ pub(super) fn prepare_capture_window_for_reveal(window: &WebviewWindow) -> Resul
 
     let ns_window: &NSWindow = unsafe { &*ns_window.cast() };
     ns_window.setAlphaValue(0.0);
-    ns_window.orderFrontRegardless();
 
     Ok(())
 }
@@ -223,12 +225,24 @@ fn capture_presentation_activation_policy() -> Option<tauri::ActivationPolicy> {
 fn capture_window_activation_suppression_policy(
     app: &AppHandle,
 ) -> Option<tauri::ActivationPolicy> {
-    should_suppress_capture_window_activation_for_state(
+    capture_window_activation_suppression_policy_for_state(
         current_application_pid(),
         frontmost_application_pid(),
         has_visible_non_capture_window_on_active_space(app),
     )
-    .then_some(tauri::ActivationPolicy::Prohibited)
+}
+
+fn capture_window_activation_suppression_policy_for_state(
+    current_pid: i32,
+    frontmost_pid: Option<i32>,
+    has_active_space_app_window: bool,
+) -> Option<tauri::ActivationPolicy> {
+    should_suppress_capture_window_activation_for_state(
+        current_pid,
+        frontmost_pid,
+        has_active_space_app_window,
+    )
+    .then_some(tauri::ActivationPolicy::Accessory)
 }
 
 fn has_visible_non_capture_window_on_active_space(app: &AppHandle) -> bool {
@@ -253,9 +267,9 @@ fn window_is_visible_on_active_space(window: &WebviewWindow) -> bool {
 fn should_suppress_capture_window_activation_for_state(
     current_pid: i32,
     frontmost_pid: Option<i32>,
-    has_active_space_app_window: bool,
+    _has_active_space_app_window: bool,
 ) -> bool {
-    frontmost_pid != Some(current_pid) && !has_active_space_app_window
+    frontmost_pid != Some(current_pid)
 }
 
 fn mark_capture_window_activation_suppressed() {
@@ -363,6 +377,10 @@ fn capture_overlay_disables_window_animation() -> bool {
     true
 }
 
+fn capture_overlay_uses_order_front_regardless() -> bool {
+    false
+}
+
 fn register_capture_cancel_shortcut(app: &AppHandle) -> Result<(), String> {
     if CAPTURE_CANCEL_SHORTCUT_REGISTERED.swap(true, Ordering::SeqCst) {
         return Ok(());
@@ -465,13 +483,13 @@ fn restore_previous_frontmost_application(disposition: RestorePreviousFrontmostD
     }
 }
 
-fn should_restore_suppressed_capture_window_activation(
+fn should_restore_capture_window_activation(
     activation_suppressed: bool,
     previous_pid: Option<i32>,
     current_pid: i32,
     current_frontmost_pid: Option<i32>,
 ) -> bool {
-    activation_suppressed
+    (activation_suppressed || current_frontmost_pid == Some(current_pid))
         && should_restore_previous_frontmost_app(previous_pid, current_pid, current_frontmost_pid)
 }
 
@@ -565,11 +583,19 @@ mod tests {
     }
 
     #[test]
-    fn capture_window_activation_suppression_preserves_visible_app_windows() {
-        assert!(!should_suppress_capture_window_activation_for_state(
+    fn capture_window_activation_suppression_avoids_raising_visible_app_windows() {
+        assert!(should_suppress_capture_window_activation_for_state(
             9000,
             Some(4242),
             true,
+        ));
+    }
+
+    #[test]
+    fn capture_window_activation_suppression_uses_accessory_policy() {
+        assert!(matches!(
+            capture_window_activation_suppression_policy_for_state(9000, Some(4242), true),
+            Some(tauri::ActivationPolicy::Accessory)
         ));
     }
 
@@ -637,6 +663,11 @@ mod tests {
     }
 
     #[test]
+    fn capture_overlay_avoids_order_front_regardless() {
+        assert!(!capture_overlay_uses_order_front_regardless());
+    }
+
+    #[test]
     fn capture_cancel_shortcut_uses_escape() {
         assert_eq!(capture_cancel_shortcut_accelerator(), "Escape");
     }
@@ -700,20 +731,20 @@ mod tests {
     }
 
     #[test]
-    fn restores_suppressed_capture_activation_when_window_creation_displaced_previous_app() {
-        assert!(should_restore_suppressed_capture_window_activation(
+    fn restores_capture_activation_when_window_creation_displaced_previous_app() {
+        assert!(should_restore_capture_window_activation(
             true,
             Some(4242),
             9000,
             Some(9000),
         ));
-        assert!(!should_restore_suppressed_capture_window_activation(
+        assert!(should_restore_capture_window_activation(
             false,
             Some(4242),
             9000,
             Some(9000),
         ));
-        assert!(!should_restore_suppressed_capture_window_activation(
+        assert!(!should_restore_capture_window_activation(
             true,
             Some(4242),
             9000,
