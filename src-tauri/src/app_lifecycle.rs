@@ -4,8 +4,11 @@ pub(crate) fn should_hide_window_instead_of_close(window_label: &str) -> bool {
     window_label == MAIN_WINDOW_LABEL
 }
 
-pub(crate) fn should_show_main_window_on_reopen(has_visible_windows: bool) -> bool {
-    !has_visible_windows
+pub(crate) fn should_show_main_window_on_reopen_for_state(
+    has_visible_windows: bool,
+    is_capture_presentation_active: bool,
+) -> bool {
+    !has_visible_windows && !is_capture_presentation_active
 }
 
 #[cfg(test)]
@@ -26,11 +29,16 @@ mod tests {
 
     #[test]
     fn dock_reopen_shows_main_window_when_all_windows_are_hidden() {
-        assert!(should_show_main_window_on_reopen(false));
+        assert!(should_show_main_window_on_reopen_for_state(false, false));
     }
 
     #[test]
     fn dock_reopen_keeps_visible_windows_unchanged() {
-        assert!(!should_show_main_window_on_reopen(true));
+        assert!(!should_show_main_window_on_reopen_for_state(true, false));
+    }
+
+    #[test]
+    fn capture_reopen_does_not_show_settings_window() {
+        assert!(!should_show_main_window_on_reopen_for_state(false, true));
     }
 }

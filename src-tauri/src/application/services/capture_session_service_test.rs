@@ -213,6 +213,33 @@ mod tests {
         backend
     }
 
+    fn overlapping_window_candidates() -> Vec<WindowCandidate> {
+        vec![
+            WindowCandidate {
+                id: "window-front".to_string(),
+                title: "Front".to_string(),
+                app_name: "Editor".to_string(),
+                logical_bounds: LogicalRect {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 900.0,
+                    height: 700.0,
+                },
+            },
+            WindowCandidate {
+                id: "window-behind".to_string(),
+                title: "Behind".to_string(),
+                app_name: "Settings".to_string(),
+                logical_bounds: LogicalRect {
+                    x: 100.0,
+                    y: 100.0,
+                    width: 300.0,
+                    height: 220.0,
+                },
+            },
+        ]
+    }
+
     fn make_backend_with_captured_cursor() -> MockScreenshotBackend {
         let mut backend = make_backend();
         backend.captured_cursor = Some(CapturedCursor {
@@ -306,6 +333,121 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn hydrate_layout_session_snapshots_loads_cached_monitor_pixels() {
+        let backend = make_backend();
+        let snapshot_calls = backend.capture_monitor_snapshots_calls.clone();
+        let layout_calls = backend.capture_monitor_layouts_calls.clone();
+        let captured_regions = backend.captured_regions.clone();
+        let service = CaptureSessionService::new(Arc::new(backend));
+        let view = service.create_layout_session().await.unwrap();
+
+        assert_eq!(view.monitors[0].image_base64, "");
+        assert!(service
+            .session_selection_needs_freeze(
+                &view.id,
+                &LogicalRect {
+                    x: 1.0,
+                    y: 1.0,
+                    width: 10.0,
+                    height: 10.0,
+                },
+            )
+            .unwrap());
+
+        let hydrated_view = service.hydrate_session_snapshots(&view.id).await.unwrap();
+
+        assert_eq!(*layout_calls.lock().unwrap(), 1);
+        assert_eq!(*snapshot_calls.lock().unwrap(), 1);
+        assert!(captured_regions.lock().unwrap().is_empty());
+        assert_eq!(hydrated_view.monitors[0].image_base64, "AQID");
+        assert!(!service
+            .session_selection_needs_freeze(
+                &view.id,
+                &LogicalRect {
+                    x: 1.0,
+                    y: 1.0,
+                    width: 10.0,
+                    height: 10.0,
+                },
+            )
+            .unwrap());
+    }
+
+    #[tokio::test]
+    async fn trigger_snapshot_cache_can_hydrate_layout_session_without_frontend_image_payload() {
+        let backend = make_backend();
+        let snapshot_calls = backend.capture_monitor_snapshots_calls.clone();
+        let layout_calls = backend.capture_monitor_layouts_calls.clone();
+        let service = CaptureSessionService::new(Arc::new(backend));
+
+        let cache = service.capture_session_snapshot_cache().await.unwrap();
+
+        assert_eq!(*snapshot_calls.lock().unwrap(), 1);
+        assert_eq!(*layout_calls.lock().unwrap(), 0);
+
+        let view = service.create_layout_session().await.unwrap();
+        service
+            .store_session_snapshot_cache(&view.id, cache)
+            .unwrap();
+
+        let full_view = service.get_session_view(&view.id).unwrap();
+        let frontend_view = service
+            .get_session_view_without_monitor_images(&view.id)
+            .unwrap();
+
+        assert_eq!(*layout_calls.lock().unwrap(), 1);
+        assert_eq!(full_view.monitors[0].image_base64, "AQID");
+        assert_eq!(frontend_view.monitors[0].image_base64, "");
+        assert!(!service
+            .session_selection_needs_freeze(
+                &view.id,
+                &LogicalRect {
+                    x: 1.0,
+                    y: 1.0,
+                    width: 10.0,
+                    height: 10.0,
+                },
+            )
+            .unwrap());
+    }
+
+    #[tokio::test]
+    async fn trigger_snapshot_cache_keeps_layout_geometry_as_selection_coordinate_basis() {
+        let mut backend = make_backend();
+        backend.snapshots[0].logical_bounds = LogicalRect {
+            x: 40.0,
+            y: 50.0,
+            width: 10.0,
+            height: 10.0,
+        };
+        backend.snapshots[0].physical_bounds = crate::domain::capture::PhysicalRect {
+            x: 40,
+            y: 50,
+            width: 10,
+            height: 10,
+        };
+        let service = CaptureSessionService::new(Arc::new(backend));
+
+        let view = service.create_layout_session().await.unwrap();
+        let cache = service.capture_session_snapshot_cache().await.unwrap();
+        service
+            .store_session_snapshot_cache(&view.id, cache)
+            .unwrap();
+
+        let stored = service.get_session(&view.id).unwrap();
+        let frontend_view = service
+            .get_session_view_without_monitor_images(&view.id)
+            .unwrap();
+
+        assert_eq!(view.monitors[0].logical_bounds.x, 0.0);
+        assert_eq!(stored.layout_snapshots[0].logical_bounds.x, 0.0);
+        assert_eq!(stored.snapshots[0].logical_bounds.x, 0.0);
+        assert_eq!(stored.snapshots[0].png_data, vec![1, 2, 3]);
+        assert_eq!(frontend_view.monitors[0].logical_bounds.x, 0.0);
+        assert_eq!(frontend_view.monitors[0].image_base64, "");
+    }
+
+    #[tokio::test]
     async fn freeze_session_selection_captures_only_selected_region() {
         let mut backend = make_backend_with_renderable_png();
         backend.region_png_data = make_solid_png(2, 3, [40, 50, 60, 255]);
@@ -394,7 +536,33 @@ mod tests {
                 height: 5.0,
             }
         );
-        assert_eq!(view.candidates[0].priority, 10);
+        assert!(view.candidates[0].priority > 0);
+    }
+
+    #[tokio::test]
+    async fn create_session_preserves_backend_window_order_as_descending_hover_priority() {
+        let mut backend = make_backend();
+        backend.window_candidates = overlapping_window_candidates();
+        let service = CaptureSessionService::new(Arc::new(backend));
+
+        let view = service.create_session().await.unwrap();
+
+        assert_eq!(view.candidates[0].id, "window-front");
+        assert_eq!(view.candidates[1].id, "window-behind");
+        assert!(view.candidates[0].priority > view.candidates[1].priority);
+    }
+
+    #[tokio::test]
+    async fn create_layout_session_preserves_backend_window_order_as_descending_hover_priority() {
+        let mut backend = make_backend();
+        backend.window_candidates = overlapping_window_candidates();
+        let service = CaptureSessionService::new(Arc::new(backend));
+
+        let view = service.create_layout_session().await.unwrap();
+
+        assert_eq!(view.candidates[0].id, "window-front");
+        assert_eq!(view.candidates[1].id, "window-behind");
+        assert!(view.candidates[0].priority > view.candidates[1].priority);
     }
 
     #[tokio::test]
@@ -689,6 +857,39 @@ mod tests {
             .unwrap();
         let decoded = image::load_from_memory(&png_data).unwrap().to_rgba8();
 
+        assert_eq!((decoded.width(), decoded.height()), (2, 2));
+        assert!(decoded.pixels().all(|pixel| pixel.0 == [10, 20, 30, 255]));
+    }
+
+    #[tokio::test]
+    async fn render_png_base64_from_hydrated_layout_session_uses_cached_monitor_pixels() {
+        let backend = make_backend_with_renderable_png();
+        let captured_regions = backend.captured_regions.clone();
+        let service = CaptureSessionService::new(Arc::new(backend));
+        let view = service.create_layout_session().await.unwrap();
+        service.hydrate_session_snapshots(&view.id).await.unwrap();
+
+        let encoded = service
+            .render_png_base64(
+                &ImageCompositionService::new(),
+                &view.id,
+                &LogicalRect {
+                    x: 1.0,
+                    y: 1.0,
+                    width: 2.0,
+                    height: 2.0,
+                },
+                &[],
+                false,
+            )
+            .unwrap();
+
+        let png_data = base64::engine::general_purpose::STANDARD
+            .decode(encoded)
+            .unwrap();
+        let decoded = image::load_from_memory(&png_data).unwrap().to_rgba8();
+
+        assert!(captured_regions.lock().unwrap().is_empty());
         assert_eq!((decoded.width(), decoded.height()), (2, 2));
         assert!(decoded.pixels().all(|pixel| pixel.0 == [10, 20, 30, 255]));
     }

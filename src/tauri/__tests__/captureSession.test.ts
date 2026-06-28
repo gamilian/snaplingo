@@ -44,6 +44,17 @@ describe('capture session tauri adapter', () => {
     });
   });
 
+  it('hydrates capture session snapshots through the native command', async () => {
+    const { hydrateCaptureSessionSnapshots } = await import('../captureSession');
+    invoke.mockResolvedValueOnce(undefined);
+
+    await hydrateCaptureSessionSnapshots('capture-1');
+
+    expect(invoke).toHaveBeenCalledWith('hydrate_capture_session_snapshots', {
+      sessionId: 'capture-1',
+    });
+  });
+
   it('opens screenshot OCR results with the capture result command', async () => {
     const { openCaptureOcrResultWindow } = await import('../captureSession');
     invoke.mockResolvedValueOnce(undefined);

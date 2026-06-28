@@ -20,7 +20,7 @@ describe('capture window visibility', () => {
     ).toBe(false);
   });
 
-  it('reveals the capture window before frozen screen images are decoded', () => {
+  it('keeps the capture window hidden until backend snapshots are hydrated', () => {
     expect(
       shouldRevealCaptureWindow({
         status: 'selecting',
@@ -28,7 +28,7 @@ describe('capture window visibility', () => {
         hasCaptureImagesReady: false,
         hasRevealed: false,
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('reveals the capture window once the frozen screen session is ready', () => {

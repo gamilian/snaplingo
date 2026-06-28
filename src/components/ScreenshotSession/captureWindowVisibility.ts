@@ -47,13 +47,17 @@ export function getCaptureWindowRevealPermissions() {
 export function shouldRevealCaptureWindow({
   status,
   hasSession,
-  hasCaptureImagesReady: _hasCaptureImagesReady,
+  hasCaptureImagesReady,
   hasRevealed,
 }: CaptureWindowRevealState) {
   if (hasRevealed) return false;
   if (status === 'error') return true;
 
-  return hasSession && (status === 'selecting' || status === 'preview');
+  return (
+    hasSession &&
+    hasCaptureImagesReady &&
+    (status === 'selecting' || status === 'preview')
+  );
 }
 
 export async function revealCaptureWindow(

@@ -117,6 +117,7 @@ interface CancelCapturePointerState {
 }
 interface CancelCaptureBlurState {
   status: 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
+  isRenderingOutput?: boolean;
 }
 
 export function shouldRecordSuccessfulCaptureSelection(
@@ -520,6 +521,8 @@ export function getCancelCapturePointerAction(
 }
 
 export function shouldCancelCaptureOnBlur(state: CancelCaptureBlurState) {
+  if (state.isRenderingOutput) return false;
+
   return state.status === 'selecting' || state.status === 'preview';
 }
 

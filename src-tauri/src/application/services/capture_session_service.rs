@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
@@ -28,10 +28,17 @@ pub struct CaptureSession {
     pub created_at: SystemTime,
 }
 
+pub struct CaptureSessionSnapshotCache {
+    snapshots: Vec<MonitorSnapshot>,
+    captured_cursor: Option<CapturedCursor>,
+}
+
 /// Owns frozen screenshot sessions.
 pub struct CaptureSessionService {
     screenshot_backend: Arc<dyn ScreenshotBackend>,
     sessions: Arc<Mutex<HashMap<CaptureSessionId, CaptureSession>>>,
+    hydrating_sessions: Arc<Mutex<HashSet<CaptureSessionId>>>,
+    hydration_notify: Arc<tokio::sync::Notify>,
 }
 
 impl CaptureSessionService {
@@ -39,6 +46,8 @@ impl CaptureSessionService {
         Self {
             screenshot_backend,
             sessions: Arc::new(Mutex::new(HashMap::new())),
+            hydrating_sessions: Arc::new(Mutex::new(HashSet::new())),
+            hydration_notify: Arc::new(tokio::sync::Notify::new()),
         }
     }
 
@@ -87,7 +96,8 @@ impl CaptureSessionService {
         let captured_cursor_ms = elapsed_ms(captured_cursor_start);
         let candidates = window_candidates
             .iter()
-            .map(window_candidate_to_view)
+            .enumerate()
+            .map(|(index, candidate)| window_candidate_to_view(candidate, index))
             .collect::<Vec<_>>();
 
         let id = CaptureSessionId(generate_session_id());
@@ -137,6 +147,68 @@ impl CaptureSessionService {
         Ok(view)
     }
 
+    pub async fn capture_session_snapshot_cache(&self) -> Result<CaptureSessionSnapshotCache> {
+        let snapshots = self.screenshot_backend.capture_monitor_snapshots().await?;
+        if snapshots.is_empty() {
+            return Err(AppError::System(
+                "Cannot cache capture session without monitor snapshots".to_string(),
+            ));
+        }
+
+        let captured_cursor = self
+            .screenshot_backend
+            .capture_cursor(&snapshots)
+            .await
+            .map_err(|err| {
+                log::warn!("Failed to capture cursor while hydrating session: {}", err);
+                err
+            })
+            .unwrap_or_default();
+
+        Ok(CaptureSessionSnapshotCache {
+            snapshots,
+            captured_cursor,
+        })
+    }
+
+    pub fn store_session_snapshot_cache(
+        &self,
+        id: &CaptureSessionId,
+        cache: CaptureSessionSnapshotCache,
+    ) -> Result<CaptureSessionView> {
+        let cached_snapshots = cache
+            .snapshots
+            .into_iter()
+            .map(|snapshot| (snapshot.id.clone(), snapshot))
+            .collect::<HashMap<_, _>>();
+        let mut sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| AppError::System("Capture session lock poisoned".to_string()))?;
+        let session = sessions
+            .get_mut(id)
+            .ok_or_else(|| AppError::System(format!("Capture session not found: {}", id.0)))?;
+        let snapshots = session
+            .layout_snapshots
+            .iter()
+            .map(|layout| {
+                let cached = cached_snapshots.get(&layout.id).ok_or_else(|| {
+                    AppError::System(format!(
+                        "Capture session snapshot cache is missing monitor: {}",
+                        layout.id
+                    ))
+                })?;
+                let mut snapshot = layout.clone();
+                snapshot.png_data = cached.png_data.clone();
+                Ok(snapshot)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        session.snapshots = snapshots;
+        session.captured_cursor = cache.captured_cursor;
+
+        Ok(session_to_view(session))
+    }
+
     pub async fn create_layout_session(&self) -> Result<CaptureSessionView> {
         self.create_layout_session_with_hidden_window_labels(Vec::new())
             .await
@@ -175,7 +247,8 @@ impl CaptureSessionService {
         let window_candidates_ms = elapsed_ms(window_candidates_start);
         let candidates = window_candidates
             .iter()
-            .map(window_candidate_to_view)
+            .enumerate()
+            .map(|(index, candidate)| window_candidate_to_view(candidate, index))
             .collect::<Vec<_>>();
 
         let id = CaptureSessionId(generate_session_id());
@@ -206,6 +279,57 @@ impl CaptureSessionService {
         );
 
         Ok(view)
+    }
+
+    pub async fn hydrate_session_snapshots(
+        &self,
+        id: &CaptureSessionId,
+    ) -> Result<CaptureSessionView> {
+        loop {
+            if let Some(view) = self.hydrated_session_view(id)? {
+                return Ok(view);
+            }
+
+            if self.try_begin_session_hydration(id)? {
+                let result = self.capture_and_store_session_snapshots(id).await;
+                self.finish_session_hydration(id)?;
+                self.hydration_notify.notify_waiters();
+                return result;
+            }
+
+            self.hydration_notify.notified().await;
+        }
+    }
+
+    async fn capture_and_store_session_snapshots(
+        &self,
+        id: &CaptureSessionId,
+    ) -> Result<CaptureSessionView> {
+        self.get_session(id)?;
+
+        let cache = self.capture_session_snapshot_cache().await?;
+
+        self.store_session_snapshot_cache(id, cache)
+    }
+
+    fn try_begin_session_hydration(&self, id: &CaptureSessionId) -> Result<bool> {
+        self.get_session(id)?;
+
+        let mut hydrating_sessions = self
+            .hydrating_sessions
+            .lock()
+            .map_err(|_| AppError::System("Capture hydration lock poisoned".to_string()))?;
+
+        Ok(hydrating_sessions.insert(id.clone()))
+    }
+
+    fn finish_session_hydration(&self, id: &CaptureSessionId) -> Result<()> {
+        let mut hydrating_sessions = self
+            .hydrating_sessions
+            .lock()
+            .map_err(|_| AppError::System("Capture hydration lock poisoned".to_string()))?;
+        hydrating_sessions.remove(id);
+        Ok(())
     }
 
     pub async fn freeze_session_selection(
@@ -276,10 +400,31 @@ impl CaptureSessionService {
             .ok_or_else(|| AppError::System(format!("Capture session not found: {}", id.0)))
     }
 
+    fn hydrated_session_view(&self, id: &CaptureSessionId) -> Result<Option<CaptureSessionView>> {
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| AppError::System("Capture session lock poisoned".to_string()))?;
+        let session = sessions
+            .get(id)
+            .ok_or_else(|| AppError::System(format!("Capture session not found: {}", id.0)))?;
+
+        Ok(session_has_cached_monitor_snapshots(session).then(|| session_to_view(session)))
+    }
+
     pub fn get_session_view(&self, id: &CaptureSessionId) -> Result<CaptureSessionView> {
         let session = self.get_session(id)?;
 
         Ok(session_to_view(&session))
+    }
+
+    pub fn get_session_view_without_monitor_images(
+        &self,
+        id: &CaptureSessionId,
+    ) -> Result<CaptureSessionView> {
+        let session = self.get_session(id)?;
+
+        Ok(session_to_view_without_monitor_images(&session))
     }
 
     pub fn current_cursor_position(&self, id: &CaptureSessionId) -> Result<Option<LogicalPoint>> {
@@ -366,13 +511,35 @@ fn session_to_view(session: &CaptureSession) -> CaptureSessionView {
     }
 }
 
-fn window_candidate_to_view(candidate: &WindowCandidate) -> CaptureCandidateView {
+fn session_to_view_without_monitor_images(session: &CaptureSession) -> CaptureSessionView {
+    CaptureSessionView {
+        id: session.id.clone(),
+        monitors: session
+            .layout_snapshots
+            .iter()
+            .map(snapshot_to_view)
+            .collect(),
+        candidates: session.candidates.clone(),
+        captured_cursor: session
+            .captured_cursor
+            .as_ref()
+            .map(captured_cursor_to_view),
+    }
+}
+
+const WINDOW_CANDIDATE_BASE_PRIORITY: i32 = 10_000;
+
+fn window_candidate_to_view(candidate: &WindowCandidate, index: usize) -> CaptureCandidateView {
     CaptureCandidateView {
         id: candidate.id.clone(),
         kind: "window".to_string(),
         rect: candidate.logical_bounds.clone(),
-        priority: 10,
+        priority: window_candidate_priority(index),
     }
+}
+
+fn window_candidate_priority(index: usize) -> i32 {
+    WINDOW_CANDIDATE_BASE_PRIORITY.saturating_sub(index as i32)
 }
 
 fn snapshot_to_view(snapshot: &MonitorSnapshot) -> MonitorSnapshotView {
@@ -410,6 +577,44 @@ fn session_snapshots_cover_rect(session: &CaptureSession, rect: &LogicalRect) ->
     let captured_area = snapshots_intersection_area(rect, &session.snapshots, true);
 
     captured_area + f64::EPSILON >= required_area
+}
+
+fn session_has_cached_monitor_snapshots(session: &CaptureSession) -> bool {
+    let Some(bounds) = snapshots_logical_bounds(&session.layout_snapshots) else {
+        return false;
+    };
+
+    session_snapshots_cover_rect(session, &bounds)
+}
+
+fn snapshots_logical_bounds(snapshots: &[MonitorSnapshot]) -> Option<LogicalRect> {
+    if snapshots.is_empty() {
+        return None;
+    }
+
+    let left = snapshots
+        .iter()
+        .map(|snapshot| snapshot.logical_bounds.x)
+        .fold(f64::INFINITY, f64::min);
+    let top = snapshots
+        .iter()
+        .map(|snapshot| snapshot.logical_bounds.y)
+        .fold(f64::INFINITY, f64::min);
+    let right = snapshots
+        .iter()
+        .map(|snapshot| snapshot.logical_bounds.x + snapshot.logical_bounds.width)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let bottom = snapshots
+        .iter()
+        .map(|snapshot| snapshot.logical_bounds.y + snapshot.logical_bounds.height)
+        .fold(f64::NEG_INFINITY, f64::max);
+
+    Some(LogicalRect {
+        x: left,
+        y: top,
+        width: right - left,
+        height: bottom - top,
+    })
 }
 
 fn snapshots_intersection_area(

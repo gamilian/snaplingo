@@ -1683,6 +1683,15 @@ describe('capture session actions', () => {
     expect(shouldCancelCaptureOnBlur({ status: 'error' })).toBe(false);
   });
 
+  it('keeps the capture session alive when the window blurs during output', () => {
+    expect(
+      shouldCancelCaptureOnBlur({
+        status: 'preview',
+        isRenderingOutput: true,
+      }),
+    ).toBe(false);
+  });
+
   it('uses Space for moving an in-progress selection without system modifiers', () => {
     expect(
       isMoveDraftSelectionShortcut({

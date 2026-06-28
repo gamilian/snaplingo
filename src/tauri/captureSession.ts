@@ -51,6 +51,10 @@ export async function getCaptureSession(sessionId: string) {
   return invoke<CaptureSessionView>('get_capture_session', { sessionId });
 }
 
+export async function hydrateCaptureSessionSnapshots(sessionId: string) {
+  return invoke<void>('hydrate_capture_session_snapshots', { sessionId });
+}
+
 export function logCaptureFrontendPerf(input: {
   event: string;
   mode: CaptureMode | string;

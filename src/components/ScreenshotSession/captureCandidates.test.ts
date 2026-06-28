@@ -119,6 +119,27 @@ describe('capture candidates', () => {
     );
   });
 
+  it('prefers the frontmost candidate priority over a smaller occluded window', () => {
+    const candidates: CaptureCandidate[] = [
+      {
+        id: 'window:front',
+        kind: 'window',
+        rect: { x: 0, y: 0, width: 900, height: 700 },
+        priority: 10000,
+      },
+      {
+        id: 'window:behind',
+        kind: 'window',
+        rect: { x: 100, y: 100, width: 300, height: 220 },
+        priority: 9999,
+      },
+    ];
+
+    expect(getBestCandidateAtPoint(candidates, { x: 120, y: 120 })?.id).toBe(
+      'window:front',
+    );
+  });
+
   it('ignores tiny automatic hover candidates and uses the enclosing window', () => {
     const candidates: CaptureCandidate[] = [
       {

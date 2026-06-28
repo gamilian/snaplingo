@@ -188,7 +188,7 @@ fn register_hotkey_action(
     let action = action.to_string();
     let app_clone = app.clone();
 
-    if category == TRANSLATION_CATEGORY && action == SELECTION_TRANSLATE_ACTION {
+    if should_register_hotkey_on_release(&category, &action) {
         return infrastructure::system::register_shortcut_on_release(app, accelerator, move || {
             trigger_hotkey_action(app_clone.clone(), category.clone(), action.clone());
         });
@@ -291,6 +291,17 @@ fn capture_mode_for_screenshot_hotkey_action(action: &str) -> Option<&'static st
     }
 }
 
+fn should_register_hotkey_on_release(category: &str, action: &str) -> bool {
+    match (category, action) {
+        (SCREENSHOT_CATEGORY, action) => {
+            capture_mode_for_screenshot_hotkey_action(action).is_some()
+        }
+        (TRANSLATION_CATEGORY, SELECTION_TRANSLATE_ACTION | SCREENSHOT_TRANSLATE_ACTION) => true,
+        (OCR_CATEGORY, SCREENSHOT_OCR_ACTION | SILENT_SCREENSHOT_OCR_ACTION) => true,
+        _ => false,
+    }
+}
+
 pub(crate) fn display_hotkey_to_accelerator(hotkey: &str) -> Result<Option<String>> {
     let hotkey = hotkey.trim();
     if hotkey.is_empty() || hotkey == "未设置" {
@@ -370,9 +381,10 @@ fn accelerator_key(main_key: &str) -> Result<String> {
 mod tests {
     use super::{
         capture_mode_for_screenshot_hotkey_action, display_hotkey_to_accelerator,
-        resolve_hotkey_accelerator, FILE_OCR_ACTION, OCR_CATEGORY, SCREENSHOT_ACTION,
-        SCREENSHOT_CATEGORY, SCREENSHOT_COPY_ACTION, SCREENSHOT_CUSTOM_ACTION,
-        SHOW_OCR_WINDOW_ACTION, SILENT_SCREENSHOT_OCR_ACTION,
+        resolve_hotkey_accelerator, should_register_hotkey_on_release, FILE_OCR_ACTION,
+        OCR_CATEGORY, SCREENSHOT_ACTION, SCREENSHOT_CATEGORY, SCREENSHOT_COPY_ACTION,
+        SCREENSHOT_CUSTOM_ACTION, SCREENSHOT_OCR_ACTION, SCREENSHOT_TRANSLATE_ACTION,
+        SHOW_OCR_WINDOW_ACTION, SILENT_SCREENSHOT_OCR_ACTION, TRANSLATION_CATEGORY,
     };
     use std::str::FromStr;
     use tauri_plugin_global_shortcut::Shortcut;
@@ -465,5 +477,29 @@ mod tests {
             resolve_hotkey_accelerator(OCR_CATEGORY, SHOW_OCR_WINDOW_ACTION, "⌘O").unwrap(),
             Some("CmdOrCtrl+KeyO".to_string())
         );
+    }
+
+    #[test]
+    fn capture_hotkeys_trigger_after_the_key_combo_is_released() {
+        assert!(should_register_hotkey_on_release(
+            SCREENSHOT_CATEGORY,
+            SCREENSHOT_ACTION
+        ));
+        assert!(should_register_hotkey_on_release(
+            SCREENSHOT_CATEGORY,
+            SCREENSHOT_COPY_ACTION
+        ));
+        assert!(should_register_hotkey_on_release(
+            OCR_CATEGORY,
+            SCREENSHOT_OCR_ACTION
+        ));
+        assert!(should_register_hotkey_on_release(
+            OCR_CATEGORY,
+            SILENT_SCREENSHOT_OCR_ACTION
+        ));
+        assert!(should_register_hotkey_on_release(
+            TRANSLATION_CATEGORY,
+            SCREENSHOT_TRANSLATE_ACTION
+        ));
     }
 }

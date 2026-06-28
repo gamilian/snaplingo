@@ -19,17 +19,28 @@ const NO_PREVIOUS_FRONTMOST_APP_PID: i32 = -1;
 const CAPTURE_CANCEL_SHORTCUT_ACCELERATOR: &str = "Escape";
 const CAPTURE_CANCEL_REQUESTED_EVENT: &str = "capture-cancel-requested";
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RestorePreviousFrontmostDisposition {
+    Keep,
+    Clear,
+}
+
 pub(super) fn begin_capture_presentation(app: &AppHandle) -> Result<(), String> {
     let previous_depth = CAPTURE_PRESENTATION_DEPTH.fetch_add(1, Ordering::SeqCst);
 
     if previous_depth == 0 {
         remember_previous_frontmost_application();
+        if let Some(activation_policy) = capture_presentation_activation_policy() {
+            if let Err(err) = app.set_activation_policy(activation_policy) {
+                CAPTURE_PRESENTATION_DEPTH.fetch_sub(1, Ordering::SeqCst);
+                return Err(err.to_string());
+            }
+        }
         if let Err(err) = register_capture_cancel_shortcut(app) {
             log::warn!("Failed to register capture cancel shortcut: {}", err);
         }
     }
 
-    let _ = app;
     Ok(())
 }
 
@@ -39,25 +50,44 @@ pub(super) fn end_capture_presentation(app: &AppHandle) -> Result<(), String> {
     if previous_depth == 1 {
         let activation_suppressed = take_capture_window_activation_suppressed();
         unregister_capture_cancel_shortcut(app);
-        restore_previous_frontmost_application();
-
-        if activation_suppressed {
+        let activation_policy_result = if activation_suppressed {
             app.set_activation_policy(tauri::ActivationPolicy::Regular)
-                .map_err(|e| e.to_string())?;
-        }
+                .map_err(|e| e.to_string())
+        } else {
+            Ok(())
+        };
+        restore_previous_frontmost_application(RestorePreviousFrontmostDisposition::Clear);
+        activation_policy_result?;
     }
 
     Ok(())
 }
 
+pub(super) fn is_capture_presentation_active() -> bool {
+    CAPTURE_PRESENTATION_DEPTH.load(Ordering::SeqCst) > 0
+}
+
 pub(super) fn suppress_capture_window_activation(app: &AppHandle) -> Result<(), String> {
-    if let Some(activation_policy) = capture_presentation_activation_policy(app) {
+    if let Some(activation_policy) = capture_window_activation_suppression_policy() {
         app.set_activation_policy(activation_policy)
             .map_err(|e| e.to_string())?;
         mark_capture_window_activation_suppressed();
     }
 
     Ok(())
+}
+
+pub(super) fn restore_suppressed_capture_window_activation() {
+    if !should_restore_suppressed_capture_window_activation(
+        CAPTURE_WINDOW_ACTIVATION_SUPPRESSED.load(Ordering::SeqCst),
+        Some(PREVIOUS_FRONTMOST_APP_PID.load(Ordering::SeqCst)),
+        current_application_pid(),
+        frontmost_application_pid(),
+    ) {
+        return;
+    }
+
+    restore_previous_frontmost_application(RestorePreviousFrontmostDisposition::Keep);
 }
 
 pub(super) fn configure_capture_window_for_current_space(
@@ -155,73 +185,53 @@ fn decrement_capture_presentation_depth() -> usize {
 fn capture_overlay_collection_behavior(
     base: NSWindowCollectionBehavior,
 ) -> NSWindowCollectionBehavior {
+    let base = base
+        & !NSWindowCollectionBehavior::MoveToActiveSpace
+        & !NSWindowCollectionBehavior::Managed
+        & !NSWindowCollectionBehavior::Transient
+        & !NSWindowCollectionBehavior::ParticipatesInCycle
+        & !NSWindowCollectionBehavior::FullScreenPrimary
+        & !NSWindowCollectionBehavior::FullScreenNone;
+
     base | NSWindowCollectionBehavior::CanJoinAllSpaces
         | NSWindowCollectionBehavior::FullScreenAuxiliary
         | NSWindowCollectionBehavior::Stationary
-        | NSWindowCollectionBehavior::Transient
         | NSWindowCollectionBehavior::IgnoresCycle
 }
 
 fn capture_overlay_style_mask(base: NSWindowStyleMask) -> NSWindowStyleMask {
-    base
+    base | NSWindowStyleMask::NonactivatingPanel
 }
 
-fn capture_presentation_activation_policy(app: &AppHandle) -> Option<tauri::ActivationPolicy> {
-    capture_presentation_activation_policy_for_state(
+fn capture_presentation_activation_policy() -> Option<tauri::ActivationPolicy> {
+    None
+}
+
+fn capture_window_activation_suppression_policy() -> Option<tauri::ActivationPolicy> {
+    should_suppress_capture_window_activation().then_some(tauri::ActivationPolicy::Prohibited)
+}
+
+fn should_suppress_capture_window_activation() -> bool {
+    should_suppress_capture_window_activation_for_state(
         current_application_pid(),
         frontmost_application_pid(),
-        has_active_space_capture_subject_app_window(app),
+        false,
     )
 }
 
-fn capture_presentation_activation_policy_for_state(
+fn should_suppress_capture_window_activation_for_state(
     current_pid: i32,
     frontmost_pid: Option<i32>,
-    has_active_space_app_window: bool,
-) -> Option<tauri::ActivationPolicy> {
-    if has_active_space_app_window {
-        return None;
-    }
-
-    capture_presentation_activation_policy_for_frontmost(current_pid, frontmost_pid)
-}
-
-fn capture_presentation_activation_policy_for_frontmost(
-    current_pid: i32,
-    frontmost_pid: Option<i32>,
-) -> Option<tauri::ActivationPolicy> {
-    match frontmost_pid {
-        Some(pid) if pid == current_pid => None,
-        _ => Some(tauri::ActivationPolicy::Prohibited),
-    }
-}
-
-fn has_active_space_capture_subject_app_window(app: &AppHandle) -> bool {
-    app.webview_windows().into_iter().any(|(label, window)| {
-        label != CAPTURE_WINDOW_LABEL && is_capture_subject_window_on_active_space(&window)
-    })
-}
-
-fn is_capture_subject_window_on_active_space(window: &WebviewWindow) -> bool {
-    let Ok(ns_window) = window.ns_window() else {
-        return false;
-    };
-    if ns_window.is_null() {
-        return false;
-    }
-
-    let ns_window: &NSWindow = unsafe { &*ns_window.cast() };
-    capture_subject_window_is_on_active_space_for_state(
-        ns_window.isVisible(),
-        ns_window.isOnActiveSpace(),
-    )
-}
-
-fn capture_subject_window_is_on_active_space_for_state(
-    is_visible: bool,
-    is_on_active_space: bool,
+    _has_active_space_app_window: bool,
 ) -> bool {
-    is_visible && is_on_active_space
+    should_suppress_capture_window_activation_for_frontmost(current_pid, frontmost_pid)
+}
+
+fn should_suppress_capture_window_activation_for_frontmost(
+    _current_pid: i32,
+    _frontmost_pid: Option<i32>,
+) -> bool {
+    true
 }
 
 fn mark_capture_window_activation_suppressed() {
@@ -243,9 +253,9 @@ fn should_make_capture_overlay_key_on_reveal() -> bool {
 }
 
 fn should_make_capture_overlay_key_on_reveal_for_activation_suppressed(
-    activation_suppressed: bool,
+    _activation_suppressed: bool,
 ) -> bool {
-    !activation_suppressed
+    false
 }
 
 fn capture_cancel_shortcut_accelerator() -> &'static str {
@@ -305,19 +315,36 @@ fn remember_previous_frontmost_application() {
     );
 }
 
-fn restore_previous_frontmost_application() {
-    let pid = PREVIOUS_FRONTMOST_APP_PID.swap(NO_PREVIOUS_FRONTMOST_APP_PID, Ordering::SeqCst);
-    if !should_restore_previous_frontmost_app(
+fn restore_previous_frontmost_application(disposition: RestorePreviousFrontmostDisposition) {
+    let pid = PREVIOUS_FRONTMOST_APP_PID.load(Ordering::SeqCst);
+    let current_pid = current_application_pid();
+    let current_frontmost_pid = frontmost_application_pid();
+    let next_pid = previous_frontmost_pid_after_restore_attempt(
         Some(pid),
-        current_application_pid(),
-        frontmost_application_pid(),
-    ) {
+        current_pid,
+        current_frontmost_pid,
+        disposition,
+    )
+    .unwrap_or(NO_PREVIOUS_FRONTMOST_APP_PID);
+    PREVIOUS_FRONTMOST_APP_PID.store(next_pid, Ordering::SeqCst);
+
+    if !should_restore_previous_frontmost_app(Some(pid), current_pid, current_frontmost_pid) {
         return;
     }
 
     if let Some(application) = NSRunningApplication::runningApplicationWithProcessIdentifier(pid) {
         application.activateWithOptions(NSApplicationActivationOptions::empty());
     }
+}
+
+fn should_restore_suppressed_capture_window_activation(
+    activation_suppressed: bool,
+    previous_pid: Option<i32>,
+    current_pid: i32,
+    current_frontmost_pid: Option<i32>,
+) -> bool {
+    activation_suppressed
+        && should_restore_previous_frontmost_app(previous_pid, current_pid, current_frontmost_pid)
 }
 
 fn should_restore_previous_frontmost_app(
@@ -350,18 +377,31 @@ fn previous_frontmost_pid_to_restore(frontmost_pid: Option<i32>, current_pid: i3
     }
 }
 
+fn previous_frontmost_pid_after_restore_attempt(
+    previous_pid: Option<i32>,
+    _current_pid: i32,
+    _current_frontmost_pid: Option<i32>,
+    disposition: RestorePreviousFrontmostDisposition,
+) -> Option<i32> {
+    match disposition {
+        RestorePreviousFrontmostDisposition::Keep => previous_pid.filter(|pid| *pid > 0),
+        RestorePreviousFrontmostDisposition::Clear => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn capture_overlay_joins_fullscreen_spaces() {
+    fn capture_overlay_joins_fullscreen_spaces_without_moving_between_spaces() {
         let behavior = capture_overlay_collection_behavior(NSWindowCollectionBehavior::Default);
 
         assert!(behavior.contains(NSWindowCollectionBehavior::CanJoinAllSpaces));
+        assert!(!behavior.contains(NSWindowCollectionBehavior::MoveToActiveSpace));
         assert!(behavior.contains(NSWindowCollectionBehavior::FullScreenAuxiliary));
         assert!(behavior.contains(NSWindowCollectionBehavior::Stationary));
-        assert!(behavior.contains(NSWindowCollectionBehavior::Transient));
+        assert!(!behavior.contains(NSWindowCollectionBehavior::Transient));
         assert!(behavior.contains(NSWindowCollectionBehavior::IgnoresCycle));
     }
 
@@ -374,11 +414,11 @@ mod tests {
     }
 
     #[test]
-    fn capture_overlay_does_not_add_unsupported_nonactivating_panel_style() {
+    fn capture_overlay_uses_nonactivating_panel_style_for_fullscreen_spaces() {
         let style = capture_overlay_style_mask(NSWindowStyleMask::Borderless);
 
         assert!(style.contains(NSWindowStyleMask::Borderless));
-        assert!(!style.contains(NSWindowStyleMask::NonactivatingPanel));
+        assert!(style.contains(NSWindowStyleMask::NonactivatingPanel));
     }
 
     #[test]
@@ -393,59 +433,63 @@ mod tests {
 
     #[test]
     fn capture_presentation_suppresses_activation_for_other_frontmost_apps() {
+        assert!(should_suppress_capture_window_activation_for_frontmost(
+            9000,
+            Some(4242)
+        ));
+    }
+
+    #[test]
+    fn capture_presentation_does_not_change_activation_policy() {
+        assert!(capture_presentation_activation_policy().is_none());
+    }
+
+    #[test]
+    fn capture_window_activation_suppression_uses_prohibited_policy() {
         assert!(matches!(
-            capture_presentation_activation_policy_for_frontmost(9000, Some(4242)),
+            capture_window_activation_suppression_policy(),
             Some(tauri::ActivationPolicy::Prohibited)
         ));
     }
 
     #[test]
-    fn capture_presentation_keeps_activation_when_snaplingo_is_frontmost() {
-        assert!(matches!(
-            capture_presentation_activation_policy_for_frontmost(9000, Some(9000)),
-            None
+    fn capture_presentation_suppresses_activation_even_when_snaplingo_is_frontmost() {
+        assert!(should_suppress_capture_window_activation_for_frontmost(
+            9000,
+            Some(9000)
         ));
     }
 
     #[test]
-    fn capture_presentation_keeps_activation_for_active_space_snaplingo_windows() {
-        assert!(matches!(
-            capture_presentation_activation_policy_for_state(9000, Some(4242), true),
-            None
+    fn capture_presentation_suppresses_activation_for_active_space_snaplingo_windows_behind_another_app(
+    ) {
+        assert!(should_suppress_capture_window_activation_for_state(
+            9000,
+            Some(4242),
+            true
         ));
     }
 
     #[test]
-    fn capture_presentation_keeps_activation_when_snaplingo_is_frontmost_with_active_window() {
-        assert!(matches!(
-            capture_presentation_activation_policy_for_state(9000, Some(9000), true),
-            None
+    fn capture_presentation_suppresses_activation_when_snaplingo_is_frontmost_with_active_window() {
+        assert!(should_suppress_capture_window_activation_for_state(
+            9000,
+            Some(9000),
+            true
         ));
     }
 
     #[test]
     fn capture_presentation_suppresses_activation_without_active_space_snaplingo_windows() {
-        assert!(matches!(
-            capture_presentation_activation_policy_for_state(9000, Some(4242), false),
-            Some(tauri::ActivationPolicy::Prohibited)
+        assert!(should_suppress_capture_window_activation_for_state(
+            9000,
+            Some(4242),
+            false
         ));
     }
 
     #[test]
-    fn capture_subject_window_must_be_visible_on_active_space() {
-        assert!(capture_subject_window_is_on_active_space_for_state(
-            true, true
-        ));
-        assert!(!capture_subject_window_is_on_active_space_for_state(
-            true, false
-        ));
-        assert!(!capture_subject_window_is_on_active_space_for_state(
-            false, true
-        ));
-    }
-
-    #[test]
-    fn capture_activation_policy_restores_only_after_suppression() {
+    fn capture_suppression_flag_clears_only_after_suppression() {
         assert!(!take_capture_window_activation_suppressed());
 
         mark_capture_window_activation_suppressed();
@@ -459,8 +503,8 @@ mod tests {
     }
 
     #[test]
-    fn capture_overlay_becomes_key_when_activation_is_not_suppressed() {
-        assert!(should_make_capture_overlay_key_on_reveal_for_activation_suppressed(false));
+    fn capture_overlay_never_becomes_key_on_reveal() {
+        assert!(!should_make_capture_overlay_key_on_reveal_for_activation_suppressed(false));
     }
 
     #[test]
@@ -524,5 +568,53 @@ mod tests {
             9000,
             Some(9000),
         ));
+    }
+
+    #[test]
+    fn restores_suppressed_capture_activation_when_window_creation_displaced_previous_app() {
+        assert!(should_restore_suppressed_capture_window_activation(
+            true,
+            Some(4242),
+            9000,
+            Some(9000),
+        ));
+        assert!(!should_restore_suppressed_capture_window_activation(
+            false,
+            Some(4242),
+            9000,
+            Some(9000),
+        ));
+        assert!(!should_restore_suppressed_capture_window_activation(
+            true,
+            Some(4242),
+            9000,
+            Some(4242),
+        ));
+    }
+
+    #[test]
+    fn mid_capture_restore_keeps_previous_frontmost_pid_for_final_exit() {
+        assert_eq!(
+            previous_frontmost_pid_after_restore_attempt(
+                Some(4242),
+                9000,
+                Some(9000),
+                RestorePreviousFrontmostDisposition::Keep,
+            ),
+            Some(4242)
+        );
+    }
+
+    #[test]
+    fn final_capture_restore_clears_previous_frontmost_pid_after_exit() {
+        assert_eq!(
+            previous_frontmost_pid_after_restore_attempt(
+                Some(4242),
+                9000,
+                Some(9000),
+                RestorePreviousFrontmostDisposition::Clear,
+            ),
+            None
+        );
     }
 }

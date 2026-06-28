@@ -110,6 +110,7 @@ pub fn run() {
             commands::save_screenshot,
             commands::create_capture_session,
             commands::get_capture_session,
+            commands::hydrate_capture_session_snapshots,
             commands::log_capture_frontend_perf,
             commands::current_capture_cursor_position,
             commands::cancel_capture_session,
@@ -148,7 +149,10 @@ pub fn run() {
                 ..
             } = event
             {
-                if !app_lifecycle::should_show_main_window_on_reopen(has_visible_windows) {
+                if !app_lifecycle::should_show_main_window_on_reopen_for_state(
+                    has_visible_windows,
+                    infrastructure::system::capture_window::is_capture_presentation_active(),
+                ) {
                     return;
                 }
 

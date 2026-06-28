@@ -7,6 +7,7 @@ import {
   createCaptureSession,
   currentCaptureCursorPosition,
   getCaptureSession,
+  hydrateCaptureSessionSnapshots,
   logCaptureFrontendPerf,
   openCaptureOcrResultWindow,
   openCaptureTranslationResultWindow,
@@ -197,7 +198,6 @@ import { parseCaptureLaunchPayload } from './windowMode';
 import {
   getMonitorAtVirtualPoint,
   getCurrentMonitorBounds,
-  getMonitorViewportRect,
   getVirtualDesktopBounds,
   nudgeVirtualPoint,
   viewportPointToVirtualPoint,
@@ -238,10 +238,6 @@ type DraftSelectionMoveGesture = {
   startPoint: Point;
   startSelection: LogicalRect;
   startAnchorPoint: Point;
-};
-type CaptureImageReadiness = {
-  sessionId: string | null;
-  monitorIds: Set<string>;
 };
 type CaptureFrontendPerfState = {
   mode: CaptureMode;
@@ -583,6 +579,10 @@ export default function ScreenshotSession({
   const keyboardDraftCursorPointRef = useRef<Point | null>(null);
   const keyboardEditCursorPointRef = useRef<Point | null>(null);
   const isCancellingSessionRef = useRef(false);
+  const captureSnapshotHydrationRef = useRef<{
+    sessionId: string;
+    promise: Promise<void>;
+  } | null>(null);
   const [status, setStatus] = useState<SessionStatus>('idle');
   const [mode, setMode] = useState<CaptureMode>('screenshot');
   const [session, setSession] = useState<CaptureSessionView | null>(null);
@@ -622,13 +622,15 @@ export default function ScreenshotSession({
   const [includeCapturedCursor, setIncludeCapturedCursor] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasStartedInitialSession, setHasStartedInitialSession] = useState(false);
-  const [captureImageReadiness, setCaptureImageReadiness] =
-    useState<CaptureImageReadiness>(() => ({
-      sessionId: null,
-      monitorIds: new Set(),
-    }));
+  const [hydratedCaptureSessionId, setHydratedCaptureSessionId] =
+    useState<string | null>(null);
   const hasRevealedCaptureWindowRef = useRef(false);
   const captureFrontendPerfRef = useRef<CaptureFrontendPerfState | null>(null);
+  const isRenderingOutputRef = useRef(false);
+  const setRenderingOutput = useCallback((nextIsRendering: boolean) => {
+    isRenderingOutputRef.current = nextIsRendering;
+    setIsRenderingOutput(nextIsRendering);
+  }, []);
 
   const isActive = status !== 'idle';
   const annotations = annotationHistory.annotations;
@@ -662,14 +664,8 @@ export default function ScreenshotSession({
   }, [session]);
   const areCaptureImagesReady = useMemo(() => {
     if (!session) return false;
-    const imageMonitors = session.monitors.filter((monitor) => monitor.image_base64);
-    if (imageMonitors.length === 0) return true;
-    if (captureImageReadiness.sessionId !== session.id) return false;
-
-    return imageMonitors.every((monitor) =>
-      captureImageReadiness.monitorIds.has(monitor.id),
-    );
-  }, [captureImageReadiness, session]);
+    return hydratedCaptureSessionId === session.id;
+  }, [hydratedCaptureSessionId, session]);
   const snapTargetRects = useMemo(
     () => captureCandidates.map((candidate) => candidate.rect),
     [captureCandidates],
@@ -871,26 +867,8 @@ export default function ScreenshotSession({
   }, []);
 
   const resetCaptureImageReadiness = useCallback(() => {
-    setCaptureImageReadiness({
-      sessionId: null,
-      monitorIds: new Set(),
-    });
-  }, []);
-
-  const markCaptureImageReady = useCallback((sessionId: string, monitorId: string) => {
-    setCaptureImageReadiness((previous) => {
-      const monitorIds =
-        previous.sessionId === sessionId ? previous.monitorIds : new Set<string>();
-      if (monitorIds.has(monitorId)) return previous;
-
-      const nextMonitorIds = new Set(monitorIds);
-      nextMonitorIds.add(monitorId);
-
-      return {
-        sessionId,
-        monitorIds: nextMonitorIds,
-      };
-    });
+    captureSnapshotHydrationRef.current = null;
+    setHydratedCaptureSessionId(null);
   }, []);
 
   const resetCaptureInteractionState = useCallback(() => {
@@ -920,7 +898,7 @@ export default function ScreenshotSession({
     setColorSampleFormat('hex');
     setIsMagnifierRequested(false);
     setSampleCanvasVersion(0);
-    setIsRenderingOutput(false);
+    setRenderingOutput(false);
     setIncludeCapturedCursor(false);
     setError(null);
     resetCaptureImageReadiness();
@@ -971,6 +949,36 @@ export default function ScreenshotSession({
     },
     [],
   );
+
+  const ensureCaptureSnapshotsHydrated = useCallback((sessionId: string) => {
+    const currentHydration = captureSnapshotHydrationRef.current;
+    if (currentHydration?.sessionId === sessionId) {
+      return currentHydration.promise;
+    }
+
+    setHydratedCaptureSessionId(null);
+    const hydrationPromise = hydrateCaptureSessionSnapshots(sessionId)
+      .then(() => {
+        if (captureSnapshotHydrationRef.current?.sessionId !== sessionId) return;
+
+        setHydratedCaptureSessionId(sessionId);
+        markCaptureFrontendPerf('snapshots_hydrated', sessionId);
+      })
+      .catch((err) => {
+        if (captureSnapshotHydrationRef.current?.sessionId === sessionId) {
+          captureSnapshotHydrationRef.current = null;
+          setHydratedCaptureSessionId(null);
+        }
+        throw err;
+      });
+
+    captureSnapshotHydrationRef.current = {
+      sessionId,
+      promise: hydrationPromise,
+    };
+
+    return hydrationPromise;
+  }, [markCaptureFrontendPerf]);
 
   const finishCurrentCaptureSession = useCallback(
     async (sessionId: string) => {
@@ -1028,6 +1036,10 @@ export default function ScreenshotSession({
         captureFrontendPerfRef.current.sessionId = nextSession.id;
       }
       markCaptureFrontendPerf('session_loaded', nextSession.id);
+      void ensureCaptureSnapshotsHydrated(nextSession.id).catch((err) => {
+        setError(err instanceof Error ? err.message : String(err));
+        setStatus('error');
+      });
       const initialCursorPosition = nextSession.captured_cursor
         ? null
         : await currentCaptureCursorPosition(nextSession.id).catch(() => null);
@@ -1039,6 +1051,7 @@ export default function ScreenshotSession({
       setStatus('error');
     }
   }, [
+    ensureCaptureSnapshotsHydrated,
     markCaptureFrontendPerf,
     primeInitialHoverSelection,
     resetCaptureInteractionState,
@@ -1068,6 +1081,7 @@ export default function ScreenshotSession({
       if (!session) return;
 
       if (effect.type === 'output-capture') {
+        await ensureCaptureSnapshotsHydrated(session.id);
         if (effect.action === 'copy') {
           await copyCaptureSelection(
             session.id,
@@ -1111,6 +1125,7 @@ export default function ScreenshotSession({
       }
 
       if (effect.type === 'run-ocr') {
+        await ensureCaptureSnapshotsHydrated(session.id);
         const ocrResult = await runCaptureOcr(session.id, rect);
         if (effect.resultWindow === 'translation') {
           await openCaptureTranslationResultWindow(ocrResult.text);
@@ -1131,6 +1146,7 @@ export default function ScreenshotSession({
     },
     [
       finishCurrentCaptureSession,
+      ensureCaptureSnapshotsHydrated,
       recordSuccessfulSelection,
       screenshotSavePath,
       session,
@@ -1146,11 +1162,12 @@ export default function ScreenshotSession({
     ) => {
       if (!session) return;
 
-      setIsRenderingOutput(true);
+      setRenderingOutput(true);
       setPreviewImageBase64(null);
       setError(null);
 
       try {
+        await ensureCaptureSnapshotsHydrated(session.id);
         const base64 = await renderCaptureOutput({
           sessionId: session.id,
           rect,
@@ -1162,11 +1179,12 @@ export default function ScreenshotSession({
         setError(err instanceof Error ? err.message : String(err));
         setStatus('error');
       } finally {
-        setIsRenderingOutput(false);
+        setRenderingOutput(false);
       }
     },
     [
       annotations,
+      ensureCaptureSnapshotsHydrated,
       session,
       shouldIncludeCapturedCursor,
     ],
@@ -1194,11 +1212,12 @@ export default function ScreenshotSession({
   const copySelection = useCallback(async () => {
     if (!session || !selection) return;
 
-    setIsRenderingOutput(true);
+    setRenderingOutput(true);
     setError(null);
 
     try {
       const outputHistory = commitTextDraftToHistory();
+      await ensureCaptureSnapshotsHydrated(session.id);
       await copyCaptureSelection(
         session.id,
         selection,
@@ -1211,10 +1230,11 @@ export default function ScreenshotSession({
       setError(err instanceof Error ? err.message : String(err));
       setStatus('error');
     } finally {
-      setIsRenderingOutput(false);
+      setRenderingOutput(false);
     }
   }, [
     commitTextDraftToHistory,
+    ensureCaptureSnapshotsHydrated,
     finishCurrentCaptureSession,
     recordSuccessfulSelection,
     selection,
@@ -1228,7 +1248,7 @@ export default function ScreenshotSession({
   ) => {
     if (!session) return;
 
-    setIsRenderingOutput(true);
+    setRenderingOutput(true);
     setError(null);
 
     try {
@@ -1239,7 +1259,7 @@ export default function ScreenshotSession({
       setError(err instanceof Error ? err.message : String(err));
       setStatus('error');
     } finally {
-      setIsRenderingOutput(false);
+      setRenderingOutput(false);
     }
   }, [
     executeCaptureRuntimeEffect,
@@ -1262,11 +1282,12 @@ export default function ScreenshotSession({
   const saveSelection = useCallback(async () => {
     if (!session || !selection) return;
 
-    setIsRenderingOutput(true);
+    setRenderingOutput(true);
     setError(null);
 
     try {
       const outputHistory = commitTextDraftToHistory();
+      await ensureCaptureSnapshotsHydrated(session.id);
       await saveCaptureSelection(
         session.id,
         selection,
@@ -1279,10 +1300,11 @@ export default function ScreenshotSession({
       setError(err instanceof Error ? err.message : String(err));
       setStatus('error');
     } finally {
-      setIsRenderingOutput(false);
+      setRenderingOutput(false);
     }
   }, [
     commitTextDraftToHistory,
+    ensureCaptureSnapshotsHydrated,
     finishCurrentCaptureSession,
     recordSuccessfulSelection,
     selection,
@@ -1293,11 +1315,12 @@ export default function ScreenshotSession({
   const quickSaveSelection = useCallback(async () => {
     if (!session || !selection) return;
 
-    setIsRenderingOutput(true);
+    setRenderingOutput(true);
     setError(null);
 
     try {
       const outputHistory = commitTextDraftToHistory();
+      await ensureCaptureSnapshotsHydrated(session.id);
       await quickSaveCaptureSelection(
         session.id,
         selection,
@@ -1311,10 +1334,11 @@ export default function ScreenshotSession({
       setError(err instanceof Error ? err.message : String(err));
       setStatus('error');
     } finally {
-      setIsRenderingOutput(false);
+      setRenderingOutput(false);
     }
   }, [
     commitTextDraftToHistory,
+    ensureCaptureSnapshotsHydrated,
     finishCurrentCaptureSession,
     recordSuccessfulSelection,
     screenshotSavePath,
@@ -1326,10 +1350,11 @@ export default function ScreenshotSession({
   const runOcrSelection = useCallback(async () => {
     if (!session || !selection) return;
 
-    setIsRenderingOutput(true);
+    setRenderingOutput(true);
     setError(null);
 
     try {
+      await ensureCaptureSnapshotsHydrated(session.id);
       const ocrResult = await runCaptureOcr(session.id, selection);
       await openCaptureOcrResultWindow(ocrResult.text);
       recordSuccessfulSelection('ocr', selection);
@@ -1338,9 +1363,10 @@ export default function ScreenshotSession({
       setError(err instanceof Error ? err.message : String(err));
       setStatus('error');
     } finally {
-      setIsRenderingOutput(false);
+      setRenderingOutput(false);
     }
   }, [
+    ensureCaptureSnapshotsHydrated,
     finishCurrentCaptureSession,
     recordSuccessfulSelection,
     selection,
@@ -1350,11 +1376,12 @@ export default function ScreenshotSession({
   const pinSelection = useCallback(async () => {
     if (!session || !selection) return;
 
-    setIsRenderingOutput(true);
+    setRenderingOutput(true);
     setError(null);
 
     try {
       const outputHistory = commitTextDraftToHistory();
+      await ensureCaptureSnapshotsHydrated(session.id);
       await outputCapture({
         sessionId: session.id,
         rect: selection,
@@ -1368,10 +1395,11 @@ export default function ScreenshotSession({
       setError(err instanceof Error ? err.message : String(err));
       setStatus('error');
     } finally {
-      setIsRenderingOutput(false);
+      setRenderingOutput(false);
     }
   }, [
     commitTextDraftToHistory,
+    ensureCaptureSnapshotsHydrated,
     finishCurrentCaptureSession,
     recordSuccessfulSelection,
     selection,
@@ -1382,11 +1410,12 @@ export default function ScreenshotSession({
   const printSelection = useCallback(async () => {
     if (!session || !selection) return;
 
-    setIsRenderingOutput(true);
+    setRenderingOutput(true);
     setError(null);
 
     try {
       const outputHistory = commitTextDraftToHistory();
+      await ensureCaptureSnapshotsHydrated(session.id);
       await printCaptureSelection(
         session.id,
         selection,
@@ -1400,10 +1429,11 @@ export default function ScreenshotSession({
       setError(err instanceof Error ? err.message : String(err));
       setStatus('error');
     } finally {
-      setIsRenderingOutput(false);
+      setRenderingOutput(false);
     }
   }, [
     commitTextDraftToHistory,
+    ensureCaptureSnapshotsHydrated,
     finishCurrentCaptureSession,
     recordSuccessfulSelection,
     selection,
@@ -1420,6 +1450,10 @@ export default function ScreenshotSession({
 
     try {
       const nextSession = await refreshCaptureSession(session.id);
+      void ensureCaptureSnapshotsHydrated(nextSession.id).catch((err) => {
+        setError(err instanceof Error ? err.message : String(err));
+        setStatus('error');
+      });
       const initialCursorPosition = nextSession.captured_cursor
         ? null
         : await currentCaptureCursorPosition(nextSession.id).catch(() => null);
@@ -1430,7 +1464,12 @@ export default function ScreenshotSession({
       setError(err instanceof Error ? err.message : String(err));
       setStatus('error');
     }
-  }, [primeInitialHoverSelection, resetCaptureInteractionState, session]);
+  }, [
+    ensureCaptureSnapshotsHydrated,
+    primeInitialHoverSelection,
+    resetCaptureInteractionState,
+    session,
+  ]);
 
   const undoAnnotation = useCallback(() => {
     if (!selection || !canUndoAnnotation) return;
@@ -1788,7 +1827,7 @@ export default function ScreenshotSession({
     setHoverSelection(null);
     setEditGesture(null);
     setPreviewImageBase64(null);
-    setIsRenderingOutput(false);
+    setRenderingOutput(false);
     setActiveAnnotationTool(null);
     setAnnotationGesture(null);
     setDraftAnnotation(null);
@@ -1838,7 +1877,7 @@ export default function ScreenshotSession({
 
     setIsAnnotationToolbarVisible(false);
     setStatus('selecting');
-    setIsRenderingOutput(true);
+    setRenderingOutput(true);
     setError(null);
 
     void (async () => {
@@ -1850,7 +1889,7 @@ export default function ScreenshotSession({
         setError(err instanceof Error ? err.message : String(err));
         setStatus('error');
       } finally {
-        setIsRenderingOutput(false);
+        setRenderingOutput(false);
       }
     })();
   }, [
@@ -2234,7 +2273,7 @@ export default function ScreenshotSession({
         setSelection(result.selection);
         scheduleSelectionOverlayPaint(result.selection, null);
         setPreviewImageBase64(null);
-        setIsRenderingOutput(false);
+        setRenderingOutput(false);
       } else if (
         status === 'preview' &&
         !textDraft &&
@@ -2260,7 +2299,7 @@ export default function ScreenshotSession({
           startSelection: result.selection,
         });
         setPreviewImageBase64(null);
-        setIsRenderingOutput(false);
+        setRenderingOutput(false);
       } else if (
         status === 'preview' &&
         !textDraft &&
@@ -2289,7 +2328,7 @@ export default function ScreenshotSession({
           startSelection: result.selection,
         });
         setPreviewImageBase64(null);
-        setIsRenderingOutput(false);
+        setRenderingOutput(false);
       } else if (
         status === 'selecting' &&
         !textDraft &&
@@ -2493,7 +2532,12 @@ export default function ScreenshotSession({
 
     const handleWindowBlur = () => {
       setIsMagnifierRequested(false);
-      if (shouldCancelCaptureOnBlur({ status })) {
+      if (
+        shouldCancelCaptureOnBlur({
+          status,
+          isRenderingOutput: isRenderingOutputRef.current,
+        })
+      ) {
         void cancelSession();
       }
     };
@@ -2624,7 +2668,7 @@ export default function ScreenshotSession({
     setHoverSelection(null);
     scheduleSelectionOverlayPaint(draftSelection, null);
     setPreviewImageBase64(null);
-    setIsRenderingOutput(false);
+    setRenderingOutput(false);
     setStatus('selecting');
     setActiveAnnotationTool(null);
     setAnnotationGesture(null);
@@ -2764,7 +2808,7 @@ export default function ScreenshotSession({
       startPointRef.current = result.anchorPoint;
       scheduleSelectionOverlayPaint(result.selection, null);
       setPreviewImageBase64(null);
-      setIsRenderingOutput(false);
+      setRenderingOutput(false);
       return;
     }
 
@@ -2772,7 +2816,7 @@ export default function ScreenshotSession({
       keyboardEditCursorPointRef.current = null;
       setSelection(applyEditGesture(editGesture, point, event.shiftKey));
       setPreviewImageBase64(null);
-      setIsRenderingOutput(false);
+      setRenderingOutput(false);
       return;
     }
 
@@ -3113,23 +3157,6 @@ export default function ScreenshotSession({
       onWheel={handleWheel}
       onContextMenu={(event) => event.preventDefault()}
     >
-      {session &&
-        selectionBounds &&
-        session.monitors.filter((monitor) => monitor.image_base64).map((monitor) => (
-          <img
-            key={monitor.id}
-            src={`data:image/png;base64,${monitor.image_base64}`}
-            className="absolute object-fill"
-            style={rectStyle(getMonitorViewportRect(monitor, selectionBounds))}
-            onLoad={() => markCaptureImageReady(session.id, monitor.id)}
-            onError={() => {
-              setError('Failed to load capture snapshot');
-              setStatus('error');
-            }}
-            draggable={false}
-          />
-        ))}
-
       {shouldShowCaptureLoadingMask(status) && (
         <div className="absolute inset-0 bg-black" aria-label="Loading capture" />
       )}

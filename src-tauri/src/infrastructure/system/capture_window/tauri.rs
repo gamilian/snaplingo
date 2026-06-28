@@ -44,6 +44,18 @@ pub fn end_capture_presentation(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+pub fn is_capture_presentation_active() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        return super::macos::is_capture_presentation_active();
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        false
+    }
+}
+
 pub fn hide_capture_snapshot_windows(app: &AppHandle) -> Result<Vec<String>, String> {
     let visible_window_labels = app
         .webview_windows()
@@ -84,7 +96,9 @@ pub fn reveal_capture_window(app: &AppHandle) -> Result<(), String> {
 
     #[cfg(target_os = "macos")]
     {
+        suppress_capture_window_activation(app)?;
         reveal_capture_window_for_current_space(&window)?;
+        restore_suppressed_capture_window_activation();
     }
 
     #[cfg(not(target_os = "macos"))]
@@ -105,7 +119,9 @@ pub fn prepare_capture_window_for_reveal(app: &AppHandle) -> Result<(), String> 
 
     #[cfg(target_os = "macos")]
     {
+        suppress_capture_window_activation(app)?;
         super::macos::prepare_capture_window_for_reveal(&window)?;
+        restore_suppressed_capture_window_activation();
     }
 
     #[cfg(not(target_os = "macos"))]
@@ -153,7 +169,7 @@ pub fn prewarm_capture_window(app: &AppHandle) -> Result<(), String> {
     .inner_size(1.0, 1.0)
     .decorations(false)
     .always_on_top(true)
-    .visible_on_all_workspaces(true)
+    .visible_on_all_workspaces(capture_window_visible_on_all_workspaces())
     .transparent(capture_window_is_transparent())
     .background_color(capture_window_background_color())
     .visible(false)
@@ -164,6 +180,7 @@ pub fn prewarm_capture_window(app: &AppHandle) -> Result<(), String> {
     .build()
     .map_err(|e| e.to_string())?;
     configure_capture_window_for_current_space(&window)?;
+    restore_suppressed_capture_window_activation();
 
     Ok(())
 }
@@ -182,6 +199,11 @@ pub fn open_capture_window_for_session(
         } else {
             if should_reset_capture_window_fullscreen_before_reuse() {
                 window.set_fullscreen(false).map_err(|e| e.to_string())?;
+            }
+            if capture_window_visible_on_all_workspaces() {
+                window
+                    .set_visible_on_all_workspaces(true)
+                    .map_err(|e| e.to_string())?;
             }
             window
                 .set_position(LogicalPosition::new(bounds.x, bounds.y))
@@ -214,7 +236,7 @@ pub fn open_capture_window_for_session(
     .inner_size(bounds.width, bounds.height)
     .decorations(false)
     .always_on_top(true)
-    .visible_on_all_workspaces(true)
+    .visible_on_all_workspaces(capture_window_visible_on_all_workspaces())
     .transparent(capture_window_is_transparent())
     .background_color(capture_window_background_color())
     .visible(false)
@@ -225,6 +247,7 @@ pub fn open_capture_window_for_session(
     .build()
     .map_err(|e| e.to_string())?;
     configure_capture_window_for_current_space(&window)?;
+    restore_suppressed_capture_window_activation();
 
     Ok(())
 }
@@ -257,6 +280,13 @@ fn configure_capture_window_for_current_space(window: &tauri::WebviewWindow) -> 
     Ok(())
 }
 
+fn restore_suppressed_capture_window_activation() {
+    #[cfg(target_os = "macos")]
+    {
+        super::macos::restore_suppressed_capture_window_activation();
+    }
+}
+
 #[cfg(not(target_os = "macos"))]
 fn focus_capture_window_for_current_space(window: &tauri::WebviewWindow) -> Result<(), String> {
     window.set_focus().map_err(|e| e.to_string())?;
@@ -269,6 +299,10 @@ fn capture_window_accepts_first_mouse() -> bool {
 }
 
 fn capture_window_is_transparent() -> bool {
+    true
+}
+
+fn capture_window_visible_on_all_workspaces() -> bool {
     true
 }
 
@@ -285,7 +319,7 @@ fn should_prewarm_capture_window() -> bool {
 }
 
 fn should_reuse_capture_window_for_session() -> bool {
-    !cfg!(target_os = "macos")
+    true
 }
 
 fn discard_capture_window_before_new_session(
@@ -335,14 +369,20 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
+    fn macos_capture_window_joins_all_spaces_for_fullscreen_apps() {
+        assert!(capture_window_visible_on_all_workspaces());
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
     fn macos_capture_window_is_not_prewarmed() {
         assert!(!should_prewarm_capture_window());
     }
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn macos_capture_window_is_not_reused_between_sessions() {
-        assert!(!should_reuse_capture_window_for_session());
+    fn macos_capture_window_is_reused_between_sessions() {
+        assert!(should_reuse_capture_window_for_session());
     }
 
     #[cfg(target_os = "macos")]
