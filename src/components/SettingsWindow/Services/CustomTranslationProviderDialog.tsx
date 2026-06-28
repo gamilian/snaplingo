@@ -12,7 +12,7 @@ interface AddCustomTranslationProviderRequest {
 interface CustomTranslationProviderDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (request: AddCustomTranslationProviderRequest) => void;
+  onSave: (request: AddCustomTranslationProviderRequest) => Promise<void> | void;
 }
 
 export function CustomTranslationProviderDialog({
@@ -26,6 +26,8 @@ export function CustomTranslationProviderDialog({
   const [model, setModel] = useState('gpt-4o');
   const [apiKey, setApiKey] = useState('');
   const [reasoningLevel, setReasoningLevel] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const resetAndClose = () => {
     setName('');
@@ -34,10 +36,13 @@ export function CustomTranslationProviderDialog({
     setModel('gpt-4o');
     setApiKey('');
     setReasoningLevel('');
+    setSaveError(null);
     onClose();
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (isSaving) return;
+
     const trimmedName = name.trim();
     const trimmedApiKey = apiKey.trim();
     const trimmedEndpoint = endpoint.trim();
@@ -45,15 +50,24 @@ export function CustomTranslationProviderDialog({
 
     if (!trimmedName || !trimmedApiKey || !trimmedEndpoint || !trimmedModel) return;
 
-    onSave({
-      name: trimmedName,
-      protocol,
-      endpoint: trimmedEndpoint,
-      model: trimmedModel,
-      api_key: trimmedApiKey,
-      reasoning_level: reasoningLevel || undefined,
-    });
-    resetAndClose();
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      await onSave({
+        name: trimmedName,
+        protocol,
+        endpoint: trimmedEndpoint,
+        model: trimmedModel,
+        api_key: trimmedApiKey,
+        reasoning_level: reasoningLevel || undefined,
+      });
+      setIsSaving(false);
+      resetAndClose();
+    } catch (error) {
+      setSaveError(`添加失败: ${formatSaveError(error)}`);
+      setIsSaving(false);
+    }
   };
 
   const handleProtocolChange = (newProtocol: 'openai' | 'anthropic' | 'gemini') => {
@@ -162,22 +176,37 @@ export function CustomTranslationProviderDialog({
           </div>
         </div>
 
+        {saveError && (
+          <p className="mt-4 text-sm text-red-600">{saveError}</p>
+        )}
+
         <div className="flex gap-3 mt-6">
           <button
             onClick={resetAndClose}
+            disabled={isSaving}
             className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
           >
             取消
           </button>
           <button
             onClick={handleSave}
-            disabled={!name.trim() || !apiKey.trim() || !endpoint.trim() || !model.trim()}
+            disabled={
+              isSaving || !name.trim() || !apiKey.trim() || !endpoint.trim() || !model.trim()
+            }
             className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
-            添加
+            {isSaving ? '添加中...' : '添加'}
           </button>
         </div>
       </div>
     </div>
   );
+}
+
+function formatSaveError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return String(error);
 }

@@ -66,12 +66,7 @@ export function TranslationProvidersPage() {
   };
 
   const handleSaveCustomProvider = async (request: any) => {
-    try {
-      await addCustomProvider(request);
-      setAddingCustomProvider(false);
-    } catch (error) {
-      alert(`添加失败: ${error}`);
-    }
+    await addCustomProvider(request);
   };
 
   // 拖拽处理
