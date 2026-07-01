@@ -9,6 +9,7 @@ use crate::{commands, settings_window, AppState};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum AppShellMode {
     MenuBar,
+    #[cfg_attr(target_os = "macos", allow(dead_code))]
     DockDebug,
 }
 
