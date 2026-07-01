@@ -150,7 +150,6 @@ mod tests {
     fn hides_only_existing_capture_overlay_before_capture_snapshot() {
         assert_eq!(
             super::capture_snapshot_window_labels_to_hide(&[
-                "main".to_string(),
                 "settings".to_string(),
                 "capture".to_string(),
                 "pin-pin-1".to_string(),
@@ -162,7 +161,6 @@ mod tests {
     #[test]
     fn does_not_restore_business_windows_after_capture_snapshot() {
         assert!(super::capture_snapshot_window_labels_to_restore(&[
-            "main".to_string(),
             "settings".to_string(),
             "capture".to_string(),
             "pin-pin-1".to_string(),

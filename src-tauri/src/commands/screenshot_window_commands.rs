@@ -1,4 +1,4 @@
-use crate::AppState;
+use crate::{settings_window, AppState};
 use base64::Engine;
 use std::io::Cursor;
 use std::process::Command;
@@ -311,19 +311,23 @@ pub fn crop_screenshot(
     let base64 = general_purpose::STANDARD.encode(&buf);
 
     if should_focus_main_after_legacy_screenshot_crop() {
-        if let Some(main_window) = app.get_webview_window("main") {
-            main_window
+        if let Some(settings_window) =
+            app.get_webview_window(settings_window::SETTINGS_WINDOW_LABEL)
+        {
+            settings_window
                 .show()
-                .map_err(|e| format!("Failed to show main window: {}", e))?;
-            main_window
+                .map_err(|e| format!("Failed to show settings window: {}", e))?;
+            settings_window
                 .set_focus()
-                .map_err(|e| format!("Failed to focus main window: {}", e))?;
-            main_window
+                .map_err(|e| format!("Failed to focus settings window: {}", e))?;
+            settings_window
                 .emit("screenshot-captured", base64.clone())
                 .map_err(|e| format!("Failed to emit screenshot-captured: {}", e))?;
         }
-    } else if let Some(main_window) = app.get_webview_window("main") {
-        main_window
+    } else if let Some(settings_window) =
+        app.get_webview_window(settings_window::SETTINGS_WINDOW_LABEL)
+    {
+        settings_window
             .emit("screenshot-captured", base64.clone())
             .map_err(|e| format!("Failed to emit screenshot-captured: {}", e))?;
     }
@@ -359,7 +363,7 @@ mod tests {
     #[test]
     fn legacy_screenshot_close_does_not_restore_main_window() {
         let labels = vec![
-            "main".to_string(),
+            "settings".to_string(),
             "capture".to_string(),
             "screenshot".to_string(),
         ];

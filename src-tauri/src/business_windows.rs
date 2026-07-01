@@ -28,7 +28,6 @@ mod tests {
 
     #[test]
     fn rejects_settings_and_unknown_labels() {
-        assert!(!is_business_window_label("main"));
         assert!(!is_business_window_label("settings"));
         assert!(!is_business_window_label("random"));
     }

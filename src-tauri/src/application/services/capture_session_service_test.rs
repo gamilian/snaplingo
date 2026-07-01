@@ -674,7 +674,7 @@ mod tests {
         let service = CaptureSessionService::new(Arc::new(make_backend()));
         let view = service
             .create_session_with_hidden_window_labels(vec![
-                "main".to_string(),
+                "settings".to_string(),
                 "pin-pin-1".to_string(),
             ])
             .await
@@ -682,7 +682,7 @@ mod tests {
 
         assert_eq!(
             service.take_hidden_window_labels(&view.id).unwrap(),
-            vec!["main".to_string(), "pin-pin-1".to_string()]
+            vec!["settings".to_string(), "pin-pin-1".to_string()]
         );
         assert!(service
             .take_hidden_window_labels(&view.id)

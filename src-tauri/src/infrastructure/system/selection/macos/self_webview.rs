@@ -8,6 +8,7 @@ use crate::domain::{
     MethodAvailability, SelectionAttempt, SelectionContext, SelectionMethodKind, SelectionSource,
 };
 use crate::infrastructure::system::selection::SelectionMethod;
+use crate::settings_window::SETTINGS_WINDOW_LABEL;
 
 const EVAL_TIMEOUT: Duration = Duration::from_millis(300);
 
@@ -32,15 +33,15 @@ impl SelectionMethod for SelfWebviewSelectionMethod {
             return MethodAvailability::Unavailable("frontmost app is not SnapLingo".to_string());
         }
 
-        if self.app.get_webview_window("main").is_none() {
-            return MethodAvailability::Unavailable("main window not found".to_string());
+        if self.app.get_webview_window(SETTINGS_WINDOW_LABEL).is_none() {
+            return MethodAvailability::Unavailable("settings window not found".to_string());
         }
 
         MethodAvailability::Available
     }
 
     async fn acquire(&self, context: &SelectionContext) -> SelectionAttempt {
-        match read_main_window_selection(&self.app).await {
+        match read_settings_window_selection(&self.app).await {
             Ok(text) if !text.trim().is_empty() => SelectionAttempt::success(
                 self.kind(),
                 SelectionSource::SelfWebview,
@@ -53,9 +54,9 @@ impl SelectionMethod for SelfWebviewSelectionMethod {
     }
 }
 
-async fn read_main_window_selection(app: &tauri::AppHandle) -> Result<String, String> {
-    let Some(window) = app.get_webview_window("main") else {
-        return Err("main window not found".to_string());
+async fn read_settings_window_selection(app: &tauri::AppHandle) -> Result<String, String> {
+    let Some(window) = app.get_webview_window(SETTINGS_WINDOW_LABEL) else {
+        return Err("settings window not found".to_string());
     };
 
     let (sender, receiver) = tokio::sync::oneshot::channel();

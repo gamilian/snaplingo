@@ -1,6 +1,6 @@
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, Window};
 
-pub(crate) const SETTINGS_WINDOW_LABEL: &str = "main";
+pub(crate) const SETTINGS_WINDOW_LABEL: &str = "settings";
 
 pub(crate) fn should_hide_settings_window_instead_of_close(window_label: &str) -> bool {
     window_label == SETTINGS_WINDOW_LABEL
@@ -36,8 +36,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn settings_window_label_stays_legacy_main_during_migration() {
-        assert_eq!(SETTINGS_WINDOW_LABEL, "main");
+    fn settings_window_label_is_settings_domain_name() {
+        assert_eq!(SETTINGS_WINDOW_LABEL, "settings");
     }
 
     #[test]

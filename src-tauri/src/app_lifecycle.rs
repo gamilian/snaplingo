@@ -1,7 +1,6 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-pub(crate) const MAIN_WINDOW_LABEL: &str = crate::settings_window::SETTINGS_WINDOW_LABEL;
 const BUSINESS_HOTKEY_REOPEN_SUPPRESSION_MS: u64 = 1_500;
 static SUPPRESS_MAIN_WINDOW_REOPEN_UNTIL_MS: AtomicU64 = AtomicU64::new(0);
 
@@ -44,7 +43,9 @@ mod tests {
 
     #[test]
     fn main_settings_window_close_keeps_app_running_in_background() {
-        assert!(should_hide_window_instead_of_close(MAIN_WINDOW_LABEL));
+        assert!(should_hide_window_instead_of_close(
+            crate::settings_window::SETTINGS_WINDOW_LABEL
+        ));
     }
 
     #[test]

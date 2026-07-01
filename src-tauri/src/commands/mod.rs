@@ -30,6 +30,7 @@ use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBui
 use crate::{
     app_lifecycle,
     business_windows::{CAPTURE_RESULT_WINDOW_LABEL, CAPTURE_WINDOW_LABEL},
+    settings_window,
 };
 
 static CAPTURE_RESULT_WINDOW_PAYLOAD: LazyLock<Mutex<Option<CaptureResultWindowPayload>>> =
@@ -249,7 +250,7 @@ pub fn copy_text_to_clipboard(text: String) -> Result<(), String> {
 }
 
 pub fn emit_screenshot_error(app: tauri::AppHandle, message: String) {
-    if let Some(window) = app.get_webview_window("main") {
+    if let Some(window) = app.get_webview_window(settings_window::SETTINGS_WINDOW_LABEL) {
         let _ = window.show();
         let _ = window.set_focus();
         let _ = window.emit("screenshot-error", message);

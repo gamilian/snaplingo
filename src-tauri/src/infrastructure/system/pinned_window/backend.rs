@@ -104,7 +104,7 @@ mod tests {
     fn identifies_pinned_window_labels() {
         assert!(super::is_pinned_window_label("pin-pin-1"));
         assert!(!super::is_pinned_window_label("capture"));
-        assert!(!super::is_pinned_window_label("main"));
+        assert!(!super::is_pinned_window_label("settings"));
     }
 
     #[test]
