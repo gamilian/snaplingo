@@ -27,10 +27,10 @@ use objc2_app_kit::{
 use serde::Serialize;
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
-use crate::app_lifecycle;
-
-pub(crate) const CAPTURE_RESULT_WINDOW_LABEL: &str = "capture-result";
-const CAPTURE_WINDOW_LABEL: &str = "capture";
+use crate::{
+    app_lifecycle,
+    business_windows::{CAPTURE_RESULT_WINDOW_LABEL, CAPTURE_WINDOW_LABEL},
+};
 
 static CAPTURE_RESULT_WINDOW_PAYLOAD: LazyLock<Mutex<Option<CaptureResultWindowPayload>>> =
     LazyLock::new(|| Mutex::new(None));

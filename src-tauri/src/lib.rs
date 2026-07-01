@@ -2,6 +2,7 @@
 mod app_lifecycle;
 mod app_state;
 mod application;
+mod business_windows;
 mod commands;
 mod composition;
 mod domain;
@@ -161,15 +162,10 @@ pub fn run() {
                 ..
             } = event
             {
-                let has_visible_capture_result_window = app_handle
-                    .get_webview_window(commands::CAPTURE_RESULT_WINDOW_LABEL)
-                    .and_then(|window| window.is_visible().ok())
-                    .unwrap_or(false);
-
                 if !app_lifecycle::should_show_main_window_on_reopen_for_state(
                     has_visible_windows,
                     infrastructure::system::capture_window::is_capture_presentation_active(),
-                    has_visible_capture_result_window,
+                    business_windows::has_visible_business_window(app_handle),
                     app_lifecycle::is_main_window_reopen_suppressed(),
                 ) {
                     return;
