@@ -1,5 +1,6 @@
 // Module declarations
 mod app_lifecycle;
+mod app_shell;
 mod app_state;
 mod application;
 mod business_windows;
@@ -162,18 +163,7 @@ pub fn run() {
                 ..
             } = event
             {
-                if !app_lifecycle::should_show_main_window_on_reopen_for_state(
-                    has_visible_windows,
-                    infrastructure::system::capture_window::is_capture_presentation_active(),
-                    business_windows::has_visible_business_window(app_handle),
-                    app_lifecycle::is_main_window_reopen_suppressed(),
-                ) {
-                    return;
-                }
-
-                if let Err(err) = settings_window::show_settings_window(app_handle) {
-                    log::warn!("Failed to show settings window on app reopen: {}", err);
-                }
+                app_shell::handle_reopen(app_handle, has_visible_windows);
             }
         });
 }
