@@ -322,9 +322,13 @@ pub fn configure_hotkey(
     action: String,
     hotkey: String,
     app: tauri::AppHandle,
+    state: State<'_, crate::AppState>,
 ) -> Result<Option<String>, String> {
-    crate::startup_shortcuts::configure_hotkey(&app, &category, &action, &hotkey)
-        .map_err(|e| e.to_string())
+    let accelerator = crate::startup_shortcuts::configure_hotkey(&app, &category, &action, &hotkey)
+        .map_err(|e| e.to_string())?;
+    crate::startup_shortcuts::save_hotkey_config(&state.config_file, &category, &action, &hotkey)
+        .map_err(|e| e.to_string())?;
+    Ok(accelerator)
 }
 
 #[tauri::command]
@@ -332,9 +336,19 @@ pub fn configure_translation_hotkey(
     action: String,
     hotkey: String,
     app: tauri::AppHandle,
+    state: State<'_, crate::AppState>,
 ) -> Result<Option<String>, String> {
-    crate::startup_shortcuts::configure_translation_shortcut(&app, &action, &hotkey)
-        .map_err(|e| e.to_string())
+    let accelerator =
+        crate::startup_shortcuts::configure_translation_shortcut(&app, &action, &hotkey)
+            .map_err(|e| e.to_string())?;
+    crate::startup_shortcuts::save_hotkey_config(
+        &state.config_file,
+        "translation",
+        &action,
+        &hotkey,
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(accelerator)
 }
 
 #[tauri::command]

@@ -1,7 +1,10 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use tauri::Manager;
 
+use crate::infrastructure::storage::ConfigFile;
 use crate::{commands, infrastructure, AppState, Result};
 
 const SCREENSHOT_CATEGORY: &str = "screenshot";
@@ -24,6 +27,7 @@ const FILE_OCR_ACTION: &str = "file-ocr";
 const SHOW_OCR_WINDOW_ACTION: &str = "show-window";
 
 static HOTKEY_REGISTRATIONS: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+const HOTKEY_CONFIG_KEY: &str = "hotkeys";
 
 const STARTUP_HOTKEYS: &[(&str, &str, &str)] = &[
     (SCREENSHOT_CATEGORY, SCREENSHOT_ACTION, "⇧⌘R"),
@@ -49,21 +53,266 @@ const STARTUP_HOTKEYS: &[(&str, &str, &str)] = &[
 pub(crate) async fn register_startup_shortcuts(app: tauri::AppHandle) {
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-    for (category, action, hotkey) in STARTUP_HOTKEYS {
-        match configure_hotkey(&app, category, action, hotkey) {
+    let startup_hotkeys = {
+        let state = app.state::<AppState>();
+        startup_hotkeys_from_config_file(&state.config_file)
+    };
+
+    for hotkey in startup_hotkeys {
+        match configure_hotkey(&app, &hotkey.category, &hotkey.action, &hotkey.hotkey) {
             Ok(Some(accelerator)) => {
                 log::info!(
                     "Hotkey registered: {}:{} -> {}",
-                    category,
-                    action,
+                    hotkey.category,
+                    hotkey.action,
                     accelerator
                 );
             }
             Ok(None) => {}
             Err(e) => {
-                log::error!("Failed to register hotkey {}:{}: {}", category, action, e);
+                log::error!(
+                    "Failed to register hotkey {}:{}: {}",
+                    hotkey.category,
+                    hotkey.action,
+                    e
+                );
             }
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct StartupHotkey {
+    category: String,
+    action: String,
+    hotkey: String,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+struct StoredHotkeyConfig {
+    #[serde(default)]
+    screenshot: HashMap<String, String>,
+    #[serde(default)]
+    translation: HashMap<String, String>,
+    #[serde(default)]
+    ocr: HashMap<String, String>,
+}
+
+pub(crate) fn save_hotkey_config(
+    config_file: &ConfigFile,
+    category: &str,
+    action: &str,
+    hotkey: &str,
+) -> Result<()> {
+    resolve_hotkey_accelerator(category, action, hotkey)?;
+
+    let mut config = config_file
+        .load::<StoredHotkeyConfig>(HOTKEY_CONFIG_KEY)
+        .unwrap_or_else(|_| default_hotkey_config());
+    hotkey_category_mut(&mut config, category)?.insert(action.to_string(), hotkey.to_string());
+    config_file.save(HOTKEY_CONFIG_KEY, &config)
+}
+
+fn startup_hotkeys_from_config_file(config_file: &ConfigFile) -> Vec<StartupHotkey> {
+    let saved_config = match config_file.load::<StoredHotkeyConfig>(HOTKEY_CONFIG_KEY) {
+        Ok(config) => config,
+        Err(err) => {
+            log::info!(
+                "No backend hotkey config loaded, trying legacy WebKit settings: {}",
+                err
+            );
+            load_legacy_webkit_hotkey_config()
+                .inspect(|legacy_config| {
+                    let migrated =
+                        merge_saved_hotkeys(default_hotkey_config(), legacy_config.clone());
+                    if let Err(save_err) = config_file.save(HOTKEY_CONFIG_KEY, &migrated) {
+                        log::warn!("Failed to migrate legacy hotkey config: {}", save_err);
+                    } else {
+                        log::info!("Migrated legacy hotkey config to backend config file");
+                    }
+                })
+                .unwrap_or_default()
+        }
+    };
+    let merged_config = merge_saved_hotkeys(default_hotkey_config(), saved_config);
+    startup_hotkeys_from_config(&merged_config)
+}
+
+fn load_legacy_webkit_hotkey_config() -> Option<StoredHotkeyConfig> {
+    let root = dirs::home_dir()?.join("Library/WebKit/com.snaplingo.app");
+    let storage_paths = find_legacy_local_storage_paths(&root);
+
+    for path in storage_paths {
+        match legacy_hotkey_config_from_local_storage_path(&path) {
+            Some(config) => return Some(config),
+            None => continue,
+        }
+    }
+
+    None
+}
+
+fn find_legacy_local_storage_paths(root: &Path) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    collect_legacy_local_storage_paths(root, &mut paths);
+    paths
+}
+
+fn collect_legacy_local_storage_paths(path: &Path, paths: &mut Vec<PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(path) else {
+        return;
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.file_name().and_then(|name| name.to_str()) == Some("localstorage.sqlite3") {
+            paths.push(path);
+            continue;
+        }
+
+        if path.is_dir() {
+            collect_legacy_local_storage_paths(&path, paths);
+        }
+    }
+}
+
+fn legacy_hotkey_config_from_local_storage_path(path: &Path) -> Option<StoredHotkeyConfig> {
+    let connection =
+        rusqlite::Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .ok()?;
+    let value = connection
+        .query_row(
+            "SELECT value FROM ItemTable WHERE key = ?1",
+            ["snaplingo-settings"],
+            |row| row.get::<_, Vec<u8>>(0),
+        )
+        .ok()?;
+
+    legacy_hotkey_config_from_local_storage_value(&value)
+}
+
+fn legacy_hotkey_config_from_local_storage_value(value: &[u8]) -> Option<StoredHotkeyConfig> {
+    let json = decode_local_storage_value(value)?;
+    let settings = serde_json::from_str::<serde_json::Value>(&json).ok()?;
+    let hotkeys = settings.get("state")?.get("hotkeys")?.clone();
+    serde_json::from_value(hotkeys).ok()
+}
+
+fn decode_local_storage_value(value: &[u8]) -> Option<String> {
+    if let Ok(text) = std::str::from_utf8(value) {
+        if text.trim_start().starts_with('{') {
+            return Some(text.to_string());
+        }
+    }
+
+    if value.len() % 2 != 0 {
+        return None;
+    }
+
+    let units = value
+        .chunks_exact(2)
+        .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+        .collect::<Vec<_>>();
+    String::from_utf16(&units).ok()
+}
+
+fn default_hotkey_config() -> StoredHotkeyConfig {
+    let mut config = StoredHotkeyConfig::default();
+    for (category, action, hotkey) in STARTUP_HOTKEYS {
+        if let Ok(category_hotkeys) = hotkey_category_mut(&mut config, category) {
+            category_hotkeys.insert((*action).to_string(), (*hotkey).to_string());
+        }
+    }
+    config
+}
+
+fn merge_saved_hotkeys(
+    mut default_config: StoredHotkeyConfig,
+    saved_config: StoredHotkeyConfig,
+) -> StoredHotkeyConfig {
+    merge_saved_category(
+        &mut default_config.screenshot,
+        &saved_config.screenshot,
+        SCREENSHOT_CATEGORY,
+    );
+    merge_saved_category(
+        &mut default_config.translation,
+        &saved_config.translation,
+        TRANSLATION_CATEGORY,
+    );
+    merge_saved_category(&mut default_config.ocr, &saved_config.ocr, OCR_CATEGORY);
+    default_config
+}
+
+fn merge_saved_category(
+    default_category: &mut HashMap<String, String>,
+    saved_category: &HashMap<String, String>,
+    category: &str,
+) {
+    for (action, hotkey) in saved_category {
+        if !default_category.contains_key(action) {
+            log::warn!(
+                "Ignoring unknown saved hotkey action {}:{}",
+                category,
+                action
+            );
+            continue;
+        }
+
+        if let Err(err) = resolve_hotkey_accelerator(category, action, hotkey) {
+            log::warn!(
+                "Ignoring invalid saved hotkey {}:{}='{}': {}",
+                category,
+                action,
+                hotkey,
+                err
+            );
+            continue;
+        }
+
+        default_category.insert(action.clone(), hotkey.clone());
+    }
+}
+
+fn startup_hotkeys_from_config(config: &StoredHotkeyConfig) -> Vec<StartupHotkey> {
+    STARTUP_HOTKEYS
+        .iter()
+        .filter_map(|(category, action, _)| {
+            hotkey_category(config, category)
+                .and_then(|category_hotkeys| category_hotkeys.get(*action))
+                .map(|hotkey| StartupHotkey {
+                    category: (*category).to_string(),
+                    action: (*action).to_string(),
+                    hotkey: hotkey.clone(),
+                })
+        })
+        .collect()
+}
+
+fn hotkey_category<'a>(
+    config: &'a StoredHotkeyConfig,
+    category: &str,
+) -> Option<&'a HashMap<String, String>> {
+    match category {
+        SCREENSHOT_CATEGORY => Some(&config.screenshot),
+        TRANSLATION_CATEGORY => Some(&config.translation),
+        OCR_CATEGORY => Some(&config.ocr),
+        _ => None,
+    }
+}
+
+fn hotkey_category_mut<'a>(
+    config: &'a mut StoredHotkeyConfig,
+    category: &str,
+) -> Result<&'a mut HashMap<String, String>> {
+    match category {
+        SCREENSHOT_CATEGORY => Ok(&mut config.screenshot),
+        TRANSLATION_CATEGORY => Ok(&mut config.translation),
+        OCR_CATEGORY => Ok(&mut config.ocr),
+        _ => Err(crate::AppError::Other(format!(
+            "Unknown hotkey category '{}'",
+            category
+        ))),
     }
 }
 
@@ -381,11 +630,14 @@ fn accelerator_key(main_key: &str) -> Result<String> {
 mod tests {
     use super::{
         capture_mode_for_screenshot_hotkey_action, display_hotkey_to_accelerator,
-        resolve_hotkey_accelerator, should_register_hotkey_on_release, FILE_OCR_ACTION,
-        OCR_CATEGORY, SCREENSHOT_ACTION, SCREENSHOT_CATEGORY, SCREENSHOT_COPY_ACTION,
-        SCREENSHOT_CUSTOM_ACTION, SCREENSHOT_OCR_ACTION, SCREENSHOT_TRANSLATE_ACTION,
-        SHOW_OCR_WINDOW_ACTION, SILENT_SCREENSHOT_OCR_ACTION, TRANSLATION_CATEGORY,
+        legacy_hotkey_config_from_local_storage_value, resolve_hotkey_accelerator,
+        save_hotkey_config, should_register_hotkey_on_release, startup_hotkeys_from_config_file,
+        FILE_OCR_ACTION, OCR_CATEGORY, SCREENSHOT_ACTION, SCREENSHOT_CATEGORY,
+        SCREENSHOT_COPY_ACTION, SCREENSHOT_CUSTOM_ACTION, SCREENSHOT_OCR_ACTION,
+        SCREENSHOT_TRANSLATE_ACTION, SELECTION_TRANSLATE_ACTION, SHOW_OCR_WINDOW_ACTION,
+        SILENT_SCREENSHOT_OCR_ACTION, TRANSLATION_CATEGORY,
     };
+    use crate::infrastructure::storage::ConfigFile;
     use std::str::FromStr;
     use tauri_plugin_global_shortcut::Shortcut;
 
@@ -501,5 +753,101 @@ mod tests {
             TRANSLATION_CATEGORY,
             SCREENSHOT_TRANSLATE_ACTION
         ));
+    }
+
+    #[test]
+    fn startup_hotkeys_use_saved_selection_translate_shortcut() {
+        let config_file = ConfigFile::new_temp();
+        save_hotkey_config(
+            &config_file,
+            TRANSLATION_CATEGORY,
+            SELECTION_TRANSLATE_ACTION,
+            "⇧⌥D",
+        )
+        .unwrap();
+
+        let startup_hotkeys = startup_hotkeys_from_config_file(&config_file);
+        let saved = startup_hotkeys
+            .iter()
+            .find(|hotkey| {
+                hotkey.category == TRANSLATION_CATEGORY
+                    && hotkey.action == SELECTION_TRANSLATE_ACTION
+            })
+            .unwrap();
+
+        assert_eq!(saved.hotkey, "⇧⌥D");
+        assert_eq!(
+            resolve_hotkey_accelerator(&saved.category, &saved.action, &saved.hotkey).unwrap(),
+            Some("Shift+Alt+KeyD".to_string())
+        );
+    }
+
+    #[test]
+    fn startup_hotkeys_keep_unset_saved_shortcuts_unregistered() {
+        let config_file = ConfigFile::new_temp();
+        save_hotkey_config(
+            &config_file,
+            TRANSLATION_CATEGORY,
+            SELECTION_TRANSLATE_ACTION,
+            "未设置",
+        )
+        .unwrap();
+
+        let startup_hotkeys = startup_hotkeys_from_config_file(&config_file);
+        let saved = startup_hotkeys
+            .iter()
+            .find(|hotkey| {
+                hotkey.category == TRANSLATION_CATEGORY
+                    && hotkey.action == SELECTION_TRANSLATE_ACTION
+            })
+            .unwrap();
+
+        assert_eq!(saved.hotkey, "未设置");
+        assert_eq!(
+            resolve_hotkey_accelerator(&saved.category, &saved.action, &saved.hotkey).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn startup_hotkeys_ignore_invalid_saved_shortcuts() {
+        let config_file = ConfigFile::new_temp();
+        config_file
+            .save(
+                "hotkeys",
+                &serde_json::json!({
+                    "translation": {
+                        "selection-translate": "⌘"
+                    }
+                }),
+            )
+            .unwrap();
+
+        let startup_hotkeys = startup_hotkeys_from_config_file(&config_file);
+        let saved = startup_hotkeys
+            .iter()
+            .find(|hotkey| {
+                hotkey.category == TRANSLATION_CATEGORY
+                    && hotkey.action == SELECTION_TRANSLATE_ACTION
+            })
+            .unwrap();
+
+        assert_eq!(saved.hotkey, "⌥D");
+    }
+
+    #[test]
+    fn reads_hotkeys_from_legacy_webkit_local_storage_value() {
+        let json = r#"{"state":{"hotkeys":{"translation":{"selection-translate":"⇧⌥D"}}}}"#;
+        let blob = json
+            .encode_utf16()
+            .flat_map(|unit| unit.to_le_bytes())
+            .collect::<Vec<_>>();
+
+        let config = legacy_hotkey_config_from_local_storage_value(&blob).unwrap();
+
+        assert_eq!(
+            config.translation.get(SELECTION_TRANSLATE_ACTION),
+            Some(&"⇧⌥D".to_string())
+        );
     }
 }
