@@ -170,6 +170,30 @@ pub(crate) fn reopen_action_for_mode(mode: AppShellMode) -> ReopenAction {
     }
 }
 
+#[cfg(target_os = "macos")]
+pub(crate) fn resting_activation_policy_for_mode(mode: AppShellMode) -> tauri::ActivationPolicy {
+    match mode {
+        AppShellMode::MenuBar => tauri::ActivationPolicy::Accessory,
+        AppShellMode::DockDebug => tauri::ActivationPolicy::Regular,
+    }
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn current_resting_activation_policy() -> tauri::ActivationPolicy {
+    resting_activation_policy_for_mode(current_app_shell_mode())
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn apply_resting_activation_policy(app: &tauri::AppHandle) -> Result<(), String> {
+    app.set_activation_policy(current_resting_activation_policy())
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn apply_resting_activation_policy(_app: &tauri::AppHandle) -> Result<(), String> {
+    Ok(())
+}
+
 pub(crate) fn handle_reopen(app: &tauri::AppHandle, has_visible_windows: bool) {
     match reopen_action_for_mode(current_app_shell_mode()) {
         ReopenAction::Ignore => {}
@@ -215,6 +239,24 @@ mod tests {
             reopen_action_for_mode(AppShellMode::DockDebug),
             ReopenAction::ShowSettings
         );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn menu_bar_mode_uses_accessory_activation_policy() {
+        assert!(matches!(
+            resting_activation_policy_for_mode(AppShellMode::MenuBar),
+            tauri::ActivationPolicy::Accessory
+        ));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn dock_debug_mode_uses_regular_activation_policy() {
+        assert!(matches!(
+            resting_activation_policy_for_mode(AppShellMode::DockDebug),
+            tauri::ActivationPolicy::Regular
+        ));
     }
 
     #[test]

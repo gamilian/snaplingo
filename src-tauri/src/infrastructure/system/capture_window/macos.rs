@@ -61,8 +61,7 @@ pub(super) fn end_capture_presentation(app: &AppHandle) -> Result<(), String> {
         unregister_capture_cancel_shortcut(app);
         unregister_capture_copy_shortcut(app);
         let activation_policy_result = if activation_suppressed {
-            app.set_activation_policy(tauri::ActivationPolicy::Regular)
-                .map_err(|e| e.to_string())
+            crate::app_shell::apply_resting_activation_policy(app)
         } else {
             Ok(())
         };

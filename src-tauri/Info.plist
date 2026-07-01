@@ -2,9 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>NSScreenCaptureUsageDescription</key>
-    <string>SnapLingo needs screen recording permission to capture screenshots for OCR and translation.</string>
-    <key>NSScreenCaptureDescription</key>
-    <string>SnapLingo captures your screen to provide screenshot, OCR, and translation features.</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>SnapLingo needs screen recording permission to capture screenshots for OCR and translation.</string>
+	<key>NSScreenCaptureDescription</key>
+	<string>SnapLingo captures your screen to provide screenshot, OCR, and translation features.</string>
 </dict>
 </plist>

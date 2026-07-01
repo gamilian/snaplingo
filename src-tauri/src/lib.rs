@@ -60,6 +60,10 @@ pub fn run() {
 
             app.manage(app_state);
 
+            if let Err(err) = app_shell::apply_resting_activation_policy(app.handle()) {
+                log::warn!("Failed to apply resting activation policy: {}", err);
+            }
+
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(startup_shortcuts::register_startup_shortcuts(app_handle));
 
