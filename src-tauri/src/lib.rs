@@ -69,7 +69,9 @@ pub fn run() {
                 log::warn!("Failed to prewarm capture window: {}", err);
             }
 
-            // TODO: Create system tray
+            if let Err(err) = app_shell::setup_menu_bar(app) {
+                log::warn!("Failed to setup menu bar: {}", err);
+            }
 
             Ok(())
         })
