@@ -12,17 +12,7 @@
   "app": {
     "withGlobalTauri": true,
     "macOSPrivateApi": true,
-    "windows": [
-      {
-        "title": "SnapLingo",
-        "width": 900,
-        "height": 650,
-        "minWidth": 700,
-        "minHeight": 500,
-        "resizable": true,
-        "fullscreen": false
-      }
-    ],
+    "windows": [],
     "security": {
       "csp": null
     }

@@ -23,12 +23,19 @@ import {
 import { subscribeMainWindowEvents } from './tauri/appEvents';
 import { recognizeImageFile, selectImageFile } from './tauri/ocr';
 import { takeCaptureResultWindowPayload } from './tauri/captureSession';
-import { isCaptureResultWindowLaunch } from './appWindowRouting';
+import {
+  isCaptureResultWindowLaunch,
+  isSettingsWindowLaunch,
+} from './appWindowRouting';
 
 const currentWindow = getCurrentWebviewWindow();
 const captureLaunch = readCaptureLaunch(window.location.search);
 const pinnedImageId = readPinnedImageLaunch(window.location.search);
 const isCaptureResultWindow = isCaptureResultWindowLaunch(
+  currentWindow.label,
+  window.location.search,
+);
+const isSettingsWindow = isSettingsWindowLaunch(
   currentWindow.label,
   window.location.search,
 );
@@ -49,7 +56,6 @@ function App() {
   const setHotkey = useSettingsStore((state) => state.setHotkey);
   const isCaptureWindow =
     currentWindow.label === CAPTURE_WINDOW_LABEL || captureLaunch !== null;
-  const isPinnedImageWindow = pinnedImageId !== null;
   const [hasLoadedCaptureResultPayload, setHasLoadedCaptureResultPayload] =
     useState(false);
 
@@ -70,7 +76,7 @@ function App() {
   ]);
 
   useEffect(() => {
-    if (isCaptureWindow || isPinnedImageWindow) return;
+    if (!isSettingsWindow) return;
 
     let disposed = false;
     let unlisten: (() => void) | undefined;
@@ -116,8 +122,7 @@ function App() {
       unlisten?.();
     };
   }, [
-    isCaptureWindow,
-    isPinnedImageWindow,
+    isSettingsWindow,
     requestAutoTranslate,
     setActiveMainTab,
     setCapturedScreenshot,
@@ -131,7 +136,7 @@ function App() {
   ]);
 
   useEffect(() => {
-    if (isCaptureWindow || isPinnedImageWindow || isCaptureResultWindow) return;
+    if (!isSettingsWindow) return;
 
     (Object.entries(hotkeys) as [HotkeyCategory, Record<string, string>][]).forEach(
       ([category, actionHotkeys]) => {
@@ -143,7 +148,7 @@ function App() {
         });
       },
     );
-  }, [hotkeys, isCaptureWindow, isPinnedImageWindow, setHotkey]);
+  }, [hotkeys, isSettingsWindow, setHotkey]);
 
   const loadCaptureResultPayload = useCallback(async () => {
     const payload = await takeCaptureResultWindowPayload();
@@ -242,6 +247,10 @@ function App() {
 
   if (isCaptureResultWindow) {
     return <ResultWindow presentation="standalone" />;
+  }
+
+  if (!isSettingsWindow) {
+    return null;
   }
 
   return (
