@@ -9,6 +9,7 @@ interface ProviderConfigDialogProps {
   onSave: (credentials: Record<string, string>) => void;
   provider: Provider | null;
   loadCredentialSchema?: (providerId: string) => Promise<CredentialField[]>;
+  presentation?: 'dialog' | 'inline';
 }
 
 export function ProviderConfigDialog({
@@ -17,6 +18,7 @@ export function ProviderConfigDialog({
   onSave,
   provider,
   loadCredentialSchema = getProviderCredentialSchema,
+  presentation = 'dialog',
 }: ProviderConfigDialogProps) {
   const [fields, setFields] = useState<CredentialField[]>([]);
   const [credentials, setCredentials] = useState<Record<string, string>>({});
@@ -36,6 +38,9 @@ export function ProviderConfigDialog({
         schema.forEach((field) => {
           initialCreds[field.name] = '';
         });
+        if (provider.id === 'deeplx') {
+          initialCreds.mode = 'deeplx';
+        }
         setCredentials(initialCreds);
       })
       .catch((error) => {
@@ -49,6 +54,27 @@ export function ProviderConfigDialog({
   }, [isOpen, provider, loadCredentialSchema]);
 
   const handleSave = () => {
+    if (provider?.id === 'deeplx') {
+      const mode = credentials.mode === 'deepl' ? 'deepl' : 'deeplx';
+      if (mode === 'deepl') {
+        const apiKey = credentials.api_key?.trim();
+        if (!apiKey) {
+          alert('请填写：DeepL API Key');
+          return;
+        }
+        onSave({ mode, api_key: apiKey });
+      } else {
+        const endpoint = credentials.endpoint?.trim();
+        if (!endpoint) {
+          alert('请填写：DeepLX API 地址');
+          return;
+        }
+        onSave({ mode, endpoint });
+      }
+      handleClose();
+      return;
+    }
+
     // Validate all fields are filled
     for (const field of fields) {
       if (!credentials[field.name]?.trim()) {
@@ -76,14 +102,32 @@ export function ProviderConfigDialog({
 
   if (!isOpen || !provider) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={handleClose}>
-      <div
-        className="bg-white rounded-xl shadow-2xl w-[500px] max-h-[80vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
+  const form = (
+    <div
+      className={
+        presentation === 'inline'
+          ? 'w-full'
+          : 'bg-white rounded-xl shadow-2xl w-[500px] max-h-[80vh] overflow-y-auto'
+      }
+      onClick={(e) => e.stopPropagation()}
+    >
         <div className="p-6 border-b border-gray-200">
-          <h3 className="text-xl font-bold text-gray-900">配置 {provider.name}</h3>
+          <div className="flex items-center gap-3">
+            {presentation === 'inline' && (
+              <button
+                type="button"
+                onClick={handleClose}
+                aria-label="返回供应商列表"
+                title="返回供应商列表"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-50"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+            )}
+            <h3 className="text-xl font-bold text-gray-900">配置 {provider.name}</h3>
+          </div>
           <p className="text-sm text-gray-600 mt-1">{provider.description}</p>
         </div>
 
@@ -92,20 +136,27 @@ export function ProviderConfigDialog({
             <div className="text-center py-8 text-gray-500">加载中...</div>
           ) : (
             <>
-              {fields.map((field) => (
-                <div key={field.name}>
-                  <label className="block font-medium text-gray-700 mb-2">
-                    {field.label} <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type={field.secret ? 'password' : 'text'}
-                    value={credentials[field.name] || ''}
-                    onChange={(e) => updateCredential(field.name, e.target.value)}
-                    placeholder={`请输入 ${field.label}`}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-              ))}
+              {provider.id === 'deeplx' ? (
+                <DeepLXCredentialFields
+                  credentials={credentials}
+                  onChange={updateCredential}
+                />
+              ) : (
+                fields.map((field) => (
+                  <div key={field.name}>
+                    <label className="block font-medium text-gray-700 mb-2">
+                      {field.label} <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type={field.secret ? 'password' : 'text'}
+                      value={credentials[field.name] || ''}
+                      onChange={(e) => updateCredential(field.name, e.target.value)}
+                      placeholder={`请输入 ${field.label}`}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                ))
+              )}
 
               {/* Baidu 特殊提示 */}
               {provider.id === 'baidu-translate' && (
@@ -120,9 +171,9 @@ export function ProviderConfigDialog({
                 </p>
               )}
 
-              {provider.id === 'deepl' && (
+              {provider.id === 'deeplx' && (
                 <p className="text-xs text-gray-500">
-                  获取地址：<a href="https://www.deepl.com/pro-api" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">https://www.deepl.com/pro-api</a>
+                  项目地址：<a href="https://github.com/OwO-Network/DeepLX" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">https://github.com/OwO-Network/DeepLX</a>
                 </p>
               )}
 
@@ -161,13 +212,100 @@ export function ProviderConfigDialog({
           </button>
           <button
             onClick={handleSave}
-            disabled={loading || fields.some((f) => !credentials[f.name]?.trim())}
+            disabled={loading || isSaveDisabled(provider, fields, credentials)}
             className="px-6 py-2 text-sm bg-primary-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
             保存配置
           </button>
         </div>
-      </div>
     </div>
   );
+
+  if (presentation === 'inline') {
+    return form;
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={handleClose}>
+      {form}
+    </div>
+  );
+}
+
+function DeepLXCredentialFields({
+  credentials,
+  onChange,
+}: {
+  credentials: Record<string, string>;
+  onChange: (fieldName: string, value: string) => void;
+}) {
+  const isStandardDeepL = credentials.mode === 'deepl';
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+        <div>
+          <div className="font-medium text-gray-800">标准 DeepL</div>
+          <div className="text-xs text-gray-500">关闭时使用 DeepLX 服务地址</div>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={isStandardDeepL}
+          onClick={() => onChange('mode', isStandardDeepL ? 'deeplx' : 'deepl')}
+          className={`relative h-6 w-11 rounded-full transition-colors ${
+            isStandardDeepL ? 'bg-primary-600' : 'bg-gray-300'
+          }`}
+        >
+          <span
+            className={`absolute left-0 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+              isStandardDeepL ? 'translate-x-5' : 'translate-x-0.5'
+            }`}
+          />
+        </button>
+      </div>
+
+      {isStandardDeepL ? (
+        <div>
+          <label className="block font-medium text-gray-700 mb-2">
+            DeepL API Key <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="password"
+            value={credentials.api_key || ''}
+            onChange={(e) => onChange('api_key', e.target.value)}
+            placeholder="请输入 DeepL API Key"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+        </div>
+      ) : (
+        <div>
+          <label className="block font-medium text-gray-700 mb-2">
+            DeepLX API 地址 <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={credentials.endpoint || ''}
+            onChange={(e) => onChange('endpoint', e.target.value)}
+            placeholder="例如：https://deeplx.example.com"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function isSaveDisabled(
+  provider: Provider | null,
+  fields: CredentialField[],
+  credentials: Record<string, string>,
+): boolean {
+  if (provider?.id === 'deeplx') {
+    return credentials.mode === 'deepl'
+      ? !credentials.api_key?.trim()
+      : !credentials.endpoint?.trim();
+  }
+
+  return fields.some((field) => !credentials[field.name]?.trim());
 }

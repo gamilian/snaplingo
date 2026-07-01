@@ -543,7 +543,10 @@ mod tests {
         let layout_calls = backend.capture_monitor_layouts_calls.clone();
         let service = CaptureSessionService::new(Arc::new(backend));
 
-        let frontend_view = service.create_session_without_monitor_images().await.unwrap();
+        let frontend_view = service
+            .create_session_without_monitor_images()
+            .await
+            .unwrap();
 
         assert_eq!(*snapshot_calls.lock().unwrap(), 1);
         assert_eq!(*layout_calls.lock().unwrap(), 0);

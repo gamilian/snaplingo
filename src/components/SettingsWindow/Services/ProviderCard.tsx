@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 import { Provider } from '../../../stores/providerStore';
 
 interface ProviderCardProps {
@@ -7,104 +9,249 @@ interface ProviderCardProps {
   onConfigure?: () => void;
   onTest?: () => void;
   onRemove?: () => void;
+  leadingSlot?: ReactNode;
+  highlighted?: boolean;
 }
 
-export function ProviderCard({ provider, onActivate, onDeactivate, onConfigure, onTest, onRemove }: ProviderCardProps) {
-  const canConfigure = provider.requiresApiKey && onConfigure;
+export function ProviderCard({
+  provider,
+  onActivate,
+  onDeactivate,
+  onConfigure,
+  onTest,
+  onRemove,
+  leadingSlot,
+  highlighted = false,
+}: ProviderCardProps) {
+  const isActive = provider.status === 'active';
+  const canToggle = provider.status !== 'unconfigured' && Boolean(onActivate || onDeactivate);
+  const subtitle = providerSubtitle(provider);
 
-  const getStatusBadge = () => {
-    switch (provider.status) {
-      case 'active':
-        return <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded font-medium">已激活</span>;
-      case 'inactive':
-        return <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded font-medium">未激活</span>;
-      case 'unconfigured':
-        return <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-700 rounded font-medium">未配置</span>;
+  const handleToggle = () => {
+    if (isActive) {
+      onDeactivate?.();
+      return;
     }
-  };
 
-  const getIcon = () => {
-    // 根据 provider id 返回首字母或图标
-    const firstChar = provider.name.charAt(0).toUpperCase();
-    return (
-      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-        <span className="text-primary-600 font-semibold text-lg">{firstChar}</span>
-      </div>
-    );
+    onActivate?.();
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow">
-      <div className="flex items-start space-x-4">
-        {getIcon()}
+    <div
+      className={`group/provider min-h-[92px] rounded-2xl border px-5 py-4 transition-all duration-150 ${
+        highlighted
+          ? 'border-emerald-300 bg-emerald-50/55 shadow-[0_8px_22px_rgba(16,185,129,0.08)]'
+          : 'border-gray-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/25'
+      }`}
+    >
+      <div className="flex h-full items-center gap-4">
+        <div className="flex w-5 flex-shrink-0 justify-center text-gray-300">
+          {leadingSlot ?? <DragDots className="opacity-70" />}
+        </div>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center space-x-2 mb-1">
-            <h3 className="font-semibold text-gray-800">{provider.name}</h3>
-            {getStatusBadge()}
-            {provider.isBuiltin && (
-              <span className="px-2 py-0.5 text-xs bg-blue-50 text-primary-600 rounded font-medium">内置</span>
-            )}
+        <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl ${providerIconClass(provider.id)}`}>
+          <span className="text-xs font-semibold">
+            {providerInitial(provider.name)}
+          </span>
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h3 className="truncate text-base font-semibold text-gray-900">
+              {provider.name}
+            </h3>
+            {provider.status === 'unconfigured' ? (
+              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                未配置
+              </span>
+            ) : null}
           </div>
-          <p className="text-sm text-gray-600 mb-3">{provider.description}</p>
+          <p
+            className={`mt-1 truncate text-sm ${
+              provider.endpoint ? 'text-blue-500' : 'text-gray-500'
+            }`}
+          >
+            {subtitle}
+          </p>
+        </div>
 
-          <div className="flex items-center space-x-2">
-            {provider.status === 'unconfigured' && canConfigure && (
-              <button
-                onClick={onConfigure}
-                className="px-3 py-1.5 text-sm bg-primary-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-              >
-                配置
-              </button>
-            )}
+        <div className="flex flex-shrink-0 items-center justify-end gap-2 opacity-0 transition-opacity duration-150 group-hover/provider:opacity-100 group-focus-within/provider:opacity-100">
+          {canToggle ? (
+            <button
+              type="button"
+              onClick={handleToggle}
+              className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-colors ${
+                isActive
+                  ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  : 'bg-emerald-500 text-white hover:bg-emerald-600'
+              }`}
+            >
+              <PlayIcon className="h-4 w-4" />
+              {isActive ? '停用' : '启用'}
+            </button>
+          ) : null}
 
-            {provider.status === 'inactive' && onActivate && (
-              <button
-                onClick={onActivate}
-                className="px-3 py-1.5 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-              >
-                激活
-              </button>
-            )}
+          {onConfigure ? (
+            <IconButton label="编辑" onClick={onConfigure}>
+              <EditIcon />
+            </IconButton>
+          ) : null}
 
-            {provider.status === 'active' && onDeactivate && (
-              <button
-                onClick={onDeactivate}
-                className="px-3 py-1.5 text-sm bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
-              >
-                停用
-              </button>
-            )}
+          {onTest ? (
+            <IconButton label="测试联通" onClick={onTest}>
+              <PulseIcon />
+            </IconButton>
+          ) : null}
 
-            {provider.status !== 'unconfigured' && canConfigure && (
-              <button
-                onClick={onConfigure}
-                className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                设置
-              </button>
-            )}
-
-            {onTest && provider.status !== 'unconfigured' && (
-              <button
-                onClick={onTest}
-                className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                测试
-              </button>
-            )}
-
-            {!provider.isBuiltin && onRemove && (
-              <button
-                onClick={onRemove}
-                className="px-3 py-1.5 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
-              >
-                删除
-              </button>
-            )}
-          </div>
+          {!provider.isBuiltin && onRemove ? (
+            <IconButton label="删除" tone="danger" onClick={onRemove}>
+              <TrashIcon />
+            </IconButton>
+          ) : null}
         </div>
       </div>
     </div>
+  );
+}
+
+function IconButton({
+  label,
+  tone = 'default',
+  onClick,
+  children,
+}: {
+  label: string;
+  tone?: 'default' | 'danger';
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className={`inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
+        tone === 'danger'
+          ? 'text-gray-500 hover:bg-red-50 hover:text-red-600'
+          : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function DragDots({ className = '' }: { className?: string }) {
+  return (
+    <span className={`grid grid-cols-2 gap-0.5 ${className}`}>
+      {Array.from({ length: 6 }).map((_, index) => (
+        <span key={index} className="h-1 w-1 rounded-full bg-current" />
+      ))}
+    </span>
+  );
+}
+
+function providerInitial(name: string) {
+  const trimmed = name.trim();
+  if (!trimmed) return '?';
+  return trimmed.length > 1 && /^[a-z]+$/i.test(trimmed.slice(0, 2))
+    ? trimmed.slice(0, 2).toUpperCase()
+    : trimmed.charAt(0).toUpperCase();
+}
+
+function providerSubtitle(provider: Provider) {
+  if (provider.endpoint) {
+    return provider.endpoint;
+  }
+
+  if (provider.description) {
+    return provider.description;
+  }
+
+  switch (provider.id) {
+    case 'google-translate':
+      return 'https://translate.googleapis.com';
+    case 'deeplx':
+      return 'DeepLX / 标准 DeepL';
+    case 'baidu-translate':
+      return '百度翻译开放平台';
+    case 'baidu-ocr':
+      return '百度智能云 OCR';
+    case 'system-ocr':
+      return '系统内置文字识别';
+    case 'tesseract':
+      return '本地 Tesseract 引擎';
+    case 'system-tts':
+      return '系统语音合成';
+    default:
+      return provider.protocol ? `${protocolLabel(provider.protocol)} 兼容接口` : '已接入服务';
+  }
+}
+
+function protocolLabel(protocol: string) {
+  switch (protocol) {
+    case 'openai':
+      return 'OpenAI';
+    case 'openai-responses':
+      return 'OpenAI Responses';
+    case 'anthropic':
+      return 'Anthropic';
+    case 'gemini':
+      return 'Gemini';
+    default:
+      return protocol;
+  }
+}
+
+function providerIconClass(providerId: string) {
+  switch (providerId) {
+    case 'google-translate':
+      return 'border border-blue-100 bg-blue-50 text-blue-500';
+    case 'deeplx':
+      return 'border border-slate-200 bg-slate-50 text-slate-600';
+    case 'baidu-translate':
+    case 'baidu-ocr':
+      return 'border border-indigo-100 bg-indigo-50 text-indigo-500';
+    case 'system-ocr':
+      return 'border border-emerald-100 bg-emerald-50 text-emerald-600';
+    case 'tesseract':
+      return 'border border-gray-200 bg-gray-50 text-gray-600';
+    case 'system-tts':
+      return 'border border-orange-100 bg-orange-50 text-orange-600';
+    default:
+      return 'border border-gray-200 bg-gray-50 text-gray-600';
+  }
+}
+
+function EditIcon() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487 19.5 7.125M18 14.25V19.5H4.5V6h5.25m1.17 9.33 7.19-7.19a1.86 1.86 0 0 0-2.63-2.63l-7.19 7.19-.88 3.51 3.51-.88Z" />
+    </svg>
+  );
+}
+
+function PulseIcon() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 12h3.5l2-5 4 10 2.5-5H21" />
+    </svg>
+  );
+}
+
+function PlayIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8 5.75v12.5L18 12 8 5.75Z" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 7.5h12m-9 0V6a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 6v1.5m1.5 0-.63 11.34A1.5 1.5 0 0 1 14.38 20.25H9.62a1.5 1.5 0 0 1-1.49-1.41L7.5 7.5" />
+    </svg>
   );
 }

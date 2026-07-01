@@ -97,7 +97,18 @@ pub fn run() {
             commands::get_provider_credential_schema,
             commands::configure_translation_provider_credentials,
             commands::add_custom_translation_provider,
+            commands::update_custom_translation_provider,
             commands::remove_custom_translation_provider,
+            commands::list_translation_prompt_strategies,
+            commands::save_translation_prompt_strategies,
+            commands::list_openai_compatible_models,
+            commands::test_openai_compatible_provider,
+            commands::test_openai_responses_provider,
+            commands::list_anthropic_models,
+            commands::test_anthropic_provider,
+            commands::list_gemini_models,
+            commands::test_gemini_provider,
+            commands::test_custom_translation_provider,
             commands::recognize_image,
             commands::recognize_image_file,
             commands::list_ocr_providers,
@@ -149,9 +160,16 @@ pub fn run() {
                 ..
             } = event
             {
+                let has_visible_capture_result_window = app_handle
+                    .get_webview_window(commands::CAPTURE_RESULT_WINDOW_LABEL)
+                    .and_then(|window| window.is_visible().ok())
+                    .unwrap_or(false);
+
                 if !app_lifecycle::should_show_main_window_on_reopen_for_state(
                     has_visible_windows,
                     infrastructure::system::capture_window::is_capture_presentation_active(),
+                    has_visible_capture_result_window,
+                    app_lifecycle::is_main_window_reopen_suppressed(),
                 ) {
                     return;
                 }

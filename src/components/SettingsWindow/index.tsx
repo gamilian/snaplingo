@@ -55,6 +55,22 @@ function SettingsSectionContent({ section }: { section: SettingsSection }) {
     },
   );
 
+  if (section.key === 'services') {
+    return (
+      <ContentFrame>
+        <div className="relative space-y-8">
+          <SecondaryNav
+            items={section.secondary}
+            activeItem={navigationState.activeKey}
+            onItemChange={navigationState.setActiveKey}
+            orientation="horizontal"
+          />
+          {navigationState.activeItem?.render()}
+        </div>
+      </ContentFrame>
+    );
+  }
+
   return (
     <>
       <SecondaryNav

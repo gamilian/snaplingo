@@ -5,6 +5,7 @@ import type {
   AddCustomTranslationProviderRequest,
   OcrProviderInfo,
   ProviderInfo,
+  UpdateCustomTranslationProviderRequest,
 } from '../tauri/providers';
 
 export interface Provider {
@@ -26,6 +27,8 @@ export interface Provider {
   endpoint?: string;
   model?: string;
   reasoningLevel?: string;
+  promptStrategyId?: string;
+  promptFallbackStrategyId?: string;
 }
 
 interface ProviderState {
@@ -44,7 +47,12 @@ interface ProviderState {
   activateTranslationProvider: (id: string) => Promise<void>;
   deactivateTranslationProvider: (id: string) => Promise<void>;
   addCustomTranslationProvider: (request: AddCustomTranslationProviderRequest) => Promise<void>;
+  updateCustomTranslationProvider: (
+    id: string,
+    request: UpdateCustomTranslationProviderRequest,
+  ) => Promise<void>;
   removeTranslationProvider: (id: string) => Promise<void>;
+  testCustomTranslationProvider: (id: string) => Promise<void>;
 
   // OCR Actions (后端驱动)
   loadOcrProviders: () => Promise<void>;
@@ -75,7 +83,7 @@ const builtinTtsProviders: Provider[] = [
 function convertProviderInfo(info: ProviderInfo): Provider {
   return {
     id: info.id,
-    name: info.name,
+    name: displayProviderName(info),
     type: 'translation',
     status: info.is_active ? 'active' : (info.is_configured ? 'inactive' : 'unconfigured'),
     isBuiltin: info.is_builtin,
@@ -84,7 +92,17 @@ function convertProviderInfo(info: ProviderInfo): Provider {
     endpoint: info.endpoint,
     model: info.model,
     reasoningLevel: info.reasoning_level,
+    promptStrategyId: info.prompt_strategy_id,
+    promptFallbackStrategyId: info.prompt_fallback_strategy_id,
   };
+}
+
+function displayProviderName(info: ProviderInfo): string {
+  if (!info.is_builtin && info.name.startsWith('custom-llm-') && info.model) {
+    return info.model;
+  }
+
+  return info.name;
 }
 
 function normalizeTranslationCredentials(config: unknown): Record<string, string> {
@@ -161,6 +179,19 @@ export const useProviderStore = create<ProviderState>()(
         }
       },
 
+      updateCustomTranslationProvider: async (
+        id: string,
+        request: UpdateCustomTranslationProviderRequest,
+      ) => {
+        try {
+          await providerApi.updateCustomTranslationProvider(id, request);
+          await get().loadTranslationProviders();
+        } catch (error) {
+          console.error('Failed to update custom provider:', error);
+          throw error;
+        }
+      },
+
       // 删除翻译 Provider
       removeTranslationProvider: async (id: string) => {
         try {
@@ -170,6 +201,10 @@ export const useProviderStore = create<ProviderState>()(
           console.error('Failed to remove provider:', error);
           throw error;
         }
+      },
+
+      testCustomTranslationProvider: async (id: string) => {
+        await providerApi.testCustomTranslationProvider(id);
       },
 
       // 从后端加载 OCR Providers

@@ -31,9 +31,9 @@ pub(crate) fn build_translation_coordinator(
         log::warn!("Failed to register Google Translate provider: {}", e);
     }
 
-    let deepl_provider = DeepLProvider::new(http_client.clone());
-    if let Err(e) = translation_coordinator.register(deepl_provider) {
-        log::warn!("Failed to register DeepL provider: {}", e);
+    let deeplx_provider = DeepLProvider::new(http_client.clone());
+    if let Err(e) = translation_coordinator.register(deeplx_provider) {
+        log::warn!("Failed to register DeepLX provider: {}", e);
     }
 
     let baidu_provider = BaiduTranslateProvider::new(http_client.clone());
@@ -79,7 +79,7 @@ pub(crate) fn hydrate_provider_credentials(
 ) {
     hydrate_translation_provider_credentials(
         &translation_coordinator,
-        &config_file,
+        config_file.clone(),
         &keychain,
         http_client,
     );
@@ -88,14 +88,13 @@ pub(crate) fn hydrate_provider_credentials(
 
 fn hydrate_translation_provider_credentials(
     translation_coordinator: &TranslationCoordinator,
-    config_file: &ConfigFile,
+    config_file: Arc<ConfigFile>,
     keychain: &Keychain,
     http_client: Arc<dyn HttpClient>,
 ) {
-    if let Ok(api_key) = keychain.load_provider_credential("deepl") {
-        let credentials = HashMap::from([("api_key".to_string(), api_key)]);
-        if let Err(e) = translation_coordinator.reconfigure_provider("deepl", &credentials) {
-            log::warn!("Failed to hydrate DeepL credentials: {}", e);
+    if let Some(credentials) = load_deeplx_credentials(keychain) {
+        if let Err(e) = translation_coordinator.reconfigure_provider("deeplx", &credentials) {
+            log::warn!("Failed to hydrate DeepLX credentials: {}", e);
         }
     }
 
@@ -147,6 +146,26 @@ fn load_baidu_translation_credentials(keychain: &Keychain) -> Option<HashMap<Str
         })
 }
 
+fn load_deeplx_credentials(keychain: &Keychain) -> Option<HashMap<String, String>> {
+    keychain
+        .load_provider_credentials(
+            "deeplx",
+            &[
+                "mode".to_string(),
+                "endpoint".to_string(),
+                "api_key".to_string(),
+            ],
+        )
+        .ok()
+        .or_else(|| {
+            let api_key = keychain.load_provider_credential("deepl").ok()?;
+            Some(HashMap::from([
+                ("mode".to_string(), "deepl".to_string()),
+                ("api_key".to_string(), api_key),
+            ]))
+        })
+}
+
 fn load_baidu_ocr_credentials(keychain: &Keychain) -> Option<HashMap<String, String>> {
     keychain
         .load_provider_credentials(
@@ -170,7 +189,7 @@ fn load_baidu_ocr_credentials(keychain: &Keychain) -> Option<HashMap<String, Str
 
 fn register_custom_translation_providers(
     translation_coordinator: &TranslationCoordinator,
-    config_file: &ConfigFile,
+    config_file: Arc<ConfigFile>,
     keychain: &Keychain,
     http_client: Arc<dyn HttpClient>,
 ) {
@@ -185,7 +204,12 @@ fn register_custom_translation_providers(
             continue;
         };
 
-        let provider = create_llm_translation_provider(&def, http_client.clone(), api_key);
+        let provider = create_llm_translation_provider(
+            &def,
+            http_client.clone(),
+            api_key,
+            config_file.clone(),
+        );
         if let Err(e) = translation_coordinator.register(provider) {
             log::warn!(
                 "Failed to register custom LLM provider '{}': {}",

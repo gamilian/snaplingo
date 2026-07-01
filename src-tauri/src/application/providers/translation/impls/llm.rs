@@ -1,7 +1,12 @@
 use crate::application::providers::common::Provider;
 use crate::application::providers::translation::TranslationProvider;
+use crate::application::providers::{
+    merge_prompt_strategy_config, render_translation_system_prompt, ProviderPromptStrategy,
+    TranslationPromptStrategyConfig,
+};
 use crate::domain::translation::{TranslationRequest, TranslationResult};
 use crate::infrastructure::llm::{LLMClient, LLMOptions, LLMRequest, ReasoningLevel};
+use crate::infrastructure::storage::ConfigFile;
 use crate::Result;
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -14,6 +19,8 @@ pub struct LLMTranslationProvider {
     id: String,
     name: String,
     reasoning_level: Option<ReasoningLevel>,
+    prompt_strategy: ProviderPromptStrategy,
+    config_file: Arc<ConfigFile>,
 }
 
 impl LLMTranslationProvider {
@@ -22,13 +29,27 @@ impl LLMTranslationProvider {
         id: String,
         name: String,
         reasoning_level: Option<ReasoningLevel>,
+        prompt_strategy: ProviderPromptStrategy,
+        config_file: Arc<ConfigFile>,
     ) -> Self {
         Self {
             llm_client,
             id,
             name,
             reasoning_level,
+            prompt_strategy,
+            config_file,
         }
+    }
+
+    fn system_prompt(&self, request: &TranslationRequest) -> String {
+        let config = self
+            .config_file
+            .load::<TranslationPromptStrategyConfig>("translation_prompt_strategies")
+            .ok();
+        let config = merge_prompt_strategy_config(config);
+
+        render_translation_system_prompt(&config.strategies, &self.prompt_strategy, request)
     }
 }
 
@@ -54,10 +75,7 @@ impl Provider for LLMTranslationProvider {
 impl TranslationProvider for LLMTranslationProvider {
     async fn translate(&self, request: &TranslationRequest) -> Result<TranslationResult> {
         let llm_request = LLMRequest {
-            system_prompt: Some(format!(
-                "You are a translation engine. Translate the user's text to {}. Return only the translation.",
-                request.target_lang
-            )),
+            system_prompt: Some(self.system_prompt(request)),
             user_prompt: request.text.clone(),
             options: LLMOptions {
                 reasoning: self.reasoning_level,
@@ -85,11 +103,13 @@ mod tests {
 
     struct MockLLMClient {
         response: String,
+        requests: Arc<std::sync::Mutex<Vec<LLMRequest>>>,
     }
 
     #[async_trait]
     impl LLMClient for MockLLMClient {
-        async fn generate(&self, _request: &LLMRequest) -> anyhow::Result<LLMResponse> {
+        async fn generate(&self, request: &LLMRequest) -> anyhow::Result<LLMResponse> {
+            self.requests.lock().unwrap().push(request.clone());
             Ok(LLMResponse {
                 text: self.response.clone(),
             })
@@ -98,8 +118,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_llm_translation_provider() {
+        let requests = Arc::new(std::sync::Mutex::new(Vec::new()));
         let mock_client = Arc::new(MockLLMClient {
             response: "Bonjour".to_string(),
+            requests,
         });
 
         let provider = LLMTranslationProvider::new(
@@ -107,6 +129,8 @@ mod tests {
             "test-llm".to_string(),
             "Test LLM".to_string(),
             None,
+            ProviderPromptStrategy::default(),
+            Arc::new(ConfigFile::new_temp()),
         );
 
         let request = TranslationRequest {
@@ -121,8 +145,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_llm_translation_with_reasoning() {
+        let requests = Arc::new(std::sync::Mutex::new(Vec::new()));
         let mock_client = Arc::new(MockLLMClient {
             response: "Bonjour le monde".to_string(),
+            requests,
         });
 
         let provider = LLMTranslationProvider::new(
@@ -130,6 +156,8 @@ mod tests {
             "test-llm-reasoning".to_string(),
             "Test LLM Reasoning".to_string(),
             Some(ReasoningLevel::High),
+            ProviderPromptStrategy::default(),
+            Arc::new(ConfigFile::new_temp()),
         );
 
         let request = TranslationRequest {
@@ -140,5 +168,57 @@ mod tests {
 
         let result = provider.translate(&request).await.unwrap();
         assert_eq!(result.translated_text, "Bonjour le monde");
+    }
+
+    #[tokio::test]
+    async fn llm_translation_uses_edited_general_prompt_from_config() {
+        let config_file = Arc::new(ConfigFile::new_temp());
+        config_file
+            .save(
+                "translation_prompt_strategies",
+                &TranslationPromptStrategyConfig {
+                    strategies: vec![crate::application::providers::TranslationPromptStrategy {
+                        id: crate::application::providers::DEFAULT_PROMPT_STRATEGY_ID.to_string(),
+                        name: "通用翻译".to_string(),
+                        description: "".to_string(),
+                        system_prompt: "Custom prompt to {target_lang}".to_string(),
+                        is_builtin: true,
+                        is_deletable: false,
+                    }],
+                },
+            )
+            .unwrap();
+        let requests = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let mock_client = Arc::new(MockLLMClient {
+            response: "Bonjour".to_string(),
+            requests: requests.clone(),
+        });
+
+        let provider = LLMTranslationProvider::new(
+            mock_client,
+            "test-llm".to_string(),
+            "Test LLM".to_string(),
+            None,
+            ProviderPromptStrategy {
+                strategy_id: crate::application::providers::DEFAULT_PROMPT_STRATEGY_ID.to_string(),
+                fallback_strategy_id: crate::application::providers::DEFAULT_PROMPT_STRATEGY_ID
+                    .to_string(),
+            },
+            config_file,
+        );
+
+        provider
+            .translate(&TranslationRequest {
+                text: "Hello".to_string(),
+                source_lang: "en".to_string(),
+                target_lang: "fr".to_string(),
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(
+            requests.lock().unwrap()[0].system_prompt.as_deref(),
+            Some("Custom prompt to fr")
+        );
     }
 }

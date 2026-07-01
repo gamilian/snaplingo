@@ -23,13 +23,15 @@ import {
 import { subscribeMainWindowEvents } from './tauri/appEvents';
 import { recognizeImageFile, selectImageFile } from './tauri/ocr';
 import { takeCaptureResultWindowPayload } from './tauri/captureSession';
+import { isCaptureResultWindowLaunch } from './appWindowRouting';
 
 const currentWindow = getCurrentWebviewWindow();
 const captureLaunch = readCaptureLaunch(window.location.search);
 const pinnedImageId = readPinnedImageLaunch(window.location.search);
-const isCaptureResultWindow =
-  new URLSearchParams(window.location.search).get('window') ===
-  'capture-result';
+const isCaptureResultWindow = isCaptureResultWindowLaunch(
+  currentWindow.label,
+  window.location.search,
+);
 
 function App() {
   const resultWindowVisible = useAppStore((state) => state.resultWindowVisible);
@@ -160,6 +162,10 @@ function App() {
 
     setOcrText(payload.text);
     setOcrError(null);
+    if (payload.startFileOcr) {
+      startFileOcr();
+      return;
+    }
     showOcrWindow();
   }, [
     requestAutoTranslate,
@@ -168,6 +174,7 @@ function App() {
     setSourceText,
     showOcrWindow,
     showResultWindow,
+    startFileOcr,
   ]);
 
   useEffect(() => {
@@ -234,7 +241,7 @@ function App() {
   }
 
   if (isCaptureResultWindow) {
-    return <ResultWindow />;
+    return <ResultWindow presentation="standalone" />;
   }
 
   return (

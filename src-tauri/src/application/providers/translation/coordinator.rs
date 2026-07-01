@@ -67,6 +67,17 @@ impl TranslationCoordinator {
         Ok(())
     }
 
+    /// Replaces a registered provider instance without changing active provider order.
+    pub fn replace<T: TranslationProvider + 'static>(&self, provider: T) -> Result<()> {
+        let id = provider.id().to_string();
+        let mut providers = self.providers.write();
+        if !providers.contains_key(&id) {
+            return Err(format!("Provider not found: {}", id).into());
+        }
+        providers.insert(id, Arc::new(RwLock::new(provider)));
+        Ok(())
+    }
+
     /// Unregisters a translation provider by ID.
     ///
     /// If the provider is active, it will be deactivated first.
@@ -242,8 +253,9 @@ impl TranslationCoordinator {
             let providers = self.providers.read();
             active.clear();
             for id in active_ids {
-                if providers.contains_key(&id) {
-                    active.push(id);
+                let id = normalize_translation_provider_id(&id);
+                if providers.contains_key(id) {
+                    active.push(id.to_string());
                 }
             }
         }
@@ -283,6 +295,7 @@ impl TranslationCoordinator {
         // Spawn concurrent translation tasks
         let mut tasks = Vec::new();
         for provider_lock in &active_providers {
+            let provider_id = provider_lock.read().id().to_string();
             let request = request.clone();
             let provider_lock = provider_lock.clone();
 
@@ -291,23 +304,33 @@ impl TranslationCoordinator {
                 provider.translate(&request).await
             });
 
-            tasks.push(task);
+            tasks.push((provider_id, task));
         }
 
         // Collect results
         let mut results = Vec::new();
-        for task in tasks {
+        for (provider_id, task) in tasks {
             match task.await {
                 Ok(Ok(result)) => {
                     results.push(result);
                 }
                 Ok(Err(e)) => {
-                    // Log provider error but continue with other providers
                     eprintln!("Translation provider error: {}", e);
+                    results.push(TranslationResult {
+                        provider_id,
+                        translated_text: format!("Translation failed: {}", e),
+                        detected_language: None,
+                        confidence: None,
+                    });
                 }
                 Err(e) => {
-                    // Log task join error but continue
                     eprintln!("Translation task error: {}", e);
+                    results.push(TranslationResult {
+                        provider_id,
+                        translated_text: format!("Translation task failed: {}", e),
+                        detected_language: None,
+                        confidence: None,
+                    });
                 }
             }
         }
@@ -372,5 +395,12 @@ impl TranslationCoordinator {
         }
 
         result
+    }
+}
+
+fn normalize_translation_provider_id(id: &str) -> &str {
+    match id {
+        "deepl" => "deeplx",
+        _ => id,
     }
 }

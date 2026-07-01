@@ -5,6 +5,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::application::providers::common::CredentialField;
 use crate::application::providers::translation::{LLMTranslationProvider, TranslationCoordinator};
+use crate::application::providers::{
+    ProviderPromptStrategy, DEFAULT_PROMPT_STRATEGY_ID, SMART_PROMPT_STRATEGY_ID,
+};
 use crate::infrastructure::http::HttpClient;
 use crate::infrastructure::llm::{
     AnthropicLLMClient, GeminiLLMClient, LLMClient, LLMProtocol, OpenAILLMClient, ReasoningLevel,
@@ -21,6 +24,10 @@ pub struct CustomTranslationProviderDef {
     pub endpoint: String,
     pub model: String,
     pub reasoning_level: Option<ReasoningLevel>,
+    #[serde(default = "default_prompt_strategy_id")]
+    pub prompt_strategy_id: String,
+    #[serde(default = "default_prompt_fallback_strategy_id")]
+    pub prompt_fallback_strategy_id: String,
 }
 
 pub struct AddCustomTranslationProviderInput {
@@ -30,6 +37,19 @@ pub struct AddCustomTranslationProviderInput {
     pub model: String,
     pub api_key: String,
     pub reasoning_level: Option<String>,
+    pub prompt_strategy_id: Option<String>,
+    pub prompt_fallback_strategy_id: Option<String>,
+}
+
+pub struct UpdateCustomTranslationProviderInput {
+    pub name: String,
+    pub protocol: String,
+    pub endpoint: String,
+    pub model: String,
+    pub api_key: Option<String>,
+    pub reasoning_level: Option<String>,
+    pub prompt_strategy_id: Option<String>,
+    pub prompt_fallback_strategy_id: Option<String>,
 }
 
 pub struct CustomTranslationProviderView {
@@ -39,11 +59,13 @@ pub struct CustomTranslationProviderView {
     pub endpoint: String,
     pub model: String,
     pub reasoning_level: Option<String>,
+    pub prompt_strategy_id: String,
+    pub prompt_fallback_strategy_id: String,
 }
 
 pub fn add_custom_translation_provider(
     input: AddCustomTranslationProviderInput,
-    config_file: &ConfigFile,
+    config_file: Arc<ConfigFile>,
     keychain: &Keychain,
     http_client: Arc<dyn HttpClient>,
     translation_coordinator: &TranslationCoordinator,
@@ -67,7 +89,8 @@ pub fn add_custom_translation_provider(
             AppError::Other(format!("Failed to save config: {}", e))
         })?;
 
-    let provider = create_llm_translation_provider(&def, http_client, input.api_key);
+    let provider =
+        create_llm_translation_provider(&def, http_client, input.api_key, config_file.clone());
     translation_coordinator.register(provider).map_err(|e| {
         custom_defs.pop();
         let _ = config_file.save("custom_translation_providers", &custom_defs);
@@ -90,32 +113,84 @@ fn build_custom_translation_provider_def(
     id: String,
     input: &AddCustomTranslationProviderInput,
 ) -> crate::Result<CustomTranslationProviderDef> {
-    if input.name.trim().is_empty() {
-        return Err(AppError::Other("Name cannot be empty".into()));
-    }
-    if input.endpoint.trim().is_empty() {
-        return Err(AppError::Other("Endpoint cannot be empty".into()));
-    }
-    if input.model.trim().is_empty() {
-        return Err(AppError::Other("Model cannot be empty".into()));
-    }
     if input.api_key.trim().is_empty() {
         return Err(AppError::Other("API key cannot be empty".into()));
     }
 
+    build_custom_translation_provider_def_from_parts(
+        id,
+        &input.name,
+        &input.protocol,
+        &input.endpoint,
+        &input.model,
+        input.reasoning_level.as_deref(),
+        input.prompt_strategy_id.as_deref(),
+        input.prompt_fallback_strategy_id.as_deref(),
+    )
+}
+
+pub fn build_updated_custom_translation_provider_def(
+    id: String,
+    input: &UpdateCustomTranslationProviderInput,
+) -> crate::Result<CustomTranslationProviderDef> {
+    build_custom_translation_provider_def_from_parts(
+        id,
+        &input.name,
+        &input.protocol,
+        &input.endpoint,
+        &input.model,
+        input.reasoning_level.as_deref(),
+        input.prompt_strategy_id.as_deref(),
+        input.prompt_fallback_strategy_id.as_deref(),
+    )
+}
+
+fn build_custom_translation_provider_def_from_parts(
+    id: String,
+    name: &str,
+    protocol: &str,
+    endpoint: &str,
+    model: &str,
+    reasoning_level: Option<&str>,
+    prompt_strategy_id: Option<&str>,
+    prompt_fallback_strategy_id: Option<&str>,
+) -> crate::Result<CustomTranslationProviderDef> {
+    if name.trim().is_empty() {
+        return Err(AppError::Other("Name cannot be empty".into()));
+    }
+    if endpoint.trim().is_empty() {
+        return Err(AppError::Other("Endpoint cannot be empty".into()));
+    }
+    if model.trim().is_empty() {
+        return Err(AppError::Other("Model cannot be empty".into()));
+    }
+
     Ok(CustomTranslationProviderDef {
         id,
-        name: input.name.clone(),
-        protocol: parse_llm_protocol(&input.protocol)?,
-        endpoint: input.endpoint.clone(),
-        model: input.model.clone(),
-        reasoning_level: parse_reasoning_level(input.reasoning_level.as_deref())?,
+        name: name.to_string(),
+        protocol: parse_llm_protocol(protocol)?,
+        endpoint: endpoint.to_string(),
+        model: model.to_string(),
+        reasoning_level: parse_reasoning_level(reasoning_level)?,
+        prompt_strategy_id: parse_prompt_strategy_id(prompt_strategy_id, SMART_PROMPT_STRATEGY_ID)?,
+        prompt_fallback_strategy_id: parse_prompt_strategy_id(
+            prompt_fallback_strategy_id,
+            DEFAULT_PROMPT_STRATEGY_ID,
+        )?,
     })
+}
+
+fn parse_prompt_strategy_id(value: Option<&str>, default: &str) -> crate::Result<String> {
+    match value.map(str::trim).filter(|value| !value.is_empty()) {
+        Some(value) => Ok(value.to_string()),
+        None => Ok(default.to_string()),
+    }
 }
 
 fn parse_llm_protocol(protocol: &str) -> crate::Result<LLMProtocol> {
     match protocol {
         "openai" => Ok(LLMProtocol::OpenAI),
+        "openai-responses" | "openai_responses" => Ok(LLMProtocol::OpenAIResponses),
         "anthropic" => Ok(LLMProtocol::Anthropic),
         "gemini" => Ok(LLMProtocol::Gemini),
         _ => Err(AppError::Other(format!("Invalid protocol: {}", protocol))),
@@ -147,18 +222,20 @@ fn create_custom_translation_provider_id() -> String {
     )
 }
 
-fn custom_translation_provider_view(
+pub fn custom_translation_provider_view(
     def: &CustomTranslationProviderDef,
 ) -> CustomTranslationProviderView {
     CustomTranslationProviderView {
         id: def.id.clone(),
         name: def.name.clone(),
-        protocol: format!("{:?}", def.protocol).to_lowercase(),
+        protocol: def.protocol.as_str().to_string(),
         endpoint: def.endpoint.clone(),
         model: def.model.clone(),
         reasoning_level: def
             .reasoning_level
             .map(|level| format!("{:?}", level).to_lowercase()),
+        prompt_strategy_id: def.prompt_strategy_id.clone(),
+        prompt_fallback_strategy_id: def.prompt_fallback_strategy_id.clone(),
     }
 }
 
@@ -166,9 +243,16 @@ pub fn create_llm_translation_provider(
     def: &CustomTranslationProviderDef,
     http_client: Arc<dyn HttpClient>,
     api_key: String,
+    config_file: Arc<ConfigFile>,
 ) -> LLMTranslationProvider {
     let llm_client: Arc<dyn LLMClient> = match def.protocol {
-        LLMProtocol::OpenAI => Arc::new(OpenAILLMClient::new(
+        LLMProtocol::OpenAI => Arc::new(OpenAILLMClient::new_chat_completions(
+            http_client,
+            def.endpoint.clone(),
+            def.model.clone(),
+            api_key,
+        )),
+        LLMProtocol::OpenAIResponses => Arc::new(OpenAILLMClient::new_responses(
             http_client,
             def.endpoint.clone(),
             def.model.clone(),
@@ -193,7 +277,20 @@ pub fn create_llm_translation_provider(
         def.id.clone(),
         def.name.clone(),
         def.reasoning_level,
+        ProviderPromptStrategy {
+            strategy_id: def.prompt_strategy_id.clone(),
+            fallback_strategy_id: def.prompt_fallback_strategy_id.clone(),
+        },
+        config_file,
     )
+}
+
+fn default_prompt_strategy_id() -> String {
+    SMART_PROMPT_STRATEGY_ID.to_string()
+}
+
+fn default_prompt_fallback_strategy_id() -> String {
+    DEFAULT_PROMPT_STRATEGY_ID.to_string()
 }
 
 pub fn validate_required_credentials(
@@ -223,16 +320,19 @@ mod tests {
 
     use crate::application::providers::common::{CredentialField, Provider};
     use crate::application::providers::translation::TranslationProvider;
+    use crate::application::providers::{DEFAULT_PROMPT_STRATEGY_ID, SMART_PROMPT_STRATEGY_ID};
     use crate::domain::translation::TranslationRequest;
     use crate::infrastructure::http::{HttpClient, HttpResponse};
     use crate::infrastructure::llm::{LLMProtocol, ReasoningLevel};
+    use crate::infrastructure::storage::ConfigFile;
     use anyhow::Result;
     use async_trait::async_trait;
 
     use super::{
-        build_custom_translation_provider_def, create_llm_translation_provider,
-        validate_required_credentials, AddCustomTranslationProviderInput,
-        CustomTranslationProviderDef,
+        build_custom_translation_provider_def, build_updated_custom_translation_provider_def,
+        create_llm_translation_provider, validate_required_credentials,
+        AddCustomTranslationProviderInput, CustomTranslationProviderDef,
+        UpdateCustomTranslationProviderInput,
     };
 
     struct MockHttpClient {
@@ -265,6 +365,8 @@ mod tests {
             endpoint: "https://llm.example.test".to_string(),
             model: "test-model".to_string(),
             reasoning_level: None,
+            prompt_strategy_id: SMART_PROMPT_STRATEGY_ID.to_string(),
+            prompt_fallback_strategy_id: DEFAULT_PROMPT_STRATEGY_ID.to_string(),
         }
     }
 
@@ -295,6 +397,8 @@ mod tests {
             model: "gpt-test".to_string(),
             api_key: "test-key".to_string(),
             reasoning_level: Some("high".to_string()),
+            prompt_strategy_id: None,
+            prompt_fallback_strategy_id: None,
         }
     }
 
@@ -359,6 +463,18 @@ mod tests {
     }
 
     #[test]
+    fn custom_translation_provider_input_accepts_openai_responses_protocol() {
+        let input = AddCustomTranslationProviderInput {
+            protocol: "openai-responses".to_string(),
+            ..valid_add_input()
+        };
+
+        let def = build_custom_translation_provider_def("custom-id".to_string(), &input).unwrap();
+
+        assert_eq!(def.protocol, LLMProtocol::OpenAIResponses);
+    }
+
+    #[test]
     fn custom_translation_provider_input_rejects_invalid_reasoning_level() {
         let input = AddCustomTranslationProviderInput {
             reasoning_level: Some("huge".to_string()),
@@ -374,6 +490,40 @@ mod tests {
     }
 
     #[test]
+    fn update_custom_translation_provider_def_preserves_id_without_requiring_api_key() {
+        let input = UpdateCustomTranslationProviderInput {
+            name: "gpt-5-mini".to_string(),
+            protocol: "openai".to_string(),
+            endpoint: "https://api.openai.com".to_string(),
+            model: "gpt-5-mini".to_string(),
+            api_key: None,
+            reasoning_level: Some("minimal".to_string()),
+            prompt_strategy_id: Some("technical".to_string()),
+            prompt_fallback_strategy_id: Some(DEFAULT_PROMPT_STRATEGY_ID.to_string()),
+        };
+
+        let def = build_updated_custom_translation_provider_def("custom-gpt".to_string(), &input)
+            .unwrap();
+
+        assert_eq!(def.id, "custom-gpt");
+        assert_eq!(def.name, "gpt-5-mini");
+        assert_eq!(def.model, "gpt-5-mini");
+        assert_eq!(def.reasoning_level, Some(ReasoningLevel::Minimal));
+        assert_eq!(def.prompt_strategy_id, "technical");
+        assert_eq!(def.prompt_fallback_strategy_id, DEFAULT_PROMPT_STRATEGY_ID);
+    }
+
+    #[test]
+    fn custom_translation_provider_defaults_to_smart_prompt_strategy() {
+        let def =
+            build_custom_translation_provider_def("custom-id".to_string(), &valid_add_input())
+                .unwrap();
+
+        assert_eq!(def.prompt_strategy_id, SMART_PROMPT_STRATEGY_ID);
+        assert_eq!(def.prompt_fallback_strategy_id, DEFAULT_PROMPT_STRATEGY_ID);
+    }
+
+    #[test]
     fn create_llm_translation_provider_uses_custom_id_and_name() {
         let def = custom_provider_def(LLMProtocol::OpenAI);
 
@@ -381,6 +531,7 @@ mod tests {
             &def,
             mock_http_client(r#"{"choices":[]}"#),
             "key".into(),
+            Arc::new(ConfigFile::new_temp()),
         );
 
         assert_eq!(provider.id(), "custom-test");
@@ -393,6 +544,10 @@ mod tests {
             (
                 LLMProtocol::OpenAI,
                 r#"{"choices":[{"message":{"content":"Bonjour"}}]}"#,
+            ),
+            (
+                LLMProtocol::OpenAIResponses,
+                r#"{"output":[{"type":"message","content":[{"type":"output_text","text":"Bonjour"}]}]}"#,
             ),
             (
                 LLMProtocol::Anthropic,
@@ -410,6 +565,7 @@ mod tests {
                 &def,
                 mock_http_client(response_body),
                 "key".into(),
+                Arc::new(ConfigFile::new_temp()),
             );
 
             let result = provider.translate(&translation_request()).await.unwrap();
@@ -436,7 +592,12 @@ mod tests {
             ..custom_provider_def(LLMProtocol::OpenAI)
         };
 
-        let provider = create_llm_translation_provider(&def, http_client, "key".into());
+        let provider = create_llm_translation_provider(
+            &def,
+            http_client,
+            "key".into(),
+            Arc::new(ConfigFile::new_temp()),
+        );
         provider.translate(&translation_request()).await.unwrap();
 
         let body: serde_json::Value =

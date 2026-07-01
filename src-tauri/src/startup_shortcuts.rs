@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 use tauri::Manager;
 
-use crate::{commands, infrastructure, AppState, Result};
+use crate::{app_lifecycle, commands, infrastructure, AppState, Result};
 
 const SCREENSHOT_CATEGORY: &str = "screenshot";
 const TRANSLATION_CATEGORY: &str = "translation";
@@ -200,6 +200,8 @@ fn register_hotkey_action(
 }
 
 fn trigger_hotkey_action(app: tauri::AppHandle, category: String, action: String) {
+    app_lifecycle::suppress_main_window_reopen_after_hotkey();
+
     if category == SCREENSHOT_CATEGORY {
         if let Some(mode) = capture_mode_for_screenshot_hotkey_action(&action) {
             tauri::async_runtime::spawn(commands::open_capture_window_from_shortcut(app, mode));

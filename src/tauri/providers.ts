@@ -17,6 +17,8 @@ export interface ProviderInfo {
   endpoint?: string;
   model?: string;
   reasoning_level?: string;
+  prompt_strategy_id?: string;
+  prompt_fallback_strategy_id?: string;
 }
 
 export interface OcrProviderInfo {
@@ -34,6 +36,47 @@ export interface AddCustomTranslationProviderRequest {
   model: string;
   api_key: string;
   reasoning_level?: string;
+  prompt_strategy_id?: string;
+  prompt_fallback_strategy_id?: string;
+}
+
+export interface UpdateCustomTranslationProviderRequest {
+  name: string;
+  protocol: string;
+  endpoint: string;
+  model: string;
+  api_key?: string;
+  reasoning_level?: string;
+  prompt_strategy_id?: string;
+  prompt_fallback_strategy_id?: string;
+}
+
+export interface OpenAICompatibleModelsRequest {
+  endpoint: string;
+  api_key: string;
+}
+
+export interface TestOpenAICompatibleProviderRequest {
+  endpoint: string;
+  api_key: string;
+  model: string;
+}
+
+export interface OpenAICompatibleModelInfo {
+  id: string;
+}
+
+export interface TranslationPromptStrategy {
+  id: string;
+  name: string;
+  description: string;
+  system_prompt: string;
+  is_builtin: boolean;
+  is_deletable: boolean;
+}
+
+export interface TranslationPromptStrategyConfig {
+  strategies: TranslationPromptStrategy[];
 }
 
 export function listTranslationProviders() {
@@ -76,8 +119,82 @@ export function addCustomTranslationProvider(
   return invoke<ProviderInfo>('add_custom_translation_provider', { request });
 }
 
+export function updateCustomTranslationProvider(
+  providerId: string,
+  request: UpdateCustomTranslationProviderRequest,
+) {
+  return invoke<ProviderInfo>('update_custom_translation_provider', {
+    providerId,
+    request,
+  });
+}
+
 export function removeCustomTranslationProvider(providerId: string) {
   return invoke<void>('remove_custom_translation_provider', { providerId });
+}
+
+export function testCustomTranslationProvider(providerId: string) {
+  return invoke<void>('test_custom_translation_provider', { providerId });
+}
+
+export function listTranslationPromptStrategies() {
+  return invoke<TranslationPromptStrategyConfig>('list_translation_prompt_strategies');
+}
+
+export function saveTranslationPromptStrategies(
+  config: TranslationPromptStrategyConfig,
+) {
+  return invoke<TranslationPromptStrategyConfig>('save_translation_prompt_strategies', {
+    config,
+  });
+}
+
+export function listOpenAICompatibleModels(
+  request: OpenAICompatibleModelsRequest,
+) {
+  return invoke<OpenAICompatibleModelInfo[]>('list_openai_compatible_models', {
+    request,
+  });
+}
+
+export function testOpenAICompatibleProvider(
+  request: TestOpenAICompatibleProviderRequest,
+) {
+  return invoke<void>('test_openai_compatible_provider', { request });
+}
+
+export function testOpenAIResponsesProvider(
+  request: TestOpenAICompatibleProviderRequest,
+) {
+  return invoke<void>('test_openai_responses_provider', { request });
+}
+
+export function listAnthropicModels(
+  request: OpenAICompatibleModelsRequest,
+) {
+  return invoke<OpenAICompatibleModelInfo[]>('list_anthropic_models', {
+    request,
+  });
+}
+
+export function testAnthropicProvider(
+  request: TestOpenAICompatibleProviderRequest,
+) {
+  return invoke<void>('test_anthropic_provider', { request });
+}
+
+export function listGeminiModels(
+  request: OpenAICompatibleModelsRequest,
+) {
+  return invoke<OpenAICompatibleModelInfo[]>('list_gemini_models', {
+    request,
+  });
+}
+
+export function testGeminiProvider(
+  request: TestOpenAICompatibleProviderRequest,
+) {
+  return invoke<void>('test_gemini_provider', { request });
 }
 
 export function listOcrProviders() {

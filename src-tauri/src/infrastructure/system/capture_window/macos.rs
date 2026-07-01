@@ -687,7 +687,10 @@ mod tests {
 
     #[test]
     fn capture_copy_event_matches_frontend_listener() {
-        assert_eq!(capture_copy_requested_event_name(), "capture-copy-requested");
+        assert_eq!(
+            capture_copy_requested_event_name(),
+            "capture-copy-requested"
+        );
     }
 
     #[test]

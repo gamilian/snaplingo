@@ -29,7 +29,7 @@ const LANGUAGES = [
 
 // Mock translation results for prototype
 const MOCK_TRANSLATIONS = [
-  { provider_id: 'deepl', name: 'DeepL X', text: 'Accurate identification', icon: 'D' },
+  { provider_id: 'deeplx', name: 'DeepLX', text: 'Accurate identification', icon: 'D' },
   { provider_id: 'google', name: 'Google 翻译', text: 'Accurate identification', icon: 'G' },
   { provider_id: 'openai', name: 'GPT-4', text: 'Precise recognition', icon: 'O' },
 ];
@@ -92,7 +92,7 @@ export default function ResultWindowPrototype() {
 
 // VARIATION 1: Bob-style (from UI doc)
 function BobStyleVariant({ sourceText, sourceLang, targetLang, setSourceText, setSourceLang, setTargetLang, hideResultWindow }: any) {
-  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set(['deepl', 'google']));
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set(['deeplx', 'google']));
 
   const toggleCard = (id: string) => {
     const newExpanded = new Set(expandedCards);

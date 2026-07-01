@@ -27,18 +27,13 @@ use objc2_app_kit::{
 use serde::Serialize;
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
-const CAPTURE_RESULT_WINDOW_LABEL: &str = "capture-result";
+use crate::app_lifecycle;
+
+pub(crate) const CAPTURE_RESULT_WINDOW_LABEL: &str = "capture-result";
 const CAPTURE_WINDOW_LABEL: &str = "capture";
 
 static CAPTURE_RESULT_WINDOW_PAYLOAD: LazyLock<Mutex<Option<CaptureResultWindowPayload>>> =
     LazyLock::new(|| Mutex::new(None));
-
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct TranslationInputPayload {
-    text: String,
-    auto_translate: bool,
-}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -53,30 +48,32 @@ pub struct CaptureResultWindowPayload {
     mode: CaptureResultWindowMode,
     text: String,
     auto_translate: bool,
+    start_file_ocr: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ResultWindowEntrypoint {
+    ManualTranslation,
+    AutoTranslation,
+    Ocr,
+    ShowOcr,
+    FileOcr,
 }
 
 #[tauri::command]
 pub fn open_result_window(text: String, app: tauri::AppHandle) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window("main") {
-        window.show().map_err(|e| e.to_string())?;
-        window.set_focus().map_err(|e| e.to_string())?;
-
-        // Emit event to frontend with text
-        window
-            .emit("input-translation", text)
-            .map_err(|e| e.to_string())?;
-    }
-    Ok(())
+    open_capture_result_window(
+        result_window_payload_for_entrypoint(ResultWindowEntrypoint::ManualTranslation, text),
+        app,
+    )
 }
 
 #[tauri::command]
 pub fn open_ocr_result_window(text: String, app: tauri::AppHandle) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window("main") {
-        window.show().map_err(|e| e.to_string())?;
-        window.set_focus().map_err(|e| e.to_string())?;
-        window.emit("input-ocr", text).map_err(|e| e.to_string())?;
-    }
-    Ok(())
+    open_capture_result_window(
+        result_window_payload_for_entrypoint(ResultWindowEntrypoint::Ocr, text),
+        app,
+    )
 }
 
 #[tauri::command]
@@ -105,6 +102,8 @@ fn open_capture_result_window(
     payload: CaptureResultWindowPayload,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
+    app_lifecycle::suppress_main_window_reopen_after_hotkey();
+
     {
         let mut pending_payload = CAPTURE_RESULT_WINDOW_PAYLOAD
             .lock()
@@ -134,6 +133,7 @@ fn open_capture_result_window(
         .map_err(|e| e.to_string())?,
     };
 
+    app_lifecycle::suppress_main_window_reopen_after_hotkey();
     reveal_capture_result_window(&window)?;
     window
         .emit("capture-result-payload-ready", ())
@@ -145,18 +145,42 @@ fn capture_result_window_url() -> PathBuf {
 }
 
 fn capture_translation_result_payload(text: String) -> CaptureResultWindowPayload {
-    CaptureResultWindowPayload {
-        mode: CaptureResultWindowMode::Translation,
-        text,
-        auto_translate: true,
-    }
+    translation_result_payload(text, true)
 }
 
 fn capture_ocr_result_payload(text: String) -> CaptureResultWindowPayload {
+    ocr_result_payload(text, false)
+}
+
+fn translation_result_payload(text: String, auto_translate: bool) -> CaptureResultWindowPayload {
+    CaptureResultWindowPayload {
+        mode: CaptureResultWindowMode::Translation,
+        text,
+        auto_translate,
+        start_file_ocr: false,
+    }
+}
+
+fn ocr_result_payload(text: String, start_file_ocr: bool) -> CaptureResultWindowPayload {
     CaptureResultWindowPayload {
         mode: CaptureResultWindowMode::Ocr,
         text,
         auto_translate: false,
+        start_file_ocr,
+    }
+}
+
+fn result_window_payload_for_entrypoint(
+    entrypoint: ResultWindowEntrypoint,
+    text: String,
+) -> CaptureResultWindowPayload {
+    match entrypoint {
+        ResultWindowEntrypoint::ManualTranslation => translation_result_payload(text, false),
+        ResultWindowEntrypoint::AutoTranslation => translation_result_payload(text, true),
+        ResultWindowEntrypoint::Ocr | ResultWindowEntrypoint::ShowOcr => {
+            ocr_result_payload(text, false)
+        }
+        ResultWindowEntrypoint::FileOcr => ocr_result_payload(String::new(), true),
     }
 }
 
@@ -164,6 +188,7 @@ fn reveal_capture_result_window(window: &WebviewWindow) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         configure_capture_result_window_for_current_space(window)?;
+        window.show().map_err(|e| e.to_string())?;
         let ns_window = window.ns_window().map_err(|e| e.to_string())?;
         if ns_window.is_null() {
             return Err("Capture result window has no native NSWindow".to_string());
@@ -171,6 +196,7 @@ fn reveal_capture_result_window(window: &WebviewWindow) -> Result<(), String> {
 
         let ns_window: &NSWindow = unsafe { &*ns_window.cast() };
         ns_window.orderFrontRegardless();
+        window.set_focus().map_err(|e| e.to_string())?;
     }
 
     #[cfg(not(target_os = "macos"))]
@@ -189,11 +215,7 @@ fn configure_capture_result_window_for_current_space(window: &WebviewWindow) -> 
     }
 
     let ns_window: &NSWindow = unsafe { &*ns_window.cast() };
-    ns_window.setStyleMask(
-        ns_window.styleMask()
-            | NSWindowStyleMask::Borderless
-            | NSWindowStyleMask::NonactivatingPanel,
-    );
+    ns_window.setStyleMask(ns_window.styleMask() | NSWindowStyleMask::Borderless);
     ns_window.setCollectionBehavior(
         ns_window.collectionBehavior()
             | NSWindowCollectionBehavior::CanJoinAllSpaces
@@ -253,49 +275,28 @@ fn should_focus_main_for_capture_screenshot_error() -> bool {
 
 #[tauri::command]
 pub fn open_translation_result_window(text: String, app: tauri::AppHandle) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window("main") {
-        window.show().map_err(|e| e.to_string())?;
-        window.set_focus().map_err(|e| e.to_string())?;
-
-        window
-            .emit(
-                "input-translation",
-                TranslationInputPayload {
-                    text,
-                    auto_translate: true,
-                },
-            )
-            .map_err(|e| e.to_string())?;
-    }
-    Ok(())
+    open_capture_result_window(
+        result_window_payload_for_entrypoint(ResultWindowEntrypoint::AutoTranslation, text),
+        app,
+    )
 }
 
 pub fn show_translation_window(app: tauri::AppHandle) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window("main") {
-        window.show().map_err(|e| e.to_string())?;
-        window.set_focus().map_err(|e| e.to_string())?;
-        window
-            .emit("show-translation-window", ())
-            .map_err(|e| e.to_string())?;
-    }
-    Ok(())
+    open_result_window(String::new(), app)
 }
 
 pub fn show_ocr_window(app: tauri::AppHandle) -> Result<(), String> {
-    emit_main_window_event(app, "show-ocr-window")
+    open_capture_result_window(
+        result_window_payload_for_entrypoint(ResultWindowEntrypoint::ShowOcr, String::new()),
+        app,
+    )
 }
 
 pub fn start_file_ocr(app: tauri::AppHandle) -> Result<(), String> {
-    emit_main_window_event(app, "start-file-ocr")
-}
-
-fn emit_main_window_event(app: tauri::AppHandle, event: &str) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window("main") {
-        window.show().map_err(|e| e.to_string())?;
-        window.set_focus().map_err(|e| e.to_string())?;
-        window.emit(event, ()).map_err(|e| e.to_string())?;
-    }
-    Ok(())
+    open_capture_result_window(
+        result_window_payload_for_entrypoint(ResultWindowEntrypoint::FileOcr, String::new()),
+        app,
+    )
 }
 
 pub async fn open_selection_translation_window_for_state(
@@ -375,6 +376,48 @@ mod tests {
         assert_eq!(payload.mode, CaptureResultWindowMode::Ocr);
         assert_eq!(payload.text, "hello");
         assert!(!payload.auto_translate);
+    }
+
+    #[test]
+    fn result_entrypoints_use_dedicated_result_window_payloads() {
+        assert_eq!(
+            result_window_payload_for_entrypoint(
+                ResultWindowEntrypoint::ManualTranslation,
+                "hello".to_string(),
+            ),
+            CaptureResultWindowPayload {
+                mode: CaptureResultWindowMode::Translation,
+                text: "hello".to_string(),
+                auto_translate: false,
+                start_file_ocr: false,
+            }
+        );
+        assert_eq!(
+            result_window_payload_for_entrypoint(
+                ResultWindowEntrypoint::AutoTranslation,
+                "hello".to_string(),
+            )
+            .auto_translate,
+            true
+        );
+        assert_eq!(
+            result_window_payload_for_entrypoint(ResultWindowEntrypoint::ShowOcr, String::new()),
+            CaptureResultWindowPayload {
+                mode: CaptureResultWindowMode::Ocr,
+                text: String::new(),
+                auto_translate: false,
+                start_file_ocr: false,
+            }
+        );
+        assert_eq!(
+            result_window_payload_for_entrypoint(ResultWindowEntrypoint::FileOcr, String::new()),
+            CaptureResultWindowPayload {
+                mode: CaptureResultWindowMode::Ocr,
+                text: String::new(),
+                auto_translate: false,
+                start_file_ocr: true,
+            }
+        );
     }
 
     #[test]

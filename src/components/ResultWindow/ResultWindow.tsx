@@ -1,10 +1,18 @@
 import { useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
+import { useProviderStore } from '../../stores/providerStore';
 import { useTranslate } from '../../hooks/useTranslate';
 import TranslationCard from './TranslationCard';
 import { CustomSelect } from '../common/CustomSelect';
 import { recognizeImageFile, selectImageFile } from '../../tauri/ocr';
 import { runOcrFileWorkflow } from './ocrFileWorkflow';
+import { getTranslationProviderDisplayName } from './translationProviderDisplayName';
+import {
+  resultWindowContainerClassName,
+  resultWindowPanelClassName,
+  shouldCloseFromContainerClick,
+  type ResultWindowPresentation,
+} from './presentation';
 
 const LANGUAGES = [
   { code: 'auto', name: 'Auto Detect' },
@@ -20,7 +28,13 @@ const LANGUAGES = [
   { code: 'ar', name: 'Arabic' },
 ];
 
-export default function ResultWindow() {
+interface ResultWindowProps {
+  presentation?: ResultWindowPresentation;
+}
+
+export default function ResultWindow({
+  presentation = 'overlay',
+}: ResultWindowProps) {
   const {
     sourceText,
     sourceLang,
@@ -42,6 +56,10 @@ export default function ResultWindow() {
     consumeAutoTranslateRequest,
     hideResultWindow,
   } = useAppStore();
+  const translationProviders = useProviderStore((state) => state.translationProviders);
+  const loadTranslationProviders = useProviderStore(
+    (state) => state.loadTranslationProviders,
+  );
 
   const { translate } = useTranslate();
 
@@ -55,6 +73,12 @@ export default function ResultWindow() {
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
   }, [resultWindowVisible, hideResultWindow]);
+
+  useEffect(() => {
+    if (!resultWindowVisible) return;
+
+    void loadTranslationProviders();
+  }, [loadTranslationProviders, resultWindowVisible]);
 
   useEffect(() => {
     if (!resultWindowVisible || !pendingAutoTranslate || !sourceText.trim()) {
@@ -76,7 +100,7 @@ export default function ResultWindow() {
   if (!resultWindowVisible) return null;
 
   const handleOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
+    if (shouldCloseFromContainerClick(presentation, e.target, e.currentTarget)) {
       hideResultWindow();
     }
   };
@@ -107,10 +131,10 @@ export default function ResultWindow() {
 
   return (
     <div
-      className="fixed inset-0 bg-black/25 backdrop-blur-sm flex items-center justify-center z-50 p-8"
+      className={resultWindowContainerClassName(presentation)}
       onClick={handleOverlayClick}
     >
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-[slideIn_0.3s_ease-out]">
+      <div className={resultWindowPanelClassName(presentation)}>
         {/* Header */}
         <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
           <h2 className="text-lg font-bold text-gray-900">
@@ -246,6 +270,10 @@ export default function ResultWindow() {
                 <TranslationCard
                   key={index}
                   providerId={result.provider_id}
+                  providerName={getTranslationProviderDisplayName(
+                    result.provider_id,
+                    translationProviders,
+                  )}
                   text={result.translated_text}
                   detectedLanguage={result.detected_language || undefined}
                 />

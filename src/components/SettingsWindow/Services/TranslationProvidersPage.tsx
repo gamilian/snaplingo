@@ -12,7 +12,9 @@ export function TranslationProvidersPage() {
   const deactivateProvider = useProviderStore((state) => state.deactivateTranslationProvider);
   const updateProviderConfig = useProviderStore((state) => state.updateProviderConfig);
   const addCustomProvider = useProviderStore((state) => state.addCustomTranslationProvider);
+  const updateCustomProvider = useProviderStore((state) => state.updateCustomTranslationProvider);
   const removeProvider = useProviderStore((state) => state.removeTranslationProvider);
+  const testCustomProvider = useProviderStore((state) => state.testCustomTranslationProvider);
   const reorderProviders = useProviderStore((state) => state.reorderTranslationProviders);
 
   const [configuringProvider, setConfiguringProvider] = useState<string | null>(null);
@@ -46,9 +48,13 @@ export function TranslationProvidersPage() {
     setConfiguringProvider(null);
   };
 
-  const handleTest = (_id: string) => {
-    // TODO: 实现 Provider 测试
-    alert('测试功能：将使用该翻译服务翻译一段示例文本\n\n此功能待实现');
+  const handleTest = async (id: string) => {
+    try {
+      await testCustomProvider(id);
+      alert('检测成功');
+    } catch (error) {
+      alert(`检测失败: ${error}`);
+    }
   };
 
   const handleRemove = async (id: string) => {
@@ -69,13 +75,22 @@ export function TranslationProvidersPage() {
     await addCustomProvider(request);
   };
 
+  const handleUpdateCustomProvider = async (providerId: string, request: any) => {
+    await updateCustomProvider(providerId, request);
+    await activateProvider(providerId);
+    setConfiguringProvider(null);
+  };
+
   // 拖拽处理
-  const handleDragStart = (id: string) => {
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', id);
     setDraggedId(id);
   };
 
   const handleDragOver = (e: React.DragEvent, id: string) => {
     e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
     if (draggedId && draggedId !== id) {
       setDragOverId(id);
     }
@@ -123,6 +138,37 @@ export function TranslationProvidersPage() {
   };
 
   const currentProvider = providers.find((p) => p.id === configuringProvider);
+  const isConfiguringCustomProvider = Boolean(
+    currentProvider && !currentProvider.isBuiltin,
+  );
+
+  if (addingCustomProvider || currentProvider) {
+    return (
+      <div className="max-w-5xl">
+        {currentProvider && !isConfiguringCustomProvider ? (
+          <ProviderConfigDialog
+            isOpen
+            presentation="inline"
+            onClose={() => setConfiguringProvider(null)}
+            onSave={handleSaveConfig}
+            provider={currentProvider}
+          />
+        ) : (
+          <CustomTranslationProviderDialog
+            isOpen
+            presentation="inline"
+            onClose={() => {
+              setAddingCustomProvider(false);
+              setConfiguringProvider(null);
+            }}
+            onSave={handleSaveCustomProvider}
+            onUpdate={handleUpdateCustomProvider}
+            initialProvider={isConfiguringCustomProvider ? currentProvider : null}
+          />
+        )}
+      </div>
+    );
+  }
 
   // 分离 active 和 inactive providers
   const activeProvidersList = activeProviders
@@ -132,107 +178,77 @@ export function TranslationProvidersPage() {
   const inactiveProvidersList = providers.filter(
     (p) => !activeProviders.includes(p.id)
   );
+  const orderedProviders = [...activeProvidersList, ...inactiveProvidersList];
 
   return (
-    <div className="max-w-4xl space-y-8">
-      <div>
-        <h2 className="text-3xl font-bold text-gray-900 mb-2">翻译服务</h2>
-        <p className="text-gray-600">
-          已激活：
-          {activeProviders.length > 0 ? (
-            activeProviders.map((id) => {
-              const provider = providers.find((p) => p.id === id);
-              return provider ? (
-                <span key={id} className="ml-2 px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded font-medium">
-                  {provider.name} ✓
-                </span>
-              ) : null;
-            })
-          ) : (
-            <span className="ml-2 text-gray-500">无</span>
-          )}
-        </p>
-        <p className="text-sm text-gray-500 mt-1">
-          支持同时激活多个翻译服务，结果会并行显示。拖拽已激活的服务可调整顺序。
-        </p>
-      </div>
+    <div className="max-w-5xl">
+      <div className="space-y-3">
+        {orderedProviders.map((provider) => {
+          const isActive = activeProviders.includes(provider.id);
 
-      {/* 已激活的服务（可拖拽排序） */}
-      {activeProvidersList.length > 0 && (
-        <div>
-          <h3 className="text-lg font-semibold text-gray-800 mb-3">已激活 ({activeProvidersList.length})</h3>
-          <div className="space-y-4">
-            {activeProvidersList.map((provider) => (
-              <div
-                key={provider.id}
-                draggable
-                onDragStart={() => handleDragStart(provider.id)}
-                onDragOver={(e) => handleDragOver(e, provider.id)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, provider.id)}
-                onDragEnd={handleDragEnd}
-                className={`transition-all ${
-                  draggedId === provider.id ? 'opacity-50' : ''
-                } ${
-                  dragOverId === provider.id ? 'border-2 border-blue-500 rounded-lg' : ''
-                }`}
-              >
-                <ProviderCard
-                  provider={provider}
-                  onActivate={() => handleActivate(provider.id)}
-                  onDeactivate={() => handleDeactivate(provider.id)}
-                  onConfigure={() => handleConfigure(provider.id)}
-                  onTest={() => handleTest(provider.id)}
-                  onRemove={() => handleRemove(provider.id)}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 未激活的服务 */}
-      {inactiveProvidersList.length > 0 && (
-        <div>
-          <h3 className="text-lg font-semibold text-gray-800 mb-3">可用服务 ({inactiveProvidersList.length})</h3>
-          <div className="space-y-4">
-            {inactiveProvidersList.map((provider) => (
+          return (
+            <div
+              key={provider.id}
+              draggable={isActive}
+              onDragStart={isActive ? (e) => handleDragStart(e, provider.id) : undefined}
+              onDragOver={isActive ? (e) => handleDragOver(e, provider.id) : undefined}
+              onDragLeave={isActive ? handleDragLeave : undefined}
+              onDrop={isActive ? (e) => handleDrop(e, provider.id) : undefined}
+              onDragEnd={isActive ? handleDragEnd : undefined}
+              className={`group transition-all ${
+                isActive ? 'cursor-grab active:cursor-grabbing' : ''
+              } ${
+                draggedId === provider.id ? 'opacity-50' : ''
+              } ${
+                dragOverId === provider.id ? 'rounded-[26px] ring-2 ring-emerald-300 ring-offset-2 ring-offset-[#f5f5f7]' : ''
+              }`}
+            >
               <ProviderCard
-                key={provider.id}
                 provider={provider}
                 onActivate={() => handleActivate(provider.id)}
                 onDeactivate={() => handleDeactivate(provider.id)}
                 onConfigure={() => handleConfigure(provider.id)}
-                onTest={() => handleTest(provider.id)}
+                onTest={!provider.isBuiltin ? () => handleTest(provider.id) : undefined}
                 onRemove={() => handleRemove(provider.id)}
+                highlighted={isActive}
+                leadingSlot={isActive ? (
+                  <span
+                    aria-label="拖动排序"
+                    title="拖动排序"
+                    className="grid grid-cols-2 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                  >
+                    {Array.from({ length: 6 }).map((_, index) => (
+                      <span
+                        key={index}
+                        className="h-1 w-1 rounded-full bg-gray-400"
+                      />
+                    ))}
+                  </span>
+                ) : undefined}
               />
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="pt-4 border-t border-gray-200">
-        <button
-          onClick={handleAddCustom}
-          className="px-4 py-2 text-sm text-primary-600 hover:bg-blue-50 rounded-lg transition-colors font-medium"
-        >
-          + 添加自定义服务
-        </button>
-        <p className="text-xs text-gray-500 mt-2">支持添加兼容 OpenAI / Claude / Gemini API 的自定义翻译服务</p>
+            </div>
+          );
+        })}
       </div>
 
-      <ProviderConfigDialog
-        isOpen={configuringProvider !== null}
-        onClose={() => setConfiguringProvider(null)}
-        onSave={handleSaveConfig}
-        provider={currentProvider || null}
-      />
+      <button
+        type="button"
+        aria-label="添加自定义服务"
+        title="添加自定义服务"
+        onClick={handleAddCustom}
+        className="absolute right-0 top-1 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary-600 text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-[#f5f5f7]"
+      >
+        <PlusIcon />
+      </button>
 
-      <CustomTranslationProviderDialog
-        isOpen={addingCustomProvider}
-        onClose={() => setAddingCustomProvider(false)}
-        onSave={handleSaveCustomProvider}
-      />
     </div>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5" />
+    </svg>
   );
 }

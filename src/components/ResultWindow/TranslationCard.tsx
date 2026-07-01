@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 interface TranslationCardProps {
   providerId: string;
+  providerName?: string;
   text: string;
   detectedLanguage?: string;
 }
@@ -9,13 +10,14 @@ interface TranslationCardProps {
 // Provider品牌色映射
 const providerColors: Record<string, string> = {
   'google': '#4285f4',
-  'deepl': '#0f2b46',
+  'deeplx': '#0f2b46',
   'baidu': '#2932e1',
   'openai': '#10a37f',
 };
 
 export default function TranslationCard({
   providerId,
+  providerName,
   text,
   detectedLanguage,
 }: TranslationCardProps) {
@@ -35,7 +37,9 @@ export default function TranslationCard({
             className="w-1 h-4 rounded"
             style={{ background: providerColor }}
           />
-          <span className="font-semibold text-gray-900">{providerId}</span>
+          <span className="font-semibold text-gray-900">
+            {providerName || providerId}
+          </span>
           {detectedLanguage && (
             <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">
               Detected: {detectedLanguage}

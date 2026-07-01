@@ -63,8 +63,21 @@ pub enum ReasoningLevel {
 pub enum LLMProtocol {
     #[serde(rename = "openai")]
     OpenAI,
+    #[serde(rename = "openai-responses")]
+    OpenAIResponses,
     #[serde(rename = "anthropic")]
     Anthropic,
     #[serde(rename = "gemini")]
     Gemini,
+}
+
+impl LLMProtocol {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::OpenAI => "openai",
+            Self::OpenAIResponses => "openai-responses",
+            Self::Anthropic => "anthropic",
+            Self::Gemini => "gemini",
+        }
+    }
 }

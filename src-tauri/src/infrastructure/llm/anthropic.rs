@@ -1,4 +1,5 @@
 use super::client::{LLMClient, LLMRequest, LLMResponse, ReasoningLevel};
+use super::endpoint_url::complete_standard_endpoint;
 use crate::error::AppError;
 use crate::infrastructure::http::HttpClient;
 use anyhow::Result;
@@ -12,6 +13,18 @@ pub struct AnthropicLLMClient {
     endpoint: String,
     model: String,
     api_key: String,
+}
+
+pub(crate) fn anthropic_messages_url(endpoint: &str) -> String {
+    complete_standard_endpoint(endpoint, "/v1/messages", &["/v1/messages", "/v1"])
+}
+
+pub(crate) fn anthropic_models_url(endpoint: &str) -> String {
+    complete_standard_endpoint(
+        endpoint,
+        "/v1/models",
+        &["/v1/messages", "/v1/models", "/v1"],
+    )
 }
 
 impl AnthropicLLMClient {
@@ -60,7 +73,7 @@ impl AnthropicLLMClient {
 #[async_trait]
 impl LLMClient for AnthropicLLMClient {
     async fn generate(&self, request: &LLMRequest) -> Result<LLMResponse> {
-        let url = format!("{}/v1/messages", self.endpoint.trim_end_matches('/'));
+        let url = anthropic_messages_url(&self.endpoint);
 
         let mut body = json!({
             "model": self.model,
@@ -247,5 +260,25 @@ mod tests {
 
         let result = client.generate(&request).await;
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_anthropic_url_helpers_complete_standard_v1_prefixes() {
+        assert_eq!(
+            anthropic_messages_url("https://api.anthropic.com"),
+            "https://api.anthropic.com/v1/messages"
+        );
+        assert_eq!(
+            anthropic_messages_url("https://api.anthropic.com/v1/messages"),
+            "https://api.anthropic.com/v1/messages"
+        );
+        assert_eq!(
+            anthropic_messages_url("https://api.anthropic.com/messages"),
+            "https://api.anthropic.com/messages"
+        );
+        assert_eq!(
+            anthropic_models_url("https://api.anthropic.com/messages"),
+            "https://api.anthropic.com/messages"
+        );
     }
 }

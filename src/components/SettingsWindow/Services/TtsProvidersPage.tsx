@@ -27,38 +27,25 @@ export function TtsProvidersPage() {
     setConfiguringProvider(null);
   };
 
-  const handleTest = (_id: string) => {
-    // TODO: 实现 Provider 测试
-    alert('测试功能：将使用该 TTS 服务朗读一段示例文本\n\n此功能待实现');
-  };
-
   const currentProvider = providers.find((p) => p.id === configuringProvider);
 
   return (
-    <div className="max-w-4xl space-y-8">
-      <div>
-        <h2 className="text-3xl font-bold text-gray-900 mb-2">语音合成</h2>
-        <p className="text-gray-600">
-          当前激活：<span className="font-medium text-primary-600">
-            {providers.find((p) => p.id === activeProvider)?.name || '无'}
-          </span>
-        </p>
-      </div>
-
-      <div className="space-y-4">
+    <div className="max-w-5xl space-y-3">
+      <div className="space-y-3">
         {providers.map((provider) => (
           <ProviderCard
             key={provider.id}
             provider={provider}
             onActivate={() => handleActivate(provider.id)}
             onConfigure={() => handleConfigure(provider.id)}
-            onTest={() => handleTest(provider.id)}
+            highlighted={provider.id === activeProvider}
           />
         ))}
       </div>
 
       <ProviderConfigDialog
         isOpen={configuringProvider !== null}
+        presentation="inline"
         onClose={() => setConfiguringProvider(null)}
         onSave={handleSaveConfig}
         provider={currentProvider || null}

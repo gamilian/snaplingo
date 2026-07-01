@@ -1,4 +1,4 @@
-use crate::application::providers::common::Provider;
+use crate::application::providers::common::{CredentialField, Provider};
 use crate::application::providers::translation::TranslationProvider;
 use crate::domain::translation::{TranslationRequest, TranslationResult};
 use crate::infrastructure::http::HttpClient;
@@ -8,56 +8,104 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// DeepL translation provider implementation.
+/// DeepLX translation provider implementation.
 ///
-/// Uses the DeepL API which requires an API key (paid service).
-/// Supports both free and paid API tiers.
+/// Uses a configured DeepLX-compatible endpoint.
 pub struct DeepLProvider {
     http_client: Arc<dyn HttpClient>,
+    mode: DeepLMode,
+    endpoint: Option<String>,
     api_key: Option<String>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DeepLMode {
+    DeepLX,
+    DeepL,
+}
+
 impl DeepLProvider {
-    /// Creates a new DeepL provider with the given HTTP client.
+    /// Creates a new DeepLX provider with the given HTTP client.
     pub fn new(http_client: Arc<dyn HttpClient>) -> Self {
         Self {
             http_client,
+            mode: DeepLMode::DeepLX,
+            endpoint: None,
             api_key: None,
         }
     }
 
-    /// Sets the API key for authentication.
-    pub fn set_api_key(&mut self, api_key: String) {
-        self.api_key = Some(api_key);
+    /// Sets the DeepLX endpoint.
+    pub fn set_endpoint(&mut self, endpoint: String) {
+        self.mode = DeepLMode::DeepLX;
+        self.endpoint = Some(endpoint);
     }
 }
 
 impl Provider for DeepLProvider {
     fn id(&self) -> &str {
-        "deepl"
+        "deeplx"
     }
 
     fn name(&self) -> &str {
-        "DeepL"
+        "DeepLX"
     }
 
     fn is_configured(&self) -> bool {
-        self.api_key.is_some()
+        match self.mode {
+            DeepLMode::DeepLX => self.endpoint.is_some(),
+            DeepLMode::DeepL => self.api_key.is_some(),
+        }
     }
 
     fn requires_api_key(&self) -> bool {
         true
     }
 
+    fn credential_fields(&self) -> Vec<CredentialField> {
+        vec![
+            CredentialField::new("mode", "模式", false),
+            CredentialField::new("endpoint", "DeepLX API 地址", false),
+            CredentialField::new("api_key", "DeepL API Key", true),
+        ]
+    }
+
     fn reconfigure_credentials(
         &mut self,
         credentials: &std::collections::HashMap<String, String>,
     ) -> crate::Result<()> {
-        let api_key = credentials
-            .get("api_key")
-            .ok_or_else(|| crate::AppError::Other("Missing api_key".to_string()))?
-            .clone();
-        self.api_key = Some(api_key);
+        let mode = credentials
+            .get("mode")
+            .map(String::as_str)
+            .unwrap_or("deeplx");
+
+        match mode {
+            "deepl" => {
+                let api_key = credentials
+                    .get("api_key")
+                    .map(|value| value.trim())
+                    .filter(|value| !value.is_empty())
+                    .ok_or_else(|| crate::AppError::Other("Missing api_key".to_string()))?;
+                self.mode = DeepLMode::DeepL;
+                self.api_key = Some(api_key.to_string());
+            }
+            "deeplx" => {
+                let endpoint = credentials
+                    .get("endpoint")
+                    .map(|value| value.trim())
+                    .filter(|value| !value.is_empty())
+                    .ok_or_else(|| crate::AppError::Other("Missing endpoint".to_string()))?;
+                self.mode = DeepLMode::DeepLX;
+                self.endpoint = Some(endpoint.to_string());
+            }
+            other => {
+                return Err(crate::AppError::Other(format!(
+                    "Invalid DeepLX mode: {}",
+                    other
+                )));
+            }
+        }
+
         Ok(())
     }
 }
@@ -80,24 +128,113 @@ struct DeepLTranslation {
     text: String,
 }
 
+#[derive(Serialize)]
+struct DeepLXRequest {
+    text: String,
+    source_lang: String,
+    target_lang: String,
+}
+
+#[derive(Deserialize)]
+struct DeepLXResponse {
+    code: Option<i32>,
+    data: String,
+}
+
+fn deeplx_translate_url(endpoint: &str) -> String {
+    let endpoint = endpoint.trim().trim_end_matches('/');
+    if endpoint.ends_with("/translate") {
+        endpoint.to_string()
+    } else {
+        format!("{}/translate", endpoint)
+    }
+}
+
+fn deepl_language_code(lang: &str) -> String {
+    if lang.eq_ignore_ascii_case("zh") {
+        return "ZH".to_string();
+    }
+
+    match lang.to_ascii_lowercase().as_str() {
+        "zh-cn" | "zh-tw" => "ZH".to_string(),
+        _ => lang.to_uppercase(),
+    }
+}
+
 #[async_trait]
 impl TranslationProvider for DeepLProvider {
     async fn translate(&self, request: &TranslationRequest) -> Result<TranslationResult> {
+        if self.mode == DeepLMode::DeepL {
+            return self.translate_with_deepl(request).await;
+        }
+
+        let endpoint = self
+            .endpoint
+            .as_ref()
+            .ok_or_else(|| AppError::Other("DeepLX endpoint not configured".to_string()))?;
+
+        let url = deeplx_translate_url(endpoint);
+
+        let deeplx_request = DeepLXRequest {
+            text: request.text.clone(),
+            source_lang: deepl_language_code(&request.source_lang),
+            target_lang: deepl_language_code(&request.target_lang),
+        };
+
+        let body = serde_json::to_string(&deeplx_request)?;
+
+        let mut headers = HashMap::new();
+        headers.insert("Content-Type".to_string(), "application/json".to_string());
+
+        let response = self
+            .http_client
+            .post(&url, headers, body)
+            .await
+            .map_err(|e| AppError::Other(format!("HTTP request failed: {}", e)))?;
+
+        if response.status != 200 {
+            return Err(AppError::Other(format!(
+                "DeepLX API returned status {}: {}",
+                response.status, response.body
+            )));
+        }
+
+        let deeplx_response: DeepLXResponse = serde_json::from_str(&response.body)?;
+        if let Some(code) = deeplx_response.code {
+            if code != 200 {
+                return Err(AppError::Other(format!(
+                    "DeepLX API returned code {}",
+                    code
+                )));
+            }
+        }
+
+        Ok(TranslationResult {
+            provider_id: self.id().to_string(),
+            translated_text: deeplx_response.data,
+            detected_language: None,
+            confidence: None,
+        })
+    }
+}
+
+impl DeepLProvider {
+    async fn translate_with_deepl(
+        &self,
+        request: &TranslationRequest,
+    ) -> Result<TranslationResult> {
         let api_key = self
             .api_key
             .as_ref()
             .ok_or_else(|| AppError::Other("DeepL API key not configured".to_string()))?;
 
-        let url = "https://api-free.deepl.com/v2/translate";
-
         let deepl_request = DeepLRequest {
             text: vec![request.text.clone()],
-            source_lang: request.source_lang.to_uppercase(),
-            target_lang: request.target_lang.to_uppercase(),
+            source_lang: deepl_language_code(&request.source_lang),
+            target_lang: deepl_language_code(&request.target_lang),
         };
 
         let body = serde_json::to_string(&deepl_request)?;
-
         let mut headers = HashMap::new();
         headers.insert(
             "Authorization".to_string(),
@@ -107,7 +244,7 @@ impl TranslationProvider for DeepLProvider {
 
         let response = self
             .http_client
-            .post(&url, headers, body)
+            .post("https://api-free.deepl.com/v2/translate", headers, body)
             .await
             .map_err(|e| AppError::Other(format!("HTTP request failed: {}", e)))?;
 
@@ -119,7 +256,6 @@ impl TranslationProvider for DeepLProvider {
         }
 
         let deepl_response: DeepLResponse = serde_json::from_str(&response.body)?;
-
         let translation = deepl_response
             .translations
             .first()
@@ -129,7 +265,7 @@ impl TranslationProvider for DeepLProvider {
             provider_id: self.id().to_string(),
             translated_text: translation.text.clone(),
             detected_language: translation.detected_source_language.clone(),
-            confidence: None, // DeepL doesn't provide confidence scores
+            confidence: None,
         })
     }
 }
@@ -143,6 +279,11 @@ mod tests {
         response: HttpResponse,
     }
 
+    struct RecordingHttpClient {
+        response: HttpResponse,
+        posts: Arc<std::sync::Mutex<Vec<(String, HashMap<String, String>, String)>>>,
+    }
+
     #[async_trait]
     impl HttpClient for MockHttpClient {
         async fn post(
@@ -151,6 +292,30 @@ mod tests {
             _headers: HashMap<String, String>,
             _body: String,
         ) -> anyhow::Result<HttpResponse> {
+            Ok(self.response.clone())
+        }
+
+        async fn get(
+            &self,
+            _url: &str,
+            _headers: HashMap<String, String>,
+        ) -> anyhow::Result<HttpResponse> {
+            Ok(self.response.clone())
+        }
+    }
+
+    #[async_trait]
+    impl HttpClient for RecordingHttpClient {
+        async fn post(
+            &self,
+            url: &str,
+            headers: HashMap<String, String>,
+            body: String,
+        ) -> anyhow::Result<HttpResponse> {
+            self.posts
+                .lock()
+                .unwrap()
+                .push((url.to_string(), headers, body));
             Ok(self.response.clone())
         }
 
@@ -175,14 +340,27 @@ mod tests {
 
         let provider = DeepLProvider::new(mock_client);
 
-        assert_eq!(provider.id(), "deepl");
-        assert_eq!(provider.name(), "DeepL");
-        assert!(!provider.is_configured()); // Not configured without API key
+        assert_eq!(provider.id(), "deeplx");
+        assert_eq!(provider.name(), "DeepLX");
+        assert!(!provider.is_configured()); // Not configured without endpoint
         assert!(provider.requires_api_key());
+        let field_names: Vec<_> = provider
+            .credential_fields()
+            .into_iter()
+            .map(|field| field.name)
+            .collect();
+        assert_eq!(
+            field_names,
+            vec![
+                "mode".to_string(),
+                "endpoint".to_string(),
+                "api_key".to_string()
+            ]
+        );
     }
 
     #[tokio::test]
-    async fn test_provider_configured_with_api_key() {
+    async fn test_provider_configured_with_endpoint() {
         let mock_client = Arc::new(MockHttpClient {
             response: HttpResponse {
                 status: 200,
@@ -192,15 +370,14 @@ mod tests {
         });
 
         let mut provider = DeepLProvider::new(mock_client);
-        provider.set_api_key("test-api-key".to_string());
+        provider.set_endpoint("https://deeplx.example.test".to_string());
 
         assert!(provider.is_configured());
     }
 
     #[tokio::test]
     async fn test_translate_success() {
-        let mock_response =
-            r#"{"translations":[{"detected_source_language":"FR","text":"Hello"}]}"#;
+        let mock_response = r#"{"code":200,"data":"Hello","alternatives":[]}"#;
 
         let mock_client = Arc::new(MockHttpClient {
             response: HttpResponse {
@@ -211,7 +388,7 @@ mod tests {
         });
 
         let mut provider = DeepLProvider::new(mock_client);
-        provider.set_api_key("test-api-key".to_string());
+        provider.set_endpoint("https://deeplx.example.test".to_string());
 
         let request = TranslationRequest {
             text: "Bonjour".to_string(),
@@ -222,8 +399,78 @@ mod tests {
         let result = provider.translate(&request).await.unwrap();
 
         assert_eq!(result.translated_text, "Hello");
-        assert_eq!(result.detected_language, Some("FR".to_string()));
+        assert_eq!(result.detected_language, None);
         assert_eq!(result.confidence, None);
+    }
+
+    #[tokio::test]
+    async fn test_deeplx_normalizes_chinese_locale_codes() {
+        let posts = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let mock_client = Arc::new(RecordingHttpClient {
+            response: HttpResponse {
+                status: 200,
+                body: r#"{"code":200,"data":"你好","alternatives":[]}"#.to_string(),
+                headers: HashMap::new(),
+            },
+            posts: posts.clone(),
+        });
+
+        let mut provider = DeepLProvider::new(mock_client);
+        provider.set_endpoint("https://deeplx.example.test".to_string());
+
+        provider
+            .translate(&TranslationRequest {
+                text: "你好".to_string(),
+                source_lang: "zh-CN".to_string(),
+                target_lang: "zh-CN".to_string(),
+            })
+            .await
+            .unwrap();
+
+        let posts = posts.lock().unwrap();
+        let body: serde_json::Value = serde_json::from_str(&posts[0].2).unwrap();
+        assert_eq!(body["source_lang"], "ZH");
+        assert_eq!(body["target_lang"], "ZH");
+    }
+
+    #[tokio::test]
+    async fn test_translate_with_standard_deepl_mode() {
+        let posts = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let mock_client = Arc::new(RecordingHttpClient {
+            response: HttpResponse {
+                status: 200,
+                body: r#"{"translations":[{"detected_source_language":"FR","text":"Hello"}]}"#
+                    .to_string(),
+                headers: HashMap::new(),
+            },
+            posts: posts.clone(),
+        });
+
+        let mut provider = DeepLProvider::new(mock_client);
+        provider
+            .reconfigure_credentials(&HashMap::from([
+                ("mode".to_string(), "deepl".to_string()),
+                ("api_key".to_string(), "test-api-key".to_string()),
+            ]))
+            .unwrap();
+
+        let result = provider
+            .translate(&TranslationRequest {
+                text: "Bonjour".to_string(),
+                source_lang: "fr".to_string(),
+                target_lang: "en".to_string(),
+            })
+            .await
+            .unwrap();
+
+        let posts = posts.lock().unwrap();
+        assert_eq!(posts[0].0, "https://api-free.deepl.com/v2/translate");
+        assert_eq!(
+            posts[0].1.get("Authorization").map(String::as_str),
+            Some("DeepL-Auth-Key test-api-key")
+        );
+        assert_eq!(result.translated_text, "Hello");
+        assert_eq!(result.detected_language, Some("FR".to_string()));
     }
 
     #[tokio::test]
@@ -259,7 +506,7 @@ mod tests {
         });
 
         let mut provider = DeepLProvider::new(mock_client);
-        provider.set_api_key("invalid-key".to_string());
+        provider.set_endpoint("https://deeplx.example.test".to_string());
 
         let request = TranslationRequest {
             text: "Hello".to_string(),
@@ -282,7 +529,7 @@ mod tests {
         });
 
         let mut provider = DeepLProvider::new(mock_client);
-        provider.set_api_key("test-api-key".to_string());
+        provider.set_endpoint("https://deeplx.example.test".to_string());
 
         let request = TranslationRequest {
             text: "Hello".to_string(),
@@ -296,7 +543,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_translate_empty_response() {
-        let mock_response = r#"{"translations":[]}"#;
+        let mock_response = r#"{"code":500,"data":""}"#;
 
         let mock_client = Arc::new(MockHttpClient {
             response: HttpResponse {
@@ -307,7 +554,7 @@ mod tests {
         });
 
         let mut provider = DeepLProvider::new(mock_client);
-        provider.set_api_key("test-api-key".to_string());
+        provider.set_endpoint("https://deeplx.example.test".to_string());
 
         let request = TranslationRequest {
             text: "Hello".to_string(),

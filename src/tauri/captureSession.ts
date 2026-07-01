@@ -28,6 +28,7 @@ export interface CaptureResultWindowPayload {
   mode: 'translation' | 'ocr';
   text: string;
   autoTranslate: boolean;
+  startFileOcr: boolean;
 }
 
 function captureOutputArgs(input: RenderCaptureOutputInput) {

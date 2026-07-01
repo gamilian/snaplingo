@@ -16,6 +16,11 @@ mod tests {
         response_text: String,
     }
 
+    struct FailingTranslationProvider {
+        id: String,
+        name: String,
+    }
+
     impl MockTranslationProvider {
         fn new(id: &str, name: &str) -> Self {
             Self {
@@ -64,6 +69,31 @@ mod tests {
         }
     }
 
+    impl Provider for FailingTranslationProvider {
+        fn id(&self) -> &str {
+            &self.id
+        }
+
+        fn name(&self) -> &str {
+            &self.name
+        }
+
+        fn is_configured(&self) -> bool {
+            true
+        }
+
+        fn requires_api_key(&self) -> bool {
+            false
+        }
+    }
+
+    #[async_trait]
+    impl TranslationProvider for FailingTranslationProvider {
+        async fn translate(&self, _request: &TranslationRequest) -> Result<TranslationResult> {
+            Err("upstream rejected request".into())
+        }
+    }
+
     fn sample_request() -> TranslationRequest {
         TranslationRequest {
             text: "Hello".to_string(),
@@ -98,6 +128,40 @@ mod tests {
         let result = coordinator.register(MockTranslationProvider::new("google", "Google"));
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_replace_provider_preserves_active_order() {
+        let config = Arc::new(ConfigFile::new_temp());
+        let coordinator = TranslationCoordinator::new(config);
+        coordinator
+            .register(MockTranslationProvider::new("google", "Google Translate"))
+            .unwrap();
+        coordinator
+            .register(MockTranslationProvider::new("custom-gpt", "gpt-5-mini"))
+            .unwrap();
+        coordinator.activate("google").unwrap();
+        coordinator.activate("custom-gpt").unwrap();
+
+        coordinator
+            .replace(MockTranslationProvider::new(
+                "custom-gpt",
+                "gpt-5-mini updated",
+            ))
+            .unwrap();
+
+        let active = coordinator.get_active();
+        let active_names: Vec<_> = active
+            .iter()
+            .map(|provider| provider.read().name().to_string())
+            .collect();
+        assert_eq!(
+            active_names,
+            vec![
+                "Google Translate".to_string(),
+                "gpt-5-mini updated".to_string()
+            ]
+        );
     }
 
     #[test]
@@ -186,6 +250,34 @@ mod tests {
         assert_eq!(active[0].read().id(), "google");
     }
 
+    #[test]
+    fn test_restore_from_config_maps_legacy_deepl_to_deeplx() {
+        let config = Arc::new(ConfigFile::new_temp());
+        config
+            .save(
+                "active_translation_providers",
+                &vec!["google".to_string(), "deepl".to_string()],
+            )
+            .unwrap();
+
+        let coordinator = TranslationCoordinator::new(config);
+        coordinator
+            .register(MockTranslationProvider::new("google", "Google"))
+            .unwrap();
+        coordinator
+            .register(MockTranslationProvider::new("deeplx", "DeepLX"))
+            .unwrap();
+
+        coordinator.restore_from_config().unwrap();
+
+        let active = coordinator.get_active();
+        let active_ids: Vec<_> = active
+            .iter()
+            .map(|provider| provider.read().id().to_string())
+            .collect();
+        assert_eq!(active_ids, vec!["google".to_string(), "deeplx".to_string()]);
+    }
+
     // ---- Translation execution tests ----
 
     #[tokio::test]
@@ -234,6 +326,38 @@ mod tests {
         let texts: Vec<String> = results.iter().map(|r| r.translated_text.clone()).collect();
         assert!(texts.contains(&"Hola (Google)".to_string()));
         assert!(texts.contains(&"Hola (DeepL)".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_translate_includes_active_provider_failure_results() {
+        let config = Arc::new(ConfigFile::new_temp());
+        let coordinator = TranslationCoordinator::new(config);
+        coordinator
+            .register(MockTranslationProvider::with_response(
+                "google",
+                "Google Translate",
+                "Hola (Google)",
+            ))
+            .unwrap();
+        coordinator
+            .register(FailingTranslationProvider {
+                id: "custom-gpt".to_string(),
+                name: "gpt-5-mini".to_string(),
+            })
+            .unwrap();
+        coordinator.activate("google").unwrap();
+        coordinator.activate("custom-gpt").unwrap();
+
+        let results = coordinator.translate(&sample_request()).await.unwrap();
+
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].provider_id, "google");
+        assert_eq!(results[0].translated_text, "Hola (Google)");
+        assert_eq!(results[1].provider_id, "custom-gpt");
+        assert!(results[1].translated_text.contains("Translation failed"));
+        assert!(results[1]
+            .translated_text
+            .contains("upstream rejected request"));
     }
 
     #[tokio::test]

@@ -1,4 +1,5 @@
 use super::client::{LLMClient, LLMRequest, LLMResponse, ReasoningLevel};
+use super::endpoint_url::complete_standard_endpoint;
 use crate::error::AppError;
 use crate::infrastructure::http::HttpClient;
 use anyhow::Result;
@@ -12,6 +13,56 @@ pub struct GeminiLLMClient {
     endpoint: String,
     model: String,
     api_key: String,
+}
+
+pub(crate) fn gemini_generate_content_url(endpoint: &str, model: &str, api_key: &str) -> String {
+    let endpoint = endpoint.trim();
+    let key = urlencoding::encode(api_key);
+    let model_id = model.strip_prefix("models/").unwrap_or(model);
+    let standard_path = format!("/v1beta/models/{}:generateContent", model_id);
+    let model_path = format!("/v1beta/models/{}", model_id);
+
+    if is_standard_gemini_generate_content_endpoint(endpoint) {
+        return append_gemini_key(endpoint.trim_end_matches('/'), &key);
+    } else {
+        let request_url = complete_standard_endpoint(
+            endpoint,
+            &standard_path,
+            &[
+                standard_path.as_str(),
+                model_path.as_str(),
+                "/v1beta/models",
+                "/v1beta",
+            ],
+        );
+        append_gemini_key(&request_url, &key)
+    }
+}
+
+pub(crate) fn gemini_models_url(endpoint: &str, api_key: &str) -> String {
+    let endpoint = endpoint.trim();
+    let endpoint_without_query = endpoint.split('?').next().unwrap_or(endpoint);
+    let models_url = if let Some((base, _)) = endpoint_without_query.split_once("/v1beta/models/") {
+        format!("{}/v1beta/models", base.trim_end_matches('/'))
+    } else {
+        complete_standard_endpoint(endpoint, "/v1beta/models", &["/v1beta/models", "/v1beta"])
+    };
+
+    append_gemini_key(&models_url, &urlencoding::encode(api_key))
+}
+
+fn append_gemini_key(endpoint: &str, encoded_key: &str) -> String {
+    if endpoint.contains('?') {
+        endpoint.to_string()
+    } else {
+        format!("{}?key={}", endpoint, encoded_key)
+    }
+}
+
+fn is_standard_gemini_generate_content_endpoint(endpoint: &str) -> bool {
+    let endpoint_without_query = endpoint.split('?').next().unwrap_or(endpoint);
+    endpoint_without_query.contains("/v1beta/models/")
+        && endpoint_without_query.ends_with(":generateContent")
 }
 
 impl GeminiLLMClient {
@@ -58,12 +109,7 @@ impl GeminiLLMClient {
 #[async_trait]
 impl LLMClient for GeminiLLMClient {
     async fn generate(&self, request: &LLMRequest) -> Result<LLMResponse> {
-        let url = format!(
-            "{}/v1beta/models/{}:generateContent?key={}",
-            self.endpoint.trim_end_matches('/'),
-            self.model,
-            self.api_key
-        );
+        let url = gemini_generate_content_url(&self.endpoint, &self.model, &self.api_key);
 
         let mut body = json!({
             "contents": [{
@@ -241,5 +287,48 @@ mod tests {
 
         let result = client.generate(&request).await;
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_gemini_url_helpers_complete_standard_v1beta_prefixes() {
+        assert_eq!(
+            gemini_generate_content_url(
+                "https://generativelanguage.googleapis.com",
+                "gemini-2.5-pro",
+                "test-key"
+            ),
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=test-key"
+        );
+        assert_eq!(
+            gemini_generate_content_url(
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent",
+                "gemini-2.5-pro",
+                "test-key"
+            ),
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=test-key"
+        );
+        assert_eq!(
+            gemini_generate_content_url(
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro",
+                "gemini-2.5-pro",
+                "test-key"
+            ),
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=test-key"
+        );
+        assert_eq!(
+            gemini_generate_content_url(
+                "https://generativelanguage.googleapis.com/models/gemini-2.5-pro:generateContent",
+                "gemini-2.5-pro",
+                "test-key"
+            ),
+            "https://generativelanguage.googleapis.com/models/gemini-2.5-pro:generateContent?key=test-key"
+        );
+        assert_eq!(
+            gemini_models_url(
+                "https://generativelanguage.googleapis.com/models/gemini-2.5-pro:generateContent",
+                "test-key"
+            ),
+            "https://generativelanguage.googleapis.com/models/gemini-2.5-pro:generateContent?key=test-key"
+        );
     }
 }
