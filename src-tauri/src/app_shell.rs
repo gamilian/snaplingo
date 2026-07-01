@@ -177,7 +177,6 @@ pub(crate) fn handle_reopen(app: &tauri::AppHandle, has_visible_windows: bool) {
                 has_visible_windows,
                 crate::infrastructure::system::capture_window::is_capture_presentation_active(),
                 crate::business_windows::has_visible_business_window(app),
-                crate::app_lifecycle::is_main_window_reopen_suppressed(),
             ) {
                 return;
             }
@@ -195,6 +194,14 @@ mod tests {
 
     #[test]
     fn menu_bar_mode_ignores_reopen() {
+        assert_eq!(
+            reopen_action_for_mode(AppShellMode::MenuBar),
+            ReopenAction::Ignore
+        );
+    }
+
+    #[test]
+    fn business_actions_do_not_need_main_reopen_suppression_in_menu_bar_mode() {
         assert_eq!(
             reopen_action_for_mode(AppShellMode::MenuBar),
             ReopenAction::Ignore

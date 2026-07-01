@@ -28,7 +28,6 @@ use serde::Serialize;
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 use crate::{
-    app_lifecycle,
     business_windows::{CAPTURE_RESULT_WINDOW_LABEL, CAPTURE_WINDOW_LABEL},
     settings_window,
 };
@@ -103,8 +102,6 @@ fn open_capture_result_window(
     payload: CaptureResultWindowPayload,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
-    app_lifecycle::suppress_main_window_reopen_after_hotkey();
-
     {
         let mut pending_payload = CAPTURE_RESULT_WINDOW_PAYLOAD
             .lock()
@@ -134,7 +131,6 @@ fn open_capture_result_window(
         .map_err(|e| e.to_string())?,
     };
 
-    app_lifecycle::suppress_main_window_reopen_after_hotkey();
     reveal_capture_result_window(&window)?;
     window
         .emit("capture-result-payload-ready", ())
