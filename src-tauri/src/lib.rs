@@ -7,6 +7,7 @@ mod composition;
 mod domain;
 mod error;
 mod infrastructure;
+mod settings_window;
 mod startup_shortcuts;
 
 // Public exports for new infrastructure layer
@@ -39,14 +40,14 @@ pub fn run() {
                 .build(),
         )
         .on_window_event(|window, event| {
-            if !app_lifecycle::should_hide_window_instead_of_close(window.label()) {
+            if !settings_window::should_hide_settings_window_instead_of_close(window.label()) {
                 return;
             }
 
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
-                if let Err(err) = window.hide() {
-                    log::warn!("Failed to hide main window on close request: {}", err);
+                if let Err(err) = settings_window::hide_settings_window(window) {
+                    log::warn!("Failed to hide settings window on close request: {}", err);
                 }
             }
         })
@@ -174,18 +175,8 @@ pub fn run() {
                     return;
                 }
 
-                let Some(window) = app_handle.get_webview_window(app_lifecycle::MAIN_WINDOW_LABEL)
-                else {
-                    return;
-                };
-
-                if let Err(err) = window.show() {
-                    log::warn!("Failed to show main window on app reopen: {}", err);
-                    return;
-                }
-
-                if let Err(err) = window.set_focus() {
-                    log::warn!("Failed to focus main window on app reopen: {}", err);
+                if let Err(err) = settings_window::show_settings_window(app_handle) {
+                    log::warn!("Failed to show settings window on app reopen: {}", err);
                 }
             }
         });

@@ -1,12 +1,12 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-pub(crate) const MAIN_WINDOW_LABEL: &str = "main";
+pub(crate) const MAIN_WINDOW_LABEL: &str = crate::settings_window::SETTINGS_WINDOW_LABEL;
 const BUSINESS_HOTKEY_REOPEN_SUPPRESSION_MS: u64 = 1_500;
 static SUPPRESS_MAIN_WINDOW_REOPEN_UNTIL_MS: AtomicU64 = AtomicU64::new(0);
 
 pub(crate) fn should_hide_window_instead_of_close(window_label: &str) -> bool {
-    window_label == MAIN_WINDOW_LABEL
+    crate::settings_window::should_hide_settings_window_instead_of_close(window_label)
 }
 
 pub(crate) fn should_show_main_window_on_reopen_for_state(
