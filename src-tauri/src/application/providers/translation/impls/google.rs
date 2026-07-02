@@ -66,12 +66,19 @@ impl TranslationProvider for GoogleTranslateProvider {
 
         let json: Value = serde_json::from_str(&response.body)?;
 
-        let translated_text = json[0][0][0]
-            .as_str()
+        let translated_text = json[0]
+            .as_array()
             .ok_or_else(|| {
                 AppError::Other("Invalid response format from Google Translate".to_string())
             })?
-            .to_string();
+            .iter()
+            .map(|segment| {
+                segment[0].as_str().ok_or_else(|| {
+                    AppError::Other("Invalid response format from Google Translate".to_string())
+                })
+            })
+            .collect::<Result<Vec<_>>>()?
+            .join("");
 
         let detected_language = json[2].as_str().map(String::from);
 
@@ -158,6 +165,35 @@ mod tests {
         assert_eq!(result.translated_text, "Hello");
         assert_eq!(result.detected_language, Some("fr".to_string()));
         assert_eq!(result.confidence, None);
+    }
+
+    #[tokio::test]
+    async fn test_translate_joins_segmented_response() {
+        let mock_response = r#"[[["程序化使用\n","Programmatic usage\n",null,null,10],["已复制\n","Copied\n",null,null,10],["SDK - 在 Node.js 应用程序中嵌入 pi。","SDK - embed pi in Node.js applications.",null,null,10]],null,"en",null,null,null,null,[]]"#;
+
+        let mock_client = Arc::new(MockHttpClient {
+            response: HttpResponse {
+                status: 200,
+                body: mock_response.to_string(),
+                headers: HashMap::new(),
+            },
+        });
+
+        let provider = GoogleTranslateProvider::new(mock_client);
+
+        let request = TranslationRequest {
+            text: "Programmatic usage\nCopied\nSDK - embed pi in Node.js applications.".to_string(),
+            source_lang: "en".to_string(),
+            target_lang: "zh-CN".to_string(),
+        };
+
+        let result = provider.translate(&request).await.unwrap();
+
+        assert_eq!(
+            result.translated_text,
+            "程序化使用\n已复制\nSDK - 在 Node.js 应用程序中嵌入 pi。"
+        );
+        assert_eq!(result.detected_language, Some("en".to_string()));
     }
 
     #[tokio::test]
