@@ -5,6 +5,9 @@ import { SettingsWindow } from './components/SettingsWindow';
 import ResultWindow from './components/ResultWindow';
 import { runOcrFileWorkflow } from './components/ResultWindow/ocrFileWorkflow';
 import {
+  shouldApplyOcrPayloadText,
+  shouldClearOcrResultsForPayload,
+  shouldStartFileOcrForPayload,
   shouldApplyTranslationPayloadText,
   shouldClearTranslationResultsForPayload,
 } from './components/ResultWindow/resultPayload';
@@ -66,6 +69,8 @@ function App() {
 
   const startFileOcr = useCallback(() => {
     showOcrWindow();
+    setOcrText('');
+    setOcrError(null);
     void runOcrFileWorkflow({
       selectImageFile,
       recognizeImageFile,
@@ -175,9 +180,14 @@ function App() {
       return;
     }
 
-    setOcrText(payload.text);
-    setOcrError(null);
-    if (payload.startFileOcr) {
+    if (shouldClearOcrResultsForPayload(payload)) {
+      setOcrText('');
+      setOcrError(null);
+    }
+    if (shouldApplyOcrPayloadText(payload)) {
+      setOcrText(payload.text);
+    }
+    if (shouldStartFileOcrForPayload(payload)) {
       startFileOcr();
       return;
     }

@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  shouldApplyOcrPayloadText,
+  shouldClearOcrResultsForPayload,
   shouldApplyTranslationPayloadText,
   shouldClearTranslationResultsForPayload,
+  shouldStartFileOcrForPayload,
 } from './resultPayload';
 
 describe('result payload application', () => {
@@ -11,7 +14,6 @@ describe('result payload application', () => {
         mode: 'translation',
         text: '',
         autoTranslate: false,
-        startFileOcr: false,
       }),
     ).toBe(false);
   });
@@ -22,7 +24,6 @@ describe('result payload application', () => {
         mode: 'translation',
         text: 'hello',
         autoTranslate: false,
-        startFileOcr: false,
       }),
     ).toBe(true);
     expect(
@@ -30,7 +31,6 @@ describe('result payload application', () => {
         mode: 'translation',
         text: 'hello',
         autoTranslate: true,
-        startFileOcr: false,
       }),
     ).toBe(true);
   });
@@ -41,7 +41,6 @@ describe('result payload application', () => {
         mode: 'translation',
         text: 'new selected text',
         autoTranslate: true,
-        startFileOcr: false,
       }),
     ).toBe(true);
     expect(
@@ -49,7 +48,71 @@ describe('result payload application', () => {
         mode: 'translation',
         text: '',
         autoTranslate: false,
-        startFileOcr: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('applies OCR text only for display-text intent', () => {
+    expect(
+      shouldApplyOcrPayloadText({
+        mode: 'ocr',
+        text: 'recognized text',
+        autoTranslate: false,
+        ocrIntent: 'display-text',
+      }),
+    ).toBe(true);
+    expect(
+      shouldApplyOcrPayloadText({
+        mode: 'ocr',
+        text: '',
+        autoTranslate: false,
+        ocrIntent: 'show',
+      }),
+    ).toBe(false);
+  });
+
+  it('clears OCR results for new OCR work but not for show-window', () => {
+    expect(
+      shouldClearOcrResultsForPayload({
+        mode: 'ocr',
+        text: 'recognized text',
+        autoTranslate: false,
+        ocrIntent: 'display-text',
+      }),
+    ).toBe(true);
+    expect(
+      shouldClearOcrResultsForPayload({
+        mode: 'ocr',
+        text: '',
+        autoTranslate: false,
+        ocrIntent: 'file',
+      }),
+    ).toBe(true);
+    expect(
+      shouldClearOcrResultsForPayload({
+        mode: 'ocr',
+        text: '',
+        autoTranslate: false,
+        ocrIntent: 'show',
+      }),
+    ).toBe(false);
+  });
+
+  it('starts file OCR only for file intent', () => {
+    expect(
+      shouldStartFileOcrForPayload({
+        mode: 'ocr',
+        text: '',
+        autoTranslate: false,
+        ocrIntent: 'file',
+      }),
+    ).toBe(true);
+    expect(
+      shouldStartFileOcrForPayload({
+        mode: 'ocr',
+        text: '',
+        autoTranslate: false,
+        ocrIntent: 'show',
       }),
     ).toBe(false);
   });

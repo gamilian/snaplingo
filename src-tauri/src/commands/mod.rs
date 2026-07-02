@@ -43,12 +43,21 @@ enum CaptureResultWindowMode {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+enum CaptureResultWindowOcrIntent {
+    Show,
+    DisplayText,
+    File,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CaptureResultWindowPayload {
     mode: CaptureResultWindowMode,
     text: String,
     auto_translate: bool,
-    start_file_ocr: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ocr_intent: Option<CaptureResultWindowOcrIntent>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -156,7 +165,7 @@ fn capture_translation_result_payload(text: String) -> CaptureResultWindowPayloa
 }
 
 fn capture_ocr_result_payload(text: String) -> CaptureResultWindowPayload {
-    ocr_result_payload(text, false)
+    ocr_result_payload(text, CaptureResultWindowOcrIntent::DisplayText)
 }
 
 fn translation_result_payload(text: String, auto_translate: bool) -> CaptureResultWindowPayload {
@@ -164,16 +173,19 @@ fn translation_result_payload(text: String, auto_translate: bool) -> CaptureResu
         mode: CaptureResultWindowMode::Translation,
         text,
         auto_translate,
-        start_file_ocr: false,
+        ocr_intent: None,
     }
 }
 
-fn ocr_result_payload(text: String, start_file_ocr: bool) -> CaptureResultWindowPayload {
+fn ocr_result_payload(
+    text: String,
+    ocr_intent: CaptureResultWindowOcrIntent,
+) -> CaptureResultWindowPayload {
     CaptureResultWindowPayload {
         mode: CaptureResultWindowMode::Ocr,
         text,
         auto_translate: false,
-        start_file_ocr,
+        ocr_intent: Some(ocr_intent),
     }
 }
 
@@ -187,10 +199,15 @@ fn result_window_payload_for_entrypoint(
             translation_result_payload(text, true)
         }
         ResultWindowEntrypoint::ShowTranslation => translation_result_payload(String::new(), false),
-        ResultWindowEntrypoint::Ocr | ResultWindowEntrypoint::ShowOcr => {
-            ocr_result_payload(text, false)
+        ResultWindowEntrypoint::Ocr => {
+            ocr_result_payload(text, CaptureResultWindowOcrIntent::DisplayText)
         }
-        ResultWindowEntrypoint::FileOcr => ocr_result_payload(String::new(), true),
+        ResultWindowEntrypoint::ShowOcr => {
+            ocr_result_payload(text, CaptureResultWindowOcrIntent::Show)
+        }
+        ResultWindowEntrypoint::FileOcr => {
+            ocr_result_payload(String::new(), CaptureResultWindowOcrIntent::File)
+        }
     }
 }
 
@@ -414,6 +431,10 @@ mod tests {
         assert_eq!(payload.mode, CaptureResultWindowMode::Ocr);
         assert_eq!(payload.text, "hello");
         assert!(!payload.auto_translate);
+        assert_eq!(
+            payload.ocr_intent,
+            Some(CaptureResultWindowOcrIntent::DisplayText)
+        );
     }
 
     #[test]
@@ -427,7 +448,7 @@ mod tests {
                 mode: CaptureResultWindowMode::Translation,
                 text: "hello".to_string(),
                 auto_translate: false,
-                start_file_ocr: false,
+                ocr_intent: None,
             }
         );
         assert_eq!(
@@ -447,7 +468,7 @@ mod tests {
                 mode: CaptureResultWindowMode::Translation,
                 text: "clipboard text".to_string(),
                 auto_translate: true,
-                start_file_ocr: false,
+                ocr_intent: None,
             }
         );
         assert_eq!(
@@ -459,7 +480,16 @@ mod tests {
                 mode: CaptureResultWindowMode::Translation,
                 text: String::new(),
                 auto_translate: false,
-                start_file_ocr: false,
+                ocr_intent: None,
+            }
+        );
+        assert_eq!(
+            result_window_payload_for_entrypoint(ResultWindowEntrypoint::Ocr, "hello".to_string()),
+            CaptureResultWindowPayload {
+                mode: CaptureResultWindowMode::Ocr,
+                text: "hello".to_string(),
+                auto_translate: false,
+                ocr_intent: Some(CaptureResultWindowOcrIntent::DisplayText),
             }
         );
         assert_eq!(
@@ -468,7 +498,7 @@ mod tests {
                 mode: CaptureResultWindowMode::Ocr,
                 text: String::new(),
                 auto_translate: false,
-                start_file_ocr: false,
+                ocr_intent: Some(CaptureResultWindowOcrIntent::Show),
             }
         );
         assert_eq!(
@@ -477,7 +507,7 @@ mod tests {
                 mode: CaptureResultWindowMode::Ocr,
                 text: String::new(),
                 auto_translate: false,
-                start_file_ocr: true,
+                ocr_intent: Some(CaptureResultWindowOcrIntent::File),
             }
         );
     }

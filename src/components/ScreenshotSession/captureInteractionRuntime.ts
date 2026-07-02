@@ -13,11 +13,14 @@ export type CaptureRuntimeOutputAction =
   | 'pin'
   | 'print';
 
-export type CaptureRuntimeResultWindow = 'ocr' | 'translation' | null;
+export type CaptureRuntimeOcrTarget =
+  | 'ocr-window'
+  | 'translation-window'
+  | 'clipboard';
 
 export type CaptureRuntimeEffect =
   | { type: 'output-capture'; action: CaptureRuntimeOutputAction }
-  | { type: 'run-ocr'; resultWindow: CaptureRuntimeResultWindow }
+  | { type: 'run-ocr'; target: CaptureRuntimeOcrTarget }
   | { type: 'record-selection'; action: CaptureCompletionAction | 'ocr' }
   | { type: 'finish-session' };
 
@@ -49,11 +52,11 @@ export function planCandidateSelectionCompletion(
   if (isOutputCaptureAction(action)) {
     effects.push({ type: 'output-capture', action });
   } else if (action === 'ocr') {
-    effects.push({ type: 'run-ocr', resultWindow: 'ocr' });
+    effects.push({ type: 'run-ocr', target: 'ocr-window' });
   } else if (action === 'ocr-translate') {
-    effects.push({ type: 'run-ocr', resultWindow: 'translation' });
+    effects.push({ type: 'run-ocr', target: 'translation-window' });
   } else if (action === 'silent-ocr') {
-    effects.push({ type: 'run-ocr', resultWindow: null });
+    effects.push({ type: 'run-ocr', target: 'clipboard' });
   }
 
   if (shouldRecordSuccessfulCaptureSelection(action)) {
@@ -73,11 +76,15 @@ export function planSelectionFlowCompletion(
   if (flow === 'preview') return [];
   if (flow === 'copy') return planCandidateSelectionCompletion('copy');
 
-  const resultWindow =
-    flow === 'ocr-translate' ? 'translation' : flow === 'ocr' ? 'ocr' : null;
+  const target =
+    flow === 'ocr-translate'
+      ? 'translation-window'
+      : flow === 'ocr'
+        ? 'ocr-window'
+        : 'clipboard';
 
   return [
-    { type: 'run-ocr', resultWindow },
+    { type: 'run-ocr', target },
     { type: 'record-selection', action: 'ocr' },
     { type: 'finish-session' },
   ];

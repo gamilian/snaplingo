@@ -50,21 +50,21 @@ describe('capture interaction model', () => {
     });
   });
 
-  it('plans OCR result windows and session completion', () => {
+  it('plans OCR targets and session completion', () => {
     expect(getCaptureCompletionPlan('ocr')).toMatchObject({
-      resultWindow: 'ocr',
+      ocrTarget: 'ocr-window',
       shouldFinishSession: true,
     });
     expect(getCaptureCompletionPlan('ocr-translate')).toMatchObject({
-      resultWindow: 'translation',
+      ocrTarget: 'translation-window',
       shouldFinishSession: true,
     });
     expect(getCaptureCompletionPlan('silent-ocr')).toMatchObject({
-      resultWindow: null,
+      ocrTarget: 'clipboard',
       shouldFinishSession: true,
     });
     expect(getCaptureCompletionPlan('cancel')).toMatchObject({
-      resultWindow: null,
+      ocrTarget: null,
       shouldFinishSession: false,
     });
   });

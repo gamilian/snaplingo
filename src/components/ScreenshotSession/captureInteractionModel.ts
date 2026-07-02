@@ -7,6 +7,7 @@ import {
   getCaptureModeSelectionFlow as getRuntimeCaptureModeSelectionFlow,
   getPrimaryCaptureCompletionActionForMode as getRuntimePrimaryCaptureCompletionActionForMode,
   planCandidateSelectionCompletion,
+  type CaptureRuntimeOcrTarget,
 } from './captureInteractionRuntime';
 import type { CaptureMode } from './types';
 
@@ -19,12 +20,10 @@ export type CaptureCompletionEffect =
   | 'print'
   | 'cancel';
 
-export type CaptureResultWindow = 'ocr' | 'translation';
-
 export interface CaptureCompletionPlan {
   action: CaptureCompletionAction;
   effect: CaptureCompletionEffect;
-  resultWindow: CaptureResultWindow | null;
+  ocrTarget: CaptureRuntimeOcrTarget | null;
   shouldRecordSelection: boolean;
   shouldFinishSession: boolean;
 }
@@ -57,7 +56,7 @@ export function getCaptureCompletionPlan(
   return {
     action,
     effect: outputEffect?.action ?? (ocrEffect ? 'ocr' : 'cancel'),
-    resultWindow: ocrEffect?.resultWindow ?? null,
+    ocrTarget: ocrEffect?.target ?? null,
     shouldRecordSelection: effects.some((effect) => effect.type === 'record-selection'),
     shouldFinishSession: effects.some((effect) => effect.type === 'finish-session'),
   };

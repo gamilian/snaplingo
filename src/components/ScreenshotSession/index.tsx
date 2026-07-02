@@ -1176,9 +1176,9 @@ export default function ScreenshotSession({
 
       if (effect.type === 'run-ocr') {
         const ocrResult = await runCaptureOcr(session.id, rect);
-        if (effect.resultWindow === 'translation') {
+        if (effect.target === 'translation-window') {
           await openCaptureTranslationResultWindow(ocrResult.text);
-        } else if (effect.resultWindow === 'ocr') {
+        } else if (effect.target === 'ocr-window') {
           await openCaptureOcrResultWindow(ocrResult.text);
         } else {
           await copyTextToClipboard(ocrResult.text);
