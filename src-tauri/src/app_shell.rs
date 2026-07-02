@@ -21,6 +21,7 @@ pub(crate) enum ReopenAction {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum MenuAction {
+    Screenshot,
     TranslateSelection,
     ScreenshotTranslate,
     InputTranslation,
@@ -32,6 +33,7 @@ pub(crate) enum MenuAction {
 }
 
 const TRAY_ID: &str = "snaplingo";
+const SCREENSHOT_ID: &str = "screenshot";
 const TRANSLATE_SELECTION_ID: &str = "translate-selection";
 const SCREENSHOT_TRANSLATE_ID: &str = "screenshot-translate";
 const INPUT_TRANSLATION_ID: &str = "input-translation";
@@ -43,6 +45,7 @@ const QUIT_ID: &str = "quit";
 
 pub(crate) fn menu_action_for_id(id: &str) -> Option<MenuAction> {
     match id {
+        SCREENSHOT_ID => Some(MenuAction::Screenshot),
         TRANSLATE_SELECTION_ID => Some(MenuAction::TranslateSelection),
         SCREENSHOT_TRANSLATE_ID => Some(MenuAction::ScreenshotTranslate),
         INPUT_TRANSLATION_ID => Some(MenuAction::InputTranslation),
@@ -56,6 +59,7 @@ pub(crate) fn menu_action_for_id(id: &str) -> Option<MenuAction> {
 }
 
 pub(crate) fn setup_menu_bar(app: &tauri::App) -> Result<(), String> {
+    let screenshot = menu_item(app, SCREENSHOT_ID, "Screenshot")?;
     let translate_selection = menu_item(app, TRANSLATE_SELECTION_ID, "Translate Selection")?;
     let screenshot_translate = menu_item(app, SCREENSHOT_TRANSLATE_ID, "Screenshot Translate")?;
     let input_translation = menu_item(app, INPUT_TRANSLATION_ID, "Input Translation")?;
@@ -68,6 +72,7 @@ pub(crate) fn setup_menu_bar(app: &tauri::App) -> Result<(), String> {
     let menu = Menu::with_items(
         app,
         &[
+            &screenshot,
             &translate_selection,
             &screenshot_translate,
             &input_translation,
@@ -103,7 +108,14 @@ fn menu_item(app: &tauri::App, id: &str, text: &str) -> Result<MenuItem<tauri::W
 }
 
 pub(crate) fn dispatch_menu_action(app: tauri::AppHandle, action: MenuAction) {
+    log::info!("Dispatching menu action: {:?}", action);
     match action {
+        MenuAction::Screenshot => {
+            tauri::async_runtime::spawn(commands::open_capture_window_from_shortcut(
+                app,
+                "screenshot",
+            ));
+        }
         MenuAction::TranslateSelection => {
             tauri::async_runtime::spawn(async move {
                 let state = app.state::<AppState>();
@@ -261,6 +273,10 @@ mod tests {
 
     #[test]
     fn maps_known_menu_item_ids_to_actions() {
+        assert_eq!(
+            menu_action_for_id("screenshot"),
+            Some(MenuAction::Screenshot)
+        );
         assert_eq!(
             menu_action_for_id("translate-selection"),
             Some(MenuAction::TranslateSelection)
