@@ -354,6 +354,19 @@ impl TranslationCoordinator {
         Ok(results)
     }
 
+    /// Translates text using one registered provider.
+    pub async fn translate_with_provider(
+        &self,
+        provider_id: &str,
+        request: &TranslationRequest,
+    ) -> Result<TranslationResult> {
+        let provider_lock = self.get(provider_id).ok_or_else(|| {
+            crate::AppError::Other(format!("Provider not found: {}", provider_id))
+        })?;
+        let provider = provider_lock.read();
+        provider.translate(request).await
+    }
+
     /// Reconfigures a provider's credentials at runtime.
     ///
     /// This allows hot-reloading of credentials without restarting the application.

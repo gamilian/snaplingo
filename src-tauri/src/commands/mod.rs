@@ -55,6 +55,8 @@ pub struct CaptureResultWindowPayload {
 enum ResultWindowEntrypoint {
     ManualTranslation,
     AutoTranslation,
+    InputTranslation,
+    ShowTranslation,
     Ocr,
     ShowOcr,
     FileOcr,
@@ -64,6 +66,14 @@ enum ResultWindowEntrypoint {
 pub fn open_result_window(text: String, app: tauri::AppHandle) -> Result<(), String> {
     open_capture_result_window(
         result_window_payload_for_entrypoint(ResultWindowEntrypoint::ManualTranslation, text),
+        app,
+    )
+}
+
+pub fn open_input_translation_window(app: tauri::AppHandle) -> Result<(), String> {
+    let text = read_clipboard_text().unwrap_or_default();
+    open_capture_result_window(
+        result_window_payload_for_entrypoint(ResultWindowEntrypoint::InputTranslation, text),
         app,
     )
 }
@@ -173,12 +183,23 @@ fn result_window_payload_for_entrypoint(
 ) -> CaptureResultWindowPayload {
     match entrypoint {
         ResultWindowEntrypoint::ManualTranslation => translation_result_payload(text, false),
-        ResultWindowEntrypoint::AutoTranslation => translation_result_payload(text, true),
+        ResultWindowEntrypoint::AutoTranslation | ResultWindowEntrypoint::InputTranslation => {
+            translation_result_payload(text, true)
+        }
+        ResultWindowEntrypoint::ShowTranslation => translation_result_payload(String::new(), false),
         ResultWindowEntrypoint::Ocr | ResultWindowEntrypoint::ShowOcr => {
             ocr_result_payload(text, false)
         }
         ResultWindowEntrypoint::FileOcr => ocr_result_payload(String::new(), true),
     }
+}
+
+fn read_clipboard_text() -> Result<String, String> {
+    let mut clipboard =
+        arboard::Clipboard::new().map_err(|e| format!("Failed to open clipboard: {}", e))?;
+    clipboard
+        .get_text()
+        .map_err(|e| format!("Failed to read clipboard text: {}", e))
 }
 
 fn reveal_capture_result_window(window: &WebviewWindow) -> Result<(), String> {
@@ -279,7 +300,13 @@ pub fn open_translation_result_window(text: String, app: tauri::AppHandle) -> Re
 }
 
 pub fn show_translation_window(app: tauri::AppHandle) -> Result<(), String> {
-    open_result_window(String::new(), app)
+    open_capture_result_window(
+        result_window_payload_for_entrypoint(
+            ResultWindowEntrypoint::ShowTranslation,
+            String::new(),
+        ),
+        app,
+    )
 }
 
 pub fn show_ocr_window(app: tauri::AppHandle) -> Result<(), String> {
@@ -410,6 +437,30 @@ mod tests {
             )
             .auto_translate,
             true
+        );
+        assert_eq!(
+            result_window_payload_for_entrypoint(
+                ResultWindowEntrypoint::InputTranslation,
+                "clipboard text".to_string(),
+            ),
+            CaptureResultWindowPayload {
+                mode: CaptureResultWindowMode::Translation,
+                text: "clipboard text".to_string(),
+                auto_translate: true,
+                start_file_ocr: false,
+            }
+        );
+        assert_eq!(
+            result_window_payload_for_entrypoint(
+                ResultWindowEntrypoint::ShowTranslation,
+                String::new()
+            ),
+            CaptureResultWindowPayload {
+                mode: CaptureResultWindowMode::Translation,
+                text: String::new(),
+                auto_translate: false,
+                start_file_ocr: false,
+            }
         );
         assert_eq!(
             result_window_payload_for_entrypoint(ResultWindowEntrypoint::ShowOcr, String::new()),

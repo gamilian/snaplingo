@@ -5,6 +5,10 @@ import { SettingsWindow } from './components/SettingsWindow';
 import ResultWindow from './components/ResultWindow';
 import { runOcrFileWorkflow } from './components/ResultWindow/ocrFileWorkflow';
 import {
+  shouldApplyTranslationPayloadText,
+  shouldClearTranslationResultsForPayload,
+} from './components/ResultWindow/resultPayload';
+import {
   PinnedImageWindow,
   readPinnedImageLaunch,
 } from './components/PinnedImageWindow';
@@ -43,6 +47,7 @@ const isSettingsWindow = isSettingsWindowLaunch(
 function App() {
   const resultWindowVisible = useAppStore((state) => state.resultWindowVisible);
   const setSourceText = useAppStore((state) => state.setSourceText);
+  const clearTranslationResults = useAppStore((state) => state.clearTranslationResults);
   const setOcrText = useAppStore((state) => state.setOcrText);
   const setOcrRunning = useAppStore((state) => state.setOcrRunning);
   const setOcrError = useAppStore((state) => state.setOcrError);
@@ -157,7 +162,12 @@ function App() {
     setHasLoadedCaptureResultPayload(true);
 
     if (payload.mode === 'translation') {
-      setSourceText(payload.text);
+      if (shouldClearTranslationResultsForPayload(payload)) {
+        clearTranslationResults();
+      }
+      if (shouldApplyTranslationPayloadText(payload)) {
+        setSourceText(payload.text);
+      }
       if (payload.autoTranslate) {
         requestAutoTranslate();
       }
@@ -174,6 +184,7 @@ function App() {
     showOcrWindow();
   }, [
     requestAutoTranslate,
+    clearTranslationResults,
     setOcrError,
     setOcrText,
     setSourceText,

@@ -16,3 +16,17 @@ export async function translateText(input: TranslateTextInput) {
     },
   });
 }
+
+export async function translateTextWithProvider(
+  providerId: string,
+  input: TranslateTextInput,
+) {
+  return invoke<TranslationResult>('translate_text_with_provider', {
+    providerId,
+    request: {
+      text: input.text,
+      source_lang: input.sourceLang === 'auto' ? null : input.sourceLang,
+      target_lang: input.targetLang,
+    },
+  });
+}

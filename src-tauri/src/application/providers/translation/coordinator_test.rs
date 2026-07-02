@@ -300,6 +300,47 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_translate_with_specific_provider() {
+        let config = Arc::new(ConfigFile::new_temp());
+        let coordinator = TranslationCoordinator::new(config);
+        coordinator
+            .register(MockTranslationProvider::with_response(
+                "google",
+                "Google Translate",
+                "Hola (Google)",
+            ))
+            .unwrap();
+        coordinator
+            .register(MockTranslationProvider::with_response(
+                "deepl",
+                "DeepL",
+                "Hola (DeepL)",
+            ))
+            .unwrap();
+
+        let result = coordinator
+            .translate_with_provider("deepl", &sample_request())
+            .await
+            .unwrap();
+
+        assert_eq!(result.provider_id, "deepl");
+        assert_eq!(result.translated_text, "Hola (DeepL)");
+    }
+
+    #[tokio::test]
+    async fn test_translate_with_specific_provider_reports_missing_provider() {
+        let config = Arc::new(ConfigFile::new_temp());
+        let coordinator = TranslationCoordinator::new(config);
+
+        let result = coordinator
+            .translate_with_provider("ghost", &sample_request())
+            .await;
+
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().to_string(), "Provider not found: ghost");
+    }
+
+    #[tokio::test]
     async fn test_translate_with_multiple_providers() {
         let config = Arc::new(ConfigFile::new_temp());
         let coordinator = TranslationCoordinator::new(config);

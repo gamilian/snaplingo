@@ -98,6 +98,7 @@ pub fn run() {
             commands::close_screenshot_window,
             commands::crop_screenshot,
             commands::translate_text_v2,
+            commands::translate_text_with_provider,
             commands::list_translation_providers,
             commands::activate_translation_provider,
             commands::deactivate_translation_provider,

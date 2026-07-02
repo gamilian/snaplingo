@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   resultWindowContainerClassName,
   shouldCloseFromContainerClick,
+  shouldCloseFromWindowBlur,
 } from './presentation';
 
 describe('result window presentation', () => {
@@ -12,16 +13,27 @@ describe('result window presentation', () => {
     expect(className).not.toContain('backdrop-blur');
   });
 
+  it('keeps a near-transparent hit layer for standalone blank clicks', () => {
+    expect(resultWindowContainerClassName('standalone')).toContain(
+      'bg-white/[0.01]',
+    );
+  });
+
   it('keeps the dark overlay only for the main-window embedded presentation', () => {
     expect(resultWindowContainerClassName('overlay')).toContain('bg-black/25');
   });
 
-  it('only closes from background clicks in overlay presentation', () => {
+  it('closes from background clicks in overlay and standalone presentations', () => {
     const target = new EventTarget();
 
     expect(shouldCloseFromContainerClick('overlay', target, target)).toBe(true);
     expect(shouldCloseFromContainerClick('standalone', target, target)).toBe(
-      false,
+      true,
     );
+  });
+
+  it('closes standalone result windows when focus leaves the window', () => {
+    expect(shouldCloseFromWindowBlur('standalone')).toBe(true);
+    expect(shouldCloseFromWindowBlur('overlay')).toBe(false);
   });
 });

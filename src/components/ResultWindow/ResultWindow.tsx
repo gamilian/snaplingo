@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useProviderStore } from '../../stores/providerStore';
 import { useTranslate } from '../../hooks/useTranslate';
@@ -11,6 +11,7 @@ import {
   resultWindowContainerClassName,
   resultWindowPanelClassName,
   shouldCloseFromContainerClick,
+  shouldCloseFromWindowBlur,
   type ResultWindowPresentation,
 } from './presentation';
 
@@ -39,21 +40,20 @@ export default function ResultWindow({
     sourceText,
     sourceLang,
     targetLang,
-    translations,
+    providerTranslations,
     isTranslating,
     ocrText,
     isOcrRunning,
     ocrError,
     resultWindowVisible,
     resultWindowMode,
-    pendingAutoTranslate,
+    autoTranslateRequestId,
     setSourceText,
     setSourceLang,
     setTargetLang,
     setOcrText,
     setOcrRunning,
     setOcrError,
-    consumeAutoTranslateRequest,
     hideResultWindow,
   } = useAppStore();
   const translationProviders = useProviderStore((state) => state.translationProviders);
@@ -61,7 +61,8 @@ export default function ResultWindow({
     (state) => state.loadTranslationProviders,
   );
 
-  const { translate } = useTranslate();
+  const { translate, retryProvider } = useTranslate();
+  const lastAutoTranslateRequestId = useRef(0);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -75,21 +76,36 @@ export default function ResultWindow({
   }, [resultWindowVisible, hideResultWindow]);
 
   useEffect(() => {
+    if (!resultWindowVisible || !shouldCloseFromWindowBlur(presentation)) return;
+
+    const handleBlur = () => {
+      hideResultWindow();
+    };
+
+    window.addEventListener('blur', handleBlur);
+    return () => window.removeEventListener('blur', handleBlur);
+  }, [hideResultWindow, presentation, resultWindowVisible]);
+
+  useEffect(() => {
     if (!resultWindowVisible) return;
 
     void loadTranslationProviders();
   }, [loadTranslationProviders, resultWindowVisible]);
 
   useEffect(() => {
-    if (!resultWindowVisible || !pendingAutoTranslate || !sourceText.trim()) {
+    if (
+      !resultWindowVisible ||
+      autoTranslateRequestId === 0 ||
+      autoTranslateRequestId === lastAutoTranslateRequestId.current ||
+      !sourceText.trim()
+    ) {
       return;
     }
 
-    consumeAutoTranslateRequest();
+    lastAutoTranslateRequestId.current = autoTranslateRequestId;
     void translate(sourceText, sourceLang, targetLang);
   }, [
-    consumeAutoTranslateRequest,
-    pendingAutoTranslate,
+    autoTranslateRequestId,
     resultWindowVisible,
     sourceLang,
     sourceText,
@@ -263,19 +279,23 @@ export default function ResultWindow({
           </button>
 
           {/* Translation Results */}
-          {translations.length > 0 && (
+          {providerTranslations.length > 0 && (
             <div className="space-y-3">
               <h3 className="text-sm font-medium text-gray-700">Results</h3>
-              {translations.map((result, index) => (
+              {providerTranslations.map((result) => (
                 <TranslationCard
-                  key={index}
+                  key={result.provider_id}
                   providerId={result.provider_id}
                   providerName={getTranslationProviderDisplayName(
                     result.provider_id,
                     translationProviders,
                   )}
+                  status={result.status}
                   text={result.translated_text}
                   detectedLanguage={result.detected_language || undefined}
+                  onRetry={() => {
+                    void retryProvider(result.provider_id);
+                  }}
                 />
               ))}
             </div>

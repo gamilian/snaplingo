@@ -495,7 +495,7 @@ fn trigger_hotkey_action(app: tauri::AppHandle, category: String, action: String
             });
         }
         (TRANSLATION_CATEGORY, INPUT_TRANSLATE_ACTION) => {
-            if let Err(err) = commands::open_result_window(String::new(), app) {
+            if let Err(err) = commands::open_input_translation_window(app) {
                 log::error!("Failed to open input translation window: {}", err);
             }
         }

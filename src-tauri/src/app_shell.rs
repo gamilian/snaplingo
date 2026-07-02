@@ -125,7 +125,7 @@ pub(crate) fn dispatch_menu_action(app: tauri::AppHandle, action: MenuAction) {
             ));
         }
         MenuAction::InputTranslation => {
-            if let Err(err) = commands::open_result_window(String::new(), app) {
+            if let Err(err) = commands::open_input_translation_window(app) {
                 log::error!("Failed to open input translation window: {}", err);
             }
         }

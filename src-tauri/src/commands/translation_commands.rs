@@ -26,3 +26,22 @@ pub async fn translate_text_v2(
         .await
         .map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn translate_text_with_provider(
+    provider_id: String,
+    request: TranslateTextRequest,
+    state: State<'_, crate::AppState>,
+) -> Result<TranslationResult, String> {
+    let translation_request = TranslationRequest {
+        text: request.text,
+        source_lang: request.source_lang.unwrap_or_else(|| "auto".to_string()),
+        target_lang: request.target_lang,
+    };
+
+    state
+        .translation_coordinator
+        .translate_with_provider(&provider_id, &translation_request)
+        .await
+        .map_err(|e| e.to_string())
+}
