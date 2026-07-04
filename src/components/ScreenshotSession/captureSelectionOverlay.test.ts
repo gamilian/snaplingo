@@ -61,7 +61,7 @@ describe('capture selection canvas overlay', () => {
     ).toEqual({
       variant: 'draft',
       rect: { x: 80, y: 40, width: 120.4, height: 60.6 },
-      label: '120 x 61',
+      label: '120 x 61 px',
     });
   });
 
@@ -77,7 +77,7 @@ describe('capture selection canvas overlay', () => {
     ).toEqual({
       variant: 'hover',
       rect: { x: 100, y: 30, width: 50, height: 40 },
-      label: '50 x 40',
+      label: '50 x 40 px',
     });
   });
 
@@ -93,7 +93,7 @@ describe('capture selection canvas overlay', () => {
     ).toEqual({
       variant: 'preview',
       rect: { x: 100, y: 30, width: 50.4, height: 40.6 },
-      label: '50 x 41',
+      label: '50 x 41 px',
     });
   });
 
@@ -168,7 +168,7 @@ describe('capture selection canvas overlay', () => {
       {
         variant: 'draft',
         rect: { x: 80, y: 40, width: 120, height: 60 },
-        label: '120 x 60',
+        label: '120 x 60 px',
       },
     );
 
@@ -187,13 +187,13 @@ describe('capture selection canvas overlay', () => {
       'font:500 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       'textBaseline:top',
       'fillStyle:rgba(0, 0, 0, 0.82)',
-      'fillRect:80,40,64,20',
+      'fillRect:80,14,82,20',
       'fillStyle:rgba(255, 255, 255, 0.95)',
-      'fillText:120 x 60,88,44',
+      'fillText:120 x 60 px,88,18',
     ]);
   });
 
-  it('draws the preview size label at the selection top left', () => {
+  it('draws the preview size label above the selection top left', () => {
     const context = createRecordingContext();
 
     drawCaptureSelectionOverlayFrame(
@@ -202,11 +202,28 @@ describe('capture selection canvas overlay', () => {
       {
         variant: 'preview',
         rect: { x: 100, y: 30, width: 50, height: 40 },
-        label: '50 x 40',
+        label: '50 x 40 px',
       },
     );
 
-    expect(context.calls).toContain('fillRect:100,30,58,20');
-    expect(context.calls).toContain('fillText:50 x 40,108,34');
+    expect(context.calls).toContain('fillRect:100,4,76,20');
+    expect(context.calls).toContain('fillText:50 x 40 px,108,8');
+  });
+
+  it('keeps the size label inside the selection when the top edge is too close to the screen', () => {
+    const context = createRecordingContext();
+
+    drawCaptureSelectionOverlayFrame(
+      context,
+      { width: 500, height: 300 },
+      {
+        variant: 'preview',
+        rect: { x: 100, y: 12, width: 50, height: 40 },
+        label: '50 x 40 px',
+      },
+    );
+
+    expect(context.calls).toContain('fillRect:100,12,76,20');
+    expect(context.calls).toContain('fillText:50 x 40 px,108,16');
   });
 });

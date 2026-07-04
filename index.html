@@ -6,8 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SnapLingo</title>
     <script>
-      if (new URLSearchParams(window.location.search).get('window') === 'capture') {
-        document.documentElement.setAttribute('data-window', 'capture');
+      const snaplingoWindow = new URLSearchParams(window.location.search).get('window');
+      if (snaplingoWindow === 'capture' || snaplingoWindow === 'capture-result') {
+        document.documentElement.setAttribute('data-window', snaplingoWindow);
       }
     </script>
     <style>
@@ -17,7 +18,17 @@
         background: transparent;
       }
 
+      html[data-window="capture-result"],
+      html[data-window="capture-result"] body,
+      html[data-window="capture-result"] #root {
+        background: transparent;
+      }
+
       html[data-window="capture"] body {
+        overflow: hidden;
+      }
+
+      html[data-window="capture-result"] body {
         overflow: hidden;
       }
     </style>

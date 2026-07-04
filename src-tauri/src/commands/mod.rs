@@ -58,6 +58,8 @@ pub struct CaptureResultWindowPayload {
     auto_translate: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     ocr_intent: Option<CaptureResultWindowOcrIntent>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    image_base64: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -96,8 +98,17 @@ pub fn open_ocr_result_window(text: String, app: tauri::AppHandle) -> Result<(),
 }
 
 #[tauri::command]
-pub fn open_capture_ocr_result_window(text: String, app: tauri::AppHandle) -> Result<(), String> {
-    open_capture_result_window(capture_ocr_result_payload(text), app)
+pub fn open_capture_ocr_result_window(
+    text: String,
+    image_base64: Option<String>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    log::info!(
+        "Opening capture OCR result window: text_chars={} has_image={}",
+        text.chars().count(),
+        image_base64.as_ref().is_some_and(|image| !image.is_empty())
+    );
+    open_capture_result_window(capture_ocr_result_payload(text, image_base64), app)
 }
 
 #[tauri::command]
@@ -136,7 +147,7 @@ fn open_capture_result_window(
             WebviewUrl::App(capture_result_window_url()),
         )
         .title("SnapLingo Result")
-        .inner_size(780.0, 560.0)
+        .inner_size(660.0, 660.0)
         .position(120.0, 120.0)
         .decorations(false)
         .always_on_top(true)
@@ -164,8 +175,11 @@ fn capture_translation_result_payload(text: String) -> CaptureResultWindowPayloa
     translation_result_payload(text, true)
 }
 
-fn capture_ocr_result_payload(text: String) -> CaptureResultWindowPayload {
-    ocr_result_payload(text, CaptureResultWindowOcrIntent::DisplayText)
+fn capture_ocr_result_payload(
+    text: String,
+    image_base64: Option<String>,
+) -> CaptureResultWindowPayload {
+    ocr_result_payload(text, CaptureResultWindowOcrIntent::DisplayText, image_base64)
 }
 
 fn translation_result_payload(text: String, auto_translate: bool) -> CaptureResultWindowPayload {
@@ -174,18 +188,21 @@ fn translation_result_payload(text: String, auto_translate: bool) -> CaptureResu
         text,
         auto_translate,
         ocr_intent: None,
+        image_base64: None,
     }
 }
 
 fn ocr_result_payload(
     text: String,
     ocr_intent: CaptureResultWindowOcrIntent,
+    image_base64: Option<String>,
 ) -> CaptureResultWindowPayload {
     CaptureResultWindowPayload {
         mode: CaptureResultWindowMode::Ocr,
         text,
         auto_translate: false,
         ocr_intent: Some(ocr_intent),
+        image_base64,
     }
 }
 
@@ -200,13 +217,13 @@ fn result_window_payload_for_entrypoint(
         }
         ResultWindowEntrypoint::ShowTranslation => translation_result_payload(String::new(), false),
         ResultWindowEntrypoint::Ocr => {
-            ocr_result_payload(text, CaptureResultWindowOcrIntent::DisplayText)
+            ocr_result_payload(text, CaptureResultWindowOcrIntent::DisplayText, None)
         }
         ResultWindowEntrypoint::ShowOcr => {
-            ocr_result_payload(text, CaptureResultWindowOcrIntent::Show)
+            ocr_result_payload(text, CaptureResultWindowOcrIntent::Show, None)
         }
         ResultWindowEntrypoint::FileOcr => {
-            ocr_result_payload(String::new(), CaptureResultWindowOcrIntent::File)
+            ocr_result_payload(String::new(), CaptureResultWindowOcrIntent::File, None)
         }
     }
 }
@@ -426,7 +443,7 @@ mod tests {
 
     #[test]
     fn capture_ocr_payload_does_not_request_auto_translation() {
-        let payload = capture_ocr_result_payload("hello".to_string());
+        let payload = capture_ocr_result_payload("hello".to_string(), None);
 
         assert_eq!(payload.mode, CaptureResultWindowMode::Ocr);
         assert_eq!(payload.text, "hello");
@@ -435,6 +452,16 @@ mod tests {
             payload.ocr_intent,
             Some(CaptureResultWindowOcrIntent::DisplayText)
         );
+        assert_eq!(payload.image_base64, None);
+    }
+
+    #[test]
+    fn capture_ocr_payload_can_include_source_image() {
+        let payload =
+            capture_ocr_result_payload("hello".to_string(), Some("image-base64".to_string()));
+
+        assert_eq!(payload.mode, CaptureResultWindowMode::Ocr);
+        assert_eq!(payload.image_base64, Some("image-base64".to_string()));
     }
 
     #[test]
@@ -449,6 +476,7 @@ mod tests {
                 text: "hello".to_string(),
                 auto_translate: false,
                 ocr_intent: None,
+                image_base64: None,
             }
         );
         assert_eq!(
@@ -469,6 +497,7 @@ mod tests {
                 text: "clipboard text".to_string(),
                 auto_translate: true,
                 ocr_intent: None,
+                image_base64: None,
             }
         );
         assert_eq!(
@@ -481,6 +510,7 @@ mod tests {
                 text: String::new(),
                 auto_translate: false,
                 ocr_intent: None,
+                image_base64: None,
             }
         );
         assert_eq!(
@@ -490,6 +520,7 @@ mod tests {
                 text: "hello".to_string(),
                 auto_translate: false,
                 ocr_intent: Some(CaptureResultWindowOcrIntent::DisplayText),
+                image_base64: None,
             }
         );
         assert_eq!(
@@ -499,6 +530,7 @@ mod tests {
                 text: String::new(),
                 auto_translate: false,
                 ocr_intent: Some(CaptureResultWindowOcrIntent::Show),
+                image_base64: None,
             }
         );
         assert_eq!(
@@ -508,6 +540,7 @@ mod tests {
                 text: String::new(),
                 auto_translate: false,
                 ocr_intent: Some(CaptureResultWindowOcrIntent::File),
+                image_base64: None,
             }
         );
     }

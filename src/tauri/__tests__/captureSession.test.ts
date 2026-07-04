@@ -75,10 +75,11 @@ describe('capture session tauri adapter', () => {
     const { openCaptureOcrResultWindow } = await import('../captureSession');
     invoke.mockResolvedValueOnce(undefined);
 
-    await openCaptureOcrResultWindow('ocr text');
+    await openCaptureOcrResultWindow('ocr text', 'rendered-image-base64');
 
     expect(invoke).toHaveBeenCalledWith('open_capture_ocr_result_window', {
       text: 'ocr text',
+      imageBase64: 'rendered-image-base64',
     });
   });
 

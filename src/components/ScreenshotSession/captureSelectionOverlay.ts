@@ -45,6 +45,7 @@ interface Size {
 
 const LABEL_HEIGHT = 20;
 const LABEL_PADDING_X = 8;
+const LABEL_SELECTION_GAP = 6;
 const CROSSHAIR_ARM_LENGTH = 10;
 const CROSSHAIR_GAP = 3;
 
@@ -85,7 +86,7 @@ function buildCaptureSelectionOverlayFrame(
   return {
     variant,
     rect: virtualRectToViewportRect(selection, selectionBounds),
-    label: `${Math.round(selection.width)} x ${Math.round(selection.height)}`,
+    label: `${Math.round(selection.width)} x ${Math.round(selection.height)} px`,
   };
 }
 
@@ -179,8 +180,14 @@ function drawSizeLabel(
   const labelX = snapCanvasTextPosition(
     clamp(rect.x, 0, Math.max(0, size.width - labelWidth)),
   );
+  const preferredLabelY = rect.y - LABEL_HEIGHT - LABEL_SELECTION_GAP;
+  const fallbackLabelY = rect.y;
   const labelY = snapCanvasTextPosition(
-    clamp(rect.y, 0, Math.max(0, size.height - LABEL_HEIGHT)),
+    clamp(
+      preferredLabelY >= 0 ? preferredLabelY : fallbackLabelY,
+      0,
+      Math.max(0, size.height - LABEL_HEIGHT),
+    ),
   );
 
   context.fillStyle = 'rgba(0, 0, 0, 0.82)';

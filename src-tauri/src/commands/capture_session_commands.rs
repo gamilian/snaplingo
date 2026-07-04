@@ -530,14 +530,24 @@ pub async fn run_capture_ocr(
     rect: LogicalRect,
     state: State<'_, crate::AppState>,
 ) -> Result<OcrResult, String> {
-    let session_id = CaptureSessionId(session_id);
-    ensure_capture_session_cached_for_selection(state.inner(), &session_id, &rect)?;
+    let capture_session_id = CaptureSessionId(session_id.clone());
+    ensure_capture_session_cached_for_selection(state.inner(), &capture_session_id, &rect)?;
 
-    state
+    let result = state
         .capture_session_runtime
-        .recognize_selection_text(&session_id, &rect)
+        .recognize_selection_text(&capture_session_id, &rect)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    log::info!(
+        "Capture OCR completed: session_id={} text_chars={} rect={}x{}",
+        session_id,
+        result.text.chars().count(),
+        rect.width,
+        rect.height
+    );
+
+    Ok(result)
 }
 
 fn ensure_capture_session_cached_for_selection(

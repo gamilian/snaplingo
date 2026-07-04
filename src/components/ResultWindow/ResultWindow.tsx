@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, type MouseEvent, type ReactNode } from 'react';
+import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import { useAppStore } from '../../stores/appStore';
 import { useProviderStore } from '../../stores/providerStore';
 import { useTranslate } from '../../hooks/useTranslate';
@@ -8,12 +9,32 @@ import { recognizeImageFile, selectImageFile } from '../../tauri/ocr';
 import { runOcrFileWorkflow } from './ocrFileWorkflow';
 import { getTranslationProviderDisplayName } from './translationProviderDisplayName';
 import {
+  resultWindowContentClassName,
+  resultWindowAdaptiveTextStyle,
   resultWindowContainerClassName,
+  resultWindowOcrImagePanelClassName,
+  resultWindowOcrResultGridClassName,
+  resultWindowOcrResultTextAreaClassName,
   resultWindowPanelClassName,
+  resultWindowResultsListClassName,
+  resultWindowTextAreaClassName,
+  resultWindowTextBoxClassName,
+  resultWindowTranslationLayout,
   shouldCloseFromContainerClick,
+  shouldCloseFromEscapeKey,
   shouldCloseFromWindowBlur,
   type ResultWindowPresentation,
 } from './presentation';
+import {
+  ClearTextIcon,
+  CloseIcon,
+  CopyIcon,
+  LanguageIcon,
+  RetryIcon,
+  ScanIcon,
+  SwapIcon,
+  UploadIcon,
+} from './icons';
 
 const LANGUAGES = [
   { code: 'auto', name: 'Auto Detect' },
@@ -29,8 +50,173 @@ const LANGUAGES = [
   { code: 'ar', name: 'Arabic' },
 ];
 
+const LANGUAGE_DISPLAY_NAMES: Record<string, string> = {
+  auto: '自动检测',
+  en: '英语',
+  zh: '中文',
+  'zh-CN': '中文简体',
+  'zh-TW': '中文繁体',
+  ja: '日语',
+  ko: '韩语',
+  es: '西班牙语',
+  fr: '法语',
+  de: '德语',
+  ru: '俄语',
+  ar: '阿拉伯语',
+};
+
 interface ResultWindowProps {
   presentation?: ResultWindowPresentation;
+}
+
+function IconButton({
+  title,
+  children,
+  onClick,
+  disabled = false,
+}: {
+  title: string;
+  children: ReactNode;
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
+      title={title}
+      aria-label={title}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Header({
+  mode,
+  subtitle,
+  onClose,
+}: {
+  mode: 'translation' | 'ocr';
+  subtitle: string;
+  onClose: () => void;
+}) {
+  const isOcr = mode === 'ocr';
+
+  return (
+    <div className="flex min-h-12 items-center justify-between gap-3 rounded-t-[14px] border-b border-slate-200 bg-slate-50/90 px-3.5">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <div
+          className={`grid h-7 w-7 shrink-0 place-items-center rounded-[7px] text-white ${
+            isOcr
+              ? 'bg-gradient-to-br from-emerald-600 to-blue-600'
+              : 'bg-gradient-to-br from-blue-600 to-emerald-500'
+          }`}
+        >
+          {isOcr ? (
+            <ScanIcon className="h-4 w-4" />
+          ) : (
+            <LanguageIcon className="h-4 w-4" />
+          )}
+        </div>
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2.5">
+          <h2 className="text-base font-bold leading-tight text-slate-950">
+            {isOcr ? 'OCR' : '翻译'}
+          </h2>
+          <span className="text-xs font-semibold text-slate-500">{subtitle}</span>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={onClose}
+        className="grid h-7 w-7 shrink-0 place-items-center rounded-[7px] text-slate-500 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-800"
+        title="关闭"
+        aria-label="关闭"
+      >
+        <CloseIcon className="h-[18px] w-[18px]" />
+      </button>
+    </div>
+  );
+}
+
+function LanguageSelect({
+  options,
+  value,
+  onChange,
+  buttonClassName = 'h-9 rounded-[14px] border-slate-200 py-0 text-[14px] font-semibold shadow-none hover:shadow-none',
+}: {
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (value: string) => void;
+  buttonClassName?: string;
+}) {
+  return (
+    <CustomSelect
+      options={options}
+      value={value}
+      onChange={onChange}
+      align="center"
+      buttonClassName={buttonClassName}
+      menuClassName="rounded-[14px]"
+    />
+  );
+}
+
+function LanguageSwitcher({
+  sourceLang,
+  targetLang,
+  onSourceChange,
+  onTargetChange,
+  onSwap,
+}: {
+  sourceLang: string;
+  targetLang: string;
+  onSourceChange: (value: string) => void;
+  onTargetChange: (value: string) => void;
+  onSwap: () => void;
+}) {
+  const mergedSelectButtonClassName =
+    'h-9 rounded-none !border-0 !bg-transparent py-0 text-[14px] font-semibold !shadow-none !ring-0 hover:!border-transparent hover:!bg-transparent hover:!shadow-none';
+
+  return (
+    <div className="grid h-10 flex-none grid-cols-[minmax(0,1fr)_40px_minmax(0,1fr)] items-center overflow-visible rounded-[14px] border border-slate-200 bg-slate-50/90">
+      <LanguageSelect
+        options={LANGUAGES.map((lang) => ({
+          value: lang.code,
+          label: lang.name,
+        }))}
+        value={sourceLang}
+        onChange={onSourceChange}
+        buttonClassName={mergedSelectButtonClassName}
+      />
+      <button
+        type="button"
+        onClick={onSwap}
+        disabled={sourceLang === 'auto'}
+        className="grid h-full w-full place-items-center border-x border-slate-200 text-slate-600 transition-colors duration-150 hover:bg-white disabled:cursor-not-allowed disabled:opacity-45"
+        title="Swap languages"
+        aria-label="Swap languages"
+      >
+        <SwapIcon className="h-4 w-4" />
+      </button>
+      <LanguageSelect
+        options={LANGUAGES.filter((lang) => lang.code !== 'auto').map((lang) => ({
+          value: lang.code,
+          label: lang.name,
+        }))}
+        value={targetLang}
+        onChange={onTargetChange}
+        buttonClassName={mergedSelectButtonClassName}
+      />
+    </div>
+  );
+}
+
+function getLanguageDisplayName(languageCode: string) {
+  return LANGUAGE_DISPLAY_NAMES[languageCode] ?? languageCode;
 }
 
 export default function ResultWindow({
@@ -43,6 +229,7 @@ export default function ResultWindow({
     providerTranslations,
     isTranslating,
     ocrText,
+    ocrImageBase64,
     isOcrRunning,
     ocrError,
     resultWindowVisible,
@@ -52,6 +239,7 @@ export default function ResultWindow({
     setSourceLang,
     setTargetLang,
     setOcrText,
+    setOcrImageBase64,
     setOcrRunning,
     setOcrError,
     hideResultWindow,
@@ -63,10 +251,20 @@ export default function ResultWindow({
 
   const { translate, retryProvider } = useTranslate();
   const lastAutoTranslateRequestId = useRef(0);
+  const translationLayout = useMemo(
+    () =>
+      resultWindowTranslationLayout(
+        providerTranslations.map((translation) => ({
+          providerId: translation.provider_id,
+          text: translation.translated_text,
+        })),
+      ),
+    [providerTranslations],
+  );
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && resultWindowVisible) {
+      if (shouldCloseFromEscapeKey(e.key) && resultWindowVisible) {
         hideResultWindow();
       }
     };
@@ -85,6 +283,20 @@ export default function ResultWindow({
     window.addEventListener('blur', handleBlur);
     return () => window.removeEventListener('blur', handleBlur);
   }, [hideResultWindow, presentation, resultWindowVisible]);
+
+  useEffect(() => {
+    if (!resultWindowVisible || presentation !== 'standalone') return;
+
+    const windowHeight =
+      resultWindowMode === 'translation' ? translationLayout.windowHeightPx : 660;
+
+    void getCurrentWindow().setSize(new LogicalSize(660, windowHeight));
+  }, [
+    presentation,
+    resultWindowMode,
+    resultWindowVisible,
+    translationLayout.windowHeightPx,
+  ]);
 
   useEffect(() => {
     if (!resultWindowVisible) return;
@@ -115,7 +327,7 @@ export default function ResultWindow({
 
   if (!resultWindowVisible) return null;
 
-  const handleOverlayClick = (e: React.MouseEvent) => {
+  const handleOverlayClick = (e: MouseEvent<HTMLDivElement>) => {
     if (shouldCloseFromContainerClick(presentation, e.target, e.currentTarget)) {
       hideResultWindow();
     }
@@ -130,10 +342,11 @@ export default function ResultWindow({
   };
 
   const handleTranslate = () => {
-    translate();
+    void translate();
   };
 
   const handleUploadImage = () => {
+    setOcrImageBase64(null);
     void runOcrFileWorkflow({
       selectImageFile,
       recognizeImageFile,
@@ -144,162 +357,278 @@ export default function ResultWindow({
   };
 
   const isOcrMode = resultWindowMode === 'ocr';
+  const successCount = providerTranslations.filter(
+    (translation) => translation.status === 'success',
+  ).length;
+  const translationSubtitle =
+    providerTranslations.length > 0
+      ? `${successCount} 个服务已返回`
+      : isTranslating
+        ? '正在请求服务'
+        : '准备翻译';
+  const ocrSubtitle = isOcrRunning
+    ? '识别中'
+    : ocrText
+      ? `已识别 ${ocrText.length} 个字符`
+      : '等待上传';
+  const detectedSourceLanguage =
+    providerTranslations.find((translation) => translation.detected_language)
+      ?.detected_language || (sourceLang !== 'auto' ? sourceLang : 'auto');
+  const translationPanelHeight =
+    presentation === 'overlay'
+      ? `min(${translationLayout.windowHeightPx}px, 90vh)`
+      : `${translationLayout.windowHeightPx}px`;
 
   return (
     <div
       className={resultWindowContainerClassName(presentation)}
       onClick={handleOverlayClick}
     >
-      <div className={resultWindowPanelClassName(presentation)}>
-        {/* Header */}
-        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-gray-900">
-            {isOcrMode ? 'OCR' : '翻译'}
-          </h2>
-          <button
-            onClick={hideResultWindow}
-            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-150"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
+      <div
+        className={resultWindowPanelClassName(presentation)}
+        style={isOcrMode ? undefined : { height: translationPanelHeight }}
+      >
+        <Header
+          mode={isOcrMode ? 'ocr' : 'translation'}
+          subtitle={isOcrMode ? ocrSubtitle : translationSubtitle}
+          onClose={hideResultWindow}
+        />
 
-        {/* Content */}
         {isOcrMode ? (
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
-            <button
-              type="button"
-              onClick={handleUploadImage}
-              disabled={isOcrRunning}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
-            >
-              {isOcrRunning ? '识别中...' : '上传图片 OCR'}
-            </button>
+          <div className={resultWindowContentClassName()}>
+            {ocrImageBase64 ? (
+              <div className={resultWindowOcrResultGridClassName()}>
+                <div className="flex min-h-0 flex-col gap-2">
+                  <div className="flex min-h-[18px] items-center justify-between gap-3">
+                    <h3 className="text-[13px] font-bold text-slate-600">截图区域</h3>
+                    <span className="text-[11px] text-slate-400">source</span>
+                  </div>
+                  <div className={resultWindowOcrImagePanelClassName()}>
+                    <img
+                      src={`data:image/png;base64,${ocrImageBase64}`}
+                      alt=""
+                      className="h-full w-full object-contain"
+                      draggable={false}
+                    />
+                  </div>
+                </div>
 
-            {ocrError && (
-              <div className="px-3 py-2 rounded-lg bg-red-50 text-sm text-red-700 border border-red-100">
-                {ocrError}
+                <div className="flex min-h-0 flex-col gap-2">
+                  <div className="flex min-h-[18px] items-center justify-between gap-3">
+                    <h3 className="text-[13px] font-bold text-slate-600">识别文本</h3>
+                    <span className="text-[11px] text-slate-400">
+                      {ocrText ? `${ocrText.length} chars` : 'No text'}
+                    </span>
+                  </div>
+                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[14px] border border-slate-300 bg-white">
+                    <textarea
+                      value={ocrText}
+                      readOnly
+                      placeholder="OCR 结果..."
+                      className={resultWindowOcrResultTextAreaClassName()}
+                      style={resultWindowAdaptiveTextStyle(ocrText, 'ocr')}
+                    />
+                    <div className="flex min-h-8 items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/80 px-3 py-1">
+                      <span className="text-[11px] text-slate-400">
+                        {ocrText.length} chars
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <IconButton
+                          title="复制"
+                          disabled={!ocrText.trim()}
+                          onClick={() => {
+                            void navigator.clipboard.writeText(ocrText);
+                          }}
+                        >
+                          <CopyIcon className="h-4 w-4" />
+                        </IconButton>
+                        <IconButton
+                          title="清空"
+                          disabled={!ocrText}
+                          onClick={() => {
+                            setOcrText('');
+                            setOcrImageBase64(null);
+                          }}
+                        >
+                          <ClearTextIcon className="h-4 w-4" />
+                        </IconButton>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-            )}
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <div className="flex min-h-[18px] items-center justify-between gap-3">
+                    <label className="text-[13px] font-bold text-slate-600">图片</label>
+                    <span className="text-[11px] text-slate-400">PNG/JPG/WebP</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleUploadImage}
+                    disabled={isOcrRunning}
+                    className="grid min-h-[92px] w-full place-items-center rounded-[14px] border border-dashed border-slate-300 bg-gradient-to-b from-slate-50 to-white px-4 py-3 text-center transition-colors duration-150 hover:border-emerald-300 hover:bg-emerald-50/30 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    <span className="grid justify-items-center gap-2">
+                      <span className="grid h-9 w-9 place-items-center rounded-[7px] bg-emerald-50 text-emerald-700">
+                        <UploadIcon className="h-5 w-5" />
+                      </span>
+                      <span className="text-[13px] font-semibold text-slate-900">
+                        {isOcrRunning ? '识别中...' : '上传图片 OCR'}
+                      </span>
+                      <span className="text-[11px] text-slate-500">
+                        选择一张图片后自动开始识别
+                      </span>
+                    </span>
+                  </button>
+                </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                OCR Text
-              </label>
-              <textarea
-                value={ocrText}
-                readOnly
-                placeholder="上传图片后显示识别文本..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 resize-none"
-                rows={8}
-              />
-            </div>
+                {ocrError && (
+                  <div className="rounded-[14px] border border-red-200 bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700">
+                    {ocrError}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleUploadImage}
+                  disabled={isOcrRunning}
+                  className="grid h-10 w-full place-items-center rounded-[14px] bg-emerald-600 text-[14px] font-bold text-white shadow-[0_10px_24px_rgba(5,150,105,0.18)] transition-colors duration-150 hover:bg-emerald-700 disabled:bg-slate-300 disabled:shadow-none"
+                >
+                  {ocrText ? '重新选择图片' : '选择图片'}
+                </button>
+
+                <div className="min-h-0 space-y-2">
+                  <div className="flex min-h-[18px] items-center justify-between gap-3">
+                    <h3 className="text-[13px] font-bold text-slate-600">识别文本</h3>
+                    <span className="text-[11px] text-slate-400">
+                      {ocrText ? `${ocrText.length} chars` : 'No text'}
+                    </span>
+                  </div>
+                  <div className={resultWindowTextBoxClassName()}>
+                    <textarea
+                      value={ocrText}
+                      readOnly
+                      rows={5}
+                      placeholder="OCR 结果..."
+                      className={resultWindowTextAreaClassName('ocr')}
+                      style={resultWindowAdaptiveTextStyle(ocrText, 'ocr')}
+                    />
+                    <div className="flex min-h-8 items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/80 px-3 py-1">
+                      <span className="text-[11px] text-slate-400">
+                        {ocrText.length} chars
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <IconButton
+                          title="复制"
+                          disabled={!ocrText.trim()}
+                          onClick={() => {
+                            void navigator.clipboard.writeText(ocrText);
+                          }}
+                        >
+                          <CopyIcon className="h-4 w-4" />
+                        </IconButton>
+                        <IconButton
+                          title="清空"
+                          disabled={!ocrText}
+                          onClick={() => setOcrText('')}
+                        >
+                          <ClearTextIcon className="h-4 w-4" />
+                        </IconButton>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {/* Source Text */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Source Text
-            </label>
-            <textarea
-              value={sourceText}
-              onChange={(e) => setSourceText(e.target.value)}
-              placeholder="Enter text to translate..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-              rows={4}
+          <div className={resultWindowContentClassName()}>
+            <div className="flex-none">
+              <div className={resultWindowTextBoxClassName()}>
+                <textarea
+                  value={sourceText}
+                  onChange={(e) => setSourceText(e.target.value)}
+                  rows={3}
+                  placeholder="输入需要翻译的文本..."
+                  className={resultWindowTextAreaClassName('source')}
+                  style={resultWindowAdaptiveTextStyle(sourceText, 'source')}
+                />
+                <div className="flex min-h-8 items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/80 px-3 py-1">
+                  <span className="min-w-0 truncate text-[11px] text-slate-400">
+                    {sourceText.length} chars · 识别为{' '}
+                    <span className="font-semibold text-blue-600">
+                      {getLanguageDisplayName(detectedSourceLanguage)}
+                    </span>
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <IconButton
+                      title="复制"
+                      disabled={!sourceText.trim()}
+                      onClick={() => {
+                        void navigator.clipboard.writeText(sourceText);
+                      }}
+                    >
+                      <CopyIcon className="h-4 w-4" />
+                    </IconButton>
+                    <IconButton
+                      title="重试"
+                      disabled={!sourceText.trim() || isTranslating}
+                      onClick={handleTranslate}
+                    >
+                      <RetryIcon className="h-4 w-4" />
+                    </IconButton>
+                    <IconButton
+                      title="清空"
+                      disabled={!sourceText}
+                      onClick={() => setSourceText('')}
+                    >
+                      <ClearTextIcon className="h-4 w-4" />
+                    </IconButton>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <LanguageSwitcher
+              sourceLang={sourceLang}
+              targetLang={targetLang}
+              onSourceChange={setSourceLang}
+              onTargetChange={setTargetLang}
+              onSwap={handleSwapLanguages}
             />
-          </div>
 
-          {/* Language Selection */}
-          <div className="flex items-center gap-2">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                From
-              </label>
-              <CustomSelect
-                options={LANGUAGES.map(lang => ({ value: lang.code, label: lang.name }))}
-                value={sourceLang}
-                onChange={setSourceLang}
-              />
-            </div>
-
-            <button
-              onClick={handleSwapLanguages}
-              disabled={sourceLang === 'auto'}
-              className="mt-7 p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              title="Swap languages"
-            >
-              <svg
-                className="w-5 h-5 text-gray-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-                />
-              </svg>
-            </button>
-
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                To
-              </label>
-              <CustomSelect
-                options={LANGUAGES.filter(lang => lang.code !== 'auto').map(lang => ({ value: lang.code, label: lang.name }))}
-                value={targetLang}
-                onChange={setTargetLang}
-              />
-            </div>
-          </div>
-
-          {/* Translate Button */}
-          <button
-            onClick={handleTranslate}
-            disabled={!sourceText.trim() || isTranslating}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
-          >
-            {isTranslating ? 'Translating...' : 'Translate'}
-          </button>
-
-          {/* Translation Results */}
-          {providerTranslations.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium text-gray-700">Results</h3>
-              {providerTranslations.map((result) => (
-                <TranslationCard
-                  key={result.provider_id}
-                  providerId={result.provider_id}
-                  providerName={getTranslationProviderDisplayName(
-                    result.provider_id,
-                    translationProviders,
-                  )}
-                  status={result.status}
-                  text={result.translated_text}
-                  detectedLanguage={result.detected_language || undefined}
-                  onRetry={() => {
-                    void retryProvider(result.provider_id);
-                  }}
-                />
-              ))}
-            </div>
-          )}
+            {providerTranslations.length > 0 && (
+              <div className="flex min-h-0 flex-1 flex-col">
+                <div
+                  className={resultWindowResultsListClassName()}
+                  style={{ height: `${translationLayout.resultsHeightPx}px` }}
+                >
+                  {providerTranslations.map((result) => (
+                    <TranslationCard
+                      key={result.provider_id}
+                      providerId={result.provider_id}
+                      providerName={getTranslationProviderDisplayName(
+                        result.provider_id,
+                        translationProviders,
+                      )}
+                      status={result.status}
+                      text={result.translated_text}
+                      detectedLanguage={result.detected_language || undefined}
+                      bodyMaxHeightPx={
+                        translationLayout.bodyMaxHeightByProviderId[
+                          result.provider_id
+                        ] ?? 44
+                      }
+                      onRetry={() => {
+                        void retryProvider(result.provider_id);
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

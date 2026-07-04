@@ -55,6 +55,7 @@ interface AppState {
   translationSessionId: string | null;
   isTranslating: boolean;
   ocrText: string;
+  ocrImageBase64: string | null;
   isOcrRunning: boolean;
   ocrError: string | null;
   resultWindowVisible: boolean;
@@ -76,6 +77,7 @@ interface AppState {
   ) => void;
   setTranslating: (value: boolean) => void;
   setOcrText: (text: string) => void;
+  setOcrImageBase64: (imageBase64: string | null) => void;
   setOcrRunning: (value: boolean) => void;
   setOcrError: (message: string | null) => void;
   requestAutoTranslate: () => void;
@@ -95,6 +97,7 @@ export const useAppStore = create<AppState>((set) => ({
   translationSessionId: null,
   isTranslating: false,
   ocrText: '',
+  ocrImageBase64: null,
   isOcrRunning: false,
   ocrError: null,
   resultWindowVisible: false,
@@ -195,6 +198,7 @@ export const useAppStore = create<AppState>((set) => ({
     }),
   setTranslating: (value) => set({ isTranslating: value }),
   setOcrText: (text) => set({ ocrText: text }),
+  setOcrImageBase64: (imageBase64) => set({ ocrImageBase64: imageBase64 }),
   setOcrRunning: (value) => set({ isOcrRunning: value }),
   setOcrError: (message) => set({ ocrError: message }),
   requestAutoTranslate: () =>
@@ -212,6 +216,7 @@ export const useAppStore = create<AppState>((set) => ({
     translationSessionId: null,
     isTranslating: false,
     ocrText: '',
+    ocrImageBase64: null,
     isOcrRunning: false,
     ocrError: null,
     autoTranslateRequestId: 0,

@@ -29,6 +29,7 @@ export interface CaptureResultWindowPayload {
   text: string;
   autoTranslate: boolean;
   ocrIntent?: 'show' | 'display-text' | 'file';
+  imageBase64?: string;
 }
 
 function captureOutputArgs(input: RenderCaptureOutputInput) {
@@ -133,8 +134,14 @@ export async function openTranslationResultWindow(text: string) {
   return invoke<void>('open_translation_result_window', { text });
 }
 
-export async function openCaptureOcrResultWindow(text: string) {
-  return invoke<void>('open_capture_ocr_result_window', { text });
+export async function openCaptureOcrResultWindow(
+  text: string,
+  imageBase64?: string,
+) {
+  return invoke<void>('open_capture_ocr_result_window', {
+    text,
+    ...(imageBase64 ? { imageBase64 } : {}),
+  });
 }
 
 export async function openCaptureTranslationResultWindow(text: string) {

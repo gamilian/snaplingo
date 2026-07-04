@@ -96,4 +96,14 @@ describe('translation session state', () => {
     expect(state.providerTranslations).toEqual([]);
     expect(state.isTranslating).toBe(false);
   });
+
+  it('stores and clears the source image for screenshot OCR results', () => {
+    useAppStore.getState().setOcrImageBase64('rendered-image-base64');
+
+    expect(useAppStore.getState().ocrImageBase64).toBe('rendered-image-base64');
+
+    useAppStore.getState().setOcrImageBase64(null);
+
+    expect(useAppStore.getState().ocrImageBase64).toBeNull();
+  });
 });

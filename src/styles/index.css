@@ -94,6 +94,32 @@ body {
   background: var(--gray-400);
 }
 
+.result-window-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.result-window-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.result-window-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.result-window-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+
+.result-window-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+  background-clip: content-box;
+}
+
 /* 动画 */
 @keyframes slideIn {
   from {

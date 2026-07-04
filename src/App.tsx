@@ -52,6 +52,7 @@ function App() {
   const setSourceText = useAppStore((state) => state.setSourceText);
   const clearTranslationResults = useAppStore((state) => state.clearTranslationResults);
   const setOcrText = useAppStore((state) => state.setOcrText);
+  const setOcrImageBase64 = useAppStore((state) => state.setOcrImageBase64);
   const setOcrRunning = useAppStore((state) => state.setOcrRunning);
   const setOcrError = useAppStore((state) => state.setOcrError);
   const requestAutoTranslate = useAppStore((state) => state.requestAutoTranslate);
@@ -70,6 +71,7 @@ function App() {
   const startFileOcr = useCallback(() => {
     showOcrWindow();
     setOcrText('');
+    setOcrImageBase64(null);
     setOcrError(null);
     void runOcrFileWorkflow({
       selectImageFile,
@@ -80,6 +82,7 @@ function App() {
     });
   }, [
     setOcrError,
+    setOcrImageBase64,
     setOcrRunning,
     setOcrText,
     showOcrWindow,
@@ -182,10 +185,12 @@ function App() {
 
     if (shouldClearOcrResultsForPayload(payload)) {
       setOcrText('');
+      setOcrImageBase64(null);
       setOcrError(null);
     }
     if (shouldApplyOcrPayloadText(payload)) {
       setOcrText(payload.text);
+      setOcrImageBase64(payload.imageBase64 ?? null);
     }
     if (shouldStartFileOcrForPayload(payload)) {
       startFileOcr();
@@ -196,6 +201,7 @@ function App() {
     requestAutoTranslate,
     clearTranslationResults,
     setOcrError,
+    setOcrImageBase64,
     setOcrText,
     setSourceText,
     showOcrWindow,

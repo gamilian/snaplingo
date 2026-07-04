@@ -520,7 +520,7 @@ function Magnifier({
     MAGNIFIER_ZOOM,
   );
   const sizeText = selection
-    ? `${Math.round(selection.width)} x ${Math.round(selection.height)}`
+    ? `${Math.round(selection.width)} x ${Math.round(selection.height)} px`
     : '';
   const colorText = color ? colorSampleToClipboardText(color, colorFormat) : '';
 
@@ -1179,7 +1179,12 @@ export default function ScreenshotSession({
         if (effect.target === 'translation-window') {
           await openCaptureTranslationResultWindow(ocrResult.text);
         } else if (effect.target === 'ocr-window') {
-          await openCaptureOcrResultWindow(ocrResult.text);
+          const imageBase64 = await renderCaptureOutput({
+            sessionId: session.id,
+            rect,
+            annotations: [],
+          });
+          await openCaptureOcrResultWindow(ocrResult.text, imageBase64);
         } else {
           await copyTextToClipboard(ocrResult.text);
         }
@@ -1426,7 +1431,12 @@ export default function ScreenshotSession({
 
     try {
       const ocrResult = await runCaptureOcr(session.id, selection);
-      await openCaptureOcrResultWindow(ocrResult.text);
+      const imageBase64 = await renderCaptureOutput({
+        sessionId: session.id,
+        rect: selection,
+        annotations: [],
+      });
+      await openCaptureOcrResultWindow(ocrResult.text, imageBase64);
       recordSuccessfulSelection('ocr', selection);
       await finishCurrentCaptureSession(session.id);
     } catch (err) {

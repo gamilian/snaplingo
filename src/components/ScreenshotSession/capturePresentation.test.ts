@@ -27,6 +27,15 @@ describe('capture presentation', () => {
     );
   });
 
+  it('keeps the capture result html shell transparent before React renders', () => {
+    const html = readFileSync(new URL('../../../index.html', import.meta.url), 'utf8');
+
+    expect(html).toContain('data-window="capture-result"');
+    expect(html).toMatch(
+      /html\[data-window="capture-result"\][\s\S]*background:\s*transparent/s,
+    );
+  });
+
   it('keeps the capture surface transparent while the snapshot session loads', () => {
     expect(getCaptureRootClassName('loading')).not.toContain('bg-black');
     expect(shouldShowCaptureLoadingMask('loading')).toBe(false);
