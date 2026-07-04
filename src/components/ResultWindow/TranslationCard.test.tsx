@@ -15,6 +15,7 @@ describe('translation card presentation', () => {
     );
 
     expect(markup).toContain('rounded-[14px]');
+    expect(markup).toContain('px-2.5');
     expect(markup).toContain('leading-[1.38]');
     expect(markup).not.toContain('height:144px');
     expect(markup).not.toContain('max-height:144px');

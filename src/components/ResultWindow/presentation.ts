@@ -10,17 +10,30 @@ const translationWindowMaxHeightPx = 820;
 const translationWindowMinHeightPx = 320;
 const translationWindowStaticHeightPx = 236;
 const translationProviderCardHeaderHeightPx = 36;
-const translationProviderCardGapPx = 8;
+const translationProviderCardBorderHeightPx = 2;
+const translationProviderCardGapPx = 10;
 const translationProviderBodyMinHeightPx = 44;
 const translationProviderPendingBodyHeightPx = 62;
 const translationProviderBodyVerticalPaddingPx = 16;
 const translationProviderBodyLineHeightPx = 18;
-const translationResultsBottomPaddingPx = 8;
+const translationResultsBottomPaddingPx = 10;
+const resultWindowSourceTextAreaMinRows = 2;
+const resultWindowOcrTextAreaMinRows = 4;
+const resultWindowSourceTextAreaMinHeightPx = 52;
+const resultWindowOcrTextAreaMinHeightPx = 72;
+const resultWindowTextAreaSlackRatio = 0.75;
+const resultWindowTextAreaMinSlackPx = 10;
+const resultWindowTextAreaMaxSlackPx = 16;
 const resultWindowStandaloneContainerPaddingPx = 16;
 
 export interface ResultWindowAdaptiveTextStyle {
   fontSize: string;
   lineHeight: number;
+}
+
+export interface ResultWindowTextAreaAutosizeOptions {
+  minHeightPx?: number;
+  textStyle?: ResultWindowAdaptiveTextStyle;
 }
 
 export interface ResultWindowTranslationLayoutItem {
@@ -59,8 +72,12 @@ export function resultWindowPanelClassName(
   return `${baseClassName} max-h-[90vh] animate-[slideIn_0.3s_ease-out]`;
 }
 
-export function resultWindowContentClassName() {
-  return 'flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overflow-x-hidden px-3 py-2.5 result-window-scrollbar';
+export function resultWindowContentClassName({
+  reserveBottom = true,
+}: { reserveBottom?: boolean } = {}) {
+  const bottomPaddingClassName = reserveBottom ? 'pb-2.5' : 'pb-0';
+
+  return `flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overflow-x-hidden pl-2.5 pr-[4px] ${bottomPaddingClassName} pt-2.5 result-window-scrollbar`;
 }
 
 export function resultWindowTextBoxClassName() {
@@ -72,27 +89,48 @@ export function resultWindowTextAreaClassName(kind: 'source' | 'ocr') {
     'w-full resize-none overflow-hidden border-0 outline-none placeholder:text-slate-400';
 
   if (kind === 'ocr') {
-    return `${baseClassName} min-h-[86px] px-3 py-2.5 text-[14px] leading-[1.42] text-slate-800`;
+    return `${baseClassName} min-h-[72px] px-2.5 py-2.5 text-[14px] leading-[1.42] text-slate-800`;
   }
 
-  return `${baseClassName} min-h-[68px] px-3 py-2 text-[13px] leading-[1.38] text-slate-900`;
+  return `${baseClassName} min-h-[52px] px-2.5 py-2 text-[13px] leading-[1.38] text-slate-900`;
 }
 
 export function resultWindowTextAreaRows(
   text: string,
   kind: 'source' | 'ocr',
 ) {
-  const minRows = kind === 'source' ? 3 : 5;
-  return Math.max(minRows, estimateVisualLineCount(text, kind));
+  void text;
+
+  return kind === 'source'
+    ? resultWindowSourceTextAreaMinRows
+    : resultWindowOcrTextAreaMinRows;
+}
+
+export function resultWindowTextAreaMinHeightPx(kind: 'source' | 'ocr') {
+  return kind === 'source'
+    ? resultWindowSourceTextAreaMinHeightPx
+    : resultWindowOcrTextAreaMinHeightPx;
 }
 
 export function autosizeResultWindowTextArea(
   textArea: Pick<HTMLTextAreaElement, 'scrollHeight' | 'style'> | null,
+  options: ResultWindowTextAreaAutosizeOptions = {},
 ) {
-  if (!textArea) return;
+  if (!textArea) return null;
 
   textArea.style.height = 'auto';
-  textArea.style.height = `${textArea.scrollHeight}px`;
+  const minHeightPx = options.minHeightPx ?? 0;
+  const baseHeight = Math.max(textArea.scrollHeight, minHeightPx);
+  const shouldAddSlack = textArea.scrollHeight > minHeightPx;
+  const measuredHeight =
+    baseHeight +
+    (shouldAddSlack
+      ? resultWindowTextAreaAutosizeSlackPx(options.textStyle)
+      : 0);
+
+  textArea.style.height = `${measuredHeight}px`;
+
+  return measuredHeight;
 }
 
 export function resultWindowAdaptiveTextStyle(
@@ -121,13 +159,22 @@ export function resultWindowAdaptiveTextStyle(
 
 export function resultWindowTranslationLayout(
   providers: ResultWindowTranslationLayoutItem[],
+  sourceTextAreaHeightPx = resultWindowSourceTextAreaMinHeightPx,
 ): ResultWindowTranslationLayout {
+  const sourceTextAreaExtraHeightPx = Math.max(
+    0,
+    sourceTextAreaHeightPx - resultWindowSourceTextAreaMinHeightPx,
+  );
+
   if (providers.length === 0) {
     return {
       bodyHeightByProviderId: {},
       isConstrained: false,
       resultsHeightPx: 0,
-      windowHeightPx: translationWindowMinHeightPx,
+      windowHeightPx: clampTranslationWindowHeight(
+        0,
+        sourceTextAreaExtraHeightPx,
+      ),
     };
   }
 
@@ -137,7 +184,10 @@ export function resultWindowTranslationLayout(
   const naturalResultsHeightPx =
     bodyHeights.reduce(
       (height, bodyHeight) =>
-        height + translationProviderCardHeaderHeightPx + bodyHeight,
+        height +
+        translationProviderCardHeaderHeightPx +
+        bodyHeight +
+        translationProviderCardBorderHeightPx,
       0,
     ) +
     translationProviderCardGapPx * Math.max(0, providers.length - 1) +
@@ -149,7 +199,10 @@ export function resultWindowTranslationLayout(
     ),
     isConstrained: naturalResultsHeightPx > translationResultsMaxHeightPx,
     resultsHeightPx: naturalResultsHeightPx,
-    windowHeightPx: clampTranslationWindowHeight(naturalResultsHeightPx),
+    windowHeightPx: clampTranslationWindowHeight(
+      naturalResultsHeightPx,
+      sourceTextAreaExtraHeightPx,
+    ),
   };
 }
 
@@ -180,18 +233,23 @@ function estimateTranslationBodyHeight(
   );
 }
 
-function clampTranslationWindowHeight(resultsHeightPx: number) {
+function clampTranslationWindowHeight(
+  resultsHeightPx: number,
+  sourceTextAreaExtraHeightPx = 0,
+) {
   return Math.min(
     translationWindowMaxHeightPx,
     Math.max(
       translationWindowMinHeightPx,
-      translationWindowStaticHeightPx + resultsHeightPx,
+      translationWindowStaticHeightPx +
+        sourceTextAreaExtraHeightPx +
+        resultsHeightPx,
     ),
   );
 }
 
 export function resultWindowResultsListClassName() {
-  return 'min-h-0 flex-none space-y-2 pb-2';
+  return 'min-h-0 flex-none space-y-2.5 pb-2.5';
 }
 
 export function resultWindowStandaloneWindowHeight(panelHeightPx: number) {
@@ -213,7 +271,7 @@ export function resultWindowTranslationSubtitle(
 }
 
 export function resultWindowOcrResultGridClassName() {
-  return 'grid min-h-0 flex-1 grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] gap-3';
+  return 'grid min-h-0 flex-1 grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] gap-2.5';
 }
 
 export function resultWindowOcrImagePanelClassName() {
@@ -221,7 +279,24 @@ export function resultWindowOcrImagePanelClassName() {
 }
 
 export function resultWindowOcrResultTextAreaClassName() {
-  return 'min-h-[86px] w-full resize-none overflow-hidden border-0 px-3 py-2.5 text-[14px] leading-[1.42] text-slate-800 outline-none placeholder:text-slate-400';
+  return 'min-h-[72px] w-full resize-none overflow-hidden border-0 px-2.5 py-2.5 text-[14px] leading-[1.42] text-slate-800 outline-none placeholder:text-slate-400';
+}
+
+function resultWindowTextAreaAutosizeSlackPx(
+  textStyle?: ResultWindowAdaptiveTextStyle,
+) {
+  const fontSizePx = Number.parseFloat(textStyle?.fontSize ?? '14px');
+  const lineHeightPx = fontSizePx * (textStyle?.lineHeight ?? 1.4);
+
+  return Math.ceil(
+    Math.min(
+      resultWindowTextAreaMaxSlackPx,
+      Math.max(
+        resultWindowTextAreaMinSlackPx,
+        lineHeightPx * resultWindowTextAreaSlackRatio,
+      ),
+    ),
+  );
 }
 
 export function shouldCloseFromContainerClick(

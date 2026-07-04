@@ -97,6 +97,7 @@ body {
 .result-window-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 transparent;
+  scrollbar-gutter: stable;
 }
 
 .result-window-scrollbar::-webkit-scrollbar {
@@ -106,6 +107,7 @@ body {
 
 .result-window-scrollbar::-webkit-scrollbar-track {
   background: transparent;
+  margin-block: 12px;
 }
 
 .result-window-scrollbar::-webkit-scrollbar-thumb {

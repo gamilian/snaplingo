@@ -3,6 +3,7 @@ import {
   useLayoutEffect,
   useMemo,
   useRef,
+  useState,
   type MouseEvent,
   type ReactNode,
 } from 'react';
@@ -28,6 +29,7 @@ import {
   resultWindowStandaloneWindowHeight,
   resultWindowTranslationSubtitle,
   resultWindowTextAreaClassName,
+  resultWindowTextAreaMinHeightPx,
   resultWindowTextAreaRows,
   resultWindowTextBoxClassName,
   resultWindowTranslationLayout,
@@ -117,7 +119,7 @@ function Header({
   const isOcr = mode === 'ocr';
 
   return (
-    <div className="flex min-h-12 items-center justify-between gap-3 rounded-t-[14px] border-b border-slate-200 bg-slate-50/90 px-3.5">
+    <div className="flex min-h-12 items-center justify-between gap-2.5 rounded-t-[14px] border-b border-slate-200 bg-slate-50/90 px-2.5">
       <div className="flex min-w-0 items-center gap-2.5">
         <div
           className={`grid h-7 w-7 shrink-0 place-items-center rounded-[7px] text-white ${
@@ -265,6 +267,17 @@ export default function ResultWindow({
   const sourceTextAreaRef = useRef<HTMLTextAreaElement>(null);
   const ocrImageTextAreaRef = useRef<HTMLTextAreaElement>(null);
   const ocrTextAreaRef = useRef<HTMLTextAreaElement>(null);
+  const [sourceTextAreaHeightPx, setSourceTextAreaHeightPx] = useState<
+    number | undefined
+  >(undefined);
+  const sourceTextStyle = useMemo(
+    () => resultWindowAdaptiveTextStyle(sourceText, 'source'),
+    [sourceText],
+  );
+  const ocrTextStyle = useMemo(
+    () => resultWindowAdaptiveTextStyle(ocrText, 'ocr'),
+    [ocrText],
+  );
   const translationLayout = useMemo(
     () =>
       resultWindowTranslationLayout(
@@ -273,8 +286,9 @@ export default function ResultWindow({
           text: translation.translated_text,
           status: translation.status,
         })),
+        sourceTextAreaHeightPx,
       ),
-    [providerTranslations],
+    [providerTranslations, sourceTextAreaHeightPx],
   );
 
   useEffect(() => {
@@ -324,15 +338,30 @@ export default function ResultWindow({
   useLayoutEffect(() => {
     if (!resultWindowVisible) return;
 
-    autosizeResultWindowTextArea(sourceTextAreaRef.current);
-  }, [resultWindowVisible, sourceText]);
+    const measuredHeight = autosizeResultWindowTextArea(sourceTextAreaRef.current, {
+      minHeightPx: resultWindowTextAreaMinHeightPx('source'),
+      textStyle: sourceTextStyle,
+    });
+
+    if (measuredHeight !== null) {
+      setSourceTextAreaHeightPx((currentHeight) =>
+        currentHeight === measuredHeight ? currentHeight : measuredHeight,
+      );
+    }
+  }, [resultWindowVisible, sourceText, sourceTextStyle]);
 
   useLayoutEffect(() => {
     if (!resultWindowVisible) return;
 
-    autosizeResultWindowTextArea(ocrImageTextAreaRef.current);
-    autosizeResultWindowTextArea(ocrTextAreaRef.current);
-  }, [ocrText, resultWindowVisible]);
+    autosizeResultWindowTextArea(ocrImageTextAreaRef.current, {
+      minHeightPx: resultWindowTextAreaMinHeightPx('ocr'),
+      textStyle: ocrTextStyle,
+    });
+    autosizeResultWindowTextArea(ocrTextAreaRef.current, {
+      minHeightPx: resultWindowTextAreaMinHeightPx('ocr'),
+      textStyle: ocrTextStyle,
+    });
+  }, [ocrText, ocrTextStyle, resultWindowVisible]);
 
   useEffect(() => {
     if (
@@ -424,7 +453,7 @@ export default function ResultWindow({
             {ocrImageBase64 ? (
               <div className={resultWindowOcrResultGridClassName()}>
                 <div className="flex min-h-0 flex-col gap-2">
-                  <div className="flex min-h-[18px] items-center justify-between gap-3">
+                  <div className="flex min-h-[18px] items-center justify-between gap-2.5">
                     <h3 className="text-[13px] font-bold text-slate-600">截图区域</h3>
                     <span className="text-[11px] text-slate-400">source</span>
                   </div>
@@ -439,7 +468,7 @@ export default function ResultWindow({
                 </div>
 
                 <div className="flex min-h-0 flex-col gap-2">
-                  <div className="flex min-h-[18px] items-center justify-between gap-3">
+                  <div className="flex min-h-[18px] items-center justify-between gap-2.5">
                     <h3 className="text-[13px] font-bold text-slate-600">识别文本</h3>
                     <span className="text-[11px] text-slate-400">
                       {ocrText ? `${ocrText.length} chars` : 'No text'}
@@ -453,9 +482,9 @@ export default function ResultWindow({
                       placeholder="OCR 结果..."
                       rows={resultWindowTextAreaRows(ocrText, 'ocr')}
                       className={resultWindowOcrResultTextAreaClassName()}
-                      style={resultWindowAdaptiveTextStyle(ocrText, 'ocr')}
+                      style={ocrTextStyle}
                     />
-                    <div className="flex min-h-8 items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/80 px-3 py-1">
+                    <div className="flex min-h-8 items-center justify-between gap-2.5 border-t border-slate-100 bg-slate-50/80 px-2.5 py-1">
                       <span className="text-[11px] text-slate-400">
                         {ocrText.length} chars
                       </span>
@@ -486,8 +515,8 @@ export default function ResultWindow({
               </div>
             ) : (
               <>
-                <div className="space-y-2">
-                  <div className="flex min-h-[18px] items-center justify-between gap-3">
+                <div className="space-y-2.5">
+                  <div className="flex min-h-[18px] items-center justify-between gap-2.5">
                     <label className="text-[13px] font-bold text-slate-600">图片</label>
                     <span className="text-[11px] text-slate-400">PNG/JPG/WebP</span>
                   </div>
@@ -495,7 +524,7 @@ export default function ResultWindow({
                     type="button"
                     onClick={handleUploadImage}
                     disabled={isOcrRunning}
-                    className="grid min-h-[92px] w-full place-items-center rounded-[14px] border border-dashed border-slate-300 bg-gradient-to-b from-slate-50 to-white px-4 py-3 text-center transition-colors duration-150 hover:border-emerald-300 hover:bg-emerald-50/30 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="grid min-h-[92px] w-full place-items-center rounded-[14px] border border-dashed border-slate-300 bg-gradient-to-b from-slate-50 to-white px-2.5 py-2.5 text-center transition-colors duration-150 hover:border-emerald-300 hover:bg-emerald-50/30 disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     <span className="grid justify-items-center gap-2">
                       <span className="grid h-9 w-9 place-items-center rounded-[7px] bg-emerald-50 text-emerald-700">
@@ -512,7 +541,7 @@ export default function ResultWindow({
                 </div>
 
                 {ocrError && (
-                  <div className="rounded-[14px] border border-red-200 bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700">
+                  <div className="rounded-[14px] border border-red-200 bg-red-50 px-2.5 py-2.5 text-sm font-medium text-red-700">
                     {ocrError}
                   </div>
                 )}
@@ -526,8 +555,8 @@ export default function ResultWindow({
                   {ocrText ? '重新选择图片' : '选择图片'}
                 </button>
 
-                <div className="min-h-0 space-y-2">
-                  <div className="flex min-h-[18px] items-center justify-between gap-3">
+                <div className="min-h-0 space-y-2.5">
+                  <div className="flex min-h-[18px] items-center justify-between gap-2.5">
                     <h3 className="text-[13px] font-bold text-slate-600">识别文本</h3>
                     <span className="text-[11px] text-slate-400">
                       {ocrText ? `${ocrText.length} chars` : 'No text'}
@@ -541,9 +570,9 @@ export default function ResultWindow({
                       rows={resultWindowTextAreaRows(ocrText, 'ocr')}
                       placeholder="OCR 结果..."
                       className={resultWindowTextAreaClassName('ocr')}
-                      style={resultWindowAdaptiveTextStyle(ocrText, 'ocr')}
+                      style={ocrTextStyle}
                     />
-                    <div className="flex min-h-8 items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/80 px-3 py-1">
+                    <div className="flex min-h-8 items-center justify-between gap-2.5 border-t border-slate-100 bg-slate-50/80 px-2.5 py-1">
                       <span className="text-[11px] text-slate-400">
                         {ocrText.length} chars
                       </span>
@@ -572,7 +601,11 @@ export default function ResultWindow({
             )}
           </div>
         ) : (
-          <div className={resultWindowContentClassName()}>
+          <div
+            className={resultWindowContentClassName({
+              reserveBottom: providerTranslations.length === 0,
+            })}
+          >
             <div className="flex-none">
               <div className={resultWindowTextBoxClassName()}>
                 <textarea
@@ -582,9 +615,9 @@ export default function ResultWindow({
                   rows={resultWindowTextAreaRows(sourceText, 'source')}
                   placeholder="输入需要翻译的文本..."
                   className={resultWindowTextAreaClassName('source')}
-                  style={resultWindowAdaptiveTextStyle(sourceText, 'source')}
+                  style={sourceTextStyle}
                 />
-                <div className="flex min-h-8 items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/80 px-3 py-1">
+                <div className="flex min-h-8 items-center justify-between gap-2.5 border-t border-slate-100 bg-slate-50/80 px-2.5 py-1">
                   <span className="min-w-0 truncate text-[11px] text-slate-400">
                     {sourceText.length} chars · 识别为{' '}
                     <span className="font-semibold text-blue-600">

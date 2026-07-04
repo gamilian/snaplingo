@@ -64,11 +64,11 @@ export default function TranslationCard({
 
   return (
     <div className="overflow-hidden rounded-[14px] border border-slate-200 bg-white">
-      <div className="flex min-h-9 items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/80 px-2.5 py-1.5">
+      <div className="flex min-h-9 items-center justify-between gap-2.5 border-b border-slate-100 bg-slate-50/80 px-2.5 py-1.5">
         <button
           type="button"
           onClick={() => setIsExpanded(!isExpanded)}
-          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+          className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
         >
           <div
             className="h-5 w-1 shrink-0 rounded-full"
@@ -78,12 +78,12 @@ export default function TranslationCard({
             {providerName || providerId}
           </span>
           {isPending && (
-            <span className="shrink-0 rounded-[8px] bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
+            <span className="shrink-0 rounded-[7px] bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
               翻译中
             </span>
           )}
           {isError && (
-            <span className="shrink-0 rounded-[8px] bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">
+            <span className="shrink-0 rounded-[7px] bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">
               失败
             </span>
           )}
@@ -142,7 +142,7 @@ export default function TranslationCard({
         <div className="bg-white">
           {isPending ? (
             <div
-              className="space-y-1.5 overflow-hidden px-3 py-2.5"
+              className="space-y-1.5 overflow-hidden px-2.5 py-2.5"
               style={{
                 height: `${bodyHeightPx}px`,
                 maxHeight: `${bodyHeightPx}px`,
@@ -155,7 +155,7 @@ export default function TranslationCard({
             </div>
           ) : (
             <p
-              className={`whitespace-pre-wrap break-words px-3 py-2 pr-4 text-[13px] leading-[1.38] ${
+              className={`whitespace-pre-wrap break-words px-2.5 py-2.5 text-[13px] leading-[1.38] ${
                 isError ? 'text-red-700' : 'text-slate-800'
               }`}
               style={resultWindowAdaptiveTextStyle(text, 'result')}
