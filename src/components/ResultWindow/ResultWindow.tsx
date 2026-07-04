@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, type MouseEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import { useAppStore } from '../../stores/appStore';
 import { useProviderStore } from '../../stores/providerStore';
@@ -9,6 +16,7 @@ import { recognizeImageFile, selectImageFile } from '../../tauri/ocr';
 import { runOcrFileWorkflow } from './ocrFileWorkflow';
 import { getTranslationProviderDisplayName } from './translationProviderDisplayName';
 import {
+  autosizeResultWindowTextArea,
   resultWindowContentClassName,
   resultWindowAdaptiveTextStyle,
   resultWindowContainerClassName,
@@ -17,7 +25,10 @@ import {
   resultWindowOcrResultTextAreaClassName,
   resultWindowPanelClassName,
   resultWindowResultsListClassName,
+  resultWindowStandaloneWindowHeight,
+  resultWindowTranslationSubtitle,
   resultWindowTextAreaClassName,
+  resultWindowTextAreaRows,
   resultWindowTextBoxClassName,
   resultWindowTranslationLayout,
   shouldCloseFromContainerClick,
@@ -251,12 +262,16 @@ export default function ResultWindow({
 
   const { translate, retryProvider } = useTranslate();
   const lastAutoTranslateRequestId = useRef(0);
+  const sourceTextAreaRef = useRef<HTMLTextAreaElement>(null);
+  const ocrImageTextAreaRef = useRef<HTMLTextAreaElement>(null);
+  const ocrTextAreaRef = useRef<HTMLTextAreaElement>(null);
   const translationLayout = useMemo(
     () =>
       resultWindowTranslationLayout(
         providerTranslations.map((translation) => ({
           providerId: translation.provider_id,
           text: translation.translated_text,
+          status: translation.status,
         })),
       ),
     [providerTranslations],
@@ -287,10 +302,12 @@ export default function ResultWindow({
   useEffect(() => {
     if (!resultWindowVisible || presentation !== 'standalone') return;
 
-    const windowHeight =
+    const panelHeight =
       resultWindowMode === 'translation' ? translationLayout.windowHeightPx : 660;
 
-    void getCurrentWindow().setSize(new LogicalSize(660, windowHeight));
+    void getCurrentWindow().setSize(
+      new LogicalSize(660, resultWindowStandaloneWindowHeight(panelHeight)),
+    );
   }, [
     presentation,
     resultWindowMode,
@@ -303,6 +320,19 @@ export default function ResultWindow({
 
     void loadTranslationProviders();
   }, [loadTranslationProviders, resultWindowVisible]);
+
+  useLayoutEffect(() => {
+    if (!resultWindowVisible) return;
+
+    autosizeResultWindowTextArea(sourceTextAreaRef.current);
+  }, [resultWindowVisible, sourceText]);
+
+  useLayoutEffect(() => {
+    if (!resultWindowVisible) return;
+
+    autosizeResultWindowTextArea(ocrImageTextAreaRef.current);
+    autosizeResultWindowTextArea(ocrTextAreaRef.current);
+  }, [ocrText, resultWindowVisible]);
 
   useEffect(() => {
     if (
@@ -357,15 +387,10 @@ export default function ResultWindow({
   };
 
   const isOcrMode = resultWindowMode === 'ocr';
-  const successCount = providerTranslations.filter(
-    (translation) => translation.status === 'success',
-  ).length;
-  const translationSubtitle =
-    providerTranslations.length > 0
-      ? `${successCount} 个服务已返回`
-      : isTranslating
-        ? '正在请求服务'
-        : '准备翻译';
+  const translationSubtitle = resultWindowTranslationSubtitle(
+    providerTranslations,
+    isTranslating,
+  );
   const ocrSubtitle = isOcrRunning
     ? '识别中'
     : ocrText
@@ -422,9 +447,11 @@ export default function ResultWindow({
                   </div>
                   <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[14px] border border-slate-300 bg-white">
                     <textarea
+                      ref={ocrImageTextAreaRef}
                       value={ocrText}
                       readOnly
                       placeholder="OCR 结果..."
+                      rows={resultWindowTextAreaRows(ocrText, 'ocr')}
                       className={resultWindowOcrResultTextAreaClassName()}
                       style={resultWindowAdaptiveTextStyle(ocrText, 'ocr')}
                     />
@@ -508,9 +535,10 @@ export default function ResultWindow({
                   </div>
                   <div className={resultWindowTextBoxClassName()}>
                     <textarea
+                      ref={ocrTextAreaRef}
                       value={ocrText}
                       readOnly
-                      rows={5}
+                      rows={resultWindowTextAreaRows(ocrText, 'ocr')}
                       placeholder="OCR 结果..."
                       className={resultWindowTextAreaClassName('ocr')}
                       style={resultWindowAdaptiveTextStyle(ocrText, 'ocr')}
@@ -548,9 +576,10 @@ export default function ResultWindow({
             <div className="flex-none">
               <div className={resultWindowTextBoxClassName()}>
                 <textarea
+                  ref={sourceTextAreaRef}
                   value={sourceText}
                   onChange={(e) => setSourceText(e.target.value)}
-                  rows={3}
+                  rows={resultWindowTextAreaRows(sourceText, 'source')}
                   placeholder="输入需要翻译的文本..."
                   className={resultWindowTextAreaClassName('source')}
                   style={resultWindowAdaptiveTextStyle(sourceText, 'source')}
@@ -603,7 +632,6 @@ export default function ResultWindow({
               <div className="flex min-h-0 flex-1 flex-col">
                 <div
                   className={resultWindowResultsListClassName()}
-                  style={{ height: `${translationLayout.resultsHeightPx}px` }}
                 >
                   {providerTranslations.map((result) => (
                     <TranslationCard
@@ -615,9 +643,8 @@ export default function ResultWindow({
                       )}
                       status={result.status}
                       text={result.translated_text}
-                      detectedLanguage={result.detected_language || undefined}
-                      bodyMaxHeightPx={
-                        translationLayout.bodyMaxHeightByProviderId[
+                      bodyHeightPx={
+                        translationLayout.bodyHeightByProviderId[
                           result.provider_id
                         ] ?? 44
                       }

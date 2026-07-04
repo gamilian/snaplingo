@@ -1,4 +1,5 @@
 export const CAPTURE_RESULT_WINDOW_LABEL = 'capture-result';
+export const SETTINGS_WINDOW_LABEL = 'settings';
 
 export function isCaptureResultWindowLaunch(label: string, search: string) {
   return (
@@ -7,7 +8,6 @@ export function isCaptureResultWindowLaunch(label: string, search: string) {
   );
 }
 
-export function isSettingsWindowLaunch(label: string, search: string): boolean {
-  const params = new URLSearchParams(search);
-  return label === 'settings' || params.get('window') === 'settings';
+export function isSettingsWindowLaunch(label: string, _search: string): boolean {
+  return label === SETTINGS_WINDOW_LABEL;
 }

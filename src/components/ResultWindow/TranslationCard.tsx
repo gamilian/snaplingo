@@ -15,7 +15,7 @@ interface TranslationCardProps {
   status: ProviderTranslationStatus;
   text: string;
   detectedLanguage?: string;
-  bodyMaxHeightPx?: number;
+  bodyHeightPx?: number;
   onRetry?: () => void;
 }
 
@@ -53,8 +53,7 @@ export default function TranslationCard({
   providerName,
   status,
   text,
-  detectedLanguage,
-  bodyMaxHeightPx = 144,
+  bodyHeightPx = 62,
   onRetry,
 }: TranslationCardProps) {
   const [isExpanded, setIsExpanded] = useState(true);
@@ -86,11 +85,6 @@ export default function TranslationCard({
           {isError && (
             <span className="shrink-0 rounded-[8px] bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">
               失败
-            </span>
-          )}
-          {detectedLanguage && (
-            <span className="shrink-0 rounded-[8px] bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
-              Detected: {detectedLanguage}
             </span>
           )}
         </button>
@@ -147,20 +141,24 @@ export default function TranslationCard({
       {isExpanded && (
         <div className="bg-white">
           {isPending ? (
-            <div className="space-y-1.5 px-3 py-2.5" aria-label="翻译中">
+            <div
+              className="space-y-1.5 overflow-hidden px-3 py-2.5"
+              style={{
+                height: `${bodyHeightPx}px`,
+                maxHeight: `${bodyHeightPx}px`,
+              }}
+              aria-label="翻译中"
+            >
               <div className="h-2.5 w-11/12 rounded-full bg-slate-100 animate-pulse" />
               <div className="h-2.5 w-3/4 rounded-full bg-slate-100 animate-pulse" />
               <div className="h-2.5 w-1/2 rounded-full bg-slate-100 animate-pulse" />
             </div>
           ) : (
             <p
-              className={`overflow-y-auto whitespace-pre-wrap px-3 py-2 pr-4 text-[13px] leading-[1.38] result-window-scrollbar ${
+              className={`whitespace-pre-wrap break-words px-3 py-2 pr-4 text-[13px] leading-[1.38] ${
                 isError ? 'text-red-700' : 'text-slate-800'
               }`}
-              style={{
-                ...resultWindowAdaptiveTextStyle(text, 'result'),
-                maxHeight: `${bodyMaxHeightPx}px`,
-              }}
+              style={resultWindowAdaptiveTextStyle(text, 'result')}
             >
               {text}
             </p>

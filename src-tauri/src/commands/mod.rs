@@ -14,21 +14,10 @@ pub use pinned_image_commands::*;
 pub use provider_commands::*;
 pub use translation_commands::*;
 
-use std::path::PathBuf;
 use std::sync::{LazyLock, Mutex};
 
-#[cfg(target_os = "macos")]
-use objc2_app_kit::{
-    NSScreenSaverWindowLevel, NSWindow, NSWindowAnimationBehavior, NSWindowCollectionBehavior,
-    NSWindowStyleMask,
-};
 use serde::Serialize;
-use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
-
-use crate::settings_window;
-
-pub(crate) const CAPTURE_RESULT_WINDOW_LABEL: &str = "capture-result";
-pub(crate) const CAPTURE_WINDOW_LABEL: &str = "capture";
+use tauri::{Emitter, State};
 
 static CAPTURE_RESULT_WINDOW_PAYLOAD: LazyLock<Mutex<Option<CaptureResultWindowPayload>>> =
     LazyLock::new(|| Mutex::new(None));
@@ -137,36 +126,10 @@ fn open_capture_result_window(
         *pending_payload = Some(payload);
     }
 
-    let window = match app.get_webview_window(CAPTURE_RESULT_WINDOW_LABEL) {
-        Some(window) => window,
-        None => WebviewWindowBuilder::new(
-            &app,
-            CAPTURE_RESULT_WINDOW_LABEL,
-            WebviewUrl::App(capture_result_window_url()),
-        )
-        .title("SnapLingo Result")
-        .inner_size(660.0, 660.0)
-        .position(120.0, 120.0)
-        .decorations(false)
-        .always_on_top(true)
-        .visible_on_all_workspaces(true)
-        .transparent(true)
-        .visible(false)
-        .skip_taskbar(true)
-        .focused(false)
-        .shadow(true)
-        .build()
-        .map_err(|e| e.to_string())?,
-    };
-
-    reveal_capture_result_window(&window)?;
+    let window = crate::infrastructure::system::result_window::show_or_create_result_window(&app)?;
     window
         .emit("capture-result-payload-ready", ())
         .map_err(|e| e.to_string())
-}
-
-fn capture_result_window_url() -> PathBuf {
-    PathBuf::from("index.html?window=capture-result")
 }
 
 fn capture_translation_result_payload(text: String) -> CaptureResultWindowPayload {
@@ -238,61 +201,6 @@ fn read_clipboard_text() -> Result<String, String> {
         .map_err(|e| format!("Failed to read clipboard text: {}", e))
 }
 
-fn reveal_capture_result_window(window: &WebviewWindow) -> Result<(), String> {
-    #[cfg(target_os = "macos")]
-    {
-        configure_capture_result_window_for_current_space(window)?;
-        window.show().map_err(|e| e.to_string())?;
-        let ns_window = window.ns_window().map_err(|e| e.to_string())?;
-        if ns_window.is_null() {
-            return Err("Capture result window has no native NSWindow".to_string());
-        }
-
-        let ns_window: &NSWindow = unsafe { &*ns_window.cast() };
-        ns_window.orderFrontRegardless();
-        window.set_focus().map_err(|e| e.to_string())?;
-    }
-
-    #[cfg(not(target_os = "macos"))]
-    {
-        window.show().map_err(|e| e.to_string())?;
-    }
-
-    Ok(())
-}
-
-#[cfg(target_os = "macos")]
-fn configure_capture_result_window_for_current_space(window: &WebviewWindow) -> Result<(), String> {
-    let ns_window = window.ns_window().map_err(|e| e.to_string())?;
-    if ns_window.is_null() {
-        return Err("Capture result window has no native NSWindow".to_string());
-    }
-
-    let ns_window: &NSWindow = unsafe { &*ns_window.cast() };
-    ns_window.setStyleMask(ns_window.styleMask() | NSWindowStyleMask::Borderless);
-    ns_window.setCollectionBehavior(
-        ns_window.collectionBehavior()
-            | NSWindowCollectionBehavior::CanJoinAllSpaces
-            | NSWindowCollectionBehavior::FullScreenAuxiliary
-            | NSWindowCollectionBehavior::Stationary
-            | NSWindowCollectionBehavior::Transient
-            | NSWindowCollectionBehavior::IgnoresCycle,
-    );
-    ns_window.setLevel(NSScreenSaverWindowLevel);
-    ns_window.setCanHide(false);
-    ns_window.setHidesOnDeactivate(false);
-    if capture_result_window_disables_window_animation() {
-        ns_window.setAnimationBehavior(NSWindowAnimationBehavior::None);
-    }
-
-    Ok(())
-}
-
-#[cfg(target_os = "macos")]
-fn capture_result_window_disables_window_animation() -> bool {
-    true
-}
-
 #[tauri::command]
 pub fn copy_text_to_clipboard(text: String) -> Result<(), String> {
     let mut clipboard =
@@ -300,23 +208,6 @@ pub fn copy_text_to_clipboard(text: String) -> Result<(), String> {
     clipboard
         .set_text(text)
         .map_err(|e| format!("Failed to write text to clipboard: {}", e))
-}
-
-pub fn emit_screenshot_error(app: tauri::AppHandle, message: String) {
-    if let Some(window) = app.get_webview_window(settings_window::SETTINGS_WINDOW_LABEL) {
-        let _ = window.show();
-        let _ = window.set_focus();
-        let _ = window.emit("screenshot-error", message);
-    }
-}
-
-pub fn emit_capture_screenshot_error(app: tauri::AppHandle, message: String) {
-    if let Some(window) = app.get_webview_window(CAPTURE_WINDOW_LABEL) {
-        let _ = window.emit("screenshot-error", message);
-        return;
-    }
-
-    log::error!("Capture screenshot error: {}", message);
 }
 
 #[tauri::command]
@@ -417,14 +308,6 @@ pub async fn trigger_screenshot(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn capture_result_window_uses_dedicated_route() {
-        assert_eq!(
-            capture_result_window_url().to_string_lossy(),
-            "index.html?window=capture-result"
-        );
-    }
 
     #[test]
     fn capture_translation_payload_requests_auto_translation() {
@@ -537,11 +420,5 @@ mod tests {
                 image_base64: None,
             }
         );
-    }
-
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn capture_result_window_disables_appkit_window_animation() {
-        assert!(capture_result_window_disables_window_animation());
     }
 }

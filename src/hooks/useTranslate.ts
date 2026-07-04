@@ -7,11 +7,9 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-async function activeTranslationProviderIds() {
+export async function activeTranslationProviderIds() {
   const providerState = useProviderStore.getState();
-  if (providerState.activeTranslationProviders.length === 0) {
-    await providerState.loadTranslationProviders();
-  }
+  await providerState.loadTranslationProviders();
 
   return useProviderStore.getState().activeTranslationProviders;
 }

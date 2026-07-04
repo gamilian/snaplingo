@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  autosizeResultWindowTextArea,
   resultWindowContentClassName,
   resultWindowAdaptiveTextStyle,
   resultWindowContainerClassName,
@@ -8,7 +9,10 @@ import {
   resultWindowOcrResultGridClassName,
   resultWindowOcrResultTextAreaClassName,
   resultWindowResultsListClassName,
+  resultWindowStandaloneWindowHeight,
+  resultWindowTranslationSubtitle,
   resultWindowTextAreaClassName,
+  resultWindowTextAreaRows,
   resultWindowTextBoxClassName,
   resultWindowTranslationLayout,
   shouldCloseFromContainerClick,
@@ -51,26 +55,42 @@ describe('result window presentation', () => {
     expect(resultWindowPanelClassName('standalone')).toContain('overflow-hidden');
   });
 
-  it('keeps result window body scrolling out of the outer shell', () => {
+  it('uses one overall content scrollbar inside the result window', () => {
     const className = resultWindowContentClassName();
 
-    expect(className).toContain('overflow-hidden');
-    expect(className).not.toContain('overflow-y-auto');
+    expect(className).toContain('overflow-y-auto');
+    expect(className).toContain('result-window-scrollbar');
   });
 
-  it('uses small rounded text boxes with internal text scrolling', () => {
+  it('uses expanding text boxes without individual scrollbars', () => {
     expect(resultWindowTextBoxClassName()).toContain('rounded-[14px]');
     expect(resultWindowTextBoxClassName()).toContain('overflow-hidden');
 
-    expect(resultWindowTextAreaClassName('source')).toContain('max-h-[82px]');
     expect(resultWindowTextAreaClassName('source')).toContain('text-[13px]');
     expect(resultWindowTextAreaClassName('source')).toContain('leading-[1.38]');
-    expect(resultWindowTextAreaClassName('ocr')).toContain('max-h-[132px]');
-    expect(resultWindowTextAreaClassName('source')).toContain('overflow-y-auto');
-    expect(resultWindowTextAreaClassName('ocr')).toContain('overflow-y-auto');
-    expect(resultWindowTextAreaClassName('source')).toContain(
+    expect(resultWindowTextAreaClassName('source')).not.toContain('max-h-');
+    expect(resultWindowTextAreaClassName('ocr')).not.toContain('max-h-');
+    expect(resultWindowTextAreaClassName('source')).not.toContain('overflow-y-auto');
+    expect(resultWindowTextAreaClassName('ocr')).not.toContain('overflow-y-auto');
+    expect(resultWindowTextAreaClassName('source')).not.toContain(
       'result-window-scrollbar',
     );
+  });
+
+  it('expands source text rows to estimated wrapped content', () => {
+    expect(resultWindowTextAreaRows('Short text', 'source')).toBe(3);
+    expect(resultWindowTextAreaRows('A long source sentence '.repeat(12), 'source')).toBeGreaterThan(3);
+  });
+
+  it('autosizes textareas to measured content height', () => {
+    const textArea = {
+      scrollHeight: 184,
+      style: { height: '320px' },
+    } as HTMLTextAreaElement;
+
+    autosizeResultWindowTextArea(textArea);
+
+    expect(textArea.style.height).toBe('184px');
   });
 
   it('adapts text size and line height to content density', () => {
@@ -92,12 +112,44 @@ describe('result window presentation', () => {
     });
   });
 
-  it('keeps every provider card visible by preventing result-list scrolling', () => {
+  it('keeps provider result lists out of individual scrolling', () => {
     const className = resultWindowResultsListClassName();
 
     expect(className).toContain('min-h-0');
-    expect(className).toContain('overflow-hidden');
+    expect(className).toContain('pb-2');
+    expect(className).not.toContain('overflow-hidden');
     expect(className).not.toContain('overflow-y-auto');
+  });
+
+  it('reports returned providers against the active provider total', () => {
+    expect(
+      resultWindowTranslationSubtitle(
+        [
+          {
+            provider_id: 'google',
+            status: 'success',
+            translated_text: '你好',
+            detected_language: 'en',
+            confidence: 1,
+          },
+          {
+            provider_id: 'openai',
+            status: 'pending',
+            translated_text: '',
+            detected_language: null,
+            confidence: null,
+          },
+          {
+            provider_id: 'deeplx',
+            status: 'pending',
+            translated_text: '',
+            detected_language: null,
+            confidence: null,
+          },
+        ],
+        true,
+      ),
+    ).toBe('1/3 个服务已返回');
   });
 
   it('sizes short provider results naturally without forcing inner scrolling', () => {
@@ -107,13 +159,13 @@ describe('result window presentation', () => {
     ]);
 
     expect(layout.isConstrained).toBe(false);
-    expect(layout.bodyMaxHeightByProviderId.google).toBeLessThan(80);
-    expect(layout.bodyMaxHeightByProviderId.openai).toBeLessThan(80);
+    expect(layout.bodyHeightByProviderId.google).toBeLessThan(80);
+    expect(layout.bodyHeightByProviderId.openai).toBeLessThan(80);
     expect(layout.resultsHeightPx).toBeLessThan(180);
     expect(layout.windowHeightPx).toBeLessThan(480);
   });
 
-  it('splits the maximum result area across many long provider results', () => {
+  it('keeps long provider results at natural height and caps only the window', () => {
     const layout = resultWindowTranslationLayout([
       { providerId: 'google', text: 'Long result '.repeat(120) },
       { providerId: 'openai', text: 'Long result '.repeat(120) },
@@ -122,12 +174,27 @@ describe('result window presentation', () => {
     ]);
 
     expect(layout.isConstrained).toBe(true);
-    expect(layout.resultsHeightPx).toBeLessThanOrEqual(560);
+    expect(layout.resultsHeightPx).toBeGreaterThan(560);
     expect(layout.windowHeightPx).toBeLessThanOrEqual(820);
-    expect(layout.bodyMaxHeightByProviderId.google).toBe(
-      layout.bodyMaxHeightByProviderId.openai,
+    expect(layout.bodyHeightByProviderId.google).toBeGreaterThan(300);
+  });
+
+  it('adds standalone container padding to the native window height', () => {
+    expect(resultWindowStandaloneWindowHeight(794)).toBe(810);
+  });
+
+  it('allocates pending provider body height and bottom breathing room', () => {
+    const layout = resultWindowTranslationLayout([
+      { providerId: 'google', text: '短结果', status: 'success' },
+      { providerId: 'openai', text: '', status: 'pending' },
+      { providerId: 'deeplx', text: '', status: 'pending' },
+    ]);
+
+    expect(layout.bodyHeightByProviderId.openai).toBeGreaterThanOrEqual(62);
+    expect(layout.bodyHeightByProviderId.deeplx).toBeGreaterThanOrEqual(62);
+    expect(layout.resultsHeightPx).toBeGreaterThan(
+      3 * 36 + 2 * 8 + 62 + 62,
     );
-    expect(layout.bodyMaxHeightByProviderId.google).toBeGreaterThanOrEqual(90);
   });
 
   it('uses a two-panel OCR result layout when a source image is available', () => {
@@ -139,10 +206,10 @@ describe('result window presentation', () => {
     expect(resultWindowOcrImagePanelClassName()).toContain('rounded-[14px]');
     expect(resultWindowOcrImagePanelClassName()).toContain('overflow-hidden');
 
-    expect(resultWindowOcrResultTextAreaClassName()).toContain('overflow-y-auto');
+    expect(resultWindowOcrResultTextAreaClassName()).not.toContain('overflow-y-auto');
     expect(resultWindowOcrResultTextAreaClassName()).toContain('text-[14px]');
     expect(resultWindowOcrResultTextAreaClassName()).toContain('leading-[1.42]');
-    expect(resultWindowOcrResultTextAreaClassName()).toContain(
+    expect(resultWindowOcrResultTextAreaClassName()).not.toContain(
       'result-window-scrollbar',
     );
   });

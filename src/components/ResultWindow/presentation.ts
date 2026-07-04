@@ -1,3 +1,5 @@
+import type { ProviderTranslation } from '../../stores/appStore';
+
 export type ResultWindowPresentation = 'overlay' | 'standalone';
 export type ResultWindowTextKind = 'source' | 'ocr' | 'result';
 
@@ -10,8 +12,11 @@ const translationWindowStaticHeightPx = 236;
 const translationProviderCardHeaderHeightPx = 36;
 const translationProviderCardGapPx = 8;
 const translationProviderBodyMinHeightPx = 44;
+const translationProviderPendingBodyHeightPx = 62;
 const translationProviderBodyVerticalPaddingPx = 16;
 const translationProviderBodyLineHeightPx = 18;
+const translationResultsBottomPaddingPx = 8;
+const resultWindowStandaloneContainerPaddingPx = 16;
 
 export interface ResultWindowAdaptiveTextStyle {
   fontSize: string;
@@ -21,10 +26,11 @@ export interface ResultWindowAdaptiveTextStyle {
 export interface ResultWindowTranslationLayoutItem {
   providerId: string;
   text: string;
+  status?: ProviderTranslation['status'];
 }
 
 export interface ResultWindowTranslationLayout {
-  bodyMaxHeightByProviderId: Record<string, number>;
+  bodyHeightByProviderId: Record<string, number>;
   isConstrained: boolean;
   resultsHeightPx: number;
   windowHeightPx: number;
@@ -54,7 +60,7 @@ export function resultWindowPanelClassName(
 }
 
 export function resultWindowContentClassName() {
-  return 'flex min-h-0 flex-1 flex-col gap-2.5 overflow-hidden px-3 py-2.5';
+  return 'flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overflow-x-hidden px-3 py-2.5 result-window-scrollbar';
 }
 
 export function resultWindowTextBoxClassName() {
@@ -63,13 +69,30 @@ export function resultWindowTextBoxClassName() {
 
 export function resultWindowTextAreaClassName(kind: 'source' | 'ocr') {
   const baseClassName =
-    'w-full resize-none overflow-y-auto border-0 outline-none placeholder:text-slate-400 result-window-scrollbar';
+    'w-full resize-none overflow-hidden border-0 outline-none placeholder:text-slate-400';
 
   if (kind === 'ocr') {
-    return `${baseClassName} min-h-[86px] max-h-[132px] px-3 py-2.5 text-[14px] leading-[1.42] text-slate-800`;
+    return `${baseClassName} min-h-[86px] px-3 py-2.5 text-[14px] leading-[1.42] text-slate-800`;
   }
 
-  return `${baseClassName} min-h-[68px] max-h-[82px] px-3 py-2 text-[13px] leading-[1.38] text-slate-900`;
+  return `${baseClassName} min-h-[68px] px-3 py-2 text-[13px] leading-[1.38] text-slate-900`;
+}
+
+export function resultWindowTextAreaRows(
+  text: string,
+  kind: 'source' | 'ocr',
+) {
+  const minRows = kind === 'source' ? 3 : 5;
+  return Math.max(minRows, estimateVisualLineCount(text, kind));
+}
+
+export function autosizeResultWindowTextArea(
+  textArea: Pick<HTMLTextAreaElement, 'scrollHeight' | 'style'> | null,
+) {
+  if (!textArea) return;
+
+  textArea.style.height = 'auto';
+  textArea.style.height = `${textArea.scrollHeight}px`;
 }
 
 export function resultWindowAdaptiveTextStyle(
@@ -101,7 +124,7 @@ export function resultWindowTranslationLayout(
 ): ResultWindowTranslationLayout {
   if (providers.length === 0) {
     return {
-      bodyMaxHeightByProviderId: {},
+      bodyHeightByProviderId: {},
       isConstrained: false,
       resultsHeightPx: 0,
       windowHeightPx: translationWindowMinHeightPx,
@@ -109,7 +132,7 @@ export function resultWindowTranslationLayout(
   }
 
   const bodyHeights = providers.map((provider) =>
-    estimateTranslationBodyHeight(provider.text),
+    estimateTranslationBodyHeight(provider.text, provider.status),
   );
   const naturalResultsHeightPx =
     bodyHeights.reduce(
@@ -117,40 +140,16 @@ export function resultWindowTranslationLayout(
         height + translationProviderCardHeaderHeightPx + bodyHeight,
       0,
     ) +
-    translationProviderCardGapPx * Math.max(0, providers.length - 1);
-
-  if (naturalResultsHeightPx <= translationResultsMaxHeightPx) {
-    return {
-      bodyMaxHeightByProviderId: Object.fromEntries(
-        providers.map((provider, index) => [provider.providerId, bodyHeights[index]]),
-      ),
-      isConstrained: false,
-      resultsHeightPx: naturalResultsHeightPx,
-      windowHeightPx: clampTranslationWindowHeight(naturalResultsHeightPx),
-    };
-  }
-
-  const gapHeight =
-    translationProviderCardGapPx * Math.max(0, providers.length - 1);
-  const providerCardMaxHeightPx = Math.floor(
-    (translationResultsMaxHeightPx - gapHeight) / providers.length,
-  );
-  const bodyMaxHeightPx = Math.max(
-    translationProviderBodyMinHeightPx,
-    providerCardMaxHeightPx - translationProviderCardHeaderHeightPx,
-  );
-  const resultsHeightPx =
-    providers.length *
-      (translationProviderCardHeaderHeightPx + bodyMaxHeightPx) +
-    gapHeight;
+    translationProviderCardGapPx * Math.max(0, providers.length - 1) +
+    translationResultsBottomPaddingPx;
 
   return {
-    bodyMaxHeightByProviderId: Object.fromEntries(
-      providers.map((provider) => [provider.providerId, bodyMaxHeightPx]),
+    bodyHeightByProviderId: Object.fromEntries(
+      providers.map((provider, index) => [provider.providerId, bodyHeights[index]]),
     ),
-    isConstrained: true,
-    resultsHeightPx,
-    windowHeightPx: clampTranslationWindowHeight(resultsHeightPx),
+    isConstrained: naturalResultsHeightPx > translationResultsMaxHeightPx,
+    resultsHeightPx: naturalResultsHeightPx,
+    windowHeightPx: clampTranslationWindowHeight(naturalResultsHeightPx),
   };
 }
 
@@ -164,7 +163,14 @@ function estimateVisualLineCount(text: string, kind: ResultWindowTextKind) {
   }, 0);
 }
 
-function estimateTranslationBodyHeight(text: string) {
+function estimateTranslationBodyHeight(
+  text: string,
+  status?: ProviderTranslation['status'],
+) {
+  if (status === 'pending') {
+    return translationProviderPendingBodyHeightPx;
+  }
+
   const visualLineCount = estimateVisualLineCount(text, 'result');
 
   return Math.max(
@@ -185,7 +191,25 @@ function clampTranslationWindowHeight(resultsHeightPx: number) {
 }
 
 export function resultWindowResultsListClassName() {
-  return 'min-h-0 flex-none space-y-2 overflow-hidden';
+  return 'min-h-0 flex-none space-y-2 pb-2';
+}
+
+export function resultWindowStandaloneWindowHeight(panelHeightPx: number) {
+  return panelHeightPx + resultWindowStandaloneContainerPaddingPx;
+}
+
+export function resultWindowTranslationSubtitle(
+  providerTranslations: ProviderTranslation[],
+  isTranslating: boolean,
+) {
+  if (providerTranslations.length > 0) {
+    const successCount = providerTranslations.filter(
+      (translation) => translation.status === 'success',
+    ).length;
+    return `${successCount}/${providerTranslations.length} 个服务已返回`;
+  }
+
+  return isTranslating ? '正在请求服务' : '准备翻译';
 }
 
 export function resultWindowOcrResultGridClassName() {
@@ -197,7 +221,7 @@ export function resultWindowOcrImagePanelClassName() {
 }
 
 export function resultWindowOcrResultTextAreaClassName() {
-  return 'h-full min-h-0 w-full resize-none overflow-y-auto border-0 px-3 py-2.5 text-[14px] leading-[1.42] text-slate-800 outline-none placeholder:text-slate-400 result-window-scrollbar';
+  return 'min-h-[86px] w-full resize-none overflow-hidden border-0 px-3 py-2.5 text-[14px] leading-[1.42] text-slate-800 outline-none placeholder:text-slate-400';
 }
 
 export function shouldCloseFromContainerClick(

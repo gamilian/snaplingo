@@ -27,7 +27,6 @@ import {
   configureHotkey,
   type HotkeyCategory,
 } from './tauri/hotkeys';
-import { subscribeSettingsWindowEvents } from './tauri/appEvents';
 import { recognizeImageFile, selectImageFile } from './tauri/ocr';
 import { takeCaptureResultWindowPayload } from './tauri/captureSession';
 import {
@@ -58,9 +57,6 @@ function App() {
   const requestAutoTranslate = useAppStore((state) => state.requestAutoTranslate);
   const showResultWindow = useAppStore((state) => state.showResultWindow);
   const showOcrWindow = useAppStore((state) => state.showOcrWindow);
-  const setActiveMainTab = useSettingsStore((state) => state.setActiveMainTab);
-  const setScreenshotSubTab = useSettingsStore((state) => state.setScreenshotSubTab);
-  const setCapturedScreenshot = useSettingsStore((state) => state.setCapturedScreenshot);
   const hotkeys = useSettingsStore((state) => state.hotkeys);
   const setHotkey = useSettingsStore((state) => state.setHotkey);
   const isCaptureWindow =
@@ -86,66 +82,6 @@ function App() {
     setOcrRunning,
     setOcrText,
     showOcrWindow,
-  ]);
-
-  useEffect(() => {
-    if (!isSettingsWindow) return;
-
-    let disposed = false;
-    let unlisten: (() => void) | undefined;
-
-    subscribeSettingsWindowEvents({
-      onScreenshotCaptured: (base64) => {
-        setCapturedScreenshot(`data:image/png;base64,${base64}`);
-        setActiveMainTab('screenshot');
-        setScreenshotSubTab('editor');
-      },
-      onScreenshotError: (message) => {
-        alert(message);
-      },
-      onInputTranslation: (input) => {
-        setSourceText(input.text);
-        if (input.autoTranslate) {
-          requestAutoTranslate();
-        }
-        showResultWindow();
-      },
-      onInputOcr: (text) => {
-        setOcrText(text);
-        setOcrError(null);
-        showOcrWindow();
-      },
-      onShowOcrWindow: showOcrWindow,
-      onStartFileOcr: startFileOcr,
-      onShowTranslationWindow: showResultWindow,
-    })
-      .then((nextUnlisten) => {
-        if (disposed) {
-          nextUnlisten();
-        } else {
-          unlisten = nextUnlisten;
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to subscribe to settings window events:', err);
-      });
-
-    return () => {
-      disposed = true;
-      unlisten?.();
-    };
-  }, [
-    isSettingsWindow,
-    requestAutoTranslate,
-    setActiveMainTab,
-    setCapturedScreenshot,
-    setOcrError,
-    setOcrText,
-    setScreenshotSubTab,
-    setSourceText,
-    showOcrWindow,
-    showResultWindow,
-    startFileOcr,
   ]);
 
   useEffect(() => {

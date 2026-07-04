@@ -113,7 +113,6 @@ pub(crate) fn dispatch_menu_action(app: tauri::AppHandle, action: MenuAction) {
                 .await
                 {
                     log::error!("Failed to open selection translation window: {}", err);
-                    commands::emit_screenshot_error(app, format!("划词翻译失败：{}", err));
                 }
             });
         }

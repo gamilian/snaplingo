@@ -582,7 +582,6 @@ pub async fn open_capture_window_from_shortcut(app: AppHandle, mode: &'static st
 
     if let Err(err) = result {
         log::error!("Failed to open capture window: {}", err);
-        super::emit_capture_screenshot_error(app, err.to_string());
     }
 }
 

@@ -443,9 +443,9 @@ Mitigation:
 
 Mitigation:
 
-- Route Settings explicitly with `?window=settings`.
-- Keep `main` label during early phases.
-- Rename to `settings` only after tests cover routing.
+- Route Settings by the native `settings` window label.
+- Keep `?window=settings` only as the Settings Window launch URL, not as a frontend routing fallback.
+- Do not preserve the old `main` label as a Settings alias.
 
 ### Risk: Removing Suppression Too Early Reintroduces Settings Reopen Bugs
 
@@ -484,4 +484,3 @@ Do this as several small commits:
 7. `refactor: remove obsolete main reopen suppression`
 
 Stop after each commit and run the focused tests for that phase. Do not combine Provider, translation, OCR, or Settings UI redesign work with this refactor.
-

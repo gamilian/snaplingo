@@ -2,6 +2,7 @@ pub mod capture_window;
 pub mod hotkey;
 pub mod paths;
 pub mod pinned_window;
+pub mod result_window;
 pub mod screenshot;
 pub mod selection;
 pub mod shortcut;

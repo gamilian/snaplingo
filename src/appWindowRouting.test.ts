@@ -17,9 +17,9 @@ describe('app window routing', () => {
     expect(isCaptureResultWindowLaunch('main', '')).toBe(false);
   });
 
-  it('recognizes settings window launch by label or search', () => {
+  it('recognizes settings window launch only by its native label', () => {
     expect(isSettingsWindowLaunch('settings', '')).toBe(true);
-    expect(isSettingsWindowLaunch('main', '?window=settings')).toBe(true);
+    expect(isSettingsWindowLaunch('main', '?window=settings')).toBe(false);
     expect(isSettingsWindowLaunch('capture-result', '?window=capture-result')).toBe(false);
   });
 });
