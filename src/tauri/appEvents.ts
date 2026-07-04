@@ -7,7 +7,7 @@ export interface InputTranslationEvent {
 
 type EventCallback<T> = (payload: T) => void;
 
-export interface MainWindowEventHandlers {
+export interface SettingsWindowEventHandlers {
   onScreenshotCaptured?: EventCallback<string>;
   onScreenshotError?: EventCallback<string>;
   onInputTranslation?: EventCallback<InputTranslationEvent>;
@@ -49,8 +49,8 @@ async function onEvent<T>(
   });
 }
 
-export async function subscribeMainWindowEvents(
-  handlers: MainWindowEventHandlers,
+export async function subscribeSettingsWindowEvents(
+  handlers: SettingsWindowEventHandlers,
 ): Promise<UnlistenFn> {
   const unlisteners = await Promise.all([
     onEvent('screenshot-captured', handlers.onScreenshotCaptured, parseString),

@@ -530,7 +530,7 @@ describe('pinned image actions', () => {
     ]);
   });
 
-  it('opens preferences by showing and focusing the main window', async () => {
+  it('opens preferences by showing and focusing the settings window', async () => {
     const calls: string[] = [];
 
     await openPinnedPreferences(async () => ({
@@ -545,7 +545,7 @@ describe('pinned image actions', () => {
     expect(calls).toEqual(['show', 'focus']);
   });
 
-  it('ignores opening preferences when the main window is unavailable', async () => {
+  it('ignores opening preferences when the settings window is unavailable', async () => {
     await expect(openPinnedPreferences(async () => null)).resolves.toBeUndefined();
   });
 

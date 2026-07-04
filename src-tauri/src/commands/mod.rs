@@ -4,7 +4,6 @@ mod history_commands;
 mod ocr_commands;
 mod pinned_image_commands;
 mod provider_commands;
-mod screenshot_window_commands;
 mod translation_commands;
 
 pub use capture_commands::*;
@@ -13,7 +12,6 @@ pub use history_commands::*;
 pub use ocr_commands::*;
 pub use pinned_image_commands::*;
 pub use provider_commands::*;
-pub use screenshot_window_commands::*;
 pub use translation_commands::*;
 
 use std::path::PathBuf;
@@ -27,10 +25,10 @@ use objc2_app_kit::{
 use serde::Serialize;
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
-use crate::{
-    business_windows::{CAPTURE_RESULT_WINDOW_LABEL, CAPTURE_WINDOW_LABEL},
-    settings_window,
-};
+use crate::settings_window;
+
+pub(crate) const CAPTURE_RESULT_WINDOW_LABEL: &str = "capture-result";
+pub(crate) const CAPTURE_WINDOW_LABEL: &str = "capture";
 
 static CAPTURE_RESULT_WINDOW_PAYLOAD: LazyLock<Mutex<Option<CaptureResultWindowPayload>>> =
     LazyLock::new(|| Mutex::new(None));
@@ -179,7 +177,11 @@ fn capture_ocr_result_payload(
     text: String,
     image_base64: Option<String>,
 ) -> CaptureResultWindowPayload {
-    ocr_result_payload(text, CaptureResultWindowOcrIntent::DisplayText, image_base64)
+    ocr_result_payload(
+        text,
+        CaptureResultWindowOcrIntent::DisplayText,
+        image_base64,
+    )
 }
 
 fn translation_result_payload(text: String, auto_translate: bool) -> CaptureResultWindowPayload {
@@ -314,15 +316,7 @@ pub fn emit_capture_screenshot_error(app: tauri::AppHandle, message: String) {
         return;
     }
 
-    if should_focus_main_for_capture_screenshot_error() {
-        emit_screenshot_error(app, message);
-    } else {
-        log::error!("Capture screenshot error: {}", message);
-    }
-}
-
-fn should_focus_main_for_capture_screenshot_error() -> bool {
-    false
+    log::error!("Capture screenshot error: {}", message);
 }
 
 #[tauri::command]
@@ -543,11 +537,6 @@ mod tests {
                 image_base64: None,
             }
         );
-    }
-
-    #[test]
-    fn capture_screenshot_errors_do_not_focus_main_window() {
-        assert!(!should_focus_main_for_capture_screenshot_error());
     }
 
     #[cfg(target_os = "macos")]

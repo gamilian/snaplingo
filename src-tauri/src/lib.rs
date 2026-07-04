@@ -1,9 +1,7 @@
 // Module declarations
-mod app_lifecycle;
 mod app_shell;
 mod app_state;
 mod application;
-mod business_windows;
 mod commands;
 mod composition;
 mod domain;
@@ -92,11 +90,6 @@ pub fn run() {
             commands::configure_translation_hotkey,
             commands::trigger_screenshot,
             commands::open_capture_window,
-            commands::create_screenshot_window,
-            commands::create_screenshot_window_simple,
-            commands::screenshot_overlay_ready,
-            commands::close_screenshot_window,
-            commands::crop_screenshot,
             commands::translate_text_v2,
             commands::translate_text_with_provider,
             commands::list_translation_providers,
@@ -164,13 +157,5 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app_handle, event| {
-            if let tauri::RunEvent::Reopen {
-                has_visible_windows,
-                ..
-            } = event
-            {
-                app_shell::handle_reopen(app_handle, has_visible_windows);
-            }
-        });
+        .run(|_, _| {});
 }

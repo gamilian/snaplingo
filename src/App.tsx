@@ -27,7 +27,7 @@ import {
   configureHotkey,
   type HotkeyCategory,
 } from './tauri/hotkeys';
-import { subscribeMainWindowEvents } from './tauri/appEvents';
+import { subscribeSettingsWindowEvents } from './tauri/appEvents';
 import { recognizeImageFile, selectImageFile } from './tauri/ocr';
 import { takeCaptureResultWindowPayload } from './tauri/captureSession';
 import {
@@ -94,7 +94,7 @@ function App() {
     let disposed = false;
     let unlisten: (() => void) | undefined;
 
-    subscribeMainWindowEvents({
+    subscribeSettingsWindowEvents({
       onScreenshotCaptured: (base64) => {
         setCapturedScreenshot(`data:image/png;base64,${base64}`);
         setActiveMainTab('screenshot');
@@ -127,7 +127,7 @@ function App() {
         }
       })
       .catch((err) => {
-        console.error('Failed to subscribe to main window events:', err);
+        console.error('Failed to subscribe to settings window events:', err);
       });
 
     return () => {

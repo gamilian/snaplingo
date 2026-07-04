@@ -10,7 +10,7 @@ Design prototypes live under `designs/` so the production frontend tree stays fo
 
 `src-tauri/` is the Tauri/Rust backend runtime. `src-tauri/src/lib.rs` is the Tauri startup shell, `src-tauri/src/app_state.rs` owns the AppState shape, and `src-tauri/src/commands/` is the frontend-facing adapter seam. `application/` owns workflow modules, `domain/` owns shared domain types, and `infrastructure/` owns OS, storage, HTTP, window, and event adapters.
 
-The app shell is menu-bar resident: `app_shell` owns tray/menu setup and app reopen behavior, `settings_window` owns the Settings Window lifecycle, and `business_windows` owns business-window labels and visibility checks.
+The app shell is menu-bar resident: `app_shell` owns tray/menu setup and explicit menu actions. `settings_window` owns the Settings Window lifecycle. Business windows are lazy-created by their owning modules, such as capture, result, and pinned-image window adapters.
 
 ## Frontend/Backend Seam
 

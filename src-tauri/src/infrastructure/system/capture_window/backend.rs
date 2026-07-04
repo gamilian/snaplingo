@@ -159,7 +159,7 @@ mod tests {
     }
 
     #[test]
-    fn does_not_restore_business_windows_after_capture_snapshot() {
+    fn does_not_restore_hidden_non_capture_windows_after_capture_snapshot() {
         assert!(super::capture_snapshot_window_labels_to_restore(&[
             "settings".to_string(),
             "capture".to_string(),

@@ -364,7 +364,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
 
   const openPreferencesWindow = useCallback(async () => {
     try {
-      await openPinnedPreferences(() => WebviewWindow.getByLabel('main'));
+      await openPinnedPreferences(() => WebviewWindow.getByLabel('settings'));
       setContextMenuPosition(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

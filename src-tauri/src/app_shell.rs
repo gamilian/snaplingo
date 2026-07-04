@@ -7,19 +7,6 @@ use tauri::{
 use crate::{commands, settings_window, AppState};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum AppShellMode {
-    MenuBar,
-    #[cfg_attr(target_os = "macos", allow(dead_code))]
-    DockDebug,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum ReopenAction {
-    Ignore,
-    ShowSettings,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum MenuAction {
     Screenshot,
     TranslateSelection,
@@ -163,41 +150,14 @@ pub(crate) fn dispatch_menu_action(app: tauri::AppHandle, action: MenuAction) {
     }
 }
 
-pub(crate) fn current_app_shell_mode() -> AppShellMode {
-    #[cfg(target_os = "macos")]
-    {
-        AppShellMode::MenuBar
-    }
-
-    #[cfg(not(target_os = "macos"))]
-    {
-        AppShellMode::DockDebug
-    }
-}
-
-pub(crate) fn reopen_action_for_mode(mode: AppShellMode) -> ReopenAction {
-    match mode {
-        AppShellMode::MenuBar => ReopenAction::Ignore,
-        AppShellMode::DockDebug => ReopenAction::ShowSettings,
-    }
-}
-
 #[cfg(target_os = "macos")]
-pub(crate) fn resting_activation_policy_for_mode(mode: AppShellMode) -> tauri::ActivationPolicy {
-    match mode {
-        AppShellMode::MenuBar => tauri::ActivationPolicy::Accessory,
-        AppShellMode::DockDebug => tauri::ActivationPolicy::Regular,
-    }
-}
-
-#[cfg(target_os = "macos")]
-pub(crate) fn current_resting_activation_policy() -> tauri::ActivationPolicy {
-    resting_activation_policy_for_mode(current_app_shell_mode())
+fn menu_bar_resting_activation_policy() -> tauri::ActivationPolicy {
+    tauri::ActivationPolicy::Accessory
 }
 
 #[cfg(target_os = "macos")]
 pub(crate) fn apply_resting_activation_policy(app: &tauri::AppHandle) -> Result<(), String> {
-    app.set_activation_policy(current_resting_activation_policy())
+    app.set_activation_policy(menu_bar_resting_activation_policy())
         .map_err(|e| e.to_string())
 }
 
@@ -206,68 +166,16 @@ pub(crate) fn apply_resting_activation_policy(_app: &tauri::AppHandle) -> Result
     Ok(())
 }
 
-pub(crate) fn handle_reopen(app: &tauri::AppHandle, has_visible_windows: bool) {
-    match reopen_action_for_mode(current_app_shell_mode()) {
-        ReopenAction::Ignore => {}
-        ReopenAction::ShowSettings => {
-            if !crate::app_lifecycle::should_show_main_window_on_reopen_for_state(
-                has_visible_windows,
-                crate::infrastructure::system::capture_window::is_capture_presentation_active(),
-                crate::business_windows::has_visible_business_window(app),
-            ) {
-                return;
-            }
-
-            if let Err(err) = crate::settings_window::show_settings_window(app) {
-                log::warn!("Failed to show settings window on app reopen: {}", err);
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn menu_bar_mode_ignores_reopen() {
-        assert_eq!(
-            reopen_action_for_mode(AppShellMode::MenuBar),
-            ReopenAction::Ignore
-        );
-    }
-
-    #[test]
-    fn business_actions_do_not_need_main_reopen_suppression_in_menu_bar_mode() {
-        assert_eq!(
-            reopen_action_for_mode(AppShellMode::MenuBar),
-            ReopenAction::Ignore
-        );
-    }
-
-    #[test]
-    fn dock_debug_mode_can_show_settings() {
-        assert_eq!(
-            reopen_action_for_mode(AppShellMode::DockDebug),
-            ReopenAction::ShowSettings
-        );
-    }
-
     #[cfg(target_os = "macos")]
     #[test]
-    fn menu_bar_mode_uses_accessory_activation_policy() {
+    fn menu_bar_shell_uses_accessory_activation_policy() {
         assert!(matches!(
-            resting_activation_policy_for_mode(AppShellMode::MenuBar),
+            menu_bar_resting_activation_policy(),
             tauri::ActivationPolicy::Accessory
-        ));
-    }
-
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn dock_debug_mode_uses_regular_activation_policy() {
-        assert!(matches!(
-            resting_activation_policy_for_mode(AppShellMode::DockDebug),
-            tauri::ActivationPolicy::Regular
         ));
     }
 

@@ -22,7 +22,7 @@ describe('appEvents', () => {
       return unlisten;
     });
 
-    const { subscribeMainWindowEvents } = await import('../appEvents');
+    const { subscribeSettingsWindowEvents } = await import('../appEvents');
     const events = {
       onInputTranslation: vi.fn(),
       onInputOcr: vi.fn(),
@@ -33,7 +33,7 @@ describe('appEvents', () => {
       onScreenshotError: vi.fn(),
     };
 
-    const dispose = await subscribeMainWindowEvents(events);
+    const dispose = await subscribeSettingsWindowEvents(events);
 
     expect([...handlers.keys()].sort()).toEqual([
       'input-ocr',
@@ -74,9 +74,9 @@ describe('appEvents', () => {
       return vi.fn() as () => void;
     });
 
-    const { subscribeMainWindowEvents } = await import('../appEvents');
+    const { subscribeSettingsWindowEvents } = await import('../appEvents');
     const callback = vi.fn();
-    await subscribeMainWindowEvents({ onInputTranslation: callback });
+    await subscribeSettingsWindowEvents({ onInputTranslation: callback });
 
     inputTranslationHandler?.({ payload: { autoTranslate: true } });
 
