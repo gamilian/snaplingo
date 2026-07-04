@@ -21,10 +21,12 @@ import {
   resultWindowContentClassName,
   resultWindowAdaptiveTextStyle,
   resultWindowContainerClassName,
+  resultWindowHeaderDragHandleClassName,
   resultWindowOcrImagePanelClassName,
   resultWindowOcrResultGridClassName,
   resultWindowOcrResultTextAreaClassName,
   resultWindowPanelClassName,
+  resultWindowPinButtonClassName,
   resultWindowResultsListClassName,
   resultWindowStandaloneWindowHeight,
   resultWindowTranslationSubtitle,
@@ -43,6 +45,7 @@ import {
   CloseIcon,
   CopyIcon,
   LanguageIcon,
+  PinIcon,
   RetryIcon,
   ScanIcon,
   SwapIcon,
@@ -78,6 +81,8 @@ const LANGUAGE_DISPLAY_NAMES: Record<string, string> = {
   ar: '阿拉伯语',
 };
 
+const RESULT_WINDOW_SCROLLBAR_IDLE_DELAY_MS = 900;
+
 interface ResultWindowProps {
   presentation?: ResultWindowPresentation;
 }
@@ -110,17 +115,43 @@ function IconButton({
 function Header({
   mode,
   subtitle,
+  isPinned,
+  onTogglePinned,
+  onStartDrag,
   onClose,
 }: {
   mode: 'translation' | 'ocr';
   subtitle: string;
+  isPinned: boolean;
+  onTogglePinned: () => void;
+  onStartDrag?: () => void;
   onClose: () => void;
 }) {
   const isOcr = mode === 'ocr';
+  const isDraggable = Boolean(onStartDrag);
 
   return (
     <div className="flex min-h-12 items-center justify-between gap-2.5 rounded-t-[14px] border-b border-slate-200 bg-slate-50/90 px-2.5">
-      <div className="flex min-w-0 items-center gap-2.5">
+      <button
+        type="button"
+        onClick={onTogglePinned}
+        className={resultWindowPinButtonClassName(isPinned)}
+        title={isPinned ? '取消固定' : '固定窗口'}
+        aria-label={isPinned ? '取消固定' : '固定窗口'}
+        aria-pressed={isPinned}
+      >
+        <PinIcon className="h-[18px] w-[18px]" />
+      </button>
+
+      <div
+        className={resultWindowHeaderDragHandleClassName(isDraggable)}
+        onMouseDown={(event) => {
+          if (!onStartDrag || event.button !== 0) return;
+
+          event.preventDefault();
+          onStartDrag();
+        }}
+      >
         <div
           className={`grid h-7 w-7 shrink-0 place-items-center rounded-[7px] text-white ${
             isOcr
@@ -267,9 +298,12 @@ export default function ResultWindow({
   const sourceTextAreaRef = useRef<HTMLTextAreaElement>(null);
   const ocrImageTextAreaRef = useRef<HTMLTextAreaElement>(null);
   const ocrTextAreaRef = useRef<HTMLTextAreaElement>(null);
+  const resultWindowScrollIdleTimeoutRef = useRef<number | null>(null);
   const [sourceTextAreaHeightPx, setSourceTextAreaHeightPx] = useState<
     number | undefined
   >(undefined);
+  const [isResultWindowPinned, setResultWindowPinned] = useState(false);
+  const [isResultWindowScrolling, setResultWindowScrolling] = useState(false);
   const sourceTextStyle = useMemo(
     () => resultWindowAdaptiveTextStyle(sourceText, 'source'),
     [sourceText],
@@ -303,7 +337,7 @@ export default function ResultWindow({
   }, [resultWindowVisible, hideResultWindow]);
 
   useEffect(() => {
-    if (!resultWindowVisible || !shouldCloseFromWindowBlur(presentation)) return;
+    if (!resultWindowVisible || !shouldCloseFromWindowBlur(presentation, isResultWindowPinned)) return;
 
     const handleBlur = () => {
       hideResultWindow();
@@ -311,7 +345,26 @@ export default function ResultWindow({
 
     window.addEventListener('blur', handleBlur);
     return () => window.removeEventListener('blur', handleBlur);
-  }, [hideResultWindow, presentation, resultWindowVisible]);
+  }, [hideResultWindow, isResultWindowPinned, presentation, resultWindowVisible]);
+
+  useEffect(() => {
+    if (resultWindowVisible) return;
+
+    setResultWindowPinned(false);
+    setResultWindowScrolling(false);
+    if (resultWindowScrollIdleTimeoutRef.current !== null) {
+      window.clearTimeout(resultWindowScrollIdleTimeoutRef.current);
+      resultWindowScrollIdleTimeoutRef.current = null;
+    }
+  }, [resultWindowVisible]);
+
+  useEffect(() => {
+    return () => {
+      if (resultWindowScrollIdleTimeoutRef.current !== null) {
+        window.clearTimeout(resultWindowScrollIdleTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!resultWindowVisible || presentation !== 'standalone') return;
@@ -387,9 +440,33 @@ export default function ResultWindow({
   if (!resultWindowVisible) return null;
 
   const handleOverlayClick = (e: MouseEvent<HTMLDivElement>) => {
-    if (shouldCloseFromContainerClick(presentation, e.target, e.currentTarget)) {
+    if (
+      shouldCloseFromContainerClick(
+        presentation,
+        e.target,
+        e.currentTarget,
+        isResultWindowPinned,
+      )
+    ) {
       hideResultWindow();
     }
+  };
+
+  const handleStartDrag = () => {
+    void getCurrentWindow().startDragging();
+  };
+
+  const handleResultWindowScroll = () => {
+    setResultWindowScrolling(true);
+
+    if (resultWindowScrollIdleTimeoutRef.current !== null) {
+      window.clearTimeout(resultWindowScrollIdleTimeoutRef.current);
+    }
+
+    resultWindowScrollIdleTimeoutRef.current = window.setTimeout(() => {
+      setResultWindowScrolling(false);
+      resultWindowScrollIdleTimeoutRef.current = null;
+    }, RESULT_WINDOW_SCROLLBAR_IDLE_DELAY_MS);
   };
 
   const handleSwapLanguages = () => {
@@ -445,11 +522,19 @@ export default function ResultWindow({
         <Header
           mode={isOcrMode ? 'ocr' : 'translation'}
           subtitle={isOcrMode ? ocrSubtitle : translationSubtitle}
+          isPinned={isResultWindowPinned}
+          onTogglePinned={() => setResultWindowPinned((isPinned) => !isPinned)}
+          onStartDrag={presentation === 'standalone' ? handleStartDrag : undefined}
           onClose={hideResultWindow}
         />
 
         {isOcrMode ? (
-          <div className={resultWindowContentClassName()}>
+          <div
+            className={resultWindowContentClassName({
+              isScrolling: isResultWindowScrolling,
+            })}
+            onScroll={handleResultWindowScroll}
+          >
             {ocrImageBase64 ? (
               <div className={resultWindowOcrResultGridClassName()}>
                 <div className="flex min-h-0 flex-col gap-2">
@@ -603,8 +688,10 @@ export default function ResultWindow({
         ) : (
           <div
             className={resultWindowContentClassName({
+              isScrolling: isResultWindowScrolling,
               reserveBottom: providerTranslations.length === 0,
             })}
+            onScroll={handleResultWindowScroll}
           >
             <div className="flex-none">
               <div className={resultWindowTextBoxClassName()}>

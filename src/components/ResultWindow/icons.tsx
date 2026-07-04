@@ -28,6 +28,16 @@ export function CloseIcon(props: IconProps) {
   );
 }
 
+export function PinIcon(props: IconProps) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M14 4v4l4 4v2H6v-2l4-4V4" />
+      <path d="M9 4h6" />
+      <path d="M12 14v7" />
+    </BaseIcon>
+  );
+}
+
 export function CommandIcon(props: IconProps) {
   return (
     <BaseIcon {...props}>

@@ -9,6 +9,8 @@ import {
   resultWindowOcrImagePanelClassName,
   resultWindowOcrResultGridClassName,
   resultWindowOcrResultTextAreaClassName,
+  resultWindowHeaderDragHandleClassName,
+  resultWindowPinButtonClassName,
   resultWindowResultsListClassName,
   resultWindowStandaloneWindowHeight,
   resultWindowTranslationSubtitle,
@@ -42,6 +44,18 @@ describe('result window presentation', () => {
     expect(resultWindowContainerClassName('overlay')).toContain('bg-black/25');
   });
 
+  it('marks the header blank area as draggable when native dragging is available', () => {
+    expect(resultWindowHeaderDragHandleClassName(true)).toContain('cursor-move');
+    expect(resultWindowHeaderDragHandleClassName(true)).toContain('select-none');
+    expect(resultWindowHeaderDragHandleClassName(false)).toContain('cursor-default');
+  });
+
+  it('styles the Bob-style pin control by pinned state', () => {
+    expect(resultWindowPinButtonClassName(false)).toContain('text-slate-500');
+    expect(resultWindowPinButtonClassName(true)).toContain('bg-blue-50');
+    expect(resultWindowPinButtonClassName(true)).toContain('text-blue-600');
+  });
+
   it('uses the compact pro rounded shell for both result window presentations', () => {
     expect(resultWindowPanelClassName('overlay')).toContain('rounded-[14px]');
     expect(resultWindowPanelClassName('standalone')).toContain('rounded-[14px]');
@@ -62,12 +76,22 @@ describe('result window presentation', () => {
 
     expect(className).toContain('overflow-y-auto');
     expect(className).toContain('result-window-scrollbar');
+    expect(className).not.toContain('result-window-scrollbar--active');
     expect(className).toContain('gap-2.5');
     expect(className).toContain('pl-2.5');
     expect(className).toContain('pr-[4px]');
     expect(className).toContain('pb-2.5');
     expect(className).toContain('pt-2.5');
     expect(className).not.toContain('px-3');
+  });
+
+  it('marks the result window scrollbar active only while scrolling', () => {
+    expect(resultWindowContentClassName({ isScrolling: true })).toContain(
+      'result-window-scrollbar--active',
+    );
+    expect(resultWindowContentClassName({ isScrolling: false })).not.toContain(
+      'result-window-scrollbar--active',
+    );
   });
 
   it('can delegate bottom spacing to the final content block', () => {
@@ -81,14 +105,26 @@ describe('result window presentation', () => {
     const css = readFileSync(new URL('../../styles/index.css', import.meta.url), 'utf8');
 
     expect(css).toMatch(
+      /\.result-window-scrollbar\s*{[^}]*scrollbar-color:\s*transparent transparent/s,
+    );
+    expect(css).toMatch(
       /\.result-window-scrollbar\s*{[^}]*scrollbar-gutter:\s*stable/s,
     );
     expect(css).not.toContain('scrollbar-gutter: stable both-edges');
+    expect(css).toMatch(
+      /\.result-window-scrollbar--active\s*{[^}]*scrollbar-color:\s*#cbd5e1 transparent/s,
+    );
     expect(css).toMatch(
       /\.result-window-scrollbar::\-webkit-scrollbar\s*{[^}]*width:\s*6px/s,
     );
     expect(css).toMatch(
       /\.result-window-scrollbar::\-webkit-scrollbar-track\s*{[^}]*margin-block:\s*12px/s,
+    );
+    expect(css).toMatch(
+      /\.result-window-scrollbar::\-webkit-scrollbar-thumb\s*{[^}]*background:\s*transparent/s,
+    );
+    expect(css).toMatch(
+      /\.result-window-scrollbar--active::\-webkit-scrollbar-thumb\s*{[^}]*background:\s*#cbd5e1/s,
     );
   });
 
@@ -216,7 +252,7 @@ describe('result window presentation', () => {
     expect(layout.bodyHeightByProviderId.google).toBeLessThan(80);
     expect(layout.bodyHeightByProviderId.openai).toBeLessThan(80);
     expect(layout.resultsHeightPx).toBe(184);
-    expect(layout.windowHeightPx).toBeLessThan(480);
+    expect(layout.windowHeightPx).toBe(388);
   });
 
   it('raises the translation window height from the measured source text box height', () => {
@@ -292,9 +328,17 @@ describe('result window presentation', () => {
     );
   });
 
+  it('does not close from background clicks when pinned', () => {
+    const target = new EventTarget();
+
+    expect(shouldCloseFromContainerClick('overlay', target, target, true)).toBe(false);
+    expect(shouldCloseFromContainerClick('standalone', target, target, true)).toBe(false);
+  });
+
   it('closes standalone result windows when focus leaves the window', () => {
     expect(shouldCloseFromWindowBlur('standalone')).toBe(true);
     expect(shouldCloseFromWindowBlur('overlay')).toBe(false);
+    expect(shouldCloseFromWindowBlur('standalone', true)).toBe(false);
   });
 
   it('closes result windows from Escape but not other keys', () => {

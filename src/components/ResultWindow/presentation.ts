@@ -8,7 +8,7 @@ const resultWindowSurfaceClipClassName = '[clip-path:inset(0_round_14px)]';
 const translationResultsMaxHeightPx = 560;
 const translationWindowMaxHeightPx = 820;
 const translationWindowMinHeightPx = 320;
-const translationWindowStaticHeightPx = 236;
+const translationWindowStaticHeightPx = 204;
 const translationProviderCardHeaderHeightPx = 36;
 const translationProviderCardBorderHeightPx = 2;
 const translationProviderCardGapPx = 10;
@@ -74,10 +74,26 @@ export function resultWindowPanelClassName(
 
 export function resultWindowContentClassName({
   reserveBottom = true,
-}: { reserveBottom?: boolean } = {}) {
+  isScrolling = false,
+}: { reserveBottom?: boolean; isScrolling?: boolean } = {}) {
   const bottomPaddingClassName = reserveBottom ? 'pb-2.5' : 'pb-0';
+  const scrollingClassName = isScrolling ? 'result-window-scrollbar--active' : '';
 
-  return `flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overflow-x-hidden pl-2.5 pr-[4px] ${bottomPaddingClassName} pt-2.5 result-window-scrollbar`;
+  return `flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overflow-x-hidden pl-2.5 pr-[4px] ${bottomPaddingClassName} pt-2.5 result-window-scrollbar ${scrollingClassName}`.trim();
+}
+
+export function resultWindowHeaderDragHandleClassName(isDraggable: boolean) {
+  const dragClassName = isDraggable ? 'cursor-move' : 'cursor-default';
+
+  return `flex min-w-0 flex-1 select-none items-center gap-2.5 ${dragClassName}`;
+}
+
+export function resultWindowPinButtonClassName(isPinned: boolean) {
+  const pinnedClassName = isPinned
+    ? 'bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700'
+    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800';
+
+  return `grid h-7 w-7 shrink-0 place-items-center rounded-[7px] transition-colors duration-150 ${pinnedClassName}`;
 }
 
 export function resultWindowTextBoxClassName() {
@@ -303,12 +319,20 @@ export function shouldCloseFromContainerClick(
   presentation: ResultWindowPresentation,
   target: EventTarget,
   currentTarget: EventTarget,
+  isPinned = false,
 ) {
-  return (presentation === 'overlay' || presentation === 'standalone') && target === currentTarget;
+  return (
+    !isPinned &&
+    (presentation === 'overlay' || presentation === 'standalone') &&
+    target === currentTarget
+  );
 }
 
-export function shouldCloseFromWindowBlur(presentation: ResultWindowPresentation) {
-  return presentation === 'standalone';
+export function shouldCloseFromWindowBlur(
+  presentation: ResultWindowPresentation,
+  isPinned = false,
+) {
+  return presentation === 'standalone' && !isPinned;
 }
 
 export function shouldCloseFromEscapeKey(key: string) {

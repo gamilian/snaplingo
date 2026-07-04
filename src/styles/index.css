@@ -96,8 +96,12 @@ body {
 
 .result-window-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-color: transparent transparent;
   scrollbar-gutter: stable;
+}
+
+.result-window-scrollbar--active {
+  scrollbar-color: #cbd5e1 transparent;
 }
 
 .result-window-scrollbar::-webkit-scrollbar {
@@ -111,13 +115,18 @@ body {
 }
 
 .result-window-scrollbar::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: transparent;
   border: 2px solid transparent;
   border-radius: 999px;
   background-clip: content-box;
 }
 
-.result-window-scrollbar::-webkit-scrollbar-thumb:hover {
+.result-window-scrollbar--active::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  background-clip: content-box;
+}
+
+.result-window-scrollbar--active::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
   background-clip: content-box;
 }
