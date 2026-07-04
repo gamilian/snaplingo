@@ -95,40 +95,12 @@ body {
 }
 
 .result-window-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-  scrollbar-gutter: stable;
-}
-
-.result-window-scrollbar--active {
-  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .result-window-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.result-window-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-  margin-block: 12px;
-}
-
-.result-window-scrollbar::-webkit-scrollbar-thumb {
-  background: transparent;
-  border: 2px solid transparent;
-  border-radius: 999px;
-  background-clip: content-box;
-}
-
-.result-window-scrollbar--active::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  background-clip: content-box;
-}
-
-.result-window-scrollbar--active::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-  background-clip: content-box;
+  display: none;
 }
 
 /* 动画 */

@@ -15,6 +15,17 @@ function nextTranslationSessionId() {
   return `translation-${translationSessionSequence}`;
 }
 
+function normalizeTranslatedText(text: string) {
+  return text.trim();
+}
+
+function normalizeTranslationResult<T extends TranslationResult>(result: T): T {
+  return {
+    ...result,
+    translated_text: normalizeTranslatedText(result.translated_text),
+  };
+}
+
 function updateProviderTranslation(
   translations: ProviderTranslation[],
   providerId: string,
@@ -109,9 +120,9 @@ export const useAppStore = create<AppState>((set) => ({
   setTargetLang: (lang) => set({ targetLang: lang }),
   setTranslations: (results) =>
     set({
-      translations: results,
+      translations: results.map(normalizeTranslationResult),
       providerTranslations: results.map((result) => ({
-        ...result,
+        ...normalizeTranslationResult(result),
         status: 'success',
       })),
     }),
@@ -161,11 +172,12 @@ export const useAppStore = create<AppState>((set) => ({
   completeProviderTranslation: (sessionId, result) =>
     set((state) => {
       if (state.translationSessionId !== sessionId) return state;
+      const normalizedResult = normalizeTranslationResult(result);
       const providerTranslations = updateProviderTranslation(
         state.providerTranslations,
-        result.provider_id,
+        normalizedResult.provider_id,
         {
-          ...result,
+          ...normalizedResult,
           status: 'success',
         },
       );

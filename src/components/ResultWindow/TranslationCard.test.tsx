@@ -15,7 +15,10 @@ describe('translation card presentation', () => {
     );
 
     expect(markup).toContain('rounded-[14px]');
-    expect(markup).toContain('px-2.5');
+    expect(markup).toContain('px-3');
+    expect(markup).not.toContain('px-2.5');
+    expect(markup).toContain('py-2');
+    expect(markup).not.toContain('py-3');
     expect(markup).toContain('leading-[1.38]');
     expect(markup).not.toContain('height:144px');
     expect(markup).not.toContain('max-height:144px');
@@ -35,6 +38,8 @@ describe('translation card presentation', () => {
 
     expect(markup).toContain('style="height:62px;max-height:62px');
     expect(markup).toContain('aria-label="翻译中"');
+    expect(markup).toContain('py-2');
+    expect(markup).not.toContain('py-3');
   });
 
   it('does not repeat detected language in provider card headers', () => {
@@ -50,5 +55,20 @@ describe('translation card presentation', () => {
     );
 
     expect(markup).not.toContain('Detected: en');
+  });
+
+  it('does not render preserved blank lines from leading or trailing whitespace', () => {
+    const markup = renderToStaticMarkup(
+      <TranslationCard
+        providerId="google"
+        providerName="Google Translate"
+        status="success"
+        text={'\n\ntranslated result\n'}
+        bodyHeightPx={80}
+      />,
+    );
+
+    expect(markup).toContain('>translated result</p>');
+    expect(markup).not.toContain('>\n\ntranslated result\n</p>');
   });
 });

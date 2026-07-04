@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
 import {
   autosizeResultWindowTextArea,
+  measureResultWindowTextMirrorHeight,
   resultWindowContentClassName,
   resultWindowAdaptiveTextStyle,
   resultWindowContainerClassName,
@@ -11,13 +11,16 @@ import {
   resultWindowOcrResultTextAreaClassName,
   resultWindowHeaderDragHandleClassName,
   resultWindowPinButtonClassName,
+  resultWindowResultsSectionClassName,
   resultWindowResultsListClassName,
   resultWindowStandaloneWindowHeight,
+  resultWindowTranslationMeasuredPanelHeight,
   resultWindowTranslationSubtitle,
   resultWindowTextAreaClassName,
   resultWindowTextAreaMinHeightPx,
   resultWindowTextAreaRows,
   resultWindowTextBoxClassName,
+  resultWindowTextMirrorContent,
   resultWindowTranslationLayout,
   shouldCloseFromContainerClick,
   shouldCloseFromEscapeKey,
@@ -71,27 +74,20 @@ describe('result window presentation', () => {
     expect(resultWindowPanelClassName('standalone')).toContain('overflow-hidden');
   });
 
-  it('uses one overall content scrollbar inside the result window', () => {
+  it('uses one overall content scrollbar inside the result window with the larger 12px spacing rhythm', () => {
     const className = resultWindowContentClassName();
 
     expect(className).toContain('overflow-y-auto');
     expect(className).toContain('result-window-scrollbar');
-    expect(className).not.toContain('result-window-scrollbar--active');
-    expect(className).toContain('gap-2.5');
-    expect(className).toContain('pl-2.5');
-    expect(className).toContain('pr-[4px]');
-    expect(className).toContain('pb-2.5');
-    expect(className).toContain('pt-2.5');
+    expect(className).toContain('gap-3');
+    expect(className).toContain('pl-3');
+    expect(className).toContain('pr-3');
+    expect(className).toContain('pb-3');
+    expect(className).toContain('pt-3');
+    expect(className).not.toContain('gap-2.5');
+    expect(className).not.toContain('pl-2.5');
+    expect(className).not.toContain('pr-2.5');
     expect(className).not.toContain('px-3');
-  });
-
-  it('marks the result window scrollbar active only while scrolling', () => {
-    expect(resultWindowContentClassName({ isScrolling: true })).toContain(
-      'result-window-scrollbar--active',
-    );
-    expect(resultWindowContentClassName({ isScrolling: false })).not.toContain(
-      'result-window-scrollbar--active',
-    );
   });
 
   it('can delegate bottom spacing to the final content block', () => {
@@ -99,33 +95,6 @@ describe('result window presentation', () => {
 
     expect(className).toContain('pb-0');
     expect(className).not.toContain('pb-3');
-  });
-
-  it('keeps the result window scrollbar inside the rounded shell', () => {
-    const css = readFileSync(new URL('../../styles/index.css', import.meta.url), 'utf8');
-
-    expect(css).toMatch(
-      /\.result-window-scrollbar\s*{[^}]*scrollbar-color:\s*transparent transparent/s,
-    );
-    expect(css).toMatch(
-      /\.result-window-scrollbar\s*{[^}]*scrollbar-gutter:\s*stable/s,
-    );
-    expect(css).not.toContain('scrollbar-gutter: stable both-edges');
-    expect(css).toMatch(
-      /\.result-window-scrollbar--active\s*{[^}]*scrollbar-color:\s*#cbd5e1 transparent/s,
-    );
-    expect(css).toMatch(
-      /\.result-window-scrollbar::\-webkit-scrollbar\s*{[^}]*width:\s*6px/s,
-    );
-    expect(css).toMatch(
-      /\.result-window-scrollbar::\-webkit-scrollbar-track\s*{[^}]*margin-block:\s*12px/s,
-    );
-    expect(css).toMatch(
-      /\.result-window-scrollbar::\-webkit-scrollbar-thumb\s*{[^}]*background:\s*transparent/s,
-    );
-    expect(css).toMatch(
-      /\.result-window-scrollbar--active::\-webkit-scrollbar-thumb\s*{[^}]*background:\s*#cbd5e1/s,
-    );
   });
 
   it('uses expanding text boxes without individual scrollbars', () => {
@@ -182,31 +151,67 @@ describe('result window presentation', () => {
     expect(measuredHeight).toBe(196);
   });
 
-  it('adapts text size and line height to content density', () => {
+  it('can use a tighter autosize slack for wrapped source text', () => {
+    const textArea = {
+      scrollHeight: 184,
+      style: { height: '320px' },
+    } as HTMLTextAreaElement;
+
+    const measuredHeight = autosizeResultWindowTextArea(textArea, {
+      minHeightPx: 52,
+      textStyle: { fontSize: '12px', lineHeight: 1.28 },
+      slackPx: 4,
+    });
+
+    expect(textArea.style.height).toBe('188px');
+    expect(measuredHeight).toBe(188);
+  });
+
+  it('measures mirror-based source text height without adding extra slack', () => {
+    const mirror = {
+      offsetHeight: 184,
+    } as HTMLDivElement;
+
+    const measuredHeight = measureResultWindowTextMirrorHeight(mirror, 52);
+
+    expect(measuredHeight).toBe(184);
+  });
+
+  it('adds a sentinel to mirror content so trailing newlines still measure correctly', () => {
+    expect(resultWindowTextMirrorContent('line 1\nline 2')).toBe('line 1\nline 2\u200b');
+    expect(resultWindowTextMirrorContent('line 1\n')).toBe('line 1\n\u200b');
+    expect(resultWindowTextMirrorContent('')).toBe('\u200b');
+  });
+
+  it('keeps source and result line height fixed while adapting font size to content density', () => {
     expect(resultWindowAdaptiveTextStyle('Short text', 'source')).toEqual({
       fontSize: '14px',
-      lineHeight: 1.42,
+      lineHeight: 1.38,
     });
     expect(
       resultWindowAdaptiveTextStyle('A moderately long source text '.repeat(4), 'source'),
     ).toEqual({
       fontSize: '13px',
-      lineHeight: 1.34,
+      lineHeight: 1.38,
     });
     expect(
       resultWindowAdaptiveTextStyle('A very long translation result '.repeat(24), 'result'),
     ).toEqual({
       fontSize: '12px',
-      lineHeight: 1.28,
+      lineHeight: 1.38,
     });
   });
 
   it('keeps provider result lists out of individual scrolling', () => {
+    expect(resultWindowResultsSectionClassName()).toContain('flex-none');
+    expect(resultWindowResultsSectionClassName()).not.toContain('flex-1');
+
     const className = resultWindowResultsListClassName();
 
     expect(className).toContain('min-h-0');
-    expect(className).toContain('space-y-2.5');
-    expect(className).toContain('pb-2.5');
+    expect(className).toContain('space-y-3');
+    expect(className).toContain('pb-3');
+    expect(className).not.toContain('space-y-2.5');
     expect(className).not.toContain('overflow-hidden');
     expect(className).not.toContain('overflow-y-auto');
   });
@@ -251,8 +256,28 @@ describe('result window presentation', () => {
     expect(layout.isConstrained).toBe(false);
     expect(layout.bodyHeightByProviderId.google).toBeLessThan(80);
     expect(layout.bodyHeightByProviderId.openai).toBeLessThan(80);
-    expect(layout.resultsHeightPx).toBe(184);
-    expect(layout.windowHeightPx).toBe(388);
+    expect(layout.resultsHeightPx).toBe(188);
+    expect(layout.windowHeightPx).toBe(392);
+  });
+
+  it('does not add minimum-window filler below a single short provider result', () => {
+    const layout = resultWindowTranslationLayout([
+      { providerId: 'google', text: '短结果' },
+    ]);
+
+    expect(layout.resultsHeightPx).toBe(94);
+    expect(layout.windowHeightPx).toBe(298);
+  });
+
+  it('can size the translation panel from measured DOM heights', () => {
+    expect(
+      resultWindowTranslationMeasuredPanelHeight({
+        sourceBoxHeightPx: 86,
+        languageSwitcherHeightPx: 40,
+        resultsListHeightPx: 318,
+        hasResults: true,
+      }),
+    ).toBe(528);
   });
 
   it('raises the translation window height from the measured source text box height', () => {
@@ -283,6 +308,21 @@ describe('result window presentation', () => {
     expect(layout.bodyHeightByProviderId.google).toBeGreaterThan(300);
   });
 
+  it('does not add extra result height for trailing blank lines', () => {
+    const cleanLayout = resultWindowTranslationLayout([
+      { providerId: 'google', text: 'Short result' },
+    ]);
+    const trailingNewlineLayout = resultWindowTranslationLayout([
+      { providerId: 'google', text: 'Short result\n' },
+    ]);
+
+    expect(trailingNewlineLayout.bodyHeightByProviderId.google).toBe(
+      cleanLayout.bodyHeightByProviderId.google,
+    );
+    expect(trailingNewlineLayout.resultsHeightPx).toBe(cleanLayout.resultsHeightPx);
+    expect(trailingNewlineLayout.windowHeightPx).toBe(cleanLayout.windowHeightPx);
+  });
+
   it('adds standalone container padding to the native window height', () => {
     expect(resultWindowStandaloneWindowHeight(794)).toBe(810);
   });
@@ -306,7 +346,8 @@ describe('result window presentation', () => {
       'grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]',
     );
     expect(resultWindowOcrResultGridClassName()).toContain('min-h-0');
-    expect(resultWindowOcrResultGridClassName()).toContain('gap-2.5');
+    expect(resultWindowOcrResultGridClassName()).toContain('gap-3');
+    expect(resultWindowOcrResultGridClassName()).not.toContain('gap-2.5');
 
     expect(resultWindowOcrImagePanelClassName()).toContain('rounded-[14px]');
     expect(resultWindowOcrImagePanelClassName()).toContain('overflow-hidden');

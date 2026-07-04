@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -16,22 +17,27 @@ import { CustomSelect } from '../common/CustomSelect';
 import { recognizeImageFile, selectImageFile } from '../../tauri/ocr';
 import { runOcrFileWorkflow } from './ocrFileWorkflow';
 import { getTranslationProviderDisplayName } from './translationProviderDisplayName';
+import ResultWindowScrollArea from './ResultWindowScrollArea';
 import {
-  autosizeResultWindowTextArea,
   resultWindowContentClassName,
   resultWindowAdaptiveTextStyle,
   resultWindowContainerClassName,
   resultWindowHeaderDragHandleClassName,
+  autosizeResultWindowTextArea,
+  measureResultWindowTextMirrorHeight,
   resultWindowOcrImagePanelClassName,
   resultWindowOcrResultGridClassName,
   resultWindowOcrResultTextAreaClassName,
   resultWindowPanelClassName,
   resultWindowPinButtonClassName,
+  resultWindowResultsSectionClassName,
   resultWindowResultsListClassName,
   resultWindowStandaloneWindowHeight,
+  resultWindowTranslationMeasuredPanelHeight,
   resultWindowTranslationSubtitle,
   resultWindowTextAreaClassName,
   resultWindowTextAreaMinHeightPx,
+  resultWindowTextMirrorContent,
   resultWindowTextAreaRows,
   resultWindowTextBoxClassName,
   resultWindowTranslationLayout,
@@ -81,8 +87,6 @@ const LANGUAGE_DISPLAY_NAMES: Record<string, string> = {
   ar: '阿拉伯语',
 };
 
-const RESULT_WINDOW_SCROLLBAR_IDLE_DELAY_MS = 900;
-
 interface ResultWindowProps {
   presentation?: ResultWindowPresentation;
 }
@@ -131,7 +135,7 @@ function Header({
   const isDraggable = Boolean(onStartDrag);
 
   return (
-    <div className="flex min-h-12 items-center justify-between gap-2.5 rounded-t-[14px] border-b border-slate-200 bg-slate-50/90 px-2.5">
+    <div className="flex min-h-12 items-center justify-between gap-3 rounded-t-[14px] border-b border-slate-200 bg-slate-50/90 px-3">
       <button
         type="button"
         onClick={onTogglePinned}
@@ -165,7 +169,7 @@ function Header({
             <LanguageIcon className="h-4 w-4" />
           )}
         </div>
-        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2.5">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-3">
           <h2 className="text-base font-bold leading-tight text-slate-950">
             {isOcr ? 'OCR' : '翻译'}
           </h2>
@@ -296,14 +300,18 @@ export default function ResultWindow({
   const { translate, retryProvider } = useTranslate();
   const lastAutoTranslateRequestId = useRef(0);
   const sourceTextAreaRef = useRef<HTMLTextAreaElement>(null);
+  const sourceTextMirrorRef = useRef<HTMLDivElement>(null);
   const ocrImageTextAreaRef = useRef<HTMLTextAreaElement>(null);
   const ocrTextAreaRef = useRef<HTMLTextAreaElement>(null);
-  const resultWindowScrollIdleTimeoutRef = useRef<number | null>(null);
+  const translationSourceBoxRef = useRef<HTMLDivElement>(null);
+  const translationLanguageSwitcherRef = useRef<HTMLDivElement>(null);
+  const translationResultsListRef = useRef<HTMLDivElement>(null);
   const [sourceTextAreaHeightPx, setSourceTextAreaHeightPx] = useState<
     number | undefined
   >(undefined);
+  const [measuredTranslationPanelHeightPx, setMeasuredTranslationPanelHeightPx] =
+    useState<number | undefined>(undefined);
   const [isResultWindowPinned, setResultWindowPinned] = useState(false);
-  const [isResultWindowScrolling, setResultWindowScrolling] = useState(false);
   const sourceTextStyle = useMemo(
     () => resultWindowAdaptiveTextStyle(sourceText, 'source'),
     [sourceText],
@@ -324,6 +332,47 @@ export default function ResultWindow({
       ),
     [providerTranslations, sourceTextAreaHeightPx],
   );
+  const translationPanelHeightPx =
+    measuredTranslationPanelHeightPx ?? translationLayout.windowHeightPx;
+  const sourceTextAreaStyle =
+    sourceTextAreaHeightPx === undefined
+      ? sourceTextStyle
+      : {
+          ...sourceTextStyle,
+          height: `${sourceTextAreaHeightPx}px`,
+        };
+
+  const updateSourceTextAreaHeight = useCallback(() => {
+    const measuredHeight = measureResultWindowTextMirrorHeight(
+      sourceTextMirrorRef.current,
+      resultWindowTextAreaMinHeightPx('source'),
+    );
+
+    if (measuredHeight !== null) {
+      setSourceTextAreaHeightPx((currentHeight) =>
+        currentHeight === measuredHeight ? currentHeight : measuredHeight,
+      );
+    }
+  }, []);
+
+  const updateMeasuredTranslationPanelHeight = useCallback(() => {
+    if (!resultWindowVisible || resultWindowMode !== 'translation') return;
+
+    const sourceBox = translationSourceBoxRef.current;
+    const languageSwitcher = translationLanguageSwitcherRef.current;
+    if (!sourceBox || !languageSwitcher) return;
+
+    const measuredHeight = resultWindowTranslationMeasuredPanelHeight({
+      sourceBoxHeightPx: sourceBox.offsetHeight,
+      languageSwitcherHeightPx: languageSwitcher.offsetHeight,
+      resultsListHeightPx: translationResultsListRef.current?.offsetHeight,
+      hasResults: providerTranslations.length > 0,
+    });
+
+    setMeasuredTranslationPanelHeightPx((currentHeight) =>
+      currentHeight === measuredHeight ? currentHeight : measuredHeight,
+    );
+  }, [providerTranslations.length, resultWindowMode, resultWindowVisible]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -351,26 +400,14 @@ export default function ResultWindow({
     if (resultWindowVisible) return;
 
     setResultWindowPinned(false);
-    setResultWindowScrolling(false);
-    if (resultWindowScrollIdleTimeoutRef.current !== null) {
-      window.clearTimeout(resultWindowScrollIdleTimeoutRef.current);
-      resultWindowScrollIdleTimeoutRef.current = null;
-    }
+    setMeasuredTranslationPanelHeightPx(undefined);
   }, [resultWindowVisible]);
-
-  useEffect(() => {
-    return () => {
-      if (resultWindowScrollIdleTimeoutRef.current !== null) {
-        window.clearTimeout(resultWindowScrollIdleTimeoutRef.current);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     if (!resultWindowVisible || presentation !== 'standalone') return;
 
     const panelHeight =
-      resultWindowMode === 'translation' ? translationLayout.windowHeightPx : 660;
+      resultWindowMode === 'translation' ? translationPanelHeightPx : 660;
 
     void getCurrentWindow().setSize(
       new LogicalSize(660, resultWindowStandaloneWindowHeight(panelHeight)),
@@ -379,7 +416,7 @@ export default function ResultWindow({
     presentation,
     resultWindowMode,
     resultWindowVisible,
-    translationLayout.windowHeightPx,
+    translationPanelHeightPx,
   ]);
 
   useEffect(() => {
@@ -391,17 +428,22 @@ export default function ResultWindow({
   useLayoutEffect(() => {
     if (!resultWindowVisible) return;
 
-    const measuredHeight = autosizeResultWindowTextArea(sourceTextAreaRef.current, {
-      minHeightPx: resultWindowTextAreaMinHeightPx('source'),
-      textStyle: sourceTextStyle,
-    });
+    updateSourceTextAreaHeight();
+  }, [resultWindowVisible, sourceText, sourceTextStyle, updateSourceTextAreaHeight]);
 
-    if (measuredHeight !== null) {
-      setSourceTextAreaHeightPx((currentHeight) =>
-        currentHeight === measuredHeight ? currentHeight : measuredHeight,
-      );
-    }
-  }, [resultWindowVisible, sourceText, sourceTextStyle]);
+  useLayoutEffect(() => {
+    if (!resultWindowVisible) return;
+
+    const sourceBox = translationSourceBoxRef.current;
+    if (!sourceBox || typeof ResizeObserver === 'undefined') return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateSourceTextAreaHeight();
+    });
+    resizeObserver.observe(sourceBox);
+
+    return () => resizeObserver.disconnect();
+  }, [resultWindowVisible, updateSourceTextAreaHeight]);
 
   useLayoutEffect(() => {
     if (!resultWindowVisible) return;
@@ -415,6 +457,21 @@ export default function ResultWindow({
       textStyle: ocrTextStyle,
     });
   }, [ocrText, ocrTextStyle, resultWindowVisible]);
+
+  useLayoutEffect(() => {
+    if (!resultWindowVisible) return;
+
+    updateMeasuredTranslationPanelHeight();
+  }, [
+    measuredTranslationPanelHeightPx,
+    ocrImageBase64,
+    ocrText,
+    providerTranslations,
+    resultWindowMode,
+    resultWindowVisible,
+    sourceTextAreaHeightPx,
+    updateMeasuredTranslationPanelHeight,
+  ]);
 
   useEffect(() => {
     if (
@@ -456,19 +513,6 @@ export default function ResultWindow({
     void getCurrentWindow().startDragging();
   };
 
-  const handleResultWindowScroll = () => {
-    setResultWindowScrolling(true);
-
-    if (resultWindowScrollIdleTimeoutRef.current !== null) {
-      window.clearTimeout(resultWindowScrollIdleTimeoutRef.current);
-    }
-
-    resultWindowScrollIdleTimeoutRef.current = window.setTimeout(() => {
-      setResultWindowScrolling(false);
-      resultWindowScrollIdleTimeoutRef.current = null;
-    }, RESULT_WINDOW_SCROLLBAR_IDLE_DELAY_MS);
-  };
-
   const handleSwapLanguages = () => {
     if (sourceLang !== 'auto') {
       const temp = sourceLang;
@@ -507,8 +551,8 @@ export default function ResultWindow({
       ?.detected_language || (sourceLang !== 'auto' ? sourceLang : 'auto');
   const translationPanelHeight =
     presentation === 'overlay'
-      ? `min(${translationLayout.windowHeightPx}px, 90vh)`
-      : `${translationLayout.windowHeightPx}px`;
+      ? `min(${translationPanelHeightPx}px, 90vh)`
+      : `${translationPanelHeightPx}px`;
 
   return (
     <div
@@ -529,16 +573,11 @@ export default function ResultWindow({
         />
 
         {isOcrMode ? (
-          <div
-            className={resultWindowContentClassName({
-              isScrolling: isResultWindowScrolling,
-            })}
-            onScroll={handleResultWindowScroll}
-          >
+          <ResultWindowScrollArea className={resultWindowContentClassName()}>
             {ocrImageBase64 ? (
               <div className={resultWindowOcrResultGridClassName()}>
-                <div className="flex min-h-0 flex-col gap-2">
-                  <div className="flex min-h-[18px] items-center justify-between gap-2.5">
+                <div className="flex min-h-0 flex-col gap-3">
+                  <div className="flex min-h-[18px] items-center justify-between gap-3">
                     <h3 className="text-[13px] font-bold text-slate-600">截图区域</h3>
                     <span className="text-[11px] text-slate-400">source</span>
                   </div>
@@ -552,8 +591,8 @@ export default function ResultWindow({
                   </div>
                 </div>
 
-                <div className="flex min-h-0 flex-col gap-2">
-                  <div className="flex min-h-[18px] items-center justify-between gap-2.5">
+                <div className="flex min-h-0 flex-col gap-3">
+                  <div className="flex min-h-[18px] items-center justify-between gap-3">
                     <h3 className="text-[13px] font-bold text-slate-600">识别文本</h3>
                     <span className="text-[11px] text-slate-400">
                       {ocrText ? `${ocrText.length} chars` : 'No text'}
@@ -569,7 +608,7 @@ export default function ResultWindow({
                       className={resultWindowOcrResultTextAreaClassName()}
                       style={ocrTextStyle}
                     />
-                    <div className="flex min-h-8 items-center justify-between gap-2.5 border-t border-slate-100 bg-slate-50/80 px-2.5 py-1">
+                    <div className="flex min-h-8 items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/80 px-3 py-1.5">
                       <span className="text-[11px] text-slate-400">
                         {ocrText.length} chars
                       </span>
@@ -600,8 +639,8 @@ export default function ResultWindow({
               </div>
             ) : (
               <>
-                <div className="space-y-2.5">
-                  <div className="flex min-h-[18px] items-center justify-between gap-2.5">
+                <div className="space-y-3">
+                  <div className="flex min-h-[18px] items-center justify-between gap-3">
                     <label className="text-[13px] font-bold text-slate-600">图片</label>
                     <span className="text-[11px] text-slate-400">PNG/JPG/WebP</span>
                   </div>
@@ -609,9 +648,9 @@ export default function ResultWindow({
                     type="button"
                     onClick={handleUploadImage}
                     disabled={isOcrRunning}
-                    className="grid min-h-[92px] w-full place-items-center rounded-[14px] border border-dashed border-slate-300 bg-gradient-to-b from-slate-50 to-white px-2.5 py-2.5 text-center transition-colors duration-150 hover:border-emerald-300 hover:bg-emerald-50/30 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="grid min-h-[92px] w-full place-items-center rounded-[14px] border border-dashed border-slate-300 bg-gradient-to-b from-slate-50 to-white px-3 py-3 text-center transition-colors duration-150 hover:border-emerald-300 hover:bg-emerald-50/30 disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    <span className="grid justify-items-center gap-2">
+                    <span className="grid justify-items-center gap-3">
                       <span className="grid h-9 w-9 place-items-center rounded-[7px] bg-emerald-50 text-emerald-700">
                         <UploadIcon className="h-5 w-5" />
                       </span>
@@ -626,7 +665,7 @@ export default function ResultWindow({
                 </div>
 
                 {ocrError && (
-                  <div className="rounded-[14px] border border-red-200 bg-red-50 px-2.5 py-2.5 text-sm font-medium text-red-700">
+                  <div className="rounded-[14px] border border-red-200 bg-red-50 px-3 py-3 text-sm font-medium text-red-700">
                     {ocrError}
                   </div>
                 )}
@@ -640,8 +679,8 @@ export default function ResultWindow({
                   {ocrText ? '重新选择图片' : '选择图片'}
                 </button>
 
-                <div className="min-h-0 space-y-2.5">
-                  <div className="flex min-h-[18px] items-center justify-between gap-2.5">
+                <div className="min-h-0 space-y-3">
+                  <div className="flex min-h-[18px] items-center justify-between gap-3">
                     <h3 className="text-[13px] font-bold text-slate-600">识别文本</h3>
                     <span className="text-[11px] text-slate-400">
                       {ocrText ? `${ocrText.length} chars` : 'No text'}
@@ -657,7 +696,7 @@ export default function ResultWindow({
                       className={resultWindowTextAreaClassName('ocr')}
                       style={ocrTextStyle}
                     />
-                    <div className="flex min-h-8 items-center justify-between gap-2.5 border-t border-slate-100 bg-slate-50/80 px-2.5 py-1">
+                    <div className="flex min-h-8 items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/80 px-3 py-1.5">
                       <span className="text-[11px] text-slate-400">
                         {ocrText.length} chars
                       </span>
@@ -684,17 +723,23 @@ export default function ResultWindow({
                 </div>
               </>
             )}
-          </div>
+          </ResultWindowScrollArea>
         ) : (
-          <div
+          <ResultWindowScrollArea
             className={resultWindowContentClassName({
-              isScrolling: isResultWindowScrolling,
               reserveBottom: providerTranslations.length === 0,
             })}
-            onScroll={handleResultWindowScroll}
           >
-            <div className="flex-none">
-              <div className={resultWindowTextBoxClassName()}>
+            <div ref={translationSourceBoxRef} className="flex-none">
+              <div className={`${resultWindowTextBoxClassName()} relative`}>
+                <div
+                  ref={sourceTextMirrorRef}
+                  aria-hidden="true"
+                  className="invisible pointer-events-none absolute inset-x-0 top-0 whitespace-pre-wrap break-words px-3 py-2.5 text-[13px] text-slate-900"
+                  style={sourceTextStyle}
+                >
+                  {resultWindowTextMirrorContent(sourceText)}
+                </div>
                 <textarea
                   ref={sourceTextAreaRef}
                   value={sourceText}
@@ -702,9 +747,9 @@ export default function ResultWindow({
                   rows={resultWindowTextAreaRows(sourceText, 'source')}
                   placeholder="输入需要翻译的文本..."
                   className={resultWindowTextAreaClassName('source')}
-                  style={sourceTextStyle}
+                  style={sourceTextAreaStyle}
                 />
-                <div className="flex min-h-8 items-center justify-between gap-2.5 border-t border-slate-100 bg-slate-50/80 px-2.5 py-1">
+                <div className="flex min-h-8 items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/80 px-3 py-1.5">
                   <span className="min-w-0 truncate text-[11px] text-slate-400">
                     {sourceText.length} chars · 识别为{' '}
                     <span className="font-semibold text-blue-600">
@@ -740,17 +785,20 @@ export default function ResultWindow({
               </div>
             </div>
 
-            <LanguageSwitcher
-              sourceLang={sourceLang}
-              targetLang={targetLang}
-              onSourceChange={setSourceLang}
-              onTargetChange={setTargetLang}
-              onSwap={handleSwapLanguages}
-            />
+            <div ref={translationLanguageSwitcherRef} className="flex-none">
+              <LanguageSwitcher
+                sourceLang={sourceLang}
+                targetLang={targetLang}
+                onSourceChange={setSourceLang}
+                onTargetChange={setTargetLang}
+                onSwap={handleSwapLanguages}
+              />
+            </div>
 
             {providerTranslations.length > 0 && (
-              <div className="flex min-h-0 flex-1 flex-col">
+              <div className={resultWindowResultsSectionClassName()}>
                 <div
+                  ref={translationResultsListRef}
                   className={resultWindowResultsListClassName()}
                 >
                   {providerTranslations.map((result) => (
@@ -776,7 +824,7 @@ export default function ResultWindow({
                 </div>
               </div>
             )}
-          </div>
+          </ResultWindowScrollArea>
         )}
       </div>
     </div>

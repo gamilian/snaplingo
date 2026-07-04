@@ -78,6 +78,23 @@ describe('translation session state', () => {
     ]);
   });
 
+  it('trims leading and trailing whitespace from successful provider results', () => {
+    const sessionId = useAppStore
+      .getState()
+      .startTranslationSession('source text', ['deeplx']);
+
+    useAppStore.getState().completeProviderTranslation(sessionId, {
+      provider_id: 'deeplx',
+      translated_text: '\n\n  translated result  \n',
+      detected_language: 'en',
+      confidence: 1,
+    });
+
+    const state = useAppStore.getState();
+    expect(state.providerTranslations[0].translated_text).toBe('translated result');
+    expect(state.translations[0].translated_text).toBe('translated result');
+  });
+
   it('clears previous translation results before applying new source text', () => {
     const sessionId = useAppStore
       .getState()

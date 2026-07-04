@@ -61,14 +61,15 @@ export default function TranslationCard({
   const providerColor = providerColors[providerId.toLowerCase()] || '#6b7280';
   const isPending = status === 'pending';
   const isError = status === 'error';
+  const displayText = text.trim();
 
   return (
     <div className="overflow-hidden rounded-[14px] border border-slate-200 bg-white">
-      <div className="flex min-h-9 items-center justify-between gap-2.5 border-b border-slate-100 bg-slate-50/80 px-2.5 py-1.5">
+      <div className="flex min-h-9 items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/80 px-3 py-2">
         <button
           type="button"
           onClick={() => setIsExpanded(!isExpanded)}
-          className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
         >
           <div
             className="h-5 w-1 shrink-0 rounded-full"
@@ -89,7 +90,7 @@ export default function TranslationCard({
           )}
         </button>
 
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-2">
           {onRetry && !isPending && (
             <ActionButton
               title="重试"
@@ -102,25 +103,25 @@ export default function TranslationCard({
             </ActionButton>
           )}
 
-          <ActionButton
-            title="朗读"
-            onClick={(event) => {
-              event.stopPropagation();
-              console.log('朗读:', text);
-            }}
-          >
-            <VolumeIcon className="h-[15px] w-[15px]" />
-          </ActionButton>
+            <ActionButton
+              title="朗读"
+              onClick={(event) => {
+                event.stopPropagation();
+                console.log('朗读:', displayText);
+              }}
+            >
+              <VolumeIcon className="h-[15px] w-[15px]" />
+            </ActionButton>
 
-          <ActionButton
-            title="复制"
-            onClick={(event) => {
-              event.stopPropagation();
-              void navigator.clipboard.writeText(text);
-            }}
-          >
-            <CopyIcon className="h-[15px] w-[15px]" />
-          </ActionButton>
+            <ActionButton
+              title="复制"
+              onClick={(event) => {
+                event.stopPropagation();
+                void navigator.clipboard.writeText(displayText);
+              }}
+            >
+              <CopyIcon className="h-[15px] w-[15px]" />
+            </ActionButton>
 
           <ActionButton
             title={isExpanded ? '收起' : '展开'}
@@ -142,7 +143,7 @@ export default function TranslationCard({
         <div className="bg-white">
           {isPending ? (
             <div
-              className="space-y-1.5 overflow-hidden px-2.5 py-2.5"
+              className="space-y-2 overflow-hidden px-3 py-2"
               style={{
                 height: `${bodyHeightPx}px`,
                 maxHeight: `${bodyHeightPx}px`,
@@ -155,12 +156,12 @@ export default function TranslationCard({
             </div>
           ) : (
             <p
-              className={`whitespace-pre-wrap break-words px-2.5 py-2.5 text-[13px] leading-[1.38] ${
+              className={`whitespace-pre-wrap break-words px-3 py-2 text-[13px] leading-[1.38] ${
                 isError ? 'text-red-700' : 'text-slate-800'
               }`}
-              style={resultWindowAdaptiveTextStyle(text, 'result')}
+              style={resultWindowAdaptiveTextStyle(displayText, 'result')}
             >
-              {text}
+              {displayText}
             </p>
           )}
         </div>
