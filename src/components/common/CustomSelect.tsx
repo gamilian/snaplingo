@@ -9,6 +9,7 @@ interface CustomSelectProps {
   options: SelectOption[];
   value: string;
   onChange: (value: string) => void;
+  selectedLabel?: string;
   placeholder?: string;
   className?: string;
   align?: 'left' | 'center';
@@ -20,6 +21,7 @@ export function CustomSelect({
   options,
   value,
   onChange,
+  selectedLabel,
   placeholder,
   className = '',
   align = 'left',
@@ -80,7 +82,7 @@ export function CustomSelect({
         `}
       >
         <span className={`text-gray-900 ${isCentered ? 'min-w-0 flex-1 text-center' : ''}`}>
-          {selectedOption?.label || placeholder || '请选择'}
+          {selectedLabel || selectedOption?.label || placeholder || '请选择'}
         </span>
         <svg
           className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${

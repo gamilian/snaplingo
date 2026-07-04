@@ -140,10 +140,10 @@ export function ChevronDownIcon(props: IconProps) {
 export function SwapIcon(props: IconProps) {
   return (
     <BaseIcon {...props}>
-      <path d="M7 7h10" />
-      <path d="m14 4 3 3-3 3" />
-      <path d="M17 17H7" />
-      <path d="m10 14-3 3 3 3" />
+      <path d="M6 7h12" />
+      <path d="m15 4 3 3-3 3" />
+      <path d="M18 17H6" />
+      <path d="m9 14-3 3 3 3" />
     </BaseIcon>
   );
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useProviderStore } from '../../../stores/providerStore';
+import IconActionButton from '../../common/IconActionButton';
 import { ProviderCard } from './ProviderCard';
 import { ProviderConfigDialog } from './ProviderConfigDialog';
 import { CustomTranslationProviderDialog } from './CustomTranslationProviderDialog';
@@ -231,15 +232,14 @@ export function TranslationProvidersPage() {
         })}
       </div>
 
-      <button
-        type="button"
-        aria-label="添加自定义服务"
+      <IconActionButton
         title="添加自定义服务"
         onClick={handleAddCustom}
+        tooltipPlacement="bottom"
         className="absolute right-0 top-1 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary-600 text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-[#f5f5f7]"
       >
         <PlusIcon />
-      </button>
+      </IconActionButton>
 
     </div>
   );

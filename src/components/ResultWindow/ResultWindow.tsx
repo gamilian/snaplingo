@@ -6,17 +6,25 @@ import {
   useRef,
   useState,
   type MouseEvent,
-  type ReactNode,
 } from 'react';
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import { useAppStore } from '../../stores/appStore';
 import { useProviderStore } from '../../stores/providerStore';
+import {
+  defaultTargetLanguageForSource,
+  getTranslationLanguageDisplayName,
+  getTranslationLanguageSelectLabel,
+  resolveTranslationRequestLanguages,
+  swapTranslationLanguagePair,
+  TRANSLATION_LANGUAGES,
+} from '../../hooks/translationLanguages';
 import { useTranslate } from '../../hooks/useTranslate';
 import TranslationCard from './TranslationCard';
 import { CustomSelect } from '../common/CustomSelect';
 import { recognizeImageFile, selectImageFile } from '../../tauri/ocr';
 import { runOcrFileWorkflow } from './ocrFileWorkflow';
 import { getTranslationProviderDisplayName } from './translationProviderDisplayName';
+import IconActionButton from './IconActionButton';
 import ResultWindowScrollArea from './ResultWindowScrollArea';
 import {
   resultWindowContentClassName,
@@ -56,64 +64,12 @@ import {
   ScanIcon,
   SwapIcon,
   UploadIcon,
+  VolumeIcon,
 } from './icons';
-
-const LANGUAGES = [
-  { code: 'auto', name: 'Auto Detect' },
-  { code: 'en', name: 'English' },
-  { code: 'zh-CN', name: 'Chinese (Simplified)' },
-  { code: 'zh-TW', name: 'Chinese (Traditional)' },
-  { code: 'ja', name: 'Japanese' },
-  { code: 'ko', name: 'Korean' },
-  { code: 'es', name: 'Spanish' },
-  { code: 'fr', name: 'French' },
-  { code: 'de', name: 'German' },
-  { code: 'ru', name: 'Russian' },
-  { code: 'ar', name: 'Arabic' },
-];
-
-const LANGUAGE_DISPLAY_NAMES: Record<string, string> = {
-  auto: '自动检测',
-  en: '英语',
-  zh: '中文',
-  'zh-CN': '中文简体',
-  'zh-TW': '中文繁体',
-  ja: '日语',
-  ko: '韩语',
-  es: '西班牙语',
-  fr: '法语',
-  de: '德语',
-  ru: '俄语',
-  ar: '阿拉伯语',
-};
+import { speakResultWindowText } from './speech';
 
 interface ResultWindowProps {
   presentation?: ResultWindowPresentation;
-}
-
-function IconButton({
-  title,
-  children,
-  onClick,
-  disabled = false,
-}: {
-  title: string;
-  children: ReactNode;
-  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
-      title={title}
-      aria-label={title}
-    >
-      {children}
-    </button>
-  );
 }
 
 function Header({
@@ -136,16 +92,15 @@ function Header({
 
   return (
     <div className="flex min-h-12 items-center justify-between gap-3 rounded-t-[14px] border-b border-slate-200 bg-slate-50/90 px-3">
-      <button
-        type="button"
+      <IconActionButton
         onClick={onTogglePinned}
         className={resultWindowPinButtonClassName(isPinned)}
         title={isPinned ? '取消固定' : '固定窗口'}
-        aria-label={isPinned ? '取消固定' : '固定窗口'}
         aria-pressed={isPinned}
+        tooltipPlacement="bottom"
       >
         <PinIcon className="h-[18px] w-[18px]" />
-      </button>
+      </IconActionButton>
 
       <div
         className={resultWindowHeaderDragHandleClassName(isDraggable)}
@@ -177,15 +132,14 @@ function Header({
         </div>
       </div>
 
-      <button
-        type="button"
+      <IconActionButton
         onClick={onClose}
         className="grid h-7 w-7 shrink-0 place-items-center rounded-[7px] text-slate-500 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-800"
         title="关闭"
-        aria-label="关闭"
+        tooltipPlacement="bottom"
       >
         <CloseIcon className="h-[18px] w-[18px]" />
-      </button>
+      </IconActionButton>
     </div>
   );
 }
@@ -194,11 +148,13 @@ function LanguageSelect({
   options,
   value,
   onChange,
+  selectedLabel,
   buttonClassName = 'h-9 rounded-[14px] border-slate-200 py-0 text-[14px] font-semibold shadow-none hover:shadow-none',
 }: {
   options: { value: string; label: string }[];
   value: string;
   onChange: (value: string) => void;
+  selectedLabel?: string;
   buttonClassName?: string;
 }) {
   return (
@@ -206,6 +162,7 @@ function LanguageSelect({
       options={options}
       value={value}
       onChange={onChange}
+      selectedLabel={selectedLabel}
       align="center"
       buttonClassName={buttonClassName}
       menuClassName="rounded-[14px]"
@@ -227,44 +184,40 @@ function LanguageSwitcher({
   onSwap: () => void;
 }) {
   const mergedSelectButtonClassName =
-    'h-9 rounded-none !border-0 !bg-transparent py-0 text-[14px] font-semibold !shadow-none !ring-0 hover:!border-transparent hover:!bg-transparent hover:!shadow-none';
+    'h-9 rounded-none !border-0 !bg-transparent py-0 text-[13px] font-semibold !shadow-none !ring-0 hover:!border-transparent hover:!bg-transparent hover:!shadow-none';
 
   return (
     <div className="grid h-10 flex-none grid-cols-[minmax(0,1fr)_40px_minmax(0,1fr)] items-center overflow-visible rounded-[14px] border border-slate-200 bg-slate-50/90">
       <LanguageSelect
-        options={LANGUAGES.map((lang) => ({
+        options={TRANSLATION_LANGUAGES.map((lang) => ({
           value: lang.code,
-          label: lang.name,
+          label: getTranslationLanguageSelectLabel(lang.code),
         }))}
         value={sourceLang}
         onChange={onSourceChange}
+        selectedLabel={getTranslationLanguageDisplayName(sourceLang)}
         buttonClassName={mergedSelectButtonClassName}
       />
-      <button
-        type="button"
+      <IconActionButton
         onClick={onSwap}
-        disabled={sourceLang === 'auto'}
-        className="grid h-full w-full place-items-center border-x border-slate-200 text-slate-600 transition-colors duration-150 hover:bg-white disabled:cursor-not-allowed disabled:opacity-45"
-        title="Swap languages"
-        aria-label="Swap languages"
+        className="grid h-full w-full place-items-center text-slate-600 transition-colors duration-150 hover:bg-white"
+        title="切换语言"
+        tooltipPlacement="bottom"
       >
         <SwapIcon className="h-4 w-4" />
-      </button>
+      </IconActionButton>
       <LanguageSelect
-        options={LANGUAGES.filter((lang) => lang.code !== 'auto').map((lang) => ({
+        options={TRANSLATION_LANGUAGES.map((lang) => ({
           value: lang.code,
-          label: lang.name,
+          label: getTranslationLanguageSelectLabel(lang.code),
         }))}
         value={targetLang}
         onChange={onTargetChange}
+        selectedLabel={getTranslationLanguageDisplayName(targetLang)}
         buttonClassName={mergedSelectButtonClassName}
       />
     </div>
   );
-}
-
-function getLanguageDisplayName(languageCode: string) {
-  return LANGUAGE_DISPLAY_NAMES[languageCode] ?? languageCode;
 }
 
 export default function ResultWindow({
@@ -331,6 +284,12 @@ export default function ResultWindow({
         sourceTextAreaHeightPx,
       ),
     [providerTranslations, sourceTextAreaHeightPx],
+  );
+  const resolvedTargetLanguage = useMemo(
+    () =>
+      resolveTranslationRequestLanguages(sourceText, sourceLang, targetLang)
+        .targetLang,
+    [sourceLang, sourceText, targetLang],
   );
   const translationPanelHeightPx =
     measuredTranslationPanelHeightPx ?? translationLayout.windowHeightPx;
@@ -513,12 +472,19 @@ export default function ResultWindow({
     void getCurrentWindow().startDragging();
   };
 
+  const handleSourceLanguageChange = (nextSourceLang: string) => {
+    setSourceLang(nextSourceLang);
+    setTargetLang(
+      targetLang === 'auto'
+        ? 'auto'
+        : defaultTargetLanguageForSource(nextSourceLang),
+    );
+  };
+
   const handleSwapLanguages = () => {
-    if (sourceLang !== 'auto') {
-      const temp = sourceLang;
-      setSourceLang(targetLang);
-      setTargetLang(temp);
-    }
+    const nextLanguagePair = swapTranslationLanguagePair(sourceLang, targetLang);
+    setSourceLang(nextLanguagePair.sourceLang);
+    setTargetLang(nextLanguagePair.targetLang);
   };
 
   const handleTranslate = () => {
@@ -613,25 +579,27 @@ export default function ResultWindow({
                         {ocrText.length} chars
                       </span>
                       <div className="flex items-center gap-2">
-                        <IconButton
+                        <IconActionButton
                           title="复制"
                           disabled={!ocrText.trim()}
+                          className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
                           onClick={() => {
                             void navigator.clipboard.writeText(ocrText);
                           }}
                         >
                           <CopyIcon className="h-4 w-4" />
-                        </IconButton>
-                        <IconButton
+                        </IconActionButton>
+                        <IconActionButton
                           title="清空"
                           disabled={!ocrText}
+                          className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
                           onClick={() => {
                             setOcrText('');
                             setOcrImageBase64(null);
                           }}
                         >
                           <ClearTextIcon className="h-4 w-4" />
-                        </IconButton>
+                        </IconActionButton>
                       </div>
                     </div>
                   </div>
@@ -701,22 +669,24 @@ export default function ResultWindow({
                         {ocrText.length} chars
                       </span>
                       <div className="flex items-center gap-2">
-                        <IconButton
+                        <IconActionButton
                           title="复制"
                           disabled={!ocrText.trim()}
+                          className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
                           onClick={() => {
                             void navigator.clipboard.writeText(ocrText);
                           }}
                         >
                           <CopyIcon className="h-4 w-4" />
-                        </IconButton>
-                        <IconButton
+                        </IconActionButton>
+                        <IconActionButton
                           title="清空"
                           disabled={!ocrText}
+                          className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
                           onClick={() => setOcrText('')}
                         >
                           <ClearTextIcon className="h-4 w-4" />
-                        </IconButton>
+                        </IconActionButton>
                       </div>
                     </div>
                   </div>
@@ -753,33 +723,51 @@ export default function ResultWindow({
                   <span className="min-w-0 truncate text-[11px] text-slate-400">
                     {sourceText.length} chars · 识别为{' '}
                     <span className="font-semibold text-blue-600">
-                      {getLanguageDisplayName(detectedSourceLanguage)}
+                      {getTranslationLanguageDisplayName(detectedSourceLanguage)}
                     </span>
                   </span>
                   <div className="flex items-center gap-2">
-                    <IconButton
+                    <IconActionButton
                       title="复制"
                       disabled={!sourceText.trim()}
+                      className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
                       onClick={() => {
                         void navigator.clipboard.writeText(sourceText);
                       }}
                     >
                       <CopyIcon className="h-4 w-4" />
-                    </IconButton>
-                    <IconButton
+                    </IconActionButton>
+                    <IconActionButton
+                      title="朗读"
+                      disabled={!sourceText.trim()}
+                      className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
+                      onClick={() => {
+                        void speakResultWindowText(
+                          sourceText,
+                          detectedSourceLanguage === 'auto'
+                            ? undefined
+                            : detectedSourceLanguage,
+                        );
+                      }}
+                    >
+                      <VolumeIcon className="h-4 w-4" />
+                    </IconActionButton>
+                    <IconActionButton
                       title="重试"
                       disabled={!sourceText.trim() || isTranslating}
+                      className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
                       onClick={handleTranslate}
                     >
                       <RetryIcon className="h-4 w-4" />
-                    </IconButton>
-                    <IconButton
+                    </IconActionButton>
+                    <IconActionButton
                       title="清空"
                       disabled={!sourceText}
+                      className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
                       onClick={() => setSourceText('')}
                     >
                       <ClearTextIcon className="h-4 w-4" />
-                    </IconButton>
+                    </IconActionButton>
                   </div>
                 </div>
               </div>
@@ -789,7 +777,7 @@ export default function ResultWindow({
               <LanguageSwitcher
                 sourceLang={sourceLang}
                 targetLang={targetLang}
-                onSourceChange={setSourceLang}
+                onSourceChange={handleSourceLanguageChange}
                 onTargetChange={setTargetLang}
                 onSwap={handleSwapLanguages}
               />
@@ -811,6 +799,7 @@ export default function ResultWindow({
                       )}
                       status={result.status}
                       text={result.translated_text}
+                      languageCode={resolvedTargetLanguage}
                       bodyHeightPx={
                         translationLayout.bodyHeightByProviderId[
                           result.provider_id

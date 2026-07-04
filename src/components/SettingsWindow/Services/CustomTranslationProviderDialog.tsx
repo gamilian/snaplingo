@@ -17,6 +17,7 @@ import type {
   UpdateCustomTranslationProviderRequest,
 } from '../../../tauri/providers';
 import type { Provider } from '../../../stores/providerStore';
+import IconActionButton from '../../common/IconActionButton';
 import { getCustomProviderEndpointPreview } from './customTranslationProviderForm';
 
 type LLMProtocol = 'openai' | 'openai-responses' | 'anthropic' | 'gemini';
@@ -426,18 +427,17 @@ export function CustomTranslationProviderDialog({
     >
         <div className="flex items-center gap-3">
           {presentation === 'inline' && (
-            <button
-              type="button"
+            <IconActionButton
               onClick={resetAndClose}
               disabled={isSaving}
-              aria-label="返回供应商列表"
               title="返回供应商列表"
+              tooltipPlacement="bottom"
               className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
-            </button>
+            </IconActionButton>
           )}
           <h3 className="text-xl font-semibold text-gray-900">{dialogTitle}</h3>
         </div>

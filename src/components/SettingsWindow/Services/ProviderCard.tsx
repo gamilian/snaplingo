@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { Provider } from '../../../stores/providerStore';
+import IconActionButton from '../../common/IconActionButton';
 
 interface ProviderCardProps {
   provider: Provider;
@@ -92,53 +93,37 @@ export function ProviderCard({
           ) : null}
 
           {onConfigure ? (
-            <IconButton label="编辑" onClick={onConfigure}>
+            <IconActionButton
+              title="编辑"
+              onClick={onConfigure}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
+            >
               <EditIcon />
-            </IconButton>
+            </IconActionButton>
           ) : null}
 
           {onTest ? (
-            <IconButton label="测试联通" onClick={onTest}>
+            <IconActionButton
+              title="测试联通"
+              onClick={onTest}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
+            >
               <PulseIcon />
-            </IconButton>
+            </IconActionButton>
           ) : null}
 
           {!provider.isBuiltin && onRemove ? (
-            <IconButton label="删除" tone="danger" onClick={onRemove}>
+            <IconActionButton
+              title="删除"
+              onClick={onRemove}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600"
+            >
               <TrashIcon />
-            </IconButton>
+            </IconActionButton>
           ) : null}
         </div>
       </div>
     </div>
-  );
-}
-
-function IconButton({
-  label,
-  tone = 'default',
-  onClick,
-  children,
-}: {
-  label: string;
-  tone?: 'default' | 'danger';
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      className={`inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
-        tone === 'danger'
-          ? 'text-gray-500 hover:bg-red-50 hover:text-red-600'
-          : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800'
-      }`}
-    >
-      {children}
-    </button>
   );
 }
 

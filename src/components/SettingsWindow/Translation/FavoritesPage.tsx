@@ -1,5 +1,6 @@
 import { useHistoryStore } from '../../../stores/historyStore';
 import { formatRelativeTime } from '../../../utils/formatTime';
+import IconActionButton from '../../common/IconActionButton';
 
 const typeLabels: Record<string, string> = {
   selection: '划词',
@@ -39,13 +40,13 @@ export function FavoritesPage() {
                 </div>
                 <div className="flex items-center space-x-2">
                   <span className="text-xs text-gray-400">{formatRelativeTime(item.timestamp)}</span>
-                  <button
+                  <IconActionButton
                     onClick={() => toggleFavorite(item.id)}
-                    className="w-6 h-6 flex items-center justify-center text-yellow-500 rounded transition-colors"
                     title="取消收藏"
+                    className="w-6 h-6 flex items-center justify-center rounded text-yellow-500 transition-colors"
                   >
                     ★
-                  </button>
+                  </IconActionButton>
                 </div>
               </div>
               <div className="space-y-2">

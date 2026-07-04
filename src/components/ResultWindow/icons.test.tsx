@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { ClearTextIcon, PinIcon, RetryIcon } from './icons';
+import { ClearTextIcon, PinIcon, RetryIcon, SwapIcon } from './icons';
 
 describe('result window icons', () => {
   it('renders the compact pro retry icon path', () => {
@@ -26,5 +26,14 @@ describe('result window icons', () => {
     expect(markup).toContain('M14 4v4l4 4v2H6v-2l4-4V4');
     expect(markup).toContain('M9 4h6');
     expect(markup).toContain('M12 14v7');
+  });
+
+  it('renders the slightly longer swap icon path', () => {
+    const markup = renderToStaticMarkup(<SwapIcon />);
+
+    expect(markup).toContain('M6 7h12');
+    expect(markup).toContain('m15 4 3 3-3 3');
+    expect(markup).toContain('M18 17H6');
+    expect(markup).toContain('m9 14-3 3 3 3');
   });
 });

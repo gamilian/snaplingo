@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useHistoryStore } from '../../../stores/historyStore';
 import { formatRelativeTime } from '../../../utils/formatTime';
+import IconActionButton from '../../common/IconActionButton';
 
 type FilterType = 'all' | 'screenshot' | 'silent' | 'file';
 
@@ -87,29 +88,29 @@ export function HistoryPage() {
                 </div>
                 <div className="flex items-center space-x-2">
                   <span className="text-xs text-gray-400">{formatRelativeTime(item.timestamp)}</span>
-                  <button
+                  <IconActionButton
                     onClick={() => handleCopy(item.text)}
-                    className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-blue-500 rounded transition-colors"
                     title="复制文本"
+                    className="w-6 h-6 flex items-center justify-center rounded text-gray-400 transition-colors hover:text-blue-500"
                   >
                     📋
-                  </button>
-                  <button
+                  </IconActionButton>
+                  <IconActionButton
                     onClick={() => toggleFavorite(item.id)}
+                    title={item.favorite ? '取消收藏' : '收藏'}
                     className={`w-6 h-6 flex items-center justify-center rounded transition-colors ${
                       item.favorite ? 'text-yellow-500' : 'text-gray-300 hover:text-gray-400'
                     }`}
-                    title={item.favorite ? '取消收藏' : '收藏'}
                   >
                     {item.favorite ? '★' : '☆'}
-                  </button>
-                  <button
+                  </IconActionButton>
+                  <IconActionButton
                     onClick={() => deleteItem(item.id)}
-                    className="w-6 h-6 flex items-center justify-center text-gray-300 hover:text-red-500 rounded transition-colors"
                     title="删除"
+                    className="w-6 h-6 flex items-center justify-center rounded text-gray-300 transition-colors hover:text-red-500"
                   >
                     ✕
-                  </button>
+                  </IconActionButton>
                 </div>
               </div>
               <div className="text-sm text-gray-800 whitespace-pre-wrap">{item.text}</div>

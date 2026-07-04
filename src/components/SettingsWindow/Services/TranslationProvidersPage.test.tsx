@@ -135,8 +135,8 @@ describe('TranslationProvidersPage', () => {
     const addButton = findElement(
       view,
       (element) =>
-        element.type === 'button' &&
-        element.props['aria-label'] === '添加自定义服务',
+        getElementName(element) === 'IconActionButton' &&
+        element.props.title === '添加自定义服务',
     );
 
     expect(addButton.props.className).toContain('absolute');
@@ -205,8 +205,8 @@ describe('TranslationProvidersPage', () => {
     const addButton = findElement(
       view,
       (element) =>
-        element.type === 'button' &&
-        element.props['aria-label'] === '添加自定义服务',
+        getElementName(element) === 'IconActionButton' &&
+        element.props.title === '添加自定义服务',
     );
 
     addButton.props.onClick();

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
+import IconActionButton from '../common/IconActionButton';
 import { useSettingsStore } from '../../stores/settingsStore';
 import {
   copyTextToClipboard,
@@ -3550,8 +3551,7 @@ export default function ScreenshotSession({
                 }
               }}
             >
-              <button
-                type="button"
+              <IconActionButton
                 className={getCaptureEditorIconButtonClassName(!activeAnnotationTool)}
                 disabled={isRenderingOutput}
                 title="Select and move"
@@ -3559,9 +3559,8 @@ export default function ScreenshotSession({
                 onClick={() => setActiveAnnotationTool(null)}
               >
                 <PointerIcon />
-              </button>
-              <button
-                type="button"
+              </IconActionButton>
+              <IconActionButton
                 className={getCaptureEditorIconButtonClassName(
                   activeAnnotationTool === 'rectangle',
                 )}
@@ -3571,9 +3570,8 @@ export default function ScreenshotSession({
                 onClick={() => toggleAnnotationTool('rectangle')}
               >
                 <RectangleIcon />
-              </button>
-              <button
-                type="button"
+              </IconActionButton>
+              <IconActionButton
                 className={getCaptureEditorIconButtonClassName(
                   activeAnnotationTool === 'ellipse',
                 )}
@@ -3583,9 +3581,8 @@ export default function ScreenshotSession({
                 onClick={() => toggleAnnotationTool('ellipse')}
               >
                 <EllipseIcon />
-              </button>
-              <button
-                type="button"
+              </IconActionButton>
+              <IconActionButton
                 className={getCaptureEditorIconButtonClassName(
                   activeAnnotationTool === 'arrow',
                 )}
@@ -3595,9 +3592,8 @@ export default function ScreenshotSession({
                 onClick={() => toggleAnnotationTool('arrow')}
               >
                 <ArrowIcon />
-              </button>
-              <button
-                type="button"
+              </IconActionButton>
+              <IconActionButton
                 className={getCaptureEditorIconButtonClassName(
                   activeAnnotationTool === 'line',
                 )}
@@ -3607,9 +3603,8 @@ export default function ScreenshotSession({
                 onClick={() => toggleAnnotationTool('line')}
               >
                 <LineIcon />
-              </button>
-              <button
-                type="button"
+              </IconActionButton>
+              <IconActionButton
                 className={getCaptureEditorIconButtonClassName(
                   activeAnnotationTool === 'pen',
                 )}
@@ -3619,9 +3614,8 @@ export default function ScreenshotSession({
                 onClick={() => toggleAnnotationTool('pen')}
               >
                 <PenIcon />
-              </button>
-              <button
-                type="button"
+              </IconActionButton>
+              <IconActionButton
                 className={getCaptureEditorIconButtonClassName(
                   activeAnnotationTool === 'text',
                 )}
@@ -3631,9 +3625,8 @@ export default function ScreenshotSession({
                 onClick={() => toggleAnnotationTool('text')}
               >
                 <TextIcon />
-              </button>
-              <button
-                type="button"
+              </IconActionButton>
+              <IconActionButton
                 className={getCaptureEditorIconButtonClassName(
                   activeAnnotationTool === 'mosaic',
                 )}
@@ -3643,9 +3636,8 @@ export default function ScreenshotSession({
                 onClick={() => toggleAnnotationTool('mosaic')}
               >
                 <MosaicIcon />
-              </button>
-              <button
-                type="button"
+              </IconActionButton>
+              <IconActionButton
                 className={getCaptureEditorIconButtonClassName(
                   activeAnnotationTool === 'blur',
                 )}
@@ -3655,9 +3647,8 @@ export default function ScreenshotSession({
                 onClick={() => toggleAnnotationTool('blur')}
               >
                 <BlurIcon />
-              </button>
-              <button
-                type="button"
+              </IconActionButton>
+              <IconActionButton
                 className={getCaptureEditorIconButtonClassName(
                   activeAnnotationTool === 'eraser',
                 )}
@@ -3667,10 +3658,9 @@ export default function ScreenshotSession({
                 onClick={() => toggleAnnotationTool('eraser')}
               >
                 <EraserIcon />
-              </button>
+              </IconActionButton>
               <div className={getCaptureEditorDividerClassName()} />
-              <button
-                type="button"
+              <IconActionButton
                 className="h-9 w-9 shrink-0 rounded-[10px] border border-slate-200 bg-[#5b7fff] shadow-[0_0_0_2px_rgba(91,127,255,0.15)] disabled:cursor-not-allowed disabled:opacity-40"
                 style={{ backgroundColor: annotationColorToCss(annotationStyle.color) }}
                 disabled={isRenderingOutput}
@@ -3692,7 +3682,9 @@ export default function ScreenshotSession({
                     textFontSize,
                   );
                 }}
-              />
+              >
+                <span className="sr-only">Annotation color</span>
+              </IconActionButton>
               <input
                 className="h-9 w-20 accent-[#5b7fff] disabled:opacity-40"
                 type="range"

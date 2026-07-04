@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import IconActionButton from '../common/IconActionButton';
 
 interface ScreenshotEditorProps {
   image: string;
@@ -65,7 +66,7 @@ export function ScreenshotEditor({ image, region, onComplete, onCancel }: Screen
         {/* 左侧工具图标 */}
         <div className="flex gap-1 items-center">
           {tools.map((tool) => (
-            <button
+            <IconActionButton
               key={tool.id}
               onClick={() => setSelectedTool(tool.id)}
               title={tool.label}
@@ -76,7 +77,7 @@ export function ScreenshotEditor({ image, region, onComplete, onCancel }: Screen
               }`}
             >
               {tool.icon}
-            </button>
+            </IconActionButton>
           ))}
 
           {/* 颜色选择器 */}

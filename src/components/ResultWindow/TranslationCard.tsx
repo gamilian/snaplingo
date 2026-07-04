@@ -1,4 +1,4 @@
-import { useState, type MouseEvent, type ReactNode } from 'react';
+import { useState } from 'react';
 import type { ProviderTranslationStatus } from '../../stores/appStore';
 import {
   ChevronDownIcon,
@@ -7,7 +7,9 @@ import {
   RetryIcon,
   VolumeIcon,
 } from './icons';
+import IconActionButton from './IconActionButton';
 import { resultWindowAdaptiveTextStyle } from './presentation';
+import { speakResultWindowText } from './speech';
 
 interface TranslationCardProps {
   providerId: string;
@@ -15,6 +17,7 @@ interface TranslationCardProps {
   status: ProviderTranslationStatus;
   text: string;
   detectedLanguage?: string;
+  languageCode?: string;
   bodyHeightPx?: number;
   onRetry?: () => void;
 }
@@ -26,33 +29,12 @@ const providerColors: Record<string, string> = {
   openai: '#10a37f',
 };
 
-function ActionButton({
-  title,
-  onClick,
-  children,
-}: {
-  title: string;
-  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="grid h-6 w-6 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
-      title={title}
-      aria-label={title}
-    >
-      {children}
-    </button>
-  );
-}
-
 export default function TranslationCard({
   providerId,
   providerName,
   status,
   text,
+  languageCode,
   bodyHeightPx = 62,
   onRetry,
 }: TranslationCardProps) {
@@ -92,39 +74,47 @@ export default function TranslationCard({
 
         <div className="flex shrink-0 items-center gap-2">
           {onRetry && !isPending && (
-            <ActionButton
+            <IconActionButton
               title="重试"
+              className="grid h-6 w-6 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+              tooltipPlacement="bottom"
               onClick={(event) => {
                 event.stopPropagation();
                 onRetry();
               }}
             >
               <RetryIcon className="h-[15px] w-[15px]" />
-            </ActionButton>
+            </IconActionButton>
           )}
 
-            <ActionButton
-              title="朗读"
-              onClick={(event) => {
-                event.stopPropagation();
-                console.log('朗读:', displayText);
-              }}
-            >
-              <VolumeIcon className="h-[15px] w-[15px]" />
-            </ActionButton>
+          <IconActionButton
+            title="朗读"
+            className="grid h-6 w-6 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+            tooltipPlacement="bottom"
+            onClick={(event) => {
+              event.stopPropagation();
+              void speakResultWindowText(displayText, languageCode);
+            }}
+          >
+            <VolumeIcon className="h-[15px] w-[15px]" />
+          </IconActionButton>
 
-            <ActionButton
-              title="复制"
-              onClick={(event) => {
-                event.stopPropagation();
-                void navigator.clipboard.writeText(displayText);
-              }}
-            >
-              <CopyIcon className="h-[15px] w-[15px]" />
-            </ActionButton>
+          <IconActionButton
+            title="复制"
+            className="grid h-6 w-6 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+            tooltipPlacement="bottom"
+            onClick={(event) => {
+              event.stopPropagation();
+              void navigator.clipboard.writeText(displayText);
+            }}
+          >
+            <CopyIcon className="h-[15px] w-[15px]" />
+          </IconActionButton>
 
-          <ActionButton
+          <IconActionButton
             title={isExpanded ? '收起' : '展开'}
+            className="grid h-6 w-6 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+            tooltipPlacement="bottom"
             onClick={(event) => {
               event.stopPropagation();
               setIsExpanded(!isExpanded);
@@ -135,7 +125,7 @@ export default function TranslationCard({
             ) : (
               <ChevronDownIcon className="h-[15px] w-[15px]" />
             )}
-          </ActionButton>
+          </IconActionButton>
         </div>
       </div>
 
