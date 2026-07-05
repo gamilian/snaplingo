@@ -15,6 +15,8 @@
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-dialog": "^2.7.1",
+    "libphonenumber-js": "^1.13.8",
+    "linkify-it": "^5.0.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tauri-plugin-screenshots-api": "^2.2.0",
@@ -22,6 +24,7 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0",
+    "@types/linkify-it": "^5.0.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",

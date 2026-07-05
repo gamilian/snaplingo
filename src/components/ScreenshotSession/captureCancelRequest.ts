@@ -1,4 +1,4 @@
-import { listen } from '@tauri-apps/api/event';
+import { listenTauriEvent } from '../../tauri/events';
 
 export const CAPTURE_CANCEL_REQUESTED_EVENT = 'capture-cancel-requested';
 export const CAPTURE_COPY_REQUESTED_EVENT = 'capture-copy-requested';
@@ -15,7 +15,7 @@ export type CaptureCancelRequestListener = (
 export function subscribeCaptureCancelRequests(
   onCancel: CaptureCancelHandler,
   listenForEvent: CaptureCancelRequestListener = (eventName, handler) =>
-    listen(eventName, handler),
+    listenTauriEvent(eventName, handler),
 ) {
   return listenForEvent(CAPTURE_CANCEL_REQUESTED_EVENT, () => {
     void onCancel();
@@ -25,7 +25,7 @@ export function subscribeCaptureCancelRequests(
 export function subscribeCaptureCopyRequests(
   onCopy: CaptureCopyHandler,
   listenForEvent: CaptureCancelRequestListener = (eventName, handler) =>
-    listen(eventName, handler),
+    listenTauriEvent(eventName, handler),
 ) {
   return listenForEvent(CAPTURE_COPY_REQUESTED_EVENT, () => {
     void onCopy();

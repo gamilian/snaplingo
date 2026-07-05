@@ -1,4 +1,5 @@
 import { useHistoryStore } from '../../../stores/historyStore';
+import { writeClipboardText } from '../../../tauri/clipboard';
 import { formatRelativeTime } from '../../../utils/formatTime';
 import IconActionButton from '../../common/IconActionButton';
 
@@ -15,7 +16,7 @@ export function FavoritesPage() {
   const favorites = history.filter((item) => item.favorite);
 
   const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
+    void writeClipboardText(text);
   };
 
   return (

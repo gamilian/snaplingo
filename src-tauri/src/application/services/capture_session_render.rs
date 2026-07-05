@@ -16,6 +16,8 @@ use crate::domain::ocr::OcrResult;
 use crate::error::AppError;
 use crate::infrastructure::system::screenshot::{CapturedCursor, MonitorSnapshot};
 
+const OCR_SELECTION_PADDING_LOGICAL_PX: f64 = 2.0;
+
 #[derive(Debug, PartialEq)]
 struct CaptureImageCompositionPlan {
     width: u32,
@@ -86,7 +88,9 @@ impl CaptureSessionService {
         session_id: &CaptureSessionId,
         rect: &LogicalRect,
     ) -> crate::error::Result<OcrResult> {
-        let png_data = self.render_png(image_composition, session_id, rect, &[], false)?;
+        let session = self.get_session(session_id)?;
+        let ocr_rect = expanded_ocr_selection_rect(rect, &session.snapshots);
+        let png_data = self.render_png(image_composition, session_id, &ocr_rect, &[], false)?;
 
         ocr.recognize_image(png_data).await
     }
@@ -374,6 +378,45 @@ fn logical_rect_intersection(a: &LogicalRect, b: &LogicalRect) -> Option<Logical
         width: right - left,
         height: bottom - top,
     })
+}
+
+fn expanded_ocr_selection_rect(
+    selection_rect: &LogicalRect,
+    snapshots: &[MonitorSnapshot],
+) -> LogicalRect {
+    let expanded_rect = LogicalRect {
+        x: selection_rect.x - OCR_SELECTION_PADDING_LOGICAL_PX,
+        y: selection_rect.y - OCR_SELECTION_PADDING_LOGICAL_PX,
+        width: selection_rect.width + OCR_SELECTION_PADDING_LOGICAL_PX * 2.0,
+        height: selection_rect.height + OCR_SELECTION_PADDING_LOGICAL_PX * 2.0,
+    };
+    let Some(capture_bounds) = logical_bounds_for_snapshots(snapshots) else {
+        return expanded_rect;
+    };
+
+    logical_rect_intersection(&expanded_rect, &capture_bounds)
+        .unwrap_or_else(|| selection_rect.clone())
+}
+
+fn logical_bounds_for_snapshots(snapshots: &[MonitorSnapshot]) -> Option<LogicalRect> {
+    let mut snapshots = snapshots.iter();
+    let first = snapshots.next()?.logical_bounds.clone();
+
+    Some(snapshots.fold(first, |bounds, snapshot| {
+        let left = bounds.x.min(snapshot.logical_bounds.x);
+        let top = bounds.y.min(snapshot.logical_bounds.y);
+        let right = (bounds.x + bounds.width)
+            .max(snapshot.logical_bounds.x + snapshot.logical_bounds.width);
+        let bottom = (bounds.y + bounds.height)
+            .max(snapshot.logical_bounds.y + snapshot.logical_bounds.height);
+
+        LogicalRect {
+            x: left,
+            y: top,
+            width: right - left,
+            height: bottom - top,
+        }
+    }))
 }
 
 fn captured_cursor_placement_for_selection(

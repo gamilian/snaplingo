@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  getCurrentWindow,
-  LogicalSize,
-  PhysicalPosition,
-} from '@tauri-apps/api/window';
-import {
-  getCurrentWebviewWindow,
-  WebviewWindow,
-} from '@tauri-apps/api/webviewWindow';
+  createLogicalSize,
+  createPhysicalPosition,
+  getCurrentAppWebviewWindow,
+  getCurrentAppWindow,
+  getWebviewWindowByLabel,
+} from '../../tauri/window';
+import { writeClipboardText } from '../../tauri/clipboard';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { getPinnedImage } from '../../tauri/pinnedImage';
 import type { PinnedImageView } from '../ScreenshotSession/types';
@@ -71,8 +70,8 @@ import {
   savePinnedImage,
 } from './pinActions';
 
-const appWindow = getCurrentWindow();
-const webviewWindow = getCurrentWebviewWindow();
+const appWindow = getCurrentAppWindow();
+const webviewWindow = getCurrentAppWebviewWindow();
 const PIN_CONTEXT_MENU_SIZE = { width: 132, height: 332 };
 const PIN_HOVER_TOOLBAR_ACTIONS = getPinnedHoverToolbarActions();
 const PIN_MAGNIFIER_SIZE = { width: 160, height: 112 };
@@ -244,7 +243,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
     if (!cursorColor) return;
 
     try {
-      await navigator.clipboard.writeText(
+      await writeClipboardText(
         colorSampleToClipboardText(cursorColor, colorSampleFormat),
       );
     } catch (err) {
@@ -298,7 +297,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
         nextTransform,
         nextThumbnailMode,
       );
-      await appWindow.setSize(new LogicalSize(size.width, size.height));
+      await appWindow.setSize(createLogicalSize(size.width, size.height));
     },
     [image, isThumbnailMode, transform],
   );
@@ -335,7 +334,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
   const copyPinnedSourceText = useCallback(async () => {
     try {
       await copyPinnedText(
-        (text) => navigator.clipboard.writeText(text),
+        writeClipboardText,
         image?.source_text,
       );
       setContextMenuPosition(null);
@@ -364,7 +363,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
 
   const openPreferencesWindow = useCallback(async () => {
     try {
-      await openPinnedPreferences(() => WebviewWindow.getByLabel('settings'));
+      await openPinnedPreferences(() => getWebviewWindowByLabel('settings'));
       setContextMenuPosition(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -426,7 +425,7 @@ export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
         setContextMenuPosition(null);
         const position = await appWindow.outerPosition();
         await appWindow.setPosition(
-          new PhysicalPosition(position.x + delta.x, position.y + delta.y),
+          createPhysicalPosition(position.x + delta.x, position.y + delta.y),
         );
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));

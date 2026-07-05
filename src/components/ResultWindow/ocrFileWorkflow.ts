@@ -1,4 +1,5 @@
 import type { OcrResult } from '../ScreenshotSession/types';
+import { normalizeOcrText } from '../../utils/ocrTextProcessing';
 
 export interface OcrFileWorkflowDeps {
   selectImageFile: () => Promise<string | null>;
@@ -17,7 +18,7 @@ export async function runOcrFileWorkflow(deps: OcrFileWorkflowDeps) {
 
   try {
     const result = await deps.recognizeImageFile(path);
-    deps.setText(result.text);
+    deps.setText(normalizeOcrText(result.text));
   } catch (err) {
     deps.setError(errorMessage(err));
   } finally {

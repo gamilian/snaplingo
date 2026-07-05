@@ -7,7 +7,6 @@ import {
   useState,
   type MouseEvent,
 } from 'react';
-import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import { useAppStore } from '../../stores/appStore';
 import { useProviderStore } from '../../stores/providerStore';
 import {
@@ -21,11 +20,17 @@ import {
 import { useTranslate } from '../../hooks/useTranslate';
 import TranslationCard from './TranslationCard';
 import { CustomSelect } from '../common/CustomSelect';
-import { recognizeImageFile, selectImageFile } from '../../tauri/ocr';
+import { recognizeImageData, recognizeImageFile, selectImageFile } from '../../tauri/ocr';
+import { writeClipboardText } from '../../tauri/clipboard';
+import {
+  createLogicalSize,
+  getCurrentAppWindow,
+} from '../../tauri/window';
 import { runOcrFileWorkflow } from './ocrFileWorkflow';
 import { getTranslationProviderDisplayName } from './translationProviderDisplayName';
 import IconActionButton from './IconActionButton';
 import ResultWindowScrollArea from './ResultWindowScrollArea';
+import { normalizeOcrText, ocrCopyTokens } from '../../utils/ocrTextProcessing';
 import {
   resultWindowContentClassName,
   resultWindowAdaptiveTextStyle,
@@ -33,9 +38,12 @@ import {
   resultWindowHeaderDragHandleClassName,
   autosizeResultWindowTextArea,
   measureResultWindowTextMirrorHeight,
+  resultWindowOcrFullTextBoxClassName,
+  resultWindowOcrImageActionButtonClassName,
   resultWindowOcrImagePanelClassName,
-  resultWindowOcrResultGridClassName,
+  resultWindowOcrResultStackClassName,
   resultWindowOcrResultTextAreaClassName,
+  resultWindowOcrTokenButtonClassName,
   resultWindowPanelClassName,
   resultWindowPinButtonClassName,
   resultWindowResultsSectionClassName,
@@ -142,6 +150,12 @@ function Header({
       </IconActionButton>
     </div>
   );
+}
+
+function base64ToBytes(base64: string) {
+  const payload = base64.includes(',') ? base64.split(',').pop() ?? '' : base64;
+  const binary = window.atob(payload);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
 
 function LanguageSelect({
@@ -252,6 +266,7 @@ export default function ResultWindow({
 
   const { translate, retryProvider } = useTranslate();
   const lastAutoTranslateRequestId = useRef(0);
+  const resultWindowPanelRef = useRef<HTMLDivElement>(null);
   const sourceTextAreaRef = useRef<HTMLTextAreaElement>(null);
   const sourceTextMirrorRef = useRef<HTMLDivElement>(null);
   const ocrImageTextAreaRef = useRef<HTMLTextAreaElement>(null);
@@ -273,6 +288,7 @@ export default function ResultWindow({
     () => resultWindowAdaptiveTextStyle(ocrText, 'ocr'),
     [ocrText],
   );
+  const ocrTokens = useMemo(() => ocrCopyTokens(ocrText), [ocrText]);
   const translationLayout = useMemo(
     () =>
       resultWindowTranslationLayout(
@@ -347,8 +363,17 @@ export default function ResultWindow({
   useEffect(() => {
     if (!resultWindowVisible || !shouldCloseFromWindowBlur(presentation, isResultWindowPinned)) return;
 
+    const visibleStartedAtMs = performance.now();
     const handleBlur = () => {
-      hideResultWindow();
+      if (
+        shouldCloseFromWindowBlur(
+          presentation,
+          isResultWindowPinned,
+          performance.now() - visibleStartedAtMs,
+        )
+      ) {
+        hideResultWindow();
+      }
     };
 
     window.addEventListener('blur', handleBlur);
@@ -365,13 +390,39 @@ export default function ResultWindow({
   useEffect(() => {
     if (!resultWindowVisible || presentation !== 'standalone') return;
 
-    const panelHeight =
-      resultWindowMode === 'translation' ? translationPanelHeightPx : 660;
+    if (resultWindowMode === 'ocr') {
+      const panel = resultWindowPanelRef.current;
+      if (!panel) return;
 
-    void getCurrentWindow().setSize(
-      new LogicalSize(660, resultWindowStandaloneWindowHeight(panelHeight)),
+      const updateOcrWindowHeight = () => {
+        const panelHeight = Math.ceil(panel.scrollHeight);
+
+        void getCurrentAppWindow().setSize(
+          createLogicalSize(660, resultWindowStandaloneWindowHeight(panelHeight)),
+        );
+      };
+
+      updateOcrWindowHeight();
+
+      if (typeof ResizeObserver === 'undefined') return;
+
+      const resizeObserver = new ResizeObserver(updateOcrWindowHeight);
+      resizeObserver.observe(panel);
+
+      return () => resizeObserver.disconnect();
+    }
+
+    void getCurrentAppWindow().setSize(
+      createLogicalSize(
+        660,
+        resultWindowStandaloneWindowHeight(translationPanelHeightPx),
+      ),
     );
   }, [
+    ocrTokens.length,
+    ocrError,
+    ocrImageBase64,
+    ocrText,
     presentation,
     resultWindowMode,
     resultWindowVisible,
@@ -469,7 +520,7 @@ export default function ResultWindow({
   };
 
   const handleStartDrag = () => {
-    void getCurrentWindow().startDragging();
+    void getCurrentAppWindow().startDragging();
   };
 
   const handleSourceLanguageChange = (nextSourceLang: string) => {
@@ -502,6 +553,23 @@ export default function ResultWindow({
     });
   };
 
+  const handleRecognizeCurrentOcrImage = () => {
+    if (!ocrImageBase64) return;
+
+    setOcrError(null);
+    setOcrRunning(true);
+    void recognizeImageData(base64ToBytes(ocrImageBase64))
+      .then((result) => {
+        setOcrText(normalizeOcrText(result.text));
+      })
+      .catch((err) => {
+        setOcrError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => {
+        setOcrRunning(false);
+      });
+  };
+
   const isOcrMode = resultWindowMode === 'ocr';
   const translationSubtitle = resultWindowTranslationSubtitle(
     providerTranslations,
@@ -519,15 +587,23 @@ export default function ResultWindow({
     presentation === 'overlay'
       ? `min(${translationPanelHeightPx}px, 90vh)`
       : `${translationPanelHeightPx}px`;
+  const panelStyle = isOcrMode
+    ? { height: 'auto' }
+    : { height: translationPanelHeight };
 
   return (
     <div
-      className={resultWindowContainerClassName(presentation)}
+      className={resultWindowContainerClassName(presentation, {
+        fitContent: isOcrMode,
+      })}
       onClick={handleOverlayClick}
     >
       <div
-        className={resultWindowPanelClassName(presentation)}
-        style={isOcrMode ? undefined : { height: translationPanelHeight }}
+        ref={resultWindowPanelRef}
+        className={resultWindowPanelClassName(presentation, {
+          fitContent: isOcrMode,
+        })}
+        style={panelStyle}
       >
         <Header
           mode={isOcrMode ? 'ocr' : 'translation'}
@@ -539,32 +615,43 @@ export default function ResultWindow({
         />
 
         {isOcrMode ? (
-          <ResultWindowScrollArea className={resultWindowContentClassName()}>
+          <ResultWindowScrollArea
+            className={resultWindowContentClassName({ stretch: false })}
+          >
             {ocrImageBase64 ? (
-              <div className={resultWindowOcrResultGridClassName()}>
-                <div className="flex min-h-0 flex-col gap-3">
+              <div className={resultWindowOcrResultStackClassName()}>
+                <div className="flex min-h-0 flex-col gap-2">
                   <div className="flex min-h-[18px] items-center justify-between gap-3">
-                    <h3 className="text-[13px] font-bold text-slate-600">截图区域</h3>
+                    <h3 className="text-[13px] font-bold text-slate-600">原图</h3>
                     <span className="text-[11px] text-slate-400">source</span>
                   </div>
                   <div className={resultWindowOcrImagePanelClassName()}>
                     <img
                       src={`data:image/png;base64,${ocrImageBase64}`}
                       alt=""
-                      className="h-full w-full object-contain"
+                      className="block max-h-[220px] w-full object-contain"
                       draggable={false}
                     />
                   </div>
+                  <button
+                    type="button"
+                    className={resultWindowOcrImageActionButtonClassName()}
+                    onClick={handleRecognizeCurrentOcrImage}
+                    disabled={isOcrRunning || !ocrImageBase64}
+                  >
+                    <ScanIcon className="h-4 w-4" />
+                    {isOcrRunning ? '识别中...' : ocrText ? '重新 OCR' : 'OCR'}
+                  </button>
                 </div>
 
                 <div className="flex min-h-0 flex-col gap-3">
                   <div className="flex min-h-[18px] items-center justify-between gap-3">
-                    <h3 className="text-[13px] font-bold text-slate-600">识别文本</h3>
+                    <h3 className="text-[13px] font-bold text-slate-600">OCR 结果</h3>
                     <span className="text-[11px] text-slate-400">
                       {ocrText ? `${ocrText.length} chars` : 'No text'}
                     </span>
                   </div>
-                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[14px] border border-slate-300 bg-white">
+                  <div className={resultWindowOcrFullTextBoxClassName()}>
                     <textarea
                       ref={ocrImageTextAreaRef}
                       value={ocrText}
@@ -574,6 +661,37 @@ export default function ResultWindow({
                       className={resultWindowOcrResultTextAreaClassName()}
                       style={ocrTextStyle}
                     />
+                    {ocrTokens.length > 0 && (
+                      <div className="border-t border-slate-100 bg-slate-50/60 px-3 py-2">
+                        <div className="mb-2 flex min-h-[16px] items-center justify-between gap-3">
+                          <span className="text-[11px] font-bold text-slate-500">
+                            推荐复制片段
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {ocrTokens.length} 个
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {ocrTokens.map((token) => (
+                            <button
+                              key={token.id}
+                              type="button"
+                              title={`复制${token.label}: ${token.value}`}
+                              aria-label={`复制${token.label}: ${token.value}`}
+                              className={resultWindowOcrTokenButtonClassName()}
+                              onClick={() => {
+                                void writeClipboardText(token.value);
+                              }}
+                            >
+                              <span className="shrink-0 text-slate-400">
+                                {token.label}
+                              </span>
+                              <span className="min-w-0 break-all">{token.value}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <div className="flex min-h-8 items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/80 px-3 py-1.5">
                       <span className="text-[11px] text-slate-400">
                         {ocrText.length} chars
@@ -584,7 +702,7 @@ export default function ResultWindow({
                           disabled={!ocrText.trim()}
                           className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
                           onClick={() => {
-                            void navigator.clipboard.writeText(ocrText);
+                            void writeClipboardText(ocrText);
                           }}
                         >
                           <CopyIcon className="h-4 w-4" />
@@ -674,7 +792,7 @@ export default function ResultWindow({
                           disabled={!ocrText.trim()}
                           className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
                           onClick={() => {
-                            void navigator.clipboard.writeText(ocrText);
+                            void writeClipboardText(ocrText);
                           }}
                         >
                           <CopyIcon className="h-4 w-4" />
@@ -732,7 +850,7 @@ export default function ResultWindow({
                       disabled={!sourceText.trim()}
                       className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
                       onClick={() => {
-                        void navigator.clipboard.writeText(sourceText);
+                        void writeClipboardText(sourceText);
                       }}
                     >
                       <CopyIcon className="h-4 w-4" />

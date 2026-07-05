@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { listen } from '@tauri-apps/api/event';
-import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import IconActionButton from '../common/IconActionButton';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { normalizeOcrText } from '../../utils/ocrTextProcessing';
+import { writeClipboardText } from '../../tauri/clipboard';
+import { listenTauriEvent } from '../../tauri/events';
+import { getCurrentAppWebviewWindow } from '../../tauri/window';
 import {
   copyTextToClipboard,
   createCaptureSession,
@@ -220,7 +222,7 @@ import type {
   Point,
 } from './types';
 
-const captureWindow = getCurrentWebviewWindow();
+const captureWindow = getCurrentAppWebviewWindow();
 
 type SessionStatus = 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
 type EditGesture =
@@ -1177,17 +1179,18 @@ export default function ScreenshotSession({
 
       if (effect.type === 'run-ocr') {
         const ocrResult = await runCaptureOcr(session.id, rect);
+        const normalizedOcrText = normalizeOcrText(ocrResult.text);
         if (effect.target === 'translation-window') {
-          await openCaptureTranslationResultWindow(ocrResult.text);
+          await openCaptureTranslationResultWindow(normalizedOcrText);
         } else if (effect.target === 'ocr-window') {
           const imageBase64 = await renderCaptureOutput({
             sessionId: session.id,
             rect,
             annotations: [],
           });
-          await openCaptureOcrResultWindow(ocrResult.text, imageBase64);
+          await openCaptureOcrResultWindow(normalizedOcrText, imageBase64);
         } else {
-          await copyTextToClipboard(ocrResult.text);
+          await copyTextToClipboard(normalizedOcrText);
         }
         return;
       }
@@ -1351,7 +1354,7 @@ export default function ScreenshotSession({
     if (!cursorColor) return;
 
     try {
-      await navigator.clipboard.writeText(
+      await writeClipboardText(
         colorSampleToClipboardText(cursorColor, colorSampleFormat),
       );
     } catch (err) {
@@ -1432,12 +1435,13 @@ export default function ScreenshotSession({
 
     try {
       const ocrResult = await runCaptureOcr(session.id, selection);
+      const normalizedOcrText = normalizeOcrText(ocrResult.text);
       const imageBase64 = await renderCaptureOutput({
         sessionId: session.id,
         rect: selection,
         annotations: [],
       });
-      await openCaptureOcrResultWindow(ocrResult.text, imageBase64);
+      await openCaptureOcrResultWindow(normalizedOcrText, imageBase64);
       recordSuccessfulSelection('ocr', selection);
       await finishCurrentCaptureSession(session.id);
     } catch (err) {
@@ -2090,7 +2094,7 @@ export default function ScreenshotSession({
     let disposed = false;
     let unlisten: (() => void) | undefined;
 
-    listen<unknown>('hotkey-triggered', (event) => {
+    listenTauriEvent<unknown>('hotkey-triggered', (event) => {
       const launch = parseCaptureLaunchPayload(event.payload);
       if (launch) {
         void startSession(launch.mode, launch.sessionId);

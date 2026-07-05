@@ -1,5 +1,7 @@
 pub mod capture_window;
 pub mod hotkey;
+#[cfg(target_os = "macos")]
+pub mod ocr;
 pub mod paths;
 pub mod pinned_window;
 pub mod result_window;
@@ -14,3 +16,14 @@ pub use screenshot::{get_screenshot_backend, ScreenRegion, ScreenshotBackend};
 pub use shortcut::{
     is_shortcut_registered, register_shortcut, register_shortcut_on_release, unregister_shortcut,
 };
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+    #[test]
+    fn system_ocr_language_hints_live_in_infrastructure() {
+        assert_eq!(
+            super::ocr::vision_languages_for_request(None),
+            vec!["zh-Hans".to_string(), "en-US".to_string()]
+        );
+    }
+}

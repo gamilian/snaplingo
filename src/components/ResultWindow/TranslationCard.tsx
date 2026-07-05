@@ -10,6 +10,7 @@ import {
 import IconActionButton from './IconActionButton';
 import { resultWindowAdaptiveTextStyle } from './presentation';
 import { speakResultWindowText } from './speech';
+import { writeClipboardText } from '../../tauri/clipboard';
 
 interface TranslationCardProps {
   providerId: string;
@@ -105,7 +106,7 @@ export default function TranslationCard({
             tooltipPlacement="bottom"
             onClick={(event) => {
               event.stopPropagation();
-              void navigator.clipboard.writeText(displayText);
+              void writeClipboardText(displayText);
             }}
           >
             <CopyIcon className="h-[15px] w-[15px]" />

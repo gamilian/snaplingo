@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
-import { listen } from '@tauri-apps/api/event';
-import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { SettingsWindow } from './components/SettingsWindow';
 import ResultWindow from './components/ResultWindow';
 import { runOcrFileWorkflow } from './components/ResultWindow/ocrFileWorkflow';
 import {
+  ocrPayloadDisplayText,
   shouldApplyOcrPayloadText,
   shouldClearOcrResultsForPayload,
   shouldStartFileOcrForPayload,
   shouldApplyTranslationPayloadText,
   shouldClearTranslationResultsForPayload,
+  translationPayloadSourceText,
 } from './components/ResultWindow/resultPayload';
 import {
   PinnedImageWindow,
@@ -33,8 +33,10 @@ import {
   isCaptureResultWindowLaunch,
   isSettingsWindowLaunch,
 } from './appWindowRouting';
+import { listenTauriEvent } from './tauri/events';
+import { getCurrentAppWebviewWindow } from './tauri/window';
 
-const currentWindow = getCurrentWebviewWindow();
+const currentWindow = getCurrentAppWebviewWindow();
 const captureLaunch = readCaptureLaunch(window.location.search);
 const pinnedImageId = readPinnedImageLaunch(window.location.search);
 const isCaptureResultWindow = isCaptureResultWindowLaunch(
@@ -110,7 +112,7 @@ function App() {
         clearTranslationResults();
       }
       if (shouldApplyTranslationPayloadText(payload)) {
-        setSourceText(payload.text);
+        setSourceText(translationPayloadSourceText(payload));
       }
       if (payload.autoTranslate) {
         requestAutoTranslate();
@@ -125,7 +127,7 @@ function App() {
       setOcrError(null);
     }
     if (shouldApplyOcrPayloadText(payload)) {
-      setOcrText(payload.text);
+      setOcrText(ocrPayloadDisplayText(payload));
       setOcrImageBase64(payload.imageBase64 ?? null);
     }
     if (shouldStartFileOcrForPayload(payload)) {
@@ -155,7 +157,7 @@ function App() {
       console.error('Failed to load capture result window payload:', err);
     });
 
-    listen('capture-result-payload-ready', () => {
+    listenTauriEvent('capture-result-payload-ready', () => {
       if (disposed) return;
       void loadCaptureResultPayload().catch((err) => {
         console.error('Failed to reload capture result window payload:', err);

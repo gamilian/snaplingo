@@ -766,7 +766,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn recognize_selection_text_sends_raw_selection_png_to_ocr() {
+    async fn recognize_selection_text_expands_tight_selection_png_for_ocr() {
         let observed_request = Arc::new(Mutex::new(None));
         let ocr = OcrCoordinator::new(Arc::new(ConfigFile::new_temp()));
         ocr.register(RecordingOcrProvider {
@@ -810,7 +810,7 @@ mod tests {
 
         assert_eq!(result.text, "recorded");
         assert_eq!(request.language, None);
-        assert_eq!((decoded.width(), decoded.height()), (2, 2));
+        assert_eq!((decoded.width(), decoded.height()), (4, 4));
         assert!(decoded.pixels().all(|pixel| pixel.0 == [10, 20, 30, 255]));
     }
 

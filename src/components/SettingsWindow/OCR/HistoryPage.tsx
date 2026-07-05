@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useHistoryStore } from '../../../stores/historyStore';
+import { writeClipboardText } from '../../../tauri/clipboard';
 import { formatRelativeTime } from '../../../utils/formatTime';
 import IconActionButton from '../../common/IconActionButton';
 
@@ -28,7 +29,7 @@ export function HistoryPage() {
   });
 
   const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
+    void writeClipboardText(text);
   };
 
   const handleClear = () => {

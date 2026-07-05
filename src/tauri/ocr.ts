@@ -19,3 +19,12 @@ export async function selectImageFile() {
 export async function recognizeImageFile(path: string) {
   return invoke<OcrResult>('recognize_image_file', { path });
 }
+
+export async function recognizeImageData(imageData: Uint8Array | number[]) {
+  return invoke<OcrResult>('recognize_image', {
+    request: {
+      image_data: Array.from(imageData),
+      language: null,
+    },
+  });
+}

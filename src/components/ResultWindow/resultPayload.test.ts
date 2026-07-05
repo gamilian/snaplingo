@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ocrPayloadDisplayText,
   shouldApplyOcrPayloadText,
   shouldClearOcrResultsForPayload,
   shouldApplyTranslationPayloadText,
@@ -69,6 +70,17 @@ describe('result payload application', () => {
         ocrIntent: 'show',
       }),
     ).toBe(false);
+  });
+
+  it('normalizes OCR display text before putting it into the result window', () => {
+    expect(
+      ocrPayloadDisplayText({
+        mode: 'ocr',
+        text: 'Visit https://example.\ncom',
+        autoTranslate: false,
+        ocrIntent: 'display-text',
+      }),
+    ).toBe('Visit https://example.com');
   });
 
   it('clears OCR results for new OCR work but not for show-window', () => {

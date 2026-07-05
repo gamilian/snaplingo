@@ -29,6 +29,7 @@ const resultWindowTextAreaMinSlackPx = 10;
 const resultWindowTextAreaMaxSlackPx = 16;
 const resultWindowStandaloneContainerPaddingPx = 16;
 const resultWindowTranslationFixedLineHeight = 1.38;
+const resultWindowInitialBlurGraceMs = 300;
 
 export interface ResultWindowAdaptiveTextStyle {
   fontSize: string;
@@ -65,11 +66,18 @@ export interface ResultWindowTranslationMeasuredPanelHeightOptions {
   hasResults: boolean;
 }
 
+export interface ResultWindowShellOptions {
+  fitContent?: boolean;
+}
+
 export function resultWindowContainerClassName(
   presentation: ResultWindowPresentation,
+  { fitContent = false }: ResultWindowShellOptions = {},
 ) {
   if (presentation === 'standalone') {
-    return 'h-screen overflow-hidden bg-transparent flex items-stretch justify-center p-2';
+    const alignmentClassName = fitContent ? 'items-start' : 'items-stretch';
+
+    return `h-screen overflow-hidden bg-transparent flex ${alignmentClassName} justify-center p-2`;
   }
 
   return 'fixed inset-0 bg-black/25 backdrop-blur-sm flex items-center justify-center z-50 p-8';
@@ -77,11 +85,16 @@ export function resultWindowContainerClassName(
 
 export function resultWindowPanelClassName(
   presentation: ResultWindowPresentation,
+  { fitContent = false }: ResultWindowShellOptions = {},
 ) {
   const baseClassName =
     `relative min-h-0 bg-white ${resultWindowSurfaceRadiusClassName} shadow-xl w-full max-w-[660px] overflow-hidden ${resultWindowSurfaceClipClassName} flex flex-col`;
 
   if (presentation === 'standalone') {
+    if (fitContent) {
+      return `${baseClassName} max-h-[calc(100vh-1rem)]`;
+    }
+
     return `${baseClassName} h-full max-h-[calc(100vh-1rem)]`;
   }
 
@@ -90,10 +103,12 @@ export function resultWindowPanelClassName(
 
 export function resultWindowContentClassName({
   reserveBottom = true,
-}: { reserveBottom?: boolean } = {}) {
+  stretch = true,
+}: { reserveBottom?: boolean; stretch?: boolean } = {}) {
   const bottomPaddingClassName = reserveBottom ? 'pb-3' : 'pb-0';
+  const heightClassName = stretch ? 'flex-1' : 'flex-none';
 
-  return `flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden pl-3 pr-3 ${bottomPaddingClassName} pt-3 result-window-scrollbar`;
+  return `flex min-h-0 ${heightClassName} flex-col gap-3 overflow-y-auto overflow-x-hidden pl-3 pr-3 ${bottomPaddingClassName} pt-3 result-window-scrollbar`;
 }
 
 export function resultWindowHeaderDragHandleClassName(isDraggable: boolean) {
@@ -364,16 +379,28 @@ export function resultWindowTranslationSubtitle(
   return isTranslating ? '正在请求服务' : '准备翻译';
 }
 
-export function resultWindowOcrResultGridClassName() {
-  return 'grid min-h-0 flex-1 grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] gap-3';
+export function resultWindowOcrResultStackClassName() {
+  return 'flex min-h-0 flex-col gap-3';
 }
 
 export function resultWindowOcrImagePanelClassName() {
-  return `min-h-0 overflow-hidden ${resultWindowSurfaceRadiusClassName} border border-slate-200 bg-slate-50`;
+  return `overflow-hidden ${resultWindowSurfaceRadiusClassName} border border-slate-200 bg-slate-50`;
+}
+
+export function resultWindowOcrImageActionButtonClassName() {
+  return 'inline-flex h-8 w-full items-center justify-center gap-2 rounded-[10px] border border-emerald-200 bg-emerald-50 text-[13px] font-bold text-emerald-700 transition-colors duration-150 hover:border-emerald-300 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60';
+}
+
+export function resultWindowOcrFullTextBoxClassName() {
+  return `flex min-h-0 flex-col overflow-hidden ${resultWindowSurfaceRadiusClassName} border border-slate-300 bg-white`;
 }
 
 export function resultWindowOcrResultTextAreaClassName() {
   return 'min-h-[72px] w-full resize-none overflow-hidden border-0 px-3 py-3 text-[14px] leading-[1.42] text-slate-800 outline-none placeholder:text-slate-400';
+}
+
+export function resultWindowOcrTokenButtonClassName() {
+  return 'inline-flex max-w-full items-center gap-1 break-all rounded-full border border-slate-200 bg-white px-2.5 py-1 text-left text-[11px] font-semibold leading-tight text-slate-700 shadow-sm transition-colors duration-150 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400';
 }
 
 function resultWindowTextAreaAutosizeSlackPx(
@@ -409,8 +436,13 @@ export function shouldCloseFromContainerClick(
 export function shouldCloseFromWindowBlur(
   presentation: ResultWindowPresentation,
   isPinned = false,
+  visibleDurationMs = Number.POSITIVE_INFINITY,
 ) {
-  return presentation === 'standalone' && !isPinned;
+  return (
+    presentation === 'standalone' &&
+    !isPinned &&
+    visibleDurationMs >= resultWindowInitialBlurGraceMs
+  );
 }
 
 export function shouldCloseFromEscapeKey(key: string) {

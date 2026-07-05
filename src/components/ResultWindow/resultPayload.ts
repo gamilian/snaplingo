@@ -1,4 +1,5 @@
 import type { CaptureResultWindowPayload } from '../../tauri/captureSession';
+import { normalizeOcrText } from '../../utils/ocrTextProcessing';
 
 export function shouldApplyTranslationPayloadText(
   payload: CaptureResultWindowPayload,
@@ -25,4 +26,12 @@ export function shouldClearOcrResultsForPayload(payload: CaptureResultWindowPayl
 
 export function shouldStartFileOcrForPayload(payload: CaptureResultWindowPayload) {
   return payload.mode === 'ocr' && payload.ocrIntent === 'file';
+}
+
+export function ocrPayloadDisplayText(payload: CaptureResultWindowPayload) {
+  return normalizeOcrText(payload.text);
+}
+
+export function translationPayloadSourceText(payload: CaptureResultWindowPayload) {
+  return payload.autoTranslate ? normalizeOcrText(payload.text) : payload.text;
 }

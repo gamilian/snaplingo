@@ -6,9 +6,12 @@ import {
   resultWindowAdaptiveTextStyle,
   resultWindowContainerClassName,
   resultWindowPanelClassName,
+  resultWindowOcrFullTextBoxClassName,
+  resultWindowOcrImageActionButtonClassName,
   resultWindowOcrImagePanelClassName,
-  resultWindowOcrResultGridClassName,
+  resultWindowOcrResultStackClassName,
   resultWindowOcrResultTextAreaClassName,
+  resultWindowOcrTokenButtonClassName,
   resultWindowHeaderDragHandleClassName,
   resultWindowPinButtonClassName,
   resultWindowResultsSectionClassName,
@@ -41,6 +44,21 @@ describe('result window presentation', () => {
     expect(className).toContain('bg-transparent');
     expect(className).toContain('overflow-hidden');
     expect(className).toContain('h-screen');
+  });
+
+  it('can align standalone content to its natural height for compact OCR windows', () => {
+    expect(resultWindowContainerClassName('standalone', { fitContent: true })).toContain(
+      'items-start',
+    );
+    expect(resultWindowContainerClassName('standalone', { fitContent: true })).not.toContain(
+      'items-stretch',
+    );
+    expect(resultWindowPanelClassName('standalone', { fitContent: true })).not.toContain(
+      'h-full',
+    );
+    expect(resultWindowPanelClassName('standalone', { fitContent: true })).toContain(
+      'max-h-[calc(100vh-1rem)]',
+    );
   });
 
   it('keeps the dark overlay only for the main-window embedded presentation', () => {
@@ -95,6 +113,13 @@ describe('result window presentation', () => {
 
     expect(className).toContain('pb-0');
     expect(className).not.toContain('pb-3');
+  });
+
+  it('can avoid stretching compact OCR content to the full standalone window height', () => {
+    const className = resultWindowContentClassName({ stretch: false });
+
+    expect(className).toContain('flex-none');
+    expect(className).not.toContain('flex-1');
   });
 
   it('uses expanding text boxes without individual scrollbars', () => {
@@ -341,23 +366,32 @@ describe('result window presentation', () => {
     );
   });
 
-  it('uses a two-panel OCR result layout when a source image is available', () => {
-    expect(resultWindowOcrResultGridClassName()).toContain(
-      'grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]',
-    );
-    expect(resultWindowOcrResultGridClassName()).toContain('min-h-0');
-    expect(resultWindowOcrResultGridClassName()).toContain('gap-3');
-    expect(resultWindowOcrResultGridClassName()).not.toContain('gap-2.5');
+  it('uses a compact vertical OCR result layout when a source image is available', () => {
+    expect(resultWindowOcrResultStackClassName()).toContain('flex-col');
+    expect(resultWindowOcrResultStackClassName()).toContain('gap-3');
+    expect(resultWindowOcrResultStackClassName()).not.toContain('grid-cols-');
+    expect(resultWindowOcrResultStackClassName()).not.toContain('gap-2.5');
 
     expect(resultWindowOcrImagePanelClassName()).toContain('rounded-[14px]');
     expect(resultWindowOcrImagePanelClassName()).toContain('overflow-hidden');
+    expect(resultWindowOcrImagePanelClassName()).not.toContain('min-h-0');
+
+    expect(resultWindowOcrImageActionButtonClassName()).toContain('h-8');
+    expect(resultWindowOcrImageActionButtonClassName()).toContain('rounded-[10px]');
+
+    expect(resultWindowOcrFullTextBoxClassName()).not.toContain('flex-1');
+    expect(resultWindowOcrFullTextBoxClassName()).toContain('rounded-[14px]');
 
     expect(resultWindowOcrResultTextAreaClassName()).not.toContain('overflow-y-auto');
+    expect(resultWindowOcrResultTextAreaClassName()).not.toContain('flex-1');
     expect(resultWindowOcrResultTextAreaClassName()).toContain('text-[14px]');
     expect(resultWindowOcrResultTextAreaClassName()).toContain('leading-[1.42]');
     expect(resultWindowOcrResultTextAreaClassName()).not.toContain(
       'result-window-scrollbar',
     );
+
+    expect(resultWindowOcrTokenButtonClassName()).toContain('rounded-full');
+    expect(resultWindowOcrTokenButtonClassName()).toContain('break-all');
   });
 
   it('closes from background clicks in overlay and standalone presentations', () => {
@@ -376,8 +410,9 @@ describe('result window presentation', () => {
     expect(shouldCloseFromContainerClick('standalone', target, target, true)).toBe(false);
   });
 
-  it('closes standalone result windows when focus leaves the window', () => {
-    expect(shouldCloseFromWindowBlur('standalone')).toBe(true);
+  it('ignores initial standalone window blur while capture cleanup settles', () => {
+    expect(shouldCloseFromWindowBlur('standalone', false, 100)).toBe(false);
+    expect(shouldCloseFromWindowBlur('standalone', false, 400)).toBe(true);
     expect(shouldCloseFromWindowBlur('overlay')).toBe(false);
     expect(shouldCloseFromWindowBlur('standalone', true)).toBe(false);
   });
