@@ -101,6 +101,14 @@ export type CaptureCompletionAction =
   | 'ocr-translate'
   | 'print'
   | 'cancel';
+export type PreviewCaptureCompletionAction = Extract<
+  CaptureCompletionAction,
+  'copy' | 'save' | 'quick-save' | 'pin' | 'print' | 'ocr'
+>;
+type PreviewCaptureShortcutCompletionAction = Exclude<
+  PreviewCaptureCompletionAction,
+  'ocr'
+>;
 export type CancelCapturePointerAction =
   | 'finish-edit'
   | 'finish-annotation'
@@ -353,6 +361,18 @@ export function getHoverSelectionCompletionActionFromShortcut(
   if (isPlainCaptureCompletionShortcut(event)) {
     return getPrimaryHoverSelectionCompletionActionForMode(options.mode);
   }
+  if (isCopyCaptureKeyboardShortcut(event)) return 'copy';
+  if (isQuickSaveCaptureShortcut(event)) return 'quick-save';
+  if (isSaveCaptureShortcut(event)) return 'save';
+  if (isPinCaptureShortcut(event)) return 'pin';
+  if (isPrintCaptureShortcut(event)) return 'print';
+
+  return null;
+}
+
+export function getPreviewCaptureCompletionActionFromShortcut(
+  event: CaptureShortcutEvent,
+): PreviewCaptureShortcutCompletionAction | null {
   if (isCopyCaptureKeyboardShortcut(event)) return 'copy';
   if (isQuickSaveCaptureShortcut(event)) return 'quick-save';
   if (isSaveCaptureShortcut(event)) return 'save';

@@ -38,6 +38,7 @@ import {
   resultWindowHeaderDragHandleClassName,
   autosizeResultWindowTextArea,
   measureResultWindowTextMirrorHeight,
+  resultWindowOcrContentClassName,
   resultWindowOcrFullTextBoxClassName,
   resultWindowOcrImageActionButtonClassName,
   resultWindowOcrImagePanelClassName,
@@ -616,7 +617,9 @@ export default function ResultWindow({
 
         {isOcrMode ? (
           <ResultWindowScrollArea
-            className={resultWindowContentClassName({ stretch: false })}
+            className={resultWindowOcrContentClassName({
+              hasSourceImage: Boolean(ocrImageBase64),
+            })}
           >
             {ocrImageBase64 ? (
               <div className={resultWindowOcrResultStackClassName()}>

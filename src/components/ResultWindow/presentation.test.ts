@@ -6,6 +6,7 @@ import {
   resultWindowAdaptiveTextStyle,
   resultWindowContainerClassName,
   resultWindowPanelClassName,
+  resultWindowOcrContentClassName,
   resultWindowOcrFullTextBoxClassName,
   resultWindowOcrImageActionButtonClassName,
   resultWindowOcrImagePanelClassName,
@@ -117,6 +118,22 @@ describe('result window presentation', () => {
 
   it('can avoid stretching compact OCR content to the full standalone window height', () => {
     const className = resultWindowContentClassName({ stretch: false });
+
+    expect(className).toContain('flex-none');
+    expect(className).not.toContain('flex-1');
+  });
+
+  it('lets OCR content with a source image scroll inside a constrained result window', () => {
+    const className = resultWindowOcrContentClassName({ hasSourceImage: true });
+
+    expect(className).toContain('flex-1');
+    expect(className).toContain('overflow-y-auto');
+    expect(className).toContain('result-window-scrollbar');
+    expect(className).not.toContain('flex-none');
+  });
+
+  it('keeps OCR upload-only content compact', () => {
+    const className = resultWindowOcrContentClassName({ hasSourceImage: false });
 
     expect(className).toContain('flex-none');
     expect(className).not.toContain('flex-1');

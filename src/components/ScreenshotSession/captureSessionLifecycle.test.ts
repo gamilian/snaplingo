@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  cancelCaptureSessionFlow,
   closeInactiveCaptureSession,
   finishCaptureSession,
   hideInactiveCaptureWindow,
@@ -111,5 +112,107 @@ describe('capture session lifecycle', () => {
     );
 
     expect(events).toEqual(['hide_capture_window']);
+  });
+
+  it('ignores explicit cancellation while another cancellation is already running', async () => {
+    const events: string[] = [];
+
+    const didStart = await cancelCaptureSessionFlow({
+      sessionId: 'session-4',
+      isCancelling: () => true,
+      setCancelling: (value) => {
+        events.push(`set_cancelling:${value}`);
+      },
+      finishSession: async () => {
+        events.push('finish_session');
+      },
+      closeInactiveSession: async () => {
+        events.push('close_inactive');
+      },
+      onError: (err) => {
+        events.push(`error:${String(err)}`);
+      },
+    });
+
+    expect(didStart).toBe(false);
+    expect(events).toEqual([]);
+  });
+
+  it('routes active explicit cancellation through finish session', async () => {
+    const events: string[] = [];
+
+    const didStart = await cancelCaptureSessionFlow({
+      sessionId: 'session-5',
+      isCancelling: () => false,
+      setCancelling: (value) => {
+        events.push(`set_cancelling:${value}`);
+      },
+      finishSession: async (sessionId) => {
+        events.push(`finish:${sessionId}`);
+      },
+      closeInactiveSession: async () => {
+        events.push('close_inactive');
+      },
+      onError: (err) => {
+        events.push(`error:${String(err)}`);
+      },
+    });
+
+    expect(didStart).toBe(true);
+    expect(events).toEqual(['set_cancelling:true', 'finish:session-5']);
+  });
+
+  it('routes inactive explicit cancellation through inactive close', async () => {
+    const events: string[] = [];
+
+    const didStart = await cancelCaptureSessionFlow({
+      sessionId: null,
+      isCancelling: () => false,
+      setCancelling: (value) => {
+        events.push(`set_cancelling:${value}`);
+      },
+      finishSession: async () => {
+        events.push('finish_session');
+      },
+      closeInactiveSession: async () => {
+        events.push('close_inactive');
+      },
+      onError: (err) => {
+        events.push(`error:${String(err)}`);
+      },
+    });
+
+    expect(didStart).toBe(true);
+    expect(events).toEqual(['set_cancelling:true', 'close_inactive']);
+  });
+
+  it('releases the cancellation guard and reports errors when cancellation fails', async () => {
+    const events: string[] = [];
+
+    const didStart = await cancelCaptureSessionFlow({
+      sessionId: 'session-6',
+      isCancelling: () => false,
+      setCancelling: (value) => {
+        events.push(`set_cancelling:${value}`);
+      },
+      finishSession: async (sessionId) => {
+        events.push(`finish:${sessionId}`);
+        throw new Error('close failed');
+      },
+      closeInactiveSession: async () => {
+        events.push('close_inactive');
+      },
+      onError: (err) => {
+        events.push(err instanceof Error ? `error:${err.message}` : 'error');
+      },
+    });
+
+    expect(didStart).toBe(false);
+    expect(events).toEqual([
+      'set_cancelling:true',
+      'finish:session-6',
+      'set_cancelling:false',
+      'error:close failed',
+    ]);
   });
 });

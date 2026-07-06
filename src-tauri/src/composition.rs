@@ -43,7 +43,7 @@ pub(crate) fn build_app_state(config_path: PathBuf, app: AppHandle) -> AppState 
         event_bus.clone(),
     );
 
-    let capture_runtime = build_capture_runtime(ocr_coordinator.clone());
+    let capture_runtime = build_capture_runtime(app.clone(), ocr_coordinator.clone());
     let selected_text_acquirer = build_selected_text_acquirer(app);
 
     AppState {

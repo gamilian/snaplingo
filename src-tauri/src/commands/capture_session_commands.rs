@@ -10,11 +10,9 @@ use crate::domain::capture::{
 };
 use crate::domain::ocr::OcrResult;
 use crate::infrastructure::system::capture_window::{
-    begin_capture_presentation, capture_window_bounds, destroy_inactive_capture_window,
-    end_capture_presentation, hide_capture_window as hide_capture_window_for_app,
-    open_capture_window_for_session,
+    hide_capture_window as hide_capture_window_for_app,
     prepare_capture_window_for_reveal as prepare_capture_window_for_reveal_for_app,
-    restore_capture_snapshot_windows, reveal_capture_window as reveal_capture_window_for_app,
+    reveal_capture_window as reveal_capture_window_for_app,
 };
 use crate::infrastructure::system::pinned_window::open_pinned_image_window;
 
@@ -31,78 +29,32 @@ impl Drop for CaptureShortcutOpenGuard {
 #[tauri::command]
 pub async fn open_capture_window(
     mode: String,
-    app: AppHandle,
+    _app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    open_capture_window_for_mode(&app, &state, &mode).await
+    open_capture_window_for_mode(state.inner(), &mode).await
 }
 
 pub async fn open_capture_window_for_mode(
-    app: &AppHandle,
     state: &crate::AppState,
     mode: &str,
 ) -> Result<(), String> {
-    let total_start = Instant::now();
-    let session_start = Instant::now();
-    let session = create_triggered_capture_session_from_visible_desktop(app, state).await?;
-    let session_ms = elapsed_ms(session_start);
-    let monitor_count = session.monitors.len();
-    let candidate_count = session.candidates.len();
-    let view_base64_bytes = capture_session_view_base64_bytes(&session);
-
-    let open_start = Instant::now();
-    let open_result = match capture_window_bounds(&session.monitors) {
-        Some(bounds) => {
-            open_capture_window_for_session_on_main_thread(app, mode, &session.id.0, &bounds).await
-        }
-        None => Err("Cannot open capture window without monitor bounds".to_string()),
-    };
-    let open_ms = elapsed_ms(open_start);
-
-    log::info!(
-        "[capture-perf] open_capture_window mode={} monitors={} candidates={} view_base64_bytes={} create_session_ms={:.1} open_overlay_ms={:.1} total_ms={:.1} success={}",
-        mode,
-        monitor_count,
-        candidate_count,
-        view_base64_bytes,
-        session_ms,
-        open_ms,
-        elapsed_ms(total_start),
-        open_result.is_ok(),
-    );
-
-    if let Err(open_err) = open_result {
-        let restore_result =
-            restore_capture_snapshot_windows_for_session_id(app, state, &session.id).await;
-        let _ = state.capture_session_service.cancel_session(&session.id);
-        let presentation_result = end_capture_presentation_on_main_thread(app).await;
-
-        if let Err(restore_err) = restore_result {
-            return Err(format!(
-                "{}; also failed to restore hidden windows: {}",
-                open_err, restore_err
-            ));
-        }
-
-        if let Err(presentation_err) = presentation_result {
-            return Err(format!(
-                "{}; also failed to end capture presentation: {}",
-                open_err, presentation_err
-            ));
-        }
-
-        return Err(open_err);
-    }
-
-    Ok(())
+    state
+        .capture_session_runtime
+        .open_capture_window_for_mode(mode)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn create_capture_session(
-    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<CaptureSessionView, String> {
-    create_capture_session_from_visible_desktop(&app, state.inner()).await
+    state
+        .capture_session_runtime
+        .create_session_from_visible_desktop()
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -118,70 +70,6 @@ pub async fn prepare_capture_window_for_reveal(app: AppHandle) -> Result<(), Str
 #[tauri::command]
 pub async fn hide_capture_window(app: AppHandle) -> Result<(), String> {
     hide_capture_window_on_main_thread(&app).await
-}
-
-async fn create_triggered_capture_session_from_visible_desktop(
-    app: &AppHandle,
-    state: &crate::AppState,
-) -> Result<CaptureSessionView, String> {
-    create_capture_session_from_visible_desktop(app, state).await
-}
-
-async fn create_capture_session_from_visible_desktop(
-    app: &AppHandle,
-    state: &crate::AppState,
-) -> Result<CaptureSessionView, String> {
-    let total_start = Instant::now();
-    let begin_start = Instant::now();
-    begin_capture_presentation_on_main_thread(app).await?;
-    let begin_ms = elapsed_ms(begin_start);
-
-    let hide_overlay_start = Instant::now();
-    if let Err(err) = hide_capture_window_on_main_thread(app).await {
-        if err != "Capture window is not open" {
-            let presentation_result = end_capture_presentation_on_main_thread(app).await;
-            return match presentation_result {
-                Ok(()) => Err(err),
-                Err(presentation_err) => Err(format!(
-                    "{}; also failed to end capture presentation: {}",
-                    err, presentation_err
-                )),
-            };
-        }
-    }
-    let hide_overlay_ms = elapsed_ms(hide_overlay_start);
-
-    let session_start = Instant::now();
-    let session_result = state
-        .capture_session_service
-        .create_session_without_monitor_images()
-        .await
-        .map_err(|e| e.to_string());
-    let session_ms = elapsed_ms(session_start);
-
-    log::info!(
-        "[capture-perf] create_visible_desktop_frozen_session begin_ms={:.1} hide_overlay_ms={:.1} capture_session_ms={:.1} total_ms={:.1} success={}",
-        begin_ms,
-        hide_overlay_ms,
-        session_ms,
-        elapsed_ms(total_start),
-        session_result.is_ok(),
-    );
-
-    match session_result {
-        Ok(session) => Ok(session),
-        Err(session_err) => {
-            let presentation_result = end_capture_presentation_on_main_thread(app).await;
-
-            match presentation_result {
-                Ok(()) => Err(session_err),
-                Err(presentation_err) => Err(format!(
-                    "{}; also failed to end capture presentation: {}",
-                    session_err, presentation_err
-                )),
-            }
-        }
-    }
 }
 
 fn capture_session_view_base64_bytes(session: &CaptureSessionView) -> usize {
@@ -222,36 +110,6 @@ where
         .map_err(|e| format!("Failed to receive {operation_name} result: {e}"))?
 }
 
-async fn begin_capture_presentation_on_main_thread(app: &AppHandle) -> Result<(), String> {
-    run_on_main_thread(app, "begin capture presentation", |app| {
-        begin_capture_presentation(&app)
-    })
-    .await
-}
-
-async fn end_capture_presentation_on_main_thread(app: &AppHandle) -> Result<(), String> {
-    run_on_main_thread(app, "end capture presentation", |app| {
-        end_capture_presentation(&app)
-    })
-    .await
-}
-
-async fn open_capture_window_for_session_on_main_thread(
-    app: &AppHandle,
-    mode: &str,
-    session_id: &str,
-    bounds: &LogicalRect,
-) -> Result<(), String> {
-    let mode = mode.to_string();
-    let session_id = session_id.to_string();
-    let bounds = bounds.clone();
-
-    run_on_main_thread(app, "open capture window", move |app| {
-        open_capture_window_for_session(&app, &mode, &session_id, &bounds)
-    })
-    .await
-}
-
 async fn reveal_capture_window_on_main_thread(app: &AppHandle) -> Result<(), String> {
     run_on_main_thread(app, "reveal capture window", |app| {
         reveal_capture_window_for_app(&app)
@@ -269,23 +127,6 @@ async fn prepare_capture_window_for_reveal_on_main_thread(app: &AppHandle) -> Re
 async fn hide_capture_window_on_main_thread(app: &AppHandle) -> Result<(), String> {
     run_on_main_thread(app, "hide capture window", |app| {
         hide_capture_window_for_app(&app)
-    })
-    .await
-}
-
-async fn destroy_inactive_capture_window_on_main_thread(app: &AppHandle) -> Result<(), String> {
-    run_on_main_thread(app, "destroy inactive capture window", |app| {
-        destroy_inactive_capture_window(&app)
-    })
-    .await
-}
-
-async fn restore_capture_snapshot_windows_on_main_thread(
-    app: &AppHandle,
-    hidden_window_labels: Vec<String>,
-) -> Result<(), String> {
-    run_on_main_thread(app, "restore capture snapshot windows", move |app| {
-        restore_capture_snapshot_windows(&app, &hidden_window_labels)
     })
     .await
 }
@@ -366,80 +207,26 @@ pub fn current_capture_cursor_position(
 #[tauri::command]
 pub async fn cancel_capture_session(
     session_id: String,
-    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    let session_id = CaptureSessionId(session_id);
-
-    let restore_result =
-        restore_capture_snapshot_windows_for_session_id(&app, state.inner(), &session_id).await;
-    let cancel_result = state
-        .capture_session_service
-        .cancel_session(&session_id)
-        .map_err(|e| e.to_string());
-    let presentation_result = end_capture_presentation_on_main_thread(&app).await;
-    let destroy_window_result = destroy_inactive_capture_window_on_main_thread(&app).await;
-
-    match (
-        restore_result,
-        cancel_result,
-        presentation_result,
-        destroy_window_result,
-    ) {
-        (Ok(()), Ok(()), Ok(()), Ok(())) => Ok(()),
-        (Err(err), _, _, _) => Err(err),
-        (_, Err(err), _, _) => Err(err),
-        (_, _, Err(err), _) => Err(err),
-        (_, _, _, Err(err)) => Err(err),
-    }
+    state
+        .capture_session_runtime
+        .cancel_capture_session(&CaptureSessionId(session_id))
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn restore_capture_snapshot_windows_for_session(
     session_id: String,
-    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    let restore_result = restore_capture_snapshot_windows_for_session_id(
-        &app,
-        state.inner(),
-        &CaptureSessionId(session_id),
-    )
-    .await;
-    let presentation_result = end_capture_presentation_on_main_thread(&app).await;
-    let destroy_window_result = destroy_inactive_capture_window_on_main_thread(&app).await;
-
-    match (restore_result, presentation_result, destroy_window_result) {
-        (Ok(()), Ok(()), Ok(())) => Ok(()),
-        (Err(err), Ok(()), Ok(())) => Err(err),
-        (Ok(()), Err(err), Ok(())) => Err(err),
-        (Ok(()), Ok(()), Err(err)) => Err(err),
-        (Err(restore_err), Err(presentation_err), _) => Err(format!(
-            "{}; also failed to end capture presentation: {}",
-            restore_err, presentation_err
-        )),
-        (Err(restore_err), _, Err(destroy_err)) => Err(format!(
-            "{}; also failed to destroy inactive capture window: {}",
-            restore_err, destroy_err
-        )),
-        (_, Err(presentation_err), Err(destroy_err)) => Err(format!(
-            "{}; also failed to destroy inactive capture window: {}",
-            presentation_err, destroy_err
-        )),
-    }
-}
-
-async fn restore_capture_snapshot_windows_for_session_id(
-    app: &AppHandle,
-    state: &crate::AppState,
-    session_id: &CaptureSessionId,
-) -> Result<(), String> {
-    let hidden_window_labels = state
-        .capture_session_service
-        .take_hidden_window_labels(session_id)
+    state
+        .capture_session_runtime
+        .restore_capture_snapshot_windows_for_session(&CaptureSessionId(session_id))
+        .await
         .map_err(|e| e.to_string())?;
-
-    restore_capture_snapshot_windows_on_main_thread(app, hidden_window_labels).await
+    Ok(())
 }
 
 #[tauri::command]
@@ -451,7 +238,6 @@ pub async fn render_capture_output(
     state: State<'_, crate::AppState>,
 ) -> Result<String, String> {
     let session_id = CaptureSessionId(session_id);
-    ensure_capture_session_cached_for_selection(state.inner(), &session_id, &rect)?;
 
     state
         .capture_session_runtime
@@ -496,7 +282,6 @@ pub async fn output_capture(
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     let session_id = CaptureSessionId(session_id);
-    ensure_capture_session_cached_for_selection(state.inner(), &session_id, &rect)?;
 
     let output = state
         .capture_session_runtime
@@ -531,7 +316,6 @@ pub async fn run_capture_ocr(
     state: State<'_, crate::AppState>,
 ) -> Result<OcrResult, String> {
     let capture_session_id = CaptureSessionId(session_id.clone());
-    ensure_capture_session_cached_for_selection(state.inner(), &capture_session_id, &rect)?;
 
     let result = state
         .capture_session_runtime
@@ -550,22 +334,6 @@ pub async fn run_capture_ocr(
     Ok(result)
 }
 
-fn ensure_capture_session_cached_for_selection(
-    state: &crate::AppState,
-    session_id: &CaptureSessionId,
-    rect: &LogicalRect,
-) -> Result<(), String> {
-    if state
-        .capture_session_service
-        .session_selection_needs_freeze(session_id, rect)
-        .map_err(|e| e.to_string())?
-    {
-        return Err("Capture session snapshots are not ready for the selected area".to_string());
-    }
-
-    Ok(())
-}
-
 pub async fn open_capture_window_from_shortcut(app: AppHandle, mode: &'static str) {
     let Some(_guard) = try_begin_capture_shortcut_open() else {
         log::info!("Ignoring capture shortcut while a capture window is already opening");
@@ -574,7 +342,7 @@ pub async fn open_capture_window_from_shortcut(app: AppHandle, mode: &'static st
 
     let result = async {
         let state = app.state::<crate::AppState>();
-        open_capture_window_for_mode(&app, state.inner(), mode)
+        open_capture_window_for_mode(state.inner(), mode)
             .await
             .map_err(crate::AppError::from)
     }

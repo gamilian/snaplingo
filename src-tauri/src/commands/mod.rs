@@ -302,7 +302,8 @@ pub async fn trigger_screenshot(
     app: tauri::AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    open_capture_window_for_mode(&app, &state, "screenshot").await
+    let _ = app;
+    open_capture_window_for_mode(state.inner(), "screenshot").await
 }
 
 #[cfg(test)]

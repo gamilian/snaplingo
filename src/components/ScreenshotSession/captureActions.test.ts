@@ -4,6 +4,7 @@ import {
   type CaptureActionClient,
   canToggleCapturedCursor,
   copyCaptureSelection,
+  getPreviewCaptureCompletionActionFromShortcut,
   getCaptureKeyboardToolbarAction,
   getCaptureSelectionFlowForMode,
   getCandidateCycleDirectionFromShortcut,
@@ -1357,6 +1358,54 @@ describe('capture session actions', () => {
         shiftKey: false,
       }),
     ).toBe(false);
+  });
+
+  it('maps preview capture output shortcuts to one completion action', () => {
+    expect(
+      getPreviewCaptureCompletionActionFromShortcut({
+        key: 'Enter',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe('copy');
+    expect(
+      getPreviewCaptureCompletionActionFromShortcut({
+        key: 's',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBe('quick-save');
+    expect(
+      getPreviewCaptureCompletionActionFromShortcut({
+        key: 's',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe('save');
+    expect(
+      getPreviewCaptureCompletionActionFromShortcut({
+        key: 'p',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe('print');
+    expect(
+      getPreviewCaptureCompletionActionFromShortcut({
+        key: 'Enter',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBeNull();
   });
 
   it('uses copy shortcuts for completing a hovered capture candidate', () => {

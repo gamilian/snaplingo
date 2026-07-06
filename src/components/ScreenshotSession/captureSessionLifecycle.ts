@@ -27,6 +27,15 @@ interface FinishCaptureSessionOptions
   sessionId: string;
 }
 
+interface CancelCaptureSessionFlowOptions {
+  sessionId?: string | null;
+  isCancelling: () => boolean;
+  setCancelling: (value: boolean) => void;
+  finishSession: (sessionId: string) => Promise<void>;
+  closeInactiveSession: () => Promise<void>;
+  onError: (err: unknown) => void;
+}
+
 export async function closeInactiveCaptureSession({
   onInactive,
   resetSessionState,
@@ -47,6 +56,32 @@ export async function finishCaptureSession({
 }: FinishCaptureSessionOptions) {
   await closeInactiveCaptureSession({ onInactive, resetSessionState });
   await client.cancelCaptureSession(sessionId);
+}
+
+export async function cancelCaptureSessionFlow({
+  closeInactiveSession,
+  finishSession,
+  isCancelling,
+  onError,
+  sessionId,
+  setCancelling,
+}: CancelCaptureSessionFlowOptions) {
+  if (isCancelling()) return false;
+
+  setCancelling(true);
+
+  try {
+    if (sessionId) {
+      await finishSession(sessionId);
+    } else {
+      await closeInactiveSession();
+    }
+    return true;
+  } catch (err) {
+    setCancelling(false);
+    onError(err);
+    return false;
+  }
 }
 
 export interface CaptureWindowHideClient {
