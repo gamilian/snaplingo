@@ -15,11 +15,6 @@ import {
   type SelectionHandle,
 } from './selection';
 import {
-  shouldAutoShowCaptureMagnifier,
-  shouldShowMagnifier,
-  shouldTrackCaptureCursorForMagnifier,
-} from './magnifier';
-import {
   colorSampleToClipboardText,
   type ColorSample,
   type ColorSampleFormat,
@@ -37,7 +32,6 @@ import {
   redoAnnotationHistory,
   undoAnnotationHistory,
 } from './annotationHistory';
-import { getAnnotationBounds } from './annotationGeometry';
 import {
   DEFAULT_TEXT_FONT_SIZE,
   DEFAULT_ANNOTATION_STYLE,
@@ -115,6 +109,7 @@ import {
   completeCaptureEditorGesture,
   createCapturePreviewResetState,
   getCaptureEditorDismissAction,
+  getCaptureSelectedAnnotationBounds,
   planCaptureAnnotationColorSelection,
   planCaptureAnnotationToolActivation,
   planCaptureAnnotationFillToggle,
@@ -188,9 +183,11 @@ import {
   CaptureSelectionOverlayCanvas,
   useCaptureSelectionOverlay,
 } from './captureSelectionOverlayRuntime';
-import { useCaptureMagnifierPixelSource } from './captureMagnifierRuntime';
 import {
-  getMonitorAtVirtualPoint,
+  getCaptureMagnifierRuntimeState,
+  useCaptureMagnifierPixelSource,
+} from './captureMagnifierRuntime';
+import {
   getCurrentMonitorBounds,
   getVirtualDesktopBounds,
   viewportPointToVirtualPoint,
@@ -204,7 +201,6 @@ import type {
   CaptureSessionView,
   ArrowKey,
   LogicalRect,
-  MonitorSnapshotView,
   Point,
 } from './types';
 
@@ -395,56 +391,43 @@ export default function ScreenshotSession({
 
     return virtualPointToViewportPoint(cursorPoint, selectionBounds);
   }, [cursorPoint, selectionBounds]);
-  const hasHydratedPixelSource = useMemo(() => {
-    return Boolean(session?.monitors.some((monitor) => monitor.image_base64));
-  }, [session]);
+  const {
+    cursorInMonitorPoint,
+    cursorMonitor,
+    hasHydratedPixelSource,
+    isMagnifierShown,
+    shouldTrackMagnifierCursor,
+  } = useMemo(
+    () =>
+      getCaptureMagnifierRuntimeState({
+        session,
+        status,
+        cursorPoint,
+        cursorViewportPoint,
+        viewportBounds,
+        isMagnifierRequested,
+      }),
+    [
+      cursorPoint,
+      cursorViewportPoint,
+      isMagnifierRequested,
+      session,
+      status,
+      viewportBounds,
+    ],
+  );
   const selectedAnnotationBounds = useMemo<LogicalRect | null>(() => {
-    if (
-      annotationMoveGesture ||
-      selectedAnnotationIndex === null ||
-      !annotations[selectedAnnotationIndex]
-    ) {
-      return null;
-    }
-
-    return getAnnotationBounds(annotations[selectedAnnotationIndex]);
+    return getCaptureSelectedAnnotationBounds({
+      annotations,
+      selectedAnnotationIndex,
+      annotationMoveGesture,
+    });
   }, [annotationMoveGesture, annotations, selectedAnnotationIndex]);
-  const cursorMonitor = useMemo<MonitorSnapshotView | null>(() => {
-    if (!session || !cursorPoint) return null;
-
-    return getMonitorAtVirtualPoint(session.monitors, cursorPoint);
-  }, [cursorPoint, session]);
-  const cursorInMonitorPoint = useMemo<Point | null>(() => {
-    if (!cursorPoint || !cursorMonitor) return null;
-
-    return {
-      x: cursorPoint.x - cursorMonitor.logical_bounds.x,
-      y: cursorPoint.y - cursorMonitor.logical_bounds.y,
-    };
-  }, [cursorMonitor, cursorPoint]);
   const toolbarPosition = useMemo(() => {
     if (!selectionViewportRect || !viewportBounds || status !== 'preview') return null;
 
     return getToolbarPosition(selectionViewportRect, viewportBounds, TOOLBAR_SIZE, TOOLBAR_GAP);
   }, [selectionViewportRect, status, viewportBounds]);
-  const hasMagnifierPixelSource = Boolean(cursorMonitor?.image_base64);
-  const isMagnifierAutoRequested = shouldAutoShowCaptureMagnifier({
-    status,
-    hasHydratedPixels: hasMagnifierPixelSource,
-  });
-  const shouldTrackMagnifierCursor = shouldTrackCaptureCursorForMagnifier({
-    status,
-    requested: isMagnifierRequested,
-    hasHydratedPixels: hasHydratedPixelSource,
-  });
-  const isMagnifierShown = shouldShowMagnifier({
-    requested: isMagnifierRequested,
-    automatic: isMagnifierAutoRequested,
-    hasCursorMonitor: hasMagnifierPixelSource,
-    hasViewportCursor: Boolean(cursorViewportPoint),
-    hasImageCursor: Boolean(cursorInMonitorPoint),
-    hasViewportBounds: Boolean(viewportBounds),
-  });
 
   const setStartPointWithRef = useCallback((point: Point | null) => {
     startPointRef.current = point;

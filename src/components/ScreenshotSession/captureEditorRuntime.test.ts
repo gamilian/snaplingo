@@ -7,6 +7,7 @@ import {
   createCapturePreviewResetState,
   deriveCaptureEditorToolbarState,
   getCaptureEditorDismissAction,
+  getCaptureSelectedAnnotationBounds,
   moveSelectedAnnotationHistory,
   planCaptureAnnotationColorSelection,
   planCaptureAnnotationFillToggle,
@@ -190,6 +191,46 @@ describe('captureEditorRuntime', () => {
         delta: { x: 1, y: 1 },
       }),
     ).toBe(history);
+  });
+
+  it('derives selected annotation bounds only when selection editing is idle', () => {
+    const annotations: AnnotationCommand[] = [
+      {
+        type: 'rectangle',
+        rect: { x: 4, y: 6, width: 20, height: 10 },
+        color: [255, 77, 79, 255],
+        stroke_width: 2,
+        filled: false,
+      },
+    ];
+
+    expect(
+      getCaptureSelectedAnnotationBounds({
+        annotations,
+        selectedAnnotationIndex: 0,
+        annotationMoveGesture: null,
+      }),
+    ).toEqual({ x: 4, y: 6, width: 20, height: 10 });
+
+    expect(
+      getCaptureSelectedAnnotationBounds({
+        annotations,
+        selectedAnnotationIndex: 0,
+        annotationMoveGesture: {
+          annotationIndex: 0,
+          startPoint: { x: 1, y: 1 },
+          startAnnotation: annotations[0],
+        },
+      }),
+    ).toBeNull();
+
+    expect(
+      getCaptureSelectedAnnotationBounds({
+        annotations,
+        selectedAnnotationIndex: 1,
+        annotationMoveGesture: null,
+      }),
+    ).toBeNull();
   });
 
   it('plans selected annotation keyboard nudges through history', () => {

@@ -31,6 +31,7 @@ import type {
 } from './captureInteractionRuntime';
 import {
   constrainAnnotationMoveDelta,
+  getAnnotationBounds,
   getAnnotationKeyboardNudgeDelta,
   hitTestAnnotations,
   moveAnnotationByDelta,
@@ -155,6 +156,28 @@ export function moveSelectedAnnotationHistory({
     selectedAnnotationIndex,
     moveAnnotationByDelta(annotations[selectedAnnotationIndex], delta),
   );
+}
+
+export interface CaptureSelectedAnnotationBoundsOptions {
+  annotations: AnnotationCommand[];
+  selectedAnnotationIndex: number | null;
+  annotationMoveGesture: CaptureAnnotationMoveGesture | null;
+}
+
+export function getCaptureSelectedAnnotationBounds({
+  annotationMoveGesture,
+  annotations,
+  selectedAnnotationIndex,
+}: CaptureSelectedAnnotationBoundsOptions): LogicalRect | null {
+  if (
+    annotationMoveGesture ||
+    selectedAnnotationIndex === null ||
+    !annotations[selectedAnnotationIndex]
+  ) {
+    return null;
+  }
+
+  return getAnnotationBounds(annotations[selectedAnnotationIndex]);
 }
 
 export interface CaptureSelectedAnnotationKeyboardNudgePlan {
