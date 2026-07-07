@@ -1,3 +1,5 @@
+mod shortcut_copy;
+
 use crate::domain::{SelectionContext, SelectionMethodKind};
 
 use super::backend::{SelectionContextProvider, SelectionMethod, SystemSelectionProvider};
@@ -16,7 +18,7 @@ impl SystemSelectionProvider for PlatformSelectionProvider {
     }
 
     fn methods(&self) -> Vec<Box<dyn SelectionMethod>> {
-        Vec::new()
+        vec![Box::new(shortcut_copy::ShortcutCopySelectionMethod)]
     }
 }
 
@@ -31,6 +33,25 @@ pub fn platform_selection_provider(
 mod selection_registry_tests {
     use super::*;
     use crate::infrastructure::system::selection::backend::SystemSelectionProvider;
+
+    mod linux {
+        mod shortcut_copy {
+            use super::super::*;
+
+            #[test]
+            fn provider_methods_include_shortcut_copy() {
+                let provider = PlatformSelectionProvider;
+
+                let method_kinds = provider
+                    .methods()
+                    .into_iter()
+                    .map(|method| method.kind())
+                    .collect::<Vec<_>>();
+
+                assert_eq!(method_kinds, vec![SelectionMethodKind::ShortcutCopy]);
+            }
+        }
+    }
 
     #[test]
     fn default_scheme_prefers_shortcut_copy() {
