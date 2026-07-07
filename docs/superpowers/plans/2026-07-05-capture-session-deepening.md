@@ -57,7 +57,7 @@
 - Modify: `src-tauri/src/commands/capture_session_commands.rs`
 - Create or modify: `src-tauri/src/application/services/capture_session_runtime_test.rs`
 
-- [ ] **Step 1: Identify the backend behaviors that must survive the refactor**
+- [x] **Step 1: Identify the backend behaviors that must survive the refactor**
 
 Capture these behaviors as test targets:
 
@@ -66,7 +66,7 @@ Capture these behaviors as test targets:
 - startup failure triggers rollback ordering
 - render/output/OCR behavior still routes through `CaptureSessionRuntime`
 
-- [ ] **Step 2: Add failing focused tests for the expanded runtime seam**
+- [x] **Step 2: Add failing focused tests for the expanded runtime seam**
 
 Add tests that express the intended runtime ownership, such as:
 
@@ -78,7 +78,7 @@ async fn capture_runtime_rolls_back_when_window_open_fails() {
 }
 ```
 
-- [ ] **Step 3: Run the focused Rust tests and confirm the new seam is not implemented yet**
+- [x] **Step 3: Run the focused Rust tests and confirm the new seam is not implemented yet**
 
 Run:
 
@@ -94,7 +94,7 @@ Expected: the new runtime-focused assertions fail before implementation.
 - Modify: `src-tauri/src/application/services/capture_session_runtime.rs`
 - Modify: `src-tauri/src/application/services/mod.rs`
 
-- [ ] **Step 1: Add new runtime entrypoints for capture startup choreography**
+- [x] **Step 1: Add new runtime entrypoints for capture startup choreography**
 
 Add backend methods that the command layer can call directly, for example:
 
@@ -113,7 +113,7 @@ The exact signature may vary, but the interface must absorb:
 - main-thread window open
 - rollback ordering
 
-- [ ] **Step 2: Move main-thread dispatch and rollback behavior into the runtime**
+- [x] **Step 2: Move main-thread dispatch and rollback behavior into the runtime**
 
 Move logic currently owned by `capture_session_commands.rs` into the runtime:
 
@@ -122,7 +122,7 @@ Move logic currently owned by `capture_session_commands.rs` into the runtime:
 - restore hidden windows on failure
 - cancel failed session
 
-- [ ] **Step 3: Keep render/output/OCR methods working through the same runtime module**
+- [x] **Step 3: Keep render/output/OCR methods working through the same runtime module**
 
 Preserve these existing runtime responsibilities:
 
@@ -132,7 +132,7 @@ Preserve these existing runtime responsibilities:
 
 Do not change Capture Mode semantics or adapter responsibilities.
 
-- [ ] **Step 4: Run the focused Rust tests again**
+- [x] **Step 4: Run the focused Rust tests again**
 
 Run:
 
@@ -147,7 +147,7 @@ Expected: runtime-focused tests pass.
 **Files:**
 - Modify: `src-tauri/src/commands/capture_session_commands.rs`
 
-- [ ] **Step 1: Replace command-owned startup choreography with runtime calls**
+- [x] **Step 1: Replace command-owned startup choreography with runtime calls**
 
 Reduce command functions so they do only:
 
@@ -155,7 +155,7 @@ Reduce command functions so they do only:
 - call `CaptureSessionRuntime`
 - map errors to `String`
 
-- [ ] **Step 2: Remove direct orchestration imports from the command module**
+- [x] **Step 2: Remove direct orchestration imports from the command module**
 
 After the refactor, this file should no longer directly own most uses of:
 
@@ -164,7 +164,7 @@ After the refactor, this file should no longer directly own most uses of:
 - `open_capture_window_for_session`
 - `restore_capture_snapshot_windows`
 
-- [ ] **Step 3: Keep the existing re-entrant shortcut guard test passing**
+- [x] **Step 3: Keep the existing re-entrant shortcut guard test passing**
 
 Run:
 
@@ -174,7 +174,7 @@ cargo test --manifest-path src-tauri/Cargo.toml capture_shortcut_open_guard_bloc
 
 Expected: PASS
 
-- [ ] **Step 4: Run all command-layer Rust tests that touch capture behavior**
+- [x] **Step 4: Run all command-layer Rust tests that touch capture behavior**
 
 Run:
 
@@ -192,7 +192,7 @@ Expected: PASS
 - Modify: `src/components/ScreenshotSession/captureWindowVisibility.test.ts`
 - Modify: `src/components/ScreenshotSession/selectionMemory.test.ts`
 
-- [ ] **Step 1: Add failing tests for effect execution and host subscriptions**
+- [x] **Step 1: Add failing tests for effect execution and host subscriptions**
 
 Cover:
 
@@ -211,7 +211,7 @@ it('executes translation-window OCR effects through the provided adapters', asyn
 });
 ```
 
-- [ ] **Step 2: Run the focused frontend tests and confirm the host runtime does not exist yet**
+- [x] **Step 2: Run the focused frontend tests and confirm the host runtime does not exist yet**
 
 Run:
 
@@ -226,7 +226,7 @@ Expected: FAIL because the new module/tests are not implemented yet.
 **Files:**
 - Create: `src/components/ScreenshotSession/captureHostRuntime.ts`
 
-- [ ] **Step 1: Add a narrow interface for executing capture runtime effects**
+- [x] **Step 1: Add a narrow interface for executing capture runtime effects**
 
 Design the module around dependencies passed in, for example:
 
@@ -241,7 +241,7 @@ export async function executeCaptureRuntimeEffect(
 
 The exact shape may vary, but it must hide concrete adapter ordering from `index.tsx`.
 
-- [ ] **Step 2: Move host event subscription helpers into the new module**
+- [x] **Step 2: Move host event subscription helpers into the new module**
 
 The module should own wiring for:
 
@@ -249,7 +249,7 @@ The module should own wiring for:
 - native cancel requests
 - native copy requests
 
-- [ ] **Step 3: Move reveal timing and selection persistence helpers into the new module**
+- [x] **Step 3: Move reveal timing and selection persistence helpers into the new module**
 
 The module should own:
 
@@ -257,7 +257,7 @@ The module should own:
 - localStorage-backed selection persistence wiring
 - restore-from-history wiring
 
-- [ ] **Step 4: Run the focused frontend tests**
+- [x] **Step 4: Run the focused frontend tests**
 
 Run:
 
@@ -272,11 +272,11 @@ Expected: PASS
 **Files:**
 - Modify: `src/components/ScreenshotSession/index.tsx`
 
-- [ ] **Step 1: Replace direct effect interpretation with calls into `captureHostRuntime.ts`**
+- [x] **Step 1: Replace direct effect interpretation with calls into `captureHostRuntime.ts`**
 
 Move the current `executeCaptureRuntimeEffect(...)` behavior behind the new seam.
 
-- [ ] **Step 2: Replace direct host event subscription wiring with `captureHostRuntime.ts`**
+- [x] **Step 2: Replace direct host event subscription wiring with `captureHostRuntime.ts`**
 
 Move:
 
@@ -286,7 +286,7 @@ Move:
 
 out of the shell.
 
-- [ ] **Step 3: Replace direct selection persistence wiring with `captureHostRuntime.ts`**
+- [x] **Step 3: Replace direct selection persistence wiring with `captureHostRuntime.ts`**
 
 Move shell-owned calls around:
 
@@ -296,7 +296,7 @@ Move shell-owned calls around:
 
 behind the host runtime seam.
 
-- [ ] **Step 4: Keep JSX, refs, and state behavior intact**
+- [x] **Step 4: Keep JSX, refs, and state behavior intact**
 
 Do not redesign the component. Keep:
 
@@ -304,7 +304,7 @@ Do not redesign the component. Keep:
 - existing state transitions
 - current UI rendering
 
-- [ ] **Step 5: Run focused ScreenshotSession tests**
+- [x] **Step 5: Run focused ScreenshotSession tests**
 
 Run:
 
@@ -319,7 +319,7 @@ Expected: PASS for the targeted capture-related frontend tests.
 **Files:**
 - Verify only
 
-- [ ] **Step 1: Run full Rust test suite**
+- [x] **Step 1: Run full Rust test suite**
 
 Run:
 
@@ -329,7 +329,7 @@ cargo test --manifest-path src-tauri/Cargo.toml
 
 Expected: PASS
 
-- [ ] **Step 2: Run full frontend test suite**
+- [x] **Step 2: Run full frontend test suite**
 
 Run:
 
@@ -339,7 +339,7 @@ npm test
 
 Expected: PASS
 
-- [ ] **Step 3: Run production frontend build**
+- [x] **Step 3: Run production frontend build**
 
 Run:
 
@@ -349,7 +349,7 @@ npm run build
 
 Expected: PASS
 
-- [ ] **Step 4: Run whitespace/diff sanity check**
+- [x] **Step 4: Run whitespace/diff sanity check**
 
 Run:
 
@@ -364,13 +364,13 @@ Expected: no output
 **Files:**
 - Verify only
 
-- [ ] **Step 1: Re-read the approved spec**
+- [x] **Step 1: Re-read the approved spec**
 
 Spec:
 
 - `docs/superpowers/specs/2026-07-05-capture-session-deepening-design.md`
 
-- [ ] **Step 2: Verify backend success criteria**
+- [x] **Step 2: Verify backend success criteria**
 
 Check:
 
@@ -378,7 +378,7 @@ Check:
 - `CaptureSessionRuntime` owns startup choreography
 - rollback logic is concentrated in the runtime
 
-- [ ] **Step 3: Verify frontend success criteria**
+- [x] **Step 3: Verify frontend success criteria**
 
 Check:
 
@@ -386,9 +386,16 @@ Check:
 - `ScreenshotSession/index.tsx` no longer directly subscribes to host events
 - `ScreenshotSession/index.tsx` no longer directly owns selection persistence wiring
 
-- [ ] **Step 4: Summarize residual risks**
+- [x] **Step 4: Summarize residual risks**
 
 Call out any remaining risks explicitly, especially:
 
 - large remaining file size in `ScreenshotSession/index.tsx`
 - helper extraction that improved locality but did not fully deepen every internal seam
+
+## Final Review Notes
+
+- Backend success criteria met: `CaptureSessionRuntime` owns capture startup choreography, rollback, restore/cancel/end presentation sequencing, and render/output/OCR access; command functions are reduced to input adaptation, runtime/service calls, and error mapping, with non-startup window adapters left in command scope where they are not part of capture session startup rollback.
+- Frontend success criteria met: `ScreenshotSession/index.tsx` no longer directly interprets capture runtime effects, subscribes to host/native events, or reads/writes selection memory; those paths now go through `captureHostRuntime.ts` and related host hooks.
+- Residual risk: `ScreenshotSession/index.tsx` remains a large UI shell with many React state setters and pointer/keyboard handlers, even though workflow choreography and several derived-state seams have been moved out.
+- Residual risk: some helper extraction improves locality and testability rather than fully eliminating all internal coupling; future work should prioritize event-handler state groups only when there is a clear, testable seam.
