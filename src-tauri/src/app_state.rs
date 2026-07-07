@@ -7,6 +7,7 @@ use crate::application::providers::translation::TranslationCoordinator;
 use crate::application::{
     CaptureOutputService, CaptureService, CaptureSessionRuntime, CaptureSessionService,
     HistoryService, ImageCompositionService, PinnedImageService, SelectedTextAcquirer,
+    SettingsConfiguration,
 };
 use crate::infrastructure::events::EventBus;
 use crate::infrastructure::http::HttpClient;
@@ -25,6 +26,7 @@ pub struct ScreenshotState {
 pub struct AppState {
     // Phase 1: Infrastructure
     pub config_file: Arc<ConfigFile>,
+    pub settings_configuration: Arc<SettingsConfiguration>,
     pub keychain: Arc<Keychain>,
     pub http_client: Arc<dyn HttpClient>,
 

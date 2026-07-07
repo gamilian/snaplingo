@@ -1,5 +1,6 @@
 pub mod providers;
 pub mod services;
+pub mod settings;
 
 pub use providers::Provider;
 pub use services::{
@@ -7,3 +8,4 @@ pub use services::{
     HistoryService, HotkeyService, ImageCompositionService, PinnedImageService,
     SelectedTextAcquirer, SelectionScheme,
 };
+pub use settings::SettingsConfiguration;
