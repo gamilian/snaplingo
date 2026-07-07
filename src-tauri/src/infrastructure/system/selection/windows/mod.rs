@@ -12,7 +12,7 @@ impl SelectionContextProvider for PlatformSelectionProvider {
 
 impl SystemSelectionProvider for PlatformSelectionProvider {
     fn default_scheme(&self) -> Vec<SelectionMethodKind> {
-        Vec::new()
+        vec![SelectionMethodKind::ShortcutCopy]
     }
 
     fn methods(&self) -> Vec<Box<dyn SelectionMethod>> {
@@ -25,4 +25,20 @@ pub fn platform_selection_provider(
     _self_bundle_id: Option<String>,
 ) -> PlatformSelectionProvider {
     PlatformSelectionProvider
+}
+
+#[cfg(test)]
+mod selection_registry_tests {
+    use super::*;
+    use crate::infrastructure::system::selection::backend::SystemSelectionProvider;
+
+    #[test]
+    fn default_scheme_prefers_shortcut_copy() {
+        let provider = PlatformSelectionProvider;
+
+        assert_eq!(
+            provider.default_scheme(),
+            vec![SelectionMethodKind::ShortcutCopy]
+        );
+    }
 }

@@ -30,6 +30,36 @@ mod selection_registry_tests {
     };
     use async_trait::async_trait;
 
+    // Pull platform provider modules into the host test binary so seam-order
+    // assertions still run even when cfg(target_os) would normally exclude them.
+    mod linux_provider {
+        pub mod backend {
+            pub use crate::infrastructure::system::selection::backend::*;
+        }
+
+        #[allow(dead_code)]
+        pub mod module {
+            include!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/infrastructure/system/selection/linux/mod.rs"
+            ));
+        }
+    }
+
+    mod windows_provider {
+        pub mod backend {
+            pub use crate::infrastructure::system::selection::backend::*;
+        }
+
+        #[allow(dead_code)]
+        pub mod module {
+            include!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/src/infrastructure/system/selection/windows/mod.rs"
+            ));
+        }
+    }
+
     struct FakeMethod(SelectionMethodKind);
 
     #[async_trait]

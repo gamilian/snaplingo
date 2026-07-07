@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use crate::domain::{
-    MethodAvailability, SelectedTextSnapshot, SelectionContext, SelectionMethodKind,
+    MethodAvailability, SelectedTextSnapshot, SelectionAttemptStatus, SelectionContext,
+    SelectionMethodKind,
 };
 use crate::infrastructure::system::selection::{SelectionContextProvider, SelectionMethodRegistry};
 use crate::{AppError, Result};
@@ -63,11 +64,23 @@ impl SelectedTextAcquirer {
 
             let attempt = method.acquire(&context).await;
             let method_name = format!("{:?}", attempt.method);
+            let diagnostic = match &attempt.status {
+                SelectionAttemptStatus::Success { .. } | SelectionAttemptStatus::Empty => {
+                    format!("{method_name}: no valid text")
+                }
+                SelectionAttemptStatus::Unavailable(reason) => {
+                    format!("{method_name}: unavailable: {reason}")
+                }
+                SelectionAttemptStatus::Failed(reason) => {
+                    format!("{method_name}: failed: {reason}")
+                }
+            };
+
             if let Some(snapshot) = attempt.into_valid_snapshot() {
                 log::info!("Selected text acquired through {method_name}");
                 return Ok(snapshot);
             }
-            diagnostics.push(format!("{method_name}: no valid text"));
+            diagnostics.push(diagnostic);
         }
 
         Err(AppError::System(format!(
@@ -268,6 +281,110 @@ mod selected_text_acquirer_tests {
             *calls.lock().unwrap(),
             vec![
                 SelectionMethodKind::Accessibility,
+                SelectionMethodKind::ShortcutCopy,
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn acquirer_reports_attempted_methods_when_no_text_is_acquired() {
+        let acquirer = SelectedTextAcquirer::new(
+            SelectionScheme::new(vec![
+                SelectionMethodKind::Accessibility,
+                SelectionMethodKind::ShortcutCopy,
+            ]),
+            SelectionMethodRegistry::new(vec![
+                Box::new(FakeMethod {
+                    kind: SelectionMethodKind::Accessibility,
+                    availability: MethodAvailability::Available,
+                    result: SelectionAttemptStatusForTest::Failed("ax failed"),
+                    calls: Arc::new(Mutex::new(Vec::new())),
+                }),
+                Box::new(FakeMethod {
+                    kind: SelectionMethodKind::ShortcutCopy,
+                    availability: MethodAvailability::Available,
+                    result: SelectionAttemptStatusForTest::Empty,
+                    calls: Arc::new(Mutex::new(Vec::new())),
+                }),
+            ]),
+            Arc::new(FakeContextProvider),
+        );
+
+        let err = acquirer
+            .acquire_with_context(SelectionContext::default())
+            .await
+            .unwrap_err();
+
+        let AppError::System(message) = err else {
+            panic!("expected system error");
+        };
+
+        assert!(message.contains("Accessibility: failed: ax failed"));
+        assert!(message.contains("ShortcutCopy: no valid text"));
+    }
+
+    #[tokio::test]
+    async fn acquirer_preserves_existing_macos_method_ordering_assumptions() {
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let acquirer = SelectedTextAcquirer::new(
+            SelectionScheme::new(vec![
+                SelectionMethodKind::SelfWebview,
+                SelectionMethodKind::Accessibility,
+                SelectionMethodKind::BrowserScript,
+                SelectionMethodKind::MenuCopy,
+                SelectionMethodKind::ShortcutCopy,
+            ]),
+            SelectionMethodRegistry::new(vec![
+                Box::new(FakeMethod {
+                    kind: SelectionMethodKind::SelfWebview,
+                    availability: MethodAvailability::Available,
+                    result: SelectionAttemptStatusForTest::Empty,
+                    calls: calls.clone(),
+                }),
+                Box::new(FakeMethod {
+                    kind: SelectionMethodKind::Accessibility,
+                    availability: MethodAvailability::Available,
+                    result: SelectionAttemptStatusForTest::Empty,
+                    calls: calls.clone(),
+                }),
+                Box::new(FakeMethod {
+                    kind: SelectionMethodKind::BrowserScript,
+                    availability: MethodAvailability::Available,
+                    result: SelectionAttemptStatusForTest::Empty,
+                    calls: calls.clone(),
+                }),
+                Box::new(FakeMethod {
+                    kind: SelectionMethodKind::MenuCopy,
+                    availability: MethodAvailability::Available,
+                    result: SelectionAttemptStatusForTest::Empty,
+                    calls: calls.clone(),
+                }),
+                Box::new(FakeMethod {
+                    kind: SelectionMethodKind::ShortcutCopy,
+                    availability: MethodAvailability::Available,
+                    result: SelectionAttemptStatusForTest::Text(
+                        "shortcut text",
+                        SelectionSource::ShortcutCopy,
+                    ),
+                    calls: calls.clone(),
+                }),
+            ]),
+            Arc::new(FakeContextProvider),
+        );
+
+        let snapshot = acquirer
+            .acquire_with_context(SelectionContext::default())
+            .await
+            .unwrap();
+
+        assert_eq!(snapshot.text, "shortcut text");
+        assert_eq!(
+            *calls.lock().unwrap(),
+            vec![
+                SelectionMethodKind::SelfWebview,
+                SelectionMethodKind::Accessibility,
+                SelectionMethodKind::BrowserScript,
+                SelectionMethodKind::MenuCopy,
                 SelectionMethodKind::ShortcutCopy,
             ]
         );
