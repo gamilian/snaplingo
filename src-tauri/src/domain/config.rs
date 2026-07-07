@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct GeneralSettings {
     pub language: String,
     pub theme: String,
@@ -18,6 +19,7 @@ impl Default for GeneralSettings {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct ScreenshotSettings {
     pub save_path: String,
     pub format: String,
@@ -27,7 +29,7 @@ pub struct ScreenshotSettings {
 impl Default for ScreenshotSettings {
     fn default() -> Self {
         Self {
-            save_path: default_screenshot_save_path(),
+            save_path: String::new(),
             format: "png".to_string(),
             quality: 90,
         }
@@ -35,6 +37,7 @@ impl Default for ScreenshotSettings {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct TranslationSettings {
     pub default_source_lang: String,
     pub default_target_lang: String,
@@ -50,17 +53,9 @@ impl Default for TranslationSettings {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(default)]
 pub struct SettingsSnapshot {
     pub general: GeneralSettings,
     pub screenshot: ScreenshotSettings,
     pub translation: TranslationSettings,
-}
-
-fn default_screenshot_save_path() -> String {
-    dirs::picture_dir()
-        .or_else(dirs::home_dir)
-        .unwrap_or_else(std::env::temp_dir)
-        .join("SnapLingo")
-        .to_string_lossy()
-        .into_owned()
 }

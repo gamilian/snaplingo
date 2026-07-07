@@ -1,7 +1,5 @@
 use super::ConfigFile;
-use crate::domain::{
-    GeneralSettings, ScreenshotSettings, SettingsSnapshot, TranslationSettings,
-};
+use crate::domain::{GeneralSettings, ScreenshotSettings, SettingsSnapshot, TranslationSettings};
 use crate::error::{AppError, Result};
 use std::collections::HashSet;
 use tempfile::NamedTempFile;
@@ -26,6 +24,47 @@ fn settings_snapshot_defaults_are_sectioned() {
         TranslationSettings {
             default_source_lang: "auto".to_string(),
             default_target_lang: "zh-CN".to_string(),
+        }
+    );
+}
+
+#[test]
+fn settings_snapshot_loads_partial_sections_with_defaults() {
+    let temp_file = NamedTempFile::new().unwrap();
+    let path = temp_file.path();
+
+    let config_file = ConfigFile::new(path.to_path_buf());
+
+    config_file
+        .save(
+            "settings",
+            &serde_json::json!({
+                "general": {
+                    "theme": "dark"
+                },
+                "translation": {
+                    "default_target_lang": "en"
+                }
+            }),
+        )
+        .unwrap();
+
+    let loaded: SettingsSnapshot = config_file.load("settings").unwrap();
+
+    assert_eq!(
+        loaded.general,
+        GeneralSettings {
+            language: "zh-CN".to_string(),
+            theme: "dark".to_string(),
+            start_on_boot: false,
+        }
+    );
+    assert_eq!(loaded.screenshot, ScreenshotSettings::default());
+    assert_eq!(
+        loaded.translation,
+        TranslationSettings {
+            default_source_lang: "auto".to_string(),
+            default_target_lang: "en".to_string(),
         }
     );
 }
