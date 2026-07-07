@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import type {
   MainTab,
   OcrSubTab,
@@ -12,63 +12,28 @@ interface HotkeyMap {
   [key: string]: string;
 }
 
+type HotkeyCategory = 'screenshot' | 'translation' | 'ocr';
+
 interface SettingsState {
-  // 窗口状态
   activeMainTab: MainTab;
-
-  // 截图子页面
   screenshotSubTab: ScreenshotSubTab;
-
-  // 翻译子页面
   translationSubTab: TranslationSubTab;
-
-  // OCR 子页面
   ocrSubTab: OcrSubTab;
-
-  // 服务子页面
   servicesSubTab: ServicesSubTab;
-
-  // 快捷键配置
   hotkeys: {
     screenshot: HotkeyMap;
     translation: HotkeyMap;
     ocr: HotkeyMap;
   };
 
-  // 通用设置
-  language: string;
-  theme: 'light' | 'dark' | 'system';
-  startOnBoot: boolean;
-
-  // 截图设置
-  screenshotSavePath: string;
-  screenshotFormat: 'png' | 'jpg' | 'webp';
-  screenshotQuality: number;
-  capturedScreenshot: string | null;
-
-  // 翻译设置
-  defaultSourceLang: string;
-  defaultTargetLang: string;
-
-  // Actions
   setActiveMainTab: (tab: MainTab) => void;
   setScreenshotSubTab: (tab: SettingsState['screenshotSubTab']) => void;
   setTranslationSubTab: (tab: SettingsState['translationSubTab']) => void;
   setOcrSubTab: (tab: SettingsState['ocrSubTab']) => void;
   setServicesSubTab: (tab: SettingsState['servicesSubTab']) => void;
-
-  setHotkey: (category: 'screenshot' | 'translation' | 'ocr', key: string, value: string) => void;
-  clearHotkey: (category: 'screenshot' | 'translation' | 'ocr', key: string) => void;
-  resetHotkeys: (category: 'screenshot' | 'translation' | 'ocr') => void;
-
-  setLanguage: (lang: string) => void;
-  setTheme: (theme: SettingsState['theme']) => void;
-  setStartOnBoot: (value: boolean) => void;
-
-  setScreenshotSavePath: (path: string) => void;
-  setScreenshotFormat: (format: SettingsState['screenshotFormat']) => void;
-  setScreenshotQuality: (quality: number) => void;
-  setCapturedScreenshot: (dataUrl: string | null) => void;
+  setHotkey: (category: HotkeyCategory, key: string, value: string) => void;
+  clearHotkey: (category: HotkeyCategory, key: string) => void;
+  resetHotkeys: (category: HotkeyCategory) => void;
 }
 
 // 默认快捷键
@@ -95,31 +60,52 @@ export const DEFAULT_HOTKEYS = {
   },
 };
 
+interface PersistedSettingsState {
+  activeMainTab?: MainTab;
+  screenshotSubTab?: ScreenshotSubTab;
+  translationSubTab?: TranslationSubTab;
+  ocrSubTab?: OcrSubTab;
+  servicesSubTab?: ServicesSubTab;
+  hotkeys?: Partial<Record<HotkeyCategory, HotkeyMap>>;
+}
+
+function mergeHotkeys(
+  category: HotkeyCategory,
+  hotkeys?: Partial<Record<HotkeyCategory, HotkeyMap>>,
+) {
+  return {
+    ...DEFAULT_HOTKEYS[category],
+    ...(hotkeys?.[category] ?? {}),
+  };
+}
+
+function mergePersistedState(state: SettingsState, persistedState: unknown): SettingsState {
+  const persisted = (persistedState ?? {}) as PersistedSettingsState;
+
+  return {
+    ...state,
+    activeMainTab: persisted.activeMainTab ?? state.activeMainTab,
+    screenshotSubTab: persisted.screenshotSubTab ?? state.screenshotSubTab,
+    translationSubTab: persisted.translationSubTab ?? state.translationSubTab,
+    ocrSubTab: persisted.ocrSubTab ?? state.ocrSubTab,
+    servicesSubTab: persisted.servicesSubTab ?? state.servicesSubTab,
+    hotkeys: {
+      screenshot: mergeHotkeys('screenshot', persisted.hotkeys),
+      translation: mergeHotkeys('translation', persisted.hotkeys),
+      ocr: mergeHotkeys('ocr', persisted.hotkeys),
+    },
+  };
+}
+
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      // 初始状态
       activeMainTab: 'screenshot',
       screenshotSubTab: 'hotkeys',
       translationSubTab: 'hotkeys',
       ocrSubTab: 'hotkeys',
       servicesSubTab: 'ocr',
-
       hotkeys: DEFAULT_HOTKEYS,
-
-      language: 'zh-CN',
-      theme: 'system',
-      startOnBoot: false,
-
-      screenshotSavePath: '~/Pictures/SnapLingo',
-      screenshotFormat: 'png',
-      screenshotQuality: 90,
-      capturedScreenshot: null,
-
-      defaultSourceLang: 'auto',
-      defaultTargetLang: 'zh-CN',
-
-      // Actions
       setActiveMainTab: (tab) => set({ activeMainTab: tab }),
       setScreenshotSubTab: (tab) => set({ screenshotSubTab: tab }),
       setTranslationSubTab: (tab) => set({ translationSubTab: tab }),
@@ -155,18 +141,20 @@ export const useSettingsStore = create<SettingsState>()(
             [category]: { ...DEFAULT_HOTKEYS[category] },
           },
         })),
-
-      setLanguage: (lang) => set({ language: lang }),
-      setTheme: (theme) => set({ theme }),
-      setStartOnBoot: (value) => set({ startOnBoot: value }),
-
-      setScreenshotSavePath: (path) => set({ screenshotSavePath: path }),
-      setScreenshotFormat: (format) => set({ screenshotFormat: format }),
-      setScreenshotQuality: (quality) => set({ screenshotQuality: quality }),
-      setCapturedScreenshot: (dataUrl) => set({ capturedScreenshot: dataUrl }),
     }),
     {
       name: 'snaplingo-settings',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        activeMainTab: state.activeMainTab,
+        screenshotSubTab: state.screenshotSubTab,
+        translationSubTab: state.translationSubTab,
+        ocrSubTab: state.ocrSubTab,
+        servicesSubTab: state.servicesSubTab,
+        hotkeys: state.hotkeys,
+      }),
+      merge: (persistedState, currentState) =>
+        mergePersistedState(currentState, persistedState),
     }
   )
 );
