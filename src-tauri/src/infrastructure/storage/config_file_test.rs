@@ -1,35 +1,64 @@
 use super::ConfigFile;
-use crate::domain::AppConfig;
+use crate::domain::{
+    GeneralSettings, ScreenshotSettings, SettingsSnapshot, TranslationSettings,
+};
 use crate::error::{AppError, Result};
 use std::collections::HashSet;
 use tempfile::NamedTempFile;
 
 #[test]
-fn test_save_and_load() {
+fn settings_snapshot_defaults_are_sectioned() {
+    let snapshot = SettingsSnapshot::default();
+
+    assert_eq!(
+        snapshot.general,
+        GeneralSettings {
+            language: "zh-CN".to_string(),
+            theme: "system".to_string(),
+            start_on_boot: false,
+        }
+    );
+    assert_eq!(snapshot.screenshot.format, "png");
+    assert_eq!(snapshot.screenshot.quality, 90);
+    assert_ne!(snapshot.screenshot.save_path, "~/Pictures/SnapLingo");
+    assert_eq!(
+        snapshot.translation,
+        TranslationSettings {
+            default_source_lang: "auto".to_string(),
+            default_target_lang: "zh-CN".to_string(),
+        }
+    );
+}
+
+#[test]
+fn settings_snapshot_round_trips_through_config_file() {
     let temp_file = NamedTempFile::new().unwrap();
     let path = temp_file.path();
 
     let config_file = ConfigFile::new(path.to_path_buf());
 
-    // Save a config
-    let config = AppConfig {
-        translation_provider: "google-translate".to_string(),
-        source_language: "en".to_string(),
-        target_language: "es".to_string(),
-        hotkey: Some("Cmd+Shift+T".to_string()),
-        auto_copy: false,
+    let snapshot = SettingsSnapshot {
+        general: GeneralSettings {
+            language: "en".to_string(),
+            theme: "dark".to_string(),
+            start_on_boot: true,
+        },
+        screenshot: ScreenshotSettings {
+            save_path: "/tmp/snaps".to_string(),
+            format: "jpg".to_string(),
+            quality: 80,
+        },
+        translation: TranslationSettings {
+            default_source_lang: "ja".to_string(),
+            default_target_lang: "en".to_string(),
+        },
     };
 
-    config_file.save("app_config", &config).unwrap();
+    config_file.save("settings", &snapshot).unwrap();
 
-    // Load it back
-    let loaded: AppConfig = config_file.load("app_config").unwrap();
+    let loaded: SettingsSnapshot = config_file.load("settings").unwrap();
 
-    assert_eq!(loaded.translation_provider, "google-translate");
-    assert_eq!(loaded.source_language, "en");
-    assert_eq!(loaded.target_language, "es");
-    assert_eq!(loaded.hotkey, Some("Cmd+Shift+T".to_string()));
-    assert_eq!(loaded.auto_copy, false);
+    assert_eq!(loaded, snapshot);
 }
 
 #[test]
@@ -39,7 +68,7 @@ fn test_load_nonexistent_key() {
 
     let config_file = ConfigFile::new(path.to_path_buf());
 
-    let result: Result<AppConfig> = config_file.load("nonexistent");
+    let result: Result<SettingsSnapshot> = config_file.load("nonexistent");
 
     assert!(result.is_err());
     match result {
@@ -57,34 +86,49 @@ fn test_save_multiple_keys() {
 
     let config_file = ConfigFile::new(path.to_path_buf());
 
-    // Save first config
-    let config1 = AppConfig {
-        translation_provider: "google-translate".to_string(),
-        source_language: "en".to_string(),
-        target_language: "es".to_string(),
-        hotkey: Some("Cmd+Shift+T".to_string()),
-        auto_copy: false,
+    let config1 = SettingsSnapshot {
+        general: GeneralSettings {
+            language: "en".to_string(),
+            theme: "light".to_string(),
+            start_on_boot: false,
+        },
+        screenshot: ScreenshotSettings {
+            save_path: "/tmp/config1".to_string(),
+            format: "png".to_string(),
+            quality: 90,
+        },
+        translation: TranslationSettings {
+            default_source_lang: "auto".to_string(),
+            default_target_lang: "es".to_string(),
+        },
     };
     config_file.save("config1", &config1).unwrap();
 
-    // Save second config
-    let config2 = AppConfig {
-        translation_provider: "deepl".to_string(),
-        source_language: "ja".to_string(),
-        target_language: "en".to_string(),
-        hotkey: Some("Cmd+Shift+D".to_string()),
-        auto_copy: true,
+    let config2 = SettingsSnapshot {
+        general: GeneralSettings {
+            language: "ja".to_string(),
+            theme: "system".to_string(),
+            start_on_boot: true,
+        },
+        screenshot: ScreenshotSettings {
+            save_path: "/tmp/config2".to_string(),
+            format: "webp".to_string(),
+            quality: 75,
+        },
+        translation: TranslationSettings {
+            default_source_lang: "ja".to_string(),
+            default_target_lang: "en".to_string(),
+        },
     };
     config_file.save("config2", &config2).unwrap();
 
-    // Load both back
-    let loaded1: AppConfig = config_file.load("config1").unwrap();
-    let loaded2: AppConfig = config_file.load("config2").unwrap();
+    let loaded1: SettingsSnapshot = config_file.load("config1").unwrap();
+    let loaded2: SettingsSnapshot = config_file.load("config2").unwrap();
 
-    assert_eq!(loaded1.source_language, "en");
-    assert_eq!(loaded2.source_language, "ja");
-    assert_eq!(loaded1.translation_provider, "google-translate");
-    assert_eq!(loaded2.translation_provider, "deepl");
+    assert_eq!(loaded1.general.language, "en");
+    assert_eq!(loaded2.general.language, "ja");
+    assert_eq!(loaded1.screenshot.format, "png");
+    assert_eq!(loaded2.screenshot.format, "webp");
 }
 
 #[test]

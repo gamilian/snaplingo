@@ -1,23 +1,66 @@
 use serde::{Deserialize, Serialize};
 
-/// Application configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppConfig {
-    pub translation_provider: String,
-    pub source_language: String,
-    pub target_language: String,
-    pub hotkey: Option<String>,
-    pub auto_copy: bool,
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct GeneralSettings {
+    pub language: String,
+    pub theme: String,
+    pub start_on_boot: bool,
 }
 
-impl Default for AppConfig {
+impl Default for GeneralSettings {
     fn default() -> Self {
         Self {
-            translation_provider: "google".to_string(),
-            source_language: "auto".to_string(),
-            target_language: "en".to_string(),
-            hotkey: None,
-            auto_copy: false,
+            language: "zh-CN".to_string(),
+            theme: "system".to_string(),
+            start_on_boot: false,
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ScreenshotSettings {
+    pub save_path: String,
+    pub format: String,
+    pub quality: u8,
+}
+
+impl Default for ScreenshotSettings {
+    fn default() -> Self {
+        Self {
+            save_path: default_screenshot_save_path(),
+            format: "png".to_string(),
+            quality: 90,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TranslationSettings {
+    pub default_source_lang: String,
+    pub default_target_lang: String,
+}
+
+impl Default for TranslationSettings {
+    fn default() -> Self {
+        Self {
+            default_source_lang: "auto".to_string(),
+            default_target_lang: "zh-CN".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct SettingsSnapshot {
+    pub general: GeneralSettings,
+    pub screenshot: ScreenshotSettings,
+    pub translation: TranslationSettings,
+}
+
+fn default_screenshot_save_path() -> String {
+    dirs::picture_dir()
+        .or_else(dirs::home_dir)
+        .unwrap_or_else(std::env::temp_dir)
+        .join("SnapLingo")
+        .to_string_lossy()
+        .into_owned()
 }
