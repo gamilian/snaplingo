@@ -27,6 +27,7 @@ import {
   getCurrentAppWindow,
 } from '../../tauri/window';
 import { runOcrFileWorkflow } from './ocrFileWorkflow';
+import { closeResultWindowForPresentation } from './resultWindowClose';
 import { getTranslationProviderDisplayName } from './translationProviderDisplayName';
 import IconActionButton from './IconActionButton';
 import ResultWindowScrollArea from './ResultWindowScrollArea';
@@ -350,16 +351,24 @@ export default function ResultWindow({
     );
   }, [providerTranslations.length, resultWindowMode, resultWindowVisible]);
 
+  const closeResultWindow = useCallback(() => {
+    closeResultWindowForPresentation({
+      presentation,
+      hideResultWindow,
+      hideNativeWindow: () => getCurrentAppWindow().hide(),
+    });
+  }, [hideResultWindow, presentation]);
+
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (shouldCloseFromEscapeKey(e.key) && resultWindowVisible) {
-        hideResultWindow();
+        closeResultWindow();
       }
     };
 
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [resultWindowVisible, hideResultWindow]);
+  }, [closeResultWindow, resultWindowVisible]);
 
   useEffect(() => {
     if (!resultWindowVisible || !shouldCloseFromWindowBlur(presentation, isResultWindowPinned)) return;
@@ -373,13 +382,13 @@ export default function ResultWindow({
           performance.now() - visibleStartedAtMs,
         )
       ) {
-        hideResultWindow();
+        closeResultWindow();
       }
     };
 
     window.addEventListener('blur', handleBlur);
     return () => window.removeEventListener('blur', handleBlur);
-  }, [hideResultWindow, isResultWindowPinned, presentation, resultWindowVisible]);
+  }, [closeResultWindow, isResultWindowPinned, presentation, resultWindowVisible]);
 
   useEffect(() => {
     if (resultWindowVisible) return;
@@ -516,7 +525,7 @@ export default function ResultWindow({
         isResultWindowPinned,
       )
     ) {
-      hideResultWindow();
+      closeResultWindow();
     }
   };
 
@@ -612,7 +621,7 @@ export default function ResultWindow({
           isPinned={isResultWindowPinned}
           onTogglePinned={() => setResultWindowPinned((isPinned) => !isPinned)}
           onStartDrag={presentation === 'standalone' ? handleStartDrag : undefined}
-          onClose={hideResultWindow}
+          onClose={closeResultWindow}
         />
 
         {isOcrMode ? (

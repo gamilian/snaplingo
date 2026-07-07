@@ -149,6 +149,10 @@ pub(crate) fn dispatch_menu_action(app: tauri::AppHandle, action: MenuAction) {
     }
 }
 
+pub(crate) fn should_prevent_implicit_exit(exit_code: Option<i32>) -> bool {
+    exit_code.is_none()
+}
+
 #[cfg(target_os = "macos")]
 fn menu_bar_resting_activation_policy() -> tauri::ActivationPolicy {
     tauri::ActivationPolicy::Accessory
@@ -176,6 +180,16 @@ mod tests {
             menu_bar_resting_activation_policy(),
             tauri::ActivationPolicy::Accessory
         ));
+    }
+
+    #[test]
+    fn menu_bar_shell_stays_alive_when_last_window_is_destroyed() {
+        assert!(should_prevent_implicit_exit(None));
+    }
+
+    #[test]
+    fn menu_bar_shell_allows_explicit_quit() {
+        assert!(!should_prevent_implicit_exit(Some(0)));
     }
 
     #[test]

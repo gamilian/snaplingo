@@ -436,6 +436,7 @@ describe('result window presentation', () => {
 
   it('closes result windows from Escape but not other keys', () => {
     expect(shouldCloseFromEscapeKey('Escape')).toBe(true);
+    expect(shouldCloseFromEscapeKey('Esc')).toBe(true);
     expect(shouldCloseFromEscapeKey('Enter')).toBe(false);
   });
 });

@@ -454,5 +454,5 @@ export function shouldCloseFromWindowBlur(
 }
 
 export function shouldCloseFromEscapeKey(key: string) {
-  return key === 'Escape';
+  return key === 'Escape' || key === 'Esc';
 }
