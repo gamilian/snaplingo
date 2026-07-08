@@ -21,14 +21,22 @@ use std::collections::HashMap;
 
 /// Platform-adaptive keychain wrapper
 pub struct Keychain {
-    backend: PlatformKeychainImpl,
+    backend: Box<dyn KeychainBackend>,
 }
 
 impl Keychain {
-    /// Create a new keychain instance
+    /// Create a new keychain instance with the platform backend
     pub fn new() -> Self {
         Self {
-            backend: PlatformKeychainImpl::new(),
+            backend: Box::new(PlatformKeychainImpl::new()),
+        }
+    }
+
+    /// Create a keychain with a custom backend (tests only)
+    #[cfg(test)]
+    pub fn with_backend(backend: impl KeychainBackend + 'static) -> Self {
+        Self {
+            backend: Box::new(backend),
         }
     }
 
@@ -121,5 +129,62 @@ impl Keychain {
 impl Default for Keychain {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// In-memory backend used to exercise the trait-object wiring and Keychain
+    /// public API without touching the real platform keychain.
+    struct StubKeychainBackend {
+        store: std::sync::Mutex<std::collections::HashMap<String, String>>,
+    }
+
+    impl StubKeychainBackend {
+        fn new() -> Self {
+            Self {
+                store: std::sync::Mutex::new(std::collections::HashMap::new()),
+            }
+        }
+    }
+
+    impl KeychainBackend for StubKeychainBackend {
+        fn save(&self, key: &str, value: &str) -> Result<()> {
+            self.store
+                .lock()
+                .unwrap()
+                .insert(key.to_string(), value.to_string());
+            Ok(())
+        }
+
+        fn load(&self, key: &str) -> Result<String> {
+            self.store
+                .lock()
+                .unwrap()
+                .get(key)
+                .cloned()
+                .ok_or_else(|| crate::AppError::Other(format!("Keychain: not found: {}", key)))
+        }
+
+        fn delete(&self, key: &str) -> Result<()> {
+            self.store.lock().unwrap().remove(key);
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn keychain_with_backend_round_trips_provider_credential() {
+        let keychain = Keychain::with_backend(StubKeychainBackend::new());
+
+        keychain.save_provider_credential("custom-llm-1", "secret-key").unwrap();
+        assert_eq!(
+            keychain.load_provider_credential("custom-llm-1").unwrap(),
+            "secret-key"
+        );
+
+        keychain.delete_provider_credential("custom-llm-1").unwrap();
+        assert!(keychain.load_provider_credential("custom-llm-1").is_err());
     }
 }

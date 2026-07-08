@@ -1,7 +1,7 @@
 use crate::error::Result;
 
 /// Platform-agnostic keychain backend trait
-pub trait KeychainBackend {
+pub trait KeychainBackend: Send + Sync {
     /// Save a secret with the given key
     fn save(&self, key: &str, value: &str) -> Result<()>;
 
