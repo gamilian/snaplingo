@@ -3,6 +3,7 @@ import { useSettingsConfigStore } from '../../stores/settingsConfigStore';
 import { writeClipboardText } from '../../tauri/clipboard';
 import { getCurrentAppWebviewWindow } from '../../tauri/window';
 import {
+  cancelCaptureSession,
   createCaptureSession,
   currentCaptureCursorPosition,
   getCaptureSession,
@@ -46,7 +47,6 @@ import {
 } from './textAnnotationDraft';
 import {
   canToggleCapturedCursor,
-  type CaptureCompletionAction,
   type HoverSelectionCompletionAction,
   type PreviewCaptureCompletionAction,
   getCaptureKeyboardToolbarAction,
@@ -76,21 +76,16 @@ import {
 } from './captureInteractionRuntime';
 import {
   prepareCaptureSurfaceForReveal as prepareHostCaptureSurfaceForReveal,
-  ensureCaptureHostSnapshotsHydrated,
-  recordSuccessfulCaptureSelection as recordHostSuccessfulCaptureSelection,
   restoreCaptureSelectionFromHistory as restoreSelectionFromHostHistory,
   restoreLastSuccessfulCaptureSelection,
-  loadCaptureHostSession,
-  runCaptureHostCompletionFlow,
-  runCaptureHostPreviewRender,
-  runCaptureHostSessionRefresh,
-  runCaptureHostSessionStart,
   runCaptureHostTransitionEffects,
-  runCaptureCompletionAction as runHostCaptureCompletionAction,
-  runCaptureRuntimeEffects as runHostCaptureRuntimeEffects,
+  type CaptureHostSessionStartPerfState,
   type CaptureHostSnapshotHydration,
-  type LoadedCaptureHostSession,
 } from './captureHostRuntime';
+import {
+  createCaptureWorkspaceHostActions,
+  type CaptureWorkspaceHostAdapter,
+} from './captureWorkspaceHost';
 import {
   useCaptureHostSubscriptions,
   useCaptureHostWindowReveal,
@@ -143,11 +138,6 @@ import {
   shouldSyncHoverSelectionOnPointerMove,
 } from './capturePointerInteractionRuntime';
 import {
-  cancelCaptureSessionFlow,
-  closeInactiveCaptureSession,
-  finishCaptureSession,
-} from './captureSessionLifecycle';
-import {
   shouldPollCaptureHoverSelection,
   startCaptureHoverSelectionPolling,
 } from './captureHoverPolling';
@@ -177,6 +167,10 @@ import {
   useCaptureMagnifierPixelSource,
 } from './captureMagnifierRuntime';
 import {
+  resetCaptureInteractionStatePatch,
+  type CaptureWorkspaceState,
+} from './captureWorkspaceState';
+import {
   getCurrentMonitorBounds,
   getVirtualDesktopBounds,
   viewportPointToVirtualPoint,
@@ -194,13 +188,6 @@ import type {
 } from './types';
 
 const captureWindow = getCurrentAppWebviewWindow();
-
-type CaptureFrontendPerfState = {
-  mode: CaptureMode;
-  sessionId: string | null;
-  startMs: number;
-  hasLoggedImagesReady: boolean;
-};
 
 const MIN_SELECTION_SIZE = 10;
 const EDGE_SNAP_THRESHOLD = 6;
@@ -249,7 +236,8 @@ export default function ScreenshotSession({
     useRef<CaptureHostSnapshotHydration | null>(null);
   const isCompletingCaptureRef = useRef(false);
   const hasRevealedCaptureWindowRef = useRef(false);
-  const captureFrontendPerfRef = useRef<CaptureFrontendPerfState | null>(null);
+  const captureFrontendPerfRef =
+    useRef<CaptureHostSessionStartPerfState | null>(null);
   const isRenderingOutputRef = useRef(false);
   const handleRenderingOutputChange = useCallback((nextIsRendering: boolean) => {
     isRenderingOutputRef.current = nextIsRendering;
@@ -258,9 +246,7 @@ export default function ScreenshotSession({
     status,
     setStatus,
     mode,
-    setMode,
     session,
-    setSession,
     startPoint,
     setStartPoint,
     cursorPoint,
@@ -309,6 +295,8 @@ export default function ScreenshotSession({
     setIncludeCapturedCursor,
     error,
     setError,
+    refs,
+    applyPatch,
     startPointRef,
     cursorPointRef,
     draftSelectionRef,
@@ -317,7 +305,6 @@ export default function ScreenshotSession({
     syncHoverSelection: syncWorkspaceHoverSelection,
     resetInteraction,
     resetSession,
-    applyLoadedSession,
     resetPreview,
   } = useCaptureWorkspaceState({
     onRenderingOutputChange: handleRenderingOutputChange,
@@ -326,10 +313,81 @@ export default function ScreenshotSession({
   const [hydratedCaptureSessionId, setHydratedCaptureSessionId] =
     useState<string | null>(null);
 
+  const captureWorkspaceState: CaptureWorkspaceState = {
+    status,
+    mode,
+    session,
+    startPoint,
+    cursorPoint,
+    selection,
+    hoverSelection,
+    editGesture,
+    activeAnnotationTool,
+    annotationGesture,
+    draftAnnotation,
+    selectedAnnotationIndex,
+    annotationMoveGesture,
+    draftSelectionMoveGesture,
+    textDraft,
+    textDraftAnnotationIndex,
+    annotationStyle,
+    textFontSize,
+    annotationHistory,
+    previewImageBase64,
+    isAnnotationToolbarVisible,
+    cursorColor,
+    colorSampleFormat,
+    isMagnifierRequested,
+    isRenderingOutput,
+    includeCapturedCursor,
+    error,
+  };
+  const captureWorkspaceStateRef =
+    useRef<CaptureWorkspaceState>(captureWorkspaceState);
+  captureWorkspaceStateRef.current = captureWorkspaceState;
+  const getCurrentCaptureWorkspaceState = useCallback(
+    () => captureWorkspaceStateRef.current,
+    [],
+  );
+  const workspaceHostAdapter = useMemo<CaptureWorkspaceHostAdapter>(
+    () => ({
+      getState: getCurrentCaptureWorkspaceState,
+      patch: (next) => {
+        captureWorkspaceStateRef.current = {
+          ...captureWorkspaceStateRef.current,
+          ...next,
+        };
+        applyPatch(next);
+      },
+      resetInteraction: () => {
+        captureWorkspaceStateRef.current = {
+          ...captureWorkspaceStateRef.current,
+          ...resetCaptureInteractionStatePatch(),
+        };
+        resetInteraction();
+      },
+      resetSession: () => {
+        captureWorkspaceStateRef.current = {
+          ...captureWorkspaceStateRef.current,
+          status: 'idle',
+          session: null,
+          ...resetCaptureInteractionStatePatch(),
+        };
+        resetSession();
+      },
+      refs,
+    }),
+    [
+      applyPatch,
+      getCurrentCaptureWorkspaceState,
+      refs,
+      resetInteraction,
+      resetSession,
+    ],
+  );
+
   const isActive = status !== 'idle';
   const annotations = annotationHistory.annotations;
-  const shouldIncludeCapturedCursor =
-    includeCapturedCursor && canToggleCapturedCursor(session);
   const selectedAnnotation =
     selectedAnnotationIndex === null ? null : annotations[selectedAnnotationIndex] ?? null;
   const hasAnnotationEditingContext =
@@ -499,235 +557,6 @@ export default function ScreenshotSession({
     setHydratedCaptureSessionId(null);
   }, []);
 
-  const resetCaptureInteractionState = useCallback(() => {
-    resetInteraction();
-    resetSelectionOverlay();
-    isCompletingCaptureRef.current = false;
-    resetCaptureImageReadiness();
-  }, [resetCaptureImageReadiness, resetInteraction, resetSelectionOverlay]);
-
-  const resetSessionState = useCallback(() => {
-    resetSession();
-    resetSelectionOverlay();
-    isCompletingCaptureRef.current = false;
-    resetCaptureImageReadiness();
-  }, [resetCaptureImageReadiness, resetSelectionOverlay, resetSession]);
-
-  const applyLoadedCaptureHostSession = useCallback(
-    (loaded: LoadedCaptureHostSession) => {
-      applyLoadedSession(loaded);
-    },
-    [applyLoadedSession],
-  );
-
-  const markCaptureFrontendPerf = useCallback(
-    (event: string, sessionId?: string | null) => {
-      const perf = captureFrontendPerfRef.current;
-      if (!perf) return;
-
-      void logCaptureFrontendPerf({
-        event,
-        mode: perf.mode,
-        sessionId: sessionId ?? perf.sessionId,
-        elapsedMs: performance.now() - perf.startMs,
-      }).catch(() => undefined);
-    },
-    [],
-  );
-
-  const ensureCaptureSnapshotsHydrated = useCallback((sessionId: string) => {
-    return ensureCaptureHostSnapshotsHydrated({
-      sessionId,
-      getCurrentHydration: () => captureSnapshotHydrationRef.current,
-      setCurrentHydration: (hydration) => {
-        captureSnapshotHydrationRef.current = hydration;
-      },
-      hydrateSnapshots: hydrateCaptureSessionSnapshots,
-      clearHydratedSession: () => setHydratedCaptureSessionId(null),
-      applyHydratedSession: (hydratedSessionId, hydratedSession) => {
-        setSession((currentSession) =>
-          currentSession?.id === hydratedSessionId
-            ? hydratedSession
-            : currentSession,
-        );
-      },
-      markHydratedSession: setHydratedCaptureSessionId,
-      markSnapshotsHydrated: (hydratedSessionId) =>
-        markCaptureFrontendPerf('snapshots_hydrated', hydratedSessionId),
-    });
-  }, [markCaptureFrontendPerf]);
-
-  const finishCurrentCaptureSession = useCallback(
-    async (sessionId: string) => {
-      await finishCaptureSession({
-        sessionId,
-        onInactive,
-        resetSessionState,
-      });
-    },
-    [onInactive, resetSessionState],
-  );
-
-  const cancelSession = useCallback(async () => {
-    await cancelCaptureSessionFlow({
-      sessionId: session?.id,
-      isCancelling: () => isCancellingSessionRef.current,
-      setCancelling: (isCancelling) => {
-        isCancellingSessionRef.current = isCancelling;
-      },
-      finishSession: finishCurrentCaptureSession,
-      closeInactiveSession: () =>
-        closeInactiveCaptureSession({ onInactive, resetSessionState }),
-      onError: (err) => {
-        setError(err instanceof Error ? err.message : String(err));
-        setStatus('error');
-      },
-    });
-  }, [finishCurrentCaptureSession, onInactive, resetSessionState, session?.id]);
-
-  const startSession = useCallback(async (nextMode: CaptureMode, sessionId?: string) => {
-    await runCaptureHostSessionStart({
-      mode: nextMode,
-      sessionId,
-      now: () => performance.now(),
-      setCancelling: (isCancelling) => {
-        isCancellingSessionRef.current = isCancelling;
-      },
-      setRevealed: (hasRevealed) => {
-        hasRevealedCaptureWindowRef.current = hasRevealed;
-      },
-      showLoading: (mode) => {
-        setStatus('loading');
-        setMode(mode);
-      },
-      resetInteractionState: resetCaptureInteractionState,
-      setPerfState: (state) => {
-        captureFrontendPerfRef.current = state;
-      },
-      setLoadedPerfSessionId: (loadedSessionId) => {
-        if (captureFrontendPerfRef.current) {
-          captureFrontendPerfRef.current.sessionId = loadedSessionId;
-        }
-      },
-      markPerf: markCaptureFrontendPerf,
-      loadSession: () =>
-        loadCaptureHostSession({
-          loadSession: () =>
-            sessionId ? getCaptureSession(sessionId) : createCaptureSession(),
-          getCurrentCursorPosition: currentCaptureCursorPosition,
-        }),
-      applyLoadedSession: applyLoadedCaptureHostSession,
-      onError: (err) => {
-        setError(err instanceof Error ? err.message : String(err));
-        setStatus('error');
-      },
-    });
-  }, [
-    applyLoadedCaptureHostSession,
-    markCaptureFrontendPerf,
-    resetCaptureInteractionState,
-  ]);
-
-  const recordSuccessfulSelection = useCallback(
-    (
-      action: CaptureCompletionAction,
-      rect: LogicalRect,
-    ) => {
-      try {
-        recordHostSuccessfulCaptureSelection(window.localStorage, action, rect);
-      } catch (err) {
-        console.warn('Failed to remember capture selection:', err);
-      }
-    },
-    [],
-  );
-
-  const runCaptureRuntimeEffects = useCallback(
-    async (
-      effects: CaptureRuntimeEffect[],
-      rect: LogicalRect,
-      nextAnnotations: AnnotationCommand[] = [],
-    ) => {
-      if (!session) return;
-
-      await runHostCaptureRuntimeEffects(effects, {
-        sessionId: session.id,
-        rect,
-        annotations: nextAnnotations,
-        includeCursor: shouldIncludeCapturedCursor,
-        screenshotSavePath,
-        recordSuccessfulSelection,
-        finishCaptureSession: finishCurrentCaptureSession,
-      });
-    },
-    [
-      finishCurrentCaptureSession,
-      recordSuccessfulSelection,
-      runHostCaptureRuntimeEffects,
-      screenshotSavePath,
-      session,
-      shouldIncludeCapturedCursor,
-    ],
-  );
-
-  const runCaptureCompletionAction = useCallback(
-    async (
-      action: CaptureCompletionAction,
-      rect: LogicalRect,
-      nextAnnotations: AnnotationCommand[] = [],
-    ) => {
-      if (!session) return;
-
-      await runHostCaptureCompletionAction(action, {
-        sessionId: session.id,
-        rect,
-        annotations: nextAnnotations,
-        includeCursor: shouldIncludeCapturedCursor,
-        screenshotSavePath,
-        recordSuccessfulSelection,
-        finishCaptureSession: finishCurrentCaptureSession,
-      });
-    },
-    [
-      finishCurrentCaptureSession,
-      recordSuccessfulSelection,
-      runHostCaptureCompletionAction,
-      screenshotSavePath,
-      session,
-      shouldIncludeCapturedCursor,
-    ],
-  );
-
-  const renderSelectionPreview = useCallback(
-    async (
-      rect: LogicalRect,
-      nextAnnotations: AnnotationCommand[] = annotations,
-      includeCursor = shouldIncludeCapturedCursor,
-    ) => {
-      if (!session) return;
-
-      await runCaptureHostPreviewRender({
-        sessionId: session.id,
-        rect,
-        annotations: nextAnnotations,
-        includeCursor,
-        setRendering: setRenderingOutput,
-        clearPreview: () => setPreviewImageBase64(null),
-        clearError: () => setError(null),
-        setPreviewImage: setPreviewImageBase64,
-        onError: (err) => {
-          setError(err instanceof Error ? err.message : String(err));
-          setStatus('error');
-        },
-      });
-    },
-    [
-      annotations,
-      session,
-      shouldIncludeCapturedCursor,
-    ],
-  );
-
   const commitTextDraftToHistory = useCallback(() => {
     const commitResult = commitCaptureEditorTextDraft({
       annotationHistory,
@@ -755,50 +584,143 @@ export default function ScreenshotSession({
     textDraftAnnotationIndex,
   ]);
 
+  const markCaptureFrontendPerf = useCallback(
+    (event: string, sessionId?: string | null) => {
+      const perf = captureFrontendPerfRef.current;
+      if (!perf) return;
+
+      void logCaptureFrontendPerf({
+        event,
+        mode: perf.mode,
+        sessionId: sessionId ?? perf.sessionId,
+        elapsedMs: performance.now() - perf.startMs,
+      }).catch(() => undefined);
+    },
+    [],
+  );
+
+  const captureHostActions = useMemo(
+    () =>
+      createCaptureWorkspaceHostActions({
+        workspace: workspaceHostAdapter,
+        getScreenshotSavePath: () => screenshotSavePath,
+        getOnInactive: () => onInactive,
+        getSelection: () => workspaceHostAdapter.getState().selection,
+        getAnnotations: () =>
+          workspaceHostAdapter.getState().annotationHistory.annotations,
+        getShouldIncludeCapturedCursor: () => {
+          const currentState = workspaceHostAdapter.getState();
+          return (
+            currentState.includeCapturedCursor &&
+            canToggleCapturedCursor(currentState.session)
+          );
+        },
+        commitTextDraftToHistory,
+        isCompletingCapture: () => isCompletingCaptureRef.current,
+        setCompletingCapture: (isCompleting) => {
+          isCompletingCaptureRef.current = isCompleting;
+        },
+        isCancellingSession: () => isCancellingSessionRef.current,
+        setCancellingSession: (isCancelling) => {
+          isCancellingSessionRef.current = isCancelling;
+        },
+        setRevealed: (hasRevealed) => {
+          hasRevealedCaptureWindowRef.current = hasRevealed;
+        },
+        now: () => performance.now(),
+        getPerfState: () => captureFrontendPerfRef.current,
+        setPerfState: (state) => {
+          captureFrontendPerfRef.current = state;
+        },
+        markPerf: markCaptureFrontendPerf,
+        storage: window.localStorage,
+        logWarning: (message, err) => {
+          console.warn(message, err);
+        },
+        getSnapshotHydration: () => captureSnapshotHydrationRef.current,
+        setSnapshotHydration: (hydration) => {
+          captureSnapshotHydrationRef.current = hydration;
+        },
+        clearHydratedSession: () => setHydratedCaptureSessionId(null),
+        markHydratedSession: setHydratedCaptureSessionId,
+        resetSelectionOverlay,
+        resetCaptureImageReadiness,
+        clients: {
+          createCaptureSession,
+          getCaptureSession,
+          refreshCaptureSession,
+          currentCaptureCursorPosition,
+          hydrateCaptureSessionSnapshots,
+          cancelCaptureSession,
+        },
+      }),
+    [
+      commitTextDraftToHistory,
+      markCaptureFrontendPerf,
+      onInactive,
+      resetCaptureImageReadiness,
+      resetSelectionOverlay,
+      screenshotSavePath,
+      workspaceHostAdapter,
+    ],
+  );
+
+  const ensureCaptureSnapshotsHydrated = useCallback(
+    (sessionId: string) =>
+      captureHostActions.ensureCaptureSnapshotsHydrated(sessionId),
+    [captureHostActions],
+  );
+
+  const startSession = useCallback(
+    async (nextMode: CaptureMode, sessionId?: string) => {
+      await captureHostActions.startSession(nextMode, sessionId);
+    },
+    [captureHostActions],
+  );
+
+  const cancelSession = useCallback(async () => {
+    await captureHostActions.cancelSession();
+  }, [captureHostActions]);
+
+  const runCaptureRuntimeEffects = useCallback(
+    async (
+      effects: CaptureRuntimeEffect[],
+      rect: LogicalRect,
+      nextAnnotations: AnnotationCommand[] = [],
+    ) => {
+      await captureHostActions.runCaptureRuntimeEffects(
+        effects,
+        rect,
+        nextAnnotations,
+      );
+    },
+    [captureHostActions],
+  );
+
+  const renderSelectionPreview = useCallback(
+    async (
+      rect: LogicalRect,
+      nextAnnotations?: AnnotationCommand[],
+      includeCursor?: boolean,
+    ) => {
+      await captureHostActions.renderSelectionPreview(
+        rect,
+        nextAnnotations,
+        includeCursor,
+      );
+    },
+    [captureHostActions],
+  );
+
   const completePreviewSelection = useCallback(async (
     action: PreviewCaptureCompletionAction,
-    {
-      commitTextDraft = true,
-      guardCompletion = false,
-    }: {
+    options: {
       commitTextDraft?: boolean;
       guardCompletion?: boolean;
     } = {},
   ) => {
-    if (!session || !selection) return;
-
-    await runCaptureHostCompletionFlow({
-      guardCompletion,
-      isCompleting: () => isCompletingCaptureRef.current,
-      setCompleting: (isCompleting) => {
-        isCompletingCaptureRef.current = isCompleting;
-      },
-      setRendering: setRenderingOutput,
-      clearError: () => setError(null),
-      runCompletion: async () => {
-        if (commitTextDraft) {
-          const outputHistory = commitTextDraftToHistory();
-          await runCaptureCompletionAction(
-            action,
-            selection,
-            outputHistory.annotations,
-          );
-          return;
-        }
-
-        await runCaptureCompletionAction(action, selection);
-      },
-      onError: (err) => {
-        setError(err instanceof Error ? err.message : String(err));
-        setStatus('error');
-      },
-    });
-  }, [
-    commitTextDraftToHistory,
-    runCaptureCompletionAction,
-    selection,
-    session,
-  ]);
+    await captureHostActions.completePreviewSelection(action, options);
+  }, [captureHostActions]);
 
   const copySelection = useCallback(
     () => completePreviewSelection('copy', { guardCompletion: true }),
@@ -809,26 +731,8 @@ export default function ScreenshotSession({
     rect: LogicalRect,
     action: HoverSelectionCompletionAction,
   ) => {
-    if (!session) return;
-
-    await runCaptureHostCompletionFlow({
-      guardCompletion: true,
-      isCompleting: () => isCompletingCaptureRef.current,
-      setCompleting: (isCompleting) => {
-        isCompletingCaptureRef.current = isCompleting;
-      },
-      setRendering: setRenderingOutput,
-      clearError: () => setError(null),
-      runCompletion: () => runCaptureCompletionAction(action, rect),
-      onError: (err) => {
-        setError(err instanceof Error ? err.message : String(err));
-        setStatus('error');
-      },
-    });
-  }, [
-    runCaptureCompletionAction,
-    session,
-  ]);
+    await captureHostActions.completeCandidateSelection(rect, action);
+  }, [captureHostActions]);
 
   const handleNativeCopyRequest = useCallback(() => {
     if (status === 'preview') {
@@ -889,29 +793,8 @@ export default function ScreenshotSession({
   );
 
   const refreshSession = useCallback(async () => {
-    await runCaptureHostSessionRefresh({
-      sessionId: session?.id,
-      setRevealed: (hasRevealed) => {
-        hasRevealedCaptureWindowRef.current = hasRevealed;
-      },
-      showLoading: () => setStatus('loading'),
-      resetInteractionState: resetCaptureInteractionState,
-      loadSession: (sessionId) =>
-        loadCaptureHostSession({
-          loadSession: () => refreshCaptureSession(sessionId),
-          getCurrentCursorPosition: currentCaptureCursorPosition,
-        }),
-      applyLoadedSession: applyLoadedCaptureHostSession,
-      onError: (err) => {
-        setError(err instanceof Error ? err.message : String(err));
-        setStatus('error');
-      },
-    });
-  }, [
-    applyLoadedCaptureHostSession,
-    resetCaptureInteractionState,
-    session?.id,
-  ]);
+    await captureHostActions.refreshSession();
+  }, [captureHostActions]);
 
   const undoAnnotation = useCallback(() => {
     if (!selection || !canUndoAnnotation) return;
