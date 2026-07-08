@@ -10,10 +10,7 @@ import {
   resetCaptureInteractionStatePatch,
   type CaptureWorkspaceState,
 } from './captureWorkspaceState';
-import {
-  applyCaptureWorkspaceStatePatch,
-  type CaptureWorkspaceRefs,
-} from './useCaptureWorkspaceState';
+import { applyCaptureWorkspaceStatePatch } from './useCaptureWorkspaceState';
 import type {
   AnnotationCommand,
   CaptureSessionView,
@@ -58,15 +55,6 @@ function createMemoryStorage() {
   };
 }
 
-function createRefs(): CaptureWorkspaceRefs {
-  return {
-    startPointRef: { current: null },
-    cursorPointRef: { current: null },
-    draftSelectionRef: { current: null },
-    hoverSelectionRef: { current: null },
-  };
-}
-
 function createWorkspace(
   calls: string[],
   overrides: Partial<CaptureWorkspaceState> = {},
@@ -75,23 +63,16 @@ function createWorkspace(
     createInitialCaptureWorkspaceState(),
     overrides,
   );
-  const refs = createRefs();
   const adapter: CaptureWorkspaceHostAdapter = {
-    refs,
     getState: () => state,
     patch: (next) => {
       recordPatch(calls, next);
       state = applyCaptureWorkspaceStatePatch(state, next);
-      syncRefs(refs, next);
     },
     resetInteraction: () => {
       calls.push('reset_interaction');
       const next = resetCaptureInteractionStatePatch();
       state = applyCaptureWorkspaceStatePatch(state, next);
-      refs.startPointRef.current = null;
-      refs.cursorPointRef.current = null;
-      refs.draftSelectionRef.current = null;
-      refs.hoverSelectionRef.current = null;
     },
     resetSession: () => {
       calls.push('reset_session');
@@ -101,25 +82,10 @@ function createWorkspace(
         ...resetCaptureInteractionStatePatch(),
       } satisfies Partial<CaptureWorkspaceState>;
       state = applyCaptureWorkspaceStatePatch(state, next);
-      refs.startPointRef.current = null;
-      refs.cursorPointRef.current = null;
-      refs.draftSelectionRef.current = null;
-      refs.hoverSelectionRef.current = null;
     },
   };
 
   return adapter;
-}
-
-function syncRefs(
-  refs: CaptureWorkspaceRefs,
-  patch: Partial<CaptureWorkspaceState>,
-) {
-  if ('startPoint' in patch) refs.startPointRef.current = patch.startPoint ?? null;
-  if ('cursorPoint' in patch) refs.cursorPointRef.current = patch.cursorPoint ?? null;
-  if ('hoverSelection' in patch) {
-    refs.hoverSelectionRef.current = patch.hoverSelection ?? null;
-  }
 }
 
 function recordPatch(

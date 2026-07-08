@@ -30,7 +30,6 @@ import {
   loadedCaptureHostSessionPatch,
   type CaptureWorkspaceState,
 } from './captureWorkspaceState';
-import type { CaptureWorkspaceRefs } from './useCaptureWorkspaceState';
 import type {
   AnnotationCommand,
   CaptureMode,
@@ -44,7 +43,6 @@ export interface CaptureWorkspaceHostAdapter {
   patch(next: Partial<CaptureWorkspaceState>): void;
   resetInteraction(): void;
   resetSession(): void;
-  refs: CaptureWorkspaceRefs;
 }
 
 export interface CaptureWorkspaceSelectionStorage {

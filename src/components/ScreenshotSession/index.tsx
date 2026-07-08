@@ -295,7 +295,6 @@ export default function ScreenshotSession({
     setIncludeCapturedCursor,
     error,
     setError,
-    refs,
     applyPatch,
     startPointRef,
     cursorPointRef,
@@ -375,12 +374,10 @@ export default function ScreenshotSession({
         };
         resetSession();
       },
-      refs,
     }),
     [
       applyPatch,
       getCurrentCaptureWorkspaceState,
-      refs,
       resetInteraction,
       resetSession,
     ],
@@ -583,6 +580,8 @@ export default function ScreenshotSession({
     textDraft,
     textDraftAnnotationIndex,
   ]);
+  const commitTextDraftToHistoryRef = useRef(commitTextDraftToHistory);
+  commitTextDraftToHistoryRef.current = commitTextDraftToHistory;
 
   const markCaptureFrontendPerf = useCallback(
     (event: string, sessionId?: string | null) => {
@@ -615,7 +614,7 @@ export default function ScreenshotSession({
             canToggleCapturedCursor(currentState.session)
           );
         },
-        commitTextDraftToHistory,
+        commitTextDraftToHistory: () => commitTextDraftToHistoryRef.current(),
         isCompletingCapture: () => isCompletingCaptureRef.current,
         setCompletingCapture: (isCompleting) => {
           isCompletingCaptureRef.current = isCompleting;
@@ -655,7 +654,6 @@ export default function ScreenshotSession({
         },
       }),
     [
-      commitTextDraftToHistory,
       markCaptureFrontendPerf,
       onInactive,
       resetCaptureImageReadiness,
