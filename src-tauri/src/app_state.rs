@@ -6,8 +6,8 @@ use crate::application::providers::ocr::OcrCoordinator;
 use crate::application::providers::translation::TranslationCoordinator;
 use crate::application::{
     CaptureOutputService, CaptureService, CaptureSessionRuntime, CaptureSessionService,
-    HistoryService, ImageCompositionService, PinnedImageService, SelectedTextAcquirer,
-    SettingsConfiguration,
+    HistoryService, HotkeyRuntime, ImageCompositionService, PinnedImageService,
+    SelectedTextAcquirer, SettingsConfiguration,
 };
 use crate::infrastructure::events::EventBus;
 use crate::infrastructure::http::HttpClient;
@@ -27,6 +27,7 @@ pub struct AppState {
     // Phase 1: Infrastructure
     pub config_file: Arc<ConfigFile>,
     pub settings_configuration: Arc<SettingsConfiguration>,
+    pub hotkey_runtime: Arc<HotkeyRuntime>,
     pub keychain: Arc<Keychain>,
     pub http_client: Arc<dyn HttpClient>,
 

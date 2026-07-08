@@ -21,11 +21,13 @@ use crate::infrastructure::events::EventBus;
 use crate::infrastructure::http::{HttpClient, ReqwestHttpClient};
 use crate::infrastructure::storage::{ConfigFile, Keychain};
 use crate::AppState;
-use crate::SettingsConfiguration;
+use crate::{HotkeyConfiguration, HotkeyRuntime, SettingsConfiguration};
 
 pub(crate) fn build_app_state(config_path: PathBuf, app: AppHandle) -> AppState {
     let config_file = Arc::new(ConfigFile::new(config_path));
     let settings_configuration = Arc::new(SettingsConfiguration::new(config_file.clone()));
+    let hotkey_configuration = Arc::new(HotkeyConfiguration::new(config_file.clone()));
+    let hotkey_runtime = Arc::new(HotkeyRuntime::new(hotkey_configuration));
     let keychain = Arc::new(Keychain::new());
     let http_client: Arc<dyn HttpClient> = Arc::new(ReqwestHttpClient::new());
     let event_bus = Arc::new(EventBus::new());
@@ -51,6 +53,7 @@ pub(crate) fn build_app_state(config_path: PathBuf, app: AppHandle) -> AppState 
     AppState {
         config_file,
         settings_configuration,
+        hotkey_runtime,
         keychain,
         http_client,
         translation_coordinator,

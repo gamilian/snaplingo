@@ -1,180 +1,27 @@
-use std::collections::HashMap;
-use std::sync::{Mutex, OnceLock};
 use tauri::Manager;
 
-use crate::application::HotkeyConfiguration;
 use crate::domain::hotkey_config::{
-    default_hotkey_snapshot, hotkey_category, validate_hotkey_action, HotkeySettingsSnapshot,
-    DEFAULT_HOTKEYS, FILE_OCR_ACTION, INPUT_TRANSLATE_ACTION, OCR_CATEGORY, PIN_ACTION,
-    PIN_SWITCH_GROUP_ACTION, PIN_TOGGLE_ALL_ACTION, SCREENSHOT_ACTION, SCREENSHOT_CATEGORY,
-    SCREENSHOT_COPY_ACTION, SCREENSHOT_CUSTOM_ACTION, SCREENSHOT_OCR_ACTION,
-    SCREENSHOT_TRANSLATE_ACTION, SELECTION_TRANSLATE_ACTION, SHOW_OCR_WINDOW_ACTION,
-    SHOW_TRANSLATION_WINDOW_ACTION, SILENT_SCREENSHOT_OCR_ACTION, TRANSLATION_CATEGORY,
+    FILE_OCR_ACTION, INPUT_TRANSLATE_ACTION, OCR_CATEGORY, PIN_ACTION, PIN_SWITCH_GROUP_ACTION,
+    PIN_TOGGLE_ALL_ACTION, SCREENSHOT_ACTION, SCREENSHOT_CATEGORY, SCREENSHOT_COPY_ACTION,
+    SCREENSHOT_CUSTOM_ACTION, SCREENSHOT_OCR_ACTION, SCREENSHOT_TRANSLATE_ACTION,
+    SELECTION_TRANSLATE_ACTION, SHOW_OCR_WINDOW_ACTION, SHOW_TRANSLATION_WINDOW_ACTION,
+    SILENT_SCREENSHOT_OCR_ACTION, TRANSLATION_CATEGORY,
 };
-use crate::{commands, infrastructure, AppState, Result};
+use crate::{commands, AppState, Result};
 
-static HOTKEY_REGISTRATIONS: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
-
-pub(crate) async fn register_startup_shortcuts(app: tauri::AppHandle) {
-    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-
-    let startup_hotkeys = {
-        let state = app.state::<AppState>();
-        let configuration = HotkeyConfiguration::new(state.config_file.clone());
-        match configuration.snapshot() {
-            Ok(snapshot) => startup_hotkeys_from_snapshot(&snapshot),
-            Err(err) => {
-                log::warn!(
-                    "Failed to load hotkey configuration, using defaults for startup: {}",
-                    err
-                );
-                startup_hotkeys_from_snapshot(&default_hotkey_snapshot())
-            }
-        }
-    };
-
-    for hotkey in startup_hotkeys {
-        match configure_hotkey(&app, &hotkey.category, &hotkey.action, &hotkey.hotkey) {
-            Ok(Some(accelerator)) => {
-                log::info!(
-                    "Hotkey registered: {}:{} -> {}",
-                    hotkey.category,
-                    hotkey.action,
-                    accelerator
-                );
-            }
-            Ok(None) => {}
-            Err(e) => {
-                log::error!(
-                    "Failed to register hotkey {}:{}: {}",
-                    hotkey.category,
-                    hotkey.action,
-                    e
-                );
-            }
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct StartupHotkey {
-    category: String,
-    action: String,
-    hotkey: String,
-}
-
-fn startup_hotkeys_from_snapshot(config: &HotkeySettingsSnapshot) -> Vec<StartupHotkey> {
-    DEFAULT_HOTKEYS
-        .iter()
-        .filter_map(|default_hotkey| {
-            hotkey_category(config, default_hotkey.category)
-                .and_then(|category_hotkeys| category_hotkeys.get(default_hotkey.action))
-                .map(|hotkey| StartupHotkey {
-                    category: default_hotkey.category.to_string(),
-                    action: default_hotkey.action.to_string(),
-                    hotkey: hotkey.clone(),
-                })
-        })
-        .collect()
-}
-
-pub(crate) fn configure_hotkey(
-    app: &tauri::AppHandle,
-    category: &str,
-    action: &str,
-    hotkey: &str,
-) -> Result<Option<String>> {
-    let next_accelerator = resolve_hotkey_accelerator(category, action, hotkey)?;
-    let registration_key = hotkey_registration_key(category, action);
-    let registry = HOTKEY_REGISTRATIONS.get_or_init(|| Mutex::new(HashMap::new()));
-
-    let previous_accelerator = {
-        let registrations = registry
-            .lock()
-            .map_err(|e| crate::AppError::Other(format!("Shortcut registry lock poisoned: {e}")))?;
-        registrations.get(&registration_key).cloned()
-    };
-
-    if next_accelerator == previous_accelerator {
-        return Ok(next_accelerator);
-    }
-
-    if let Some(accelerator) = &next_accelerator {
-        register_hotkey_action(app, category, action, accelerator)?;
-    }
-
-    if let Some(accelerator) = previous_accelerator {
-        if let Err(e) = infrastructure::system::unregister_shortcut(app, &accelerator) {
-            log::warn!(
-                "Failed to unregister previous hotkey {} for {}:{}: {}",
-                accelerator,
-                category,
-                action,
-                e
-            );
-        }
-    }
-
-    let mut registrations = registry
-        .lock()
-        .map_err(|e| crate::AppError::Other(format!("Shortcut registry lock poisoned: {e}")))?;
-    match &next_accelerator {
-        Some(accelerator) => {
-            registrations.insert(registration_key, accelerator.clone());
-        }
-        None => {
-            registrations.remove(&registration_key);
-        }
-    }
-
-    Ok(next_accelerator)
-}
-
-pub(crate) fn configure_translation_shortcut(
-    app: &tauri::AppHandle,
-    action: &str,
-    hotkey: &str,
-) -> Result<Option<String>> {
-    configure_hotkey(app, TRANSLATION_CATEGORY, action, hotkey)
-}
-
+#[cfg(test)]
 fn resolve_hotkey_accelerator(
     category: &str,
     action: &str,
     hotkey: &str,
 ) -> Result<Option<String>> {
-    validate_hotkey_action(category, action)?;
+    crate::domain::hotkey_config::validate_hotkey_action(category, action)?;
 
     let next_accelerator = display_hotkey_to_accelerator(hotkey)?;
     Ok(next_accelerator)
 }
 
-fn hotkey_registration_key(category: &str, action: &str) -> String {
-    format!("{category}:{action}")
-}
-
-fn register_hotkey_action(
-    app: &tauri::AppHandle,
-    category: &str,
-    action: &str,
-    accelerator: &str,
-) -> Result<()> {
-    let category = category.to_string();
-    let action = action.to_string();
-    let app_clone = app.clone();
-
-    if should_register_hotkey_on_release(&category, &action) {
-        return infrastructure::system::register_shortcut_on_release(app, accelerator, move || {
-            trigger_hotkey_action(app_clone.clone(), category.clone(), action.clone());
-        });
-    }
-
-    infrastructure::system::register_shortcut(app, accelerator, move || {
-        trigger_hotkey_action(app_clone.clone(), category.clone(), action.clone());
-    })
-}
-
-fn trigger_hotkey_action(app: tauri::AppHandle, category: String, action: String) {
+pub(crate) fn trigger_hotkey_action(app: tauri::AppHandle, category: String, action: String) {
     if category == SCREENSHOT_CATEGORY {
         if let Some(mode) = capture_mode_for_screenshot_hotkey_action(&action) {
             tauri::async_runtime::spawn(commands::open_capture_window_from_shortcut(app, mode));
@@ -265,7 +112,7 @@ fn capture_mode_for_screenshot_hotkey_action(action: &str) -> Option<&'static st
     }
 }
 
-fn should_register_hotkey_on_release(category: &str, action: &str) -> bool {
+pub(crate) fn should_register_hotkey_on_release(category: &str, action: &str) -> bool {
     match (category, action) {
         (SCREENSHOT_CATEGORY, action) => {
             capture_mode_for_screenshot_hotkey_action(action).is_some()

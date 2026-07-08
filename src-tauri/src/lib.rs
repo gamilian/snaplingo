@@ -55,6 +55,7 @@ pub fn run() {
             let app_state = composition::build_app_state(config_path, app.handle().clone());
             composition::subscribe_history_service(&app_state);
             composition::hydrate_provider_credentials_in_background(&app_state);
+            let hotkey_runtime = app_state.hotkey_runtime.clone();
 
             app.manage(app_state);
 
@@ -63,7 +64,12 @@ pub fn run() {
             }
 
             let app_handle = app.handle().clone();
-            tauri::async_runtime::spawn(startup_shortcuts::register_startup_shortcuts(app_handle));
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                if let Err(err) = hotkey_runtime.register_startup_hotkeys(&app_handle) {
+                    log::error!("Failed to register startup hotkeys: {}", err);
+                }
+            });
 
             if let Err(err) =
                 infrastructure::system::capture_window::prewarm_capture_window(app.handle())
