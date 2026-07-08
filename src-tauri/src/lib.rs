@@ -94,6 +94,8 @@ pub fn run() {
             commands::copy_text_to_clipboard,
             commands::configure_hotkey,
             commands::configure_translation_hotkey,
+            commands::get_hotkey_snapshot,
+            commands::update_hotkey,
             commands::get_settings_snapshot,
             commands::trigger_screenshot,
             commands::update_general_settings,

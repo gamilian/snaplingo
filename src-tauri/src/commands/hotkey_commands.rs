@@ -1,0 +1,138 @@
+use tauri::State;
+
+#[cfg(test)]
+use crate::application::hotkeys::runtime::HotkeyRegistrar;
+use crate::application::HotkeyRuntime;
+use crate::domain::HotkeySettingsSnapshot;
+use crate::HotkeyUpdateOutcome;
+
+#[tauri::command]
+pub fn get_hotkey_snapshot(
+    state: State<'_, crate::AppState>,
+) -> Result<HotkeySettingsSnapshot, String> {
+    get_hotkey_snapshot_for_runtime(state.hotkey_runtime.as_ref())
+}
+
+#[tauri::command]
+pub fn update_hotkey(
+    category: String,
+    action: String,
+    hotkey: String,
+    app: tauri::AppHandle,
+    state: State<'_, crate::AppState>,
+) -> Result<HotkeyUpdateOutcome, String> {
+    state
+        .hotkey_runtime
+        .update_hotkey(&app, category, action, hotkey)
+        .map_err(|err| err.to_string())
+}
+
+fn get_hotkey_snapshot_for_runtime(
+    runtime: &HotkeyRuntime,
+) -> Result<HotkeySettingsSnapshot, String> {
+    runtime.snapshot().map_err(|err| err.to_string())
+}
+
+#[cfg(test)]
+fn update_hotkey_with_registrar_for_runtime(
+    runtime: &HotkeyRuntime,
+    registrar: &impl HotkeyRegistrar,
+    category: String,
+    action: String,
+    hotkey: String,
+) -> Result<HotkeyUpdateOutcome, String> {
+    runtime
+        .update_hotkey_with(registrar, category, action, hotkey)
+        .map_err(|err| err.to_string())
+}
+
+#[cfg(test)]
+mod hotkey_commands_tests {
+    use std::sync::Arc;
+
+    use super::{get_hotkey_snapshot_for_runtime, update_hotkey_with_registrar_for_runtime};
+    use crate::application::hotkeys::configuration::HotkeyConfiguration;
+    use crate::application::hotkeys::runtime::{
+        HotkeyRegistrar, HotkeyRegistration, HotkeyRuntime,
+    };
+    use crate::domain::hotkey_config::{SELECTION_TRANSLATE_ACTION, TRANSLATION_CATEGORY};
+    use crate::infrastructure::storage::ConfigFile;
+    use crate::Result;
+
+    #[derive(Default)]
+    struct FakeHotkeyRegistrar {
+        fail_register: bool,
+    }
+
+    impl HotkeyRegistrar for FakeHotkeyRegistrar {
+        fn register(&self, _registration: HotkeyRegistration) -> Result<()> {
+            if self.fail_register {
+                return Err(crate::AppError::Other("registration failed".to_string()));
+            }
+
+            Ok(())
+        }
+
+        fn unregister(&self, _accelerator: &str) -> Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn get_hotkey_snapshot_delegates_to_runtime() {
+        let runtime = test_runtime();
+
+        let snapshot = get_hotkey_snapshot_for_runtime(&runtime).unwrap();
+
+        assert_eq!(
+            snapshot.translation.get(SELECTION_TRANSLATE_ACTION),
+            Some(&"⌥D".to_string())
+        );
+    }
+
+    #[test]
+    fn update_hotkey_returns_snapshot_and_accelerator() {
+        let runtime = test_runtime();
+        let registrar = FakeHotkeyRegistrar::default();
+
+        let outcome = update_hotkey_with_registrar_for_runtime(
+            &runtime,
+            &registrar,
+            TRANSLATION_CATEGORY.to_string(),
+            SELECTION_TRANSLATE_ACTION.to_string(),
+            "⇧⌥D".to_string(),
+        )
+        .unwrap();
+
+        assert_eq!(outcome.accelerator, Some("Shift+Alt+KeyD".to_string()));
+        assert_eq!(
+            outcome.snapshot.translation.get(SELECTION_TRANSLATE_ACTION),
+            Some(&"⇧⌥D".to_string())
+        );
+    }
+
+    #[test]
+    fn update_hotkey_errors_are_returned_as_strings() {
+        let runtime = test_runtime();
+        let registrar = FakeHotkeyRegistrar {
+            fail_register: true,
+        };
+
+        let err = update_hotkey_with_registrar_for_runtime(
+            &runtime,
+            &registrar,
+            TRANSLATION_CATEGORY.to_string(),
+            SELECTION_TRANSLATE_ACTION.to_string(),
+            "⇧⌥D".to_string(),
+        )
+        .unwrap_err();
+
+        assert!(err.contains("registration failed"));
+    }
+
+    fn test_runtime() -> HotkeyRuntime {
+        let config_file = Arc::new(ConfigFile::new_temp());
+        let configuration = Arc::new(HotkeyConfiguration::with_legacy_root(config_file, None));
+        HotkeyRuntime::new(configuration)
+    }
+}

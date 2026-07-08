@@ -1,6 +1,7 @@
 mod capture_commands;
 mod capture_session_commands;
 mod history_commands;
+mod hotkey_commands;
 mod ocr_commands;
 mod pinned_image_commands;
 mod provider_commands;
@@ -10,6 +11,7 @@ mod translation_commands;
 pub use capture_commands::*;
 pub use capture_session_commands::*;
 pub use history_commands::*;
+pub use hotkey_commands::*;
 pub use ocr_commands::*;
 pub use pinned_image_commands::*;
 pub use provider_commands::*;
