@@ -496,6 +496,7 @@ export function handleCaptureWorkspaceKeyDown(
     selectedAnnotationIndex !== null &&
     isArrowKey(event.key)
   ) {
+    // Selected annotations own Arrow keys before selection movement previews.
     event.preventDefault();
     const annotationNudge = planCaptureSelectedAnnotationKeyboardNudge({
       annotationHistory,

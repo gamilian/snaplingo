@@ -283,6 +283,56 @@ describe('handleCaptureWorkspaceKeyDown', () => {
     ]);
   });
 
+  it('prioritizes selected annotation arrow nudges over selection arrow preview movement', () => {
+    const arrow: AnnotationCommand = {
+      type: 'arrow',
+      start: { x: 3, y: 4 },
+      end: { x: 20, y: 24 },
+      color: [255, 77, 79, 255],
+      stroke_width: 2,
+    };
+    const movedArrow: AnnotationCommand = {
+      ...arrow,
+      start: { x: 4, y: 4 },
+      end: { x: 21, y: 24 },
+    };
+    const movedAnnotations = [movedArrow];
+    const annotationHistory = {
+      ...emptyAnnotationHistory(),
+      annotations: [arrow],
+    };
+    const { actions, context } = createContext({
+      state: {
+        status: 'preview',
+        selection,
+        selectedAnnotationIndex: 0,
+        annotationHistory,
+      },
+      derived: {
+        annotations: [arrow],
+        hasAnnotationEditingContext: true,
+        selectionBounds: { x: 0, y: 0, width: 300, height: 200 },
+      },
+    });
+    const event = createKeyboardEvent('ArrowRight');
+
+    handleCaptureWorkspaceKeyDown(event, context);
+
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(actions.setAnnotationHistory).toHaveBeenCalledWith({
+      annotations: movedAnnotations,
+      undoneAnnotations: [],
+      undoSnapshots: [[arrow]],
+      redoSnapshots: [],
+    });
+    expect(actions.renderSelectionPreview).toHaveBeenCalledWith(
+      selection,
+      movedAnnotations,
+    );
+    expect(actions.setSelection).not.toHaveBeenCalled();
+    expect(actions.setPreviewImageBase64).not.toHaveBeenCalled();
+  });
+
   it('completes the active hover candidate from the hover-selection ref', () => {
     const hoverSelection: LogicalRect = { x: 40, y: 50, width: 60, height: 70 };
     const { actions, context } = createContext({
