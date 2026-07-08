@@ -733,16 +733,18 @@ export default function ScreenshotSession({
   }, [captureHostActions]);
 
   const handleNativeCopyRequest = useCallback(() => {
-    if (status === 'preview') {
+    const currentState = getCurrentCaptureWorkspaceState();
+    if (currentState.status === 'preview') {
       void copySelection();
       return;
     }
 
-    const activeStartPoint = startPointRef.current ?? startPoint;
-    const activeHoverSelection = hoverSelectionRef.current ?? hoverSelection;
+    const activeStartPoint = startPointRef.current ?? currentState.startPoint;
+    const activeHoverSelection =
+      hoverSelectionRef.current ?? currentState.hoverSelection;
     if (
-      status === 'selecting' &&
-      !textDraft &&
+      currentState.status === 'selecting' &&
+      !currentState.textDraft &&
       activeStartPoint === null &&
       activeHoverSelection
     ) {
@@ -751,10 +753,9 @@ export default function ScreenshotSession({
   }, [
     completeCandidateSelection,
     copySelection,
-    hoverSelection,
-    startPoint,
-    status,
-    textDraft,
+    getCurrentCaptureWorkspaceState,
+    hoverSelectionRef,
+    startPointRef,
   ]);
 
   const copyCurrentColor = useCallback(async () => {
