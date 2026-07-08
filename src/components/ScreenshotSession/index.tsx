@@ -16,8 +16,6 @@ import {
 } from './selection';
 import {
   colorSampleToClipboardText,
-  type ColorSample,
-  type ColorSampleFormat,
   isColorSampleCopyShortcut,
   isColorSampleFormatToggleShortcut,
 } from './colorSampler';
@@ -27,21 +25,17 @@ import {
 } from './captureCandidates';
 import {
   clearAnnotationHistory,
-  emptyAnnotationHistory,
   removeAnnotationFromHistory,
   redoAnnotationHistory,
   undoAnnotationHistory,
 } from './annotationHistory';
 import {
-  DEFAULT_TEXT_FONT_SIZE,
-  DEFAULT_ANNOTATION_STYLE,
   annotationColorFromShortcut,
   annotationSizeDirectionFromShortcut,
   annotationToolFromShortcut,
   isAnnotationFillToggleShortcut,
   nextAnnotationToolFromCycleShortcut,
   type AnnotationColor,
-  type AnnotationGestureDraft,
   type AnnotationStyle,
   type AnnotationSizeDirection,
   type AnnotationTool,
@@ -49,7 +43,6 @@ import {
 import {
   startTextAnnotationDraft,
   updateTextAnnotationDraft,
-  type TextAnnotationDraft,
 } from './textAnnotationDraft';
 import {
   canToggleCapturedCursor,
@@ -107,7 +100,6 @@ import {
   applyStyleToSelectedAnnotationHistory,
   commitCaptureEditorTextDraft,
   completeCaptureEditorGesture,
-  createCapturePreviewResetState,
   getCaptureEditorDismissAction,
   getCaptureSelectedAnnotationBounds,
   planCaptureAnnotationColorSelection,
@@ -123,7 +115,6 @@ import {
   planCaptureAnnotationToolStart,
   planCapturePolylineAnnotationContinue,
   planCaptureManualSelectionTransition,
-  type CaptureAnnotationMoveGesture,
   undoPolylineCaptureGesture,
 } from './captureEditorRuntime';
 import {
@@ -141,8 +132,6 @@ import {
   planCaptureSelectionEditKeyboardNudge,
   planCaptureSelectionEditMove,
   planCaptureSelectionResizeStart,
-  type CaptureDraftSelectionMoveGesture,
-  type CaptureSelectionEditGesture,
 } from './captureSelectionRuntime';
 import {
   getCapturePointerMoveAction,
@@ -194,12 +183,11 @@ import {
   virtualPointToViewportPoint,
   virtualRectToViewportRect,
 } from './virtualDesktop';
-import type { CaptureSessionStatus } from './captureWorkspaceState';
+import { useCaptureWorkspaceState } from './useCaptureWorkspaceState';
 import type {
   AnnotationCommand,
   CaptureLaunch,
   CaptureMode,
-  CaptureSessionView,
   ArrowKey,
   LogicalRect,
   Point,
@@ -253,10 +241,6 @@ export default function ScreenshotSession({
   const screenshotSavePath = useSettingsConfigStore(
     (state) => state.screenshot?.savePath,
   );
-  const startPointRef = useRef<Point | null>(null);
-  const cursorPointRef = useRef<Point | null>(null);
-  const draftSelectionRef = useRef<LogicalRect | null>(null);
-  const hoverSelectionRef = useRef<LogicalRect | null>(null);
   const textDraftInputRef = useRef<HTMLTextAreaElement | null>(null);
   const keyboardDraftCursorPointRef = useRef<Point | null>(null);
   const keyboardEditCursorPointRef = useRef<Point | null>(null);
@@ -264,54 +248,83 @@ export default function ScreenshotSession({
   const captureSnapshotHydrationRef =
     useRef<CaptureHostSnapshotHydration | null>(null);
   const isCompletingCaptureRef = useRef(false);
-  const [status, setStatus] = useState<CaptureSessionStatus>('idle');
-  const [mode, setMode] = useState<CaptureMode>('screenshot');
-  const [session, setSession] = useState<CaptureSessionView | null>(null);
-  const [startPoint, setStartPoint] = useState<Point | null>(null);
-  const [cursorPoint, setCursorPoint] = useState<Point | null>(null);
-  const [selection, setSelection] = useState<LogicalRect | null>(null);
-  const [hoverSelection, setHoverSelection] = useState<LogicalRect | null>(null);
-  const [editGesture, setEditGesture] =
-    useState<CaptureSelectionEditGesture | null>(null);
-  const [activeAnnotationTool, setActiveAnnotationTool] =
-    useState<AnnotationTool | null>(null);
-  const [annotationGesture, setAnnotationGesture] =
-    useState<AnnotationGestureDraft | null>(null);
-  const [draftAnnotation, setDraftAnnotation] = useState<AnnotationCommand | null>(null);
-  const [selectedAnnotationIndex, setSelectedAnnotationIndex] = useState<number | null>(
-    null,
-  );
-  const [annotationMoveGesture, setAnnotationMoveGesture] =
-    useState<CaptureAnnotationMoveGesture | null>(null);
-  const [draftSelectionMoveGesture, setDraftSelectionMoveGesture] =
-    useState<CaptureDraftSelectionMoveGesture | null>(null);
-  const [textDraft, setTextDraft] = useState<TextAnnotationDraft | null>(null);
-  const [textDraftAnnotationIndex, setTextDraftAnnotationIndex] =
-    useState<number | null>(null);
-  const [annotationStyle, setAnnotationStyle] = useState<AnnotationStyle>(
-    DEFAULT_ANNOTATION_STYLE,
-  );
-  const [textFontSize, setTextFontSize] = useState(DEFAULT_TEXT_FONT_SIZE);
-  const [annotationHistory, setAnnotationHistory] = useState(emptyAnnotationHistory);
-  const [previewImageBase64, setPreviewImageBase64] = useState<string | null>(null);
-  const [isAnnotationToolbarVisible, setIsAnnotationToolbarVisible] = useState(true);
-  const [cursorColor, setCursorColor] = useState<ColorSample | null>(null);
-  const [colorSampleFormat, setColorSampleFormat] =
-    useState<ColorSampleFormat>('hex');
-  const [isMagnifierRequested, setIsMagnifierRequested] = useState(false);
-  const [isRenderingOutput, setIsRenderingOutput] = useState(false);
-  const [includeCapturedCursor, setIncludeCapturedCursor] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [hasStartedInitialSession, setHasStartedInitialSession] = useState(false);
-  const [hydratedCaptureSessionId, setHydratedCaptureSessionId] =
-    useState<string | null>(null);
   const hasRevealedCaptureWindowRef = useRef(false);
   const captureFrontendPerfRef = useRef<CaptureFrontendPerfState | null>(null);
   const isRenderingOutputRef = useRef(false);
-  const setRenderingOutput = useCallback((nextIsRendering: boolean) => {
+  const handleRenderingOutputChange = useCallback((nextIsRendering: boolean) => {
     isRenderingOutputRef.current = nextIsRendering;
-    setIsRenderingOutput(nextIsRendering);
   }, []);
+  const {
+    status,
+    setStatus,
+    mode,
+    setMode,
+    session,
+    setSession,
+    startPoint,
+    setStartPoint,
+    cursorPoint,
+    setCursorPoint,
+    selection,
+    setSelection,
+    hoverSelection,
+    setHoverSelection,
+    editGesture,
+    setEditGesture,
+    activeAnnotationTool,
+    setActiveAnnotationTool,
+    annotationGesture,
+    setAnnotationGesture,
+    draftAnnotation,
+    setDraftAnnotation,
+    selectedAnnotationIndex,
+    setSelectedAnnotationIndex,
+    annotationMoveGesture,
+    setAnnotationMoveGesture,
+    draftSelectionMoveGesture,
+    setDraftSelectionMoveGesture,
+    textDraft,
+    setTextDraft,
+    textDraftAnnotationIndex,
+    setTextDraftAnnotationIndex,
+    annotationStyle,
+    setAnnotationStyle,
+    textFontSize,
+    setTextFontSize,
+    annotationHistory,
+    setAnnotationHistory,
+    previewImageBase64,
+    setPreviewImageBase64,
+    isAnnotationToolbarVisible,
+    setIsAnnotationToolbarVisible,
+    cursorColor,
+    setCursorColor,
+    colorSampleFormat,
+    setColorSampleFormat,
+    isMagnifierRequested,
+    setIsMagnifierRequested,
+    isRenderingOutput,
+    setRenderingOutput,
+    includeCapturedCursor,
+    setIncludeCapturedCursor,
+    error,
+    setError,
+    startPointRef,
+    cursorPointRef,
+    draftSelectionRef,
+    hoverSelectionRef,
+    setStartPointWithRef,
+    syncHoverSelection: syncWorkspaceHoverSelection,
+    resetInteraction,
+    resetSession,
+    applyLoadedSession,
+    resetPreview,
+  } = useCaptureWorkspaceState({
+    onRenderingOutputChange: handleRenderingOutputChange,
+  });
+  const [hasStartedInitialSession, setHasStartedInitialSession] = useState(false);
+  const [hydratedCaptureSessionId, setHydratedCaptureSessionId] =
+    useState<string | null>(null);
 
   const isActive = status !== 'idle';
   const annotations = annotationHistory.annotations;
@@ -431,20 +444,14 @@ export default function ScreenshotSession({
     return getToolbarPosition(selectionViewportRect, viewportBounds, TOOLBAR_SIZE, TOOLBAR_GAP);
   }, [selectionViewportRect, status, viewportBounds]);
 
-  const setStartPointWithRef = useCallback((point: Point | null) => {
-    startPointRef.current = point;
-    setStartPoint(point);
-  }, []);
-
   const syncHoverSelection = useCallback(
     (nextHoverSelection: LogicalRect | null) => {
       if (areRectsEqual(hoverSelectionRef.current, nextHoverSelection)) return;
 
-      hoverSelectionRef.current = nextHoverSelection;
-      setHoverSelection(nextHoverSelection);
+      syncWorkspaceHoverSelection(nextHoverSelection);
       scheduleSelectionOverlayPaint(null, nextHoverSelection, null);
     },
-    [scheduleSelectionOverlayPaint],
+    [hoverSelectionRef, scheduleSelectionOverlayPaint, syncWorkspaceHoverSelection],
   );
 
   useEffect(() => {
@@ -493,54 +500,25 @@ export default function ScreenshotSession({
   }, []);
 
   const resetCaptureInteractionState = useCallback(() => {
-    startPointRef.current = null;
-    cursorPointRef.current = null;
-    draftSelectionRef.current = null;
-    hoverSelectionRef.current = null;
+    resetInteraction();
     resetSelectionOverlay();
-    setStartPoint(null);
-    setCursorPoint(null);
-    setSelection(null);
-    setHoverSelection(null);
-    setEditGesture(null);
-    setActiveAnnotationTool(null);
-    setAnnotationGesture(null);
-    setDraftAnnotation(null);
-    setSelectedAnnotationIndex(null);
-    setAnnotationMoveGesture(null);
-    setDraftSelectionMoveGesture(null);
-    setTextDraft(null);
-    setTextDraftAnnotationIndex(null);
-    setAnnotationHistory(emptyAnnotationHistory());
-    setPreviewImageBase64(null);
-    setIsAnnotationToolbarVisible(true);
-    setCursorColor(null);
-    setColorSampleFormat('hex');
-    setIsMagnifierRequested(false);
-    setRenderingOutput(false);
     isCompletingCaptureRef.current = false;
-    setIncludeCapturedCursor(false);
-    setError(null);
     resetCaptureImageReadiness();
-  }, [resetCaptureImageReadiness, resetSelectionOverlay]);
+  }, [resetCaptureImageReadiness, resetInteraction, resetSelectionOverlay]);
 
   const resetSessionState = useCallback(() => {
-    setStatus('idle');
-    setSession(null);
-    resetCaptureInteractionState();
-  }, [resetCaptureInteractionState]);
+    resetSession();
+    resetSelectionOverlay();
+    isCompletingCaptureRef.current = false;
+    resetCaptureImageReadiness();
+  }, [resetCaptureImageReadiness, resetSelectionOverlay, resetSession]);
 
-  const applyLoadedCaptureHostSession = useCallback(({
-    cursorPoint,
-    hoverSelection,
-    session: nextSession,
-  }: LoadedCaptureHostSession) => {
-    cursorPointRef.current = cursorPoint;
-    hoverSelectionRef.current = hoverSelection;
-    setHoverSelection(hoverSelection);
-    setSession(nextSession);
-    setStatus('selecting');
-  }, []);
+  const applyLoadedCaptureHostSession = useCallback(
+    (loaded: LoadedCaptureHostSession) => {
+      applyLoadedSession(loaded);
+    },
+    [applyLoadedSession],
+  );
 
   const markCaptureFrontendPerf = useCallback(
     (event: string, sessionId?: string | null) => {
@@ -1221,31 +1199,9 @@ export default function ScreenshotSession({
   ]);
 
   const resetPreviewSelection = useCallback(() => {
-    startPointRef.current = null;
-    cursorPointRef.current = null;
-    draftSelectionRef.current = null;
-    hoverSelectionRef.current = null;
+    resetPreview();
     resetSelectionOverlay();
-    const resetState = createCapturePreviewResetState();
-    setStartPoint(resetState.startPoint);
-    setCursorPoint(resetState.cursorPoint);
-    setSelection(resetState.selection);
-    setHoverSelection(resetState.hoverSelection);
-    setEditGesture(resetState.editGesture);
-    setPreviewImageBase64(resetState.previewImageBase64);
-    setRenderingOutput(resetState.renderingOutput);
-    setActiveAnnotationTool(resetState.activeAnnotationTool);
-    setAnnotationGesture(resetState.annotationGesture);
-    setDraftAnnotation(resetState.draftAnnotation);
-    setSelectedAnnotationIndex(resetState.selectedAnnotationIndex);
-    setAnnotationMoveGesture(resetState.annotationMoveGesture);
-    setDraftSelectionMoveGesture(resetState.draftSelectionMoveGesture);
-    setTextDraft(resetState.textDraft);
-    setTextDraftAnnotationIndex(resetState.textDraftAnnotationIndex);
-    setAnnotationHistory(resetState.annotationHistory);
-    setIsMagnifierRequested(resetState.isMagnifierRequested);
-    setStatus(resetState.status);
-  }, [resetSelectionOverlay]);
+  }, [resetPreview, resetSelectionOverlay]);
 
   const completeManualSelection = useCallback((rect: LogicalRect) => {
     const completion = planManualSelectionCompletion(mode);
