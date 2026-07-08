@@ -15,11 +15,7 @@ import {
   snapPointToRects,
   type SelectionHandle,
 } from './selection';
-import {
-  colorSampleToClipboardText,
-  isColorSampleCopyShortcut,
-  isColorSampleFormatToggleShortcut,
-} from './colorSampler';
+import { colorSampleToClipboardText } from './colorSampler';
 import {
   buildCaptureCandidates,
   getBestCandidateAtPoint,
@@ -31,11 +27,6 @@ import {
   undoAnnotationHistory,
 } from './annotationHistory';
 import {
-  annotationColorFromShortcut,
-  annotationSizeDirectionFromShortcut,
-  annotationToolFromShortcut,
-  isAnnotationFillToggleShortcut,
-  nextAnnotationToolFromCycleShortcut,
   type AnnotationColor,
   type AnnotationStyle,
   type AnnotationSizeDirection,
@@ -49,26 +40,10 @@ import {
   canToggleCapturedCursor,
   type HoverSelectionCompletionAction,
   type PreviewCaptureCompletionAction,
-  getCaptureKeyboardToolbarAction,
-  getCandidateCycleDirectionFromShortcut,
-  getCursorNudgeDeltaFromShortcut,
-  getHoverSelectionCompletionActionFromShortcut,
-  getPreviewCaptureCompletionActionFromShortcut,
-  getSelectionArrowActionFromShortcut,
-  getSelectionHistoryStepFromShortcut,
-  getUndoRedoActionFromShortcut,
-  isClearAnnotationsShortcut,
+  type SelectionHistoryStep,
   isCopyCaptureDoubleClick,
-  isDeleteSelectedAnnotationShortcut,
   isFinishAnnotationGestureDoubleClick,
-  isMoveDraftSelectionShortcut,
-  isMagnifierShortcut,
-  isRefreshCaptureShortcut,
-  isSelectAllCaptureShortcut,
-  isToggleCapturedCursorShortcut,
-  isUndoAnnotationGesturePointShortcut,
   refreshCaptureSession,
-  shouldRestoreLastSelectionFromShortcut,
 } from './captureActions';
 import {
   planManualSelectionCompletion,
@@ -102,7 +77,6 @@ import {
   planCaptureAnnotationFillToggle,
   planCaptureAnnotationErase,
   planCaptureAnnotationGestureMove,
-  planCaptureSelectedAnnotationKeyboardNudge,
   planCaptureExistingAnnotationPointerDown,
   planCaptureAnnotationMove,
   planCaptureAnnotationMoveCommit,
@@ -113,18 +87,12 @@ import {
   undoPolylineCaptureGesture,
 } from './captureEditorRuntime';
 import {
-  planCaptureDraftSelectionMoveShortcutStart,
-  planCaptureDraftSelectionKeyboardNudge,
   planCaptureDraftSelectionCommit,
   planCaptureDraftSelectionMove,
   planCaptureDraftSelectionPointerMove,
   planCaptureDraftSelectionStart,
-  planCaptureHoverSelectionCycle,
   planCapturePreviewSelectionMoveStart,
-  planCaptureSelectionArrowPreview,
-  planCaptureSelectionCursorKeyboardNudge,
   planCaptureSelectionEditCommit,
-  planCaptureSelectionEditKeyboardNudge,
   planCaptureSelectionEditMove,
   planCaptureSelectionResizeStart,
 } from './captureSelectionRuntime';
@@ -171,6 +139,12 @@ import {
   type CaptureWorkspaceState,
 } from './captureWorkspaceState';
 import {
+  handleCaptureWorkspaceKeyDown,
+  type CaptureWorkspaceKeyboardActions,
+  type CaptureWorkspaceKeyboardDerivedState,
+  type CaptureWorkspaceKeyboardRefs,
+} from './captureWorkspaceKeyboard';
+import {
   getCurrentMonitorBounds,
   getVirtualDesktopBounds,
   viewportPointToVirtualPoint,
@@ -182,7 +156,6 @@ import type {
   AnnotationCommand,
   CaptureLaunch,
   CaptureMode,
-  ArrowKey,
   LogicalRect,
   Point,
 } from './types';
@@ -191,16 +164,9 @@ const captureWindow = getCurrentAppWebviewWindow();
 
 const MIN_SELECTION_SIZE = 10;
 const EDGE_SNAP_THRESHOLD = 6;
-const KEYBOARD_NUDGE_STEP = 1;
-const KEYBOARD_FAST_NUDGE_STEP = 10;
 const TOOLBAR_GAP = 14;
 const TOOLBAR_SIZE = { width: 1220, height: 56 };
 const CAPTURE_HOVER_POLL_INTERVAL_MS = 16;
-const ARROW_KEYS: ArrowKey[] = ['ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowLeft'];
-
-function isArrowKey(key: string): key is ArrowKey {
-  return ARROW_KEYS.includes(key as ArrowKey);
-}
 
 function areRectsEqual(a: LogicalRect | null, b: LogicalRect | null) {
   if (a === b) return true;
@@ -1169,7 +1135,7 @@ export default function ScreenshotSession({
   }, [completeManualSelection, selectionBounds]);
 
   const restoreSelectionFromHistory = useCallback(
-    (step: ReturnType<typeof getSelectionHistoryStepFromShortcut>) => {
+    (step: SelectionHistoryStep) => {
       if (!selectionBounds) return;
 
       restoreSelectionFromHostHistory({
@@ -1254,410 +1220,142 @@ export default function ScreenshotSession({
     ensureCaptureSnapshotsHydrated,
   });
 
-  const handleCaptureKeyboardKeyDown = useCallback((event: KeyboardEvent) => {
-      const activeStartPoint = startPointRef.current ?? startPoint;
-      const activeCursorPoint = cursorPointRef.current ?? cursorPoint;
-      const activeDraftSelection = draftSelectionRef.current ?? selection;
-      const activeHoverSelection = hoverSelectionRef.current ?? hoverSelection;
-      const cursorNudgeDelta = getCursorNudgeDeltaFromShortcut(event);
-      const candidateCycleDirection =
-        getCandidateCycleDirectionFromShortcut(event);
-      const hoverSelectionCompletionAction =
-        getHoverSelectionCompletionActionFromShortcut(event, {
-          drafting: activeStartPoint !== null,
-          mode,
-        });
-      const selectionHistoryStep = getSelectionHistoryStepFromShortcut(event);
-      const undoRedoAction = getUndoRedoActionFromShortcut(event);
-      const previewCaptureCompletionAction =
-        getPreviewCaptureCompletionActionFromShortcut(event);
-      const toolbarAction = getCaptureKeyboardToolbarAction(
-        event,
-        isAnnotationToolbarVisible,
-      );
-      const selectionArrowAction = getSelectionArrowActionFromShortcut(event, {
-        editing:
-          hasAnnotationEditingContext ||
-          annotationGesture !== null ||
-          annotationMoveGesture !== null ||
-          textDraft !== null,
-      });
-      const cycledAnnotationTool = nextAnnotationToolFromCycleShortcut(
-        event,
-        activeAnnotationTool,
-      );
+  const captureWorkspaceKeyboardRefs =
+    useMemo<CaptureWorkspaceKeyboardRefs>(
+      () => ({
+        startPointRef,
+        cursorPointRef,
+        draftSelectionRef,
+        hoverSelectionRef,
+        keyboardDraftCursorPointRef,
+        keyboardEditCursorPointRef,
+      }),
+      [
+        cursorPointRef,
+        draftSelectionRef,
+        hoverSelectionRef,
+        keyboardDraftCursorPointRef,
+        keyboardEditCursorPointRef,
+        startPointRef,
+      ],
+    );
 
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        dismissCaptureLayer();
-      } else if (
-        (status === 'selecting' || status === 'preview') &&
-        isRefreshCaptureShortcut(event)
-      ) {
-        event.preventDefault();
-        void refreshSession();
-      } else if (
-        (status === 'selecting' || status === 'preview') &&
-        !textDraft &&
-        canToggleCapturedCursor(session) &&
-        isToggleCapturedCursorShortcut(event)
-      ) {
-        event.preventDefault();
-        const nextIncludeCursor = !includeCapturedCursor;
-        setIncludeCapturedCursor(nextIncludeCursor);
-        if (status === 'preview' && selection) {
-          setPreviewImageBase64(null);
-          void renderSelectionPreview(selection, annotations, nextIncludeCursor);
-        }
-      } else if (isMagnifierShortcut(event)) {
-        event.preventDefault();
-        setIsMagnifierRequested(true);
-      } else if (
-        status === 'preview' &&
-        isClearAnnotationsShortcut(event)
-      ) {
-        event.preventDefault();
-        clearAnnotations();
-      } else if (
-        status === 'preview' &&
-        undoRedoAction === 'undo' &&
-        annotationGesture?.tool === 'polyline'
-      ) {
-        event.preventDefault();
-        undoPolylineGesturePoint();
-      } else if (
-        status === 'preview' &&
-        undoRedoAction
-      ) {
-        event.preventDefault();
-        if (undoRedoAction === 'undo') {
-          undoAnnotation();
-        } else {
-          redoAnnotation();
-        }
-      } else if (
-        status === 'preview' &&
-        annotationGesture?.tool === 'polyline' &&
-        isUndoAnnotationGesturePointShortcut(event)
-      ) {
-        event.preventDefault();
-        undoPolylineGesturePoint();
-      } else if (
-        status === 'preview' &&
-        selectedAnnotationIndex !== null &&
-        isDeleteSelectedAnnotationShortcut(event)
-      ) {
-        event.preventDefault();
-        deleteSelectedAnnotation();
-      } else if (
-        !textDraft &&
-        isMagnifierShown &&
-        cursorColor &&
-        isColorSampleCopyShortcut(event)
-      ) {
-        event.preventDefault();
-        void copyCurrentColor();
-      } else if (
-        !textDraft &&
-        isMagnifierShown &&
-        cursorColor &&
-        !event.repeat &&
-        isColorSampleFormatToggleShortcut(event)
-      ) {
-        event.preventDefault();
-        setColorSampleFormat((format) => (format === 'hex' ? 'rgb' : 'hex'));
-      } else if (
-        (status === 'selecting' || status === 'preview') &&
-        !textDraft &&
-        selectionHistoryStep
-      ) {
-        event.preventDefault();
-        restoreSelectionFromHistory(selectionHistoryStep);
-      } else if (
-        shouldRestoreLastSelectionFromShortcut(event, {
-          status,
-          editing:
-            hasAnnotationEditingContext ||
-            annotationGesture !== null ||
-            annotationMoveGesture !== null ||
-            textDraft !== null,
-        })
-      ) {
-        event.preventDefault();
-        restoreLastSelection();
-      } else if (
-        status === 'selecting' &&
-        !textDraft &&
-        activeStartPoint &&
-        activeDraftSelection &&
-        activeCursorPoint &&
-        selectionBounds &&
-        cursorNudgeDelta
-      ) {
-        event.preventDefault();
-        const draftNudge = planCaptureDraftSelectionKeyboardNudge({
-          anchorPoint: activeStartPoint,
-          cursorPoint: activeCursorPoint,
-          delta: cursorNudgeDelta,
-          selectionBounds,
-        });
-        keyboardDraftCursorPointRef.current = draftNudge.keyboardDraftCursorPoint;
-        cursorPointRef.current = draftNudge.cursorPoint;
-        draftSelectionRef.current = draftNudge.selection;
-        setCursorPoint(draftNudge.cursorPoint);
-        setSelection(draftNudge.selection);
-        scheduleSelectionOverlayPaint(draftNudge.selection, null);
-        setPreviewImageBase64(draftNudge.previewImageBase64);
-        setRenderingOutput(draftNudge.renderingOutput);
-      } else if (
-        status === 'preview' &&
-        !textDraft &&
-        editGesture &&
-        selection &&
-        cursorPoint &&
-        selectionBounds &&
-        cursorNudgeDelta
-      ) {
-        event.preventDefault();
-        const editNudge = planCaptureSelectionEditKeyboardNudge({
-          gesture: editGesture,
-          selection,
-          cursorPoint,
-          delta: cursorNudgeDelta,
-          selectionBounds,
-          minSelectionSize: MIN_SELECTION_SIZE,
-          preserveAspect: event.shiftKey,
-        });
-        keyboardEditCursorPointRef.current = editNudge.keyboardEditCursorPoint;
-        setCursorPoint(editNudge.cursorPoint);
-        setSelection(editNudge.selection);
-        setEditGesture(editNudge.editGesture);
-        setPreviewImageBase64(editNudge.previewImageBase64);
-        setRenderingOutput(editNudge.renderingOutput);
-      } else if (
-        status === 'selecting' &&
-        !textDraft &&
-        activeCursorPoint &&
-        selectionBounds &&
-        cursorNudgeDelta
-      ) {
-        event.preventDefault();
-        const cursorNudge = planCaptureSelectionCursorKeyboardNudge({
-          cursorPoint: activeCursorPoint,
-          delta: cursorNudgeDelta,
-          selectionBounds,
-        });
-        cursorPointRef.current = cursorNudge.cursorPoint;
-        setCursorPoint(cursorNudge.cursorPoint);
-      } else if (
-        status === 'selecting' &&
-        !textDraft &&
-        activeCursorPoint &&
-        candidateCycleDirection
-      ) {
-        event.preventDefault();
-        const hoverCycle = planCaptureHoverSelectionCycle({
-          captureCandidates,
-          cursorPoint: activeCursorPoint,
-          hoverSelection: activeHoverSelection,
-          direction: candidateCycleDirection,
-        });
-        syncHoverSelection(hoverCycle.hoverSelection);
-      } else if (
-        (status === 'selecting' || status === 'preview') &&
-        !textDraft &&
-        isSelectAllCaptureShortcut(event)
-      ) {
-        event.preventDefault();
-        selectFullCaptureArea();
-      } else if (
-        status === 'selecting' &&
-        activeHoverSelection &&
-        hoverSelectionCompletionAction
-      ) {
-        event.preventDefault();
-        void completeCandidateSelection(
-          activeHoverSelection,
-          hoverSelectionCompletionAction,
-        );
-      } else if (
-        status === 'preview' &&
-        !textDraft &&
-        toolbarAction === 'toggle'
-      ) {
-        event.preventDefault();
-        setIsAnnotationToolbarVisible((visible) => !visible);
-      } else if (
-        status === 'preview' &&
-        previewCaptureCompletionAction
-      ) {
-        event.preventDefault();
-        void completePreviewSelection(previewCaptureCompletionAction, {
-          guardCompletion: previewCaptureCompletionAction === 'copy',
-        });
-      } else if (
-        status === 'preview' &&
-        !textDraft &&
-        (event.key === '[' ||
-          event.key === ']' ||
-          (hasAnnotationEditingContext &&
-            (event.key === '1' || event.key === '2')))
-      ) {
-        const sizeDirection = annotationSizeDirectionFromShortcut(event, {
-          editing: hasAnnotationEditingContext,
-        });
-        if (sizeDirection) {
-          event.preventDefault();
-          adjustAnnotationSize(sizeDirection);
-        }
-      } else if (
-        status === 'preview' &&
-        !textDraft &&
-        isFillModeActive &&
-        !annotationGesture &&
-        !annotationMoveGesture &&
-        isAnnotationFillToggleShortcut(event)
-      ) {
-        event.preventDefault();
-        toggleAnnotationFill();
-      } else if (
-        status === 'preview' &&
-        !textDraft &&
-        cycledAnnotationTool &&
-        !annotationGesture &&
-        !annotationMoveGesture
-      ) {
-        event.preventDefault();
-        const toolActivation = planCaptureAnnotationToolActivation({
-          currentTool: activeAnnotationTool,
-          nextTool: cycledAnnotationTool,
-          selectedAnnotationIndex,
-          clearSelectedAnnotation: true,
-          toggle: false,
-        });
-        setActiveAnnotationTool(toolActivation.activeAnnotationTool);
-        setSelectedAnnotationIndex(toolActivation.selectedAnnotationIndex);
-        setAnnotationGesture(toolActivation.annotationGesture);
-        setAnnotationMoveGesture(toolActivation.annotationMoveGesture);
-        setDraftAnnotation(toolActivation.draftAnnotation);
-      } else if (
-        status === 'preview' &&
-        !textDraft &&
-        !annotationGesture &&
-        !annotationMoveGesture
-      ) {
-        const shortcutColor = annotationColorFromShortcut(event);
-        if (shortcutColor) {
-          event.preventDefault();
-          selectAnnotationColor(shortcutColor);
-        } else {
-          const shortcutTool = annotationToolFromShortcut(event);
-          if (shortcutTool) {
-            event.preventDefault();
-            toggleAnnotationTool(shortcutTool);
-          }
-        }
-      } else if (
-        isMoveDraftSelectionShortcut(event) &&
-        status === 'selecting' &&
-        activeStartPoint &&
-        activeDraftSelection &&
-        activeCursorPoint &&
-        !draftSelectionMoveGesture
-      ) {
-        event.preventDefault();
-        const draftSelectionMoveStart = planCaptureDraftSelectionMoveShortcutStart({
-          cursorPoint: activeCursorPoint,
-          selection: activeDraftSelection,
-          anchorPoint: activeStartPoint,
-        });
-        setDraftSelectionMoveGesture(
-          draftSelectionMoveStart.draftSelectionMoveGesture,
-        );
-      } else if (
-        status === 'preview' &&
-        !textDraft &&
-        !annotationGesture &&
-        !annotationMoveGesture &&
-        selectedAnnotationIndex !== null &&
-        isArrowKey(event.key)
-      ) {
-        event.preventDefault();
-        const annotationNudge = planCaptureSelectedAnnotationKeyboardNudge({
-          annotationHistory,
-          annotations,
-          selectedAnnotationIndex,
-          key: event.key,
-          fast: event.shiftKey,
-          keyboardNudgeStep: KEYBOARD_NUDGE_STEP,
-          keyboardFastNudgeStep: KEYBOARD_FAST_NUDGE_STEP,
-        });
-        if (annotationNudge.previewAnnotations && selection) {
-          setAnnotationHistory(annotationNudge.annotationHistory);
-          void renderSelectionPreview(selection, annotationNudge.previewAnnotations);
-        }
-      } else if (
-        status === 'preview' &&
-        selection &&
-        selectionBounds &&
-        selectionArrowAction
-      ) {
-        event.preventDefault();
-        const selectionArrowPreview = planCaptureSelectionArrowPreview({
-          selection,
-          selectionBounds,
-          selectionArrowAction,
-          minSelectionSize: MIN_SELECTION_SIZE,
-          keyboardNudgeStep: KEYBOARD_NUDGE_STEP,
-        });
-        setSelection(selectionArrowPreview.selection);
-        setPreviewImageBase64(selectionArrowPreview.previewImageBase64);
-        void renderSelectionPreview(selectionArrowPreview.previewRender.rect);
-      }
+  const captureWorkspaceKeyboardDerived =
+    useMemo<CaptureWorkspaceKeyboardDerivedState>(
+      () => ({
+        annotations,
+        captureCandidates,
+        selectionBounds,
+        hasAnnotationEditingContext,
+        isAnnotationToolbarVisible,
+        isMagnifierShown,
+        isFillModeActive,
+        cursorColor,
+      }),
+      [
+        annotations,
+        captureCandidates,
+        cursorColor,
+        hasAnnotationEditingContext,
+        isAnnotationToolbarVisible,
+        isFillModeActive,
+        isMagnifierShown,
+        selectionBounds,
+      ],
+    );
+
+  const captureWorkspaceKeyboardActions =
+    useMemo<CaptureWorkspaceKeyboardActions>(
+      () => ({
+        dismissCaptureLayer,
+        refreshSession,
+        setIncludeCapturedCursor,
+        clearPreviewImage: () => setPreviewImageBase64(null),
+        renderSelectionPreview,
+        setIsMagnifierRequested,
+        clearAnnotations,
+        undoPolylineGesturePoint,
+        undoAnnotation,
+        redoAnnotation,
+        deleteSelectedAnnotation,
+        copyCurrentColor,
+        setColorSampleFormat,
+        restoreSelectionFromHistory,
+        restoreLastSelection,
+        setCursorPoint,
+        setSelection,
+        scheduleSelectionOverlayPaint,
+        setPreviewImageBase64,
+        setRenderingOutput,
+        setEditGesture,
+        syncHoverSelection,
+        selectFullCaptureArea,
+        completeCandidateSelection,
+        setIsAnnotationToolbarVisible,
+        completePreviewSelection,
+        adjustAnnotationSize,
+        toggleAnnotationFill,
+        setActiveAnnotationTool,
+        setSelectedAnnotationIndex,
+        setAnnotationGesture,
+        setAnnotationMoveGesture,
+        setDraftAnnotation,
+        selectAnnotationColor,
+        toggleAnnotationTool,
+        setDraftSelectionMoveGesture,
+        setAnnotationHistory,
+      }),
+      [
+        adjustAnnotationSize,
+        clearAnnotations,
+        completeCandidateSelection,
+        completePreviewSelection,
+        copyCurrentColor,
+        deleteSelectedAnnotation,
+        dismissCaptureLayer,
+        redoAnnotation,
+        refreshSession,
+        renderSelectionPreview,
+        restoreLastSelection,
+        restoreSelectionFromHistory,
+        scheduleSelectionOverlayPaint,
+        selectAnnotationColor,
+        selectFullCaptureArea,
+        setActiveAnnotationTool,
+        setAnnotationGesture,
+        setAnnotationHistory,
+        setAnnotationMoveGesture,
+        setColorSampleFormat,
+        setCursorPoint,
+        setDraftAnnotation,
+        setDraftSelectionMoveGesture,
+        setEditGesture,
+        setIncludeCapturedCursor,
+        setIsAnnotationToolbarVisible,
+        setIsMagnifierRequested,
+        setPreviewImageBase64,
+        setRenderingOutput,
+        setSelectedAnnotationIndex,
+        setSelection,
+        toggleAnnotationFill,
+        toggleAnnotationTool,
+        undoAnnotation,
+        undoPolylineGesturePoint,
+      ],
+    );
+
+  const handleCaptureKeyboardKeyDown = useCallback((event: KeyboardEvent) => {
+    handleCaptureWorkspaceKeyDown(event, {
+      state: captureWorkspaceState,
+      refs: captureWorkspaceKeyboardRefs,
+      derived: captureWorkspaceKeyboardDerived,
+      actions: captureWorkspaceKeyboardActions,
+    });
   }, [
-    adjustAnnotationSize,
-    clearAnnotations,
-    completeCandidateSelection,
-    completePreviewSelection,
-    copyCurrentColor,
-    copySelection,
-    colorSampleFormat,
-    activeAnnotationTool,
-    annotationHistory,
-    annotationGesture,
-    annotationMoveGesture,
-    annotations,
-    captureCandidates,
-    cursorPoint,
-    draftSelectionMoveGesture,
-    dismissCaptureLayer,
-    editGesture,
-    hasAnnotationEditingContext,
-    hoverSelection,
-    includeCapturedCursor,
-    isAnnotationToolbarVisible,
-    isMagnifierShown,
-    isFillModeActive,
-    textDraft,
-    deleteSelectedAnnotation,
-    redoAnnotation,
-    refreshSession,
-    renderSelectionPreview,
-    restoreLastSelection,
-    restoreSelectionFromHistory,
-    selectAnnotationColor,
-    selection,
-    selectionBounds,
-    selectedAnnotationIndex,
-    selectFullCaptureArea,
-    startPoint,
-    status,
-    syncHoverSelection,
-    cursorColor,
-    toggleAnnotationTool,
-    toggleAnnotationFill,
-    undoAnnotation,
-    undoPolylineGesturePoint,
+    captureWorkspaceKeyboardActions,
+    captureWorkspaceKeyboardDerived,
+    captureWorkspaceKeyboardRefs,
+    captureWorkspaceState,
   ]);
 
   const releaseCaptureMagnifierRequest = useCallback(() => {
