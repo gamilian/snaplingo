@@ -118,9 +118,27 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 - 一次性迁移旧前端 localStorage 中的 durable 设置，但不接管导航状态或热键注册生命周期
 
 **边界：**
-- Settings Configuration 不负责快捷键注册；全局快捷键仍由 `startup_shortcuts.rs` 管理
+- Settings Configuration 不负责快捷键配置或注册；全局快捷键由 Hotkey Configuration / Runtime 管理
 - Provider 配置仍由 Provider Configuration Module 和各 Coordinator 管理
 - 前端不再直接持久化 general/screenshot/translation durable values
+
+### Hotkey Configuration Module（快捷键配置模块）
+`src-tauri/src/application/hotkeys/configuration.rs` 中的快捷键配置生命周期模块。
+
+**职责：**
+- 拥有 screenshot / translation / OCR 三类快捷键 snapshot 的读取、合并和保存
+- 使用现有 `"hotkeys"` 配置 key，保持旧配置文件兼容
+- 迁移旧前端 WebKit localStorage 中的 hotkeys，但忽略 durable settings 和导航状态
+- 校验未知 category/action，并复用 display hotkey parser 过滤无效快捷键
+
+### Hotkey Runtime（快捷键运行时）
+`src-tauri/src/application/hotkeys/runtime.rs` 中的全局快捷键注册生命周期模块。
+
+**职责：**
+- 启动时从 Hotkey Configuration snapshot 注册全局快捷键
+- 运行时更新时先注册/注销系统快捷键，再推进后端配置 snapshot
+- 持有当前注册表，避免前端缓存、配置文件和系统注册状态互相漂移
+- 将快捷键触发委托给 `startup_shortcuts.rs` 中的 action dispatch/timing 规则
 
 ### Durable Settings Store（持久设置 Store）
 `src/stores/settingsConfigStore.ts` 中的前端 store。
@@ -129,7 +147,7 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 - 通过 `src/tauri/settings.ts` hydrate 后端 settings snapshot
 - 为 Settings、ScreenshotSession、PinnedImageWindow、ResultWindow 共享同一份 durable settings cache
 - 调用 section update command 后用后端返回的 snapshot 更新本地 cache
-- 清理已迁移的旧 durable localStorage keys，保留导航状态和 hotkey UI state
+- 清理已迁移的旧 durable localStorage keys，保留导航状态和 legacy hotkeys 给后端迁移
 
 ### Settings Navigation State（设置导航状态）
 `src/components/SettingsWindow/settingsNavigationState.ts` 中的前端纯模型。
@@ -144,8 +162,17 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 
 **职责：**
 - 保存 Settings Window 的 main tab / secondary tab UI 状态
-- 保存当前 hotkey UI state，供设置页展示和录制交互使用
 - 不保存 durable general/screenshot/translation 设置；这些值必须走 Durable Settings Store
+- 不保存 hotkey state；快捷键展示和录制必须走 Hotkey Config Store
+
+### Hotkey Config Store（快捷键配置 Store）
+`src/stores/hotkeyConfigStore.ts` 中的前端 store。
+
+**职责：**
+- 通过 `src/tauri/hotkeys.ts` hydrate 后端 hotkey snapshot
+- 作为 Settings hotkey 页面缓存，不拥有默认值来源
+- 更新、清空和重置快捷键时调用后端 `update_hotkey`，用返回的 snapshot 覆盖本地缓存
+- 不做系统注册；注册副作用只发生在后端 Hotkey Runtime
 
 ### Capture Mode（捕获模式）
 用户触发的五种独立功能入口：
@@ -312,6 +339,7 @@ Provider 类型：
   - Linux: Secret Service
 - **非敏感配置**（语言偏好、是否激活、超时设置等）：存储在统一配置文件 `~/.snaplingo/config.json`
 - **持久用户设置**（general/screenshot/translation）：通过 Settings Configuration Module 读写；前端只通过 `settingsConfigStore` hydrate 和 section update
+- **快捷键配置**（screenshot/translation/OCR）：通过 Hotkey Configuration / Runtime 读写和注册；前端只通过 `hotkeyConfigStore` hydrate 和 update
 - **配置持久性**：配置不随应用卸载删除，用户需在设置中主动"清除所有数据"才会删除
 
 ## Workflows

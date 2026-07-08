@@ -31,10 +31,12 @@ Infrastructure Layer (基础设施层)
 - `src/tauri/*` 是前端 Tauri Adapter seam，集中维护 command 名称和 payload 形状。
 - `src/tauri/appEvents.ts` 是前端 Tauri event Adapter seam，集中维护主窗口 event 名称、payload 解析和订阅清理。
 - `src/tauri/settings.ts` + `src/stores/settingsConfigStore.ts` 是前端 durable settings seam；Settings、Capture、Result、Pinned 窗口都从同一后端 snapshot hydrate。
+- `src/tauri/hotkeys.ts` + `src/stores/hotkeyConfigStore.ts` 是前端 hotkey seam；Settings hotkey 页面只缓存后端 snapshot 并调用 update command。
 - `src-tauri/src/commands/*` 是后端 Tauri command seam，负责把 IPC 请求转给 Application 层。
 - `src-tauri/src/app_state.rs` 拥有 AppState 形状和关闭顺序。
 - `src-tauri/src/composition.rs` 是应用组合入口；`src-tauri/src/composition/*_runtime.rs` 拆分 Provider、Capture、Selection、History 的构造策略。
-- `src-tauri/src/startup_shortcuts.rs` 拥有启动期全局快捷键注册。
+- `src-tauri/src/application/hotkeys/*` 是 Hotkey Configuration / Runtime module，拥有快捷键 snapshot、legacy migration、启动注册和运行时更新生命周期。
+- `src-tauri/src/startup_shortcuts.rs` 只保留快捷键 action dispatch、display hotkey parser 和 release timing rule。
 - `src-tauri/src/application/settings/configuration.rs` 是 Settings Configuration module，拥有 durable settings 默认值、路径归一化、section 更新和 legacy migration。
 - `src-tauri/src/application/services/selected_text_acquirer.rs` 是 Selected Text acquisition workflow，拥有取词方法顺序和诊断；平台取词 mechanics 留在 `infrastructure/system/selection/*`。
 - `application/services/capture_session_runtime.rs` 是 Capture Session Runtime，统一编排截图输出和 OCR。
@@ -50,6 +52,7 @@ snaplingo/
 │   ├─ tauri/                           # ⭐ Frontend Tauri Adapter seam
 │   │   ├─ appEvents.ts                  # 主窗口 Tauri event Adapter
 │   │   ├─ settings.ts                   # durable settings command adapter
+│   │   ├─ hotkeys.ts                    # hotkey snapshot/update command adapter
 │   │   ├─ translation.ts
 │   │   ├─ providers.ts
 │   │   ├─ history.ts
@@ -65,7 +68,8 @@ snaplingo/
 │   ├─ hooks/
 │   └─ stores/                          # Zustand 状态管理
 │       ├─ settingsConfigStore.ts        # 后端 snapshot backed durable settings
-│       └─ settingsStore.ts              # Settings UI navigation + hotkey UI state
+│       ├─ hotkeyConfigStore.ts          # 后端 snapshot backed hotkey settings
+│       └─ settingsStore.ts              # Settings UI navigation
 │
 ├─ src-tauri/src/
 │   ├─ main.rs                          # Tauri binary 入口
@@ -77,7 +81,7 @@ snaplingo/
 │   │   ├─ capture_runtime.rs
 │   │   ├─ selection_runtime.rs
 │   │   └─ history_runtime.rs
-│   ├─ startup_shortcuts.rs             # 启动期全局快捷键注册
+│   ├─ startup_shortcuts.rs             # hotkey action dispatch + parser/timing
 │   ├─ error.rs                         # 统一错误类型
 │   │
 │   ├─ commands/                        # ⭐ Backend Tauri command seam
@@ -90,6 +94,10 @@ snaplingo/
 │   │   └─ ...
 │   │
 │   ├─ application/                     # ⭐ Application Layer
+│   │   ├─ hotkeys/                     # hotkey config + runtime lifecycle
+│   │   │   ├─ configuration.rs          # defaults merge, persistence, legacy migration
+│   │   │   ├─ runtime.rs                # registration state + startup/update lifecycle
+│   │   │   └─ mod.rs
 │   │   ├─ settings/                    # durable user settings module
 │   │   │   ├─ configuration.rs          # defaults, merge, path normalization, persistence
 │   │   │   └─ mod.rs
@@ -120,6 +128,7 @@ snaplingo/
 │   ├─ domain/                          # ⭐ Domain Layer
 │   │   ├─ capture.rs                   # 纯数据结构
 │   │   ├─ config.rs                    # durable settings snapshot types
+│   │   ├─ hotkey_config.rs             # hotkey snapshot/default action table
 │   │   ├─ selection.rs                 # selected-text method/source/result types
 │   │   ├─ translation.rs
 │   │   └─ ocr.rs
@@ -223,7 +232,14 @@ providers/ocr/
 - 后端 owns durable defaults：`general`、`screenshot`、`translation`
 - 前端通过 `src/tauri/settings.ts` 调用 section update command，不直接写 durable localStorage
 - `settingsConfigStore.ts` 只缓存后端 snapshot 并负责一次性 legacy migration
-- `settingsStore.ts` 只保留 Settings UI navigation 和 hotkey UI state；热键注册生命周期仍由 `startup_shortcuts.rs` 拥有
+- `settingsStore.ts` 只保留 Settings UI navigation
+
+**Hotkey Configuration / Runtime 边界：**
+- `domain/hotkey_config.rs` 只定义 sectioned hotkey snapshot、默认 action table 和 category/action 校验
+- `application/hotkeys/configuration.rs` 拥有 `"hotkeys"` 配置读写、默认值合并和 legacy localStorage hotkey migration
+- `application/hotkeys/runtime.rs` 拥有注册状态、启动注册和运行时更新顺序；更新时系统注册成功后才推进配置 snapshot
+- `startup_shortcuts.rs` 只保留 display hotkey parser、release timing rule 和 action dispatch，不再持有配置或注册状态
+- 前端 `hotkeyConfigStore.ts` 只缓存后端 snapshot；Settings 页面清空/重置/录制都通过 `src/tauri/hotkeys.ts`
 
 **Selected Text acquisition 边界：**
 - `SelectedTextAcquirer` 拥有取词方法顺序、成功短路和失败诊断格式
@@ -418,7 +434,28 @@ Frontend: all windows hydrate the same settings snapshot
 
 ---
 
-### 场景 4：划词翻译取词
+### 场景 4：用户修改全局快捷键
+
+```
+用户在 Settings Hotkeys 页面录制快捷键
+    ↓
+Hotkey page: useHotkeyConfigStore.updateHotkey(category, action, hotkey)
+    ↓
+Frontend Adapter: src/tauri/hotkeys.ts
+    ↓
+Commands: update_hotkey(category, action, hotkey, AppHandle, State)
+    ↓
+Application: HotkeyRuntime.update_hotkey(...)
+    ↓ 分两步
+    ├─→ Infrastructure: register/unregister global shortcut
+    └─→ Application: HotkeyConfiguration.update_hotkey(...)
+            ↓
+            ConfigFile.save("hotkeys", snapshot)
+```
+
+---
+
+### 场景 5：划词翻译取词
 
 ```
 用户触发划词翻译快捷键
@@ -607,6 +644,7 @@ impl CaptureSessionRuntime {
 | **Provider** | Mock HttpClient，单元测试 recognize() |
 | **Coordinator** | 单元测试激活、恢复、重配置和执行协调 |
 | **Settings Configuration** | Rust 测 section defaults、partial update、path normalization、legacy migration |
+| **Hotkey Configuration / Runtime** | Rust 测默认值合并、legacy migration、注册顺序、失败不推进持久化 |
 | **SelectedTextAcquirer** | Rust 测 method ordering、success short-circuit、unsupported/unavailable/failed diagnostics |
 | **Capture Session Runtime** | 通过一个 Interface 测试 render/output/OCR 编排 |
 | **Capture Interaction Runtime** | Vitest 测选区完成后的 effect plan |
@@ -650,10 +688,11 @@ Commands → Application → Domain
 - Backend runtime 已通过 `src-tauri/src/commands/*` 保持 Tauri command seam。
 - Provider 当前由 `TranslationCoordinator` 和 `OcrCoordinator` 统一管理激活、持久化、执行和运行时重配置。
 - Provider Configuration Module 负责凭证校验、自定义 Translation Provider 定义、运行时新增/注册/激活和回滚。
+- Hotkey Configuration / Runtime 负责快捷键 snapshot、legacy migration、启动注册和运行时更新生命周期；前端 Settings 页面只走 `hotkeyConfigStore`。
 - Capture Session Runtime 已集中截图会话的 render/output/OCR 编排。
 - AppState 形状位于 `src-tauri/src/app_state.rs`；`lib.rs` 只保留 Tauri builder/plugin setup、command 注册和启动模块调用。
 - Application Composition 由 `src-tauri/src/composition.rs` assembly shell 和 `src-tauri/src/composition/*_runtime.rs` 构造策略 builders 组成。
-- 启动期快捷键注册位于 `src-tauri/src/startup_shortcuts.rs`。
+- 快捷键 action dispatch 和 display parser 位于 `src-tauri/src/startup_shortcuts.rs`。
 - Settings navigation state、Capture interaction runtime/model 是前端纯模块 seam，可用 Vitest 直接覆盖交互规则。
 
 ---
