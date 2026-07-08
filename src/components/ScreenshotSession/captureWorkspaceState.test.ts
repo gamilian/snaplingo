@@ -1,8 +1,4 @@
-import React, {
-  type DependencyList,
-  type MutableRefObject,
-  type SetStateAction,
-} from 'react';
+import type { MutableRefObject } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { emptyAnnotationHistory } from './annotationHistory';
@@ -20,199 +16,57 @@ import {
 } from './captureWorkspaceState';
 import {
   type CaptureWorkspaceRefs,
-  type UseCaptureWorkspaceStateOptions,
   applyCaptureWorkspaceStatePatch,
   createCaptureWorkspaceStateActions,
-  useCaptureWorkspaceState,
+  createCaptureWorkspaceStateController,
 } from './useCaptureWorkspaceState';
 import type { CaptureSessionView, LogicalRect, Point } from './types';
 
-type CaptureWorkspaceHookResult = ReturnType<typeof useCaptureWorkspaceState>;
-
-type CaptureWorkspaceProbeProps = {
-  options?: UseCaptureWorkspaceStateOptions;
-  onRender: (workspace: CaptureWorkspaceHookResult) => void;
+type CaptureWorkspaceControllerOptions = {
+  onRenderingOutputChange?: (isRendering: boolean) => void;
+  onHoverSelectionSynced?: (nextHoverSelection: LogicalRect | null) => void;
 };
 
-type StateSlot = {
-  kind: 'state';
-  setValue: (nextValue: unknown) => void;
-  value: unknown;
-};
-
-type RefSlot<Value = unknown> = {
-  kind: 'ref';
-  value: MutableRefObject<Value>;
-};
-
-type MemoSlot<Value = unknown> = {
-  deps: DependencyList | undefined;
-  kind: 'memo';
-  value: Value;
-};
-
-type HookSlot = StateSlot | RefSlot | MemoSlot;
-
-type TestHookDispatcher = {
-  useCallback: <Callback extends (...args: never[]) => unknown>(
-    callback: Callback,
-    deps: DependencyList | undefined,
-  ) => Callback;
-  useMemo: <Value>(
-    factory: () => Value,
-    deps: DependencyList | undefined,
-  ) => Value;
-  useRef: <Value>(initialValue: Value) => MutableRefObject<Value>;
-  useState: <State>(
-    initialState: State | (() => State),
-  ) => [State, (nextValue: SetStateAction<State>) => void];
-};
-
-function CaptureWorkspaceStateProbe({
-  options,
-  onRender,
-}: CaptureWorkspaceProbeProps) {
-  onRender(useCaptureWorkspaceState(options));
-
-  return null;
-}
-
-function createCaptureWorkspaceHookProbe(
-  options?: UseCaptureWorkspaceStateOptions,
+function createCaptureWorkspaceControllerProbe(
+  options?: CaptureWorkspaceControllerOptions,
 ) {
-  const hookSlots: HookSlot[] = [];
-  const reactDispatcher = (
-    React as typeof React & {
-      __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED: {
-        ReactCurrentDispatcher: {
-          current: TestHookDispatcher | null;
-        };
-      };
-    }
-  ).__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentDispatcher;
-  let hookIndex = 0;
-  let current: CaptureWorkspaceHookResult | null = null;
-
-  const dispatcher: TestHookDispatcher = {
-    useCallback(callback, deps) {
-      return dispatcher.useMemo(() => callback, deps);
-    },
-    useMemo(factory, deps) {
-      const index = hookIndex;
-      hookIndex += 1;
-      const existingSlot = hookSlots[index];
-
-      if (
-        existingSlot?.kind === 'memo' &&
-        areHookDepsEqual(existingSlot.deps, deps)
-      ) {
-        return existingSlot.value as ReturnType<typeof factory>;
-      }
-
-      const value = factory();
-      hookSlots[index] = { deps, kind: 'memo', value };
-
-      return value;
-    },
-    useRef(initialValue) {
-      const index = hookIndex;
-      hookIndex += 1;
-      const existingSlot = hookSlots[index];
-
-      if (existingSlot?.kind === 'ref') {
-        return existingSlot.value as MutableRefObject<typeof initialValue>;
-      }
-
-      const value = createMutableRef(initialValue);
-      hookSlots[index] = { kind: 'ref', value };
-
-      return value;
-    },
-    useState<State>(initialState: State | (() => State)) {
-      const index = hookIndex;
-      hookIndex += 1;
-      const existingSlot = hookSlots[index];
-
-      if (existingSlot?.kind === 'state') {
-        const stateSlot = existingSlot as StateSlot;
-
-        return [
-          stateSlot.value as State,
-          stateSlot.setValue as (nextValue: SetStateAction<State>) => void,
-        ];
-      }
-
-      const initialValue: State =
-        typeof initialState === 'function'
-          ? (initialState as () => State)()
-          : initialState;
-      const slot: StateSlot = {
-        kind: 'state',
-        setValue(nextValue) {
-          const resolvedNextValue = nextValue as SetStateAction<State>;
-
-          slot.value =
-            typeof resolvedNextValue === 'function'
-              ? (resolvedNextValue as (currentValue: State) => State)(
-                  slot.value as State,
-                )
-              : resolvedNextValue;
-        },
-        value: initialValue,
-      };
-      hookSlots[index] = slot;
-
-      return [
-        slot.value as State,
-        slot.setValue as (nextValue: SetStateAction<State>) => void,
-      ];
-    },
+  let state = createInitialCaptureWorkspaceState();
+  const refs: CaptureWorkspaceRefs = {
+    startPointRef: createMutableRef<Point | null>(null),
+    cursorPointRef: createMutableRef<Point | null>(null),
+    draftSelectionRef: createMutableRef<LogicalRect | null>(null),
+    hoverSelectionRef: createMutableRef<LogicalRect | null>(null),
   };
-
-  const render = () => {
-    hookIndex = 0;
-    const previousDispatcher = reactDispatcher.current;
-    reactDispatcher.current = dispatcher;
-
-    try {
-      CaptureWorkspaceStateProbe({
-        options,
-        onRender: (workspace) => {
-          current = workspace;
-        },
-      });
-    } finally {
-      reactDispatcher.current = previousDispatcher;
-    }
-  };
-
-  render();
+  const controller = createCaptureWorkspaceStateController({
+    refs,
+    setState(updateState) {
+      state = updateState(state);
+    },
+    ...options,
+  });
 
   return {
-    act(action: (workspace: CaptureWorkspaceHookResult) => void) {
+    act(action: (workspace: ReturnType<typeof getCurrent>) => void) {
       action(this.current);
-      render();
 
       return this.current;
     },
     get current() {
-      if (!current) {
-        throw new Error('Capture workspace hook probe has not rendered');
-      }
-
-      return current;
+      return getCurrent();
     },
   };
-}
 
-function areHookDepsEqual(
-  previousDeps: DependencyList | undefined,
-  nextDeps: DependencyList | undefined,
-) {
-  if (!previousDeps || !nextDeps) return false;
-  if (previousDeps.length !== nextDeps.length) return false;
-
-  return previousDeps.every((dep, index) => Object.is(dep, nextDeps[index]));
+  function getCurrent() {
+    return {
+      ...state,
+      ...controller,
+      refs,
+      startPointRef: refs.startPointRef,
+      cursorPointRef: refs.cursorPointRef,
+      draftSelectionRef: refs.draftSelectionRef,
+      hoverSelectionRef: refs.hoverSelectionRef,
+    };
+  }
 }
 
 function createMutableRef<T>(current: T): MutableRefObject<T> {
@@ -240,9 +94,11 @@ function createCaptureSessionView(
 }
 
 describe('captureWorkspaceState', () => {
-  it('syncs ref-backed state fields when applying hook patches', () => {
+  it('syncs ref-backed state fields when applying controller patches', () => {
     const onRenderingOutputChange = vi.fn<(isRendering: boolean) => void>();
-    const probe = createCaptureWorkspaceHookProbe({ onRenderingOutputChange });
+    const probe = createCaptureWorkspaceControllerProbe({
+      onRenderingOutputChange,
+    });
     const startPoint = { x: 10, y: 20 };
     const cursorPoint = { x: 30, y: 40 };
     const hoverSelection = { x: 12, y: 22, width: 90, height: 70 };
@@ -268,9 +124,11 @@ describe('captureWorkspaceState', () => {
     expect(onRenderingOutputChange).toHaveBeenCalledWith(true);
   });
 
-  it('clears refs and interaction state when resetting hook interaction', () => {
+  it('clears refs and interaction state when resetting controller interaction', () => {
     const onRenderingOutputChange = vi.fn<(isRendering: boolean) => void>();
-    const probe = createCaptureWorkspaceHookProbe({ onRenderingOutputChange });
+    const probe = createCaptureWorkspaceControllerProbe({
+      onRenderingOutputChange,
+    });
     const draftSelection = { x: 5, y: 10, width: 40, height: 30 };
 
     probe.act((workspace) => {
@@ -308,9 +166,11 @@ describe('captureWorkspaceState', () => {
     expect(onRenderingOutputChange).toHaveBeenCalledWith(false);
   });
 
-  it('clears refs and session state when resetting a hook session', () => {
+  it('clears refs and session state when resetting a controller session', () => {
     const onRenderingOutputChange = vi.fn<(isRendering: boolean) => void>();
-    const probe = createCaptureWorkspaceHookProbe({ onRenderingOutputChange });
+    const probe = createCaptureWorkspaceControllerProbe({
+      onRenderingOutputChange,
+    });
     const session = createCaptureSessionView({ id: 'dirty-session' });
 
     probe.act((workspace) => {
@@ -343,8 +203,8 @@ describe('captureWorkspaceState', () => {
     expect(onRenderingOutputChange).toHaveBeenCalledWith(false);
   });
 
-  it('syncs loaded session cursor and hover refs through the hook', () => {
-    const probe = createCaptureWorkspaceHookProbe();
+  it('syncs loaded session cursor and hover refs through the controller', () => {
+    const probe = createCaptureWorkspaceControllerProbe();
     const session = createCaptureSessionView({ id: 'loaded-session' });
     const cursorPoint = { x: 50, y: 60 };
     const hoverSelection = { x: 45, y: 55, width: 75, height: 65 };
@@ -367,7 +227,9 @@ describe('captureWorkspaceState', () => {
 
   it('clears refs and maps preview rendering output when resetting preview state', () => {
     const onRenderingOutputChange = vi.fn<(isRendering: boolean) => void>();
-    const probe = createCaptureWorkspaceHookProbe({ onRenderingOutputChange });
+    const probe = createCaptureWorkspaceControllerProbe({
+      onRenderingOutputChange,
+    });
 
     probe.act((workspace) => {
       workspace.applyPatch({
@@ -400,8 +262,8 @@ describe('captureWorkspaceState', () => {
     expect(onRenderingOutputChange).toHaveBeenCalledWith(false);
   });
 
-  it('supports functional field setters from the hook', () => {
-    const probe = createCaptureWorkspaceHookProbe();
+  it('supports functional field setters from the controller', () => {
+    const probe = createCaptureWorkspaceControllerProbe();
 
     const workspace = probe.act((currentWorkspace) => {
       currentWorkspace.setTextFontSize((fontSize) => fontSize + 2);
@@ -414,9 +276,11 @@ describe('captureWorkspaceState', () => {
     expect(workspace.colorSampleFormat).toBe('rgb');
   });
 
-  it('fires rendering output callbacks once through hook bulk and explicit actions', () => {
+  it('fires rendering output callbacks once through controller bulk and explicit actions', () => {
     const onRenderingOutputChange = vi.fn<(isRendering: boolean) => void>();
-    const probe = createCaptureWorkspaceHookProbe({ onRenderingOutputChange });
+    const probe = createCaptureWorkspaceControllerProbe({
+      onRenderingOutputChange,
+    });
 
     probe.act((workspace) => {
       workspace.applyPatch({ isRenderingOutput: true });

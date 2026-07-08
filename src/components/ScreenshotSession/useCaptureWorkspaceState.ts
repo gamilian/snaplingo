@@ -29,6 +29,16 @@ export interface UseCaptureWorkspaceStateOptions {
   onHoverSelectionSynced?: (nextHoverSelection: LogicalRect | null) => void;
 }
 
+type CaptureWorkspaceStateUpdate = (
+  currentState: CaptureWorkspaceState,
+) => CaptureWorkspaceState;
+
+export interface CaptureWorkspaceStateControllerOptions
+  extends UseCaptureWorkspaceStateOptions {
+  refs: CaptureWorkspaceRefs;
+  setState: (updateState: CaptureWorkspaceStateUpdate) => void;
+}
+
 interface CaptureWorkspaceStateActionOptions {
   refs: CaptureWorkspaceRefs;
   applyPatch: (patch: Partial<CaptureWorkspaceState>) => void;
@@ -97,6 +107,75 @@ export function createCaptureWorkspaceStateActions({
   };
 }
 
+export function createCaptureWorkspaceStateController({
+  refs,
+  setState,
+  onRenderingOutputChange,
+  onHoverSelectionSynced,
+}: CaptureWorkspaceStateControllerOptions) {
+  const applyPatch = (patch: Partial<CaptureWorkspaceState>) => {
+    syncCaptureWorkspaceRefsFromPatch(refs, patch);
+    setState((currentState) =>
+      applyCaptureWorkspaceStatePatch(currentState, patch),
+    );
+    if ('isRenderingOutput' in patch && patch.isRenderingOutput !== undefined) {
+      onRenderingOutputChange?.(patch.isRenderingOutput);
+    }
+  };
+  const setWorkspaceField = <Field extends keyof CaptureWorkspaceState>(
+    field: Field,
+    nextValue: SetStateAction<CaptureWorkspaceState[Field]>,
+  ) => {
+    setState((currentState) => {
+      const resolvedValue = resolveSetStateAction(
+        currentState[field],
+        nextValue,
+      );
+
+      if (Object.is(currentState[field], resolvedValue)) {
+        return currentState;
+      }
+
+      return applyCaptureWorkspaceStatePatch(currentState, {
+        [field]: resolvedValue,
+      } as Partial<CaptureWorkspaceState>);
+    });
+  };
+  const resetInteraction = () => {
+    clearCaptureWorkspaceRefs(refs);
+    applyPatch(resetCaptureInteractionStatePatch());
+  };
+  const resetSession = () => {
+    clearCaptureWorkspaceRefs(refs);
+    applyPatch({
+      status: 'idle',
+      session: null,
+      ...resetCaptureInteractionStatePatch(),
+    });
+  };
+  const applyLoadedSession = (loaded: LoadedCaptureHostSession) => {
+    applyPatch(loadedCaptureHostSessionPatch(loaded));
+  };
+  const resetPreview = () => {
+    clearCaptureWorkspaceRefs(refs);
+    applyPatch(previewResetPatch());
+  };
+
+  return {
+    ...createCaptureWorkspaceFieldSetters(setWorkspaceField),
+    ...createCaptureWorkspaceStateActions({
+      refs,
+      applyPatch,
+      onHoverSelectionSynced,
+    }),
+    applyPatch,
+    resetInteraction,
+    resetSession,
+    applyLoadedSession,
+    resetPreview,
+  };
+}
+
 export function useCaptureWorkspaceState(
   options: UseCaptureWorkspaceStateOptions = {},
 ) {
@@ -115,131 +194,79 @@ export function useCaptureWorkspaceState(
     [],
   );
 
-  const applyPatch = useCallback(
-    (patch: Partial<CaptureWorkspaceState>) => {
-      syncCaptureWorkspaceRefsFromPatch(refs, patch);
-      setState((currentState) =>
-        applyCaptureWorkspaceStatePatch(currentState, patch),
-      );
-      if ('isRenderingOutput' in patch && patch.isRenderingOutput !== undefined) {
-        options.onRenderingOutputChange?.(patch.isRenderingOutput);
-      }
-    },
-    [options.onRenderingOutputChange, refs],
-  );
-
-  const setWorkspaceField = useCallback(
-    <Field extends keyof CaptureWorkspaceState>(
-      field: Field,
-      nextValue: SetStateAction<CaptureWorkspaceState[Field]>,
-    ) => {
-      setState((currentState) => {
-        const resolvedValue = resolveSetStateAction(
-          currentState[field],
-          nextValue,
-        );
-
-        if (Object.is(currentState[field], resolvedValue)) {
-          return currentState;
-        }
-
-        return applyCaptureWorkspaceStatePatch(currentState, {
-          [field]: resolvedValue,
-        } as Partial<CaptureWorkspaceState>);
-      });
-    },
-    [],
-  );
-
-  const fieldSetters = useMemo(() => {
-    const createFieldSetter =
-      <Field extends keyof CaptureWorkspaceState>(field: Field) =>
-      (nextValue: SetStateAction<CaptureWorkspaceState[Field]>) => {
-        setWorkspaceField(field, nextValue);
-      };
-
-    return {
-      setStatus: createFieldSetter('status'),
-      setMode: createFieldSetter('mode'),
-      setSession: createFieldSetter('session'),
-      setStartPoint: createFieldSetter('startPoint'),
-      setCursorPoint: createFieldSetter('cursorPoint'),
-      setSelection: createFieldSetter('selection'),
-      setHoverSelection: createFieldSetter('hoverSelection'),
-      setEditGesture: createFieldSetter('editGesture'),
-      setActiveAnnotationTool: createFieldSetter('activeAnnotationTool'),
-      setAnnotationGesture: createFieldSetter('annotationGesture'),
-      setDraftAnnotation: createFieldSetter('draftAnnotation'),
-      setSelectedAnnotationIndex: createFieldSetter('selectedAnnotationIndex'),
-      setAnnotationMoveGesture: createFieldSetter('annotationMoveGesture'),
-      setDraftSelectionMoveGesture: createFieldSetter('draftSelectionMoveGesture'),
-      setTextDraft: createFieldSetter('textDraft'),
-      setTextDraftAnnotationIndex: createFieldSetter('textDraftAnnotationIndex'),
-      setAnnotationStyle: createFieldSetter('annotationStyle'),
-      setTextFontSize: createFieldSetter('textFontSize'),
-      setAnnotationHistory: createFieldSetter('annotationHistory'),
-      setPreviewImageBase64: createFieldSetter('previewImageBase64'),
-      setIsAnnotationToolbarVisible: createFieldSetter(
-        'isAnnotationToolbarVisible',
-      ),
-      setCursorColor: createFieldSetter('cursorColor'),
-      setColorSampleFormat: createFieldSetter('colorSampleFormat'),
-      setIsMagnifierRequested: createFieldSetter('isMagnifierRequested'),
-      setIncludeCapturedCursor: createFieldSetter('includeCapturedCursor'),
-      setError: createFieldSetter('error'),
-    };
-  }, [setWorkspaceField]);
-
-  const workspaceActions = useMemo(
+  const updateState = useCallback((updateState: CaptureWorkspaceStateUpdate) => {
+    setState(updateState);
+  }, []);
+  const controller = useMemo(
     () =>
-      createCaptureWorkspaceStateActions({
+      createCaptureWorkspaceStateController({
         refs,
-        applyPatch,
+        setState: updateState,
+        onRenderingOutputChange: options.onRenderingOutputChange,
         onHoverSelectionSynced: options.onHoverSelectionSynced,
       }),
-    [applyPatch, options.onHoverSelectionSynced, refs],
+    [
+      options.onHoverSelectionSynced,
+      options.onRenderingOutputChange,
+      refs,
+      updateState,
+    ],
   );
-
-  const resetInteraction = useCallback(() => {
-    clearCaptureWorkspaceRefs(refs);
-    applyPatch(resetCaptureInteractionStatePatch());
-  }, [applyPatch, refs]);
-
-  const resetSession = useCallback(() => {
-    clearCaptureWorkspaceRefs(refs);
-    applyPatch({
-      status: 'idle',
-      session: null,
-      ...resetCaptureInteractionStatePatch(),
-    });
-  }, [applyPatch, refs]);
-
-  const applyLoadedSession = useCallback(
-    (loaded: LoadedCaptureHostSession) => {
-      applyPatch(loadedCaptureHostSessionPatch(loaded));
-    },
-    [applyPatch],
-  );
-
-  const resetPreview = useCallback(() => {
-    clearCaptureWorkspaceRefs(refs);
-    applyPatch(previewResetPatch());
-  }, [applyPatch, refs]);
 
   return {
     ...state,
-    ...fieldSetters,
-    ...workspaceActions,
+    ...controller,
     refs,
     startPointRef,
     cursorPointRef,
     draftSelectionRef,
     hoverSelectionRef,
-    applyPatch,
-    resetInteraction,
-    resetSession,
-    applyLoadedSession,
-    resetPreview,
+  };
+}
+
+function createCaptureWorkspaceFieldSetters(
+  setWorkspaceField: <Field extends keyof CaptureWorkspaceState>(
+    field: Field,
+    nextValue: SetStateAction<CaptureWorkspaceState[Field]>,
+  ) => void,
+) {
+  const createFieldSetter =
+    <Field extends keyof CaptureWorkspaceState>(field: Field) =>
+    (nextValue: SetStateAction<CaptureWorkspaceState[Field]>) => {
+      setWorkspaceField(field, nextValue);
+    };
+
+  // These preserve the previous useState-style API and update state only.
+  // Ref-backed flows should use applyPatch or explicit ref-aware actions.
+  return {
+    setStatus: createFieldSetter('status'),
+    setMode: createFieldSetter('mode'),
+    setSession: createFieldSetter('session'),
+    setStartPoint: createFieldSetter('startPoint'),
+    setCursorPoint: createFieldSetter('cursorPoint'),
+    setSelection: createFieldSetter('selection'),
+    setHoverSelection: createFieldSetter('hoverSelection'),
+    setEditGesture: createFieldSetter('editGesture'),
+    setActiveAnnotationTool: createFieldSetter('activeAnnotationTool'),
+    setAnnotationGesture: createFieldSetter('annotationGesture'),
+    setDraftAnnotation: createFieldSetter('draftAnnotation'),
+    setSelectedAnnotationIndex: createFieldSetter('selectedAnnotationIndex'),
+    setAnnotationMoveGesture: createFieldSetter('annotationMoveGesture'),
+    setDraftSelectionMoveGesture: createFieldSetter('draftSelectionMoveGesture'),
+    setTextDraft: createFieldSetter('textDraft'),
+    setTextDraftAnnotationIndex: createFieldSetter('textDraftAnnotationIndex'),
+    setAnnotationStyle: createFieldSetter('annotationStyle'),
+    setTextFontSize: createFieldSetter('textFontSize'),
+    setAnnotationHistory: createFieldSetter('annotationHistory'),
+    setPreviewImageBase64: createFieldSetter('previewImageBase64'),
+    setIsAnnotationToolbarVisible: createFieldSetter(
+      'isAnnotationToolbarVisible',
+    ),
+    setCursorColor: createFieldSetter('cursorColor'),
+    setColorSampleFormat: createFieldSetter('colorSampleFormat'),
+    setIsMagnifierRequested: createFieldSetter('isMagnifierRequested'),
+    setIncludeCapturedCursor: createFieldSetter('includeCapturedCursor'),
+    setError: createFieldSetter('error'),
   };
 }
 
