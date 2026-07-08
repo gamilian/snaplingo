@@ -56,7 +56,6 @@ import {
   type ColorSampleFormat,
 } from './colorSampler';
 import type { CaptureWorkspaceState } from './captureWorkspaceState';
-import type { CaptureWorkspaceRefs } from './useCaptureWorkspaceState';
 import type { AnnotationCommand, ArrowKey, LogicalRect, Point } from './types';
 
 const MIN_SELECTION_SIZE = 10;
@@ -75,7 +74,11 @@ interface MutableRefLike<Value> {
   current: Value;
 }
 
-export interface CaptureWorkspaceKeyboardRefs extends CaptureWorkspaceRefs {
+export interface CaptureWorkspaceKeyboardRefs {
+  startPointRef: MutableRefLike<Point | null>;
+  cursorPointRef: MutableRefLike<Point | null>;
+  draftSelectionRef: MutableRefLike<LogicalRect | null>;
+  hoverSelectionRef: MutableRefLike<LogicalRect | null>;
   keyboardDraftCursorPointRef: MutableRefLike<Point | null>;
   keyboardEditCursorPointRef: MutableRefLike<Point | null>;
 }
