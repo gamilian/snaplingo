@@ -1,54 +1,21 @@
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use tauri::Manager;
 
+use crate::domain::hotkey_config::{
+    default_hotkey_snapshot, hotkey_category, hotkey_category_mut, validate_hotkey_action,
+    HotkeySettingsSnapshot, DEFAULT_HOTKEYS, FILE_OCR_ACTION, INPUT_TRANSLATE_ACTION, OCR_CATEGORY,
+    PIN_ACTION, PIN_SWITCH_GROUP_ACTION, PIN_TOGGLE_ALL_ACTION, SCREENSHOT_ACTION,
+    SCREENSHOT_CATEGORY, SCREENSHOT_COPY_ACTION, SCREENSHOT_CUSTOM_ACTION, SCREENSHOT_OCR_ACTION,
+    SCREENSHOT_TRANSLATE_ACTION, SELECTION_TRANSLATE_ACTION, SHOW_OCR_WINDOW_ACTION,
+    SHOW_TRANSLATION_WINDOW_ACTION, SILENT_SCREENSHOT_OCR_ACTION, TRANSLATION_CATEGORY,
+};
 use crate::infrastructure::storage::ConfigFile;
 use crate::{commands, infrastructure, AppState, Result};
 
-const SCREENSHOT_CATEGORY: &str = "screenshot";
-const TRANSLATION_CATEGORY: &str = "translation";
-const OCR_CATEGORY: &str = "ocr";
-
-const SCREENSHOT_ACTION: &str = "screenshot";
-const SCREENSHOT_COPY_ACTION: &str = "screenshot-copy";
-const SCREENSHOT_CUSTOM_ACTION: &str = "screenshot-custom";
-const PIN_ACTION: &str = "pin";
-const PIN_TOGGLE_ALL_ACTION: &str = "pin-toggle-all";
-const PIN_SWITCH_GROUP_ACTION: &str = "pin-switch-group";
-const SELECTION_TRANSLATE_ACTION: &str = "selection-translate";
-const SCREENSHOT_TRANSLATE_ACTION: &str = "screenshot-translate";
-const INPUT_TRANSLATE_ACTION: &str = "input-translate";
-const SHOW_TRANSLATION_WINDOW_ACTION: &str = "show-window";
-const SCREENSHOT_OCR_ACTION: &str = "screenshot-ocr";
-const SILENT_SCREENSHOT_OCR_ACTION: &str = "silent-screenshot-ocr";
-const FILE_OCR_ACTION: &str = "file-ocr";
-const SHOW_OCR_WINDOW_ACTION: &str = "show-window";
-
 static HOTKEY_REGISTRATIONS: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
 const HOTKEY_CONFIG_KEY: &str = "hotkeys";
-
-const STARTUP_HOTKEYS: &[(&str, &str, &str)] = &[
-    (SCREENSHOT_CATEGORY, SCREENSHOT_ACTION, "⇧⌘R"),
-    (SCREENSHOT_CATEGORY, SCREENSHOT_COPY_ACTION, "⌘F1"),
-    (SCREENSHOT_CATEGORY, SCREENSHOT_CUSTOM_ACTION, "⇧F1"),
-    (SCREENSHOT_CATEGORY, PIN_ACTION, "F3"),
-    (SCREENSHOT_CATEGORY, PIN_TOGGLE_ALL_ACTION, "⇧F3"),
-    (SCREENSHOT_CATEGORY, PIN_SWITCH_GROUP_ACTION, "⌘F3"),
-    (TRANSLATION_CATEGORY, SELECTION_TRANSLATE_ACTION, "⌥D"),
-    (TRANSLATION_CATEGORY, SCREENSHOT_TRANSLATE_ACTION, "⌥S"),
-    (TRANSLATION_CATEGORY, INPUT_TRANSLATE_ACTION, "⌥A"),
-    (
-        TRANSLATION_CATEGORY,
-        SHOW_TRANSLATION_WINDOW_ACTION,
-        "未设置",
-    ),
-    (OCR_CATEGORY, SCREENSHOT_OCR_ACTION, "⇧⌥S"),
-    (OCR_CATEGORY, SILENT_SCREENSHOT_OCR_ACTION, "未设置"),
-    (OCR_CATEGORY, FILE_OCR_ACTION, "未设置"),
-    (OCR_CATEGORY, SHOW_OCR_WINDOW_ACTION, "未设置"),
-];
 
 pub(crate) async fn register_startup_shortcuts(app: tauri::AppHandle) {
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
@@ -88,16 +55,6 @@ struct StartupHotkey {
     hotkey: String,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-struct StoredHotkeyConfig {
-    #[serde(default)]
-    screenshot: HashMap<String, String>,
-    #[serde(default)]
-    translation: HashMap<String, String>,
-    #[serde(default)]
-    ocr: HashMap<String, String>,
-}
-
 pub(crate) fn save_hotkey_config(
     config_file: &ConfigFile,
     category: &str,
@@ -107,14 +64,14 @@ pub(crate) fn save_hotkey_config(
     resolve_hotkey_accelerator(category, action, hotkey)?;
 
     let mut config = config_file
-        .load::<StoredHotkeyConfig>(HOTKEY_CONFIG_KEY)
-        .unwrap_or_else(|_| default_hotkey_config());
+        .load::<HotkeySettingsSnapshot>(HOTKEY_CONFIG_KEY)
+        .unwrap_or_else(|_| default_hotkey_snapshot());
     hotkey_category_mut(&mut config, category)?.insert(action.to_string(), hotkey.to_string());
     config_file.save(HOTKEY_CONFIG_KEY, &config)
 }
 
 fn startup_hotkeys_from_config_file(config_file: &ConfigFile) -> Vec<StartupHotkey> {
-    let saved_config = match config_file.load::<StoredHotkeyConfig>(HOTKEY_CONFIG_KEY) {
+    let saved_config = match config_file.load::<HotkeySettingsSnapshot>(HOTKEY_CONFIG_KEY) {
         Ok(config) => config,
         Err(err) => {
             log::info!(
@@ -124,7 +81,7 @@ fn startup_hotkeys_from_config_file(config_file: &ConfigFile) -> Vec<StartupHotk
             load_legacy_webkit_hotkey_config()
                 .inspect(|legacy_config| {
                     let migrated =
-                        merge_saved_hotkeys(default_hotkey_config(), legacy_config.clone());
+                        merge_saved_hotkeys(default_hotkey_snapshot(), legacy_config.clone());
                     if let Err(save_err) = config_file.save(HOTKEY_CONFIG_KEY, &migrated) {
                         log::warn!("Failed to migrate legacy hotkey config: {}", save_err);
                     } else {
@@ -134,11 +91,11 @@ fn startup_hotkeys_from_config_file(config_file: &ConfigFile) -> Vec<StartupHotk
                 .unwrap_or_default()
         }
     };
-    let merged_config = merge_saved_hotkeys(default_hotkey_config(), saved_config);
+    let merged_config = merge_saved_hotkeys(default_hotkey_snapshot(), saved_config);
     startup_hotkeys_from_config(&merged_config)
 }
 
-fn load_legacy_webkit_hotkey_config() -> Option<StoredHotkeyConfig> {
+fn load_legacy_webkit_hotkey_config() -> Option<HotkeySettingsSnapshot> {
     let root = dirs::home_dir()?.join("Library/WebKit/com.snaplingo.app");
     let storage_paths = find_legacy_local_storage_paths(&root);
 
@@ -176,7 +133,7 @@ fn collect_legacy_local_storage_paths(path: &Path, paths: &mut Vec<PathBuf>) {
     }
 }
 
-fn legacy_hotkey_config_from_local_storage_path(path: &Path) -> Option<StoredHotkeyConfig> {
+fn legacy_hotkey_config_from_local_storage_path(path: &Path) -> Option<HotkeySettingsSnapshot> {
     let connection =
         rusqlite::Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
             .ok()?;
@@ -191,7 +148,7 @@ fn legacy_hotkey_config_from_local_storage_path(path: &Path) -> Option<StoredHot
     legacy_hotkey_config_from_local_storage_value(&value)
 }
 
-fn legacy_hotkey_config_from_local_storage_value(value: &[u8]) -> Option<StoredHotkeyConfig> {
+fn legacy_hotkey_config_from_local_storage_value(value: &[u8]) -> Option<HotkeySettingsSnapshot> {
     let json = decode_local_storage_value(value)?;
     let settings = serde_json::from_str::<serde_json::Value>(&json).ok()?;
     let hotkeys = settings.get("state")?.get("hotkeys")?.clone();
@@ -216,20 +173,10 @@ fn decode_local_storage_value(value: &[u8]) -> Option<String> {
     String::from_utf16(&units).ok()
 }
 
-fn default_hotkey_config() -> StoredHotkeyConfig {
-    let mut config = StoredHotkeyConfig::default();
-    for (category, action, hotkey) in STARTUP_HOTKEYS {
-        if let Ok(category_hotkeys) = hotkey_category_mut(&mut config, category) {
-            category_hotkeys.insert((*action).to_string(), (*hotkey).to_string());
-        }
-    }
-    config
-}
-
 fn merge_saved_hotkeys(
-    mut default_config: StoredHotkeyConfig,
-    saved_config: StoredHotkeyConfig,
-) -> StoredHotkeyConfig {
+    mut default_config: HotkeySettingsSnapshot,
+    saved_config: HotkeySettingsSnapshot,
+) -> HotkeySettingsSnapshot {
     merge_saved_category(
         &mut default_config.screenshot,
         &saved_config.screenshot,
@@ -274,46 +221,19 @@ fn merge_saved_category(
     }
 }
 
-fn startup_hotkeys_from_config(config: &StoredHotkeyConfig) -> Vec<StartupHotkey> {
-    STARTUP_HOTKEYS
+fn startup_hotkeys_from_config(config: &HotkeySettingsSnapshot) -> Vec<StartupHotkey> {
+    DEFAULT_HOTKEYS
         .iter()
-        .filter_map(|(category, action, _)| {
-            hotkey_category(config, category)
-                .and_then(|category_hotkeys| category_hotkeys.get(*action))
+        .filter_map(|default_hotkey| {
+            hotkey_category(config, default_hotkey.category)
+                .and_then(|category_hotkeys| category_hotkeys.get(default_hotkey.action))
                 .map(|hotkey| StartupHotkey {
-                    category: (*category).to_string(),
-                    action: (*action).to_string(),
+                    category: default_hotkey.category.to_string(),
+                    action: default_hotkey.action.to_string(),
                     hotkey: hotkey.clone(),
                 })
         })
         .collect()
-}
-
-fn hotkey_category<'a>(
-    config: &'a StoredHotkeyConfig,
-    category: &str,
-) -> Option<&'a HashMap<String, String>> {
-    match category {
-        SCREENSHOT_CATEGORY => Some(&config.screenshot),
-        TRANSLATION_CATEGORY => Some(&config.translation),
-        OCR_CATEGORY => Some(&config.ocr),
-        _ => None,
-    }
-}
-
-fn hotkey_category_mut<'a>(
-    config: &'a mut StoredHotkeyConfig,
-    category: &str,
-) -> Result<&'a mut HashMap<String, String>> {
-    match category {
-        SCREENSHOT_CATEGORY => Ok(&mut config.screenshot),
-        TRANSLATION_CATEGORY => Ok(&mut config.translation),
-        OCR_CATEGORY => Ok(&mut config.ocr),
-        _ => Err(crate::AppError::Other(format!(
-            "Unknown hotkey category '{}'",
-            category
-        ))),
-    }
 }
 
 pub(crate) fn configure_hotkey(
@@ -381,50 +301,14 @@ fn resolve_hotkey_accelerator(
     action: &str,
     hotkey: &str,
 ) -> Result<Option<String>> {
-    if !is_known_hotkey_action(category, action) {
-        return Err(crate::AppError::Other(format!(
-            "Unknown hotkey action '{}:{}'",
-            category, action
-        )));
-    }
+    validate_hotkey_action(category, action)?;
 
     let next_accelerator = display_hotkey_to_accelerator(hotkey)?;
-    if next_accelerator.is_some() && !is_implemented_hotkey_action(category, action) {
-        return Err(crate::AppError::Other(format!(
-            "Hotkey action '{}:{}' is not implemented",
-            category, action
-        )));
-    }
-
     Ok(next_accelerator)
 }
 
 fn hotkey_registration_key(category: &str, action: &str) -> String {
     format!("{category}:{action}")
-}
-
-fn is_known_hotkey_action(category: &str, action: &str) -> bool {
-    is_implemented_hotkey_action(category, action)
-}
-
-fn is_implemented_hotkey_action(category: &str, action: &str) -> bool {
-    matches!(
-        (category, action),
-        (SCREENSHOT_CATEGORY, SCREENSHOT_ACTION)
-            | (SCREENSHOT_CATEGORY, SCREENSHOT_COPY_ACTION)
-            | (SCREENSHOT_CATEGORY, SCREENSHOT_CUSTOM_ACTION)
-            | (SCREENSHOT_CATEGORY, PIN_ACTION)
-            | (SCREENSHOT_CATEGORY, PIN_TOGGLE_ALL_ACTION)
-            | (SCREENSHOT_CATEGORY, PIN_SWITCH_GROUP_ACTION)
-            | (TRANSLATION_CATEGORY, SELECTION_TRANSLATE_ACTION)
-            | (TRANSLATION_CATEGORY, SCREENSHOT_TRANSLATE_ACTION)
-            | (TRANSLATION_CATEGORY, INPUT_TRANSLATE_ACTION)
-            | (TRANSLATION_CATEGORY, SHOW_TRANSLATION_WINDOW_ACTION)
-            | (OCR_CATEGORY, SCREENSHOT_OCR_ACTION)
-            | (OCR_CATEGORY, SILENT_SCREENSHOT_OCR_ACTION)
-            | (OCR_CATEGORY, FILE_OCR_ACTION)
-            | (OCR_CATEGORY, SHOW_OCR_WINDOW_ACTION)
-    )
 }
 
 fn register_hotkey_action(
