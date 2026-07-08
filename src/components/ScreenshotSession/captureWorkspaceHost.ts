@@ -13,6 +13,7 @@ import {
   runCaptureHostPreviewRender,
   runCaptureHostSessionRefresh,
   runCaptureHostSessionStart,
+  runCaptureHostTransitionEffects,
   runCaptureRuntimeEffects as runHostCaptureRuntimeEffects,
   type CaptureHostRuntimeEffectClient,
   type CaptureHostSessionStartPerfState,
@@ -20,7 +21,11 @@ import {
   type LoadedCaptureHostSession,
   type RunCaptureHostPreviewRenderOptions,
 } from './captureHostRuntime';
-import type { CaptureRuntimeEffect } from './captureInteractionRuntime';
+import {
+  planManualSelectionCompletion,
+  type CaptureRuntimeEffect,
+} from './captureInteractionRuntime';
+import { planCaptureManualSelectionTransition } from './captureEditorRuntime';
 import {
   cancelCaptureSessionFlow,
   closeInactiveCaptureSession,
@@ -41,6 +46,7 @@ import type {
 export interface CaptureWorkspaceHostAdapter {
   getState(): CaptureWorkspaceState;
   patch(next: Partial<CaptureWorkspaceState>): void;
+  clearDraftSelectionRef(): void;
   resetInteraction(): void;
   resetSession(): void;
 }
@@ -130,6 +136,10 @@ export interface CaptureWorkspaceHostActions {
   completeCandidateSelection(
     rect: LogicalRect,
     action: HoverSelectionCompletionAction,
+  ): Promise<boolean | undefined>;
+  completeManualSelection(
+    rect: LogicalRect,
+    mode: CaptureMode,
   ): Promise<boolean | undefined>;
   refreshSession(): Promise<LoadedCaptureHostSession | null>;
 }
@@ -334,6 +344,63 @@ export function createCaptureWorkspaceHostActions(
     });
   };
 
+  const completeManualSelection = async (
+    rect: LogicalRect,
+    mode: CaptureMode,
+  ) => {
+    const transition = planCaptureManualSelectionTransition({
+      rect,
+      completion: planManualSelectionCompletion(mode),
+    });
+    const nextPatch: Partial<CaptureWorkspaceState> = {
+      startPoint: transition.nextState.startPoint,
+      selection: transition.nextState.selection,
+      hoverSelection: transition.nextState.hoverSelection,
+      editGesture: transition.nextState.editGesture,
+      activeAnnotationTool: transition.nextState.activeAnnotationTool,
+      annotationGesture: transition.nextState.annotationGesture,
+      draftAnnotation: transition.nextState.draftAnnotation,
+      selectedAnnotationIndex: transition.nextState.selectedAnnotationIndex,
+      annotationMoveGesture: transition.nextState.annotationMoveGesture,
+      draftSelectionMoveGesture: transition.nextState.draftSelectionMoveGesture,
+      textDraft: transition.nextState.textDraft,
+      textDraftAnnotationIndex: transition.nextState.textDraftAnnotationIndex,
+      annotationHistory: transition.nextState.annotationHistory,
+      isMagnifierRequested: transition.nextState.isMagnifierRequested,
+      isAnnotationToolbarVisible:
+        transition.nextState.isAnnotationToolbarVisible,
+      status: transition.nextState.status,
+    };
+
+    workspace.clearDraftSelectionRef();
+    if (transition.clearOverlay) {
+      deps.resetSelectionOverlay();
+    }
+    workspace.patch(nextPatch);
+
+    if (transition.type === 'preview') {
+      return renderSelectionPreview(
+        transition.previewRender.rect,
+        transition.previewRender.annotations,
+      );
+    }
+
+    if (!workspace.getState().session) return undefined;
+
+    return runCaptureHostTransitionEffects({
+      rendering: transition.nextState.renderingOutput,
+      error: transition.nextState.error,
+      setRendering: (isRenderingOutput) => {
+        workspace.patch({ isRenderingOutput });
+      },
+      setError: (error) => {
+        workspace.patch({ error });
+      },
+      runEffects: () => runCaptureRuntimeEffects(transition.effects, rect),
+      onError: setHostError,
+    });
+  };
+
   return {
     ensureCaptureSnapshotsHydrated(sessionId) {
       return ensureCaptureHostSnapshotsHydrated({
@@ -403,6 +470,7 @@ export function createCaptureWorkspaceHostActions(
     renderSelectionPreview,
     completePreviewSelection,
     completeCandidateSelection,
+    completeManualSelection,
     refreshSession() {
       return runCaptureHostSessionRefresh({
         sessionId: workspace.getState().session?.id,

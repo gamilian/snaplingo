@@ -41,6 +41,8 @@ Infrastructure Layer (基础设施层)
 - `src-tauri/src/application/services/selected_text_acquirer.rs` 是 Selected Text acquisition workflow，拥有取词方法顺序和诊断；平台取词 mechanics 留在 `infrastructure/system/selection/*`。
 - `application/services/capture_session_runtime.rs` 是 Capture Session Runtime，统一编排截图输出和 OCR。
 - `src/components/ScreenshotSession/captureInteractionRuntime.ts` 是前端 Capture Interaction Runtime，负责纯 effect-plan 决策。
+- `src/components/ScreenshotSession/captureWorkspace*.ts` 是前端 Capture Workspace seam，拥有截图前端状态形状、host workflow、keyboard dispatch、pointer/wheel dispatch 和 effect application 边界。
+- `src/components/ScreenshotSession/CaptureWorkspaceView.tsx` 是 Capture Workspace render seam，只接收状态、几何和 handler props；`ScreenshotSession/index.tsx` 保持为 settings、state hook、runtime adapter 和 view composition shell。
 
 ---
 

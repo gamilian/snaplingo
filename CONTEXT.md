@@ -279,8 +279,18 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 **职责：**
 - 根据 Capture Mode 决定选区完成后的 flow（预览、OCR、OCR + 翻译）
 - 根据完成动作生成有序 effect plan，决定是否记录成功截图、是否结束 session、OCR 结果进入哪个窗口
-- 不调用 Tauri、DOM 或 React hooks；`ScreenshotSession/index.tsx` 仍负责解释 effect 并执行副作用
+- 不调用 Tauri、DOM 或 React hooks；effect plan 的解释和副作用执行由 Capture Workspace host seam 绑定到 host adapter
 - `captureInteractionModel.ts` 只保留兼容 facade 和 Capture Mode 到 flow 的纯规则
+
+### Capture Workspace（截图工作区）
+`src/components/ScreenshotSession/captureWorkspace*.ts` 和 `CaptureWorkspaceView.tsx` 组成前端截图工作区 seam，位于纯 plan 模块和 React shell 之间。
+
+**职责：**
+- 拥有前端截图工作区状态形状、patch/reset/load 规则和 ref-backed state 同步
+- 把 host workflow（start/refresh/cancel/render/complete）绑定到 `captureHostRuntime` 和 Tauri adapter，但把 native command 细节留在 host adapter 外侧
+- 把 keyboard、pointer 和 wheel 事件分发到 selection/editor/candidate 纯 plan 模块，避免 `ScreenshotSession/index.tsx` 直接持有大块交互分支
+- 通过 `CaptureWorkspaceView.tsx` 渲染截图工作区；View 只接收状态、几何和 handler props，不启动 session、不读 localStorage、不调用 Tauri adapter、不读写 workflow refs
+- 让 `ScreenshotSession/index.tsx` 保持为 composition shell：读取 settings，初始化 workspace state，计算 derived geometry，创建 host/keyboard/pointer actions，连接 hooks，渲染 View
 
 ### Provider（能力提供者）
 实现某个能力的内置模块，不区分本地实现还是远程 API 调用。用户视角看到的是能力名称（如"DeepL 翻译"），而非技术实现细节。

@@ -69,6 +69,9 @@ function createWorkspace(
       recordPatch(calls, next);
       state = applyCaptureWorkspaceStatePatch(state, next);
     },
+    clearDraftSelectionRef: () => {
+      calls.push('clear_draft_selection_ref');
+    },
     resetInteraction: () => {
       calls.push('reset_interaction');
       const next = resetCaptureInteractionStatePatch();
@@ -392,5 +395,117 @@ describe('captureWorkspaceHost', () => {
       error: 'load failed',
     });
     expect(calls).toContain('patch:status:error,error:load failed');
+  });
+
+  it('completes manual selections into preview state through the workspace host seam', async () => {
+    const calls: string[] = [];
+    const selection = { x: 10, y: 20, width: 120, height: 80 };
+    const workspace = createWorkspace(calls, {
+      session: createCaptureSessionView({ id: 'session-manual-preview' }),
+      status: 'selecting',
+      startPoint: { x: 10, y: 20 },
+      hoverSelection: selection,
+      previewImageBase64: 'old-preview',
+      error: 'old error',
+    });
+    const host = createHostHarness({
+      calls,
+      workspace,
+      renderPreview: async (input) => {
+        calls.push(`render:${input.sessionId}:${formatRect(input.rect)}`);
+        return 'manual-preview';
+      },
+    });
+
+    const result = await host.completeManualSelection(selection, 'screenshot');
+
+    expect(result).toBe(true);
+    expect(workspace.getState()).toMatchObject({
+      status: 'preview',
+      selection,
+      startPoint: null,
+      hoverSelection: null,
+      isAnnotationToolbarVisible: true,
+      previewImageBase64: 'manual-preview',
+      error: null,
+    });
+    expect(calls).toEqual([
+      'clear_draft_selection_ref',
+      'patch:status:preview,hover:none',
+      'patch:rendering:true',
+      'patch:preview:null',
+      'patch:error:null',
+      'render:session-manual-preview:10x20x120x80',
+      'patch:preview:manual-preview',
+      'patch:rendering:false',
+    ]);
+  });
+
+  it('completes manual selections by applying effect transitions through the workspace host seam', async () => {
+    const calls: string[] = [];
+    const selection = { x: 10, y: 20, width: 120, height: 80 };
+    const workspace = createWorkspace(calls, {
+      session: createCaptureSessionView({ id: 'session-manual-copy' }),
+      status: 'selecting',
+      startPoint: { x: 10, y: 20 },
+      hoverSelection: selection,
+    });
+    const host = createHostHarness({
+      calls,
+      workspace,
+    });
+
+    const result = await host.completeManualSelection(
+      selection,
+      'screenshot-copy',
+    );
+
+    expect(result).toBe(true);
+    expect(workspace.getState()).toMatchObject({
+      status: 'idle',
+      session: null,
+      isRenderingOutput: false,
+    });
+    expect(calls).toEqual([
+      'clear_draft_selection_ref',
+      'reset_overlay',
+      'patch:status:selecting,hover:none',
+      'patch:rendering:true',
+      'patch:error:null',
+      'copy_capture',
+      'reset_session',
+      'reset_overlay',
+      'set_completing:false',
+      'reset_readiness',
+      'cancel_native:session-manual-copy',
+      'patch:rendering:false',
+    ]);
+  });
+
+  it('does not leave rendering active when an effects manual selection has no session', async () => {
+    const calls: string[] = [];
+    const selection = { x: 10, y: 20, width: 120, height: 80 };
+    const workspace = createWorkspace(calls, {
+      session: null,
+      status: 'selecting',
+      startPoint: { x: 10, y: 20 },
+      hoverSelection: selection,
+      isRenderingOutput: false,
+    });
+    const host = createHostHarness({
+      calls,
+      workspace,
+    });
+
+    const result = await host.completeManualSelection(
+      selection,
+      'screenshot-copy',
+    );
+
+    expect(result).toBeUndefined();
+    expect(workspace.getState()).toMatchObject({
+      session: null,
+      isRenderingOutput: false,
+    });
   });
 });

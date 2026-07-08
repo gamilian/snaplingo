@@ -39,14 +39,9 @@ import {
   refreshCaptureSession,
 } from './captureActions';
 import {
-  planManualSelectionCompletion,
-  type CaptureRuntimeEffect,
-} from './captureInteractionRuntime';
-import {
   prepareCaptureSurfaceForReveal as prepareHostCaptureSurfaceForReveal,
   restoreCaptureSelectionFromHistory as restoreSelectionFromHostHistory,
   restoreLastSuccessfulCaptureSelection,
-  runCaptureHostTransitionEffects,
   type CaptureHostSessionStartPerfState,
   type CaptureHostSnapshotHydration,
 } from './captureHostRuntime';
@@ -69,38 +64,18 @@ import {
   planCaptureAnnotationToolActivation,
   planCaptureAnnotationFillToggle,
   planCaptureAnnotationSizeAdjustment,
-  planCaptureManualSelectionTransition,
   undoPolylineCaptureGesture,
 } from './captureEditorRuntime';
 import {
   shouldPollCaptureHoverSelection,
   startCaptureHoverSelectionPolling,
 } from './captureHoverPolling';
-import { CaptureEditorToolbar } from './captureEditorToolbar';
-import { CaptureMagnifierOverlay } from './captureMagnifierOverlay';
-import {
-  getCaptureEditorSelectionClassName,
-  getCaptureRootCursorStyle,
-  getCaptureRootClassName,
-  shouldShowCaptureLoadingMask,
-} from './capturePresentation';
-import {
-  CaptureDraftAnnotationOverlay,
-  CapturePreviewImage,
-  CaptureRenderingOutputBar,
-  CaptureSelectedAnnotationBoundsOverlay,
-  CaptureSelectionResizeHandles,
-  CaptureTextDraftEditor,
-  rectStyle,
-} from './capturePreviewPresentation';
-import {
-  CaptureSelectionOverlayCanvas,
-  useCaptureSelectionOverlay,
-} from './captureSelectionOverlayRuntime';
+import { useCaptureSelectionOverlay } from './captureSelectionOverlayRuntime';
 import {
   getCaptureMagnifierRuntimeState,
   useCaptureMagnifierPixelSource,
 } from './captureMagnifierRuntime';
+import { CaptureWorkspaceView } from './CaptureWorkspaceView';
 import {
   resetCaptureInteractionStatePatch,
   type CaptureWorkspaceState,
@@ -191,7 +166,6 @@ export default function ScreenshotSession({
     mode,
     session,
     startPoint,
-    setStartPoint,
     cursorPoint,
     setCursorPoint,
     selection,
@@ -301,6 +275,9 @@ export default function ScreenshotSession({
         };
         applyPatch(next);
       },
+      clearDraftSelectionRef: () => {
+        draftSelectionRef.current = null;
+      },
       resetInteraction: () => {
         captureWorkspaceStateRef.current = {
           ...captureWorkspaceStateRef.current,
@@ -320,6 +297,7 @@ export default function ScreenshotSession({
     }),
     [
       applyPatch,
+      draftSelectionRef,
       getCurrentCaptureWorkspaceState,
       resetInteraction,
       resetSession,
@@ -622,21 +600,6 @@ export default function ScreenshotSession({
   const cancelSession = useCallback(async () => {
     await captureHostActions.cancelSession();
   }, [captureHostActions]);
-
-  const runCaptureRuntimeEffects = useCallback(
-    async (
-      effects: CaptureRuntimeEffect[],
-      rect: LogicalRect,
-      nextAnnotations: AnnotationCommand[] = [],
-    ) => {
-      await captureHostActions.runCaptureRuntimeEffects(
-        effects,
-        rect,
-        nextAnnotations,
-      );
-    },
-    [captureHostActions],
-  );
 
   const renderSelectionPreview = useCallback(
     async (
@@ -1029,65 +992,8 @@ export default function ScreenshotSession({
   }, [resetPreview, resetSelectionOverlay]);
 
   const completeManualSelection = useCallback((rect: LogicalRect) => {
-    const completion = planManualSelectionCompletion(mode);
-    const transition = planCaptureManualSelectionTransition({
-      rect,
-      completion,
-    });
-
-    startPointRef.current = null;
-    draftSelectionRef.current = null;
-    hoverSelectionRef.current = null;
-    if (transition.clearOverlay) {
-      resetSelectionOverlay();
-    }
-    setStartPoint(transition.nextState.startPoint);
-    setSelection(transition.nextState.selection);
-    setHoverSelection(transition.nextState.hoverSelection);
-    setEditGesture(transition.nextState.editGesture);
-    setActiveAnnotationTool(transition.nextState.activeAnnotationTool);
-    setAnnotationGesture(transition.nextState.annotationGesture);
-    setDraftAnnotation(transition.nextState.draftAnnotation);
-    setSelectedAnnotationIndex(transition.nextState.selectedAnnotationIndex);
-    setAnnotationMoveGesture(transition.nextState.annotationMoveGesture);
-    setDraftSelectionMoveGesture(transition.nextState.draftSelectionMoveGesture);
-    setTextDraft(transition.nextState.textDraft);
-    setTextDraftAnnotationIndex(transition.nextState.textDraftAnnotationIndex);
-    setAnnotationHistory(transition.nextState.annotationHistory);
-    setIsMagnifierRequested(transition.nextState.isMagnifierRequested);
-    setIsAnnotationToolbarVisible(
-      transition.nextState.isAnnotationToolbarVisible,
-    );
-    setStatus(transition.nextState.status);
-
-    if (transition.type === 'preview') {
-      void renderSelectionPreview(
-        transition.previewRender.rect,
-        transition.previewRender.annotations,
-      );
-      return;
-    }
-
-    if (!session) return;
-
-    void runCaptureHostTransitionEffects({
-      rendering: transition.nextState.renderingOutput,
-      error: transition.nextState.error,
-      setRendering: setRenderingOutput,
-      setError,
-      runEffects: () => runCaptureRuntimeEffects(transition.effects, rect),
-      onError: (err) => {
-        setError(err instanceof Error ? err.message : String(err));
-        setStatus('error');
-      },
-    });
-  }, [
-    mode,
-    resetSelectionOverlay,
-    renderSelectionPreview,
-    runCaptureRuntimeEffects,
-    session,
-  ]);
+    void captureHostActions.completeManualSelection(rect, mode);
+  }, [captureHostActions, mode]);
 
   const selectFullCaptureArea = useCallback(() => {
     if (!session || !selectionBounds) return;
@@ -1531,133 +1437,68 @@ export default function ScreenshotSession({
     handleCaptureWorkspaceWheel(event, captureWorkspacePointerContext);
   };
 
-  if (!isActive) return null;
+  const selectMoveTool = useCallback(() => {
+    setActiveAnnotationTool(null);
+  }, [setActiveAnnotationTool]);
+
+  const updateTextDraftFontSize = useCallback((fontSize: number) => {
+    setTextFontSize(fontSize);
+    setTextDraft((draft) => (draft ? { ...draft, fontSize } : draft));
+  }, [setTextDraft, setTextFontSize]);
+
+  const magnifierSelection =
+    selection ?? draftSelectionRef.current ?? hoverSelectionRef.current ?? hoverSelection;
 
   return (
-    <div
-      className={getCaptureRootClassName(status)}
-      style={{
-        width: `${viewportBounds?.width ?? window.innerWidth}px`,
-        height: `${viewportBounds?.height ?? window.innerHeight}px`,
-        cursor: getCaptureRootCursorStyle(status),
-      }}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onWheel={handleWheel}
-      onContextMenu={(event) => event.preventDefault()}
-    >
-      {shouldShowCaptureLoadingMask(status) && (
-        <div className="absolute inset-0 bg-black" aria-label="Loading capture" />
-      )}
-
-      {status === 'error' && (
-        <div className="absolute left-4 top-4 max-w-md rounded bg-red-950/90 px-3 py-2 text-sm text-red-100 shadow-lg">
-          {error}
-        </div>
-      )}
-
-      {status === 'preview' && selection && selectionViewportRect && (
-        <>
-          <CapturePreviewImage
-            imageBase64={previewImageBase64}
-            selectionViewportRect={selectionViewportRect}
-          />
-          <CaptureDraftAnnotationOverlay
-            draftAnnotation={draftAnnotation}
-            selectionViewportRect={selectionViewportRect}
-          />
-          {textDraft && (
-            <CaptureTextDraftEditor
-              inputRef={textDraftInputRef}
-              textDraft={textDraft}
-              selectionViewportRect={selectionViewportRect}
-              annotationStyle={annotationStyle}
-              onCommit={commitTextDraft}
-              onTextChange={updateTextDraftText}
-              onDiscard={discardTextDraft}
-            />
-          )}
-          <CaptureSelectedAnnotationBoundsOverlay
-            selectedAnnotationBounds={selectedAnnotationBounds}
-            selectionViewportRect={selectionViewportRect}
-          />
-          <div
-            className={getCaptureEditorSelectionClassName(
-              status,
-              Boolean(activeAnnotationTool),
-            )}
-            style={rectStyle(selectionViewportRect)}
-            onPointerDown={startMoveGesture}
-          />
-          {status === 'preview' && (
-            <CaptureSelectionResizeHandles
-              selectionViewportRect={selectionViewportRect}
-              onResizeHandlePointerDown={startResizeGesture}
-            />
-          )}
-          {toolbarPosition && isAnnotationToolbarVisible && (
-            <CaptureEditorToolbar
-              position={toolbarPosition}
-              width={TOOLBAR_SIZE.width}
-              activeAnnotationTool={activeAnnotationTool}
-              annotationStyle={annotationStyle}
-              textFontSize={textFontSize}
-              textDraftActive={textDraft !== null}
-              isTextSizingActive={isTextSizingActive}
-              isFillModeActive={isFillModeActive}
-              isRenderingOutput={isRenderingOutput}
-              onSelectMove={() => setActiveAnnotationTool(null)}
-              onToggleAnnotationTool={toggleAnnotationTool}
-              onApplyAnnotationStyle={applySelectedAnnotationStyle}
-              onTextDraftFontSizeChange={(fontSize) => {
-                setTextFontSize(fontSize);
-                setTextDraft((draft) =>
-                  draft ? { ...draft, fontSize } : draft,
-                );
-              }}
-              onCancel={cancelSession}
-              onRunOcr={runOcrSelection}
-              onCopy={copySelection}
-              onSave={saveSelection}
-              onQuickSave={quickSaveSelection}
-            />
-          )}
-          <CaptureRenderingOutputBar
-            isRenderingOutput={isRenderingOutput}
-            selectionViewportRect={selectionViewportRect}
-          />
-        </>
-      )}
-      <CaptureSelectionOverlayCanvas
-        canvasRef={selectionOverlayCanvasRef}
-        cssSize={selectionOverlayCssSize}
-        pixelRatio={selectionOverlayPixelRatio}
-      />
-      {isMagnifierShown &&
-        cursorMonitor &&
-        cursorViewportPoint &&
-        cursorInMonitorPoint &&
-        viewportBounds && (
-        <CaptureMagnifierOverlay
-          imageBase64={cursorMonitor.image_base64}
-          viewportCursor={cursorViewportPoint}
-          imageCursor={cursorInMonitorPoint}
-          viewportBounds={viewportBounds}
-          imageSize={{
-            width: cursorMonitor.logical_bounds.width,
-            height: cursorMonitor.logical_bounds.height,
-          }}
-          selection={
-            selection ??
-            draftSelectionRef.current ??
-            hoverSelectionRef.current ??
-            hoverSelection
-          }
-          color={cursorColor}
-          colorFormat={colorSampleFormat}
-        />
-      )}
-    </div>
+    <CaptureWorkspaceView
+      isActive={isActive}
+      status={status}
+      viewportBounds={viewportBounds}
+      error={error}
+      selection={selection}
+      selectionViewportRect={selectionViewportRect}
+      previewImageBase64={previewImageBase64}
+      draftAnnotation={draftAnnotation}
+      textDraft={textDraft}
+      textDraftInputRef={textDraftInputRef}
+      annotationStyle={annotationStyle}
+      selectedAnnotationBounds={selectedAnnotationBounds}
+      activeAnnotationTool={activeAnnotationTool}
+      toolbarPosition={toolbarPosition}
+      toolbarWidth={TOOLBAR_SIZE.width}
+      isAnnotationToolbarVisible={isAnnotationToolbarVisible}
+      textFontSize={textFontSize}
+      isTextSizingActive={isTextSizingActive}
+      isFillModeActive={isFillModeActive}
+      isRenderingOutput={isRenderingOutput}
+      selectionOverlayCanvasRef={selectionOverlayCanvasRef}
+      selectionOverlayCssSize={selectionOverlayCssSize}
+      selectionOverlayPixelRatio={selectionOverlayPixelRatio}
+      isMagnifierShown={isMagnifierShown}
+      cursorMonitor={cursorMonitor}
+      cursorViewportPoint={cursorViewportPoint}
+      cursorInMonitorPoint={cursorInMonitorPoint}
+      magnifierSelection={magnifierSelection}
+      cursorColor={cursorColor}
+      colorSampleFormat={colorSampleFormat}
+      onRootPointerDown={handlePointerDown}
+      onRootPointerMove={handlePointerMove}
+      onRootPointerUp={handlePointerUp}
+      onRootWheel={handleWheel}
+      onPreviewPointerDown={startMoveGesture}
+      onResizeHandlePointerDown={startResizeGesture}
+      onCommitTextDraft={commitTextDraft}
+      onTextDraftTextChange={updateTextDraftText}
+      onDiscardTextDraft={discardTextDraft}
+      onSelectMove={selectMoveTool}
+      onToggleAnnotationTool={toggleAnnotationTool}
+      onApplyAnnotationStyle={applySelectedAnnotationStyle}
+      onTextDraftFontSizeChange={updateTextDraftFontSize}
+      onCancel={cancelSession}
+      onRunOcr={runOcrSelection}
+      onCopy={copySelection}
+      onSave={saveSelection}
+      onQuickSave={quickSaveSelection}
+    />
   );
 }
