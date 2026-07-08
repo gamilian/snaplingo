@@ -1,14 +1,5 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import {
-  listAnthropicModels,
-  listGeminiModels,
-  listOpenAICompatibleModels,
-  testAnthropicProvider,
-  testGeminiProvider,
-  testOpenAICompatibleProvider,
-  testOpenAIResponsesProvider,
-} from '../../../tauri/providers';
 import type {
   AddCustomTranslationProviderRequest,
   OpenAICompatibleModelInfo,
@@ -32,6 +23,10 @@ import {
   type LLMProtocol,
   type LLMProtocolFamily,
 } from './customTranslationProviderFormModel';
+import {
+  loadCustomProviderModels,
+  testCustomProviderConnection,
+} from './customProviderIntrospection';
 import { useTranslationPromptStrategyWorkspace } from './useTranslationPromptStrategyWorkspace';
 
 interface CustomTranslationProviderDialogProps {
@@ -205,23 +200,13 @@ export function CustomTranslationProviderDialog({
     setTestStatus(null);
 
     try {
-      const request = {
+      const result = await loadCustomProviderModels({
+        protocol,
         endpoint: trimmedEndpoint,
-        api_key: trimmedApiKey,
-      };
-      const loadedModels =
-        protocol === 'openai' || protocol === 'openai-responses'
-          ? await listOpenAICompatibleModels(request)
-          : protocol === 'anthropic'
-            ? await listAnthropicModels(request)
-            : await listGeminiModels(request);
-      setModels(loadedModels);
-      if (loadedModels.length === 0) {
-        setModelListError('未返回可用模型');
-      }
-    } catch (error) {
-      setModels([]);
-      setModelListError(`获取模型失败: ${formatCustomProviderError(error)}`);
+        apiKey: trimmedApiKey,
+      });
+      setModels(result.models);
+      setModelListError(result.error);
     } finally {
       setIsLoadingModels(false);
     }
@@ -239,26 +224,13 @@ export function CustomTranslationProviderDialog({
     setTestStatus(null);
 
     try {
-      const request = {
+      const status = await testCustomProviderConnection({
+        protocol,
         endpoint: trimmedEndpoint,
-        api_key: trimmedApiKey,
+        apiKey: trimmedApiKey,
         model: trimmedModel,
-      };
-      if (protocol === 'openai') {
-        await testOpenAICompatibleProvider(request);
-      } else if (protocol === 'openai-responses') {
-        await testOpenAIResponsesProvider(request);
-      } else if (protocol === 'anthropic') {
-        await testAnthropicProvider(request);
-      } else {
-        await testGeminiProvider(request);
-      }
-      setTestStatus({ type: 'success', message: '检测成功' });
-    } catch (error) {
-      setTestStatus({
-        type: 'error',
-        message: `检测失败: ${formatCustomProviderError(error)}`,
       });
+      setTestStatus(status);
     } finally {
       setIsTestingProvider(false);
     }
