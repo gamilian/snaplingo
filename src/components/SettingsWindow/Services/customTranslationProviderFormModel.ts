@@ -1,6 +1,7 @@
 import type { Provider } from '../../../stores/providerStore';
 import type {
   AddCustomTranslationProviderRequest,
+  TranslationPromptStrategy,
   UpdateCustomTranslationProviderRequest,
 } from '../../../tauri/providers';
 
@@ -9,6 +10,18 @@ export type LLMProtocolFamily = 'openai' | 'anthropic' | 'gemini';
 
 export const SMART_PROMPT_STRATEGY_ID = 'smart';
 export const DEFAULT_PROMPT_STRATEGY_ID = 'general';
+
+export const DEFAULT_PROMPT_STRATEGIES: TranslationPromptStrategy[] = [
+  {
+    id: DEFAULT_PROMPT_STRATEGY_ID,
+    name: '通用翻译',
+    description: '适合大多数普通文本。',
+    system_prompt:
+      'You are a professional translation engine. Translate the user text from {source_lang} to {target_lang}. Return only the translation.',
+    is_builtin: true,
+    is_deletable: false,
+  },
+];
 
 export const PROTOCOL_OPTIONS: Array<{
   value: LLMProtocolFamily;

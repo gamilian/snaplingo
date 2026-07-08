@@ -4,8 +4,6 @@ import {
   listAnthropicModels,
   listGeminiModels,
   listOpenAICompatibleModels,
-  listTranslationPromptStrategies,
-  saveTranslationPromptStrategies,
   testAnthropicProvider,
   testGeminiProvider,
   testOpenAICompatibleProvider,
@@ -14,7 +12,6 @@ import {
 import type {
   AddCustomTranslationProviderRequest,
   OpenAICompatibleModelInfo,
-  TranslationPromptStrategy,
   UpdateCustomTranslationProviderRequest,
 } from '../../../tauri/providers';
 import type { Provider } from '../../../stores/providerStore';
@@ -24,7 +21,6 @@ import {
   buildAddCustomProviderRequest,
   buildUpdateCustomProviderRequest,
   canSaveCustomProviderForm,
-  DEFAULT_PROMPT_STRATEGY_ID,
   formatCustomProviderError,
   getInitialCustomProviderFormValues,
   getProtocolDefaults,
@@ -36,18 +32,7 @@ import {
   type LLMProtocol,
   type LLMProtocolFamily,
 } from './customTranslationProviderFormModel';
-
-const DEFAULT_PROMPT_STRATEGIES: TranslationPromptStrategy[] = [
-  {
-    id: DEFAULT_PROMPT_STRATEGY_ID,
-    name: '通用翻译',
-    description: '适合大多数普通文本。',
-    system_prompt:
-      'You are a professional translation engine. Translate the user text from {source_lang} to {target_lang}. Return only the translation.',
-    is_builtin: true,
-    is_deletable: false,
-  },
-];
+import { useTranslationPromptStrategyWorkspace } from './useTranslationPromptStrategyWorkspace';
 
 interface CustomTranslationProviderDialogProps {
   isOpen: boolean;
@@ -80,13 +65,6 @@ export function CustomTranslationProviderDialog({
     initialValues.reasoningLevel,
   );
   const [promptStrategyId, setPromptStrategyId] = useState(initialValues.promptStrategyId);
-  const [promptStrategies, setPromptStrategies] = useState<TranslationPromptStrategy[]>(
-    DEFAULT_PROMPT_STRATEGIES,
-  );
-  const [strategyDraftName, setStrategyDraftName] = useState('');
-  const [strategyDraftDescription, setStrategyDraftDescription] = useState('');
-  const [strategyDraftPrompt, setStrategyDraftPrompt] = useState('');
-  const [strategyError, setStrategyError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [models, setModels] = useState<OpenAICompatibleModelInfo[]>([]);
@@ -97,11 +75,28 @@ export function CustomTranslationProviderDialog({
     type: 'success' | 'error';
     message: string;
   } | null>(null);
+  const {
+    clearStrategyDraft,
+    handleAddStrategy,
+    handleDeleteStrategy,
+    handlePromptStrategyChange,
+    handleSaveStrategy,
+    loadPromptStrategies,
+    promptStrategies,
+    selectedPromptStrategy,
+    setStrategyDraftDescription,
+    setStrategyDraftName,
+    setStrategyDraftPrompt,
+    strategyDraftDescription,
+    strategyDraftName,
+    strategyDraftPrompt,
+    strategyError,
+  } = useTranslationPromptStrategyWorkspace({
+    selectedStrategyId: promptStrategyId,
+    onSelectedStrategyIdChange: setPromptStrategyId,
+  });
 
   const endpointPreview = getCustomProviderEndpointPreview(protocol, endpoint, model);
-  const selectedPromptStrategy = promptStrategies.find(
-    (strategy) => strategy.id === promptStrategyId,
-  );
 
   const resetProviderIntrospectionState = () => {
     setModels([]);
@@ -121,7 +116,6 @@ export function CustomTranslationProviderDialog({
     setReasoningLevel(values.reasoningLevel);
     setPromptStrategyId(values.promptStrategyId);
     setSaveError(null);
-    setStrategyError(null);
     resetProviderIntrospectionState();
     void loadPromptStrategies(values.promptStrategyId);
   }, [isOpen, initialProvider?.id]);
@@ -136,7 +130,6 @@ export function CustomTranslationProviderDialog({
     setPromptStrategyId(SMART_PROMPT_STRATEGY_ID);
     clearStrategyDraft();
     setSaveError(null);
-    setStrategyError(null);
     resetProviderIntrospectionState();
     onClose();
   };
@@ -285,117 +278,6 @@ export function CustomTranslationProviderDialog({
     setModel(value);
     setTestStatus(null);
   };
-
-  async function loadPromptStrategies(strategyId: string) {
-    try {
-      const config = await listTranslationPromptStrategies();
-      setPromptStrategies(config.strategies);
-      populateStrategyDraft(strategyId, config.strategies);
-    } catch (error) {
-      console.error('Failed to load prompt strategies:', error);
-      populateStrategyDraft(strategyId, DEFAULT_PROMPT_STRATEGIES);
-    }
-  }
-
-  const handlePromptStrategyChange = (strategyId: string) => {
-    setPromptStrategyId(strategyId);
-    setStrategyError(null);
-    populateStrategyDraft(strategyId, promptStrategies);
-  };
-
-  const handleSaveStrategy = async () => {
-    if (!selectedPromptStrategy) return;
-
-    const trimmedName = strategyDraftName.trim();
-    const trimmedPrompt = strategyDraftPrompt.trim();
-    if (!trimmedName || !trimmedPrompt) {
-      setStrategyError('策略名称和系统提示词不能为空');
-      return;
-    }
-
-    const nextStrategies = promptStrategies.map((strategy) =>
-      strategy.id === selectedPromptStrategy.id
-        ? {
-            ...strategy,
-            name: trimmedName,
-            description: strategyDraftDescription.trim(),
-            system_prompt: trimmedPrompt,
-          }
-        : strategy,
-    );
-
-    await persistPromptStrategies(nextStrategies, selectedPromptStrategy.id);
-  };
-
-  const handleAddStrategy = async () => {
-    const trimmedName = strategyDraftName.trim();
-    const trimmedPrompt = strategyDraftPrompt.trim();
-    if (!trimmedName || !trimmedPrompt) {
-      setStrategyError('策略名称和系统提示词不能为空');
-      return;
-    }
-
-    const strategy: TranslationPromptStrategy = {
-      id: `custom-${Date.now()}`,
-      name: trimmedName,
-      description: strategyDraftDescription.trim(),
-      system_prompt: trimmedPrompt,
-      is_builtin: false,
-      is_deletable: true,
-    };
-
-    await persistPromptStrategies([...promptStrategies, strategy], strategy.id);
-  };
-
-  const handleDeleteStrategy = async () => {
-    if (!selectedPromptStrategy?.is_deletable) return;
-
-    await persistPromptStrategies(
-      promptStrategies.filter((strategy) => strategy.id !== selectedPromptStrategy.id),
-      DEFAULT_PROMPT_STRATEGY_ID,
-    );
-  };
-
-  async function persistPromptStrategies(
-    strategies: TranslationPromptStrategy[],
-    nextSelectedId: string,
-  ) {
-    setStrategyError(null);
-    try {
-      const saved = await saveTranslationPromptStrategies({ strategies });
-      setPromptStrategies(saved.strategies);
-      setPromptStrategyId(nextSelectedId);
-      populateStrategyDraft(nextSelectedId, saved.strategies);
-    } catch (error) {
-      setStrategyError(`保存策略失败: ${formatCustomProviderError(error)}`);
-    }
-  }
-
-  function populateStrategyDraft(
-    strategyId: string,
-    strategies: TranslationPromptStrategy[],
-  ) {
-    if (strategyId === SMART_PROMPT_STRATEGY_ID) {
-      clearStrategyDraft();
-      return;
-    }
-
-    const strategy = strategies.find((item) => item.id === strategyId);
-    if (!strategy) {
-      clearStrategyDraft();
-      return;
-    }
-
-    setStrategyDraftName(strategy.name);
-    setStrategyDraftDescription(strategy.description);
-    setStrategyDraftPrompt(strategy.system_prompt);
-  }
-
-  function clearStrategyDraft() {
-    setStrategyDraftName('');
-    setStrategyDraftDescription('');
-    setStrategyDraftPrompt('');
-  }
 
   if (!isOpen) return null;
 
