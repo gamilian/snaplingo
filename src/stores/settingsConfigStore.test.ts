@@ -198,7 +198,7 @@ describe('settingsConfigStore', () => {
     });
   });
 
-  it('leaves settingsStore with only navigation and hotkey state after rehydration', async () => {
+  it('leaves settingsStore with only navigation state after rehydration', async () => {
     legacyPersistedState({
       activeMainTab: 'translation',
       screenshotSubTab: 'save-settings',
@@ -228,11 +228,7 @@ describe('settingsConfigStore', () => {
     expect(state.translationSubTab).toBe('translation-settings');
     expect(state.ocrSubTab).toBe('favorites');
     expect(state.servicesSubTab).toBe('translation');
-    expect(state.hotkeys).toMatchObject({
-      screenshot: { screenshot: 'F12' },
-      translation: { 'selection-translate': 'F10' },
-      ocr: { 'screenshot-ocr': 'F9' },
-    });
+    expect('hotkeys' in state).toBe(false);
     expect('language' in state).toBe(false);
     expect('theme' in state).toBe(false);
     expect('startOnBoot' in state).toBe(false);
@@ -245,6 +241,17 @@ describe('settingsConfigStore', () => {
     expect('setScreenshotSavePath' in state).toBe(false);
     expect('setDefaultTargetLang' in state).toBe(false);
     expect(typeof state.setActiveMainTab).toBe('function');
-    expect(typeof state.setHotkey).toBe('function');
+    expect('setHotkey' in state).toBe(false);
+    expect('clearHotkey' in state).toBe(false);
+    expect('resetHotkeys' in state).toBe(false);
+    expect(JSON.parse(localStorage.getItem('snaplingo-settings') ?? '{}')).toMatchObject({
+      state: {
+        hotkeys: {
+          screenshot: { screenshot: 'F12' },
+          translation: { 'selection-translate': 'F10' },
+          ocr: { 'screenshot-ocr': 'F9' },
+        },
+      },
+    });
   });
 });
