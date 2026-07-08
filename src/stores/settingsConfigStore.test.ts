@@ -221,7 +221,7 @@ describe('settingsConfigStore', () => {
     });
 
     const { useSettingsStore } = await import('./settingsStore');
-    const state = useSettingsStore.getState() as Record<string, unknown>;
+    const state = useSettingsStore.getState() as unknown as Record<string, unknown>;
 
     expect(state.activeMainTab).toBe('translation');
     expect(state.screenshotSubTab).toBe('save-settings');

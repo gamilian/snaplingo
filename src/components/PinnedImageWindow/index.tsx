@@ -7,7 +7,7 @@ import {
   getWebviewWindowByLabel,
 } from '../../tauri/window';
 import { writeClipboardText } from '../../tauri/clipboard';
-import { useSettingsStore } from '../../stores/settingsStore';
+import { useSettingsConfigStore } from '../../stores/settingsConfigStore';
 import { getPinnedImage } from '../../tauri/pinnedImage';
 import type { PinnedImageView } from '../ScreenshotSession/types';
 import {
@@ -105,7 +105,9 @@ interface PinnedImageWindowProps {
 }
 
 export function PinnedImageWindow({ imageId }: PinnedImageWindowProps) {
-  const screenshotSavePath = useSettingsStore((state) => state.screenshotSavePath);
+  const screenshotSavePath = useSettingsConfigStore(
+    (state) => state.screenshot?.savePath,
+  );
   const [image, setImage] = useState<PinnedImageView | null>(null);
   const [zoom, setZoom] = useState(1);
   const [opacity, setOpacity] = useState(1);

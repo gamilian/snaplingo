@@ -22,6 +22,7 @@ import {
   readCaptureLaunch,
 } from './components/ScreenshotSession/windowMode';
 import { useAppStore } from './stores/appStore';
+import { useSettingsConfigStore } from './stores/settingsConfigStore';
 import { useSettingsStore } from './stores/settingsStore';
 import {
   configureHotkey,
@@ -59,12 +60,34 @@ function App() {
   const requestAutoTranslate = useAppStore((state) => state.requestAutoTranslate);
   const showResultWindow = useAppStore((state) => state.showResultWindow);
   const showOcrWindow = useAppStore((state) => state.showOcrWindow);
+  const applyTranslationDefaults = useAppStore(
+    (state) => state.applyTranslationDefaults,
+  );
+  const hydrateSettings = useSettingsConfigStore((state) => state.hydrate);
   const hotkeys = useSettingsStore((state) => state.hotkeys);
   const setHotkey = useSettingsStore((state) => state.setHotkey);
   const isCaptureWindow =
     currentWindow.label === CAPTURE_WINDOW_LABEL || captureLaunch !== null;
   const [hasLoadedCaptureResultPayload, setHasLoadedCaptureResultPayload] =
     useState(false);
+
+  useEffect(() => {
+    let disposed = false;
+
+    hydrateSettings()
+      .then((snapshot) => {
+        if (!disposed) {
+          applyTranslationDefaults(snapshot.translation);
+        }
+      })
+      .catch((err) => {
+        console.warn('Failed to hydrate durable settings:', err);
+      });
+
+    return () => {
+      disposed = true;
+    };
+  }, [applyTranslationDefaults, hydrateSettings]);
 
   const startFileOcr = useCallback(() => {
     showOcrWindow();

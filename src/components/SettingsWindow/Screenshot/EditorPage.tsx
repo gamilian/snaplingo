@@ -1,14 +1,12 @@
 import { useState } from 'react';
 import { CustomSelect } from '../../common/CustomSelect';
 import { CustomRange } from '../../common/CustomRange';
-import { useSettingsStore } from '../../../stores/settingsStore';
 
 export function EditorPage() {
   const [fontSize, setFontSize] = useState('12');
   const [lineWidth, setLineWidth] = useState(3);
   const [pinOpacity, setPinOpacity] = useState(100);
-  const capturedScreenshot = useSettingsStore((state) => state.capturedScreenshot);
-  const setCapturedScreenshot = useSettingsStore((state) => state.setCapturedScreenshot);
+  const [capturedScreenshot, setCapturedScreenshot] = useState<string | null>(null);
 
   return (
     <div className="max-w-4xl space-y-8">

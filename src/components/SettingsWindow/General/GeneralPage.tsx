@@ -1,13 +1,22 @@
-import { useSettingsStore } from '../../../stores/settingsStore';
+import { useSettingsConfigStore } from '../../../stores/settingsConfigStore';
 import { CustomSelect } from '../../common/CustomSelect';
 
 export function GeneralPage() {
-  const language = useSettingsStore((state) => state.language);
-  const theme = useSettingsStore((state) => state.theme);
-  const startOnBoot = useSettingsStore((state) => state.startOnBoot);
-  const setLanguage = useSettingsStore((state) => state.setLanguage);
-  const setTheme = useSettingsStore((state) => state.setTheme);
-  const setStartOnBoot = useSettingsStore((state) => state.setStartOnBoot);
+  const general = useSettingsConfigStore((state) => state.general);
+  const updateGeneralSettings = useSettingsConfigStore(
+    (state) => state.updateGeneralSettings,
+  );
+
+  if (!general) {
+    return <div className="text-sm text-gray-500">设置加载中...</div>;
+  }
+
+  const updateGeneral = (input: Partial<typeof general>) => {
+    void updateGeneralSettings({
+      ...general,
+      ...input,
+    });
+  };
 
   return (
     <div className="max-w-4xl space-y-8">
@@ -34,8 +43,8 @@ export function GeneralPage() {
                 { value: 'en', label: 'English' },
                 { value: 'ja', label: '日本語' },
               ]}
-              value={language}
-              onChange={setLanguage}
+              value={general.language}
+              onChange={(language) => updateGeneral({ language })}
             />
           </div>
         </div>
@@ -53,8 +62,8 @@ export function GeneralPage() {
                 { value: 'light', label: '浅色' },
                 { value: 'dark', label: '深色' },
               ]}
-              value={theme}
-              onChange={(value) => setTheme(value as any)}
+              value={general.theme}
+              onChange={(theme) => updateGeneral({ theme })}
             />
           </div>
         </div>
@@ -66,14 +75,14 @@ export function GeneralPage() {
             <div className="text-sm text-gray-500 mt-1">系统启动时自动运行 SnapLingo</div>
           </div>
           <button
-            onClick={() => setStartOnBoot(!startOnBoot)}
+            onClick={() => updateGeneral({ startOnBoot: !general.startOnBoot })}
             className={`relative w-12 h-6 rounded-full transition-colors ${
-              startOnBoot ? 'bg-primary-600' : 'bg-gray-300'
+              general.startOnBoot ? 'bg-primary-600' : 'bg-gray-300'
             }`}
           >
             <span
               className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                startOnBoot ? 'translate-x-6' : 'translate-x-0'
+                general.startOnBoot ? 'translate-x-6' : 'translate-x-0'
               }`}
             />
           </button>

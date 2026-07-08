@@ -1,13 +1,22 @@
-import { useState } from 'react';
-import { useSettingsStore } from '../../../stores/settingsStore';
+import { useSettingsConfigStore } from '../../../stores/settingsConfigStore';
 import { CustomSelect } from '../../common/CustomSelect';
 
 export function TranslationSettingsPage() {
-  const defaultSourceLang = useSettingsStore((state) => state.defaultSourceLang);
-  const defaultTargetLang = useSettingsStore((state) => state.defaultTargetLang);
+  const translation = useSettingsConfigStore((state) => state.translation);
+  const updateTranslationSettings = useSettingsConfigStore(
+    (state) => state.updateTranslationSettings,
+  );
 
-  const [sourceLang, setSourceLang] = useState(defaultSourceLang);
-  const [targetLang, setTargetLang] = useState(defaultTargetLang);
+  if (!translation) {
+    return <div className="text-sm text-gray-500">设置加载中...</div>;
+  }
+
+  const updateTranslation = (input: Partial<typeof translation>) => {
+    void updateTranslationSettings({
+      ...translation,
+      ...input,
+    });
+  };
 
   return (
     <div className="max-w-4xl space-y-8">
@@ -35,8 +44,10 @@ export function TranslationSettingsPage() {
               { value: 'de', label: 'Deutsch' },
               { value: 'es', label: 'Español' },
             ]}
-            value={sourceLang}
-            onChange={setSourceLang}
+            value={translation.defaultSourceLang}
+            onChange={(defaultSourceLang) =>
+              updateTranslation({ defaultSourceLang })
+            }
           />
           <p className="text-sm text-gray-500 mt-2">翻译窗口默认的源语言</p>
         </div>
@@ -55,8 +66,10 @@ export function TranslationSettingsPage() {
               { value: 'de', label: 'Deutsch' },
               { value: 'es', label: 'Español' },
             ]}
-            value={targetLang}
-            onChange={setTargetLang}
+            value={translation.defaultTargetLang}
+            onChange={(defaultTargetLang) =>
+              updateTranslation({ defaultTargetLang })
+            }
           />
           <p className="text-sm text-gray-500 mt-2">翻译窗口默认的目标语言</p>
         </div>

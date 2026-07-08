@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSettingsStore } from '../../stores/settingsStore';
+import { useSettingsConfigStore } from '../../stores/settingsConfigStore';
 import { writeClipboardText } from '../../tauri/clipboard';
 import { getCurrentAppWebviewWindow } from '../../tauri/window';
 import {
@@ -250,7 +250,9 @@ export default function ScreenshotSession({
   initialSessionId,
   onInactive,
 }: ScreenshotSessionProps) {
-  const screenshotSavePath = useSettingsStore((state) => state.screenshotSavePath);
+  const screenshotSavePath = useSettingsConfigStore(
+    (state) => state.screenshot?.savePath,
+  );
   const startPointRef = useRef<Point | null>(null);
   const cursorPointRef = useRef<Point | null>(null);
   const draftSelectionRef = useRef<LogicalRect | null>(null);

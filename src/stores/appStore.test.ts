@@ -123,4 +123,16 @@ describe('translation session state', () => {
 
     expect(useAppStore.getState().ocrImageBase64).toBeNull();
   });
+
+  it('applies translation defaults from durable settings', () => {
+    useAppStore.getState().applyTranslationDefaults({
+      defaultSourceLang: 'ja',
+      defaultTargetLang: 'en',
+    });
+
+    expect(useAppStore.getState()).toMatchObject({
+      sourceLang: 'ja',
+      targetLang: 'en',
+    });
+  });
 });

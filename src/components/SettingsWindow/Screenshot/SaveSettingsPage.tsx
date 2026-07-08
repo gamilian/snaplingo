@@ -1,17 +1,26 @@
 import { useState } from 'react';
-import { useSettingsStore } from '../../../stores/settingsStore';
+import { useSettingsConfigStore } from '../../../stores/settingsConfigStore';
 import { CustomRange } from '../../common/CustomRange';
 import { CustomSelect } from '../../common/CustomSelect';
 
 export function SaveSettingsPage() {
-  const screenshotSavePath = useSettingsStore((state) => state.screenshotSavePath);
-  const screenshotFormat = useSettingsStore((state) => state.screenshotFormat);
-  const screenshotQuality = useSettingsStore((state) => state.screenshotQuality);
-  const setScreenshotSavePath = useSettingsStore((state) => state.setScreenshotSavePath);
-  const setScreenshotFormat = useSettingsStore((state) => state.setScreenshotFormat);
-  const setScreenshotQuality = useSettingsStore((state) => state.setScreenshotQuality);
+  const screenshot = useSettingsConfigStore((state) => state.screenshot);
+  const updateScreenshotSettings = useSettingsConfigStore(
+    (state) => state.updateScreenshotSettings,
+  );
 
   const [namingRule, setNamingRule] = useState('timestamp');
+
+  if (!screenshot) {
+    return <div className="text-sm text-gray-500">设置加载中...</div>;
+  }
+
+  const updateScreenshot = (input: Partial<typeof screenshot>) => {
+    void updateScreenshotSettings({
+      ...screenshot,
+      ...input,
+    });
+  };
 
   const handleBrowse = () => {
     // TODO: 调用 Tauri 文件选择对话框
@@ -32,8 +41,8 @@ export function SaveSettingsPage() {
           <div className="flex items-center space-x-3">
             <input
               type="text"
-              value={screenshotSavePath}
-              onChange={(e) => setScreenshotSavePath(e.target.value)}
+              value={screenshot.savePath}
+              onChange={(e) => updateScreenshot({ savePath: e.target.value })}
               className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
               placeholder="~/Pictures/SnapLingo"
             />
@@ -56,8 +65,8 @@ export function SaveSettingsPage() {
                 type="radio"
                 name="format"
                 value="png"
-                checked={screenshotFormat === 'png'}
-                onChange={(e) => setScreenshotFormat(e.target.value as any)}
+                checked={screenshot.format === 'png'}
+                onChange={(e) => updateScreenshot({ format: e.target.value })}
                 className="w-4 h-4 text-primary-600 focus:ring-primary-500"
               />
               <span className="text-sm text-gray-700">PNG</span>
@@ -67,8 +76,8 @@ export function SaveSettingsPage() {
                 type="radio"
                 name="format"
                 value="jpg"
-                checked={screenshotFormat === 'jpg'}
-                onChange={(e) => setScreenshotFormat(e.target.value as any)}
+                checked={screenshot.format === 'jpg'}
+                onChange={(e) => updateScreenshot({ format: e.target.value })}
                 className="w-4 h-4 text-primary-600 focus:ring-primary-500"
               />
               <span className="text-sm text-gray-700">JPG</span>
@@ -78,8 +87,8 @@ export function SaveSettingsPage() {
                 type="radio"
                 name="format"
                 value="webp"
-                checked={screenshotFormat === 'webp'}
-                onChange={(e) => setScreenshotFormat(e.target.value as any)}
+                checked={screenshot.format === 'webp'}
+                onChange={(e) => updateScreenshot({ format: e.target.value })}
                 className="w-4 h-4 text-primary-600 focus:ring-primary-500"
               />
               <span className="text-sm text-gray-700">WebP</span>
@@ -91,11 +100,11 @@ export function SaveSettingsPage() {
         {/* 图片质量 */}
         <div className="pt-6 border-t border-gray-100">
           <label className="block font-medium text-gray-700 mb-2">
-            图片质量：<span className="text-primary-600">{screenshotQuality}%</span>
+            图片质量：<span className="text-primary-600">{screenshot.quality}%</span>
           </label>
           <CustomRange
-            value={screenshotQuality}
-            onChange={setScreenshotQuality}
+            value={screenshot.quality}
+            onChange={(quality) => updateScreenshot({ quality })}
             min={50}
             max={100}
             step={1}

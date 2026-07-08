@@ -8,6 +8,11 @@ export interface ProviderTranslation extends TranslationResult {
   status: ProviderTranslationStatus;
 }
 
+interface TranslationDefaults {
+  defaultSourceLang: string;
+  defaultTargetLang: string;
+}
+
 let translationSessionSequence = 0;
 
 function nextTranslationSessionId() {
@@ -76,6 +81,7 @@ interface AppState {
   setSourceText: (text: string) => void;
   setSourceLang: (lang: string) => void;
   setTargetLang: (lang: string) => void;
+  applyTranslationDefaults: (defaults: TranslationDefaults) => void;
   setTranslations: (results: TranslationResult[]) => void;
   clearTranslationResults: () => void;
   startTranslationSession: (text: string, providerIds: string[]) => string;
@@ -118,6 +124,11 @@ export const useAppStore = create<AppState>((set) => ({
   setSourceText: (text) => set({ sourceText: text }),
   setSourceLang: (lang) => set({ sourceLang: lang }),
   setTargetLang: (lang) => set({ targetLang: lang }),
+  applyTranslationDefaults: (defaults) =>
+    set({
+      sourceLang: defaults.defaultSourceLang,
+      targetLang: defaults.defaultTargetLang,
+    }),
   setTranslations: (results) =>
     set({
       translations: results.map(normalizeTranslationResult),
