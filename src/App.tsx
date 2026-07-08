@@ -22,12 +22,8 @@ import {
   readCaptureLaunch,
 } from './components/ScreenshotSession/windowMode';
 import { useAppStore } from './stores/appStore';
+import { useHotkeyConfigStore } from './stores/hotkeyConfigStore';
 import { useSettingsConfigStore } from './stores/settingsConfigStore';
-import { useSettingsStore } from './stores/settingsStore';
-import {
-  configureHotkey,
-  type HotkeyCategory,
-} from './tauri/hotkeys';
 import { recognizeImageFile, selectImageFile } from './tauri/ocr';
 import { takeCaptureResultWindowPayload } from './tauri/captureSession';
 import {
@@ -64,8 +60,7 @@ function App() {
     (state) => state.applyTranslationDefaults,
   );
   const hydrateSettings = useSettingsConfigStore((state) => state.hydrate);
-  const hotkeys = useSettingsStore((state) => state.hotkeys);
-  const setHotkey = useSettingsStore((state) => state.setHotkey);
+  const hydrateHotkeys = useHotkeyConfigStore((state) => state.hydrate);
   const isCaptureWindow =
     currentWindow.label === CAPTURE_WINDOW_LABEL || captureLaunch !== null;
   const [hasLoadedCaptureResultPayload, setHasLoadedCaptureResultPayload] =
@@ -112,17 +107,10 @@ function App() {
   useEffect(() => {
     if (!isSettingsWindow) return;
 
-    (Object.entries(hotkeys) as [HotkeyCategory, Record<string, string>][]).forEach(
-      ([category, actionHotkeys]) => {
-        Object.entries(actionHotkeys).forEach(([action, hotkey]) => {
-          void configureHotkey(category, action, hotkey).catch((err) => {
-            console.warn(`Failed to configure hotkey ${category}:${action}:`, err);
-            setHotkey(category, action, '未设置');
-          });
-        });
-      },
-    );
-  }, [hotkeys, isSettingsWindow, setHotkey]);
+    hydrateHotkeys().catch((err) => {
+      console.warn('Failed to hydrate hotkey configuration:', err);
+    });
+  }, [hydrateHotkeys, isSettingsWindow]);
 
   const loadCaptureResultPayload = useCallback(async () => {
     const payload = await takeCaptureResultWindowPayload();

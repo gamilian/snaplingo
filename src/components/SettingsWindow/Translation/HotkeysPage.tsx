@@ -1,18 +1,19 @@
 import { useState, useEffect } from 'react';
 import { HotkeyRow } from '../Hotkey/HotkeyRow';
-import { DEFAULT_HOTKEYS, useSettingsStore } from '../../../stores/settingsStore';
-import { configureHotkey } from '../../../tauri/hotkeys';
+import { useHotkeyConfigStore } from '../../../stores/hotkeyConfigStore';
 import { saveHotkeyWithRegistration } from '../Hotkey/hotkeyRegistration';
 
 export function HotkeysPage() {
-  const hotkeys = useSettingsStore((state) => state.hotkeys.translation);
-  const setHotkey = useSettingsStore((state) => state.setHotkey);
-  const clearHotkey = useSettingsStore((state) => state.clearHotkey);
-  const resetHotkeys = useSettingsStore((state) => state.resetHotkeys);
+  const snapshot = useHotkeyConfigStore((state) => state.snapshot);
+  const defaultSnapshot = useHotkeyConfigStore((state) => state.defaultSnapshot);
+  const updateHotkey = useHotkeyConfigStore((state) => state.updateHotkey);
+  const resetHotkey = useHotkeyConfigStore((state) => state.resetHotkey);
+  const resetCategory = useHotkeyConfigStore((state) => state.resetCategory);
 
   const [recordingKey, setRecordingKey] = useState<string | null>(null);
 
-  const defaultHotkeys: Record<string, string> = DEFAULT_HOTKEYS.translation;
+  const hotkeys = snapshot?.translation;
+  const defaultHotkeys = defaultSnapshot?.translation ?? hotkeys;
 
   // 监听键盘事件进行录制
   useEffect(() => {
@@ -55,8 +56,7 @@ export function HotkeysPage() {
           category: 'translation',
           action: recordingKey,
           hotkey: hotkeyString,
-          configureHotkey,
-          setHotkey,
+          updateHotkey,
           reportError: alert,
         }).then(() => setRecordingKey(null));
       }
@@ -78,7 +78,7 @@ export function HotkeysPage() {
       window.removeEventListener('keydown', handleKeyDown, true);
       document.removeEventListener('mousedown', handleClickOutside, true);
     };
-  }, [recordingKey, setHotkey]);
+  }, [recordingKey, updateHotkey]);
 
   const handleRecord = (key: string) => {
     // 如果已经在录制这个键，点击取消录制
@@ -90,21 +90,28 @@ export function HotkeysPage() {
   };
 
   const handleClear = (key: string) => {
-    clearHotkey('translation', key);
+    void updateHotkey('translation', key, '未设置').catch((err) => {
+      alert(`快捷键 ${key} 清除失败：${err}`);
+    });
   };
 
   const handleReset = (key: string) => {
-    const defaultValue = defaultHotkeys[key];
-    if (defaultValue) {
-      setHotkey('translation', key, defaultValue);
-    }
+    void resetHotkey('translation', key).catch((err) => {
+      alert(`快捷键 ${key} 重置失败：${err}`);
+    });
   };
 
   const handleResetAll = () => {
     if (confirm('确定要恢复所有快捷键到默认值吗？')) {
-      resetHotkeys('translation');
+      void resetCategory('translation').catch((err) => {
+        alert(`快捷键重置失败：${err}`);
+      });
     }
   };
+
+  if (!hotkeys || !defaultHotkeys) {
+    return <div className="text-sm text-gray-500">正在加载快捷键配置...</div>;
+  }
 
   const handleDetectConflicts = () => {
     const allHotkeys = Object.values(hotkeys);
@@ -135,7 +142,7 @@ export function HotkeysPage() {
           onClear={() => handleClear('selection-translate')}
           onReset={() => handleReset('selection-translate')}
           isRecording={recordingKey === 'selection-translate'}
-          defaultValue={defaultHotkeys['selection-translate']}
+          defaultValue={defaultHotkeys['selection-translate'] ?? '未设置'}
         />
         <HotkeyRow
           label="截图翻译"
@@ -145,7 +152,7 @@ export function HotkeysPage() {
           onClear={() => handleClear('screenshot-translate')}
           onReset={() => handleReset('screenshot-translate')}
           isRecording={recordingKey === 'screenshot-translate'}
-          defaultValue={defaultHotkeys['screenshot-translate']}
+          defaultValue={defaultHotkeys['screenshot-translate'] ?? '未设置'}
         />
         <HotkeyRow
           label="输入翻译"
@@ -155,7 +162,7 @@ export function HotkeysPage() {
           onClear={() => handleClear('input-translate')}
           onReset={() => handleReset('input-translate')}
           isRecording={recordingKey === 'input-translate'}
-          defaultValue={defaultHotkeys['input-translate']}
+          defaultValue={defaultHotkeys['input-translate'] ?? '未设置'}
         />
         <HotkeyRow
           label="显示翻译窗口"
@@ -165,7 +172,7 @@ export function HotkeysPage() {
           onClear={() => handleClear('show-window')}
           onReset={() => handleReset('show-window')}
           isRecording={recordingKey === 'show-window'}
-          defaultValue={defaultHotkeys['show-window']}
+          defaultValue={defaultHotkeys['show-window'] ?? '未设置'}
         />
       </div>
 

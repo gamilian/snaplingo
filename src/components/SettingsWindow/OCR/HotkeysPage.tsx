@@ -1,18 +1,19 @@
 import { useState, useEffect } from 'react';
 import { HotkeyRow } from '../Hotkey/HotkeyRow';
-import { DEFAULT_HOTKEYS, useSettingsStore } from '../../../stores/settingsStore';
-import { configureHotkey } from '../../../tauri/hotkeys';
+import { useHotkeyConfigStore } from '../../../stores/hotkeyConfigStore';
 import { saveHotkeyWithRegistration } from '../Hotkey/hotkeyRegistration';
 
 export function HotkeysPage() {
-  const hotkeys = useSettingsStore((state) => state.hotkeys.ocr);
-  const setHotkey = useSettingsStore((state) => state.setHotkey);
-  const clearHotkey = useSettingsStore((state) => state.clearHotkey);
-  const resetHotkeys = useSettingsStore((state) => state.resetHotkeys);
+  const snapshot = useHotkeyConfigStore((state) => state.snapshot);
+  const defaultSnapshot = useHotkeyConfigStore((state) => state.defaultSnapshot);
+  const updateHotkey = useHotkeyConfigStore((state) => state.updateHotkey);
+  const resetHotkey = useHotkeyConfigStore((state) => state.resetHotkey);
+  const resetCategory = useHotkeyConfigStore((state) => state.resetCategory);
 
   const [recordingKey, setRecordingKey] = useState<string | null>(null);
 
-  const defaultHotkeys: Record<string, string> = DEFAULT_HOTKEYS.ocr;
+  const hotkeys = snapshot?.ocr;
+  const defaultHotkeys = defaultSnapshot?.ocr ?? hotkeys;
 
   // 监听键盘事件进行录制
   useEffect(() => {
@@ -55,8 +56,7 @@ export function HotkeysPage() {
           category: 'ocr',
           action: recordingKey,
           hotkey: hotkeyString,
-          configureHotkey,
-          setHotkey,
+          updateHotkey,
           reportError: alert,
         }).then(() => setRecordingKey(null));
       }
@@ -76,7 +76,7 @@ export function HotkeysPage() {
       window.removeEventListener('keydown', handleKeyDown, true);
       document.removeEventListener('mousedown', handleClickOutside, true);
     };
-  }, [recordingKey, setHotkey]);
+  }, [recordingKey, updateHotkey]);
 
   const handleRecord = (key: string) => {
     // 如果已经在录制这个键，点击取消录制
@@ -88,21 +88,28 @@ export function HotkeysPage() {
   };
 
   const handleClear = (key: string) => {
-    clearHotkey('ocr', key);
+    void updateHotkey('ocr', key, '未设置').catch((err) => {
+      alert(`快捷键 ${key} 清除失败：${err}`);
+    });
   };
 
   const handleReset = (key: string) => {
-    const defaultValue = defaultHotkeys[key];
-    if (defaultValue) {
-      setHotkey('ocr', key, defaultValue);
-    }
+    void resetHotkey('ocr', key).catch((err) => {
+      alert(`快捷键 ${key} 重置失败：${err}`);
+    });
   };
 
   const handleResetAll = () => {
     if (confirm('确定要恢复所有快捷键到默认值吗？')) {
-      resetHotkeys('ocr');
+      void resetCategory('ocr').catch((err) => {
+        alert(`快捷键重置失败：${err}`);
+      });
     }
   };
+
+  if (!hotkeys || !defaultHotkeys) {
+    return <div className="text-sm text-gray-500">正在加载快捷键配置...</div>;
+  }
 
   const handleDetectConflicts = () => {
     const allHotkeys = Object.values(hotkeys);
@@ -133,7 +140,7 @@ export function HotkeysPage() {
           onClear={() => handleClear('screenshot-ocr')}
           onReset={() => handleReset('screenshot-ocr')}
           isRecording={recordingKey === 'screenshot-ocr'}
-          defaultValue={defaultHotkeys['screenshot-ocr']}
+          defaultValue={defaultHotkeys['screenshot-ocr'] ?? '未设置'}
         />
         <HotkeyRow
           label="静默截图 OCR"
@@ -143,7 +150,7 @@ export function HotkeysPage() {
           onClear={() => handleClear('silent-screenshot-ocr')}
           onReset={() => handleReset('silent-screenshot-ocr')}
           isRecording={recordingKey === 'silent-screenshot-ocr'}
-          defaultValue={defaultHotkeys['silent-screenshot-ocr']}
+          defaultValue={defaultHotkeys['silent-screenshot-ocr'] ?? '未设置'}
         />
         <HotkeyRow
           label="访问选图 OCR"
@@ -153,7 +160,7 @@ export function HotkeysPage() {
           onClear={() => handleClear('file-ocr')}
           onReset={() => handleReset('file-ocr')}
           isRecording={recordingKey === 'file-ocr'}
-          defaultValue={defaultHotkeys['file-ocr']}
+          defaultValue={defaultHotkeys['file-ocr'] ?? '未设置'}
         />
         <HotkeyRow
           label="显示 OCR 窗口"
@@ -163,7 +170,7 @@ export function HotkeysPage() {
           onClear={() => handleClear('show-window')}
           onReset={() => handleReset('show-window')}
           isRecording={recordingKey === 'show-window'}
-          defaultValue={defaultHotkeys['show-window']}
+          defaultValue={defaultHotkeys['show-window'] ?? '未设置'}
         />
       </div>
 

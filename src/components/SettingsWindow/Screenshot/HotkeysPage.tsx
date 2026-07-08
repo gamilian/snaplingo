@@ -1,18 +1,19 @@
 import { useState, useEffect } from 'react';
 import { HotkeyRow } from '../Hotkey/HotkeyRow';
-import { DEFAULT_HOTKEYS, useSettingsStore } from '../../../stores/settingsStore';
-import { configureHotkey } from '../../../tauri/hotkeys';
+import { useHotkeyConfigStore } from '../../../stores/hotkeyConfigStore';
 import { saveHotkeyWithRegistration } from '../Hotkey/hotkeyRegistration';
 
 export function HotkeysPage() {
-  const hotkeys = useSettingsStore((state) => state.hotkeys.screenshot);
-  const setHotkey = useSettingsStore((state) => state.setHotkey);
-  const clearHotkey = useSettingsStore((state) => state.clearHotkey);
-  const resetHotkeys = useSettingsStore((state) => state.resetHotkeys);
+  const snapshot = useHotkeyConfigStore((state) => state.snapshot);
+  const defaultSnapshot = useHotkeyConfigStore((state) => state.defaultSnapshot);
+  const updateHotkey = useHotkeyConfigStore((state) => state.updateHotkey);
+  const resetHotkey = useHotkeyConfigStore((state) => state.resetHotkey);
+  const resetCategory = useHotkeyConfigStore((state) => state.resetCategory);
 
   const [recordingKey, setRecordingKey] = useState<string | null>(null);
 
-  const defaultHotkeys: Record<string, string> = DEFAULT_HOTKEYS.screenshot;
+  const hotkeys = snapshot?.screenshot;
+  const defaultHotkeys = defaultSnapshot?.screenshot ?? hotkeys;
 
   // 监听键盘事件进行录制
   useEffect(() => {
@@ -57,8 +58,7 @@ export function HotkeysPage() {
           category: 'screenshot',
           action: recordingKey,
           hotkey: hotkeyString,
-          configureHotkey,
-          setHotkey,
+          updateHotkey,
           reportError: alert,
         }).then(() => setRecordingKey(null));
       }
@@ -78,7 +78,7 @@ export function HotkeysPage() {
       window.removeEventListener('keydown', handleKeyDown, true);
       document.removeEventListener('mousedown', handleClickOutside, true);
     };
-  }, [recordingKey, setHotkey]);
+  }, [recordingKey, updateHotkey]);
 
   const handleRecord = (key: string) => {
     // 如果已经在录制这个键，点击取消录制
@@ -90,21 +90,28 @@ export function HotkeysPage() {
   };
 
   const handleClear = (key: string) => {
-    clearHotkey('screenshot', key);
+    void updateHotkey('screenshot', key, '未设置').catch((err) => {
+      alert(`快捷键 ${key} 清除失败：${err}`);
+    });
   };
 
   const handleReset = (key: string) => {
-    const defaultValue = defaultHotkeys[key];
-    if (defaultValue) {
-      setHotkey('screenshot', key, defaultValue);
-    }
+    void resetHotkey('screenshot', key).catch((err) => {
+      alert(`快捷键 ${key} 重置失败：${err}`);
+    });
   };
 
   const handleResetAll = () => {
     if (confirm('确定要恢复所有快捷键到默认值吗？')) {
-      resetHotkeys('screenshot');
+      void resetCategory('screenshot').catch((err) => {
+        alert(`快捷键重置失败：${err}`);
+      });
     }
   };
+
+  if (!hotkeys || !defaultHotkeys) {
+    return <div className="text-sm text-gray-500">正在加载快捷键配置...</div>;
+  }
 
   const handleDetectConflicts = () => {
     const allHotkeys = Object.values(hotkeys);
@@ -136,7 +143,7 @@ export function HotkeysPage() {
           onClear={() => handleClear('screenshot')}
           onReset={() => handleReset('screenshot')}
           isRecording={recordingKey === 'screenshot'}
-          defaultValue={defaultHotkeys['screenshot']}
+          defaultValue={defaultHotkeys['screenshot'] ?? '未设置'}
         />
         <HotkeyRow
           label="截屏并自动复制"
@@ -145,7 +152,7 @@ export function HotkeysPage() {
           onClear={() => handleClear('screenshot-copy')}
           onReset={() => handleReset('screenshot-copy')}
           isRecording={recordingKey === 'screenshot-copy'}
-          defaultValue={defaultHotkeys['screenshot-copy']}
+          defaultValue={defaultHotkeys['screenshot-copy'] ?? '未设置'}
         />
         <HotkeyRow
           label="自定义截屏"
@@ -154,7 +161,7 @@ export function HotkeysPage() {
           onClear={() => handleClear('screenshot-custom')}
           onReset={() => handleReset('screenshot-custom')}
           isRecording={recordingKey === 'screenshot-custom'}
-          defaultValue={defaultHotkeys['screenshot-custom']}
+          defaultValue={defaultHotkeys['screenshot-custom'] ?? '未设置'}
         />
         <HotkeyRow
           label="贴图"
@@ -163,7 +170,7 @@ export function HotkeysPage() {
           onClear={() => handleClear('pin')}
           onReset={() => handleReset('pin')}
           isRecording={recordingKey === 'pin'}
-          defaultValue={defaultHotkeys['pin']}
+          defaultValue={defaultHotkeys['pin'] ?? '未设置'}
         />
         <HotkeyRow
           label="隐藏/显示所有贴图"
@@ -172,7 +179,7 @@ export function HotkeysPage() {
           onClear={() => handleClear('pin-toggle-all')}
           onReset={() => handleReset('pin-toggle-all')}
           isRecording={recordingKey === 'pin-toggle-all'}
-          defaultValue={defaultHotkeys['pin-toggle-all']}
+          defaultValue={defaultHotkeys['pin-toggle-all'] ?? '未设置'}
         />
         <HotkeyRow
           label="切换到另一贴图组"
@@ -181,7 +188,7 @@ export function HotkeysPage() {
           onClear={() => handleClear('pin-switch-group')}
           onReset={() => handleReset('pin-switch-group')}
           isRecording={recordingKey === 'pin-switch-group'}
-          defaultValue={defaultHotkeys['pin-switch-group']}
+          defaultValue={defaultHotkeys['pin-switch-group'] ?? '未设置'}
         />
       </div>
 

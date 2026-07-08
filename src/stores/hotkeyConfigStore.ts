@@ -47,8 +47,11 @@ export const useHotkeyConfigStore = create<HotkeyConfigState>((set, get) => ({
   snapshot: null,
   defaultSnapshot: null,
   hydrate: async () => {
-    if (get().hydrated && get().snapshot) {
-      return cloneSnapshot(get().snapshot);
+    const state = get();
+    const existingSnapshot = state.snapshot;
+
+    if (state.hydrated && existingSnapshot) {
+      return cloneSnapshot(existingSnapshot);
     }
 
     const snapshot = await loadHotkeySnapshot();
