@@ -12,6 +12,7 @@ import {
   testOpenAIResponsesProvider,
 } from '../../../tauri/providers';
 import type {
+  AddCustomTranslationProviderRequest,
   OpenAICompatibleModelInfo,
   TranslationPromptStrategy,
   UpdateCustomTranslationProviderRequest,
@@ -19,12 +20,22 @@ import type {
 import type { Provider } from '../../../stores/providerStore';
 import IconActionButton from '../../common/IconActionButton';
 import { getCustomProviderEndpointPreview } from './customTranslationProviderForm';
-
-type LLMProtocol = 'openai' | 'openai-responses' | 'anthropic' | 'gemini';
-type LLMProtocolFamily = 'openai' | 'anthropic' | 'gemini';
-
-const SMART_PROMPT_STRATEGY_ID = 'smart';
-const DEFAULT_PROMPT_STRATEGY_ID = 'general';
+import {
+  buildAddCustomProviderRequest,
+  buildUpdateCustomProviderRequest,
+  canSaveCustomProviderForm,
+  DEFAULT_PROMPT_STRATEGY_ID,
+  formatCustomProviderError,
+  getInitialCustomProviderFormValues,
+  getProtocolDefaults,
+  getProtocolFamily,
+  OPENAI_MODE_OPTIONS,
+  PROTOCOL_OPTIONS,
+  REASONING_OPTIONS,
+  SMART_PROMPT_STRATEGY_ID,
+  type LLMProtocol,
+  type LLMProtocolFamily,
+} from './customTranslationProviderFormModel';
 
 const DEFAULT_PROMPT_STRATEGIES: TranslationPromptStrategy[] = [
   {
@@ -37,17 +48,6 @@ const DEFAULT_PROMPT_STRATEGIES: TranslationPromptStrategy[] = [
     is_deletable: false,
   },
 ];
-
-interface AddCustomTranslationProviderRequest {
-  name: string;
-  protocol: string;
-  endpoint: string;
-  model: string;
-  api_key: string;
-  reasoning_level?: string;
-  prompt_strategy_id?: string;
-  prompt_fallback_strategy_id?: string;
-}
 
 interface CustomTranslationProviderDialogProps {
   isOpen: boolean;
@@ -69,7 +69,7 @@ export function CustomTranslationProviderDialog({
   initialProvider = null,
   presentation = 'dialog',
 }: CustomTranslationProviderDialogProps) {
-  const initialValues = getInitialFormValues(initialProvider);
+  const initialValues = getInitialCustomProviderFormValues(initialProvider);
   const isEditing = Boolean(initialProvider);
   const [name, setName] = useState(initialValues.name);
   const [protocol, setProtocol] = useState<LLMProtocol>(initialValues.protocol);
@@ -112,7 +112,7 @@ export function CustomTranslationProviderDialog({
   useEffect(() => {
     if (!isOpen) return;
 
-    const values = getInitialFormValues(initialProvider);
+    const values = getInitialCustomProviderFormValues(initialProvider);
     setName(values.name);
     setProtocol(values.protocol);
     setEndpoint(values.endpoint);
@@ -144,45 +144,38 @@ export function CustomTranslationProviderDialog({
   const handleSave = async () => {
     if (isSaving) return;
 
-    const trimmedName = name.trim();
-    const trimmedApiKey = apiKey.trim();
-    const trimmedEndpoint = endpoint.trim();
-    const trimmedModel = model.trim();
-
-    if (!trimmedName || !trimmedEndpoint || !trimmedModel) return;
-    if (!isEditing && !trimmedApiKey) return;
+    const input = {
+      name,
+      protocol,
+      endpoint,
+      model,
+      apiKey,
+      reasoningLevel,
+      promptStrategyId,
+    };
+    const request = isEditing
+      ? buildUpdateCustomProviderRequest(input)
+      : buildAddCustomProviderRequest(input);
+    if (!request) return;
 
     setIsSaving(true);
     setSaveError(null);
 
     try {
       if (isEditing && initialProvider) {
-        await onUpdate?.(initialProvider.id, {
-          name: trimmedName,
-          protocol,
-          endpoint: trimmedEndpoint,
-          model: trimmedModel,
-          api_key: trimmedApiKey || undefined,
-          reasoning_level: reasoningLevel || undefined,
-          prompt_strategy_id: promptStrategyId,
-          prompt_fallback_strategy_id: DEFAULT_PROMPT_STRATEGY_ID,
-        });
+        await onUpdate?.(
+          initialProvider.id,
+          request as UpdateCustomTranslationProviderRequest,
+        );
       } else {
-        await onSave({
-          name: trimmedName,
-          protocol,
-          endpoint: trimmedEndpoint,
-          model: trimmedModel,
-          api_key: trimmedApiKey,
-          reasoning_level: reasoningLevel || undefined,
-          prompt_strategy_id: promptStrategyId,
-          prompt_fallback_strategy_id: DEFAULT_PROMPT_STRATEGY_ID,
-        });
+        await onSave(request as AddCustomTranslationProviderRequest);
       }
       setIsSaving(false);
       resetAndClose();
     } catch (error) {
-      setSaveError(`${isEditing ? '保存' : '添加'}失败: ${formatSaveError(error)}`);
+      setSaveError(
+        `${isEditing ? '保存' : '添加'}失败: ${formatCustomProviderError(error)}`,
+      );
       setIsSaving(false);
     }
   };
@@ -235,7 +228,7 @@ export function CustomTranslationProviderDialog({
       }
     } catch (error) {
       setModels([]);
-      setModelListError(`获取模型失败: ${formatSaveError(error)}`);
+      setModelListError(`获取模型失败: ${formatCustomProviderError(error)}`);
     } finally {
       setIsLoadingModels(false);
     }
@@ -271,7 +264,7 @@ export function CustomTranslationProviderDialog({
     } catch (error) {
       setTestStatus({
         type: 'error',
-        message: `检测失败: ${formatSaveError(error)}`,
+        message: `检测失败: ${formatCustomProviderError(error)}`,
       });
     } finally {
       setIsTestingProvider(false);
@@ -374,7 +367,7 @@ export function CustomTranslationProviderDialog({
       setPromptStrategyId(nextSelectedId);
       populateStrategyDraft(nextSelectedId, saved.strategies);
     } catch (error) {
-      setStrategyError(`保存策略失败: ${formatSaveError(error)}`);
+      setStrategyError(`保存策略失败: ${formatCustomProviderError(error)}`);
     }
   }
 
@@ -406,12 +399,18 @@ export function CustomTranslationProviderDialog({
 
   if (!isOpen) return null;
 
-  const canSave =
-    !isSaving &&
-    Boolean(name.trim()) &&
-    Boolean(endpoint.trim()) &&
-    Boolean(model.trim()) &&
-    (isEditing ? Boolean(onUpdate) : Boolean(apiKey.trim()));
+  const canSave = canSaveCustomProviderForm({
+    name,
+    protocol,
+    endpoint,
+    model,
+    apiKey,
+    reasoningLevel,
+    promptStrategyId,
+    isSaving,
+    isEditing,
+    canUpdate: Boolean(onUpdate),
+  });
   const dialogTitle = isEditing
     ? `配置 ${initialProvider?.name || '自定义翻译服务'}`
     : '添加自定义翻译服务';
@@ -726,89 +725,5 @@ export function CustomTranslationProviderDialog({
       {form}
     </div>,
     document.body,
-  );
-}
-
-function formatSaveError(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return String(error);
-}
-
-const PROTOCOL_OPTIONS: Array<{
-  value: LLMProtocolFamily;
-  label: string;
-}> = [
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'gemini', label: 'Gemini' },
-];
-
-const OPENAI_MODE_OPTIONS: Array<{ value: LLMProtocol; label: string }> = [
-  { value: 'openai', label: 'Chat Completions' },
-  { value: 'openai-responses', label: 'Responses' },
-];
-
-const REASONING_OPTIONS = [
-  { value: '', label: '默认' },
-  { value: 'minimal', label: 'Minimal' },
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' },
-  { value: 'xhigh', label: 'XHigh' },
-];
-
-function getInitialFormValues(provider: Provider | null) {
-  const protocol = isLLMProtocol(provider?.protocol) ? provider.protocol : 'openai';
-  const defaults = getProtocolDefaults(protocol);
-
-  return {
-    name: provider?.name || '',
-    protocol,
-    endpoint: provider?.endpoint || defaults.endpoint,
-    model: provider?.model || defaults.model,
-    reasoningLevel: provider?.reasoningLevel || '',
-    promptStrategyId: provider?.promptStrategyId || SMART_PROMPT_STRATEGY_ID,
-    promptFallbackStrategyId: DEFAULT_PROMPT_STRATEGY_ID,
-  };
-}
-
-function getProtocolDefaults(protocol: LLMProtocol) {
-  switch (protocol) {
-    case 'anthropic':
-      return {
-        endpoint: 'https://api.anthropic.com',
-        model: 'claude-3-5-sonnet-latest',
-      };
-    case 'openai-responses':
-      return {
-        endpoint: 'https://api.openai.com',
-        model: 'gpt-5-mini',
-      };
-    case 'gemini':
-      return {
-        endpoint: 'https://generativelanguage.googleapis.com',
-        model: 'gemini-1.5-flash',
-      };
-    case 'openai':
-      return {
-        endpoint: 'https://api.openai.com',
-        model: 'gpt-4o',
-      };
-  }
-}
-
-function getProtocolFamily(protocol: LLMProtocol): LLMProtocolFamily {
-  return protocol === 'openai-responses' ? 'openai' : protocol;
-}
-
-function isLLMProtocol(value: string | undefined): value is LLMProtocol {
-  return (
-    value === 'openai' ||
-    value === 'openai-responses' ||
-    value === 'anthropic' ||
-    value === 'gemini'
   );
 }
