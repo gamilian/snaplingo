@@ -55,8 +55,11 @@ impl SelectedTextAcquirer {
 
             match method.availability(&context) {
                 MethodAvailability::Available => {}
-                MethodAvailability::Unsupported(reason)
-                | MethodAvailability::Unavailable(reason) => {
+                MethodAvailability::Unsupported(reason) => {
+                    diagnostics.push(format!("{kind:?}: unsupported: {reason}"));
+                    continue;
+                }
+                MethodAvailability::Unavailable(reason) => {
                     diagnostics.push(format!("{kind:?}: unavailable: {reason}"));
                     continue;
                 }
@@ -113,6 +116,7 @@ mod selected_text_acquirer_tests {
     enum SelectionAttemptStatusForTest {
         Text(&'static str, SelectionSource),
         Empty,
+        Unavailable(&'static str),
         Failed(&'static str),
     }
 
@@ -142,6 +146,9 @@ mod selected_text_acquirer_tests {
                 }
                 SelectionAttemptStatusForTest::Empty => {
                     SelectionAttempt::empty(self.kind, context.clone())
+                }
+                SelectionAttemptStatusForTest::Unavailable(message) => {
+                    SelectionAttempt::unavailable(self.kind, context.clone(), message.to_string())
                 }
                 SelectionAttemptStatusForTest::Failed(message) => {
                     SelectionAttempt::failed(self.kind, context.clone(), message.to_string())
@@ -321,6 +328,56 @@ mod selected_text_acquirer_tests {
 
         assert!(message.contains("Accessibility: failed: ax failed"));
         assert!(message.contains("ShortcutCopy: no valid text"));
+    }
+
+    #[tokio::test]
+    async fn acquirer_preserves_unsupported_and_unavailable_reasons() {
+        let acquirer = SelectedTextAcquirer::new(
+            SelectionScheme::new(vec![
+                SelectionMethodKind::SelfWebview,
+                SelectionMethodKind::BrowserScript,
+                SelectionMethodKind::ShortcutCopy,
+            ]),
+            SelectionMethodRegistry::new(vec![
+                Box::new(FakeMethod {
+                    kind: SelectionMethodKind::SelfWebview,
+                    availability: MethodAvailability::Unsupported("requires macOS".to_string()),
+                    result: SelectionAttemptStatusForTest::Text(
+                        "self text",
+                        SelectionSource::SelfWebview,
+                    ),
+                    calls: Arc::new(Mutex::new(Vec::new())),
+                }),
+                Box::new(FakeMethod {
+                    kind: SelectionMethodKind::BrowserScript,
+                    availability: MethodAvailability::Available,
+                    result: SelectionAttemptStatusForTest::Unavailable(
+                        "browser scripting disabled",
+                    ),
+                    calls: Arc::new(Mutex::new(Vec::new())),
+                }),
+                Box::new(FakeMethod {
+                    kind: SelectionMethodKind::ShortcutCopy,
+                    availability: MethodAvailability::Available,
+                    result: SelectionAttemptStatusForTest::Failed("shortcut failed"),
+                    calls: Arc::new(Mutex::new(Vec::new())),
+                }),
+            ]),
+            Arc::new(FakeContextProvider),
+        );
+
+        let err = acquirer
+            .acquire_with_context(SelectionContext::default())
+            .await
+            .unwrap_err();
+
+        let AppError::System(message) = err else {
+            panic!("expected system error");
+        };
+
+        assert!(message.contains("SelfWebview: unsupported: requires macOS"));
+        assert!(message.contains("BrowserScript: unavailable: browser scripting disabled"));
+        assert!(message.contains("ShortcutCopy: failed: shortcut failed"));
     }
 
     #[tokio::test]

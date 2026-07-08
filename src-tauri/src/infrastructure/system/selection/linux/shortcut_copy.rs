@@ -145,7 +145,11 @@ fn clipboard_change_count() -> Result<i64, String> {
     {
         Ok(text) => text,
         Err(Error::ContentNotAvailable) => String::new(),
-        Err(err) => return Err(format!("Failed to inspect clipboard before shortcut copy: {err}")),
+        Err(err) => {
+            return Err(format!(
+                "Failed to inspect clipboard before shortcut copy: {err}"
+            ))
+        }
     };
 
     let mut hasher = DefaultHasher::new();
@@ -168,7 +172,9 @@ fn read_clipboard_text() -> Result<String, String> {
         .get()
         .clipboard(LinuxClipboardKind::Clipboard)
         .text()
-        .map_err(|e| format!("Failed to read selected text from clipboard after shortcut copy: {e}"))
+        .map_err(|e| {
+            format!("Failed to read selected text from clipboard after shortcut copy: {e}")
+        })
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -182,7 +188,7 @@ mod linux {
         use crate::domain::{SelectionAttemptStatus, SelectionContext, SelectionMethodKind};
 
         use super::super::{
-            ShortcutCopySelectionMethod, selection_attempt_from_shortcut_copy_result,
+            selection_attempt_from_shortcut_copy_result, ShortcutCopySelectionMethod,
         };
         use crate::infrastructure::system::selection::backend::SelectionMethod;
 

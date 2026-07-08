@@ -118,6 +118,19 @@ impl SelectionAttempt {
         }
     }
 
+    pub fn unavailable(
+        method: SelectionMethodKind,
+        context: SelectionContext,
+        message: String,
+    ) -> Self {
+        Self {
+            method,
+            status: SelectionAttemptStatus::Unavailable(message),
+            context,
+            is_editable: None,
+        }
+    }
+
     pub fn into_valid_snapshot(self) -> Option<SelectedTextSnapshot> {
         let SelectionAttemptStatus::Success { text, source } = self.status else {
             return None;
