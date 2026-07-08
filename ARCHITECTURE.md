@@ -1,6 +1,6 @@
 # SnapLingo 架构设计文档
 
-> 当前版本 - 2026-06-24
+> 当前版本 - 2026-07-08
 
 ## 📐 架构概览
 
@@ -30,10 +30,13 @@ Infrastructure Layer (基础设施层)
 **运行时 seam：**
 - `src/tauri/*` 是前端 Tauri Adapter seam，集中维护 command 名称和 payload 形状。
 - `src/tauri/appEvents.ts` 是前端 Tauri event Adapter seam，集中维护主窗口 event 名称、payload 解析和订阅清理。
+- `src/tauri/settings.ts` + `src/stores/settingsConfigStore.ts` 是前端 durable settings seam；Settings、Capture、Result、Pinned 窗口都从同一后端 snapshot hydrate。
 - `src-tauri/src/commands/*` 是后端 Tauri command seam，负责把 IPC 请求转给 Application 层。
 - `src-tauri/src/app_state.rs` 拥有 AppState 形状和关闭顺序。
 - `src-tauri/src/composition.rs` 是应用组合入口；`src-tauri/src/composition/*_runtime.rs` 拆分 Provider、Capture、Selection、History 的构造策略。
 - `src-tauri/src/startup_shortcuts.rs` 拥有启动期全局快捷键注册。
+- `src-tauri/src/application/settings/configuration.rs` 是 Settings Configuration module，拥有 durable settings 默认值、路径归一化、section 更新和 legacy migration。
+- `src-tauri/src/application/services/selected_text_acquirer.rs` 是 Selected Text acquisition workflow，拥有取词方法顺序和诊断；平台取词 mechanics 留在 `infrastructure/system/selection/*`。
 - `application/services/capture_session_runtime.rs` 是 Capture Session Runtime，统一编排截图输出和 OCR。
 - `src/components/ScreenshotSession/captureInteractionRuntime.ts` 是前端 Capture Interaction Runtime，负责纯 effect-plan 决策。
 
@@ -46,6 +49,7 @@ snaplingo/
 ├─ src/                                 # React/Vite Frontend Runtime
 │   ├─ tauri/                           # ⭐ Frontend Tauri Adapter seam
 │   │   ├─ appEvents.ts                  # 主窗口 Tauri event Adapter
+│   │   ├─ settings.ts                   # durable settings command adapter
 │   │   ├─ translation.ts
 │   │   ├─ providers.ts
 │   │   ├─ history.ts
@@ -60,6 +64,8 @@ snaplingo/
 │   │
 │   ├─ hooks/
 │   └─ stores/                          # Zustand 状态管理
+│       ├─ settingsConfigStore.ts        # 后端 snapshot backed durable settings
+│       └─ settingsStore.ts              # Settings UI navigation + hotkey UI state
 │
 ├─ src-tauri/src/
 │   ├─ main.rs                          # Tauri binary 入口
@@ -84,6 +90,9 @@ snaplingo/
 │   │   └─ ...
 │   │
 │   ├─ application/                     # ⭐ Application Layer
+│   │   ├─ settings/                    # durable user settings module
+│   │   │   ├─ configuration.rs          # defaults, merge, path normalization, persistence
+│   │   │   └─ mod.rs
 │   │   ├─ providers/                   # Provider 垂直切片
 │   │   │   ├─ common/                  # 共享基础
 │   │   │   │   ├─ provider.rs          # Provider Trait
@@ -100,6 +109,7 @@ snaplingo/
 │   │   │   │   └─ impls/               # 具体实现
 │   │   │
 │   │   └─ services/
+│   │       ├─ selected_text_acquirer.rs # ⭐ Selected Text acquisition workflow
 │   │       ├─ capture_session_runtime.rs # ⭐ Capture Session Runtime
 │   │       ├─ capture_session_service.rs
 │   │       ├─ image_composition_service.rs
@@ -109,6 +119,8 @@ snaplingo/
 │   │
 │   ├─ domain/                          # ⭐ Domain Layer
 │   │   ├─ capture.rs                   # 纯数据结构
+│   │   ├─ config.rs                    # durable settings snapshot types
+│   │   ├─ selection.rs                 # selected-text method/source/result types
 │   │   ├─ translation.rs
 │   │   └─ ocr.rs
 │   │
@@ -125,6 +137,7 @@ snaplingo/
 │       ├─ system/
 │       │   ├─ paths.rs                 # 平台适配 ⭐
 │       │   ├─ hotkey/                  # 平台适配 ⭐
+│       │   ├─ selection/               # Selected Text platform adapters ⭐
 │       │   ├─ tts/                     # 平台适配 ⭐
 │       │   └─ ...
 │       │
@@ -197,12 +210,26 @@ providers/ocr/
 #### 2.2 Application Modules（应用模块）
 
 **示例：**
+- `settings/configuration.rs`：durable user settings 的默认值、读取、section 更新、路径归一化和 legacy migration
+- `selected_text_acquirer.rs`：划词翻译取词 workflow，按 scheme 调用平台 method 并生成诊断
 - `capture_session_runtime.rs`：统一编排截图会话渲染、输出、OCR
 - `capture_session_service.rs`：创建和读取冻结桌面会话
 - `image_composition_service.rs`：裁剪、标注、合成图像
 - `capture_output_service.rs`：保存、复制、贴图输出
 - `pinned_image_service.rs`：贴图状态和恢复
 - `history_service.rs`：订阅领域事件并写入历史
+
+**Settings Configuration 边界：**
+- 后端 owns durable defaults：`general`、`screenshot`、`translation`
+- 前端通过 `src/tauri/settings.ts` 调用 section update command，不直接写 durable localStorage
+- `settingsConfigStore.ts` 只缓存后端 snapshot 并负责一次性 legacy migration
+- `settingsStore.ts` 只保留 Settings UI navigation 和 hotkey UI state；热键注册生命周期仍由 `startup_shortcuts.rs` 拥有
+
+**Selected Text acquisition 边界：**
+- `SelectedTextAcquirer` 拥有取词方法顺序、成功短路和失败诊断格式
+- `SelectionMethodRegistry` 只按 `SelectionMethodKind` 找 method，不做 workflow 决策
+- macOS/Windows/Linux method 实现留在 `infrastructure/system/selection/*`
+- Windows/Linux 目前通过 `ShortcutCopy` adapter 执行 `Ctrl+C` + clipboard transaction；macOS 仍保留 SelfWebview、Accessibility、BrowserScript、MenuCopy、ShortcutCopy 的原顺序
 
 ---
 
@@ -299,6 +326,7 @@ pub struct Keychain {
 **其他平台适配：**
 - `paths.rs`：配置文件路径（`~/Library/` vs `%APPDATA%` vs `~/.config/`）
 - `hotkey/`：全局快捷键注册（使用 global-hotkey crate）
+- `selection/`：Selected Text 平台取词 method；每个平台 provider 暴露 default scheme 和 method list
 - `tts/`：TTS 后端（macOS `say` vs Windows SAPI vs Linux espeak）
 
 ---
@@ -370,7 +398,50 @@ Commands: configure_translation_provider_credentials(provider_id, credentials, S
 
 ---
 
-### 场景 3：用户执行翻译（多 Provider 并发）
+### 场景 3：用户修改 durable settings
+
+```
+用户修改 Settings 页面字段
+    ↓
+Settings page: useSettingsConfigStore.update*Settings(section)
+    ↓
+Frontend Adapter: src/tauri/settings.ts
+    ↓
+Commands: update_*_settings(input, State)
+    ↓
+Application: SettingsConfiguration.update_*(input)
+    ↓
+Infrastructure: ConfigFile.save("settings", snapshot)
+    ↓
+Frontend: all windows hydrate the same settings snapshot
+```
+
+---
+
+### 场景 4：划词翻译取词
+
+```
+用户触发划词翻译快捷键
+    ↓
+Commands: open_selection_translation_window_for_state(...)
+    ↓
+Application: SelectedTextAcquirer.acquire()
+    ↓
+Selection scheme order
+    ├─ macOS: SelfWebview → Accessibility → BrowserScript → MenuCopy → ShortcutCopy
+    ├─ Windows: ShortcutCopy
+    └─ Linux: ShortcutCopy
+    ↓
+Infrastructure: platform selection adapter
+    ↓ 成功
+Result Window opens with selected text
+    ↓ 失败
+one string error surface includes attempted method diagnostics
+```
+
+---
+
+### 场景 5：用户执行翻译（多 Provider 并发）
 
 ```
 用户输入文本 → 点击翻译
@@ -535,6 +606,8 @@ impl CaptureSessionRuntime {
 |------|---------|
 | **Provider** | Mock HttpClient，单元测试 recognize() |
 | **Coordinator** | 单元测试激活、恢复、重配置和执行协调 |
+| **Settings Configuration** | Rust 测 section defaults、partial update、path normalization、legacy migration |
+| **SelectedTextAcquirer** | Rust 测 method ordering、success short-circuit、unsupported/unavailable/failed diagnostics |
 | **Capture Session Runtime** | 通过一个 Interface 测试 render/output/OCR 编排 |
 | **Capture Interaction Runtime** | Vitest 测选区完成后的 effect plan |
 | **Frontend Tauri Adapter** | Vitest 测 command 名称和 payload 映射 |

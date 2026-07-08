@@ -107,6 +107,30 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 - 处理自定义 Translation Provider 的运行时新增、注册、激活和失败回滚
 - 与 Coordinator 的运行时重配置能力配合，使配置命令保存凭证后立即更新已注册 Provider，无需重启应用
 
+### Settings Configuration Module（设置配置模块）
+`src-tauri/src/application/settings/configuration.rs` 中的 durable settings 模块。
+
+**职责：**
+- 拥有 `general`、`screenshot`、`translation` 三类持久设置的默认值
+- 从 `ConfigFile` 读取和保存 sectioned settings snapshot
+- 对截图保存路径做 backend-owned normalization
+- 提供 section-specific update：`update_general`、`update_screenshot`、`update_translation`
+- 一次性迁移旧前端 localStorage 中的 durable 设置，但不接管导航状态或热键注册生命周期
+
+**边界：**
+- Settings Configuration 不负责快捷键注册；全局快捷键仍由 `startup_shortcuts.rs` 管理
+- Provider 配置仍由 Provider Configuration Module 和各 Coordinator 管理
+- 前端不再直接持久化 general/screenshot/translation durable values
+
+### Durable Settings Store（持久设置 Store）
+`src/stores/settingsConfigStore.ts` 中的前端 store。
+
+**职责：**
+- 通过 `src/tauri/settings.ts` hydrate 后端 settings snapshot
+- 为 Settings、ScreenshotSession、PinnedImageWindow、ResultWindow 共享同一份 durable settings cache
+- 调用 section update command 后用后端返回的 snapshot 更新本地 cache
+- 清理已迁移的旧 durable localStorage keys，保留导航状态和 hotkey UI state
+
 ### Settings Navigation State（设置导航状态）
 `src/components/SettingsWindow/settingsNavigationState.ts` 中的前端纯模型。
 
@@ -114,6 +138,14 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 - 根据当前 Settings section 和持久化 secondary key 解析实际 active secondary item
 - 当持久化 key 过期时回退到该 section 的第一个 secondary item
 - 对用户点击的 secondary key 做 section 内合法性校验，避免 UI 调用方散落 switch 逻辑
+
+### Settings UI Store（设置 UI Store）
+`src/stores/settingsStore.ts` 中的前端 store。
+
+**职责：**
+- 保存 Settings Window 的 main tab / secondary tab UI 状态
+- 保存当前 hotkey UI state，供设置页展示和录制交互使用
+- 不保存 durable general/screenshot/translation 设置；这些值必须走 Durable Settings Store
 
 ### Capture Mode（捕获模式）
 用户触发的五种独立功能入口：
@@ -163,6 +195,24 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 
 - **Input Translation Mode（输入翻译模式）**  
   快捷键触发，弹出翻译窗口，用户直接在窗口中输入文字。按回车或点击"翻译"按钮执行翻译。
+
+### Selected Text Acquisition（划词取词）
+划词翻译中从当前前台应用获取用户选中文本的 workflow。
+
+**核心模块：**
+- `SelectedTextAcquirer`：Application 层 workflow，负责 method ordering、成功短路、失败诊断聚合
+- `SelectionMethodRegistry`：按 `SelectionMethodKind` 找到具体 method
+- `infrastructure/system/selection/*`：平台 method mechanics，包括 macOS 专用方法以及 Windows/Linux `ShortcutCopy`
+
+**平台策略：**
+- macOS：保留 SelfWebview → Accessibility → BrowserScript → MenuCopy → ShortcutCopy 的多方法顺序
+- Windows：使用 `ShortcutCopy`，通过 `Ctrl+C` 和 clipboard transaction 获取选中文本
+- Linux：使用 `ShortcutCopy`，通过 `Ctrl+C` 和 clipboard transaction 获取选中文本，失败时保留明确的 clipboard / synthetic input 错误
+
+**诊断规则：**
+- 所有失败最终仍返回一个字符串 error surface 给 `open_selection_translation_window_for_state(...)`
+- 诊断字符串包含尝试过的方法名，并区分 `unsupported`、`unavailable`、`failed` 和 empty text
+- 平台适配器负责产出平台原因，`SelectedTextAcquirer` 只负责排序和聚合
 
 ### Capture Session（截图会话）
 一次截图从快捷键触发到输出完成或取消的完整生命周期。Capture Session 不是简单的截图 API 调用，而是 SnapLingo 截图链路的核心领域对象。
@@ -261,6 +311,7 @@ Provider 类型：
   - Windows: Credential Manager
   - Linux: Secret Service
 - **非敏感配置**（语言偏好、是否激活、超时设置等）：存储在统一配置文件 `~/.snaplingo/config.json`
+- **持久用户设置**（general/screenshot/translation）：通过 Settings Configuration Module 读写；前端只通过 `settingsConfigStore` hydrate 和 section update
 - **配置持久性**：配置不随应用卸载删除，用户需在设置中主动"清除所有数据"才会删除
 
 ## Workflows
