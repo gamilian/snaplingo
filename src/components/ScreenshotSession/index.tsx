@@ -12,14 +12,10 @@ import {
 } from '../../tauri/captureSession';
 import {
   getToolbarPosition,
-  snapPointToRects,
   type SelectionHandle,
 } from './selection';
 import { colorSampleToClipboardText } from './colorSampler';
-import {
-  buildCaptureCandidates,
-  getBestCandidateAtPoint,
-} from './captureCandidates';
+import { buildCaptureCandidates } from './captureCandidates';
 import {
   clearAnnotationHistory,
   removeAnnotationFromHistory,
@@ -33,7 +29,6 @@ import {
   type AnnotationTool,
 } from './annotationStyle';
 import {
-  startTextAnnotationDraft,
   updateTextAnnotationDraft,
 } from './textAnnotationDraft';
 import {
@@ -41,8 +36,6 @@ import {
   type HoverSelectionCompletionAction,
   type PreviewCaptureCompletionAction,
   type SelectionHistoryStep,
-  isCopyCaptureDoubleClick,
-  isFinishAnnotationGestureDoubleClick,
   refreshCaptureSession,
 } from './captureActions';
 import {
@@ -75,36 +68,10 @@ import {
   planCaptureAnnotationColorSelection,
   planCaptureAnnotationToolActivation,
   planCaptureAnnotationFillToggle,
-  planCaptureAnnotationErase,
-  planCaptureAnnotationGestureMove,
-  planCaptureExistingAnnotationPointerDown,
-  planCaptureAnnotationMove,
-  planCaptureAnnotationMoveCommit,
   planCaptureAnnotationSizeAdjustment,
-  planCaptureAnnotationToolStart,
-  planCapturePolylineAnnotationContinue,
   planCaptureManualSelectionTransition,
   undoPolylineCaptureGesture,
 } from './captureEditorRuntime';
-import {
-  planCaptureDraftSelectionCommit,
-  planCaptureDraftSelectionMove,
-  planCaptureDraftSelectionPointerMove,
-  planCaptureDraftSelectionStart,
-  planCapturePreviewSelectionMoveStart,
-  planCaptureSelectionEditCommit,
-  planCaptureSelectionEditMove,
-  planCaptureSelectionResizeStart,
-} from './captureSelectionRuntime';
-import {
-  getCapturePointerMoveAction,
-  getCapturePointerUpAction,
-  getCaptureSelectionLocalPoint,
-  planCapturePointerWheelSizeAdjustment,
-  planCapturePreviewPointerDown,
-  planCaptureRootPointerDown,
-  shouldSyncHoverSelectionOnPointerMove,
-} from './capturePointerInteractionRuntime';
 import {
   shouldPollCaptureHoverSelection,
   startCaptureHoverSelectionPolling,
@@ -145,9 +112,20 @@ import {
   type CaptureWorkspaceKeyboardRefs,
 } from './captureWorkspaceKeyboard';
 import {
+  handleCaptureWorkspacePointerDown,
+  handleCaptureWorkspacePointerMove,
+  handleCaptureWorkspacePointerUp,
+  handleCaptureWorkspacePreviewPointerDown,
+  handleCaptureWorkspaceResizePointerDown,
+  handleCaptureWorkspaceWheel,
+  type CaptureWorkspacePointerActions,
+  type CaptureWorkspacePointerContext,
+  type CaptureWorkspacePointerDerivedState,
+  type CaptureWorkspacePointerRefs,
+} from './captureWorkspacePointer';
+import {
   getCurrentMonitorBounds,
   getVirtualDesktopBounds,
-  viewportPointToVirtualPoint,
   virtualPointToViewportPoint,
   virtualRectToViewportRect,
 } from './virtualDesktop';
@@ -163,7 +141,6 @@ import type {
 const captureWindow = getCurrentAppWebviewWindow();
 
 const MIN_SELECTION_SIZE = 10;
-const EDGE_SNAP_THRESHOLD = 6;
 const TOOLBAR_GAP = 14;
 const TOOLBAR_SIZE = { width: 1220, height: 56 };
 const CAPTURE_HOVER_POLL_INTERVAL_MS = 16;
@@ -1240,6 +1217,9 @@ export default function ScreenshotSession({
       ],
     );
 
+  const captureWorkspacePointerRefs: CaptureWorkspacePointerRefs =
+    captureWorkspaceKeyboardRefs;
+
   const captureWorkspaceKeyboardDerived =
     useMemo<CaptureWorkspaceKeyboardDerivedState>(
       () => ({
@@ -1261,6 +1241,26 @@ export default function ScreenshotSession({
         isFillModeActive,
         isMagnifierShown,
         selectionBounds,
+      ],
+    );
+
+  const captureWorkspacePointerDerived =
+    useMemo<CaptureWorkspacePointerDerivedState>(
+      () => ({
+        annotations,
+        captureCandidates,
+        selectionBounds,
+        snapTargetRects,
+        hasAnnotationEditingContext,
+        shouldTrackMagnifierCursor,
+      }),
+      [
+        annotations,
+        captureCandidates,
+        hasAnnotationEditingContext,
+        selectionBounds,
+        shouldTrackMagnifierCursor,
+        snapTargetRects,
       ],
     );
 
@@ -1344,6 +1344,92 @@ export default function ScreenshotSession({
       ],
     );
 
+  const captureWorkspacePointerActions =
+    useMemo<CaptureWorkspacePointerActions>(
+      () => ({
+        commitTextDraft,
+        commitAnnotationGestureAtPoint,
+        dismissCaptureLayer,
+        resetPreviewSelection,
+        cancelSession,
+        setCursorPoint,
+        setStartPointWithRef,
+        setSelection,
+        setHoverSelection,
+        scheduleSelectionOverlayPaint,
+        setPreviewImageBase64,
+        setRenderingOutput,
+        setStatus,
+        setActiveAnnotationTool,
+        setAnnotationGesture,
+        setDraftAnnotation,
+        setSelectedAnnotationIndex,
+        setAnnotationMoveGesture,
+        setDraftSelectionMoveGesture,
+        setTextDraft,
+        setTextDraftAnnotationIndex,
+        setAnnotationHistory,
+        syncHoverSelection,
+        renderSelectionPreview,
+        completeManualSelection,
+        pinSelection,
+        setEditGesture,
+        setAnnotationStyle,
+        setTextFontSize,
+        copySelection,
+        adjustAnnotationSize,
+      }),
+      [
+        adjustAnnotationSize,
+        cancelSession,
+        commitAnnotationGestureAtPoint,
+        commitTextDraft,
+        completeManualSelection,
+        copySelection,
+        dismissCaptureLayer,
+        pinSelection,
+        renderSelectionPreview,
+        resetPreviewSelection,
+        scheduleSelectionOverlayPaint,
+        setActiveAnnotationTool,
+        setAnnotationGesture,
+        setAnnotationHistory,
+        setAnnotationMoveGesture,
+        setAnnotationStyle,
+        setCursorPoint,
+        setDraftAnnotation,
+        setDraftSelectionMoveGesture,
+        setEditGesture,
+        setHoverSelection,
+        setPreviewImageBase64,
+        setRenderingOutput,
+        setSelectedAnnotationIndex,
+        setSelection,
+        setStartPointWithRef,
+        setStatus,
+        setTextDraft,
+        setTextDraftAnnotationIndex,
+        setTextFontSize,
+        syncHoverSelection,
+      ],
+    );
+
+  const captureWorkspacePointerContext =
+    useMemo<CaptureWorkspacePointerContext>(
+      () => ({
+        state: captureWorkspaceState,
+        refs: captureWorkspacePointerRefs,
+        derived: captureWorkspacePointerDerived,
+        actions: captureWorkspacePointerActions,
+      }),
+      [
+        captureWorkspacePointerActions,
+        captureWorkspacePointerDerived,
+        captureWorkspacePointerRefs,
+        captureWorkspaceState,
+      ],
+    );
+
   const handleCaptureKeyboardKeyDown = useCallback((event: KeyboardEvent) => {
     handleCaptureWorkspaceKeyDown(event, {
       state: captureWorkspaceState,
@@ -1386,427 +1472,28 @@ export default function ScreenshotSession({
   }, [textDraft]);
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    const pointerDownPlan = planCaptureRootPointerDown(event, {
-      status,
-      hasSelectionBounds: Boolean(selectionBounds),
-      hasSelection: selection !== null,
-      hasTextDraft: textDraft !== null,
-      hasAnnotationGesture: annotationGesture !== null,
-      hasDismissibleLayer:
-        textDraft !== null ||
-        annotationMoveGesture !== null ||
-        draftSelectionMoveGesture !== null ||
-        selectedAnnotationIndex !== null ||
-        activeAnnotationTool !== null ||
-        annotationGesture !== null,
-    });
-
-    if (pointerDownPlan.type === 'cancel-pointer') {
-      event.preventDefault();
-      event.stopPropagation();
-      const { action } = pointerDownPlan;
-
-      if (action === 'finish-edit') {
-        commitTextDraft();
-      } else if (action === 'finish-annotation') {
-        if (selection && selectionBounds && annotationGesture) {
-          const point = viewportPointToVirtualPoint(
-            { x: event.clientX, y: event.clientY },
-            selectionBounds,
-          );
-          const localPoint = getCaptureSelectionLocalPoint(point, selection);
-          commitAnnotationGestureAtPoint(localPoint, event.shiftKey);
-        } else {
-          dismissCaptureLayer();
-        }
-      } else if (action === 'dismiss-layer') {
-        dismissCaptureLayer();
-      } else if (action === 'reset-selection') {
-        resetPreviewSelection();
-      } else {
-        void cancelSession();
-      }
-      return;
-    }
-
-    if (pointerDownPlan.type === 'ignore' || !selectionBounds) return;
-
-    const point = viewportPointToVirtualPoint(
-      { x: event.clientX, y: event.clientY },
-      selectionBounds,
+    handleCaptureWorkspacePointerDown(
+      event,
+      captureWorkspacePointerContext,
     );
-    const snappedPoint = snapPointToRects(point, snapTargetRects, EDGE_SNAP_THRESHOLD);
-    const draftStart = planCaptureDraftSelectionStart({
-      cursorPoint: point,
-      anchorPoint: snappedPoint,
-    });
-    cursorPointRef.current = draftStart.cursorPoint;
-    draftSelectionRef.current = draftStart.draftSelection;
-    setCursorPoint(draftStart.nextState.cursorPoint);
-    event.currentTarget.setPointerCapture(event.pointerId);
-    setStartPointWithRef(draftStart.nextState.startPoint);
-    setSelection(draftStart.nextState.selection);
-    setHoverSelection(draftStart.nextState.hoverSelection);
-    scheduleSelectionOverlayPaint(draftStart.draftSelection, null);
-    setPreviewImageBase64(draftStart.nextState.previewImageBase64);
-    setRenderingOutput(draftStart.nextState.renderingOutput);
-    setStatus(draftStart.nextState.status);
-    setActiveAnnotationTool(draftStart.nextState.activeAnnotationTool);
-    setAnnotationGesture(draftStart.nextState.annotationGesture);
-    setDraftAnnotation(draftStart.nextState.draftAnnotation);
-    setSelectedAnnotationIndex(draftStart.nextState.selectedAnnotationIndex);
-    setAnnotationMoveGesture(draftStart.nextState.annotationMoveGesture);
-    setDraftSelectionMoveGesture(draftStart.nextState.draftSelectionMoveGesture);
-    keyboardDraftCursorPointRef.current = null;
-    keyboardEditCursorPointRef.current = null;
-    setTextDraft(draftStart.nextState.textDraft);
-    setTextDraftAnnotationIndex(draftStart.nextState.textDraftAnnotationIndex);
-    setAnnotationHistory(draftStart.nextState.annotationHistory);
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!selectionBounds) return;
-
-    const point = viewportPointToVirtualPoint(
-      { x: event.clientX, y: event.clientY },
-      selectionBounds,
+    handleCaptureWorkspacePointerMove(
+      event,
+      captureWorkspacePointerContext,
     );
-
-    cursorPointRef.current = point;
-
-    if (shouldTrackMagnifierCursor) {
-      setCursorPoint(point);
-    }
-    scheduleSelectionOverlayPaint();
-
-    const activeStartPoint = startPointRef.current ?? startPoint;
-    const shouldSyncHoverSelection = shouldSyncHoverSelectionOnPointerMove({
-      status,
-      hasActiveStartPoint: activeStartPoint !== null,
-      hasEditGesture: editGesture !== null,
-    });
-    const pointerMoveAction = getCapturePointerMoveAction({
-      status,
-      hasSelection: selection !== null,
-      hasActiveStartPoint: activeStartPoint !== null,
-      hasEditGesture: editGesture !== null,
-      hasAnnotationGesture: annotationGesture !== null,
-      hasAnnotationMoveGesture: annotationMoveGesture !== null,
-      hasDraftSelectionMoveGesture: draftSelectionMoveGesture !== null,
-    });
-
-    if (shouldSyncHoverSelection) {
-      const nextHoverCandidate = getBestCandidateAtPoint(captureCandidates, point);
-      const nextHoverSelection = nextHoverCandidate?.rect ?? null;
-      syncHoverSelection(nextHoverSelection);
-    }
-
-    if (pointerMoveAction === 'move-annotation-gesture' && annotationGesture && selection) {
-      const localPoint = getCaptureSelectionLocalPoint(point, selection);
-      const gestureMove = planCaptureAnnotationGestureMove({
-        gesture: annotationGesture,
-        localPoint,
-        annotationStyle,
-        constrainGesture: event.shiftKey,
-      });
-      if (gestureMove.annotationGesture !== annotationGesture) {
-        setAnnotationGesture(gestureMove.annotationGesture);
-      }
-      setDraftAnnotation(gestureMove.draftAnnotation);
-      return;
-    }
-
-    if (pointerMoveAction === 'move-annotation' && annotationMoveGesture && selection) {
-      const localPoint = getCaptureSelectionLocalPoint(point, selection);
-      const annotationMove = planCaptureAnnotationMove({
-        startAnnotation: annotationMoveGesture.startAnnotation,
-        startPoint: annotationMoveGesture.startPoint,
-        localPoint,
-        constrainMove: event.shiftKey,
-      });
-      setPreviewImageBase64(annotationMove.previewImageBase64);
-      setDraftAnnotation(annotationMove.draftAnnotation);
-      return;
-    }
-
-    if (pointerMoveAction === 'move-draft-selection' && draftSelectionMoveGesture) {
-      const draftSelectionMove = planCaptureDraftSelectionMove({
-        gesture: draftSelectionMoveGesture,
-        point,
-        selectionBounds,
-      });
-      draftSelectionRef.current = draftSelectionMove.draftSelection;
-      startPointRef.current = draftSelectionMove.anchorPoint;
-      scheduleSelectionOverlayPaint(draftSelectionMove.draftSelection, null);
-      setPreviewImageBase64(draftSelectionMove.previewImageBase64);
-      setRenderingOutput(draftSelectionMove.renderingOutput);
-      return;
-    }
-
-    if (pointerMoveAction === 'edit-selection' && editGesture) {
-      const editMove = planCaptureSelectionEditMove({
-        gesture: editGesture,
-        point,
-        selectionBounds,
-        snapTargetRects,
-        edgeSnapThreshold: EDGE_SNAP_THRESHOLD,
-        minSelectionSize: MIN_SELECTION_SIZE,
-        preserveAspect: event.shiftKey,
-      });
-      keyboardEditCursorPointRef.current = editMove.keyboardEditCursorPoint;
-      setSelection(editMove.selection);
-      setPreviewImageBase64(editMove.previewImageBase64);
-      setRenderingOutput(editMove.renderingOutput);
-      return;
-    }
-
-    if (pointerMoveAction !== 'update-draft-selection' || !activeStartPoint) return;
-
-    const draftMove = planCaptureDraftSelectionPointerMove({
-      anchorPoint: activeStartPoint,
-      point,
-      snapTargetRects,
-      edgeSnapThreshold: EDGE_SNAP_THRESHOLD,
-      constrainSelection: event.shiftKey,
-    });
-    keyboardDraftCursorPointRef.current = draftMove.keyboardDraftCursorPoint;
-    draftSelectionRef.current = draftMove.draftSelection;
-    scheduleSelectionOverlayPaint(draftMove.draftSelection, null);
   };
 
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!selectionBounds) return;
-
-    const point = viewportPointToVirtualPoint(
-      { x: event.clientX, y: event.clientY },
-      selectionBounds,
-    );
-    cursorPointRef.current = point;
-    const selectionReleasePoint =
-      keyboardDraftCursorPointRef.current ?? cursorPointRef.current ?? point;
-    const editReleasePoint = keyboardEditCursorPointRef.current ?? point;
-    setCursorPoint(point);
-    setDraftSelectionMoveGesture(null);
-    keyboardDraftCursorPointRef.current = null;
-    keyboardEditCursorPointRef.current = null;
-    const activeStartPoint = startPointRef.current ?? startPoint;
-    const pointerUpAction = getCapturePointerUpAction({
-      status,
-      hasSelection: selection !== null,
-      hasActiveStartPoint: activeStartPoint !== null,
-      hasEditGesture: editGesture !== null,
-      hasAnnotationGesture: annotationGesture !== null,
-      hasAnnotationMoveGesture: annotationMoveGesture !== null,
-    });
-
-    if (pointerUpAction === 'commit-annotation-gesture' && annotationGesture && selection) {
-      const localPoint = getCaptureSelectionLocalPoint(point, selection);
-      if (annotationGesture.tool === 'polyline') return;
-
-      commitAnnotationGestureAtPoint(localPoint, event.shiftKey);
-      return;
-    }
-
-    if (pointerUpAction === 'commit-annotation-move' && annotationMoveGesture && selection) {
-      const localPoint = getCaptureSelectionLocalPoint(point, selection);
-      const annotationMoveCommit = planCaptureAnnotationMoveCommit({
-        annotationHistory,
-        annotations,
-        annotationIndex: annotationMoveGesture.annotationIndex,
-        startAnnotation: annotationMoveGesture.startAnnotation,
-        startPoint: annotationMoveGesture.startPoint,
-        localPoint,
-        constrainMove: event.shiftKey,
-      });
-      setAnnotationMoveGesture(annotationMoveCommit.annotationMoveGesture);
-      setDraftAnnotation(annotationMoveCommit.draftAnnotation);
-      setAnnotationHistory(annotationMoveCommit.annotationHistory);
-      if (annotationMoveCommit.selectedAnnotationIndex !== undefined) {
-        setSelectedAnnotationIndex(annotationMoveCommit.selectedAnnotationIndex);
-      }
-      void renderSelectionPreview(
-        selection,
-        annotationMoveCommit.previewAnnotations,
-      );
-      return;
-    }
-
-    if (pointerUpAction === 'commit-selection-edit' && editGesture) {
-      const editCommit = planCaptureSelectionEditCommit({
-        gesture: editGesture,
-        point: editReleasePoint,
-        selectionBounds,
-        snapTargetRects,
-        edgeSnapThreshold: EDGE_SNAP_THRESHOLD,
-        minSelectionSize: MIN_SELECTION_SIZE,
-        preserveAspect: event.shiftKey,
-        annotations,
-      });
-      setEditGesture(editCommit.editGesture);
-      setSelection(editCommit.selection);
-      setStatus(editCommit.status);
-      void renderSelectionPreview(
-        editCommit.previewRender.rect,
-        editCommit.previewRender.annotations,
-      );
-      return;
-    }
-
-    if (pointerUpAction !== 'commit-draft-selection' || !activeStartPoint) return;
-
-    const activeHoverSelection = hoverSelectionRef.current ?? hoverSelection;
-    const draftCommit = planCaptureDraftSelectionCommit({
-      anchorPoint: activeStartPoint,
-      releasePoint: selectionReleasePoint,
-      snapTargetRects,
-      edgeSnapThreshold: EDGE_SNAP_THRESHOLD,
-      constrainSelection: event.shiftKey,
-      captureCandidates,
-      activeHoverSelection,
-      minSelectionSize: MIN_SELECTION_SIZE,
-    });
-    setStartPointWithRef(draftCommit.startPoint);
-    draftSelectionRef.current = draftCommit.draftSelection;
-    scheduleSelectionOverlayPaint(null, draftCommit.overlayHoverSelection);
-
-    if (draftCommit.type === 'clear-selection') {
-      setSelection(draftCommit.selection);
-      scheduleSelectionOverlayPaint(null, null);
-      return;
-    }
-
-    completeManualSelection(draftCommit.selection);
+    handleCaptureWorkspacePointerUp(event, captureWorkspacePointerContext);
   };
 
   const startMoveGesture = (event: React.PointerEvent<HTMLDivElement>) => {
-    const previewPointerDownPlan = planCapturePreviewPointerDown(event, {
-      status,
-      hasSelection: selection !== null,
-      hasSelectionBounds: Boolean(selectionBounds),
-    });
-
-    if (
-      previewPointerDownPlan.type === 'ignore' ||
-      !selection ||
-      !selectionBounds
-    ) {
-      return;
-    }
-
-    if (previewPointerDownPlan.type === 'pin-selection') {
-      event.preventDefault();
-      event.stopPropagation();
-      void pinSelection();
-      return;
-    }
-
-    event.stopPropagation();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const point = viewportPointToVirtualPoint(
-      { x: event.clientX, y: event.clientY },
-      selectionBounds,
+    handleCaptureWorkspacePreviewPointerDown(
+      event,
+      captureWorkspacePointerContext,
     );
-    setCursorPoint(point);
-    if (activeAnnotationTool) {
-      setSelectedAnnotationIndex(null);
-      const localPoint = getCaptureSelectionLocalPoint(point, selection);
-      if (annotationGesture?.tool === 'polyline') {
-        if (isFinishAnnotationGestureDoubleClick(event)) {
-          commitAnnotationGestureAtPoint(localPoint, false);
-          return;
-        }
-
-        const polylineContinue = planCapturePolylineAnnotationContinue({
-          gesture: annotationGesture,
-          localPoint,
-          annotationStyle,
-          constrainGesture: event.shiftKey,
-        });
-        setAnnotationGesture(polylineContinue.annotationGesture);
-        setDraftAnnotation(polylineContinue.draftAnnotation);
-        return;
-      }
-
-      if (activeAnnotationTool === 'text') {
-        if (textDraft) return;
-        setTextDraft(startTextAnnotationDraft(localPoint, textFontSize));
-        setTextDraftAnnotationIndex(null);
-        return;
-      }
-
-      if (activeAnnotationTool === 'eraser') {
-        const erasePlan = planCaptureAnnotationErase({
-          annotationHistory,
-          localPoint,
-        });
-        setAnnotationMoveGesture(erasePlan.annotationMoveGesture);
-        setDraftAnnotation(erasePlan.draftAnnotation);
-        if (erasePlan.previewAnnotations) {
-          setAnnotationHistory(erasePlan.annotationHistory);
-          void renderSelectionPreview(selection, erasePlan.previewAnnotations);
-        }
-        return;
-      }
-
-      const toolStart = planCaptureAnnotationToolStart({
-        tool: activeAnnotationTool,
-        localPoint,
-        annotationStyle,
-      });
-      setSelectedAnnotationIndex(toolStart.selectedAnnotationIndex);
-      setAnnotationGesture(toolStart.annotationGesture);
-      setDraftAnnotation(toolStart.draftAnnotation);
-      return;
-    }
-
-    const localPoint = getCaptureSelectionLocalPoint(point, selection);
-    const existingAnnotationStart = planCaptureExistingAnnotationPointerDown({
-      annotations,
-      localPoint,
-      pointerDetail: event.detail,
-      toolbarState: {
-        annotationStyle,
-        textFontSize,
-      },
-    });
-    if (existingAnnotationStart) {
-      setSelectedAnnotationIndex(existingAnnotationStart.selectedAnnotationIndex);
-      setAnnotationStyle(existingAnnotationStart.toolbarState.annotationStyle);
-      setTextFontSize(existingAnnotationStart.toolbarState.textFontSize);
-
-      if (existingAnnotationStart.type === 'edit-text-annotation') {
-        setAnnotationMoveGesture(existingAnnotationStart.annotationMoveGesture);
-        setDraftAnnotation(existingAnnotationStart.draftAnnotation);
-        setTextDraft(existingAnnotationStart.textDraft);
-        setTextDraftAnnotationIndex(existingAnnotationStart.textDraftAnnotationIndex);
-        setPreviewImageBase64(existingAnnotationStart.previewImageBase64);
-        void renderSelectionPreview(
-          selection,
-          existingAnnotationStart.previewAnnotations,
-        );
-        return;
-      }
-
-      setAnnotationMoveGesture(existingAnnotationStart.annotationMoveGesture);
-      return;
-    }
-
-    const selectionMoveStart = planCapturePreviewSelectionMoveStart({
-      point,
-      selection,
-      hasTextDraft: textDraft !== null,
-      isCopyDoubleClick: isCopyCaptureDoubleClick(event),
-    });
-    if (selectionMoveStart.type === 'copy-selection') {
-      event.preventDefault();
-      void copySelection();
-      return;
-    }
-
-    setSelectedAnnotationIndex(selectionMoveStart.selectedAnnotationIndex);
-    setAnnotationMoveGesture(selectionMoveStart.annotationMoveGesture);
-    setEditGesture(selectionMoveStart.editGesture);
-    setPreviewImageBase64(selectionMoveStart.previewImageBase64);
   };
 
   function toggleAnnotationTool(nextTool: AnnotationTool) {
@@ -1833,36 +1520,15 @@ export default function ScreenshotSession({
     handle: SelectionHandle,
     event: React.PointerEvent<HTMLButtonElement>,
   ) => {
-    if (status !== 'preview' || !selection || !selectionBounds) return;
-
-    event.stopPropagation();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const point = viewportPointToVirtualPoint(
-      { x: event.clientX, y: event.clientY },
-      selectionBounds,
-    );
-    const resizeStart = planCaptureSelectionResizeStart({
-      point,
-      selection,
+    handleCaptureWorkspaceResizePointerDown(
       handle,
-    });
-    setCursorPoint(resizeStart.cursorPoint);
-    setEditGesture(resizeStart.editGesture);
-    setPreviewImageBase64(resizeStart.previewImageBase64);
+      event,
+      captureWorkspacePointerContext,
+    );
   };
 
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
-    const sizeDirection = planCapturePointerWheelSizeAdjustment(event, {
-      status,
-      hasTextDraft: textDraft !== null,
-      hasAnnotationGesture: annotationGesture !== null,
-      hasAnnotationMoveGesture: annotationMoveGesture !== null,
-      hasAnnotationEditingContext,
-    });
-    if (!sizeDirection) return;
-
-    event.preventDefault();
-    adjustAnnotationSize(sizeDirection);
+    handleCaptureWorkspaceWheel(event, captureWorkspacePointerContext);
   };
 
   if (!isActive) return null;
