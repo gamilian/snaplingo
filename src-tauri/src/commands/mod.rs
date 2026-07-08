@@ -274,7 +274,8 @@ pub fn configure_hotkey(
 ) -> Result<Option<String>, String> {
     let accelerator = crate::startup_shortcuts::configure_hotkey(&app, &category, &action, &hotkey)
         .map_err(|e| e.to_string())?;
-    crate::startup_shortcuts::save_hotkey_config(&state.config_file, &category, &action, &hotkey)
+    crate::HotkeyConfiguration::new(state.config_file.clone())
+        .update_hotkey(&category, &action, &hotkey)
         .map_err(|e| e.to_string())?;
     Ok(accelerator)
 }
@@ -289,13 +290,9 @@ pub fn configure_translation_hotkey(
     let accelerator =
         crate::startup_shortcuts::configure_translation_shortcut(&app, &action, &hotkey)
             .map_err(|e| e.to_string())?;
-    crate::startup_shortcuts::save_hotkey_config(
-        &state.config_file,
-        "translation",
-        &action,
-        &hotkey,
-    )
-    .map_err(|e| e.to_string())?;
+    crate::HotkeyConfiguration::new(state.config_file.clone())
+        .update_hotkey("translation", &action, &hotkey)
+        .map_err(|e| e.to_string())?;
     Ok(accelerator)
 }
 
