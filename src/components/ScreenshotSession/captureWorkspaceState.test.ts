@@ -1,4 +1,8 @@
-import type { MutableRefObject } from 'react';
+import React, {
+  type DependencyList,
+  type MutableRefObject,
+  type SetStateAction,
+} from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { emptyAnnotationHistory } from './annotationHistory';
@@ -16,10 +20,200 @@ import {
 } from './captureWorkspaceState';
 import {
   type CaptureWorkspaceRefs,
+  type UseCaptureWorkspaceStateOptions,
   applyCaptureWorkspaceStatePatch,
   createCaptureWorkspaceStateActions,
+  useCaptureWorkspaceState,
 } from './useCaptureWorkspaceState';
 import type { CaptureSessionView, LogicalRect, Point } from './types';
+
+type CaptureWorkspaceHookResult = ReturnType<typeof useCaptureWorkspaceState>;
+
+type CaptureWorkspaceProbeProps = {
+  options?: UseCaptureWorkspaceStateOptions;
+  onRender: (workspace: CaptureWorkspaceHookResult) => void;
+};
+
+type StateSlot = {
+  kind: 'state';
+  setValue: (nextValue: unknown) => void;
+  value: unknown;
+};
+
+type RefSlot<Value = unknown> = {
+  kind: 'ref';
+  value: MutableRefObject<Value>;
+};
+
+type MemoSlot<Value = unknown> = {
+  deps: DependencyList | undefined;
+  kind: 'memo';
+  value: Value;
+};
+
+type HookSlot = StateSlot | RefSlot | MemoSlot;
+
+type TestHookDispatcher = {
+  useCallback: <Callback extends (...args: never[]) => unknown>(
+    callback: Callback,
+    deps: DependencyList | undefined,
+  ) => Callback;
+  useMemo: <Value>(
+    factory: () => Value,
+    deps: DependencyList | undefined,
+  ) => Value;
+  useRef: <Value>(initialValue: Value) => MutableRefObject<Value>;
+  useState: <State>(
+    initialState: State | (() => State),
+  ) => [State, (nextValue: SetStateAction<State>) => void];
+};
+
+function CaptureWorkspaceStateProbe({
+  options,
+  onRender,
+}: CaptureWorkspaceProbeProps) {
+  onRender(useCaptureWorkspaceState(options));
+
+  return null;
+}
+
+function createCaptureWorkspaceHookProbe(
+  options?: UseCaptureWorkspaceStateOptions,
+) {
+  const hookSlots: HookSlot[] = [];
+  const reactDispatcher = (
+    React as typeof React & {
+      __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED: {
+        ReactCurrentDispatcher: {
+          current: TestHookDispatcher | null;
+        };
+      };
+    }
+  ).__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentDispatcher;
+  let hookIndex = 0;
+  let current: CaptureWorkspaceHookResult | null = null;
+
+  const dispatcher: TestHookDispatcher = {
+    useCallback(callback, deps) {
+      return dispatcher.useMemo(() => callback, deps);
+    },
+    useMemo(factory, deps) {
+      const index = hookIndex;
+      hookIndex += 1;
+      const existingSlot = hookSlots[index];
+
+      if (
+        existingSlot?.kind === 'memo' &&
+        areHookDepsEqual(existingSlot.deps, deps)
+      ) {
+        return existingSlot.value as ReturnType<typeof factory>;
+      }
+
+      const value = factory();
+      hookSlots[index] = { deps, kind: 'memo', value };
+
+      return value;
+    },
+    useRef(initialValue) {
+      const index = hookIndex;
+      hookIndex += 1;
+      const existingSlot = hookSlots[index];
+
+      if (existingSlot?.kind === 'ref') {
+        return existingSlot.value as MutableRefObject<typeof initialValue>;
+      }
+
+      const value = createMutableRef(initialValue);
+      hookSlots[index] = { kind: 'ref', value };
+
+      return value;
+    },
+    useState<State>(initialState: State | (() => State)) {
+      const index = hookIndex;
+      hookIndex += 1;
+      const existingSlot = hookSlots[index];
+
+      if (existingSlot?.kind === 'state') {
+        const stateSlot = existingSlot as StateSlot;
+
+        return [
+          stateSlot.value as State,
+          stateSlot.setValue as (nextValue: SetStateAction<State>) => void,
+        ];
+      }
+
+      const initialValue: State =
+        typeof initialState === 'function'
+          ? (initialState as () => State)()
+          : initialState;
+      const slot: StateSlot = {
+        kind: 'state',
+        setValue(nextValue) {
+          const resolvedNextValue = nextValue as SetStateAction<State>;
+
+          slot.value =
+            typeof resolvedNextValue === 'function'
+              ? (resolvedNextValue as (currentValue: State) => State)(
+                  slot.value as State,
+                )
+              : resolvedNextValue;
+        },
+        value: initialValue,
+      };
+      hookSlots[index] = slot;
+
+      return [
+        slot.value as State,
+        slot.setValue as (nextValue: SetStateAction<State>) => void,
+      ];
+    },
+  };
+
+  const render = () => {
+    hookIndex = 0;
+    const previousDispatcher = reactDispatcher.current;
+    reactDispatcher.current = dispatcher;
+
+    try {
+      CaptureWorkspaceStateProbe({
+        options,
+        onRender: (workspace) => {
+          current = workspace;
+        },
+      });
+    } finally {
+      reactDispatcher.current = previousDispatcher;
+    }
+  };
+
+  render();
+
+  return {
+    act(action: (workspace: CaptureWorkspaceHookResult) => void) {
+      action(this.current);
+      render();
+
+      return this.current;
+    },
+    get current() {
+      if (!current) {
+        throw new Error('Capture workspace hook probe has not rendered');
+      }
+
+      return current;
+    },
+  };
+}
+
+function areHookDepsEqual(
+  previousDeps: DependencyList | undefined,
+  nextDeps: DependencyList | undefined,
+) {
+  if (!previousDeps || !nextDeps) return false;
+  if (previousDeps.length !== nextDeps.length) return false;
+
+  return previousDeps.every((dep, index) => Object.is(dep, nextDeps[index]));
+}
 
 function createMutableRef<T>(current: T): MutableRefObject<T> {
   return { current };
@@ -46,6 +240,208 @@ function createCaptureSessionView(
 }
 
 describe('captureWorkspaceState', () => {
+  it('syncs ref-backed state fields when applying hook patches', () => {
+    const onRenderingOutputChange = vi.fn<(isRendering: boolean) => void>();
+    const probe = createCaptureWorkspaceHookProbe({ onRenderingOutputChange });
+    const startPoint = { x: 10, y: 20 };
+    const cursorPoint = { x: 30, y: 40 };
+    const hoverSelection = { x: 12, y: 22, width: 90, height: 70 };
+
+    const workspace = probe.act((currentWorkspace) => {
+      currentWorkspace.applyPatch({
+        cursorPoint,
+        hoverSelection,
+        isRenderingOutput: true,
+        startPoint,
+        status: 'selecting',
+      });
+    });
+
+    expect(workspace.status).toBe('selecting');
+    expect(workspace.startPoint).toBe(startPoint);
+    expect(workspace.cursorPoint).toBe(cursorPoint);
+    expect(workspace.hoverSelection).toBe(hoverSelection);
+    expect(workspace.startPointRef.current).toBe(startPoint);
+    expect(workspace.cursorPointRef.current).toBe(cursorPoint);
+    expect(workspace.hoverSelectionRef.current).toBe(hoverSelection);
+    expect(onRenderingOutputChange).toHaveBeenCalledOnce();
+    expect(onRenderingOutputChange).toHaveBeenCalledWith(true);
+  });
+
+  it('clears refs and interaction state when resetting hook interaction', () => {
+    const onRenderingOutputChange = vi.fn<(isRendering: boolean) => void>();
+    const probe = createCaptureWorkspaceHookProbe({ onRenderingOutputChange });
+    const draftSelection = { x: 5, y: 10, width: 40, height: 30 };
+
+    probe.act((workspace) => {
+      workspace.applyPatch({
+        cursorPoint: { x: 30, y: 40 },
+        error: 'Previous error',
+        hoverSelection: { x: 12, y: 22, width: 90, height: 70 },
+        includeCapturedCursor: true,
+        isRenderingOutput: true,
+        selection: { x: 10, y: 20, width: 100, height: 80 },
+        startPoint: { x: 10, y: 20 },
+        status: 'preview',
+      });
+      workspace.setDraftSelectionWithRef(draftSelection);
+    });
+    onRenderingOutputChange.mockClear();
+
+    const workspace = probe.act((currentWorkspace) => {
+      currentWorkspace.resetInteraction();
+    });
+
+    expect(workspace.status).toBe('preview');
+    expect(workspace.startPoint).toBeNull();
+    expect(workspace.cursorPoint).toBeNull();
+    expect(workspace.selection).toBeNull();
+    expect(workspace.hoverSelection).toBeNull();
+    expect(workspace.error).toBeNull();
+    expect(workspace.isRenderingOutput).toBe(false);
+    expect(workspace.includeCapturedCursor).toBe(false);
+    expect(workspace.startPointRef.current).toBeNull();
+    expect(workspace.cursorPointRef.current).toBeNull();
+    expect(workspace.draftSelectionRef.current).toBeNull();
+    expect(workspace.hoverSelectionRef.current).toBeNull();
+    expect(onRenderingOutputChange).toHaveBeenCalledOnce();
+    expect(onRenderingOutputChange).toHaveBeenCalledWith(false);
+  });
+
+  it('clears refs and session state when resetting a hook session', () => {
+    const onRenderingOutputChange = vi.fn<(isRendering: boolean) => void>();
+    const probe = createCaptureWorkspaceHookProbe({ onRenderingOutputChange });
+    const session = createCaptureSessionView({ id: 'dirty-session' });
+
+    probe.act((workspace) => {
+      workspace.applyPatch({
+        cursorPoint: { x: 30, y: 40 },
+        hoverSelection: { x: 12, y: 22, width: 90, height: 70 },
+        isRenderingOutput: true,
+        session,
+        startPoint: { x: 10, y: 20 },
+        status: 'preview',
+      });
+      workspace.setDraftSelectionWithRef({ x: 5, y: 10, width: 40, height: 30 });
+    });
+    onRenderingOutputChange.mockClear();
+
+    const workspace = probe.act((currentWorkspace) => {
+      currentWorkspace.resetSession();
+    });
+
+    expect(workspace.status).toBe('idle');
+    expect(workspace.session).toBeNull();
+    expect(workspace.startPoint).toBeNull();
+    expect(workspace.cursorPoint).toBeNull();
+    expect(workspace.hoverSelection).toBeNull();
+    expect(workspace.startPointRef.current).toBeNull();
+    expect(workspace.cursorPointRef.current).toBeNull();
+    expect(workspace.draftSelectionRef.current).toBeNull();
+    expect(workspace.hoverSelectionRef.current).toBeNull();
+    expect(onRenderingOutputChange).toHaveBeenCalledOnce();
+    expect(onRenderingOutputChange).toHaveBeenCalledWith(false);
+  });
+
+  it('syncs loaded session cursor and hover refs through the hook', () => {
+    const probe = createCaptureWorkspaceHookProbe();
+    const session = createCaptureSessionView({ id: 'loaded-session' });
+    const cursorPoint = { x: 50, y: 60 };
+    const hoverSelection = { x: 45, y: 55, width: 75, height: 65 };
+
+    const workspace = probe.act((currentWorkspace) => {
+      currentWorkspace.applyLoadedSession({
+        cursorPoint,
+        hoverSelection,
+        session,
+      });
+    });
+
+    expect(workspace.status).toBe('selecting');
+    expect(workspace.session).toBe(session);
+    expect(workspace.cursorPoint).toBe(cursorPoint);
+    expect(workspace.hoverSelection).toBe(hoverSelection);
+    expect(workspace.cursorPointRef.current).toBe(cursorPoint);
+    expect(workspace.hoverSelectionRef.current).toBe(hoverSelection);
+  });
+
+  it('clears refs and maps preview rendering output when resetting preview state', () => {
+    const onRenderingOutputChange = vi.fn<(isRendering: boolean) => void>();
+    const probe = createCaptureWorkspaceHookProbe({ onRenderingOutputChange });
+
+    probe.act((workspace) => {
+      workspace.applyPatch({
+        cursorPoint: { x: 30, y: 40 },
+        hoverSelection: { x: 12, y: 22, width: 90, height: 70 },
+        isRenderingOutput: true,
+        selection: { x: 10, y: 20, width: 100, height: 80 },
+        startPoint: { x: 10, y: 20 },
+        status: 'preview',
+      });
+      workspace.setDraftSelectionWithRef({ x: 5, y: 10, width: 40, height: 30 });
+    });
+    onRenderingOutputChange.mockClear();
+
+    const workspace = probe.act((currentWorkspace) => {
+      currentWorkspace.resetPreview();
+    });
+
+    expect(workspace.status).toBe('selecting');
+    expect(workspace.startPoint).toBeNull();
+    expect(workspace.cursorPoint).toBeNull();
+    expect(workspace.selection).toBeNull();
+    expect(workspace.hoverSelection).toBeNull();
+    expect(workspace.isRenderingOutput).toBe(false);
+    expect(workspace.startPointRef.current).toBeNull();
+    expect(workspace.cursorPointRef.current).toBeNull();
+    expect(workspace.draftSelectionRef.current).toBeNull();
+    expect(workspace.hoverSelectionRef.current).toBeNull();
+    expect(onRenderingOutputChange).toHaveBeenCalledOnce();
+    expect(onRenderingOutputChange).toHaveBeenCalledWith(false);
+  });
+
+  it('supports functional field setters from the hook', () => {
+    const probe = createCaptureWorkspaceHookProbe();
+
+    const workspace = probe.act((currentWorkspace) => {
+      currentWorkspace.setTextFontSize((fontSize) => fontSize + 2);
+      currentWorkspace.setColorSampleFormat((format) =>
+        format === 'hex' ? 'rgb' : 'hex',
+      );
+    });
+
+    expect(workspace.textFontSize).toBe(DEFAULT_TEXT_FONT_SIZE + 2);
+    expect(workspace.colorSampleFormat).toBe('rgb');
+  });
+
+  it('fires rendering output callbacks once through hook bulk and explicit actions', () => {
+    const onRenderingOutputChange = vi.fn<(isRendering: boolean) => void>();
+    const probe = createCaptureWorkspaceHookProbe({ onRenderingOutputChange });
+
+    probe.act((workspace) => {
+      workspace.applyPatch({ isRenderingOutput: true });
+    });
+    expect(onRenderingOutputChange.mock.calls).toEqual([[true]]);
+    onRenderingOutputChange.mockClear();
+
+    probe.act((workspace) => {
+      workspace.setRenderingOutput(false);
+    });
+    expect(onRenderingOutputChange.mock.calls).toEqual([[false]]);
+    onRenderingOutputChange.mockClear();
+
+    probe.act((workspace) => {
+      workspace.resetPreview();
+    });
+    expect(onRenderingOutputChange.mock.calls).toEqual([[false]]);
+    onRenderingOutputChange.mockClear();
+
+    probe.act((workspace) => {
+      workspace.resetInteraction();
+    });
+    expect(onRenderingOutputChange.mock.calls).toEqual([[false]]);
+  });
+
   it('applies a workspace state patch without changing unspecified fields', () => {
     const initialState = createInitialCaptureWorkspaceState();
 
@@ -121,7 +517,6 @@ describe('captureWorkspaceState', () => {
       hoverSelectionRef: createMutableRef<LogicalRect | null>(null),
     };
     const applyPatch = vi.fn<(patch: Partial<CaptureWorkspaceState>) => void>();
-    const onRenderingOutputChange = vi.fn<(isRendering: boolean) => void>();
     const onHoverSelectionSynced = vi.fn<
       (nextHoverSelection: LogicalRect | null) => void
     >();
@@ -133,7 +528,6 @@ describe('captureWorkspaceState', () => {
     const actions = createCaptureWorkspaceStateActions({
       refs,
       applyPatch,
-      onRenderingOutputChange,
       onHoverSelectionSynced,
     });
     actions.setStartPointWithRef(startPoint);
@@ -154,8 +548,6 @@ describe('captureWorkspaceState', () => {
     expect(applyPatch).toHaveBeenNthCalledWith(4, { isRenderingOutput: true });
     expect(onHoverSelectionSynced).toHaveBeenCalledOnce();
     expect(onHoverSelectionSynced).toHaveBeenCalledWith(hoverSelection);
-    expect(onRenderingOutputChange).toHaveBeenCalledOnce();
-    expect(onRenderingOutputChange).toHaveBeenCalledWith(true);
   });
 
   it('creates the initial workspace state from ScreenshotSession defaults', () => {

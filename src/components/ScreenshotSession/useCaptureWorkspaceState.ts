@@ -29,10 +29,10 @@ export interface UseCaptureWorkspaceStateOptions {
   onHoverSelectionSynced?: (nextHoverSelection: LogicalRect | null) => void;
 }
 
-interface CaptureWorkspaceStateActionOptions
-  extends UseCaptureWorkspaceStateOptions {
+interface CaptureWorkspaceStateActionOptions {
   refs: CaptureWorkspaceRefs;
   applyPatch: (patch: Partial<CaptureWorkspaceState>) => void;
+  onHoverSelectionSynced?: (nextHoverSelection: LogicalRect | null) => void;
 }
 
 export function applyCaptureWorkspaceStatePatch(
@@ -70,7 +70,6 @@ export function syncCaptureWorkspaceRefsFromPatch(
 export function createCaptureWorkspaceStateActions({
   refs,
   applyPatch,
-  onRenderingOutputChange,
   onHoverSelectionSynced,
 }: CaptureWorkspaceStateActionOptions) {
   return {
@@ -94,7 +93,6 @@ export function createCaptureWorkspaceStateActions({
     },
     setRenderingOutput(nextIsRendering: boolean) {
       applyPatch({ isRenderingOutput: nextIsRendering });
-      onRenderingOutputChange?.(nextIsRendering);
     },
   };
 }
@@ -119,6 +117,7 @@ export function useCaptureWorkspaceState(
 
   const applyPatch = useCallback(
     (patch: Partial<CaptureWorkspaceState>) => {
+      syncCaptureWorkspaceRefsFromPatch(refs, patch);
       setState((currentState) =>
         applyCaptureWorkspaceStatePatch(currentState, patch),
       );
@@ -126,7 +125,7 @@ export function useCaptureWorkspaceState(
         options.onRenderingOutputChange?.(patch.isRenderingOutput);
       }
     },
-    [options.onRenderingOutputChange],
+    [options.onRenderingOutputChange, refs],
   );
 
   const setWorkspaceField = useCallback(
@@ -217,12 +216,9 @@ export function useCaptureWorkspaceState(
 
   const applyLoadedSession = useCallback(
     (loaded: LoadedCaptureHostSession) => {
-      const patch = loadedCaptureHostSessionPatch(loaded);
-
-      syncCaptureWorkspaceRefsFromPatch(refs, patch);
-      applyPatch(patch);
+      applyPatch(loadedCaptureHostSessionPatch(loaded));
     },
-    [applyPatch, refs],
+    [applyPatch],
   );
 
   const resetPreview = useCallback(() => {
