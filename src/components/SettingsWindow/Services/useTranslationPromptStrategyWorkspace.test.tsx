@@ -34,7 +34,10 @@ vi.mock('react', async () => {
   };
 });
 
-import type { TranslationPromptStrategy } from '../../../tauri/providers';
+import type {
+  TranslationPromptStrategy,
+  TranslationPromptStrategyConfig,
+} from '../../../tauri/providers';
 import {
   DEFAULT_PROMPT_STRATEGIES,
   DEFAULT_PROMPT_STRATEGY_ID,
@@ -56,7 +59,9 @@ describe('useTranslationPromptStrategyWorkspace', () => {
     const legal = strategy({ id: 'legal', name: 'Legal', description: 'Terms' });
     const harness = createWorkspaceHarness({
       selectedStrategyId: 'legal',
-      listStrategies: vi.fn().mockResolvedValue({ strategies: [generalStrategy(), legal] }),
+      listStrategies: createListStrategiesMock().mockResolvedValue({
+        strategies: [generalStrategy(), legal],
+      }),
     });
 
     await harness.current.loadPromptStrategies('legal');
@@ -71,7 +76,9 @@ describe('useTranslationPromptStrategyWorkspace', () => {
   it('falls back to default strategies when loading fails', async () => {
     const harness = createWorkspaceHarness({
       selectedStrategyId: 'missing',
-      listStrategies: vi.fn().mockRejectedValue(new Error('offline')),
+      listStrategies: createListStrategiesMock().mockRejectedValue(
+        new Error('offline'),
+      ),
     });
 
     await harness.current.loadPromptStrategies('missing');
@@ -100,7 +107,9 @@ describe('useTranslationPromptStrategyWorkspace', () => {
   });
 
   it('saves a selected strategy with trimmed draft fields', async () => {
-    const saveStrategies = vi.fn().mockImplementation(async (config) => config);
+    const saveStrategies = createSaveStrategiesMock().mockImplementation(
+      async (config) => config,
+    );
     const harness = createWorkspaceHarness({
       selectedStrategyId: 'legal',
       saveStrategies,
@@ -129,7 +138,9 @@ describe('useTranslationPromptStrategyWorkspace', () => {
   });
 
   it('adds a custom strategy and selects it', async () => {
-    const saveStrategies = vi.fn().mockImplementation(async (config) => config);
+    const saveStrategies = createSaveStrategiesMock().mockImplementation(
+      async (config) => config,
+    );
     const harness = createWorkspaceHarness({
       selectedStrategyId: DEFAULT_PROMPT_STRATEGY_ID,
       saveStrategies,
@@ -160,7 +171,9 @@ describe('useTranslationPromptStrategyWorkspace', () => {
   });
 
   it('deletes a deletable strategy and selects general', async () => {
-    const saveStrategies = vi.fn().mockImplementation(async (config) => config);
+    const saveStrategies = createSaveStrategiesMock().mockImplementation(
+      async (config) => config,
+    );
     const custom = strategy({ id: 'custom-code', is_deletable: true });
     const harness = createWorkspaceHarness({
       selectedStrategyId: 'custom-code',
@@ -181,7 +194,9 @@ describe('useTranslationPromptStrategyWorkspace', () => {
   });
 
   it('sets validation and persistence errors', async () => {
-    const saveStrategies = vi.fn().mockRejectedValue(new Error('disk full'));
+    const saveStrategies = createSaveStrategiesMock().mockRejectedValue(
+      new Error('disk full'),
+    );
     const harness = createWorkspaceHarness({
       selectedStrategyId: DEFAULT_PROMPT_STRATEGY_ID,
       saveStrategies,
@@ -203,13 +218,17 @@ describe('useTranslationPromptStrategyWorkspace', () => {
 
 function createWorkspaceHarness({
   selectedStrategyId,
-  listStrategies = vi.fn().mockResolvedValue({ strategies: DEFAULT_PROMPT_STRATEGIES }),
-  saveStrategies = vi.fn().mockImplementation(async (config) => config),
+  listStrategies = createListStrategiesMock().mockResolvedValue({
+    strategies: DEFAULT_PROMPT_STRATEGIES,
+  }),
+  saveStrategies = createSaveStrategiesMock().mockImplementation(
+    async (config) => config,
+  ),
   createStrategyId = () => 'custom-test',
 }: {
   selectedStrategyId: string;
-  listStrategies?: ReturnType<typeof vi.fn>;
-  saveStrategies?: ReturnType<typeof vi.fn>;
+  listStrategies?: ListStrategiesClient;
+  saveStrategies?: SaveStrategiesClient;
   createStrategyId?: () => string;
 }) {
   let currentSelectedStrategyId = selectedStrategyId;
@@ -241,6 +260,20 @@ function createWorkspaceHarness({
     },
     render,
   };
+}
+
+type ListStrategiesClient = () => Promise<TranslationPromptStrategyConfig>;
+
+type SaveStrategiesClient = (
+  config: TranslationPromptStrategyConfig,
+) => Promise<TranslationPromptStrategyConfig>;
+
+function createListStrategiesMock() {
+  return vi.fn<ListStrategiesClient>();
+}
+
+function createSaveStrategiesMock() {
+  return vi.fn<SaveStrategiesClient>();
 }
 
 function generalStrategy(): TranslationPromptStrategy {

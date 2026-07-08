@@ -81,6 +81,10 @@ vi.mock('react-dom', async () => {
 vi.mock('../../../tauri/providers', () => providerApi);
 
 import { CustomTranslationProviderDialog } from './CustomTranslationProviderDialog';
+import {
+  CustomTranslationProviderDialogView,
+  type CustomTranslationProviderDialogViewProps,
+} from './CustomTranslationProviderDialogView';
 
 describe('CustomTranslationProviderDialog', () => {
   beforeEach(() => {
@@ -293,6 +297,18 @@ describe('CustomTranslationProviderDialog', () => {
     expect(reactDomState.createPortal.mock.calls[0][1]).toBe(document.body);
   });
 
+  it('renders inline without creating a body portal', () => {
+    const view = renderDialog({
+      isOpen: true,
+      onClose: vi.fn(),
+      onSave: vi.fn(),
+      presentation: 'inline',
+    });
+
+    expect(reactDomState.createPortal).not.toHaveBeenCalled();
+    expect(findElementByTitle(view, '返回供应商列表')).toBeTruthy();
+  });
+
   it('does not show explanatory copy under reasoning strength', () => {
     const view = renderDialog({
       isOpen: true,
@@ -320,13 +336,43 @@ function renderDialog(
 ): DialogElement {
   reactState.cursor = 0;
   reactState.effectCursor = 0;
-  const view = CustomTranslationProviderDialog(props);
+  const view = resolveDialogView(CustomTranslationProviderDialog(props));
 
   if (!isElement(view)) {
     throw new Error('Dialog did not render an element');
   }
 
   return view;
+}
+
+function resolveDialogView(node: ReactNode): ReactNode {
+  if (Array.isArray(node)) {
+    return node.map(resolveDialogView);
+  }
+
+  if (!isElement(node)) {
+    return node;
+  }
+
+  if (node.type === CustomTranslationProviderDialogView) {
+    return resolveDialogView(
+      CustomTranslationProviderDialogView(
+        node.props as CustomTranslationProviderDialogViewProps,
+      ),
+    );
+  }
+
+  if (!('children' in node.props)) {
+    return node;
+  }
+
+  return {
+    ...node,
+    props: {
+      ...node.props,
+      children: resolveDialogView(node.props.children),
+    },
+  };
 }
 
 function changeInput(element: DialogElement, value: string) {
@@ -360,6 +406,12 @@ function findButtonByText(root: DialogElement, text: string): DialogElement {
 function findButtonByTitle(root: DialogElement, title: string): DialogElement | null {
   return findElementOrNull(root, (element) => {
     return element.type === 'button' && element.props.title === title;
+  });
+}
+
+function findElementByTitle(root: DialogElement, title: string): DialogElement | null {
+  return findElementOrNull(root, (element) => {
+    return element.props.title === title;
   });
 }
 
