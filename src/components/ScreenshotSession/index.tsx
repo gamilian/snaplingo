@@ -194,6 +194,7 @@ import {
   virtualPointToViewportPoint,
   virtualRectToViewportRect,
 } from './virtualDesktop';
+import type { CaptureSessionStatus } from './captureWorkspaceState';
 import type {
   AnnotationCommand,
   CaptureLaunch,
@@ -206,7 +207,6 @@ import type {
 
 const captureWindow = getCurrentAppWebviewWindow();
 
-type SessionStatus = 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
 type CaptureFrontendPerfState = {
   mode: CaptureMode;
   sessionId: string | null;
@@ -264,7 +264,7 @@ export default function ScreenshotSession({
   const captureSnapshotHydrationRef =
     useRef<CaptureHostSnapshotHydration | null>(null);
   const isCompletingCaptureRef = useRef(false);
-  const [status, setStatus] = useState<SessionStatus>('idle');
+  const [status, setStatus] = useState<CaptureSessionStatus>('idle');
   const [mode, setMode] = useState<CaptureMode>('screenshot');
   const [session, setSession] = useState<CaptureSessionView | null>(null);
   const [startPoint, setStartPoint] = useState<Point | null>(null);
