@@ -1385,4 +1385,156 @@ mod provider_configuration_tests {
             .unwrap_or_default();
         assert!(remaining_defs.is_empty());
     }
+
+    // Failing keychain backend for testing rollback scenarios
+    #[derive(Clone)]
+    struct FailingKeychainBackend {
+        store: Arc<Mutex<HashMap<String, String>>>,
+        fail_on_delete_key: Arc<Mutex<Option<String>>>,
+    }
+
+    impl FailingKeychainBackend {
+        fn new() -> Self {
+            Self {
+                store: Arc::new(Mutex::new(HashMap::new())),
+                fail_on_delete_key: Arc::new(Mutex::new(None)),
+            }
+        }
+
+        fn fail_on_delete(&self, key: String) {
+            *self.fail_on_delete_key.lock().unwrap() = Some(key);
+        }
+    }
+
+    impl KeychainBackend for FailingKeychainBackend {
+        fn save(&self, key: &str, value: &str) -> crate::Result<()> {
+            self.store
+                .lock()
+                .unwrap()
+                .insert(key.to_string(), value.to_string());
+            Ok(())
+        }
+
+        fn load(&self, key: &str) -> crate::Result<String> {
+            self.store
+                .lock()
+                .unwrap()
+                .get(key)
+                .cloned()
+                .ok_or_else(|| crate::AppError::Keychain(keyring::Error::NoEntry))
+        }
+
+        fn delete(&self, key: &str) -> crate::Result<()> {
+            if let Some(ref fail_key) = *self.fail_on_delete_key.lock().unwrap() {
+                if key == fail_key {
+                    return Err(crate::AppError::Other(format!(
+                        "Simulated delete failure for key: {}",
+                        key
+                    )));
+                }
+            }
+
+            self.store.lock().unwrap().remove(key);
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn remove_rolls_back_all_state_on_structured_credential_delete_failure() {
+        // Setup: create a provider configuration with failing keychain
+        let failing_backend = FailingKeychainBackend::new();
+        let backend_for_config = failing_backend.clone();
+
+        let keychain = Arc::new(Keychain::with_backend(failing_backend));
+        let config_file = Arc::new(ConfigFile::new_temp());
+        let http_client: Arc<dyn HttpClient> = Arc::new(MockHttpClient);
+        let coordinator = Arc::new(TranslationCoordinator::new(config_file.clone()));
+        let llm_introspection = Arc::new(crate::application::providers::LlmIntrospection::new(
+            http_client.clone(),
+        ));
+
+        let config = ProviderConfiguration::new(
+            config_file.clone(),
+            keychain.clone(),
+            http_client.clone(),
+            coordinator.clone(),
+            llm_introspection,
+        );
+
+        // Add a custom provider with structured credentials
+        let def = CustomTranslationProviderDef {
+            id: "test-custom-3".to_string(),
+            name: "Test Custom 3".to_string(),
+            protocol: LLMProtocol::OpenAI,
+            endpoint: "https://api.example.com/v1".to_string(),
+            model: "test-model".to_string(),
+            reasoning_level: None,
+            prompt_strategy_id: "default".to_string(),
+            prompt_fallback_strategy_id: "default".to_string(),
+        };
+
+        config_file
+            .save("custom_translation_providers", &vec![def.clone()])
+            .unwrap();
+
+        // Register the provider
+        let provider = create_llm_translation_provider(
+            &def,
+            http_client.clone(),
+            "test-key".to_string(),
+            config_file.clone(),
+        );
+        coordinator.register(provider).unwrap();
+        coordinator.activate("test-custom-3").unwrap();
+
+        // Save credentials (simple + structured)
+        keychain
+            .save_provider_credential("test-custom-3", "simple-key")
+            .unwrap();
+        let mut structured = HashMap::new();
+        structured.insert("api_key".to_string(), "struct-key".to_string());
+        keychain
+            .save_provider_credentials("test-custom-3", &structured)
+            .unwrap();
+
+        // Configure keychain to fail on structured credential deletion
+        backend_for_config.fail_on_delete("provider:test-custom-3:credential:api_key".to_string());
+
+        // Attempt to remove - should fail on structured credential deletion
+        let result = config.remove("test-custom-3".to_string());
+
+        // Should fail
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Failed to delete structured credentials"));
+
+        // Verify complete rollback:
+        // 1. Config should still have the provider
+        let remaining_defs = config_file
+            .load::<Vec<CustomTranslationProviderDef>>("custom_translation_providers")
+            .unwrap();
+        assert_eq!(remaining_defs.len(), 1);
+        assert_eq!(remaining_defs[0].id, "test-custom-3");
+
+        // 2. Simple credential should still exist
+        let simple_key = keychain.load_provider_credential("test-custom-3");
+        assert!(simple_key.is_ok());
+        assert_eq!(simple_key.unwrap(), "simple-key");
+
+        // 3. Structured credential should still exist
+        let struct_creds = keychain
+            .load_provider_credentials("test-custom-3", &vec!["api_key".to_string()])
+            .unwrap();
+        assert_eq!(struct_creds.get("api_key").unwrap(), "struct-key");
+
+        // 4. Provider should still be registered
+        assert!(coordinator.get("test-custom-3").is_some());
+
+        // 5. Provider should still be active
+        let active = coordinator.get_active();
+        let active_ids: Vec<String> = active.iter().map(|p| p.read().id().to_string()).collect();
+        assert!(active_ids.contains(&"test-custom-3".to_string()));
+    }
 }
