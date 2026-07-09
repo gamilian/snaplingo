@@ -87,7 +87,9 @@ pub struct CustomTranslationProviderView {
     pub prompt_fallback_strategy_id: String,
 }
 
-pub fn add_custom_translation_provider(
+/// Add a new custom translation provider (internal helper, use ProviderConfiguration::add).
+/// This function is not locked; callers must hold provider_state_lock.
+pub(crate) fn add_custom_translation_provider(
     input: AddCustomTranslationProviderInput,
     config_file: Arc<ConfigFile>,
     keychain: &Keychain,
