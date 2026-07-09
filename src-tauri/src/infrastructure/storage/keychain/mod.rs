@@ -353,15 +353,27 @@ mod tests {
             let current = *count;
             *count += 1;
 
-            if let Some(fail_after) = *self.fail_on_save_after_n.lock().unwrap() {
-                if current == fail_after {
-                    // Fail once, then clear so rollback saves can succeed
-                    *self.fail_on_save_after_n.lock().unwrap() = None;
-                    return Err(crate::AppError::Other(format!(
-                        "Simulated save failure at operation {}",
-                        current
-                    )));
+            // Check and clear failure flag atomically to avoid deadlock
+            let should_fail = {
+                let mut fail_config = self.fail_on_save_after_n.lock().unwrap();
+                if let Some(fail_after) = *fail_config {
+                    if current == fail_after {
+                        // Clear the failure flag so rollback saves can succeed
+                        *fail_config = None;
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
                 }
+            };
+
+            if should_fail {
+                return Err(crate::AppError::Other(format!(
+                    "Simulated save failure at operation {}",
+                    current
+                )));
             }
 
             self.store
