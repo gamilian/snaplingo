@@ -825,7 +825,8 @@ impl ProviderConfiguration {
         // Snapshot credentials
         let snapshot = self
             .keychain
-            .snapshot_provider_credentials(&provider_id, &credential_field_names);
+            .snapshot_provider_credentials(&provider_id, &credential_field_names)
+            .map_err(|e| AppError::Other(format!("Failed to snapshot credentials: {}", e)))?;
 
         // Step 1: Remove from config first (lowest risk)
         custom_defs.remove(index);
@@ -845,46 +846,42 @@ impl ProviderConfiguration {
             }
         }
 
-        // Step 3: Delete simple API key
-        let delete_result = self.keychain.delete_provider_credential(&provider_id);
-        if let Err(e) = &delete_result {
-            let err_msg = format!("{}", e);
-            // Only fail if key exists but deletion failed (idempotent delete)
-            if !err_msg.contains("not found") && !err_msg.contains("Key not found") {
-                // Complete rollback: config + credentials + provider registration + active state
-                custom_defs.insert(index, removed_def.clone());
-                let _ = self.config_file.save("custom_translation_providers", &custom_defs);
-
-                // Restore credentials from snapshot
-                let _ = self.keychain.restore_provider_credentials(&provider_id, &snapshot);
-
-                // Re-register provider if it was registered before
-                if was_registered {
-                    let api_key = snapshot.api_key.and_then(|opt| opt).unwrap_or_default();
-                    let provider = create_llm_translation_provider(
-                        &removed_def,
-                        self.http_client.clone(),
-                        api_key,
-                        self.config_file.clone(),
-                    );
-                    let _ = self.translation_coordinator.register(provider);
-
-                    // Restore active state if it was active
-                    if was_active {
-                        let _ = self.translation_coordinator.activate(&provider_id);
-                    }
-
-                    // Restore active order by reordering
-                    let _ = self.translation_coordinator.reorder_active(active_ids.clone());
+        // Helper to rollback everything
+        let mut rollback = || {
+            custom_defs.insert(index, removed_def.clone());
+            let _ = self.config_file.save("custom_translation_providers", &custom_defs);
+            let _ = self.keychain.restore_provider_credentials(&provider_id, &snapshot);
+            if was_registered {
+                let api_key = snapshot.api_key.clone().and_then(|opt| opt).unwrap_or_default();
+                let provider = create_llm_translation_provider(
+                    &removed_def,
+                    self.http_client.clone(),
+                    api_key,
+                    self.config_file.clone(),
+                );
+                let _ = self.translation_coordinator.register(provider);
+                if was_active {
+                    let _ = self.translation_coordinator.activate(&provider_id);
                 }
+                let _ = self.translation_coordinator.reorder_active(active_ids.clone());
+            }
+        };
 
+        // Step 3: Delete simple API key
+        if let Err(e) = self.keychain.delete_provider_credential(&provider_id) {
+            // Only fail if key exists but deletion failed (idempotent delete)
+            if !crate::infrastructure::storage::is_keychain_not_found(&e) {
+                rollback();
                 return Err(AppError::Other(format!("Failed to delete credential: {}", e)));
             }
         }
 
-        // Step 4: Delete structured credentials (using saved field names)
+        // Step 4: Delete structured credentials (using saved field names) with rollback on failure
         if !credential_field_names.is_empty() {
-            let _ = self.keychain.delete_provider_credentials(&provider_id, &credential_field_names);
+            if let Err(e) = self.keychain.delete_provider_credentials(&provider_id, &credential_field_names) {
+                rollback();
+                return Err(AppError::Other(format!("Failed to delete structured credentials: {}", e)));
+            }
         }
 
         Ok(())
@@ -990,7 +987,8 @@ impl ProviderConfiguration {
         let field_names: Vec<String> = expected_fields.iter().map(|f| f.name.clone()).collect();
         let snapshot = self
             .keychain
-            .snapshot_provider_credentials(&provider_id, &field_names);
+            .snapshot_provider_credentials(&provider_id, &field_names)
+            .map_err(|e| AppError::Other(format!("Failed to snapshot credentials: {}", e)))?;
 
         // Save simple API key if applicable
         if cred_map.len() == 1 && cred_map.contains_key("api_key") {
@@ -1127,7 +1125,7 @@ mod provider_configuration_tests {
                 .unwrap()
                 .get(key)
                 .cloned()
-                .ok_or_else(|| crate::AppError::Other(format!("Key not found: {}", key)))
+                .ok_or_else(|| crate::AppError::Keychain(keyring::Error::NoEntry))
         }
 
         fn delete(&self, key: &str) -> crate::Result<()> {

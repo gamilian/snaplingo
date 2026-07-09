@@ -170,7 +170,8 @@ fn configure_ocr_provider_credentials_inner(
     let field_names: Vec<String> = expected_fields.iter().map(|f| f.name.clone()).collect();
     let snapshot = state
         .keychain
-        .snapshot_provider_credentials(provider_id, &field_names);
+        .snapshot_provider_credentials(provider_id, &field_names)
+        .map_err(|e| format!("Failed to snapshot credentials: {}", e))?;
 
     // Save credentials with transaction support
     state

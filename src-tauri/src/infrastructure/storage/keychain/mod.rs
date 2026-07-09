@@ -25,6 +25,14 @@ use linux::LinuxKeychain as PlatformKeychainImpl;
 use crate::error::Result;
 use std::collections::HashMap;
 
+/// Check if an error is a "not found" / "no entry" error from keychain
+pub fn is_keychain_not_found(error: &crate::AppError) -> bool {
+    match error {
+        crate::AppError::Keychain(e) => matches!(e, keyring::Error::NoEntry),
+        _ => false,
+    }
+}
+
 /// Snapshot of provider credentials for rollback
 #[derive(Debug, Clone)]
 pub struct CredentialSnapshot {
@@ -140,20 +148,31 @@ impl Keychain {
         &self,
         provider_id: &str,
         field_names: &[String],
-    ) -> CredentialSnapshot {
+    ) -> Result<CredentialSnapshot> {
         let mut snapshot = CredentialSnapshot::new();
 
         // Snapshot simple API key
-        snapshot.api_key = Some(self.load_provider_credential(provider_id).ok());
+        match self.load_provider_credential(provider_id) {
+            Ok(key) => snapshot.api_key = Some(Some(key)),
+            Err(ref e) if is_keychain_not_found(e) => snapshot.api_key = Some(None),
+            Err(e) => return Err(e),
+        }
 
         // Snapshot structured credentials
         for field_name in field_names {
             let key = format!("provider:{}:credential:{}", provider_id, field_name);
-            let value = self.backend.load(&key).ok();
-            snapshot.structured.insert(field_name.clone(), value);
+            match self.backend.load(&key) {
+                Ok(value) => {
+                    snapshot.structured.insert(field_name.clone(), Some(value));
+                }
+                Err(ref e) if is_keychain_not_found(e) => {
+                    snapshot.structured.insert(field_name.clone(), None);
+                }
+                Err(e) => return Err(e),
+            }
         }
 
-        snapshot
+        Ok(snapshot)
     }
 
     /// Restore provider credentials from snapshot
@@ -241,9 +260,8 @@ impl Keychain {
         for field_name in field_names {
             let key = format!("provider:{}:credential:{}", provider_id, field_name);
             if let Err(e) = self.backend.delete(&key) {
-                let err_msg = format!("{}", e);
                 // Only ignore "not found" errors, propagate real failures
-                if !err_msg.contains("not found") && !err_msg.contains("Key not found") {
+                if !is_keychain_not_found(&e) {
                     return Err(e);
                 }
             }
@@ -291,7 +309,7 @@ mod tests {
                 .unwrap()
                 .get(key)
                 .cloned()
-                .ok_or_else(|| crate::AppError::Other(format!("Keychain: not found: {}", key)))
+                .ok_or_else(|| crate::AppError::Keychain(keyring::Error::NoEntry))
         }
 
         fn delete(&self, key: &str) -> Result<()> {
@@ -318,7 +336,7 @@ mod tests {
             }
         }
 
-        /// Fail on the Nth save operation (0-indexed)
+        /// Fail on the Nth save operation (0-indexed), then clear the failure so subsequent saves succeed
         fn fail_on_save_after(&self, n: usize) {
             *self.fail_on_save_after_n.lock().unwrap() = Some(n);
         }
@@ -336,7 +354,9 @@ mod tests {
             *count += 1;
 
             if let Some(fail_after) = *self.fail_on_save_after_n.lock().unwrap() {
-                if current >= fail_after {
+                if current == fail_after {
+                    // Fail once, then clear so rollback saves can succeed
+                    *self.fail_on_save_after_n.lock().unwrap() = None;
                     return Err(crate::AppError::Other(format!(
                         "Simulated save failure at operation {}",
                         current
@@ -357,7 +377,7 @@ mod tests {
                 .unwrap()
                 .get(key)
                 .cloned()
-                .ok_or_else(|| crate::AppError::Other(format!("Keychain: not found: {}", key)))
+                .ok_or_else(|| crate::AppError::Keychain(keyring::Error::NoEntry))
         }
 
         fn delete(&self, key: &str) -> Result<()> {
@@ -402,7 +422,7 @@ mod tests {
         let snapshot = keychain.snapshot_provider_credentials(
             "test-provider",
             &vec!["field1".to_string(), "field2".to_string()],
-        );
+        ).unwrap();
 
         // Create failing backend and copy state
         let failing_backend = FailingKeychainBackend::new();
@@ -432,13 +452,18 @@ mod tests {
         // Should fail
         assert!(result.is_err(), "Expected transactional save to fail");
 
-        // Verify field1 was rolled back to old value (not left as new-value1)
-        let cred1 = keychain_failing.backend.load("provider:test-provider:credential:field1").unwrap();
-        assert_eq!(cred1, "old-value1", "field1 should be rolled back");
+        // Verify rollback happened: check both fields
+        // Due to HashMap iteration order, we don't know which field was saved first
+        // But we can verify: the field that WAS saved should be rolled back
+        // and field2 (which didn't exist) should still not exist
+        let field1_result = keychain_failing.backend.load("provider:test-provider:credential:field1");
+        let field2_result = keychain_failing.backend.load("provider:test-provider:credential:field2");
 
-        // field2 should not exist (was absent before and transaction failed)
-        assert!(keychain_failing.backend.load("provider:test-provider:credential:field2").is_err(),
-                "field2 should not exist after rollback");
+        // field1 should be back to old value (either never changed, or rolled back)
+        assert_eq!(field1_result.unwrap(), "old-value1", "field1 should be old value");
+
+        // field2 should not exist (was absent before, either never saved or rolled back)
+        assert!(field2_result.is_err(), "field2 should not exist after rollback");
     }
 
     #[test]
@@ -455,7 +480,7 @@ mod tests {
         let snapshot = keychain.snapshot_provider_credentials(
             "test-provider",
             &vec!["field1".to_string(), "field2".to_string()],
-        );
+        ).unwrap();
 
         // Verify snapshot captured the state
         assert_eq!(snapshot.api_key, Some(Some("simple-key".to_string())));
