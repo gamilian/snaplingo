@@ -140,12 +140,22 @@ impl TranslationCoordinator {
         drop(providers);
 
         let mut active = self.active.lock().unwrap();
-        if !active.contains(&id.to_string()) {
-            active.push(id.to_string());
-        }
 
-        // Persist to config
-        self.config.save("active_translation_providers", &*active)?;
+        // Compute new active list
+        let new_active = if active.contains(&id.to_string()) {
+            // Already active, no change
+            return Ok(());
+        } else {
+            let mut new_list = active.clone();
+            new_list.push(id.to_string());
+            new_list
+        };
+
+        // Persist first
+        self.config.save("active_translation_providers", &new_active)?;
+
+        // Only update memory after successful persistence
+        *active = new_active;
         Ok(())
     }
 
@@ -169,10 +179,23 @@ impl TranslationCoordinator {
         drop(providers);
 
         let mut active = self.active.lock().unwrap();
-        active.retain(|active_id| active_id != id);
 
-        // Persist to config
-        self.config.save("active_translation_providers", &*active)?;
+        // Compute new active list
+        let new_active: Vec<String> = active.iter()
+            .filter(|active_id| active_id.as_str() != id)
+            .cloned()
+            .collect();
+
+        // No-op if already not active
+        if new_active.len() == active.len() {
+            return Ok(());
+        }
+
+        // Persist first
+        self.config.save("active_translation_providers", &new_active)?;
+
+        // Only update memory after successful persistence
+        *active = new_active;
         Ok(())
     }
 
@@ -206,11 +229,12 @@ impl TranslationCoordinator {
             .into());
         }
 
-        // Update order
+        // Persist first
+        self.config.save("active_translation_providers", &ordered_ids)?;
+
+        // Only update memory after successful persistence
         *active = ordered_ids;
 
-        // Persist to config
-        self.config.save("active_translation_providers", &*active)?;
         Ok(())
     }
 

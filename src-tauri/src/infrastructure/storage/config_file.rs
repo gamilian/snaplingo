@@ -40,11 +40,11 @@ impl ConfigFile {
     pub fn save<T: Serialize>(&self, key: &str, value: &T) -> Result<()> {
         let json_value = serde_json::to_value(value)?;
 
-        // Clone store and apply modification
-        let mut new_store = {
-            let store = self.store.lock().unwrap();
-            store.clone()
-        };
+        // Hold lock for entire operation to prevent concurrent lost updates
+        let mut store = self.store.lock().unwrap();
+
+        // Clone and apply modification
+        let mut new_store = store.clone();
         new_store.insert(key.to_string(), json_value.clone());
 
         let content = serde_json::to_string_pretty(&new_store)?;
@@ -74,7 +74,6 @@ impl ConfigFile {
         fs::rename(&temp_path, &self.path)?;
 
         // Only update in-memory store after successful file write
-        let mut store = self.store.lock().unwrap();
         store.insert(key.to_string(), json_value);
 
         Ok(())

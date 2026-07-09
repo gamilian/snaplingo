@@ -846,11 +846,19 @@ impl ProviderConfiguration {
             }
         }
 
-        // Helper to rollback everything
-        let mut rollback = || {
+        // Helper to rollback everything and collect errors
+        let mut rollback = || -> Vec<String> {
+            let mut errors = Vec::new();
+
             custom_defs.insert(index, removed_def.clone());
-            let _ = self.config_file.save("custom_translation_providers", &custom_defs);
-            let _ = self.keychain.restore_provider_credentials(&provider_id, &snapshot);
+            if let Err(e) = self.config_file.save("custom_translation_providers", &custom_defs) {
+                errors.push(format!("config save: {}", e));
+            }
+
+            if let Err(e) = self.keychain.restore_provider_credentials(&provider_id, &snapshot) {
+                errors.push(format!("credential restore: {}", e));
+            }
+
             if was_registered {
                 let api_key = snapshot.api_key.clone().and_then(|opt| opt).unwrap_or_default();
                 let provider = create_llm_translation_provider(
@@ -859,28 +867,52 @@ impl ProviderConfiguration {
                     api_key,
                     self.config_file.clone(),
                 );
-                let _ = self.translation_coordinator.register(provider);
-                if was_active {
-                    let _ = self.translation_coordinator.activate(&provider_id);
+                if let Err(e) = self.translation_coordinator.register(provider) {
+                    errors.push(format!("re-register: {}", e));
                 }
-                let _ = self.translation_coordinator.reorder_active(active_ids.clone());
+                if was_active {
+                    if let Err(e) = self.translation_coordinator.activate(&provider_id) {
+                        errors.push(format!("re-activate: {}", e));
+                    }
+                }
+                if let Err(e) = self.translation_coordinator.reorder_active(active_ids.clone()) {
+                    errors.push(format!("reorder active: {}", e));
+                }
             }
+
+            errors
         };
 
         // Step 3: Delete simple API key
         if let Err(e) = self.keychain.delete_provider_credential(&provider_id) {
             // Only fail if key exists but deletion failed (idempotent delete)
             if !crate::infrastructure::storage::is_keychain_not_found(&e) {
-                rollback();
-                return Err(AppError::Other(format!("Failed to delete credential: {}", e)));
+                let rollback_errors = rollback();
+                if rollback_errors.is_empty() {
+                    return Err(AppError::Other(format!("Failed to delete credential: {}", e)));
+                } else {
+                    return Err(AppError::Other(format!(
+                        "Failed to delete credential: {}. Rollback also failed: {}",
+                        e,
+                        rollback_errors.join(", ")
+                    )));
+                }
             }
         }
 
         // Step 4: Delete structured credentials (using saved field names) with rollback on failure
         if !credential_field_names.is_empty() {
             if let Err(e) = self.keychain.delete_provider_credentials(&provider_id, &credential_field_names) {
-                rollback();
-                return Err(AppError::Other(format!("Failed to delete structured credentials: {}", e)));
+                let rollback_errors = rollback();
+                if rollback_errors.is_empty() {
+                    return Err(AppError::Other(format!("Failed to delete structured credentials: {}", e)));
+                } else {
+                    return Err(AppError::Other(format!(
+                        "Failed to delete structured credentials: {}. Rollback also failed: {}",
+                        e,
+                        rollback_errors.join(", ")
+                    )));
+                }
             }
         }
 
