@@ -36,13 +36,18 @@ impl ConfigFile {
 
     /// Saves a value under the specified key.
     /// The value must implement Serialize.
+    /// Atomic operation: only modifies in-memory store if file write succeeds.
     pub fn save<T: Serialize>(&self, key: &str, value: &T) -> Result<()> {
         let json_value = serde_json::to_value(value)?;
 
-        let mut store = self.store.lock().unwrap();
-        store.insert(key.to_string(), json_value);
+        // Clone store and apply modification
+        let mut new_store = {
+            let store = self.store.lock().unwrap();
+            store.clone()
+        };
+        new_store.insert(key.to_string(), json_value.clone());
 
-        let content = serde_json::to_string_pretty(&*store)?;
+        let content = serde_json::to_string_pretty(&new_store)?;
 
         // Atomic write: write to temp file in same directory, then rename
         let parent = self
@@ -67,6 +72,10 @@ impl ConfigFile {
         }
 
         fs::rename(&temp_path, &self.path)?;
+
+        // Only update in-memory store after successful file write
+        let mut store = self.store.lock().unwrap();
+        store.insert(key.to_string(), json_value);
 
         Ok(())
     }

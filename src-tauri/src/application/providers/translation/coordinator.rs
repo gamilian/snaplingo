@@ -90,21 +90,32 @@ impl TranslationCoordinator {
     ///
     /// * `Result<()>` - Ok if successful, Err if the provider doesn't exist
     pub fn unregister(&self, id: &str) -> Result<()> {
-        // Deactivate first if active
+        // Check if provider exists first
+        let providers = self.providers.read();
+        if !providers.contains_key(id) {
+            return Err(format!("Provider not found: {}", id).into());
+        }
+        drop(providers);
+
+        // Deactivate if active: compute new active list and persist before modifying memory
         let mut active = self.active.lock().unwrap();
-        let was_active = active.iter().position(|active_id| active_id == id);
-        if was_active.is_some() {
-            active.retain(|active_id| active_id != id);
-            // Persist active list
-            self.config.save("active_translation_providers", &*active)?;
+        let was_active = active.iter().any(|active_id| active_id == id);
+        if was_active {
+            let new_active: Vec<String> = active.iter()
+                .filter(|active_id| active_id.as_str() != id)
+                .cloned()
+                .collect();
+
+            // Persist first
+            self.config.save("active_translation_providers", &new_active)?;
+
+            // Only modify memory after successful persistence
+            *active = new_active;
         }
         drop(active);
 
         // Remove from providers
         let mut providers = self.providers.write();
-        if !providers.contains_key(id) {
-            return Err(format!("Provider not found: {}", id).into());
-        }
         providers.remove(id);
         Ok(())
     }

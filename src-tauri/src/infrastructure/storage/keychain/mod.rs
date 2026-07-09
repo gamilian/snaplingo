@@ -22,7 +22,7 @@ mod linux;
 #[cfg(target_os = "linux")]
 use linux::LinuxKeychain as PlatformKeychainImpl;
 
-use crate::error::Result;
+use crate::error::{Result, AppError};
 use std::collections::HashMap;
 
 /// Check if an error is a "not found" / "no entry" error from keychain
@@ -121,21 +121,24 @@ impl Keychain {
         for (field_name, value) in credentials {
             let key = format!("provider:{}:credential:{}", provider_id, field_name);
             if let Err(e) = self.backend.save(&key, value) {
-                // Rollback: restore all saved fields
-                for saved_field in &saved_fields {
-                    let key = format!("provider:{}:credential:{}", provider_id, saved_field);
-                    // Check if this field was in the snapshot
-                    match snapshot.structured.get(saved_field.as_str()) {
-                        Some(Some(val)) => {
-                            // Restore old value
-                            let _ = self.backend.save(&key, val);
-                        }
-                        Some(None) | None => {
-                            // Was absent or not tracked, delete the new value
-                            let _ = self.backend.delete(&key);
-                        }
-                    }
+                // Rollback: restore snapshot for all affected fields
+                let rollback_snapshot = CredentialSnapshot {
+                    api_key: None, // Don't touch simple API key
+                    structured: saved_fields
+                        .iter()
+                        .filter_map(|f| {
+                            snapshot.structured.get(f).map(|v| (f.clone(), v.clone()))
+                        })
+                        .collect(),
+                };
+
+                if let Err(rollback_err) = self.restore_provider_credentials(provider_id, &rollback_snapshot) {
+                    return Err(AppError::Other(format!(
+                        "Save failed: {}. Rollback also failed: {}. Credentials may be inconsistent.",
+                        e, rollback_err
+                    )));
                 }
+
                 return Err(e);
             }
             saved_fields.push(field_name.clone());
@@ -190,7 +193,12 @@ impl Keychain {
                 }
                 None => {
                     // Was absent, delete current value
-                    let _ = self.delete_provider_credential(provider_id);
+                    if let Err(e) = self.delete_provider_credential(provider_id) {
+                        // Only ignore "not found", propagate real failures
+                        if !is_keychain_not_found(&e) {
+                            return Err(e);
+                        }
+                    }
                 }
             }
         }
@@ -205,7 +213,12 @@ impl Keychain {
                 }
                 None => {
                     // Was absent, delete current value
-                    let _ = self.backend.delete(&key);
+                    if let Err(e) = self.backend.delete(&key) {
+                        // Only ignore "not found", propagate real failures
+                        if !is_keychain_not_found(&e) {
+                            return Err(e);
+                        }
+                    }
                 }
             }
         }
