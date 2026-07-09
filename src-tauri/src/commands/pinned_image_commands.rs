@@ -23,10 +23,11 @@ pub fn pin_clipboard_image_for_state(
     state: &crate::AppState,
 ) -> Result<(), String> {
     let request = state
-        .pinned_image_service
+        .capture
+        .pinned_images
         .pin_clipboard_capture_output(
-            &state.image_composition_service,
-            &state.capture_output_service,
+            &state.capture.image_composition,
+            &state.capture.output,
         )
         .map_err(|e| e.to_string())?;
 
@@ -58,7 +59,8 @@ pub fn close_pinned_image_for_state(
     state: &crate::AppState,
 ) -> Result<(), String> {
     state
-        .pinned_image_service
+        .capture
+        .pinned_images
         .close_pinned_image(image_id)
         .map_err(|e| e.to_string())?;
 
@@ -72,7 +74,8 @@ pub fn get_pinned_image(
 ) -> Result<PinnedImageView, String> {
     state
         .inner()
-        .pinned_image_service
+        .capture
+        .pinned_images
         .get_pinned_image(&image_id)
         .map_err(|e| e.to_string())
 }
@@ -84,7 +87,8 @@ pub fn remove_pinned_image(
 ) -> Result<(), String> {
     state
         .inner()
-        .pinned_image_service
+        .capture
+        .pinned_images
         .remove_pinned_image(&image_id)
         .map_err(|e| e.to_string())
 }
@@ -96,8 +100,9 @@ pub async fn copy_pinned_image(
 ) -> Result<(), String> {
     state
         .inner()
-        .pinned_image_service
-        .copy_pinned_png_to_clipboard(&state.inner().capture_output_service, &image_id)
+        .capture
+        .pinned_images
+        .copy_pinned_png_to_clipboard(&state.inner().capture.output, &image_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -109,10 +114,11 @@ pub fn replace_pinned_image_from_clipboard(
 ) -> Result<PinnedImageView, String> {
     state
         .inner()
-        .pinned_image_service
+        .capture
+        .pinned_images
         .replace_clipboard_capture_output_view(
-            &state.inner().image_composition_service,
-            &state.inner().capture_output_service,
+            &state.inner().capture.image_composition,
+            &state.inner().capture.output,
             &image_id,
         )
         .map_err(|e| e.to_string())
@@ -126,9 +132,10 @@ pub async fn save_pinned_image(
 ) -> Result<(), String> {
     state
         .inner()
-        .pinned_image_service
+        .capture
+        .pinned_images
         .save_pinned_png_to_path(
-            &state.inner().capture_output_service,
+            &state.inner().capture.output,
             &image_id,
             Path::new(&path),
         )
@@ -153,7 +160,7 @@ pub fn switch_pinned_image_group_for_state(
     app: &AppHandle,
     state: &crate::AppState,
 ) -> Result<Option<u32>, String> {
-    let Some(group_switch) = state.pinned_image_service.switch_to_next_group() else {
+    let Some(group_switch) = state.capture.pinned_images.switch_to_next_group() else {
         return Ok(None);
     };
 
@@ -174,7 +181,8 @@ pub fn move_pinned_image_to_next_group(
 ) -> Result<u32, String> {
     let next_group = state
         .inner()
-        .pinned_image_service
+        .capture
+        .pinned_images
         .move_pinned_image_to_next_group(&image_id)
         .map_err(|e| e.to_string())?;
     hide_moved_pinned_image_window(&app, &image_id)?;
@@ -190,7 +198,8 @@ pub fn hide_pinned_image_group(
 ) -> Result<Vec<String>, String> {
     let membership = state
         .inner()
-        .pinned_image_service
+        .capture
+        .pinned_images
         .pinned_image_group_containing(&image_id)
         .map_err(|e| e.to_string())?;
 
@@ -207,7 +216,8 @@ pub fn destroy_pinned_image_group(
 ) -> Result<Vec<String>, String> {
     let removal = state
         .inner()
-        .pinned_image_service
+        .capture
+        .pinned_images
         .remove_pinned_image_group_containing(&image_id)
         .map_err(|e| e.to_string())?;
 

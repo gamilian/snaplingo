@@ -10,7 +10,7 @@ use crate::HotkeyUpdateOutcome;
 pub fn get_hotkey_snapshot(
     state: State<'_, crate::AppState>,
 ) -> Result<HotkeySettingsSnapshot, String> {
-    get_hotkey_snapshot_for_runtime(state.hotkey_runtime.as_ref())
+    get_hotkey_snapshot_for_runtime(state.settings.hotkeys.as_ref())
 }
 
 #[tauri::command]
@@ -22,7 +22,8 @@ pub fn update_hotkey(
     state: State<'_, crate::AppState>,
 ) -> Result<HotkeyUpdateOutcome, String> {
     state
-        .hotkey_runtime
+        .settings
+        .hotkeys
         .update_hotkey(&app, category, action, hotkey)
         .map_err(|err| err.to_string())
 }

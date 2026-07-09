@@ -251,6 +251,7 @@ pub async fn open_selection_translation_window_for_state(
     state: &crate::AppState,
 ) -> Result<(), String> {
     let snapshot = state
+        .selection
         .selected_text_acquirer
         .acquire()
         .await
@@ -275,7 +276,8 @@ pub fn configure_hotkey(
     state: State<'_, crate::AppState>,
 ) -> Result<Option<String>, String> {
     let outcome = state
-        .hotkey_runtime
+        .settings
+        .hotkeys
         .update_hotkey(&app, category, action, hotkey)
         .map_err(|e| e.to_string())?;
     Ok(outcome.accelerator)
@@ -289,7 +291,8 @@ pub fn configure_translation_hotkey(
     state: State<'_, crate::AppState>,
 ) -> Result<Option<String>, String> {
     let outcome = state
-        .hotkey_runtime
+        .settings
+        .hotkeys
         .update_hotkey(&app, "translation".to_string(), action, hotkey)
         .map_err(|e| e.to_string())?;
     Ok(outcome.accelerator)

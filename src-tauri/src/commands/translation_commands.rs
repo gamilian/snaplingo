@@ -21,7 +21,8 @@ pub async fn translate_text_v2(
     };
 
     state
-        .translation_coordinator
+        .providers
+        .translation
         .translate(&translation_request)
         .await
         .map_err(|e| e.to_string())
@@ -40,7 +41,8 @@ pub async fn translate_text_with_provider(
     };
 
     state
-        .translation_coordinator
+        .providers
+        .translation
         .translate_with_provider(&provider_id, &translation_request)
         .await
         .map_err(|e| e.to_string())

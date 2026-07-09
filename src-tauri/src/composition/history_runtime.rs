@@ -15,8 +15,8 @@ pub(crate) fn build_history_service() -> Arc<HistoryService> {
 }
 
 pub(crate) fn subscribe_history_service(app_state: &AppState) {
-    let history_service_subscriber = app_state.history_service.clone() as Arc<dyn EventSubscriber>;
-    let event_bus = app_state.event_bus.clone();
+    let history_service_subscriber = app_state.history.service.clone() as Arc<dyn EventSubscriber>;
+    let event_bus = app_state.history.events.clone();
     tauri::async_runtime::spawn(async move {
         event_bus.subscribe(history_service_subscriber).await;
     });

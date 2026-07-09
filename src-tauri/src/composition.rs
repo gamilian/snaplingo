@@ -21,7 +21,12 @@ pub(crate) use history_runtime::subscribe_history_service;
 use crate::infrastructure::events::EventBus;
 use crate::infrastructure::http::{HttpClient, ReqwestHttpClient};
 use crate::infrastructure::storage::{ConfigFile, Keychain};
-use crate::AppState;
+use crate::app_state::{
+    AppState, CaptureRuntimeState, HistoryRuntime, ProviderRuntime, SelectionRuntime,
+    SettingsRuntime,
+};
+use crate::application::providers::ocr::OcrProviderConfiguration;
+use crate::application::providers::TranslationPromptConfiguration;
 use crate::{HotkeyConfiguration, HotkeyRuntime, SettingsConfiguration};
 
 pub(crate) fn build_app_state(config_path: PathBuf, app: AppHandle) -> AppState {
@@ -49,46 +54,68 @@ pub(crate) fn build_app_state(config_path: PathBuf, app: AppHandle) -> AppState 
         translation_coordinator.clone(),
         llm_introspection.clone(),
     );
+    let prompt_strategies = Arc::new(TranslationPromptConfiguration::new(config_file.clone()));
     let ocr_coordinator = build_ocr_coordinator(
         config_file.clone(),
         keychain.clone(),
         http_client.clone(),
         event_bus.clone(),
     );
+    let ocr_configuration = Arc::new(OcrProviderConfiguration::new(
+        ocr_coordinator.clone(),
+        keychain.clone(),
+    ));
 
     let capture_runtime = build_capture_runtime(app.clone(), ocr_coordinator.clone());
     let selected_text_acquirer = build_selected_text_acquirer(app);
 
-    AppState {
+    hydrate_provider_credentials_in_background(
         config_file,
-        settings_configuration,
-        hotkey_runtime,
         keychain,
         http_client,
-        translation_coordinator,
-        llm_introspection,
-        provider_configuration,
-        ocr_coordinator,
-        capture_service: capture_runtime.capture_service,
-        capture_session_service: capture_runtime.capture_session_service,
-        image_composition_service: capture_runtime.image_composition_service,
-        capture_output_service: capture_runtime.capture_output_service,
-        capture_session_runtime: capture_runtime.capture_session_runtime,
-        pinned_image_service: capture_runtime.pinned_image_service,
-        screenshot_state: capture_runtime.screenshot_state,
-        history_service,
-        event_bus,
-        selected_text_acquirer,
+        translation_coordinator.clone(),
+        ocr_coordinator.clone(),
+    );
+
+    AppState {
+        settings: Arc::new(SettingsRuntime {
+            configuration: settings_configuration,
+            hotkeys: hotkey_runtime,
+        }),
+        providers: Arc::new(ProviderRuntime {
+            translation: translation_coordinator,
+            ocr: ocr_coordinator,
+            ocr_configuration,
+            llm_introspection,
+            configuration: provider_configuration,
+            prompt_strategies,
+        }),
+        capture: Arc::new(CaptureRuntimeState {
+            capture: capture_runtime.capture_service,
+            sessions: capture_runtime.capture_session_service,
+            image_composition: capture_runtime.image_composition_service,
+            output: capture_runtime.capture_output_service,
+            session_runtime: capture_runtime.capture_session_runtime,
+            pinned_images: capture_runtime.pinned_image_service,
+            screenshot_state: capture_runtime.screenshot_state,
+        }),
+        history: Arc::new(HistoryRuntime {
+            service: history_service,
+            events: event_bus,
+        }),
+        selection: Arc::new(SelectionRuntime {
+            selected_text_acquirer,
+        }),
     }
 }
 
-pub(crate) fn hydrate_provider_credentials_in_background(app_state: &AppState) {
-    let config_file = app_state.config_file.clone();
-    let keychain = app_state.keychain.clone();
-    let http_client = app_state.http_client.clone();
-    let translation_coordinator = app_state.translation_coordinator.clone();
-    let ocr_coordinator = app_state.ocr_coordinator.clone();
-
+fn hydrate_provider_credentials_in_background(
+    config_file: Arc<ConfigFile>,
+    keychain: Arc<Keychain>,
+    http_client: Arc<dyn HttpClient>,
+    translation_coordinator: Arc<crate::application::providers::translation::TranslationCoordinator>,
+    ocr_coordinator: Arc<crate::application::providers::ocr::OcrCoordinator>,
+) {
     tauri::async_runtime::spawn_blocking(move || {
         hydrate_provider_credentials(
             config_file,

@@ -40,7 +40,8 @@ pub async fn open_capture_window_for_mode(
     mode: &str,
 ) -> Result<(), String> {
     state
-        .capture_session_runtime
+        .capture
+        .session_runtime
         .open_capture_window_for_mode(mode)
         .await
         .map_err(|e| e.to_string())
@@ -51,7 +52,8 @@ pub async fn create_capture_session(
     state: State<'_, crate::AppState>,
 ) -> Result<CaptureSessionView, String> {
     state
-        .capture_session_runtime
+        .capture
+        .session_runtime
         .create_session_from_visible_desktop()
         .await
         .map_err(|e| e.to_string())
@@ -148,7 +150,8 @@ pub fn get_capture_session(
 ) -> Result<CaptureSessionView, String> {
     let start = Instant::now();
     let view = state
-        .capture_session_service
+        .capture
+        .sessions
         .get_session_view_without_monitor_images(&CaptureSessionId(session_id))
         .map_err(|e| e.to_string())?;
     let view_base64_bytes = capture_session_view_base64_bytes(&view);
@@ -171,7 +174,8 @@ pub async fn hydrate_capture_session_snapshots(
     state: State<'_, crate::AppState>,
 ) -> Result<CaptureSessionView, String> {
     state
-        .capture_session_service
+        .capture
+        .sessions
         .hydrate_session_snapshots(&CaptureSessionId(session_id))
         .await
         .map_err(|e| e.to_string())
@@ -199,7 +203,8 @@ pub fn current_capture_cursor_position(
     state: State<'_, crate::AppState>,
 ) -> Result<Option<LogicalPoint>, String> {
     state
-        .capture_session_service
+        .capture
+        .sessions
         .current_cursor_position(&CaptureSessionId(session_id))
         .map_err(|e| e.to_string())
 }
@@ -210,7 +215,8 @@ pub async fn cancel_capture_session(
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     state
-        .capture_session_runtime
+        .capture
+        .session_runtime
         .cancel_capture_session(&CaptureSessionId(session_id))
         .await
         .map_err(|e| e.to_string())
@@ -222,7 +228,8 @@ pub async fn restore_capture_snapshot_windows_for_session(
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     state
-        .capture_session_runtime
+        .capture
+        .session_runtime
         .restore_capture_snapshot_windows_for_session(&CaptureSessionId(session_id))
         .await
         .map_err(|e| e.to_string())?;
@@ -240,7 +247,8 @@ pub async fn render_capture_output(
     let session_id = CaptureSessionId(session_id);
 
     state
-        .capture_session_runtime
+        .capture
+        .session_runtime
         .render_png_base64(
             &session_id,
             &rect,
@@ -253,7 +261,8 @@ pub async fn render_capture_output(
 #[tauri::command]
 pub fn default_capture_save_path(state: State<'_, crate::AppState>) -> Result<String, String> {
     Ok(state
-        .capture_output_service
+        .capture
+        .output
         .default_capture_save_path()
         .to_string_lossy()
         .to_string())
@@ -265,7 +274,8 @@ pub fn quick_capture_save_path(
     state: State<'_, crate::AppState>,
 ) -> Result<String, String> {
     Ok(state
-        .capture_output_service
+        .capture
+        .output
         .quick_capture_save_path(directory.as_deref())
         .to_string_lossy()
         .to_string())
@@ -284,7 +294,8 @@ pub async fn output_capture(
     let session_id = CaptureSessionId(session_id);
 
     let output = state
-        .capture_session_runtime
+        .capture
+        .session_runtime
         .output_selection(
             &session_id,
             &rect,
@@ -300,7 +311,8 @@ pub async fn output_capture(
         CaptureSessionOutput::Pin(png_data) => {
             let image = state
                 .inner()
-                .pinned_image_service
+                .capture
+                .pinned_images
                 .pin_png_view(png_data)
                 .map_err(|e| e.to_string())?;
 
@@ -318,7 +330,8 @@ pub async fn run_capture_ocr(
     let capture_session_id = CaptureSessionId(session_id.clone());
 
     let result = state
-        .capture_session_runtime
+        .capture
+        .session_runtime
         .recognize_selection_text(&capture_session_id, &rect)
         .await
         .map_err(|e| e.to_string())?;

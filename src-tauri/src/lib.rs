@@ -54,8 +54,7 @@ pub fn run() {
         .setup(|app| {
             let app_state = composition::build_app_state(config_path, app.handle().clone());
             composition::subscribe_history_service(&app_state);
-            composition::hydrate_provider_credentials_in_background(&app_state);
-            let hotkey_runtime = app_state.hotkey_runtime.clone();
+            let hotkey_runtime = app_state.settings.hotkeys.clone();
 
             app.manage(app_state);
 

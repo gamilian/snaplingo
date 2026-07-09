@@ -6,7 +6,8 @@ use tauri::State;
 #[tauri::command]
 pub async fn capture_full_screen(state: State<'_, crate::AppState>) -> Result<String, String> {
     let png_data = state
-        .capture_service
+        .capture
+        .capture
         .capture_full_screen()
         .await
         .map_err(|e| e.to_string())?;
@@ -28,7 +29,8 @@ pub async fn capture_region(
         height,
     };
     let png_data = state
-        .capture_service
+        .capture
+        .capture
         .capture_region(region)
         .await
         .map_err(|e| e.to_string())?;
@@ -48,7 +50,8 @@ pub async fn save_screenshot(
 
     let path_buf = PathBuf::from(path);
     state
-        .capture_service
+        .capture
+        .capture
         .save_screenshot(&png_data, &path_buf)
         .await
         .map_err(|e| e.to_string())?;

@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 use crate::domain::translation::TranslationRequest;
+use crate::infrastructure::storage::ConfigFile;
 
 pub const SMART_PROMPT_STRATEGY_ID: &str = "smart";
 pub const DEFAULT_PROMPT_STRATEGY_ID: &str = "general";
@@ -18,6 +20,36 @@ pub struct TranslationPromptStrategy {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TranslationPromptStrategyConfig {
     pub strategies: Vec<TranslationPromptStrategy>,
+}
+
+pub struct TranslationPromptConfiguration {
+    config_file: Arc<ConfigFile>,
+}
+
+impl TranslationPromptConfiguration {
+    pub fn new(config_file: Arc<ConfigFile>) -> Self {
+        Self { config_file }
+    }
+
+    pub fn list(&self) -> TranslationPromptStrategyConfig {
+        let stored = self
+            .config_file
+            .load::<TranslationPromptStrategyConfig>("translation_prompt_strategies")
+            .ok();
+        merge_prompt_strategy_config(stored)
+    }
+
+    pub fn save(
+        &self,
+        config: TranslationPromptStrategyConfig,
+    ) -> crate::Result<TranslationPromptStrategyConfig> {
+        validate_prompt_strategy_config(&config)?;
+        let config = sanitize_prompt_strategy_config(config);
+        self.config_file
+            .save("translation_prompt_strategies", &config)
+            .map_err(|e| format!("Failed to save prompt strategies: {}", e))?;
+        Ok(config)
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

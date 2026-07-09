@@ -7,7 +7,7 @@ use crate::domain::{GeneralSettings, ScreenshotSettings, SettingsSnapshot, Trans
 pub fn get_settings_snapshot(
     state: State<'_, crate::AppState>,
 ) -> Result<SettingsSnapshot, String> {
-    get_settings_snapshot_for_configuration(state.settings_configuration.as_ref())
+    get_settings_snapshot_for_configuration(state.settings.configuration.as_ref())
 }
 
 #[tauri::command]
@@ -15,7 +15,7 @@ pub fn update_general_settings(
     input: GeneralSettings,
     state: State<'_, crate::AppState>,
 ) -> Result<SettingsSnapshot, String> {
-    update_general_settings_for_configuration(state.settings_configuration.as_ref(), input)
+    update_general_settings_for_configuration(state.settings.configuration.as_ref(), input)
 }
 
 #[tauri::command]
@@ -23,7 +23,7 @@ pub fn update_screenshot_settings(
     input: ScreenshotSettings,
     state: State<'_, crate::AppState>,
 ) -> Result<SettingsSnapshot, String> {
-    update_screenshot_settings_for_configuration(state.settings_configuration.as_ref(), input)
+    update_screenshot_settings_for_configuration(state.settings.configuration.as_ref(), input)
 }
 
 #[tauri::command]
@@ -31,7 +31,7 @@ pub fn update_translation_settings(
     input: TranslationSettings,
     state: State<'_, crate::AppState>,
 ) -> Result<SettingsSnapshot, String> {
-    update_translation_settings_for_configuration(state.settings_configuration.as_ref(), input)
+    update_translation_settings_for_configuration(state.settings.configuration.as_ref(), input)
 }
 
 fn get_settings_snapshot_for_configuration(

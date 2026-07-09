@@ -3,8 +3,6 @@ use crate::application::providers::configuration::{
     CredentialValue, ProviderInfo,
 };
 use crate::application::providers::{
-    merge_prompt_strategy_config, sanitize_prompt_strategy_config,
-    validate_prompt_strategy_config,
     AddCustomTranslationProviderInput,
     CustomTranslationProviderView, TranslationPromptStrategyConfig,
     UpdateCustomTranslationProviderInput,
@@ -37,8 +35,8 @@ impl From<CustomTranslationProviderView> for ProviderInfo {
 pub async fn list_translation_providers(
     state: State<'_, crate::AppState>,
 ) -> Result<Vec<ProviderInfo>, String> {
-    let info = state.provider_configuration.list_provider_infos();
-    let active = state.translation_coordinator.get_active();
+    let info = state.providers.configuration.list_provider_infos();
+    let active = state.providers.translation.get_active();
     let active_ids: Vec<_> = active.iter().map(|p| p.read().id().to_string()).collect();
 
     Ok(order_provider_infos_for_display(info, &active_ids))
@@ -73,7 +71,8 @@ pub async fn activate_translation_provider(
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     state
-        .provider_configuration
+        .providers
+        .configuration
         .activate_provider(provider_id)
         .map_err(|e| e.to_string())
 }
@@ -84,7 +83,8 @@ pub async fn deactivate_translation_provider(
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     state
-        .provider_configuration
+        .providers
+        .configuration
         .deactivate_provider(provider_id)
         .map_err(|e| e.to_string())
 }
@@ -108,7 +108,7 @@ pub async fn configure_translation_provider(
         .map(|(key, value)| CredentialValue { key, value })
         .collect();
 
-    state.provider_configuration
+    state.providers.configuration
         .save_credentials(provider_id, cred_values)
         .map_err(|e| e.to_string())
 }
@@ -119,7 +119,8 @@ pub async fn reorder_active_translation_providers(
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     state
-        .provider_configuration
+        .providers
+        .configuration
         .reorder_active_providers(provider_ids)
         .map_err(|e| e.to_string())
 }
@@ -129,7 +130,7 @@ pub async fn get_provider_credential_schema(
     provider_id: String,
     state: State<'_, crate::AppState>,
 ) -> Result<Vec<CredentialField>, String> {
-    state.provider_configuration
+    state.providers.configuration
         .credential_schema(provider_id)
         .map_err(|e| e.to_string())
 }
@@ -145,7 +146,7 @@ pub async fn configure_translation_provider_credentials(
         .map(|(key, value)| CredentialValue { key, value })
         .collect();
 
-    state.provider_configuration
+    state.providers.configuration
         .save_credentials(provider_id, cred_values)
         .map_err(|e| e.to_string())
 }
@@ -209,7 +210,7 @@ pub async fn add_custom_translation_provider(
     };
 
     let view = state
-        .provider_configuration
+        .providers.configuration
         .add(input)
         .map_err(|e| e.to_string())?;
 
@@ -234,13 +235,13 @@ pub async fn update_custom_translation_provider(
     };
 
     let view = state
-        .provider_configuration
+        .providers.configuration
         .update(provider_id.clone(), input)
         .map_err(|e| e.to_string())?;
 
     let mut info = ProviderInfo::from(view);
     info.is_active = state
-        .translation_coordinator
+        .providers.translation
         .get_active()
         .iter()
         .any(|provider| provider.read().id() == provider_id);
@@ -251,11 +252,7 @@ pub async fn update_custom_translation_provider(
 pub async fn list_translation_prompt_strategies(
     state: State<'_, crate::AppState>,
 ) -> Result<TranslationPromptStrategyConfig, String> {
-    let stored = state
-        .config_file
-        .load::<TranslationPromptStrategyConfig>("translation_prompt_strategies")
-        .ok();
-    Ok(merge_prompt_strategy_config(stored))
+    Ok(state.providers.prompt_strategies.list())
 }
 
 #[tauri::command]
@@ -263,13 +260,11 @@ pub async fn save_translation_prompt_strategies(
     config: TranslationPromptStrategyConfig,
     state: State<'_, crate::AppState>,
 ) -> Result<TranslationPromptStrategyConfig, String> {
-    validate_prompt_strategy_config(&config).map_err(|e| e.to_string())?;
-    let config = sanitize_prompt_strategy_config(config);
     state
-        .config_file
-        .save("translation_prompt_strategies", &config)
-        .map_err(|e| format!("Failed to save prompt strategies: {}", e))?;
-    Ok(config)
+        .providers
+        .prompt_strategies
+        .save(config)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -281,7 +276,7 @@ pub async fn list_openai_compatible_models(
     let api_key = validate_non_blank(&request.api_key, "API key")?;
 
     state
-        .llm_introspection
+        .providers.llm_introspection
         .list_models(LLMProtocol::OpenAI, endpoint, api_key)
         .await
         .map(|models| {
@@ -303,7 +298,7 @@ pub async fn test_openai_compatible_provider(
     let model = validate_non_blank(&request.model, "Model")?;
 
     state
-        .llm_introspection
+        .providers.llm_introspection
         .test(LLMProtocol::OpenAI, endpoint, model, api_key)
         .await
         .map_err(|e| format!("Provider test failed: {}", e))
@@ -319,7 +314,7 @@ pub async fn test_openai_responses_provider(
     let model = validate_non_blank(&request.model, "Model")?;
 
     state
-        .llm_introspection
+        .providers.llm_introspection
         .test(LLMProtocol::OpenAIResponses, endpoint, model, api_key)
         .await
         .map_err(|e| format!("Provider test failed: {}", e))
@@ -334,7 +329,7 @@ pub async fn list_anthropic_models(
     let api_key = validate_non_blank(&request.api_key, "API key")?;
 
     state
-        .llm_introspection
+        .providers.llm_introspection
         .list_models(LLMProtocol::Anthropic, endpoint, api_key)
         .await
         .map(|models| {
@@ -356,7 +351,7 @@ pub async fn test_anthropic_provider(
     let model = validate_non_blank(&request.model, "Model")?;
 
     state
-        .llm_introspection
+        .providers.llm_introspection
         .test(LLMProtocol::Anthropic, endpoint, model, api_key)
         .await
         .map_err(|e| format!("Provider test failed: {}", e))
@@ -371,7 +366,7 @@ pub async fn list_gemini_models(
     let api_key = validate_non_blank(&request.api_key, "API key")?;
 
     state
-        .llm_introspection
+        .providers.llm_introspection
         .list_models(LLMProtocol::Gemini, endpoint, api_key)
         .await
         .map(|models| {
@@ -393,7 +388,7 @@ pub async fn test_gemini_provider(
     let model = validate_non_blank(&request.model, "Model")?;
 
     state
-        .llm_introspection
+        .providers.llm_introspection
         .test(LLMProtocol::Gemini, endpoint, model, api_key)
         .await
         .map_err(|e| format!("Provider test failed: {}", e))
@@ -405,7 +400,7 @@ pub async fn test_custom_translation_provider(
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     state
-        .provider_configuration
+        .providers.configuration
         .test_custom_provider(provider_id)
         .await
         .map_err(|e| e.to_string())
@@ -417,7 +412,7 @@ pub async fn remove_custom_translation_provider(
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     state
-        .provider_configuration
+        .providers.configuration
         .remove(provider_id)
         .map_err(|e| e.to_string())
 }

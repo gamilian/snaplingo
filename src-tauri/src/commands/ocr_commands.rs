@@ -1,10 +1,11 @@
 use crate::application::providers::common::CredentialField;
-use crate::application::providers::ocr::OcrCoordinator;
-use crate::application::providers::validate_required_credentials;
 use crate::domain::ocr::{OcrRequest, OcrResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tauri::State;
+
+#[cfg(test)]
+use crate::application::providers::ocr::OcrCoordinator;
 
 #[derive(Serialize, Deserialize)]
 pub struct RecognizeImageRequest {
@@ -32,7 +33,8 @@ pub async fn recognize_image(
     };
 
     state
-        .ocr_coordinator
+        .providers
+        .ocr
         .recognize(&ocr_request)
         .await
         .map_err(|e| e.to_string())
@@ -50,7 +52,8 @@ pub async fn recognize_image_file(
     };
 
     state
-        .ocr_coordinator
+        .providers
+        .ocr
         .recognize(&ocr_request)
         .await
         .map_err(|e| e.to_string())
@@ -60,8 +63,8 @@ pub async fn recognize_image_file(
 pub async fn list_ocr_providers(
     state: State<'_, crate::AppState>,
 ) -> Result<Vec<OcrProviderInfo>, String> {
-    let all_providers = state.ocr_coordinator.list_all();
-    let active = state.ocr_coordinator.get_active();
+    let all_providers = state.providers.ocr.list_all();
+    let active = state.providers.ocr.get_active();
     let active_id = active
         .as_ref()
         .map(|active_p| active_p.read().id().to_string());
@@ -91,7 +94,8 @@ pub async fn activate_ocr_provider(
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     state
-        .ocr_coordinator
+        .providers
+        .ocr
         .activate(&provider_id)
         .map_err(|e| e.to_string())
 }
@@ -110,7 +114,11 @@ pub async fn configure_ocr_provider(
         credentials.insert("secret_key".to_string(), secret);
     }
 
-    configure_ocr_provider_credentials_inner(&provider_id, &credentials, state.inner())
+    state
+        .providers
+        .ocr_configuration
+        .save_credentials(&provider_id, &credentials)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -118,7 +126,11 @@ pub async fn get_ocr_provider_credential_schema(
     provider_id: String,
     state: State<'_, crate::AppState>,
 ) -> Result<Vec<CredentialField>, String> {
-    ocr_provider_credential_schema(&state.ocr_coordinator, &provider_id)
+    state
+        .providers
+        .ocr_configuration
+        .credential_schema(&provider_id)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -127,9 +139,14 @@ pub async fn configure_ocr_provider_credentials(
     credentials: HashMap<String, String>,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    configure_ocr_provider_credentials_inner(&provider_id, &credentials, state.inner())
+    state
+        .providers
+        .ocr_configuration
+        .save_credentials(&provider_id, &credentials)
+        .map_err(|e| e.to_string())
 }
 
+#[cfg(test)]
 fn ocr_provider_credential_schema(
     ocr: &OcrCoordinator,
     provider_id: &str,
@@ -140,58 +157,6 @@ fn ocr_provider_credential_schema(
 
     let fields = provider_lock.read().credential_fields();
     Ok(fields)
-}
-
-fn configure_ocr_provider_credentials_inner(
-    provider_id: &str,
-    credentials: &HashMap<String, String>,
-    state: &crate::AppState,
-) -> Result<(), String> {
-    let provider_lock = state
-        .ocr_coordinator
-        .get(provider_id)
-        .ok_or_else(|| format!("Provider not found: {}", provider_id))?;
-    let expected_fields = provider_lock.read().credential_fields();
-
-    if expected_fields.is_empty() {
-        if credentials.is_empty() {
-            return Ok(());
-        }
-
-        return Err(format!(
-            "Provider {} does not accept credentials",
-            provider_id
-        ));
-    }
-
-    validate_required_credentials(&expected_fields, &credentials).map_err(|e| e.to_string())?;
-
-    // Snapshot existing credentials for rollback
-    let field_names: Vec<String> = expected_fields.iter().map(|f| f.name.clone()).collect();
-    let snapshot = state
-        .keychain
-        .snapshot_provider_credentials(provider_id, &field_names)
-        .map_err(|e| format!("Failed to snapshot credentials: {}", e))?;
-
-    // Save credentials with transaction support
-    state
-        .keychain
-        .save_provider_credentials_transactional(provider_id, credentials, &snapshot)
-        .map_err(|e| e.to_string())?;
-
-    // Reconfigure provider with complete rollback on failure
-    if let Err(e) = state
-        .ocr_coordinator
-        .reconfigure_provider(provider_id, credentials)
-    {
-        // Rollback keychain changes
-        let _ = state
-            .keychain
-            .restore_provider_credentials(provider_id, &snapshot);
-        return Err(format!("Failed to reconfigure provider: {}", e));
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]

@@ -2,17 +2,17 @@ use std::sync::Arc;
 
 use parking_lot::Mutex as ParkingLotMutex;
 
-use crate::application::providers::ocr::OcrCoordinator;
+use crate::application::providers::ocr::{OcrCoordinator, OcrProviderConfiguration};
 use crate::application::providers::translation::TranslationCoordinator;
-use crate::application::providers::{LlmIntrospection, ProviderConfiguration};
+use crate::application::providers::{
+    LlmIntrospection, ProviderConfiguration, TranslationPromptConfiguration,
+};
 use crate::application::{
     CaptureOutputService, CaptureService, CaptureSessionRuntime, CaptureSessionService,
     HistoryService, HotkeyRuntime, ImageCompositionService, PinnedImageService,
     SelectedTextAcquirer, SettingsConfiguration,
 };
 use crate::infrastructure::events::EventBus;
-use crate::infrastructure::http::HttpClient;
-use crate::infrastructure::storage::{ConfigFile, Keychain};
 use crate::Result;
 
 /// Screenshot state for storing captured image data
@@ -24,37 +24,45 @@ pub struct ScreenshotState {
     pub scale_factor: f64,
 }
 
-pub struct AppState {
-    // Phase 1: Infrastructure
-    pub config_file: Arc<ConfigFile>,
-    pub settings_configuration: Arc<SettingsConfiguration>,
-    pub hotkey_runtime: Arc<HotkeyRuntime>,
-    pub keychain: Arc<Keychain>,
-    pub http_client: Arc<dyn HttpClient>,
+pub struct SettingsRuntime {
+    pub configuration: Arc<SettingsConfiguration>,
+    pub hotkeys: Arc<HotkeyRuntime>,
+}
 
-    // Phase 2: Translation
-    pub translation_coordinator: Arc<TranslationCoordinator>,
+pub struct ProviderRuntime {
+    pub translation: Arc<TranslationCoordinator>,
+    pub ocr: Arc<OcrCoordinator>,
+    pub ocr_configuration: Arc<OcrProviderConfiguration>,
     pub llm_introspection: Arc<LlmIntrospection>,
-    pub provider_configuration: Arc<ProviderConfiguration>,
+    pub configuration: Arc<ProviderConfiguration>,
+    pub prompt_strategies: Arc<TranslationPromptConfiguration>,
+}
 
-    // Phase 3: OCR
-    pub ocr_coordinator: Arc<OcrCoordinator>,
-
-    // Phase 4: Capture
-    pub capture_service: Arc<CaptureService>,
-    pub capture_session_service: Arc<CaptureSessionService>,
-    pub image_composition_service: Arc<ImageCompositionService>,
-    pub capture_output_service: Arc<CaptureOutputService>,
-    pub capture_session_runtime: Arc<CaptureSessionRuntime>,
-    pub pinned_image_service: Arc<PinnedImageService>,
+pub struct CaptureRuntimeState {
+    pub capture: Arc<CaptureService>,
+    pub sessions: Arc<CaptureSessionService>,
+    pub image_composition: Arc<ImageCompositionService>,
+    pub output: Arc<CaptureOutputService>,
+    pub session_runtime: Arc<CaptureSessionRuntime>,
+    pub pinned_images: Arc<PinnedImageService>,
     pub screenshot_state: Arc<ParkingLotMutex<ScreenshotState>>,
+}
 
-    // Phase 5: History
-    pub history_service: Arc<HistoryService>,
-    pub event_bus: Arc<EventBus>,
+pub struct HistoryRuntime {
+    pub service: Arc<HistoryService>,
+    pub events: Arc<EventBus>,
+}
 
-    // Phase 6: Selected text acquisition
+pub struct SelectionRuntime {
     pub selected_text_acquirer: Arc<SelectedTextAcquirer>,
+}
+
+pub struct AppState {
+    pub settings: Arc<SettingsRuntime>,
+    pub providers: Arc<ProviderRuntime>,
+    pub capture: Arc<CaptureRuntimeState>,
+    pub history: Arc<HistoryRuntime>,
+    pub selection: Arc<SelectionRuntime>,
 }
 
 impl AppState {
@@ -64,7 +72,8 @@ impl AppState {
 
         // Wait for all pending events to complete (max 5 seconds)
         let drained = self
-            .event_bus
+            .history
+            .events
             .drain(std::time::Duration::from_secs(5))
             .await;
 

@@ -18,6 +18,6 @@ pub use translation::TranslationProvider;
 pub use translation_prompt::{
     default_prompt_strategy_config, merge_prompt_strategy_config, render_translation_system_prompt,
     sanitize_prompt_strategy_config, validate_prompt_strategy_config, ProviderPromptStrategy,
-    TranslationPromptStrategy, TranslationPromptStrategyConfig, DEFAULT_PROMPT_STRATEGY_ID,
-    SMART_PROMPT_STRATEGY_ID,
+    TranslationPromptConfiguration, TranslationPromptStrategy, TranslationPromptStrategyConfig,
+    DEFAULT_PROMPT_STRATEGY_ID, SMART_PROMPT_STRATEGY_ID,
 };
