@@ -57,7 +57,8 @@
 `src-tauri/src/app_state.rs` 中的运行时状态形状。
 
 **职责：**
-- 聚合 ConfigFile、Keychain、HttpClient、Coordinators、Capture Runtime、History、EventBus 等运行时依赖
+- 聚合面向 Commands 的 runtime slices：`settings`、`providers`、`capture`、`history`、`selection`
+- 隐藏 ConfigFile、Keychain、HttpClient 等 raw infrastructure 依赖；这些依赖只在 Application Composition wiring 阶段使用
 - 定义应用关闭时的清理顺序
 - 不负责依赖构建；依赖构建由 Application Composition 完成
 
@@ -103,6 +104,7 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 **职责：**
 - 完整的自定义 Translation Provider 生命周期管理：add、update、remove
 - 凭证管理：保存、加载、删除 keychain 条目
+- 调用 Provider 自身的 `validate_credentials`，让 DeepL/DeepLX mode 等 Provider-specific 规则留在具体 Provider 实现中
 - 测试自定义 Provider 连接（test_custom_provider）
 - Update 操作包含失败回滚：coordinator 替换失败时恢复旧定义和旧 API key
 - 与 `LlmIntrospection` 配合进行 Provider 测试
@@ -111,6 +113,7 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 **边界：**
 - 不执行翻译/OCR 请求
 - 不负责 Provider 内省操作（list_models/test），由 `LlmIntrospection` 负责
+- 不在 commands/configuration 中特殊分支 DeepLX；DeepL/DeepLX credential mode 由 `DeepLProvider` 拥有
 
 ### LLM Introspection Module（LLM 内省模块）
 `src-tauri/src/application/providers/llm_introspection.rs` 中的 `LlmIntrospection` struct。
@@ -287,10 +290,11 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 
 **职责：**
 - 调用 `CaptureSessionService` 读取冻结桌面和选区
-- 调用 `ImageCompositionService` 渲染复制、保存、贴图所需的最终图像
+- 通过 `capture_session_render.rs` helper 调用 `ImageCompositionService` 渲染复制、保存、贴图所需的最终图像
 - 调用 `CaptureOutputService` 处理剪贴板、文件输出和输出结果判断
 - 调用 `OcrCoordinator` 对原始选区图像执行 OCR
 - 让 Commands 层通过一个 Interface 完成 render/output/OCR，而不是了解多个服务的调用顺序
+- `capture_session_render.rs` 只提供 free helper，不作为 `CaptureSessionService` 的扩展 impl
 
 ### Capture Interaction Runtime（截图交互运行时）
 `src/components/ScreenshotSession/captureInteractionRuntime.ts` 中的前端纯运行时决策模块。
@@ -309,7 +313,7 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 - 把 host workflow（start/refresh/cancel/render/complete）绑定到 `captureHostRuntime` 和 Tauri adapter，但把 native command 细节留在 host adapter 外侧
 - 把 keyboard、pointer 和 wheel 事件分发到 selection/editor/candidate 纯 plan 模块，避免 `ScreenshotSession/index.tsx` 直接持有大块交互分支
 - 通过 `CaptureWorkspaceView.tsx` 渲染截图工作区；View 只接收状态、几何和 handler props，不启动 session、不读 localStorage、不调用 Tauri adapter、不读写 workflow refs
-- 让 `ScreenshotSession/index.tsx` 保持为 composition shell：读取 settings，初始化 workspace state，计算 derived geometry，创建 host/keyboard/pointer actions，连接 hooks，渲染 View
+- 让 `ScreenshotSession/index.tsx` 保持为 composition shell：读取 settings，调用 `useCaptureWorkspaceController`，连接 host/keyboard hooks，渲染 View
 
 ### Provider（能力提供者）
 实现某个能力的内置模块，不区分本地实现还是远程 API 调用。用户视角看到的是能力名称（如"DeepL 翻译"），而非技术实现细节。

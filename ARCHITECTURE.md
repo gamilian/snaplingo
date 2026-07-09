@@ -1,6 +1,6 @@
 # SnapLingo 架构设计文档
 
-> 当前版本 - 2026-07-08
+> 当前版本 - 2026-07-10
 
 ## 📐 架构概览
 
@@ -33,16 +33,16 @@ Infrastructure Layer (基础设施层)
 - `src/tauri/settings.ts` + `src/stores/settingsConfigStore.ts` 是前端 durable settings seam；Settings、Capture、Result、Pinned 窗口都从同一后端 snapshot hydrate。
 - `src/tauri/hotkeys.ts` + `src/stores/hotkeyConfigStore.ts` 是前端 hotkey seam；Settings hotkey 页面只缓存后端 snapshot 并调用 update command。
 - `src-tauri/src/commands/*` 是后端 Tauri command seam，负责把 IPC 请求转给 Application 层。
-- `src-tauri/src/app_state.rs` 拥有 AppState 形状和关闭顺序。
+- `src-tauri/src/app_state.rs` 拥有 AppState runtime slice 形状和关闭顺序；raw ConfigFile/Keychain/HttpClient 只在 composition wiring 阶段使用。
 - `src-tauri/src/composition.rs` 是应用组合入口；`src-tauri/src/composition/*_runtime.rs` 拆分 Provider、Capture、Selection、History 的构造策略。
 - `src-tauri/src/application/hotkeys/*` 是 Hotkey Configuration / Runtime module，拥有快捷键 snapshot、legacy migration、启动注册和运行时更新生命周期。
 - `src-tauri/src/startup_shortcuts.rs` 只保留快捷键 action dispatch、display hotkey parser 和 release timing rule。
 - `src-tauri/src/application/settings/configuration.rs` 是 Settings Configuration module，拥有 durable settings 默认值、路径归一化、section 更新和 legacy migration。
 - `src-tauri/src/application/services/selected_text_acquirer.rs` 是 Selected Text acquisition workflow，拥有取词方法顺序和诊断；平台取词 mechanics 留在 `infrastructure/system/selection/*`。
-- `application/services/capture_session_runtime.rs` 是 Capture Session Runtime，统一编排截图输出和 OCR。
+- `application/services/capture_session_runtime.rs` 是 Capture Session Runtime，统一编排截图输出和 OCR；render/output 细节在 `capture_session_render.rs` helper module 中以显式输入运行。
 - `src/components/ScreenshotSession/captureInteractionRuntime.ts` 是前端 Capture Interaction Runtime，负责纯 effect-plan 决策。
 - `src/components/ScreenshotSession/captureWorkspace*.ts` 是前端 Capture Workspace seam，拥有截图前端状态形状、host workflow、keyboard dispatch、pointer/wheel dispatch 和 effect application 边界。
-- `src/components/ScreenshotSession/CaptureWorkspaceView.tsx` 是 Capture Workspace render seam，只接收状态、几何和 handler props；`ScreenshotSession/index.tsx` 保持为 settings、state hook、runtime adapter 和 view composition shell。
+- `src/components/ScreenshotSession/CaptureWorkspaceView.tsx` 是 Capture Workspace render seam，只接收状态、几何和 handler props；`ScreenshotSession/index.tsx` 保持为 settings、controller hook、host hooks 和 view composition shell。
 
 ---
 
@@ -155,11 +155,14 @@ snaplingo/
 │       │       └─ linux.rs
 │       │
 │       ├─ system/
-│       │   ├─ paths.rs                 # 平台适配 ⭐
-│       │   ├─ hotkey/                  # 平台适配 ⭐
+│       │   ├─ paths.rs                 # 平台路径适配
 │       │   ├─ selection/               # Selected Text platform adapters ⭐
-│       │   ├─ tts/                     # 平台适配 ⭐
-│       │   └─ ...
+│       │   ├─ screenshot/              # Screenshot platform adapters ⭐
+│       │   ├─ ocr/                     # macOS System OCR adapter
+│       │   ├─ capture_window/          # Capture window runtime adapters
+│       │   ├─ result_window/           # Result window runtime adapters
+│       │   ├─ pinned_window/           # Pinned image window runtime adapters
+│       │   └─ shortcut.rs              # platform shortcut helpers
 │       │
 │       └─ http/
 │           ├─ client.rs                # HttpClient Trait
@@ -186,7 +189,7 @@ pub async fn activate_ocr_provider(
     provider_id: String,
     state: State<'_, AppState>
 ) -> Result<()> {
-    state.ocr_coordinator.activate(&provider_id)
+    state.providers.ocr.activate(&provider_id)
 }
 ```
 
@@ -217,9 +220,9 @@ providers/ocr/
 |------|------|--------|
 | **Trait** | 定义 Provider 接口 | 不管理实例、不执行业务 |
 | **Coordinator** | 管理 Provider 列表、激活状态、持久化、执行协调和运行时重配置 | 不实现具体 OCR/翻译 API |
-| **configuration.rs** | 校验凭证、自定义 Translation Provider 生命周期（add/update/remove）、构造自定义 LLM Provider | 不执行翻译/OCR 请求 |
+| **configuration.rs** | 自定义 Translation Provider 生命周期（add/update/remove）、凭证持久化、构造自定义 LLM Provider；调用 Provider 自身的凭证校验 | 不执行翻译/OCR 请求、不拥有 Provider-specific credential 规则 |
 | **llm_introspection.rs** | LLM provider 内省（list_models/test）、集中客户端构造 | 不管理 Provider 生命周期 |
-| **impls/** | 实现具体能力（OCR 识别） | 不管理自己的激活状态 |
+| **impls/** | 实现具体能力和 Provider-specific credential 规则（例如 DeepL/DeepLX mode） | 不管理自己的激活状态 |
 
 **Translation Provider 特殊性：**
 - TranslationCoordinator 是**多选**（可同时激活多个）
@@ -353,9 +356,11 @@ pub struct Keychain {
 
 **其他平台适配：**
 - `paths.rs`：配置文件路径（`~/Library/` vs `%APPDATA%` vs `~/.config/`）
-- `hotkey/`：全局快捷键注册（使用 global-hotkey crate）
 - `selection/`：Selected Text 平台取词 method；每个平台 provider 暴露 default scheme 和 method list
-- `tts/`：TTS 后端（macOS `say` vs Windows SAPI vs Linux espeak）
+- `screenshot/`：截图 backend（macOS/Windows/Linux）
+- `ocr/`：macOS System OCR adapter
+- `capture_window/`、`result_window/`、`pinned_window/`：Tauri window runtime adapters
+- `shortcut.rs`：平台快捷键辅助函数；全局快捷键注册生命周期位于 `application/hotkeys/runtime.rs`
 
 ---
 
@@ -597,7 +602,7 @@ impl OcrCoordinator {
 // 对外暴露简单接口
 struct CaptureSessionRuntime {
     sessions: Arc<CaptureSessionService>,
-    composer: Arc<ImageCompositionService>,
+    image_composition: Arc<ImageCompositionService>,
     output: Arc<CaptureOutputService>,
     ocr: Arc<OcrCoordinator>,
 }
@@ -607,6 +612,8 @@ impl CaptureSessionRuntime {
     pub async fn recognize_selection_text(&self, input: CaptureOcrInput) -> Result<String> { ... }
 }
 ```
+
+`capture_session_render.rs` 不扩展 `CaptureSessionService`；它只提供 `render_capture_png_base64`、`recognize_capture_selection_text`、`output_capture_selection` 等 free helper。Runtime 拥有依赖，helper 只接收显式输入。
 
 ---
 
@@ -704,11 +711,14 @@ Commands → Application → Domain
 - LLM 客户端实现 `LLMClient` (generate) 和 `LlmModelLister` (list_models) traits，支持 interface segregation。
 - Keychain 使用 `Box<dyn KeychainBackend>` trait object 实现平台抽象和测试注入。
 - Hotkey Configuration / Runtime 负责快捷键 snapshot、legacy migration、启动注册和运行时更新生命周期；前端 Settings 页面只走 `hotkeyConfigStore`。
-- Capture Session Runtime 已集中截图会话的 render/output/OCR 编排。
-- AppState 形状位于 `src-tauri/src/app_state.rs`；`lib.rs` 只保留 Tauri builder/plugin setup、command 注册和启动模块调用。
+- Provider credential validation 由 Provider trait 暴露；DeepL/DeepLX mode 规则位于 `DeepLProvider`，commands/configuration 不特殊分支 DeepLX。
+- Capture Session Runtime 已集中截图会话的 render/output/OCR 编排，render helper module 不再伪装成 `CaptureSessionService` 扩展。
+- AppState 形状位于 `src-tauri/src/app_state.rs`，当前只暴露 `settings`、`providers`、`capture`、`history`、`selection` runtime slices；`lib.rs` 只保留 Tauri builder/plugin setup、command 注册和启动模块调用。
 - Application Composition 由 `src-tauri/src/composition.rs` assembly shell 和 `src-tauri/src/composition/*_runtime.rs` 构造策略 builders 组成。
 - 快捷键 action dispatch 和 display parser 位于 `src-tauri/src/startup_shortcuts.rs`。
 - Settings navigation state、Capture interaction runtime/model 是前端纯模块 seam，可用 Vitest 直接覆盖交互规则。
+- `ScreenshotSession/index.tsx` 当前是 composition shell；workspace state、derived geometry、host/keyboard/pointer/editor action assembly 由 `useCaptureWorkspaceController` 和相邻 workspace modules 承担。
+- ProviderStore<P> remains intentionally deferred: TranslationCoordinator and OcrCoordinator still have different activation semantics, and no current change requires reopening ADR-0004.
 
 ---
 
