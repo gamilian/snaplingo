@@ -86,12 +86,15 @@ impl OcrCoordinator {
         if !providers.contains_key(id) {
             return Err(format!("Provider not found: {}", id).into());
         }
+        drop(providers);
 
+        // Persist first
+        self.config.save("active_ocr_provider", &id.to_string())?;
+
+        // Only update memory after successful persistence
         let mut active = self.active_provider_id.lock().unwrap();
         *active = Some(id.to_string());
 
-        // Persist to config
-        self.config.save("active_ocr_provider", &id.to_string())?;
         Ok(())
     }
 
