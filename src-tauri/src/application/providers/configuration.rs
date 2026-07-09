@@ -711,7 +711,7 @@ impl ProviderConfiguration {
     }
 
     /// Acquires the provider state lock. Holds it to serialize provider mutations.
-    fn lock_provider_state(&self) -> crate::Result<std::sync::MutexGuard<()>> {
+    fn lock_provider_state(&self) -> crate::Result<std::sync::MutexGuard<'_, ()>> {
         self.provider_state_lock
             .lock()
             .map_err(|e| crate::AppError::Other(format!("Provider state lock poisoned: {}", e)))
@@ -1672,5 +1672,144 @@ mod provider_configuration_tests {
         let active = coordinator.get_active();
         let active_ids: Vec<String> = active.iter().map(|p| p.read().id().to_string()).collect();
         assert!(active_ids.contains(&"test-custom-3".to_string()));
+    }
+
+    #[test]
+    fn concurrent_custom_adds_are_serialized() {
+        use std::sync::{Arc, Barrier};
+        use std::thread;
+
+        let config = Arc::new(test_provider_configuration());
+
+        // Barrier ensures all threads start simultaneously
+        let barrier = Arc::new(Barrier::new(3));
+        let mut handles = vec![];
+
+        for i in 0..3 {
+            let config_clone = config.clone();
+            let barrier_clone = barrier.clone();
+
+            handles.push(thread::spawn(move || {
+                barrier_clone.wait(); // Sync start
+                let input = AddCustomTranslationProviderInput {
+                    name: format!("Concurrent Test {}", i),
+                    protocol: "openai".to_string(),
+                    endpoint: format!("https://api{}.example.com/v1", i),
+                    model: "test-model".to_string(),
+                    api_key: format!("key-{}", i),
+                    reasoning_level: None,
+                    prompt_strategy_id: None,
+                    prompt_fallback_strategy_id: None,
+                };
+                config_clone.add(input)
+            }));
+        }
+
+        // Collect results
+        let results: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+
+        // All adds should succeed (serialized by lock)
+        assert_eq!(results.iter().filter(|r| r.is_ok()).count(), 3);
+
+        // Verify invariant: config defs == keychain ids == coordinator ids
+        let custom_defs = config
+            .config_file
+            .load::<Vec<CustomTranslationProviderDef>>("custom_translation_providers")
+            .unwrap();
+        let config_ids: std::collections::HashSet<_> =
+            custom_defs.iter().map(|d| d.id.clone()).collect();
+
+        // Check all added ids are in config
+        for result in &results {
+            if let Ok(view) = result {
+                assert!(config_ids.contains(&view.id));
+                // Keychain should have the credential
+                assert!(config.keychain.load_provider_credential(&view.id).is_ok());
+                // Coordinator should have the provider
+                assert!(config.translation_coordinator.get(&view.id).is_some());
+            }
+        }
+
+        // No divergence: all 3 custom providers present everywhere
+        assert_eq!(config_ids.len(), 3);
+    }
+
+    #[test]
+    fn concurrent_remove_and_save_credentials_no_orphan() {
+        use std::sync::{Arc, Barrier};
+        use std::thread;
+
+        let config = Arc::new(test_provider_configuration());
+
+        // Pre-create a provider
+        let add_input = AddCustomTranslationProviderInput {
+            name: "Test Remove".to_string(),
+            protocol: "openai".to_string(),
+            endpoint: "https://api.example.com/v1".to_string(),
+            model: "test-model".to_string(),
+            api_key: "old-key".to_string(),
+            reasoning_level: None,
+            prompt_strategy_id: None,
+            prompt_fallback_strategy_id: None,
+        };
+        let view = config.add(add_input).unwrap();
+        let provider_id = view.id.clone();
+
+        let barrier = Arc::new(Barrier::new(2));
+        let config_clone1 = config.clone();
+        let config_clone2 = config.clone();
+        let barrier_clone1 = barrier.clone();
+        let barrier_clone2 = barrier.clone();
+        let provider_id_for_remove = provider_id.clone();
+        let provider_id_for_save = provider_id.clone();
+
+        // Thread 1: remove
+        let h1 = thread::spawn(move || {
+            barrier_clone1.wait();
+            config_clone1.remove(provider_id_for_remove)
+        });
+
+        // Thread 2: save_credentials
+        let h2 = thread::spawn(move || {
+            barrier_clone2.wait();
+            config_clone2.save_credentials(
+                provider_id_for_save,
+                vec![CredentialValue {
+                    key: "api_key".to_string(),
+                    value: "new-key".to_string(),
+                }],
+            )
+        });
+
+        let result1 = h1.join().unwrap();
+        let result2 = h2.join().unwrap();
+
+        // One succeeds, one fails (serialized by lock)
+        assert!(result1.is_ok() ^ result2.is_ok());
+
+        // Invariant: if remove succeeded, provider is gone from all stores
+        if result1.is_ok() {
+            let custom_defs = config
+                .config_file
+                .load::<Vec<CustomTranslationProviderDef>>("custom_translation_providers")
+                .unwrap_or_default();
+            assert!(!custom_defs.iter().any(|d| d.id == provider_id));
+            assert!(config.keychain.load_provider_credential(&provider_id).is_err());
+            assert!(config.translation_coordinator.get(&provider_id).is_none());
+        }
+
+        // If save_credentials succeeded, provider is still present with new credential
+        if result2.is_ok() {
+            let custom_defs = config
+                .config_file
+                .load::<Vec<CustomTranslationProviderDef>>("custom_translation_providers")
+                .unwrap();
+            assert!(custom_defs.iter().any(|d| d.id == provider_id));
+            assert_eq!(
+                config.keychain.load_provider_credential(&provider_id).unwrap(),
+                "new-key"
+            );
+            assert!(config.translation_coordinator.get(&provider_id).is_some());
+        }
     }
 }
