@@ -121,13 +121,15 @@ impl Keychain {
         for (field_name, value) in credentials {
             let key = format!("provider:{}:credential:{}", provider_id, field_name);
             if let Err(e) = self.backend.save(&key, value) {
-                // Rollback: restore snapshot for all affected fields
+                // Rollback: restore snapshot for all saved fields.
+                // Fields not in the snapshot default to None (was absent → delete).
                 let rollback_snapshot = CredentialSnapshot {
                     api_key: None, // Don't touch simple API key
                     structured: saved_fields
                         .iter()
-                        .filter_map(|f| {
-                            snapshot.structured.get(f).map(|v| (f.clone(), v.clone()))
+                        .map(|f| {
+                            let val = snapshot.structured.get(f).cloned().unwrap_or(None);
+                            (f.clone(), val)
                         })
                         .collect(),
                 };
@@ -331,12 +333,11 @@ mod tests {
         }
     }
 
-    /// Keychain backend that can be configured to fail on specific operations
+    /// Keychain backend that can be configured to fail on save operations
     struct FailingKeychainBackend {
         store: std::sync::Mutex<std::collections::HashMap<String, String>>,
         fail_on_save_after_n: std::sync::Mutex<Option<usize>>,
         save_count: std::sync::Mutex<usize>,
-        fail_on_delete: std::sync::Mutex<Option<String>>,
     }
 
     impl FailingKeychainBackend {
@@ -345,18 +346,12 @@ mod tests {
                 store: std::sync::Mutex::new(std::collections::HashMap::new()),
                 fail_on_save_after_n: std::sync::Mutex::new(None),
                 save_count: std::sync::Mutex::new(0),
-                fail_on_delete: std::sync::Mutex::new(None),
             }
         }
 
         /// Fail on the Nth save operation (0-indexed), then clear the failure so subsequent saves succeed
         fn fail_on_save_after(&self, n: usize) {
             *self.fail_on_save_after_n.lock().unwrap() = Some(n);
-        }
-
-        /// Fail when deleting a specific key
-        fn fail_on_delete_key(&self, key: String) {
-            *self.fail_on_delete.lock().unwrap() = Some(key);
         }
     }
 
@@ -406,15 +401,6 @@ mod tests {
         }
 
         fn delete(&self, key: &str) -> Result<()> {
-            if let Some(ref fail_key) = *self.fail_on_delete.lock().unwrap() {
-                if key == fail_key {
-                    return Err(crate::AppError::Other(format!(
-                        "Simulated delete failure for key: {}",
-                        key
-                    )));
-                }
-            }
-
             self.store.lock().unwrap().remove(key);
             Ok(())
         }

@@ -109,25 +109,62 @@ pub fn add_custom_translation_provider(
     config_file
         .save("custom_translation_providers", &custom_defs)
         .map_err(|e| {
-            let _ = keychain.delete_provider_credential(&id);
-            AppError::Other(format!("Failed to save config: {}", e))
+            let rollback_err = keychain
+                .delete_provider_credential(&id)
+                .err()
+                .map(|re| format!(" keychain cleanup failed: {}", re));
+            match rollback_err {
+                Some(re) => AppError::Other(format!(
+                    "Failed to save config: {}. Rollback also failed:{}",
+                    e, re
+                )),
+                None => AppError::Other(format!("Failed to save config: {}", e)),
+            }
         })?;
 
     let provider =
         create_llm_translation_provider(&def, http_client, input.api_key, config_file.clone());
     translation_coordinator.register(provider).map_err(|e| {
+        let mut rollback_errors: Vec<String> = Vec::new();
         custom_defs.pop();
-        let _ = config_file.save("custom_translation_providers", &custom_defs);
-        let _ = keychain.delete_provider_credential(&id);
-        AppError::Other(format!("Failed to register provider: {}", e))
+        if let Err(re) = config_file.save("custom_translation_providers", &custom_defs) {
+            rollback_errors.push(format!("config rollback: {}", re));
+        }
+        if let Err(re) = keychain.delete_provider_credential(&id) {
+            rollback_errors.push(format!("keychain rollback: {}", re));
+        }
+        if rollback_errors.is_empty() {
+            AppError::Other(format!("Failed to register provider: {}", e))
+        } else {
+            AppError::Other(format!(
+                "Failed to register provider: {}. Rollback also failed: {}",
+                e,
+                rollback_errors.join(", ")
+            ))
+        }
     })?;
 
     translation_coordinator.activate(&id).map_err(|e| {
-        let _ = translation_coordinator.unregister(&id);
+        let mut rollback_errors: Vec<String> = Vec::new();
+        if let Err(re) = translation_coordinator.unregister(&id) {
+            rollback_errors.push(format!("unregister: {}", re));
+        }
         custom_defs.pop();
-        let _ = config_file.save("custom_translation_providers", &custom_defs);
-        let _ = keychain.delete_provider_credential(&id);
-        AppError::Other(format!("Failed to activate provider: {}", e))
+        if let Err(re) = config_file.save("custom_translation_providers", &custom_defs) {
+            rollback_errors.push(format!("config rollback: {}", re));
+        }
+        if let Err(re) = keychain.delete_provider_credential(&id) {
+            rollback_errors.push(format!("keychain rollback: {}", re));
+        }
+        if rollback_errors.is_empty() {
+            AppError::Other(format!("Failed to activate provider: {}", e))
+        } else {
+            AppError::Other(format!(
+                "Failed to activate provider: {}. Rollback also failed: {}",
+                e,
+                rollback_errors.join(", ")
+            ))
+        }
     })?;
 
     Ok(custom_translation_provider_view(&def))
@@ -750,8 +787,18 @@ impl ProviderConfiguration {
                 if let Err(e) = self.keychain.save_provider_credential(&provider_id, new_key.trim()) {
                     // Rollback config
                     custom_defs[index] = old_def.clone();
-                    let _ = self.config_file.save("custom_translation_providers", &custom_defs);
-                    return Err(AppError::Other(format!("Failed to save API key: {}", e)));
+                    let rollback_err = self
+                        .config_file
+                        .save("custom_translation_providers", &custom_defs)
+                        .err()
+                        .map(|re| format!(" config rollback failed: {}", re));
+                    return Err(match rollback_err {
+                        Some(re) => AppError::Other(format!(
+                            "Failed to save API key: {}. Rollback also failed:{}",
+                            e, re
+                        )),
+                        None => AppError::Other(format!("Failed to save API key: {}", e)),
+                    });
                 }
             }
         }
@@ -766,21 +813,36 @@ impl ProviderConfiguration {
 
         // Step 4: Attempt to replace in coordinator - rollback on failure
         if let Err(e) = self.translation_coordinator.replace(provider) {
+            let mut rollback_errors: Vec<String> = Vec::new();
+
             // Rollback config
             custom_defs[index] = old_def;
-            let _ = self
+            if let Err(re) = self
                 .config_file
-                .save("custom_translation_providers", &custom_defs);
+                .save("custom_translation_providers", &custom_defs)
+            {
+                rollback_errors.push(format!("config rollback: {}", re));
+            }
 
             // Rollback keychain if we saved a new key
             if let Some(ref old_key) = old_api_key {
-                let _ = self.keychain.save_provider_credential(&provider_id, old_key);
+                if let Err(re) = self.keychain.save_provider_credential(&provider_id, old_key) {
+                    rollback_errors.push(format!("keychain rollback: {}", re));
+                }
             }
 
-            return Err(AppError::Other(format!(
-                "Failed to update provider: {}",
-                e
-            )));
+            if rollback_errors.is_empty() {
+                return Err(AppError::Other(format!(
+                    "Failed to update provider: {}",
+                    e
+                )));
+            } else {
+                return Err(AppError::Other(format!(
+                    "Failed to update provider: {}. Rollback also failed: {}",
+                    e,
+                    rollback_errors.join(", ")
+                )));
+            }
         }
 
         Ok(custom_translation_provider_view(&updated_def))
