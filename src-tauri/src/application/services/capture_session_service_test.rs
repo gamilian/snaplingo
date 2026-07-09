@@ -8,6 +8,9 @@ mod tests {
 
     use crate::application::providers::common::Provider;
     use crate::application::providers::ocr::{OcrCoordinator, OcrProvider};
+    use crate::application::services::capture_session_render::{
+        output_capture_selection, recognize_capture_selection_text, render_capture_png_base64,
+    };
     use crate::application::services::{
         CaptureOutputService, CaptureSessionOutput, CaptureSessionRuntime,
     };
@@ -788,20 +791,20 @@ mod tests {
         let service = CaptureSessionService::new(Arc::new(backend));
         let view = service.create_session().await.unwrap();
 
-        let result = service
-            .recognize_selection_text(
-                &ImageCompositionService::new(),
-                &ocr,
-                &view.id,
-                &LogicalRect {
-                    x: 1.0,
-                    y: 1.0,
-                    width: 2.0,
-                    height: 2.0,
-                },
-            )
-            .await
-            .unwrap();
+        let result = recognize_capture_selection_text(
+            &service,
+            &ImageCompositionService::new(),
+            &ocr,
+            &view.id,
+            &LogicalRect {
+                x: 1.0,
+                y: 1.0,
+                width: 2.0,
+                height: 2.0,
+            },
+        )
+        .await
+        .unwrap();
 
         let request = observed_request.lock().unwrap().clone().unwrap();
         let decoded = image::load_from_memory(&request.image_data)
@@ -858,25 +861,25 @@ mod tests {
         let view = service.create_session().await.unwrap();
         let path = temp_png_path();
 
-        let output = service
-            .output_selection(
-                &ImageCompositionService::new(),
-                &CaptureOutputService::new(),
-                &view.id,
-                &LogicalRect {
-                    x: 1.0,
-                    y: 1.0,
-                    width: 2.0,
-                    height: 2.0,
-                },
-                &[],
-                false,
-                CaptureOutputAction::Save {
-                    path: path.to_string_lossy().to_string(),
-                },
-            )
-            .await
-            .unwrap();
+        let output = output_capture_selection(
+            &service,
+            &ImageCompositionService::new(),
+            &CaptureOutputService::new(),
+            &view.id,
+            &LogicalRect {
+                x: 1.0,
+                y: 1.0,
+                width: 2.0,
+                height: 2.0,
+            },
+            &[],
+            false,
+            CaptureOutputAction::Save {
+                path: path.to_string_lossy().to_string(),
+            },
+        )
+        .await
+        .unwrap();
 
         let saved = std::fs::read(&path).unwrap();
         let decoded = image::load_from_memory(&saved).unwrap().to_rgba8();
@@ -893,20 +896,20 @@ mod tests {
         let service = CaptureSessionService::new(Arc::new(make_backend_with_renderable_png()));
         let view = service.create_session().await.unwrap();
 
-        let encoded = service
-            .render_png_base64(
-                &ImageCompositionService::new(),
-                &view.id,
-                &LogicalRect {
-                    x: 1.0,
-                    y: 1.0,
-                    width: 2.0,
-                    height: 2.0,
-                },
-                &[],
-                false,
-            )
-            .unwrap();
+        let encoded = render_capture_png_base64(
+            &service,
+            &ImageCompositionService::new(),
+            &view.id,
+            &LogicalRect {
+                x: 1.0,
+                y: 1.0,
+                width: 2.0,
+                height: 2.0,
+            },
+            &[],
+            false,
+        )
+        .unwrap();
 
         let png_data = base64::engine::general_purpose::STANDARD
             .decode(encoded)
@@ -925,20 +928,20 @@ mod tests {
         let view = service.create_layout_session().await.unwrap();
         service.hydrate_session_snapshots(&view.id).await.unwrap();
 
-        let encoded = service
-            .render_png_base64(
-                &ImageCompositionService::new(),
-                &view.id,
-                &LogicalRect {
-                    x: 1.0,
-                    y: 1.0,
-                    width: 2.0,
-                    height: 2.0,
-                },
-                &[],
-                false,
-            )
-            .unwrap();
+        let encoded = render_capture_png_base64(
+            &service,
+            &ImageCompositionService::new(),
+            &view.id,
+            &LogicalRect {
+                x: 1.0,
+                y: 1.0,
+                width: 2.0,
+                height: 2.0,
+            },
+            &[],
+            false,
+        )
+        .unwrap();
 
         let png_data = base64::engine::general_purpose::STANDARD
             .decode(encoded)
@@ -955,23 +958,23 @@ mod tests {
         let service = CaptureSessionService::new(Arc::new(make_backend_with_renderable_png()));
         let view = service.create_session().await.unwrap();
 
-        let output = service
-            .output_selection(
-                &ImageCompositionService::new(),
-                &CaptureOutputService::new(),
-                &view.id,
-                &LogicalRect {
-                    x: 1.0,
-                    y: 1.0,
-                    width: 2.0,
-                    height: 2.0,
-                },
-                &[],
-                false,
-                CaptureOutputAction::Pin,
-            )
-            .await
-            .unwrap();
+        let output = output_capture_selection(
+            &service,
+            &ImageCompositionService::new(),
+            &CaptureOutputService::new(),
+            &view.id,
+            &LogicalRect {
+                x: 1.0,
+                y: 1.0,
+                width: 2.0,
+                height: 2.0,
+            },
+            &[],
+            false,
+            CaptureOutputAction::Pin,
+        )
+        .await
+        .unwrap();
 
         let CaptureSessionOutput::Pin(png_data) = output else {
             panic!("expected pin output");

@@ -43,87 +43,70 @@ pub enum CaptureSessionOutput {
     Pin(Vec<u8>),
 }
 
-impl CaptureSessionService {
-    pub fn render_png(
-        &self,
-        image_composition: &ImageCompositionService,
-        session_id: &CaptureSessionId,
-        rect: &LogicalRect,
-        annotations: &[AnnotationCommand],
-        include_cursor: bool,
-    ) -> crate::error::Result<Vec<u8>> {
-        render_capture_png(
-            self,
-            image_composition,
-            session_id,
-            rect,
-            annotations,
-            include_cursor,
-        )
-    }
+pub fn render_capture_png_base64(
+    capture_sessions: &CaptureSessionService,
+    image_composition: &ImageCompositionService,
+    session_id: &CaptureSessionId,
+    rect: &LogicalRect,
+    annotations: &[AnnotationCommand],
+    include_cursor: bool,
+) -> crate::error::Result<String> {
+    let png_data = render_capture_png(
+        capture_sessions,
+        image_composition,
+        session_id,
+        rect,
+        annotations,
+        include_cursor,
+    )?;
 
-    pub fn render_png_base64(
-        &self,
-        image_composition: &ImageCompositionService,
-        session_id: &CaptureSessionId,
-        rect: &LogicalRect,
-        annotations: &[AnnotationCommand],
-        include_cursor: bool,
-    ) -> crate::error::Result<String> {
-        let png_data = self.render_png(
-            image_composition,
-            session_id,
-            rect,
-            annotations,
-            include_cursor,
-        )?;
+    Ok(base64::engine::general_purpose::STANDARD.encode(png_data))
+}
 
-        Ok(base64::engine::general_purpose::STANDARD.encode(png_data))
-    }
+pub async fn recognize_capture_selection_text(
+    capture_sessions: &CaptureSessionService,
+    image_composition: &ImageCompositionService,
+    ocr: &OcrCoordinator,
+    session_id: &CaptureSessionId,
+    rect: &LogicalRect,
+) -> crate::error::Result<OcrResult> {
+    let session = capture_sessions.get_session(session_id)?;
+    let ocr_rect = expanded_ocr_selection_rect(rect, &session.snapshots);
+    let png_data =
+        render_capture_png(capture_sessions, image_composition, session_id, &ocr_rect, &[], false)?;
 
-    pub async fn recognize_selection_text(
-        &self,
-        image_composition: &ImageCompositionService,
-        ocr: &OcrCoordinator,
-        session_id: &CaptureSessionId,
-        rect: &LogicalRect,
-    ) -> crate::error::Result<OcrResult> {
-        let session = self.get_session(session_id)?;
-        let ocr_rect = expanded_ocr_selection_rect(rect, &session.snapshots);
-        let png_data = self.render_png(image_composition, session_id, &ocr_rect, &[], false)?;
+    ocr.recognize_image(png_data).await
+}
 
-        ocr.recognize_image(png_data).await
-    }
+pub async fn output_capture_selection(
+    capture_sessions: &CaptureSessionService,
+    image_composition: &ImageCompositionService,
+    output: &CaptureOutputService,
+    session_id: &CaptureSessionId,
+    rect: &LogicalRect,
+    annotations: &[AnnotationCommand],
+    include_cursor: bool,
+    action: CaptureOutputAction,
+) -> crate::error::Result<CaptureSessionOutput> {
+    let png_data = render_capture_png(
+        capture_sessions,
+        image_composition,
+        session_id,
+        rect,
+        annotations,
+        include_cursor,
+    )?;
 
-    pub async fn output_selection(
-        &self,
-        image_composition: &ImageCompositionService,
-        output: &CaptureOutputService,
-        session_id: &CaptureSessionId,
-        rect: &LogicalRect,
-        annotations: &[AnnotationCommand],
-        include_cursor: bool,
-        action: CaptureOutputAction,
-    ) -> crate::error::Result<CaptureSessionOutput> {
-        let png_data = self.render_png(
-            image_composition,
-            session_id,
-            rect,
-            annotations,
-            include_cursor,
-        )?;
-
-        match action {
-            CaptureOutputAction::Save { path } => {
-                output.save_png(&png_data, Path::new(&path)).await?;
-                Ok(CaptureSessionOutput::Completed)
-            }
-            CaptureOutputAction::Copy => {
-                output.copy_png(&png_data).await?;
-                Ok(CaptureSessionOutput::Completed)
-            }
-            CaptureOutputAction::Pin => Ok(CaptureSessionOutput::Pin(png_data)),
+    match action {
+        CaptureOutputAction::Save { path } => {
+            output.save_png(&png_data, Path::new(&path)).await?;
+            Ok(CaptureSessionOutput::Completed)
         }
+        CaptureOutputAction::Copy => {
+            output.copy_png(&png_data).await?;
+            Ok(CaptureSessionOutput::Completed)
+        }
+        CaptureOutputAction::Pin => Ok(CaptureSessionOutput::Pin(png_data)),
     }
 }
 

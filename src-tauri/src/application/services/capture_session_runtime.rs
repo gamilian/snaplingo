@@ -5,6 +5,9 @@ use async_trait::async_trait;
 use tauri::AppHandle;
 
 use crate::application::providers::ocr::OcrCoordinator;
+use crate::application::services::capture_session_render::{
+    output_capture_selection, recognize_capture_selection_text, render_capture_png_base64,
+};
 use crate::application::services::{
     CaptureOutputService, CaptureSessionOutput, CaptureSessionService, ImageCompositionService,
 };
@@ -359,7 +362,8 @@ impl CaptureSessionRuntime {
     ) -> Result<String> {
         self.ensure_selection_snapshots_ready(session_id, rect)?;
 
-        self.sessions.render_png_base64(
+        render_capture_png_base64(
+            &self.sessions,
             &self.image_composition,
             session_id,
             rect,
@@ -375,9 +379,14 @@ impl CaptureSessionRuntime {
     ) -> Result<OcrResult> {
         self.ensure_selection_snapshots_ready(session_id, rect)?;
 
-        self.sessions
-            .recognize_selection_text(&self.image_composition, &self.ocr, session_id, rect)
-            .await
+        recognize_capture_selection_text(
+            &self.sessions,
+            &self.image_composition,
+            &self.ocr,
+            session_id,
+            rect,
+        )
+        .await
     }
 
     pub async fn output_selection(
@@ -390,17 +399,17 @@ impl CaptureSessionRuntime {
     ) -> Result<CaptureSessionOutput> {
         self.ensure_selection_snapshots_ready(session_id, rect)?;
 
-        self.sessions
-            .output_selection(
-                &self.image_composition,
-                &self.output,
-                session_id,
-                rect,
-                annotations,
-                include_cursor,
-                action,
-            )
-            .await
+        output_capture_selection(
+            &self.sessions,
+            &self.image_composition,
+            &self.output,
+            session_id,
+            rect,
+            annotations,
+            include_cursor,
+            action,
+        )
+        .await
     }
 
     fn ensure_selection_snapshots_ready(
@@ -474,13 +483,16 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use async_trait::async_trait;
+    use image::ImageEncoder;
 
-    use super::{CaptureSessionRuntime, CaptureSessionRuntimeHost};
+    use super::{CaptureSessionOutput, CaptureSessionRuntime, CaptureSessionRuntimeHost};
     use crate::application::providers::ocr::OcrCoordinator;
     use crate::application::services::{
         CaptureOutputService, CaptureSessionService, ImageCompositionService,
     };
-    use crate::domain::capture::{CaptureSessionId, LogicalPoint, LogicalRect, PhysicalRect};
+    use crate::domain::capture::{
+        CaptureOutputAction, CaptureSessionId, LogicalPoint, LogicalRect, PhysicalRect,
+    };
     use crate::error::AppError;
     use crate::infrastructure::storage::ConfigFile;
     use crate::infrastructure::system::screenshot::{
@@ -656,6 +668,36 @@ mod tests {
         }
     }
 
+    fn make_renderable_snapshot() -> MonitorSnapshot {
+        MonitorSnapshot {
+            id: "primary".to_string(),
+            logical_bounds: LogicalRect {
+                x: 0.0,
+                y: 0.0,
+                width: 4.0,
+                height: 4.0,
+            },
+            physical_bounds: PhysicalRect {
+                x: 0,
+                y: 0,
+                width: 4,
+                height: 4,
+            },
+            scale_factor: 1.0,
+            png_data: make_solid_png(4, 4, [10, 20, 30, 255]),
+        }
+    }
+
+    fn make_solid_png(width: u32, height: u32, rgba: [u8; 4]) -> Vec<u8> {
+        let pixels = rgba.repeat((width * height) as usize);
+        let mut png = Vec::new();
+        let encoder = image::codecs::png::PngEncoder::new(&mut png);
+        encoder
+            .write_image(&pixels, width, height, image::ExtendedColorType::Rgba8)
+            .unwrap();
+        png
+    }
+
     fn make_runtime(
         host: Arc<dyn CaptureSessionRuntimeHost>,
         snapshots: Vec<MonitorSnapshot>,
@@ -780,5 +822,36 @@ mod tests {
             err,
             "Capture session snapshots are not ready for the selected area"
         );
+    }
+
+    #[tokio::test]
+    async fn output_selection_pin_returns_rendered_png_through_runtime() {
+        let host = Arc::new(RecordingRuntimeHost::succeeds());
+        let (runtime, sessions) = make_runtime(host, vec![make_renderable_snapshot()]);
+        let session = sessions.create_session().await.unwrap();
+
+        let output = runtime
+            .output_selection(
+                &session.id,
+                &LogicalRect {
+                    x: 1.0,
+                    y: 1.0,
+                    width: 2.0,
+                    height: 2.0,
+                },
+                &[],
+                false,
+                CaptureOutputAction::Pin,
+            )
+            .await
+            .unwrap();
+
+        let CaptureSessionOutput::Pin(png_data) = output else {
+            panic!("expected pin output");
+        };
+        let decoded = image::load_from_memory(&png_data).unwrap().to_rgba8();
+
+        assert_eq!((decoded.width(), decoded.height()), (2, 2));
+        assert!(decoded.pixels().all(|pixel| pixel.0 == [10, 20, 30, 255]));
     }
 }
