@@ -288,7 +288,7 @@ impl TranslationCoordinator {
             let providers = self.providers.read();
             active.clear();
             for id in active_ids {
-                let id = normalize_translation_provider_id(&id);
+                let id = normalize_legacy_translation_provider_id(&id);
                 if providers.contains_key(id) {
                     active.push(id.to_string());
                 }
@@ -446,7 +446,7 @@ impl TranslationCoordinator {
     }
 }
 
-fn normalize_translation_provider_id(id: &str) -> &str {
+fn normalize_legacy_translation_provider_id(id: &str) -> &str {
     match id {
         "deepl" => "deeplx",
         _ => id,

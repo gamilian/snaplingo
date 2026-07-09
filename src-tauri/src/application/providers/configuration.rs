@@ -376,6 +376,25 @@ pub fn validate_required_credentials(
     Ok(())
 }
 
+fn legacy_api_key_credentials(provider_id: &str, api_key: String) -> Vec<CredentialValue> {
+    match provider_id {
+        "deeplx" => vec![
+            CredentialValue {
+                key: "mode".to_string(),
+                value: "deepl".to_string(),
+            },
+            CredentialValue {
+                key: "api_key".to_string(),
+                value: api_key,
+            },
+        ],
+        _ => vec![CredentialValue {
+            key: "api_key".to_string(),
+            value: api_key,
+        }],
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -1057,6 +1076,12 @@ impl ProviderConfiguration {
         Ok(fields)
     }
 
+    /// Save an API key submitted through the legacy single-key command path.
+    pub fn save_legacy_api_key(&self, provider_id: String, api_key: String) -> crate::Result<()> {
+        let credentials = legacy_api_key_credentials(&provider_id, api_key);
+        self.save_credentials(provider_id, credentials)
+    }
+
     /// Save credentials for a translation provider.
     pub fn save_credentials(
         &self,
@@ -1077,15 +1102,11 @@ impl ProviderConfiguration {
             .get(&provider_id)
             .ok_or_else(|| AppError::Other(format!("Provider not found: {}", provider_id)))?;
 
-        let expected_fields = provider.read().credential_fields();
-
-        // Validate credentials before saving anything
-        if provider_id == "deeplx" {
-            validate_deeplx_credentials_map(&cred_map)?;
-        } else {
-            validate_required_credentials(&expected_fields, &cred_map)
-                .map_err(|e| AppError::Other(e.to_string()))?;
-        }
+        let expected_fields = {
+            let provider = provider.read();
+            provider.validate_credentials(&cred_map)?;
+            provider.credential_fields()
+        };
 
         // Validate that all provided credentials are non-blank
         for (key, value) in &cred_map {
@@ -1195,41 +1216,6 @@ impl ProviderConfiguration {
             .await
             .map_err(|e| AppError::Other(format!("Provider test failed: {}", e)))
     }
-}
-
-/// Validate DeepLX credentials based on mode.
-fn validate_deeplx_credentials_map(credentials: &HashMap<String, String>) -> crate::Result<()> {
-    let mode = credentials
-        .get("mode")
-        .map(String::as_str)
-        .unwrap_or("deeplx");
-
-    match mode {
-        "deepl" => {
-            // DeepL mode requires api_key
-            if !credentials.contains_key("api_key") {
-                return Err(AppError::Other("DeepL mode requires api_key".into()));
-            }
-            let api_key = credentials.get("api_key").unwrap();
-            if api_key.trim().is_empty() {
-                return Err(AppError::Other("DeepL api_key cannot be blank".into()));
-            }
-        }
-        "deeplx" => {
-            // DeepLX mode requires endpoint
-            if !credentials.contains_key("endpoint") {
-                return Err(AppError::Other("DeepLX mode requires endpoint".into()));
-            }
-            let endpoint = credentials.get("endpoint").unwrap();
-            if endpoint.trim().is_empty() {
-                return Err(AppError::Other("DeepLX endpoint cannot be blank".into()));
-            }
-        }
-        other => {
-            return Err(AppError::Other(format!("Invalid DeepLX mode: {}", other)));
-        }
-    }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -1366,6 +1352,27 @@ mod provider_configuration_tests {
             .unwrap_err()
             .to_string()
             .contains("Provider not found"));
+    }
+
+    #[test]
+    fn save_legacy_api_key_maps_deeplx_to_standard_deepl_credentials() {
+        let config = test_provider_configuration();
+
+        config
+            .save_legacy_api_key("deeplx".to_string(), "test-api-key".to_string())
+            .unwrap();
+
+        let field_names = vec!["mode".to_string(), "api_key".to_string()];
+        let saved = config
+            .keychain
+            .load_provider_credentials("deeplx", &field_names)
+            .unwrap();
+
+        assert_eq!(saved.get("mode").map(String::as_str), Some("deepl"));
+        assert_eq!(
+            saved.get("api_key").map(String::as_str),
+            Some("test-api-key")
+        );
     }
 
     #[test]

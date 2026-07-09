@@ -95,21 +95,10 @@ pub async fn configure_translation_provider(
     api_key: String,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    let mut credentials = HashMap::new();
-    if provider_id == "deeplx" {
-        credentials.insert("mode".to_string(), "deepl".to_string());
-        credentials.insert("api_key".to_string(), api_key);
-    } else {
-        credentials.insert("api_key".to_string(), api_key);
-    }
-
-    let cred_values: Vec<CredentialValue> = credentials
-        .into_iter()
-        .map(|(key, value)| CredentialValue { key, value })
-        .collect();
-
-    state.providers.configuration
-        .save_credentials(provider_id, cred_values)
+    state
+        .providers
+        .configuration
+        .save_legacy_api_key(provider_id, api_key)
         .map_err(|e| e.to_string())
 }
 

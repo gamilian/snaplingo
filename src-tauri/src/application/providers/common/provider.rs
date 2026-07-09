@@ -64,6 +64,24 @@ pub trait Provider: Send + Sync {
         }
     }
 
+    /// Validates credentials before persistence or runtime reconfiguration.
+    fn validate_credentials(&self, credentials: &HashMap<String, String>) -> crate::Result<()> {
+        for field in self.credential_fields() {
+            let value = credentials.get(&field.name).ok_or_else(|| {
+                crate::AppError::Other(format!("Missing required field: {}", field.label))
+            })?;
+
+            if value.trim().is_empty() {
+                return Err(crate::AppError::Other(format!(
+                    "Field cannot be empty: {}",
+                    field.label
+                )));
+            }
+        }
+
+        Ok(())
+    }
+
     /// Reconfigures the provider's credentials at runtime.
     ///
     /// This allows hot-reloading of credentials without restarting the application.

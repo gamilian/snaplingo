@@ -70,44 +70,86 @@ impl Provider for DeepLProvider {
         ]
     }
 
+    fn validate_credentials(&self, credentials: &HashMap<String, String>) -> crate::Result<()> {
+        validate_deepl_credentials(credentials)
+    }
+
     fn reconfigure_credentials(
         &mut self,
         credentials: &std::collections::HashMap<String, String>,
     ) -> crate::Result<()> {
-        let mode = credentials
-            .get("mode")
-            .map(String::as_str)
-            .unwrap_or("deeplx");
-
-        match mode {
-            "deepl" => {
-                let api_key = credentials
-                    .get("api_key")
-                    .map(|value| value.trim())
-                    .filter(|value| !value.is_empty())
-                    .ok_or_else(|| crate::AppError::Other("Missing api_key".to_string()))?;
+        match parse_deepl_credentials(credentials)? {
+            DeepLCredentials::DeepL { api_key } => {
                 self.mode = DeepLMode::DeepL;
-                self.api_key = Some(api_key.to_string());
+                self.api_key = Some(api_key);
             }
-            "deeplx" => {
-                let endpoint = credentials
-                    .get("endpoint")
-                    .map(|value| value.trim())
-                    .filter(|value| !value.is_empty())
-                    .ok_or_else(|| crate::AppError::Other("Missing endpoint".to_string()))?;
+            DeepLCredentials::DeepLX { endpoint } => {
                 self.mode = DeepLMode::DeepLX;
-                self.endpoint = Some(endpoint.to_string());
-            }
-            other => {
-                return Err(crate::AppError::Other(format!(
-                    "Invalid DeepLX mode: {}",
-                    other
-                )));
+                self.endpoint = Some(endpoint);
             }
         }
 
         Ok(())
     }
+}
+
+enum DeepLCredentials {
+    DeepL { api_key: String },
+    DeepLX { endpoint: String },
+}
+
+fn validate_deepl_credentials(credentials: &HashMap<String, String>) -> crate::Result<()> {
+    parse_deepl_credentials(credentials).map(|_| ())
+}
+
+fn parse_deepl_credentials(
+    credentials: &HashMap<String, String>,
+) -> crate::Result<DeepLCredentials> {
+    let mode = credentials
+        .get("mode")
+        .map(String::as_str)
+        .unwrap_or("deeplx");
+
+    let credentials = match mode {
+        "deepl" => {
+            let Some(api_key) = credentials.get("api_key") else {
+                return Err(crate::AppError::Other(
+                    "DeepL mode requires api_key".to_string(),
+                ));
+            };
+            if api_key.trim().is_empty() {
+                return Err(crate::AppError::Other(
+                    "DeepL api_key cannot be blank".to_string(),
+                ));
+            }
+            DeepLCredentials::DeepL {
+                api_key: api_key.trim().to_string(),
+            }
+        }
+        "deeplx" => {
+            let Some(endpoint) = credentials.get("endpoint") else {
+                return Err(crate::AppError::Other(
+                    "DeepLX mode requires endpoint".to_string(),
+                ));
+            };
+            if endpoint.trim().is_empty() {
+                return Err(crate::AppError::Other(
+                    "DeepLX endpoint cannot be blank".to_string(),
+                ));
+            }
+            DeepLCredentials::DeepLX {
+                endpoint: endpoint.trim().to_string(),
+            }
+        }
+        other => {
+            return Err(crate::AppError::Other(format!(
+                "Invalid DeepLX mode: {}",
+                other
+            )));
+        }
+    };
+
+    Ok(credentials)
 }
 
 #[derive(Serialize)]
@@ -373,6 +415,110 @@ mod tests {
         provider.set_endpoint("https://deeplx.example.test".to_string());
 
         assert!(provider.is_configured());
+    }
+
+    #[test]
+    fn validate_credentials_accepts_deepl_mode_api_key_without_endpoint() {
+        let mock_client = Arc::new(MockHttpClient {
+            response: HttpResponse {
+                status: 200,
+                body: String::new(),
+                headers: HashMap::new(),
+            },
+        });
+        let provider = DeepLProvider::new(mock_client);
+
+        provider
+            .validate_credentials(&HashMap::from([
+                ("mode".to_string(), "deepl".to_string()),
+                ("api_key".to_string(), "test-api-key".to_string()),
+            ]))
+            .unwrap();
+    }
+
+    #[test]
+    fn validate_credentials_accepts_deeplx_mode_endpoint_without_api_key() {
+        let mock_client = Arc::new(MockHttpClient {
+            response: HttpResponse {
+                status: 200,
+                body: String::new(),
+                headers: HashMap::new(),
+            },
+        });
+        let provider = DeepLProvider::new(mock_client);
+
+        provider
+            .validate_credentials(&HashMap::from([
+                ("mode".to_string(), "deeplx".to_string()),
+                (
+                    "endpoint".to_string(),
+                    "https://deeplx.example.test".to_string(),
+                ),
+            ]))
+            .unwrap();
+    }
+
+    #[test]
+    fn validate_credentials_rejects_missing_required_deepl_api_key() {
+        let mock_client = Arc::new(MockHttpClient {
+            response: HttpResponse {
+                status: 200,
+                body: String::new(),
+                headers: HashMap::new(),
+            },
+        });
+        let provider = DeepLProvider::new(mock_client);
+
+        let error = provider
+            .validate_credentials(&HashMap::from([(
+                "mode".to_string(),
+                "deepl".to_string(),
+            )]))
+            .unwrap_err();
+
+        assert_eq!(error.to_string(), "DeepL mode requires api_key");
+    }
+
+    #[test]
+    fn validate_credentials_rejects_blank_required_deeplx_endpoint() {
+        let mock_client = Arc::new(MockHttpClient {
+            response: HttpResponse {
+                status: 200,
+                body: String::new(),
+                headers: HashMap::new(),
+            },
+        });
+        let provider = DeepLProvider::new(mock_client);
+
+        let error = provider
+            .validate_credentials(&HashMap::from([
+                ("mode".to_string(), "deeplx".to_string()),
+                ("endpoint".to_string(), "  ".to_string()),
+            ]))
+            .unwrap_err();
+
+        assert_eq!(error.to_string(), "DeepLX endpoint cannot be blank");
+    }
+
+    #[test]
+    fn validate_credentials_rejects_invalid_mode() {
+        let mock_client = Arc::new(MockHttpClient {
+            response: HttpResponse {
+                status: 200,
+                body: String::new(),
+                headers: HashMap::new(),
+            },
+        });
+        let provider = DeepLProvider::new(mock_client);
+
+        let error = provider
+            .validate_credentials(&HashMap::from([(
+                "mode".to_string(),
+                "hybrid".to_string(),
+            )]))
+            .unwrap_err();
+
+        assert_eq!(error.to_string(), "Invalid DeepLX mode: hybrid");
     }
 
     #[tokio::test]
