@@ -73,8 +73,8 @@ pub async fn activate_translation_provider(
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     state
-        .translation_coordinator
-        .activate(&provider_id)
+        .provider_configuration
+        .activate_provider(provider_id)
         .map_err(|e| e.to_string())
 }
 
@@ -84,8 +84,8 @@ pub async fn deactivate_translation_provider(
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     state
-        .translation_coordinator
-        .deactivate(&provider_id)
+        .provider_configuration
+        .deactivate_provider(provider_id)
         .map_err(|e| e.to_string())
 }
 
@@ -119,8 +119,8 @@ pub async fn reorder_active_translation_providers(
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     state
-        .translation_coordinator
-        .reorder_active(provider_ids)
+        .provider_configuration
+        .reorder_active_providers(provider_ids)
         .map_err(|e| e.to_string())
 }
 

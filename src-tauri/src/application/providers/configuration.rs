@@ -687,6 +687,9 @@ pub struct ProviderConfiguration {
     http_client: Arc<dyn HttpClient>,
     translation_coordinator: Arc<TranslationCoordinator>,
     llm_introspection: Arc<crate::application::providers::LlmIntrospection>,
+    /// Serializes all provider state mutations (config + keychain + coordinator).
+    /// Prevents concurrent add/update/remove from causing config/keychain/coordinator divergence.
+    provider_state_lock: std::sync::Mutex<()>,
 }
 
 impl ProviderConfiguration {
@@ -703,7 +706,15 @@ impl ProviderConfiguration {
             http_client,
             translation_coordinator,
             llm_introspection,
+            provider_state_lock: std::sync::Mutex::new(()),
         }
+    }
+
+    /// Acquires the provider state lock. Holds it to serialize provider mutations.
+    fn lock_provider_state(&self) -> crate::Result<std::sync::MutexGuard<()>> {
+        self.provider_state_lock
+            .lock()
+            .map_err(|e| crate::AppError::Other(format!("Provider state lock poisoned: {}", e)))
     }
 
     /// Add a new custom translation provider.
@@ -711,6 +722,7 @@ impl ProviderConfiguration {
         &self,
         input: AddCustomTranslationProviderInput,
     ) -> crate::Result<CustomTranslationProviderView> {
+        let _guard = self.lock_provider_state()?;
         add_custom_translation_provider(
             input,
             self.config_file.clone(),
@@ -726,6 +738,8 @@ impl ProviderConfiguration {
         provider_id: String,
         input: UpdateCustomTranslationProviderInput,
     ) -> crate::Result<CustomTranslationProviderView> {
+        let _guard = self.lock_provider_state()?;
+
         // Load current state for rollback
         let mut custom_defs = self
             .config_file
@@ -850,6 +864,8 @@ impl ProviderConfiguration {
 
     /// Remove a custom translation provider.
     pub fn remove(&self, provider_id: String) -> crate::Result<()> {
+        let _guard = self.lock_provider_state()?;
+
         // Reject builtin providers
         let builtin_ids = ["google-translate", "deeplx", "baidu-translate"];
         if builtin_ids.contains(&provider_id.as_str()) {
@@ -1045,6 +1061,8 @@ impl ProviderConfiguration {
         provider_id: String,
         credentials: Vec<CredentialValue>,
     ) -> crate::Result<()> {
+        let _guard = self.lock_provider_state()?;
+
         // Convert to HashMap for validation and processing
         let cred_map: HashMap<String, String> = credentials
             .into_iter()
@@ -1119,6 +1137,30 @@ impl ProviderConfiguration {
         }
 
         Ok(())
+    }
+
+    /// Activate a translation provider by ID (with provider state lock).
+    pub fn activate_provider(&self, id: String) -> crate::Result<()> {
+        let _guard = self.lock_provider_state()?;
+        self.translation_coordinator
+            .activate(&id)
+            .map_err(|e| AppError::Other(format!("Failed to activate provider: {}", e)))
+    }
+
+    /// Deactivate a translation provider by ID (with provider state lock).
+    pub fn deactivate_provider(&self, id: String) -> crate::Result<()> {
+        let _guard = self.lock_provider_state()?;
+        self.translation_coordinator
+            .deactivate(&id)
+            .map_err(|e| AppError::Other(format!("Failed to deactivate provider: {}", e)))
+    }
+
+    /// Reorder active translation providers (with provider state lock).
+    pub fn reorder_active_providers(&self, ordered_ids: Vec<String>) -> crate::Result<()> {
+        let _guard = self.lock_provider_state()?;
+        self.translation_coordinator
+            .reorder_active(ordered_ids)
+            .map_err(|e| AppError::Other(format!("Failed to reorder active providers: {}", e)))
     }
 
     /// Test a custom translation provider by ID.

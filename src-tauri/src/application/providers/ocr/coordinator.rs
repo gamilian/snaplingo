@@ -82,17 +82,20 @@ impl OcrCoordinator {
     ///
     /// * `Result<()>` - Ok if successful, Err if the provider doesn't exist or persistence fails
     pub fn activate(&self, id: &str) -> Result<()> {
+        // Lock active first to serialize the entire activate operation
+        let mut active = self.active_provider_id.lock().unwrap();
+
+        // Validate provider exists
         let providers = self.providers.lock().unwrap();
         if !providers.contains_key(id) {
             return Err(format!("Provider not found: {}", id).into());
         }
         drop(providers);
 
-        // Persist first
+        // Persist to disk
         self.config.save("active_ocr_provider", &id.to_string())?;
 
-        // Only update memory after successful persistence
-        let mut active = self.active_provider_id.lock().unwrap();
+        // Update memory only after successful persistence
         *active = Some(id.to_string());
 
         Ok(())
