@@ -4,7 +4,6 @@ mod capture_session_render;
 pub mod capture_session_runtime;
 pub mod capture_session_service;
 pub mod history_service;
-pub mod hotkey_service;
 pub mod image_composition_service;
 pub mod pinned_image_service;
 pub mod selected_text_acquirer;
@@ -26,7 +25,6 @@ pub use capture_session_render::CaptureSessionOutput;
 pub use capture_session_runtime::CaptureSessionRuntime;
 pub use capture_session_service::CaptureSessionService;
 pub use history_service::HistoryService;
-pub use hotkey_service::HotkeyService;
 pub use image_composition_service::ImageCompositionService;
 pub use pinned_image_service::{
     PinnedImageGroupMembership, PinnedImageGroupRemoval, PinnedImageGroupSwitch,

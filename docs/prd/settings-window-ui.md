@@ -38,7 +38,7 @@ SnapLingo 目前缺少一个主设置窗口（Settings Window），用户无法�
 17. As a user, I want to access OCR history with thumbnail previews, so that I can review past OCR results
 18. As a user, I want to switch to the "服务" tab, so that I can manage all Providers
 19. As a user, I want to see top-level tabs in the 服务 tab (OCR服务/翻译服务/语音合成), so that I can navigate between provider types
-20. As a user, I want to see OCR Provider cards (Tesseract/PaddleOCR/百度OCR), so that I can view available OCR providers
+20. As a user, I want to see OCR Provider cards (Tesseract/System OCR/百度OCR), so that I can view available OCR providers
 21. As a user, I want to see the currently active OCR Provider highlighted, so that I understand which one is being used
 22. As a user, I want to click "激活" on a Provider card, so that I can enable that provider
 23. As a user, I want to click "配置" on a Provider card, so that I can enter API keys and other settings

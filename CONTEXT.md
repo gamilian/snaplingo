@@ -13,7 +13,7 @@
 
 **已实现的 Providers：**
 - Translation: Google Translate、DeepL、Baidu Translation
-- OCR: Tesseract（本地）、Baidu OCR（远程）
+- OCR: Tesseract（本地）、System OCR（macOS，本地）、Baidu OCR（远程）
 
 ### Coordinator（协调器）
 管理 Providers 并协调其执行的核心模块。每种 Provider 类型有对应的 Coordinator：
@@ -326,8 +326,11 @@ Provider 类型：
 
 **OCR Provider**：
 - Tesseract（免费，本地）
-- PaddleOCR（免费，本地，中文优化）
+- System OCR（macOS，本地）
 - 百度 OCR（需 API Key）
+
+**未来候选 OCR Provider（未实现）**：
+- PaddleOCR（免费，本地，中文优化）
 - 腾讯云 OCR（需 API Key）
 - Google Cloud Vision（需 API Key）
 - Azure Computer Vision（需 API Key）
