@@ -7,7 +7,7 @@ pub mod translation_prompt;
 
 pub use common::Provider;
 pub use configuration::{
-    add_custom_translation_provider, build_updated_custom_translation_provider_def,
+    build_updated_custom_translation_provider_def,
     create_llm_translation_provider, custom_translation_provider_view, validate_required_credentials,
     AddCustomTranslationProviderInput, CustomTranslationProviderDef, CustomTranslationProviderView,
     ProviderConfiguration, UpdateCustomTranslationProviderInput,

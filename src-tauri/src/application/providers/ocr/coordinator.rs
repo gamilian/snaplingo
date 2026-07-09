@@ -141,9 +141,13 @@ impl OcrCoordinator {
     /// Skips if the provider ID is not registered.
     pub fn restore_from_config(&self) -> Result<()> {
         if let Ok(active_id) = self.config.load::<String>("active_ocr_provider") {
+            // Lock order: active_provider_id first (consistent with activate)
+            let mut active = self.active_provider_id.lock().unwrap();
+
+            // Validate provider exists (short-lived providers lock)
             let providers = self.providers.lock().unwrap();
             if providers.contains_key(&active_id) {
-                let mut active = self.active_provider_id.lock().unwrap();
+                drop(providers); // Release before writing active
                 *active = Some(active_id);
             }
         }

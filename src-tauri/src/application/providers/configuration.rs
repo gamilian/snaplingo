@@ -1165,23 +1165,31 @@ impl ProviderConfiguration {
 
     /// Test a custom translation provider by ID.
     pub async fn test_custom_provider(&self, provider_id: String) -> crate::Result<()> {
-        let custom_defs = self
-            .config_file
-            .load::<Vec<CustomTranslationProviderDef>>("custom_translation_providers")
-            .unwrap_or_default();
+        // Short-lived lock: clone out the values needed for async test
+        let (protocol, endpoint, model, api_key) = {
+            let _guard = self.lock_provider_state()?;
 
-        let def = custom_defs
-            .iter()
-            .find(|def| def.id == provider_id)
-            .ok_or_else(|| AppError::Other(format!("Provider not found: {}", provider_id)))?;
+            let custom_defs = self
+                .config_file
+                .load::<Vec<CustomTranslationProviderDef>>("custom_translation_providers")
+                .unwrap_or_default();
 
-        let api_key = self
-            .keychain
-            .load_provider_credential(&provider_id)
-            .map_err(|e| AppError::Other(format!("Failed to load provider credential: {}", e)))?;
+            let def = custom_defs
+                .iter()
+                .find(|def| def.id == provider_id)
+                .ok_or_else(|| AppError::Other(format!("Provider not found: {}", provider_id)))?;
 
+            let api_key = self
+                .keychain
+                .load_provider_credential(&provider_id)
+                .map_err(|e| AppError::Other(format!("Failed to load provider credential: {}", e)))?;
+
+            (def.protocol, def.endpoint.clone(), def.model.clone(), api_key)
+        }; // Lock released here
+
+        // Async test without holding the lock
         self.llm_introspection
-            .test(def.protocol, &def.endpoint, &def.model, &api_key)
+            .test(protocol, &endpoint, &model, &api_key)
             .await
             .map_err(|e| AppError::Other(format!("Provider test failed: {}", e)))
     }
@@ -1784,7 +1792,9 @@ mod provider_configuration_tests {
         let result1 = h1.join().unwrap();
         let result2 = h2.join().unwrap();
 
-        // One succeeds, one fails (serialized by lock)
+        // Exactly one succeeds (serialized by provider_state_lock).
+        // The lock ensures mutual exclusion: remove and save_credentials cannot
+        // interleave, so the loser sees "provider not found" or similar.
         assert!(result1.is_ok() ^ result2.is_ok());
 
         // Invariant: if remove succeeded, provider is gone from all stores
