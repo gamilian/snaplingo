@@ -18,15 +18,15 @@ use selection_runtime::build_selected_text_acquirer;
 
 pub(crate) use history_runtime::subscribe_history_service;
 
-use crate::infrastructure::events::EventBus;
-use crate::infrastructure::http::{HttpClient, ReqwestHttpClient};
-use crate::infrastructure::storage::{ConfigFile, Keychain};
 use crate::app_state::{
     AppState, CaptureRuntimeState, HistoryRuntime, ProviderRuntime, SelectionRuntime,
     SettingsRuntime,
 };
 use crate::application::providers::ocr::OcrProviderConfiguration;
 use crate::application::providers::TranslationPromptConfiguration;
+use crate::infrastructure::events::EventBus;
+use crate::infrastructure::http::{HttpClient, ReqwestHttpClient};
+use crate::infrastructure::storage::{ConfigFile, Keychain};
 use crate::{HotkeyConfiguration, HotkeyRuntime, SettingsConfiguration};
 
 pub(crate) fn build_app_state(config_path: PathBuf, app: AppHandle) -> AppState {
@@ -70,10 +70,8 @@ pub(crate) fn build_app_state(config_path: PathBuf, app: AppHandle) -> AppState 
     let selected_text_acquirer = build_selected_text_acquirer(app);
 
     hydrate_provider_credentials_in_background(
-        config_file,
         keychain,
-        http_client,
-        translation_coordinator.clone(),
+        provider_configuration.clone(),
         ocr_coordinator.clone(),
     );
 
@@ -110,19 +108,11 @@ pub(crate) fn build_app_state(config_path: PathBuf, app: AppHandle) -> AppState 
 }
 
 fn hydrate_provider_credentials_in_background(
-    config_file: Arc<ConfigFile>,
     keychain: Arc<Keychain>,
-    http_client: Arc<dyn HttpClient>,
-    translation_coordinator: Arc<crate::application::providers::translation::TranslationCoordinator>,
+    provider_configuration: Arc<crate::application::providers::ProviderConfiguration>,
     ocr_coordinator: Arc<crate::application::providers::ocr::OcrCoordinator>,
 ) {
     tauri::async_runtime::spawn_blocking(move || {
-        hydrate_provider_credentials(
-            config_file,
-            keychain,
-            http_client,
-            translation_coordinator,
-            ocr_coordinator,
-        );
+        hydrate_provider_credentials(provider_configuration, keychain, ocr_coordinator);
     });
 }

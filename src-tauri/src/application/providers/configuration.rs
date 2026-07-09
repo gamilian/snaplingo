@@ -395,6 +395,43 @@ fn legacy_api_key_credentials(provider_id: &str, api_key: String) -> Vec<Credent
     }
 }
 
+fn load_baidu_translation_credentials(keychain: &Keychain) -> Option<HashMap<String, String>> {
+    keychain
+        .load_provider_credentials(
+            "baidu-translate",
+            &["app_id".to_string(), "secret_key".to_string()],
+        )
+        .ok()
+        .or_else(|| {
+            let app_id = keychain.load_provider_credential("baidu_app_id").ok()?;
+            let secret_key = keychain.load_provider_credential("baidu_secret_key").ok()?;
+            Some(HashMap::from([
+                ("app_id".to_string(), app_id),
+                ("secret_key".to_string(), secret_key),
+            ]))
+        })
+}
+
+fn load_deeplx_credentials(keychain: &Keychain) -> Option<HashMap<String, String>> {
+    keychain
+        .load_provider_credentials(
+            "deeplx",
+            &[
+                "mode".to_string(),
+                "endpoint".to_string(),
+                "api_key".to_string(),
+            ],
+        )
+        .ok()
+        .or_else(|| {
+            let api_key = keychain.load_provider_credential("deepl").ok()?;
+            Some(HashMap::from([
+                ("mode".to_string(), "deepl".to_string()),
+                ("api_key".to_string(), api_key),
+            ]))
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -736,6 +773,68 @@ impl ProviderConfiguration {
         self.provider_state_lock
             .lock()
             .map_err(|e| crate::AppError::Other(format!("Provider state lock poisoned: {}", e)))
+    }
+
+    pub(crate) fn hydrate_credentials(&self) -> crate::Result<()> {
+        let _guard = self.lock_provider_state()?;
+
+        if let Some(credentials) = load_deeplx_credentials(&self.keychain) {
+            if let Err(e) = self
+                .translation_coordinator
+                .reconfigure_provider("deeplx", &credentials)
+            {
+                log::warn!("Failed to hydrate DeepLX credentials: {}", e);
+            }
+        }
+
+        if let Some(credentials) = load_baidu_translation_credentials(&self.keychain) {
+            if let Err(e) = self
+                .translation_coordinator
+                .reconfigure_provider("baidu-translate", &credentials)
+            {
+                log::warn!("Failed to hydrate Baidu Translate credentials: {}", e);
+            }
+        }
+
+        self.register_custom_translation_providers();
+
+        if let Err(e) = self.translation_coordinator.restore_from_config() {
+            log::warn!(
+                "Failed to restore active providers after credential hydration: {}",
+                e
+            );
+        }
+
+        Ok(())
+    }
+
+    fn register_custom_translation_providers(&self) {
+        let Ok(custom_defs) = self
+            .config_file
+            .load::<Vec<CustomTranslationProviderDef>>("custom_translation_providers")
+        else {
+            return;
+        };
+
+        for def in custom_defs {
+            let Ok(api_key) = self.keychain.load_provider_credential(&def.id) else {
+                continue;
+            };
+
+            let provider = create_llm_translation_provider(
+                &def,
+                self.http_client.clone(),
+                api_key,
+                self.config_file.clone(),
+            );
+            if let Err(e) = self.translation_coordinator.register(provider) {
+                log::warn!(
+                    "Failed to register custom LLM provider '{}': {}",
+                    def.name,
+                    e
+                );
+            }
+        }
     }
 
     /// Add a new custom translation provider.
@@ -1463,6 +1562,24 @@ mod provider_configuration_tests {
             .unwrap_err()
             .to_string()
             .contains("Provider not found"));
+    }
+
+    #[test]
+    fn hydrate_credentials_uses_provider_state_lock() {
+        let config = test_provider_configuration();
+        let poison_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _guard = config.provider_state_lock.lock().unwrap();
+            panic!("poison provider state lock");
+        }));
+        assert!(poison_result.is_err());
+
+        let result = config.hydrate_credentials();
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Provider state lock poisoned"));
     }
 
     #[test]
