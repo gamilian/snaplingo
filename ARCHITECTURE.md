@@ -106,7 +106,9 @@ snaplingo/
 │   │   ├─ providers/                   # Provider 垂直切片
 │   │   │   ├─ common/                  # 共享基础
 │   │   │   │   ├─ provider.rs          # Provider Trait
-│   │   │   ├─ configuration.rs         # Provider 配置生命周期
+│   │   │   ├─ configuration.rs         # Provider 配置生命周期（ProviderConfiguration struct）
+│   │   │   ├─ llm_introspection.rs     # LLM provider 内省 facade（LlmIntrospection struct）
+│   │   │   ├─ translation_prompt.rs    # Translation prompt 策略配置
 │   │   │   │
 │   │   │   ├─ ocr/                     # OCR Providers
 │   │   │   │   ├─ trait_def.rs
@@ -136,11 +138,18 @@ snaplingo/
 │   │   └─ ocr.rs
 │   │
 │   └─ infrastructure/                  # ⭐ Infrastructure Layer
+│       ├─ llm/                         # LLM 客户端
+│       │   ├─ client.rs                # LLMClient + LlmModelLister traits
+│       │   ├─ openai.rs
+│       │   ├─ anthropic.rs
+│       │   └─ gemini.rs
+│       │
 │       ├─ storage/
 │       │   ├─ config_file.rs
 │       │   ├─ history_db.rs
-│       │   └─ keychain/                # 平台适配 ⭐
+│       │   └─ keychain/                # 平台适配 ⭐（trait object: Box<dyn KeychainBackend>）
 │       │       ├─ mod.rs
+│       │       ├─ backend.rs
 │       │       ├─ macos.rs
 │       │       ├─ windows.rs
 │       │       └─ linux.rs
@@ -208,7 +217,8 @@ providers/ocr/
 |------|------|--------|
 | **Trait** | 定义 Provider 接口 | 不管理实例、不执行业务 |
 | **Coordinator** | 管理 Provider 列表、激活状态、持久化、执行协调和运行时重配置 | 不实现具体 OCR/翻译 API |
-| **configuration.rs** | 校验凭证、自定义 Translation Provider 生命周期、构造自定义 LLM Provider | 不执行翻译/OCR 请求 |
+| **configuration.rs** | 校验凭证、自定义 Translation Provider 生命周期（add/update/remove）、构造自定义 LLM Provider | 不执行翻译/OCR 请求 |
+| **llm_introspection.rs** | LLM provider 内省（list_models/test）、集中客户端构造 | 不管理 Provider 生命周期 |
 | **impls/** | 实现具体能力（OCR 识别） | 不管理自己的激活状态 |
 
 **Translation Provider 特殊性：**
@@ -689,7 +699,10 @@ Commands → Application → Domain
 - 主窗口 Tauri events 已通过 `src/tauri/appEvents.ts` 集中订阅和解析。
 - Backend runtime 已通过 `src-tauri/src/commands/*` 保持 Tauri command seam。
 - Provider 当前由 `TranslationCoordinator` 和 `OcrCoordinator` 统一管理激活、持久化、执行和运行时重配置。
-- Provider Configuration Module 负责凭证校验、自定义 Translation Provider 定义、运行时新增/注册/激活和回滚。
+- Provider Configuration Module (`ProviderConfiguration` struct) 负责自定义 Translation Provider 完整生命周期：add/update/remove + 凭证管理 + test。Update 包含 coordinator 失败时的 rollback。
+- LLM Introspection Module (`LlmIntrospection` struct) 负责 LLM provider 内省操作：list_models 和 test，集中客户端构造逻辑。
+- LLM 客户端实现 `LLMClient` (generate) 和 `LlmModelLister` (list_models) traits，支持 interface segregation。
+- Keychain 使用 `Box<dyn KeychainBackend>` trait object 实现平台抽象和测试注入。
 - Hotkey Configuration / Runtime 负责快捷键 snapshot、legacy migration、启动注册和运行时更新生命周期；前端 Settings 页面只走 `hotkeyConfigStore`。
 - Capture Session Runtime 已集中截图会话的 render/output/OCR 编排。
 - AppState 形状位于 `src-tauri/src/app_state.rs`；`lib.rs` 只保留 Tauri builder/plugin setup、command 注册和启动模块调用。

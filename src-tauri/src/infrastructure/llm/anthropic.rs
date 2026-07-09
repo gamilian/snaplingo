@@ -1,4 +1,4 @@
-use super::client::{LLMClient, LLMRequest, LLMResponse, ReasoningLevel};
+use super::client::{LLMClient, LlmModelLister, LLMRequest, LLMResponse, ModelInfo, ReasoningLevel};
 use super::endpoint_url::complete_standard_endpoint;
 use crate::error::AppError;
 use crate::infrastructure::http::HttpClient;
@@ -144,6 +144,69 @@ impl LLMClient for AnthropicLLMClient {
     }
 }
 
+#[async_trait]
+impl LlmModelLister for AnthropicLLMClient {
+    async fn list_models(&self) -> Result<Vec<ModelInfo>> {
+        let url = anthropic_models_url(&self.endpoint);
+        let mut headers = HashMap::new();
+        headers.insert("x-api-key".to_string(), self.api_key.clone());
+        headers.insert(
+            "anthropic-version".to_string(),
+            "2023-06-01".to_string(),
+        );
+        headers.insert("Content-Type".to_string(), "application/json".to_string());
+
+        let response = self
+            .http_client
+            .get(&url, headers)
+            .await
+            .map_err(|e| AppError::Network(e.to_string()))?;
+
+        ensure_anthropic_success_status(response.status, &response.body)?;
+        parse_anthropic_models_response(&response.body)
+    }
+}
+
+fn ensure_anthropic_success_status(status: u16, body: &str) -> Result<()> {
+    match status {
+        200 => Ok(()),
+        401 | 403 => Err(AppError::Unauthorized("Invalid API key or insufficient permission".into()).into()),
+        404 => Err(AppError::InvalidResponse("API endpoint not found".into()).into()),
+        429 => Err(AppError::RateLimited("Rate limit exceeded".into()).into()),
+        _ => Err(AppError::UpstreamStatus(status, body.to_string()).into()),
+    }
+}
+
+fn parse_anthropic_models_response(body: &str) -> Result<Vec<ModelInfo>> {
+    let json: serde_json::Value = serde_json::from_str(body)
+        .map_err(|e| AppError::InvalidResponse(format!("Model list JSON parse failed: {}", e)))?;
+    let data = json["data"]
+        .as_array()
+        .ok_or_else(|| AppError::InvalidResponse("Model list response is missing data array".into()))?;
+
+    let models: Vec<_> = models_from_array(data, "id");
+
+    if models.is_empty() {
+        Err(AppError::InvalidResponse(
+            "Model list response did not contain model ids".into(),
+        )
+        .into())
+    } else {
+        Ok(models)
+    }
+}
+
+fn models_from_array(data: &[serde_json::Value], field: &str) -> Vec<ModelInfo> {
+    data.iter()
+        .filter_map(|item| {
+            item[field]
+                .as_str()
+                .or_else(|| item.as_str())
+                .map(|id| ModelInfo { id: id.to_string() })
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -169,6 +232,74 @@ mod tests {
 
         async fn get(&self, _url: &str, _headers: HashMap<String, String>) -> Result<HttpResponse> {
             unimplemented!()
+        }
+    }
+
+    #[tokio::test]
+    async fn list_models_parses_anthropic_data_array() {
+        let mock = Arc::new(ListModelsMockHttpClient {
+            status: 200,
+            body: r#"{"data":[{"id":"claude-sonnet-4-5"},{"id":"claude-haiku-4-5"}]}"#.to_string(),
+        });
+        let client = AnthropicLLMClient::new(
+            mock,
+            "https://api.anthropic.com".to_string(),
+            "unused".to_string(),
+            "key".to_string(),
+        );
+
+        let models = client.list_models().await.unwrap();
+
+        let ids: Vec<_> = models.into_iter().map(|m| m.id).collect();
+        assert_eq!(ids, vec!["claude-sonnet-4-5", "claude-haiku-4-5"]);
+    }
+
+    #[tokio::test]
+    async fn list_models_rejects_response_without_data_array() {
+        let mock = Arc::new(ListModelsMockHttpClient {
+            status: 200,
+            body: r#"{"object":"list"}"#.to_string(),
+        });
+        let client = AnthropicLLMClient::new(
+            mock,
+            "https://api.anthropic.com".to_string(),
+            "unused".to_string(),
+            "key".to_string(),
+        );
+
+        let error = client.list_models().await.unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "Invalid response: Model list response is missing data array"
+        );
+    }
+
+    struct ListModelsMockHttpClient {
+        status: u16,
+        body: String,
+    }
+
+    #[async_trait]
+    impl HttpClient for ListModelsMockHttpClient {
+        async fn post(
+            &self,
+            _url: &str,
+            _headers: HashMap<String, String>,
+            _body: String,
+        ) -> Result<HttpResponse> {
+            unimplemented!()
+        }
+
+        async fn get(
+            &self,
+            _url: &str,
+            _headers: HashMap<String, String>,
+        ) -> Result<HttpResponse> {
+            Ok(HttpResponse {
+                status: self.status,
+                body: self.body.clone(),
+                headers: HashMap::new(),
+            })
         }
     }
 

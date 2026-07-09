@@ -166,15 +166,29 @@ fn configure_ocr_provider_credentials_inner(
 
     validate_required_credentials(&expected_fields, &credentials).map_err(|e| e.to_string())?;
 
+    // Snapshot existing credentials for rollback
+    let field_names: Vec<String> = expected_fields.iter().map(|f| f.name.clone()).collect();
+    let snapshot = state
+        .keychain
+        .snapshot_provider_credentials(provider_id, &field_names);
+
+    // Save credentials with transaction support
     state
         .keychain
-        .save_provider_credentials(provider_id, credentials)
+        .save_provider_credentials_transactional(provider_id, credentials, &snapshot)
         .map_err(|e| e.to_string())?;
 
-    state
+    // Reconfigure provider with complete rollback on failure
+    if let Err(e) = state
         .ocr_coordinator
         .reconfigure_provider(provider_id, credentials)
-        .map_err(|e| e.to_string())?;
+    {
+        // Rollback keychain changes
+        let _ = state
+            .keychain
+            .restore_provider_credentials(provider_id, &snapshot);
+        return Err(format!("Failed to reconfigure provider: {}", e));
+    }
 
     Ok(())
 }

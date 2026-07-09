@@ -1,4 +1,4 @@
-use super::client::{LLMClient, LLMRequest, LLMResponse, ReasoningLevel};
+use super::client::{LLMClient, LlmModelLister, LLMRequest, LLMResponse, ModelInfo, ReasoningLevel};
 use super::endpoint_url::complete_standard_endpoint;
 use crate::error::AppError;
 use crate::infrastructure::http::HttpClient;
@@ -271,6 +271,68 @@ impl LLMClient for OpenAILLMClient {
     }
 }
 
+#[async_trait]
+impl LlmModelLister for OpenAILLMClient {
+    async fn list_models(&self) -> Result<Vec<ModelInfo>> {
+        let url = openai_compatible_models_url(&self.endpoint);
+        let mut headers = HashMap::new();
+        headers.insert(
+            "Authorization".to_string(),
+            format!("Bearer {}", self.api_key),
+        );
+        headers.insert("Content-Type".to_string(), "application/json".to_string());
+
+        let response = self
+            .http_client
+            .get(&url, headers)
+            .await
+            .map_err(|e| AppError::Network(e.to_string()))?;
+
+        ensure_success_status(response.status, &response.body)?;
+        parse_models_response(&response.body)
+    }
+}
+
+/// Maps a non-2xx model-list response to a user-facing string error.
+/// Shared shape with the Anthropic lister; kept here since OpenAI-compatible
+/// listing is the common case.
+fn ensure_success_status(status: u16, body: &str) -> Result<()> {
+    match status {
+        200 => Ok(()),
+        401 | 403 => Err(AppError::Unauthorized("Invalid API key or insufficient permission".into()).into()),
+        404 => Err(AppError::InvalidResponse("API endpoint not found".into()).into()),
+        429 => Err(AppError::RateLimited("Rate limit exceeded".into()).into()),
+        _ => Err(AppError::UpstreamStatus(status, body.to_string()).into()),
+    }
+}
+
+fn parse_models_response(body: &str) -> Result<Vec<ModelInfo>> {
+    let json: serde_json::Value = serde_json::from_str(body)
+        .map_err(|e| AppError::InvalidResponse(format!("Model list JSON parse failed: {}", e)))?;
+    let data = json["data"]
+        .as_array()
+        .ok_or_else(|| AppError::InvalidResponse("Model list response is missing data array".into()))?;
+
+    let models: Vec<_> = data
+        .iter()
+        .filter_map(|item| {
+            item["id"]
+                .as_str()
+                .or_else(|| item.as_str())
+                .map(|id| ModelInfo { id: id.to_string() })
+        })
+        .collect();
+
+    if models.is_empty() {
+        Err(AppError::InvalidResponse(
+            "Model list response did not contain model ids".into(),
+        )
+        .into())
+    } else {
+        Ok(models)
+    }
+}
+
 impl OpenAILLMClient {
     async fn generate_responses(&self, request: &LLMRequest) -> Result<LLMResponse> {
         let url = self.responses_url();
@@ -399,6 +461,74 @@ mod tests {
         async fn get(&self, _url: &str, _headers: HashMap<String, String>) -> Result<HttpResponse> {
             unimplemented!()
         }
+    }
+
+    struct ListModelsMockHttpClient {
+        status: u16,
+        body: String,
+    }
+
+    #[async_trait]
+    impl HttpClient for ListModelsMockHttpClient {
+        async fn post(
+            &self,
+            _url: &str,
+            _headers: HashMap<String, String>,
+            _body: String,
+        ) -> Result<HttpResponse> {
+            unimplemented!()
+        }
+
+        async fn get(
+            &self,
+            _url: &str,
+            _headers: HashMap<String, String>,
+        ) -> Result<HttpResponse> {
+            Ok(HttpResponse {
+                status: self.status,
+                body: self.body.clone(),
+                headers: HashMap::new(),
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn list_models_parses_openai_compatible_data_array() {
+        let mock = Arc::new(ListModelsMockHttpClient {
+            status: 200,
+            body: r#"{"data":[{"id":"DeepSeek-V4-Pro"},{"id":"GLM-5.1"}]}"#.to_string(),
+        });
+        let client = OpenAILLMClient::new(
+            mock,
+            "https://api.openai.com".to_string(),
+            "unused".to_string(),
+            "key".to_string(),
+        );
+
+        let models = client.list_models().await.unwrap();
+
+        let ids: Vec<_> = models.into_iter().map(|m| m.id).collect();
+        assert_eq!(ids, vec!["DeepSeek-V4-Pro", "GLM-5.1"]);
+    }
+
+    #[tokio::test]
+    async fn list_models_rejects_response_without_data_array() {
+        let mock = Arc::new(ListModelsMockHttpClient {
+            status: 200,
+            body: r#"{"object":"list"}"#.to_string(),
+        });
+        let client = OpenAILLMClient::new(
+            mock,
+            "https://api.openai.com".to_string(),
+            "unused".to_string(),
+            "key".to_string(),
+        );
+
+        let error = client.list_models().await.unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "Invalid response: Model list response is missing data array"
+        );
     }
 
     #[tokio::test]

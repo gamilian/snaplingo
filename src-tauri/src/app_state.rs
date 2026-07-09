@@ -4,6 +4,7 @@ use parking_lot::Mutex as ParkingLotMutex;
 
 use crate::application::providers::ocr::OcrCoordinator;
 use crate::application::providers::translation::TranslationCoordinator;
+use crate::application::providers::{LlmIntrospection, ProviderConfiguration};
 use crate::application::{
     CaptureOutputService, CaptureService, CaptureSessionRuntime, CaptureSessionService,
     HistoryService, HotkeyRuntime, ImageCompositionService, PinnedImageService,
@@ -33,6 +34,8 @@ pub struct AppState {
 
     // Phase 2: Translation
     pub translation_coordinator: Arc<TranslationCoordinator>,
+    pub llm_introspection: Arc<LlmIntrospection>,
+    pub provider_configuration: Arc<ProviderConfiguration>,
 
     // Phase 3: OCR
     pub ocr_coordinator: Arc<OcrCoordinator>,

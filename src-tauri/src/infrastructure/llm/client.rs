@@ -9,6 +9,21 @@ pub trait LLMClient: Send + Sync {
     async fn generate(&self, request: &LLMRequest) -> Result<LLMResponse>;
 }
 
+/// 能力 interface for enumerating models an LLM endpoint exposes.
+/// Sibling to `LLMClient`: only clients that can list models implement this,
+/// so `LLMTranslationProvider` (which only needs `generate`) is not forced
+/// to carry a method it does not use.
+#[async_trait]
+pub trait LlmModelLister: Send + Sync {
+    async fn list_models(&self) -> Result<Vec<ModelInfo>>;
+}
+
+/// A single model exposed by an LLM endpoint, for provider introspection.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ModelInfo {
+    pub id: String,
+}
+
 /// 响应（极简：只返回文本）
 #[derive(Debug, Clone)]
 pub struct LLMResponse {

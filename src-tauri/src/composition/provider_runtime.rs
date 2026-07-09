@@ -12,11 +12,32 @@ use crate::application::providers::translation::{
     TranslationCoordinator,
 };
 use crate::application::providers::{
-    create_llm_translation_provider, CustomTranslationProviderDef,
+    create_llm_translation_provider, CustomTranslationProviderDef, LlmIntrospection,
+    ProviderConfiguration,
 };
 use crate::infrastructure::events::EventBus;
 use crate::infrastructure::http::HttpClient;
 use crate::infrastructure::storage::{ConfigFile, Keychain};
+
+pub(crate) fn build_llm_introspection(http_client: Arc<dyn HttpClient>) -> Arc<LlmIntrospection> {
+    Arc::new(LlmIntrospection::new(http_client))
+}
+
+pub(crate) fn build_provider_configuration(
+    config_file: Arc<ConfigFile>,
+    keychain: Arc<Keychain>,
+    http_client: Arc<dyn HttpClient>,
+    translation_coordinator: Arc<crate::application::providers::translation::TranslationCoordinator>,
+    llm_introspection: Arc<LlmIntrospection>,
+) -> Arc<ProviderConfiguration> {
+    Arc::new(ProviderConfiguration::new(
+        config_file,
+        keychain,
+        http_client,
+        translation_coordinator,
+        llm_introspection,
+    ))
+}
 
 pub(crate) fn build_translation_coordinator(
     config_file: Arc<ConfigFile>,

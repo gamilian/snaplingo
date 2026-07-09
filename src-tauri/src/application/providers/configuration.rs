@@ -52,6 +52,30 @@ pub struct UpdateCustomTranslationProviderInput {
     pub prompt_fallback_strategy_id: Option<String>,
 }
 
+/// Information about a translation provider for display purposes.
+#[derive(Serialize)]
+pub struct ProviderInfo {
+    pub id: String,
+    pub name: String,
+    pub is_configured: bool,
+    pub requires_api_key: bool,
+    pub is_active: bool,
+    pub is_builtin: bool,
+    pub protocol: Option<String>,
+    pub endpoint: Option<String>,
+    pub model: Option<String>,
+    pub reasoning_level: Option<String>,
+    pub prompt_strategy_id: Option<String>,
+    pub prompt_fallback_strategy_id: Option<String>,
+}
+
+/// A credential value to save.
+#[derive(Deserialize)]
+pub struct CredentialValue {
+    pub key: String,
+    pub value: String,
+}
+
 pub struct CustomTranslationProviderView {
     pub id: String,
     pub name: String,
@@ -616,5 +640,751 @@ mod tests {
             result.unwrap_err().to_string(),
             "Field cannot be empty: API Key"
         );
+    }
+}
+
+/// Owns the full custom LLM provider lifecycle: add/update/remove, credentials, listing, testing.
+pub struct ProviderConfiguration {
+    config_file: Arc<ConfigFile>,
+    keychain: Arc<Keychain>,
+    http_client: Arc<dyn HttpClient>,
+    translation_coordinator: Arc<TranslationCoordinator>,
+    llm_introspection: Arc<crate::application::providers::LlmIntrospection>,
+}
+
+impl ProviderConfiguration {
+    pub fn new(
+        config_file: Arc<ConfigFile>,
+        keychain: Arc<Keychain>,
+        http_client: Arc<dyn HttpClient>,
+        translation_coordinator: Arc<TranslationCoordinator>,
+        llm_introspection: Arc<crate::application::providers::LlmIntrospection>,
+    ) -> Self {
+        Self {
+            config_file,
+            keychain,
+            http_client,
+            translation_coordinator,
+            llm_introspection,
+        }
+    }
+
+    /// Add a new custom translation provider.
+    pub fn add(
+        &self,
+        input: AddCustomTranslationProviderInput,
+    ) -> crate::Result<CustomTranslationProviderView> {
+        add_custom_translation_provider(
+            input,
+            self.config_file.clone(),
+            &self.keychain,
+            self.http_client.clone(),
+            &self.translation_coordinator,
+        )
+    }
+
+    /// Update an existing custom translation provider.
+    pub fn update(
+        &self,
+        provider_id: String,
+        input: UpdateCustomTranslationProviderInput,
+    ) -> crate::Result<CustomTranslationProviderView> {
+        // Load current state for rollback
+        let mut custom_defs = self
+            .config_file
+            .load::<Vec<CustomTranslationProviderDef>>("custom_translation_providers")
+            .unwrap_or_default();
+
+        let index = custom_defs
+            .iter()
+            .position(|def| def.id == provider_id)
+            .ok_or_else(|| AppError::Other(format!("Provider not found: {}", provider_id)))?;
+
+        let old_def = custom_defs[index].clone();
+
+        // Load old API key for rollback if we're changing it
+        let old_api_key = if input.api_key.as_ref().map(|k| !k.trim().is_empty()).unwrap_or(false) {
+            // We're changing the key, load old for rollback - must succeed
+            Some(
+                self.keychain
+                    .load_provider_credential(&provider_id)
+                    .map_err(|e| AppError::Other(format!("Cannot load existing key for rollback: {}", e)))?
+            )
+        } else {
+            None
+        };
+
+        // Determine API key: use new if provided, otherwise load existing
+        let api_key = if let Some(ref new_key) = input.api_key {
+            let trimmed = new_key.trim();
+            if trimmed.is_empty() {
+                // If explicitly empty, load existing
+                self.keychain
+                    .load_provider_credential(&provider_id)
+                    .map_err(|e| AppError::Other(format!("Failed to load existing API key: {}", e)))?
+            } else {
+                trimmed.to_string()
+            }
+        } else {
+            self.keychain
+                .load_provider_credential(&provider_id)
+                .map_err(|e| AppError::Other(format!("Failed to load existing API key: {}", e)))?
+        };
+
+        // Build updated definition
+        let updated_def = build_updated_custom_translation_provider_def(provider_id.clone(), &input)?;
+
+        // Step 1: Save config first (no side effects if this fails)
+        custom_defs[index] = updated_def.clone();
+        self.config_file
+            .save("custom_translation_providers", &custom_defs)
+            .map_err(|e| {
+                // Restore in-memory state
+                custom_defs[index] = old_def.clone();
+                AppError::Other(format!("Failed to save config: {}", e))
+            })?;
+
+        // Step 2: Save new API key if provided and non-empty
+        if let Some(ref new_key) = input.api_key {
+            if !new_key.trim().is_empty() {
+                if let Err(e) = self.keychain.save_provider_credential(&provider_id, new_key.trim()) {
+                    // Rollback config
+                    custom_defs[index] = old_def.clone();
+                    let _ = self.config_file.save("custom_translation_providers", &custom_defs);
+                    return Err(AppError::Other(format!("Failed to save API key: {}", e)));
+                }
+            }
+        }
+
+        // Step 3: Create and register the updated provider
+        let provider = create_llm_translation_provider(
+            &updated_def,
+            self.http_client.clone(),
+            api_key,
+            self.config_file.clone(),
+        );
+
+        // Step 4: Attempt to replace in coordinator - rollback on failure
+        if let Err(e) = self.translation_coordinator.replace(provider) {
+            // Rollback config
+            custom_defs[index] = old_def;
+            let _ = self
+                .config_file
+                .save("custom_translation_providers", &custom_defs);
+
+            // Rollback keychain if we saved a new key
+            if let Some(ref old_key) = old_api_key {
+                let _ = self.keychain.save_provider_credential(&provider_id, old_key);
+            }
+
+            return Err(AppError::Other(format!(
+                "Failed to update provider: {}",
+                e
+            )));
+        }
+
+        Ok(custom_translation_provider_view(&updated_def))
+    }
+
+    /// Remove a custom translation provider.
+    pub fn remove(&self, provider_id: String) -> crate::Result<()> {
+        // Reject builtin providers
+        let builtin_ids = ["google-translate", "deeplx", "baidu-translate"];
+        if builtin_ids.contains(&provider_id.as_str()) {
+            return Err(AppError::Other("Cannot remove builtin provider".into()));
+        }
+
+        let mut custom_defs = self
+            .config_file
+            .load::<Vec<CustomTranslationProviderDef>>("custom_translation_providers")
+            .unwrap_or_default();
+
+        let index = custom_defs
+            .iter()
+            .position(|def| def.id == provider_id)
+            .ok_or_else(|| AppError::Other(format!("Provider not found: {}", provider_id)))?;
+
+        let removed_def = custom_defs[index].clone();
+
+        // Step 0: Snapshot active providers list and order for rollback
+        let active_providers = self.translation_coordinator.get_active();
+        let active_ids: Vec<String> = active_providers
+            .iter()
+            .map(|p| p.read().id().to_string())
+            .collect();
+        let was_active = active_ids.contains(&provider_id);
+
+        // Step 0.5: Collect credential field names BEFORE unregistering
+        let credential_field_names: Vec<String> = if let Some(provider) = self.translation_coordinator.get(&provider_id) {
+            provider.read().credential_fields().iter().map(|f| f.name.clone()).collect()
+        } else {
+            // Not registered, infer from custom LLM default
+            vec!["api_key".to_string()]
+        };
+
+        // Snapshot credentials
+        let snapshot = self
+            .keychain
+            .snapshot_provider_credentials(&provider_id, &credential_field_names);
+
+        // Step 1: Remove from config first (lowest risk)
+        custom_defs.remove(index);
+        self.config_file
+            .save("custom_translation_providers", &custom_defs)
+            .map_err(|e| AppError::Other(format!("Failed to save config: {}", e)))?;
+
+        // Step 2: Unregister from coordinator (track whether it was registered)
+        let was_registered = self.translation_coordinator.get(&provider_id).is_some();
+
+        if was_registered {
+            if let Err(e) = self.translation_coordinator.unregister(&provider_id) {
+                // Rollback config
+                custom_defs.insert(index, removed_def.clone());
+                let _ = self.config_file.save("custom_translation_providers", &custom_defs);
+                return Err(AppError::Other(format!("Failed to unregister: {}", e)));
+            }
+        }
+
+        // Step 3: Delete simple API key
+        let delete_result = self.keychain.delete_provider_credential(&provider_id);
+        if let Err(e) = &delete_result {
+            let err_msg = format!("{}", e);
+            // Only fail if key exists but deletion failed (idempotent delete)
+            if !err_msg.contains("not found") && !err_msg.contains("Key not found") {
+                // Complete rollback: config + credentials + provider registration + active state
+                custom_defs.insert(index, removed_def.clone());
+                let _ = self.config_file.save("custom_translation_providers", &custom_defs);
+
+                // Restore credentials from snapshot
+                let _ = self.keychain.restore_provider_credentials(&provider_id, &snapshot);
+
+                // Re-register provider if it was registered before
+                if was_registered {
+                    let api_key = snapshot.api_key.and_then(|opt| opt).unwrap_or_default();
+                    let provider = create_llm_translation_provider(
+                        &removed_def,
+                        self.http_client.clone(),
+                        api_key,
+                        self.config_file.clone(),
+                    );
+                    let _ = self.translation_coordinator.register(provider);
+
+                    // Restore active state if it was active
+                    if was_active {
+                        let _ = self.translation_coordinator.activate(&provider_id);
+                    }
+
+                    // Restore active order by reordering
+                    let _ = self.translation_coordinator.reorder_active(active_ids.clone());
+                }
+
+                return Err(AppError::Other(format!("Failed to delete credential: {}", e)));
+            }
+        }
+
+        // Step 4: Delete structured credentials (using saved field names)
+        if !credential_field_names.is_empty() {
+            let _ = self.keychain.delete_provider_credentials(&provider_id, &credential_field_names);
+        }
+
+        Ok(())
+    }
+
+    /// List all translation providers with metadata.
+    pub fn list_provider_infos(&self) -> Vec<ProviderInfo> {
+        let all_providers = self.translation_coordinator.list_all();
+        let active = self.translation_coordinator.get_active();
+        let active_ids: Vec<_> = active.iter().map(|p| p.read().id().to_string()).collect();
+
+        // Load custom provider definitions for extra metadata
+        let custom_defs = self
+            .config_file
+            .load::<Vec<CustomTranslationProviderDef>>("custom_translation_providers")
+            .unwrap_or_default();
+
+        all_providers
+            .iter()
+            .map(|p| {
+                let provider = p.read();
+                let id = provider.id().to_string();
+                let is_builtin = matches!(
+                    id.as_str(),
+                    "google-translate" | "deeplx" | "baidu-translate"
+                );
+
+                // Find matching custom def
+                let custom_def = custom_defs.iter().find(|def| def.id == id);
+
+                ProviderInfo {
+                    id: id.clone(),
+                    name: provider.name().to_string(),
+                    is_configured: provider.is_configured(),
+                    requires_api_key: provider.requires_api_key(),
+                    is_active: active_ids.contains(&id),
+                    is_builtin,
+                    protocol: custom_def.map(|def| def.protocol.as_str().to_string()),
+                    endpoint: custom_def.map(|def| def.endpoint.clone()),
+                    model: custom_def.map(|def| def.model.clone()),
+                    reasoning_level: custom_def.and_then(|def| {
+                        def.reasoning_level
+                            .map(|level| format!("{:?}", level).to_lowercase())
+                    }),
+                    prompt_strategy_id: custom_def.map(|def| def.prompt_strategy_id.clone()),
+                    prompt_fallback_strategy_id: custom_def
+                        .map(|def| def.prompt_fallback_strategy_id.clone()),
+                }
+            })
+            .collect()
+    }
+
+    /// Get the credential schema for a translation provider.
+    pub fn credential_schema(&self, provider_id: String) -> crate::Result<Vec<CredentialField>> {
+        let provider = self
+            .translation_coordinator
+            .get(&provider_id)
+            .ok_or_else(|| AppError::Other(format!("Provider not found: {}", provider_id)))?;
+
+        let fields = provider.read().credential_fields();
+        Ok(fields)
+    }
+
+    /// Save credentials for a translation provider.
+    pub fn save_credentials(
+        &self,
+        provider_id: String,
+        credentials: Vec<CredentialValue>,
+    ) -> crate::Result<()> {
+        // Convert to HashMap for validation and processing
+        let cred_map: HashMap<String, String> = credentials
+            .into_iter()
+            .map(|c| (c.key, c.value))
+            .collect();
+
+        // Get provider to validate schema
+        let provider = self
+            .translation_coordinator
+            .get(&provider_id)
+            .ok_or_else(|| AppError::Other(format!("Provider not found: {}", provider_id)))?;
+
+        let expected_fields = provider.read().credential_fields();
+
+        // Validate credentials before saving anything
+        if provider_id == "deeplx" {
+            validate_deeplx_credentials_map(&cred_map)?;
+        } else {
+            validate_required_credentials(&expected_fields, &cred_map)
+                .map_err(|e| AppError::Other(e.to_string()))?;
+        }
+
+        // Validate that all provided credentials are non-blank
+        for (key, value) in &cred_map {
+            if value.trim().is_empty() {
+                return Err(AppError::Other(format!(
+                    "Credential '{}' cannot be blank",
+                    key
+                )));
+            }
+        }
+
+        // Snapshot existing credentials for rollback
+        let field_names: Vec<String> = expected_fields.iter().map(|f| f.name.clone()).collect();
+        let snapshot = self
+            .keychain
+            .snapshot_provider_credentials(&provider_id, &field_names);
+
+        // Save simple API key if applicable
+        if cred_map.len() == 1 && cred_map.contains_key("api_key") {
+            let api_key = cred_map.get("api_key").unwrap();
+            if let Err(e) = self.keychain.save_provider_credential(&provider_id, api_key) {
+                return Err(AppError::Other(format!("Failed to save credential: {}", e)));
+            }
+        }
+
+        // Save structured credentials with transaction support
+        if let Err(e) = self
+            .keychain
+            .save_provider_credentials_transactional(&provider_id, &cred_map, &snapshot)
+        {
+            // Rollback simple credential if we saved it
+            if cred_map.len() == 1 && cred_map.contains_key("api_key") {
+                if let Some(Some(ref old_key)) = snapshot.api_key {
+                    let _ = self.keychain.save_provider_credential(&provider_id, old_key);
+                } else if snapshot.api_key == Some(None) {
+                    let _ = self.keychain.delete_provider_credential(&provider_id);
+                }
+            }
+            return Err(AppError::Other(format!("Failed to save credentials: {}", e)));
+        }
+
+        // Reconfigure the provider with credentials
+        if let Err(e) = self
+            .translation_coordinator
+            .reconfigure_provider(&provider_id, &cred_map)
+        {
+            // Complete rollback using snapshot
+            let _ = self.keychain.restore_provider_credentials(&provider_id, &snapshot);
+            return Err(AppError::Other(format!("Failed to reconfigure provider: {}", e)));
+        }
+
+        Ok(())
+    }
+
+    /// Test a custom translation provider by ID.
+    pub async fn test_custom_provider(&self, provider_id: String) -> crate::Result<()> {
+        let custom_defs = self
+            .config_file
+            .load::<Vec<CustomTranslationProviderDef>>("custom_translation_providers")
+            .unwrap_or_default();
+
+        let def = custom_defs
+            .iter()
+            .find(|def| def.id == provider_id)
+            .ok_or_else(|| AppError::Other(format!("Provider not found: {}", provider_id)))?;
+
+        let api_key = self
+            .keychain
+            .load_provider_credential(&provider_id)
+            .map_err(|e| AppError::Other(format!("Failed to load provider credential: {}", e)))?;
+
+        self.llm_introspection
+            .test(def.protocol, &def.endpoint, &def.model, &api_key)
+            .await
+            .map_err(|e| AppError::Other(format!("Provider test failed: {}", e)))
+    }
+}
+
+/// Validate DeepLX credentials based on mode.
+fn validate_deeplx_credentials_map(credentials: &HashMap<String, String>) -> crate::Result<()> {
+    let mode = credentials
+        .get("mode")
+        .map(String::as_str)
+        .unwrap_or("deeplx");
+
+    match mode {
+        "deepl" => {
+            // DeepL mode requires api_key
+            if !credentials.contains_key("api_key") {
+                return Err(AppError::Other("DeepL mode requires api_key".into()));
+            }
+            let api_key = credentials.get("api_key").unwrap();
+            if api_key.trim().is_empty() {
+                return Err(AppError::Other("DeepL api_key cannot be blank".into()));
+            }
+        }
+        "deeplx" => {
+            // DeepLX mode requires endpoint
+            if !credentials.contains_key("endpoint") {
+                return Err(AppError::Other("DeepLX mode requires endpoint".into()));
+            }
+            let endpoint = credentials.get("endpoint").unwrap();
+            if endpoint.trim().is_empty() {
+                return Err(AppError::Other("DeepLX endpoint cannot be blank".into()));
+            }
+        }
+        other => {
+            return Err(AppError::Other(format!("Invalid DeepLX mode: {}", other)));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod provider_configuration_tests {
+    use super::*;
+    use crate::application::providers::translation::TranslationCoordinator;
+    use crate::infrastructure::http::{HttpClient, HttpResponse};
+    use crate::infrastructure::storage::{ConfigFile, KeychainBackend};
+    use anyhow::Result;
+    use async_trait::async_trait;
+    use std::collections::HashMap;
+    use std::sync::{Arc, Mutex};
+
+    // Stub keychain for testing
+    struct StubKeychainBackend {
+        store: Mutex<HashMap<String, String>>,
+    }
+
+    impl StubKeychainBackend {
+        fn new() -> Self {
+            Self {
+                store: Mutex::new(HashMap::new()),
+            }
+        }
+    }
+
+    impl KeychainBackend for StubKeychainBackend {
+        fn save(&self, key: &str, value: &str) -> crate::Result<()> {
+            self.store
+                .lock()
+                .unwrap()
+                .insert(key.to_string(), value.to_string());
+            Ok(())
+        }
+
+        fn load(&self, key: &str) -> crate::Result<String> {
+            self.store
+                .lock()
+                .unwrap()
+                .get(key)
+                .cloned()
+                .ok_or_else(|| crate::AppError::Other(format!("Key not found: {}", key)))
+        }
+
+        fn delete(&self, key: &str) -> crate::Result<()> {
+            self.store.lock().unwrap().remove(key);
+            Ok(())
+        }
+    }
+
+    struct MockHttpClient;
+
+    #[async_trait]
+    impl HttpClient for MockHttpClient {
+        async fn get(&self, _url: &str, _headers: HashMap<String, String>) -> Result<HttpResponse> {
+            Ok(HttpResponse {
+                status: 200,
+                body: r#"{"data":[]}"#.to_string(),
+                headers: HashMap::new(),
+            })
+        }
+
+        async fn post(
+            &self,
+            _url: &str,
+            _headers: HashMap<String, String>,
+            _body: String,
+        ) -> Result<HttpResponse> {
+            Ok(HttpResponse {
+                status: 200,
+                body: r#"{"choices":[{"message":{"content":"OK"}}]}"#.to_string(),
+                headers: HashMap::new(),
+            })
+        }
+    }
+
+    fn test_provider_configuration() -> ProviderConfiguration {
+        let keychain = Arc::new(Keychain::with_backend(StubKeychainBackend::new()));
+        let config_file = Arc::new(ConfigFile::new_temp());
+        let http_client: Arc<dyn HttpClient> = Arc::new(MockHttpClient);
+        let coordinator = Arc::new(TranslationCoordinator::new(config_file.clone()));
+        let llm_introspection = Arc::new(crate::application::providers::LlmIntrospection::new(
+            http_client.clone(),
+        ));
+
+        // Register builtin DeepL provider for testing
+        use crate::application::providers::translation::DeepLProvider;
+        let deeplx_provider = DeepLProvider::new(http_client.clone());
+        let _ = coordinator.register(deeplx_provider);
+
+        ProviderConfiguration::new(
+            config_file,
+            keychain,
+            http_client,
+            coordinator,
+            llm_introspection,
+        )
+    }
+
+    #[test]
+    fn remove_rejects_builtin_providers() {
+        let config = test_provider_configuration();
+
+        let result = config.remove("google-translate".to_string());
+
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Cannot remove builtin provider"
+        );
+    }
+
+    #[test]
+    fn remove_returns_error_for_nonexistent_provider() {
+        let config = test_provider_configuration();
+
+        let result = config.remove("nonexistent-id".to_string());
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Provider not found"));
+    }
+
+    #[tokio::test]
+    async fn test_custom_provider_returns_error_for_nonexistent() {
+        let config = test_provider_configuration();
+
+        let result = config.test_custom_provider("nonexistent-id".to_string()).await;
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Provider not found"));
+    }
+
+    #[test]
+    fn save_credentials_validates_deeplx_mode_deepl_requires_api_key() {
+        let config = test_provider_configuration();
+
+        let credentials = vec![
+            CredentialValue {
+                key: "mode".to_string(),
+                value: "deepl".to_string(),
+            },
+            CredentialValue {
+                key: "endpoint".to_string(),
+                value: "http://example.com".to_string(),
+            },
+        ];
+
+        let result = config.save_credentials("deeplx".to_string(), credentials);
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("DeepL mode requires api_key"));
+    }
+
+    #[test]
+    fn save_credentials_validates_deeplx_mode_deeplx_requires_endpoint() {
+        let config = test_provider_configuration();
+
+        let credentials = vec![
+            CredentialValue {
+                key: "mode".to_string(),
+                value: "deeplx".to_string(),
+            },
+            CredentialValue {
+                key: "api_key".to_string(),
+                value: "some-key".to_string(),
+            },
+        ];
+
+        let result = config.save_credentials("deeplx".to_string(), credentials);
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("DeepLX mode requires endpoint"));
+    }
+
+    #[test]
+    fn save_credentials_rejects_blank_values() {
+        let config = test_provider_configuration();
+
+        let credentials = vec![
+            CredentialValue {
+                key: "mode".to_string(),
+                value: "deeplx".to_string(),
+            },
+            CredentialValue {
+                key: "endpoint".to_string(),
+                value: "   ".to_string(), // blank
+            },
+        ];
+
+        let result = config.save_credentials("deeplx".to_string(), credentials);
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("cannot be blank"));
+    }
+
+    #[test]
+    fn save_credentials_rejects_nonexistent_provider() {
+        let config = test_provider_configuration();
+
+        let credentials = vec![CredentialValue {
+            key: "api_key".to_string(),
+            value: "test-key".to_string(),
+        }];
+
+        let result = config.save_credentials("nonexistent-id".to_string(), credentials);
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Provider not found"));
+    }
+
+    #[test]
+    fn remove_succeeds_for_unregistered_provider() {
+        let config = test_provider_configuration();
+
+        // Add a custom provider to config but don't register it
+        let def = CustomTranslationProviderDef {
+            id: "test-custom-1".to_string(),
+            name: "Test Custom".to_string(),
+            protocol: LLMProtocol::OpenAI,
+            endpoint: "https://api.example.com/v1".to_string(),
+            model: "test-model".to_string(),
+            reasoning_level: None,
+            prompt_strategy_id: "default".to_string(),
+            prompt_fallback_strategy_id: "default".to_string(),
+        };
+
+        let _ = config
+            .config_file
+            .save("custom_translation_providers", &vec![def]);
+
+        // Save a credential
+        let _ = config
+            .keychain
+            .save_provider_credential("test-custom-1", "test-key");
+
+        // Remove should succeed even though provider is not registered
+        let result = config.remove("test-custom-1".to_string());
+
+        assert!(result.is_ok());
+
+        // Verify config and keychain are cleaned up
+        let remaining_defs = config
+            .config_file
+            .load::<Vec<CustomTranslationProviderDef>>("custom_translation_providers")
+            .unwrap_or_default();
+        assert!(remaining_defs.is_empty());
+
+        let key_result = config.keychain.load_provider_credential("test-custom-1");
+        assert!(key_result.is_err());
+    }
+
+    #[test]
+    fn remove_succeeds_when_keychain_missing() {
+        let config = test_provider_configuration();
+
+        // Add a custom provider to config but don't save any credentials
+        let def = CustomTranslationProviderDef {
+            id: "test-custom-2".to_string(),
+            name: "Test Custom 2".to_string(),
+            protocol: LLMProtocol::OpenAI,
+            endpoint: "https://api.example.com/v1".to_string(),
+            model: "test-model".to_string(),
+            reasoning_level: None,
+            prompt_strategy_id: "default".to_string(),
+            prompt_fallback_strategy_id: "default".to_string(),
+        };
+
+        let _ = config
+            .config_file
+            .save("custom_translation_providers", &vec![def]);
+
+        // Remove should succeed even though keychain entry doesn't exist
+        let result = config.remove("test-custom-2".to_string());
+
+        assert!(result.is_ok());
+
+        // Verify config is cleaned up
+        let remaining_defs = config
+            .config_file
+            .load::<Vec<CustomTranslationProviderDef>>("custom_translation_providers")
+            .unwrap_or_default();
+        assert!(remaining_defs.is_empty());
     }
 }

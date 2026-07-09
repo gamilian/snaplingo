@@ -1,5 +1,12 @@
 mod backend;
 
+// Re-export KeychainBackend for testing
+#[cfg(test)]
+pub use backend::KeychainBackend;
+
+#[cfg(not(test))]
+use backend::KeychainBackend;
+
 #[cfg(target_os = "macos")]
 mod macos;
 #[cfg(target_os = "macos")]
@@ -16,8 +23,26 @@ mod linux;
 use linux::LinuxKeychain as PlatformKeychainImpl;
 
 use crate::error::Result;
-use backend::KeychainBackend;
 use std::collections::HashMap;
+
+/// Snapshot of provider credentials for rollback
+#[derive(Debug, Clone)]
+pub struct CredentialSnapshot {
+    /// Simple API key: Present(value) or Absent
+    pub api_key: Option<Option<String>>,
+    /// Structured credentials: field_name -> Present(value) or Absent
+    pub structured: HashMap<String, Option<String>>,
+}
+
+impl CredentialSnapshot {
+    /// Create an empty snapshot
+    pub fn new() -> Self {
+        Self {
+            api_key: None,
+            structured: HashMap::new(),
+        }
+    }
+}
 
 /// Platform-adaptive keychain wrapper
 pub struct Keychain {
@@ -75,6 +100,100 @@ impl Keychain {
         Ok(())
     }
 
+    /// Save provider credentials with automatic rollback on failure.
+    /// Returns the fields that were successfully saved before failure (for manual cleanup).
+    pub fn save_provider_credentials_transactional(
+        &self,
+        provider_id: &str,
+        credentials: &HashMap<String, String>,
+        snapshot: &CredentialSnapshot,
+    ) -> Result<()> {
+        let mut saved_fields: Vec<String> = Vec::new();
+
+        for (field_name, value) in credentials {
+            let key = format!("provider:{}:credential:{}", provider_id, field_name);
+            if let Err(e) = self.backend.save(&key, value) {
+                // Rollback: restore all saved fields
+                for saved_field in &saved_fields {
+                    let key = format!("provider:{}:credential:{}", provider_id, saved_field);
+                    // Check if this field was in the snapshot
+                    match snapshot.structured.get(saved_field.as_str()) {
+                        Some(Some(val)) => {
+                            // Restore old value
+                            let _ = self.backend.save(&key, val);
+                        }
+                        Some(None) | None => {
+                            // Was absent or not tracked, delete the new value
+                            let _ = self.backend.delete(&key);
+                        }
+                    }
+                }
+                return Err(e);
+            }
+            saved_fields.push(field_name.clone());
+        }
+        Ok(())
+    }
+
+    /// Snapshot provider credentials for rollback
+    pub fn snapshot_provider_credentials(
+        &self,
+        provider_id: &str,
+        field_names: &[String],
+    ) -> CredentialSnapshot {
+        let mut snapshot = CredentialSnapshot::new();
+
+        // Snapshot simple API key
+        snapshot.api_key = Some(self.load_provider_credential(provider_id).ok());
+
+        // Snapshot structured credentials
+        for field_name in field_names {
+            let key = format!("provider:{}:credential:{}", provider_id, field_name);
+            let value = self.backend.load(&key).ok();
+            snapshot.structured.insert(field_name.clone(), value);
+        }
+
+        snapshot
+    }
+
+    /// Restore provider credentials from snapshot
+    pub fn restore_provider_credentials(
+        &self,
+        provider_id: &str,
+        snapshot: &CredentialSnapshot,
+    ) -> Result<()> {
+        // Restore simple API key
+        if let Some(api_key_state) = &snapshot.api_key {
+            match api_key_state {
+                Some(key) => {
+                    // Restore old value
+                    self.save_provider_credential(provider_id, key)?;
+                }
+                None => {
+                    // Was absent, delete current value
+                    let _ = self.delete_provider_credential(provider_id);
+                }
+            }
+        }
+
+        // Restore structured credentials
+        for (field_name, old_value) in &snapshot.structured {
+            let key = format!("provider:{}:credential:{}", provider_id, field_name);
+            match old_value {
+                Some(val) => {
+                    // Restore old value
+                    self.backend.save(&key, val)?;
+                }
+                None => {
+                    // Was absent, delete current value
+                    let _ = self.backend.delete(&key);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     /// Load multiple provider credentials
     /// Key format: "provider:{provider_id}:credential:{field_name}"
     /// Returns only the fields that exist in keychain
@@ -113,6 +232,7 @@ impl Keychain {
     }
 
     /// Delete specific credential fields for a provider
+    /// Only ignores "not found" errors, other errors are propagated
     pub fn delete_provider_credentials(
         &self,
         provider_id: &str,
@@ -120,7 +240,13 @@ impl Keychain {
     ) -> Result<()> {
         for field_name in field_names {
             let key = format!("provider:{}:credential:{}", provider_id, field_name);
-            let _ = self.backend.delete(&key); // Ignore errors for non-existent keys
+            if let Err(e) = self.backend.delete(&key) {
+                let err_msg = format!("{}", e);
+                // Only ignore "not found" errors, propagate real failures
+                if !err_msg.contains("not found") && !err_msg.contains("Key not found") {
+                    return Err(e);
+                }
+            }
         }
         Ok(())
     }
@@ -174,6 +300,81 @@ mod tests {
         }
     }
 
+    /// Keychain backend that can be configured to fail on specific operations
+    struct FailingKeychainBackend {
+        store: std::sync::Mutex<std::collections::HashMap<String, String>>,
+        fail_on_save_after_n: std::sync::Mutex<Option<usize>>,
+        save_count: std::sync::Mutex<usize>,
+        fail_on_delete: std::sync::Mutex<Option<String>>,
+    }
+
+    impl FailingKeychainBackend {
+        fn new() -> Self {
+            Self {
+                store: std::sync::Mutex::new(std::collections::HashMap::new()),
+                fail_on_save_after_n: std::sync::Mutex::new(None),
+                save_count: std::sync::Mutex::new(0),
+                fail_on_delete: std::sync::Mutex::new(None),
+            }
+        }
+
+        /// Fail on the Nth save operation (0-indexed)
+        fn fail_on_save_after(&self, n: usize) {
+            *self.fail_on_save_after_n.lock().unwrap() = Some(n);
+        }
+
+        /// Fail when deleting a specific key
+        fn fail_on_delete_key(&self, key: String) {
+            *self.fail_on_delete.lock().unwrap() = Some(key);
+        }
+    }
+
+    impl KeychainBackend for FailingKeychainBackend {
+        fn save(&self, key: &str, value: &str) -> Result<()> {
+            let mut count = self.save_count.lock().unwrap();
+            let current = *count;
+            *count += 1;
+
+            if let Some(fail_after) = *self.fail_on_save_after_n.lock().unwrap() {
+                if current >= fail_after {
+                    return Err(crate::AppError::Other(format!(
+                        "Simulated save failure at operation {}",
+                        current
+                    )));
+                }
+            }
+
+            self.store
+                .lock()
+                .unwrap()
+                .insert(key.to_string(), value.to_string());
+            Ok(())
+        }
+
+        fn load(&self, key: &str) -> Result<String> {
+            self.store
+                .lock()
+                .unwrap()
+                .get(key)
+                .cloned()
+                .ok_or_else(|| crate::AppError::Other(format!("Keychain: not found: {}", key)))
+        }
+
+        fn delete(&self, key: &str) -> Result<()> {
+            if let Some(ref fail_key) = *self.fail_on_delete.lock().unwrap() {
+                if key == fail_key {
+                    return Err(crate::AppError::Other(format!(
+                        "Simulated delete failure for key: {}",
+                        key
+                    )));
+                }
+            }
+
+            self.store.lock().unwrap().remove(key);
+            Ok(())
+        }
+    }
+
     #[test]
     fn keychain_with_backend_round_trips_provider_credential() {
         let keychain = Keychain::with_backend(StubKeychainBackend::new());
@@ -186,5 +387,97 @@ mod tests {
 
         keychain.delete_provider_credential("custom-llm-1").unwrap();
         assert!(keychain.load_provider_credential("custom-llm-1").is_err());
+    }
+
+    #[test]
+    fn save_credentials_transactional_rolls_back_on_failure() {
+        // Create a keychain with stub backend for initial setup
+        let keychain = Keychain::with_backend(StubKeychainBackend::new());
+        keychain.save_provider_credential("test-provider", "old-simple-key").unwrap();
+        let mut existing_creds = std::collections::HashMap::new();
+        existing_creds.insert("field1".to_string(), "old-value1".to_string());
+        keychain.save_provider_credentials("test-provider", &existing_creds).unwrap();
+
+        // Snapshot
+        let snapshot = keychain.snapshot_provider_credentials(
+            "test-provider",
+            &vec!["field1".to_string(), "field2".to_string()],
+        );
+
+        // Create failing backend and copy state
+        let failing_backend = FailingKeychainBackend::new();
+        failing_backend.store.lock().unwrap().insert(
+            "provider:test-provider:api_key".to_string(),
+            "old-simple-key".to_string(),
+        );
+        failing_backend.store.lock().unwrap().insert(
+            "provider:test-provider:credential:field1".to_string(),
+            "old-value1".to_string(),
+        );
+
+        failing_backend.fail_on_save_after(1); // Fail on 2nd save operation
+        let keychain_failing = Keychain::with_backend(failing_backend);
+
+        // Try to save 2 fields, should fail on the 2nd
+        let mut new_creds = std::collections::HashMap::new();
+        new_creds.insert("field1".to_string(), "new-value1".to_string());
+        new_creds.insert("field2".to_string(), "new-value2".to_string());
+
+        let result = keychain_failing.save_provider_credentials_transactional(
+            "test-provider",
+            &new_creds,
+            &snapshot,
+        );
+
+        // Should fail
+        assert!(result.is_err(), "Expected transactional save to fail");
+
+        // Verify field1 was rolled back to old value (not left as new-value1)
+        let cred1 = keychain_failing.backend.load("provider:test-provider:credential:field1").unwrap();
+        assert_eq!(cred1, "old-value1", "field1 should be rolled back");
+
+        // field2 should not exist (was absent before and transaction failed)
+        assert!(keychain_failing.backend.load("provider:test-provider:credential:field2").is_err(),
+                "field2 should not exist after rollback");
+    }
+
+    #[test]
+    fn restore_provider_credentials_handles_present_and_absent() {
+        let keychain = Keychain::with_backend(StubKeychainBackend::new());
+
+        // Setup: field1 exists, field2 absent
+        keychain.save_provider_credential("test-provider", "simple-key").unwrap();
+        let mut creds = std::collections::HashMap::new();
+        creds.insert("field1".to_string(), "value1".to_string());
+        keychain.save_provider_credentials("test-provider", &creds).unwrap();
+
+        // Create snapshot
+        let snapshot = keychain.snapshot_provider_credentials(
+            "test-provider",
+            &vec!["field1".to_string(), "field2".to_string()],
+        );
+
+        // Verify snapshot captured the state
+        assert_eq!(snapshot.api_key, Some(Some("simple-key".to_string())));
+        assert_eq!(snapshot.structured.get("field1"), Some(&Some("value1".to_string())));
+        assert_eq!(snapshot.structured.get("field2"), Some(&None));
+
+        // Modify state
+        keychain.save_provider_credential("test-provider", "changed-key").unwrap();
+        let mut new_creds = std::collections::HashMap::new();
+        new_creds.insert("field1".to_string(), "changed1".to_string());
+        new_creds.insert("field2".to_string(), "new-field2".to_string());
+        keychain.save_provider_credentials("test-provider", &new_creds).unwrap();
+
+        // Restore from snapshot
+        keychain.restore_provider_credentials("test-provider", &snapshot).unwrap();
+
+        // Verify restoration
+        assert_eq!(keychain.load_provider_credential("test-provider").unwrap(), "simple-key");
+        let field1 = keychain.backend.load("provider:test-provider:credential:field1").unwrap();
+        assert_eq!(field1, "value1");
+
+        // field2 should be deleted (was absent in snapshot)
+        assert!(keychain.backend.load("provider:test-provider:credential:field2").is_err());
     }
 }

@@ -1,4 +1,4 @@
-use super::client::{LLMClient, LLMRequest, LLMResponse, ReasoningLevel};
+use super::client::{LLMClient, LlmModelLister, LLMRequest, LLMResponse, ModelInfo, ReasoningLevel};
 use super::endpoint_url::complete_standard_endpoint;
 use crate::error::AppError;
 use crate::infrastructure::http::HttpClient;
@@ -171,6 +171,55 @@ impl LLMClient for GeminiLLMClient {
     }
 }
 
+#[async_trait]
+impl LlmModelLister for GeminiLLMClient {
+    async fn list_models(&self) -> Result<Vec<ModelInfo>> {
+        let url = gemini_models_url(&self.endpoint, &self.api_key);
+        let response = self
+            .http_client
+            .get(&url, HashMap::new())
+            .await
+            .map_err(|e| AppError::Network(e.to_string()))?;
+
+        ensure_gemini_success_status(response.status, &response.body)?;
+        parse_gemini_models_response(&response.body)
+    }
+}
+
+fn ensure_gemini_success_status(status: u16, body: &str) -> Result<()> {
+    match status {
+        200 => Ok(()),
+        401 | 403 => Err(AppError::Unauthorized("Invalid API key or insufficient permission".into()).into()),
+        404 => Err(AppError::InvalidResponse("API endpoint not found".into()).into()),
+        429 => Err(AppError::RateLimited("Rate limit exceeded".into()).into()),
+        _ => Err(AppError::UpstreamStatus(status, body.to_string()).into()),
+    }
+}
+
+fn parse_gemini_models_response(body: &str) -> Result<Vec<ModelInfo>> {
+    let json: serde_json::Value = serde_json::from_str(body)
+        .map_err(|e| AppError::InvalidResponse(format!("Model list JSON parse failed: {}", e)))?;
+    let data = json["models"]
+        .as_array()
+        .ok_or_else(|| AppError::InvalidResponse("Model list response is missing models array".into()))?;
+    let models: Vec<_> = data
+        .iter()
+        .filter_map(|item| item["name"].as_str())
+        .map(|name| ModelInfo {
+            id: name.strip_prefix("models/").unwrap_or(name).to_string(),
+        })
+        .collect();
+
+    if models.is_empty() {
+        Err(AppError::InvalidResponse(
+            "Model list response did not contain model ids".into(),
+        )
+        .into())
+    } else {
+        Ok(models)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -197,6 +246,58 @@ mod tests {
         async fn get(&self, _url: &str, _headers: HashMap<String, String>) -> Result<HttpResponse> {
             unimplemented!()
         }
+    }
+
+    struct ListModelsMockHttpClient {
+        status: u16,
+        body: String,
+    }
+
+    #[async_trait]
+    impl HttpClient for ListModelsMockHttpClient {
+        async fn post(
+            &self,
+            _url: &str,
+            _headers: HashMap<String, String>,
+            _body: String,
+        ) -> Result<HttpResponse> {
+            unimplemented!()
+        }
+
+        async fn get(
+            &self,
+            _url: &str,
+            _headers: HashMap<String, String>,
+        ) -> Result<HttpResponse> {
+            let mut response = HttpResponse {
+                status: self.status,
+                body: self.body.clone(),
+                headers: HashMap::new(),
+            };
+            // Mirror the key-stripping the real response parsing does not depend on.
+            response.body = response.body.replacen("?key=key", "", 1);
+            Ok(response)
+        }
+    }
+
+    #[tokio::test]
+    async fn list_models_parses_gemini_models_array() {
+        let mock = Arc::new(ListModelsMockHttpClient {
+            status: 200,
+            body: r#"{"models":[{"name":"models/gemini-2.5-pro"},{"name":"models/gemini-2.5-flash"}]}"#
+                .to_string(),
+        });
+        let client = GeminiLLMClient::new(
+            mock,
+            "https://generativelanguage.googleapis.com".to_string(),
+            "unused".to_string(),
+            "key".to_string(),
+        );
+
+        let models = client.list_models().await.unwrap();
+
+        let ids: Vec<_> = models.into_iter().map(|m| m.id).collect();
+        assert_eq!(ids, vec!["gemini-2.5-pro", "gemini-2.5-flash"]);
     }
 
     #[tokio::test]

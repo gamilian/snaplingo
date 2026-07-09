@@ -98,14 +98,33 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 - `translate()` 和 `recognize()` 可以并发调用，互不阻塞
 
 ### Provider Configuration Module（Provider 配置模块）
-`src-tauri/src/application/providers/configuration.rs` 中的配置生命周期模块。
+`src-tauri/src/application/providers/configuration.rs` 中的 `ProviderConfiguration` struct。
 
 **职责：**
-- 校验 Provider 必填凭证字段
-- 保存自定义 Translation Provider 定义
-- 构造自定义 LLM Translation Provider
-- 处理自定义 Translation Provider 的运行时新增、注册、激活和失败回滚
+- 完整的自定义 Translation Provider 生命周期管理：add、update、remove
+- 凭证管理：保存、加载、删除 keychain 条目
+- 测试自定义 Provider 连接（test_custom_provider）
+- Update 操作包含失败回滚：coordinator 替换失败时恢复旧定义和旧 API key
+- 与 `LlmIntrospection` 配合进行 Provider 测试
 - 与 Coordinator 的运行时重配置能力配合，使配置命令保存凭证后立即更新已注册 Provider，无需重启应用
+
+**边界：**
+- 不执行翻译/OCR 请求
+- 不负责 Provider 内省操作（list_models/test），由 `LlmIntrospection` 负责
+
+### LLM Introspection Module（LLM 内省模块）
+`src-tauri/src/application/providers/llm_introspection.rs` 中的 `LlmIntrospection` struct。
+
+**职责：**
+- LLM provider 内省操作：list_models 和 test
+- 集中 LLM 客户端构造逻辑，按 protocol 分发到正确的客户端
+- 在保存配置前测试 API 端点连接
+- 列举 API 端点可用模型供 UI 选择
+
+**边界：**
+- 不管理 Provider 生命周期（add/update/remove）
+- 不保存凭证或配置
+- 仅用于 UI 预览和验证
 
 ### Settings Configuration Module（设置配置模块）
 `src-tauri/src/application/settings/configuration.rs` 中的 durable settings 模块。
@@ -487,6 +506,26 @@ Provider 类型：
 - 配置管理（读写 `~/.snaplingo/config.json`、系统密钥存储）
 - 历史记录存储
 - TTS 调用（系统 TTS API）
+
+### Infrastructure Layer（基础设施层）
+
+**LLM 客户端（`infrastructure/llm/`）：**
+- `LLMClient` trait：定义 `generate()` 方法，用于生成翻译
+- `LlmModelLister` trait：定义 `list_models()` 方法，用于列举端点可用模型
+- Interface segregation：`LLMTranslationProvider` 只依赖 `LLMClient`，不需要 `list_models()` 能力
+- 实现：`OpenAILLMClient`、`AnthropicLLMClient`、`GeminiLLMClient`
+- 每个客户端封装自己的协议细节：请求头构造、错误处理、响应解析
+
+**Keychain（`infrastructure/storage/keychain/`）：**
+- 使用 `Box<dyn KeychainBackend>` trait object 实现平台抽象
+- 提供 `with_backend()` 测试构造函数支持依赖注入
+- `StubKeychainBackend` 用于单元测试，避免真实 keychain 操作
+- 平台实现：macOS (Security framework)、Windows (Credential Manager)、Linux (libsecret)
+
+**HttpClient（`infrastructure/http/`）：**
+- `HttpClient` trait：定义 GET/POST 方法
+- `ReqwestHttpClient`：基于 reqwest 的生产实现
+- 支持 mock 实现用于测试
 
 ## History（历史记录）
 
