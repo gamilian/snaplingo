@@ -4,20 +4,7 @@ use tauri::{
     Manager,
 };
 
-use crate::{commands, settings_window, AppState};
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum MenuAction {
-    Screenshot,
-    TranslateSelection,
-    ScreenshotTranslate,
-    InputTranslation,
-    ScreenshotOcr,
-    FileOcr,
-    Settings,
-    About,
-    Quit,
-}
+use crate::app_actions::{dispatch_app_action, AppAction, CaptureLaunchMode};
 
 const TRAY_ID: &str = "snaplingo";
 const SCREENSHOT_ID: &str = "screenshot";
@@ -30,17 +17,19 @@ const SETTINGS_ID: &str = "settings";
 const ABOUT_ID: &str = "about";
 const QUIT_ID: &str = "quit";
 
-pub(crate) fn menu_action_for_id(id: &str) -> Option<MenuAction> {
+pub(crate) fn menu_action_for_id(id: &str) -> Option<AppAction> {
     match id {
-        SCREENSHOT_ID => Some(MenuAction::Screenshot),
-        TRANSLATE_SELECTION_ID => Some(MenuAction::TranslateSelection),
-        SCREENSHOT_TRANSLATE_ID => Some(MenuAction::ScreenshotTranslate),
-        INPUT_TRANSLATION_ID => Some(MenuAction::InputTranslation),
-        SCREENSHOT_OCR_ID => Some(MenuAction::ScreenshotOcr),
-        FILE_OCR_ID => Some(MenuAction::FileOcr),
-        SETTINGS_ID => Some(MenuAction::Settings),
-        ABOUT_ID => Some(MenuAction::About),
-        QUIT_ID => Some(MenuAction::Quit),
+        SCREENSHOT_ID => Some(AppAction::OpenCapture(CaptureLaunchMode::Screenshot)),
+        TRANSLATE_SELECTION_ID => Some(AppAction::TranslateSelection),
+        SCREENSHOT_TRANSLATE_ID => Some(AppAction::OpenCapture(
+            CaptureLaunchMode::ScreenshotTranslate,
+        )),
+        INPUT_TRANSLATION_ID => Some(AppAction::OpenInputTranslation),
+        SCREENSHOT_OCR_ID => Some(AppAction::OpenCapture(CaptureLaunchMode::ScreenshotOcr)),
+        FILE_OCR_ID => Some(AppAction::RunFileOcr),
+        SETTINGS_ID => Some(AppAction::OpenSettings),
+        ABOUT_ID => Some(AppAction::OpenAbout),
+        QUIT_ID => Some(AppAction::Quit),
         _ => None,
     }
 }
@@ -78,7 +67,8 @@ pub(crate) fn setup_menu_bar(app: &tauri::App) -> Result<(), String> {
         .show_menu_on_left_click(true)
         .on_menu_event(|app, event| {
             if let Some(action) = menu_action_for_id(event.id().as_ref()) {
-                dispatch_menu_action(app.clone(), action);
+                log::info!("Dispatching menu action: {:?}", action);
+                dispatch_app_action(app.clone(), action);
             }
         });
 
@@ -92,61 +82,6 @@ pub(crate) fn setup_menu_bar(app: &tauri::App) -> Result<(), String> {
 
 fn menu_item(app: &tauri::App, id: &str, text: &str) -> Result<MenuItem<tauri::Wry>, String> {
     MenuItem::with_id(app, id, text, true, None::<&str>).map_err(|e| e.to_string())
-}
-
-pub(crate) fn dispatch_menu_action(app: tauri::AppHandle, action: MenuAction) {
-    log::info!("Dispatching menu action: {:?}", action);
-    match action {
-        MenuAction::Screenshot => {
-            tauri::async_runtime::spawn(commands::open_capture_window_from_shortcut(
-                app,
-                "screenshot",
-            ));
-        }
-        MenuAction::TranslateSelection => {
-            tauri::async_runtime::spawn(async move {
-                let state = app.state::<AppState>();
-                if let Err(err) = commands::open_selection_translation_window_for_state(
-                    app.clone(),
-                    state.inner(),
-                )
-                .await
-                {
-                    log::error!("Failed to open selection translation window: {}", err);
-                }
-            });
-        }
-        MenuAction::ScreenshotTranslate => {
-            tauri::async_runtime::spawn(commands::open_capture_window_from_shortcut(
-                app,
-                "screenshot-translate",
-            ));
-        }
-        MenuAction::InputTranslation => {
-            if let Err(err) = commands::open_input_translation_window(app) {
-                log::error!("Failed to open input translation window: {}", err);
-            }
-        }
-        MenuAction::ScreenshotOcr => {
-            tauri::async_runtime::spawn(commands::open_capture_window_from_shortcut(
-                app,
-                "screenshot-ocr",
-            ));
-        }
-        MenuAction::FileOcr => {
-            if let Err(err) = commands::start_file_ocr(app) {
-                log::error!("Failed to start file OCR: {}", err);
-            }
-        }
-        MenuAction::Settings | MenuAction::About => {
-            if let Err(err) = settings_window::show_settings_window(&app) {
-                log::error!("Failed to show settings window: {}", err);
-            }
-        }
-        MenuAction::Quit => {
-            app.exit(0);
-        }
-    }
 }
 
 pub(crate) fn should_prevent_implicit_exit(exit_code: Option<i32>) -> bool {
@@ -196,28 +131,33 @@ mod tests {
     fn maps_known_menu_item_ids_to_actions() {
         assert_eq!(
             menu_action_for_id("screenshot"),
-            Some(MenuAction::Screenshot)
+            Some(AppAction::OpenCapture(CaptureLaunchMode::Screenshot))
         );
         assert_eq!(
             menu_action_for_id("translate-selection"),
-            Some(MenuAction::TranslateSelection)
+            Some(AppAction::TranslateSelection)
         );
         assert_eq!(
             menu_action_for_id("screenshot-translate"),
-            Some(MenuAction::ScreenshotTranslate)
+            Some(AppAction::OpenCapture(
+                CaptureLaunchMode::ScreenshotTranslate
+            ))
         );
         assert_eq!(
             menu_action_for_id("input-translation"),
-            Some(MenuAction::InputTranslation)
+            Some(AppAction::OpenInputTranslation)
         );
         assert_eq!(
             menu_action_for_id("screenshot-ocr"),
-            Some(MenuAction::ScreenshotOcr)
+            Some(AppAction::OpenCapture(CaptureLaunchMode::ScreenshotOcr))
         );
-        assert_eq!(menu_action_for_id("file-ocr"), Some(MenuAction::FileOcr));
-        assert_eq!(menu_action_for_id("settings"), Some(MenuAction::Settings));
-        assert_eq!(menu_action_for_id("about"), Some(MenuAction::About));
-        assert_eq!(menu_action_for_id("quit"), Some(MenuAction::Quit));
+        assert_eq!(menu_action_for_id("file-ocr"), Some(AppAction::RunFileOcr));
+        assert_eq!(
+            menu_action_for_id("settings"),
+            Some(AppAction::OpenSettings)
+        );
+        assert_eq!(menu_action_for_id("about"), Some(AppAction::OpenAbout));
+        assert_eq!(menu_action_for_id("quit"), Some(AppAction::Quit));
     }
 
     #[test]
