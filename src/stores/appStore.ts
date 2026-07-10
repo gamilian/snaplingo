@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { TranslationResult } from '../types';
+import type { TranslationResult } from '../types';
 
 export type ResultWindowMode = 'translation' | 'ocr';
 export type ProviderTranslationStatus = 'pending' | 'success' | 'error';

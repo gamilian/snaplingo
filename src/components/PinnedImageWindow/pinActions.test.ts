@@ -22,7 +22,7 @@ import {
   type PinActionClient,
   savePinnedImage,
 } from './pinActions';
-import type { PinnedImageView } from '../ScreenshotSession/types';
+import type { PinnedImageView } from '../../domain/capture';
 
 function createPinActionClient(
   calls: Array<{ command: string; args?: unknown }>,

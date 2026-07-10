@@ -1,15 +1,9 @@
-import type { CaptureLaunch, CaptureMode } from './types';
+import { CAPTURE_MODES, type CaptureLaunch, type CaptureMode } from '../../domain/capture';
 
 export const CAPTURE_WINDOW_LABEL = 'capture';
 
 export function isCaptureMode(value: unknown): value is CaptureMode {
-  return (
-    value === 'screenshot' ||
-    value === 'screenshot-copy' ||
-    value === 'screenshot-ocr' ||
-    value === 'silent-screenshot-ocr' ||
-    value === 'screenshot-translate'
-  );
+  return typeof value === 'string' && CAPTURE_MODES.includes(value as CaptureMode);
 }
 
 export function readCaptureLaunch(search: string): CaptureLaunch | null {

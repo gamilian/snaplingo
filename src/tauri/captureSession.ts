@@ -6,7 +6,7 @@ import type {
   LogicalRect,
   OcrResult,
   Point,
-} from '../components/ScreenshotSession/types';
+} from '../domain/capture';
 
 export type CaptureOutputAction =
   | { type: 'copy' }

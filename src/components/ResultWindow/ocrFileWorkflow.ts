@@ -1,4 +1,4 @@
-import type { OcrResult } from '../ScreenshotSession/types';
+import type { OcrResult } from '../../domain/capture';
 import { normalizeOcrText } from '../../utils/ocrTextProcessing';
 
 export interface OcrFileWorkflowDeps {

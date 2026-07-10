@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CaptureSessionView } from '../../components/ScreenshotSession/types';
+import type { CaptureSessionView } from '../../domain/capture';
 
 const invoke = vi.fn();
 

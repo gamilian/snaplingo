@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
-import type { OcrResult } from '../components/ScreenshotSession/types';
+import type { OcrResult } from '../domain/capture';
 
 export async function selectImageFile() {
   const selected = await open({

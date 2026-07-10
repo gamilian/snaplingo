@@ -12,7 +12,7 @@ import {
   replacePinnedImageFromClipboard as replacePinnedImageFromClipboardCommand,
   savePinnedImage as savePinnedImageCommand,
 } from '../../tauri/pinnedImage';
-import type { PinnedImageView } from '../ScreenshotSession/types';
+import type { PinnedImageView } from '../../domain/capture';
 
 export type PinWriteText = (text: string) => Promise<void>;
 

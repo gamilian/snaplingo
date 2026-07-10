@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { PinnedImageView } from '../components/ScreenshotSession/types';
+import type { PinnedImageView } from '../domain/capture';
 
 export async function getPinnedImage(imageId: string) {
   return invoke<PinnedImageView>('get_pinned_image', { imageId });

@@ -9,7 +9,7 @@ import {
 import { writeClipboardText } from '../../tauri/clipboard';
 import { useSettingsConfigStore } from '../../stores/settingsConfigStore';
 import { getPinnedImage } from '../../tauri/pinnedImage';
-import type { PinnedImageView } from '../ScreenshotSession/types';
+import type { PinnedImageView } from '../../domain/capture';
 import {
   getPinnedContextMenuPosition,
   getPinnedDisplaySize,
