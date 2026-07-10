@@ -1,4 +1,5 @@
 // Module declarations
+mod app_actions;
 mod app_shell;
 mod app_state;
 mod application;
