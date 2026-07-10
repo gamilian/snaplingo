@@ -1,5 +1,4 @@
 pub mod capture_window;
-#[cfg(target_os = "macos")]
 pub mod ocr;
 pub mod paths;
 pub mod pinned_window;

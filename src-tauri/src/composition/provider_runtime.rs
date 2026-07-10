@@ -15,6 +15,7 @@ use crate::application::providers::{LlmIntrospection, ProviderConfiguration};
 use crate::infrastructure::events::EventBus;
 use crate::infrastructure::http::HttpClient;
 use crate::infrastructure::storage::{ConfigFile, Keychain};
+use crate::infrastructure::system::ocr::get_tesseract_engine;
 
 pub(crate) fn build_llm_introspection(http_client: Arc<dyn HttpClient>) -> Arc<LlmIntrospection> {
     Arc::new(LlmIntrospection::new(http_client))
@@ -77,7 +78,7 @@ pub(crate) fn build_ocr_coordinator(
 ) -> Arc<OcrCoordinator> {
     let ocr_coordinator = OcrCoordinator::new(config_file);
 
-    let tesseract_provider = TesseractProvider::new();
+    let tesseract_provider = TesseractProvider::new(get_tesseract_engine());
     ocr_coordinator.register(tesseract_provider).ok();
 
     #[cfg(target_os = "macos")]

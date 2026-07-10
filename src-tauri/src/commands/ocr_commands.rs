@@ -162,14 +162,28 @@ fn ocr_provider_credential_schema(
 #[cfg(test)]
 mod tests {
     use crate::application::providers::ocr::impls::TesseractProvider;
-    use crate::application::providers::ocr::OcrCoordinator;
+    use crate::application::providers::ocr::{OcrCoordinator, TesseractEngine};
     use crate::infrastructure::storage::ConfigFile;
     use std::sync::Arc;
+
+    struct StubTesseractEngine;
+
+    impl TesseractEngine for StubTesseractEngine {
+        fn available_languages(&self) -> crate::Result<Vec<String>> {
+            Ok(vec!["eng".to_string()])
+        }
+
+        fn recognize(&self, _image_data: &[u8], _language: Option<&str>) -> crate::Result<String> {
+            Ok(String::new())
+        }
+    }
 
     #[test]
     fn ocr_provider_credential_schema_returns_empty_fields_for_tesseract() {
         let coordinator = OcrCoordinator::new(Arc::new(ConfigFile::new_temp()));
-        coordinator.register(TesseractProvider::new()).unwrap();
+        coordinator
+            .register(TesseractProvider::new(Arc::new(StubTesseractEngine)))
+            .unwrap();
 
         let fields = super::ocr_provider_credential_schema(&coordinator, "tesseract").unwrap();
 
