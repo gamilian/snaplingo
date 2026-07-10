@@ -32,16 +32,6 @@ fn with_platform_hint(msg: String) -> AppError {
     AppError::System(format!("{}{}", msg, hint))
 }
 
-/// Capture the primary monitor's full screen as PNG bytes.
-#[cfg(any(target_os = "windows", target_os = "linux"))]
-pub fn capture_full_screen_png() -> Result<Vec<u8>, AppError> {
-    let primary = get_primary_monitor()?;
-    let image = primary
-        .capture_image()
-        .map_err(|e| with_platform_hint(format!("Screenshot failed: {}", e)))?;
-    rgba_image_to_png(image)
-}
-
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 pub fn capture_all_monitor_snapshots() -> Result<Vec<MonitorSnapshot>, AppError> {
     let mut monitors = Monitor::all()

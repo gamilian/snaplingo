@@ -105,10 +105,6 @@ mod tests {
             Ok(self.current_cursor_position.clone())
         }
 
-        async fn capture_full_screen(&self) -> Result<Vec<u8>, AppError> {
-            Ok(self.snapshots[0].png_data.clone())
-        }
-
         async fn capture_region(&self, region: ScreenRegion) -> Result<Vec<u8>, AppError> {
             self.captured_regions.lock().unwrap().push(region);
             Ok(self.region_png_data.clone())

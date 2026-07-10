@@ -33,10 +33,6 @@ impl ScreenshotBackend for LinuxScreenshotBackend {
         xcap_common::capture_window_candidates(monitors)
     }
 
-    async fn capture_full_screen(&self) -> Result<Vec<u8>, AppError> {
-        xcap_common::capture_full_screen_png()
-    }
-
     async fn capture_region(&self, region: ScreenRegion) -> Result<Vec<u8>, AppError> {
         xcap_common::capture_region_png(region)
     }

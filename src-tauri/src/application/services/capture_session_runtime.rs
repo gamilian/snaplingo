@@ -632,10 +632,6 @@ mod tests {
             Ok(Vec::new())
         }
 
-        async fn capture_full_screen(&self) -> Result<Vec<u8>, AppError> {
-            Ok(vec![1, 2, 3])
-        }
-
         async fn capture_region(&self, _region: ScreenRegion) -> Result<Vec<u8>, AppError> {
             Ok(vec![1, 2, 3])
         }

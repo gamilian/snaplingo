@@ -232,10 +232,6 @@ pub trait ScreenshotBackend: Send + Sync {
         Ok(None)
     }
 
-    /// Capture the entire screen
-    /// Returns PNG-encoded image data
-    async fn capture_full_screen(&self) -> Result<Vec<u8>, AppError>;
-
     /// Capture a specific region of the screen
     /// Returns PNG-encoded image data
     async fn capture_region(&self, region: ScreenRegion) -> Result<Vec<u8>, AppError>;

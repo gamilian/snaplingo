@@ -596,17 +596,6 @@ impl ScreenshotBackend for MacOSScreenshotBackend {
         ))
     }
 
-    async fn capture_full_screen(&self) -> Result<Vec<u8>, AppError> {
-        let access = prepare_screen_capture_access();
-
-        let display = CGDisplay::main();
-        let image = display
-            .image()
-            .ok_or_else(|| screen_capture_unavailable_error("全屏截图返回空图像", access))?;
-
-        image_to_png(image)
-    }
-
     async fn capture_region(&self, region: ScreenRegion) -> Result<Vec<u8>, AppError> {
         let access = prepare_screen_capture_access();
 
