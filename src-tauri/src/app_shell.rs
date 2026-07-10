@@ -1,7 +1,6 @@
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    Manager,
 };
 
 use crate::app_actions::{dispatch_app_action, AppAction, CaptureLaunchMode};
