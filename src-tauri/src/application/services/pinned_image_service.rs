@@ -298,6 +298,7 @@ impl PinnedImageService {
         None
     }
 
+    #[cfg(test)]
     pub fn move_pinned_image_to_group(&self, image_id: &str, group: u32) -> Result<()> {
         let mut images = self.images.lock().unwrap();
         let image = images

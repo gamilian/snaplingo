@@ -6,7 +6,7 @@ mod capture_session_source;
 pub mod history_service;
 pub mod image_composition_service;
 mod pinned_image_runtime;
-pub mod pinned_image_service;
+mod pinned_image_service;
 pub mod selected_text_acquirer;
 
 #[cfg(test)]
@@ -31,8 +31,5 @@ pub use history_service::HistoryService;
 pub use image_composition_service::ImageCompositionService;
 pub use pinned_image_runtime::PinnedImageRuntime;
 pub(crate) use pinned_image_runtime::PinnedImageRuntimeHost;
-pub use pinned_image_service::{
-    PinnedImageGroupMembership, PinnedImageGroupRemoval, PinnedImageGroupSwitch,
-    PinnedImageOpenRequest, PinnedImageService,
-};
+pub(crate) use pinned_image_service::{PinnedImageOpenRequest, PinnedImageService};
 pub use selected_text_acquirer::{SelectedTextAcquirer, SelectionScheme};

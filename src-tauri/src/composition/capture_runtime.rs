@@ -4,11 +4,12 @@ use tauri::AppHandle;
 
 use crate::application::providers::ocr::OcrCoordinator;
 use crate::application::services::capture_session_runtime::TauriCaptureSessionRuntimeHost;
+use crate::application::services::PinnedImageService;
 use crate::infrastructure::system::pinned_window::TauriPinnedImageRuntimeHost;
 use crate::infrastructure::system::screenshot::get_capture_session_source;
 use crate::{
     CaptureOutputService, CaptureSessionRuntime, CaptureSessionService, ImageCompositionService,
-    PinnedImageRuntime, PinnedImageService,
+    PinnedImageRuntime,
 };
 
 pub(crate) struct CaptureRuntimeParts {
