@@ -470,10 +470,7 @@ mod tests {
         let provider = DeepLProvider::new(mock_client);
 
         let error = provider
-            .validate_credentials(&HashMap::from([(
-                "mode".to_string(),
-                "deepl".to_string(),
-            )]))
+            .validate_credentials(&HashMap::from([("mode".to_string(), "deepl".to_string())]))
             .unwrap_err();
 
         assert_eq!(error.to_string(), "DeepL mode requires api_key");
@@ -512,10 +509,7 @@ mod tests {
         let provider = DeepLProvider::new(mock_client);
 
         let error = provider
-            .validate_credentials(&HashMap::from([(
-                "mode".to_string(),
-                "hybrid".to_string(),
-            )]))
+            .validate_credentials(&HashMap::from([("mode".to_string(), "hybrid".to_string())]))
             .unwrap_err();
 
         assert_eq!(error.to_string(), "Invalid DeepLX mode: hybrid");

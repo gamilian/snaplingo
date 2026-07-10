@@ -1,28 +1,17 @@
 use std::sync::Arc;
 
-use parking_lot::Mutex as ParkingLotMutex;
-
 use crate::application::providers::ocr::{OcrCoordinator, OcrProviderConfiguration};
 use crate::application::providers::translation::TranslationCoordinator;
 use crate::application::providers::{
     LlmIntrospection, ProviderConfiguration, TranslationPromptConfiguration,
 };
 use crate::application::{
-    CaptureOutputService, CaptureService, CaptureSessionRuntime, CaptureSessionService,
-    HistoryService, HotkeyRuntime, ImageCompositionService, PinnedImageService,
-    SelectedTextAcquirer, SettingsConfiguration,
+    CaptureOutputService, CaptureSessionRuntime, CaptureSessionService, HistoryService,
+    HotkeyRuntime, ImageCompositionService, PinnedImageService, SelectedTextAcquirer,
+    SettingsConfiguration,
 };
 use crate::infrastructure::events::EventBus;
 use crate::Result;
-
-/// Screenshot state for storing captured image data
-#[derive(Default)]
-pub struct ScreenshotState {
-    pub data: Option<Vec<u8>>,
-    pub width: u32,
-    pub height: u32,
-    pub scale_factor: f64,
-}
 
 pub struct SettingsRuntime {
     pub configuration: Arc<SettingsConfiguration>,
@@ -39,13 +28,11 @@ pub struct ProviderRuntime {
 }
 
 pub struct CaptureRuntimeState {
-    pub capture: Arc<CaptureService>,
     pub sessions: Arc<CaptureSessionService>,
     pub image_composition: Arc<ImageCompositionService>,
     pub output: Arc<CaptureOutputService>,
     pub session_runtime: Arc<CaptureSessionRuntime>,
     pub pinned_images: Arc<PinnedImageService>,
-    pub screenshot_state: Arc<ParkingLotMutex<ScreenshotState>>,
 }
 
 pub struct HistoryRuntime {

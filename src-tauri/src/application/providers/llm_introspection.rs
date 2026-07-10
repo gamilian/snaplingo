@@ -1,7 +1,7 @@
 use crate::infrastructure::http::HttpClient;
 use crate::infrastructure::llm::{
-    AnthropicLLMClient, GeminiLLMClient, LlmModelLister, LLMClient, LLMOptions, LLMProtocol,
-    LLMRequest, ModelInfo, OpenAILLMClient,
+    AnthropicLLMClient, GeminiLLMClient, LLMClient, LLMOptions, LLMProtocol, LLMRequest,
+    LlmModelLister, ModelInfo, OpenAILLMClient,
 };
 use anyhow::Result;
 use std::sync::Arc;
@@ -24,14 +24,14 @@ impl LlmIntrospection {
         api_key: &str,
     ) -> Result<Vec<ModelInfo>> {
         let lister: Arc<dyn LlmModelLister> = match protocol {
-            LLMProtocol::OpenAI | LLMProtocol::OpenAIResponses => Arc::new(
-                OpenAILLMClient::new_chat_completions(
+            LLMProtocol::OpenAI | LLMProtocol::OpenAIResponses => {
+                Arc::new(OpenAILLMClient::new_chat_completions(
                     self.http_client.clone(),
                     endpoint.to_string(),
                     String::new(), // model not needed for listing
                     api_key.to_string(),
-                ),
-            ),
+                ))
+            }
             LLMProtocol::Anthropic => Arc::new(AnthropicLLMClient::new(
                 self.http_client.clone(),
                 endpoint.to_string(),
@@ -162,7 +162,11 @@ mod tests {
         let introspection = LlmIntrospection::new(http);
 
         let models = introspection
-            .list_models(LLMProtocol::OpenAIResponses, "https://api.openai.com/v1", "test-key")
+            .list_models(
+                LLMProtocol::OpenAIResponses,
+                "https://api.openai.com/v1",
+                "test-key",
+            )
             .await
             .unwrap();
 
@@ -176,7 +180,11 @@ mod tests {
         let introspection = LlmIntrospection::new(http);
 
         let models = introspection
-            .list_models(LLMProtocol::Anthropic, "https://api.anthropic.com/v1", "test-key")
+            .list_models(
+                LLMProtocol::Anthropic,
+                "https://api.anthropic.com/v1",
+                "test-key",
+            )
             .await
             .unwrap();
 
@@ -190,24 +198,30 @@ mod tests {
         let introspection = LlmIntrospection::new(http);
 
         let models = introspection
-            .list_models(LLMProtocol::Gemini, "https://generativelanguage.googleapis.com/v1", "test-key")
+            .list_models(
+                LLMProtocol::Gemini,
+                "https://generativelanguage.googleapis.com/v1",
+                "test-key",
+            )
             .await
             .unwrap();
 
         assert_eq!(models.len(), 1);
-        assert_eq!(models[0].id, "gemini-pro");  // Gemini strips "models/" prefix
+        assert_eq!(models[0].id, "gemini-pro"); // Gemini strips "models/" prefix
     }
 
     #[tokio::test]
     async fn test_sends_generate_request_for_openai() {
-        let http = mock_http_client(
-            "",
-            r#"{"choices":[{"message":{"content":"OK"}}]}"#,
-        );
+        let http = mock_http_client("", r#"{"choices":[{"message":{"content":"OK"}}]}"#);
         let introspection = LlmIntrospection::new(http);
 
         let result = introspection
-            .test(LLMProtocol::OpenAI, "https://api.openai.com/v1", "gpt-4", "test-key")
+            .test(
+                LLMProtocol::OpenAI,
+                "https://api.openai.com/v1",
+                "gpt-4",
+                "test-key",
+            )
             .await;
 
         assert!(result.is_ok());
@@ -215,14 +229,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_sends_generate_request_for_anthropic() {
-        let http = mock_http_client(
-            "",
-            r#"{"content":[{"type":"text","text":"OK"}]}"#,
-        );
+        let http = mock_http_client("", r#"{"content":[{"type":"text","text":"OK"}]}"#);
         let introspection = LlmIntrospection::new(http);
 
         let result = introspection
-            .test(LLMProtocol::Anthropic, "https://api.anthropic.com/v1", "claude-3-5-sonnet-20241022", "test-key")
+            .test(
+                LLMProtocol::Anthropic,
+                "https://api.anthropic.com/v1",
+                "claude-3-5-sonnet-20241022",
+                "test-key",
+            )
             .await;
 
         assert!(result.is_ok());
@@ -237,7 +253,12 @@ mod tests {
         let introspection = LlmIntrospection::new(http);
 
         let result = introspection
-            .test(LLMProtocol::Gemini, "https://generativelanguage.googleapis.com/v1", "gemini-pro", "test-key")
+            .test(
+                LLMProtocol::Gemini,
+                "https://generativelanguage.googleapis.com/v1",
+                "gemini-pro",
+                "test-key",
+            )
             .await;
 
         assert!(result.is_ok());

@@ -89,13 +89,11 @@ pub(crate) fn build_app_state(config_path: PathBuf, app: AppHandle) -> AppState 
             prompt_strategies,
         }),
         capture: Arc::new(CaptureRuntimeState {
-            capture: capture_runtime.capture_service,
             sessions: capture_runtime.capture_session_service,
             image_composition: capture_runtime.image_composition_service,
             output: capture_runtime.capture_output_service,
             session_runtime: capture_runtime.capture_session_runtime,
             pinned_images: capture_runtime.pinned_image_service,
-            screenshot_state: capture_runtime.screenshot_state,
         }),
         history: Arc::new(HistoryRuntime {
             service: history_service,

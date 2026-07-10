@@ -1,4 +1,6 @@
-use super::client::{LLMClient, LlmModelLister, LLMRequest, LLMResponse, ModelInfo, ReasoningLevel};
+use super::client::{
+    LLMClient, LLMRequest, LLMResponse, LlmModelLister, ModelInfo, ReasoningLevel,
+};
 use super::endpoint_url::complete_standard_endpoint;
 use crate::error::AppError;
 use crate::infrastructure::http::HttpClient;
@@ -189,7 +191,9 @@ impl LlmModelLister for GeminiLLMClient {
 fn ensure_gemini_success_status(status: u16, body: &str) -> Result<()> {
     match status {
         200 => Ok(()),
-        401 | 403 => Err(AppError::Unauthorized("Invalid API key or insufficient permission".into()).into()),
+        401 | 403 => {
+            Err(AppError::Unauthorized("Invalid API key or insufficient permission".into()).into())
+        }
         404 => Err(AppError::InvalidResponse("API endpoint not found".into()).into()),
         429 => Err(AppError::RateLimited("Rate limit exceeded".into()).into()),
         _ => Err(AppError::UpstreamStatus(status, body.to_string()).into()),
@@ -199,9 +203,9 @@ fn ensure_gemini_success_status(status: u16, body: &str) -> Result<()> {
 fn parse_gemini_models_response(body: &str) -> Result<Vec<ModelInfo>> {
     let json: serde_json::Value = serde_json::from_str(body)
         .map_err(|e| AppError::InvalidResponse(format!("Model list JSON parse failed: {}", e)))?;
-    let data = json["models"]
-        .as_array()
-        .ok_or_else(|| AppError::InvalidResponse("Model list response is missing models array".into()))?;
+    let data = json["models"].as_array().ok_or_else(|| {
+        AppError::InvalidResponse("Model list response is missing models array".into())
+    })?;
     let models: Vec<_> = data
         .iter()
         .filter_map(|item| item["name"].as_str())
@@ -211,10 +215,10 @@ fn parse_gemini_models_response(body: &str) -> Result<Vec<ModelInfo>> {
         .collect();
 
     if models.is_empty() {
-        Err(AppError::InvalidResponse(
-            "Model list response did not contain model ids".into(),
+        Err(
+            AppError::InvalidResponse("Model list response did not contain model ids".into())
+                .into(),
         )
-        .into())
     } else {
         Ok(models)
     }
@@ -264,11 +268,7 @@ mod tests {
             unimplemented!()
         }
 
-        async fn get(
-            &self,
-            _url: &str,
-            _headers: HashMap<String, String>,
-        ) -> Result<HttpResponse> {
+        async fn get(&self, _url: &str, _headers: HashMap<String, String>) -> Result<HttpResponse> {
             let mut response = HttpResponse {
                 status: self.status,
                 body: self.body.clone(),

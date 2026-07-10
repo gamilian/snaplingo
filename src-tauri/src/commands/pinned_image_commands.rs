@@ -25,10 +25,7 @@ pub fn pin_clipboard_image_for_state(
     let request = state
         .capture
         .pinned_images
-        .pin_clipboard_capture_output(
-            &state.capture.image_composition,
-            &state.capture.output,
-        )
+        .pin_clipboard_capture_output(&state.capture.image_composition, &state.capture.output)
         .map_err(|e| e.to_string())?;
 
     open_pinned_image_for_request(app, request)
@@ -134,11 +131,7 @@ pub async fn save_pinned_image(
         .inner()
         .capture
         .pinned_images
-        .save_pinned_png_to_path(
-            &state.inner().capture.output,
-            &image_id,
-            Path::new(&path),
-        )
+        .save_pinned_png_to_path(&state.inner().capture.output, &image_id, Path::new(&path))
         .await
         .map_err(|e| e.to_string())
 }

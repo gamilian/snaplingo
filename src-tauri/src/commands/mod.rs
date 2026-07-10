@@ -1,4 +1,3 @@
-mod capture_commands;
 mod capture_session_commands;
 mod history_commands;
 mod hotkey_commands;
@@ -8,7 +7,6 @@ mod provider_commands;
 mod settings_commands;
 mod translation_commands;
 
-pub use capture_commands::*;
 pub use capture_session_commands::*;
 pub use history_commands::*;
 pub use hotkey_commands::*;

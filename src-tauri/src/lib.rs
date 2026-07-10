@@ -11,7 +11,7 @@ mod settings_window;
 mod startup_shortcuts;
 
 // Public exports for new infrastructure layer
-pub use app_state::{AppState, ScreenshotState};
+pub use app_state::AppState;
 pub use application::*;
 #[allow(ambiguous_glob_reexports)]
 pub use domain::*;
@@ -130,9 +130,6 @@ pub fn run() {
             commands::configure_ocr_provider,
             commands::get_ocr_provider_credential_schema,
             commands::configure_ocr_provider_credentials,
-            commands::capture_full_screen,
-            commands::capture_region,
-            commands::save_screenshot,
             commands::create_capture_session,
             commands::get_capture_session,
             commands::hydrate_capture_session_snapshots,

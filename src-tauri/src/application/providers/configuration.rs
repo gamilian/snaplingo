@@ -874,12 +874,19 @@ impl ProviderConfiguration {
         let old_def = custom_defs[index].clone();
 
         // Load old API key for rollback if we're changing it
-        let old_api_key = if input.api_key.as_ref().map(|k| !k.trim().is_empty()).unwrap_or(false) {
+        let old_api_key = if input
+            .api_key
+            .as_ref()
+            .map(|k| !k.trim().is_empty())
+            .unwrap_or(false)
+        {
             // We're changing the key, load old for rollback - must succeed
             Some(
                 self.keychain
                     .load_provider_credential(&provider_id)
-                    .map_err(|e| AppError::Other(format!("Cannot load existing key for rollback: {}", e)))?
+                    .map_err(|e| {
+                        AppError::Other(format!("Cannot load existing key for rollback: {}", e))
+                    })?,
             )
         } else {
             None
@@ -892,7 +899,9 @@ impl ProviderConfiguration {
                 // If explicitly empty, load existing
                 self.keychain
                     .load_provider_credential(&provider_id)
-                    .map_err(|e| AppError::Other(format!("Failed to load existing API key: {}", e)))?
+                    .map_err(|e| {
+                        AppError::Other(format!("Failed to load existing API key: {}", e))
+                    })?
             } else {
                 trimmed.to_string()
             }
@@ -903,7 +912,8 @@ impl ProviderConfiguration {
         };
 
         // Build updated definition
-        let updated_def = build_updated_custom_translation_provider_def(provider_id.clone(), &input)?;
+        let updated_def =
+            build_updated_custom_translation_provider_def(provider_id.clone(), &input)?;
 
         // Step 1: Save config first (no side effects if this fails)
         custom_defs[index] = updated_def.clone();
@@ -918,7 +928,10 @@ impl ProviderConfiguration {
         // Step 2: Save new API key if provided and non-empty
         if let Some(ref new_key) = input.api_key {
             if !new_key.trim().is_empty() {
-                if let Err(e) = self.keychain.save_provider_credential(&provider_id, new_key.trim()) {
+                if let Err(e) = self
+                    .keychain
+                    .save_provider_credential(&provider_id, new_key.trim())
+                {
                     // Rollback config
                     custom_defs[index] = old_def.clone();
                     let rollback_err = self
@@ -960,16 +973,16 @@ impl ProviderConfiguration {
 
             // Rollback keychain if we saved a new key
             if let Some(ref old_key) = old_api_key {
-                if let Err(re) = self.keychain.save_provider_credential(&provider_id, old_key) {
+                if let Err(re) = self
+                    .keychain
+                    .save_provider_credential(&provider_id, old_key)
+                {
                     rollback_errors.push(format!("keychain rollback: {}", re));
                 }
             }
 
             if rollback_errors.is_empty() {
-                return Err(AppError::Other(format!(
-                    "Failed to update provider: {}",
-                    e
-                )));
+                return Err(AppError::Other(format!("Failed to update provider: {}", e)));
             } else {
                 return Err(AppError::Other(format!(
                     "Failed to update provider: {}. Rollback also failed: {}",
@@ -1013,12 +1026,18 @@ impl ProviderConfiguration {
         let was_active = active_ids.contains(&provider_id);
 
         // Step 0.5: Collect credential field names BEFORE unregistering
-        let credential_field_names: Vec<String> = if let Some(provider) = self.translation_coordinator.get(&provider_id) {
-            provider.read().credential_fields().iter().map(|f| f.name.clone()).collect()
-        } else {
-            // Not registered, infer from custom LLM default
-            vec!["api_key".to_string()]
-        };
+        let credential_field_names: Vec<String> =
+            if let Some(provider) = self.translation_coordinator.get(&provider_id) {
+                provider
+                    .read()
+                    .credential_fields()
+                    .iter()
+                    .map(|f| f.name.clone())
+                    .collect()
+            } else {
+                // Not registered, infer from custom LLM default
+                vec!["api_key".to_string()]
+            };
 
         // Snapshot credentials
         let snapshot = self
@@ -1039,7 +1058,9 @@ impl ProviderConfiguration {
             if let Err(e) = self.translation_coordinator.unregister(&provider_id) {
                 // Rollback config
                 custom_defs.insert(index, removed_def.clone());
-                let _ = self.config_file.save("custom_translation_providers", &custom_defs);
+                let _ = self
+                    .config_file
+                    .save("custom_translation_providers", &custom_defs);
                 return Err(AppError::Other(format!("Failed to unregister: {}", e)));
             }
         }
@@ -1049,16 +1070,26 @@ impl ProviderConfiguration {
             let mut errors = Vec::new();
 
             custom_defs.insert(index, removed_def.clone());
-            if let Err(e) = self.config_file.save("custom_translation_providers", &custom_defs) {
+            if let Err(e) = self
+                .config_file
+                .save("custom_translation_providers", &custom_defs)
+            {
                 errors.push(format!("config save: {}", e));
             }
 
-            if let Err(e) = self.keychain.restore_provider_credentials(&provider_id, &snapshot) {
+            if let Err(e) = self
+                .keychain
+                .restore_provider_credentials(&provider_id, &snapshot)
+            {
                 errors.push(format!("credential restore: {}", e));
             }
 
             if was_registered {
-                let api_key = snapshot.api_key.clone().and_then(|opt| opt).unwrap_or_default();
+                let api_key = snapshot
+                    .api_key
+                    .clone()
+                    .and_then(|opt| opt)
+                    .unwrap_or_default();
                 let provider = create_llm_translation_provider(
                     &removed_def,
                     self.http_client.clone(),
@@ -1073,7 +1104,10 @@ impl ProviderConfiguration {
                         errors.push(format!("re-activate: {}", e));
                     }
                 }
-                if let Err(e) = self.translation_coordinator.reorder_active(active_ids.clone()) {
+                if let Err(e) = self
+                    .translation_coordinator
+                    .reorder_active(active_ids.clone())
+                {
                     errors.push(format!("reorder active: {}", e));
                 }
             }
@@ -1087,7 +1121,10 @@ impl ProviderConfiguration {
             if !crate::infrastructure::storage::is_keychain_not_found(&e) {
                 let rollback_errors = rollback();
                 if rollback_errors.is_empty() {
-                    return Err(AppError::Other(format!("Failed to delete credential: {}", e)));
+                    return Err(AppError::Other(format!(
+                        "Failed to delete credential: {}",
+                        e
+                    )));
                 } else {
                     return Err(AppError::Other(format!(
                         "Failed to delete credential: {}. Rollback also failed: {}",
@@ -1100,10 +1137,16 @@ impl ProviderConfiguration {
 
         // Step 4: Delete structured credentials (using saved field names) with rollback on failure
         if !credential_field_names.is_empty() {
-            if let Err(e) = self.keychain.delete_provider_credentials(&provider_id, &credential_field_names) {
+            if let Err(e) = self
+                .keychain
+                .delete_provider_credentials(&provider_id, &credential_field_names)
+            {
                 let rollback_errors = rollback();
                 if rollback_errors.is_empty() {
-                    return Err(AppError::Other(format!("Failed to delete structured credentials: {}", e)));
+                    return Err(AppError::Other(format!(
+                        "Failed to delete structured credentials: {}",
+                        e
+                    )));
                 } else {
                     return Err(AppError::Other(format!(
                         "Failed to delete structured credentials: {}. Rollback also failed: {}",
@@ -1190,10 +1233,8 @@ impl ProviderConfiguration {
         let _guard = self.lock_provider_state()?;
 
         // Convert to HashMap for validation and processing
-        let cred_map: HashMap<String, String> = credentials
-            .into_iter()
-            .map(|c| (c.key, c.value))
-            .collect();
+        let cred_map: HashMap<String, String> =
+            credentials.into_iter().map(|c| (c.key, c.value)).collect();
 
         // Get provider to validate schema
         let provider = self
@@ -1227,25 +1268,34 @@ impl ProviderConfiguration {
         // Save simple API key if applicable
         if cred_map.len() == 1 && cred_map.contains_key("api_key") {
             let api_key = cred_map.get("api_key").unwrap();
-            if let Err(e) = self.keychain.save_provider_credential(&provider_id, api_key) {
+            if let Err(e) = self
+                .keychain
+                .save_provider_credential(&provider_id, api_key)
+            {
                 return Err(AppError::Other(format!("Failed to save credential: {}", e)));
             }
         }
 
         // Save structured credentials with transaction support
-        if let Err(e) = self
-            .keychain
-            .save_provider_credentials_transactional(&provider_id, &cred_map, &snapshot)
-        {
+        if let Err(e) = self.keychain.save_provider_credentials_transactional(
+            &provider_id,
+            &cred_map,
+            &snapshot,
+        ) {
             // Rollback simple credential if we saved it
             if cred_map.len() == 1 && cred_map.contains_key("api_key") {
                 if let Some(Some(ref old_key)) = snapshot.api_key {
-                    let _ = self.keychain.save_provider_credential(&provider_id, old_key);
+                    let _ = self
+                        .keychain
+                        .save_provider_credential(&provider_id, old_key);
                 } else if snapshot.api_key == Some(None) {
                     let _ = self.keychain.delete_provider_credential(&provider_id);
                 }
             }
-            return Err(AppError::Other(format!("Failed to save credentials: {}", e)));
+            return Err(AppError::Other(format!(
+                "Failed to save credentials: {}",
+                e
+            )));
         }
 
         // Reconfigure the provider with credentials
@@ -1254,8 +1304,13 @@ impl ProviderConfiguration {
             .reconfigure_provider(&provider_id, &cred_map)
         {
             // Complete rollback using snapshot
-            let _ = self.keychain.restore_provider_credentials(&provider_id, &snapshot);
-            return Err(AppError::Other(format!("Failed to reconfigure provider: {}", e)));
+            let _ = self
+                .keychain
+                .restore_provider_credentials(&provider_id, &snapshot);
+            return Err(AppError::Other(format!(
+                "Failed to reconfigure provider: {}",
+                e
+            )));
         }
 
         Ok(())
@@ -1304,9 +1359,16 @@ impl ProviderConfiguration {
             let api_key = self
                 .keychain
                 .load_provider_credential(&provider_id)
-                .map_err(|e| AppError::Other(format!("Failed to load provider credential: {}", e)))?;
+                .map_err(|e| {
+                    AppError::Other(format!("Failed to load provider credential: {}", e))
+                })?;
 
-            (def.protocol, def.endpoint.clone(), def.model.clone(), api_key)
+            (
+                def.protocol,
+                def.endpoint.clone(),
+                def.model.clone(),
+                api_key,
+            )
         }; // Lock released here
 
         // Async test without holding the lock
@@ -1444,7 +1506,9 @@ mod provider_configuration_tests {
     async fn test_custom_provider_returns_error_for_nonexistent() {
         let config = test_provider_configuration();
 
-        let result = config.test_custom_provider("nonexistent-id".to_string()).await;
+        let result = config
+            .test_custom_provider("nonexistent-id".to_string())
+            .await;
 
         assert!(result.is_err());
         assert!(result
@@ -1540,10 +1604,7 @@ mod provider_configuration_tests {
         let result = config.save_credentials("deeplx".to_string(), credentials);
 
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("cannot be blank"));
+        assert!(result.unwrap_err().to_string().contains("cannot be blank"));
     }
 
     #[test]
@@ -1930,7 +1991,10 @@ mod provider_configuration_tests {
                 .load::<Vec<CustomTranslationProviderDef>>("custom_translation_providers")
                 .unwrap_or_default();
             assert!(!custom_defs.iter().any(|d| d.id == provider_id));
-            assert!(config.keychain.load_provider_credential(&provider_id).is_err());
+            assert!(config
+                .keychain
+                .load_provider_credential(&provider_id)
+                .is_err());
             assert!(config.translation_coordinator.get(&provider_id).is_none());
         }
 
@@ -1942,7 +2006,10 @@ mod provider_configuration_tests {
                 .unwrap();
             assert!(custom_defs.iter().any(|d| d.id == provider_id));
             assert_eq!(
-                config.keychain.load_provider_credential(&provider_id).unwrap(),
+                config
+                    .keychain
+                    .load_provider_credential(&provider_id)
+                    .unwrap(),
                 "new-key"
             );
             assert!(config.translation_coordinator.get(&provider_id).is_some());

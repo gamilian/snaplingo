@@ -1,11 +1,8 @@
 use crate::application::providers::common::CredentialField;
-use crate::application::providers::configuration::{
-    CredentialValue, ProviderInfo,
-};
+use crate::application::providers::configuration::{CredentialValue, ProviderInfo};
 use crate::application::providers::{
-    AddCustomTranslationProviderInput,
-    CustomTranslationProviderView, TranslationPromptStrategyConfig,
-    UpdateCustomTranslationProviderInput,
+    AddCustomTranslationProviderInput, CustomTranslationProviderView,
+    TranslationPromptStrategyConfig, UpdateCustomTranslationProviderInput,
 };
 use crate::infrastructure::llm::LLMProtocol;
 use serde::{Deserialize, Serialize};
@@ -119,7 +116,9 @@ pub async fn get_provider_credential_schema(
     provider_id: String,
     state: State<'_, crate::AppState>,
 ) -> Result<Vec<CredentialField>, String> {
-    state.providers.configuration
+    state
+        .providers
+        .configuration
         .credential_schema(provider_id)
         .map_err(|e| e.to_string())
 }
@@ -135,7 +134,9 @@ pub async fn configure_translation_provider_credentials(
         .map(|(key, value)| CredentialValue { key, value })
         .collect();
 
-    state.providers.configuration
+    state
+        .providers
+        .configuration
         .save_credentials(provider_id, cred_values)
         .map_err(|e| e.to_string())
 }
@@ -199,7 +200,8 @@ pub async fn add_custom_translation_provider(
     };
 
     let view = state
-        .providers.configuration
+        .providers
+        .configuration
         .add(input)
         .map_err(|e| e.to_string())?;
 
@@ -224,13 +226,15 @@ pub async fn update_custom_translation_provider(
     };
 
     let view = state
-        .providers.configuration
+        .providers
+        .configuration
         .update(provider_id.clone(), input)
         .map_err(|e| e.to_string())?;
 
     let mut info = ProviderInfo::from(view);
     info.is_active = state
-        .providers.translation
+        .providers
+        .translation
         .get_active()
         .iter()
         .any(|provider| provider.read().id() == provider_id);
@@ -265,7 +269,8 @@ pub async fn list_openai_compatible_models(
     let api_key = validate_non_blank(&request.api_key, "API key")?;
 
     state
-        .providers.llm_introspection
+        .providers
+        .llm_introspection
         .list_models(LLMProtocol::OpenAI, endpoint, api_key)
         .await
         .map(|models| {
@@ -287,7 +292,8 @@ pub async fn test_openai_compatible_provider(
     let model = validate_non_blank(&request.model, "Model")?;
 
     state
-        .providers.llm_introspection
+        .providers
+        .llm_introspection
         .test(LLMProtocol::OpenAI, endpoint, model, api_key)
         .await
         .map_err(|e| format!("Provider test failed: {}", e))
@@ -303,7 +309,8 @@ pub async fn test_openai_responses_provider(
     let model = validate_non_blank(&request.model, "Model")?;
 
     state
-        .providers.llm_introspection
+        .providers
+        .llm_introspection
         .test(LLMProtocol::OpenAIResponses, endpoint, model, api_key)
         .await
         .map_err(|e| format!("Provider test failed: {}", e))
@@ -318,7 +325,8 @@ pub async fn list_anthropic_models(
     let api_key = validate_non_blank(&request.api_key, "API key")?;
 
     state
-        .providers.llm_introspection
+        .providers
+        .llm_introspection
         .list_models(LLMProtocol::Anthropic, endpoint, api_key)
         .await
         .map(|models| {
@@ -340,7 +348,8 @@ pub async fn test_anthropic_provider(
     let model = validate_non_blank(&request.model, "Model")?;
 
     state
-        .providers.llm_introspection
+        .providers
+        .llm_introspection
         .test(LLMProtocol::Anthropic, endpoint, model, api_key)
         .await
         .map_err(|e| format!("Provider test failed: {}", e))
@@ -355,7 +364,8 @@ pub async fn list_gemini_models(
     let api_key = validate_non_blank(&request.api_key, "API key")?;
 
     state
-        .providers.llm_introspection
+        .providers
+        .llm_introspection
         .list_models(LLMProtocol::Gemini, endpoint, api_key)
         .await
         .map(|models| {
@@ -377,7 +387,8 @@ pub async fn test_gemini_provider(
     let model = validate_non_blank(&request.model, "Model")?;
 
     state
-        .providers.llm_introspection
+        .providers
+        .llm_introspection
         .test(LLMProtocol::Gemini, endpoint, model, api_key)
         .await
         .map_err(|e| format!("Provider test failed: {}", e))
@@ -389,7 +400,8 @@ pub async fn test_custom_translation_provider(
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     state
-        .providers.configuration
+        .providers
+        .configuration
         .test_custom_provider(provider_id)
         .await
         .map_err(|e| e.to_string())
@@ -401,7 +413,8 @@ pub async fn remove_custom_translation_provider(
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     state
-        .providers.configuration
+        .providers
+        .configuration
         .remove(provider_id)
         .map_err(|e| e.to_string())
 }

@@ -101,13 +101,15 @@ impl TranslationCoordinator {
         let mut active = self.active.lock().unwrap();
         let was_active = active.iter().any(|active_id| active_id == id);
         if was_active {
-            let new_active: Vec<String> = active.iter()
+            let new_active: Vec<String> = active
+                .iter()
                 .filter(|active_id| active_id.as_str() != id)
                 .cloned()
                 .collect();
 
             // Persist first
-            self.config.save("active_translation_providers", &new_active)?;
+            self.config
+                .save("active_translation_providers", &new_active)?;
 
             // Only modify memory after successful persistence
             *active = new_active;
@@ -152,7 +154,8 @@ impl TranslationCoordinator {
         };
 
         // Persist first
-        self.config.save("active_translation_providers", &new_active)?;
+        self.config
+            .save("active_translation_providers", &new_active)?;
 
         // Only update memory after successful persistence
         *active = new_active;
@@ -181,7 +184,8 @@ impl TranslationCoordinator {
         let mut active = self.active.lock().unwrap();
 
         // Compute new active list
-        let new_active: Vec<String> = active.iter()
+        let new_active: Vec<String> = active
+            .iter()
             .filter(|active_id| active_id.as_str() != id)
             .cloned()
             .collect();
@@ -192,7 +196,8 @@ impl TranslationCoordinator {
         }
 
         // Persist first
-        self.config.save("active_translation_providers", &new_active)?;
+        self.config
+            .save("active_translation_providers", &new_active)?;
 
         // Only update memory after successful persistence
         *active = new_active;
@@ -230,7 +235,8 @@ impl TranslationCoordinator {
         }
 
         // Persist first
-        self.config.save("active_translation_providers", &ordered_ids)?;
+        self.config
+            .save("active_translation_providers", &ordered_ids)?;
 
         // Only update memory after successful persistence
         *active = ordered_ids;

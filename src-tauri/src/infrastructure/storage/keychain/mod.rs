@@ -22,7 +22,7 @@ mod linux;
 #[cfg(target_os = "linux")]
 use linux::LinuxKeychain as PlatformKeychainImpl;
 
-use crate::error::{Result, AppError};
+use crate::error::{AppError, Result};
 use std::collections::HashMap;
 
 /// Check if an error is a "not found" / "no entry" error from keychain
@@ -134,7 +134,9 @@ impl Keychain {
                         .collect(),
                 };
 
-                if let Err(rollback_err) = self.restore_provider_credentials(provider_id, &rollback_snapshot) {
+                if let Err(rollback_err) =
+                    self.restore_provider_credentials(provider_id, &rollback_snapshot)
+                {
                     return Err(AppError::Other(format!(
                         "Save failed: {}. Rollback also failed: {}. Credentials may be inconsistent.",
                         e, rollback_err
@@ -410,7 +412,9 @@ mod tests {
     fn keychain_with_backend_round_trips_provider_credential() {
         let keychain = Keychain::with_backend(StubKeychainBackend::new());
 
-        keychain.save_provider_credential("custom-llm-1", "secret-key").unwrap();
+        keychain
+            .save_provider_credential("custom-llm-1", "secret-key")
+            .unwrap();
         assert_eq!(
             keychain.load_provider_credential("custom-llm-1").unwrap(),
             "secret-key"
@@ -424,16 +428,22 @@ mod tests {
     fn save_credentials_transactional_rolls_back_on_failure() {
         // Create a keychain with stub backend for initial setup
         let keychain = Keychain::with_backend(StubKeychainBackend::new());
-        keychain.save_provider_credential("test-provider", "old-simple-key").unwrap();
+        keychain
+            .save_provider_credential("test-provider", "old-simple-key")
+            .unwrap();
         let mut existing_creds = std::collections::HashMap::new();
         existing_creds.insert("field1".to_string(), "old-value1".to_string());
-        keychain.save_provider_credentials("test-provider", &existing_creds).unwrap();
+        keychain
+            .save_provider_credentials("test-provider", &existing_creds)
+            .unwrap();
 
         // Snapshot
-        let snapshot = keychain.snapshot_provider_credentials(
-            "test-provider",
-            &vec!["field1".to_string(), "field2".to_string()],
-        ).unwrap();
+        let snapshot = keychain
+            .snapshot_provider_credentials(
+                "test-provider",
+                &vec!["field1".to_string(), "field2".to_string()],
+            )
+            .unwrap();
 
         // Create failing backend and copy state
         let failing_backend = FailingKeychainBackend::new();
@@ -467,14 +477,25 @@ mod tests {
         // Due to HashMap iteration order, we don't know which field was saved first
         // But we can verify: the field that WAS saved should be rolled back
         // and field2 (which didn't exist) should still not exist
-        let field1_result = keychain_failing.backend.load("provider:test-provider:credential:field1");
-        let field2_result = keychain_failing.backend.load("provider:test-provider:credential:field2");
+        let field1_result = keychain_failing
+            .backend
+            .load("provider:test-provider:credential:field1");
+        let field2_result = keychain_failing
+            .backend
+            .load("provider:test-provider:credential:field2");
 
         // field1 should be back to old value (either never changed, or rolled back)
-        assert_eq!(field1_result.unwrap(), "old-value1", "field1 should be old value");
+        assert_eq!(
+            field1_result.unwrap(),
+            "old-value1",
+            "field1 should be old value"
+        );
 
         // field2 should not exist (was absent before, either never saved or rolled back)
-        assert!(field2_result.is_err(), "field2 should not exist after rollback");
+        assert!(
+            field2_result.is_err(),
+            "field2 should not exist after rollback"
+        );
     }
 
     #[test]
@@ -482,38 +503,62 @@ mod tests {
         let keychain = Keychain::with_backend(StubKeychainBackend::new());
 
         // Setup: field1 exists, field2 absent
-        keychain.save_provider_credential("test-provider", "simple-key").unwrap();
+        keychain
+            .save_provider_credential("test-provider", "simple-key")
+            .unwrap();
         let mut creds = std::collections::HashMap::new();
         creds.insert("field1".to_string(), "value1".to_string());
-        keychain.save_provider_credentials("test-provider", &creds).unwrap();
+        keychain
+            .save_provider_credentials("test-provider", &creds)
+            .unwrap();
 
         // Create snapshot
-        let snapshot = keychain.snapshot_provider_credentials(
-            "test-provider",
-            &vec!["field1".to_string(), "field2".to_string()],
-        ).unwrap();
+        let snapshot = keychain
+            .snapshot_provider_credentials(
+                "test-provider",
+                &vec!["field1".to_string(), "field2".to_string()],
+            )
+            .unwrap();
 
         // Verify snapshot captured the state
         assert_eq!(snapshot.api_key, Some(Some("simple-key".to_string())));
-        assert_eq!(snapshot.structured.get("field1"), Some(&Some("value1".to_string())));
+        assert_eq!(
+            snapshot.structured.get("field1"),
+            Some(&Some("value1".to_string()))
+        );
         assert_eq!(snapshot.structured.get("field2"), Some(&None));
 
         // Modify state
-        keychain.save_provider_credential("test-provider", "changed-key").unwrap();
+        keychain
+            .save_provider_credential("test-provider", "changed-key")
+            .unwrap();
         let mut new_creds = std::collections::HashMap::new();
         new_creds.insert("field1".to_string(), "changed1".to_string());
         new_creds.insert("field2".to_string(), "new-field2".to_string());
-        keychain.save_provider_credentials("test-provider", &new_creds).unwrap();
+        keychain
+            .save_provider_credentials("test-provider", &new_creds)
+            .unwrap();
 
         // Restore from snapshot
-        keychain.restore_provider_credentials("test-provider", &snapshot).unwrap();
+        keychain
+            .restore_provider_credentials("test-provider", &snapshot)
+            .unwrap();
 
         // Verify restoration
-        assert_eq!(keychain.load_provider_credential("test-provider").unwrap(), "simple-key");
-        let field1 = keychain.backend.load("provider:test-provider:credential:field1").unwrap();
+        assert_eq!(
+            keychain.load_provider_credential("test-provider").unwrap(),
+            "simple-key"
+        );
+        let field1 = keychain
+            .backend
+            .load("provider:test-provider:credential:field1")
+            .unwrap();
         assert_eq!(field1, "value1");
 
         // field2 should be deleted (was absent in snapshot)
-        assert!(keychain.backend.load("provider:test-provider:credential:field2").is_err());
+        assert!(keychain
+            .backend
+            .load("provider:test-provider:credential:field2")
+            .is_err());
     }
 }
