@@ -6,9 +6,8 @@ use crate::application::providers::{
     LlmIntrospection, ProviderConfiguration, TranslationPromptConfiguration,
 };
 use crate::application::{
-    CaptureOutputService, CaptureSessionRuntime, CaptureSessionService, HistoryService,
-    HotkeyRuntime, ImageCompositionService, PinnedImageRuntime, SelectedTextAcquirer,
-    SettingsConfiguration,
+    CaptureOutput, CaptureSessionRuntime, CaptureSessions, History, HotkeyRuntime,
+    PinnedImageRuntime, SelectedTextAcquirer, SettingsConfiguration,
 };
 use crate::infrastructure::events::EventBus;
 use crate::Result;
@@ -28,20 +27,19 @@ pub struct ProviderRuntime {
 }
 
 pub struct CaptureRuntimeState {
-    pub sessions: Arc<CaptureSessionService>,
-    pub image_composition: Arc<ImageCompositionService>,
-    pub output: Arc<CaptureOutputService>,
-    pub session_runtime: Arc<CaptureSessionRuntime>,
+    pub sessions: Arc<CaptureSessions>,
+    pub output: Arc<CaptureOutput>,
+    pub runtime: Arc<CaptureSessionRuntime>,
     pub pinned_images: Arc<PinnedImageRuntime>,
 }
 
 pub struct HistoryRuntime {
-    pub service: Arc<HistoryService>,
+    pub history: Arc<History>,
     pub events: Arc<EventBus>,
 }
 
 pub struct SelectionRuntime {
-    pub selected_text_acquirer: Arc<SelectedTextAcquirer>,
+    pub acquirer: Arc<SelectedTextAcquirer>,
 }
 
 pub struct AppState {

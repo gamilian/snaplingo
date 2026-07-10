@@ -4,13 +4,11 @@ use std::time::Instant;
 use async_trait::async_trait;
 use tauri::AppHandle;
 
-use crate::application::providers::ocr::OcrCoordinator;
-use crate::application::services::capture_session_render::{
+use super::render::{
     output_capture_selection, recognize_capture_selection_text, render_capture_png_base64,
 };
-use crate::application::services::{
-    CaptureOutputService, CaptureSessionOutput, CaptureSessionService, ImageCompositionService,
-};
+use super::{CaptureImageComposer, CaptureOutput, CaptureSessionOutput, CaptureSessions};
+use crate::application::providers::ocr::OcrCoordinator;
 use crate::domain::capture::{
     AnnotationCommand, CaptureOutputAction, CaptureSessionId, CaptureSessionView, LogicalRect,
 };
@@ -144,20 +142,20 @@ impl CaptureSessionRuntimeHost for TauriCaptureSessionRuntimeHost {
     }
 }
 
-/// Coordinates Capture Session operations that need several application services.
+/// Coordinates Capture Session operations that span several application modules.
 pub struct CaptureSessionRuntime {
-    sessions: Arc<CaptureSessionService>,
-    image_composition: Arc<ImageCompositionService>,
-    output: Arc<CaptureOutputService>,
+    sessions: Arc<CaptureSessions>,
+    image_composition: Arc<CaptureImageComposer>,
+    output: Arc<CaptureOutput>,
     ocr: Arc<OcrCoordinator>,
     host: Arc<dyn CaptureSessionRuntimeHost>,
 }
 
 impl CaptureSessionRuntime {
     pub fn new(
-        sessions: Arc<CaptureSessionService>,
-        image_composition: Arc<ImageCompositionService>,
-        output: Arc<CaptureOutputService>,
+        sessions: Arc<CaptureSessions>,
+        image_composition: Arc<CaptureImageComposer>,
+        output: Arc<CaptureOutput>,
         ocr: Arc<OcrCoordinator>,
     ) -> Self {
         Self::with_host(
@@ -170,9 +168,9 @@ impl CaptureSessionRuntime {
     }
 
     pub(crate) fn with_host(
-        sessions: Arc<CaptureSessionService>,
-        image_composition: Arc<ImageCompositionService>,
-        output: Arc<CaptureOutputService>,
+        sessions: Arc<CaptureSessions>,
+        image_composition: Arc<CaptureImageComposer>,
+        output: Arc<CaptureOutput>,
         ocr: Arc<OcrCoordinator>,
         host: Arc<dyn CaptureSessionRuntimeHost>,
     ) -> Self {
@@ -485,11 +483,11 @@ mod tests {
     use async_trait::async_trait;
     use image::ImageEncoder;
 
+    use super::super::{
+        CaptureImageComposer, CaptureOutput, CaptureSessionSource, CaptureSessions,
+    };
     use super::{CaptureSessionOutput, CaptureSessionRuntime, CaptureSessionRuntimeHost};
     use crate::application::providers::ocr::OcrCoordinator;
-    use crate::application::services::{
-        CaptureOutputService, CaptureSessionService, CaptureSessionSource, ImageCompositionService,
-    };
     use crate::domain::capture::{
         CaptureOutputAction, CaptureSessionId, LogicalPoint, LogicalRect, MonitorLayout,
         MonitorSnapshot, PhysicalRect, ScreenRegion, WindowCandidate,
@@ -695,14 +693,14 @@ mod tests {
     fn make_runtime(
         host: Arc<dyn CaptureSessionRuntimeHost>,
         snapshots: Vec<MonitorSnapshot>,
-    ) -> (CaptureSessionRuntime, Arc<CaptureSessionService>) {
-        let sessions = Arc::new(CaptureSessionService::new(Arc::new(
-            MockCaptureSessionSource { snapshots },
-        )));
+    ) -> (CaptureSessionRuntime, Arc<CaptureSessions>) {
+        let sessions = Arc::new(CaptureSessions::new(Arc::new(MockCaptureSessionSource {
+            snapshots,
+        })));
         let runtime = CaptureSessionRuntime::with_host(
             sessions.clone(),
-            Arc::new(ImageCompositionService::new()),
-            Arc::new(CaptureOutputService::new()),
+            Arc::new(CaptureImageComposer::new()),
+            Arc::new(CaptureOutput::new()),
             Arc::new(OcrCoordinator::new(Arc::new(ConfigFile::new_temp()))),
             host,
         );

@@ -250,7 +250,7 @@ pub async fn open_selection_translation_window_for_state(
 ) -> Result<(), String> {
     let snapshot = state
         .selection
-        .selected_text_acquirer
+        .acquirer
         .acquire()
         .await
         .map_err(|e| e.to_string())?;

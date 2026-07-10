@@ -7,17 +7,20 @@ use crate::Result;
 use async_trait::async_trait;
 use std::sync::Arc;
 
-/// Service for managing history records.
+#[cfg(test)]
+mod tests;
+
+/// Owns history recording, queries, and deletion.
 ///
-/// HistoryService acts as an EventSubscriber, automatically recording
+/// History acts as an EventSubscriber, automatically recording
 /// translation and OCR operations when they complete. It also provides
 /// query and management APIs for history records.
-pub struct HistoryService {
+pub struct History {
     db: Arc<HistoryDatabase>,
 }
 
-impl HistoryService {
-    /// Create a new HistoryService
+impl History {
+    /// Create a new History module.
     pub fn new(db: Arc<HistoryDatabase>) -> Self {
         Self { db }
     }
@@ -57,7 +60,7 @@ impl HistoryService {
 }
 
 #[async_trait]
-impl EventSubscriber for HistoryService {
+impl EventSubscriber for History {
     async fn handle(&self, event: &DomainEvent) {
         match event {
             DomainEvent::TranslationCompleted {
@@ -72,7 +75,7 @@ impl EventSubscriber for HistoryService {
                     .insert_translation(request, results, providers_used, *timestamp, *duration_ms)
                     .await
                 {
-                    eprintln!("[HistoryService] Failed to record translation: {}", e);
+                    eprintln!("[History] Failed to record translation: {}", e);
                 }
             }
             DomainEvent::OcrCompleted {
@@ -87,7 +90,7 @@ impl EventSubscriber for HistoryService {
                     .insert_ocr(request, result, provider_used, *timestamp, *duration_ms)
                     .await
                 {
-                    eprintln!("[HistoryService] Failed to record OCR: {}", e);
+                    eprintln!("[History] Failed to record OCR: {}", e);
                 }
             }
             DomainEvent::ProviderConfigurationFailed {
@@ -97,7 +100,7 @@ impl EventSubscriber for HistoryService {
             } => {
                 // Log the error but don't persist to history database
                 eprintln!(
-                    "[HistoryService] Provider configuration failed: {} - {}",
+                    "[History] Provider configuration failed: {} - {}",
                     provider_id, error_message
                 );
             }
@@ -105,6 +108,6 @@ impl EventSubscriber for HistoryService {
     }
 
     fn name(&self) -> &str {
-        "history_service"
+        "history"
     }
 }

@@ -1,6 +1,6 @@
 use tauri::AppHandle;
 
-use crate::application::services::PinnedImageRuntimeHost;
+use crate::application::pinned_image::PinnedImageRuntimeHost;
 use crate::domain::capture::PinnedImageView;
 use crate::Result;
 

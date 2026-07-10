@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use super::super::HistoryService;
+    use crate::application::history::History;
     use crate::domain::events::DomainEvent;
     use crate::domain::ocr::{OcrRequest, OcrResult};
     use crate::domain::translation::{TranslationRequest, TranslationResult};
@@ -18,10 +18,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_history_service_handles_translation_completed_event() {
+    async fn test_history_handles_translation_completed_event() {
         // Arrange
         let db = create_temp_db();
-        let service = HistoryService::new(db.clone());
+        let history = History::new(db.clone());
 
         let event = DomainEvent::TranslationCompleted {
             request: TranslationRequest {
@@ -41,7 +41,7 @@ mod tests {
         };
 
         // Act
-        service.handle(&event).await;
+        history.handle(&event).await;
 
         // Assert - history should be recorded
         let history = db.query_translations(10, 0).await.unwrap();
@@ -51,10 +51,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_history_service_handles_ocr_completed_event() {
+    async fn test_history_handles_ocr_completed_event() {
         // Arrange
         let db = create_temp_db();
-        let service = HistoryService::new(db.clone());
+        let history = History::new(db.clone());
 
         let event = DomainEvent::OcrCompleted {
             request: OcrRequest {
@@ -71,7 +71,7 @@ mod tests {
         };
 
         // Act
-        service.handle(&event).await;
+        history.handle(&event).await;
 
         // Assert - history should be recorded
         let history = db.query_ocr(10, 0).await.unwrap();
@@ -81,10 +81,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_history_service_query_apis() {
+    async fn test_history_query_apis() {
         // Arrange
         let db = create_temp_db();
-        let service = HistoryService::new(db.clone());
+        let history = History::new(db.clone());
 
         // Insert some test data via events
         let translation_event = DomainEvent::TranslationCompleted {
@@ -104,11 +104,11 @@ mod tests {
             duration_ms: 100,
         };
 
-        service.handle(&translation_event).await;
+        history.handle(&translation_event).await;
 
-        // Act - Query via HistoryService APIs
-        let translations = service.get_translation_history(10, 0).await.unwrap();
-        let search_results = service.search_history("Test").await.unwrap();
+        // Act - Query via History APIs
+        let translations = history.get_translation_history(10, 0).await.unwrap();
+        let search_results = history.search_history("Test").await.unwrap();
 
         // Assert
         assert_eq!(translations.len(), 1);
@@ -118,10 +118,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_history_service_delete_apis() {
+    async fn test_history_delete_apis() {
         // Arrange
         let db = create_temp_db();
-        let service = HistoryService::new(db.clone());
+        let history = History::new(db.clone());
 
         // Insert data
         let event = DomainEvent::TranslationCompleted {
@@ -141,17 +141,17 @@ mod tests {
             duration_ms: 50,
         };
 
-        service.handle(&event).await;
+        history.handle(&event).await;
 
-        let history = service.get_translation_history(10, 0).await.unwrap();
-        assert_eq!(history.len(), 1);
-        let id = history[0].id;
+        let entries = history.get_translation_history(10, 0).await.unwrap();
+        assert_eq!(entries.len(), 1);
+        let id = entries[0].id;
 
         // Act - Delete
-        service.delete_history(id).await.unwrap();
+        history.delete_history(id).await.unwrap();
 
         // Assert
-        let history = service.get_translation_history(10, 0).await.unwrap();
-        assert_eq!(history.len(), 0);
+        let entries = history.get_translation_history(10, 0).await.unwrap();
+        assert_eq!(entries.len(), 0);
     }
 }

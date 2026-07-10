@@ -13,6 +13,7 @@ mod startup_shortcuts;
 
 // Public exports for new infrastructure layer
 pub use app_state::AppState;
+#[allow(ambiguous_glob_reexports)]
 pub use application::*;
 #[allow(ambiguous_glob_reexports)]
 pub use domain::*;
@@ -54,7 +55,7 @@ pub fn run() {
         })
         .setup(|app| {
             let app_state = composition::build_app_state(config_path, app.handle().clone());
-            composition::subscribe_history_service(&app_state);
+            composition::subscribe_history(&app_state);
             let hotkey_runtime = app_state.settings.hotkeys.clone();
 
             app.manage(app_state);

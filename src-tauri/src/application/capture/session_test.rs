@@ -6,14 +6,15 @@ mod tests {
     use base64::Engine;
     use image::ImageEncoder;
 
-    use crate::application::providers::common::Provider;
-    use crate::application::providers::ocr::{OcrCoordinator, OcrProvider};
-    use crate::application::services::capture_session_render::{
+    use crate::application::capture::render::{
         output_capture_selection, recognize_capture_selection_text, render_capture_png_base64,
     };
-    use crate::application::services::{
-        CaptureOutputService, CaptureSessionOutput, CaptureSessionRuntime, CaptureSessionSource,
+    use crate::application::capture::{
+        CaptureImageComposer, CaptureOutput, CaptureSessionOutput, CaptureSessionRuntime,
+        CaptureSessionSource, CaptureSessions,
     };
+    use crate::application::providers::common::Provider;
+    use crate::application::providers::ocr::{OcrCoordinator, OcrProvider};
     use crate::domain::capture::{
         CaptureOutputAction, CapturedCursor, LogicalPoint, LogicalRect, MonitorLayout,
         MonitorSnapshot, ScreenRegion, WindowCandidate,
@@ -21,9 +22,6 @@ mod tests {
     use crate::domain::ocr::{OcrRequest, OcrResult};
     use crate::error::AppError;
     use crate::infrastructure::storage::ConfigFile;
-
-    use crate::application::services::capture_session_service::CaptureSessionService;
-    use crate::application::services::image_composition_service::ImageCompositionService;
 
     struct MockCaptureSessionSource {
         snapshots: Vec<MonitorSnapshot>,
@@ -316,16 +314,16 @@ mod tests {
         let backend = make_backend();
         let snapshot_calls = backend.capture_monitor_snapshots_calls.clone();
         let layout_calls = backend.capture_monitor_layouts_calls.clone();
-        let service = CaptureSessionService::new(Arc::new(backend));
+        let sessions = CaptureSessions::new(Arc::new(backend));
 
-        let view = service.create_layout_session().await.unwrap();
+        let view = sessions.create_layout_session().await.unwrap();
 
         assert_eq!(*layout_calls.lock().unwrap(), 1);
         assert_eq!(*snapshot_calls.lock().unwrap(), 0);
         assert_eq!(view.monitors.len(), 1);
         assert_eq!(view.monitors[0].id, "primary");
         assert_eq!(view.monitors[0].image_base64, "");
-        assert!(service.get_session(&view.id).unwrap().snapshots[0]
+        assert!(sessions.get_session(&view.id).unwrap().snapshots[0]
             .png_data
             .is_empty());
     }
@@ -336,11 +334,11 @@ mod tests {
         let snapshot_calls = backend.capture_monitor_snapshots_calls.clone();
         let layout_calls = backend.capture_monitor_layouts_calls.clone();
         let captured_regions = backend.captured_regions.clone();
-        let service = CaptureSessionService::new(Arc::new(backend));
-        let view = service.create_layout_session().await.unwrap();
+        let sessions = CaptureSessions::new(Arc::new(backend));
+        let view = sessions.create_layout_session().await.unwrap();
 
         assert_eq!(view.monitors[0].image_base64, "");
-        assert!(service
+        assert!(sessions
             .session_selection_needs_freeze(
                 &view.id,
                 &LogicalRect {
@@ -352,13 +350,13 @@ mod tests {
             )
             .unwrap());
 
-        let hydrated_view = service.hydrate_session_snapshots(&view.id).await.unwrap();
+        let hydrated_view = sessions.hydrate_session_snapshots(&view.id).await.unwrap();
 
         assert_eq!(*layout_calls.lock().unwrap(), 1);
         assert_eq!(*snapshot_calls.lock().unwrap(), 1);
         assert!(captured_regions.lock().unwrap().is_empty());
         assert_eq!(hydrated_view.monitors[0].image_base64, "AQID");
-        assert!(!service
+        assert!(!sessions
             .session_selection_needs_freeze(
                 &view.id,
                 &LogicalRect {
@@ -376,27 +374,27 @@ mod tests {
         let backend = make_backend();
         let snapshot_calls = backend.capture_monitor_snapshots_calls.clone();
         let layout_calls = backend.capture_monitor_layouts_calls.clone();
-        let service = CaptureSessionService::new(Arc::new(backend));
+        let sessions = CaptureSessions::new(Arc::new(backend));
 
-        let cache = service.capture_session_snapshot_cache().await.unwrap();
+        let cache = sessions.capture_session_snapshot_cache().await.unwrap();
 
         assert_eq!(*snapshot_calls.lock().unwrap(), 1);
         assert_eq!(*layout_calls.lock().unwrap(), 0);
 
-        let view = service.create_layout_session().await.unwrap();
-        service
+        let view = sessions.create_layout_session().await.unwrap();
+        sessions
             .store_session_snapshot_cache(&view.id, cache)
             .unwrap();
 
-        let full_view = service.get_session_view(&view.id).unwrap();
-        let frontend_view = service
+        let full_view = sessions.get_session_view(&view.id).unwrap();
+        let frontend_view = sessions
             .get_session_view_without_monitor_images(&view.id)
             .unwrap();
 
         assert_eq!(*layout_calls.lock().unwrap(), 1);
         assert_eq!(full_view.monitors[0].image_base64, "AQID");
         assert_eq!(frontend_view.monitors[0].image_base64, "");
-        assert!(!service
+        assert!(!sessions
             .session_selection_needs_freeze(
                 &view.id,
                 &LogicalRect {
@@ -424,16 +422,16 @@ mod tests {
             width: 10,
             height: 10,
         };
-        let service = CaptureSessionService::new(Arc::new(backend));
+        let sessions = CaptureSessions::new(Arc::new(backend));
 
-        let view = service.create_layout_session().await.unwrap();
-        let cache = service.capture_session_snapshot_cache().await.unwrap();
-        service
+        let view = sessions.create_layout_session().await.unwrap();
+        let cache = sessions.capture_session_snapshot_cache().await.unwrap();
+        sessions
             .store_session_snapshot_cache(&view.id, cache)
             .unwrap();
 
-        let stored = service.get_session(&view.id).unwrap();
-        let frontend_view = service
+        let stored = sessions.get_session(&view.id).unwrap();
+        let frontend_view = sessions
             .get_session_view_without_monitor_images(&view.id)
             .unwrap();
 
@@ -450,10 +448,10 @@ mod tests {
         let mut backend = make_backend_with_renderable_png();
         backend.region_png_data = make_solid_png(2, 3, [40, 50, 60, 255]);
         let captured_regions = backend.captured_regions.clone();
-        let service = CaptureSessionService::new(Arc::new(backend));
-        let view = service.create_layout_session().await.unwrap();
+        let sessions = CaptureSessions::new(Arc::new(backend));
+        let view = sessions.create_layout_session().await.unwrap();
 
-        let frozen_view = service
+        let frozen_view = sessions
             .freeze_session_selection(
                 &view.id,
                 &LogicalRect {
@@ -480,7 +478,7 @@ mod tests {
                 [40, 50, 60, 255]
             ))
         );
-        assert!(!service
+        assert!(!sessions
             .session_selection_needs_freeze(
                 &view.id,
                 &LogicalRect {
@@ -495,15 +493,15 @@ mod tests {
 
     #[tokio::test]
     async fn create_session_stores_snapshot_and_returns_view() {
-        let service = CaptureSessionService::new(Arc::new(make_backend()));
+        let sessions = CaptureSessions::new(Arc::new(make_backend()));
 
-        let view = service.create_session().await.unwrap();
+        let view = sessions.create_session().await.unwrap();
 
         assert_eq!(view.monitors.len(), 1);
         assert_eq!(view.monitors[0].id, "primary");
         assert_eq!(view.monitors[0].image_base64, "AQID");
         assert!(view.candidates.is_empty());
-        assert!(service.has_session(&view.id));
+        assert!(sessions.has_session(&view.id));
     }
 
     #[tokio::test]
@@ -511,17 +509,17 @@ mod tests {
         let backend = make_backend();
         let snapshot_calls = backend.capture_monitor_snapshots_calls.clone();
         let layout_calls = backend.capture_monitor_layouts_calls.clone();
-        let service = CaptureSessionService::new(Arc::new(backend));
+        let sessions = CaptureSessions::new(Arc::new(backend));
 
-        let view = service.create_session().await.unwrap();
-        let frontend_view = service
+        let view = sessions.create_session().await.unwrap();
+        let frontend_view = sessions
             .get_session_view_without_monitor_images(&view.id)
             .unwrap();
 
         assert_eq!(*snapshot_calls.lock().unwrap(), 1);
         assert_eq!(*layout_calls.lock().unwrap(), 0);
         assert_eq!(frontend_view.monitors[0].image_base64, "");
-        assert!(!service
+        assert!(!sessions
             .session_selection_needs_freeze(
                 &view.id,
                 &LogicalRect {
@@ -539,9 +537,9 @@ mod tests {
         let backend = make_backend();
         let snapshot_calls = backend.capture_monitor_snapshots_calls.clone();
         let layout_calls = backend.capture_monitor_layouts_calls.clone();
-        let service = CaptureSessionService::new(Arc::new(backend));
+        let sessions = CaptureSessions::new(Arc::new(backend));
 
-        let frontend_view = service
+        let frontend_view = sessions
             .create_session_without_monitor_images()
             .await
             .unwrap();
@@ -549,7 +547,7 @@ mod tests {
         assert_eq!(*snapshot_calls.lock().unwrap(), 1);
         assert_eq!(*layout_calls.lock().unwrap(), 0);
         assert_eq!(frontend_view.monitors[0].image_base64, "");
-        assert!(!service
+        assert!(!sessions
             .session_selection_needs_freeze(
                 &frontend_view.id,
                 &LogicalRect {
@@ -564,19 +562,19 @@ mod tests {
 
     #[tokio::test]
     async fn get_session_view_returns_stored_view() {
-        let service = CaptureSessionService::new(Arc::new(make_backend_with_captured_cursor()));
+        let sessions = CaptureSessions::new(Arc::new(make_backend_with_captured_cursor()));
 
-        let created_view = service.create_session().await.unwrap();
-        let stored_view = service.get_session_view(&created_view.id).unwrap();
+        let created_view = sessions.create_session().await.unwrap();
+        let stored_view = sessions.get_session_view(&created_view.id).unwrap();
 
         assert_eq!(stored_view, created_view);
     }
 
     #[tokio::test]
     async fn create_session_returns_window_candidates_for_hover_selection() {
-        let service = CaptureSessionService::new(Arc::new(make_backend_with_window_candidate()));
+        let sessions = CaptureSessions::new(Arc::new(make_backend_with_window_candidate()));
 
-        let view = service.create_session().await.unwrap();
+        let view = sessions.create_session().await.unwrap();
 
         assert_eq!(view.candidates.len(), 1);
         assert_eq!(view.candidates[0].id, "window-42");
@@ -597,9 +595,9 @@ mod tests {
     async fn create_session_preserves_backend_window_order_as_descending_hover_priority() {
         let mut backend = make_backend();
         backend.window_candidates = overlapping_window_candidates();
-        let service = CaptureSessionService::new(Arc::new(backend));
+        let sessions = CaptureSessions::new(Arc::new(backend));
 
-        let view = service.create_session().await.unwrap();
+        let view = sessions.create_session().await.unwrap();
 
         assert_eq!(view.candidates[0].id, "window-front");
         assert_eq!(view.candidates[1].id, "window-behind");
@@ -610,9 +608,9 @@ mod tests {
     async fn create_layout_session_preserves_backend_window_order_as_descending_hover_priority() {
         let mut backend = make_backend();
         backend.window_candidates = overlapping_window_candidates();
-        let service = CaptureSessionService::new(Arc::new(backend));
+        let sessions = CaptureSessions::new(Arc::new(backend));
 
-        let view = service.create_layout_session().await.unwrap();
+        let view = sessions.create_layout_session().await.unwrap();
 
         assert_eq!(view.candidates[0].id, "window-front");
         assert_eq!(view.candidates[1].id, "window-behind");
@@ -621,9 +619,9 @@ mod tests {
 
     #[tokio::test]
     async fn create_session_returns_captured_cursor_for_output_composition() {
-        let service = CaptureSessionService::new(Arc::new(make_backend_with_captured_cursor()));
+        let sessions = CaptureSessions::new(Arc::new(make_backend_with_captured_cursor()));
 
-        let view = service.create_session().await.unwrap();
+        let view = sessions.create_session().await.unwrap();
 
         let captured_cursor = view.captured_cursor.unwrap();
         assert_eq!(
@@ -639,17 +637,16 @@ mod tests {
         assert_eq!(captured_cursor.scale_factor, 2.0);
         assert_eq!(captured_cursor.image_base64, "CQgH");
 
-        let session = service.get_session(&view.id).unwrap();
+        let session = sessions.get_session(&view.id).unwrap();
         assert!(session.captured_cursor.is_some());
     }
 
     #[tokio::test]
     async fn returns_current_cursor_position_for_active_session() {
-        let service =
-            CaptureSessionService::new(Arc::new(make_backend_with_current_cursor_position()));
-        let view = service.create_session().await.unwrap();
+        let sessions = CaptureSessions::new(Arc::new(make_backend_with_current_cursor_position()));
+        let view = sessions.create_session().await.unwrap();
 
-        let position = service.current_cursor_position(&view.id).unwrap();
+        let position = sessions.current_cursor_position(&view.id).unwrap();
 
         assert_eq!(
             position,
@@ -659,18 +656,18 @@ mod tests {
 
     #[tokio::test]
     async fn cancel_session_removes_stored_snapshot() {
-        let service = CaptureSessionService::new(Arc::new(make_backend()));
-        let view = service.create_session().await.unwrap();
+        let sessions = CaptureSessions::new(Arc::new(make_backend()));
+        let view = sessions.create_session().await.unwrap();
 
-        service.cancel_session(&view.id).unwrap();
+        sessions.cancel_session(&view.id).unwrap();
 
-        assert!(!service.has_session(&view.id));
+        assert!(!sessions.has_session(&view.id));
     }
 
     #[tokio::test]
     async fn hidden_window_labels_are_stored_until_explicit_restore() {
-        let service = CaptureSessionService::new(Arc::new(make_backend()));
-        let view = service
+        let sessions = CaptureSessions::new(Arc::new(make_backend()));
+        let view = sessions
             .create_session_with_hidden_window_labels(vec![
                 "settings".to_string(),
                 "pin-pin-1".to_string(),
@@ -679,22 +676,22 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            service.take_hidden_window_labels(&view.id).unwrap(),
+            sessions.take_hidden_window_labels(&view.id).unwrap(),
             vec!["settings".to_string(), "pin-pin-1".to_string()]
         );
-        assert!(service
+        assert!(sessions
             .take_hidden_window_labels(&view.id)
             .unwrap()
             .is_empty());
-        assert!(service.has_session(&view.id));
+        assert!(sessions.has_session(&view.id));
     }
 
     #[tokio::test]
     async fn converts_logical_rect_to_physical_rect() {
-        let service = CaptureSessionService::new(Arc::new(make_backend_with_scale(2.0)));
-        let view = service.create_session().await.unwrap();
+        let sessions = CaptureSessions::new(Arc::new(make_backend_with_scale(2.0)));
+        let view = sessions.create_session().await.unwrap();
 
-        let physical = service
+        let physical = sessions
             .logical_rect_to_physical(
                 &view.id,
                 &crate::domain::capture::LogicalRect {
@@ -714,10 +711,10 @@ mod tests {
 
     #[tokio::test]
     async fn clamps_logical_rect_to_monitor_bounds() {
-        let service = CaptureSessionService::new(Arc::new(make_backend_with_scale(2.0)));
-        let view = service.create_session().await.unwrap();
+        let sessions = CaptureSessions::new(Arc::new(make_backend_with_scale(2.0)));
+        let view = sessions.create_session().await.unwrap();
 
-        let physical = service
+        let physical = sessions
             .logical_rect_to_physical(
                 &view.id,
                 &crate::domain::capture::LogicalRect {
@@ -737,10 +734,10 @@ mod tests {
 
     #[tokio::test]
     async fn converts_logical_rect_on_secondary_monitor_to_that_monitor_physical_space() {
-        let service = CaptureSessionService::new(Arc::new(make_multi_monitor_backend()));
-        let view = service.create_session().await.unwrap();
+        let sessions = CaptureSessions::new(Arc::new(make_multi_monitor_backend()));
+        let view = sessions.create_session().await.unwrap();
 
-        let physical = service
+        let physical = sessions
             .logical_rect_to_physical(
                 &view.id,
                 &crate::domain::capture::LogicalRect {
@@ -783,12 +780,12 @@ mod tests {
             png_data: make_solid_png(2, 2, [255, 0, 0, 255]),
         });
 
-        let service = CaptureSessionService::new(Arc::new(backend));
-        let view = service.create_session().await.unwrap();
+        let sessions = CaptureSessions::new(Arc::new(backend));
+        let view = sessions.create_session().await.unwrap();
 
         let result = recognize_capture_selection_text(
-            &service,
-            &ImageCompositionService::new(),
+            &sessions,
+            &CaptureImageComposer::new(),
             &ocr,
             &view.id,
             &LogicalRect {
@@ -822,13 +819,13 @@ mod tests {
         .unwrap();
         ocr.activate("recording").unwrap();
 
-        let sessions = Arc::new(CaptureSessionService::new(Arc::new(
+        let sessions = Arc::new(CaptureSessions::new(Arc::new(
             make_backend_with_renderable_png(),
         )));
         let runtime = CaptureSessionRuntime::new(
             sessions.clone(),
-            Arc::new(ImageCompositionService::new()),
-            Arc::new(CaptureOutputService::new()),
+            Arc::new(CaptureImageComposer::new()),
+            Arc::new(CaptureOutput::new()),
             Arc::new(ocr),
         );
         let view = sessions.create_session().await.unwrap();
@@ -852,14 +849,14 @@ mod tests {
 
     #[tokio::test]
     async fn output_selection_save_writes_rendered_png_to_path() {
-        let service = CaptureSessionService::new(Arc::new(make_backend_with_renderable_png()));
-        let view = service.create_session().await.unwrap();
+        let sessions = CaptureSessions::new(Arc::new(make_backend_with_renderable_png()));
+        let view = sessions.create_session().await.unwrap();
         let path = temp_png_path();
 
         let output = output_capture_selection(
-            &service,
-            &ImageCompositionService::new(),
-            &CaptureOutputService::new(),
+            &sessions,
+            &CaptureImageComposer::new(),
+            &CaptureOutput::new(),
             &view.id,
             &LogicalRect {
                 x: 1.0,
@@ -888,12 +885,12 @@ mod tests {
 
     #[tokio::test]
     async fn render_png_base64_returns_rendered_selection_as_base64() {
-        let service = CaptureSessionService::new(Arc::new(make_backend_with_renderable_png()));
-        let view = service.create_session().await.unwrap();
+        let sessions = CaptureSessions::new(Arc::new(make_backend_with_renderable_png()));
+        let view = sessions.create_session().await.unwrap();
 
         let encoded = render_capture_png_base64(
-            &service,
-            &ImageCompositionService::new(),
+            &sessions,
+            &CaptureImageComposer::new(),
             &view.id,
             &LogicalRect {
                 x: 1.0,
@@ -919,13 +916,13 @@ mod tests {
     async fn render_png_base64_from_hydrated_layout_session_uses_cached_monitor_pixels() {
         let backend = make_backend_with_renderable_png();
         let captured_regions = backend.captured_regions.clone();
-        let service = CaptureSessionService::new(Arc::new(backend));
-        let view = service.create_layout_session().await.unwrap();
-        service.hydrate_session_snapshots(&view.id).await.unwrap();
+        let sessions = CaptureSessions::new(Arc::new(backend));
+        let view = sessions.create_layout_session().await.unwrap();
+        sessions.hydrate_session_snapshots(&view.id).await.unwrap();
 
         let encoded = render_capture_png_base64(
-            &service,
-            &ImageCompositionService::new(),
+            &sessions,
+            &CaptureImageComposer::new(),
             &view.id,
             &LogicalRect {
                 x: 1.0,
@@ -950,13 +947,13 @@ mod tests {
 
     #[tokio::test]
     async fn output_selection_pin_returns_rendered_png() {
-        let service = CaptureSessionService::new(Arc::new(make_backend_with_renderable_png()));
-        let view = service.create_session().await.unwrap();
+        let sessions = CaptureSessions::new(Arc::new(make_backend_with_renderable_png()));
+        let view = sessions.create_session().await.unwrap();
 
         let output = output_capture_selection(
-            &service,
-            &ImageCompositionService::new(),
-            &CaptureOutputService::new(),
+            &sessions,
+            &CaptureImageComposer::new(),
+            &CaptureOutput::new(),
             &view.id,
             &LogicalRect {
                 x: 1.0,

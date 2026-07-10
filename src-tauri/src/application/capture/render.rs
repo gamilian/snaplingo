@@ -2,12 +2,8 @@ use std::path::Path;
 
 use base64::Engine;
 
+use super::{CaptureImageComposer, CaptureOutput, CaptureSessions, ImageAnnotation, PngPlacement};
 use crate::application::providers::ocr::OcrCoordinator;
-use crate::application::services::capture_output_service::CaptureOutputService;
-use crate::application::services::capture_session_service::CaptureSessionService;
-use crate::application::services::image_composition_service::{
-    ImageAnnotation, ImageCompositionService, PngPlacement,
-};
 use crate::domain::capture::{
     AnnotationCommand, CaptureOutputAction, CaptureSessionId, CapturedCursor, LogicalPoint,
     LogicalRect, MonitorSnapshot, PhysicalPoint, PhysicalRect,
@@ -43,8 +39,8 @@ pub enum CaptureSessionOutput {
 }
 
 pub fn render_capture_png_base64(
-    capture_sessions: &CaptureSessionService,
-    image_composition: &ImageCompositionService,
+    capture_sessions: &CaptureSessions,
+    image_composition: &CaptureImageComposer,
     session_id: &CaptureSessionId,
     rect: &LogicalRect,
     annotations: &[AnnotationCommand],
@@ -63,8 +59,8 @@ pub fn render_capture_png_base64(
 }
 
 pub async fn recognize_capture_selection_text(
-    capture_sessions: &CaptureSessionService,
-    image_composition: &ImageCompositionService,
+    capture_sessions: &CaptureSessions,
+    image_composition: &CaptureImageComposer,
     ocr: &OcrCoordinator,
     session_id: &CaptureSessionId,
     rect: &LogicalRect,
@@ -84,9 +80,9 @@ pub async fn recognize_capture_selection_text(
 }
 
 pub async fn output_capture_selection(
-    capture_sessions: &CaptureSessionService,
-    image_composition: &ImageCompositionService,
-    output: &CaptureOutputService,
+    capture_sessions: &CaptureSessions,
+    image_composition: &CaptureImageComposer,
+    output: &CaptureOutput,
     session_id: &CaptureSessionId,
     rect: &LogicalRect,
     annotations: &[AnnotationCommand],
@@ -116,8 +112,8 @@ pub async fn output_capture_selection(
 }
 
 pub fn render_capture_png(
-    capture_sessions: &CaptureSessionService,
-    image_composition: &ImageCompositionService,
+    capture_sessions: &CaptureSessions,
+    image_composition: &CaptureImageComposer,
     session_id: &CaptureSessionId,
     rect: &LogicalRect,
     annotations: &[AnnotationCommand],
@@ -489,7 +485,7 @@ fn scaled_extent(value: f64, scale: f64) -> Result<u32, String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::application::services::image_composition_service::ImageAnnotation;
+    use super::ImageAnnotation;
     use crate::domain::capture::{
         AnnotationCommand, LogicalPoint, LogicalRect, PhysicalPoint, PhysicalRect,
     };

@@ -2,9 +2,7 @@
 mod tests {
     use image::ImageEncoder;
 
-    use crate::application::services::image_composition_service::{
-        ImageAnnotation, ImageCompositionService, PngPlacement,
-    };
+    use crate::application::capture::{CaptureImageComposer, ImageAnnotation, PngPlacement};
     use crate::domain::capture::{PhysicalPoint, PhysicalRect};
 
     fn make_solid_png(width: u32, height: u32, rgba: [u8; 4]) -> Vec<u8> {
@@ -64,7 +62,7 @@ mod tests {
 
     #[test]
     fn crops_png_to_physical_rect() {
-        let service = ImageCompositionService::new();
+        let composer = CaptureImageComposer::new();
         let png = make_test_png(4, 4);
         let rect = PhysicalRect {
             x: 1,
@@ -73,18 +71,18 @@ mod tests {
             height: 2,
         };
 
-        let cropped = service.crop_png(&png, &rect).unwrap();
+        let cropped = composer.crop_png(&png, &rect).unwrap();
 
         assert_eq!(png_dimensions(&cropped), (2, 2));
     }
 
     #[test]
     fn composes_cropped_pngs_into_one_output() {
-        let service = ImageCompositionService::new();
+        let composer = CaptureImageComposer::new();
         let red = make_solid_png(4, 2, [255, 0, 0, 255]);
         let blue = make_solid_png(4, 2, [0, 0, 255, 255]);
 
-        let output = service
+        let output = composer
             .compose_png(
                 6,
                 2,
@@ -132,10 +130,10 @@ mod tests {
 
     #[test]
     fn composes_png_with_rectangle_annotation() {
-        let service = ImageCompositionService::new();
+        let composer = CaptureImageComposer::new();
         let white = make_solid_png(6, 6, [255, 255, 255, 255]);
 
-        let output = service
+        let output = composer
             .compose_png_with_annotations(
                 6,
                 6,
@@ -175,10 +173,10 @@ mod tests {
 
     #[test]
     fn composes_png_with_filled_rectangle_annotation() {
-        let service = ImageCompositionService::new();
+        let composer = CaptureImageComposer::new();
         let white = make_solid_png(6, 6, [255, 255, 255, 255]);
 
-        let output = service
+        let output = composer
             .compose_png_with_annotations(
                 6,
                 6,
@@ -216,10 +214,10 @@ mod tests {
 
     #[test]
     fn composes_png_with_ellipse_annotation() {
-        let service = ImageCompositionService::new();
+        let composer = CaptureImageComposer::new();
         let white = make_solid_png(9, 7, [255, 255, 255, 255]);
 
-        let output = service
+        let output = composer
             .compose_png_with_annotations(
                 9,
                 7,
@@ -261,10 +259,10 @@ mod tests {
 
     #[test]
     fn composes_png_with_filled_ellipse_annotation() {
-        let service = ImageCompositionService::new();
+        let composer = CaptureImageComposer::new();
         let white = make_solid_png(9, 7, [255, 255, 255, 255]);
 
-        let output = service
+        let output = composer
             .compose_png_with_annotations(
                 9,
                 7,
@@ -302,10 +300,10 @@ mod tests {
 
     #[test]
     fn composes_png_with_arrow_annotation() {
-        let service = ImageCompositionService::new();
+        let composer = CaptureImageComposer::new();
         let white = make_solid_png(12, 9, [255, 255, 255, 255]);
 
-        let output = service
+        let output = composer
             .compose_png_with_annotations(
                 12,
                 9,
@@ -341,10 +339,10 @@ mod tests {
 
     #[test]
     fn composes_png_with_line_annotation() {
-        let service = ImageCompositionService::new();
+        let composer = CaptureImageComposer::new();
         let white = make_solid_png(8, 6, [255, 255, 255, 255]);
 
-        let output = service
+        let output = composer
             .compose_png_with_annotations(
                 8,
                 6,
@@ -380,10 +378,10 @@ mod tests {
 
     #[test]
     fn composes_png_with_polyline_annotation() {
-        let service = ImageCompositionService::new();
+        let composer = CaptureImageComposer::new();
         let white = make_solid_png(8, 8, [255, 255, 255, 255]);
 
-        let output = service
+        let output = composer
             .compose_png_with_annotations(
                 8,
                 8,
@@ -422,10 +420,10 @@ mod tests {
 
     #[test]
     fn composes_png_with_freehand_annotation() {
-        let service = ImageCompositionService::new();
+        let composer = CaptureImageComposer::new();
         let white = make_solid_png(8, 8, [255, 255, 255, 255]);
 
-        let output = service
+        let output = composer
             .compose_png_with_annotations(
                 8,
                 8,
@@ -464,10 +462,10 @@ mod tests {
 
     #[test]
     fn composes_png_with_highlight_annotation() {
-        let service = ImageCompositionService::new();
+        let composer = CaptureImageComposer::new();
         let white = make_solid_png(8, 6, [255, 255, 255, 255]);
 
-        let output = service
+        let output = composer
             .compose_png_with_annotations(
                 8,
                 6,
@@ -502,7 +500,7 @@ mod tests {
 
     #[test]
     fn composes_png_with_mosaic_annotation() {
-        let service = ImageCompositionService::new();
+        let composer = CaptureImageComposer::new();
         let png = make_png_from_pixels(
             4,
             3,
@@ -513,7 +511,7 @@ mod tests {
             ],
         );
 
-        let output = service
+        let output = composer
             .compose_png_with_annotations(
                 4,
                 3,
@@ -552,7 +550,7 @@ mod tests {
 
     #[test]
     fn composes_png_with_blur_annotation() {
-        let service = ImageCompositionService::new();
+        let composer = CaptureImageComposer::new();
         let png = make_png_from_pixels(
             5,
             1,
@@ -561,7 +559,7 @@ mod tests {
             ],
         );
 
-        let output = service
+        let output = composer
             .compose_png_with_annotations(
                 5,
                 1,
@@ -601,10 +599,10 @@ mod tests {
 
     #[test]
     fn composes_png_with_text_annotation() {
-        let service = ImageCompositionService::new();
+        let composer = CaptureImageComposer::new();
         let white = make_solid_png(80, 32, [255, 255, 255, 255]);
 
-        let output = service
+        let output = composer
             .compose_png_with_annotations(
                 80,
                 32,
@@ -638,10 +636,10 @@ mod tests {
 
     #[test]
     fn text_annotation_respects_position() {
-        let service = ImageCompositionService::new();
+        let composer = CaptureImageComposer::new();
         let white = make_solid_png(120, 60, [255, 255, 255, 255]);
 
-        let output = service
+        let output = composer
             .compose_png_with_annotations(
                 120,
                 60,
@@ -691,9 +689,9 @@ mod tests {
 
     #[test]
     fn renders_clipboard_text_as_pinned_png() {
-        let service = ImageCompositionService::new();
+        let composer = CaptureImageComposer::new();
 
-        let output = service
+        let output = composer
             .render_text_png("Hello from clipboard\nSnapLingo")
             .unwrap();
         let (width, height) = png_dimensions(&output);
@@ -706,9 +704,9 @@ mod tests {
 
     #[test]
     fn renders_clipboard_hex_color_as_pinned_png() {
-        let service = ImageCompositionService::new();
+        let composer = CaptureImageComposer::new();
 
-        let output = service.render_clipboard_text_png("#0A141E").unwrap();
+        let output = composer.render_clipboard_text_png("#0A141E").unwrap();
         let (width, height) = png_dimensions(&output);
 
         assert!(width >= 160);
@@ -718,9 +716,9 @@ mod tests {
 
     #[test]
     fn renders_clipboard_rgb_color_as_pinned_png() {
-        let service = ImageCompositionService::new();
+        let composer = CaptureImageComposer::new();
 
-        let output = service
+        let output = composer
             .render_clipboard_text_png("rgb(10, 20, 30)")
             .unwrap();
         let (width, height) = png_dimensions(&output);
@@ -730,9 +728,9 @@ mod tests {
 
     #[test]
     fn renders_clipboard_decimal_rgb_color_as_pinned_png() {
-        let service = ImageCompositionService::new();
+        let composer = CaptureImageComposer::new();
 
-        let output = service.render_clipboard_text_png("0.5 0.25 1.0").unwrap();
+        let output = composer.render_clipboard_text_png("0.5 0.25 1.0").unwrap();
         let (width, height) = png_dimensions(&output);
 
         assert_eq!(
@@ -743,8 +741,8 @@ mod tests {
 
     #[test]
     fn rejects_blank_clipboard_text_pngs() {
-        let service = ImageCompositionService::new();
+        let composer = CaptureImageComposer::new();
 
-        assert!(service.render_text_png(" \n\t ").is_err());
+        assert!(composer.render_text_png(" \n\t ").is_err());
     }
 }

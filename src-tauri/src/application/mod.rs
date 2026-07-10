@@ -1,13 +1,15 @@
+pub mod capture;
+pub mod history;
 pub mod hotkeys;
+pub mod pinned_image;
 pub mod providers;
-pub mod services;
+pub mod selected_text;
 pub mod settings;
 
+pub use capture::{CaptureOutput, CaptureSessionRuntime, CaptureSessionSource, CaptureSessions};
+pub use history::History;
 pub use hotkeys::{HotkeyConfiguration, HotkeyRuntime, HotkeyUpdateOutcome};
+pub use pinned_image::PinnedImageRuntime;
 pub use providers::Provider;
-pub use services::{
-    CaptureOutputService, CaptureSessionRuntime, CaptureSessionService, CaptureSessionSource,
-    HistoryService, ImageCompositionService, PinnedImageRuntime, SelectedTextAcquirer,
-    SelectionScheme,
-};
+pub use selected_text::{SelectedTextAcquirer, SelectionScheme};
 pub use settings::SettingsConfiguration;

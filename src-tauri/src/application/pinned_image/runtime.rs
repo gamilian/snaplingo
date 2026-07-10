@@ -1,9 +1,9 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::application::services::{
-    CaptureOutputService, ImageCompositionService, PinnedImageOpenRequest, PinnedImageService,
-};
+use crate::application::capture::{CaptureImageComposer, CaptureOutput};
+
+use super::{PinnedImageOpenRequest, PinnedImageState};
 use crate::domain::capture::PinnedImageView;
 use crate::Result;
 
@@ -24,21 +24,21 @@ pub(crate) trait PinnedImageRuntimeHost: Send + Sync {
 
 /// Coordinates Pinned Image state, image output, and window effects.
 pub struct PinnedImageRuntime {
-    service: Arc<PinnedImageService>,
-    image_composition: Arc<ImageCompositionService>,
-    output: Arc<CaptureOutputService>,
+    state: Arc<PinnedImageState>,
+    image_composition: Arc<CaptureImageComposer>,
+    output: Arc<CaptureOutput>,
     host: Arc<dyn PinnedImageRuntimeHost>,
 }
 
 impl PinnedImageRuntime {
     pub(crate) fn new(
-        service: Arc<PinnedImageService>,
-        image_composition: Arc<ImageCompositionService>,
-        output: Arc<CaptureOutputService>,
+        state: Arc<PinnedImageState>,
+        image_composition: Arc<CaptureImageComposer>,
+        output: Arc<CaptureOutput>,
         host: Arc<dyn PinnedImageRuntimeHost>,
     ) -> Self {
         Self {
-            service,
+            state,
             image_composition,
             output,
             host,
@@ -47,7 +47,7 @@ impl PinnedImageRuntime {
 
     pub async fn pin_clipboard(&self) -> Result<()> {
         let request = self
-            .service
+            .state
             .pin_clipboard_capture_output(&self.image_composition, &self.output)?;
 
         match request {
@@ -57,31 +57,31 @@ impl PinnedImageRuntime {
     }
 
     pub async fn pin_png_and_open(&self, png_data: Vec<u8>) -> Result<()> {
-        let image = self.service.pin_png_view(png_data)?;
+        let image = self.state.pin_png_view(png_data)?;
         self.host.open(image).await
     }
 
     pub async fn close(&self, image_id: &str) -> Result<()> {
-        self.service.close_pinned_image(image_id)?;
+        self.state.close_pinned_image(image_id)?;
         self.host.hide(image_id.to_string()).await
     }
 
     pub fn get(&self, image_id: &str) -> Result<PinnedImageView> {
-        self.service.get_pinned_image(image_id)
+        self.state.get_pinned_image(image_id)
     }
 
     pub fn remove(&self, image_id: &str) -> Result<()> {
-        self.service.remove_pinned_image(image_id)
+        self.state.remove_pinned_image(image_id)
     }
 
     pub async fn copy(&self, image_id: &str) -> Result<()> {
-        self.service
+        self.state
             .copy_pinned_png_to_clipboard(&self.output, image_id)
             .await
     }
 
     pub fn replace_from_clipboard(&self, image_id: &str) -> Result<PinnedImageView> {
-        self.service.replace_clipboard_capture_output_view(
+        self.state.replace_clipboard_capture_output_view(
             &self.image_composition,
             &self.output,
             image_id,
@@ -89,7 +89,7 @@ impl PinnedImageRuntime {
     }
 
     pub async fn save(&self, image_id: &str, path: &Path) -> Result<()> {
-        self.service
+        self.state
             .save_pinned_png_to_path(&self.output, image_id, path)
             .await
     }
@@ -99,7 +99,7 @@ impl PinnedImageRuntime {
     }
 
     pub async fn switch_group(&self) -> Result<Option<u32>> {
-        let Some(group_switch) = self.service.switch_to_next_group() else {
+        let Some(group_switch) = self.state.switch_to_next_group() else {
             return Ok(None);
         };
 
@@ -110,21 +110,19 @@ impl PinnedImageRuntime {
     }
 
     pub async fn move_to_next_group(&self, image_id: &str) -> Result<u32> {
-        let next_group = self.service.move_pinned_image_to_next_group(image_id)?;
+        let next_group = self.state.move_pinned_image_to_next_group(image_id)?;
         self.host.hide(image_id.to_string()).await?;
         Ok(next_group)
     }
 
     pub async fn hide_group(&self, image_id: &str) -> Result<Vec<String>> {
-        let membership = self.service.pinned_image_group_containing(image_id)?;
+        let membership = self.state.pinned_image_group_containing(image_id)?;
         self.host.hide_group(membership.image_ids.clone()).await?;
         Ok(membership.image_ids)
     }
 
     pub async fn destroy_group(&self, image_id: &str) -> Result<Vec<String>> {
-        let removal = self
-            .service
-            .remove_pinned_image_group_containing(image_id)?;
+        let removal = self.state.remove_pinned_image_group_containing(image_id)?;
         self.host
             .close_group(removal.removed_image_ids.clone())
             .await?;

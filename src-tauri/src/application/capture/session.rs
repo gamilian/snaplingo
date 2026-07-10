@@ -5,7 +5,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
 
-use crate::application::services::CaptureSessionSource;
+use super::CaptureSessionSource;
 use crate::domain::capture::{
     monitor_snapshot_from_layout, CaptureCandidateView, CaptureSessionId, CaptureSessionView,
     CapturedCursor, CapturedCursorView, LogicalPoint, LogicalRect, MonitorSnapshot,
@@ -38,14 +38,14 @@ enum CaptureSessionViewMode {
 }
 
 /// Owns frozen screenshot sessions.
-pub struct CaptureSessionService {
+pub struct CaptureSessions {
     source: Arc<dyn CaptureSessionSource>,
     sessions: Arc<Mutex<HashMap<CaptureSessionId, CaptureSession>>>,
     hydrating_sessions: Arc<Mutex<HashSet<CaptureSessionId>>>,
     hydration_notify: Arc<tokio::sync::Notify>,
 }
 
-impl CaptureSessionService {
+impl CaptureSessions {
     pub fn new(source: Arc<dyn CaptureSessionSource>) -> Self {
         Self {
             source,

@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use tauri::{AppHandle, Manager, State};
 
-use crate::application::services::CaptureSessionOutput;
+use crate::application::capture::CaptureSessionOutput;
 use crate::domain::capture::{
     AnnotationCommand, CaptureOutputAction, CaptureSessionId, CaptureSessionView, LogicalPoint,
     LogicalRect,
@@ -40,7 +40,7 @@ pub async fn open_capture_window_for_mode(
 ) -> Result<(), String> {
     state
         .capture
-        .session_runtime
+        .runtime
         .open_capture_window_for_mode(mode)
         .await
         .map_err(|e| e.to_string())
@@ -52,7 +52,7 @@ pub async fn create_capture_session(
 ) -> Result<CaptureSessionView, String> {
     state
         .capture
-        .session_runtime
+        .runtime
         .create_session_from_visible_desktop()
         .await
         .map_err(|e| e.to_string())
@@ -205,7 +205,7 @@ pub async fn cancel_capture_session(
 ) -> Result<(), String> {
     state
         .capture
-        .session_runtime
+        .runtime
         .cancel_capture_session(&CaptureSessionId(session_id))
         .await
         .map_err(|e| e.to_string())
@@ -218,7 +218,7 @@ pub async fn restore_capture_snapshot_windows_for_session(
 ) -> Result<(), String> {
     state
         .capture
-        .session_runtime
+        .runtime
         .restore_capture_snapshot_windows_for_session(&CaptureSessionId(session_id))
         .await
         .map_err(|e| e.to_string())?;
@@ -237,7 +237,7 @@ pub async fn render_capture_output(
 
     state
         .capture
-        .session_runtime
+        .runtime
         .render_png_base64(
             &session_id,
             &rect,
@@ -283,7 +283,7 @@ pub async fn output_capture(
 
     let output = state
         .capture
-        .session_runtime
+        .runtime
         .output_selection(
             &session_id,
             &rect,
@@ -315,7 +315,7 @@ pub async fn run_capture_ocr(
 
     let result = state
         .capture
-        .session_runtime
+        .runtime
         .recognize_selection_text(&capture_session_id, &rect)
         .await
         .map_err(|e| e.to_string())?;

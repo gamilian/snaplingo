@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use serde::Deserialize;
 
-use crate::application::services::capture_output_service::configured_capture_save_dir;
+use crate::application::capture::configured_capture_save_dir;
 use crate::domain::{GeneralSettings, ScreenshotSettings, SettingsSnapshot, TranslationSettings};
 use crate::infrastructure::storage::ConfigFile;
 use crate::{AppError, Result};

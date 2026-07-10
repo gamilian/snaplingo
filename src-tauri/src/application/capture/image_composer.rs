@@ -80,9 +80,9 @@ pub enum ImageAnnotation {
     },
 }
 
-pub struct ImageCompositionService;
+pub struct CaptureImageComposer;
 
-impl ImageCompositionService {
+impl CaptureImageComposer {
     pub fn new() -> Self {
         Self
     }
@@ -993,7 +993,7 @@ fn draw_vertical_line(
     }
 }
 
-impl Default for ImageCompositionService {
+impl Default for CaptureImageComposer {
     fn default() -> Self {
         Self::new()
     }

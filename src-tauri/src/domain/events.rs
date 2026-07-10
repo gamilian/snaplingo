@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 /// Domain events representing significant business actions.
 ///
 /// These events are published by Coordinators when operations complete,
-/// allowing decoupled components (like HistoryService) to react.
+/// allowing decoupled components (like History) to react.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DomainEvent {
     /// A translation operation completed successfully

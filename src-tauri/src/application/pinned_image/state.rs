@@ -5,9 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
 
-use crate::application::services::{
-    CaptureOutputService, ClipboardCaptureOutput, ImageCompositionService,
-};
+use crate::application::capture::{CaptureImageComposer, CaptureOutput, ClipboardCaptureOutput};
 use crate::domain::capture::PinnedImageView;
 use crate::error::{AppError, Result};
 
@@ -47,13 +45,13 @@ pub enum PinnedImageOpenRequest {
     Open(PinnedImageView),
 }
 
-pub struct PinnedImageService {
+pub struct PinnedImageState {
     images: Mutex<HashMap<String, PinnedImage>>,
     active_group: Mutex<u32>,
     recoverable_closed_image_ids: Mutex<VecDeque<String>>,
 }
 
-impl PinnedImageService {
+impl PinnedImageState {
     pub fn new() -> Self {
         Self {
             images: Mutex::new(HashMap::new()),
@@ -74,7 +72,7 @@ impl PinnedImageService {
 
     pub fn pin_capture_output_view(
         &self,
-        image_composition: &ImageCompositionService,
+        image_composition: &CaptureImageComposer,
         output: ClipboardCaptureOutput,
     ) -> Result<PinnedImageView> {
         match output {
@@ -87,8 +85,8 @@ impl PinnedImageService {
 
     pub fn pin_clipboard_capture_output(
         &self,
-        image_composition: &ImageCompositionService,
-        output: &CaptureOutputService,
+        image_composition: &CaptureImageComposer,
+        output: &CaptureOutput,
     ) -> Result<PinnedImageOpenRequest> {
         if let Some(image_id) = self.pop_recoverable_pinned_image() {
             let image = self.get_pinned_image(&image_id)?;
@@ -125,7 +123,7 @@ impl PinnedImageService {
 
     pub fn pin_text_as_png_view(
         &self,
-        image_composition: &ImageCompositionService,
+        image_composition: &CaptureImageComposer,
         text: &str,
     ) -> Result<PinnedImageView> {
         let png_data = image_composition.render_clipboard_text_png(text)?;
@@ -163,7 +161,7 @@ impl PinnedImageService {
 
     pub async fn save_pinned_png_to_path(
         &self,
-        output: &CaptureOutputService,
+        output: &CaptureOutput,
         image_id: &str,
         path: &Path,
     ) -> Result<()> {
@@ -174,7 +172,7 @@ impl PinnedImageService {
 
     pub async fn copy_pinned_png_to_clipboard(
         &self,
-        output: &CaptureOutputService,
+        output: &CaptureOutput,
         image_id: &str,
     ) -> Result<()> {
         let png_data = self.get_pinned_png(image_id)?;
@@ -198,7 +196,7 @@ impl PinnedImageService {
 
     pub fn replace_capture_output_view(
         &self,
-        image_composition: &ImageCompositionService,
+        image_composition: &CaptureImageComposer,
         image_id: &str,
         output: ClipboardCaptureOutput,
     ) -> Result<PinnedImageView> {
@@ -214,8 +212,8 @@ impl PinnedImageService {
 
     pub fn replace_clipboard_capture_output_view(
         &self,
-        image_composition: &ImageCompositionService,
-        output: &CaptureOutputService,
+        image_composition: &CaptureImageComposer,
+        output: &CaptureOutput,
         image_id: &str,
     ) -> Result<PinnedImageView> {
         let output = output.read_clipboard_capture_output()?;
@@ -225,7 +223,7 @@ impl PinnedImageService {
 
     pub fn replace_pinned_text_as_png_view(
         &self,
-        image_composition: &ImageCompositionService,
+        image_composition: &CaptureImageComposer,
         image_id: &str,
         text: &str,
     ) -> Result<PinnedImageView> {
@@ -441,7 +439,7 @@ impl PinnedImageService {
     }
 }
 
-impl Default for PinnedImageService {
+impl Default for PinnedImageState {
     fn default() -> Self {
         Self::new()
     }

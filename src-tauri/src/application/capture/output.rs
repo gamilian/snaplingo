@@ -6,14 +6,14 @@ use image::ImageEncoder;
 
 use crate::error::{AppError, Result};
 
-pub struct CaptureOutputService;
+pub struct CaptureOutput;
 
 pub enum ClipboardCaptureOutput {
     Png(Vec<u8>),
     Text(String),
 }
 
-impl CaptureOutputService {
+impl CaptureOutput {
     pub fn new() -> Self {
         Self
     }
@@ -159,7 +159,7 @@ fn configured_capture_save_dir_for_system(configured: &str) -> PathBuf {
     PathBuf::from(configured)
 }
 
-impl Default for CaptureOutputService {
+impl Default for CaptureOutput {
     fn default() -> Self {
         Self::new()
     }

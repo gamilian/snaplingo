@@ -9,14 +9,14 @@ mod provider_runtime;
 mod selection_runtime;
 
 use capture_runtime::build_capture_runtime;
-use history_runtime::build_history_service;
+use history_runtime::build_history;
 use provider_runtime::{
     build_llm_introspection, build_ocr_coordinator, build_provider_configuration,
     build_translation_coordinator, hydrate_provider_credentials,
 };
 use selection_runtime::build_selected_text_acquirer;
 
-pub(crate) use history_runtime::subscribe_history_service;
+pub(crate) use history_runtime::subscribe_history;
 
 use crate::app_state::{
     AppState, CaptureRuntimeState, HistoryRuntime, ProviderRuntime, SelectionRuntime,
@@ -38,7 +38,7 @@ pub(crate) fn build_app_state(config_path: PathBuf, app: AppHandle) -> AppState 
     let http_client: Arc<dyn HttpClient> = Arc::new(ReqwestHttpClient::new());
     let event_bus = Arc::new(EventBus::new());
 
-    let history_service = build_history_service();
+    let history = build_history();
 
     let llm_introspection = build_llm_introspection(http_client.clone());
     let translation_coordinator = build_translation_coordinator(
@@ -89,18 +89,17 @@ pub(crate) fn build_app_state(config_path: PathBuf, app: AppHandle) -> AppState 
             prompt_strategies,
         }),
         capture: Arc::new(CaptureRuntimeState {
-            sessions: capture_runtime.capture_session_service,
-            image_composition: capture_runtime.image_composition_service,
-            output: capture_runtime.capture_output_service,
-            session_runtime: capture_runtime.capture_session_runtime,
-            pinned_images: capture_runtime.pinned_image_runtime,
+            sessions: capture_runtime.sessions,
+            output: capture_runtime.output,
+            runtime: capture_runtime.runtime,
+            pinned_images: capture_runtime.pinned_images,
         }),
         history: Arc::new(HistoryRuntime {
-            service: history_service,
+            history,
             events: event_bus,
         }),
         selection: Arc::new(SelectionRuntime {
-            selected_text_acquirer,
+            acquirer: selected_text_acquirer,
         }),
     }
 }

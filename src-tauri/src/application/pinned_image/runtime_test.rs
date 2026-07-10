@@ -2,10 +2,9 @@ use std::sync::{Arc, Mutex};
 
 use image::ImageEncoder;
 
-use super::{
-    CaptureOutputService, ImageCompositionService, PinnedImageRuntime, PinnedImageRuntimeHost,
-    PinnedImageService,
-};
+use crate::application::capture::{CaptureImageComposer, CaptureOutput};
+
+use super::{PinnedImageRuntime, PinnedImageRuntimeHost, PinnedImageState};
 use crate::domain::capture::PinnedImageView;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -106,18 +105,18 @@ impl PinnedImageRuntimeHost for RecordingPinnedImageHost {
 
 fn make_runtime() -> (
     PinnedImageRuntime,
-    Arc<PinnedImageService>,
+    Arc<PinnedImageState>,
     Arc<RecordingPinnedImageHost>,
 ) {
-    let service = Arc::new(PinnedImageService::new());
+    let state = Arc::new(PinnedImageState::new());
     let host = Arc::new(RecordingPinnedImageHost::new());
     let runtime = PinnedImageRuntime::new(
-        service.clone(),
-        Arc::new(ImageCompositionService::new()),
-        Arc::new(CaptureOutputService::new()),
+        state.clone(),
+        Arc::new(CaptureImageComposer::new()),
+        Arc::new(CaptureOutput::new()),
         host.clone(),
     );
-    (runtime, service, host)
+    (runtime, state, host)
 }
 
 fn make_test_png(width: u32, height: u32) -> Vec<u8> {
@@ -138,22 +137,22 @@ fn opened_image_id(host: &RecordingPinnedImageHost, index: usize) -> String {
 
 #[tokio::test]
 async fn pin_png_stores_image_before_opening_window() {
-    let (runtime, service, host) = make_runtime();
+    let (runtime, state, host) = make_runtime();
 
     runtime.pin_png_and_open(make_test_png(3, 2)).await.unwrap();
 
     let image_id = opened_image_id(&host, 0);
-    assert_eq!(service.get_pinned_image(&image_id).unwrap().width, 3);
+    assert_eq!(state.get_pinned_image(&image_id).unwrap().width, 3);
 }
 
 #[tokio::test]
 async fn pin_png_keeps_state_when_window_open_fails() {
-    let service = Arc::new(PinnedImageService::new());
+    let state = Arc::new(PinnedImageState::new());
     let host = Arc::new(RecordingPinnedImageHost::with_open_error("open failed"));
     let runtime = PinnedImageRuntime::new(
-        service.clone(),
-        Arc::new(ImageCompositionService::new()),
-        Arc::new(CaptureOutputService::new()),
+        state.clone(),
+        Arc::new(CaptureImageComposer::new()),
+        Arc::new(CaptureOutput::new()),
         host.clone(),
     );
 
@@ -164,7 +163,7 @@ async fn pin_png_keeps_state_when_window_open_fails() {
 
     let image_id = opened_image_id(&host, 0);
     assert!(error.to_string().contains("open failed"));
-    assert!(service.get_pinned_image(&image_id).is_ok());
+    assert!(state.get_pinned_image(&image_id).is_ok());
 }
 
 #[tokio::test]
@@ -209,14 +208,14 @@ async fn switch_group_applies_service_transition_to_window_host() {
 
 #[tokio::test]
 async fn destroy_group_removes_state_before_closing_windows() {
-    let (runtime, service, host) = make_runtime();
+    let (runtime, state, host) = make_runtime();
     runtime.pin_png_and_open(make_test_png(1, 1)).await.unwrap();
     let image_id = opened_image_id(&host, 0);
 
     let removed = runtime.destroy_group(&image_id).await.unwrap();
 
     assert_eq!(removed, vec![image_id.clone()]);
-    assert!(service.get_pinned_image(&image_id).is_err());
+    assert!(state.get_pinned_image(&image_id).is_err());
     assert_eq!(
         host.calls().last(),
         Some(&HostCall::CloseGroup(vec![image_id]))

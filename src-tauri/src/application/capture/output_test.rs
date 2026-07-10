@@ -5,7 +5,10 @@ mod tests {
     use arboard::ImageData;
     use image::ImageEncoder;
 
-    use crate::application::services::capture_output_service::CaptureOutputService;
+    use crate::application::capture::output::{
+        capture_save_path, configured_capture_save_dir, quick_capture_save_file_path,
+    };
+    use crate::application::capture::CaptureOutput;
 
     fn make_test_png(width: u32, height: u32) -> Vec<u8> {
         let pixels = vec![255; (width * height * 4) as usize];
@@ -29,11 +32,11 @@ mod tests {
 
     #[tokio::test]
     async fn save_output_writes_png_to_path() {
-        let service = CaptureOutputService::new();
+        let output = CaptureOutput::new();
         let path = temp_png_path();
         let png = vec![137, 80, 78, 71, 13, 10, 26, 10];
 
-        let saved_path = service.save_png(&png, &path).await.unwrap();
+        let saved_path = output.save_png(&png, &path).await.unwrap();
 
         assert_eq!(saved_path, path);
         assert_eq!(std::fs::read(&saved_path).unwrap(), png);
@@ -43,20 +46,15 @@ mod tests {
 
     #[test]
     fn capture_save_path_uses_timestamped_png_name() {
-        let path = super::super::capture_output_service::capture_save_path(
-            std::path::Path::new("/tmp"),
-            "20260617-023000",
-        );
+        let path = capture_save_path(std::path::Path::new("/tmp"), "20260617-023000");
 
         assert_eq!(path.to_string_lossy(), "/tmp/SnapLingo-20260617-023000.png");
     }
 
     #[test]
     fn quick_capture_save_path_uses_configured_directory() {
-        let path = super::super::capture_output_service::quick_capture_save_file_path(
-            std::path::Path::new("/tmp/SnapLingo"),
-            "20260617-023000",
-        );
+        let path =
+            quick_capture_save_file_path(std::path::Path::new("/tmp/SnapLingo"), "20260617-023000");
 
         assert_eq!(
             path.to_string_lossy(),
@@ -66,7 +64,7 @@ mod tests {
 
     #[test]
     fn configured_capture_save_dir_expands_home_prefix() {
-        let dir = super::super::capture_output_service::configured_capture_save_dir(
+        let dir = configured_capture_save_dir(
             "~/Pictures/SnapLingo",
             std::path::Path::new("/Users/alice"),
         );
@@ -81,7 +79,7 @@ mod tests {
     fn decodes_png_to_clipboard_image_data() {
         let png = make_test_png(3, 2);
 
-        let image = CaptureOutputService::png_to_clipboard_image(&png).unwrap();
+        let image = CaptureOutput::png_to_clipboard_image(&png).unwrap();
 
         assert_eq!(image.width, 3);
         assert_eq!(image.height, 2);
@@ -96,7 +94,7 @@ mod tests {
             bytes: std::borrow::Cow::Owned(vec![255, 0, 0, 255, 0, 255, 0, 255]),
         };
 
-        let png = CaptureOutputService::clipboard_image_to_png(image).unwrap();
+        let png = CaptureOutput::clipboard_image_to_png(image).unwrap();
         let decoded = image::load_from_memory(&png).unwrap().to_rgba8();
 
         assert_eq!(decoded.width(), 2);
