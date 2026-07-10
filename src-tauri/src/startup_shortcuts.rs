@@ -1,5 +1,4 @@
-use tauri::Manager;
-
+use crate::app_actions::{dispatch_app_action, AppAction, CaptureLaunchMode};
 use crate::domain::hotkey_config::{
     FILE_OCR_ACTION, INPUT_TRANSLATE_ACTION, OCR_CATEGORY, PIN_ACTION, PIN_SWITCH_GROUP_ACTION,
     PIN_TOGGLE_ALL_ACTION, SCREENSHOT_ACTION, SCREENSHOT_CATEGORY, SCREENSHOT_COPY_ACTION,
@@ -7,7 +6,7 @@ use crate::domain::hotkey_config::{
     SELECTION_TRANSLATE_ACTION, SHOW_OCR_WINDOW_ACTION, SHOW_TRANSLATION_WINDOW_ACTION,
     SILENT_SCREENSHOT_OCR_ACTION, TRANSLATION_CATEGORY,
 };
-use crate::{commands, AppState, Result};
+use crate::Result;
 
 #[cfg(test)]
 fn resolve_hotkey_accelerator(
@@ -21,106 +20,65 @@ fn resolve_hotkey_accelerator(
     Ok(next_accelerator)
 }
 
-pub(crate) fn trigger_hotkey_action(app: tauri::AppHandle, category: String, action: String) {
-    if category == SCREENSHOT_CATEGORY {
-        if let Some(mode) = capture_mode_for_screenshot_hotkey_action(&action) {
-            tauri::async_runtime::spawn(commands::open_capture_window_from_shortcut(app, mode));
-            return;
-        }
-    }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct HotkeyActionBinding {
+    pub action: AppAction,
+    pub trigger_on_release: bool,
+}
 
-    match (category.as_str(), action.as_str()) {
-        (SCREENSHOT_CATEGORY, PIN_ACTION) => {
-            let state = app.state::<AppState>();
-            if let Err(err) = commands::pin_clipboard_image_for_state(&app, state.inner()) {
-                log::error!("Failed to pin clipboard image: {}", err);
-            }
+pub(crate) fn hotkey_action_binding(
+    category: &str,
+    action_key: &str,
+) -> Option<HotkeyActionBinding> {
+    let action = match (category, action_key) {
+        (SCREENSHOT_CATEGORY, SCREENSHOT_ACTION | SCREENSHOT_CUSTOM_ACTION) => {
+            AppAction::OpenCapture(CaptureLaunchMode::Screenshot)
         }
-        (SCREENSHOT_CATEGORY, PIN_TOGGLE_ALL_ACTION) => {
-            if let Err(err) = commands::toggle_pinned_images_visibility(app) {
-                log::error!("Failed to toggle pinned images: {}", err);
-            }
+        (SCREENSHOT_CATEGORY, SCREENSHOT_COPY_ACTION) => {
+            AppAction::OpenCapture(CaptureLaunchMode::ScreenshotCopy)
         }
-        (SCREENSHOT_CATEGORY, PIN_SWITCH_GROUP_ACTION) => {
-            let state = app.state::<AppState>();
-            if let Err(err) = commands::switch_pinned_image_group_for_state(&app, state.inner()) {
-                log::error!("Failed to switch pinned image group: {}", err);
-            }
-        }
+        (SCREENSHOT_CATEGORY, PIN_ACTION) => AppAction::PinClipboardImage,
+        (SCREENSHOT_CATEGORY, PIN_TOGGLE_ALL_ACTION) => AppAction::TogglePinnedImagesVisibility,
+        (SCREENSHOT_CATEGORY, PIN_SWITCH_GROUP_ACTION) => AppAction::SwitchPinnedImageGroup,
         (TRANSLATION_CATEGORY, SCREENSHOT_TRANSLATE_ACTION) => {
-            tauri::async_runtime::spawn(commands::open_capture_window_from_shortcut(
-                app,
-                "screenshot-translate",
-            ));
+            AppAction::OpenCapture(CaptureLaunchMode::ScreenshotTranslate)
         }
-        (TRANSLATION_CATEGORY, SELECTION_TRANSLATE_ACTION) => {
-            tauri::async_runtime::spawn(async move {
-                let state = app.state::<AppState>();
-                if let Err(err) = commands::open_selection_translation_window_for_state(
-                    app.clone(),
-                    state.inner(),
-                )
-                .await
-                {
-                    log::error!("Failed to open selection translation window: {}", err);
-                }
-            });
-        }
-        (TRANSLATION_CATEGORY, INPUT_TRANSLATE_ACTION) => {
-            if let Err(err) = commands::open_input_translation_window(app) {
-                log::error!("Failed to open input translation window: {}", err);
-            }
-        }
-        (TRANSLATION_CATEGORY, SHOW_TRANSLATION_WINDOW_ACTION) => {
-            if let Err(err) = commands::show_translation_window(app) {
-                log::error!("Failed to show translation window: {}", err);
-            }
-        }
+        (TRANSLATION_CATEGORY, SELECTION_TRANSLATE_ACTION) => AppAction::TranslateSelection,
+        (TRANSLATION_CATEGORY, INPUT_TRANSLATE_ACTION) => AppAction::OpenInputTranslation,
+        (TRANSLATION_CATEGORY, SHOW_TRANSLATION_WINDOW_ACTION) => AppAction::OpenTranslationWindow,
         (OCR_CATEGORY, SCREENSHOT_OCR_ACTION) => {
-            tauri::async_runtime::spawn(commands::open_capture_window_from_shortcut(
-                app,
-                "screenshot-ocr",
-            ));
+            AppAction::OpenCapture(CaptureLaunchMode::ScreenshotOcr)
         }
         (OCR_CATEGORY, SILENT_SCREENSHOT_OCR_ACTION) => {
-            tauri::async_runtime::spawn(commands::open_capture_window_from_shortcut(
-                app,
-                "silent-screenshot-ocr",
-            ));
+            AppAction::OpenCapture(CaptureLaunchMode::SilentScreenshotOcr)
         }
-        (OCR_CATEGORY, FILE_OCR_ACTION) => {
-            if let Err(err) = commands::start_file_ocr(app) {
-                log::error!("Failed to start file OCR: {}", err);
-            }
-        }
-        (OCR_CATEGORY, SHOW_OCR_WINDOW_ACTION) => {
-            if let Err(err) = commands::show_ocr_window(app) {
-                log::error!("Failed to show OCR window: {}", err);
-            }
-        }
-        _ => {
-            log::warn!("Unknown hotkey action: {}:{}", category, action);
-        }
-    }
+        (OCR_CATEGORY, FILE_OCR_ACTION) => AppAction::RunFileOcr,
+        (OCR_CATEGORY, SHOW_OCR_WINDOW_ACTION) => AppAction::OpenOcrWindow,
+        _ => return None,
+    };
+
+    let trigger_on_release = matches!(
+        action,
+        AppAction::OpenCapture(_) | AppAction::TranslateSelection
+    );
+
+    Some(HotkeyActionBinding {
+        action,
+        trigger_on_release,
+    })
 }
 
-fn capture_mode_for_screenshot_hotkey_action(action: &str) -> Option<&'static str> {
-    match action {
-        SCREENSHOT_ACTION | SCREENSHOT_CUSTOM_ACTION => Some("screenshot"),
-        SCREENSHOT_COPY_ACTION => Some("screenshot-copy"),
-        _ => None,
-    }
+pub(crate) fn trigger_hotkey_action(app: tauri::AppHandle, category: String, action_key: String) {
+    let Some(binding) = hotkey_action_binding(&category, &action_key) else {
+        log::warn!("Unknown hotkey action: {}:{}", category, action_key);
+        return;
+    };
+
+    dispatch_app_action(app, binding.action);
 }
 
-pub(crate) fn should_register_hotkey_on_release(category: &str, action: &str) -> bool {
-    match (category, action) {
-        (SCREENSHOT_CATEGORY, action) => {
-            capture_mode_for_screenshot_hotkey_action(action).is_some()
-        }
-        (TRANSLATION_CATEGORY, SELECTION_TRANSLATE_ACTION | SCREENSHOT_TRANSLATE_ACTION) => true,
-        (OCR_CATEGORY, SCREENSHOT_OCR_ACTION | SILENT_SCREENSHOT_OCR_ACTION) => true,
-        _ => false,
-    }
+pub(crate) fn should_register_hotkey_on_release(category: &str, action_key: &str) -> bool {
+    hotkey_action_binding(category, action_key).is_some_and(|binding| binding.trigger_on_release)
 }
 
 pub(crate) fn display_hotkey_to_accelerator(hotkey: &str) -> Result<Option<String>> {
@@ -200,15 +158,129 @@ fn accelerator_key(main_key: &str) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        capture_mode_for_screenshot_hotkey_action, display_hotkey_to_accelerator,
-        resolve_hotkey_accelerator, should_register_hotkey_on_release, FILE_OCR_ACTION,
-        OCR_CATEGORY, SCREENSHOT_ACTION, SCREENSHOT_CATEGORY, SCREENSHOT_COPY_ACTION,
-        SCREENSHOT_CUSTOM_ACTION, SCREENSHOT_OCR_ACTION, SCREENSHOT_TRANSLATE_ACTION,
-        SHOW_OCR_WINDOW_ACTION, SILENT_SCREENSHOT_OCR_ACTION, TRANSLATION_CATEGORY,
-    };
+    use std::collections::HashSet;
     use std::str::FromStr;
+
+    use crate::app_actions::{AppAction, CaptureLaunchMode};
+    use crate::domain::hotkey_config::{
+        DEFAULT_HOTKEYS, FILE_OCR_ACTION, INPUT_TRANSLATE_ACTION, OCR_CATEGORY, PIN_ACTION,
+        PIN_SWITCH_GROUP_ACTION, PIN_TOGGLE_ALL_ACTION, SCREENSHOT_ACTION, SCREENSHOT_CATEGORY,
+        SCREENSHOT_COPY_ACTION, SCREENSHOT_CUSTOM_ACTION, SCREENSHOT_OCR_ACTION,
+        SCREENSHOT_TRANSLATE_ACTION, SELECTION_TRANSLATE_ACTION, SHOW_OCR_WINDOW_ACTION,
+        SHOW_TRANSLATION_WINDOW_ACTION, SILENT_SCREENSHOT_OCR_ACTION, TRANSLATION_CATEGORY,
+    };
     use tauri_plugin_global_shortcut::Shortcut;
+
+    use super::{
+        display_hotkey_to_accelerator, hotkey_action_binding, resolve_hotkey_accelerator,
+        should_register_hotkey_on_release,
+    };
+
+    #[test]
+    fn maps_hotkey_keys_to_app_actions_and_trigger_timing() {
+        let cases = [
+            (
+                SCREENSHOT_CATEGORY,
+                SCREENSHOT_ACTION,
+                AppAction::OpenCapture(CaptureLaunchMode::Screenshot),
+                true,
+            ),
+            (
+                SCREENSHOT_CATEGORY,
+                SCREENSHOT_COPY_ACTION,
+                AppAction::OpenCapture(CaptureLaunchMode::ScreenshotCopy),
+                true,
+            ),
+            (
+                SCREENSHOT_CATEGORY,
+                SCREENSHOT_CUSTOM_ACTION,
+                AppAction::OpenCapture(CaptureLaunchMode::Screenshot),
+                true,
+            ),
+            (
+                SCREENSHOT_CATEGORY,
+                PIN_ACTION,
+                AppAction::PinClipboardImage,
+                false,
+            ),
+            (
+                SCREENSHOT_CATEGORY,
+                PIN_TOGGLE_ALL_ACTION,
+                AppAction::TogglePinnedImagesVisibility,
+                false,
+            ),
+            (
+                SCREENSHOT_CATEGORY,
+                PIN_SWITCH_GROUP_ACTION,
+                AppAction::SwitchPinnedImageGroup,
+                false,
+            ),
+            (
+                TRANSLATION_CATEGORY,
+                SELECTION_TRANSLATE_ACTION,
+                AppAction::TranslateSelection,
+                true,
+            ),
+            (
+                TRANSLATION_CATEGORY,
+                SCREENSHOT_TRANSLATE_ACTION,
+                AppAction::OpenCapture(CaptureLaunchMode::ScreenshotTranslate),
+                true,
+            ),
+            (
+                TRANSLATION_CATEGORY,
+                INPUT_TRANSLATE_ACTION,
+                AppAction::OpenInputTranslation,
+                false,
+            ),
+            (
+                TRANSLATION_CATEGORY,
+                SHOW_TRANSLATION_WINDOW_ACTION,
+                AppAction::OpenTranslationWindow,
+                false,
+            ),
+            (
+                OCR_CATEGORY,
+                SCREENSHOT_OCR_ACTION,
+                AppAction::OpenCapture(CaptureLaunchMode::ScreenshotOcr),
+                true,
+            ),
+            (
+                OCR_CATEGORY,
+                SILENT_SCREENSHOT_OCR_ACTION,
+                AppAction::OpenCapture(CaptureLaunchMode::SilentScreenshotOcr),
+                true,
+            ),
+            (OCR_CATEGORY, FILE_OCR_ACTION, AppAction::RunFileOcr, false),
+            (
+                OCR_CATEGORY,
+                SHOW_OCR_WINDOW_ACTION,
+                AppAction::OpenOcrWindow,
+                false,
+            ),
+        ];
+
+        for (category, action_key, expected_action, expected_trigger_on_release) in cases {
+            let binding = hotkey_action_binding(category, action_key).unwrap();
+
+            assert_eq!(binding.action, expected_action);
+            assert_eq!(binding.trigger_on_release, expected_trigger_on_release);
+        }
+
+        let covered: HashSet<_> = cases
+            .iter()
+            .map(|(category, action, _, _)| (*category, *action))
+            .collect();
+        let defaults: HashSet<_> = DEFAULT_HOTKEYS
+            .iter()
+            .map(|hotkey| (hotkey.category, hotkey.action))
+            .collect();
+
+        assert_eq!(cases.len(), 14);
+        assert_eq!(cases.len(), DEFAULT_HOTKEYS.len());
+        assert_eq!(covered, defaults);
+        assert!(hotkey_action_binding("unknown", "unknown").is_none());
+    }
 
     #[test]
     fn converts_display_hotkeys_to_tauri_accelerators() {
@@ -265,22 +337,6 @@ mod tests {
         assert_eq!(
             resolve_hotkey_accelerator(OCR_CATEGORY, "screenshot-ocr", "⇧⌥S").unwrap(),
             Some("Shift+Alt+KeyS".to_string())
-        );
-    }
-
-    #[test]
-    fn resolves_capture_modes_for_screenshot_hotkey_actions() {
-        assert_eq!(
-            capture_mode_for_screenshot_hotkey_action(SCREENSHOT_ACTION),
-            Some("screenshot")
-        );
-        assert_eq!(
-            capture_mode_for_screenshot_hotkey_action(SCREENSHOT_COPY_ACTION),
-            Some("screenshot-copy")
-        );
-        assert_eq!(
-            capture_mode_for_screenshot_hotkey_action(SCREENSHOT_CUSTOM_ACTION),
-            Some("screenshot")
         );
     }
 
