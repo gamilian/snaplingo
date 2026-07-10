@@ -1,6 +1,8 @@
 # SnapLingo 架构设计文档
 
-> 当前版本 - 2026-07-10
+> 当前版本 - 2026-07-11
+
+本文件描述当前运行时结构。已批准的目标边界见 [Target Module Ownership](docs/architecture/target-module-ownership.md)，完整决策见 [Architecture Rebuild Design](docs/superpowers/specs/2026-07-11-architecture-rebuild-design.md)。目标文档使用 module、interface、depth、seam、adapter、leverage、locality 作为统一架构词汇；这里列出的现存路径不表示迁移阶段已经完成。
 
 ## 📐 架构概览
 
@@ -27,9 +29,13 @@ Infrastructure Layer (基础设施层)
 3. **平台差异在 Infrastructure 隔离**（应用层无感知）
 4. **依赖注入实现可测试性**（HttpClient, TtsBackend 等）
 
+**目标 ownership：** Frontend View 只消费 Frontend Application interface；Frontend Platform 提供 domain-named Tauri adapter；Backend Command 只调用一个 Backend Application interface；Backend Application 拥有所需 port；Composition 选择并注入具体 adapter；Infrastructure 实现 inward-owned port。完整 ownership 和禁止项由 [Target Module Ownership](docs/architecture/target-module-ownership.md) 定义。
+
+**迁移说明：** architecture foundation 的 frontend/backend dependency allowlist 只是当前泄漏的冻结迁移 inventory，用于阻止新增直接 Tauri import、raw event string caller 和 Backend Application→Infrastructure dependency。Allowlist 不是 accepted architecture，也不是新增类似依赖的许可；后续迁移会逐步缩小并删除它们。
+
 **运行时 seam：**
 - `src/tauri/*` 是前端 Tauri Adapter seam，集中维护 command 名称和 payload 形状。
-- `src/tauri/appEvents.ts` 是前端 Tauri event Adapter seam，集中维护主窗口 event 名称、payload 解析和订阅清理。
+- `src/tauri/events.ts` 是当前浅层 Tauri event listener wrapper；event 名称和 payload 含义仍由 callers 持有，并已记录为 migration inventory。
 - `src/tauri/settings.ts` + `src/stores/settingsConfigStore.ts` 是前端 durable settings seam；Settings、Capture、Result、Pinned 窗口都从同一后端 snapshot hydrate。
 - `src/tauri/hotkeys.ts` + `src/stores/hotkeyConfigStore.ts` 是前端 hotkey seam；Settings hotkey 页面只缓存后端 snapshot 并调用 update command。
 - `src-tauri/src/commands/*` 是后端 Tauri command seam，负责把 IPC 请求转给 Application 层。
@@ -58,7 +64,7 @@ Infrastructure Layer (基础设施层)
 snaplingo/
 ├─ src/                                 # React/Vite Frontend Runtime
 │   ├─ tauri/                           # ⭐ Frontend Tauri Adapter seam
-│   │   ├─ appEvents.ts                  # 主窗口 Tauri event Adapter
+│   │   ├─ events.ts                     # 浅层 Tauri event listener wrapper
 │   │   ├─ settings.ts                   # durable settings command adapter
 │   │   ├─ hotkeys.ts                    # hotkey snapshot/update command adapter
 │   │   ├─ translation.ts
@@ -715,26 +721,29 @@ Commands 只调用 `pin_clipboard`、`pin_png_and_open`、`close`、`switch_grou
 
 ### 依赖方向 ✅
 
-**规则：** 外层 → 内层（单向）
+**目标规则：** ownership 由内向外定义，外层 adapter 依赖 inward-owned interface。
 
 ```
-Commands → Application → Domain
-                ↓
-           Infrastructure → External Systems
+Frontend View → Frontend Application ← Frontend Platform adapter
+Backend Command → Backend Application ← Composition → Infrastructure adapter
 ```
 
 **验证：**
-- ✅ Application 可以调用 Infrastructure
-- ✅ Commands 可以调用 Application + Infrastructure
-- ❌ Infrastructure 不能调用 Application
+- ✅ Views 只调用 Frontend Application interface
+- ✅ Backend Commands 只调用 Backend Application interface
+- ✅ Composition 选择并注入具体 adapter
+- ❌ Backend Application 不能 import Infrastructure
+- ❌ Infrastructure 不能拥有 Backend Application port 或 workflow
 - ❌ Domain 不能调用任何内部模块
+
+当前树中不符合目标方向的依赖由 foundation dependency-rule tests 精确记录为 migration inventory；测试允许 baseline 保持可验证，同时拒绝 inventory 之外的新泄漏。此状态不表示目标迁移已经完成。
 
 ---
 
 ## 🚀 当前演进状态
 
 - Frontend runtime 已通过 `src/tauri/*` 适配器集中调用 Tauri commands。
-- 主窗口 Tauri events 已通过 `src/tauri/appEvents.ts` 集中订阅和解析。
+- 前端 Tauri event subscription 当前经 `src/tauri/events.ts` 的浅层 listener wrapper 调用；event 名称和 payload 含义仍分散在 callers，计划在 Phase 2 迁入 domain-named adapters。
 - Backend runtime 已通过 `src-tauri/src/commands/*` 保持 Tauri command seam。
 - Provider 当前由 `TranslationCoordinator` 和 `OcrCoordinator` 统一管理激活、持久化、执行和运行时重配置。
 - Provider Configuration Module (`ProviderConfiguration` struct) 负责自定义 Translation Provider 完整生命周期：add/update/remove + 凭证管理 + test。Update 包含 coordinator 失败时的 rollback。
@@ -754,7 +763,7 @@ Commands → Application → Domain
 - `src-tauri/src/app_shell.rs` 负责 menu/tray construction 和 lifecycle policy helpers，`lib.rs` 保留 Tauri lifecycle event wiring；`startup_shortcuts.rs` 负责 Hotkey binding/parser/timing。
 - Settings navigation state、Capture interaction runtime/model 是前端纯模块 seam，可用 Vitest 直接覆盖交互规则。
 - `ScreenshotSession/index.tsx` 当前是 composition shell；`useCaptureWorkspaceController` 只组合状态、派生几何、overlay 和 magnifier，Host/Editor/Input controller hooks 分别拥有副作用、编辑事务和输入 context assembly。
-- Capture Workspace interface deepening 已完成；后续行为应优先下沉到对应 controller 或纯 runtime module，不把 workflow 分支重新堆回 composition hook。
+- Capture Workspace 已分离 composition、host、editor、input controllers，但 workflow 仍跨越较宽的 property-bag wiring；interface depth 和 workflow locality 的收敛仍属于 Phase 3。
 - ProviderStore<P> remains intentionally deferred: TranslationCoordinator and OcrCoordinator still have different activation semantics, and no current change requires reopening ADR-0004.
 
 ---
@@ -762,9 +771,12 @@ Commands → Application → Domain
 ## 📚 参考资料
 
 - **CONTEXT.md**：领域语言定义
+- **[Target Module Ownership](docs/architecture/target-module-ownership.md)**：已批准的目标 ownership、dependency direction 和 migration inventory 解释
+- **[Architecture Rebuild Design](docs/superpowers/specs/2026-07-11-architecture-rebuild-design.md)**：已批准的 rebuild spec
 - **ADR 0002**：主窗口架构（功能域独立）
 - **ADR 0003**：Provider 架构设计（当前 Coordinator 结构）
 - **ADR 0004**：Coordinator Consolidation
 - **ADR 0005**：Runtime Provider Reconfiguration
+- **ADR 0006**：Menu Bar Resident App Shell
 - **Clean Architecture**：依赖倒置原则
 - **Strategy Pattern**：Provider 是策略模式的实现
