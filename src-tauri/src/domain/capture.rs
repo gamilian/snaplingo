@@ -67,6 +67,64 @@ pub struct PhysicalPoint {
     pub y: i32,
 }
 
+/// Rectangle region in physical screen pixels requested from a capture source.
+#[derive(Debug, Clone, Copy)]
+pub struct ScreenRegion {
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+}
+
+/// Frozen screenshot data for one monitor.
+#[derive(Debug, Clone)]
+pub struct MonitorSnapshot {
+    pub id: String,
+    pub logical_bounds: LogicalRect,
+    pub physical_bounds: PhysicalRect,
+    pub scale_factor: f64,
+    pub png_data: Vec<u8>,
+}
+
+/// Monitor geometry without captured pixels.
+#[derive(Debug, Clone)]
+pub struct MonitorLayout {
+    pub id: String,
+    pub logical_bounds: LogicalRect,
+    pub physical_bounds: PhysicalRect,
+    pub scale_factor: f64,
+}
+
+/// Cursor captured with a frozen desktop snapshot.
+#[derive(Debug, Clone)]
+pub struct CapturedCursor {
+    pub logical_position: LogicalPoint,
+    pub hotspot: LogicalPoint,
+    pub image_width: u32,
+    pub image_height: u32,
+    pub scale_factor: f64,
+    pub png_data: Vec<u8>,
+}
+
+/// Window candidate available for automatic Capture Session selection.
+#[derive(Debug, Clone, PartialEq)]
+pub struct WindowCandidate {
+    pub id: String,
+    pub title: String,
+    pub app_name: String,
+    pub logical_bounds: LogicalRect,
+}
+
+pub fn monitor_snapshot_from_layout(layout: MonitorLayout, png_data: Vec<u8>) -> MonitorSnapshot {
+    MonitorSnapshot {
+        id: layout.id,
+        logical_bounds: layout.logical_bounds,
+        physical_bounds: layout.physical_bounds,
+        scale_factor: layout.scale_factor,
+        png_data,
+    }
+}
+
 /// Identifier for a frozen screenshot capture session.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -202,6 +260,33 @@ pub enum ImageFormat {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn monitor_snapshot_keeps_coordinate_metadata_with_png_data() {
+        let snapshot = MonitorSnapshot {
+            id: "primary".to_string(),
+            logical_bounds: LogicalRect {
+                x: 0.0,
+                y: 0.0,
+                width: 100.0,
+                height: 50.0,
+            },
+            physical_bounds: PhysicalRect {
+                x: 0,
+                y: 0,
+                width: 200,
+                height: 100,
+            },
+            scale_factor: 2.0,
+            png_data: vec![1, 2, 3],
+        };
+
+        assert_eq!(snapshot.id, "primary");
+        assert_eq!(snapshot.logical_bounds.width, 100.0);
+        assert_eq!(snapshot.physical_bounds.width, 200);
+        assert_eq!(snapshot.scale_factor, 2.0);
+        assert_eq!(snapshot.png_data, vec![1, 2, 3]);
+    }
 
     #[test]
     fn capture_session_id_serializes_as_string() {

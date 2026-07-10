@@ -488,16 +488,14 @@ mod tests {
     use super::{CaptureSessionOutput, CaptureSessionRuntime, CaptureSessionRuntimeHost};
     use crate::application::providers::ocr::OcrCoordinator;
     use crate::application::services::{
-        CaptureOutputService, CaptureSessionService, ImageCompositionService,
+        CaptureOutputService, CaptureSessionService, CaptureSessionSource, ImageCompositionService,
     };
     use crate::domain::capture::{
-        CaptureOutputAction, CaptureSessionId, LogicalPoint, LogicalRect, PhysicalRect,
+        CaptureOutputAction, CaptureSessionId, LogicalPoint, LogicalRect, MonitorLayout,
+        MonitorSnapshot, PhysicalRect, ScreenRegion, WindowCandidate,
     };
     use crate::error::AppError;
     use crate::infrastructure::storage::ConfigFile;
-    use crate::infrastructure::system::screenshot::{
-        MonitorLayout, MonitorSnapshot, ScreenRegion, ScreenshotBackend, WindowCandidate,
-    };
 
     #[derive(Debug, Clone, PartialEq)]
     enum HostCall {
@@ -602,12 +600,12 @@ mod tests {
         }
     }
 
-    struct MockScreenshotBackend {
+    struct MockCaptureSessionSource {
         snapshots: Vec<MonitorSnapshot>,
     }
 
     #[async_trait]
-    impl ScreenshotBackend for MockScreenshotBackend {
+    impl CaptureSessionSource for MockCaptureSessionSource {
         async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError> {
             Ok(self.snapshots.clone())
         }
@@ -699,7 +697,7 @@ mod tests {
         snapshots: Vec<MonitorSnapshot>,
     ) -> (CaptureSessionRuntime, Arc<CaptureSessionService>) {
         let sessions = Arc::new(CaptureSessionService::new(Arc::new(
-            MockScreenshotBackend { snapshots },
+            MockCaptureSessionSource { snapshots },
         )));
         let runtime = CaptureSessionRuntime::with_host(
             sessions.clone(),

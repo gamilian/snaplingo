@@ -2,6 +2,7 @@ pub mod capture_output_service;
 mod capture_session_render;
 pub mod capture_session_runtime;
 pub mod capture_session_service;
+mod capture_session_source;
 pub mod history_service;
 pub mod image_composition_service;
 pub mod pinned_image_service;
@@ -22,6 +23,7 @@ pub use capture_output_service::{CaptureOutputService, ClipboardCaptureOutput};
 pub use capture_session_render::CaptureSessionOutput;
 pub use capture_session_runtime::CaptureSessionRuntime;
 pub use capture_session_service::CaptureSessionService;
+pub use capture_session_source::CaptureSessionSource;
 pub use history_service::HistoryService;
 pub use image_composition_service::ImageCompositionService;
 pub use pinned_image_service::{

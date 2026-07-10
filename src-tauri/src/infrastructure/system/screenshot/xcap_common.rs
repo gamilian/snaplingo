@@ -1,11 +1,12 @@
 #[cfg(any(target_os = "windows", target_os = "linux"))]
-use super::backend::ScreenRegion;
-#[cfg(any(target_os = "windows", target_os = "linux"))]
-use super::backend::{
+use super::geometry::{
     monitor_layout_from_physical_geometry, monitor_snapshot_from_physical_geometry,
-    rgba_image_to_png, window_candidate_from_physical_geometry, MonitorLayout, MonitorSnapshot,
-    WindowCandidate,
+    window_candidate_from_physical_geometry,
 };
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+use super::image::rgba_image_to_png;
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+use crate::domain::capture::{MonitorLayout, MonitorSnapshot, ScreenRegion, WindowCandidate};
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use crate::error::AppError;
 #[cfg(any(target_os = "windows", target_os = "linux"))]

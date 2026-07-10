@@ -9,12 +9,11 @@ use crate::application::services::image_composition_service::{
     ImageAnnotation, ImageCompositionService, PngPlacement,
 };
 use crate::domain::capture::{
-    AnnotationCommand, CaptureOutputAction, CaptureSessionId, LogicalPoint, LogicalRect,
-    PhysicalPoint, PhysicalRect,
+    AnnotationCommand, CaptureOutputAction, CaptureSessionId, CapturedCursor, LogicalPoint,
+    LogicalRect, MonitorSnapshot, PhysicalPoint, PhysicalRect,
 };
 use crate::domain::ocr::OcrResult;
 use crate::error::AppError;
-use crate::infrastructure::system::screenshot::{CapturedCursor, MonitorSnapshot};
 
 const OCR_SELECTION_PADDING_LOGICAL_PX: f64 = 2.0;
 
@@ -494,7 +493,7 @@ mod tests {
     use crate::domain::capture::{
         AnnotationCommand, LogicalPoint, LogicalRect, PhysicalPoint, PhysicalRect,
     };
-    use crate::infrastructure::system::screenshot::{CapturedCursor, MonitorSnapshot};
+    use crate::domain::capture::{CapturedCursor, MonitorSnapshot};
 
     #[test]
     fn capture_image_placements_split_selection_across_monitors() {

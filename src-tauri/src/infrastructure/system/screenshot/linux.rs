@@ -1,23 +1,22 @@
-use super::backend::{
-    MonitorLayout, MonitorSnapshot, ScreenRegion, ScreenshotBackend, WindowCandidate,
-};
 use super::xcap_common;
+use crate::application::CaptureSessionSource;
+use crate::domain::capture::{MonitorLayout, MonitorSnapshot, ScreenRegion, WindowCandidate};
 use crate::error::AppError;
 
 /// Linux screenshot backend using the cross-platform XCap crate.
 ///
 /// XCap handles X11 and Wayland differences internally. On Wayland, the
 /// compositor must support a screenshot protocol (e.g. via xdg-desktop-portal).
-pub struct LinuxScreenshotBackend;
+pub struct LinuxCaptureSessionSource;
 
-impl LinuxScreenshotBackend {
+impl LinuxCaptureSessionSource {
     pub fn new() -> Self {
         Self
     }
 }
 
 #[async_trait::async_trait]
-impl ScreenshotBackend for LinuxScreenshotBackend {
+impl CaptureSessionSource for LinuxCaptureSessionSource {
     async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError> {
         xcap_common::capture_all_monitor_snapshots()
     }

@@ -1,4 +1,5 @@
-mod backend;
+mod geometry;
+mod image;
 
 #[cfg(target_os = "linux")]
 mod linux;
@@ -9,27 +10,23 @@ mod windows;
 #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
 mod xcap_common;
 
-pub use backend::{
-    monitor_snapshot_from_layout, CapturedCursor, MonitorLayout, MonitorSnapshot, ScreenRegion,
-    ScreenshotBackend, WindowCandidate,
-};
-
 use std::sync::Arc;
 
-/// Get the platform-specific screenshot backend
-pub fn get_screenshot_backend() -> Arc<dyn ScreenshotBackend> {
+use crate::application::CaptureSessionSource;
+
+pub fn get_capture_session_source() -> Arc<dyn CaptureSessionSource> {
     #[cfg(target_os = "macos")]
     {
-        Arc::new(macos::MacOSScreenshotBackend::new())
+        Arc::new(macos::MacOSCaptureSessionSource::new())
     }
 
     #[cfg(target_os = "windows")]
     {
-        Arc::new(windows::WindowsScreenshotBackend::new())
+        Arc::new(windows::WindowsCaptureSessionSource::new())
     }
 
     #[cfg(target_os = "linux")]
     {
-        Arc::new(linux::LinuxScreenshotBackend::new())
+        Arc::new(linux::LinuxCaptureSessionSource::new())
     }
 }

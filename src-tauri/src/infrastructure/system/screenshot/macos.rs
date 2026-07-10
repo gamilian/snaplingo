@@ -1,8 +1,11 @@
-use super::backend::{
-    monitor_layout_from_physical_geometry, monitor_snapshot_from_physical_geometry, CapturedCursor,
-    MonitorLayout, MonitorSnapshot, ScreenRegion, ScreenshotBackend, WindowCandidate,
+use super::geometry::{
+    monitor_layout_from_physical_geometry, monitor_snapshot_from_physical_geometry,
 };
-use crate::domain::capture::{LogicalPoint, LogicalRect};
+use crate::application::CaptureSessionSource;
+use crate::domain::capture::{
+    CapturedCursor, LogicalPoint, LogicalRect, MonitorLayout, MonitorSnapshot, ScreenRegion,
+    WindowCandidate,
+};
 use crate::error::AppError;
 use core_graphics::display::{CGDisplay, CGRect};
 use core_graphics::image::CGImage;
@@ -15,9 +18,9 @@ use std::io::Cursor;
 use std::time::Instant;
 use xcap::{Monitor, Window};
 
-pub struct MacOSScreenshotBackend;
+pub struct MacOSCaptureSessionSource;
 
-impl MacOSScreenshotBackend {
+impl MacOSCaptureSessionSource {
     pub fn new() -> Self {
         Self
     }
@@ -527,7 +530,7 @@ fn should_skip_window_candidate(title: &str, app_name: &str) -> bool {
 }
 
 #[async_trait::async_trait]
-impl ScreenshotBackend for MacOSScreenshotBackend {
+impl CaptureSessionSource for MacOSCaptureSessionSource {
     async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError> {
         capture_visible_display_snapshots()
     }

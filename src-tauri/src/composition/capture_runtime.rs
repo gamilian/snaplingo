@@ -4,7 +4,7 @@ use tauri::AppHandle;
 
 use crate::application::providers::ocr::OcrCoordinator;
 use crate::application::services::capture_session_runtime::TauriCaptureSessionRuntimeHost;
-use crate::infrastructure::system::screenshot::get_screenshot_backend;
+use crate::infrastructure::system::screenshot::get_capture_session_source;
 use crate::{
     CaptureOutputService, CaptureSessionRuntime, CaptureSessionService, ImageCompositionService,
     PinnedImageService,
@@ -22,8 +22,8 @@ pub(crate) fn build_capture_runtime(
     app: AppHandle,
     ocr_coordinator: Arc<OcrCoordinator>,
 ) -> CaptureRuntimeParts {
-    let screenshot_backend = get_screenshot_backend();
-    let capture_session_service = Arc::new(CaptureSessionService::new(screenshot_backend));
+    let capture_session_source = get_capture_session_source();
+    let capture_session_service = Arc::new(CaptureSessionService::new(capture_session_source));
     let image_composition_service = Arc::new(ImageCompositionService::new());
     let capture_output_service = Arc::new(CaptureOutputService::new());
     let capture_session_runtime = Arc::new(CaptureSessionRuntime::with_host(

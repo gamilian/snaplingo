@@ -1,20 +1,19 @@
-use super::backend::{
-    MonitorLayout, MonitorSnapshot, ScreenRegion, ScreenshotBackend, WindowCandidate,
-};
 use super::xcap_common;
+use crate::application::CaptureSessionSource;
+use crate::domain::capture::{MonitorLayout, MonitorSnapshot, ScreenRegion, WindowCandidate};
 use crate::error::AppError;
 
 /// Windows screenshot backend using the cross-platform XCap crate.
-pub struct WindowsScreenshotBackend;
+pub struct WindowsCaptureSessionSource;
 
-impl WindowsScreenshotBackend {
+impl WindowsCaptureSessionSource {
     pub fn new() -> Self {
         Self
     }
 }
 
 #[async_trait::async_trait]
-impl ScreenshotBackend for WindowsScreenshotBackend {
+impl CaptureSessionSource for WindowsCaptureSessionSource {
     async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError> {
         xcap_common::capture_all_monitor_snapshots()
     }

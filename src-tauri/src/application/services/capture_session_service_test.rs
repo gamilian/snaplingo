@@ -12,21 +12,20 @@ mod tests {
         output_capture_selection, recognize_capture_selection_text, render_capture_png_base64,
     };
     use crate::application::services::{
-        CaptureOutputService, CaptureSessionOutput, CaptureSessionRuntime,
+        CaptureOutputService, CaptureSessionOutput, CaptureSessionRuntime, CaptureSessionSource,
     };
-    use crate::domain::capture::{CaptureOutputAction, LogicalPoint, LogicalRect};
+    use crate::domain::capture::{
+        CaptureOutputAction, CapturedCursor, LogicalPoint, LogicalRect, MonitorLayout,
+        MonitorSnapshot, ScreenRegion, WindowCandidate,
+    };
     use crate::domain::ocr::{OcrRequest, OcrResult};
     use crate::error::AppError;
     use crate::infrastructure::storage::ConfigFile;
-    use crate::infrastructure::system::screenshot::{
-        CapturedCursor, MonitorLayout, MonitorSnapshot, ScreenRegion, ScreenshotBackend,
-        WindowCandidate,
-    };
 
     use crate::application::services::capture_session_service::CaptureSessionService;
     use crate::application::services::image_composition_service::ImageCompositionService;
 
-    struct MockScreenshotBackend {
+    struct MockCaptureSessionSource {
         snapshots: Vec<MonitorSnapshot>,
         monitor_layouts: Vec<MonitorLayout>,
         window_candidates: Vec<WindowCandidate>,
@@ -73,7 +72,7 @@ mod tests {
     }
 
     #[async_trait::async_trait]
-    impl ScreenshotBackend for MockScreenshotBackend {
+    impl CaptureSessionSource for MockCaptureSessionSource {
         async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError> {
             *self.capture_monitor_snapshots_calls.lock().unwrap() += 1;
             Ok(self.snapshots.clone())
@@ -111,11 +110,11 @@ mod tests {
         }
     }
 
-    fn make_backend() -> MockScreenshotBackend {
+    fn make_backend() -> MockCaptureSessionSource {
         make_backend_with_scale(1.0)
     }
 
-    fn make_backend_with_scale(scale_factor: f64) -> MockScreenshotBackend {
+    fn make_backend_with_scale(scale_factor: f64) -> MockCaptureSessionSource {
         let snapshots = vec![MonitorSnapshot {
             id: "primary".to_string(),
             logical_bounds: crate::domain::capture::LogicalRect {
@@ -133,7 +132,7 @@ mod tests {
             scale_factor,
             png_data: vec![1, 2, 3],
         }];
-        MockScreenshotBackend {
+        MockCaptureSessionSource {
             monitor_layouts: snapshots.iter().map(monitor_layout_from_snapshot).collect(),
             snapshots,
             window_candidates: Vec::new(),
@@ -146,7 +145,7 @@ mod tests {
         }
     }
 
-    fn make_multi_monitor_backend() -> MockScreenshotBackend {
+    fn make_multi_monitor_backend() -> MockCaptureSessionSource {
         let snapshots = vec![
             MonitorSnapshot {
                 id: "primary".to_string(),
@@ -183,7 +182,7 @@ mod tests {
                 png_data: vec![4, 5, 6],
             },
         ];
-        MockScreenshotBackend {
+        MockCaptureSessionSource {
             monitor_layouts: snapshots.iter().map(monitor_layout_from_snapshot).collect(),
             snapshots,
             window_candidates: Vec::new(),
@@ -196,7 +195,7 @@ mod tests {
         }
     }
 
-    fn make_backend_with_window_candidate() -> MockScreenshotBackend {
+    fn make_backend_with_window_candidate() -> MockCaptureSessionSource {
         let mut backend = make_backend();
         backend.window_candidates = vec![WindowCandidate {
             id: "window-42".to_string(),
@@ -239,7 +238,7 @@ mod tests {
         ]
     }
 
-    fn make_backend_with_captured_cursor() -> MockScreenshotBackend {
+    fn make_backend_with_captured_cursor() -> MockCaptureSessionSource {
         let mut backend = make_backend();
         backend.captured_cursor = Some(CapturedCursor {
             logical_position: crate::domain::capture::LogicalPoint { x: 4.0, y: 5.0 },
@@ -252,14 +251,14 @@ mod tests {
         backend
     }
 
-    fn make_backend_with_current_cursor_position() -> MockScreenshotBackend {
+    fn make_backend_with_current_cursor_position() -> MockCaptureSessionSource {
         let mut backend = make_backend();
         backend.current_cursor_position =
             Some(crate::domain::capture::LogicalPoint { x: 6.0, y: 7.0 });
         backend
     }
 
-    fn make_backend_with_renderable_png() -> MockScreenshotBackend {
+    fn make_backend_with_renderable_png() -> MockCaptureSessionSource {
         let mut backend = make_backend();
         backend.snapshots[0].logical_bounds = crate::domain::capture::LogicalRect {
             x: 0.0,

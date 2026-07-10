@@ -5,15 +5,13 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
 
+use crate::application::services::CaptureSessionSource;
 use crate::domain::capture::{
-    CaptureCandidateView, CaptureSessionId, CaptureSessionView, CapturedCursorView, LogicalPoint,
-    LogicalRect, MonitorSnapshotView, PhysicalRect,
+    monitor_snapshot_from_layout, CaptureCandidateView, CaptureSessionId, CaptureSessionView,
+    CapturedCursor, CapturedCursorView, LogicalPoint, LogicalRect, MonitorSnapshot,
+    MonitorSnapshotView, PhysicalRect, ScreenRegion, WindowCandidate,
 };
 use crate::error::{AppError, Result};
-use crate::infrastructure::system::screenshot::{
-    monitor_snapshot_from_layout, CapturedCursor, MonitorSnapshot, ScreenRegion, ScreenshotBackend,
-    WindowCandidate,
-};
 
 static NEXT_SESSION_COUNTER: AtomicU64 = AtomicU64::new(1);
 
@@ -41,16 +39,16 @@ enum CaptureSessionViewMode {
 
 /// Owns frozen screenshot sessions.
 pub struct CaptureSessionService {
-    screenshot_backend: Arc<dyn ScreenshotBackend>,
+    source: Arc<dyn CaptureSessionSource>,
     sessions: Arc<Mutex<HashMap<CaptureSessionId, CaptureSession>>>,
     hydrating_sessions: Arc<Mutex<HashSet<CaptureSessionId>>>,
     hydration_notify: Arc<tokio::sync::Notify>,
 }
 
 impl CaptureSessionService {
-    pub fn new(screenshot_backend: Arc<dyn ScreenshotBackend>) -> Self {
+    pub fn new(source: Arc<dyn CaptureSessionSource>) -> Self {
         Self {
-            screenshot_backend,
+            source,
             sessions: Arc::new(Mutex::new(HashMap::new())),
             hydrating_sessions: Arc::new(Mutex::new(HashSet::new())),
             hydration_notify: Arc::new(tokio::sync::Notify::new()),
@@ -89,7 +87,7 @@ impl CaptureSessionService {
         let total_start = Instant::now();
 
         let snapshots_start = Instant::now();
-        let snapshots = self.screenshot_backend.capture_monitor_snapshots().await?;
+        let snapshots = self.source.capture_monitor_snapshots().await?;
         let snapshots_ms = elapsed_ms(snapshots_start);
         if snapshots.is_empty() {
             return Err(AppError::System(
@@ -99,7 +97,7 @@ impl CaptureSessionService {
 
         let window_candidates_start = Instant::now();
         let window_candidates = self
-            .screenshot_backend
+            .source
             .capture_window_candidates(&snapshots)
             .await
             .map_err(|err| {
@@ -111,7 +109,7 @@ impl CaptureSessionService {
 
         let captured_cursor_start = Instant::now();
         let captured_cursor = self
-            .screenshot_backend
+            .source
             .capture_cursor(&snapshots)
             .await
             .map_err(|err| {
@@ -179,7 +177,7 @@ impl CaptureSessionService {
     }
 
     pub async fn capture_session_snapshot_cache(&self) -> Result<CaptureSessionSnapshotCache> {
-        let snapshots = self.screenshot_backend.capture_monitor_snapshots().await?;
+        let snapshots = self.source.capture_monitor_snapshots().await?;
         if snapshots.is_empty() {
             return Err(AppError::System(
                 "Cannot cache capture session without monitor snapshots".to_string(),
@@ -187,7 +185,7 @@ impl CaptureSessionService {
         }
 
         let captured_cursor = self
-            .screenshot_backend
+            .source
             .capture_cursor(&snapshots)
             .await
             .map_err(|err| {
@@ -252,7 +250,7 @@ impl CaptureSessionService {
         let total_start = Instant::now();
 
         let layouts_start = Instant::now();
-        let layouts = self.screenshot_backend.capture_monitor_layouts().await?;
+        let layouts = self.source.capture_monitor_layouts().await?;
         let layouts_ms = elapsed_ms(layouts_start);
         if layouts.is_empty() {
             return Err(AppError::System(
@@ -267,7 +265,7 @@ impl CaptureSessionService {
 
         let window_candidates_start = Instant::now();
         let window_candidates = self
-            .screenshot_backend
+            .source
             .capture_window_candidates(&layout_snapshots)
             .await
             .map_err(|err| {
@@ -461,7 +459,7 @@ impl CaptureSessionService {
     pub fn current_cursor_position(&self, id: &CaptureSessionId) -> Result<Option<LogicalPoint>> {
         let session = self.get_session(id)?;
 
-        self.screenshot_backend
+        self.source
             .current_cursor_position(&session.layout_snapshots)
     }
 
@@ -502,7 +500,7 @@ impl CaptureSessionService {
             };
             let physical_rect = logical_rect_to_snapshot_physical(&intersection, layout)?;
             let png_data = self
-                .screenshot_backend
+                .source
                 .capture_region(ScreenRegion {
                     x: physical_rect.x,
                     y: physical_rect.y,
