@@ -59,7 +59,7 @@ The deletion test remains the primary test for shallow modules: deleting a suspe
 
 ## Invariants
 
-1. Frontend Views do not import @tauri-apps packages, raw Tauri Window/WebviewWindow types, or event-name strings.
+1. Frontend Views do not import @tauri-apps packages, frontend Platform modules, raw Tauri Window/WebviewWindow types, or event-name strings. The frontend composition root injects Platform adapters into Application runtimes; Views consume only Application interfaces.
 2. Backend Commands parse IPC, obtain AppState, call one Application interface, and convert the final error.
 3. Each Application module owns the ports it needs. Infrastructure implements those ports.
 4. Application modules never import Infrastructure modules.
@@ -142,7 +142,7 @@ The exact filenames may change during planning when an existing module already p
 
 The current src/tauri/events.ts and src/tauri/window.ts are shallow because callers still own event names, payload meaning, and window mechanics. Their replacement is a set of domain-named adapter modules.
 
-Views call operations such as subscribing to a result-window payload, resizing the current result window, revealing a capture window, or closing a pinned window. They do not receive raw Tauri objects.
+Frontend Application runtimes call operations such as subscribing to a result-window payload, resizing the current result window, revealing a capture window, or closing a pinned window. Views send actions to those runtimes and do not import Platform adapters or receive raw Tauri objects.
 
 The adapter modules:
 
@@ -204,12 +204,16 @@ It depends on outward ports for:
 
 The command root no longer owns a static mailbox, direct arboard calls, window creation, or event emission.
 
-The pending payload implementation must define atomic behavior:
+The pending payload implementation uses a serialized, single-slot, latest-request-wins state machine because SnapLingo has one Result Window and one active presentation:
 
-- a failed window open must not leave an unintended deliverable payload;
-- a failed notification must have an explicit retry or discard outcome;
-- taking a payload is a single ownership transfer;
-- concurrent opens must have deterministic last-write, queue, or rejection semantics selected in the implementation plan.
+- each open request receives a monotonically increasing request id;
+- a newer request replaces an older pending request that has not been taken;
+- a failed window open removes its payload only when that request id is still current, so it cannot erase a newer concurrent request;
+- delivery notification is a wakeup hint, not ownership transfer;
+- a failed notification leaves the latest payload pending;
+- Result Window startup and every wakeup both pull the latest pending payload;
+- taking the latest payload atomically removes the current slot; a newer request arriving after that ownership transfer remains pending for the next take;
+- no retry queue is introduced.
 
 The frontend Result Window Application module owns mode state, OCR-file workflow coordination, translation triggering, and window presentation decisions. The View renders the state and sends actions.
 
@@ -283,7 +287,7 @@ The rebuild is delivered through six sequential branches. Each branch starts fro
 ### Phase 1: Architecture Foundation
 
 - Establish frontend application, platform/tauri, and views ownership rules.
-- Add dependency-rule tests.
+- Add staged dependency-rule tests. Phase 1 records the existing src/tauri path and current legacy callers as an explicit allowlist, rejects any new direct Tauri import or event string outside that inventory, and permits the baseline to pass.
 - Move only the minimum shared vocabulary required for later migrations.
 
 ### Phase 2: Frontend Runtime Migration
@@ -291,6 +295,7 @@ The rebuild is delivered through six sequential branches. Each branch starts fro
 - Replace raw Tauri event and window access with domain-named adapters.
 - Migrate Capture, Result, Pinned, Settings, and App routing callers.
 - Delete the old shallow src/tauri modules after all callers move.
+- Remove the Phase 1 legacy allowlist and tighten the dependency rule so only src/platform/tauri and the frontend composition root may import Tauri packages or Platform adapters.
 
 ### Phase 3: Capture Workspace Deepening
 
@@ -343,6 +348,7 @@ Each phase follows red-green-refactor.
 Automated checks must reject:
 
 - @tauri-apps imports outside src/platform/tauri;
+- frontend Platform imports from Views;
 - imports from backend Application into Infrastructure;
 - platform cfg in portable backend Application modules;
 - raw event-name strings outside their owning adapter;
@@ -358,6 +364,14 @@ Automated checks must reject:
 - native target verification available in the current environment.
 
 Cross-platform CI must use native runners. macOS cross-compilation to Linux and Windows is not accepted as proof because GTK, Leptonica, Tesseract, and other native dependencies require target sysroots.
+
+The strict final architecture checks take effect in Phase 2. Phase 1 uses the frozen legacy allowlist described above so the foundation branch remains green while preventing new leakage.
+
+## ADR Impact
+
+- ADR 0004 remains accepted: Provider Coordinators stay deep and are not split.
+- ADR 0006 remains accepted: the app remains menu-bar resident.
+- ADR 0005 remains accepted for runtime Provider reconfiguration, but its requirement to retain the older single-api-key compatibility command is superseded by this design. Phase 6 removes that compatibility command and any remaining compatibility adapter.
 
 ## Completion Criteria
 
