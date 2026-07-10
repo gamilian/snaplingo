@@ -149,6 +149,7 @@ function tauriEventUses(files: SourceFile[]): TauriEventUse[] {
   return files.flatMap((file) => {
     const sourceFile = parseSourceFile(file);
     const listenerNames = new Set(TAURI_EVENT_LISTENER_NAMES);
+    const listenerNamespaces = new Set<string>();
     const localStrings = new Map<string, string>();
     const eventNames = new Set<string>();
 
@@ -157,13 +158,16 @@ function tauriEventUses(files: SourceFile[]): TauriEventUse[] {
         ts.isImportDeclaration(node) &&
         ts.isStringLiteral(node.moduleSpecifier) &&
         node.moduleSpecifier.text.endsWith('/tauri/events') &&
-        node.importClause?.namedBindings &&
-        ts.isNamedImports(node.importClause.namedBindings)
+        node.importClause?.namedBindings
       ) {
-        for (const element of node.importClause.namedBindings.elements) {
-          const importedName = element.propertyName?.text ?? element.name.text;
-          if (TAURI_EVENT_LISTENER_NAMES.has(importedName)) {
-            listenerNames.add(element.name.text);
+        if (ts.isNamespaceImport(node.importClause.namedBindings)) {
+          listenerNamespaces.add(node.importClause.namedBindings.name.text);
+        } else {
+          for (const element of node.importClause.namedBindings.elements) {
+            const importedName = element.propertyName?.text ?? element.name.text;
+            if (TAURI_EVENT_LISTENER_NAMES.has(importedName)) {
+              listenerNames.add(element.name.text);
+            }
           }
         }
       }
@@ -183,13 +187,40 @@ function tauriEventUses(files: SourceFile[]): TauriEventUse[] {
       ts.forEachChild(node, visitDeclarations);
     }
 
+    function isRecognizedListenerCall(expression: ts.Expression) {
+      if (ts.isIdentifier(expression)) {
+        return listenerNames.has(expression.text);
+      }
+
+      return (
+        ts.isPropertyAccessExpression(expression) &&
+        ts.isIdentifier(expression.expression) &&
+        listenerNamespaces.has(expression.expression.text) &&
+        TAURI_EVENT_LISTENER_NAMES.has(expression.name.text)
+      );
+    }
+
+    function unwrapEventArgument(expression: ts.Expression): ts.Expression {
+      let unwrapped = expression;
+      while (
+        ts.isAsExpression(unwrapped) ||
+        ts.isTypeAssertionExpression(unwrapped) ||
+        ts.isParenthesizedExpression(unwrapped) ||
+        ts.isNonNullExpression(unwrapped)
+      ) {
+        unwrapped = unwrapped.expression;
+      }
+      return unwrapped;
+    }
+
     function visitCalls(node: ts.Node) {
       if (
         ts.isCallExpression(node) &&
-        ts.isIdentifier(node.expression) &&
-        listenerNames.has(node.expression.text)
+        isRecognizedListenerCall(node.expression)
       ) {
-        const eventArgument = node.arguments[0];
+        const eventArgument = node.arguments[0]
+          ? unwrapEventArgument(node.arguments[0])
+          : undefined;
         if (
           eventArgument &&
           (ts.isStringLiteral(eventArgument) ||
@@ -205,6 +236,10 @@ function tauriEventUses(files: SourceFile[]): TauriEventUse[] {
 
       ts.forEachChild(node, visitCalls);
     }
+
+    // Semantic forwarding or barrel renaming without a recognizable imported
+    // listener symbol is outside this static rule. A wrapper that calls a
+    // recognized listener with an unresolved identifier is still rejected.
 
     visitDeclarations(sourceFile);
     visitCalls(sourceFile);
@@ -387,5 +422,40 @@ describe('frontend dependency rules', () => {
     expect(
       tauriImportInventoryViolations([syntheticView], new Set()),
     ).toEqual(['src/views/ExampleView.tsx -> @tauri-apps/api/core']);
+  });
+
+  test('rejects events passed through an imported listener namespace', () => {
+    const syntheticView: SourceFile = {
+      path: 'src/views/ExampleView.tsx',
+      source: `
+        import * as events from '../tauri/events';
+        events.listenTauriEvent('new-event', handler);
+      `,
+    };
+
+    expect(
+      unexpectedTauriEventUses([syntheticView], LEGACY_TAURI_EVENT_USES),
+    ).toEqual(['src/views/ExampleView.tsx -> new-event']);
+  });
+
+  test('unwraps transparent TypeScript expressions around event arguments', () => {
+    const syntheticView: SourceFile = {
+      path: 'src/views/ExampleView.ts',
+      source: `
+        listenTauriEvent('as-event' as EventName, handler);
+        listenTauriEvent(<EventName>'asserted-event', handler);
+        listenTauriEvent(('parenthesized-event'), handler);
+        listenTauriEvent('nonnull-event'!, handler);
+      `,
+    };
+
+    expect(
+      unexpectedTauriEventUses([syntheticView], LEGACY_TAURI_EVENT_USES),
+    ).toEqual([
+      'src/views/ExampleView.ts -> as-event',
+      'src/views/ExampleView.ts -> asserted-event',
+      'src/views/ExampleView.ts -> nonnull-event',
+      'src/views/ExampleView.ts -> parenthesized-event',
+    ]);
   });
 });
