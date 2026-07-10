@@ -159,7 +159,7 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 **职责：**
 - 定义菜单与 Hotkey adapter 共用的 `AppAction` vocabulary
 - 将 typed Capture launch mode 映射为现有 Capture Session mode 字符串
-- 统一执行 Capture、OCR、Translation、Pinned Image、Settings、About 和 Quit workflow
+- 统一分发 Capture、OCR、Translation、Pinned Image、Settings、About 和 Quit workflow entry action
 - 保持 menu ID 与 Hotkey category/action key 的解析留在各自 adapter
 
 **边界：**
@@ -175,7 +175,7 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 - 运行时更新时先注册/注销系统快捷键，再推进后端配置 snapshot
 - 持有当前注册表，避免前端缓存、配置文件和系统注册状态互相漂移
 - `startup_shortcuts.rs` 拥有 Hotkey key binding、display parser 和 trigger timing
-- App Action Dispatch 拥有 workflow selection/execution
+- App Action Dispatch 拥有 action selection/dispatch；business workflow execution 留在现有 command helpers
 
 ### Durable Settings Store（持久设置 Store）
 `src/stores/settingsConfigStore.ts` 中的前端 store。
