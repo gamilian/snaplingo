@@ -159,13 +159,13 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 **职责：**
 - 定义菜单与 Hotkey adapter 共用的 `AppAction` vocabulary
 - 将 typed Capture launch mode 映射为现有 Capture Session mode 字符串
-- 统一执行 Capture、OCR、Translation、Pinned Image、Settings 和 Quit workflow
+- 统一执行 Capture、OCR、Translation、Pinned Image、Settings、About 和 Quit workflow
 - 保持 menu ID 与 Hotkey category/action key 的解析留在各自 adapter
 
 **边界：**
 - 不负责 Hotkey 注册、display hotkey parser 或 pressed/released timing
-- 不负责 menu-bar 创建和应用生命周期
-- 不包含 workflow implementation；只调用现有 Commands interface
+- 不负责 menu-bar/tray 创建或 Tauri lifecycle event wiring
+- business workflow 委托给现有 command helpers；dispatch mechanics 以及 shell-level Settings/About/Quit action 由 `app_actions.rs` 直接处理
 
 ### Hotkey Runtime（快捷键运行时）
 `src-tauri/src/application/hotkeys/runtime.rs` 中的全局快捷键注册生命周期模块。
