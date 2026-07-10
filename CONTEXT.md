@@ -153,6 +153,20 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 - 迁移旧前端 WebKit localStorage 中的 hotkeys，但忽略 durable settings 和导航状态
 - 校验未知 category/action，并复用 display hotkey parser 过滤无效快捷键
 
+### App Action Dispatch（应用动作分发）
+`src-tauri/src/app_actions.rs` 中的运行时 dispatch module。
+
+**职责：**
+- 定义菜单与 Hotkey adapter 共用的 `AppAction` vocabulary
+- 将 typed Capture launch mode 映射为现有 Capture Session mode 字符串
+- 统一执行 Capture、OCR、Translation、Pinned Image、Settings 和 Quit workflow
+- 保持 menu ID 与 Hotkey category/action key 的解析留在各自 adapter
+
+**边界：**
+- 不负责 Hotkey 注册、display hotkey parser 或 pressed/released timing
+- 不负责 menu-bar 创建和应用生命周期
+- 不包含 workflow implementation；只调用现有 Commands interface
+
 ### Hotkey Runtime（快捷键运行时）
 `src-tauri/src/application/hotkeys/runtime.rs` 中的全局快捷键注册生命周期模块。
 
@@ -160,7 +174,8 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 - 启动时从 Hotkey Configuration snapshot 注册全局快捷键
 - 运行时更新时先注册/注销系统快捷键，再推进后端配置 snapshot
 - 持有当前注册表，避免前端缓存、配置文件和系统注册状态互相漂移
-- 将快捷键触发委托给 `startup_shortcuts.rs` 中的 action dispatch/timing 规则
+- `startup_shortcuts.rs` 拥有 Hotkey key binding、display parser 和 trigger timing
+- App Action Dispatch 拥有 workflow selection/execution
 
 ### Durable Settings Store（持久设置 Store）
 `src/stores/settingsConfigStore.ts` 中的前端 store。

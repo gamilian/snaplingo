@@ -36,7 +36,10 @@ Infrastructure Layer (基础设施层)
 - `src-tauri/src/app_state.rs` 拥有 AppState runtime slice 形状和关闭顺序；raw ConfigFile/Keychain/HttpClient 只在 composition wiring 阶段使用。
 - `src-tauri/src/composition.rs` 是应用组合入口；`src-tauri/src/composition/*_runtime.rs` 拆分 Provider、Capture、Selection、History 的构造策略。
 - `src-tauri/src/application/hotkeys/*` 是 Hotkey Configuration / Runtime module，拥有快捷键 snapshot、legacy migration、启动注册和运行时更新生命周期。
-- `src-tauri/src/startup_shortcuts.rs` 只保留快捷键 action dispatch、display hotkey parser 和 release timing rule。
+- `src-tauri/src/app_actions.rs` 是菜单与 Hotkey 共用的 dispatch seam，拥有 `AppAction` / `CaptureLaunchMode` vocabulary，并通过现有 command interfaces 执行 workflow。
+- `src-tauri/src/app_shell.rs` 是 menu ID adapter，并拥有 menu-bar/tray/application lifecycle。
+- `src-tauri/src/startup_shortcuts.rs` 是 Hotkey category/action binding、display parser 和 pressed/released timing adapter。
+- 两个 adapter 都调用同一个 `dispatch_app_action` interface。
 - `src-tauri/src/application/settings/configuration.rs` 是 Settings Configuration module，拥有 durable settings 默认值、路径归一化、section 更新和 legacy migration。
 - `src-tauri/src/application/services/selected_text_acquirer.rs` 是 Selected Text acquisition workflow，拥有取词方法顺序和诊断；平台取词 mechanics 留在 `infrastructure/system/selection/*`。
 - `application/services/capture_session_runtime.rs` 是 Capture Session Runtime，统一编排截图输出和 OCR；render/output 细节在 `capture_session_render.rs` helper module 中以显式输入运行。
@@ -77,13 +80,15 @@ snaplingo/
 │   ├─ main.rs                          # Tauri binary 入口
 │   ├─ lib.rs                           # Tauri builder/plugin setup + command 注册
 │   ├─ app_state.rs                     # AppState 形状 + shutdown
+│   ├─ app_actions.rs                   # shared menu/Hotkey action dispatch
+│   ├─ app_shell.rs                     # menu ID adapter + menu-bar/tray/lifecycle
 │   ├─ composition.rs                   # ⭐ Runtime composition assembly shell
 │   ├─ composition/                     # 构造策略 builders
 │   │   ├─ provider_runtime.rs
 │   │   ├─ capture_runtime.rs
 │   │   ├─ selection_runtime.rs
 │   │   └─ history_runtime.rs
-│   ├─ startup_shortcuts.rs             # hotkey action dispatch + parser/timing
+│   ├─ startup_shortcuts.rs             # hotkey binding + parser + pressed/released timing
 │   ├─ error.rs                         # 统一错误类型
 │   │
 │   ├─ commands/                        # ⭐ Backend Tauri command seam
@@ -253,7 +258,9 @@ providers/ocr/
 - `domain/hotkey_config.rs` 只定义 sectioned hotkey snapshot、默认 action table 和 category/action 校验
 - `application/hotkeys/configuration.rs` 拥有 `"hotkeys"` 配置读写、默认值合并和 legacy localStorage hotkey migration
 - `application/hotkeys/runtime.rs` 拥有注册状态、启动注册和运行时更新顺序；更新时系统注册成功后才推进配置 snapshot
-- `startup_shortcuts.rs` 只保留 display hotkey parser、release timing rule 和 action dispatch，不再持有配置或注册状态
+- `startup_shortcuts.rs` 只保留 Hotkey category/action binding、display parser 和 pressed/released timing，不再持有配置、注册状态或 workflow dispatch
+- `app_shell.rs` 将 menu ID 映射为 `AppAction`，`startup_shortcuts.rs` 将 Hotkey category/action key 映射为 `AppAction`；两者都调用 `dispatch_app_action`
+- `app_actions.rs` 拥有共享 `AppAction` / `CaptureLaunchMode` vocabulary 和 workflow selection/execution，并只调用现有 command interfaces
 - 前端 `hotkeyConfigStore.ts` 只缓存后端 snapshot；Settings 页面清空/重置/录制都通过 `src/tauri/hotkeys.ts`
 
 **Selected Text acquisition 边界：**
@@ -715,7 +722,8 @@ Commands → Application → Domain
 - Capture Session Runtime 已集中截图会话的 render/output/OCR 编排，render helper module 不再伪装成 `CaptureSessionService` 扩展。
 - AppState 形状位于 `src-tauri/src/app_state.rs`，当前只暴露 `settings`、`providers`、`capture`、`history`、`selection` runtime slices；`lib.rs` 只保留 Tauri builder/plugin setup、command 注册和启动模块调用。
 - Application Composition 由 `src-tauri/src/composition.rs` assembly shell 和 `src-tauri/src/composition/*_runtime.rs` 构造策略 builders 组成。
-- 快捷键 action dispatch 和 display parser 位于 `src-tauri/src/startup_shortcuts.rs`。
+- `src-tauri/src/app_actions.rs` 已集中菜单/Hotkey 共享 action vocabulary 和 workflow dispatch；`app_shell.rs` 与 `startup_shortcuts.rs` 作为 adapter 共用 `dispatch_app_action`。
+- `src-tauri/src/app_shell.rs` 负责 menu ID adapter 以及 menu-bar/tray/application lifecycle；`startup_shortcuts.rs` 负责 Hotkey category/action binding、display parser 和 pressed/released timing。
 - Settings navigation state、Capture interaction runtime/model 是前端纯模块 seam，可用 Vitest 直接覆盖交互规则。
 - `ScreenshotSession/index.tsx` 当前是 composition shell；workspace state、derived geometry、host/keyboard/pointer/editor action assembly 由 `useCaptureWorkspaceController` 和相邻 workspace modules 承担。
 - ProviderStore<P> remains intentionally deferred: TranslationCoordinator and OcrCoordinator still have different activation semantics, and no current change requires reopening ADR-0004.
