@@ -50,7 +50,7 @@
 - 构建 Provider Coordinators 并注册内置 Provider
 - 通过 Provider Configuration Module 恢复自定义 Translation Provider，并恢复 Provider 激活状态
 - 构建 Capture、Selection、History 等运行时依赖组合
-- 将 EventBus 注入 Coordinator，并在 Tauri runtime 就绪后订阅 HistoryService
+- 将 EventBus 注入 Coordinator，并在 Tauri runtime 就绪后订阅 History module
 - 让 `lib.rs` 保持为 Tauri builder/plugin setup、command 注册和启动模块调用的启动壳
 
 ### App State（应用状态）
@@ -301,15 +301,15 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 - Screenshot Mode 中的 OCR 按钮复用同一个 Capture Session 的原始图像
 
 ### Capture Session Runtime（截图会话运行时）
-`CaptureSessionRuntime` 是 Application 层的深模块，统一编排 Capture Session 的输出和 OCR 路径。
+`application/capture/` 是 Capture Session Application module；`CaptureSessionRuntime` 统一编排 Capture Session 的输出和 OCR 路径。
 
 **职责：**
-- 调用 `CaptureSessionService` 读取冻结桌面和选区
-- 通过 `capture_session_render.rs` helper 调用 `ImageCompositionService` 渲染复制、保存、贴图所需的最终图像
-- 调用 `CaptureOutputService` 处理剪贴板、文件输出和输出结果判断
+- 调用 `CaptureSessions` 读取冻结桌面和选区
+- 通过 `capture/render.rs` helper 调用 `CaptureImageComposer` 渲染复制、保存、贴图所需的最终图像
+- 调用 `CaptureOutput` 处理剪贴板、文件输出和输出结果判断
 - 调用 `OcrCoordinator` 对原始选区图像执行 OCR
-- 让 Commands 层通过一个 Interface 完成 render/output/OCR，而不是了解多个服务的调用顺序
-- `capture_session_render.rs` 只提供 free helper，不作为 `CaptureSessionService` 的扩展 impl
+- 让 Commands 层通过一个 Interface 完成 render/output/OCR，而不是了解内部 module 的调用顺序
+- `capture/render.rs` 只提供 free helper，不作为 `CaptureSessions` 的扩展 impl
 
 ### Capture Session Source（截图会话来源）
 `CaptureSessionSource` 是 Capture Session Application module 拥有的 inward port，用于获取冻结桌面所需的 portable 数据。
@@ -318,7 +318,7 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 - 定义 monitor snapshot/layout、window candidate、cursor 和 physical region capture 能力
 - 使用 `domain/capture.rs` 中的 portable Capture 数据，不暴露平台 SDK 类型
 - 由 macOS、Windows、Linux screenshot adapters 实现
-- 由 Application Composition 选择当前平台 adapter 并注入 `CaptureSessionService`
+- 由 Application Composition 选择当前平台 adapter 并注入 `CaptureSessions`
 
 **边界：**
 - Infrastructure 只实现平台 mechanics 和 physical/logical geometry 映射
@@ -335,7 +335,7 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 - 让 Pinned Image Commands 和 Capture Session Pin 输出只调用一个 runtime interface
 
 **边界：**
-- `PinnedImageService` 继续拥有纯内存状态和 group 规则
+- `PinnedImageState` 继续拥有纯内存状态和 group 规则
 - `infrastructure/system/pinned_window` 继续拥有窗口 label、size、show/hide/close mechanics
 - 当前保持原有失败语义：状态更新后窗口调用失败时不自动回滚
 
@@ -349,12 +349,14 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 - `captureInteractionModel.ts` 只保留兼容 facade 和 Capture Mode 到 flow 的纯规则
 
 ### Capture Workspace（截图工作区）
-`src/components/ScreenshotSession/captureWorkspace*.ts` 和 `CaptureWorkspaceView.tsx` 组成前端截图工作区 seam，位于纯 plan 模块和 React shell 之间。
+`src/components/ScreenshotSession/captureWorkspace*.ts`、`useCaptureWorkspace*Controller.ts` 和 `CaptureWorkspaceView.tsx` 组成前端截图工作区 seam，位于纯 plan 模块和 React shell 之间。
 
 **职责：**
 - 拥有前端截图工作区状态形状、patch/reset/load 规则和 ref-backed state 同步
-- 把 host workflow（start/refresh/cancel/render/complete）绑定到 `captureHostRuntime` 和 Tauri adapter，但把 native command 细节留在 host adapter 外侧
-- 把 keyboard、pointer 和 wheel 事件分发到 selection/editor/candidate 纯 plan 模块，避免 `ScreenshotSession/index.tsx` 直接持有大块交互分支
+- `useCaptureWorkspaceController` 只组合 workspace state、derived geometry、selection overlay 和 magnifier pixel source
+- `useCaptureWorkspaceHostController` 把 host workflow（start/refresh/cancel/render/complete）、hydration/perf、window reveal 和 subscriptions 绑定到 `captureHostRuntime` 和 Tauri adapter
+- `useCaptureWorkspaceEditorController` 拥有 text draft、annotation history、style/tool 和 dismiss transaction
+- `useCaptureWorkspaceInputController` 组装 keyboard、pointer 和 wheel context，并只返回 host keyboard events 与 view pointer handlers
 - 通过 `CaptureWorkspaceView.tsx` 渲染截图工作区；View 只接收状态、几何和 handler props，不启动 session、不读 localStorage、不调用 Tauri adapter、不读写 workflow refs
 - 让 `ScreenshotSession/index.tsx` 保持为 composition shell：读取 settings，调用 `useCaptureWorkspaceController`，连接 host/keyboard hooks，渲染 View
 

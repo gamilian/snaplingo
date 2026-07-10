@@ -41,13 +41,13 @@ Infrastructure Layer (基础设施层)
 - `src-tauri/src/startup_shortcuts.rs` 是 Hotkey category/action binding、display parser 和 pressed/released timing adapter。
 - 两个 adapter 都调用同一个 `dispatch_app_action` interface。
 - `src-tauri/src/application/settings/configuration.rs` 是 Settings Configuration module，拥有 durable settings 默认值、路径归一化、section 更新和 legacy migration。
-- `src-tauri/src/application/services/selected_text_acquirer.rs` 是 Selected Text acquisition workflow，拥有取词方法顺序和诊断；平台取词 mechanics 留在 `infrastructure/system/selection/*`。
-- `application/services/capture_session_runtime.rs` 是 Capture Session Runtime，统一编排截图输出和 OCR；render/output 细节在 `capture_session_render.rs` helper module 中以显式输入运行。
-- `application/services/capture_session_source.rs` 是 Capture Session 拥有的 inward source port；portable snapshot/layout/cursor/window candidate types 位于 `domain/capture.rs`，三个 screenshot platform adapters 只实现该 port。
+- `src-tauri/src/application/selected_text/mod.rs` 是 Selected Text acquisition workflow，拥有取词方法顺序和诊断；平台取词 mechanics 留在 `infrastructure/system/selection/*`。
+- `application/capture/runtime.rs` 是 Capture Session Runtime，统一编排截图输出和 OCR；render/output 细节在 `capture/render.rs` helper module 中以显式输入运行。
+- `application/capture/source.rs` 是 Capture Session 拥有的 inward source port；portable snapshot/layout/cursor/window candidate types 位于 `domain/capture.rs`，三个 screenshot platform adapters 只实现该 port。
 - `application/providers/ocr/tesseract_engine.rs` 是 Tesseract Provider-facing port；语言策略留在 Provider，executable/process/native mechanics 位于 `infrastructure/system/ocr/tesseract.rs`。
-- `application/services/pinned_image_runtime.rs` 是 Pinned Image Runtime，统一编排 state、image output 和 window effects；Commands 不直接调用 `pinned_window` adapter。
+- `application/pinned_image/runtime.rs` 是 Pinned Image Runtime，统一编排 state、image output 和 window effects；Commands 不直接调用 `pinned_window` adapter。
 - `src/components/ScreenshotSession/captureInteractionRuntime.ts` 是前端 Capture Interaction Runtime，负责纯 effect-plan 决策。
-- `src/components/ScreenshotSession/captureWorkspace*.ts` 是前端 Capture Workspace seam，拥有截图前端状态形状、host workflow、keyboard dispatch、pointer/wheel dispatch 和 effect application 边界。
+- `src/components/ScreenshotSession/useCaptureWorkspace*Controller.ts` 是前端 Capture Workspace controller seam：composition、host、editor、input 四个 hook 分别拥有状态组合、host workflow、编辑事务和输入分发。
 - `src/components/ScreenshotSession/CaptureWorkspaceView.tsx` 是 Capture Workspace render seam，只接收状态、几何和 handler props；`ScreenshotSession/index.tsx` 保持为 settings、controller hook、host hooks 和 view composition shell。
 
 ---
@@ -128,16 +128,18 @@ snaplingo/
 │   │   │   │   ├─ coordinator.rs       # 多选 + 并发执行
 │   │   │   │   └─ impls/               # 具体实现
 │   │   │
-│   │   └─ services/
-│   │       ├─ selected_text_acquirer.rs # ⭐ Selected Text acquisition workflow
-│   │       ├─ capture_session_runtime.rs # ⭐ Capture Session Runtime
-│   │       ├─ capture_session_service.rs
-│   │       ├─ capture_session_source.rs  # Capture Session inward source port
-│   │       ├─ image_composition_service.rs
-│   │       ├─ capture_output_service.rs
-│   │       ├─ pinned_image_runtime.rs    # ⭐ Pinned Image workflow runtime
-│   │       ├─ pinned_image_service.rs
-│   │       └─ history_service.rs
+│   │   ├─ capture/                      # ⭐ Capture Session module
+│   │   │   ├─ session.rs                # frozen desktop/session state
+│   │   │   ├─ runtime.rs                # output/OCR/window workflow
+│   │   │   ├─ render.rs                 # explicit render helpers
+│   │   │   ├─ image_composer.rs
+│   │   │   ├─ output.rs
+│   │   │   └─ source.rs                 # inward source port
+│   │   ├─ pinned_image/                 # ⭐ Pinned Image module
+│   │   │   ├─ state.rs
+│   │   │   └─ runtime.rs
+│   │   ├─ history/                      # history recording/query module
+│   │   └─ selected_text/                # Selected Text acquisition workflow
 │   │
 │   ├─ domain/                          # ⭐ Domain Layer
 │   │   ├─ capture.rs                   # 纯数据结构
@@ -245,13 +247,14 @@ providers/ocr/
 
 **示例：**
 - `settings/configuration.rs`：durable user settings 的默认值、读取、section 更新、路径归一化和 legacy migration
-- `selected_text_acquirer.rs`：划词翻译取词 workflow，按 scheme 调用平台 method 并生成诊断
-- `capture_session_runtime.rs`：统一编排截图会话渲染、输出、OCR
-- `capture_session_service.rs`：创建和读取冻结桌面会话
-- `image_composition_service.rs`：裁剪、标注、合成图像
-- `capture_output_service.rs`：保存、复制、贴图输出
-- `pinned_image_service.rs`：贴图状态和恢复
-- `history_service.rs`：订阅领域事件并写入历史
+- `selected_text/mod.rs`：划词翻译取词 workflow，按 scheme 调用平台 method 并生成诊断
+- `capture/runtime.rs`：统一编排截图会话渲染、输出、OCR 和窗口生命周期
+- `capture/session.rs`：创建和读取冻结桌面会话
+- `capture/image_composer.rs`：裁剪、标注、合成图像
+- `capture/output.rs`：保存、复制和输出转换
+- `pinned_image/state.rs`：贴图状态、分组和恢复规则
+- `pinned_image/runtime.rs`：贴图输出与窗口副作用编排
+- `history/mod.rs`：订阅领域事件并写入历史
 
 **Settings Configuration 边界：**
 - 后端 owns durable defaults：`general`、`screenshot`、`translation`
@@ -616,10 +619,11 @@ impl OcrCoordinator {
 ```rust
 // 对外暴露简单接口
 struct CaptureSessionRuntime {
-    sessions: Arc<CaptureSessionService>,
-    image_composition: Arc<ImageCompositionService>,
-    output: Arc<CaptureOutputService>,
+    sessions: Arc<CaptureSessions>,
+    image_composition: Arc<CaptureImageComposer>,
+    output: Arc<CaptureOutput>,
     ocr: Arc<OcrCoordinator>,
+    host: Arc<dyn CaptureSessionRuntimeHost>,
 }
 
 impl CaptureSessionRuntime {
@@ -628,14 +632,14 @@ impl CaptureSessionRuntime {
 }
 ```
 
-`capture_session_render.rs` 不扩展 `CaptureSessionService`；它只提供 `render_capture_png_base64`、`recognize_capture_selection_text`、`output_capture_selection` 等 free helper。Runtime 拥有依赖，helper 只接收显式输入。
+`application/capture/render.rs` 不扩展 `CaptureSessions`；它只提供 `render_capture_png_base64`、`recognize_capture_selection_text`、`output_capture_selection` 等 free helper。Runtime 拥有依赖，helper 只接收显式输入。
 
 **Pinned Image Runtime 简化状态和窗口副作用：**
 ```rust
 struct PinnedImageRuntime {
-    service: Arc<PinnedImageService>,
-    image_composition: Arc<ImageCompositionService>,
-    output: Arc<CaptureOutputService>,
+    state: Arc<PinnedImageState>,
+    image_composition: Arc<CaptureImageComposer>,
+    output: Arc<CaptureOutput>,
     host: Arc<dyn PinnedImageRuntimeHost>,
 }
 ```
@@ -739,7 +743,8 @@ Commands → Application → Domain
 - Keychain 使用 `Box<dyn KeychainBackend>` trait object 实现平台抽象和测试注入。
 - Hotkey Configuration / Runtime 负责快捷键 snapshot、legacy migration、启动注册和运行时更新生命周期；前端 Settings 页面只走 `hotkeyConfigStore`。
 - Provider credential validation 由 Provider trait 暴露；DeepL/DeepLX mode 规则位于 `DeepLProvider`，commands/configuration 不特殊分支 DeepLX。
-- Capture Session Runtime 已集中截图会话的 render/output/OCR 编排，render helper module 不再伪装成 `CaptureSessionService` 扩展。
+- Application 层已移除水平的 `services/` bucket，按 `capture`、`pinned_image`、`history`、`selected_text`、`hotkeys`、`providers`、`settings` 领域 module 组织。
+- Capture Session Runtime 已集中截图会话的 render/output/OCR 编排，render helper module 不再伪装成 `CaptureSessions` 扩展。
 - Capture Session portable contract 已由 `domain/capture.rs` 和 Application-owned `CaptureSessionSource` 持有；screenshot Infrastructure 仅实现平台 adapter。
 - Tesseract Provider 只拥有 OCR 语言策略和 Provider 语义；executable discovery、process/native mechanics 已收敛到 Infrastructure engine adapter。
 - Pinned Image Runtime 已集中 state transition、image output 和 window workflow；Commands 与 App Actions 不直接依赖 `pinned_window` adapter。
@@ -748,8 +753,8 @@ Commands → Application → Domain
 - `src-tauri/src/app_actions.rs` 已集中菜单/Hotkey 共享 dispatch；`app_shell.rs` 与 `startup_shortcuts.rs` 作为 adapter 共用 `dispatch_app_action`。
 - `src-tauri/src/app_shell.rs` 负责 menu/tray construction 和 lifecycle policy helpers，`lib.rs` 保留 Tauri lifecycle event wiring；`startup_shortcuts.rs` 负责 Hotkey binding/parser/timing。
 - Settings navigation state、Capture interaction runtime/model 是前端纯模块 seam，可用 Vitest 直接覆盖交互规则。
-- `ScreenshotSession/index.tsx` 当前是 composition shell；workspace state、derived geometry、host/keyboard/pointer/editor action assembly 由 `useCaptureWorkspaceController` 和相邻 workspace modules 承担。
-- Capture Workspace interface deepening remains conditional; do not refactor it solely to reduce file or line count.
+- `ScreenshotSession/index.tsx` 当前是 composition shell；`useCaptureWorkspaceController` 只组合状态、派生几何、overlay 和 magnifier，Host/Editor/Input controller hooks 分别拥有副作用、编辑事务和输入 context assembly。
+- Capture Workspace interface deepening 已完成；后续行为应优先下沉到对应 controller 或纯 runtime module，不把 workflow 分支重新堆回 composition hook。
 - ProviderStore<P> remains intentionally deferred: TranslationCoordinator and OcrCoordinator still have different activation semantics, and no current change requires reopening ADR-0004.
 
 ---
