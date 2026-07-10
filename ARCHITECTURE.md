@@ -43,6 +43,9 @@ Infrastructure Layer (基础设施层)
 - `src-tauri/src/application/settings/configuration.rs` 是 Settings Configuration module，拥有 durable settings 默认值、路径归一化、section 更新和 legacy migration。
 - `src-tauri/src/application/services/selected_text_acquirer.rs` 是 Selected Text acquisition workflow，拥有取词方法顺序和诊断；平台取词 mechanics 留在 `infrastructure/system/selection/*`。
 - `application/services/capture_session_runtime.rs` 是 Capture Session Runtime，统一编排截图输出和 OCR；render/output 细节在 `capture_session_render.rs` helper module 中以显式输入运行。
+- `application/services/capture_session_source.rs` 是 Capture Session 拥有的 inward source port；portable snapshot/layout/cursor/window candidate types 位于 `domain/capture.rs`，三个 screenshot platform adapters 只实现该 port。
+- `application/providers/ocr/tesseract_engine.rs` 是 Tesseract Provider-facing port；语言策略留在 Provider，executable/process/native mechanics 位于 `infrastructure/system/ocr/tesseract.rs`。
+- `application/services/pinned_image_runtime.rs` 是 Pinned Image Runtime，统一编排 state、image output 和 window effects；Commands 不直接调用 `pinned_window` adapter。
 - `src/components/ScreenshotSession/captureInteractionRuntime.ts` 是前端 Capture Interaction Runtime，负责纯 effect-plan 决策。
 - `src/components/ScreenshotSession/captureWorkspace*.ts` 是前端 Capture Workspace seam，拥有截图前端状态形状、host workflow、keyboard dispatch、pointer/wheel dispatch 和 effect application 边界。
 - `src/components/ScreenshotSession/CaptureWorkspaceView.tsx` 是 Capture Workspace render seam，只接收状态、几何和 handler props；`ScreenshotSession/index.tsx` 保持为 settings、controller hook、host hooks 和 view composition shell。
@@ -129,8 +132,10 @@ snaplingo/
 │   │       ├─ selected_text_acquirer.rs # ⭐ Selected Text acquisition workflow
 │   │       ├─ capture_session_runtime.rs # ⭐ Capture Session Runtime
 │   │       ├─ capture_session_service.rs
+│   │       ├─ capture_session_source.rs  # Capture Session inward source port
 │   │       ├─ image_composition_service.rs
 │   │       ├─ capture_output_service.rs
+│   │       ├─ pinned_image_runtime.rs    # ⭐ Pinned Image workflow runtime
 │   │       ├─ pinned_image_service.rs
 │   │       └─ history_service.rs
 │   │
@@ -163,7 +168,7 @@ snaplingo/
 │       │   ├─ paths.rs                 # 平台路径适配
 │       │   ├─ selection/               # Selected Text platform adapters ⭐
 │       │   ├─ screenshot/              # Screenshot platform adapters ⭐
-│       │   ├─ ocr/                     # macOS System OCR adapter
+│       │   ├─ ocr/                     # Tesseract + macOS System OCR adapters
 │       │   ├─ capture_window/          # Capture window runtime adapters
 │       │   ├─ result_window/           # Result window runtime adapters
 │       │   ├─ pinned_window/           # Pinned image window runtime adapters
@@ -364,8 +369,8 @@ pub struct Keychain {
 **其他平台适配：**
 - `paths.rs`：配置文件路径（`~/Library/` vs `%APPDATA%` vs `~/.config/`）
 - `selection/`：Selected Text 平台取词 method；每个平台 provider 暴露 default scheme 和 method list
-- `screenshot/`：截图 backend（macOS/Windows/Linux）
-- `ocr/`：macOS System OCR adapter
+- `screenshot/`：实现 Application-owned `CaptureSessionSource` 的 macOS/Windows/Linux adapters
+- `ocr/`：Tesseract engine adapter + macOS System OCR adapter
 - `capture_window/`、`result_window/`、`pinned_window/`：Tauri window runtime adapters
 - `shortcut.rs`：平台快捷键辅助函数；全局快捷键注册生命周期位于 `application/hotkeys/runtime.rs`
 
@@ -578,6 +583,9 @@ struct BaiduOcrProvider {
 // 在 composition/provider_runtime.rs 注入
 let http_client = Arc::new(ReqwestHttpClient::new());
 let provider = BaiduOcrProvider::new(Arc::clone(&http_client));
+
+let tesseract_engine = get_tesseract_engine();
+let tesseract_provider = TesseractProvider::new(tesseract_engine);
 ```
 
 ---
@@ -621,6 +629,18 @@ impl CaptureSessionRuntime {
 ```
 
 `capture_session_render.rs` 不扩展 `CaptureSessionService`；它只提供 `render_capture_png_base64`、`recognize_capture_selection_text`、`output_capture_selection` 等 free helper。Runtime 拥有依赖，helper 只接收显式输入。
+
+**Pinned Image Runtime 简化状态和窗口副作用：**
+```rust
+struct PinnedImageRuntime {
+    service: Arc<PinnedImageService>,
+    image_composition: Arc<ImageCompositionService>,
+    output: Arc<CaptureOutputService>,
+    host: Arc<dyn PinnedImageRuntimeHost>,
+}
+```
+
+Commands 只调用 `pin_clipboard`、`pin_png_and_open`、`close`、`switch_group` 等 workflow interface；Tauri window mechanics 位于 Infrastructure host adapter。
 
 ---
 
@@ -720,12 +740,16 @@ Commands → Application → Domain
 - Hotkey Configuration / Runtime 负责快捷键 snapshot、legacy migration、启动注册和运行时更新生命周期；前端 Settings 页面只走 `hotkeyConfigStore`。
 - Provider credential validation 由 Provider trait 暴露；DeepL/DeepLX mode 规则位于 `DeepLProvider`，commands/configuration 不特殊分支 DeepLX。
 - Capture Session Runtime 已集中截图会话的 render/output/OCR 编排，render helper module 不再伪装成 `CaptureSessionService` 扩展。
+- Capture Session portable contract 已由 `domain/capture.rs` 和 Application-owned `CaptureSessionSource` 持有；screenshot Infrastructure 仅实现平台 adapter。
+- Tesseract Provider 只拥有 OCR 语言策略和 Provider 语义；executable discovery、process/native mechanics 已收敛到 Infrastructure engine adapter。
+- Pinned Image Runtime 已集中 state transition、image output 和 window workflow；Commands 与 App Actions 不直接依赖 `pinned_window` adapter。
 - AppState 形状位于 `src-tauri/src/app_state.rs`，当前只暴露 `settings`、`providers`、`capture`、`history`、`selection` runtime slices；`lib.rs` 保留 Tauri builder/plugin setup、command 注册、启动模块调用和 lifecycle event wiring。
 - Application Composition 由 `src-tauri/src/composition.rs` assembly shell 和 `src-tauri/src/composition/*_runtime.rs` 构造策略 builders 组成。
 - `src-tauri/src/app_actions.rs` 已集中菜单/Hotkey 共享 dispatch；`app_shell.rs` 与 `startup_shortcuts.rs` 作为 adapter 共用 `dispatch_app_action`。
 - `src-tauri/src/app_shell.rs` 负责 menu/tray construction 和 lifecycle policy helpers，`lib.rs` 保留 Tauri lifecycle event wiring；`startup_shortcuts.rs` 负责 Hotkey binding/parser/timing。
 - Settings navigation state、Capture interaction runtime/model 是前端纯模块 seam，可用 Vitest 直接覆盖交互规则。
 - `ScreenshotSession/index.tsx` 当前是 composition shell；workspace state、derived geometry、host/keyboard/pointer/editor action assembly 由 `useCaptureWorkspaceController` 和相邻 workspace modules 承担。
+- Capture Workspace interface deepening remains conditional; do not refactor it solely to reduce file or line count.
 - ProviderStore<P> remains intentionally deferred: TranslationCoordinator and OcrCoordinator still have different activation semantics, and no current change requires reopening ADR-0004.
 
 ---

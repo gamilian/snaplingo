@@ -18,11 +18,13 @@ Frontend code calls backend behavior through `src/tauri/*` adapters. Those adapt
 
 `src-tauri/src/composition.rs` owns runtime dependency construction: Provider registration, Coordinator construction, and startup event subscriptions. `src-tauri/src/application/hotkeys/runtime.rs` owns startup/global shortcut registration and update lifecycle. `src-tauri/src/startup_shortcuts.rs` owns Hotkey category/action binding, display parser, and pressed/released timing. Custom Translation Provider creation and runtime add/register/activate behavior live in the Provider Configuration Module.
 
+Capture Session owns the portable `CaptureSessionSource` port and Capture data. `infrastructure/system/screenshot` supplies the current macOS, Windows, or Linux adapter through Composition. Tesseract follows the same direction: the Provider owns language policy, while `infrastructure/system/ocr/tesseract.rs` implements executable discovery and native engine mechanics.
+
 ## Deep Modules
 
 - Provider Coordinators: provider activation, persistence, and execution.
 - Provider Configuration Module: credential validation, custom Translation Provider definitions, runtime add/register/activate rollback, and Provider reconfiguration support.
-- Capture Session Runtime: frozen desktop, selection rendering, output, and OCR handoff behind one Application interface.
-- Pinned Image: in-memory pinned image state and window adapter behavior.
+- Capture Session Runtime: frozen desktop, selection rendering, output, and OCR handoff behind one Application interface; its source port is owned inward and implemented by platform adapters.
+- Pinned Image Runtime: in-memory state transitions, image output, group workflows, and window effects behind one Application interface.
 - Settings Navigation State: pure frontend model for resolving and guarding Settings secondary navigation.
 - Capture Interaction Model: pure frontend model for capture completion flow decisions.

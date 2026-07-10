@@ -311,6 +311,34 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 - 让 Commands 层通过一个 Interface 完成 render/output/OCR，而不是了解多个服务的调用顺序
 - `capture_session_render.rs` 只提供 free helper，不作为 `CaptureSessionService` 的扩展 impl
 
+### Capture Session Source（截图会话来源）
+`CaptureSessionSource` 是 Capture Session Application module 拥有的 inward port，用于获取冻结桌面所需的 portable 数据。
+
+**职责：**
+- 定义 monitor snapshot/layout、window candidate、cursor 和 physical region capture 能力
+- 使用 `domain/capture.rs` 中的 portable Capture 数据，不暴露平台 SDK 类型
+- 由 macOS、Windows、Linux screenshot adapters 实现
+- 由 Application Composition 选择当前平台 adapter 并注入 `CaptureSessionService`
+
+**边界：**
+- Infrastructure 只实现平台 mechanics 和 physical/logical geometry 映射
+- Capture Session Application modules 不导入 `infrastructure/system/screenshot`
+- 平台是否实际可运行不改变该 port 的所有权和依赖方向
+
+### Pinned Image Runtime（贴图运行时）
+`PinnedImageRuntime` 是 Pinned Image workflow module，统一编排内存状态、图像输出和窗口副作用。
+
+**职责：**
+- 处理 clipboard pin、PNG pin、close/reopen、copy/save/replace
+- 处理 group switch、move、hide 和 destroy 的状态及窗口调用顺序
+- 通过 `PinnedImageRuntimeHost` port 调用 Tauri window adapter
+- 让 Pinned Image Commands 和 Capture Session Pin 输出只调用一个 runtime interface
+
+**边界：**
+- `PinnedImageService` 继续拥有纯内存状态和 group 规则
+- `infrastructure/system/pinned_window` 继续拥有窗口 label、size、show/hide/close mechanics
+- 当前保持原有失败语义：状态更新后窗口调用失败时不自动回滚
+
 ### Capture Interaction Runtime（截图交互运行时）
 `src/components/ScreenshotSession/captureInteractionRuntime.ts` 中的前端纯运行时决策模块。
 
@@ -353,6 +381,17 @@ Provider 类型：
 - 腾讯云 OCR（需 API Key）
 - Google Cloud Vision（需 API Key）
 - Azure Computer Vision（需 API Key）
+
+### Tesseract Engine Adapter（Tesseract 引擎适配器）
+`TesseractProvider` 拥有语言代码映射、默认语言策略和 OCR result 语义；`TesseractEngine` port 隔离系统 mechanics。
+
+Infrastructure adapter 负责：
+- Tesseract executable discovery、`PATH` 和平台 fallback paths
+- `--version` / `--list-langs` process calls
+- 图像解码和 grayscale frame normalization
+- native Tesseract instance、全局锁和文字提取
+
+Application Composition 将 concrete engine 注入 Provider；Provider tests 使用 fake engine，不依赖本机安装。
 
 **Translation Provider**：
 - Google Translate（免费 API）
