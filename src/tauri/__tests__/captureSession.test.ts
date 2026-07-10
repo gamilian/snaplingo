@@ -103,4 +103,13 @@ describe('capture session tauri adapter', () => {
 
     expect(invoke).toHaveBeenCalledWith('hide_capture_window');
   });
+
+  it('keeps the Advanced Settings screenshot entrypoint on Capture Session', async () => {
+    const { triggerScreenshot } = await import('../captureSession');
+    invoke.mockResolvedValueOnce(undefined);
+
+    await triggerScreenshot();
+
+    expect(invoke).toHaveBeenCalledWith('trigger_screenshot');
+  });
 });
