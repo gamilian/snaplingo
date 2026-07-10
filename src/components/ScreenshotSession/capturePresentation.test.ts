@@ -66,14 +66,53 @@ describe('capture presentation', () => {
   });
 
   it('uses a light floating toolbar for the editing surface', () => {
-    expect(getCaptureEditorToolbarClassName()).toEqual(
-      expect.stringContaining('bg-white/95'),
+    const className = getCaptureEditorToolbarClassName();
+
+    expect(className).toContain('h-[42px]');
+    expect(className).toContain('gap-1');
+    expect(className).toContain('rounded-[12px]');
+    expect(className).toContain('bg-white/95');
+    expect(className).toContain('text-slate-600');
+  });
+
+  it('uses compact editor controls for small capture selections', () => {
+    expect(getCaptureEditorIconButtonClassName()).toContain('h-7 w-7');
+    expect(getCaptureEditorCommandButtonClassName()).toContain('h-7');
+    expect(getCaptureEditorCommandButtonClassName()).toContain('text-[11px]');
+    expect(getCaptureEditorCommandButtonClassName('primary')).toContain(
+      'w-7',
     );
-    expect(getCaptureEditorToolbarClassName()).toEqual(
-      expect.stringContaining('rounded-[16px]'),
+  });
+
+  it('uses short text for escape and OCR while keeping output actions as SVG icons', () => {
+    const toolbar = readFileSync(
+      new URL('./captureEditorToolbar.tsx', import.meta.url),
+      'utf8',
     );
-    expect(getCaptureEditorToolbarClassName()).toEqual(
-      expect.stringContaining('text-slate-600'),
+
+    expect(toolbar).toMatch(/>\s*ESC\s*</);
+    expect(toolbar).toMatch(/>\s*OCR\s*</);
+    expect(toolbar).not.toContain('取消 (Esc)');
+    expect(toolbar).not.toContain('完成 (Enter)');
+    expect(toolbar).toContain('<CopyIcon />');
+    expect(toolbar).toContain('<SaveIcon />');
+    expect(toolbar).toContain('<CheckIcon />');
+    expect(toolbar).toMatch(
+      /<button(?:(?!<\/button>)[\s\S])*className=\{getCaptureEditorCommandButtonClassName\(\)\}(?:(?!<\/button>)[\s\S])*title="OCR"/,
+    );
+    expect(toolbar).toMatch(
+      /<button(?:(?!<\/button>)[\s\S])*className=\{getCaptureEditorCommandButtonClassName\('icon'\)\}(?:(?!<\/button>)[\s\S])*title="Copy/,
+    );
+  });
+
+  it('keeps toolbar placement dimensions synchronized with the compact surface', () => {
+    const controller = readFileSync(
+      new URL('./useCaptureWorkspaceController.ts', import.meta.url),
+      'utf8',
+    );
+
+    expect(controller).toContain(
+      'const TOOLBAR_SIZE = { width: 640, height: 42 };',
     );
   });
 

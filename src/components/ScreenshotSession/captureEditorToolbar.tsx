@@ -183,7 +183,7 @@ export function CaptureEditorToolbar({
       ))}
       <div className={getCaptureEditorDividerClassName()} />
       <IconActionButton
-        className="h-9 w-9 shrink-0 rounded-[10px] border border-slate-200 bg-[#5b7fff] shadow-[0_0_0_2px_rgba(91,127,255,0.15)] disabled:cursor-not-allowed disabled:opacity-40"
+        className="h-7 w-7 shrink-0 rounded-[8px] border border-slate-200 bg-[#5b7fff] shadow-[0_0_0_2px_rgba(91,127,255,0.12)] disabled:cursor-not-allowed disabled:opacity-40"
         style={{ backgroundColor: annotationColorToCss(annotationStyle.color) }}
         disabled={isRenderingOutput}
         title="Annotation color"
@@ -201,7 +201,7 @@ export function CaptureEditorToolbar({
         <span className="sr-only">Annotation color</span>
       </IconActionButton>
       <input
-        className="h-9 w-20 accent-[#5b7fff] disabled:opacity-40"
+        className="h-7 w-14 accent-[#5b7fff] disabled:opacity-40"
         type="range"
         min={
           isTextSizingActive
@@ -242,7 +242,7 @@ export function CaptureEditorToolbar({
         }}
       />
       <input
-        className="h-5 w-5 accent-[#5b7fff] disabled:opacity-40"
+        className="h-4 w-4 accent-[#5b7fff] disabled:opacity-40"
         type="checkbox"
         checked={annotationStyle.filled}
         disabled={isRenderingOutput || !isFillModeActive}
@@ -263,13 +263,13 @@ export function CaptureEditorToolbar({
         type="button"
         className={getCaptureEditorCommandButtonClassName()}
         disabled={isRenderingOutput}
-        title="Cancel"
+        title="Cancel (Esc)"
         aria-label="Cancel capture"
         onClick={() => {
           void onCancel();
         }}
       >
-        取消 (Esc)
+        ESC
       </button>
       <button
         type="button"
@@ -285,37 +285,37 @@ export function CaptureEditorToolbar({
       </button>
       <button
         type="button"
-        className={getCaptureEditorCommandButtonClassName()}
+        className={getCaptureEditorCommandButtonClassName('icon')}
         disabled={isRenderingOutput}
-        title="Copy"
+        title="Copy (Ctrl/Cmd+C)"
         aria-label="Copy selection"
         onClick={() => {
           void onCopy();
         }}
       >
-        复制 (⌘C)
+        <CopyIcon />
       </button>
       <button
         type="button"
-        className={getCaptureEditorCommandButtonClassName()}
+        className={getCaptureEditorCommandButtonClassName('icon')}
         disabled={isRenderingOutput}
-        title="Save"
+        title="Save (Ctrl/Cmd+S, Shift-click for quick save)"
         aria-label="Save selection"
         onClick={handleSaveClick}
       >
-        保存
+        <SaveIcon />
       </button>
       <button
         type="button"
         className={getCaptureEditorCommandButtonClassName('primary')}
         disabled={isRenderingOutput}
-        title="Finish"
+        title="Finish (Enter)"
         aria-label="Finish capture"
         onClick={() => {
           void onCopy();
         }}
       >
-        完成 (Enter)
+        <CheckIcon />
       </button>
     </div>
   );
@@ -337,7 +337,7 @@ function nextAnnotationColor(currentColor: AnnotationColor) {
 
 function PointerIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" aria-hidden="true">
       <path
         d="M7 4.8v13.9l3.2-3.5 2.4 4.9 2.3-1.1-2.4-4.8h5.1L7 4.8Z"
         fill="currentColor"
@@ -348,7 +348,7 @@ function PointerIcon() {
 
 function RectangleIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" aria-hidden="true">
       <rect
         x="5"
         y="8"
@@ -356,7 +356,7 @@ function RectangleIcon() {
         height="8"
         fill="none"
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="1.8"
       />
     </svg>
   );
@@ -364,14 +364,14 @@ function RectangleIcon() {
 
 function EllipseIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" aria-hidden="true">
       <circle
         cx="12"
         cy="12"
         r="7"
         fill="none"
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="1.8"
       />
     </svg>
   );
@@ -379,14 +379,14 @@ function EllipseIcon() {
 
 function ArrowIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" aria-hidden="true">
       <path
         d="M5 12h13m-5-5 5 5-5 5"
         fill="none"
         stroke="currentColor"
         strokeLinecap="round"
         strokeLinejoin="round"
-        strokeWidth="2"
+        strokeWidth="1.8"
       />
     </svg>
   );
@@ -394,13 +394,13 @@ function ArrowIcon() {
 
 function LineIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" aria-hidden="true">
       <path
         d="M5 12h14"
         fill="none"
         stroke="currentColor"
         strokeLinecap="round"
-        strokeWidth="2"
+        strokeWidth="1.8"
       />
     </svg>
   );
@@ -408,20 +408,20 @@ function LineIcon() {
 
 function PenIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" aria-hidden="true">
       <path
         d="M5 17.5 15.7 6.8l2.5 2.5L7.5 20H5v-2.5Z"
         fill="none"
         stroke="currentColor"
         strokeLinejoin="round"
-        strokeWidth="2"
+        strokeWidth="1.8"
       />
       <path
         d="m14.5 8 1.5-1.5a1.8 1.8 0 0 1 2.5 2.5L17 10.5"
         fill="none"
         stroke="currentColor"
         strokeLinecap="round"
-        strokeWidth="2"
+        strokeWidth="1.8"
       />
     </svg>
   );
@@ -429,15 +429,25 @@ function PenIcon() {
 
 function TextIcon() {
   return (
-    <span className="text-lg font-semibold leading-none" aria-hidden="true">
-      T
-    </span>
+    <svg
+      viewBox="0 0 24 24"
+      className="h-[17px] w-[17px]"
+      aria-hidden="true"
+    >
+      <path
+        d="M7 5h10M12 5v14"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.8"
+      />
+    </svg>
   );
 }
 
 function MosaicIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" aria-hidden="true">
       <path
         d="M5 5h14v14H5V5Zm4 0v14M15 5v14M5 9h14M5 15h14"
         fill="none"
@@ -450,14 +460,14 @@ function MosaicIcon() {
 
 function BlurIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" aria-hidden="true">
       <circle
         cx="12"
         cy="12"
         r="7"
         fill="none"
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="1.8"
       />
       <path d="M12 5a7 7 0 0 1 0 14V5Z" fill="currentColor" opacity="0.45" />
     </svg>
@@ -466,20 +476,87 @@ function BlurIcon() {
 
 function EraserIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" aria-hidden="true">
       <path
         d="m5 15 8.6-8.6a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L12 18H8l-3-3Z"
         fill="none"
         stroke="currentColor"
         strokeLinejoin="round"
-        strokeWidth="2"
+        strokeWidth="1.8"
       />
       <path
         d="M12 18h7"
         fill="none"
         stroke="currentColor"
         strokeLinecap="round"
-        strokeWidth="2"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function CopyIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-[17px] w-[17px]"
+      aria-hidden="true"
+    >
+      <rect
+        x="8"
+        y="8"
+        width="11"
+        height="11"
+        rx="2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function SaveIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-[17px] w-[17px]"
+      aria-hidden="true"
+    >
+      <path
+        d="M12 4v11m-4-4 4 4 4-4M5 19h14"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-[17px] w-[17px]"
+      aria-hidden="true"
+    >
+      <path
+        d="m6 12 4 4 8-9"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
       />
     </svg>
   );

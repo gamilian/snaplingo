@@ -19,7 +19,7 @@ import type { CaptureMode, LogicalRect, Point } from './types';
 
 const MIN_SELECTION_SIZE = 10;
 const TOOLBAR_GAP = 14;
-const TOOLBAR_SIZE = { width: 1220, height: 56 };
+const TOOLBAR_SIZE = { width: 640, height: 42 };
 const CAPTURE_HOVER_POLL_INTERVAL_MS = 16;
 
 function areRectsEqual(a: LogicalRect | null, b: LogicalRect | null) {

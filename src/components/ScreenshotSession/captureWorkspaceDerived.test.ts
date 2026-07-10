@@ -52,7 +52,7 @@ describe('captureWorkspaceDerived', () => {
       state,
       hydratedCaptureSessionId: session.id,
       toolbarGap: 14,
-      toolbarSize: { width: 1220, height: 56 },
+      toolbarSize: { width: 640, height: 42 },
     });
 
     expect(derived.areCaptureImagesReady).toBe(true);
@@ -113,7 +113,7 @@ describe('captureWorkspaceDerived', () => {
       state,
       hydratedCaptureSessionId: null,
       toolbarGap: 14,
-      toolbarSize: { width: 1220, height: 56 },
+      toolbarSize: { width: 640, height: 42 },
     });
 
     expect(derived.selectedAnnotation).toBe(annotation);

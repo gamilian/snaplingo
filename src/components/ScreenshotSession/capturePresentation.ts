@@ -1,5 +1,5 @@
 type CapturePresentationStatus = 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
-type CaptureEditorCommandButtonVariant = 'default' | 'primary';
+type CaptureEditorCommandButtonVariant = 'default' | 'icon' | 'primary';
 
 export function getCaptureRootClassName(_status: CapturePresentationStatus) {
   return [
@@ -21,8 +21,8 @@ export function getCaptureSelectionOverlayCanvasClassName() {
 
 export function getCaptureEditorToolbarClassName() {
   return [
-    'absolute flex h-14 items-center gap-2 rounded-[16px] bg-white/95 px-3 py-2',
-    'text-sm font-semibold text-slate-600 shadow-[0_12px_34px_rgba(15,23,42,0.22)]',
+    'absolute flex h-[42px] items-center gap-1 rounded-[12px] bg-white/95 px-1.5 py-1',
+    'text-[11px] font-semibold text-slate-600 shadow-[0_10px_28px_rgba(15,23,42,0.2)]',
     'ring-1 ring-slate-200/90 backdrop-blur-xl',
   ].join(' ');
 }
@@ -43,7 +43,7 @@ export function getCaptureEditorSelectionClassName(
 
 export function getCaptureEditorIconButtonClassName(isActive = false) {
   return [
-    'flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border text-lg leading-none',
+    'flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] border leading-none',
     'transition-colors disabled:cursor-not-allowed disabled:opacity-40',
     isActive
       ? 'border-[#5b7fff] bg-[#eef3ff] text-[#4a6fe8] shadow-[0_0_0_2px_rgba(91,127,255,0.2)]'
@@ -55,15 +55,19 @@ export function getCaptureEditorCommandButtonClassName(
   variant: CaptureEditorCommandButtonVariant = 'default',
 ) {
   const base =
-    'flex h-9 shrink-0 items-center justify-center rounded-[10px] px-5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40';
+    'flex h-7 shrink-0 items-center justify-center rounded-[8px] text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40';
 
   if (variant === 'primary') {
-    return `${base} bg-[#5b7fff] text-white shadow-[0_8px_18px_rgba(91,127,255,0.3)] hover:bg-[#4a6fe8]`;
+    return `${base} w-7 bg-[#5b7fff] text-white shadow-[0_5px_12px_rgba(91,127,255,0.28)] hover:bg-[#4a6fe8]`;
   }
 
-  return `${base} border border-slate-200 bg-white text-slate-600 hover:bg-slate-50`;
+  if (variant === 'icon') {
+    return `${base} w-7 border border-slate-200 bg-white text-slate-600 hover:bg-slate-50`;
+  }
+
+  return `${base} border border-slate-200 bg-white px-2 text-slate-600 hover:bg-slate-50`;
 }
 
 export function getCaptureEditorDividerClassName() {
-  return 'h-8 w-px shrink-0 bg-slate-200';
+  return 'mx-0.5 h-6 w-px shrink-0 bg-slate-200';
 }
