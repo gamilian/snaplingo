@@ -161,7 +161,3 @@ export async function copyTextToClipboard(text: string) {
 export async function triggerScreenshot() {
   return invoke<void>('trigger_screenshot');
 }
-
-export async function captureFullScreen() {
-  return invoke<string>('capture_full_screen');
-}
