@@ -66,7 +66,7 @@ The deletion test remains the primary test for shallow modules: deleting a suspe
 5. Application Composition is the only place that selects concrete OS adapters.
 6. Platform cfg belongs in Composition or Infrastructure, never in portable Application modules.
 7. No generic global ports, interfaces, or shared-type bucket is introduced. A port stays beside the module that consumes it.
-8. No compatibility re-export, duplicate command, duplicate event, or temporary dual runtime survives a merged phase.
+8. No compatibility re-export, duplicate command, duplicate event, or temporary dual runtime introduced by a phase survives that merged phase. Pre-existing compatibility paths are removed in the phase that migrates their owning seam and cannot survive the final rebuild.
 9. Tests exercise module interfaces and workflows, not source-code strings, except for explicit dependency-rule tests.
 
 ## Target Frontend Structure
@@ -150,7 +150,7 @@ The adapter modules:
 - validate and parse IPC payloads;
 - translate Tauri position and size types;
 - hide subscription cleanup;
-- expose portable outcomes to Application modules and Views.
+- expose portable outcomes to Application modules.
 
 Deletion test: removing a new domain adapter must force callers to reimplement meaningful payload and lifecycle behavior, not merely rename an invoke call.
 
@@ -295,7 +295,8 @@ The rebuild is delivered through six sequential branches. Each branch starts fro
 - Replace raw Tauri event and window access with domain-named adapters.
 - Migrate Capture, Result, Pinned, Settings, and App routing callers.
 - Delete the old shallow src/tauri modules after all callers move.
-- Remove the Phase 1 legacy allowlist and tighten the dependency rule so only src/platform/tauri and the frontend composition root may import Tauri packages or Platform adapters.
+- Remove the Phase 1 legacy allowlist and tighten the dependency rule so only src/platform/tauri may import Tauri packages. The frontend composition root may import Platform adapters to inject them into Application runtimes, but it may not import Tauri packages.
+- Remove the older single-api-key Provider compatibility command and its frontend compatibility adapter while migrating the Provider Tauri adapter.
 
 ### Phase 3: Capture Workspace Deepening
 
@@ -371,7 +372,7 @@ The strict final architecture checks take effect in Phase 2. Phase 1 uses the fr
 
 - ADR 0004 remains accepted: Provider Coordinators stay deep and are not split.
 - ADR 0006 remains accepted: the app remains menu-bar resident.
-- ADR 0005 remains accepted for runtime Provider reconfiguration, but its requirement to retain the older single-api-key compatibility command is superseded by this design. Phase 6 removes that compatibility command and any remaining compatibility adapter.
+- ADR 0005 remains accepted for runtime Provider reconfiguration, but its requirement to retain the older single-api-key compatibility command is superseded by this design. Phase 2 removes that compatibility command and its frontend compatibility adapter.
 
 ## Completion Criteria
 
