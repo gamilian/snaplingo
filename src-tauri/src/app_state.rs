@@ -7,7 +7,7 @@ use crate::application::providers::{
 };
 use crate::application::{
     CaptureOutputService, CaptureSessionRuntime, CaptureSessionService, HistoryService,
-    HotkeyRuntime, ImageCompositionService, PinnedImageService, SelectedTextAcquirer,
+    HotkeyRuntime, ImageCompositionService, PinnedImageRuntime, SelectedTextAcquirer,
     SettingsConfiguration,
 };
 use crate::infrastructure::events::EventBus;
@@ -32,7 +32,7 @@ pub struct CaptureRuntimeState {
     pub image_composition: Arc<ImageCompositionService>,
     pub output: Arc<CaptureOutputService>,
     pub session_runtime: Arc<CaptureSessionRuntime>,
-    pub pinned_images: Arc<PinnedImageService>,
+    pub pinned_images: Arc<PinnedImageRuntime>,
 }
 
 pub struct HistoryRuntime {

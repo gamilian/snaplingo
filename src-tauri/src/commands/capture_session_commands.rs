@@ -6,7 +6,7 @@ use tauri::{AppHandle, Manager, State};
 use crate::application::services::CaptureSessionOutput;
 use crate::domain::capture::{
     AnnotationCommand, CaptureOutputAction, CaptureSessionId, CaptureSessionView, LogicalPoint,
-    LogicalRect, PinnedImageView,
+    LogicalRect,
 };
 use crate::domain::ocr::OcrResult;
 use crate::infrastructure::system::capture_window::{
@@ -14,7 +14,6 @@ use crate::infrastructure::system::capture_window::{
     prepare_capture_window_for_reveal as prepare_capture_window_for_reveal_for_app,
     reveal_capture_window as reveal_capture_window_for_app,
 };
-use crate::infrastructure::system::pinned_window::open_pinned_image_window;
 
 static CAPTURE_SHORTCUT_OPEN_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 
@@ -129,16 +128,6 @@ async fn prepare_capture_window_for_reveal_on_main_thread(app: &AppHandle) -> Re
 async fn hide_capture_window_on_main_thread(app: &AppHandle) -> Result<(), String> {
     run_on_main_thread(app, "hide capture window", |app| {
         hide_capture_window_for_app(&app)
-    })
-    .await
-}
-
-async fn open_pinned_image_window_on_main_thread(
-    app: &AppHandle,
-    image: PinnedImageView,
-) -> Result<(), String> {
-    run_on_main_thread(app, "open pinned image window", move |app| {
-        open_pinned_image_window(&app, &image)
     })
     .await
 }
@@ -288,7 +277,6 @@ pub async fn output_capture(
     annotations: Vec<AnnotationCommand>,
     include_cursor: Option<bool>,
     action: CaptureOutputAction,
-    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     let session_id = CaptureSessionId(session_id);
@@ -308,16 +296,12 @@ pub async fn output_capture(
 
     match output {
         CaptureSessionOutput::Completed => Ok(()),
-        CaptureSessionOutput::Pin(png_data) => {
-            let image = state
-                .inner()
-                .capture
-                .pinned_images
-                .pin_png_view(png_data)
-                .map_err(|e| e.to_string())?;
-
-            open_pinned_image_window_on_main_thread(&app, image).await
-        }
+        CaptureSessionOutput::Pin(png_data) => state
+            .capture
+            .pinned_images
+            .pin_png_and_open(png_data)
+            .await
+            .map_err(|error| error.to_string()),
     }
 }
 

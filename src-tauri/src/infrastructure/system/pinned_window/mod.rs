@@ -1,5 +1,8 @@
 mod backend;
+mod runtime_host;
 mod tauri;
+
+pub(crate) use runtime_host::TauriPinnedImageRuntimeHost;
 
 pub use tauri::{
     apply_pinned_group_window_switch, close_pinned_group_windows, close_pinned_image_window,

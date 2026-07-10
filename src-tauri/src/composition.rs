@@ -93,7 +93,7 @@ pub(crate) fn build_app_state(config_path: PathBuf, app: AppHandle) -> AppState 
             image_composition: capture_runtime.image_composition_service,
             output: capture_runtime.capture_output_service,
             session_runtime: capture_runtime.capture_session_runtime,
-            pinned_images: capture_runtime.pinned_image_service,
+            pinned_images: capture_runtime.pinned_image_runtime,
         }),
         history: Arc::new(HistoryRuntime {
             service: history_service,

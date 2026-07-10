@@ -80,21 +80,31 @@ pub(crate) fn dispatch_app_action(app: tauri::AppHandle, action: AppAction) {
             }
         }
         AppAction::PinClipboardImage => {
-            let state = app.state::<AppState>();
-            if let Err(err) = commands::pin_clipboard_image_for_state(&app, state.inner()) {
-                log::error!("Failed to pin clipboard image: {}", err);
-            }
+            tauri::async_runtime::spawn(async move {
+                let state = app.state::<AppState>();
+                if let Err(err) = commands::pin_clipboard_image_for_state(state.inner()).await {
+                    log::error!("Failed to pin clipboard image: {}", err);
+                }
+            });
         }
         AppAction::TogglePinnedImagesVisibility => {
-            if let Err(err) = commands::toggle_pinned_images_visibility(app) {
-                log::error!("Failed to toggle pinned images: {}", err);
-            }
+            tauri::async_runtime::spawn(async move {
+                let state = app.state::<AppState>();
+                if let Err(err) =
+                    commands::toggle_pinned_images_visibility_for_state(state.inner()).await
+                {
+                    log::error!("Failed to toggle pinned images: {}", err);
+                }
+            });
         }
         AppAction::SwitchPinnedImageGroup => {
-            let state = app.state::<AppState>();
-            if let Err(err) = commands::switch_pinned_image_group_for_state(&app, state.inner()) {
-                log::error!("Failed to switch pinned image group: {}", err);
-            }
+            tauri::async_runtime::spawn(async move {
+                let state = app.state::<AppState>();
+                if let Err(err) = commands::switch_pinned_image_group_for_state(state.inner()).await
+                {
+                    log::error!("Failed to switch pinned image group: {}", err);
+                }
+            });
         }
         AppAction::OpenSettings | AppAction::OpenAbout => {
             if let Err(err) = settings_window::show_settings_window(&app) {

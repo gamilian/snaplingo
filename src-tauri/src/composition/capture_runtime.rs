@@ -4,10 +4,11 @@ use tauri::AppHandle;
 
 use crate::application::providers::ocr::OcrCoordinator;
 use crate::application::services::capture_session_runtime::TauriCaptureSessionRuntimeHost;
+use crate::infrastructure::system::pinned_window::TauriPinnedImageRuntimeHost;
 use crate::infrastructure::system::screenshot::get_capture_session_source;
 use crate::{
     CaptureOutputService, CaptureSessionRuntime, CaptureSessionService, ImageCompositionService,
-    PinnedImageService,
+    PinnedImageRuntime, PinnedImageService,
 };
 
 pub(crate) struct CaptureRuntimeParts {
@@ -15,7 +16,7 @@ pub(crate) struct CaptureRuntimeParts {
     pub image_composition_service: Arc<ImageCompositionService>,
     pub capture_output_service: Arc<CaptureOutputService>,
     pub capture_session_runtime: Arc<CaptureSessionRuntime>,
-    pub pinned_image_service: Arc<PinnedImageService>,
+    pub pinned_image_runtime: Arc<PinnedImageRuntime>,
 }
 
 pub(crate) fn build_capture_runtime(
@@ -31,15 +32,21 @@ pub(crate) fn build_capture_runtime(
         image_composition_service.clone(),
         capture_output_service.clone(),
         ocr_coordinator,
-        Arc::new(TauriCaptureSessionRuntimeHost::new(app)),
+        Arc::new(TauriCaptureSessionRuntimeHost::new(app.clone())),
     ));
     let pinned_image_service = Arc::new(PinnedImageService::new());
+    let pinned_image_runtime = Arc::new(PinnedImageRuntime::new(
+        pinned_image_service,
+        image_composition_service.clone(),
+        capture_output_service.clone(),
+        Arc::new(TauriPinnedImageRuntimeHost::new(app)),
+    ));
 
     CaptureRuntimeParts {
         capture_session_service,
         image_composition_service,
         capture_output_service,
         capture_session_runtime,
-        pinned_image_service,
+        pinned_image_runtime,
     }
 }
