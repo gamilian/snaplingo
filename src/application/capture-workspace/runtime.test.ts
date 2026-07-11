@@ -5,7 +5,96 @@ import { createCaptureWorkspaceRuntime } from './runtime';
 
 const selection = { x: 20, y: 30, width: 120, height: 80 };
 
+function createKeyboardTarget() {
+  const listeners = new Map<string, Set<(event: KeyboardEvent) => void>>();
+  return {
+    target: {
+      addEventListener(type: string, listener: (event: KeyboardEvent) => void) {
+        const current = listeners.get(type) ?? new Set();
+        current.add(listener);
+        listeners.set(type, current);
+      },
+      removeEventListener(type: string, listener: (event: KeyboardEvent) => void) {
+        listeners.get(type)?.delete(listener);
+      },
+    },
+    dispatch(key: string) {
+      let defaultPrevented = false;
+      const event = {
+        key,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+        repeat: false,
+        preventDefault: () => {
+          defaultPrevented = true;
+        },
+        get defaultPrevented() {
+          return defaultPrevented;
+        },
+      } as KeyboardEvent;
+      listeners.get('keydown')?.forEach((listener) => listener(event));
+      return event;
+    },
+    listenerCount(type: string) {
+      return listeners.get(type)?.size ?? 0;
+    },
+  };
+}
+
 describe('capture workspace runtime', () => {
+  it('prevents runtime and delegated editor shortcuts synchronously', async () => {
+    const platform = createPlatform();
+    const keyboardTarget = createKeyboardTarget();
+    const runtime = createCaptureWorkspaceRuntime({
+      platform,
+      keyboard: {
+        target: keyboardTarget.target,
+        onUnhandledKeyDown: (event) => event.preventDefault(),
+        releaseMagnifierRequest: vi.fn(),
+        hasDraftSelectionMoveGesture: () => false,
+        finishDraftSelectionMove: vi.fn(),
+        hasDismissibleLayer: () => false,
+      },
+    });
+    await runtime.actions.connectHost();
+    await runtime.actions.startSession('screenshot', 'session-key-listener');
+
+    expect(keyboardTarget.dispatch('F5').defaultPrevented).toBe(true);
+    expect(keyboardTarget.dispatch('x').defaultPrevented).toBe(true);
+  });
+
+  it('contains an unexpected rejection from work launched by a synchronous shortcut', async () => {
+    const platform = createPlatform();
+    const runtime = createCaptureWorkspaceRuntime({
+      platform,
+      host: {
+        resetInteraction: vi.fn(),
+        resetSession: vi.fn(),
+        applyManualSelection: () => {
+          throw new Error('selection bridge failed');
+        },
+        getAnnotations: () => [],
+        commitTextDraft: () => [],
+        shouldIncludeCursor: () => false,
+        hasTextDraft: () => false,
+        prepareSurface: vi.fn(),
+        getSnapTargetRects: () => [],
+      },
+    });
+    await runtime.actions.startSession('screenshot', 'session-key-rejection');
+
+    expect(runtime.actions.keyDown({ key: 'a', metaKey: true })).toBe(true);
+
+    await vi.waitFor(() =>
+      expect(runtime.renderState).toMatchObject({
+        status: 'error',
+        error: 'selection bridge failed',
+      }),
+    );
+  });
+
   it('owns host subscriptions and cleans every listener up together', async () => {
     const platform = createPlatform();
     const unlistenHotkey = vi.fn();
@@ -31,6 +120,47 @@ describe('capture workspace runtime', () => {
     expect(unlistenHotkey).toHaveBeenCalledTimes(1);
     expect(unlistenCancel).toHaveBeenCalledTimes(1);
     expect(unlistenCopy).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['second', 'cancel'],
+    ['third', 'copy'],
+  ] as const)('cleans partial subscriptions when the %s registration fails', async (_label, failure) => {
+    const platform = createPlatform();
+    const keyboardTarget = createKeyboardTarget();
+    const unlistenHotkey = vi.fn();
+    const unlistenCancel =
+      failure === 'copy'
+        ? vi.fn(() => {
+            throw new Error('cancel dispose failed');
+          })
+        : vi.fn();
+    platform.onHotkeyTriggered.mockResolvedValue(unlistenHotkey);
+    if (failure === 'cancel') {
+      platform.onCancelRequested.mockRejectedValue(new Error('cancel listen failed'));
+    } else {
+      platform.onCancelRequested.mockResolvedValue(unlistenCancel);
+      platform.onCopyRequested.mockRejectedValue(new Error('copy listen failed'));
+    }
+    const runtime = createCaptureWorkspaceRuntime({
+      platform,
+      keyboard: {
+        target: keyboardTarget.target,
+        onUnhandledKeyDown: vi.fn(),
+        releaseMagnifierRequest: vi.fn(),
+        hasDraftSelectionMoveGesture: () => false,
+        finishDraftSelectionMove: vi.fn(),
+        hasDismissibleLayer: () => false,
+      },
+    });
+
+    await runtime.actions.connectHost();
+
+    expect(unlistenHotkey).toHaveBeenCalledOnce();
+    expect(unlistenCancel).toHaveBeenCalledTimes(failure === 'copy' ? 1 : 0);
+    expect(keyboardTarget.listenerCount('keydown')).toBe(0);
+    expect(keyboardTarget.listenerCount('keyup')).toBe(0);
+    expect(keyboardTarget.listenerCount('blur')).toBe(0);
   });
 
   it('handles native preview copy through runtime-owned completion effects', async () => {
@@ -108,6 +238,55 @@ describe('capture workspace runtime', () => {
     expect(platform.reveal).toHaveBeenCalledTimes(1);
   });
 
+  it('coalesces concurrent readiness and ignores a stale reveal preparation', async () => {
+    const firstPrepare = deferred<void>();
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockImplementation(async (id) =>
+      createSession({ id }),
+    );
+    platform.prepareForReveal
+      .mockImplementationOnce(() => firstPrepare.promise.then(() => undefined))
+      .mockResolvedValue(undefined);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-a');
+
+    const first = runtime.actions.updateHostReadiness(true);
+    const duplicate = runtime.actions.updateHostReadiness(true);
+    expect(platform.prepareForReveal).toHaveBeenCalledTimes(1);
+
+    await runtime.actions.startSession('screenshot', 'session-b');
+    await runtime.actions.updateHostReadiness(true);
+    expect(platform.reveal).toHaveBeenCalledTimes(1);
+
+    firstPrepare.resolve();
+    await Promise.all([first, duplicate]);
+    expect(platform.reveal).toHaveBeenCalledTimes(1);
+    await runtime.actions.updateHostReadiness(true);
+    expect(platform.reveal).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries reveal preparation after the current attempt fails', async () => {
+    const platform = createPlatform({
+      session: createSession({ id: 'session-reveal-retry' }),
+    });
+    platform.prepareForReveal
+      .mockRejectedValueOnce(new Error('prepare failed'))
+      .mockResolvedValue(undefined);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-reveal-retry');
+
+    await runtime.actions.updateHostReadiness(true);
+    expect(runtime.renderState).toMatchObject({
+      status: 'error',
+      error: 'prepare failed',
+    });
+
+    await runtime.actions.updateHostReadiness(true);
+
+    expect(platform.prepareForReveal).toHaveBeenCalledTimes(2);
+    expect(platform.reveal).toHaveBeenCalledOnce();
+  });
+
   it('ignores refresh without an active session', async () => {
     const platform = createPlatform();
     const runtime = createCaptureWorkspaceRuntime({ platform });
@@ -131,6 +310,61 @@ describe('capture workspace runtime', () => {
       sessionId: null,
       error: 'load failed',
     });
+  });
+
+  it('keeps a canceled loading session idle when its load resolves later', async () => {
+    const load = deferred<ReturnType<typeof createSession>>();
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockImplementation(() => load.promise);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    const start = runtime.actions.startSession('screenshot', 'session-late');
+    await runtime.actions.cancelSession();
+    load.resolve(createSession({ id: 'session-late' }));
+    await start;
+
+    expect(runtime.renderState.status).toBe('idle');
+    expect(runtime.renderState.sessionId).toBeNull();
+  });
+
+  it('does not surface a stale preview failure after cancel', async () => {
+    const preview = deferred<string>();
+    const platform = createPlatform({ session: createSession({ id: 'session-preview-cancel' }) });
+    platform.commands.renderCaptureOutput.mockImplementation(() => preview.promise);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-preview-cancel');
+
+    const rendering = runtime.actions.renderSelectionPreview(selection);
+    await runtime.actions.cancelSession();
+    preview.reject(new Error('late preview failure'));
+    await rendering;
+
+    expect(runtime.renderState).toMatchObject({ status: 'idle', error: null });
+  });
+
+  it('does not surface stale output or preview work after reset or cancel', async () => {
+    const preview = deferred<string>();
+    const output = deferred<void>();
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockImplementation(async (id) => createSession({ id }));
+    platform.commands.renderCaptureOutput.mockImplementationOnce(() => preview.promise);
+    platform.commands.outputCapture.mockImplementationOnce(() => output.promise);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession('screenshot', 'session-reset-preview');
+    const rendering = runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.resetPreview();
+    preview.reject(new Error('late reset preview failure'));
+    await rendering;
+    expect(runtime.renderState).toMatchObject({ status: 'selecting', error: null });
+    expect(platform.commands.cancelCaptureSession).not.toHaveBeenCalled();
+
+    await runtime.actions.startSession('screenshot-copy', 'session-cancel-output');
+    const completing = runtime.actions.completeCandidateSelection(selection, 'copy');
+    await runtime.actions.cancelSession();
+    output.reject(new Error('late cancel output failure'));
+    await completing;
+    expect(runtime.renderState).toMatchObject({ status: 'idle', error: null });
   });
 
   it('guards duplicate candidate completion while output is pending', async () => {
@@ -157,10 +391,10 @@ describe('capture workspace runtime', () => {
     const runtime = createCaptureWorkspaceRuntime({ platform });
     await runtime.actions.startSession('screenshot', 'session-keyboard-host');
 
-    await expect(runtime.actions.keyDown({ key: 'F5' })).resolves.toBe(true);
-    await expect(
-      runtime.actions.keyDown({ key: 'a', metaKey: true }),
-    ).resolves.toBe(true);
+    expect(runtime.actions.keyDown({ key: 'F5' })).toBe(true);
+    await vi.waitFor(() => expect(runtime.renderState.status).toBe('selecting'));
+    expect(runtime.actions.keyDown({ key: 'a', metaKey: true })).toBe(true);
+    await vi.waitFor(() => expect(runtime.renderState.status).toBe('preview'));
 
     expect(platform.commands.createCaptureSession).toHaveBeenCalledTimes(1);
     expect(platform.commands.renderCaptureOutput).toHaveBeenCalledWith({
@@ -186,10 +420,10 @@ describe('capture workspace runtime', () => {
     await runtime.actions.startSession('screenshot-copy', 'session-record');
     await runtime.actions.completeCandidateSelection(selection, 'copy');
     await runtime.actions.startSession('screenshot', 'session-restore');
-    await expect(runtime.actions.keyDown({ key: 'r' })).resolves.toBe(true);
-    await expect(
-      runtime.actions.keyDown({ key: 'c', metaKey: true }),
-    ).resolves.toBe(true);
+    expect(runtime.actions.keyDown({ key: 'r' })).toBe(true);
+    await vi.waitFor(() => expect(runtime.renderState.isRenderingOutput).toBe(false));
+    expect(runtime.actions.keyDown({ key: 'c', metaKey: true })).toBe(true);
+    await vi.waitFor(() => expect(platform.commands.outputCapture).toHaveBeenCalledTimes(2));
 
     expect(platform.commands.renderCaptureOutput).toHaveBeenCalledWith({
       sessionId: 'session-restore',
@@ -269,7 +503,7 @@ describe('capture workspace runtime', () => {
     runtime.actions.pointerDown({ x: 20, y: 30 });
     runtime.actions.pointerMove({ x: 100, y: 80 });
 
-    await expect(runtime.actions.keyDown({ key: 'd' })).resolves.toBe(true);
+    expect(runtime.actions.keyDown({ key: 'd' })).toBe(true);
 
     expect(runtime.renderState).toMatchObject({
       startPoint: { x: 20, y: 30 },
@@ -293,7 +527,7 @@ describe('capture workspace runtime', () => {
     const runtime = createCaptureWorkspaceRuntime({ platform });
     await runtime.actions.startSession('screenshot', 'session-cursor-nudge');
 
-    await expect(runtime.actions.keyDown({ key: 'd' })).resolves.toBe(true);
+    expect(runtime.actions.keyDown({ key: 'd' })).toBe(true);
 
     expect(runtime.renderState).toMatchObject({
       cursorPoint: { x: 40, y: 50 },
@@ -317,9 +551,94 @@ describe('capture workspace runtime', () => {
     runtime.actions.pointerMove({ x: 40, y: 50 });
     expect(runtime.renderState.hoverSelection).toEqual(higher);
 
-    await expect(runtime.actions.keyDown({ key: 'Tab' })).resolves.toBe(true);
+    expect(runtime.actions.keyDown({ key: 'Tab' })).toBe(true);
 
     expect(runtime.renderState.hoverSelection).toEqual(lower);
+  });
+
+  it('commits the keyboard-adjusted draft endpoint on pointer release', async () => {
+    const platform = createPlatform();
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-nudge-release');
+    runtime.actions.pointerDown({ x: 20, y: 30 });
+    runtime.actions.pointerMove({ x: 100, y: 80 });
+    expect(runtime.actions.keyDown({ key: 'd' })).toBe(true);
+
+    await runtime.actions.pointerUp({ x: 100, y: 80 });
+
+    expect(platform.commands.renderCaptureOutput).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      rect: { x: 20, y: 30, width: 81, height: 50 },
+      annotations: [],
+    });
+  });
+
+  it('uses the pointer-up coordinate when the draft was not keyboard-adjusted', async () => {
+    const platform = createPlatform();
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-pointer-release');
+    runtime.actions.pointerDown({ x: 20, y: 30 });
+    runtime.actions.pointerMove({ x: 100, y: 80 });
+
+    await runtime.actions.pointerUp({ x: 120, y: 90 });
+
+    expect(platform.commands.renderCaptureOutput).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      rect: { x: 20, y: 30, width: 100, height: 60 },
+      annotations: [],
+    });
+  });
+
+  it('uses runtime-owned polled hover state for keyboard and native copy', async () => {
+    const candidateB = { x: 200, y: 40, width: 80, height: 70 };
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockImplementation(async (id) => createSession({ id }));
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot-copy', 'session-poll-enter');
+    runtime.actions.updatePolledCursor({ x: 220, y: 60 });
+    runtime.actions.updatePolledHover(candidateB);
+    expect(runtime.actions.keyDown({ key: 'Enter' })).toBe(true);
+    await vi.waitFor(() => expect(platform.commands.outputCapture).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: 'session-poll-enter', rect: candidateB }),
+    ));
+
+    await runtime.actions.startSession('screenshot-copy', 'session-poll-native');
+    runtime.actions.updatePolledCursor({ x: 220, y: 60 });
+    runtime.actions.updatePolledHover(candidateB);
+    await runtime.actions.connectHost();
+    const copyCalls = platform.onCopyRequested.mock.calls;
+    await copyCalls[copyCalls.length - 1]?.[0]?.();
+    expect(platform.commands.outputCapture).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: 'session-poll-native', rect: candidateB }),
+    );
+  });
+
+  it('does not notify subscribers for unchanged polled cursor or hover state', async () => {
+    const platform = createPlatform();
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-poll-dedupe');
+    const listener = vi.fn();
+    runtime.subscribe(listener);
+
+    runtime.actions.updatePolledCursor({ x: 220, y: 60 });
+    runtime.actions.updatePolledCursor({ x: 220, y: 60 });
+    runtime.actions.updatePolledHover({ x: 200, y: 40, width: 80, height: 70 });
+    runtime.actions.updatePolledHover({ x: 200, y: 40, width: 80, height: 70 });
+
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+
+  it('cancels a selecting draft on Escape without delegating to the editor', async () => {
+    const platform = createPlatform();
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-draft-escape');
+    runtime.actions.pointerDown({ x: 20, y: 30 });
+    runtime.actions.pointerMove({ x: 100, y: 80 });
+
+    expect(runtime.actions.keyDown({ key: 'Escape' })).toBe(true);
+    await vi.waitFor(() => expect(runtime.renderState.status).toBe('idle'));
+    expect(platform.dismiss).toHaveBeenCalledOnce();
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith('session-1');
   });
 
   it('keeps the newest session authoritative when an older start resolves later', async () => {
@@ -422,7 +741,7 @@ describe('capture workspace runtime', () => {
       annotations: [],
       action: { type: 'copy' },
     });
-    expect(platform.dismiss).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(platform.dismiss).toHaveBeenCalledTimes(1));
     expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
       'session-pointer',
     );
@@ -452,16 +771,18 @@ describe('capture workspace runtime', () => {
 
     await runtime.actions.startSession('screenshot-copy', 'session-confirm');
     runtime.actions.pointerMove({ x: 40, y: 50 });
-    await runtime.actions.keyDown({ key: 'Enter' });
+    expect(runtime.actions.keyDown({ key: 'Enter' })).toBe(true);
 
-    expect(platform.commands.outputCapture).toHaveBeenCalledWith(
-      expect.objectContaining({
-        sessionId: 'session-confirm',
-        rect: selection,
-        action: { type: 'copy' },
-      }),
+    await vi.waitFor(() =>
+      expect(platform.commands.outputCapture).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionId: 'session-confirm',
+          rect: selection,
+          action: { type: 'copy' },
+        }),
+      ),
     );
-    expect(platform.dismiss).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(platform.dismiss).toHaveBeenCalledTimes(1));
     expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
       'session-confirm',
     );
@@ -588,7 +909,9 @@ describe('capture workspace runtime', () => {
     await oldCompletion;
 
     expect(platform.dismiss).not.toHaveBeenCalled();
-    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() =>
+      expect(platform.commands.cancelCaptureSession).toHaveBeenCalledTimes(1),
+    );
     expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
       'session-old',
     );
@@ -669,10 +992,14 @@ describe('capture workspace runtime', () => {
     const runtime = createCaptureWorkspaceRuntime({ platform });
 
     await runtime.actions.startSession('screenshot', 'session-old');
-    const oldCancel = runtime.actions.keyDown({ key: 'Escape' });
+    expect(runtime.actions.keyDown({ key: 'Escape' })).toBe(true);
     await runtime.actions.startSession('screenshot', 'session-new');
     dismiss.resolve();
-    await oldCancel;
+    await vi.waitFor(() =>
+      expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
+        'session-old',
+      ),
+    );
 
     expect(platform.dismiss).toHaveBeenCalledTimes(1);
     expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
@@ -696,13 +1023,13 @@ describe('capture workspace runtime', () => {
     const runtime = createCaptureWorkspaceRuntime({ platform });
 
     await runtime.actions.startSession('screenshot', 'session-old');
-    const oldCancel = runtime.actions.keyDown({ key: 'Escape' });
+    expect(runtime.actions.keyDown({ key: 'Escape' })).toBe(true);
     await runtime.actions.startSession('screenshot', 'session-new');
     dismiss.reject(new Error('old dismiss failed'));
-    await oldCancel;
-
     expect(platform.dismiss).toHaveBeenCalledTimes(1);
-    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() =>
+      expect(platform.commands.cancelCaptureSession).toHaveBeenCalledTimes(1),
+    );
     expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
       'session-old',
     );

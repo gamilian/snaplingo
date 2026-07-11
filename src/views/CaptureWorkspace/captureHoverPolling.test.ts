@@ -146,8 +146,8 @@ describe('capture hover polling', () => {
     expect(events).toEqual([
       'ref:120,120',
       'state:120,120',
-      'paint',
       'hover:100,100',
+      'paint',
       'next',
     ]);
   });

@@ -40,7 +40,10 @@ describe('capture workspace production runtime wiring', () => {
     expect(controller).toContain('workflowRuntime.actions.pointerDown');
     expect(controller).toContain('workflowRuntime.actions.pointerMove');
     expect(controller).toContain('workflowRuntime.actions.pointerUp');
-    expect(runtime).toContain('actions.keyDown(keyboardEvent)');
+    expect(runtime).toContain('actions.keyDown(event)');
+    expect(controller).toContain('workflowRuntime.actions.updatePolledCursor');
+    expect(controller).toContain('workflowRuntime.actions.updatePolledHover');
+    expect(controller).not.toContain('workspace.syncHoverSelection');
   });
 
   it('lets the application runtime own host subscriptions and reveal lifecycle', () => {

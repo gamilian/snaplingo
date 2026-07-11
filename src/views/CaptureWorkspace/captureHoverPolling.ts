@@ -89,8 +89,8 @@ export async function runCaptureHoverSelectionPoll({
     if (shouldTrackMagnifierCursor) {
       setCursorPoint(point);
     }
-    scheduleSelectionOverlayPaint();
     syncHoverSelection(getPolledHoverSelection(candidates, point));
+    scheduleSelectionOverlayPaint();
     scheduleNextPoll();
   } catch {
     syncHoverSelection(null);

@@ -38,18 +38,6 @@ const TOOLBAR_GAP = 14;
 const TOOLBAR_SIZE = { width: 640, height: 42 };
 const CAPTURE_HOVER_POLL_INTERVAL_MS = 16;
 
-function areRectsEqual(a: LogicalRect | null, b: LogicalRect | null) {
-  if (a === b) return true;
-  if (!a || !b) return false;
-
-  return (
-    a.x === b.x &&
-    a.y === b.y &&
-    a.width === b.width &&
-    a.height === b.height
-  );
-}
-
 interface CaptureWorkspaceControllerOptions {
   initialMode?: CaptureMode;
   initialSessionId?: string;
@@ -231,23 +219,6 @@ export function useCaptureWorkspaceController({
     hoverSelectionRef: workspace.hoverSelectionRef,
   });
 
-  const syncHoverSelection = useCallback(
-    (nextHoverSelection: LogicalRect | null) => {
-      if (
-        areRectsEqual(
-          workspace.hoverSelectionRef.current,
-          nextHoverSelection,
-        )
-      ) {
-        return;
-      }
-
-      workspace.syncHoverSelection(nextHoverSelection);
-      overlay.schedulePaint(null, nextHoverSelection, null);
-    },
-    [overlay.schedulePaint, workspace.hoverSelectionRef, workspace.syncHoverSelection],
-  );
-
   useEffect(() => {
     if (!workspace.session || !derived.selectionBounds) return;
 
@@ -269,12 +240,10 @@ export function useCaptureWorkspaceController({
       intervalMs: CAPTURE_HOVER_POLL_INTERVAL_MS,
       canPoll,
       getCursorPosition: runtime.commands.currentCaptureCursorPosition,
-      setCursorPointRef: (point) => {
-        workspace.cursorPointRef.current = point;
-      },
-      setCursorPoint: workspace.setCursorPoint,
+      setCursorPointRef: workflowRuntime.actions.updatePolledCursor,
+      setCursorPoint: () => undefined,
       scheduleSelectionOverlayPaint: overlay.schedulePaint,
-      syncHoverSelection,
+      syncHoverSelection: workflowRuntime.actions.updatePolledHover,
       setTimeout: window.setTimeout,
       clearTimeout: window.clearTimeout,
     });
@@ -283,14 +252,12 @@ export function useCaptureWorkspaceController({
     derived.selectionBounds,
     derived.shouldTrackMagnifierCursor,
     overlay.schedulePaint,
-    syncHoverSelection,
-    workspace.cursorPointRef,
     workspace.editGesture,
     workspace.session,
-    workspace.setCursorPoint,
     workspace.startPoint,
     workspace.startPointRef,
     workspace.status,
+    workflowRuntime,
   ]);
 
   const commitTextDraftToHistoryRef = useRef<() => AnnotationHistory>(

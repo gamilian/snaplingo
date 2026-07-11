@@ -61,7 +61,9 @@ export interface CaptureWorkspaceRuntimeActions {
   pointerDown(input: Point | CaptureWorkspacePointerInput): boolean;
   pointerMove(input: Point | CaptureWorkspacePointerInput): boolean;
   pointerUp(input: Point | CaptureWorkspacePointerInput): Promise<boolean>;
-  keyDown(event: CaptureWorkspaceKeyInput): Promise<boolean>;
+  updatePolledCursor(point: Point): void;
+  updatePolledHover(selection: LogicalRect | null): void;
+  keyDown(event: CaptureWorkspaceKeyInput): boolean;
   hydrateSnapshots(): Promise<void>;
 }
 
