@@ -29,6 +29,7 @@ export interface CaptureWorkspaceRenderState {
   readonly selection: LogicalRect | null;
   readonly hoverSelection: LogicalRect | null;
   readonly previewImageBase64: string | null;
+  readonly includeCapturedCursor: boolean;
   readonly isRenderingOutput: boolean;
   readonly hasHydratedPixelSource: boolean;
   readonly error: string | null;
@@ -57,10 +58,10 @@ export interface CaptureWorkspaceRuntimeActions {
     includeCursor?: boolean,
   ): Promise<void>;
   resetPreview(): void;
-  pointerDown(input: Point | CaptureWorkspacePointerInput): void;
-  pointerMove(input: Point | CaptureWorkspacePointerInput): void;
-  pointerUp(input: Point | CaptureWorkspacePointerInput): Promise<void>;
-  keyDown(event: { key: string }): Promise<boolean>;
+  pointerDown(input: Point | CaptureWorkspacePointerInput): boolean;
+  pointerMove(input: Point | CaptureWorkspacePointerInput): boolean;
+  pointerUp(input: Point | CaptureWorkspacePointerInput): Promise<boolean>;
+  keyDown(event: CaptureWorkspaceKeyInput): Promise<boolean>;
   hydrateSnapshots(): Promise<void>;
 }
 
@@ -68,6 +69,16 @@ export interface CaptureWorkspacePointerInput {
   point: Point;
   button?: number;
   shiftKey?: boolean;
+  source?: 'root' | 'preview';
+}
+
+export interface CaptureWorkspaceKeyInput {
+  key: string;
+  metaKey?: boolean;
+  ctrlKey?: boolean;
+  altKey?: boolean;
+  shiftKey?: boolean;
+  repeat?: boolean;
 }
 
 export interface CaptureWorkspaceRuntime {

@@ -9,6 +9,16 @@ import type {
   HoverSelectionCompletionAction,
 } from '../../views/CaptureWorkspace/captureActions';
 import {
+  canToggleCapturedCursor,
+  getHoverSelectionCompletionActionFromShortcut,
+  getPreviewCaptureCompletionActionFromShortcut,
+  getSelectionHistoryStepFromShortcut,
+  isRefreshCaptureShortcut,
+  isRestoreLastSelectionShortcut,
+  isSelectAllCaptureShortcut,
+  isToggleCapturedCursorShortcut,
+} from '../../views/CaptureWorkspace/captureActions';
+import {
   getCaptureKeyboardKeyUpAction,
   planCaptureKeyboardBlur,
 } from '../../views/CaptureWorkspace/captureKeyboardHostRuntime';
@@ -24,6 +34,8 @@ import {
 } from '../../views/CaptureWorkspace/captureInteractionRuntime';
 import {
   recordSuccessfulCaptureSelection,
+  restoreCaptureSelectionFromHistory,
+  restoreLastSuccessfulCaptureSelection,
   type CaptureSelectionStorage,
 } from '../../views/CaptureWorkspace/captureHostRuntime';
 import { printBase64PngImage } from '../../views/CaptureWorkspace/capturePrint';
@@ -37,11 +49,16 @@ import {
   planCaptureDraftSelectionStart,
 } from '../../views/CaptureWorkspace/captureSelectionRuntime';
 import { shouldRevealCaptureWindow } from '../../views/CaptureWorkspace/captureWindowVisibility';
+import {
+  getCurrentMonitorBounds,
+  getVirtualDesktopBounds,
+} from '../../views/CaptureWorkspace/virtualDesktop';
 import { normalizeOcrText } from '../../utils/ocrTextProcessing';
 import type {
   CaptureWorkspaceRenderState,
   CaptureWorkspaceRuntime,
   CaptureWorkspacePointerInput,
+  CaptureWorkspaceKeyInput,
   CaptureWorkspaceRuntimePlatform,
 } from './types';
 
@@ -56,6 +73,7 @@ interface RuntimeState {
   selection: LogicalRect | null;
   hoverSelection: LogicalRect | null;
   previewImageBase64: string | null;
+  includeCapturedCursor: boolean;
   isRenderingOutput: boolean;
   error: string | null;
 }
@@ -87,6 +105,7 @@ interface CaptureWorkspaceRuntimeKeyboard {
   releaseMagnifierRequest(): void;
   hasDraftSelectionMoveGesture(): boolean;
   finishDraftSelectionMove(): void;
+  hasDismissibleLayer(): boolean;
 }
 
 interface CaptureFrontendPerfState {
@@ -390,6 +409,38 @@ export function createCaptureWorkspaceRuntime({
     await runCompletionEffects(rect, completion.effects);
   };
 
+  const restoreLastSelection = () => {
+    if (!storage || !state.session) return false;
+    let restored = false;
+    restoreLastSuccessfulCaptureSelection({
+      storage,
+      selectionBounds: getVirtualDesktopBounds(state.session.monitors),
+      minSelectionSize: MIN_SELECTION_SIZE,
+      completeSelection: (rect) => {
+        restored = true;
+        void completeManualSelection(rect);
+      },
+    });
+    return restored;
+  };
+
+  const restoreSelectionHistory = (step: 'previous' | 'next') => {
+    if (!storage || !state.session) return false;
+    let restored = false;
+    restoreCaptureSelectionFromHistory({
+      storage,
+      currentSelection: state.selection,
+      step,
+      selectionBounds: getVirtualDesktopBounds(state.session.monitors),
+      minSelectionSize: MIN_SELECTION_SIZE,
+      completeSelection: (rect) => {
+        restored = true;
+        void completeManualSelection(rect);
+      },
+    });
+    return restored;
+  };
+
   const cancelSession = async () => {
     const sessionId = state.session?.id;
     if (!sessionId) {
@@ -649,6 +700,7 @@ export function createCaptureWorkspaceRuntime({
       );
     },
     resetPreview() {
+      host?.resetInteraction();
       patch({
         status: 'selecting',
         selection: null,
@@ -660,15 +712,37 @@ export function createCaptureWorkspaceRuntime({
     },
 
     pointerDown(input) {
-      if (state.status !== 'selecting' || !state.session) return;
-      const { button = 0, point } = pointerInput(input);
+      if (!state.session) return false;
+      const { button = 0, point, source = 'root' } = pointerInput(input);
+      if (state.status === 'preview') {
+        if (source === 'preview' && button === 1 && state.selection) {
+          void runCompletionEffects(
+            state.selection,
+            planCandidateSelectionCompletion('pin'),
+            host?.commitTextDraft() ?? host?.getAnnotations() ?? [],
+            state.includeCapturedCursor,
+          );
+          return true;
+        }
+        if (source === 'root' && button === 2) {
+          if (keyboard?.hasDismissibleLayer()) return false;
+          actions.resetPreview();
+          return true;
+        }
+        if (source === 'root') {
+          actions.resetPreview();
+        } else {
+          return false;
+        }
+      }
+      if (state.status !== 'selecting') return false;
       if (button === 2) {
         if (state.selection) {
           patch({ startPoint: null, selection: null, hoverSelection: null });
         } else {
           void cancelSession();
         }
-        return;
+        return true;
       }
 
       const draftStart = planCaptureDraftSelectionStart({
@@ -688,10 +762,11 @@ export function createCaptureWorkspaceRuntime({
         previewImageBase64: draftStart.nextState.previewImageBase64,
         isRenderingOutput: draftStart.nextState.renderingOutput,
       });
+      return true;
     },
 
     pointerMove(input) {
-      if (state.status !== 'selecting' || !state.session) return;
+      if (state.status !== 'selecting' || !state.session) return false;
       const { point, shiftKey = false } = pointerInput(input);
 
       if (state.startPoint) {
@@ -706,7 +781,7 @@ export function createCaptureWorkspaceRuntime({
           cursorPoint: point,
           selection: draft.draftSelection,
         });
-        return;
+        return true;
       }
 
       patch({
@@ -720,11 +795,12 @@ export function createCaptureWorkspaceRuntime({
             point,
           )?.rect ?? null,
       });
+      return true;
     },
 
     async pointerUp(input) {
       if (state.status !== 'selecting' || !state.session || !state.startPoint) {
-        return;
+        return false;
       }
       const { point, shiftKey = false } = pointerInput(input);
 
@@ -755,10 +831,101 @@ export function createCaptureWorkspaceRuntime({
       } else {
         patch({ selection: null, hoverSelection: null });
       }
+      return true;
     },
 
-    async keyDown({ key }) {
-      if (key === 'Escape') {
+    async keyDown(input: CaptureWorkspaceKeyInput) {
+      const event = {
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+        ...input,
+      };
+      if (
+        (state.status === 'selecting' || state.status === 'preview') &&
+        isRefreshCaptureShortcut(event)
+      ) {
+        await actions.refreshSession();
+        return true;
+      }
+      if (
+        (state.status === 'selecting' || state.status === 'preview') &&
+        !host?.hasTextDraft() &&
+        canToggleCapturedCursor(state.session) &&
+        isToggleCapturedCursorShortcut(event)
+      ) {
+        const includeCapturedCursor = !state.includeCapturedCursor;
+        patch({ includeCapturedCursor });
+        if (state.status === 'preview' && state.selection) {
+          await renderSelectionPreview(
+            state.selection,
+            host?.getAnnotations() ?? [],
+            includeCapturedCursor,
+          );
+        }
+        return true;
+      }
+      const historyStep = getSelectionHistoryStepFromShortcut(event);
+      if (
+        historyStep &&
+        !host?.hasTextDraft() &&
+        (state.status === 'selecting' || state.status === 'preview')
+      ) {
+        restoreSelectionHistory(historyStep);
+        return true;
+      }
+      if (
+        isRestoreLastSelectionShortcut(event) &&
+        !host?.hasTextDraft() &&
+        (state.status === 'selecting' || state.status === 'preview')
+      ) {
+        restoreLastSelection();
+        return true;
+      }
+      if (
+        isSelectAllCaptureShortcut(event) &&
+        !host?.hasTextDraft() &&
+        state.session &&
+        (state.status === 'selecting' || state.status === 'preview')
+      ) {
+        const point =
+          state.cursorPoint ??
+          state.session.captured_cursor?.logical_position ??
+          null;
+        await completeManualSelection(
+          getCurrentMonitorBounds(state.session.monitors, point),
+        );
+        return true;
+      }
+      const hoverAction = getHoverSelectionCompletionActionFromShortcut(event, {
+        drafting: state.startPoint !== null,
+        mode: state.mode,
+      });
+      if (
+        state.status === 'selecting' &&
+        state.hoverSelection &&
+        hoverAction
+      ) {
+        await completeCandidateSelection(state.hoverSelection, hoverAction);
+        return true;
+      }
+      const previewAction = getPreviewCaptureCompletionActionFromShortcut(event);
+      if (state.status === 'preview' && state.selection && previewAction) {
+        await runCompletionEffects(
+          state.selection,
+          planCandidateSelectionCompletion(previewAction),
+          host?.commitTextDraft() ?? host?.getAnnotations() ?? [],
+          state.includeCapturedCursor,
+        );
+        return true;
+      }
+      if (event.key === 'Escape') {
+        if (state.status === 'preview') {
+          if (keyboard?.hasDismissibleLayer()) return false;
+          await cancelSession();
+          return true;
+        }
         if (
           state.status !== 'selecting' ||
           state.startPoint ||
@@ -770,7 +937,7 @@ export function createCaptureWorkspaceRuntime({
         return true;
       }
 
-      if (key === 'Enter' && state.hoverSelection) {
+      if (event.key === 'Enter' && state.hoverSelection) {
         await completeCandidateSelection(state.hoverSelection);
         return true;
       }
@@ -839,6 +1006,7 @@ export function createCaptureWorkspaceRuntime({
         selection: state.selection,
         hoverSelection: state.hoverSelection,
         previewImageBase64: state.previewImageBase64,
+        includeCapturedCursor: state.includeCapturedCursor,
         isRenderingOutput: state.isRenderingOutput,
         hasHydratedPixelSource:
           state.session !== null && hydratedSessionId === state.session.id,
@@ -863,6 +1031,7 @@ function createInitialState(mode: CaptureMode = 'screenshot'): RuntimeState {
     selection: null,
     hoverSelection: null,
     previewImageBase64: null,
+    includeCapturedCursor: false,
     isRenderingOutput: false,
     error: null,
   };

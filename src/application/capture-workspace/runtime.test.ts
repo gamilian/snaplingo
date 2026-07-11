@@ -150,6 +150,99 @@ describe('capture workspace runtime', () => {
     await first;
   });
 
+  it('owns refresh and full-area keyboard workflows', async () => {
+    const platform = createPlatform({
+      session: createSession({ id: 'session-keyboard-host' }),
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-keyboard-host');
+
+    await expect(runtime.actions.keyDown({ key: 'F5' })).resolves.toBe(true);
+    await expect(
+      runtime.actions.keyDown({ key: 'a', metaKey: true }),
+    ).resolves.toBe(true);
+
+    expect(platform.commands.createCaptureSession).toHaveBeenCalledTimes(1);
+    expect(platform.commands.renderCaptureOutput).toHaveBeenCalledWith({
+      sessionId: 'session-keyboard-host',
+      rect: { x: 0, y: 0, width: 500, height: 300 },
+      annotations: [],
+    });
+    expect(runtime.renderState.status).toBe('preview');
+  });
+
+  it('owns preview output and remembered-selection keyboard workflows', async () => {
+    const values = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+    };
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockImplementation(async (sessionId) =>
+      createSession({ id: sessionId }),
+    );
+    const runtime = createCaptureWorkspaceRuntime({ platform, storage });
+
+    await runtime.actions.startSession('screenshot-copy', 'session-record');
+    await runtime.actions.completeCandidateSelection(selection, 'copy');
+    await runtime.actions.startSession('screenshot', 'session-restore');
+    await expect(runtime.actions.keyDown({ key: 'r' })).resolves.toBe(true);
+    await expect(
+      runtime.actions.keyDown({ key: 'c', metaKey: true }),
+    ).resolves.toBe(true);
+
+    expect(platform.commands.renderCaptureOutput).toHaveBeenCalledWith({
+      sessionId: 'session-restore',
+      rect: selection,
+      annotations: [],
+    });
+    expect(platform.commands.outputCapture).toHaveBeenLastCalledWith({
+      sessionId: 'session-restore',
+      rect: selection,
+      annotations: [],
+      action: { type: 'copy' },
+    });
+  });
+
+  it('owns preview pin and root reset pointer decisions', async () => {
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockImplementation(async (sessionId) =>
+      createSession({ id: sessionId }),
+    );
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession('screenshot', 'session-reset');
+    await runtime.actions.renderSelectionPreview(selection);
+    expect(
+      runtime.actions.pointerDown({
+        point: { x: 30, y: 40 },
+        button: 2,
+        source: 'root',
+      }),
+    ).toBe(true);
+    expect(runtime.renderState).toMatchObject({
+      status: 'selecting',
+      selection: null,
+    });
+
+    await runtime.actions.renderSelectionPreview(selection);
+    expect(
+      runtime.actions.pointerDown({
+        point: { x: 30, y: 40 },
+        button: 1,
+        source: 'preview',
+      }),
+    ).toBe(true);
+    await vi.waitFor(() => {
+      expect(platform.commands.outputCapture).toHaveBeenCalledWith({
+        sessionId: 'session-reset',
+        rect: selection,
+        annotations: [],
+        action: { type: 'pin' },
+      });
+    });
+  });
+
   it('keeps the newest session authoritative when an older start resolves later', async () => {
     const oldSession = deferred<ReturnType<typeof createSession>>();
     const platform = createPlatform();

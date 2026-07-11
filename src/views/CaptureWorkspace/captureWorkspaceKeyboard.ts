@@ -162,6 +162,51 @@ export interface CaptureWorkspaceKeyboardContext {
   actions: CaptureWorkspaceKeyboardActions;
 }
 
+export type CaptureWorkspaceKeyboardEditorActions = Pick<
+  CaptureWorkspaceKeyboardActions,
+  | 'dismissCaptureLayer'
+  | 'setIsMagnifierRequested'
+  | 'clearAnnotations'
+  | 'undoPolylineGesturePoint'
+  | 'undoAnnotation'
+  | 'redoAnnotation'
+  | 'deleteSelectedAnnotation'
+  | 'copyCurrentColor'
+  | 'setColorSampleFormat'
+  | 'setCursorPoint'
+  | 'setSelection'
+  | 'scheduleSelectionOverlayPaint'
+  | 'setPreviewImageBase64'
+  | 'setRenderingOutput'
+  | 'setEditGesture'
+  | 'syncHoverSelection'
+  | 'setIsAnnotationToolbarVisible'
+  | 'adjustAnnotationSize'
+  | 'toggleAnnotationFill'
+  | 'setActiveAnnotationTool'
+  | 'setSelectedAnnotationIndex'
+  | 'setAnnotationGesture'
+  | 'setAnnotationMoveGesture'
+  | 'setDraftAnnotation'
+  | 'selectAnnotationColor'
+  | 'toggleAnnotationTool'
+  | 'setDraftSelectionMoveGesture'
+  | 'setAnnotationHistory'
+  | 'renderSelectionPreview'
+>;
+
+export function handleCaptureWorkspaceEditorKeyDown(
+  event: KeyboardEvent,
+  context: Omit<CaptureWorkspaceKeyboardContext, 'actions'> & {
+    actions: CaptureWorkspaceKeyboardEditorActions;
+  },
+) {
+  handleCaptureWorkspaceKeyDown(event, {
+    ...context,
+    actions: context.actions as CaptureWorkspaceKeyboardActions,
+  });
+}
+
 function isArrowKey(key: string): key is ArrowKey {
   return ARROW_KEYS.includes(key as ArrowKey);
 }

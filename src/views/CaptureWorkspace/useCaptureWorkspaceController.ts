@@ -33,7 +33,6 @@ import {
 } from './captureWorkspacePointer';
 import type { CaptureWorkspaceState } from './captureWorkspaceState';
 import { useCaptureWorkspaceEditorController } from './useCaptureWorkspaceEditorController';
-import { useCaptureWorkspaceEditorInput } from './useCaptureWorkspaceEditorInput';
 import { useCaptureWorkspaceState } from './useCaptureWorkspaceState';
 import { getCurrentMonitorBounds } from './virtualDesktop';
 import type {
@@ -103,11 +102,13 @@ export function useCaptureWorkspaceController({
     releaseMagnifierRequest(): void;
     hasDraftSelectionMoveGesture(): boolean;
     finishDraftSelectionMove(): void;
+    hasDismissibleLayer(): boolean;
   }>({
     onUnhandledKeyDown: (_event: KeyboardEvent) => undefined,
     releaseMagnifierRequest: () => undefined,
     hasDraftSelectionMoveGesture: () => false,
     finishDraftSelectionMove: () => undefined,
+    hasDismissibleLayer: () => false,
   });
   onInactiveRef.current = onInactive;
   screenshotSavePathRef.current = screenshotSavePath;
@@ -142,6 +143,8 @@ export function useCaptureWorkspaceController({
             keyboardBridgeRef.current.hasDraftSelectionMoveGesture(),
           finishDraftSelectionMove: () =>
             keyboardBridgeRef.current.finishDraftSelectionMove(),
+          hasDismissibleLayer: () =>
+            keyboardBridgeRef.current.hasDismissibleLayer(),
         },
       }),
     [runtime],
@@ -179,6 +182,7 @@ export function useCaptureWorkspaceController({
           selection: next.selection,
           hoverSelection: next.hoverSelection,
           previewImageBase64: next.previewImageBase64,
+          includeCapturedCursor: next.includeCapturedCursor,
           isRenderingOutput: next.isRenderingOutput,
           error: next.error,
         });
@@ -515,38 +519,6 @@ export function useCaptureWorkspaceController({
     [cancelSession, completeCandidateSelection, completeManualSelection, completePreviewSelection, copySelection, ensureCaptureSnapshotsHydrated, pinSelection, quickSaveSelection, renderSelectionPreview, resetPreviewSelection, restoreLastSelection, restoreSelectionFromHistory, runOcrSelection, saveSelection, selectFullCaptureArea, workflowRuntime.actions.refreshSession],
   );
 
-  const editorSetters = useMemo(
-    () => ({
-      setStatus: workspace.setStatus,
-      setError: workspace.setError,
-      setActiveAnnotationTool: workspace.setActiveAnnotationTool,
-      setAnnotationGesture: workspace.setAnnotationGesture,
-      setDraftAnnotation: workspace.setDraftAnnotation,
-      setSelectedAnnotationIndex: workspace.setSelectedAnnotationIndex,
-      setAnnotationMoveGesture: workspace.setAnnotationMoveGesture,
-      setDraftSelectionMoveGesture: workspace.setDraftSelectionMoveGesture,
-      setTextDraft: workspace.setTextDraft,
-      setTextDraftAnnotationIndex: workspace.setTextDraftAnnotationIndex,
-      setAnnotationStyle: workspace.setAnnotationStyle,
-      setTextFontSize: workspace.setTextFontSize,
-      setAnnotationHistory: workspace.setAnnotationHistory,
-    }),
-    [
-      workspace.setActiveAnnotationTool,
-      workspace.setAnnotationGesture,
-      workspace.setAnnotationHistory,
-      workspace.setAnnotationMoveGesture,
-      workspace.setAnnotationStyle,
-      workspace.setDraftAnnotation,
-      workspace.setDraftSelectionMoveGesture,
-      workspace.setError,
-      workspace.setSelectedAnnotationIndex,
-      workspace.setStatus,
-      workspace.setTextDraft,
-      workspace.setTextDraftAnnotationIndex,
-      workspace.setTextFontSize,
-    ],
-  );
   const editorDerived = useMemo(
     () => ({
       annotations: derived.annotations,
@@ -570,27 +542,6 @@ export function useCaptureWorkspaceController({
     }),
     [cancelSession, renderSelectionPreview],
   );
-  const editorController = useCaptureWorkspaceEditorController({
-    state: captureWorkspaceState,
-    derived: editorDerived,
-    setters: editorSetters,
-    host: editorHost,
-    runtime,
-  });
-  commitTextDraftToHistoryRef.current =
-    editorController.commitTextDraftToHistory;
-
-  useCaptureMagnifierPixelSource({
-    session: workspace.session,
-    hasHydratedPixelSource: derived.hasHydratedPixelSource,
-    isMagnifierRequested: workspace.isMagnifierRequested,
-    isMagnifierShown: derived.isMagnifierShown,
-    cursorMonitor: derived.cursorMonitor,
-    cursorInMonitorPoint: derived.cursorInMonitorPoint,
-    setCursorColor: workspace.setCursorColor,
-    ensureCaptureSnapshotsHydrated,
-  });
-
   const inputRefs = useMemo<CaptureWorkspaceKeyboardRefs>(
     () => ({
       startPointRef: workspace.startPointRef,
@@ -633,9 +584,10 @@ export function useCaptureWorkspaceController({
       workspace.isAnnotationToolbarVisible,
     ],
   );
-  const inputSetters = useMemo(
+  const editorSetters = useMemo(
     () => ({
       setStatus: workspace.setStatus,
+      setError: workspace.setError,
       setCursorPoint: workspace.setCursorPoint,
       setSelection: workspace.setSelection,
       setHoverSelection: workspace.setHoverSelection,
@@ -670,6 +622,7 @@ export function useCaptureWorkspaceController({
       workspace.setDraftAnnotation,
       workspace.setDraftSelectionMoveGesture,
       workspace.setEditGesture,
+      workspace.setError,
       workspace.setHoverSelection,
       workspace.setIncludeCapturedCursor,
       workspace.setIsAnnotationToolbarVisible,
@@ -685,76 +638,117 @@ export function useCaptureWorkspaceController({
       workspace.setTextFontSize,
     ],
   );
-  const editorInput = useCaptureWorkspaceEditorInput({
+  const editorController = useCaptureWorkspaceEditorController({
     state: captureWorkspaceState,
-    refs: inputRefs,
-    derived: inputDerived,
-    setters: inputSetters,
-    host: hostActions,
-    editor: editorController.actions,
-    scheduleSelectionOverlayPaint: overlay.schedulePaint,
-    syncHoverSelection,
+    derived: editorDerived,
+    setters: editorSetters,
+    host: editorHost,
+    runtime,
+    input: {
+      refs: inputRefs,
+      derived: inputDerived,
+      setters: editorSetters,
+      scheduleSelectionOverlayPaint: overlay.schedulePaint,
+      syncHoverSelection,
+    },
   });
+  commitTextDraftToHistoryRef.current =
+    editorController.commitTextDraftToHistory;
+
+  useCaptureMagnifierPixelSource({
+    session: workspace.session,
+    hasHydratedPixelSource: derived.hasHydratedPixelSource,
+    isMagnifierRequested: workspace.isMagnifierRequested,
+    isMagnifierShown: derived.isMagnifierShown,
+    cursorMonitor: derived.cursorMonitor,
+    cursorInMonitorPoint: derived.cursorInMonitorPoint,
+    setCursorColor: workspace.setCursorColor,
+    ensureCaptureSnapshotsHydrated,
+  });
+
+  const editorInput = editorController.input;
   keyboardBridgeRef.current = {
     onUnhandledKeyDown: editorInput.onUnhandledKeyDown,
     releaseMagnifierRequest: () =>
-      inputSetters.setIsMagnifierRequested(false),
+      editorSetters.setIsMagnifierRequested(false),
     hasDraftSelectionMoveGesture: () =>
       captureWorkspaceState.draftSelectionMoveGesture !== null,
     finishDraftSelectionMove: () =>
-      inputSetters.setDraftSelectionMoveGesture(null),
+      editorSetters.setDraftSelectionMoveGesture(null),
+    hasDismissibleLayer: () =>
+      captureWorkspaceState.textDraft !== null ||
+      captureWorkspaceState.annotationGesture !== null ||
+      captureWorkspaceState.annotationMoveGesture !== null ||
+      captureWorkspaceState.draftSelectionMoveGesture !== null ||
+      captureWorkspaceState.selectedAnnotationIndex !== null ||
+      captureWorkspaceState.activeAnnotationTool !== null,
   };
   const onRootPointerDown = useCallback(
     (event: PointerEvent<HTMLDivElement>) => {
-      if (
-        captureWorkspaceState.status === 'selecting' &&
-        derived.selectionBounds
-      ) {
+      if (derived.selectionBounds) {
         event.currentTarget.setPointerCapture(event.pointerId);
-        workflowRuntime.actions.pointerDown({
+        const handled = workflowRuntime.actions.pointerDown({
           point: getCaptureWorkspacePointerPoint(event, derived.selectionBounds),
           button: event.button,
           shiftKey: event.shiftKey,
+          source: 'root',
         });
-        return;
+        if (handled) return;
       }
       editorInput.onRootPointerDown(event);
     },
-    [captureWorkspaceState.status, derived.selectionBounds, editorInput, workflowRuntime],
+    [derived.selectionBounds, editorInput, workflowRuntime],
   );
   const onRootPointerMove = useCallback(
     (event: PointerEvent<HTMLDivElement>) => {
-      if (
-        captureWorkspaceState.status === 'selecting' &&
-        derived.selectionBounds
-      ) {
-        workflowRuntime.actions.pointerMove({
+      if (derived.selectionBounds) {
+        const handled = workflowRuntime.actions.pointerMove({
           point: getCaptureWorkspacePointerPoint(event, derived.selectionBounds),
           button: event.button,
           shiftKey: event.shiftKey,
+          source: 'root',
         });
-        return;
+        if (handled) return;
       }
       editorInput.onRootPointerMove(event);
     },
-    [captureWorkspaceState.status, derived.selectionBounds, editorInput, workflowRuntime],
+    [derived.selectionBounds, editorInput, workflowRuntime],
   );
   const onRootPointerUp = useCallback(
     (event: PointerEvent<HTMLDivElement>) => {
-      if (
-        captureWorkspaceState.status === 'selecting' &&
-        derived.selectionBounds
-      ) {
+      if (derived.selectionBounds) {
         void workflowRuntime.actions.pointerUp({
           point: getCaptureWorkspacePointerPoint(event, derived.selectionBounds),
           button: event.button,
           shiftKey: event.shiftKey,
+          source: 'root',
+        }).then((handled) => {
+          if (!handled) editorInput.onRootPointerUp(event);
         });
         return;
       }
       editorInput.onRootPointerUp(event);
     },
-    [captureWorkspaceState.status, derived.selectionBounds, editorInput, workflowRuntime],
+    [derived.selectionBounds, editorInput, workflowRuntime],
+  );
+  const onPreviewPointerDown = useCallback(
+    (event: PointerEvent<HTMLDivElement>) => {
+      if (
+        derived.selectionBounds &&
+        workflowRuntime.actions.pointerDown({
+          point: getCaptureWorkspacePointerPoint(event, derived.selectionBounds),
+          button: event.button,
+          shiftKey: event.shiftKey,
+          source: 'preview',
+        })
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      editorInput.onPreviewPointerDown(event);
+    },
+    [derived.selectionBounds, editorInput, workflowRuntime],
   );
 
   const magnifierSelection =
@@ -799,7 +793,7 @@ export function useCaptureWorkspaceController({
       onRootPointerMove,
       onRootPointerUp,
       onRootWheel: editorInput.onRootWheel,
-      onPreviewPointerDown: editorInput.onPreviewPointerDown,
+      onPreviewPointerDown,
       onResizeHandlePointerDown: editorInput.onResizeHandlePointerDown,
       onCommitTextDraft: editorController.actions.commitTextDraft,
       onTextDraftTextChange: editorController.actions.updateTextDraftText,

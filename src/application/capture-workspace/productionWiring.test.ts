@@ -10,6 +10,18 @@ const captureViewRoot = readFileSync(
   'utf8',
 );
 const runtime = readFileSync(new URL('./runtime.ts', import.meta.url), 'utf8');
+const viewSources = Object.entries(
+  import.meta.glob('../../views/CaptureWorkspace/*.{ts,tsx}', {
+    eager: true,
+    import: 'default',
+    query: '?raw',
+  }) as Record<string, string>,
+)
+  .filter(([name]) => !name.endsWith('.test.ts'))
+  .map(([path, source]) => {
+    const parts = path.split('/');
+    return { name: parts[parts.length - 1], source };
+  });
 
 describe('capture workspace production runtime wiring', () => {
   it('routes selecting pointer and keyboard host actions through the application runtime', () => {
@@ -35,5 +47,29 @@ describe('capture workspace production runtime wiring', () => {
     expect(controller).not.toContain('CaptureWorkspaceKeyboardActions');
     expect(controller).not.toContain('pointerContext');
     expect(controller).not.toContain('keyboardActions');
+  });
+
+  it('rejects renamed wide input forwarding modules anywhere in the CaptureWorkspace View', () => {
+    expect(viewSources.map(({ name }) => name)).not.toContain(
+      'useCaptureWorkspaceEditorInput.ts',
+    );
+    expect(
+      viewSources.some(({ source }) =>
+        source.includes('useCaptureWorkspaceEditorInput'),
+      ),
+    ).toBe(false);
+    expect(
+      viewSources
+        .filter(({ name }) => name.startsWith('use'))
+        .filter(({ source }) =>
+          [
+            'CaptureWorkspacePointerActions',
+            'CaptureWorkspaceKeyboardActions',
+            'EditorInputHost',
+            'inputSetters',
+          ].some((token) => source.includes(token)),
+        )
+        .map(({ name }) => name),
+    ).toEqual([]);
   });
 });

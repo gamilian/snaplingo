@@ -168,6 +168,75 @@ export interface CaptureWorkspacePointerContext {
   actions: CaptureWorkspacePointerActions;
 }
 
+export type CaptureWorkspacePointerEditorInputActions =
+  CaptureWorkspacePointerEditorActions &
+    CaptureWorkspacePointerStateActions &
+    Pick<CaptureWorkspacePointerHostActions, 'renderSelectionPreview'>;
+
+export interface CaptureWorkspacePointerEditorContext
+  extends Omit<CaptureWorkspacePointerContext, 'actions'> {
+  actions: CaptureWorkspacePointerEditorInputActions;
+}
+
+function editorPointerContext(
+  context: CaptureWorkspacePointerEditorContext,
+): CaptureWorkspacePointerContext {
+  return {
+    ...context,
+    actions: context.actions as CaptureWorkspacePointerActions,
+  };
+}
+
+export function handleCaptureWorkspaceEditorPointerDown(
+  event: CaptureWorkspacePointerEvent,
+  context: CaptureWorkspacePointerEditorContext,
+) {
+  handleCaptureWorkspacePointerDown(event, editorPointerContext(context));
+}
+
+export function handleCaptureWorkspaceEditorPointerMove(
+  event: CaptureWorkspacePointerEvent,
+  context: CaptureWorkspacePointerEditorContext,
+) {
+  handleCaptureWorkspacePointerMove(event, editorPointerContext(context));
+}
+
+export function handleCaptureWorkspaceEditorPointerUp(
+  event: CaptureWorkspacePointerEvent,
+  context: CaptureWorkspacePointerEditorContext,
+) {
+  handleCaptureWorkspacePointerUp(event, editorPointerContext(context));
+}
+
+export function handleCaptureWorkspaceEditorPreviewPointerDown(
+  event: CaptureWorkspacePointerEvent,
+  context: CaptureWorkspacePointerEditorContext,
+) {
+  handleCaptureWorkspacePreviewPointerDown(
+    event,
+    editorPointerContext(context),
+  );
+}
+
+export function handleCaptureWorkspaceEditorResizePointerDown(
+  handle: SelectionHandle,
+  event: CaptureWorkspacePointerEvent,
+  context: CaptureWorkspacePointerEditorContext,
+) {
+  handleCaptureWorkspaceResizePointerDown(
+    handle,
+    event,
+    editorPointerContext(context),
+  );
+}
+
+export function handleCaptureWorkspaceEditorWheel(
+  event: CaptureWorkspaceWheelEvent,
+  context: CaptureWorkspacePointerEditorContext,
+) {
+  handleCaptureWorkspaceWheel(event, editorPointerContext(context));
+}
+
 export function handleCaptureWorkspacePointerDown(
   event: CaptureWorkspacePointerEvent,
   context: CaptureWorkspacePointerContext,
