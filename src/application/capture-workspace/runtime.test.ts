@@ -51,38 +51,23 @@ describe('capture workspace runtime', () => {
       platform,
       keyboard: {
         target: keyboardTarget.target,
-        onUnhandledKeyDown: (event) => event.preventDefault(),
-        releaseMagnifierRequest: vi.fn(),
-        hasDraftSelectionMoveGesture: () => false,
-        finishDraftSelectionMove: vi.fn(),
-        hasDismissibleLayer: () => false,
       },
     });
     await runtime.actions.connectHost();
     await runtime.actions.startSession('screenshot', 'session-key-listener');
 
     expect(keyboardTarget.dispatch('F5').defaultPrevented).toBe(true);
-    expect(keyboardTarget.dispatch('x').defaultPrevented).toBe(true);
+    await vi.waitFor(() => expect(runtime.renderState.status).toBe('selecting'));
+    await runtime.actions.renderSelectionPreview(selection);
+    expect(keyboardTarget.dispatch('t').defaultPrevented).toBe(true);
   });
 
   it('contains an unexpected rejection from work launched by a synchronous shortcut', async () => {
     const platform = createPlatform();
-    const runtime = createCaptureWorkspaceRuntime({
-      platform,
-      host: {
-        resetInteraction: vi.fn(),
-        resetSession: vi.fn(),
-        applyManualSelection: () => {
-          throw new Error('selection bridge failed');
-        },
-        getAnnotations: () => [],
-        commitTextDraft: () => [],
-        shouldIncludeCursor: () => false,
-        hasTextDraft: () => false,
-        prepareSurface: vi.fn(),
-        getSnapTargetRects: () => [],
-      },
-    });
+    platform.commands.renderCaptureOutput.mockRejectedValue(
+      new Error('selection render failed'),
+    );
+    const runtime = createCaptureWorkspaceRuntime({ platform });
     await runtime.actions.startSession('screenshot', 'session-key-rejection');
 
     expect(runtime.actions.keyDown({ key: 'a', metaKey: true })).toBe(true);
@@ -90,7 +75,7 @@ describe('capture workspace runtime', () => {
     await vi.waitFor(() =>
       expect(runtime.renderState).toMatchObject({
         status: 'error',
-        error: 'selection bridge failed',
+        error: 'selection render failed',
       }),
     );
   });
@@ -146,11 +131,6 @@ describe('capture workspace runtime', () => {
       platform,
       keyboard: {
         target: keyboardTarget.target,
-        onUnhandledKeyDown: vi.fn(),
-        releaseMagnifierRequest: vi.fn(),
-        hasDraftSelectionMoveGesture: () => false,
-        finishDraftSelectionMove: vi.fn(),
-        hasDismissibleLayer: () => false,
       },
     });
 
@@ -165,31 +145,28 @@ describe('capture workspace runtime', () => {
 
   it('handles native preview copy through runtime-owned completion effects', async () => {
     const annotation = {
-      type: 'rectangle' as const,
-      rect: { x: 1, y: 2, width: 10, height: 20 },
+      type: 'text' as const,
+      position: { x: 10, y: 10 },
+      text: 'SnapLingo',
       color: [255, 0, 0, 255] as [number, number, number, number],
-      stroke_width: 2,
-      filled: false,
+      font_size: 24,
     };
     const platform = createPlatform({
       session: createSession({ id: 'session-native-copy' }),
     });
-    const runtime = createCaptureWorkspaceRuntime({
-      platform,
-      host: {
-        resetInteraction: vi.fn(),
-        resetSession: vi.fn(),
-        applyManualSelection: vi.fn(),
-        getAnnotations: () => [],
-        commitTextDraft: () => [annotation],
-        shouldIncludeCursor: () => true,
-        hasTextDraft: () => false,
-        prepareSurface: vi.fn(),
-        getSnapTargetRects: () => [],
-      },
-    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
     await runtime.actions.startSession('screenshot', 'session-native-copy');
     await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.applySelectedAnnotationStyle(
+      { color: [255, 0, 0, 255], strokeWidth: 2, filled: false },
+      24,
+    );
+    runtime.actions.toggleAnnotationTool('text');
+    runtime.actions.pointerDown({
+      point: { x: 30, y: 40 },
+      source: 'preview',
+    });
+    runtime.actions.updateTextDraftText('SnapLingo');
     await runtime.actions.connectHost();
 
     const copy = platform.onCopyRequested.mock.calls[0]?.[0];
@@ -199,7 +176,6 @@ describe('capture workspace runtime', () => {
       sessionId: 'session-native-copy',
       rect: selection,
       annotations: [annotation],
-      includeCursor: true,
       action: { type: 'copy' },
     });
     expect(platform.dismiss).toHaveBeenCalledTimes(1);
@@ -218,13 +194,7 @@ describe('capture workspace runtime', () => {
       host: {
         resetInteraction: vi.fn(),
         resetSession: vi.fn(),
-        applyManualSelection: vi.fn(),
-        getAnnotations: () => [],
-        commitTextDraft: () => [],
-        shouldIncludeCursor: () => false,
-        hasTextDraft: () => false,
         prepareSurface,
-        getSnapTargetRects: () => [],
       },
     });
 
@@ -568,6 +538,207 @@ describe('capture workspace runtime', () => {
         annotations: [],
         action: { type: 'copy' },
       });
+    });
+  });
+
+  it('owns annotation draw and preview commit transactions', async () => {
+    const platform = createPlatform({
+      session: createSession({ id: 'session-editor-draw' }),
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession('screenshot', 'session-editor-draw');
+    await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.toggleAnnotationTool('rectangle');
+
+    expect(
+      runtime.actions.pointerDown({
+        point: { x: 30, y: 40 },
+        source: 'preview',
+      }),
+    ).toBe(true);
+    expect(
+      runtime.actions.pointerMove({
+        point: { x: 70, y: 80 },
+        source: 'preview',
+      }),
+    ).toBe(true);
+    await expect(
+      runtime.actions.pointerUp({
+        point: { x: 70, y: 80 },
+        source: 'preview',
+      }),
+    ).resolves.toBe(true);
+
+    expect(runtime.renderState.annotationHistory.annotations).toEqual([
+      {
+        type: 'rectangle',
+        rect: { x: 10, y: 10, width: 40, height: 40 },
+        color: [255, 77, 79, 255],
+        stroke_width: 2,
+        filled: false,
+      },
+    ]);
+    expect(platform.commands.renderCaptureOutput).toHaveBeenLastCalledWith({
+      sessionId: 'session-editor-draw',
+      rect: selection,
+      annotations: runtime.renderState.annotationHistory.annotations,
+    });
+  });
+
+  it('owns text draft, style, undo, and redo transactions', async () => {
+    const platform = createPlatform({
+      session: createSession({ id: 'session-editor-text' }),
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession('screenshot', 'session-editor-text');
+    await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.applySelectedAnnotationStyle(
+      { color: [24, 144, 255, 255], strokeWidth: 4, filled: false },
+      30,
+    );
+    runtime.actions.toggleAnnotationTool('text');
+    runtime.actions.pointerDown({
+      point: { x: 50, y: 60 },
+      source: 'preview',
+    });
+    runtime.actions.updateTextDraftText('runtime text');
+    runtime.actions.commitTextDraft();
+
+    expect(runtime.renderState.textDraft).toBeNull();
+    expect(runtime.renderState.annotationHistory.annotations).toEqual([
+      {
+        type: 'text',
+        position: { x: 30, y: 30 },
+        text: 'runtime text',
+        color: [24, 144, 255, 255],
+        font_size: 30,
+      },
+    ]);
+
+    await vi.waitFor(() =>
+      expect(runtime.renderState.isRenderingOutput).toBe(false),
+    );
+    expect(runtime.actions.keyDown({ key: 'z', metaKey: true })).toBe(true);
+    expect(runtime.renderState.annotationHistory.annotations).toEqual([]);
+    await vi.waitFor(() =>
+      expect(runtime.renderState.isRenderingOutput).toBe(false),
+    );
+    expect(runtime.actions.keyDown({ key: 'y', metaKey: true })).toBe(true);
+    expect(runtime.renderState.annotationHistory.annotations).toHaveLength(1);
+  });
+
+  it('owns selection move and resize edit transactions', async () => {
+    const platform = createPlatform({
+      session: createSession({ id: 'session-editor-selection' }),
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession(
+      'screenshot',
+      'session-editor-selection',
+    );
+    await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.pointerDown({
+      point: { x: 40, y: 50 },
+      source: 'preview',
+    });
+    runtime.actions.pointerMove({ point: { x: 55, y: 65 }, source: 'root' });
+    await runtime.actions.pointerUp({
+      point: { x: 55, y: 65 },
+      source: 'root',
+    });
+
+    expect(runtime.renderState.selection).toEqual({
+      x: 35,
+      y: 45,
+      width: 120,
+      height: 80,
+    });
+    await vi.waitFor(() =>
+      expect(runtime.renderState.isRenderingOutput).toBe(false),
+    );
+
+    expect(
+      runtime.actions.resizePointerDown('se', {
+        point: { x: 155, y: 125 },
+        source: 'preview',
+      }),
+    ).toBe(true);
+    runtime.actions.pointerMove({ point: { x: 175, y: 140 }, source: 'root' });
+    await runtime.actions.pointerUp({
+      point: { x: 175, y: 140 },
+      source: 'root',
+    });
+
+    expect(runtime.renderState.selection).toEqual({
+      x: 35,
+      y: 45,
+      width: 140,
+      height: 95,
+    });
+  });
+
+  it('owns delete, erase, clear, and preview failure state', async () => {
+    const platform = createPlatform({
+      session: createSession({ id: 'session-editor-delete' }),
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession('screenshot', 'session-editor-delete');
+    await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.toggleAnnotationTool('rectangle');
+    runtime.actions.pointerDown({ point: { x: 30, y: 40 }, source: 'preview' });
+    runtime.actions.pointerMove({ point: { x: 70, y: 80 }, source: 'root' });
+    await runtime.actions.pointerUp({ point: { x: 70, y: 80 }, source: 'root' });
+    await vi.waitFor(() =>
+      expect(runtime.renderState.isRenderingOutput).toBe(false),
+    );
+
+    runtime.actions.selectMoveTool();
+    runtime.actions.pointerDown({ point: { x: 45, y: 55 }, source: 'preview' });
+    expect(runtime.actions.keyDown({ key: 'Delete' })).toBe(true);
+    expect(runtime.renderState.annotationHistory.annotations).toEqual([]);
+
+    runtime.actions.toggleAnnotationTool('rectangle');
+    runtime.actions.pointerDown({ point: { x: 30, y: 40 }, source: 'preview' });
+    runtime.actions.pointerMove({ point: { x: 70, y: 80 }, source: 'root' });
+    await runtime.actions.pointerUp({ point: { x: 70, y: 80 }, source: 'root' });
+    await vi.waitFor(() =>
+      expect(runtime.renderState.isRenderingOutput).toBe(false),
+    );
+    runtime.actions.toggleAnnotationTool('eraser');
+    runtime.actions.pointerDown({ point: { x: 45, y: 55 }, source: 'preview' });
+    expect(runtime.renderState.annotationHistory.annotations).toEqual([]);
+    await vi.waitFor(() =>
+      expect(runtime.renderState.isRenderingOutput).toBe(false),
+    );
+
+    runtime.actions.toggleAnnotationTool('rectangle');
+    runtime.actions.pointerDown({ point: { x: 30, y: 40 }, source: 'preview' });
+    runtime.actions.pointerMove({ point: { x: 70, y: 80 }, source: 'root' });
+    await runtime.actions.pointerUp({ point: { x: 70, y: 80 }, source: 'root' });
+    await vi.waitFor(() =>
+      expect(runtime.renderState.isRenderingOutput).toBe(false),
+    );
+    expect(
+      runtime.actions.keyDown({ key: 'z', metaKey: true, shiftKey: true }),
+    ).toBe(true);
+    expect(runtime.renderState.annotationHistory.annotations).toEqual([]);
+    await vi.waitFor(() =>
+      expect(runtime.renderState.isRenderingOutput).toBe(false),
+    );
+
+    platform.commands.renderCaptureOutput.mockRejectedValueOnce(
+      new Error('editor preview failed'),
+    );
+    await runtime.actions.renderSelectionPreview(selection);
+    expect(runtime.renderState).toMatchObject({
+      status: 'error',
+      selection,
+      isRenderingOutput: false,
+      error: 'editor preview failed',
     });
   });
 

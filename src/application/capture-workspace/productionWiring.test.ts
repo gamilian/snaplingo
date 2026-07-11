@@ -22,6 +22,10 @@ const deletedEditorInput = new URL(
   '../../views/CaptureWorkspace/useCaptureWorkspaceEditorInput.ts',
   import.meta.url,
 );
+const deletedEditorController = new URL(
+  '../../views/CaptureWorkspace/useCaptureWorkspaceEditorController.ts',
+  import.meta.url,
+);
 const viewSources = Object.entries(
   import.meta.glob('../../views/CaptureWorkspace/*.{ts,tsx}', {
     eager: true,
@@ -102,6 +106,37 @@ describe('capture workspace production runtime wiring', () => {
         )
         .map(({ name }) => name),
     ).toEqual([]);
+  });
+
+  it('deletes the editor controller without rebuilding an equivalent forwarding hook', () => {
+    expect(() => readFileSync(deletedEditorController, 'utf8')).toThrow();
+    expect(viewSources.map(({ name }) => name)).not.toContain(
+      'useCaptureWorkspaceEditorController.ts',
+    );
+    expect(controller).not.toContain('useCaptureWorkspaceEditorController');
+    expect(controller).not.toContain('editorController');
+    expect(controller).not.toContain('editorSetters');
+    expect(controller).not.toContain('editorInput');
+    expect(
+      viewSources
+        .filter(({ name, source }) =>
+          name.includes('EditorController') ||
+          [
+            'editorController',
+            'editorSetters',
+            'editorInput',
+            'EditorInputActions',
+          ].some((token) => source.includes(token)),
+        )
+        .map(({ name }) => name),
+    ).toEqual([]);
+    expect(controller).toContain('workflowRuntime.actions.toggleAnnotationTool');
+    expect(controller).toContain('workflowRuntime.actions.commitTextDraft');
+    expect(controller).toContain('workflowRuntime.actions.resizePointerDown');
+    expect(controller).toContain('workflowRuntime.actions.wheel');
+    expect(runtime).toContain('handleCaptureWorkspaceEditorKeyDown');
+    expect(runtime).toContain('handleCaptureWorkspaceEditorPreviewPointerDown');
+    expect(runtime).toContain('commitCaptureEditorTextDraft');
   });
 
   it('keeps selecting keyboard workflows out of the editor-only handler', () => {

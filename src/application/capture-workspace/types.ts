@@ -10,6 +10,29 @@ import type {
   HoverSelectionCompletionAction,
   PreviewCaptureCompletionAction,
 } from '../../views/CaptureWorkspace/captureActions';
+import type {
+  AnnotationHistory,
+} from '../../views/CaptureWorkspace/annotationHistory';
+import type {
+  AnnotationGestureDraft,
+  AnnotationStyle,
+  AnnotationTool,
+} from '../../views/CaptureWorkspace/annotationStyle';
+import type {
+  CaptureAnnotationMoveGesture,
+} from '../../views/CaptureWorkspace/captureEditorRuntime';
+import type {
+  CaptureDraftSelectionMoveGesture,
+  CaptureSelectionEditGesture,
+} from '../../views/CaptureWorkspace/captureSelectionRuntime';
+import type {
+  ColorSample,
+  ColorSampleFormat,
+} from '../../views/CaptureWorkspace/colorSampler';
+import type { SelectionHandle } from '../../views/CaptureWorkspace/selection';
+import type {
+  TextAnnotationDraft,
+} from '../../views/CaptureWorkspace/textAnnotationDraft';
 import type { CaptureWorkspaceCommandsPort } from './ports';
 
 export type CaptureWorkspaceRuntimeStatus =
@@ -29,6 +52,22 @@ export interface CaptureWorkspaceRenderState {
   readonly selection: LogicalRect | null;
   readonly hoverSelection: LogicalRect | null;
   readonly previewImageBase64: string | null;
+  readonly editGesture: CaptureSelectionEditGesture | null;
+  readonly activeAnnotationTool: AnnotationTool | null;
+  readonly annotationGesture: AnnotationGestureDraft | null;
+  readonly draftAnnotation: AnnotationCommand | null;
+  readonly selectedAnnotationIndex: number | null;
+  readonly annotationMoveGesture: CaptureAnnotationMoveGesture | null;
+  readonly draftSelectionMoveGesture: CaptureDraftSelectionMoveGesture | null;
+  readonly textDraft: TextAnnotationDraft | null;
+  readonly textDraftAnnotationIndex: number | null;
+  readonly annotationStyle: AnnotationStyle;
+  readonly textFontSize: number;
+  readonly annotationHistory: AnnotationHistory;
+  readonly isAnnotationToolbarVisible: boolean;
+  readonly cursorColor: ColorSample | null;
+  readonly colorSampleFormat: ColorSampleFormat;
+  readonly isMagnifierRequested: boolean;
   readonly includeCapturedCursor: boolean;
   readonly isRenderingOutput: boolean;
   readonly hasHydratedPixelSource: boolean;
@@ -61,6 +100,22 @@ export interface CaptureWorkspaceRuntimeActions {
   pointerDown(input: Point | CaptureWorkspacePointerInput): boolean;
   pointerMove(input: Point | CaptureWorkspacePointerInput): boolean;
   pointerUp(input: Point | CaptureWorkspacePointerInput): Promise<boolean>;
+  resizePointerDown(
+    handle: SelectionHandle,
+    input: Point | CaptureWorkspacePointerInput,
+  ): boolean;
+  wheel(input: CaptureWorkspaceWheelInput): boolean;
+  commitTextDraft(): void;
+  updateTextDraftText(text: string): void;
+  discardTextDraft(): void;
+  selectMoveTool(): void;
+  toggleAnnotationTool(tool: AnnotationTool): void;
+  applySelectedAnnotationStyle(
+    style: AnnotationStyle,
+    textFontSize: number,
+  ): void;
+  updateTextDraftFontSize(fontSize: number): void;
+  updateCursorColor(color: ColorSample | null): void;
   updatePolledCursor(point: Point): void;
   updatePolledHover(selection: LogicalRect | null): void;
   keyDown(event: CaptureWorkspaceKeyInput): boolean;
@@ -76,6 +131,13 @@ export interface CaptureWorkspacePointerInput {
   altKey?: boolean;
   shiftKey?: boolean;
   source?: 'root' | 'preview';
+}
+
+export interface CaptureWorkspaceWheelInput {
+  deltaY: number;
+  metaKey?: boolean;
+  ctrlKey?: boolean;
+  altKey?: boolean;
 }
 
 export interface CaptureWorkspaceKeyInput {
@@ -95,6 +157,9 @@ export interface CaptureWorkspaceRuntime {
 
 export interface CaptureWorkspaceRuntimePlatform {
   commands: CaptureWorkspaceCommandsPort;
+  clipboard: {
+    copyText(text: string): Promise<void>;
+  };
   onCancelRequested(handler: () => void | Promise<void>): Promise<() => void>;
   onCopyRequested(handler: () => void | Promise<void>): Promise<() => void>;
   onHotkeyTriggered(
