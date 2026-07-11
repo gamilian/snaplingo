@@ -260,7 +260,7 @@ export function CaptureWorkspaceView({
         <div className="absolute inset-0 bg-black" aria-label="Loading capture" />
       )}
 
-      {renderState.status === 'error' && (
+      {renderState.error && (
         <div className="absolute left-4 top-4 max-w-md rounded bg-red-950/90 px-3 py-2 text-sm text-red-100 shadow-lg">
           {renderState.error}
         </div>

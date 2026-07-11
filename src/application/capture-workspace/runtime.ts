@@ -191,6 +191,15 @@ interface CaptureFrontendPerfState {
   hasLoggedImagesReady: boolean;
 }
 
+interface RuntimeReplacementSnapshot {
+  state: RuntimeState;
+  hydratedSessionId: string | null;
+  hasRevealed: boolean;
+  perfState: CaptureFrontendPerfState | null;
+  hasKeyboardAdjustedDraft: boolean;
+  keyboardEditCursorPoint: Point | null;
+}
+
 export function createCaptureWorkspaceRuntime({
   platform,
   host,
@@ -276,6 +285,40 @@ export function createCaptureWorkspaceRuntime({
     nativeSessionCancellations.set(sessionId, cancellation);
     void cancellation.catch(() => undefined);
     return cancellation;
+  };
+
+  const captureReplacementSnapshot = (): RuntimeReplacementSnapshot => ({
+    state,
+    hydratedSessionId,
+    hasRevealed,
+    perfState: perfState ? { ...perfState } : null,
+    hasKeyboardAdjustedDraft,
+    keyboardEditCursorPoint: keyboardEditCursorPointRef.current,
+  });
+
+  const restoreReplacementSnapshot = (
+    snapshot: RuntimeReplacementSnapshot,
+    error: unknown,
+  ) => {
+    state = {
+      ...snapshot.state,
+      isRenderingOutput: false,
+      error: errorMessage(error),
+    };
+    cursorPointRef.current = state.cursorPoint;
+    keyboardEditCursorPointRef.current = snapshot.keyboardEditCursorPoint;
+    hydratedSessionId = snapshot.hydratedSessionId;
+    snapshotHydration = null;
+    hasRevealed = snapshot.hasRevealed;
+    revealAttempt = null;
+    perfState = snapshot.perfState;
+    hasKeyboardAdjustedDraft = snapshot.hasKeyboardAdjustedDraft;
+    listeners.forEach((listener) => listener());
+    try {
+      host?.scheduleSelectionOverlayPaint?.();
+    } catch {
+      // The restored runtime state remains authoritative if the old DOM is gone.
+    }
   };
 
   const markPerf = (event: string, sessionId?: string | null) => {
@@ -1264,7 +1307,19 @@ export function createCaptureWorkspaceRuntime({
     async startSession(mode, requestedSessionId) {
       if (disposed) return;
       const previousSessionId = state.session?.id ?? null;
+      const previousSnapshot = previousSessionId
+        ? captureReplacementSnapshot()
+        : null;
       if (previousSessionId) provisionalSessionIds.add(previousSessionId);
+      const cancelStalePrevious = async () => {
+        if (
+          !previousSessionId ||
+          !provisionalSessionIds.delete(previousSessionId)
+        ) {
+          return;
+        }
+        await cancelNativeSessionOnce(previousSessionId).catch(() => undefined);
+      };
       const actionGeneration = ++generation;
       detachPreviewScheduler();
       terminalOutputOperation = null;
@@ -1295,13 +1350,13 @@ export function createCaptureWorkspaceRuntime({
         if (generation !== actionGeneration) {
           provisionalSessionIds.delete(session.id);
           await cancelNativeSessionOnce(session.id).catch(() => undefined);
+          await cancelStalePrevious();
           return;
         }
         if (previousSessionId && previousSessionId !== session.id) {
           try {
             await cancelNativeSessionOnce(previousSessionId);
           } catch (error) {
-            provisionalSessionIds.delete(previousSessionId);
             provisionalSessionIds.delete(session.id);
             await cancelNativeSessionOnce(session.id).catch(() => undefined);
             throw error;
@@ -1310,6 +1365,7 @@ export function createCaptureWorkspaceRuntime({
           if (generation !== actionGeneration) {
             provisionalSessionIds.delete(session.id);
             await cancelNativeSessionOnce(session.id).catch(() => undefined);
+            await cancelStalePrevious();
             return;
           }
         }
@@ -1324,6 +1380,7 @@ export function createCaptureWorkspaceRuntime({
         if (generation !== actionGeneration) {
           provisionalSessionIds.delete(session.id);
           await cancelNativeSessionOnce(session.id).catch(() => undefined);
+          await cancelStalePrevious();
           return;
         }
 
@@ -1341,7 +1398,17 @@ export function createCaptureWorkspaceRuntime({
         });
       } catch (error) {
         if (generation === actionGeneration) {
-          patch({ status: 'error', error: errorMessage(error) });
+          if (
+            previousSessionId &&
+            previousSnapshot &&
+            provisionalSessionIds.delete(previousSessionId)
+          ) {
+            restoreReplacementSnapshot(previousSnapshot, error);
+          } else {
+            patch({ status: 'error', error: errorMessage(error) });
+          }
+        } else {
+          await cancelStalePrevious();
         }
       }
     },
@@ -1350,7 +1417,12 @@ export function createCaptureWorkspaceRuntime({
       if (disposed) return;
       const previousSessionId = state.session?.id;
       if (!previousSessionId) return;
+      const previousSnapshot = captureReplacementSnapshot();
       provisionalSessionIds.add(previousSessionId);
+      const cancelStalePrevious = async () => {
+        if (!provisionalSessionIds.delete(previousSessionId)) return;
+        await cancelNativeSessionOnce(previousSessionId).catch(() => undefined);
+      };
       const actionGeneration = ++generation;
       detachPreviewScheduler();
       terminalOutputOperation = null;
@@ -1374,13 +1446,19 @@ export function createCaptureWorkspaceRuntime({
         provisionalSessionIds.add(session.id);
         await cancelNativeSessionOnce(previousSessionId);
         provisionalSessionIds.delete(previousSessionId);
-        if (generation !== actionGeneration) return;
+        if (generation !== actionGeneration) {
+          await cancelStalePrevious();
+          return;
+        }
         const cursorPoint =
           session.captured_cursor?.logical_position ??
           (await platform.commands
             .currentCaptureCursorPosition(session.id)
             .catch(() => null));
-        if (generation !== actionGeneration) return;
+        if (generation !== actionGeneration) {
+          await cancelStalePrevious();
+          return;
+        }
         adoptedCreatedSession = true;
         provisionalSessionIds.delete(session.id);
         patch({
@@ -1396,7 +1474,13 @@ export function createCaptureWorkspaceRuntime({
         });
       } catch (error) {
         if (generation === actionGeneration) {
-          patch({ status: 'error', error: errorMessage(error) });
+          if (provisionalSessionIds.delete(previousSessionId)) {
+            restoreReplacementSnapshot(previousSnapshot, error);
+          } else {
+            patch({ status: 'error', error: errorMessage(error) });
+          }
+        } else {
+          await cancelStalePrevious();
         }
       } finally {
         if (createdSession && !adoptedCreatedSession) {

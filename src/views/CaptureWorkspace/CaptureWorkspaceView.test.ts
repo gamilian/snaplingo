@@ -246,6 +246,31 @@ describe('CaptureWorkspaceView runtime seam', () => {
       selection,
     );
   });
+
+  it('keeps a restored preview usable while showing its replacement error', async () => {
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    mountedRoots.push({ container, root });
+    const renderState = {
+      ...createRenderState(),
+      error: 'replacement load failed',
+    };
+
+    await act(async () => {
+      root.render(
+        createElement(CaptureWorkspaceView, {
+          renderState,
+          actions: createActions(),
+        }),
+      );
+    });
+
+    expect(container.textContent).toContain('replacement load failed');
+    expect(
+      container.querySelector('button[aria-label="Copy selection"]'),
+    ).not.toBeNull();
+  });
 });
 
 function createRenderState(): CaptureWorkspaceViewRenderState {
