@@ -1,15 +1,27 @@
 import { create } from 'zustand';
-import {
-  getSettingsSnapshot as loadSettingsSnapshot,
-  updateGeneralSettings as persistGeneralSettings,
-  updateScreenshotSettings as persistScreenshotSettings,
-  updateTranslationSettings as persistTranslationSettings,
-} from '../tauri/settings';
+import type { SettingsRuntime } from '../application/settings/runtime';
+import type {
+  GeneralSettings,
+  ScreenshotSettings,
+  SettingsSnapshot,
+  TranslationSettings,
+} from '../application/settings/ports';
 
-type SettingsSnapshot = Awaited<ReturnType<typeof loadSettingsSnapshot>>;
-type GeneralSettings = SettingsSnapshot['general'];
-type ScreenshotSettings = SettingsSnapshot['screenshot'];
-type TranslationSettings = SettingsSnapshot['translation'];
+type DurableSettingsRuntime = SettingsRuntime['durableSettings'];
+
+let durableSettingsRuntime: DurableSettingsRuntime | null = null;
+
+export function initializeSettingsConfigStore(runtime: DurableSettingsRuntime) {
+  durableSettingsRuntime = runtime;
+}
+
+function settingsRuntime() {
+  if (!durableSettingsRuntime) {
+    throw new Error('Settings config store runtime has not been initialized');
+  }
+
+  return durableSettingsRuntime;
+}
 
 const LEGACY_STORAGE_KEY = 'snaplingo-settings';
 const DURABLE_LEGACY_KEYS = [
@@ -133,7 +145,7 @@ async function migrateLegacyDurableSettings(snapshot: SettingsSnapshot) {
     hasString(state.theme) ||
     hasBoolean(state.startOnBoot)
   ) {
-    nextSnapshot = await persistGeneralSettings({
+    nextSnapshot = await settingsRuntime().updateGeneral({
       language: hasString(state.language) ? state.language : nextSnapshot.general.language,
       theme: hasString(state.theme) ? state.theme : nextSnapshot.general.theme,
       startOnBoot: hasBoolean(state.startOnBoot)
@@ -148,7 +160,7 @@ async function migrateLegacyDurableSettings(snapshot: SettingsSnapshot) {
     hasString(state.screenshotFormat) ||
     hasNumber(state.screenshotQuality)
   ) {
-    nextSnapshot = await persistScreenshotSettings({
+    nextSnapshot = await settingsRuntime().updateScreenshot({
       savePath: hasString(state.screenshotSavePath)
         ? state.screenshotSavePath
         : nextSnapshot.screenshot.savePath,
@@ -166,7 +178,7 @@ async function migrateLegacyDurableSettings(snapshot: SettingsSnapshot) {
     hasString(state.defaultSourceLang) ||
     hasString(state.defaultTargetLang)
   ) {
-    nextSnapshot = await persistTranslationSettings({
+    nextSnapshot = await settingsRuntime().updateTranslation({
       defaultSourceLang: hasString(state.defaultSourceLang)
         ? state.defaultSourceLang
         : nextSnapshot.translation.defaultSourceLang,
@@ -196,23 +208,23 @@ export const useSettingsConfigStore = create<SettingsConfigState>((set, get) => 
       return existingSnapshot;
     }
 
-    let snapshot = await loadSettingsSnapshot();
+    let snapshot = await settingsRuntime().load();
     snapshot = await migrateLegacyDurableSettings(snapshot);
     applySnapshot(set, snapshot);
     return snapshot;
   },
   updateGeneralSettings: async (input) => {
-    const snapshot = await persistGeneralSettings(input);
+    const snapshot = await settingsRuntime().updateGeneral(input);
     applySnapshot(set, snapshot);
     return snapshot;
   },
   updateScreenshotSettings: async (input) => {
-    const snapshot = await persistScreenshotSettings(input);
+    const snapshot = await settingsRuntime().updateScreenshot(input);
     applySnapshot(set, snapshot);
     return snapshot;
   },
   updateTranslationSettings: async (input) => {
-    const snapshot = await persistTranslationSettings(input);
+    const snapshot = await settingsRuntime().updateTranslation(input);
     applySnapshot(set, snapshot);
     return snapshot;
   },

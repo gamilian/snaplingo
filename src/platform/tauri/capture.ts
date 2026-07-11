@@ -1,36 +1,17 @@
 import { invoke } from '@tauri-apps/api/core';
 import type {
-  AnnotationCommand,
   CaptureMode,
   CaptureSessionView,
   LogicalRect,
   OcrResult,
   Point,
 } from '../../domain/capture';
-
-export type CaptureOutputAction =
-  | { type: 'copy' }
-  | { type: 'save'; path: string }
-  | { type: 'pin' };
-
-export interface RenderCaptureOutputInput {
-  sessionId: string;
-  rect: LogicalRect;
-  annotations: AnnotationCommand[];
-  includeCursor?: boolean;
-}
-
-export interface OutputCaptureInput extends RenderCaptureOutputInput {
-  action: CaptureOutputAction;
-}
-
-export interface CaptureResultWindowPayload {
-  mode: 'translation' | 'ocr';
-  text: string;
-  autoTranslate: boolean;
-  ocrIntent?: 'show' | 'display-text' | 'file';
-  imageBase64?: string;
-}
+import type {
+  CaptureWorkspaceCommandsPort,
+  OutputCaptureInput,
+  RenderCaptureOutputInput,
+} from '../../application/capture-workspace/ports';
+import type { CaptureResultWindowPayload } from '../../application/result-window/ports';
 
 function captureOutputArgs(input: RenderCaptureOutputInput) {
   return {
@@ -151,3 +132,21 @@ export async function copyTextToClipboard(text: string) {
 export async function triggerScreenshot() {
   return invoke<void>('trigger_screenshot');
 }
+
+export const captureWorkspaceCommands: CaptureWorkspaceCommandsPort = {
+  createCaptureSession,
+  getCaptureSession,
+  hydrateCaptureSessionSnapshots,
+  logCaptureFrontendPerf,
+  currentCaptureCursorPosition,
+  cancelCaptureSession,
+  restoreCaptureSnapshotWindowsForSession,
+  renderCaptureOutput,
+  defaultCaptureSavePath,
+  quickCaptureSavePath,
+  outputCapture,
+  runCaptureOcr,
+  openCaptureOcrResultWindow,
+  openCaptureTranslationResultWindow,
+  copyTextToClipboard,
+};

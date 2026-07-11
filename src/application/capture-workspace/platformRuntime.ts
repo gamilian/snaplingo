@@ -1,5 +1,7 @@
 import type {
   CaptureHotkeyHandler,
+  CaptureWorkspaceClipboardPort,
+  CaptureWorkspaceCommandsPort,
   CaptureWindowPort,
   CaptureWorkspaceEventsPort,
   CaptureWorkspaceRequestHandler,
@@ -7,6 +9,10 @@ import type {
 } from './ports';
 
 export interface CaptureWorkspacePlatformRuntime {
+  commands: CaptureWorkspaceCommandsPort;
+  clipboard: {
+    copyText(text: string): Promise<void>;
+  };
   onCancelRequested(
     handler: CaptureWorkspaceRequestHandler,
   ): Promise<CaptureWorkspaceUnsubscribe>;
@@ -22,6 +28,8 @@ export interface CaptureWorkspacePlatformRuntime {
 }
 
 interface CaptureWorkspacePlatformPorts {
+  commands: CaptureWorkspaceCommandsPort;
+  clipboard: CaptureWorkspaceClipboardPort;
   events: CaptureWorkspaceEventsPort;
   window: CaptureWindowPort;
 }
@@ -30,6 +38,10 @@ export function createCaptureWorkspacePlatformRuntime(
   ports: CaptureWorkspacePlatformPorts,
 ): CaptureWorkspacePlatformRuntime {
   return {
+    commands: ports.commands,
+    clipboard: {
+      copyText: (text) => ports.clipboard.writeText(text),
+    },
     onCancelRequested: (handler) =>
       ports.events.subscribeCaptureCancel(handler),
     onCopyRequested: (handler) => ports.events.subscribeCaptureCopy(handler),

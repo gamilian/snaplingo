@@ -1,13 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const settingsApi = vi.hoisted(() => ({
-  getSettingsSnapshot: vi.fn(),
-  updateGeneralSettings: vi.fn(),
-  updateScreenshotSettings: vi.fn(),
-  updateTranslationSettings: vi.fn(),
+const settingsRuntime = vi.hoisted(() => ({
+  load: vi.fn(),
+  updateGeneral: vi.fn(),
+  updateScreenshot: vi.fn(),
+  updateTranslation: vi.fn(),
 }));
-
-vi.mock('../tauri/settings', () => settingsApi);
 
 const backendSnapshot = {
   general: {
@@ -70,16 +68,18 @@ describe('settingsConfigStore', () => {
       value: createMemoryStorage(),
     });
     localStorage.clear();
-    settingsApi.getSettingsSnapshot.mockResolvedValue(structuredClone(backendSnapshot));
+    settingsRuntime.load.mockResolvedValue(structuredClone(backendSnapshot));
   });
 
   it('hydrates once from the backend snapshot', async () => {
-    const { useSettingsConfigStore } = await import('./settingsConfigStore');
+    const { initializeSettingsConfigStore, useSettingsConfigStore } =
+      await import('./settingsConfigStore');
+    initializeSettingsConfigStore(settingsRuntime);
 
     await useSettingsConfigStore.getState().hydrate();
     await useSettingsConfigStore.getState().hydrate();
 
-    expect(settingsApi.getSettingsSnapshot).toHaveBeenCalledTimes(1);
+    expect(settingsRuntime.load).toHaveBeenCalledTimes(1);
     expect(useSettingsConfigStore.getState()).toMatchObject({
       hydrated: true,
       general: backendSnapshot.general,
@@ -89,7 +89,7 @@ describe('settingsConfigStore', () => {
   });
 
   it('migrates legacy durable values once and clears only migrated keys', async () => {
-    settingsApi.updateGeneralSettings.mockResolvedValueOnce({
+    settingsRuntime.updateGeneral.mockResolvedValueOnce({
       ...backendSnapshot,
       general: {
         language: 'en',
@@ -97,7 +97,7 @@ describe('settingsConfigStore', () => {
         startOnBoot: true,
       },
     });
-    settingsApi.updateScreenshotSettings.mockResolvedValueOnce({
+    settingsRuntime.updateScreenshot.mockResolvedValueOnce({
       ...backendSnapshot,
       general: {
         language: 'en',
@@ -110,7 +110,7 @@ describe('settingsConfigStore', () => {
         quality: 81,
       },
     });
-    settingsApi.updateTranslationSettings.mockResolvedValueOnce({
+    settingsRuntime.updateTranslation.mockResolvedValueOnce({
       general: {
         language: 'en',
         theme: 'dark',
@@ -145,23 +145,25 @@ describe('settingsConfigStore', () => {
       defaultTargetLang: 'fr',
     });
 
-    const { useSettingsConfigStore } = await import('./settingsConfigStore');
+    const { initializeSettingsConfigStore, useSettingsConfigStore } =
+      await import('./settingsConfigStore');
+    initializeSettingsConfigStore(settingsRuntime);
 
     await useSettingsConfigStore.getState().hydrate();
     await useSettingsConfigStore.getState().hydrate();
 
-    expect(settingsApi.getSettingsSnapshot).toHaveBeenCalledTimes(1);
-    expect(settingsApi.updateGeneralSettings).toHaveBeenCalledWith({
+    expect(settingsRuntime.load).toHaveBeenCalledTimes(1);
+    expect(settingsRuntime.updateGeneral).toHaveBeenCalledWith({
       language: 'en',
       theme: 'dark',
       startOnBoot: true,
     });
-    expect(settingsApi.updateScreenshotSettings).toHaveBeenCalledWith({
+    expect(settingsRuntime.updateScreenshot).toHaveBeenCalledWith({
       savePath: '~/legacy-captures',
       format: 'jpg',
       quality: 81,
     });
-    expect(settingsApi.updateTranslationSettings).toHaveBeenCalledWith({
+    expect(settingsRuntime.updateTranslation).toHaveBeenCalledWith({
       defaultSourceLang: 'ja',
       defaultTargetLang: 'fr',
     });

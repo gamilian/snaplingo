@@ -1,17 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const providerApi = vi.hoisted(() => ({
-  listTranslationProviders: vi.fn(),
-}));
-
-vi.mock('../tauri/providers', () => ({
-  listTranslationProviders: providerApi.listTranslationProviders,
+const providersRuntime = vi.hoisted(() => ({
+  listTranslation: vi.fn(),
 }));
 
 describe('active translation providers for translation sessions', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
-    const { useProviderStore } = await import('../stores/providerStore');
+    const { initializeProviderStore, useProviderStore } =
+      await import('../stores/providerStore');
+    initializeProviderStore(providersRuntime as never);
     useProviderStore.setState({
       translationProviders: [],
       activeTranslationProviders: [],
@@ -24,31 +22,45 @@ describe('active translation providers for translation sessions', () => {
     useProviderStore.setState({
       activeTranslationProviders: ['google-translate'],
     });
-    providerApi.listTranslationProviders.mockResolvedValueOnce([
+    providersRuntime.listTranslation.mockResolvedValueOnce([
       {
         id: 'google-translate',
         name: 'Google Translate',
-        is_active: true,
-        is_configured: true,
-        is_builtin: true,
-        requires_api_key: false,
+        isActive: true,
+        isConfigured: true,
+        isBuiltin: true,
+        requiresApiKey: false,
+        protocol: null,
+        endpoint: null,
+        model: null,
+        reasoningLevel: null,
+        promptStrategyId: null,
+        promptFallbackStrategyId: null,
       },
       {
         id: 'custom-gpt',
         name: 'gpt-5-mini',
-        is_active: true,
-        is_configured: true,
-        is_builtin: false,
-        requires_api_key: true,
+        isActive: true,
+        isConfigured: true,
+        isBuiltin: false,
+        requiresApiKey: true,
+        protocol: null,
+        endpoint: null,
         model: 'gpt-5-mini',
       },
       {
         id: 'deeplx',
         name: 'DeepLX',
-        is_active: true,
-        is_configured: true,
-        is_builtin: true,
-        requires_api_key: false,
+        isActive: true,
+        isConfigured: true,
+        isBuiltin: true,
+        requiresApiKey: false,
+        protocol: null,
+        endpoint: null,
+        model: null,
+        reasoningLevel: null,
+        promptStrategyId: null,
+        promptFallbackStrategyId: null,
       },
     ]);
 

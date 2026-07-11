@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { SettingsWindow } from './components/SettingsWindow';
-import ResultWindow from './components/ResultWindow';
-import { runOcrFileWorkflow } from './components/ResultWindow/ocrFileWorkflow';
+import { SettingsWindow } from './views/SettingsWindow';
+import ResultWindow from './views/ResultWindow';
+import { runOcrFileWorkflow } from './views/ResultWindow/ocrFileWorkflow';
 import {
   ocrPayloadDisplayText,
   shouldApplyOcrPayloadText,
@@ -10,38 +10,105 @@ import {
   shouldApplyTranslationPayloadText,
   shouldClearTranslationResultsForPayload,
   translationPayloadSourceText,
-} from './components/ResultWindow/resultPayload';
+} from './views/ResultWindow/resultPayload';
 import {
   PinnedImageWindow,
   readPinnedImageLaunch,
-} from './components/PinnedImageWindow';
-import ScreenshotSession from './components/ScreenshotSession';
-import { hideInactiveCaptureWindow } from './components/ScreenshotSession/captureSessionLifecycle';
+} from './views/PinnedImageWindow';
+import CaptureWorkspace from './views/CaptureWorkspace';
 import {
   CAPTURE_WINDOW_LABEL,
   readCaptureLaunch,
-} from './components/ScreenshotSession/windowMode';
+} from './views/CaptureWorkspace/windowMode';
+import { createCaptureWorkspacePlatformRuntime } from './application/capture-workspace/platformRuntime';
+import { createResultWindowPlatformRuntime } from './application/result-window/platformRuntime';
+import { createPinnedImagePlatformRuntime } from './application/pinned-image/platformRuntime';
+import { createSettingsRuntime } from './application/settings/runtime';
 import { useAppStore } from './stores/appStore';
-import { useHotkeyConfigStore } from './stores/hotkeyConfigStore';
-import { useSettingsConfigStore } from './stores/settingsConfigStore';
-import { recognizeImageFile, selectImageFile } from './tauri/ocr';
-import { takeCaptureResultWindowPayload } from './tauri/captureSession';
+import {
+  initializeHotkeyConfigStore,
+  useHotkeyConfigStore,
+} from './stores/hotkeyConfigStore';
+import {
+  initializeSettingsConfigStore,
+  useSettingsConfigStore,
+} from './stores/settingsConfigStore';
+import { initializeProviderStore } from './stores/providerStore';
+import { initializeHistoryStore } from './stores/historyStore';
 import {
   isCaptureResultWindowLaunch,
   isSettingsWindowLaunch,
 } from './appWindowRouting';
-import { listenTauriEvent } from './tauri/events';
-import { getCurrentAppWebviewWindow } from './tauri/window';
+import { captureWorkspaceEvents, resultWindowEvents } from './platform/tauri/appEvents';
+import {
+  captureWorkspaceCommands,
+  takeCaptureResultWindowPayload,
+  triggerScreenshot,
+} from './platform/tauri/capture';
+import { captureWindow } from './platform/tauri/captureWindow';
+import { writeClipboardText } from './platform/tauri/clipboard';
+import * as history from './platform/tauri/history';
+import * as hotkeys from './platform/tauri/hotkeys';
+import { recognizeImageData, recognizeImageFile, selectImageFile } from './platform/tauri/ocr';
+import { pinnedImageCommands } from './platform/tauri/pinnedImage';
+import { pinnedWindow } from './platform/tauri/pinnedWindow';
+import { settingsProviders } from './platform/tauri/providers';
+import {
+  getCurrentWindowLabel,
+  resultWindow,
+} from './platform/tauri/resultWindow';
+import * as durableSettings from './platform/tauri/settings';
+import { settingsWindow } from './platform/tauri/settingsWindow';
+import { translateTextWithProvider } from './platform/tauri/translation';
 
-const currentWindow = getCurrentAppWebviewWindow();
+const settingsRuntime = createSettingsRuntime({
+  window: settingsWindow,
+  durableSettings,
+  providers: settingsProviders,
+  hotkeys,
+  history,
+  clipboard: { writeText: writeClipboardText },
+  capture: { triggerScreenshot },
+});
+const captureWorkspaceRuntime = createCaptureWorkspacePlatformRuntime({
+  events: captureWorkspaceEvents,
+  window: captureWindow,
+  commands: captureWorkspaceCommands,
+  clipboard: { writeText: writeClipboardText },
+});
+const resultWindowRuntime = createResultWindowPlatformRuntime({
+  events: resultWindowEvents,
+  window: resultWindow,
+  clipboard: { writeText: writeClipboardText },
+  commands: {
+    takePayload: takeCaptureResultWindowPayload,
+    selectImageFile,
+    recognizeImageFile,
+    recognizeImageData,
+    translateTextWithProvider,
+  },
+});
+const pinnedImageRuntime = createPinnedImagePlatformRuntime({
+  window: pinnedWindow,
+  commands: pinnedImageCommands,
+  clipboard: { writeText: writeClipboardText },
+  settings: settingsRuntime.window,
+});
+
+initializeSettingsConfigStore(settingsRuntime.durableSettings);
+initializeHotkeyConfigStore(settingsRuntime.hotkeys);
+initializeProviderStore(settingsRuntime.providers);
+initializeHistoryStore(settingsRuntime.history);
+
+const currentWindowLabel = getCurrentWindowLabel();
 const captureLaunch = readCaptureLaunch(window.location.search);
 const pinnedImageId = readPinnedImageLaunch(window.location.search);
 const isCaptureResultWindow = isCaptureResultWindowLaunch(
-  currentWindow.label,
+  currentWindowLabel,
   window.location.search,
 );
 const isSettingsWindow = isSettingsWindowLaunch(
-  currentWindow.label,
+  currentWindowLabel,
   window.location.search,
 );
 
@@ -62,7 +129,7 @@ function App() {
   const hydrateSettings = useSettingsConfigStore((state) => state.hydrate);
   const hydrateHotkeys = useHotkeyConfigStore((state) => state.hydrate);
   const isCaptureWindow =
-    currentWindow.label === CAPTURE_WINDOW_LABEL || captureLaunch !== null;
+    currentWindowLabel === CAPTURE_WINDOW_LABEL || captureLaunch !== null;
   const [hasLoadedCaptureResultPayload, setHasLoadedCaptureResultPayload] =
     useState(false);
 
@@ -90,8 +157,8 @@ function App() {
     setOcrImageBase64(null);
     setOcrError(null);
     void runOcrFileWorkflow({
-      selectImageFile,
-      recognizeImageFile,
+      selectImageFile: resultWindowRuntime.commands.selectImageFile,
+      recognizeImageFile: resultWindowRuntime.commands.recognizeImageFile,
       setText: setOcrText,
       setRunning: setOcrRunning,
       setError: setOcrError,
@@ -113,7 +180,7 @@ function App() {
   }, [hydrateHotkeys, isSettingsWindow]);
 
   const loadCaptureResultPayload = useCallback(async () => {
-    const payload = await takeCaptureResultWindowPayload();
+    const payload = await resultWindowRuntime.commands.takePayload();
     if (!payload) return;
 
     setHasLoadedCaptureResultPayload(true);
@@ -168,7 +235,7 @@ function App() {
       console.error('Failed to load capture result window payload:', err);
     });
 
-    listenTauriEvent('capture-result-payload-ready', () => {
+    resultWindowRuntime.onPayloadReady(() => {
       if (disposed) return;
       void loadCaptureResultPayload().catch((err) => {
         console.error('Failed to reload capture result window payload:', err);
@@ -200,7 +267,7 @@ function App() {
       return;
     }
 
-    void currentWindow.hide();
+    void resultWindowRuntime.dismiss();
   }, [
     hasLoadedCaptureResultPayload,
     isCaptureResultWindow,
@@ -209,20 +276,21 @@ function App() {
 
   if (isCaptureWindow) {
     return (
-      <ScreenshotSession
+      <CaptureWorkspace
+        runtime={captureWorkspaceRuntime}
         initialMode={captureLaunch?.mode}
         initialSessionId={captureLaunch?.sessionId}
-        onInactive={() => hideInactiveCaptureWindow(currentWindow)}
+        onInactive={() => captureWorkspaceRuntime.dismiss()}
       />
     );
   }
 
   if (pinnedImageId) {
-    return <PinnedImageWindow imageId={pinnedImageId} />;
+    return <PinnedImageWindow imageId={pinnedImageId} runtime={pinnedImageRuntime} />;
   }
 
   if (isCaptureResultWindow) {
-    return <ResultWindow presentation="standalone" />;
+    return <ResultWindow presentation="standalone" runtime={resultWindowRuntime} />;
   }
 
   if (!isSettingsWindow) {
@@ -232,10 +300,10 @@ function App() {
   return (
     <>
       {/* 主设置窗口 */}
-      <SettingsWindow />
+      <SettingsWindow runtime={settingsRuntime} />
 
       {/* 翻译结果窗口（浮动） */}
-      {resultWindowVisible && <ResultWindow />}
+      {resultWindowVisible && <ResultWindow runtime={resultWindowRuntime} />}
     </>
   );
 }

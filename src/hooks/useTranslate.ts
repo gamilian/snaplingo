@@ -1,6 +1,6 @@
 import { useAppStore } from '../stores/appStore';
 import { useProviderStore } from '../stores/providerStore';
-import { translateTextWithProvider } from '../tauri/translation';
+import type { ResultWindowCommandsPort } from '../application/result-window/ports';
 import { resolveTranslationRequestLanguages } from './translationLanguages';
 
 function errorMessage(error: unknown) {
@@ -14,7 +14,9 @@ export async function activeTranslationProviderIds() {
   return useProviderStore.getState().activeTranslationProviders;
 }
 
-export function useTranslate() {
+export function useTranslate(
+  translateTextWithProvider: ResultWindowCommandsPort['translateTextWithProvider'],
+) {
   const {
     sourceText,
     sourceLang,

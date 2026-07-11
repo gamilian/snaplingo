@@ -1,10 +1,25 @@
 import { create } from 'zustand';
-import {
-  getHotkeySnapshot as loadHotkeySnapshot,
-  updateHotkey as persistHotkey,
-  type HotkeyCategory,
-  type HotkeySnapshot,
-} from '../tauri/hotkeys';
+import type { SettingsRuntime } from '../application/settings/runtime';
+import type {
+  HotkeyCategory,
+  HotkeySnapshot,
+} from '../application/settings/ports';
+
+type HotkeysRuntime = SettingsRuntime['hotkeys'];
+
+let hotkeysRuntime: HotkeysRuntime | null = null;
+
+export function initializeHotkeyConfigStore(runtime: HotkeysRuntime) {
+  hotkeysRuntime = runtime;
+}
+
+function runtime() {
+  if (!hotkeysRuntime) {
+    throw new Error('Hotkey config store runtime has not been initialized');
+  }
+
+  return hotkeysRuntime;
+}
 
 interface HotkeyConfigState {
   hydrated: boolean;
@@ -54,7 +69,7 @@ export const useHotkeyConfigStore = create<HotkeyConfigState>((set, get) => ({
       return cloneSnapshot(existingSnapshot);
     }
 
-    const snapshot = await loadHotkeySnapshot();
+    const snapshot = await runtime().load();
     set({
       hydrated: true,
       snapshot: cloneSnapshot(snapshot),
@@ -63,7 +78,7 @@ export const useHotkeyConfigStore = create<HotkeyConfigState>((set, get) => ({
     return cloneSnapshot(snapshot);
   },
   updateHotkey: async (category, action, hotkey) => {
-    const outcome = await persistHotkey({ category, action, hotkey });
+    const outcome = await runtime().update({ category, action, hotkey });
     applySnapshot(set, outcome.snapshot);
     return cloneSnapshot(outcome.snapshot);
   },

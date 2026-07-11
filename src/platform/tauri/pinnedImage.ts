@@ -1,5 +1,10 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { PinnedImageView } from '../../domain/capture';
+import type { PinnedImageCommandsPort } from '../../application/pinned-image/ports';
+import {
+  defaultCaptureSavePath,
+  quickCaptureSavePath,
+} from './capture';
 
 export async function getPinnedImage(imageId: string) {
   return invoke<PinnedImageView>('get_pinned_image', { imageId });
@@ -46,3 +51,17 @@ export async function hidePinnedImageGroup(imageId: string) {
 export async function destroyPinnedImageGroup(imageId: string) {
   return invoke<string[]>('destroy_pinned_image_group', { imageId });
 }
+
+export const pinnedImageCommands: PinnedImageCommandsPort = {
+  getPinnedImage,
+  defaultCaptureSavePath,
+  quickCaptureSavePath,
+  copyPinnedImage,
+  replacePinnedImageFromClipboard,
+  savePinnedImage,
+  closePinnedImage,
+  removePinnedImage,
+  movePinnedImageToNextGroup,
+  hidePinnedImageGroup,
+  destroyPinnedImageGroup,
+};

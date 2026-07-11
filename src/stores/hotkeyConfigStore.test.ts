@@ -1,11 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const hotkeysApi = vi.hoisted(() => ({
-  getHotkeySnapshot: vi.fn(),
-  updateHotkey: vi.fn(),
+const hotkeysRuntime = vi.hoisted(() => ({
+  load: vi.fn(),
+  update: vi.fn(),
 }));
-
-vi.mock('../tauri/hotkeys', () => hotkeysApi);
 
 const backendSnapshot = {
   screenshot: {
@@ -24,16 +22,18 @@ describe('hotkeyConfigStore', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    hotkeysApi.getHotkeySnapshot.mockResolvedValue(structuredClone(backendSnapshot));
+    hotkeysRuntime.load.mockResolvedValue(structuredClone(backendSnapshot));
   });
 
   it('hydrates once from the backend hotkey snapshot', async () => {
-    const { useHotkeyConfigStore } = await import('./hotkeyConfigStore');
+    const { initializeHotkeyConfigStore, useHotkeyConfigStore } =
+      await import('./hotkeyConfigStore');
+    initializeHotkeyConfigStore(hotkeysRuntime);
 
     await useHotkeyConfigStore.getState().hydrate();
     await useHotkeyConfigStore.getState().hydrate();
 
-    expect(hotkeysApi.getHotkeySnapshot).toHaveBeenCalledTimes(1);
+    expect(hotkeysRuntime.load).toHaveBeenCalledTimes(1);
     expect(useHotkeyConfigStore.getState()).toMatchObject({
       hydrated: true,
       snapshot: backendSnapshot,
@@ -41,7 +41,9 @@ describe('hotkeyConfigStore', () => {
   });
 
   it('updates through the backend and applies the returned snapshot', async () => {
-    const { useHotkeyConfigStore } = await import('./hotkeyConfigStore');
+    const { initializeHotkeyConfigStore, useHotkeyConfigStore } =
+      await import('./hotkeyConfigStore');
+    initializeHotkeyConfigStore(hotkeysRuntime);
     const updatedSnapshot = {
       ...backendSnapshot,
       translation: {
@@ -49,7 +51,7 @@ describe('hotkeyConfigStore', () => {
         'selection-translate': '⇧⌥D',
       },
     };
-    hotkeysApi.updateHotkey.mockResolvedValueOnce({
+    hotkeysRuntime.update.mockResolvedValueOnce({
       snapshot: updatedSnapshot,
       accelerator: 'Shift+Alt+KeyD',
     });
@@ -59,7 +61,7 @@ describe('hotkeyConfigStore', () => {
       .getState()
       .updateHotkey('translation', 'selection-translate', '⇧⌥D');
 
-    expect(hotkeysApi.updateHotkey).toHaveBeenCalledWith({
+    expect(hotkeysRuntime.update).toHaveBeenCalledWith({
       category: 'translation',
       action: 'selection-translate',
       hotkey: '⇧⌥D',
@@ -69,7 +71,9 @@ describe('hotkeyConfigStore', () => {
   });
 
   it('resets one hotkey from the backend-provided default snapshot', async () => {
-    const { useHotkeyConfigStore } = await import('./hotkeyConfigStore');
+    const { initializeHotkeyConfigStore, useHotkeyConfigStore } =
+      await import('./hotkeyConfigStore');
+    initializeHotkeyConfigStore(hotkeysRuntime);
     const changedSnapshot = {
       ...backendSnapshot,
       translation: {
@@ -77,7 +81,7 @@ describe('hotkeyConfigStore', () => {
         'selection-translate': '⇧⌥D',
       },
     };
-    hotkeysApi.updateHotkey
+    hotkeysRuntime.update
       .mockResolvedValueOnce({
         snapshot: changedSnapshot,
         accelerator: 'Shift+Alt+KeyD',
@@ -95,7 +99,7 @@ describe('hotkeyConfigStore', () => {
       .getState()
       .resetHotkey('translation', 'selection-translate');
 
-    expect(hotkeysApi.updateHotkey).toHaveBeenLastCalledWith({
+    expect(hotkeysRuntime.update).toHaveBeenLastCalledWith({
       category: 'translation',
       action: 'selection-translate',
       hotkey: '⌥D',

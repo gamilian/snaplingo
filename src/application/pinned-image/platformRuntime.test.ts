@@ -9,16 +9,28 @@ describe('pinned image platform runtime', () => {
       startDragging: vi.fn(async () => undefined),
       close: vi.fn(async () => undefined),
     };
-    const runtime = createPinnedImagePlatformRuntime({ window });
+    const commands = {} as never;
+    const clipboard = { writeText: vi.fn(async () => undefined) };
+    const settings = { open: vi.fn(async () => undefined) };
+    const runtime = createPinnedImagePlatformRuntime({
+      window,
+      commands,
+      clipboard,
+      settings,
+    });
 
     await runtime.resizeTo(320, 240);
     await runtime.moveBy(12, -8);
     await runtime.beginDrag();
     await runtime.dismiss();
+    await runtime.clipboard.copyText('sample');
+    await runtime.settings.open();
 
     expect(window.resize).toHaveBeenCalledWith(320, 240);
     expect(window.moveBy).toHaveBeenCalledWith(12, -8);
     expect(window.startDragging).toHaveBeenCalledTimes(1);
     expect(window.close).toHaveBeenCalledTimes(1);
+    expect(clipboard.writeText).toHaveBeenCalledWith('sample');
+    expect(settings.open).toHaveBeenCalledTimes(1);
   });
 });

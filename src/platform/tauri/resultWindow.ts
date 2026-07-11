@@ -12,3 +12,7 @@ export const resultWindow: ResultWindowPort = {
     return getCurrentWindow().startDragging();
   },
 };
+
+export function getCurrentWindowLabel() {
+  return getCurrentWindow().label;
+}

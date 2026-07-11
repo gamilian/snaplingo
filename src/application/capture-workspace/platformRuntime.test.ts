@@ -7,6 +7,8 @@ describe('capture workspace platform runtime', () => {
     const copyUnsubscribe = vi.fn();
     const hotkeyUnsubscribe = vi.fn();
     const ports = {
+      commands: {} as never,
+      clipboard: { writeText: vi.fn(async () => undefined) },
       events: {
         subscribeCaptureCancel: vi.fn(async () => cancelUnsubscribe),
         subscribeCaptureCopy: vi.fn(async () => copyUnsubscribe),
@@ -35,6 +37,7 @@ describe('capture workspace platform runtime', () => {
     await runtime.prepareForReveal();
     await runtime.reveal();
     await runtime.dismiss();
+    await runtime.clipboard.copyText('sample');
 
     expect(ports.events.subscribeCaptureCancel).toHaveBeenCalledWith(onCancel);
     expect(ports.events.subscribeCaptureCopy).toHaveBeenCalledWith(onCopy);
@@ -42,5 +45,6 @@ describe('capture workspace platform runtime', () => {
     expect(ports.window.prepareForReveal).toHaveBeenCalledTimes(1);
     expect(ports.window.reveal).toHaveBeenCalledTimes(1);
     expect(ports.window.hide).toHaveBeenCalledTimes(1);
+    expect(ports.clipboard.writeText).toHaveBeenCalledWith('sample');
   });
 });

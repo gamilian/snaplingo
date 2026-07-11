@@ -6,7 +6,7 @@ import type {
   ScreenshotSubTab,
   ServicesSubTab,
   TranslationSubTab,
-} from '../components/SettingsWindow/navigationModel';
+} from '../views/SettingsWindow/navigationModel';
 
 interface SettingsState {
   activeMainTab: MainTab;

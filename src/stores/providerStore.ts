@@ -1,12 +1,48 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import * as providerApi from '../tauri/providers';
 import type {
-  AddCustomTranslationProviderRequest,
+  AddCustomTranslationProviderRequest as ApplicationAddCustomTranslationProviderRequest,
   OcrProviderInfo,
   ProviderInfo,
-  UpdateCustomTranslationProviderRequest,
-} from '../tauri/providers';
+  SettingsProvidersPort,
+  UpdateCustomTranslationProviderRequest as ApplicationUpdateCustomTranslationProviderRequest,
+} from '../application/settings/ports';
+
+export interface AddCustomTranslationProviderRequest {
+  name: string;
+  protocol: string;
+  endpoint: string;
+  model: string;
+  api_key: string;
+  reasoning_level?: string;
+  prompt_strategy_id?: string;
+  prompt_fallback_strategy_id?: string;
+}
+
+export interface UpdateCustomTranslationProviderRequest {
+  name: string;
+  protocol: string;
+  endpoint: string;
+  model: string;
+  api_key?: string;
+  reasoning_level?: string;
+  prompt_strategy_id?: string;
+  prompt_fallback_strategy_id?: string;
+}
+
+let providersRuntime: SettingsProvidersPort | null = null;
+
+export function initializeProviderStore(runtime: SettingsProvidersPort) {
+  providersRuntime = runtime;
+}
+
+function runtime() {
+  if (!providersRuntime) {
+    throw new Error('Provider store runtime has not been initialized');
+  }
+
+  return providersRuntime;
+}
 
 export interface Provider {
   id: string;
@@ -85,20 +121,20 @@ function convertProviderInfo(info: ProviderInfo): Provider {
     id: info.id,
     name: displayProviderName(info),
     type: 'translation',
-    status: info.is_active ? 'active' : (info.is_configured ? 'inactive' : 'unconfigured'),
-    isBuiltin: info.is_builtin,
-    requiresApiKey: info.requires_api_key,
-    protocol: info.protocol,
-    endpoint: info.endpoint,
-    model: info.model,
-    reasoningLevel: info.reasoning_level,
-    promptStrategyId: info.prompt_strategy_id,
-    promptFallbackStrategyId: info.prompt_fallback_strategy_id,
+    status: info.isActive ? 'active' : (info.isConfigured ? 'inactive' : 'unconfigured'),
+    isBuiltin: info.isBuiltin,
+    requiresApiKey: info.requiresApiKey,
+    protocol: info.protocol ?? undefined,
+    endpoint: info.endpoint ?? undefined,
+    model: info.model ?? undefined,
+    reasoningLevel: info.reasoningLevel ?? undefined,
+    promptStrategyId: info.promptStrategyId ?? undefined,
+    promptFallbackStrategyId: info.promptFallbackStrategyId ?? undefined,
   };
 }
 
 function displayProviderName(info: ProviderInfo): string {
-  if (!info.is_builtin && info.name.startsWith('custom-llm-') && info.model) {
+  if (!info.isBuiltin && info.name.startsWith('custom-llm-') && info.model) {
     return info.model;
   }
 
@@ -118,6 +154,36 @@ function normalizeTranslationCredentials(config: unknown): Record<string, string
   return config as Record<string, string>;
 }
 
+function toAddCustomTranslationRequest(
+  request: AddCustomTranslationProviderRequest,
+): ApplicationAddCustomTranslationProviderRequest {
+  return {
+    name: request.name,
+    protocol: request.protocol,
+    endpoint: request.endpoint,
+    model: request.model,
+    apiKey: request.api_key,
+    reasoningLevel: request.reasoning_level,
+    promptStrategyId: request.prompt_strategy_id,
+    promptFallbackStrategyId: request.prompt_fallback_strategy_id,
+  };
+}
+
+function toUpdateCustomTranslationRequest(
+  request: UpdateCustomTranslationProviderRequest,
+): ApplicationUpdateCustomTranslationProviderRequest {
+  return {
+    name: request.name,
+    protocol: request.protocol,
+    endpoint: request.endpoint,
+    model: request.model,
+    apiKey: request.api_key,
+    reasoningLevel: request.reasoning_level,
+    promptStrategyId: request.prompt_strategy_id,
+    promptFallbackStrategyId: request.prompt_fallback_strategy_id,
+  };
+}
+
 export const useProviderStore = create<ProviderState>()(
   persist(
     (set, get) => ({
@@ -133,7 +199,7 @@ export const useProviderStore = create<ProviderState>()(
       // 从后端加载翻译 Providers
       loadTranslationProviders: async () => {
         try {
-          const providers = await providerApi.listTranslationProviders();
+          const providers = await runtime().listTranslation();
           const converted = providers.map(convertProviderInfo);
           const activeIds = converted.filter(p => p.status === 'active').map(p => p.id);
 
@@ -149,7 +215,7 @@ export const useProviderStore = create<ProviderState>()(
       // 激活翻译 Provider
       activateTranslationProvider: async (id: string) => {
         try {
-          await providerApi.activateTranslationProvider(id);
+          await runtime().activateTranslation(id);
           await get().loadTranslationProviders();
         } catch (error) {
           console.error('Failed to activate provider:', error);
@@ -160,7 +226,7 @@ export const useProviderStore = create<ProviderState>()(
       // 停用翻译 Provider
       deactivateTranslationProvider: async (id: string) => {
         try {
-          await providerApi.deactivateTranslationProvider(id);
+          await runtime().deactivateTranslation(id);
           await get().loadTranslationProviders();
         } catch (error) {
           console.error('Failed to deactivate provider:', error);
@@ -171,7 +237,9 @@ export const useProviderStore = create<ProviderState>()(
       // 添加自定义翻译 Provider
       addCustomTranslationProvider: async (request: AddCustomTranslationProviderRequest) => {
         try {
-          await providerApi.addCustomTranslationProvider(request);
+          await runtime().addCustomTranslation(
+            toAddCustomTranslationRequest(request),
+          );
           await get().loadTranslationProviders();
         } catch (error) {
           console.error('Failed to add custom provider:', error);
@@ -184,7 +252,10 @@ export const useProviderStore = create<ProviderState>()(
         request: UpdateCustomTranslationProviderRequest,
       ) => {
         try {
-          await providerApi.updateCustomTranslationProvider(id, request);
+          await runtime().updateCustomTranslation(
+            id,
+            toUpdateCustomTranslationRequest(request),
+          );
           await get().loadTranslationProviders();
         } catch (error) {
           console.error('Failed to update custom provider:', error);
@@ -195,7 +266,7 @@ export const useProviderStore = create<ProviderState>()(
       // 删除翻译 Provider
       removeTranslationProvider: async (id: string) => {
         try {
-          await providerApi.removeCustomTranslationProvider(id);
+          await runtime().removeCustomTranslation(id);
           await get().loadTranslationProviders();
         } catch (error) {
           console.error('Failed to remove provider:', error);
@@ -204,20 +275,20 @@ export const useProviderStore = create<ProviderState>()(
       },
 
       testCustomTranslationProvider: async (id: string) => {
-        await providerApi.testCustomTranslationProvider(id);
+        await runtime().testCustomTranslation(id);
       },
 
       // 从后端加载 OCR Providers
       loadOcrProviders: async () => {
         try {
-          const providers = await providerApi.listOcrProviders();
+          const providers = await runtime().listOcr();
           const converted = providers.map((p: OcrProviderInfo) => ({
             id: p.id,
             name: p.name,
             type: 'ocr' as const,
-            status: p.is_active ? 'active' as const : (p.is_configured ? 'inactive' as const : 'unconfigured' as const),
+            status: p.isActive ? 'active' as const : (p.isConfigured ? 'inactive' as const : 'unconfigured' as const),
             isBuiltin: true,
-            requiresApiKey: p.requires_api_key,
+            requiresApiKey: p.requiresApiKey,
           }));
 
           const activeProvider = converted.find(p => p.status === 'active');
@@ -234,7 +305,7 @@ export const useProviderStore = create<ProviderState>()(
       // OCR Provider 激活
       activateOcrProvider: async (id: string) => {
         try {
-          await providerApi.activateOcrProvider(id);
+          await runtime().activateOcr(id);
           await get().loadOcrProviders();
         } catch (error) {
           console.error('Failed to activate OCR provider:', error);
@@ -245,7 +316,7 @@ export const useProviderStore = create<ProviderState>()(
       // 配置 OCR Provider
       configureOcrProvider: async (providerId: string, credentials: Record<string, string>) => {
         try {
-          await providerApi.configureOcrProviderCredentials(providerId, credentials);
+          await runtime().configureOcrCredentials(providerId, credentials);
           await get().loadOcrProviders();
         } catch (error) {
           console.error('Failed to configure OCR provider:', error);
@@ -266,7 +337,7 @@ export const useProviderStore = create<ProviderState>()(
       updateProviderConfig: async (_id: string, providerId: string, config: any) => {
         try {
           const credentials = normalizeTranslationCredentials(config);
-          await providerApi.configureTranslationProviderCredentials(providerId, credentials);
+          await runtime().configureTranslationCredentials(providerId, credentials);
           await get().loadTranslationProviders();
         } catch (error) {
           console.error('Failed to update provider config:', error);
@@ -287,7 +358,7 @@ export const useProviderStore = create<ProviderState>()(
           }
 
           // 调用后端命令更新顺序
-          await providerApi.reorderActiveTranslationProviders(reorderedActiveIds);
+          await runtime().reorderActiveTranslation(reorderedActiveIds);
 
           // 重新加载以同步状态
           await get().loadTranslationProviders();

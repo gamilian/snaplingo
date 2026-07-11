@@ -16,6 +16,11 @@ interface TauriEventUse {
   eventName: string;
 }
 
+interface ModuleImport {
+  path: string;
+  specifier: string;
+}
+
 const LEGACY_TAURI_IMPORTS = new Set([
   'src/tauri/captureSession.ts -> @tauri-apps/api/core',
   'src/tauri/events.ts -> @tauri-apps/api/event',
@@ -31,14 +36,7 @@ const LEGACY_TAURI_IMPORTS = new Set([
   'src/tauri/window.ts -> @tauri-apps/api/window',
 ]);
 
-const LEGACY_TAURI_EVENT_USES = new Set([
-  'src/App.tsx -> capture-result-payload-ready',
-  'src/components/ScreenshotSession/captureCancelRequest.ts -> capture-cancel-requested',
-  'src/components/ScreenshotSession/captureCancelRequest.ts -> capture-copy-requested',
-  'src/components/ScreenshotSession/captureCancelRequest.ts -> eventName',
-  'src/components/ScreenshotSession/captureHostRuntime.ts -> eventName',
-  'src/components/ScreenshotSession/captureHostRuntime.ts -> hotkey-triggered',
-]);
+const LEGACY_TAURI_EVENT_USES = new Set<string>();
 
 const TAURI_EVENT_LISTENER_NAMES = new Set([
   'listenTauriEvent',
@@ -121,6 +119,24 @@ function tauriImports(files: SourceFile[]): TauriImport[] {
     }
 
     visit(sourceFile);
+    return imports;
+  });
+}
+
+function moduleImports(files: SourceFile[]): ModuleImport[] {
+  return files.flatMap((file) => {
+    const sourceFile = parseSourceFile(file);
+    const imports: ModuleImport[] = [];
+
+    sourceFile.forEachChild((node) => {
+      if (
+        ts.isImportDeclaration(node) &&
+        ts.isStringLiteral(node.moduleSpecifier)
+      ) {
+        imports.push({ path: file.path, specifier: node.moduleSpecifier.text });
+      }
+    });
+
     return imports;
   });
 }
@@ -265,6 +281,66 @@ function unexpectedTauriEventUses(
 }
 
 describe('frontend dependency rules', () => {
+  test('production Views live under canonical roots and consume Application seams only', () => {
+    const productionFiles = productionSourceFiles();
+    const paths = productionFiles.map(({ path }) => path);
+    const canonicalRoots = [
+      'src/views/CaptureWorkspace/',
+      'src/views/ResultWindow/',
+      'src/views/PinnedImageWindow/',
+      'src/views/SettingsWindow/',
+    ];
+
+    for (const root of canonicalRoots) {
+      expect(paths.some((path) => path.startsWith(root))).toBe(true);
+    }
+
+    expect(
+      paths.filter((path) =>
+        [
+          'src/components/ScreenshotSession/',
+          'src/components/ResultWindow/',
+          'src/components/PinnedImageWindow/',
+          'src/components/SettingsWindow/',
+        ].some((root) => path.startsWith(root)),
+      ),
+    ).toEqual([]);
+
+    expect(
+      moduleImports(
+        productionFiles.filter(({ path }) => path.startsWith('src/views/')),
+      )
+        .filter(({ specifier }) =>
+          specifier.includes('/platform/') ||
+          specifier.includes('/tauri/') ||
+          specifier.startsWith('@tauri-apps/'),
+        )
+        .map(({ path, specifier }) => `${path} -> ${specifier}`),
+    ).toEqual([]);
+  });
+
+  test('App composes Platform adapters into Application runtimes', () => {
+    const appFile = productionSourceFiles().find(({ path }) => path === 'src/App.tsx');
+    expect(appFile).toBeDefined();
+
+    const imports = moduleImports([appFile!]).map(({ specifier }) => specifier);
+
+    expect(imports).toEqual(
+      expect.arrayContaining([
+        './application/capture-workspace/platformRuntime',
+        './application/result-window/platformRuntime',
+        './application/pinned-image/platformRuntime',
+        './application/settings/runtime',
+        './views/CaptureWorkspace',
+        './views/ResultWindow',
+        './views/PinnedImageWindow',
+        './views/SettingsWindow',
+      ]),
+    );
+    expect(imports.some((specifier) => specifier.startsWith('./platform/tauri/'))).toBe(true);
+    expect(imports.some((specifier) => specifier.startsWith('./tauri/'))).toBe(false);
+  });
+
   test('@tauri-apps imports stay behind the Tauri platform boundary', () => {
     const productionFiles = productionSourceFiles();
     const legacyInventory = tauriImports(productionFiles)
