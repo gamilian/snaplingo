@@ -241,6 +241,25 @@ describe('capture workspace runtime', () => {
         action: { type: 'pin' },
       });
     });
+
+    await runtime.actions.startSession('screenshot', 'session-copy');
+    await runtime.actions.renderSelectionPreview(selection);
+    expect(
+      runtime.actions.pointerDown({
+        point: { x: 30, y: 40 },
+        button: 0,
+        detail: 2,
+        source: 'preview',
+      }),
+    ).toBe(true);
+    await vi.waitFor(() => {
+      expect(platform.commands.outputCapture).toHaveBeenCalledWith({
+        sessionId: 'session-copy',
+        rect: selection,
+        annotations: [],
+        action: { type: 'copy' },
+      });
+    });
   });
 
   it('nudges an active selecting draft through the runtime keyboard path', async () => {

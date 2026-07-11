@@ -14,6 +14,10 @@ const keyboard = readFileSync(
   new URL('../../views/CaptureWorkspace/captureWorkspaceKeyboard.ts', import.meta.url),
   'utf8',
 );
+const pointer = readFileSync(
+  new URL('../../views/CaptureWorkspace/captureWorkspacePointer.ts', import.meta.url),
+  'utf8',
+);
 const deletedEditorInput = new URL(
   '../../views/CaptureWorkspace/useCaptureWorkspaceEditorInput.ts',
   import.meta.url,
@@ -97,5 +101,47 @@ describe('capture workspace production runtime wiring', () => {
     expect(runtime).toContain('planCaptureDraftSelectionKeyboardNudge');
     expect(runtime).toContain('planCaptureSelectionCursorKeyboardNudge');
     expect(runtime).toContain('planCaptureHoverSelectionCycle');
+  });
+
+  it('deletes compatibility-only full keyboard and pointer orchestrators', () => {
+    expect(keyboard).not.toContain(
+      'export interface CaptureWorkspaceKeyboardActions',
+    );
+    expect(keyboard).not.toContain(
+      'export function handleCaptureWorkspaceKeyDown',
+    );
+    expect(pointer).not.toContain('as CaptureWorkspacePointerActions');
+    expect(pointer).not.toContain('editorPointerContext');
+    expect(pointer).not.toContain(
+      'export interface CaptureWorkspacePointerActions',
+    );
+    expect(pointer).not.toContain(
+      'export function handleCaptureWorkspacePointerDown',
+    );
+    expect(pointer).not.toContain(
+      'export function handleCaptureWorkspacePointerMove',
+    );
+    expect(pointer).not.toContain(
+      'export function handleCaptureWorkspacePointerUp',
+    );
+    expect(pointer).not.toContain(
+      'export function handleCaptureWorkspacePreviewPointerDown',
+    );
+    expect(pointer).not.toContain(
+      'export function handleCaptureWorkspaceResizePointerDown',
+    );
+    expect(pointer).not.toContain('export function handleCaptureWorkspaceWheel');
+    for (const hostOrSelectingToken of [
+      'resetPreviewSelection',
+      'cancelSession',
+      'completeManualSelection',
+      'pinSelection',
+      'copySelection',
+      'planCaptureDraftSelectionStart',
+      'planCaptureDraftSelectionPointerMove',
+      'planCaptureDraftSelectionCommit',
+    ]) {
+      expect(pointer).not.toContain(hostOrSelectingToken);
+    }
   });
 });

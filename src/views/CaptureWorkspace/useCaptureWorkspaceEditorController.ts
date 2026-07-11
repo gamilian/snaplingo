@@ -49,9 +49,10 @@ import {
   handleCaptureWorkspaceEditorPreviewPointerDown,
   handleCaptureWorkspaceEditorResizePointerDown,
   handleCaptureWorkspaceEditorWheel,
+  type CaptureWorkspacePointerEditorActions,
   type CaptureWorkspacePointerEditorContext,
-  type CaptureWorkspacePointerEditorInputActions,
   type CaptureWorkspacePointerDerivedState,
+  type CaptureWorkspacePointerRefs,
 } from './captureWorkspacePointer';
 import type { SelectionHandle } from './selection';
 import type { AnnotationCommand, LogicalRect, Point } from './types';
@@ -565,14 +566,12 @@ interface EditorInputSetters {
   setStatus: EditorInputWorkspaceSetter<'status'>;
   setCursorPoint: EditorInputWorkspaceSetter<'cursorPoint'>;
   setSelection: EditorInputWorkspaceSetter<'selection'>;
-  setHoverSelection: EditorInputWorkspaceSetter<'hoverSelection'>;
   setEditGesture: EditorInputWorkspaceSetter<'editGesture'>;
   setActiveAnnotationTool: EditorInputWorkspaceSetter<'activeAnnotationTool'>;
   setAnnotationGesture: EditorInputWorkspaceSetter<'annotationGesture'>;
   setDraftAnnotation: EditorInputWorkspaceSetter<'draftAnnotation'>;
   setSelectedAnnotationIndex: EditorInputWorkspaceSetter<'selectedAnnotationIndex'>;
   setAnnotationMoveGesture: EditorInputWorkspaceSetter<'annotationMoveGesture'>;
-  setDraftSelectionMoveGesture: EditorInputWorkspaceSetter<'draftSelectionMoveGesture'>;
   setTextDraft: EditorInputWorkspaceSetter<'textDraft'>;
   setTextDraftAnnotationIndex: EditorInputWorkspaceSetter<'textDraftAnnotationIndex'>;
   setAnnotationStyle: EditorInputWorkspaceSetter<'annotationStyle'>;
@@ -582,14 +581,11 @@ interface EditorInputSetters {
   setIsAnnotationToolbarVisible: EditorInputWorkspaceSetter<'isAnnotationToolbarVisible'>;
   setColorSampleFormat: EditorInputWorkspaceSetter<'colorSampleFormat'>;
   setIsMagnifierRequested: EditorInputWorkspaceSetter<'isMagnifierRequested'>;
-  setIncludeCapturedCursor: EditorInputWorkspaceSetter<'includeCapturedCursor'>;
   setRenderingOutput(isRendering: boolean): void;
-  setStartPointWithRef(point: Point | null): void;
 }
 
 interface EditorInputDerived {
   annotations: AnnotationCommand[];
-  captureCandidates: CaptureWorkspaceKeyboardDerivedState['captureCandidates'];
   selectionBounds: LogicalRect | null;
   snapTargetRects: LogicalRect[];
   hasAnnotationEditingContext: boolean;
@@ -624,20 +620,17 @@ function useEditorEventHandlers({
   editor,
   renderSelectionPreview,
   scheduleSelectionOverlayPaint,
-  syncHoverSelection,
 }: {
   state: CaptureWorkspaceState;
-  refs: CaptureWorkspaceKeyboardRefs;
+  refs: CaptureWorkspaceKeyboardRefs & CaptureWorkspacePointerRefs;
   derived: EditorInputDerived;
   setters: EditorInputSetters;
   editor: EditorInputActions;
   renderSelectionPreview(rect: LogicalRect, annotations?: AnnotationCommand[], includeCursor?: boolean): Promise<void>;
   scheduleSelectionOverlayPaint(draft?: LogicalRect | null, hover?: LogicalRect | null, active?: LogicalRect | null): void;
-  syncHoverSelection(selection: LogicalRect | null): void;
 }) {
   const keyboardDerived = useMemo<CaptureWorkspaceKeyboardDerivedState>(() => ({
     annotations: derived.annotations,
-    captureCandidates: derived.captureCandidates,
     selectionBounds: derived.selectionBounds,
     hasAnnotationEditingContext: derived.hasAnnotationEditingContext,
     isAnnotationToolbarVisible: derived.isAnnotationToolbarVisible,
@@ -647,7 +640,6 @@ function useEditorEventHandlers({
   }), [derived]);
   const pointerDerived = useMemo<CaptureWorkspacePointerDerivedState>(() => ({
     annotations: derived.annotations,
-    captureCandidates: derived.captureCandidates,
     selectionBounds: derived.selectionBounds,
     snapTargetRects: derived.snapTargetRects,
     hasAnnotationEditingContext: derived.hasAnnotationEditingContext,
@@ -666,11 +658,9 @@ function useEditorEventHandlers({
     setColorSampleFormat: setters.setColorSampleFormat,
     setCursorPoint: setters.setCursorPoint,
     setSelection: setters.setSelection,
-    scheduleSelectionOverlayPaint,
     setPreviewImageBase64: setters.setPreviewImageBase64,
     setRenderingOutput: setters.setRenderingOutput,
     setEditGesture: setters.setEditGesture,
-    syncHoverSelection,
     setIsAnnotationToolbarVisible: setters.setIsAnnotationToolbarVisible,
     adjustAnnotationSize: editor.adjustAnnotationSize,
     toggleAnnotationFill: editor.toggleAnnotationFill,
@@ -681,37 +671,31 @@ function useEditorEventHandlers({
     setDraftAnnotation: setters.setDraftAnnotation,
     selectAnnotationColor: editor.selectAnnotationColor,
     toggleAnnotationTool: editor.toggleAnnotationTool,
-    setDraftSelectionMoveGesture: setters.setDraftSelectionMoveGesture,
     setAnnotationHistory: setters.setAnnotationHistory,
-  }), [derived.cursorColor, editor, renderSelectionPreview, scheduleSelectionOverlayPaint, setters, syncHoverSelection]);
-  const pointerActions = useMemo<CaptureWorkspacePointerEditorInputActions>(() => ({
+  }), [derived.cursorColor, editor, renderSelectionPreview, setters]);
+  const pointerActions = useMemo<CaptureWorkspacePointerEditorActions>(() => ({
     commitTextDraft: editor.commitTextDraft,
     commitAnnotationGestureAtPoint: editor.commitAnnotationGestureAtPoint,
     dismissCaptureLayer: editor.dismissCaptureLayer,
     setCursorPoint: setters.setCursorPoint,
-    setStartPointWithRef: setters.setStartPointWithRef,
     setSelection: setters.setSelection,
-    setHoverSelection: setters.setHoverSelection,
     scheduleSelectionOverlayPaint,
     setPreviewImageBase64: setters.setPreviewImageBase64,
     setRenderingOutput: setters.setRenderingOutput,
     setStatus: setters.setStatus,
-    setActiveAnnotationTool: setters.setActiveAnnotationTool,
     setAnnotationGesture: setters.setAnnotationGesture,
     setDraftAnnotation: setters.setDraftAnnotation,
     setSelectedAnnotationIndex: setters.setSelectedAnnotationIndex,
     setAnnotationMoveGesture: setters.setAnnotationMoveGesture,
-    setDraftSelectionMoveGesture: setters.setDraftSelectionMoveGesture,
     setTextDraft: setters.setTextDraft,
     setTextDraftAnnotationIndex: setters.setTextDraftAnnotationIndex,
     setAnnotationHistory: setters.setAnnotationHistory,
-    syncHoverSelection,
     renderSelectionPreview,
     setEditGesture: setters.setEditGesture,
     setAnnotationStyle: setters.setAnnotationStyle,
     setTextFontSize: setters.setTextFontSize,
     adjustAnnotationSize: editor.adjustAnnotationSize,
-  }), [editor, renderSelectionPreview, scheduleSelectionOverlayPaint, setters, syncHoverSelection]);
+  }), [editor, renderSelectionPreview, scheduleSelectionOverlayPaint, setters]);
   const context = useMemo<CaptureWorkspacePointerEditorContext>(() => ({ state, refs, derived: pointerDerived, actions: pointerActions }), [pointerActions, pointerDerived, refs, state]);
   const onUnhandledKeyDown = useCallback((event: KeyboardEvent) => {
     handleCaptureWorkspaceEditorKeyDown(event, { state, refs, derived: keyboardDerived, actions: keyboardActions });

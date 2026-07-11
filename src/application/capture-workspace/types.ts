@@ -68,6 +68,10 @@ export interface CaptureWorkspaceRuntimeActions {
 export interface CaptureWorkspacePointerInput {
   point: Point;
   button?: number;
+  detail?: number;
+  metaKey?: boolean;
+  ctrlKey?: boolean;
+  altKey?: boolean;
   shiftKey?: boolean;
   source?: 'root' | 'preview';
 }

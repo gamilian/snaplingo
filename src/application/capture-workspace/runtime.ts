@@ -718,13 +718,41 @@ export function createCaptureWorkspaceRuntime({
 
     pointerDown(input) {
       if (!state.session) return false;
-      const { button = 0, point, source = 'root' } = pointerInput(input);
+      const {
+        altKey = false,
+        button = 0,
+        ctrlKey = false,
+        detail = 0,
+        metaKey = false,
+        point,
+        shiftKey = false,
+        source = 'root',
+      } = pointerInput(input);
       if (state.status === 'preview') {
         if (source === 'preview' && button === 1 && state.selection) {
           void runCompletionEffects(
             state.selection,
             planCandidateSelectionCompletion('pin'),
             host?.commitTextDraft() ?? host?.getAnnotations() ?? [],
+            state.includeCapturedCursor,
+          );
+          return true;
+        }
+        if (
+          source === 'preview' &&
+          button === 0 &&
+          detail >= 2 &&
+          !metaKey &&
+          !ctrlKey &&
+          !altKey &&
+          !shiftKey &&
+          !host?.hasTextDraft() &&
+          state.selection
+        ) {
+          void runCompletionEffects(
+            state.selection,
+            planCandidateSelectionCompletion('copy'),
+            host?.getAnnotations() ?? [],
             state.includeCapturedCursor,
           );
           return true;

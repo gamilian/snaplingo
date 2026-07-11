@@ -26,7 +26,6 @@ import {
 import { useCaptureMagnifierPixelSource } from './captureMagnifierRuntime';
 import { useCaptureSelectionOverlay } from './captureSelectionOverlayRuntime';
 import { getCaptureWorkspaceDerivedState } from './captureWorkspaceDerived';
-import type { CaptureWorkspaceKeyboardRefs } from './captureWorkspaceKeyboard';
 import { planManualSelectionCompletion } from './captureInteractionRuntime';
 import {
   getCaptureWorkspacePointerPoint,
@@ -149,7 +148,6 @@ export function useCaptureWorkspaceController({
       }),
     [runtime],
   );
-  const keyboardDraftCursorPointRef = useRef<Point | null>(null);
   const keyboardEditCursorPointRef = useRef<Point | null>(null);
   const isRenderingOutputRef = useRef(false);
   const handleRenderingOutputChange = useCallback(
@@ -542,26 +540,18 @@ export function useCaptureWorkspaceController({
     }),
     [cancelSession, renderSelectionPreview],
   );
-  const inputRefs = useMemo<CaptureWorkspaceKeyboardRefs>(
+  const inputRefs = useMemo(
     () => ({
-      startPointRef: workspace.startPointRef,
       cursorPointRef: workspace.cursorPointRef,
-      draftSelectionRef: workspace.draftSelectionRef,
-      hoverSelectionRef: workspace.hoverSelectionRef,
-      keyboardDraftCursorPointRef,
       keyboardEditCursorPointRef,
     }),
     [
       workspace.cursorPointRef,
-      workspace.draftSelectionRef,
-      workspace.hoverSelectionRef,
-      workspace.startPointRef,
     ],
   );
   const inputDerived = useMemo(
     () => ({
       annotations: derived.annotations,
-      captureCandidates: derived.captureCandidates,
       selectionBounds: derived.selectionBounds,
       snapTargetRects: derived.snapTargetRects,
       hasAnnotationEditingContext: derived.hasAnnotationEditingContext,
@@ -573,7 +563,6 @@ export function useCaptureWorkspaceController({
     }),
     [
       derived.annotations,
-      derived.captureCandidates,
       derived.hasAnnotationEditingContext,
       derived.isFillModeActive,
       derived.isMagnifierShown,
@@ -649,7 +638,6 @@ export function useCaptureWorkspaceController({
       derived: inputDerived,
       setters: editorSetters,
       scheduleSelectionOverlayPaint: overlay.schedulePaint,
-      syncHoverSelection,
     },
   });
   commitTextDraftToHistoryRef.current =
@@ -738,6 +726,10 @@ export function useCaptureWorkspaceController({
         workflowRuntime.actions.pointerDown({
           point: getCaptureWorkspacePointerPoint(event, derived.selectionBounds),
           button: event.button,
+          detail: event.detail,
+          metaKey: event.metaKey,
+          ctrlKey: event.ctrlKey,
+          altKey: event.altKey,
           shiftKey: event.shiftKey,
           source: 'preview',
         })
