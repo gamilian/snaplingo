@@ -1,12 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import type { CaptureWorkspacePlatformRuntime } from './platformRuntime';
 import { createCaptureWorkspaceRuntime } from './runtime';
 
 const selection = { x: 20, y: 30, width: 120, height: 80 };
 
 describe('capture workspace runtime', () => {
   it('completes a pointer selection through effect interpretation and execution', async () => {
-    const platform = createPlatform();
+    const platform = createPlatform({
+      session: createSession({ id: 'session-pointer' }),
+    });
     const runtime = createCaptureWorkspaceRuntime({ platform });
 
     await runtime.actions.startSession('screenshot-copy', 'session-pointer');
@@ -14,6 +17,9 @@ describe('capture workspace runtime', () => {
     runtime.actions.pointerMove({ x: 140, y: 110 });
     await runtime.actions.pointerUp({ x: 140, y: 110 });
 
+    expect(platform.commands.getCaptureSession).toHaveBeenCalledWith(
+      'session-pointer',
+    );
     expect(platform.commands.outputCapture).toHaveBeenCalledWith({
       sessionId: 'session-pointer',
       rect: selection,
@@ -32,8 +38,8 @@ describe('capture workspace runtime', () => {
     });
   });
 
-  it('routes keyboard confirm and cancel through the same runtime actions', async () => {
-    const confirmPlatform = createPlatform({
+  it('confirms a keyboard candidate through the same completion effects', async () => {
+    const platform = createPlatform({
       session: createSession({
         id: 'session-confirm',
         candidates: [
@@ -46,41 +52,46 @@ describe('capture workspace runtime', () => {
         ],
       }),
     });
-    const confirmRuntime = createCaptureWorkspaceRuntime({
-      platform: confirmPlatform,
-    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
 
-    await confirmRuntime.actions.startSession(
-      'screenshot-copy',
-      'session-confirm',
-    );
-    confirmRuntime.actions.pointerMove({ x: 40, y: 50 });
-    await confirmRuntime.actions.keyDown({ key: 'Enter' });
+    await runtime.actions.startSession('screenshot-copy', 'session-confirm');
+    runtime.actions.pointerMove({ x: 40, y: 50 });
+    await runtime.actions.keyDown({ key: 'Enter' });
 
-    expect(confirmPlatform.commands.outputCapture).toHaveBeenCalledWith(
+    expect(platform.commands.outputCapture).toHaveBeenCalledWith(
       expect.objectContaining({
         sessionId: 'session-confirm',
         rect: selection,
         action: { type: 'copy' },
       }),
     );
+    expect(platform.dismiss).toHaveBeenCalledTimes(1);
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
+      'session-confirm',
+    );
+    expect(runtime.renderState).toMatchObject({
+      status: 'idle',
+      selection: null,
+      isRenderingOutput: false,
+      error: null,
+    });
+  });
 
-    const cancelPlatform = createPlatform({
+  it('cancels from Escape through the keyboard runtime action', async () => {
+    const platform = createPlatform({
       session: createSession({ id: 'session-cancel' }),
     });
-    const cancelRuntime = createCaptureWorkspaceRuntime({
-      platform: cancelPlatform,
-    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
 
-    await cancelRuntime.actions.startSession('screenshot', 'session-cancel');
-    await cancelRuntime.actions.keyDown({ key: 'Escape' });
+    await runtime.actions.startSession('screenshot', 'session-cancel');
+    await runtime.actions.keyDown({ key: 'Escape' });
 
-    expect(cancelPlatform.commands.outputCapture).not.toHaveBeenCalled();
-    expect(cancelPlatform.dismiss).toHaveBeenCalledTimes(1);
-    expect(cancelPlatform.commands.cancelCaptureSession).toHaveBeenCalledWith(
+    expect(platform.commands.outputCapture).not.toHaveBeenCalled();
+    expect(platform.dismiss).toHaveBeenCalledTimes(1);
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
       'session-cancel',
     );
-    expect(cancelRuntime.renderState).toMatchObject({
+    expect(runtime.renderState).toMatchObject({
       status: 'idle',
       selection: null,
       error: null,
@@ -159,7 +170,7 @@ function createPlatform({
     prepareForReveal: vi.fn(async () => undefined),
     reveal: vi.fn(async () => undefined),
     dismiss: vi.fn(async () => undefined),
-  };
+  } satisfies CaptureWorkspacePlatformRuntime;
 }
 
 function createSession(
