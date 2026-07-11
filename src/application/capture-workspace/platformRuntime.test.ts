@@ -1,0 +1,46 @@
+import { describe, expect, it, vi } from 'vitest';
+import { createCaptureWorkspacePlatformRuntime } from './platformRuntime';
+
+describe('capture workspace platform runtime', () => {
+  it('translates capture workspace actions into portable event and window calls', async () => {
+    const cancelUnsubscribe = vi.fn();
+    const copyUnsubscribe = vi.fn();
+    const hotkeyUnsubscribe = vi.fn();
+    const ports = {
+      events: {
+        subscribeCaptureCancel: vi.fn(async () => cancelUnsubscribe),
+        subscribeCaptureCopy: vi.fn(async () => copyUnsubscribe),
+        subscribeHotkeyTriggered: vi.fn(async () => hotkeyUnsubscribe),
+      },
+      window: {
+        prepareForReveal: vi.fn(async () => undefined),
+        reveal: vi.fn(async () => undefined),
+        hide: vi.fn(async () => undefined),
+      },
+    };
+    const runtime = createCaptureWorkspacePlatformRuntime(ports);
+    const onCancel = vi.fn();
+    const onCopy = vi.fn();
+    const onHotkey = vi.fn();
+
+    await expect(runtime.onCancelRequested(onCancel)).resolves.toBe(
+      cancelUnsubscribe,
+    );
+    await expect(runtime.onCopyRequested(onCopy)).resolves.toBe(
+      copyUnsubscribe,
+    );
+    await expect(runtime.onHotkeyTriggered(onHotkey)).resolves.toBe(
+      hotkeyUnsubscribe,
+    );
+    await runtime.prepareForReveal();
+    await runtime.reveal();
+    await runtime.dismiss();
+
+    expect(ports.events.subscribeCaptureCancel).toHaveBeenCalledWith(onCancel);
+    expect(ports.events.subscribeCaptureCopy).toHaveBeenCalledWith(onCopy);
+    expect(ports.events.subscribeHotkeyTriggered).toHaveBeenCalledWith(onHotkey);
+    expect(ports.window.prepareForReveal).toHaveBeenCalledTimes(1);
+    expect(ports.window.reveal).toHaveBeenCalledTimes(1);
+    expect(ports.window.hide).toHaveBeenCalledTimes(1);
+  });
+});
