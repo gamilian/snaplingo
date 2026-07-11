@@ -4,7 +4,6 @@ const providerApi = vi.hoisted(() => ({
   configureOcrProvider: vi.fn(),
   configureOcrProviderCredentials: vi.fn(),
   configureTranslationProviderCredentials: vi.fn(),
-  configureTranslationProvider: vi.fn(),
   updateCustomTranslationProvider: vi.fn(),
   testCustomTranslationProvider: vi.fn(),
   listOcrProviders: vi.fn(),
@@ -34,7 +33,6 @@ describe('providerStore', () => {
       mode: 'deepl',
       api_key: 'secret',
     });
-    expect(providerApi.configureTranslationProvider).not.toHaveBeenCalled();
   });
 
   it('configures OCR providers through the credential map command', async () => {
