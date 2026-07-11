@@ -9,15 +9,8 @@ import {
 
 import { createCaptureWorkspaceRuntime } from '../../application/capture-workspace/runtime';
 import type { AnnotationHistory } from './annotationHistory';
-import {
-  canToggleCapturedCursor,
-  type SelectionHistoryStep,
-} from './captureActions';
-import {
-  prepareCaptureSurfaceForReveal,
-  restoreCaptureSelectionFromHistory,
-  restoreLastSuccessfulCaptureSelection,
-} from './captureHostRuntime';
+import { canToggleCapturedCursor } from './captureActions';
+import { prepareCaptureSurfaceForReveal } from './captureHostRuntime';
 import { planCaptureManualSelectionTransition } from './captureEditorRuntime';
 import {
   shouldPollCaptureHoverSelection,
@@ -33,7 +26,6 @@ import {
 import type { CaptureWorkspaceState } from './captureWorkspaceState';
 import { useCaptureWorkspaceEditorController } from './useCaptureWorkspaceEditorController';
 import { useCaptureWorkspaceState } from './useCaptureWorkspaceState';
-import { getCurrentMonitorBounds } from './virtualDesktop';
 import type {
   AnnotationCommand,
   CaptureMode,
@@ -42,7 +34,6 @@ import type {
 } from './types';
 import { useCaptureWorkspaceRuntime } from './runtimeContext';
 
-const MIN_SELECTION_SIZE = 10;
 const TOOLBAR_GAP = 14;
 const TOOLBAR_SIZE = { width: 640, height: 42 };
 const CAPTURE_HOVER_POLL_INTERVAL_MS = 16;
@@ -358,20 +349,6 @@ export function useCaptureWorkspaceController({
     },
     [captureWorkspaceState, commitTextDraftToHistory, workflowRuntime],
   );
-  const completeCandidateSelection = useCallback(
-    (rect: LogicalRect, action: Parameters<typeof workflowRuntime.actions.completeCandidateSelection>[1]) =>
-      workflowRuntime.actions.completeCandidateSelection(rect, action),
-    [workflowRuntime],
-  );
-  const completeManualSelection = useCallback(
-    (rect: LogicalRect) => workflowRuntime.actions.completeManualSelection(rect),
-    [workflowRuntime],
-  );
-  const resetPreviewSelection = useCallback(() => {
-    workflowRuntime.actions.resetPreview();
-    workspace.resetPreview();
-    overlay.reset();
-  }, [overlay.reset, workflowRuntime, workspace.resetPreview]);
   const copySelection = useCallback(
     () => completePreviewSelection('copy', { guardCompletion: true }),
     [completePreviewSelection],
@@ -388,45 +365,6 @@ export function useCaptureWorkspaceController({
     () => completePreviewSelection('ocr', { commitTextDraft: false }),
     [completePreviewSelection],
   );
-  const pinSelection = useCallback(
-    () => completePreviewSelection('pin'),
-    [completePreviewSelection],
-  );
-  const selectFullCaptureArea = useCallback(() => {
-    if (!captureWorkspaceState.session || !derived.selectionBounds) return;
-    const currentPoint =
-      workspace.cursorPointRef.current ??
-      captureWorkspaceState.cursorPoint ??
-      captureWorkspaceState.session.captured_cursor?.logical_position ??
-      null;
-    void completeManualSelection(
-      getCurrentMonitorBounds(captureWorkspaceState.session.monitors, currentPoint),
-    );
-  }, [captureWorkspaceState, completeManualSelection, derived.selectionBounds, workspace.cursorPointRef]);
-  const restoreLastSelection = useCallback(() => {
-    if (!derived.selectionBounds) return;
-    restoreLastSuccessfulCaptureSelection({
-      storage: window.localStorage,
-      selectionBounds: derived.selectionBounds,
-      minSelectionSize: MIN_SELECTION_SIZE,
-      completeSelection: completeManualSelection,
-    });
-  }, [completeManualSelection, derived.selectionBounds]);
-  const restoreSelectionFromHistory = useCallback(
-    (step: SelectionHistoryStep) => {
-      if (!derived.selectionBounds) return;
-      restoreCaptureSelectionFromHistory({
-        storage: window.localStorage,
-        currentSelection: captureWorkspaceState.selection,
-        step,
-        selectionBounds: derived.selectionBounds,
-        minSelectionSize: MIN_SELECTION_SIZE,
-        completeSelection: completeManualSelection,
-      });
-    },
-    [captureWorkspaceState.selection, completeManualSelection, derived.selectionBounds],
-  );
-
   useEffect(() => {
     if (!initialMode || hasStartedInitialSessionRef.current) return;
     hasStartedInitialSessionRef.current = true;
@@ -494,28 +432,6 @@ export function useCaptureWorkspaceController({
       derived.areCaptureImagesReady,
     );
   }, [derived.areCaptureImagesReady, workflowRuntime]);
-
-  const hostActions = useMemo(
-    () => ({
-      ensureCaptureSnapshotsHydrated,
-      cancelSession,
-      refreshSession: workflowRuntime.actions.refreshSession,
-      renderSelectionPreview,
-      completeCandidateSelection,
-      completePreviewSelection,
-      completeManualSelection,
-      pinSelection,
-      copySelection,
-      saveSelection,
-      quickSaveSelection,
-      runOcrSelection,
-      resetPreviewSelection,
-      selectFullCaptureArea,
-      restoreLastSelection,
-      restoreSelectionFromHistory,
-    }),
-    [cancelSession, completeCandidateSelection, completeManualSelection, completePreviewSelection, copySelection, ensureCaptureSnapshotsHydrated, pinSelection, quickSaveSelection, renderSelectionPreview, resetPreviewSelection, restoreLastSelection, restoreSelectionFromHistory, runOcrSelection, saveSelection, selectFullCaptureArea, workflowRuntime.actions.refreshSession],
-  );
 
   const editorDerived = useMemo(
     () => ({
@@ -796,11 +712,11 @@ export function useCaptureWorkspaceController({
         editorController.actions.applySelectedAnnotationStyle,
       onTextDraftFontSizeChange:
         editorController.actions.updateTextDraftFontSize,
-      onCancel: hostActions.cancelSession,
-      onRunOcr: hostActions.runOcrSelection,
-      onCopy: hostActions.copySelection,
-      onSave: hostActions.saveSelection,
-      onQuickSave: hostActions.quickSaveSelection,
+      onCancel: cancelSession,
+      onRunOcr: runOcrSelection,
+      onCopy: copySelection,
+      onSave: saveSelection,
+      onQuickSave: quickSaveSelection,
     },
   };
 }

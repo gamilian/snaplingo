@@ -61,6 +61,21 @@ describe('capture workspace production runtime wiring', () => {
     expect(controller).not.toContain('keyboardActions');
   });
 
+  it('does not retain a controller-local host workflow compatibility bag', () => {
+    for (const runtimeOwnedToken of [
+      'const hostActions',
+      'const completeCandidateSelection',
+      'const completeManualSelection',
+      'const resetPreviewSelection',
+      'const pinSelection',
+      'const selectFullCaptureArea',
+      'const restoreLastSelection',
+      'const restoreSelectionFromHistory',
+    ]) {
+      expect(controller).not.toContain(runtimeOwnedToken);
+    }
+  });
+
   it('rejects renamed wide input forwarding modules anywhere in the CaptureWorkspace View', () => {
     expect(() => readFileSync(deletedEditorInput, 'utf8')).toThrow();
     expect(viewSources.map(({ name }) => name)).not.toContain(
