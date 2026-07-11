@@ -1,12 +1,24 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const controller = readFileSync(
-  new URL('../../views/CaptureWorkspace/useCaptureWorkspaceController.ts', import.meta.url),
+const runtimeView = readFileSync(
+  new URL('../../views/CaptureWorkspace/useCaptureWorkspaceRuntimeView.ts', import.meta.url),
   'utf8',
+);
+const deletedController = new URL(
+  '../../views/CaptureWorkspace/useCaptureWorkspaceController.ts',
+  import.meta.url,
+);
+const deletedStateHook = new URL(
+  '../../views/CaptureWorkspace/useCaptureWorkspaceState.ts',
+  import.meta.url,
 );
 const captureViewRoot = readFileSync(
   new URL('../../views/CaptureWorkspace/index.tsx', import.meta.url),
+  'utf8',
+);
+const captureView = readFileSync(
+  new URL('../../views/CaptureWorkspace/CaptureWorkspaceView.tsx', import.meta.url),
   'utf8',
 );
 const runtime = readFileSync(new URL('./runtime.ts', import.meta.url), 'utf8');
@@ -41,31 +53,31 @@ const viewSources = Object.entries(
 
 describe('capture workspace production runtime wiring', () => {
   it('routes selecting pointer and keyboard host actions through the application runtime', () => {
-    expect(controller).toContain('workflowRuntime.actions.pointerDown');
-    expect(controller).toContain('workflowRuntime.actions.pointerMove');
-    expect(controller).toContain('workflowRuntime.actions.pointerUp');
+    expect(captureView).toContain('actions.pointerDown');
+    expect(captureView).toContain('actions.pointerMove');
+    expect(captureView).toContain('actions.pointerUp');
     expect(runtime).toContain('actions.keyDown(event)');
-    expect(controller).toContain('workflowRuntime.actions.updatePolledCursor');
-    expect(controller).toContain('workflowRuntime.actions.updatePolledHover');
-    expect(controller).not.toContain('workspace.syncHoverSelection');
+    expect(runtimeView).toContain('workflowRuntime.actions.updatePolledCursor');
+    expect(runtimeView).toContain('workflowRuntime.actions.updatePolledHover');
+    expect(runtimeView).not.toContain('workspace.syncHoverSelection');
   });
 
   it('lets the application runtime own host subscriptions and reveal lifecycle', () => {
-    expect(controller).toContain('workflowRuntime.actions.connectHost');
-    expect(controller).toContain('workflowRuntime.actions.updateHostReadiness');
-    expect(controller).not.toContain('hostSubscriptions');
-    expect(controller).not.toContain('hostWindowReveal');
-    expect(controller).not.toContain('keyboardHostEvents');
+    expect(runtimeView).toContain('workflowRuntime.actions.connectHost');
+    expect(runtimeView).toContain('workflowRuntime.actions.updateHostReadiness');
+    expect(runtimeView).not.toContain('hostSubscriptions');
+    expect(runtimeView).not.toContain('hostWindowReveal');
+    expect(runtimeView).not.toContain('keyboardHostEvents');
     expect(captureViewRoot).not.toContain('useCaptureHostSubscriptions');
     expect(captureViewRoot).not.toContain('useCaptureHostWindowReveal');
     expect(captureViewRoot).not.toContain('useCaptureKeyboardHostEvents');
   });
 
   it('does not rebuild combined host/editor pointer and keyboard action bags in the view controller', () => {
-    expect(controller).not.toContain('CaptureWorkspacePointerActions');
-    expect(controller).not.toContain('CaptureWorkspaceKeyboardActions');
-    expect(controller).not.toContain('pointerContext');
-    expect(controller).not.toContain('keyboardActions');
+    expect(runtimeView).not.toContain('CaptureWorkspacePointerActions');
+    expect(runtimeView).not.toContain('CaptureWorkspaceKeyboardActions');
+    expect(runtimeView).not.toContain('pointerContext');
+    expect(runtimeView).not.toContain('keyboardActions');
   });
 
   it('does not retain a controller-local host workflow compatibility bag', () => {
@@ -79,7 +91,7 @@ describe('capture workspace production runtime wiring', () => {
       'const restoreLastSelection',
       'const restoreSelectionFromHistory',
     ]) {
-      expect(controller).not.toContain(runtimeOwnedToken);
+      expect(runtimeView).not.toContain(runtimeOwnedToken);
     }
   });
 
@@ -113,10 +125,10 @@ describe('capture workspace production runtime wiring', () => {
     expect(viewSources.map(({ name }) => name)).not.toContain(
       'useCaptureWorkspaceEditorController.ts',
     );
-    expect(controller).not.toContain('useCaptureWorkspaceEditorController');
-    expect(controller).not.toContain('editorController');
-    expect(controller).not.toContain('editorSetters');
-    expect(controller).not.toContain('editorInput');
+    expect(runtimeView).not.toContain('useCaptureWorkspaceEditorController');
+    expect(runtimeView).not.toContain('editorController');
+    expect(runtimeView).not.toContain('editorSetters');
+    expect(runtimeView).not.toContain('editorInput');
     expect(
       viewSources
         .filter(({ name, source }) =>
@@ -130,22 +142,36 @@ describe('capture workspace production runtime wiring', () => {
         )
         .map(({ name }) => name),
     ).toEqual([]);
-    expect(controller).toContain('workflowRuntime.actions.toggleAnnotationTool');
-    expect(controller).toContain('workflowRuntime.actions.commitTextDraft');
-    expect(controller).toContain('workflowRuntime.actions.resizePointerDown');
-    expect(controller).toContain('workflowRuntime.actions.wheel');
+    expect(captureView).toContain('actions.toggleAnnotationTool');
+    expect(captureView).toContain('actions.commitTextDraft');
+    expect(captureView).toContain('actions.resizePointerDown');
+    expect(captureView).toContain('actions.wheel');
     expect(runtime).toContain('handleCaptureWorkspaceEditorKeyDown');
     expect(runtime).toContain('handleCaptureWorkspaceEditorPreviewPointerDown');
     expect(runtime).toContain('commitCaptureEditorTextDraft');
   });
 
   it('lets runtime terminal exclusion handle copy while editor previews are pending', () => {
-    expect(controller).not.toContain('isRenderingOutputRef');
-    expect(controller).not.toContain('guardCompletion');
+    expect(runtimeView).not.toContain('isRenderingOutputRef');
+    expect(runtimeView).not.toContain('guardCompletion');
     expect(runtime).toContain('interface TerminalOutputOperation');
     expect(runtime).toContain('terminalOutputOperation === operation');
     expect(runtime).not.toContain('terminalOutputInFlight');
     expect(runtime).not.toContain('if (!session || state.isRenderingOutput)');
+  });
+
+  it('deletes the wide controller and keeps a two-field View seam', () => {
+    expect(() => readFileSync(deletedController, 'utf8')).toThrow();
+    expect(() => readFileSync(deletedStateHook, 'utf8')).toThrow();
+    expect(captureViewRoot).toContain(
+      '<CaptureWorkspaceView renderState={renderState} actions={actions} />',
+    );
+    expect(captureViewRoot).not.toContain('viewProps');
+    expect(captureView).toContain('renderState,\n  actions,');
+    expect(runtimeView).toContain(
+      'return { renderState, actions: workflowRuntime.actions };',
+    );
+    expect(runtimeView).not.toContain('useCaptureWorkspaceState');
   });
 
   it('keeps selecting keyboard workflows out of the editor-only handler', () => {

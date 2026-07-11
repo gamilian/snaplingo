@@ -106,12 +106,12 @@ describe('capture presentation', () => {
   });
 
   it('keeps toolbar placement dimensions synchronized with the compact surface', () => {
-    const controller = readFileSync(
-      new URL('./useCaptureWorkspaceController.ts', import.meta.url),
+    const runtimeView = readFileSync(
+      new URL('./useCaptureWorkspaceRuntimeView.ts', import.meta.url),
       'utf8',
     );
 
-    expect(controller).toContain(
+    expect(runtimeView).toContain(
       'const TOOLBAR_SIZE = { width: 640, height: 42 };',
     );
   });

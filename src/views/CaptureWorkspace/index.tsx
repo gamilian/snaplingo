@@ -1,7 +1,7 @@
 import { useSettingsConfigStore } from '../../stores/settingsConfigStore';
 import type { CaptureWorkspacePlatformRuntime } from '../../application/capture-workspace/platformRuntime';
 import { CaptureWorkspaceView } from './CaptureWorkspaceView';
-import { useCaptureWorkspaceController } from './useCaptureWorkspaceController';
+import { useCaptureWorkspaceRuntimeView } from './useCaptureWorkspaceRuntimeView';
 import type { CaptureMode } from './types';
 import {
   CaptureWorkspaceRuntimeProvider,
@@ -30,12 +30,12 @@ function CaptureWorkspaceContent({
   const screenshotSavePath = useSettingsConfigStore(
     (state) => state.screenshot?.savePath,
   );
-  const controller = useCaptureWorkspaceController({
+  const { renderState, actions } = useCaptureWorkspaceRuntimeView({
     initialMode,
     initialSessionId,
     onInactive,
     screenshotSavePath,
   });
 
-  return <CaptureWorkspaceView {...controller.viewProps} />;
+  return <CaptureWorkspaceView renderState={renderState} actions={actions} />;
 }

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   dispatchCaptureWorkspacePreviewPointerDown,
   dispatchCaptureWorkspaceResizePointerDown,
-} from './useCaptureWorkspaceController';
+} from './CaptureWorkspaceView';
 
 const selectionBounds = { x: -20, y: 10, width: 500, height: 300 };
 
