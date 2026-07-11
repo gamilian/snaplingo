@@ -254,6 +254,36 @@ describe('capture workspace runtime', () => {
     });
   });
 
+  it('cancels an old native session when its pending output rejects after replacement', async () => {
+    const output = deferred<void>();
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockImplementation(async (sessionId) =>
+      createSession({ id: sessionId }),
+    );
+    platform.commands.outputCapture.mockImplementation(() => output.promise);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession('screenshot-copy', 'session-old');
+    runtime.actions.pointerDown({ x: 20, y: 30 });
+    runtime.actions.pointerMove({ x: 140, y: 110 });
+    const oldCompletion = runtime.actions.pointerUp({ x: 140, y: 110 });
+    await runtime.actions.startSession('screenshot', 'session-new');
+    output.reject(new Error('old output failed'));
+    await oldCompletion;
+
+    expect(platform.dismiss).not.toHaveBeenCalled();
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledTimes(1);
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
+      'session-old',
+    );
+    expect(runtime.renderState).toMatchObject({
+      status: 'selecting',
+      sessionId: 'session-new',
+      isRenderingOutput: false,
+      error: null,
+    });
+  });
+
   it('does not let an old pending dismiss reset a replacement session', async () => {
     const dismiss = deferred<void>();
     const platform = createPlatform();
@@ -270,6 +300,34 @@ describe('capture workspace runtime', () => {
     await oldCancel;
 
     expect(platform.dismiss).toHaveBeenCalledTimes(1);
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
+      'session-old',
+    );
+    expect(runtime.renderState).toMatchObject({
+      status: 'selecting',
+      sessionId: 'session-new',
+      isRenderingOutput: false,
+      error: null,
+    });
+  });
+
+  it('cancels an old native session when its pending dismiss rejects after replacement', async () => {
+    const dismiss = deferred<void>();
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockImplementation(async (sessionId) =>
+      createSession({ id: sessionId }),
+    );
+    platform.dismiss.mockImplementation(() => dismiss.promise);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession('screenshot', 'session-old');
+    const oldCancel = runtime.actions.keyDown({ key: 'Escape' });
+    await runtime.actions.startSession('screenshot', 'session-new');
+    dismiss.reject(new Error('old dismiss failed'));
+    await oldCancel;
+
+    expect(platform.dismiss).toHaveBeenCalledTimes(1);
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledTimes(1);
     expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
       'session-old',
     );

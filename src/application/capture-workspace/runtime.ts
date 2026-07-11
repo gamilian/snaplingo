@@ -61,20 +61,32 @@ export function createCaptureWorkspaceRuntime({
     snapshotHydration = null;
   };
 
-  const finishSession = async (sessionId: string, actionGeneration: number) => {
+  const createNativeSessionCancellation = (sessionId: string) => {
+    let cancellation: Promise<void> | null = null;
+
+    return () => {
+      cancellation ??= platform.commands.cancelCaptureSession(sessionId);
+      return cancellation;
+    };
+  };
+
+  const finishSession = async (
+    actionGeneration: number,
+    cancelNativeSession: () => Promise<void>,
+  ) => {
     if (generation !== actionGeneration) {
-      await platform.commands.cancelCaptureSession(sessionId);
+      await cancelNativeSession();
       return;
     }
 
     await platform.dismiss();
     if (generation !== actionGeneration) {
-      await platform.commands.cancelCaptureSession(sessionId);
+      await cancelNativeSession();
       return;
     }
 
     resetSession();
-    await platform.commands.cancelCaptureSession(sessionId);
+    await cancelNativeSession();
   };
 
   const executeEffect = async (
@@ -82,6 +94,7 @@ export function createCaptureWorkspaceRuntime({
     sessionId: string,
     rect: LogicalRect,
     actionGeneration: number,
+    cancelNativeSession: () => Promise<void>,
   ) => {
     if (effect.type === 'output-capture') {
       if (effect.action !== 'copy') {
@@ -100,7 +113,7 @@ export function createCaptureWorkspaceRuntime({
     if (effect.type === 'record-selection') return;
 
     if (effect.type === 'finish-session') {
-      await finishSession(sessionId, actionGeneration);
+      await finishSession(actionGeneration, cancelNativeSession);
       return;
     }
 
@@ -117,6 +130,7 @@ export function createCaptureWorkspaceRuntime({
       return;
     }
     const actionGeneration = generation;
+    const cancelNativeSession = createNativeSessionCancellation(session.id);
 
     patch({
       selection: rect,
@@ -130,11 +144,19 @@ export function createCaptureWorkspaceRuntime({
         getPrimaryCaptureCompletionActionForMode(state.mode),
       );
       for (const effect of effects) {
-        await executeEffect(effect, session.id, rect, actionGeneration);
+        await executeEffect(
+          effect,
+          session.id,
+          rect,
+          actionGeneration,
+          cancelNativeSession,
+        );
       }
     } catch (error) {
       if (generation === actionGeneration) {
         patch({ status: 'error', error: errorMessage(error) });
+      } else {
+        await cancelNativeSession().catch(() => undefined);
       }
     } finally {
       if (generation === actionGeneration) {
@@ -147,12 +169,15 @@ export function createCaptureWorkspaceRuntime({
     const sessionId = state.session?.id;
     if (!sessionId) return;
     const actionGeneration = generation;
+    const cancelNativeSession = createNativeSessionCancellation(sessionId);
 
     try {
-      await finishSession(sessionId, actionGeneration);
+      await finishSession(actionGeneration, cancelNativeSession);
     } catch (error) {
       if (generation === actionGeneration) {
         patch({ status: 'error', error: errorMessage(error) });
+      } else {
+        await cancelNativeSession().catch(() => undefined);
       }
     }
   };
