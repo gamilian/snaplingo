@@ -376,25 +376,6 @@ pub fn validate_required_credentials(
     Ok(())
 }
 
-fn legacy_api_key_credentials(provider_id: &str, api_key: String) -> Vec<CredentialValue> {
-    match provider_id {
-        "deeplx" => vec![
-            CredentialValue {
-                key: "mode".to_string(),
-                value: "deepl".to_string(),
-            },
-            CredentialValue {
-                key: "api_key".to_string(),
-                value: api_key,
-            },
-        ],
-        _ => vec![CredentialValue {
-            key: "api_key".to_string(),
-            value: api_key,
-        }],
-    }
-}
-
 fn load_baidu_translation_credentials(keychain: &Keychain) -> Option<HashMap<String, String>> {
     keychain
         .load_provider_credentials(
@@ -1218,12 +1199,6 @@ impl ProviderConfiguration {
         Ok(fields)
     }
 
-    /// Save an API key submitted through the legacy single-key command path.
-    pub fn save_legacy_api_key(&self, provider_id: String, api_key: String) -> crate::Result<()> {
-        let credentials = legacy_api_key_credentials(&provider_id, api_key);
-        self.save_credentials(provider_id, credentials)
-    }
-
     /// Save credentials for a translation provider.
     pub fn save_credentials(
         &self,
@@ -1515,27 +1490,6 @@ mod provider_configuration_tests {
             .unwrap_err()
             .to_string()
             .contains("Provider not found"));
-    }
-
-    #[test]
-    fn save_legacy_api_key_maps_deeplx_to_standard_deepl_credentials() {
-        let config = test_provider_configuration();
-
-        config
-            .save_legacy_api_key("deeplx".to_string(), "test-api-key".to_string())
-            .unwrap();
-
-        let field_names = vec!["mode".to_string(), "api_key".to_string()];
-        let saved = config
-            .keychain
-            .load_provider_credentials("deeplx", &field_names)
-            .unwrap();
-
-        assert_eq!(saved.get("mode").map(String::as_str), Some("deepl"));
-        assert_eq!(
-            saved.get("api_key").map(String::as_str),
-            Some("test-api-key")
-        );
     }
 
     #[test]

@@ -109,7 +109,6 @@ pub fn run() {
             commands::activate_translation_provider,
             commands::deactivate_translation_provider,
             commands::reorder_active_translation_providers,
-            commands::configure_translation_provider,
             commands::get_provider_credential_schema,
             commands::configure_translation_provider_credentials,
             commands::add_custom_translation_provider,

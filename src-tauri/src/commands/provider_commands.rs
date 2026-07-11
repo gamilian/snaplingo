@@ -87,19 +87,6 @@ pub async fn deactivate_translation_provider(
 }
 
 #[tauri::command]
-pub async fn configure_translation_provider(
-    provider_id: String,
-    api_key: String,
-    state: State<'_, crate::AppState>,
-) -> Result<(), String> {
-    state
-        .providers
-        .configuration
-        .save_legacy_api_key(provider_id, api_key)
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
 pub async fn reorder_active_translation_providers(
     provider_ids: Vec<String>,
     state: State<'_, crate::AppState>,
