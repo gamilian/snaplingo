@@ -1,14 +1,17 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
-import type { ProviderInfo } from './providers';
+import type {
+  ProviderInfo,
+  TranslationPromptStrategy,
+} from '../../application/settings/ports';
 
 const invoke = vi.fn();
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke }));
 
 describe('Tauri providers command adapter', () => {
-  it('models built-in provider metadata as explicit nulls', async () => {
-    const { listTranslationProviders } = await import('./providers');
-    const expected: ProviderInfo[] = [
+  it('maps serialized provider metadata into the Settings model', async () => {
+    const { settingsProviders } = await import('./providers');
+    invoke.mockResolvedValueOnce([
       {
         id: 'google-translate',
         name: 'Google Translate',
@@ -23,238 +26,122 @@ describe('Tauri providers command adapter', () => {
         prompt_strategy_id: null,
         prompt_fallback_strategy_id: null,
       },
-    ];
-    invoke.mockResolvedValueOnce(expected);
+    ]);
 
-    await expect(listTranslationProviders()).resolves.toEqual(expected);
+    await expect(settingsProviders.listTranslation()).resolves.toEqual([
+      {
+        id: 'google-translate',
+        name: 'Google Translate',
+        isConfigured: true,
+        requiresApiKey: false,
+        isActive: true,
+        isBuiltin: true,
+        protocol: null,
+        endpoint: null,
+        model: null,
+        reasoningLevel: null,
+        promptStrategyId: null,
+        promptFallbackStrategyId: null,
+      },
+    ]);
     expect(invoke).toHaveBeenCalledWith('list_translation_providers');
     expectTypeOf<ProviderInfo['protocol']>().toEqualTypeOf<string | null>();
-    expectTypeOf<ProviderInfo['reasoning_level']>()
+    expectTypeOf<ProviderInfo['reasoningLevel']>()
       .toEqualTypeOf<string | null>();
   });
 
-  it('activates translation provider with backend parameter name', async () => {
-    const { activateTranslationProvider } = await import('./providers');
-    invoke.mockResolvedValueOnce(undefined);
-
-    await activateTranslationProvider('deeplx');
-
-    expect(invoke).toHaveBeenCalledWith('activate_translation_provider', {
-      providerId: 'deeplx',
-    });
-  });
-
-  it('saves translation credentials as a credentials map', async () => {
-    const { configureTranslationProviderCredentials } = await import('./providers');
-    invoke.mockResolvedValueOnce(undefined);
-
-    await configureTranslationProviderCredentials('baidu-translate', {
-      app_id: 'app',
-      secret_key: 'secret',
-    });
-
-    expect(invoke).toHaveBeenCalledWith('configure_translation_provider_credentials', {
-      providerId: 'baidu-translate',
-      credentials: { app_id: 'app', secret_key: 'secret' },
-    });
-  });
-
-  it('loads OCR credential schema from the OCR command', async () => {
-    const { getOcrProviderCredentialSchema } = await import('./providers');
-    invoke.mockResolvedValueOnce([{ name: 'api_key', label: 'API Key', secret: true }]);
-
-    await getOcrProviderCredentialSchema('baidu-ocr');
-
-    expect(invoke).toHaveBeenCalledWith('get_ocr_provider_credential_schema', {
-      providerId: 'baidu-ocr',
-    });
-  });
-
-  it('saves OCR credentials as a credentials map', async () => {
-    const { configureOcrProviderCredentials } = await import('./providers');
-    invoke.mockResolvedValueOnce(undefined);
-
-    await configureOcrProviderCredentials('baidu-ocr', {
-      api_key: 'key',
-      secret_key: 'secret',
-    });
-
-    expect(invoke).toHaveBeenCalledWith('configure_ocr_provider_credentials', {
-      providerId: 'baidu-ocr',
-      credentials: { api_key: 'key', secret_key: 'secret' },
-    });
-  });
-
-  it('loads OpenAI-compatible models with endpoint and api key', async () => {
-    const { listOpenAICompatibleModels } = await import('./providers');
-    invoke.mockResolvedValueOnce([{ id: 'DeepSeek-V4-Pro' }]);
-
-    await listOpenAICompatibleModels({
-      endpoint: 'https://llm.example.test',
-      api_key: 'sk-test',
-    });
-
-    expect(invoke).toHaveBeenCalledWith('list_openai_compatible_models', {
-      request: {
-        endpoint: 'https://llm.example.test',
-        api_key: 'sk-test',
-      },
-    });
-  });
-
-  it('tests OpenAI-compatible provider with selected model', async () => {
-    const { testOpenAICompatibleProvider } = await import('./providers');
-    invoke.mockResolvedValueOnce(undefined);
-
-    await testOpenAICompatibleProvider({
-      endpoint: 'https://llm.example.test',
-      api_key: 'sk-test',
-      model: 'DeepSeek-V4-Pro',
-    });
-
-    expect(invoke).toHaveBeenCalledWith('test_openai_compatible_provider', {
-      request: {
-        endpoint: 'https://llm.example.test',
-        api_key: 'sk-test',
-        model: 'DeepSeek-V4-Pro',
-      },
-    });
-  });
-
-  it('tests OpenAI Responses provider with selected model', async () => {
-    const { testOpenAIResponsesProvider } = await import('./providers');
-    invoke.mockResolvedValueOnce(undefined);
-
-    await testOpenAIResponsesProvider({
-      endpoint: 'https://api.openai.com',
-      api_key: 'sk-test',
-      model: 'gpt-5-mini',
-    });
-
-    expect(invoke).toHaveBeenCalledWith('test_openai_responses_provider', {
-      request: {
-        endpoint: 'https://api.openai.com',
-        api_key: 'sk-test',
-        model: 'gpt-5-mini',
-      },
-    });
-  });
-
-  it('loads Anthropic models with endpoint and api key', async () => {
-    const { listAnthropicModels } = await import('./providers');
-    invoke.mockResolvedValueOnce([{ id: 'claude-sonnet-4-5' }]);
-
-    await listAnthropicModels({
-      endpoint: 'https://api.anthropic.com',
-      api_key: 'sk-ant-test',
-    });
-
-    expect(invoke).toHaveBeenCalledWith('list_anthropic_models', {
-      request: {
-        endpoint: 'https://api.anthropic.com',
-        api_key: 'sk-ant-test',
-      },
-    });
-  });
-
-  it('tests Anthropic provider with selected model', async () => {
-    const { testAnthropicProvider } = await import('./providers');
-    invoke.mockResolvedValueOnce(undefined);
-
-    await testAnthropicProvider({
-      endpoint: 'https://api.anthropic.com',
-      api_key: 'sk-ant-test',
-      model: 'claude-sonnet-4-5',
-    });
-
-    expect(invoke).toHaveBeenCalledWith('test_anthropic_provider', {
-      request: {
-        endpoint: 'https://api.anthropic.com',
-        api_key: 'sk-ant-test',
-        model: 'claude-sonnet-4-5',
-      },
-    });
-  });
-
-  it('loads Gemini models with endpoint and api key', async () => {
-    const { listGeminiModels } = await import('./providers');
-    invoke.mockResolvedValueOnce([{ id: 'gemini-2.5-pro' }]);
-
-    await listGeminiModels({
-      endpoint: 'https://generativelanguage.googleapis.com',
-      api_key: 'gemini-key',
-    });
-
-    expect(invoke).toHaveBeenCalledWith('list_gemini_models', {
-      request: {
-        endpoint: 'https://generativelanguage.googleapis.com',
-        api_key: 'gemini-key',
-      },
-    });
-  });
-
-  it('tests Gemini provider with selected model', async () => {
-    const { testGeminiProvider } = await import('./providers');
-    invoke.mockResolvedValueOnce(undefined);
-
-    await testGeminiProvider({
-      endpoint: 'https://generativelanguage.googleapis.com',
-      api_key: 'gemini-key',
-      model: 'gemini-2.5-pro',
-    });
-
-    expect(invoke).toHaveBeenCalledWith('test_gemini_provider', {
-      request: {
-        endpoint: 'https://generativelanguage.googleapis.com',
-        api_key: 'gemini-key',
-        model: 'gemini-2.5-pro',
-      },
-    });
-  });
-
-  it('tests a saved custom translation provider by id', async () => {
-    const { testCustomTranslationProvider } = await import('./providers');
-    invoke.mockResolvedValueOnce(undefined);
-
-    await testCustomTranslationProvider('custom-gpt');
-
-    expect(invoke).toHaveBeenCalledWith('test_custom_translation_provider', {
-      providerId: 'custom-gpt',
-    });
-  });
-
-  it('updates a custom translation provider with full provider settings', async () => {
-    const { updateCustomTranslationProvider } = await import('./providers');
-    invoke.mockResolvedValueOnce(undefined);
-
-    await updateCustomTranslationProvider('custom-gpt', {
-      name: 'gpt-5-mini',
+  it('maps custom provider requests and returned values at the boundary', async () => {
+    const { settingsProviders } = await import('./providers');
+    invoke.mockResolvedValueOnce({
+      id: 'custom-gpt',
+      name: 'Custom GPT',
+      is_configured: true,
+      requires_api_key: true,
+      is_active: false,
+      is_builtin: false,
       protocol: 'openai-responses',
       endpoint: 'https://api.openai.com',
       model: 'gpt-5-mini',
-      api_key: 'sk-test',
       reasoning_level: 'minimal',
+      prompt_strategy_id: 'general',
+      prompt_fallback_strategy_id: 'general',
     });
 
-    expect(invoke).toHaveBeenCalledWith('update_custom_translation_provider', {
-      providerId: 'custom-gpt',
+    await expect(
+      settingsProviders.addCustomTranslation({
+        name: 'Custom GPT',
+        protocol: 'openai-responses',
+        endpoint: 'https://api.openai.com',
+        model: 'gpt-5-mini',
+        apiKey: 'sk-test',
+        reasoningLevel: 'minimal',
+        promptStrategyId: 'general',
+        promptFallbackStrategyId: 'general',
+      }),
+    ).resolves.toMatchObject({
+      id: 'custom-gpt',
+      isConfigured: true,
+      requiresApiKey: true,
+      reasoningLevel: 'minimal',
+      promptStrategyId: 'general',
+    });
+    expect(invoke).toHaveBeenCalledWith('add_custom_translation_provider', {
       request: {
-        name: 'gpt-5-mini',
+        name: 'Custom GPT',
         protocol: 'openai-responses',
         endpoint: 'https://api.openai.com',
         model: 'gpt-5-mini',
         api_key: 'sk-test',
         reasoning_level: 'minimal',
+        prompt_strategy_id: 'general',
+        prompt_fallback_strategy_id: 'general',
       },
     });
   });
 
-  it('loads and saves translation prompt strategies', async () => {
-    const {
-      listTranslationPromptStrategies,
-      saveTranslationPromptStrategies,
-    } = await import('./providers');
-    const config = {
+  it('maps optional custom provider updates to serialized request fields', async () => {
+    const { settingsProviders } = await import('./providers');
+    invoke.mockResolvedValueOnce({
+      id: 'custom-gpt',
+      name: 'Custom GPT',
+      is_configured: true,
+      requires_api_key: true,
+      is_active: false,
+      is_builtin: false,
+      protocol: 'openai-responses',
+      endpoint: 'https://api.openai.com',
+      model: 'gpt-5-mini',
+      reasoning_level: null,
+      prompt_strategy_id: null,
+      prompt_fallback_strategy_id: null,
+    });
+
+    await settingsProviders.updateCustomTranslation('custom-gpt', {
+      name: 'Custom GPT',
+      protocol: 'openai-responses',
+      endpoint: 'https://api.openai.com',
+      model: 'gpt-5-mini',
+      apiKey: 'sk-test',
+    });
+
+    expect(invoke).toHaveBeenCalledWith('update_custom_translation_provider', {
+      providerId: 'custom-gpt',
+      request: {
+        name: 'Custom GPT',
+        protocol: 'openai-responses',
+        endpoint: 'https://api.openai.com',
+        model: 'gpt-5-mini',
+        api_key: 'sk-test',
+        reasoning_level: undefined,
+        prompt_strategy_id: undefined,
+        prompt_fallback_strategy_id: undefined,
+      },
+    });
+  });
+
+  it('maps prompt strategies in both directions', async () => {
+    const { settingsProviders } = await import('./providers');
+    const backendConfig = {
       strategies: [
         {
           id: 'general',
@@ -266,14 +153,188 @@ describe('Tauri providers command adapter', () => {
         },
       ],
     };
-    invoke.mockResolvedValueOnce(config).mockResolvedValueOnce(config);
+    const applicationConfig = {
+      strategies: [
+        {
+          id: 'general',
+          name: '通用翻译',
+          description: 'Default',
+          systemPrompt: 'Translate to {target_lang}',
+          isBuiltin: true,
+          isDeletable: false,
+        },
+      ],
+    };
+    invoke
+      .mockResolvedValueOnce(backendConfig)
+      .mockResolvedValueOnce(backendConfig);
 
-    await listTranslationPromptStrategies();
-    await saveTranslationPromptStrategies(config);
+    await expect(
+      settingsProviders.listTranslationPromptStrategies(),
+    ).resolves.toEqual(applicationConfig);
+    await expect(
+      settingsProviders.saveTranslationPromptStrategies(applicationConfig),
+    ).resolves.toEqual(applicationConfig);
 
     expect(invoke).toHaveBeenCalledWith('list_translation_prompt_strategies');
     expect(invoke).toHaveBeenCalledWith('save_translation_prompt_strategies', {
-      config,
+      config: backendConfig,
+    });
+    expectTypeOf<TranslationPromptStrategy['systemPrompt']>()
+      .toEqualTypeOf<string>();
+  });
+
+  it('keeps backend request keys private for model introspection', async () => {
+    const { settingsProviders } = await import('./providers');
+    invoke.mockResolvedValueOnce([{ id: 'DeepSeek-V4-Pro' }]);
+
+    await settingsProviders.listOpenAICompatibleModels({
+      endpoint: 'https://llm.example.test',
+      apiKey: 'sk-test',
+    });
+
+    expect(invoke).toHaveBeenCalledWith('list_openai_compatible_models', {
+      request: {
+        endpoint: 'https://llm.example.test',
+        api_key: 'sk-test',
+      },
+    });
+  });
+
+  it.each([
+    ['testOpenAICompatible', 'test_openai_compatible_provider'],
+    ['testOpenAIResponses', 'test_openai_responses_provider'],
+    ['testAnthropic', 'test_anthropic_provider'],
+    ['testGemini', 'test_gemini_provider'],
+  ] as const)('maps %s requests to %s', async (method, command) => {
+    const { settingsProviders } = await import('./providers');
+    invoke.mockResolvedValueOnce(undefined);
+
+    await settingsProviders[method]({
+      endpoint: 'https://llm.example.test',
+      apiKey: 'sk-test',
+      model: 'model',
+    });
+
+    expect(invoke).toHaveBeenCalledWith(command, {
+      request: {
+        endpoint: 'https://llm.example.test',
+        api_key: 'sk-test',
+        model: 'model',
+      },
+    });
+  });
+
+  it.each([
+    ['listAnthropicModels', 'list_anthropic_models'],
+    ['listGeminiModels', 'list_gemini_models'],
+  ] as const)('maps %s requests to %s', async (method, command) => {
+    const { settingsProviders } = await import('./providers');
+    invoke.mockResolvedValueOnce([{ id: 'model' }]);
+
+    await settingsProviders[method]({
+      endpoint: 'https://llm.example.test',
+      apiKey: 'sk-test',
+    });
+
+    expect(invoke).toHaveBeenCalledWith(command, {
+      request: {
+        endpoint: 'https://llm.example.test',
+        api_key: 'sk-test',
+      },
+    });
+  });
+
+  it('maps OCR providers and delegates credential operations', async () => {
+    const { settingsProviders } = await import('./providers');
+    invoke
+      .mockResolvedValueOnce([
+        {
+          id: 'system-ocr',
+          name: 'System OCR',
+          is_configured: true,
+          requires_api_key: false,
+          is_active: true,
+        },
+      ])
+      .mockResolvedValueOnce(undefined);
+
+    await expect(settingsProviders.listOcr()).resolves.toEqual([
+      {
+        id: 'system-ocr',
+        name: 'System OCR',
+        isConfigured: true,
+        requiresApiKey: false,
+        isActive: true,
+      },
+    ]);
+    await settingsProviders.configureOcrCredentials('baidu-ocr', {
+      api_key: 'key',
+      secret_key: 'secret',
+    });
+
+    expect(invoke).toHaveBeenCalledWith('configure_ocr_provider_credentials', {
+      providerId: 'baidu-ocr',
+      credentials: { api_key: 'key', secret_key: 'secret' },
+    });
+  });
+
+  it('preserves the standalone OCR credential adapter', async () => {
+    const { configureOcrProvider } = await import('./providers');
+    invoke.mockResolvedValueOnce(undefined);
+
+    await configureOcrProvider('baidu-ocr', 'api', 'secret');
+
+    expect(invoke).toHaveBeenCalledWith('configure_ocr_provider', {
+      providerId: 'baidu-ocr',
+      apiKey: 'api',
+      secretKey: 'secret',
+    });
+  });
+
+  it('delegates provider identity and credential actions', async () => {
+    const { settingsProviders } = await import('./providers');
+    invoke.mockResolvedValue(undefined);
+
+    await settingsProviders.activateTranslation('deeplx');
+    await settingsProviders.deactivateTranslation('deeplx');
+    await settingsProviders.reorderActiveTranslation(['deeplx']);
+    await settingsProviders.getTranslationCredentialSchema('deeplx');
+    await settingsProviders.getOcrCredentialSchema('system-ocr');
+    await settingsProviders.configureTranslationCredentials('deeplx', {
+      api_key: 'secret',
+    });
+    await settingsProviders.removeCustomTranslation('custom-gpt');
+    await settingsProviders.testCustomTranslation('custom-gpt');
+    await settingsProviders.activateOcr('system-ocr');
+
+    expect(invoke).toHaveBeenCalledWith('activate_translation_provider', {
+      providerId: 'deeplx',
+    });
+    expect(invoke).toHaveBeenCalledWith('deactivate_translation_provider', {
+      providerId: 'deeplx',
+    });
+    expect(invoke).toHaveBeenCalledWith('reorder_active_translation_providers', {
+      providerIds: ['deeplx'],
+    });
+    expect(invoke).toHaveBeenCalledWith('get_provider_credential_schema', {
+      providerId: 'deeplx',
+    });
+    expect(invoke).toHaveBeenCalledWith('get_ocr_provider_credential_schema', {
+      providerId: 'system-ocr',
+    });
+    expect(invoke).toHaveBeenCalledWith(
+      'configure_translation_provider_credentials',
+      { providerId: 'deeplx', credentials: { api_key: 'secret' } },
+    );
+    expect(invoke).toHaveBeenCalledWith('remove_custom_translation_provider', {
+      providerId: 'custom-gpt',
+    });
+    expect(invoke).toHaveBeenCalledWith('test_custom_translation_provider', {
+      providerId: 'custom-gpt',
+    });
+    expect(invoke).toHaveBeenCalledWith('activate_ocr_provider', {
+      providerId: 'system-ocr',
     });
   });
 });

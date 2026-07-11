@@ -1,12 +1,17 @@
 import { invoke } from '@tauri-apps/api/core';
+import type {
+  AddCustomTranslationProviderRequest,
+  OcrProviderInfo,
+  ProviderInfo,
+  ProviderModelsRequest,
+  SettingsProvidersPort,
+  TestProviderRequest,
+  TranslationPromptStrategy,
+  TranslationPromptStrategyConfig,
+  UpdateCustomTranslationProviderRequest,
+} from '../../application/settings/ports';
 
-export interface CredentialField {
-  name: string;
-  label: string;
-  secret: boolean;
-}
-
-export interface ProviderInfo {
+interface BackendProviderInfo {
   id: string;
   name: string;
   is_configured: boolean;
@@ -21,7 +26,7 @@ export interface ProviderInfo {
   prompt_fallback_strategy_id: string | null;
 }
 
-export interface OcrProviderInfo {
+interface BackendOcrProviderInfo {
   id: string;
   name: string;
   is_configured: boolean;
@@ -29,18 +34,7 @@ export interface OcrProviderInfo {
   is_active: boolean;
 }
 
-export interface AddCustomTranslationProviderRequest {
-  name: string;
-  protocol: string;
-  endpoint: string;
-  model: string;
-  api_key: string;
-  reasoning_level?: string;
-  prompt_strategy_id?: string;
-  prompt_fallback_strategy_id?: string;
-}
-
-export interface UpdateCustomTranslationProviderRequest {
+interface BackendCustomProviderRequest {
   name: string;
   protocol: string;
   endpoint: string;
@@ -51,22 +45,20 @@ export interface UpdateCustomTranslationProviderRequest {
   prompt_fallback_strategy_id?: string;
 }
 
-export interface OpenAICompatibleModelsRequest {
+interface BackendProviderModelsRequest {
   endpoint: string;
   api_key: string;
 }
 
-export interface TestOpenAICompatibleProviderRequest {
-  endpoint: string;
-  api_key: string;
+interface BackendTestProviderRequest extends BackendProviderModelsRequest {
   model: string;
 }
 
-export interface OpenAICompatibleModelInfo {
+interface BackendProviderModelInfo {
   id: string;
 }
 
-export interface TranslationPromptStrategy {
+interface BackendTranslationPromptStrategy {
   id: string;
   name: string;
   description: string;
@@ -75,135 +67,232 @@ export interface TranslationPromptStrategy {
   is_deletable: boolean;
 }
 
-export interface TranslationPromptStrategyConfig {
-  strategies: TranslationPromptStrategy[];
+interface BackendTranslationPromptStrategyConfig {
+  strategies: BackendTranslationPromptStrategy[];
 }
 
-export function listTranslationProviders() {
-  return invoke<ProviderInfo[]>('list_translation_providers');
+function toProviderInfo(provider: BackendProviderInfo): ProviderInfo {
+  return {
+    id: provider.id,
+    name: provider.name,
+    isConfigured: provider.is_configured,
+    requiresApiKey: provider.requires_api_key,
+    isActive: provider.is_active,
+    isBuiltin: provider.is_builtin,
+    protocol: provider.protocol,
+    endpoint: provider.endpoint,
+    model: provider.model,
+    reasoningLevel: provider.reasoning_level,
+    promptStrategyId: provider.prompt_strategy_id,
+    promptFallbackStrategyId: provider.prompt_fallback_strategy_id,
+  };
 }
 
-export function activateTranslationProvider(providerId: string) {
-  return invoke<void>('activate_translation_provider', { providerId });
+function toOcrProviderInfo(provider: BackendOcrProviderInfo): OcrProviderInfo {
+  return {
+    id: provider.id,
+    name: provider.name,
+    isConfigured: provider.is_configured,
+    requiresApiKey: provider.requires_api_key,
+    isActive: provider.is_active,
+  };
 }
 
-export function deactivateTranslationProvider(providerId: string) {
-  return invoke<void>('deactivate_translation_provider', { providerId });
+function toBackendCustomProviderRequest(
+  request:
+    | AddCustomTranslationProviderRequest
+    | UpdateCustomTranslationProviderRequest,
+): BackendCustomProviderRequest {
+  return {
+    name: request.name,
+    protocol: request.protocol,
+    endpoint: request.endpoint,
+    model: request.model,
+    api_key: request.apiKey,
+    reasoning_level: request.reasoningLevel,
+    prompt_strategy_id: request.promptStrategyId,
+    prompt_fallback_strategy_id: request.promptFallbackStrategyId,
+  };
 }
 
-export function reorderActiveTranslationProviders(providerIds: string[]) {
-  return invoke<void>('reorder_active_translation_providers', { providerIds });
+function toBackendProviderModelsRequest(
+  request: ProviderModelsRequest,
+): BackendProviderModelsRequest {
+  return {
+    endpoint: request.endpoint,
+    api_key: request.apiKey,
+  };
 }
 
-export function getProviderCredentialSchema(providerId: string) {
-  return invoke<CredentialField[]>('get_provider_credential_schema', { providerId });
+function toBackendTestProviderRequest(
+  request: TestProviderRequest,
+): BackendTestProviderRequest {
+  return {
+    ...toBackendProviderModelsRequest(request),
+    model: request.model,
+  };
 }
 
-export function getOcrProviderCredentialSchema(providerId: string) {
-  return invoke<CredentialField[]>('get_ocr_provider_credential_schema', { providerId });
+function toTranslationPromptStrategy(
+  strategy: BackendTranslationPromptStrategy,
+): TranslationPromptStrategy {
+  return {
+    id: strategy.id,
+    name: strategy.name,
+    description: strategy.description,
+    systemPrompt: strategy.system_prompt,
+    isBuiltin: strategy.is_builtin,
+    isDeletable: strategy.is_deletable,
+  };
 }
 
-export function configureTranslationProviderCredentials(
-  providerId: string,
-  credentials: Record<string, string>,
-) {
-  return invoke<void>('configure_translation_provider_credentials', {
-    providerId,
-    credentials,
-  });
+function toBackendTranslationPromptStrategy(
+  strategy: TranslationPromptStrategy,
+): BackendTranslationPromptStrategy {
+  return {
+    id: strategy.id,
+    name: strategy.name,
+    description: strategy.description,
+    system_prompt: strategy.systemPrompt,
+    is_builtin: strategy.isBuiltin,
+    is_deletable: strategy.isDeletable,
+  };
 }
 
-export function addCustomTranslationProvider(
-  request: AddCustomTranslationProviderRequest,
-) {
-  return invoke<ProviderInfo>('add_custom_translation_provider', { request });
+function toTranslationPromptStrategyConfig(
+  config: BackendTranslationPromptStrategyConfig,
+): TranslationPromptStrategyConfig {
+  return {
+    strategies: config.strategies.map(toTranslationPromptStrategy),
+  };
 }
 
-export function updateCustomTranslationProvider(
-  providerId: string,
-  request: UpdateCustomTranslationProviderRequest,
-) {
-  return invoke<ProviderInfo>('update_custom_translation_provider', {
-    providerId,
-    request,
-  });
-}
-
-export function removeCustomTranslationProvider(providerId: string) {
-  return invoke<void>('remove_custom_translation_provider', { providerId });
-}
-
-export function testCustomTranslationProvider(providerId: string) {
-  return invoke<void>('test_custom_translation_provider', { providerId });
-}
-
-export function listTranslationPromptStrategies() {
-  return invoke<TranslationPromptStrategyConfig>('list_translation_prompt_strategies');
-}
-
-export function saveTranslationPromptStrategies(
+function toBackendTranslationPromptStrategyConfig(
   config: TranslationPromptStrategyConfig,
-) {
-  return invoke<TranslationPromptStrategyConfig>('save_translation_prompt_strategies', {
-    config,
-  });
+): BackendTranslationPromptStrategyConfig {
+  return {
+    strategies: config.strategies.map(toBackendTranslationPromptStrategy),
+  };
 }
 
-export function listOpenAICompatibleModels(
-  request: OpenAICompatibleModelsRequest,
-) {
-  return invoke<OpenAICompatibleModelInfo[]>('list_openai_compatible_models', {
-    request,
-  });
-}
-
-export function testOpenAICompatibleProvider(
-  request: TestOpenAICompatibleProviderRequest,
-) {
-  return invoke<void>('test_openai_compatible_provider', { request });
-}
-
-export function testOpenAIResponsesProvider(
-  request: TestOpenAICompatibleProviderRequest,
-) {
-  return invoke<void>('test_openai_responses_provider', { request });
-}
-
-export function listAnthropicModels(
-  request: OpenAICompatibleModelsRequest,
-) {
-  return invoke<OpenAICompatibleModelInfo[]>('list_anthropic_models', {
-    request,
-  });
-}
-
-export function testAnthropicProvider(
-  request: TestOpenAICompatibleProviderRequest,
-) {
-  return invoke<void>('test_anthropic_provider', { request });
-}
-
-export function listGeminiModels(
-  request: OpenAICompatibleModelsRequest,
-) {
-  return invoke<OpenAICompatibleModelInfo[]>('list_gemini_models', {
-    request,
-  });
-}
-
-export function testGeminiProvider(
-  request: TestOpenAICompatibleProviderRequest,
-) {
-  return invoke<void>('test_gemini_provider', { request });
-}
-
-export function listOcrProviders() {
-  return invoke<OcrProviderInfo[]>('list_ocr_providers');
-}
-
-export function activateOcrProvider(providerId: string) {
-  return invoke<void>('activate_ocr_provider', { providerId });
-}
+export const settingsProviders: SettingsProvidersPort = {
+  async listTranslation() {
+    const providers = await invoke<BackendProviderInfo[]>(
+      'list_translation_providers',
+    );
+    return providers.map(toProviderInfo);
+  },
+  activateTranslation(providerId) {
+    return invoke<void>('activate_translation_provider', { providerId });
+  },
+  deactivateTranslation(providerId) {
+    return invoke<void>('deactivate_translation_provider', { providerId });
+  },
+  reorderActiveTranslation(providerIds) {
+    return invoke<void>('reorder_active_translation_providers', {
+      providerIds,
+    });
+  },
+  getTranslationCredentialSchema(providerId) {
+    return invoke('get_provider_credential_schema', { providerId });
+  },
+  getOcrCredentialSchema(providerId) {
+    return invoke('get_ocr_provider_credential_schema', { providerId });
+  },
+  configureTranslationCredentials(providerId, credentials) {
+    return invoke<void>('configure_translation_provider_credentials', {
+      providerId,
+      credentials,
+    });
+  },
+  async addCustomTranslation(request) {
+    const provider = await invoke<BackendProviderInfo>(
+      'add_custom_translation_provider',
+      { request: toBackendCustomProviderRequest(request) },
+    );
+    return toProviderInfo(provider);
+  },
+  async updateCustomTranslation(providerId, request) {
+    const provider = await invoke<BackendProviderInfo>(
+      'update_custom_translation_provider',
+      {
+        providerId,
+        request: toBackendCustomProviderRequest(request),
+      },
+    );
+    return toProviderInfo(provider);
+  },
+  removeCustomTranslation(providerId) {
+    return invoke<void>('remove_custom_translation_provider', { providerId });
+  },
+  testCustomTranslation(providerId) {
+    return invoke<void>('test_custom_translation_provider', { providerId });
+  },
+  async listTranslationPromptStrategies() {
+    const config = await invoke<BackendTranslationPromptStrategyConfig>(
+      'list_translation_prompt_strategies',
+    );
+    return toTranslationPromptStrategyConfig(config);
+  },
+  async saveTranslationPromptStrategies(config) {
+    const saved = await invoke<BackendTranslationPromptStrategyConfig>(
+      'save_translation_prompt_strategies',
+      { config: toBackendTranslationPromptStrategyConfig(config) },
+    );
+    return toTranslationPromptStrategyConfig(saved);
+  },
+  listOpenAICompatibleModels(request) {
+    return invoke<BackendProviderModelInfo[]>(
+      'list_openai_compatible_models',
+      { request: toBackendProviderModelsRequest(request) },
+    );
+  },
+  testOpenAICompatible(request) {
+    return invoke<void>('test_openai_compatible_provider', {
+      request: toBackendTestProviderRequest(request),
+    });
+  },
+  testOpenAIResponses(request) {
+    return invoke<void>('test_openai_responses_provider', {
+      request: toBackendTestProviderRequest(request),
+    });
+  },
+  listAnthropicModels(request) {
+    return invoke<BackendProviderModelInfo[]>('list_anthropic_models', {
+      request: toBackendProviderModelsRequest(request),
+    });
+  },
+  testAnthropic(request) {
+    return invoke<void>('test_anthropic_provider', {
+      request: toBackendTestProviderRequest(request),
+    });
+  },
+  listGeminiModels(request) {
+    return invoke<BackendProviderModelInfo[]>('list_gemini_models', {
+      request: toBackendProviderModelsRequest(request),
+    });
+  },
+  testGemini(request) {
+    return invoke<void>('test_gemini_provider', {
+      request: toBackendTestProviderRequest(request),
+    });
+  },
+  async listOcr() {
+    const providers = await invoke<BackendOcrProviderInfo[]>(
+      'list_ocr_providers',
+    );
+    return providers.map(toOcrProviderInfo);
+  },
+  activateOcr(providerId) {
+    return invoke<void>('activate_ocr_provider', { providerId });
+  },
+  configureOcrCredentials(providerId, credentials) {
+    return invoke<void>('configure_ocr_provider_credentials', {
+      providerId,
+      credentials,
+    });
+  },
+};
 
 export function configureOcrProvider(
   providerId: string,
@@ -214,15 +303,5 @@ export function configureOcrProvider(
     providerId,
     apiKey,
     secretKey: secretKey || null,
-  });
-}
-
-export function configureOcrProviderCredentials(
-  providerId: string,
-  credentials: Record<string, string>,
-) {
-  return invoke<void>('configure_ocr_provider_credentials', {
-    providerId,
-    credentials,
   });
 }

@@ -1,6 +1,11 @@
 import { invoke } from '@tauri-apps/api/core';
+import type {
+  HistoryEntry,
+  OcrHistoryEntry,
+  TranslationHistoryEntry,
+} from '../../application/settings/ports';
 
-export interface BackendTranslationEntry {
+interface BackendTranslationEntry {
   id: number;
   timestamp: string;
   source_text: string;
@@ -16,7 +21,7 @@ export interface BackendTranslationEntry {
   duration_ms: number;
 }
 
-export interface BackendOcrEntry {
+interface BackendOcrEntry {
   id: number;
   timestamp: string;
   image_hash: string;
@@ -27,20 +32,72 @@ export interface BackendOcrEntry {
   duration_ms: number;
 }
 
-export type BackendHistoryEntry =
+type BackendHistoryEntry =
   | (BackendTranslationEntry & { type: 'Translation' })
   | (BackendOcrEntry & { type: 'Ocr' });
 
-export function getTranslationHistory(limit: number, offset: number) {
-  return invoke<BackendTranslationEntry[]>('get_translation_history', { limit, offset });
+function toTranslationHistoryEntry(
+  entry: BackendTranslationEntry,
+): TranslationHistoryEntry {
+  return {
+    id: entry.id,
+    timestamp: entry.timestamp,
+    sourceText: entry.source_text,
+    sourceLang: entry.source_lang,
+    targetLang: entry.target_lang,
+    providersUsed: entry.providers_used,
+    results: entry.results.map((result) => ({
+      providerId: result.provider_id,
+      translatedText: result.translated_text,
+      detectedLanguage: result.detected_language,
+      confidence: result.confidence,
+    })),
+    durationMs: entry.duration_ms,
+  };
 }
 
-export function getOcrHistory(limit: number, offset: number) {
-  return invoke<BackendOcrEntry[]>('get_ocr_history', { limit, offset });
+function toOcrHistoryEntry(entry: BackendOcrEntry): OcrHistoryEntry {
+  return {
+    id: entry.id,
+    timestamp: entry.timestamp,
+    imageHash: entry.image_hash,
+    language: entry.language,
+    providerUsed: entry.provider_used,
+    recognizedText: entry.recognized_text,
+    confidence: entry.confidence,
+    durationMs: entry.duration_ms,
+  };
 }
 
-export function searchHistory(query: string) {
-  return invoke<BackendHistoryEntry[]>('search_history', { query });
+function toHistoryEntry(entry: BackendHistoryEntry): HistoryEntry {
+  if (entry.type === 'Translation') {
+    return { ...toTranslationHistoryEntry(entry), type: 'translation' };
+  }
+
+  return { ...toOcrHistoryEntry(entry), type: 'ocr' };
+}
+
+export async function getTranslationHistory(limit: number, offset: number) {
+  const entries = await invoke<BackendTranslationEntry[]>(
+    'get_translation_history',
+    { limit, offset },
+  );
+  return entries.map(toTranslationHistoryEntry);
+}
+
+export async function getOcrHistory(limit: number, offset: number) {
+  const entries = await invoke<BackendOcrEntry[]>('get_ocr_history', {
+    limit,
+    offset,
+  });
+  return entries.map(toOcrHistoryEntry);
+}
+
+export async function searchHistory(query: string) {
+  const entries = await invoke<BackendHistoryEntry[]>('search_history', {
+    query,
+  });
+  return entries.map(toHistoryEntry);
 }
 
 export function deleteHistory(id: number) {

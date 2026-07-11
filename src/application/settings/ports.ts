@@ -45,24 +45,24 @@ export interface CredentialField {
 export interface ProviderInfo {
   id: string;
   name: string;
-  is_configured: boolean;
-  requires_api_key: boolean;
-  is_active: boolean;
-  is_builtin: boolean;
+  isConfigured: boolean;
+  requiresApiKey: boolean;
+  isActive: boolean;
+  isBuiltin: boolean;
   protocol: string | null;
   endpoint: string | null;
   model: string | null;
-  reasoning_level: string | null;
-  prompt_strategy_id: string | null;
-  prompt_fallback_strategy_id: string | null;
+  reasoningLevel: string | null;
+  promptStrategyId: string | null;
+  promptFallbackStrategyId: string | null;
 }
 
 export interface OcrProviderInfo {
   id: string;
   name: string;
-  is_configured: boolean;
-  requires_api_key: boolean;
-  is_active: boolean;
+  isConfigured: boolean;
+  requiresApiKey: boolean;
+  isActive: boolean;
 }
 
 export interface AddCustomTranslationProviderRequest {
@@ -70,10 +70,10 @@ export interface AddCustomTranslationProviderRequest {
   protocol: string;
   endpoint: string;
   model: string;
-  api_key: string;
-  reasoning_level?: string;
-  prompt_strategy_id?: string;
-  prompt_fallback_strategy_id?: string;
+  apiKey: string;
+  reasoningLevel?: string;
+  promptStrategyId?: string;
+  promptFallbackStrategyId?: string;
 }
 
 export interface UpdateCustomTranslationProviderRequest {
@@ -81,15 +81,15 @@ export interface UpdateCustomTranslationProviderRequest {
   protocol: string;
   endpoint: string;
   model: string;
-  api_key?: string;
-  reasoning_level?: string;
-  prompt_strategy_id?: string;
-  prompt_fallback_strategy_id?: string;
+  apiKey?: string;
+  reasoningLevel?: string;
+  promptStrategyId?: string;
+  promptFallbackStrategyId?: string;
 }
 
 export interface ProviderModelsRequest {
   endpoint: string;
-  api_key: string;
+  apiKey: string;
 }
 
 export interface TestProviderRequest extends ProviderModelsRequest {
@@ -104,9 +104,9 @@ export interface TranslationPromptStrategy {
   id: string;
   name: string;
   description: string;
-  system_prompt: string;
-  is_builtin: boolean;
-  is_deletable: boolean;
+  systemPrompt: string;
+  isBuiltin: boolean;
+  isDeletable: boolean;
 }
 
 export interface TranslationPromptStrategyConfig {
@@ -114,27 +114,27 @@ export interface TranslationPromptStrategyConfig {
 }
 
 export interface SettingsProvidersPort {
-  listTranslationProviders(): Promise<ProviderInfo[]>;
-  activateTranslationProvider(providerId: string): Promise<void>;
-  deactivateTranslationProvider(providerId: string): Promise<void>;
-  reorderActiveTranslationProviders(providerIds: string[]): Promise<void>;
-  getProviderCredentialSchema(providerId: string): Promise<CredentialField[]>;
-  getOcrProviderCredentialSchema(
+  listTranslation(): Promise<ProviderInfo[]>;
+  activateTranslation(providerId: string): Promise<void>;
+  deactivateTranslation(providerId: string): Promise<void>;
+  reorderActiveTranslation(providerIds: string[]): Promise<void>;
+  getTranslationCredentialSchema(
     providerId: string,
   ): Promise<CredentialField[]>;
-  configureTranslationProviderCredentials(
+  getOcrCredentialSchema(providerId: string): Promise<CredentialField[]>;
+  configureTranslationCredentials(
     providerId: string,
     credentials: Record<string, string>,
   ): Promise<void>;
-  addCustomTranslationProvider(
+  addCustomTranslation(
     request: AddCustomTranslationProviderRequest,
   ): Promise<ProviderInfo>;
-  updateCustomTranslationProvider(
+  updateCustomTranslation(
     providerId: string,
     request: UpdateCustomTranslationProviderRequest,
   ): Promise<ProviderInfo>;
-  removeCustomTranslationProvider(providerId: string): Promise<void>;
-  testCustomTranslationProvider(providerId: string): Promise<void>;
+  removeCustomTranslation(providerId: string): Promise<void>;
+  testCustomTranslation(providerId: string): Promise<void>;
   listTranslationPromptStrategies(): Promise<TranslationPromptStrategyConfig>;
   saveTranslationPromptStrategies(
     config: TranslationPromptStrategyConfig,
@@ -142,17 +142,17 @@ export interface SettingsProvidersPort {
   listOpenAICompatibleModels(
     request: ProviderModelsRequest,
   ): Promise<ProviderModelInfo[]>;
-  testOpenAICompatibleProvider(request: TestProviderRequest): Promise<void>;
-  testOpenAIResponsesProvider(request: TestProviderRequest): Promise<void>;
+  testOpenAICompatible(request: TestProviderRequest): Promise<void>;
+  testOpenAIResponses(request: TestProviderRequest): Promise<void>;
   listAnthropicModels(
     request: ProviderModelsRequest,
   ): Promise<ProviderModelInfo[]>;
-  testAnthropicProvider(request: TestProviderRequest): Promise<void>;
+  testAnthropic(request: TestProviderRequest): Promise<void>;
   listGeminiModels(request: ProviderModelsRequest): Promise<ProviderModelInfo[]>;
-  testGeminiProvider(request: TestProviderRequest): Promise<void>;
-  listOcrProviders(): Promise<OcrProviderInfo[]>;
-  activateOcrProvider(providerId: string): Promise<void>;
-  configureOcrProviderCredentials(
+  testGemini(request: TestProviderRequest): Promise<void>;
+  listOcr(): Promise<OcrProviderInfo[]>;
+  activateOcr(providerId: string): Promise<void>;
+  configureOcrCredentials(
     providerId: string,
     credentials: Record<string, string>,
   ): Promise<void>;
@@ -181,29 +181,33 @@ export interface SettingsHotkeysPort {
 export interface TranslationHistoryEntry {
   id: number;
   timestamp: string;
-  source_text: string;
-  source_lang: string;
-  target_lang: string;
-  providers_used: string[];
+  sourceText: string;
+  sourceLang: string;
+  targetLang: string;
+  providersUsed: string[];
   results: Array<{
-    provider_id: string;
-    translated_text: string;
-    detected_language: string | null;
+    providerId: string;
+    translatedText: string;
+    detectedLanguage: string | null;
     confidence: number | null;
   }>;
-  duration_ms: number;
+  durationMs: number;
 }
 
 export interface OcrHistoryEntry {
   id: number;
   timestamp: string;
-  image_hash: string;
+  imageHash: string;
   language: string | null;
-  provider_used: string;
-  recognized_text: string;
+  providerUsed: string;
+  recognizedText: string;
   confidence: number | null;
-  duration_ms: number;
+  durationMs: number;
 }
+
+export type HistoryEntry =
+  | (TranslationHistoryEntry & { type: 'translation' })
+  | (OcrHistoryEntry & { type: 'ocr' });
 
 export interface SettingsHistoryPort {
   getTranslationHistory(

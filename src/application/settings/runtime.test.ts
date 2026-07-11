@@ -42,106 +42,11 @@ describe('settings runtime', () => {
     );
   });
 
-  it('translates provider actions into the provider port vocabulary', async () => {
+  it('exposes the injected provider facet without duplicate wrappers', () => {
     const providers = createProviderPort();
     const runtime = createSettingsRuntime(createPorts({ providers }));
-    const credentials = { api_key: 'secret' };
-    const addRequest = {
-      name: 'Custom',
-      protocol: 'openai',
-      endpoint: 'https://example.com',
-      model: 'model',
-      api_key: 'secret',
-    };
-    const updateRequest = { ...addRequest, api_key: undefined };
-    const modelRequest = {
-      endpoint: 'https://example.com',
-      api_key: 'secret',
-    };
-    const testRequest = { ...modelRequest, model: 'model' };
-    const strategyConfig = { strategies: [] };
 
-    await runtime.providers.listTranslation();
-    await runtime.providers.activateTranslation('provider');
-    await runtime.providers.deactivateTranslation('provider');
-    await runtime.providers.reorderActiveTranslation(['one', 'two']);
-    await runtime.providers.getTranslationCredentialSchema('provider');
-    await runtime.providers.getOcrCredentialSchema('ocr');
-    await runtime.providers.configureTranslationCredentials(
-      'provider',
-      credentials,
-    );
-    await runtime.providers.addCustomTranslation(addRequest);
-    await runtime.providers.updateCustomTranslation('provider', updateRequest);
-    await runtime.providers.removeCustomTranslation('provider');
-    await runtime.providers.testCustomTranslation('provider');
-    await runtime.providers.listTranslationPromptStrategies();
-    await runtime.providers.saveTranslationPromptStrategies(strategyConfig);
-    await runtime.providers.listOpenAICompatibleModels(modelRequest);
-    await runtime.providers.testOpenAICompatible(testRequest);
-    await runtime.providers.testOpenAIResponses(testRequest);
-    await runtime.providers.listAnthropicModels(modelRequest);
-    await runtime.providers.testAnthropic(testRequest);
-    await runtime.providers.listGeminiModels(modelRequest);
-    await runtime.providers.testGemini(testRequest);
-    await runtime.providers.listOcr();
-    await runtime.providers.activateOcr('ocr');
-    await runtime.providers.configureOcrCredentials('ocr', credentials);
-
-    expect(providers.listTranslationProviders).toHaveBeenCalledTimes(1);
-    expect(providers.activateTranslationProvider).toHaveBeenCalledWith(
-      'provider',
-    );
-    expect(providers.deactivateTranslationProvider).toHaveBeenCalledWith(
-      'provider',
-    );
-    expect(providers.reorderActiveTranslationProviders).toHaveBeenCalledWith([
-      'one',
-      'two',
-    ]);
-    expect(providers.getProviderCredentialSchema).toHaveBeenCalledWith(
-      'provider',
-    );
-    expect(providers.getOcrProviderCredentialSchema).toHaveBeenCalledWith('ocr');
-    expect(
-      providers.configureTranslationProviderCredentials,
-    ).toHaveBeenCalledWith('provider', credentials);
-    expect(providers.addCustomTranslationProvider).toHaveBeenCalledWith(
-      addRequest,
-    );
-    expect(providers.updateCustomTranslationProvider).toHaveBeenCalledWith(
-      'provider',
-      updateRequest,
-    );
-    expect(providers.removeCustomTranslationProvider).toHaveBeenCalledWith(
-      'provider',
-    );
-    expect(providers.testCustomTranslationProvider).toHaveBeenCalledWith(
-      'provider',
-    );
-    expect(providers.listTranslationPromptStrategies).toHaveBeenCalledTimes(1);
-    expect(providers.saveTranslationPromptStrategies).toHaveBeenCalledWith(
-      strategyConfig,
-    );
-    expect(providers.listOpenAICompatibleModels).toHaveBeenCalledWith(
-      modelRequest,
-    );
-    expect(providers.testOpenAICompatibleProvider).toHaveBeenCalledWith(
-      testRequest,
-    );
-    expect(providers.testOpenAIResponsesProvider).toHaveBeenCalledWith(
-      testRequest,
-    );
-    expect(providers.listAnthropicModels).toHaveBeenCalledWith(modelRequest);
-    expect(providers.testAnthropicProvider).toHaveBeenCalledWith(testRequest);
-    expect(providers.listGeminiModels).toHaveBeenCalledWith(modelRequest);
-    expect(providers.testGeminiProvider).toHaveBeenCalledWith(testRequest);
-    expect(providers.listOcrProviders).toHaveBeenCalledTimes(1);
-    expect(providers.activateOcrProvider).toHaveBeenCalledWith('ocr');
-    expect(providers.configureOcrProviderCredentials).toHaveBeenCalledWith(
-      'ocr',
-      credentials,
-    );
+    expect(runtime.providers).toBe(providers);
   });
 
   it('translates hotkey actions into portable port calls', async () => {
@@ -163,11 +68,16 @@ describe('settings runtime', () => {
       hotkey: '⇧⌘S',
     };
 
-    await runtime.hotkeys.load();
-    await runtime.hotkeys.update(input);
+    const snapshot = await runtime.hotkeys.load();
+    const outcome = await runtime.hotkeys.update(input);
 
     expect(hotkeys.getHotkeySnapshot).toHaveBeenCalledTimes(1);
+    expect(snapshot).toEqual({ screenshot: {}, translation: {}, ocr: {} });
     expect(hotkeys.updateHotkey).toHaveBeenCalledWith(input);
+    expect(outcome).toEqual({
+      snapshot: { screenshot: {}, translation: {}, ocr: {} },
+      accelerator: 'CommandOrControl+Shift+S',
+    });
   });
 
   it('translates history actions into portable port calls', async () => {
@@ -197,6 +107,14 @@ describe('settings runtime', () => {
     await runtime.clipboard.copyText('recognized text');
 
     expect(clipboard.writeText).toHaveBeenCalledWith('recognized text');
+  });
+
+  it('propagates rejected portable operations unchanged', async () => {
+    const error = new Error('clipboard unavailable');
+    const clipboard = { writeText: vi.fn(async () => Promise.reject(error)) };
+    const runtime = createSettingsRuntime(createPorts({ clipboard }));
+
+    await expect(runtime.clipboard.copyText('text')).rejects.toBe(error);
   });
 
   it('enters capture from Advanced settings through the capture port', async () => {
@@ -237,28 +155,28 @@ function createPorts(overrides: Record<string, unknown> = {}) {
 
 function createProviderPort() {
   return {
-    listTranslationProviders: vi.fn(),
-    activateTranslationProvider: vi.fn(),
-    deactivateTranslationProvider: vi.fn(),
-    reorderActiveTranslationProviders: vi.fn(),
-    getProviderCredentialSchema: vi.fn(),
-    getOcrProviderCredentialSchema: vi.fn(),
-    configureTranslationProviderCredentials: vi.fn(),
-    addCustomTranslationProvider: vi.fn(),
-    updateCustomTranslationProvider: vi.fn(),
-    removeCustomTranslationProvider: vi.fn(),
-    testCustomTranslationProvider: vi.fn(),
+    listTranslation: vi.fn(),
+    activateTranslation: vi.fn(),
+    deactivateTranslation: vi.fn(),
+    reorderActiveTranslation: vi.fn(),
+    getTranslationCredentialSchema: vi.fn(),
+    getOcrCredentialSchema: vi.fn(),
+    configureTranslationCredentials: vi.fn(),
+    addCustomTranslation: vi.fn(),
+    updateCustomTranslation: vi.fn(),
+    removeCustomTranslation: vi.fn(),
+    testCustomTranslation: vi.fn(),
     listTranslationPromptStrategies: vi.fn(),
     saveTranslationPromptStrategies: vi.fn(),
     listOpenAICompatibleModels: vi.fn(),
-    testOpenAICompatibleProvider: vi.fn(),
-    testOpenAIResponsesProvider: vi.fn(),
+    testOpenAICompatible: vi.fn(),
+    testOpenAIResponses: vi.fn(),
     listAnthropicModels: vi.fn(),
-    testAnthropicProvider: vi.fn(),
+    testAnthropic: vi.fn(),
     listGeminiModels: vi.fn(),
-    testGeminiProvider: vi.fn(),
-    listOcrProviders: vi.fn(),
-    activateOcrProvider: vi.fn(),
-    configureOcrProviderCredentials: vi.fn(),
+    testGemini: vi.fn(),
+    listOcr: vi.fn(),
+    activateOcr: vi.fn(),
+    configureOcrCredentials: vi.fn(),
   };
 }
