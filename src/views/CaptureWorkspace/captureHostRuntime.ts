@@ -12,7 +12,6 @@ import { printBase64PngImage } from './capturePrint';
 import {
   shouldRevealCaptureWindow,
   waitForCaptureSurfacePaint,
-  type CaptureWindowHandle,
 } from './captureWindowVisibility';
 import type { CaptureSelectionOverlayFrame } from './captureSelectionOverlay';
 import {
@@ -582,15 +581,13 @@ export interface RevealCaptureHostWindowOptions {
   sessionId?: string | null;
   hasCaptureImagesReady: boolean;
   hasRevealed: boolean;
-  window: CaptureWindowHandle;
   prepareSurface?: () => void | Promise<void>;
 }
 
 export interface CaptureHostWindowRevealRuntime {
   shouldRevealCaptureWindow: typeof shouldRevealCaptureWindow;
-  revealCaptureWindow(window: CaptureWindowHandle): Promise<void>;
+  revealCaptureWindow(): Promise<void>;
   revealCaptureWindowForSession(options: {
-    window: CaptureWindowHandle;
     sessionId: string;
     prepareSurface?: () => void | Promise<void>;
   }): Promise<void>;
@@ -612,12 +609,11 @@ export async function revealCaptureHostWindow(
   }
 
   if (!options.sessionId) {
-    await runtime.revealCaptureWindow(options.window);
+    await runtime.revealCaptureWindow();
     return true;
   }
 
   await runtime.revealCaptureWindowForSession({
-    window: options.window,
     sessionId: options.sessionId,
     prepareSurface: options.prepareSurface,
   });

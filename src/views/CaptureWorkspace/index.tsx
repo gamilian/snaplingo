@@ -10,7 +10,6 @@ import { useCaptureWorkspaceController } from './useCaptureWorkspaceController';
 import type { CaptureMode } from './types';
 import {
   CaptureWorkspaceRuntimeProvider,
-  useCaptureWorkspaceRuntime,
 } from './runtimeContext';
 
 interface CaptureWorkspaceProps {
@@ -33,7 +32,6 @@ function CaptureWorkspaceContent({
   initialSessionId,
   onInactive,
 }: Omit<CaptureWorkspaceProps, 'runtime'>) {
-  const runtime = useCaptureWorkspaceRuntime();
   const screenshotSavePath = useSettingsConfigStore(
     (state) => state.screenshot?.savePath,
   );
@@ -44,13 +42,7 @@ function CaptureWorkspaceContent({
     screenshotSavePath,
   });
 
-  useCaptureHostWindowReveal({
-    ...controller.hostWindowReveal,
-    window: {
-      show: runtime.reveal,
-      setFocus: async () => undefined,
-    },
-  });
+  useCaptureHostWindowReveal(controller.hostWindowReveal);
   useCaptureHostSubscriptions(controller.hostSubscriptions);
   useCaptureKeyboardHostEvents(controller.keyboardHostEvents);
 

@@ -210,14 +210,6 @@ describe('captureHostRuntime', () => {
         sessionId: 'session-3',
         hasCaptureImagesReady: true,
         hasRevealed: false,
-        window: {
-          show: async () => {
-            calls.push('show');
-          },
-          setFocus: async () => {
-            calls.push('set_focus');
-          },
-        },
         prepareSurface: async () => {
           calls.push('prepare_surface');
         },

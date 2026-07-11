@@ -13,11 +13,6 @@ interface CaptureWindowRevealState {
   hasRevealed: boolean;
 }
 
-export interface CaptureWindowHandle {
-  show: () => Promise<void>;
-  setFocus: () => Promise<void>;
-}
-
 export interface CaptureWindowRevealClient {
   prepareCaptureWindowForReveal?: () => Promise<void>;
   revealCaptureWindow: () => Promise<void>;
@@ -25,7 +20,6 @@ export interface CaptureWindowRevealClient {
 }
 
 interface RevealCaptureWindowForSessionOptions {
-  window: CaptureWindowHandle;
   client: CaptureWindowRevealClient;
   sessionId: string;
   prepareSurface?: () => void | Promise<void>;
@@ -48,7 +42,6 @@ export function shouldRevealCaptureWindow({
 }
 
 export async function revealCaptureWindow(
-  _window: CaptureWindowHandle,
   client: CaptureWindowRevealClient,
 ) {
   await client.revealCaptureWindow();
@@ -79,12 +72,11 @@ export async function waitForCaptureSurfacePaint(
 }
 
 export async function revealCaptureWindowForSession({
-  window,
   client,
   sessionId: _sessionId,
   prepareSurface,
 }: RevealCaptureWindowForSessionOptions) {
   await client.prepareCaptureWindowForReveal?.();
   await prepareSurface?.();
-  await revealCaptureWindow(window, client);
+  await revealCaptureWindow(client);
 }

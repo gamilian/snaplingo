@@ -5,7 +5,6 @@ import {
   revealCaptureWindowForSession,
   waitForCaptureSurfacePaint,
   shouldRevealCaptureWindow,
-  type CaptureWindowHandle,
 } from './captureWindowVisibility';
 
 describe('capture window visibility', () => {
@@ -66,16 +65,7 @@ describe('capture window visibility', () => {
 
   it('delegates capture window reveal to the native client', async () => {
     const calls: string[] = [];
-    const window: CaptureWindowHandle = {
-      show: async () => {
-        calls.push('show');
-      },
-      setFocus: async () => {
-        calls.push('setFocus');
-      },
-    };
-
-    await revealCaptureWindow(window, {
+    await revealCaptureWindow({
       revealCaptureWindow: async () => {
         calls.push('native_reveal_capture_window');
       },
@@ -89,17 +79,7 @@ describe('capture window visibility', () => {
 
   it('keeps the native capture presentation active after reveal', async () => {
     const calls: string[] = [];
-    const window: CaptureWindowHandle = {
-      show: async () => {
-        calls.push('show');
-      },
-      setFocus: async () => {
-        calls.push('setFocus');
-      },
-    };
-
     await revealCaptureWindowForSession({
-      window,
       sessionId: 'capture-1',
       prepareSurface: async () => {
         calls.push('prepare_surface');

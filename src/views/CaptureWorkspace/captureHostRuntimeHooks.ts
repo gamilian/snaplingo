@@ -3,7 +3,6 @@ import {
   revealCaptureHostWindow,
   type CaptureHotkeyLaunchListener,
 } from './captureHostRuntime';
-import type { CaptureWindowHandle } from './captureWindowVisibility';
 import { shouldRevealCaptureWindow } from './captureWindowVisibility';
 import { useCaptureWorkspaceRuntime } from './runtimeContext';
 
@@ -21,7 +20,6 @@ interface UseCaptureHostWindowRevealOptions {
   sessionId: string | null;
   hasCaptureImagesReady: boolean;
   hasRevealedRef: MutableRefObject<boolean>;
-  window: CaptureWindowHandle;
   prepareSurface: () => void | Promise<void>;
   onRevealedSession: (sessionId: string) => void;
   onError: (err: unknown) => void;
@@ -35,7 +33,6 @@ export function useCaptureHostWindowReveal({
   prepareSurface,
   sessionId,
   status,
-  window,
 }: UseCaptureHostWindowRevealOptions) {
   const runtime = useCaptureWorkspaceRuntime();
   useEffect(() => {
@@ -44,11 +41,10 @@ export function useCaptureHostWindowReveal({
       sessionId,
       hasCaptureImagesReady,
       hasRevealed: hasRevealedRef.current,
-      window,
       prepareSurface,
     }, {
       shouldRevealCaptureWindow,
-      revealCaptureWindow: async () => runtime.reveal(),
+      revealCaptureWindow: () => runtime.reveal(),
       revealCaptureWindowForSession: async ({ prepareSurface }) => {
         await runtime.prepareForReveal();
         await prepareSurface?.();
@@ -71,7 +67,6 @@ export function useCaptureHostWindowReveal({
     prepareSurface,
     sessionId,
     status,
-    window,
     runtime,
   ]);
 }
