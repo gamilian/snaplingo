@@ -653,6 +653,96 @@ describe('capture workspace runtime', () => {
     ).toHaveLength(1);
   });
 
+  it('retries a rejected previous-session cancellation on the next replacement', async () => {
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockImplementation(async (id) =>
+      createSession({ id }),
+    );
+    let previousCancellationAttempt = 0;
+    platform.commands.cancelCaptureSession.mockImplementation(async (id) => {
+      if (id === 'retry-cancel-previous') {
+        previousCancellationAttempt += 1;
+        if (previousCancellationAttempt === 1) {
+          throw new Error('transient cancel failure');
+        }
+      }
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'retry-cancel-previous');
+
+    await runtime.actions.startSession('screenshot', 'retry-cancel-first');
+    expect(runtime.renderState).toMatchObject({
+      status: 'selecting',
+      sessionId: 'retry-cancel-previous',
+      error: 'transient cancel failure',
+    });
+    expect(
+      platform.commands.cancelCaptureSession.mock.calls.filter(
+        ([id]) => id === 'retry-cancel-previous',
+      ),
+    ).toHaveLength(1);
+    expect(
+      platform.commands.cancelCaptureSession.mock.calls.filter(
+        ([id]) => id === 'retry-cancel-first',
+      ),
+    ).toHaveLength(1);
+
+    await runtime.actions.startSession('screenshot', 'retry-cancel-success');
+    expect(
+      platform.commands.cancelCaptureSession.mock.calls.filter(
+        ([id]) => id === 'retry-cancel-previous',
+      ),
+    ).toHaveLength(2);
+    expect(
+      platform.commands.cancelCaptureSession.mock.calls.filter(
+        ([id]) => id === 'retry-cancel-success',
+      ),
+    ).toHaveLength(0);
+    expect(
+      platform.commands.cancelCaptureSession.mock.calls.filter(
+        ([id]) => id === 'retry-cancel-first',
+      ),
+    ).toHaveLength(1);
+    expect(runtime.renderState).toMatchObject({
+      status: 'selecting',
+      sessionId: 'retry-cancel-success',
+      error: null,
+    });
+  });
+
+  it('coalesces concurrent cancellation attempts while the native call is pending', async () => {
+    const firstDismiss = deferred<void>();
+    const nativeCancellation = deferred<void>();
+    const platform = createPlatform({
+      session: createSession({ id: 'concurrent-cancel' }),
+    });
+    platform.dismiss
+      .mockImplementationOnce(() => firstDismiss.promise)
+      .mockResolvedValue(undefined);
+    platform.commands.cancelCaptureSession.mockReturnValue(
+      nativeCancellation.promise,
+    );
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'concurrent-cancel');
+
+    const first = runtime.actions.cancelSession();
+    const second = runtime.actions.cancelSession();
+    await vi.waitFor(() =>
+      expect(platform.commands.cancelCaptureSession).toHaveBeenCalledOnce(),
+    );
+    firstDismiss.resolve();
+    await Promise.resolve();
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledOnce();
+
+    nativeCancellation.resolve();
+    await Promise.all([first, second]);
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledOnce();
+    expect(runtime.renderState).toMatchObject({
+      status: 'idle',
+      sessionId: null,
+    });
+  });
+
   it('cleans a stale unadopted refresh session without changing its replacement', async () => {
     const cancelPrevious = deferred<void>();
     const platform = createPlatform();

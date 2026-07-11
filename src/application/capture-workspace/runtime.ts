@@ -283,7 +283,11 @@ export function createCaptureWorkspaceRuntime({
       cancellation = Promise.reject(error);
     }
     nativeSessionCancellations.set(sessionId, cancellation);
-    void cancellation.catch(() => undefined);
+    void cancellation.catch(() => {
+      if (nativeSessionCancellations.get(sessionId) === cancellation) {
+        nativeSessionCancellations.delete(sessionId);
+      }
+    });
     return cancellation;
   };
 
