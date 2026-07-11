@@ -296,6 +296,81 @@ describe('capture workspace runtime', () => {
     expect(platform.commands.createCaptureSession).not.toHaveBeenCalled();
   });
 
+  it('cleans an unadopted refresh session when canceling the previous session fails', async () => {
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockImplementation(async (id) =>
+      createSession({ id }),
+    );
+    platform.commands.createCaptureSession.mockResolvedValue(
+      createSession({ id: 'session-refresh-new' }),
+    );
+    platform.commands.cancelCaptureSession.mockImplementation(async (id) => {
+      if (id === 'session-refresh-old') {
+        throw new Error('cancel previous failed');
+      }
+      throw new Error('cleanup failed');
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-refresh-old');
+
+    await runtime.actions.refreshSession();
+
+    expect(runtime.renderState).toMatchObject({
+      status: 'error',
+      sessionId: null,
+      error: 'cancel previous failed',
+    });
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
+      'session-refresh-old',
+    );
+    expect(
+      platform.commands.cancelCaptureSession.mock.calls.filter(
+        ([id]) => id === 'session-refresh-new',
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('cleans a stale unadopted refresh session without changing its replacement', async () => {
+    const cancelPrevious = deferred<void>();
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockImplementation(async (id) =>
+      createSession({ id }),
+    );
+    platform.commands.createCaptureSession.mockResolvedValue(
+      createSession({ id: 'session-refresh-stale' }),
+    );
+    platform.commands.cancelCaptureSession.mockImplementation((id) => {
+      if (id === 'session-refresh-old') return cancelPrevious.promise;
+      if (id === 'session-refresh-stale') {
+        return Promise.reject(new Error('late cleanup failed'));
+      }
+      return Promise.resolve();
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-refresh-old');
+
+    const refresh = runtime.actions.refreshSession();
+    await vi.waitFor(() =>
+      expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
+        'session-refresh-old',
+      ),
+    );
+    await runtime.actions.startSession('screenshot', 'session-replacement');
+    cancelPrevious.reject(new Error('late cancel previous failed'));
+    await refresh;
+
+    expect(runtime.renderState).toMatchObject({
+      status: 'selecting',
+      sessionId: 'session-replacement',
+      error: null,
+    });
+    expect(
+      platform.commands.cancelCaptureSession.mock.calls.filter(
+        ([id]) => id === 'session-refresh-stale',
+      ),
+    ).toHaveLength(1);
+  });
+
   it('reports session start failures through runtime state', async () => {
     const platform = createPlatform();
     platform.commands.getCaptureSession.mockRejectedValue(
@@ -1157,7 +1232,9 @@ function createPlatform({
       currentCaptureCursorPosition: vi.fn<
         CaptureWorkspacePlatformRuntime['commands']['currentCaptureCursorPosition']
       >(async () => null),
-      cancelCaptureSession: vi.fn(async () => undefined),
+      cancelCaptureSession: vi.fn<
+        CaptureWorkspacePlatformRuntime['commands']['cancelCaptureSession']
+      >(async () => undefined),
       restoreCaptureSnapshotWindowsForSession: vi.fn(async () => undefined),
       renderCaptureOutput: vi.fn(async () => 'preview-image'),
       defaultCaptureSavePath: vi.fn(async () => '/captures/capture.png'),

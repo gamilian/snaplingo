@@ -730,23 +730,21 @@ export function createCaptureWorkspaceRuntime({
       listeners.forEach((listener) => listener());
       hydratedSessionId = null;
       snapshotHydration = null;
+      let createdSession: CaptureSessionView | null = null;
+      let adoptedCreatedSession = false;
 
       try {
         const session = await platform.commands.createCaptureSession();
+        createdSession = session;
         await platform.commands.cancelCaptureSession(previousSessionId);
-        if (generation !== actionGeneration) {
-          await platform.commands.cancelCaptureSession(session.id);
-          return;
-        }
+        if (generation !== actionGeneration) return;
         const cursorPoint =
           session.captured_cursor?.logical_position ??
           (await platform.commands
             .currentCaptureCursorPosition(session.id)
             .catch(() => null));
-        if (generation !== actionGeneration) {
-          await platform.commands.cancelCaptureSession(session.id);
-          return;
-        }
+        if (generation !== actionGeneration) return;
+        adoptedCreatedSession = true;
         patch({
           status: 'selecting',
           session,
@@ -761,6 +759,12 @@ export function createCaptureWorkspaceRuntime({
       } catch (error) {
         if (generation === actionGeneration) {
           patch({ status: 'error', error: errorMessage(error) });
+        }
+      } finally {
+        if (createdSession && !adoptedCreatedSession) {
+          await platform.commands
+            .cancelCaptureSession(createdSession.id)
+            .catch(() => undefined);
         }
       }
     },
