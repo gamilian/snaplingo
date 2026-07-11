@@ -26,7 +26,6 @@ function createPointerEvent(
   return {
     clientX: 0,
     clientY: 0,
-    pointerId: 7,
     button: 0,
     detail: 1,
     metaKey: false,
@@ -35,7 +34,6 @@ function createPointerEvent(
     shiftKey: false,
     preventDefault: vi.fn(),
     stopPropagation: vi.fn(),
-    currentTarget: { setPointerCapture: vi.fn() },
     ...overrides,
   };
 }
@@ -155,7 +153,6 @@ describe('capture workspace editor pointer dispatch', () => {
     handleCaptureWorkspaceEditorPreviewPointerDown(event, context);
 
     expect(event.stopPropagation).toHaveBeenCalledOnce();
-    expect(event.currentTarget.setPointerCapture).toHaveBeenCalledWith(7);
     expect(actions.setCursorPoint).toHaveBeenCalledWith({ x: 82, y: 96 });
     expect(actions.setAnnotationGesture).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -222,7 +219,6 @@ describe('capture workspace editor pointer dispatch', () => {
 
     handleCaptureWorkspaceEditorResizePointerDown('se', event, context);
 
-    expect(event.currentTarget.setPointerCapture).toHaveBeenCalledWith(7);
     expect(actions.setEditGesture).toHaveBeenCalledWith({
       type: 'resize',
       handle: 'se',

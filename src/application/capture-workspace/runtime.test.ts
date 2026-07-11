@@ -682,6 +682,267 @@ describe('capture workspace runtime', () => {
     expect(runtime.renderState.annotationHistory.annotations).toHaveLength(1);
   });
 
+  it('serializes rapid editor previews and publishes the latest history', async () => {
+    const firstPreview = deferred<string>();
+    const platform = createPlatform({
+      session: createSession({ id: 'session-editor-latest' }),
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession('screenshot', 'session-editor-latest');
+    await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.toggleAnnotationTool('rectangle');
+    runtime.actions.pointerDown({ point: { x: 30, y: 40 }, source: 'preview' });
+    runtime.actions.pointerMove({ point: { x: 70, y: 80 }, source: 'root' });
+    await runtime.actions.pointerUp({ point: { x: 70, y: 80 }, source: 'root' });
+    await vi.waitFor(() =>
+      expect(runtime.renderState.isRenderingOutput).toBe(false),
+    );
+
+    platform.commands.renderCaptureOutput.mockReset();
+    platform.commands.renderCaptureOutput
+      .mockImplementationOnce(() => firstPreview.promise)
+      .mockResolvedValueOnce('redo-preview');
+
+    expect(runtime.actions.keyDown({ key: 'z', metaKey: true })).toBe(true);
+    expect(runtime.actions.keyDown({ key: 'y', metaKey: true })).toBe(true);
+    expect(platform.commands.renderCaptureOutput).toHaveBeenCalledTimes(1);
+
+    firstPreview.resolve('undo-preview');
+    await vi.waitFor(() =>
+      expect(runtime.renderState.isRenderingOutput).toBe(false),
+    );
+
+    expect(platform.commands.renderCaptureOutput).toHaveBeenCalledTimes(2);
+    expect(platform.commands.renderCaptureOutput).toHaveBeenLastCalledWith({
+      sessionId: 'session-editor-latest',
+      rect: selection,
+      annotations: runtime.renderState.annotationHistory.annotations,
+    });
+    expect(runtime.renderState.previewImageBase64).toBe('redo-preview');
+  });
+
+  it('ignores a superseded preview failure and publishes the queued revision', async () => {
+    const supersededPreview = deferred<string>();
+    const platform = createPlatform({
+      session: createSession({ id: 'session-preview-revision' }),
+    });
+    platform.commands.renderCaptureOutput
+      .mockImplementationOnce(() => supersededPreview.promise)
+      .mockResolvedValueOnce('latest-preview');
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession(
+      'screenshot',
+      'session-preview-revision',
+    );
+    const first = runtime.actions.renderSelectionPreview(selection, []);
+    await vi.waitFor(() =>
+      expect(platform.commands.renderCaptureOutput).toHaveBeenCalledTimes(1),
+    );
+    const finalAnnotations = [
+      {
+        type: 'rectangle' as const,
+        rect: { x: 4, y: 5, width: 30, height: 20 },
+        color: [255, 77, 79, 255] as [number, number, number, number],
+        stroke_width: 2,
+        filled: false,
+      },
+    ];
+    const latest = runtime.actions.renderSelectionPreview(
+      selection,
+      finalAnnotations,
+    );
+
+    supersededPreview.reject(new Error('superseded failure'));
+    await Promise.all([first, latest]);
+
+    expect(runtime.renderState).toMatchObject({
+      status: 'preview',
+      previewImageBase64: 'latest-preview',
+      isRenderingOutput: false,
+      error: null,
+    });
+    expect(platform.commands.renderCaptureOutput).toHaveBeenLastCalledWith({
+      sessionId: 'session-preview-revision',
+      rect: selection,
+      annotations: finalAnnotations,
+    });
+  });
+
+  it('executes copy once with current annotations while a preview is pending', async () => {
+    const pendingPreview = deferred<string>();
+    const platform = createPlatform({
+      session: createSession({ id: 'session-copy-pending-preview' }),
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession(
+      'screenshot',
+      'session-copy-pending-preview',
+    );
+    await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.toggleAnnotationTool('rectangle');
+    runtime.actions.pointerDown({ point: { x: 30, y: 40 }, source: 'preview' });
+    runtime.actions.pointerMove({ point: { x: 70, y: 80 }, source: 'root' });
+    await runtime.actions.pointerUp({ point: { x: 70, y: 80 }, source: 'root' });
+    await vi.waitFor(() =>
+      expect(runtime.renderState.isRenderingOutput).toBe(false),
+    );
+
+    runtime.actions.selectMoveTool();
+    runtime.actions.pointerDown({ point: { x: 45, y: 55 }, source: 'preview' });
+    platform.commands.renderCaptureOutput.mockReset();
+    platform.commands.renderCaptureOutput.mockImplementationOnce(
+      () => pendingPreview.promise,
+    );
+    runtime.actions.applySelectedAnnotationStyle(
+      { color: [24, 144, 255, 255], strokeWidth: 4, filled: true },
+      24,
+    );
+    await vi.waitFor(() =>
+      expect(platform.commands.renderCaptureOutput).toHaveBeenCalledTimes(1),
+    );
+
+    await runtime.actions.completePreviewSelection('copy', selection);
+
+    expect(platform.commands.outputCapture).toHaveBeenCalledTimes(1);
+    expect(platform.commands.outputCapture).toHaveBeenCalledWith({
+      sessionId: 'session-copy-pending-preview',
+      rect: selection,
+      annotations: [
+        {
+          type: 'rectangle',
+          rect: { x: 10, y: 10, width: 40, height: 40 },
+          color: [24, 144, 255, 255],
+          stroke_width: 4,
+          filled: true,
+        },
+      ],
+      action: { type: 'copy' },
+    });
+
+    pendingPreview.resolve('stale-preview');
+    await vi.waitFor(() => expect(runtime.renderState.status).toBe('idle'));
+  });
+
+  it('coalesces rapid style previews to the latest selected annotation style', async () => {
+    const firstStylePreview = deferred<string>();
+    const platform = createPlatform({
+      session: createSession({ id: 'session-style-latest' }),
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession('screenshot', 'session-style-latest');
+    await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.toggleAnnotationTool('rectangle');
+    runtime.actions.pointerDown({ point: { x: 30, y: 40 }, source: 'preview' });
+    runtime.actions.pointerMove({ point: { x: 70, y: 80 }, source: 'root' });
+    await runtime.actions.pointerUp({ point: { x: 70, y: 80 }, source: 'root' });
+    await vi.waitFor(() =>
+      expect(runtime.renderState.isRenderingOutput).toBe(false),
+    );
+    runtime.actions.selectMoveTool();
+    runtime.actions.pointerDown({ point: { x: 45, y: 55 }, source: 'preview' });
+
+    platform.commands.renderCaptureOutput.mockReset();
+    platform.commands.renderCaptureOutput
+      .mockImplementationOnce(() => firstStylePreview.promise)
+      .mockResolvedValueOnce('latest-style-preview');
+    runtime.actions.applySelectedAnnotationStyle(
+      { color: [24, 144, 255, 255], strokeWidth: 3, filled: false },
+      24,
+    );
+    await vi.waitFor(() =>
+      expect(platform.commands.renderCaptureOutput).toHaveBeenCalledTimes(1),
+    );
+    runtime.actions.applySelectedAnnotationStyle(
+      { color: [40, 167, 69, 255], strokeWidth: 6, filled: true },
+      24,
+    );
+
+    firstStylePreview.resolve('superseded-style-preview');
+    await vi.waitFor(() =>
+      expect(runtime.renderState.isRenderingOutput).toBe(false),
+    );
+
+    expect(platform.commands.renderCaptureOutput).toHaveBeenLastCalledWith({
+      sessionId: 'session-style-latest',
+      rect: selection,
+      annotations: [
+        {
+          type: 'rectangle',
+          rect: { x: 10, y: 10, width: 40, height: 40 },
+          color: [40, 167, 69, 255],
+          stroke_width: 6,
+          filled: true,
+        },
+      ],
+    });
+    expect(runtime.renderState.previewImageBase64).toBe(
+      'latest-style-preview',
+    );
+  });
+
+  it('queues text-edit removal and discard renders without losing the restored text', async () => {
+    const removalPreview = deferred<string>();
+    const platform = createPlatform({
+      session: createSession({ id: 'session-text-discard-latest' }),
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession(
+      'screenshot',
+      'session-text-discard-latest',
+    );
+    await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.toggleAnnotationTool('text');
+    runtime.actions.pointerDown({ point: { x: 50, y: 60 }, source: 'preview' });
+    runtime.actions.updateTextDraftText('restored text');
+    runtime.actions.commitTextDraft();
+    await vi.waitFor(() =>
+      expect(runtime.renderState.isRenderingOutput).toBe(false),
+    );
+    runtime.actions.selectMoveTool();
+
+    platform.commands.renderCaptureOutput.mockReset();
+    platform.commands.renderCaptureOutput
+      .mockImplementationOnce(() => removalPreview.promise)
+      .mockResolvedValueOnce('restored-text-preview');
+    runtime.actions.pointerDown({
+      point: { x: 50, y: 60 },
+      detail: 2,
+      shiftKey: true,
+      source: 'preview',
+    });
+    await vi.waitFor(() =>
+      expect(platform.commands.renderCaptureOutput).toHaveBeenCalledTimes(1),
+    );
+    runtime.actions.discardTextDraft();
+
+    removalPreview.resolve('text-removed-preview');
+    await vi.waitFor(() =>
+      expect(runtime.renderState.isRenderingOutput).toBe(false),
+    );
+
+    expect(platform.commands.renderCaptureOutput).toHaveBeenLastCalledWith({
+      sessionId: 'session-text-discard-latest',
+      rect: selection,
+      annotations: [
+        {
+          type: 'text',
+          position: { x: 30, y: 30 },
+          text: 'restored text',
+          color: [255, 77, 79, 255],
+          font_size: 24,
+        },
+      ],
+    });
+    expect(runtime.renderState.previewImageBase64).toBe(
+      'restored-text-preview',
+    );
+  });
+
   it('owns selection move and resize edit transactions', async () => {
     const platform = createPlatform({
       session: createSession({ id: 'session-editor-selection' }),

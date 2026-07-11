@@ -39,21 +39,15 @@ interface MutableRefLike<Value> {
   current: Value;
 }
 
-export interface CaptureWorkspacePointerTarget {
-  setPointerCapture(pointerId: number): void;
-}
-
 export interface CaptureWorkspacePointerEvent {
   clientX: number;
   clientY: number;
-  pointerId: number;
   button: number;
   detail?: number;
   metaKey: boolean;
   ctrlKey: boolean;
   altKey: boolean;
   shiftKey: boolean;
-  currentTarget: CaptureWorkspacePointerTarget;
   preventDefault(): void;
   stopPropagation(): void;
 }
@@ -359,7 +353,6 @@ export function handleCaptureWorkspaceEditorPreviewPointerDown(
   }
 
   event.stopPropagation();
-  event.currentTarget.setPointerCapture(event.pointerId);
   const point = getCaptureWorkspacePointerPoint(event, selectionBounds);
   actions.setCursorPoint(point);
   if (activeAnnotationTool) {
@@ -466,7 +459,6 @@ export function handleCaptureWorkspaceEditorResizePointerDown(
   if (status !== 'preview' || !selection || !selectionBounds) return;
 
   event.stopPropagation();
-  event.currentTarget.setPointerCapture(event.pointerId);
   const start = planCaptureSelectionResizeStart({
     point: getCaptureWorkspacePointerPoint(event, selectionBounds),
     selection,

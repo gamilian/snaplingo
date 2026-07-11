@@ -9,6 +9,9 @@ import {
 } from 'react';
 
 import { createCaptureWorkspaceRuntime } from '../../application/capture-workspace/runtime';
+import type {
+  CaptureWorkspacePointerInput,
+} from '../../application/capture-workspace/types';
 import { prepareCaptureSurfaceForReveal } from './captureHostRuntime';
 import {
   shouldPollCaptureHoverSelection,
@@ -19,8 +22,9 @@ import { useCaptureSelectionOverlay } from './captureSelectionOverlayRuntime';
 import { getCaptureWorkspaceDerivedState } from './captureWorkspaceDerived';
 import { getCaptureWorkspacePointerPoint } from './captureWorkspacePointer';
 import type { CaptureWorkspaceState } from './captureWorkspaceState';
+import type { SelectionHandle } from './selection';
 import { useCaptureWorkspaceState } from './useCaptureWorkspaceState';
-import type { CaptureMode } from './types';
+import type { CaptureMode, LogicalRect } from './types';
 import { useCaptureWorkspaceRuntime } from './runtimeContext';
 
 const TOOLBAR_GAP = 14;
@@ -32,6 +36,82 @@ interface CaptureWorkspaceControllerOptions {
   initialSessionId?: string;
   onInactive?: () => void | Promise<void>;
   screenshotSavePath?: string;
+}
+
+interface CaptureWorkspaceDomPointerEvent {
+  clientX: number;
+  clientY: number;
+  pointerId: number;
+  button: number;
+  detail: number;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  altKey: boolean;
+  shiftKey: boolean;
+  currentTarget: {
+    setPointerCapture(pointerId: number): void;
+  };
+  preventDefault(): void;
+  stopPropagation(): void;
+}
+
+export function dispatchCaptureWorkspacePreviewPointerDown({
+  event,
+  selectionBounds,
+  pointerDown,
+}: {
+  event: CaptureWorkspaceDomPointerEvent;
+  selectionBounds: LogicalRect | null;
+  pointerDown(input: CaptureWorkspacePointerInput): boolean;
+}) {
+  if (!selectionBounds) return false;
+
+  event.currentTarget.setPointerCapture(event.pointerId);
+  const handled = pointerDown({
+    point: getCaptureWorkspacePointerPoint(event, selectionBounds),
+    button: event.button,
+    detail: event.detail,
+    metaKey: event.metaKey,
+    ctrlKey: event.ctrlKey,
+    altKey: event.altKey,
+    shiftKey: event.shiftKey,
+    source: 'preview',
+  });
+  if (handled) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  return handled;
+}
+
+export function dispatchCaptureWorkspaceResizePointerDown({
+  handle,
+  event,
+  selectionBounds,
+  resizePointerDown,
+}: {
+  handle: SelectionHandle;
+  event: CaptureWorkspaceDomPointerEvent;
+  selectionBounds: LogicalRect | null;
+  resizePointerDown(
+    handle: SelectionHandle,
+    input: CaptureWorkspacePointerInput,
+  ): boolean;
+}) {
+  if (!selectionBounds) return false;
+
+  event.currentTarget.setPointerCapture(event.pointerId);
+  const handled = resizePointerDown(handle, {
+    point: getCaptureWorkspacePointerPoint(event, selectionBounds),
+    button: event.button,
+    shiftKey: event.shiftKey,
+    source: 'preview',
+  });
+  if (handled) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  return handled;
 }
 
 export function useCaptureWorkspaceController({
@@ -76,16 +156,7 @@ export function useCaptureWorkspaceController({
       }),
     [runtime],
   );
-  const isRenderingOutputRef = useRef(false);
-  const handleRenderingOutputChange = useCallback(
-    (isRenderingOutput: boolean) => {
-      isRenderingOutputRef.current = isRenderingOutput;
-    },
-    [],
-  );
-  const workspace = useCaptureWorkspaceState({
-    onRenderingOutputChange: handleRenderingOutputChange,
-  });
+  const workspace = useCaptureWorkspaceState();
   const [hydratedCaptureSessionId, setHydratedCaptureSessionId] =
     useState<string | null>(null);
 
@@ -238,10 +309,8 @@ export function useCaptureWorkspaceController({
       action: Parameters<
         typeof workflowRuntime.actions.completePreviewSelection
       >[0],
-      guardCompletion = false,
     ) => {
       if (!captureWorkspaceState.selection) return;
-      if (guardCompletion && isRenderingOutputRef.current) return;
 
       await workflowRuntime.actions.completePreviewSelection(
         action,
@@ -251,7 +320,7 @@ export function useCaptureWorkspaceController({
     [captureWorkspaceState.selection, workflowRuntime],
   );
   const copySelection = useCallback(
-    () => completePreviewSelection('copy', true),
+    () => completePreviewSelection('copy'),
     [completePreviewSelection],
   );
   const saveSelection = useCallback(
@@ -374,23 +443,11 @@ export function useCaptureWorkspaceController({
   );
   const onPreviewPointerDown = useCallback(
     (event: PointerEvent<HTMLDivElement>) => {
-      if (
-        derived.selectionBounds &&
-        workflowRuntime.actions.pointerDown({
-          point: getCaptureWorkspacePointerPoint(event, derived.selectionBounds),
-          button: event.button,
-          detail: event.detail,
-          metaKey: event.metaKey,
-          ctrlKey: event.ctrlKey,
-          altKey: event.altKey,
-          shiftKey: event.shiftKey,
-          source: 'preview',
-        })
-      ) {
-        event.preventDefault();
-        event.stopPropagation();
-        return;
-      }
+      dispatchCaptureWorkspacePreviewPointerDown({
+        event,
+        selectionBounds: derived.selectionBounds,
+        pointerDown: workflowRuntime.actions.pointerDown,
+      });
     },
     [derived.selectionBounds, workflowRuntime],
   );
@@ -399,18 +456,12 @@ export function useCaptureWorkspaceController({
       handle: Parameters<typeof workflowRuntime.actions.resizePointerDown>[0],
       event: PointerEvent<HTMLButtonElement>,
     ) => {
-      if (!derived.selectionBounds) return;
-      if (
-        workflowRuntime.actions.resizePointerDown(handle, {
-          point: getCaptureWorkspacePointerPoint(event, derived.selectionBounds),
-          button: event.button,
-          shiftKey: event.shiftKey,
-          source: 'preview',
-        })
-      ) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
+      dispatchCaptureWorkspaceResizePointerDown({
+        handle,
+        event,
+        selectionBounds: derived.selectionBounds,
+        resizePointerDown: workflowRuntime.actions.resizePointerDown,
+      });
     },
     [derived.selectionBounds, workflowRuntime],
   );

@@ -125,6 +125,15 @@ interface SnapshotHydration {
   promise: Promise<void>;
 }
 
+interface PreviewRenderRequest {
+  revision: number;
+  generation: number;
+  sessionId: string;
+  rect: LogicalRect;
+  annotations: AnnotationCommand[];
+  includeCursor: boolean;
+}
+
 interface CaptureWorkspaceRuntimeHost {
   resetInteraction(): void;
   resetSession(): void;
@@ -188,6 +197,10 @@ export function createCaptureWorkspaceRuntime({
   let hasKeyboardAdjustedDraft = false;
   const cursorPointRef = { current: null as Point | null };
   const keyboardEditCursorPointRef = { current: null as Point | null };
+  let previewRevision = 0;
+  let queuedPreview: PreviewRenderRequest | null = null;
+  let previewDrain: Promise<void> | null = null;
+  let terminalOutputInFlight = false;
 
   const markPerf = (event: string, sessionId?: string | null) => {
     const perf = perfState;
@@ -223,6 +236,8 @@ export function createCaptureWorkspaceRuntime({
   };
 
   const resetSession = () => {
+    queuedPreview = null;
+    previewRevision += 1;
     state = createInitialState(state.mode, state);
     cursorPointRef.current = null;
     keyboardEditCursorPointRef.current = null;
@@ -369,7 +384,8 @@ export function createCaptureWorkspaceRuntime({
     includeCursor = false,
   ) => {
     const session = state.session;
-    if (!session || state.isRenderingOutput) return;
+    if (!session || terminalOutputInFlight) return;
+    terminalOutputInFlight = true;
     const actionGeneration = generation;
     const cancelNativeSession = createNativeSessionCancellation(session.id);
 
@@ -406,8 +422,9 @@ export function createCaptureWorkspaceRuntime({
         await cancelNativeSession().catch(() => undefined);
       }
     } finally {
+      terminalOutputInFlight = false;
       if (generation === actionGeneration && state.session?.id === session.id) {
-        patch({ isRenderingOutput: false });
+        patch({ isRenderingOutput: previewDrain !== null });
       }
     }
   };
@@ -418,9 +435,16 @@ export function createCaptureWorkspaceRuntime({
     includeCursor = false,
   ) => {
     const session = state.session;
-    if (!session || state.isRenderingOutput) return;
-    const actionGeneration = generation;
-    const cancelNativeSession = createNativeSessionCancellation(session.id);
+    if (!session) return;
+    const request: PreviewRenderRequest = {
+      revision: ++previewRevision,
+      generation,
+      sessionId: session.id,
+      rect,
+      annotations,
+      includeCursor,
+    };
+    queuedPreview = request;
 
     patch({
       status: 'preview',
@@ -431,29 +455,64 @@ export function createCaptureWorkspaceRuntime({
       error: null,
     });
 
-    try {
-      const previewImageBase64 = await platform.commands.renderCaptureOutput({
-        sessionId: session.id,
-        rect,
-        annotations,
-        ...(includeCursor ? { includeCursor: true } : {}),
+    if (!previewDrain) {
+      const work = (async () => {
+        while (queuedPreview) {
+          const current = queuedPreview;
+          queuedPreview = null;
+          const cancelNativeSession = createNativeSessionCancellation(
+            current.sessionId,
+          );
+          if (
+            generation !== current.generation ||
+            state.session?.id !== current.sessionId
+          ) {
+            if (state.session?.id !== current.sessionId) {
+              await cancelNativeSession().catch(() => undefined);
+            }
+            continue;
+          }
+
+          try {
+            const previewImageBase64 =
+              await platform.commands.renderCaptureOutput({
+                sessionId: current.sessionId,
+                rect: current.rect,
+                annotations: current.annotations,
+                ...(current.includeCursor ? { includeCursor: true } : {}),
+              });
+            if (
+              generation === current.generation &&
+              state.session?.id === current.sessionId &&
+              previewRevision === current.revision
+            ) {
+              patch({ previewImageBase64 });
+            } else if (state.session?.id !== current.sessionId) {
+              await cancelNativeSession().catch(() => undefined);
+            }
+          } catch (error) {
+            if (
+              generation === current.generation &&
+              state.session?.id === current.sessionId &&
+              previewRevision === current.revision
+            ) {
+              patch({ status: 'error', error: errorMessage(error) });
+            } else if (state.session?.id !== current.sessionId) {
+              await cancelNativeSession().catch(() => undefined);
+            }
+          }
+        }
+      })();
+      let drain!: Promise<void>;
+      drain = work.finally(() => {
+        if (previewDrain === drain) {
+          previewDrain = null;
+          patch({ isRenderingOutput: terminalOutputInFlight });
+        }
       });
-      if (generation !== actionGeneration || state.session?.id !== session.id) {
-        if (state.session?.id !== session.id) await cancelNativeSession();
-        return;
-      }
-      patch({ previewImageBase64 });
-    } catch (error) {
-      if (generation === actionGeneration && state.session?.id === session.id) {
-        patch({ status: 'error', error: errorMessage(error) });
-      } else if (state.session?.id !== session.id) {
-        await cancelNativeSession().catch(() => undefined);
-      }
-    } finally {
-      if (generation === actionGeneration && state.session?.id === session.id) {
-        patch({ isRenderingOutput: false });
-      }
+      previewDrain = drain;
     }
+    await previewDrain;
   };
 
   const getEditorDerived = () =>
@@ -1045,6 +1104,8 @@ export function createCaptureWorkspaceRuntime({
 
     async startSession(mode, requestedSessionId) {
       const actionGeneration = ++generation;
+      queuedPreview = null;
+      previewRevision += 1;
       hasKeyboardAdjustedDraft = false;
       host?.resetInteraction();
       hasRevealed = false;
@@ -1107,6 +1168,8 @@ export function createCaptureWorkspaceRuntime({
       const previousSessionId = state.session?.id;
       if (!previousSessionId) return;
       const actionGeneration = ++generation;
+      queuedPreview = null;
+      previewRevision += 1;
       hasKeyboardAdjustedDraft = false;
       host?.resetInteraction();
       hasRevealed = false;
@@ -1181,6 +1244,8 @@ export function createCaptureWorkspaceRuntime({
     },
     resetPreview() {
       generation += 1;
+      queuedPreview = null;
+      previewRevision += 1;
       hasKeyboardAdjustedDraft = false;
       snapshotHydration = null;
       hydratedSessionId = null;
@@ -1827,14 +1892,12 @@ function createEditorPointerEvent(
   const event: CaptureWorkspacePointerEvent = {
     clientX: input.point.x - selectionBounds.x,
     clientY: input.point.y - selectionBounds.y,
-    pointerId: 0,
     button: input.button ?? 0,
     detail: input.detail ?? 1,
     metaKey: input.metaKey ?? false,
     ctrlKey: input.ctrlKey ?? false,
     altKey: input.altKey ?? false,
     shiftKey: input.shiftKey ?? false,
-    currentTarget: { setPointerCapture: markHandled },
     preventDefault: markHandled,
     stopPropagation: markHandled,
   };

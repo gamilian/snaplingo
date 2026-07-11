@@ -139,6 +139,13 @@ describe('capture workspace production runtime wiring', () => {
     expect(runtime).toContain('commitCaptureEditorTextDraft');
   });
 
+  it('lets runtime terminal exclusion handle copy while editor previews are pending', () => {
+    expect(controller).not.toContain('isRenderingOutputRef');
+    expect(controller).not.toContain('guardCompletion');
+    expect(runtime).toContain('terminalOutputInFlight');
+    expect(runtime).not.toContain('if (!session || state.isRenderingOutput)');
+  });
+
   it('keeps selecting keyboard workflows out of the editor-only handler', () => {
     const editorHandler = keyboard.slice(
       keyboard.indexOf('export function handleCaptureWorkspaceEditorKeyDown'),
