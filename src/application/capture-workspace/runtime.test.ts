@@ -6,6 +6,150 @@ import { createCaptureWorkspaceRuntime } from './runtime';
 const selection = { x: 20, y: 30, width: 120, height: 80 };
 
 describe('capture workspace runtime', () => {
+  it('owns host subscriptions and cleans every listener up together', async () => {
+    const platform = createPlatform();
+    const unlistenHotkey = vi.fn();
+    const unlistenCancel = vi.fn();
+    const unlistenCopy = vi.fn();
+    platform.onHotkeyTriggered.mockResolvedValue(unlistenHotkey);
+    platform.onCancelRequested.mockResolvedValue(unlistenCancel);
+    platform.onCopyRequested.mockResolvedValue(unlistenCopy);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    const disconnect = await runtime.actions.connectHost();
+    const launch = platform.onHotkeyTriggered.mock.calls[0]?.[0];
+    await launch?.({ mode: 'screenshot', sessionId: 'session-host' });
+
+    expect(runtime.renderState).toMatchObject({
+      status: 'selecting',
+      sessionId: 'session-1',
+    });
+    expect(platform.onCancelRequested).toHaveBeenCalledTimes(1);
+    expect(platform.onCopyRequested).toHaveBeenCalledTimes(1);
+
+    disconnect();
+    expect(unlistenHotkey).toHaveBeenCalledTimes(1);
+    expect(unlistenCancel).toHaveBeenCalledTimes(1);
+    expect(unlistenCopy).toHaveBeenCalledTimes(1);
+  });
+
+  it('handles native preview copy through runtime-owned completion effects', async () => {
+    const annotation = {
+      type: 'rectangle' as const,
+      rect: { x: 1, y: 2, width: 10, height: 20 },
+      color: [255, 0, 0, 255] as [number, number, number, number],
+      stroke_width: 2,
+      filled: false,
+    };
+    const platform = createPlatform({
+      session: createSession({ id: 'session-native-copy' }),
+    });
+    const runtime = createCaptureWorkspaceRuntime({
+      platform,
+      host: {
+        resetInteraction: vi.fn(),
+        resetSession: vi.fn(),
+        applyManualSelection: vi.fn(),
+        getAnnotations: () => [],
+        commitTextDraft: () => [annotation],
+        shouldIncludeCursor: () => true,
+        hasTextDraft: () => false,
+        prepareSurface: vi.fn(),
+        getSnapTargetRects: () => [],
+      },
+    });
+    await runtime.actions.startSession('screenshot', 'session-native-copy');
+    await runtime.actions.renderSelectionPreview(selection);
+    await runtime.actions.connectHost();
+
+    const copy = platform.onCopyRequested.mock.calls[0]?.[0];
+    await copy?.();
+
+    expect(platform.commands.outputCapture).toHaveBeenCalledWith({
+      sessionId: 'session-native-copy',
+      rect: selection,
+      annotations: [annotation],
+      includeCursor: true,
+      action: { type: 'copy' },
+    });
+    expect(platform.dismiss).toHaveBeenCalledTimes(1);
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
+      'session-native-copy',
+    );
+  });
+
+  it('reveals once when runtime host readiness becomes complete', async () => {
+    const platform = createPlatform({
+      session: createSession({ id: 'session-reveal' }),
+    });
+    const prepareSurface = vi.fn(async () => undefined);
+    const runtime = createCaptureWorkspaceRuntime({
+      platform,
+      host: {
+        resetInteraction: vi.fn(),
+        resetSession: vi.fn(),
+        applyManualSelection: vi.fn(),
+        getAnnotations: () => [],
+        commitTextDraft: () => [],
+        shouldIncludeCursor: () => false,
+        hasTextDraft: () => false,
+        prepareSurface,
+        getSnapTargetRects: () => [],
+      },
+    });
+
+    await runtime.actions.startSession('screenshot', 'session-reveal');
+    await runtime.actions.updateHostReadiness(false);
+    await runtime.actions.updateHostReadiness(true);
+    await runtime.actions.updateHostReadiness(true);
+
+    expect(platform.prepareForReveal).toHaveBeenCalledTimes(1);
+    expect(prepareSurface).toHaveBeenCalledTimes(1);
+    expect(platform.reveal).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores refresh without an active session', async () => {
+    const platform = createPlatform();
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.refreshSession();
+
+    expect(platform.commands.createCaptureSession).not.toHaveBeenCalled();
+  });
+
+  it('reports session start failures through runtime state', async () => {
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockRejectedValue(
+      new Error('load failed'),
+    );
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession('screenshot', 'session-failure');
+
+    expect(runtime.renderState).toMatchObject({
+      status: 'error',
+      sessionId: null,
+      error: 'load failed',
+    });
+  });
+
+  it('guards duplicate candidate completion while output is pending', async () => {
+    const output = deferred<void>();
+    const platform = createPlatform({
+      session: createSession({ id: 'session-duplicate' }),
+    });
+    platform.commands.outputCapture.mockImplementation(() => output.promise);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot-copy', 'session-duplicate');
+
+    const first = runtime.actions.completeCandidateSelection(selection, 'copy');
+    await runtime.actions.completeCandidateSelection(selection, 'copy');
+    expect(platform.commands.outputCapture).toHaveBeenCalledTimes(1);
+
+    output.resolve();
+    await first;
+  });
+
   it('keeps the newest session authoritative when an older start resolves later', async () => {
     const oldSession = deferred<ReturnType<typeof createSession>>();
     const platform = createPlatform();
@@ -530,9 +674,15 @@ function createPlatform({
     clipboard: {
       copyText: vi.fn(async () => undefined),
     },
-    onCancelRequested: vi.fn(async () => vi.fn()),
-    onCopyRequested: vi.fn(async () => vi.fn()),
-    onHotkeyTriggered: vi.fn(async () => vi.fn()),
+    onCancelRequested: vi.fn<
+      CaptureWorkspacePlatformRuntime['onCancelRequested']
+    >(async () => () => undefined),
+    onCopyRequested: vi.fn<
+      CaptureWorkspacePlatformRuntime['onCopyRequested']
+    >(async () => () => undefined),
+    onHotkeyTriggered: vi.fn<
+      CaptureWorkspacePlatformRuntime['onHotkeyTriggered']
+    >(async () => () => undefined),
     prepareForReveal: vi.fn(async () => undefined),
     reveal: vi.fn(async () => undefined),
     dismiss: vi.fn<CaptureWorkspacePlatformRuntime['dismiss']>(async () =>

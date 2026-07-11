@@ -9,9 +9,12 @@ import type {
   HoverSelectionCompletionAction,
 } from '../../views/CaptureWorkspace/captureActions';
 import {
+  getCaptureKeyboardKeyUpAction,
+  planCaptureKeyboardBlur,
+} from '../../views/CaptureWorkspace/captureKeyboardHostRuntime';
+import {
   buildCaptureCandidates,
   getBestCandidateAtPoint,
-  getCandidateForPointerReleaseCompletion,
 } from '../../views/CaptureWorkspace/captureCandidates';
 import {
   getPrimaryCaptureCompletionActionForMode,
@@ -24,11 +27,21 @@ import {
   type CaptureSelectionStorage,
 } from '../../views/CaptureWorkspace/captureHostRuntime';
 import { printBase64PngImage } from '../../views/CaptureWorkspace/capturePrint';
-import { normalizeSelection } from '../../views/CaptureWorkspace/selection';
+import {
+  normalizeSelection,
+  snapPointToRects,
+} from '../../views/CaptureWorkspace/selection';
+import {
+  planCaptureDraftSelectionCommit,
+  planCaptureDraftSelectionPointerMove,
+  planCaptureDraftSelectionStart,
+} from '../../views/CaptureWorkspace/captureSelectionRuntime';
+import { shouldRevealCaptureWindow } from '../../views/CaptureWorkspace/captureWindowVisibility';
 import { normalizeOcrText } from '../../utils/ocrTextProcessing';
 import type {
   CaptureWorkspaceRenderState,
   CaptureWorkspaceRuntime,
+  CaptureWorkspacePointerInput,
   CaptureWorkspaceRuntimePlatform,
 } from './types';
 
@@ -53,13 +66,47 @@ interface SnapshotHydration {
   promise: Promise<void>;
 }
 
+interface CaptureWorkspaceRuntimeHost {
+  resetInteraction(): void;
+  resetSession(): void;
+  applyManualSelection(rect: LogicalRect, mode: CaptureMode): void;
+  getAnnotations(): AnnotationCommand[];
+  commitTextDraft(): AnnotationCommand[];
+  shouldIncludeCursor(): boolean;
+  hasTextDraft(): boolean;
+  prepareSurface(): void | Promise<void>;
+  getSnapTargetRects(): LogicalRect[];
+}
+
+interface CaptureWorkspaceRuntimeKeyboard {
+  target: {
+    addEventListener(type: string, listener: EventListener): void;
+    removeEventListener(type: string, listener: EventListener): void;
+  };
+  onUnhandledKeyDown(event: KeyboardEvent): void;
+  releaseMagnifierRequest(): void;
+  hasDraftSelectionMoveGesture(): boolean;
+  finishDraftSelectionMove(): void;
+}
+
+interface CaptureFrontendPerfState {
+  mode: CaptureMode;
+  sessionId: string | null;
+  startMs: number;
+  hasLoggedImagesReady: boolean;
+}
+
 export function createCaptureWorkspaceRuntime({
   platform,
+  host,
+  keyboard,
   onInactive,
   screenshotSavePath,
   storage,
 }: {
   platform: CaptureWorkspaceRuntimePlatform;
+  host?: CaptureWorkspaceRuntimeHost;
+  keyboard?: CaptureWorkspaceRuntimeKeyboard;
   onInactive?: () => void | Promise<void>;
   screenshotSavePath?: () => string | undefined;
   storage?: CaptureSelectionStorage;
@@ -69,6 +116,20 @@ export function createCaptureWorkspaceRuntime({
   let hydratedSessionId: string | null = null;
   let snapshotHydration: SnapshotHydration | null = null;
   const listeners = new Set<() => void>();
+  let hasRevealed = false;
+  let perfState: CaptureFrontendPerfState | null = null;
+
+  const markPerf = (event: string, sessionId?: string | null) => {
+    const perf = perfState;
+    if (!perf) return;
+
+    void platform.commands.logCaptureFrontendPerf({
+      event,
+      mode: perf.mode,
+      sessionId: sessionId ?? perf.sessionId,
+      elapsedMs: performance.now() - perf.startMs,
+    }).catch(() => undefined);
+  };
 
   const patch = (next: Partial<RuntimeState>) => {
     state = { ...state, ...next };
@@ -79,6 +140,7 @@ export function createCaptureWorkspaceRuntime({
     state = createInitialState(state.mode);
     hydratedSessionId = null;
     snapshotHydration = null;
+    host?.resetSession();
     listeners.forEach((listener) => listener());
   };
 
@@ -318,6 +380,7 @@ export function createCaptureWorkspaceRuntime({
   };
 
   const completeManualSelection = async (rect: LogicalRect) => {
+    host?.applyManualSelection(rect, state.mode);
     const completion = planManualSelectionCompletion(state.mode);
     if (completion.type === 'preview') {
       await renderSelectionPreview(rect);
@@ -353,8 +416,137 @@ export function createCaptureWorkspaceRuntime({
   };
 
   const actions: CaptureWorkspaceRuntime['actions'] = {
+    async connectHost() {
+      const unlisten: Array<() => void> = [];
+      const handleKeyDown = (event: Event) => {
+        const keyboardEvent = event as KeyboardEvent;
+        void actions.keyDown(keyboardEvent).then((handled) => {
+          if (handled) {
+            keyboardEvent.preventDefault();
+            return;
+          }
+          keyboard?.onUnhandledKeyDown(keyboardEvent);
+        });
+      };
+      const handleKeyUp = (event: Event) => {
+        const keyboardEvent = event as KeyboardEvent;
+        const action = getCaptureKeyboardKeyUpAction(keyboardEvent, {
+          hasDraftSelectionMoveGesture:
+            keyboard?.hasDraftSelectionMoveGesture() ?? false,
+        });
+        if (action === 'release-magnifier-request') {
+          keyboard?.releaseMagnifierRequest();
+        } else if (action === 'finish-draft-selection-move') {
+          keyboardEvent.preventDefault();
+          keyboard?.finishDraftSelectionMove();
+        }
+      };
+      const handleBlur = () => {
+        const plan = planCaptureKeyboardBlur({
+          status: state.status,
+          isRenderingOutput: state.isRenderingOutput,
+        });
+        if (plan.releaseMagnifierRequest) {
+          keyboard?.releaseMagnifierRequest();
+        }
+        if (plan.cancelSession) {
+          void cancelSession();
+        }
+      };
+
+      if (keyboard) {
+        keyboard.target.addEventListener('keydown', handleKeyDown);
+        keyboard.target.addEventListener('keyup', handleKeyUp);
+        keyboard.target.addEventListener('blur', handleBlur);
+        unlisten.push(() => {
+          keyboard.target.removeEventListener('keydown', handleKeyDown);
+          keyboard.target.removeEventListener('keyup', handleKeyUp);
+          keyboard.target.removeEventListener('blur', handleBlur);
+        });
+      }
+
+      try {
+        unlisten.push(
+          await platform.onHotkeyTriggered((launch) =>
+            actions.startSession(launch.mode, launch.sessionId),
+          ),
+          await platform.onCancelRequested(() => cancelSession()),
+          await platform.onCopyRequested(async () => {
+            if (state.status === 'preview' && state.selection) {
+              await runCompletionEffects(
+                state.selection,
+                planCandidateSelectionCompletion('copy'),
+                host?.commitTextDraft() ?? host?.getAnnotations() ?? [],
+                host?.shouldIncludeCursor() ?? false,
+              );
+              return;
+            }
+
+            if (
+              state.status === 'selecting' &&
+              !state.startPoint &&
+              state.hoverSelection &&
+              !host?.hasTextDraft()
+            ) {
+              await completeCandidateSelection(state.hoverSelection, 'copy');
+            }
+          }),
+        );
+      } catch (error) {
+        unlisten.forEach((dispose) => dispose());
+        patch({ status: 'error', error: errorMessage(error) });
+        return () => undefined;
+      }
+
+      return () => unlisten.forEach((dispose) => dispose());
+    },
+
+    async updateHostReadiness(imagesReady) {
+      const sessionId = state.session?.id ?? null;
+      if (
+        !shouldRevealCaptureWindow({
+          status: state.status,
+          hasSession: Boolean(sessionId),
+          hasCaptureImagesReady: imagesReady,
+          hasRevealed,
+        })
+      ) {
+        return;
+      }
+
+      try {
+        await platform.prepareForReveal();
+        await host?.prepareSurface();
+        await platform.reveal();
+        hasRevealed = true;
+        if (sessionId) markPerf('revealed', sessionId);
+      } catch (error) {
+        patch({ status: 'error', error: errorMessage(error) });
+      }
+
+      const perf = perfState;
+      if (
+        perf &&
+        imagesReady &&
+        !perf.hasLoggedImagesReady &&
+        perf.sessionId === sessionId
+      ) {
+        perf.hasLoggedImagesReady = true;
+        markPerf('images_ready', sessionId);
+      }
+    },
+
     async startSession(mode, requestedSessionId) {
       const actionGeneration = ++generation;
+      host?.resetInteraction();
+      hasRevealed = false;
+      perfState = {
+        mode,
+        sessionId: null,
+        startMs: performance.now(),
+        hasLoggedImagesReady: false,
+      };
+      markPerf('start_session', null);
       state = {
         ...createInitialState(mode),
         status: 'loading',
@@ -368,6 +560,8 @@ export function createCaptureWorkspaceRuntime({
           ? await platform.commands.getCaptureSession(requestedSessionId)
           : await platform.commands.createCaptureSession();
         if (generation !== actionGeneration) return;
+        if (perfState) perfState.sessionId = session.id;
+        markPerf('session_loaded', session.id);
 
         const cursorPoint =
           session.captured_cursor?.logical_position ??
@@ -398,6 +592,8 @@ export function createCaptureWorkspaceRuntime({
       const previousSessionId = state.session?.id;
       if (!previousSessionId) return;
       const actionGeneration = ++generation;
+      host?.resetInteraction();
+      hasRevealed = false;
       state = {
         ...createInitialState(state.mode),
         status: 'loading',
@@ -463,24 +659,52 @@ export function createCaptureWorkspaceRuntime({
       });
     },
 
-    pointerDown(point) {
+    pointerDown(input) {
       if (state.status !== 'selecting' || !state.session) return;
+      const { button = 0, point } = pointerInput(input);
+      if (button === 2) {
+        if (state.selection) {
+          patch({ startPoint: null, selection: null, hoverSelection: null });
+        } else {
+          void cancelSession();
+        }
+        return;
+      }
+
+      const draftStart = planCaptureDraftSelectionStart({
+        cursorPoint: point,
+        anchorPoint: snapPointToRects(
+          point,
+          host?.getSnapTargetRects() ?? [],
+          6,
+        ),
+      });
 
       patch({
-        startPoint: point,
-        cursorPoint: point,
-        selection: null,
-        hoverSelection: null,
+        startPoint: draftStart.nextState.startPoint,
+        cursorPoint: draftStart.nextState.cursorPoint,
+        selection: draftStart.nextState.selection,
+        hoverSelection: draftStart.nextState.hoverSelection,
+        previewImageBase64: draftStart.nextState.previewImageBase64,
+        isRenderingOutput: draftStart.nextState.renderingOutput,
       });
     },
 
-    pointerMove(point) {
+    pointerMove(input) {
       if (state.status !== 'selecting' || !state.session) return;
+      const { point, shiftKey = false } = pointerInput(input);
 
       if (state.startPoint) {
+        const draft = planCaptureDraftSelectionPointerMove({
+          anchorPoint: state.startPoint,
+          point,
+          snapTargetRects: host?.getSnapTargetRects() ?? [],
+          edgeSnapThreshold: 6,
+          constrainSelection: shiftKey,
+        });
         patch({
           cursorPoint: point,
-          selection: normalizeSelection(state.startPoint, point),
+          selection: draft.draftSelection,
         });
         return;
       }
@@ -498,33 +722,36 @@ export function createCaptureWorkspaceRuntime({
       });
     },
 
-    async pointerUp(point) {
+    async pointerUp(input) {
       if (state.status !== 'selecting' || !state.session || !state.startPoint) {
         return;
       }
+      const { point, shiftKey = false } = pointerInput(input);
 
-      const selection = normalizeSelection(state.startPoint, point);
-      const candidate = getCandidateForPointerReleaseCompletion(
-          buildCaptureCandidates(
-            state.session.monitors,
-            state.session.candidates,
-          ),
-          point,
-          state.hoverSelection,
-          selection,
-          MIN_SELECTION_SIZE,
-        );
-      const manualSelection =
-        selection.width >= MIN_SELECTION_SIZE &&
-        selection.height >= MIN_SELECTION_SIZE
-          ? selection
-          : null;
+      const candidates = buildCaptureCandidates(
+        state.session.monitors,
+        state.session.candidates,
+      );
+      const draftCommit = planCaptureDraftSelectionCommit({
+        anchorPoint: state.startPoint,
+        releasePoint: point,
+        snapTargetRects: host?.getSnapTargetRects() ?? [],
+        edgeSnapThreshold: 6,
+        constrainSelection: shiftKey,
+        captureCandidates: candidates,
+        activeHoverSelection: state.hoverSelection,
+        minSelectionSize: MIN_SELECTION_SIZE,
+      });
+      const manualSelection = normalizeSelection(state.startPoint, point);
+      const isManualSelection =
+        manualSelection.width >= MIN_SELECTION_SIZE &&
+        manualSelection.height >= MIN_SELECTION_SIZE;
 
       patch({ startPoint: null, cursorPoint: point });
-      if (candidate) {
-        await completeCandidateSelection(candidate.rect);
-      } else if (manualSelection) {
-        await completeManualSelection(manualSelection);
+      if (draftCommit.type === 'complete-selection' && isManualSelection) {
+        await completeManualSelection(draftCommit.selection);
+      } else if (draftCommit.type === 'complete-selection') {
+        await completeCandidateSelection(draftCommit.selection);
       } else {
         patch({ selection: null, hoverSelection: null });
       }
@@ -532,13 +759,22 @@ export function createCaptureWorkspaceRuntime({
 
     async keyDown({ key }) {
       if (key === 'Escape') {
+        if (
+          state.status !== 'selecting' ||
+          state.startPoint ||
+          state.selection
+        ) {
+          return false;
+        }
         await cancelSession();
-        return;
+        return true;
       }
 
       if (key === 'Enter' && state.hoverSelection) {
         await completeCandidateSelection(state.hoverSelection);
+        return true;
       }
+      return false;
     },
 
     async hydrateSnapshots() {
@@ -569,6 +805,7 @@ export function createCaptureWorkspaceRuntime({
 
           patch({ session });
           hydratedSessionId = sessionId;
+          markPerf('snapshots_hydrated', sessionId);
         })
         .catch((error) => {
           if (
@@ -598,6 +835,7 @@ export function createCaptureWorkspaceRuntime({
         session: state.session,
         sessionId: state.session?.id ?? null,
         cursorPoint: state.cursorPoint,
+        startPoint: state.startPoint,
         selection: state.selection,
         hoverSelection: state.hoverSelection,
         previewImageBase64: state.previewImageBase64,
@@ -632,4 +870,10 @@ function createInitialState(mode: CaptureMode = 'screenshot'): RuntimeState {
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function pointerInput(
+  input: Point | CaptureWorkspacePointerInput,
+): CaptureWorkspacePointerInput {
+  return 'point' in input ? input : { point: input };
 }

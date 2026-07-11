@@ -5,7 +5,6 @@ import {
   useRef,
   useState,
   type PointerEvent,
-  type WheelEvent,
 } from 'react';
 
 import { createCaptureWorkspaceRuntime } from '../../application/capture-workspace/runtime';
@@ -27,32 +26,18 @@ import {
 import { useCaptureMagnifierPixelSource } from './captureMagnifierRuntime';
 import { useCaptureSelectionOverlay } from './captureSelectionOverlayRuntime';
 import { getCaptureWorkspaceDerivedState } from './captureWorkspaceDerived';
-import {
-  handleCaptureWorkspaceKeyDown,
-  type CaptureWorkspaceKeyboardActions,
-  type CaptureWorkspaceKeyboardDerivedState,
-  type CaptureWorkspaceKeyboardRefs,
-} from './captureWorkspaceKeyboard';
+import type { CaptureWorkspaceKeyboardRefs } from './captureWorkspaceKeyboard';
 import { planManualSelectionCompletion } from './captureInteractionRuntime';
 import {
-  handleCaptureWorkspacePointerDown,
-  handleCaptureWorkspacePointerMove,
-  handleCaptureWorkspacePointerUp,
-  handleCaptureWorkspacePreviewPointerDown,
-  handleCaptureWorkspaceResizePointerDown,
-  handleCaptureWorkspaceWheel,
-  type CaptureWorkspacePointerActions,
-  type CaptureWorkspacePointerContext,
-  type CaptureWorkspacePointerDerivedState,
+  getCaptureWorkspacePointerPoint,
 } from './captureWorkspacePointer';
 import type { CaptureWorkspaceState } from './captureWorkspaceState';
 import { useCaptureWorkspaceEditorController } from './useCaptureWorkspaceEditorController';
+import { useCaptureWorkspaceEditorInput } from './useCaptureWorkspaceEditorInput';
 import { useCaptureWorkspaceState } from './useCaptureWorkspaceState';
-import type { SelectionHandle } from './selection';
 import { getCurrentMonitorBounds } from './virtualDesktop';
 import type {
   AnnotationCommand,
-  CaptureLaunch,
   CaptureMode,
   LogicalRect,
   Point,
@@ -92,6 +77,38 @@ export function useCaptureWorkspaceController({
   const runtime = useCaptureWorkspaceRuntime();
   const onInactiveRef = useRef(onInactive);
   const screenshotSavePathRef = useRef(screenshotSavePath);
+  const hostBridgeRef = useRef<{
+    resetInteraction(): void;
+    resetSession(): void;
+    applyManualSelection(rect: LogicalRect, mode: CaptureMode): void;
+    getAnnotations(): AnnotationCommand[];
+    commitTextDraft(): AnnotationCommand[];
+    shouldIncludeCursor(): boolean;
+    hasTextDraft(): boolean;
+    prepareSurface(): Promise<void>;
+    getSnapTargetRects(): LogicalRect[];
+  }>({
+    resetInteraction: () => undefined,
+    resetSession: () => undefined,
+    applyManualSelection: (_rect: LogicalRect, _mode: CaptureMode) => undefined,
+    getAnnotations: (): AnnotationCommand[] => [],
+    commitTextDraft: (): AnnotationCommand[] => [],
+    shouldIncludeCursor: () => false,
+    hasTextDraft: () => false,
+    prepareSurface: async () => undefined,
+    getSnapTargetRects: () => [],
+  });
+  const keyboardBridgeRef = useRef<{
+    onUnhandledKeyDown(event: KeyboardEvent): void;
+    releaseMagnifierRequest(): void;
+    hasDraftSelectionMoveGesture(): boolean;
+    finishDraftSelectionMove(): void;
+  }>({
+    onUnhandledKeyDown: (_event: KeyboardEvent) => undefined,
+    releaseMagnifierRequest: () => undefined,
+    hasDraftSelectionMoveGesture: () => false,
+    finishDraftSelectionMove: () => undefined,
+  });
   onInactiveRef.current = onInactive;
   screenshotSavePathRef.current = screenshotSavePath;
   const workflowRuntime = useMemo(
@@ -101,17 +118,36 @@ export function useCaptureWorkspaceController({
         onInactive: () => onInactiveRef.current?.(),
         screenshotSavePath: () => screenshotSavePathRef.current,
         storage: window.localStorage,
+        host: {
+          resetInteraction: () => hostBridgeRef.current.resetInteraction(),
+          resetSession: () => hostBridgeRef.current.resetSession(),
+          applyManualSelection: (rect, mode) =>
+            hostBridgeRef.current.applyManualSelection(rect, mode),
+          getAnnotations: () => hostBridgeRef.current.getAnnotations(),
+          commitTextDraft: () => hostBridgeRef.current.commitTextDraft(),
+          shouldIncludeCursor: () =>
+            hostBridgeRef.current.shouldIncludeCursor(),
+          hasTextDraft: () => hostBridgeRef.current.hasTextDraft(),
+          prepareSurface: () => hostBridgeRef.current.prepareSurface(),
+          getSnapTargetRects: () =>
+            hostBridgeRef.current.getSnapTargetRects(),
+        },
+        keyboard: {
+          target: window,
+          onUnhandledKeyDown: (event) =>
+            keyboardBridgeRef.current.onUnhandledKeyDown(event),
+          releaseMagnifierRequest: () =>
+            keyboardBridgeRef.current.releaseMagnifierRequest(),
+          hasDraftSelectionMoveGesture: () =>
+            keyboardBridgeRef.current.hasDraftSelectionMoveGesture(),
+          finishDraftSelectionMove: () =>
+            keyboardBridgeRef.current.finishDraftSelectionMove(),
+        },
       }),
     [runtime],
   );
   const keyboardDraftCursorPointRef = useRef<Point | null>(null);
   const keyboardEditCursorPointRef = useRef<Point | null>(null);
-  const captureFrontendPerfRef = useRef<{
-    mode: CaptureMode;
-    sessionId: string | null;
-    startMs: number;
-    hasLoggedImagesReady: boolean;
-  } | null>(null);
   const isRenderingOutputRef = useRef(false);
   const handleRenderingOutputChange = useCallback(
     (isRenderingOutput: boolean) => {
@@ -129,16 +165,6 @@ export function useCaptureWorkspaceController({
     () =>
       workflowRuntime.subscribe(() => {
         const next = workflowRuntime.renderState;
-        const perf = captureFrontendPerfRef.current;
-        if (perf && next.sessionId && perf.sessionId !== next.sessionId) {
-          perf.sessionId = next.sessionId;
-          void runtime.commands.logCaptureFrontendPerf({
-            event: 'session_loaded',
-            mode: perf.mode,
-            sessionId: next.sessionId,
-            elapsedMs: performance.now() - perf.startMs,
-          }).catch(() => undefined);
-        }
         if (next.status === 'idle' && !next.session) {
           workspace.resetSession();
           setHydratedCaptureSessionId(null);
@@ -148,6 +174,7 @@ export function useCaptureWorkspaceController({
           status: next.status,
           mode: next.mode,
           session: next.session,
+          startPoint: next.startPoint,
           cursorPoint: next.cursorPoint,
           selection: next.selection,
           hoverSelection: next.hoverSelection,
@@ -159,7 +186,7 @@ export function useCaptureWorkspaceController({
           next.hasHydratedPixelSource ? next.sessionId : null,
         );
       }),
-    [runtime.commands, workflowRuntime, workspace.applyPatch, workspace.resetSession],
+    [workflowRuntime, workspace.applyPatch, workspace.resetSession],
   );
 
   const captureWorkspaceState: CaptureWorkspaceState = {
@@ -281,45 +308,12 @@ export function useCaptureWorkspaceController({
     [],
   );
   const hasStartedInitialSessionRef = useRef(false);
-  const hasRevealedCaptureWindowRef = useRef(false);
-  const startSession = useCallback(
-    (mode: CaptureMode, sessionId?: string) => {
-      captureFrontendPerfRef.current = {
-        mode,
-        sessionId: null,
-        startMs: performance.now(),
-        hasLoggedImagesReady: false,
-      };
-      void runtime.commands.logCaptureFrontendPerf({
-        event: 'start_session',
-        mode,
-        sessionId: null,
-        elapsedMs: 0,
-      }).catch(() => undefined);
-      hasRevealedCaptureWindowRef.current = false;
-      workspace.resetInteraction();
-      overlay.reset();
-      setHydratedCaptureSessionId(null);
-      return workflowRuntime.actions.startSession(mode, sessionId);
-    },
-    [overlay.reset, runtime.commands, workflowRuntime, workspace.resetInteraction],
-  );
-
   const ensureCaptureSnapshotsHydrated = useCallback(
     async (_sessionId: string) => {
       await workflowRuntime.actions.hydrateSnapshots();
-      const perf = captureFrontendPerfRef.current;
-      if (perf) {
-        void runtime.commands.logCaptureFrontendPerf({
-          event: 'snapshots_hydrated',
-          mode: perf.mode,
-          sessionId: workflowRuntime.renderState.sessionId,
-          elapsedMs: performance.now() - perf.startMs,
-        }).catch(() => undefined);
-      }
       return workflowRuntime.renderState.session!;
     },
-    [runtime.commands, workflowRuntime],
+    [workflowRuntime],
   );
   const cancelSession = workflowRuntime.actions.cancelSession;
   const renderSelectionPreview = useCallback(
@@ -368,25 +362,8 @@ export function useCaptureWorkspaceController({
     [workflowRuntime],
   );
   const completeManualSelection = useCallback(
-    (rect: LogicalRect) => {
-      const transition = planCaptureManualSelectionTransition({
-        rect,
-        completion: planManualSelectionCompletion(captureWorkspaceState.mode),
-      });
-      workspace.draftSelectionRef.current = null;
-      if (transition.clearOverlay) overlay.reset();
-      if (transition.type === 'effects') {
-        const { renderingOutput, ...nextState } = transition.nextState;
-        workspace.applyPatch({
-          ...nextState,
-          isRenderingOutput: renderingOutput,
-        });
-      } else {
-        workspace.applyPatch(transition.nextState);
-      }
-      return workflowRuntime.actions.completeManualSelection(rect);
-    },
-    [captureWorkspaceState.mode, overlay.reset, workflowRuntime, workspace.applyPatch, workspace.draftSelectionRef],
+    (rect: LogicalRect) => workflowRuntime.actions.completeManualSelection(rect),
+    [workflowRuntime],
   );
   const resetPreviewSelection = useCallback(() => {
     workflowRuntime.actions.resetPreview();
@@ -451,28 +428,8 @@ export function useCaptureWorkspaceController({
   useEffect(() => {
     if (!initialMode || hasStartedInitialSessionRef.current) return;
     hasStartedInitialSessionRef.current = true;
-    void startSession(initialMode, initialSessionId);
-  }, [initialMode, initialSessionId, startSession]);
-
-  useEffect(() => {
-    const perf = captureFrontendPerfRef.current;
-    if (
-      !perf ||
-      !derived.areCaptureImagesReady ||
-      perf.hasLoggedImagesReady ||
-      perf.sessionId !== captureWorkspaceState.session?.id
-    ) {
-      return;
-    }
-
-    perf.hasLoggedImagesReady = true;
-    void runtime.commands.logCaptureFrontendPerf({
-      event: 'images_ready',
-      mode: perf.mode,
-      sessionId: perf.sessionId,
-      elapsedMs: performance.now() - perf.startMs,
-    }).catch(() => undefined);
-  }, [captureWorkspaceState.session?.id, derived.areCaptureImagesReady, runtime.commands]);
+    void workflowRuntime.actions.startSession(initialMode, initialSessionId);
+  }, [initialMode, initialSessionId, workflowRuntime]);
 
   const prepareCaptureSurface = useCallback(
     () =>
@@ -482,73 +439,65 @@ export function useCaptureWorkspaceController({
       }),
     [overlay.getCurrentFrame, overlay.paintFrame],
   );
-  const hostWindowReveal = useMemo(
-    () => ({
-      status: captureWorkspaceState.status,
-      sessionId: captureWorkspaceState.session?.id ?? null,
-      hasCaptureImagesReady: derived.areCaptureImagesReady,
-      hasRevealedRef: hasRevealedCaptureWindowRef,
-      prepareSurface: prepareCaptureSurface,
-      onRevealedSession: (sessionId: string) => {
-        const perf = captureFrontendPerfRef.current;
-        if (!perf) return;
-        void runtime.commands.logCaptureFrontendPerf({
-          event: 'revealed',
-          mode: perf.mode,
-          sessionId,
-          elapsedMs: performance.now() - perf.startMs,
-        }).catch(() => undefined);
-      },
-      onError: (error: unknown) => {
+
+  hostBridgeRef.current = {
+    resetInteraction: () => {
+      workspace.resetInteraction();
+      overlay.reset();
+      setHydratedCaptureSessionId(null);
+    },
+    resetSession: workspace.resetSession,
+    applyManualSelection: (rect, mode) => {
+      const transition = planCaptureManualSelectionTransition({
+        rect,
+        completion: planManualSelectionCompletion(mode),
+      });
+      workspace.draftSelectionRef.current = null;
+      if (transition.clearOverlay) overlay.reset();
+      if (transition.type === 'effects') {
+        const { renderingOutput, ...nextState } = transition.nextState;
         workspace.applyPatch({
-          status: 'error',
-          error: error instanceof Error ? error.message : String(error),
+          ...nextState,
+          isRenderingOutput: renderingOutput,
         });
-      },
-    }),
-    [captureWorkspaceState.session?.id, captureWorkspaceState.status, derived.areCaptureImagesReady, prepareCaptureSurface, runtime.commands, workspace.applyPatch],
-  );
-  const handleNativeCopyRequest = useCallback(() => {
-    if (captureWorkspaceState.status === 'preview') {
-      void copySelection();
-      return;
-    }
-    const activeStartPoint =
-      workspace.startPointRef.current ?? captureWorkspaceState.startPoint;
-    const activeHoverSelection =
-      workspace.hoverSelectionRef.current ?? captureWorkspaceState.hoverSelection;
-    if (
-      captureWorkspaceState.status === 'selecting' &&
-      !captureWorkspaceState.textDraft &&
-      activeStartPoint === null &&
-      activeHoverSelection
-    ) {
-      void completeCandidateSelection(activeHoverSelection, 'copy');
-    }
-  }, [captureWorkspaceState, completeCandidateSelection, copySelection, workspace.hoverSelectionRef, workspace.startPointRef]);
-  const hostSubscriptions = useMemo(
-    () => ({
-      isActive: captureWorkspaceState.status !== 'idle',
-      onLaunch: (launch: CaptureLaunch) => {
-        void startSession(launch.mode, launch.sessionId);
-      },
-      onCancel: cancelSession,
-      onCopy: handleNativeCopyRequest,
-    }),
-    [cancelSession, captureWorkspaceState.status, handleNativeCopyRequest, startSession],
-  );
+      } else {
+        workspace.applyPatch(transition.nextState);
+      }
+    },
+    getAnnotations: () => captureWorkspaceState.annotationHistory.annotations,
+    commitTextDraft: () => commitTextDraftToHistory().annotations,
+    shouldIncludeCursor: () =>
+      captureWorkspaceState.includeCapturedCursor &&
+      canToggleCapturedCursor(captureWorkspaceState.session),
+    hasTextDraft: () => captureWorkspaceState.textDraft !== null,
+    prepareSurface: prepareCaptureSurface,
+    getSnapTargetRects: () => derived.snapTargetRects,
+  };
+
+  useEffect(() => {
+    let disposed = false;
+    let disconnect: (() => void) | undefined;
+    void workflowRuntime.actions.connectHost().then((nextDisconnect) => {
+      if (disposed) nextDisconnect();
+      else disconnect = nextDisconnect;
+    });
+    return () => {
+      disposed = true;
+      disconnect?.();
+    };
+  }, [workflowRuntime]);
+
+  useEffect(() => {
+    void workflowRuntime.actions.updateHostReadiness(
+      derived.areCaptureImagesReady,
+    );
+  }, [derived.areCaptureImagesReady, workflowRuntime]);
 
   const hostActions = useMemo(
     () => ({
       ensureCaptureSnapshotsHydrated,
       cancelSession,
-      refreshSession: async () => {
-        hasRevealedCaptureWindowRef.current = false;
-        workspace.resetInteraction();
-        overlay.reset();
-        setHydratedCaptureSessionId(null);
-        await workflowRuntime.actions.refreshSession();
-      },
+      refreshSession: workflowRuntime.actions.refreshSession,
       renderSelectionPreview,
       completeCandidateSelection,
       completePreviewSelection,
@@ -563,7 +512,7 @@ export function useCaptureWorkspaceController({
       restoreLastSelection,
       restoreSelectionFromHistory,
     }),
-    [cancelSession, completeCandidateSelection, completeManualSelection, completePreviewSelection, copySelection, ensureCaptureSnapshotsHydrated, overlay.reset, pinSelection, quickSaveSelection, renderSelectionPreview, resetPreviewSelection, restoreLastSelection, restoreSelectionFromHistory, runOcrSelection, saveSelection, selectFullCaptureArea, workflowRuntime, workspace.resetInteraction],
+    [cancelSession, completeCandidateSelection, completeManualSelection, completePreviewSelection, copySelection, ensureCaptureSnapshotsHydrated, pinSelection, quickSaveSelection, renderSelectionPreview, resetPreviewSelection, restoreLastSelection, restoreSelectionFromHistory, runOcrSelection, saveSelection, selectFullCaptureArea, workflowRuntime.actions.refreshSession],
   );
 
   const editorSetters = useMemo(
@@ -736,181 +685,76 @@ export function useCaptureWorkspaceController({
       workspace.setTextFontSize,
     ],
   );
-  const keyboardDerived = useMemo<CaptureWorkspaceKeyboardDerivedState>(
-    () => ({
-      annotations: inputDerived.annotations,
-      captureCandidates: inputDerived.captureCandidates,
-      selectionBounds: inputDerived.selectionBounds,
-      hasAnnotationEditingContext: inputDerived.hasAnnotationEditingContext,
-      isAnnotationToolbarVisible: inputDerived.isAnnotationToolbarVisible,
-      isMagnifierShown: inputDerived.isMagnifierShown,
-      isFillModeActive: inputDerived.isFillModeActive,
-      cursorColor: inputDerived.cursorColor,
-    }),
-    [inputDerived],
-  );
-  const pointerDerived = useMemo<CaptureWorkspacePointerDerivedState>(
-    () => ({
-      annotations: inputDerived.annotations,
-      captureCandidates: inputDerived.captureCandidates,
-      selectionBounds: inputDerived.selectionBounds,
-      snapTargetRects: inputDerived.snapTargetRects,
-      hasAnnotationEditingContext: inputDerived.hasAnnotationEditingContext,
-      shouldTrackMagnifierCursor: inputDerived.shouldTrackMagnifierCursor,
-    }),
-    [inputDerived],
-  );
-  const keyboardActions = useMemo<CaptureWorkspaceKeyboardActions>(
-    () => ({
-      dismissCaptureLayer: editorController.actions.dismissCaptureLayer,
-      refreshSession: hostActions.refreshSession,
-      setIncludeCapturedCursor: inputSetters.setIncludeCapturedCursor,
-      clearPreviewImage: () => inputSetters.setPreviewImageBase64(null),
-      renderSelectionPreview: hostActions.renderSelectionPreview,
-      setIsMagnifierRequested: inputSetters.setIsMagnifierRequested,
-      clearAnnotations: editorController.actions.clearAnnotations,
-      undoPolylineGesturePoint:
-        editorController.actions.undoPolylineGesturePoint,
-      undoAnnotation: editorController.actions.undoAnnotation,
-      redoAnnotation: editorController.actions.redoAnnotation,
-      deleteSelectedAnnotation: editorController.actions.deleteSelectedAnnotation,
-      copyCurrentColor: () =>
-        editorController.actions.copyCurrentColor(inputDerived.cursorColor),
-      setColorSampleFormat: inputSetters.setColorSampleFormat,
-      restoreSelectionFromHistory: hostActions.restoreSelectionFromHistory,
-      restoreLastSelection: hostActions.restoreLastSelection,
-      setCursorPoint: inputSetters.setCursorPoint,
-      setSelection: inputSetters.setSelection,
-      scheduleSelectionOverlayPaint: overlay.schedulePaint,
-      setPreviewImageBase64: inputSetters.setPreviewImageBase64,
-      setRenderingOutput: inputSetters.setRenderingOutput,
-      setEditGesture: inputSetters.setEditGesture,
-      syncHoverSelection,
-      selectFullCaptureArea: hostActions.selectFullCaptureArea,
-      completeCandidateSelection: hostActions.completeCandidateSelection,
-      setIsAnnotationToolbarVisible:
-        inputSetters.setIsAnnotationToolbarVisible,
-      completePreviewSelection: hostActions.completePreviewSelection,
-      adjustAnnotationSize: editorController.actions.adjustAnnotationSize,
-      toggleAnnotationFill: editorController.actions.toggleAnnotationFill,
-      setActiveAnnotationTool: inputSetters.setActiveAnnotationTool,
-      setSelectedAnnotationIndex: inputSetters.setSelectedAnnotationIndex,
-      setAnnotationGesture: inputSetters.setAnnotationGesture,
-      setAnnotationMoveGesture: inputSetters.setAnnotationMoveGesture,
-      setDraftAnnotation: inputSetters.setDraftAnnotation,
-      selectAnnotationColor: editorController.actions.selectAnnotationColor,
-      toggleAnnotationTool: editorController.actions.toggleAnnotationTool,
-      setDraftSelectionMoveGesture:
-        inputSetters.setDraftSelectionMoveGesture,
-      setAnnotationHistory: inputSetters.setAnnotationHistory,
-    }),
-    [editorController.actions, hostActions, inputDerived.cursorColor, inputSetters, overlay.schedulePaint, syncHoverSelection],
-  );
-  const pointerActions = useMemo<CaptureWorkspacePointerActions>(
-    () => ({
-      commitTextDraft: editorController.actions.commitTextDraft,
-      commitAnnotationGestureAtPoint:
-        editorController.actions.commitAnnotationGestureAtPoint,
-      dismissCaptureLayer: editorController.actions.dismissCaptureLayer,
-      resetPreviewSelection: hostActions.resetPreviewSelection,
-      cancelSession: hostActions.cancelSession,
-      setCursorPoint: inputSetters.setCursorPoint,
-      setStartPointWithRef: inputSetters.setStartPointWithRef,
-      setSelection: inputSetters.setSelection,
-      setHoverSelection: inputSetters.setHoverSelection,
-      scheduleSelectionOverlayPaint: overlay.schedulePaint,
-      setPreviewImageBase64: inputSetters.setPreviewImageBase64,
-      setRenderingOutput: inputSetters.setRenderingOutput,
-      setStatus: inputSetters.setStatus,
-      setActiveAnnotationTool: inputSetters.setActiveAnnotationTool,
-      setAnnotationGesture: inputSetters.setAnnotationGesture,
-      setDraftAnnotation: inputSetters.setDraftAnnotation,
-      setSelectedAnnotationIndex: inputSetters.setSelectedAnnotationIndex,
-      setAnnotationMoveGesture: inputSetters.setAnnotationMoveGesture,
-      setDraftSelectionMoveGesture:
-        inputSetters.setDraftSelectionMoveGesture,
-      setTextDraft: inputSetters.setTextDraft,
-      setTextDraftAnnotationIndex: inputSetters.setTextDraftAnnotationIndex,
-      setAnnotationHistory: inputSetters.setAnnotationHistory,
-      syncHoverSelection,
-      renderSelectionPreview: hostActions.renderSelectionPreview,
-      completeManualSelection: (rect) => {
-        void hostActions.completeManualSelection(rect);
-      },
-      pinSelection: hostActions.pinSelection,
-      setEditGesture: inputSetters.setEditGesture,
-      setAnnotationStyle: inputSetters.setAnnotationStyle,
-      setTextFontSize: inputSetters.setTextFontSize,
-      copySelection: hostActions.copySelection,
-      adjustAnnotationSize: editorController.actions.adjustAnnotationSize,
-    }),
-    [editorController.actions, hostActions, inputSetters, overlay.schedulePaint, syncHoverSelection],
-  );
-  const pointerContext = useMemo<CaptureWorkspacePointerContext>(
-    () => ({
-      state: captureWorkspaceState,
-      refs: inputRefs,
-      derived: pointerDerived,
-      actions: pointerActions,
-    }),
-    [captureWorkspaceState, inputRefs, pointerActions, pointerDerived],
-  );
-  const onKeyDown = useCallback(
-    (event: KeyboardEvent) => {
-      handleCaptureWorkspaceKeyDown(event, {
-        state: captureWorkspaceState,
-        refs: inputRefs,
-        derived: keyboardDerived,
-        actions: keyboardActions,
-      });
-    },
-    [captureWorkspaceState, inputRefs, keyboardActions, keyboardDerived],
-  );
-  const keyboardHostEvents = useMemo(
-    () => ({
-      isActive: captureWorkspaceState.status !== 'idle',
-      status: captureWorkspaceState.status,
-      isRenderingOutputRef,
-      hasDraftSelectionMoveGesture:
-        captureWorkspaceState.draftSelectionMoveGesture !== null,
-      onKeyDown,
-      onReleaseMagnifierRequest: () =>
-        inputSetters.setIsMagnifierRequested(false),
-      onFinishDraftSelectionMove: () =>
-        inputSetters.setDraftSelectionMoveGesture(null),
-      onCancelSession: hostActions.cancelSession,
-    }),
-    [captureWorkspaceState.draftSelectionMoveGesture, captureWorkspaceState.status, hostActions.cancelSession, inputSetters, onKeyDown],
-  );
+  const editorInput = useCaptureWorkspaceEditorInput({
+    state: captureWorkspaceState,
+    refs: inputRefs,
+    derived: inputDerived,
+    setters: inputSetters,
+    host: hostActions,
+    editor: editorController.actions,
+    scheduleSelectionOverlayPaint: overlay.schedulePaint,
+    syncHoverSelection,
+  });
+  keyboardBridgeRef.current = {
+    onUnhandledKeyDown: editorInput.onUnhandledKeyDown,
+    releaseMagnifierRequest: () =>
+      inputSetters.setIsMagnifierRequested(false),
+    hasDraftSelectionMoveGesture: () =>
+      captureWorkspaceState.draftSelectionMoveGesture !== null,
+    finishDraftSelectionMove: () =>
+      inputSetters.setDraftSelectionMoveGesture(null),
+  };
   const onRootPointerDown = useCallback(
-    (event: PointerEvent<HTMLDivElement>) =>
-      handleCaptureWorkspacePointerDown(event, pointerContext),
-    [pointerContext],
+    (event: PointerEvent<HTMLDivElement>) => {
+      if (
+        captureWorkspaceState.status === 'selecting' &&
+        derived.selectionBounds
+      ) {
+        event.currentTarget.setPointerCapture(event.pointerId);
+        workflowRuntime.actions.pointerDown({
+          point: getCaptureWorkspacePointerPoint(event, derived.selectionBounds),
+          button: event.button,
+          shiftKey: event.shiftKey,
+        });
+        return;
+      }
+      editorInput.onRootPointerDown(event);
+    },
+    [captureWorkspaceState.status, derived.selectionBounds, editorInput, workflowRuntime],
   );
   const onRootPointerMove = useCallback(
-    (event: PointerEvent<HTMLDivElement>) =>
-      handleCaptureWorkspacePointerMove(event, pointerContext),
-    [pointerContext],
+    (event: PointerEvent<HTMLDivElement>) => {
+      if (
+        captureWorkspaceState.status === 'selecting' &&
+        derived.selectionBounds
+      ) {
+        workflowRuntime.actions.pointerMove({
+          point: getCaptureWorkspacePointerPoint(event, derived.selectionBounds),
+          button: event.button,
+          shiftKey: event.shiftKey,
+        });
+        return;
+      }
+      editorInput.onRootPointerMove(event);
+    },
+    [captureWorkspaceState.status, derived.selectionBounds, editorInput, workflowRuntime],
   );
   const onRootPointerUp = useCallback(
-    (event: PointerEvent<HTMLDivElement>) =>
-      handleCaptureWorkspacePointerUp(event, pointerContext),
-    [pointerContext],
-  );
-  const onPreviewPointerDown = useCallback(
-    (event: PointerEvent<HTMLDivElement>) =>
-      handleCaptureWorkspacePreviewPointerDown(event, pointerContext),
-    [pointerContext],
-  );
-  const onResizeHandlePointerDown = useCallback(
-    (handle: SelectionHandle, event: PointerEvent<HTMLButtonElement>) =>
-      handleCaptureWorkspaceResizePointerDown(handle, event, pointerContext),
-    [pointerContext],
-  );
-  const onRootWheel = useCallback(
-    (event: WheelEvent<HTMLDivElement>) =>
-      handleCaptureWorkspaceWheel(event, pointerContext),
-    [pointerContext],
+    (event: PointerEvent<HTMLDivElement>) => {
+      if (
+        captureWorkspaceState.status === 'selecting' &&
+        derived.selectionBounds
+      ) {
+        void workflowRuntime.actions.pointerUp({
+          point: getCaptureWorkspacePointerPoint(event, derived.selectionBounds),
+          button: event.button,
+          shiftKey: event.shiftKey,
+        });
+        return;
+      }
+      editorInput.onRootPointerUp(event);
+    },
+    [captureWorkspaceState.status, derived.selectionBounds, editorInput, workflowRuntime],
   );
 
   const magnifierSelection =
@@ -920,9 +764,6 @@ export function useCaptureWorkspaceController({
     workspace.hoverSelection;
 
   return {
-    hostWindowReveal,
-    hostSubscriptions,
-    keyboardHostEvents,
     viewProps: {
       isActive: workspace.status !== 'idle',
       status: workspace.status,
@@ -957,9 +798,9 @@ export function useCaptureWorkspaceController({
       onRootPointerDown,
       onRootPointerMove,
       onRootPointerUp,
-      onRootWheel,
-      onPreviewPointerDown,
-      onResizeHandlePointerDown,
+      onRootWheel: editorInput.onRootWheel,
+      onPreviewPointerDown: editorInput.onPreviewPointerDown,
+      onResizeHandlePointerDown: editorInput.onResizeHandlePointerDown,
       onCommitTextDraft: editorController.actions.commitTextDraft,
       onTextDraftTextChange: editorController.actions.updateTextDraftText,
       onDiscardTextDraft: editorController.actions.discardTextDraft,

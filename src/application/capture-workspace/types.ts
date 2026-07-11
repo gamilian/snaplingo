@@ -1,5 +1,6 @@
 import type {
   AnnotationCommand,
+  CaptureLaunch,
   CaptureMode,
   CaptureSessionView,
   LogicalRect,
@@ -24,6 +25,7 @@ export interface CaptureWorkspaceRenderState {
   readonly session: CaptureSessionView | null;
   readonly sessionId: string | null;
   readonly cursorPoint: Point | null;
+  readonly startPoint: Point | null;
   readonly selection: LogicalRect | null;
   readonly hoverSelection: LogicalRect | null;
   readonly previewImageBase64: string | null;
@@ -33,6 +35,8 @@ export interface CaptureWorkspaceRenderState {
 }
 
 export interface CaptureWorkspaceRuntimeActions {
+  connectHost(): Promise<() => void>;
+  updateHostReadiness(imagesReady: boolean): Promise<void>;
   startSession(mode: CaptureMode, sessionId?: string): Promise<void>;
   refreshSession(): Promise<void>;
   cancelSession(): Promise<void>;
@@ -53,11 +57,17 @@ export interface CaptureWorkspaceRuntimeActions {
     includeCursor?: boolean,
   ): Promise<void>;
   resetPreview(): void;
-  pointerDown(point: Point): void;
-  pointerMove(point: Point): void;
-  pointerUp(point: Point): Promise<void>;
-  keyDown(event: { key: string }): Promise<void>;
+  pointerDown(input: Point | CaptureWorkspacePointerInput): void;
+  pointerMove(input: Point | CaptureWorkspacePointerInput): void;
+  pointerUp(input: Point | CaptureWorkspacePointerInput): Promise<void>;
+  keyDown(event: { key: string }): Promise<boolean>;
   hydrateSnapshots(): Promise<void>;
+}
+
+export interface CaptureWorkspacePointerInput {
+  point: Point;
+  button?: number;
+  shiftKey?: boolean;
 }
 
 export interface CaptureWorkspaceRuntime {
@@ -68,5 +78,12 @@ export interface CaptureWorkspaceRuntime {
 
 export interface CaptureWorkspaceRuntimePlatform {
   commands: CaptureWorkspaceCommandsPort;
+  onCancelRequested(handler: () => void | Promise<void>): Promise<() => void>;
+  onCopyRequested(handler: () => void | Promise<void>): Promise<() => void>;
+  onHotkeyTriggered(
+    handler: (launch: CaptureLaunch) => void | Promise<void>,
+  ): Promise<() => void>;
+  prepareForReveal(): Promise<void>;
+  reveal(): Promise<void>;
   dismiss(): Promise<void>;
 }

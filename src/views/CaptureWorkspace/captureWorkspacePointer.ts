@@ -217,7 +217,7 @@ export function handleCaptureWorkspacePointerDown(
       actions.commitTextDraft();
     } else if (action === 'finish-annotation') {
       if (selection && selectionBounds && annotationGesture) {
-        const point = getVirtualPoint(event, selectionBounds);
+        const point = getCaptureWorkspacePointerPoint(event, selectionBounds);
         const localPoint = getCaptureSelectionLocalPoint(point, selection);
         actions.commitAnnotationGestureAtPoint(localPoint, event.shiftKey);
       } else {
@@ -235,7 +235,7 @@ export function handleCaptureWorkspacePointerDown(
 
   if (pointerDownPlan.type === 'ignore' || !selectionBounds) return;
 
-  const point = getVirtualPoint(event, selectionBounds);
+  const point = getCaptureWorkspacePointerPoint(event, selectionBounds);
   const snappedPoint = snapPointToRects(
     point,
     snapTargetRects,
@@ -310,7 +310,7 @@ export function handleCaptureWorkspacePointerMove(
 
   if (!selectionBounds) return;
 
-  const point = getVirtualPoint(event, selectionBounds);
+  const point = getCaptureWorkspacePointerPoint(event, selectionBounds);
 
   cursorPointRef.current = point;
 
@@ -464,7 +464,7 @@ export function handleCaptureWorkspacePointerUp(
 
   if (!selectionBounds) return;
 
-  const point = getVirtualPoint(event, selectionBounds);
+  const point = getCaptureWorkspacePointerPoint(event, selectionBounds);
   cursorPointRef.current = point;
   const selectionReleasePoint =
     keyboardDraftCursorPointRef.current ?? cursorPointRef.current ?? point;
@@ -621,7 +621,7 @@ export function handleCaptureWorkspacePreviewPointerDown(
 
   event.stopPropagation();
   event.currentTarget.setPointerCapture(event.pointerId);
-  const point = getVirtualPoint(event, selectionBounds);
+  const point = getCaptureWorkspacePointerPoint(event, selectionBounds);
   actions.setCursorPoint(point);
   if (activeAnnotationTool) {
     actions.setSelectedAnnotationIndex(null);
@@ -755,7 +755,7 @@ export function handleCaptureWorkspaceResizePointerDown(
 
   event.stopPropagation();
   event.currentTarget.setPointerCapture(event.pointerId);
-  const point = getVirtualPoint(event, selectionBounds);
+  const point = getCaptureWorkspacePointerPoint(event, selectionBounds);
   const resizeStart = planCaptureSelectionResizeStart({
     point,
     selection,
@@ -794,7 +794,7 @@ export function handleCaptureWorkspaceWheel(
   actions.adjustAnnotationSize(sizeDirection);
 }
 
-function getVirtualPoint(
+export function getCaptureWorkspacePointerPoint(
   event: CaptureWorkspacePointerEvent,
   selectionBounds: LogicalRect,
 ): Point {
