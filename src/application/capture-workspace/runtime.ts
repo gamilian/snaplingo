@@ -466,7 +466,7 @@ export function createCaptureWorkspaceRuntime({
         generation === actionGeneration &&
         state.session?.id === session.id
       ) {
-        patch({ isRenderingOutput: previewScheduler?.drain !== null });
+        patch({ isRenderingOutput: Boolean(previewScheduler?.drain) });
       }
     }
   };

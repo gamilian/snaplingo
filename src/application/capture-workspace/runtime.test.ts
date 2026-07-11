@@ -357,6 +357,30 @@ describe('capture workspace runtime', () => {
     });
   });
 
+  it('clears terminal rendering state after a direct selecting output failure', async () => {
+    const platform = createPlatform({
+      session: createSession({ id: 'session-direct-output-failure' }),
+    });
+    platform.commands.outputCapture.mockRejectedValue(
+      new Error('direct output failed'),
+    );
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession(
+      'screenshot-copy',
+      'session-direct-output-failure',
+    );
+    await runtime.actions.completeCandidateSelection(selection, 'copy');
+
+    expect(platform.commands.renderCaptureOutput).not.toHaveBeenCalled();
+    expect(runtime.renderState).toMatchObject({
+      status: 'error',
+      sessionId: 'session-direct-output-failure',
+      isRenderingOutput: false,
+      error: 'direct output failed',
+    });
+  });
+
   it('keeps a canceled loading session idle when its load resolves later', async () => {
     const load = deferred<ReturnType<typeof createSession>>();
     const platform = createPlatform();
