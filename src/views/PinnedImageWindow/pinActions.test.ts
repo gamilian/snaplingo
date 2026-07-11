@@ -16,7 +16,6 @@ import {
   isReplacePinnedImageShortcut,
   isSavePinnedImageShortcut,
   movePinnedImageToNextGroup,
-  openPinnedPreferences,
   quickSavePinnedImage,
   replacePinnedImageFromClipboard,
   type PinActionClient,
@@ -528,25 +527,6 @@ describe('pinned image actions', () => {
         args: { imageId: 'pin-1' },
       },
     ]);
-  });
-
-  it('opens preferences by showing and focusing the settings window', async () => {
-    const calls: string[] = [];
-
-    await openPinnedPreferences(async () => ({
-      show: async () => {
-        calls.push('show');
-      },
-      setFocus: async () => {
-        calls.push('focus');
-      },
-    }));
-
-    expect(calls).toEqual(['show', 'focus']);
-  });
-
-  it('ignores opening preferences when the settings window is unavailable', async () => {
-    await expect(openPinnedPreferences(async () => null)).resolves.toBeUndefined();
   });
 
   it('closes a pinned image through the backend recovery path', async () => {

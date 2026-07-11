@@ -153,7 +153,7 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
     } catch (err) {
       console.error('Failed to hide pinned image:', err);
     }
-  }, [imageId]);
+  }, [imageId, runtime]);
 
   const destroyCurrentPinnedImage = useCallback(async () => {
     try {
@@ -165,7 +165,7 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
     } catch (err) {
       console.error('Failed to destroy pinned image:', err);
     }
-  }, [imageId]);
+  }, [imageId, runtime]);
 
   const destroyCurrentPinnedImageGroup = useCallback(async () => {
     try {
@@ -174,7 +174,7 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [imageId]);
+  }, [imageId, runtime]);
 
   const hideCurrentPinnedImageGroup = useCallback(async () => {
     try {
@@ -183,7 +183,7 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [imageId]);
+  }, [imageId, runtime]);
 
   useEffect(() => {
     let disposed = false;
@@ -203,7 +203,7 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
     return () => {
       disposed = true;
     };
-  }, [imageId]);
+  }, [imageId, runtime]);
 
   useEffect(() => {
     sampleCanvasRef.current = null;
@@ -258,7 +258,7 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [colorSampleFormat, cursorColor]);
+  }, [colorSampleFormat, cursorColor, runtime]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -308,7 +308,7 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
       );
       await runtime.resizeTo(size.width, size.height);
     },
-    [image, isThumbnailMode, transform],
+    [image, isThumbnailMode, runtime, transform],
   );
 
   const resetPinnedSize = useCallback(() => {
@@ -338,7 +338,7 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [imageId]);
+  }, [imageId, runtime]);
 
   const copyPinnedSourceText = useCallback(async () => {
     try {
@@ -350,7 +350,7 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [image?.source_text]);
+  }, [image?.source_text, runtime]);
 
   const savePinnedImageAs = useCallback(async () => {
     try {
@@ -359,7 +359,7 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [imageId]);
+  }, [imageId, runtime]);
 
   const quickSavePinnedImageToDirectory = useCallback(async () => {
     try {
@@ -372,7 +372,7 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [imageId, screenshotSavePath]);
+  }, [imageId, runtime, screenshotSavePath]);
 
   const openPreferencesWindow = useCallback(async () => {
     try {
@@ -381,7 +381,7 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, []);
+  }, [runtime]);
 
   const replacePinnedFromClipboard = useCallback(async () => {
     try {
@@ -400,7 +400,7 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [imageId, resizePinnedWindow]);
+  }, [imageId, resizePinnedWindow, runtime]);
 
   const movePinnedToAnotherGroup = useCallback(async () => {
     try {
@@ -409,7 +409,7 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [imageId]);
+  }, [imageId, runtime]);
 
   const adjustPinnedZoom = useCallback(
     (wheelDirection: number) => {

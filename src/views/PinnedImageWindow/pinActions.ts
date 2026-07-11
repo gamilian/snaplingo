@@ -38,13 +38,6 @@ interface PinWindow {
   close?: () => Promise<void>;
 }
 
-interface PinSettingsWindow {
-  show?: () => Promise<void>;
-  setFocus?: () => Promise<void>;
-}
-
-type PinSettingsWindowResolver = () => Promise<PinSettingsWindow | null>;
-
 export type PinnedHoverToolbarActionId = 'copy' | 'save' | 'close';
 
 export interface PinnedHoverToolbarAction {
@@ -202,14 +195,6 @@ export async function replacePinnedImageFromClipboard<T>(
   client: PinActionClient,
 ) {
   return client.replacePinnedImageFromClipboard(imageId) as Promise<T>;
-}
-
-export async function openPinnedPreferences(
-  getSettingsWindow: PinSettingsWindowResolver,
-) {
-  const settingsWindow = await getSettingsWindow();
-  await settingsWindow?.show?.();
-  await settingsWindow?.setFocus?.();
 }
 
 export async function closePinnedImage(

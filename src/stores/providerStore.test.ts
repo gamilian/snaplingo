@@ -11,6 +11,7 @@ const providersRuntime = vi.hoisted(() => ({
 
 describe('providerStore', () => {
   beforeEach(() => {
+    vi.resetModules();
     vi.clearAllMocks();
     providersRuntime.listOcr.mockResolvedValue([]);
     providersRuntime.listTranslation.mockResolvedValue([]);
