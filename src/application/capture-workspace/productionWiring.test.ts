@@ -71,6 +71,8 @@ describe('capture workspace production runtime wiring', () => {
     expect(captureViewRoot).not.toContain('useCaptureHostSubscriptions');
     expect(captureViewRoot).not.toContain('useCaptureHostWindowReveal');
     expect(captureViewRoot).not.toContain('useCaptureKeyboardHostEvents');
+    expect(runtimeView).toContain('workflowRuntime.dispose()');
+    expect(runtime).toContain('dispose,');
   });
 
   it('does not rebuild combined host/editor pointer and keyboard action bags in the view controller', () => {

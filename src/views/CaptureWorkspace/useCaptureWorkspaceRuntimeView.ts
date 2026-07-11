@@ -7,6 +7,7 @@ import {
 } from 'react';
 
 import { createCaptureWorkspaceRuntime } from '../../application/capture-workspace/runtime';
+import type { CaptureWorkspaceRuntime } from '../../application/capture-workspace/types';
 import { prepareCaptureSurfaceForReveal } from './captureHostRuntime';
 import {
   shouldPollCaptureHoverSelection,
@@ -59,6 +60,8 @@ export function useCaptureWorkspaceRuntimeView({
   onInactiveRef.current = onInactive;
   screenshotSavePathRef.current = screenshotSavePath;
 
+  const [runtimeRevision, setRuntimeRevision] = useState(0);
+  const disposedRuntimeRef = useRef<CaptureWorkspaceRuntime | null>(null);
   const workflowRuntime = useMemo(
     () =>
       createCaptureWorkspaceRuntime({
@@ -75,7 +78,7 @@ export function useCaptureWorkspaceRuntimeView({
         },
         keyboard: { target: window },
       }),
-    [platformRuntime],
+    [platformRuntime, runtimeRevision],
   );
   const [runtimeRenderState, setRuntimeRenderState] = useState(
     () => workflowRuntime.renderState,
@@ -160,10 +163,12 @@ export function useCaptureWorkspaceRuntimeView({
     workflowRuntime,
   ]);
 
-  const hasStartedInitialSessionRef = useRef(false);
+  const initialSessionRuntimeRef = useRef<CaptureWorkspaceRuntime | null>(null);
   useEffect(() => {
-    if (!initialMode || hasStartedInitialSessionRef.current) return;
-    hasStartedInitialSessionRef.current = true;
+    if (!initialMode || initialSessionRuntimeRef.current === workflowRuntime) {
+      return;
+    }
+    initialSessionRuntimeRef.current = workflowRuntime;
     void workflowRuntime.actions.startSession(initialMode, initialSessionId);
   }, [initialMode, initialSessionId, workflowRuntime]);
 
@@ -182,15 +187,15 @@ export function useCaptureWorkspaceRuntimeView({
   };
 
   useEffect(() => {
-    let disposed = false;
-    let disconnect: (() => void) | undefined;
-    void workflowRuntime.actions.connectHost().then((nextDisconnect) => {
-      if (disposed) nextDisconnect();
-      else disconnect = nextDisconnect;
-    });
+    if (disposedRuntimeRef.current === workflowRuntime) {
+      setRuntimeRevision((revision) => revision + 1);
+      return;
+    }
+
+    void workflowRuntime.actions.connectHost().catch(() => undefined);
     return () => {
-      disposed = true;
-      disconnect?.();
+      disposedRuntimeRef.current = workflowRuntime;
+      workflowRuntime.dispose();
     };
   }, [workflowRuntime]);
 

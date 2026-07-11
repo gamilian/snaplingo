@@ -148,6 +148,12 @@ interface TerminalOutputOperation {
   sessionId: string;
 }
 
+interface HostConnection {
+  readonly isClosed: boolean;
+  retain(dispose: () => void): void;
+  disconnect(): void;
+}
+
 interface CaptureWorkspaceRuntimeHost {
   resetInteraction(): void;
   resetSession(): void;
@@ -202,6 +208,7 @@ export function createCaptureWorkspaceRuntime({
 }): CaptureWorkspaceRuntime {
   let state = createInitialState();
   let generation = 0;
+  let disposed = false;
   let hydratedSessionId: string | null = null;
   let snapshotHydration: SnapshotHydration | null = null;
   const listeners = new Set<() => void>();
@@ -214,8 +221,65 @@ export function createCaptureWorkspaceRuntime({
   let previewScheduler: PreviewRenderScheduler | null = null;
   let terminalOutputSequence = 0;
   let terminalOutputOperation: TerminalOutputOperation | null = null;
+  const hostConnections = new Set<HostConnection>();
+  const nativeSessionCancellations = new Map<string, Promise<void>>();
+  const provisionalSessionIds = new Set<string>();
+
+  const releaseDisposer = (dispose: () => void) => {
+    try {
+      const result = dispose() as unknown;
+      if (result && typeof (result as PromiseLike<void>).then === 'function') {
+        void Promise.resolve(result).catch(() => undefined);
+      }
+    } catch {
+      // Disposal is best-effort and must not interrupt remaining cleanup.
+    }
+  };
+
+  const createHostConnection = (): HostConnection => {
+    let closed = false;
+    const disposers: Array<() => void> = [];
+    const connection: HostConnection = {
+      get isClosed() {
+        return closed;
+      },
+      retain(dispose) {
+        if (disposed || closed) {
+          releaseDisposer(dispose);
+          return;
+        }
+        disposers.push(dispose);
+      },
+      disconnect() {
+        if (closed) return;
+        closed = true;
+        hostConnections.delete(connection);
+        for (const dispose of disposers.splice(0).reverse()) {
+          releaseDisposer(dispose);
+        }
+      },
+    };
+    hostConnections.add(connection);
+    return connection;
+  };
+
+  const cancelNativeSessionOnce = (sessionId: string) => {
+    const existing = nativeSessionCancellations.get(sessionId);
+    if (existing) return existing;
+
+    let cancellation: Promise<void>;
+    try {
+      cancellation = platform.commands.cancelCaptureSession(sessionId);
+    } catch (error) {
+      cancellation = Promise.reject(error);
+    }
+    nativeSessionCancellations.set(sessionId, cancellation);
+    void cancellation.catch(() => undefined);
+    return cancellation;
+  };
 
   const markPerf = (event: string, sessionId?: string | null) => {
+    if (disposed) return;
     const perf = perfState;
     if (!perf) return;
 
@@ -228,12 +292,14 @@ export function createCaptureWorkspaceRuntime({
   };
 
   const patch = (next: Partial<RuntimeState>) => {
+    if (disposed) return;
     state = { ...state, ...next };
     if ('cursorPoint' in next) cursorPointRef.current = next.cursorPoint ?? null;
     listeners.forEach((listener) => listener());
   };
 
   const launch = (operation: () => Promise<unknown>) => {
+    if (disposed) return;
     const actionGeneration = generation;
     const reportFailure = (error: unknown) => {
       if (generation === actionGeneration) {
@@ -260,7 +326,41 @@ export function createCaptureWorkspaceRuntime({
     terminalOutputOperation?.generation === generation &&
     terminalOutputOperation.sessionId === state.session?.id;
 
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    generation += 1;
+    const activeSessionId = state.session?.id ?? null;
+    detachPreviewScheduler();
+    terminalOutputOperation = null;
+    revealAttempt = null;
+    hasRevealed = false;
+    perfState = null;
+    snapshotHydration = null;
+    hydratedSessionId = null;
+    hasKeyboardAdjustedDraft = false;
+    cursorPointRef.current = null;
+    keyboardEditCursorPointRef.current = null;
+    for (const connection of [...hostConnections]) {
+      connection.disconnect();
+    }
+    listeners.clear();
+    state = createInitialState(state.mode, state);
+    try {
+      host?.resetSession();
+    } catch {
+      // Continue native cleanup even if the presentation host is already gone.
+    }
+    const sessionsToCancel = new Set(provisionalSessionIds);
+    provisionalSessionIds.clear();
+    if (activeSessionId) sessionsToCancel.add(activeSessionId);
+    for (const sessionId of sessionsToCancel) {
+      void cancelNativeSessionOnce(sessionId).catch(() => undefined);
+    }
+  };
+
   const resetSession = () => {
+    if (disposed) return;
     detachPreviewScheduler();
     terminalOutputOperation = null;
     state = createInitialState(state.mode, state);
@@ -274,12 +374,7 @@ export function createCaptureWorkspaceRuntime({
   };
 
   const createNativeSessionCancellation = (sessionId: string) => {
-    let cancellation: Promise<void> | null = null;
-
-    return () => {
-      cancellation ??= platform.commands.cancelCaptureSession(sessionId);
-      return cancellation;
-    };
+    return () => cancelNativeSessionOnce(sessionId);
   };
 
   const finishSession = async (
@@ -989,6 +1084,7 @@ export function createCaptureWorkspaceRuntime({
   };
 
   const cancelSession = async () => {
+    if (disposed) return;
     const actionGeneration = ++generation;
     const sessionId = state.session?.id;
     if (!sessionId) {
@@ -1017,16 +1113,8 @@ export function createCaptureWorkspaceRuntime({
 
   const actions: CaptureWorkspaceRuntime['actions'] = {
     async connectHost() {
-      const unlisten: Array<() => void> = [];
-      const disposeAll = () => {
-        for (const dispose of unlisten.splice(0).reverse()) {
-          try {
-            dispose();
-          } catch {
-            // Keep releasing the remaining host subscriptions.
-          }
-        }
-      };
+      if (disposed) return () => undefined;
+      const connection = createHostConnection();
       const handleKeyDown = (event: KeyboardEvent) => {
         if (actions.keyDown(event)) {
           event.preventDefault();
@@ -1057,11 +1145,11 @@ export function createCaptureWorkspaceRuntime({
         }
       };
 
-      if (keyboard) {
+      if (keyboard && !disposed && !connection.isClosed) {
         keyboard.target.addEventListener('keydown', handleKeyDown);
         keyboard.target.addEventListener('keyup', handleKeyUp);
         keyboard.target.addEventListener('blur', handleBlur);
-        unlisten.push(() => {
+        connection.retain(() => {
           keyboard.target.removeEventListener('keydown', handleKeyDown);
           keyboard.target.removeEventListener('keyup', handleKeyUp);
           keyboard.target.removeEventListener('blur', handleBlur);
@@ -1069,14 +1157,25 @@ export function createCaptureWorkspaceRuntime({
       }
 
       try {
-        unlisten.push(
-          await platform.onHotkeyTriggered((launch) =>
-            actions.startSession(launch.mode, launch.sessionId),
-          ),
+        connection.retain(
+          await platform.onHotkeyTriggered((launch) => {
+            if (disposed) return;
+            return actions.startSession(launch.mode, launch.sessionId);
+          }),
         );
-        unlisten.push(await platform.onCancelRequested(() => cancelSession()));
-        unlisten.push(
+        if (disposed || connection.isClosed) return connection.disconnect;
+
+        connection.retain(
+          await platform.onCancelRequested(() => {
+            if (disposed) return;
+            return cancelSession();
+          }),
+        );
+        if (disposed || connection.isClosed) return connection.disconnect;
+
+        connection.retain(
           await platform.onCopyRequested(async () => {
+            if (disposed) return;
             if (state.status === 'preview' && state.selection) {
               await runCompletionEffects(
                 state.selection,
@@ -1099,15 +1198,16 @@ export function createCaptureWorkspaceRuntime({
           }),
         );
       } catch (error) {
-        disposeAll();
-        patch({ status: 'error', error: errorMessage(error) });
+        connection.disconnect();
+        if (!disposed) patch({ status: 'error', error: errorMessage(error) });
         return () => undefined;
       }
 
-      return disposeAll;
+      return connection.disconnect;
     },
 
     async updateHostReadiness(imagesReady) {
+      if (disposed) return;
       const sessionId = state.session?.id ?? null;
       const readinessGeneration = generation;
       const revealKey = `${readinessGeneration}:${sessionId ?? ''}`;
@@ -1162,6 +1262,9 @@ export function createCaptureWorkspaceRuntime({
     },
 
     async startSession(mode, requestedSessionId) {
+      if (disposed) return;
+      const previousSessionId = state.session?.id ?? null;
+      if (previousSessionId) provisionalSessionIds.add(previousSessionId);
       const actionGeneration = ++generation;
       detachPreviewScheduler();
       terminalOutputOperation = null;
@@ -1188,9 +1291,27 @@ export function createCaptureWorkspaceRuntime({
         const session = requestedSessionId
           ? await platform.commands.getCaptureSession(requestedSessionId)
           : await platform.commands.createCaptureSession();
+        provisionalSessionIds.add(session.id);
         if (generation !== actionGeneration) {
-          await platform.commands.cancelCaptureSession(session.id);
+          provisionalSessionIds.delete(session.id);
+          await cancelNativeSessionOnce(session.id).catch(() => undefined);
           return;
+        }
+        if (previousSessionId && previousSessionId !== session.id) {
+          try {
+            await cancelNativeSessionOnce(previousSessionId);
+          } catch (error) {
+            provisionalSessionIds.delete(previousSessionId);
+            provisionalSessionIds.delete(session.id);
+            await cancelNativeSessionOnce(session.id).catch(() => undefined);
+            throw error;
+          }
+          provisionalSessionIds.delete(previousSessionId);
+          if (generation !== actionGeneration) {
+            provisionalSessionIds.delete(session.id);
+            await cancelNativeSessionOnce(session.id).catch(() => undefined);
+            return;
+          }
         }
         if (perfState) perfState.sessionId = session.id;
         markPerf('session_loaded', session.id);
@@ -1201,10 +1322,12 @@ export function createCaptureWorkspaceRuntime({
             .currentCaptureCursorPosition(session.id)
             .catch(() => null));
         if (generation !== actionGeneration) {
-          await platform.commands.cancelCaptureSession(session.id);
+          provisionalSessionIds.delete(session.id);
+          await cancelNativeSessionOnce(session.id).catch(() => undefined);
           return;
         }
 
+        provisionalSessionIds.delete(session.id);
         patch({
           status: 'selecting',
           session,
@@ -1224,8 +1347,10 @@ export function createCaptureWorkspaceRuntime({
     },
 
     async refreshSession() {
+      if (disposed) return;
       const previousSessionId = state.session?.id;
       if (!previousSessionId) return;
+      provisionalSessionIds.add(previousSessionId);
       const actionGeneration = ++generation;
       detachPreviewScheduler();
       terminalOutputOperation = null;
@@ -1246,7 +1371,9 @@ export function createCaptureWorkspaceRuntime({
       try {
         const session = await platform.commands.createCaptureSession();
         createdSession = session;
-        await platform.commands.cancelCaptureSession(previousSessionId);
+        provisionalSessionIds.add(session.id);
+        await cancelNativeSessionOnce(previousSessionId);
+        provisionalSessionIds.delete(previousSessionId);
         if (generation !== actionGeneration) return;
         const cursorPoint =
           session.captured_cursor?.logical_position ??
@@ -1255,6 +1382,7 @@ export function createCaptureWorkspaceRuntime({
             .catch(() => null));
         if (generation !== actionGeneration) return;
         adoptedCreatedSession = true;
+        provisionalSessionIds.delete(session.id);
         patch({
           status: 'selecting',
           session,
@@ -1272,9 +1400,10 @@ export function createCaptureWorkspaceRuntime({
         }
       } finally {
         if (createdSession && !adoptedCreatedSession) {
-          await platform.commands
-            .cancelCaptureSession(createdSession.id)
-            .catch(() => undefined);
+          provisionalSessionIds.delete(createdSession.id);
+          await cancelNativeSessionOnce(createdSession.id).catch(
+            () => undefined,
+          );
         }
       }
     },
@@ -1302,6 +1431,7 @@ export function createCaptureWorkspaceRuntime({
       );
     },
     resetPreview() {
+      if (disposed) return;
       generation += 1;
       detachPreviewScheduler();
       terminalOutputOperation = null;
@@ -1809,6 +1939,7 @@ export function createCaptureWorkspaceRuntime({
     },
 
     async hydrateSnapshots() {
+      if (disposed) return;
       const sessionId = state.session?.id;
       if (!sessionId) return;
       const actionGeneration = generation;
@@ -1839,6 +1970,7 @@ export function createCaptureWorkspaceRuntime({
           markPerf('snapshots_hydrated', sessionId);
         })
         .catch((error) => {
+          if (disposed) return;
           if (
             snapshotHydration?.generation === actionGeneration &&
             snapshotHydration.sessionId === sessionId
@@ -1895,9 +2027,11 @@ export function createCaptureWorkspaceRuntime({
     },
     actions,
     subscribe(listener) {
+      if (disposed) return () => undefined;
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
+    dispose,
   };
 }
 

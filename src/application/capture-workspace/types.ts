@@ -153,6 +153,7 @@ export interface CaptureWorkspaceRuntime {
   readonly renderState: CaptureWorkspaceRenderState;
   readonly actions: CaptureWorkspaceRuntimeActions;
   subscribe(listener: () => void): () => void;
+  dispose(): void;
 }
 
 export interface CaptureWorkspaceRuntimePlatform {

@@ -44,6 +44,247 @@ function createKeyboardTarget() {
 }
 
 describe('capture workspace runtime', () => {
+  it('disposes acquired and late host registrations exactly once', async () => {
+    const platform = createPlatform();
+    const keyboardTarget = createKeyboardTarget();
+    const disposeHotkey = vi.fn();
+    const disposeCancel = vi.fn();
+    const cancelRegistration = deferred<() => void>();
+    platform.onHotkeyTriggered.mockResolvedValue(disposeHotkey);
+    platform.onCancelRequested.mockReturnValue(cancelRegistration.promise);
+    const runtime = createCaptureWorkspaceRuntime({
+      platform,
+      keyboard: { target: keyboardTarget.target },
+    });
+
+    const connecting = runtime.actions.connectHost();
+    await vi.waitFor(() =>
+      expect(platform.onCancelRequested).toHaveBeenCalledOnce(),
+    );
+    runtime.dispose();
+
+    expect(keyboardTarget.listenerCount('keydown')).toBe(0);
+    expect(keyboardTarget.listenerCount('keyup')).toBe(0);
+    expect(keyboardTarget.listenerCount('blur')).toBe(0);
+    expect(disposeHotkey).toHaveBeenCalledOnce();
+
+    cancelRegistration.resolve(disposeCancel);
+    const disconnect = await connecting;
+    disconnect();
+    disconnect();
+
+    expect(disposeCancel).toHaveBeenCalledOnce();
+    expect(platform.onCopyRequested).not.toHaveBeenCalled();
+    expect(disposeHotkey).toHaveBeenCalledOnce();
+  });
+
+  it('disposes a late third host registration without retaining listeners', async () => {
+    const platform = createPlatform();
+    const keyboardTarget = createKeyboardTarget();
+    const disposeHotkey = vi.fn();
+    const disposeCancel = vi.fn();
+    const disposeCopy = vi.fn();
+    const copyRegistration = deferred<() => void>();
+    platform.onHotkeyTriggered.mockResolvedValue(disposeHotkey);
+    platform.onCancelRequested.mockResolvedValue(disposeCancel);
+    platform.onCopyRequested.mockReturnValue(copyRegistration.promise);
+    const runtime = createCaptureWorkspaceRuntime({
+      platform,
+      keyboard: { target: keyboardTarget.target },
+    });
+
+    const connecting = runtime.actions.connectHost();
+    await vi.waitFor(() =>
+      expect(platform.onCopyRequested).toHaveBeenCalledOnce(),
+    );
+    runtime.dispose();
+    copyRegistration.resolve(disposeCopy);
+    const disconnect = await connecting;
+    disconnect();
+
+    expect(disposeHotkey).toHaveBeenCalledOnce();
+    expect(disposeCancel).toHaveBeenCalledOnce();
+    expect(disposeCopy).toHaveBeenCalledOnce();
+    expect(keyboardTarget.listenerCount('keydown')).toBe(0);
+    expect(keyboardTarget.listenerCount('keyup')).toBe(0);
+    expect(keyboardTarget.listenerCount('blur')).toBe(0);
+  });
+
+  it('cancels a session that resolves after disposal without adopting it', async () => {
+    const platform = createPlatform();
+    const session = createSession({ id: 'late-disposed-session' });
+    const sessionRequest = deferred<typeof session>();
+    platform.commands.getCaptureSession.mockReturnValue(sessionRequest.promise);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    const starting = runtime.actions.startSession(
+      'screenshot',
+      'late-disposed-session',
+    );
+    runtime.dispose();
+    sessionRequest.resolve(session);
+    await starting;
+
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledTimes(1);
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
+      'late-disposed-session',
+    );
+    expect(runtime.renderState).toMatchObject({
+      status: 'idle',
+      sessionId: null,
+    });
+
+    await runtime.actions.startSession('screenshot', 'ignored-after-dispose');
+    expect(platform.commands.getCaptureSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels a resolved provisional session while cursor loading is pending', async () => {
+    const platform = createPlatform({
+      session: createSession({ id: 'provisional-session' }),
+    });
+    const cursor = deferred<{ x: number; y: number } | null>();
+    platform.commands.currentCaptureCursorPosition.mockReturnValue(
+      cursor.promise,
+    );
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    const starting = runtime.actions.startSession(
+      'screenshot',
+      'provisional-session',
+    );
+    await vi.waitFor(() =>
+      expect(
+        platform.commands.currentCaptureCursorPosition,
+      ).toHaveBeenCalledOnce(),
+    );
+    runtime.dispose();
+
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledOnce();
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
+      'provisional-session',
+    );
+    cursor.resolve(null);
+    await starting;
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledOnce();
+  });
+
+  it('cancels an active session once and invalidates pending preview work', async () => {
+    const platform = createPlatform();
+    const preview = deferred<string>();
+    platform.commands.renderCaptureOutput.mockReturnValue(preview.promise);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-1');
+
+    const rendering = runtime.actions.renderSelectionPreview(selection);
+    runtime.dispose();
+    runtime.dispose();
+    preview.resolve('late-preview');
+    await rendering;
+
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledTimes(1);
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
+      'session-1',
+    );
+    expect(runtime.renderState).toMatchObject({
+      status: 'idle',
+      sessionId: null,
+      previewImageBase64: null,
+      isRenderingOutput: false,
+    });
+  });
+
+  it('invalidates pending terminal output when disposing an active session', async () => {
+    const platform = createPlatform();
+    const output = deferred<void>();
+    platform.commands.outputCapture.mockReturnValue(output.promise);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-1');
+    await runtime.actions.renderSelectionPreview(selection);
+
+    const completing = runtime.actions.completePreviewSelection(
+      'copy',
+      selection,
+    );
+    await vi.waitFor(() =>
+      expect(platform.commands.outputCapture).toHaveBeenCalledOnce(),
+    );
+    runtime.dispose();
+    output.resolve();
+    await completing;
+
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledTimes(1);
+    expect(runtime.renderState).toMatchObject({
+      status: 'idle',
+      sessionId: null,
+      isRenderingOutput: false,
+      error: null,
+    });
+  });
+
+  it('cancels both the previous and late-created sessions when disposed during refresh', async () => {
+    const platform = createPlatform({
+      session: createSession({ id: 'refresh-previous' }),
+    });
+    const createdSession = createSession({ id: 'refresh-created-late' });
+    const created = deferred<typeof createdSession>();
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'refresh-previous');
+    platform.commands.createCaptureSession.mockReturnValue(created.promise);
+
+    const refreshing = runtime.actions.refreshSession();
+    runtime.dispose();
+
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
+      'refresh-previous',
+    );
+    created.resolve(createdSession);
+    await refreshing;
+    expect(
+      platform.commands.cancelCaptureSession.mock.calls.filter(
+        ([sessionId]) => sessionId === 'refresh-previous',
+      ),
+    ).toHaveLength(1);
+    expect(
+      platform.commands.cancelCaptureSession.mock.calls.filter(
+        ([sessionId]) => sessionId === 'refresh-created-late',
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('cancels both the previous and late-loaded sessions when disposed during replacement', async () => {
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockImplementation(async (sessionId) =>
+      createSession({ id: sessionId }),
+    );
+    const replacementSession = createSession({ id: 'replacement-late' });
+    const replacement = deferred<typeof replacementSession>();
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'replacement-previous');
+    platform.commands.getCaptureSession.mockReturnValue(replacement.promise);
+
+    const replacing = runtime.actions.startSession(
+      'screenshot',
+      'replacement-late',
+    );
+    runtime.dispose();
+
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
+      'replacement-previous',
+    );
+    replacement.resolve(replacementSession);
+    await replacing;
+    expect(
+      platform.commands.cancelCaptureSession.mock.calls.filter(
+        ([sessionId]) => sessionId === 'replacement-previous',
+      ),
+    ).toHaveLength(1);
+    expect(
+      platform.commands.cancelCaptureSession.mock.calls.filter(
+        ([sessionId]) => sessionId === 'replacement-late',
+      ),
+    ).toHaveLength(1);
+  });
+
   it('prevents runtime and delegated editor shortcuts synchronously', async () => {
     const platform = createPlatform();
     const keyboardTarget = createKeyboardTarget();
