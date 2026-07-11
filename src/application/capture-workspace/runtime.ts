@@ -36,6 +36,7 @@ interface RuntimeState {
 }
 
 interface SnapshotHydration {
+  generation: number;
   sessionId: string;
   promise: Promise<void>;
 }
@@ -46,6 +47,7 @@ export function createCaptureWorkspaceRuntime({
   platform: CaptureWorkspaceRuntimePlatform;
 }): CaptureWorkspaceRuntime {
   let state = createInitialState();
+  let generation = 0;
   let hydratedSessionId: string | null = null;
   let snapshotHydration: SnapshotHydration | null = null;
 
@@ -59,8 +61,18 @@ export function createCaptureWorkspaceRuntime({
     snapshotHydration = null;
   };
 
-  const finishSession = async (sessionId: string) => {
+  const finishSession = async (sessionId: string, actionGeneration: number) => {
+    if (generation !== actionGeneration) {
+      await platform.commands.cancelCaptureSession(sessionId);
+      return;
+    }
+
     await platform.dismiss();
+    if (generation !== actionGeneration) {
+      await platform.commands.cancelCaptureSession(sessionId);
+      return;
+    }
+
     resetSession();
     await platform.commands.cancelCaptureSession(sessionId);
   };
@@ -69,9 +81,12 @@ export function createCaptureWorkspaceRuntime({
     effect: CaptureRuntimeEffect,
     sessionId: string,
     rect: LogicalRect,
+    actionGeneration: number,
   ) => {
     if (effect.type === 'output-capture') {
-      if (effect.action !== 'copy') return;
+      if (effect.action !== 'copy') {
+        throw new Error(`Unsupported capture output action: ${effect.action}`);
+      }
 
       await platform.commands.outputCapture({
         sessionId,
@@ -82,14 +97,26 @@ export function createCaptureWorkspaceRuntime({
       return;
     }
 
+    if (effect.type === 'record-selection') return;
+
     if (effect.type === 'finish-session') {
-      await finishSession(sessionId);
+      await finishSession(sessionId, actionGeneration);
+      return;
     }
+
+    throw new Error(`Unsupported capture runtime effect: ${effect.type}`);
   };
 
   const completeSelection = async (rect: LogicalRect) => {
     const session = state.session;
-    if (!session || state.isRenderingOutput) return;
+    if (
+      !session ||
+      state.isRenderingOutput ||
+      state.mode !== 'screenshot-copy'
+    ) {
+      return;
+    }
+    const actionGeneration = generation;
 
     patch({
       selection: rect,
@@ -103,28 +130,36 @@ export function createCaptureWorkspaceRuntime({
         getPrimaryCaptureCompletionActionForMode(state.mode),
       );
       for (const effect of effects) {
-        await executeEffect(effect, session.id, rect);
+        await executeEffect(effect, session.id, rect, actionGeneration);
       }
     } catch (error) {
-      patch({ status: 'error', error: errorMessage(error) });
+      if (generation === actionGeneration) {
+        patch({ status: 'error', error: errorMessage(error) });
+      }
     } finally {
-      patch({ isRenderingOutput: false });
+      if (generation === actionGeneration) {
+        patch({ isRenderingOutput: false });
+      }
     }
   };
 
   const cancelSession = async () => {
     const sessionId = state.session?.id;
     if (!sessionId) return;
+    const actionGeneration = generation;
 
     try {
-      await finishSession(sessionId);
+      await finishSession(sessionId, actionGeneration);
     } catch (error) {
-      patch({ status: 'error', error: errorMessage(error) });
+      if (generation === actionGeneration) {
+        patch({ status: 'error', error: errorMessage(error) });
+      }
     }
   };
 
   const actions: CaptureWorkspaceRuntime['actions'] = {
     async startSession(mode, requestedSessionId) {
+      const actionGeneration = ++generation;
       state = {
         ...createInitialState(mode),
         status: 'loading',
@@ -136,11 +171,14 @@ export function createCaptureWorkspaceRuntime({
         const session = requestedSessionId
           ? await platform.commands.getCaptureSession(requestedSessionId)
           : await platform.commands.createCaptureSession();
+        if (generation !== actionGeneration) return;
+
         const cursorPoint =
           session.captured_cursor?.logical_position ??
           (await platform.commands
             .currentCaptureCursorPosition(session.id)
             .catch(() => null));
+        if (generation !== actionGeneration) return;
 
         patch({
           status: 'selecting',
@@ -154,7 +192,9 @@ export function createCaptureWorkspaceRuntime({
             : null,
         });
       } catch (error) {
-        patch({ status: 'error', error: errorMessage(error) });
+        if (generation === actionGeneration) {
+          patch({ status: 'error', error: errorMessage(error) });
+        }
       }
     },
 
@@ -237,8 +277,12 @@ export function createCaptureWorkspaceRuntime({
     async hydrateSnapshots() {
       const sessionId = state.session?.id;
       if (!sessionId) return;
+      const actionGeneration = generation;
 
-      if (snapshotHydration?.sessionId === sessionId) {
+      if (
+        snapshotHydration?.generation === actionGeneration &&
+        snapshotHydration.sessionId === sessionId
+      ) {
         await snapshotHydration.promise;
         return;
       }
@@ -248,7 +292,9 @@ export function createCaptureWorkspaceRuntime({
         .hydrateCaptureSessionSnapshots(sessionId)
         .then((session) => {
           if (
+            snapshotHydration?.generation !== actionGeneration ||
             snapshotHydration?.sessionId !== sessionId ||
+            generation !== actionGeneration ||
             state.session?.id !== sessionId
           ) {
             return;
@@ -258,14 +304,21 @@ export function createCaptureWorkspaceRuntime({
           hydratedSessionId = sessionId;
         })
         .catch((error) => {
-          if (snapshotHydration?.sessionId === sessionId) {
+          if (
+            snapshotHydration?.generation === actionGeneration &&
+            snapshotHydration.sessionId === sessionId
+          ) {
             snapshotHydration = null;
             hydratedSessionId = null;
           }
           throw error;
         });
 
-      snapshotHydration = { sessionId, promise };
+      snapshotHydration = {
+        generation: actionGeneration,
+        sessionId,
+        promise,
+      };
       await promise;
     },
   };

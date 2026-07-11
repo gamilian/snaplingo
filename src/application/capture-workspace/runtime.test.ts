@@ -6,6 +6,86 @@ import { createCaptureWorkspaceRuntime } from './runtime';
 const selection = { x: 20, y: 30, width: 120, height: 80 };
 
 describe('capture workspace runtime', () => {
+  it('keeps the newest session authoritative when an older start resolves later', async () => {
+    const oldSession = deferred<ReturnType<typeof createSession>>();
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockImplementation((sessionId) =>
+      sessionId === 'session-old'
+        ? oldSession.promise
+        : Promise.resolve(createSession({ id: 'session-new' })),
+    );
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    const oldStart = runtime.actions.startSession('screenshot', 'session-old');
+    await runtime.actions.startSession('screenshot', 'session-new');
+    oldSession.resolve(createSession({ id: 'session-old' }));
+    await oldStart;
+
+    expect(runtime.renderState).toMatchObject({
+      status: 'selecting',
+      sessionId: 'session-new',
+      error: null,
+    });
+    expect(platform.commands.currentCaptureCursorPosition).toHaveBeenCalledTimes(
+      1,
+    );
+    expect(platform.commands.currentCaptureCursorPosition).toHaveBeenCalledWith(
+      'session-new',
+    );
+  });
+
+  it('ignores an older start rejection after a newer session loads', async () => {
+    const oldSession = deferred<ReturnType<typeof createSession>>();
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockImplementation((sessionId) =>
+      sessionId === 'session-old'
+        ? oldSession.promise
+        : Promise.resolve(createSession({ id: 'session-new' })),
+    );
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    const oldStart = runtime.actions.startSession('screenshot', 'session-old');
+    await runtime.actions.startSession('screenshot', 'session-new');
+    oldSession.reject(new Error('old load failed'));
+    await oldStart;
+
+    expect(runtime.renderState).toMatchObject({
+      status: 'selecting',
+      sessionId: 'session-new',
+      error: null,
+    });
+  });
+
+  it('ignores an older cursor lookup after a newer session loads', async () => {
+    const oldCursor = deferred<{ x: number; y: number } | null>();
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockImplementation(async (sessionId) =>
+      createSession({ id: sessionId }),
+    );
+    platform.commands.currentCaptureCursorPosition.mockImplementation(
+      (sessionId) =>
+        sessionId === 'session-old' ? oldCursor.promise : Promise.resolve(null),
+    );
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    const oldStart = runtime.actions.startSession('screenshot', 'session-old');
+    await vi.waitFor(() => {
+      expect(
+        platform.commands.currentCaptureCursorPosition,
+      ).toHaveBeenCalledWith('session-old');
+    });
+    await runtime.actions.startSession('screenshot', 'session-new');
+    oldCursor.resolve({ x: 40, y: 50 });
+    await oldStart;
+
+    expect(runtime.renderState).toMatchObject({
+      status: 'selecting',
+      sessionId: 'session-new',
+      cursorPoint: null,
+      error: null,
+    });
+  });
+
   it('completes a pointer selection through effect interpretation and execution', async () => {
     const platform = createPlatform({
       session: createSession({ id: 'session-pointer' }),
@@ -142,6 +222,86 @@ describe('capture workspace runtime', () => {
       error: null,
     });
   });
+
+  it('does not let an old pending output dismiss or reset a replacement session', async () => {
+    const output = deferred<void>();
+    const platform = createPlatform({
+      session: createSession({ id: 'session-old' }),
+    });
+    platform.commands.getCaptureSession.mockImplementation(async (sessionId) =>
+      createSession({ id: sessionId }),
+    );
+    platform.commands.outputCapture.mockImplementation(() => output.promise);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession('screenshot-copy', 'session-old');
+    runtime.actions.pointerDown({ x: 20, y: 30 });
+    runtime.actions.pointerMove({ x: 140, y: 110 });
+    const oldCompletion = runtime.actions.pointerUp({ x: 140, y: 110 });
+    await runtime.actions.startSession('screenshot', 'session-new');
+    output.resolve();
+    await oldCompletion;
+
+    expect(platform.dismiss).not.toHaveBeenCalled();
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
+      'session-old',
+    );
+    expect(runtime.renderState).toMatchObject({
+      status: 'selecting',
+      sessionId: 'session-new',
+      isRenderingOutput: false,
+      error: null,
+    });
+  });
+
+  it('does not let an old pending dismiss reset a replacement session', async () => {
+    const dismiss = deferred<void>();
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockImplementation(async (sessionId) =>
+      createSession({ id: sessionId }),
+    );
+    platform.dismiss.mockImplementation(() => dismiss.promise);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession('screenshot', 'session-old');
+    const oldCancel = runtime.actions.keyDown({ key: 'Escape' });
+    await runtime.actions.startSession('screenshot', 'session-new');
+    dismiss.resolve();
+    await oldCancel;
+
+    expect(platform.dismiss).toHaveBeenCalledTimes(1);
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
+      'session-old',
+    );
+    expect(runtime.renderState).toMatchObject({
+      status: 'selecting',
+      sessionId: 'session-new',
+      isRenderingOutput: false,
+      error: null,
+    });
+  });
+
+  it('does not silently complete modes whose runtime effects are not implemented yet', async () => {
+    const platform = createPlatform({
+      session: createSession({ id: 'session-preview' }),
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession('screenshot', 'session-preview');
+    runtime.actions.pointerDown({ x: 20, y: 30 });
+    runtime.actions.pointerMove({ x: 140, y: 110 });
+    await runtime.actions.pointerUp({ x: 140, y: 110 });
+
+    expect(platform.commands.outputCapture).not.toHaveBeenCalled();
+    expect(platform.dismiss).not.toHaveBeenCalled();
+    expect(platform.commands.cancelCaptureSession).not.toHaveBeenCalled();
+    expect(runtime.renderState).toMatchObject({
+      status: 'selecting',
+      sessionId: 'session-preview',
+      selection,
+      error: null,
+    });
+  });
 });
 
 function createPlatform({
@@ -152,16 +312,22 @@ function createPlatform({
   return {
     commands: {
       createCaptureSession: vi.fn(async () => session),
-      getCaptureSession: vi.fn(async () => session),
+      getCaptureSession: vi.fn<
+        CaptureWorkspacePlatformRuntime['commands']['getCaptureSession']
+      >(async () => session),
       hydrateCaptureSessionSnapshots: vi.fn(async () => session),
       logCaptureFrontendPerf: vi.fn(async () => undefined),
-      currentCaptureCursorPosition: vi.fn(async () => null),
+      currentCaptureCursorPosition: vi.fn<
+        CaptureWorkspacePlatformRuntime['commands']['currentCaptureCursorPosition']
+      >(async () => null),
       cancelCaptureSession: vi.fn(async () => undefined),
       restoreCaptureSnapshotWindowsForSession: vi.fn(async () => undefined),
       renderCaptureOutput: vi.fn(async () => 'preview-image'),
       defaultCaptureSavePath: vi.fn(async () => '/captures/capture.png'),
       quickCaptureSavePath: vi.fn(async () => '/captures/quick.png'),
-      outputCapture: vi.fn(async () => undefined),
+      outputCapture: vi.fn<
+        CaptureWorkspacePlatformRuntime['commands']['outputCapture']
+      >(async () => undefined),
       runCaptureOcr: vi.fn(async () => ({ text: '', confidence: null })),
       openCaptureOcrResultWindow: vi.fn(async () => undefined),
       openCaptureTranslationResultWindow: vi.fn(async () => undefined),
@@ -175,7 +341,9 @@ function createPlatform({
     onHotkeyTriggered: vi.fn(async () => vi.fn()),
     prepareForReveal: vi.fn(async () => undefined),
     reveal: vi.fn(async () => undefined),
-    dismiss: vi.fn(async () => undefined),
+    dismiss: vi.fn<CaptureWorkspacePlatformRuntime['dismiss']>(async () =>
+      undefined,
+    ),
   } satisfies CaptureWorkspacePlatformRuntime;
 }
 
@@ -213,4 +381,15 @@ function createMonitor(
     image_base64: '',
     ...overrides,
   };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+
+  return { promise, resolve, reject };
 }

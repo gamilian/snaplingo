@@ -14,16 +14,16 @@ export type CaptureWorkspaceRuntimeStatus =
   | 'error';
 
 export interface CaptureWorkspaceRenderState {
-  status: CaptureWorkspaceRuntimeStatus;
-  mode: CaptureMode;
-  session: CaptureSessionView | null;
-  sessionId: string | null;
-  cursorPoint: Point | null;
-  selection: LogicalRect | null;
-  hoverSelection: LogicalRect | null;
-  isRenderingOutput: boolean;
-  hasHydratedPixelSource: boolean;
-  error: string | null;
+  readonly status: CaptureWorkspaceRuntimeStatus;
+  readonly mode: CaptureMode;
+  readonly session: CaptureSessionView | null;
+  readonly sessionId: string | null;
+  readonly cursorPoint: Point | null;
+  readonly selection: LogicalRect | null;
+  readonly hoverSelection: LogicalRect | null;
+  readonly isRenderingOutput: boolean;
+  readonly hasHydratedPixelSource: boolean;
+  readonly error: string | null;
 }
 
 export interface CaptureWorkspaceRuntimeActions {
@@ -37,7 +37,7 @@ export interface CaptureWorkspaceRuntimeActions {
 
 export interface CaptureWorkspaceRuntime {
   readonly renderState: CaptureWorkspaceRenderState;
-  actions: CaptureWorkspaceRuntimeActions;
+  readonly actions: CaptureWorkspaceRuntimeActions;
 }
 
 export interface CaptureWorkspaceRuntimePlatform {
