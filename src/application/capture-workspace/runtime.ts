@@ -472,16 +472,17 @@ export function createCaptureWorkspaceRuntime({
     state.selectedAnnotationIndex !== null ||
     state.activeAnnotationTool !== null;
 
+  const renderEditorSelectionPreview = (
+    rect: LogicalRect,
+    annotations: AnnotationCommand[] = state.annotationHistory.annotations,
+    includeCursor =
+      state.includeCapturedCursor && canToggleCapturedCursor(state.session),
+  ) => renderSelectionPreview(rect, annotations, includeCursor);
+
   const renderCurrentSelection = (annotations: AnnotationCommand[]) => {
     const selection = state.selection;
     if (!selection) return;
-    launch(() =>
-      renderSelectionPreview(
-        selection,
-        annotations,
-        state.includeCapturedCursor && canToggleCapturedCursor(state.session),
-      ),
-    );
+    launch(() => renderEditorSelectionPreview(selection, annotations));
   };
 
   const commitTextDraftToHistory = () => {
@@ -716,7 +717,7 @@ export function createCaptureWorkspaceRuntime({
     commitAnnotationGestureAtPoint,
     dismissCaptureLayer,
     adjustAnnotationSize,
-    renderSelectionPreview,
+    renderSelectionPreview: renderEditorSelectionPreview,
     setCursorPoint: (cursorPoint) => patch({ cursorPoint }),
     setSelection: (selection) => patch({ selection }),
     scheduleSelectionOverlayPaint: () => host?.scheduleSelectionOverlayPaint?.(),

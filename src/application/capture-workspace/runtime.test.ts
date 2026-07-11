@@ -586,6 +586,59 @@ describe('capture workspace runtime', () => {
     });
   });
 
+  it('preserves the captured cursor when delegated editor rerenders omit an override', async () => {
+    const platform = createPlatform({
+      session: createSession({
+        id: 'session-editor-cursor',
+        captured_cursor: {
+          logical_position: { x: 30, y: 40 },
+          hotspot: { x: 1, y: 2 },
+          image_width: 16,
+          image_height: 20,
+          scale_factor: 2,
+          image_base64: 'cursor-image',
+        },
+      }),
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession('screenshot', 'session-editor-cursor');
+    await runtime.actions.renderSelectionPreview(selection);
+    expect(runtime.actions.keyDown({ key: '`' })).toBe(true);
+    await vi.waitFor(() =>
+      expect(runtime.renderState.isRenderingOutput).toBe(false),
+    );
+
+    runtime.actions.toggleAnnotationTool('rectangle');
+    runtime.actions.pointerDown({ point: { x: 30, y: 40 }, source: 'preview' });
+    runtime.actions.pointerMove({ point: { x: 70, y: 80 }, source: 'root' });
+    await runtime.actions.pointerUp({ point: { x: 70, y: 80 }, source: 'root' });
+    await vi.waitFor(() =>
+      expect(runtime.renderState.isRenderingOutput).toBe(false),
+    );
+
+    runtime.actions.selectMoveTool();
+    runtime.actions.pointerDown({ point: { x: 45, y: 55 }, source: 'preview' });
+    platform.commands.renderCaptureOutput.mockClear();
+
+    runtime.actions.pointerMove({ point: { x: 46, y: 55 }, source: 'root' });
+    await runtime.actions.pointerUp({ point: { x: 46, y: 55 }, source: 'root' });
+    expect(platform.commands.renderCaptureOutput).toHaveBeenCalledWith({
+      sessionId: 'session-editor-cursor',
+      rect: selection,
+      annotations: [
+        {
+          type: 'rectangle',
+          rect: { x: 11, y: 10, width: 40, height: 40 },
+          color: [255, 77, 79, 255],
+          stroke_width: 2,
+          filled: false,
+        },
+      ],
+      includeCursor: true,
+    });
+  });
+
   it('owns text draft, style, undo, and redo transactions', async () => {
     const platform = createPlatform({
       session: createSession({ id: 'session-editor-text' }),
@@ -1448,6 +1501,14 @@ function createSession(
       rect: typeof selection;
       priority: number;
     }>;
+    captured_cursor: {
+      logical_position: { x: number; y: number };
+      hotspot: { x: number; y: number };
+      image_width: number;
+      image_height: number;
+      scale_factor: number;
+      image_base64: string;
+    } | null;
   }> = {},
 ) {
   return {
