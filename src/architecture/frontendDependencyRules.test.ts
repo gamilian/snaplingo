@@ -94,6 +94,24 @@ function moduleImports(files: SourceFile[]): ModuleImport[] {
     const sourceFile = parseSourceFile(file);
     const imports: ModuleImport[] = [];
 
+    function dynamicImportSpecifier(node: ts.Expression) {
+      if (
+        ts.isStringLiteral(node) ||
+        ts.isNoSubstitutionTemplateLiteral(node)
+      ) {
+        return node.text;
+      }
+
+      if (ts.isTemplateExpression(node)) {
+        return node.templateSpans.reduce(
+          (specifier, span) => `${specifier}\${...}${span.literal.text}`,
+          node.head.text,
+        );
+      }
+
+      return null;
+    }
+
     function visit(node: ts.Node) {
       if (
         (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
@@ -106,12 +124,11 @@ function moduleImports(files: SourceFile[]): ModuleImport[] {
         node.expression.kind === ts.SyntaxKind.ImportKeyword
       ) {
         const specifier = node.arguments[0];
-        if (
-          specifier &&
-          (ts.isStringLiteral(specifier) ||
-            ts.isNoSubstitutionTemplateLiteral(specifier))
-        ) {
-          imports.push({ path: file.path, specifier: specifier.text });
+        if (specifier) {
+          const text = dynamicImportSpecifier(specifier);
+          if (text !== null) {
+            imports.push({ path: file.path, specifier: text });
+          }
         }
       }
 
@@ -441,6 +458,29 @@ describe('frontend dependency rules', () => {
     expect(
       forbiddenPlatformImports([syntheticView]),
     ).toEqual(['src/views/ExampleView.tsx -> @tauri-apps/api/core']);
+  });
+
+  test('rejects interpolated dynamic imports across frontend boundaries', () => {
+    const syntheticFiles: SourceFile[] = [
+      {
+        path: 'src/views/TauriView.tsx',
+        source: "const tauri = await import(`@tauri-apps/api/${api}`);",
+      },
+      {
+        path: 'src/views/PlatformView.tsx',
+        source: "const adapter = await import(`../platform/${adapter}`);",
+      },
+      {
+        path: 'src/application/legacy.ts',
+        source: "const legacy = await import(`../tauri/${adapter}`);",
+      },
+    ];
+
+    expect(forbiddenPlatformImports(syntheticFiles)).toEqual([
+      'src/application/legacy.ts -> ../tauri/${...}',
+      'src/views/PlatformView.tsx -> ../platform/${...}',
+      'src/views/TauriView.tsx -> @tauri-apps/api/${...}',
+    ]);
   });
 
   test('rejects @tauri-apps re-exports outside the platform boundary', () => {

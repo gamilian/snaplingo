@@ -5,6 +5,17 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke }));
 vi.mock('@tauri-apps/plugin-dialog', () => ({ open }));
 
 describe('Tauri OCR command adapter', () => {
+  it('recognizes an image file by path', async () => {
+    const { recognizeImageFile } = await import('./ocr');
+    invoke.mockResolvedValueOnce({ text: 'recognized' });
+
+    await recognizeImageFile('/tmp/capture.png');
+
+    expect(invoke).toHaveBeenCalledWith('recognize_image_file', {
+      path: '/tmp/capture.png',
+    });
+  });
+
   it('recognizes in-memory image bytes', async () => {
     const { recognizeImageData } = await import('./ocr');
     invoke.mockResolvedValueOnce({ text: 'recognized' });
