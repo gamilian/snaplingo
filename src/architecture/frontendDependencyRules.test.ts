@@ -73,6 +73,19 @@ function productionSourceFiles(): SourceFile[] {
     .filter(({ path }) => isProductionTypeScript(path));
 }
 
+function viewSourceFilesIncludingTests(): SourceFile[] {
+  const modules = import.meta.glob('../views/**/*.{ts,tsx}', {
+    eager: true,
+    import: 'default',
+    query: '?raw',
+  }) as Record<string, string>;
+
+  return Object.entries(modules).map(([path, source]) => ({
+    path: `src/${path.replace(/^\.\.\//, '')}`,
+    source,
+  }));
+}
+
 function parseSourceFile({ path, source }: SourceFile) {
   return ts.createSourceFile(
     path,
@@ -314,6 +327,18 @@ describe('frontend dependency rules', () => {
           specifier.includes('/platform/') ||
           specifier.includes('/tauri/') ||
           specifier.startsWith('@tauri-apps/'),
+        )
+        .map(({ path, specifier }) => `${path} -> ${specifier}`),
+    ).toEqual([]);
+  });
+
+  test('View tests also stay independent of legacy and Platform modules', () => {
+    expect(
+      moduleImports(viewSourceFilesIncludingTests())
+        .filter(({ specifier }) =>
+          specifier.startsWith('@tauri-apps/') ||
+          /(?:^|\/)platform(?:\/|$)/.test(specifier) ||
+          /(?:^|\/)tauri(?:\/|$)/.test(specifier),
         )
         .map(({ path, specifier }) => `${path} -> ${specifier}`),
     ).toEqual([]);

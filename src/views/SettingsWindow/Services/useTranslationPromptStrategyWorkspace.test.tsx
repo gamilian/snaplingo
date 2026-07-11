@@ -37,7 +37,7 @@ vi.mock('react', async () => {
 import type {
   TranslationPromptStrategy,
   TranslationPromptStrategyConfig,
-} from '../../../tauri/providers';
+} from './providerViewTypes';
 import {
   DEFAULT_PROMPT_STRATEGIES,
   DEFAULT_PROMPT_STRATEGY_ID,
