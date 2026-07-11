@@ -7,7 +7,6 @@ import {
 } from 'react';
 
 import { createCaptureWorkspaceRuntime } from '../../application/capture-workspace/runtime';
-import type { CaptureWorkspaceRuntimeActions } from '../../application/capture-workspace/types';
 import { prepareCaptureSurfaceForReveal } from './captureHostRuntime';
 import {
   shouldPollCaptureHoverSelection,
@@ -16,7 +15,10 @@ import {
 import { useCaptureMagnifierPixelSource } from './captureMagnifierRuntime';
 import { useCaptureSelectionOverlay } from './captureSelectionOverlayRuntime';
 import { getCaptureWorkspaceDerivedState } from './captureWorkspaceDerived';
-import type { CaptureWorkspaceViewRenderState } from './CaptureWorkspaceView';
+import type {
+  CaptureWorkspaceViewActions,
+  CaptureWorkspaceViewRenderState,
+} from './CaptureWorkspaceView';
 import type { CaptureMode, LogicalRect } from './types';
 import { useCaptureWorkspaceRuntime } from './runtimeContext';
 
@@ -33,7 +35,7 @@ interface CaptureWorkspaceRuntimeViewOptions {
 
 export interface CaptureWorkspaceRuntimeView {
   renderState: CaptureWorkspaceViewRenderState;
-  actions: CaptureWorkspaceRuntimeActions;
+  actions: CaptureWorkspaceViewActions;
 }
 
 export function useCaptureWorkspaceRuntimeView({
@@ -223,16 +225,47 @@ export function useCaptureWorkspaceRuntimeView({
 
   const renderState = useMemo<CaptureWorkspaceViewRenderState>(
     () => ({
-      ...runtimeRenderState,
-      ...derived,
-      hasHydratedPixelSource: runtimeRenderState.hasHydratedPixelSource,
-      toolbarWidth: TOOLBAR_SIZE.width,
-      magnifierSelection:
-        runtimeRenderState.selection ?? runtimeRenderState.hoverSelection,
-      textDraftInputRef,
-      selectionOverlayCanvasRef: overlay.canvasRef,
-      selectionOverlayCssSize: overlay.cssSize,
-      selectionOverlayPixelRatio: overlay.pixelRatio,
+      status: runtimeRenderState.status,
+      error: runtimeRenderState.error,
+      viewportBounds: derived.viewportBounds,
+      selectionBounds: derived.selectionBounds,
+      isRenderingOutput: runtimeRenderState.isRenderingOutput,
+      editor: {
+        selection: runtimeRenderState.selection,
+        selectionViewportRect: derived.selectionViewportRect,
+        previewImageBase64: runtimeRenderState.previewImageBase64,
+        draftAnnotation: runtimeRenderState.draftAnnotation,
+        textDraft: runtimeRenderState.textDraft,
+        annotationStyle: runtimeRenderState.annotationStyle,
+        selectedAnnotationBounds: derived.selectedAnnotationBounds,
+        activeAnnotationTool: runtimeRenderState.activeAnnotationTool,
+      },
+      toolbar: {
+        position: derived.toolbarPosition,
+        width: TOOLBAR_SIZE.width,
+        isVisible: runtimeRenderState.isAnnotationToolbarVisible,
+        textFontSize: runtimeRenderState.textFontSize,
+        isTextSizingActive: derived.isTextSizingActive,
+        isFillModeActive: derived.isFillModeActive,
+      },
+      dom: {
+        textDraftInputRef,
+        selectionOverlay: {
+          canvasRef: overlay.canvasRef,
+          cssSize: overlay.cssSize,
+          pixelRatio: overlay.pixelRatio,
+        },
+      },
+      magnifier: {
+        isShown: derived.isMagnifierShown,
+        cursorMonitor: derived.cursorMonitor,
+        cursorViewportPoint: derived.cursorViewportPoint,
+        cursorInMonitorPoint: derived.cursorInMonitorPoint,
+        selection:
+          runtimeRenderState.selection ?? runtimeRenderState.hoverSelection,
+        cursorColor: runtimeRenderState.cursorColor,
+        colorSampleFormat: runtimeRenderState.colorSampleFormat,
+      },
     }),
     [
       derived,
@@ -242,6 +275,27 @@ export function useCaptureWorkspaceRuntimeView({
       runtimeRenderState,
     ],
   );
+  const actions = useMemo<CaptureWorkspaceViewActions>(
+    () => ({
+      pointerDown: workflowRuntime.actions.pointerDown,
+      pointerMove: workflowRuntime.actions.pointerMove,
+      pointerUp: workflowRuntime.actions.pointerUp,
+      resizePointerDown: workflowRuntime.actions.resizePointerDown,
+      wheel: workflowRuntime.actions.wheel,
+      commitTextDraft: workflowRuntime.actions.commitTextDraft,
+      updateTextDraftText: workflowRuntime.actions.updateTextDraftText,
+      discardTextDraft: workflowRuntime.actions.discardTextDraft,
+      selectMoveTool: workflowRuntime.actions.selectMoveTool,
+      toggleAnnotationTool: workflowRuntime.actions.toggleAnnotationTool,
+      applySelectedAnnotationStyle:
+        workflowRuntime.actions.applySelectedAnnotationStyle,
+      updateTextDraftFontSize: workflowRuntime.actions.updateTextDraftFontSize,
+      cancelSession: workflowRuntime.actions.cancelSession,
+      completePreviewSelection:
+        workflowRuntime.actions.completePreviewSelection,
+    }),
+    [workflowRuntime],
+  );
 
-  return { renderState, actions: workflowRuntime.actions };
+  return { renderState, actions };
 }

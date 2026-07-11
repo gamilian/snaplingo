@@ -168,10 +168,16 @@ describe('capture workspace production runtime wiring', () => {
     );
     expect(captureViewRoot).not.toContain('viewProps');
     expect(captureView).toContain('renderState,\n  actions,');
-    expect(runtimeView).toContain(
-      'return { renderState, actions: workflowRuntime.actions };',
-    );
+    expect(runtimeView).toContain('return { renderState, actions };');
+    expect(runtimeView).not.toContain('...runtimeRenderState');
+    expect(runtimeView).not.toContain('...derived');
     expect(runtimeView).not.toContain('useCaptureWorkspaceState');
+    expect(captureView).not.toContain('extends CaptureWorkspaceRenderState');
+    expect(captureView).not.toContain('CaptureWorkspaceDerivedState');
+    expect(captureView).not.toContain('connectHost');
+    expect(captureView).not.toContain('updateHostReadiness');
+    expect(captureView).not.toContain('updatePolledCursor');
+    expect(captureView).not.toContain('updatePolledHover');
   });
 
   it('keeps selecting keyboard workflows out of the editor-only handler', () => {

@@ -2,9 +2,9 @@ import type { PointerEvent, Ref, WheelEvent } from 'react';
 
 import type {
   CaptureWorkspacePointerInput,
-  CaptureWorkspaceRenderState,
   CaptureWorkspaceRuntimeActions,
 } from '../../application/capture-workspace/types';
+import type { AnnotationStyle, AnnotationTool } from './annotationStyle';
 import { CaptureEditorToolbar } from './captureEditorToolbar';
 import { CaptureMagnifierOverlay } from './captureMagnifierOverlay';
 import {
@@ -23,30 +23,86 @@ import {
   rectStyle,
 } from './capturePreviewPresentation';
 import { CaptureSelectionOverlayCanvas } from './captureSelectionOverlayRuntime';
-import type { CaptureWorkspaceDerivedState } from './captureWorkspaceDerived';
 import { getCaptureWorkspacePointerPoint } from './captureWorkspacePointer';
+import type { ColorSample, ColorSampleFormat } from './colorSampler';
 import type { SelectionHandle } from './selection';
-import type { LogicalRect } from './types';
+import type { TextAnnotationDraft } from './textAnnotationDraft';
+import type {
+  AnnotationCommand,
+  LogicalRect,
+  MonitorSnapshotView,
+  Point,
+} from './types';
 
 interface CaptureSelectionOverlaySize {
   width: number;
   height: number;
 }
 
-export interface CaptureWorkspaceViewRenderState
-  extends CaptureWorkspaceRenderState,
-    Omit<CaptureWorkspaceDerivedState, 'hasHydratedPixelSource'> {
-  readonly toolbarWidth: number;
-  readonly magnifierSelection: LogicalRect | null;
-  readonly textDraftInputRef: Ref<HTMLTextAreaElement>;
-  readonly selectionOverlayCanvasRef: Ref<HTMLCanvasElement>;
-  readonly selectionOverlayCssSize: CaptureSelectionOverlaySize | null;
-  readonly selectionOverlayPixelRatio: number;
+export interface CaptureWorkspaceViewRenderState {
+  readonly status: 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
+  readonly error: string | null;
+  readonly viewportBounds: LogicalRect | null;
+  readonly selectionBounds: LogicalRect | null;
+  readonly isRenderingOutput: boolean;
+  readonly editor: {
+    readonly selection: LogicalRect | null;
+    readonly selectionViewportRect: LogicalRect | null;
+    readonly previewImageBase64: string | null;
+    readonly draftAnnotation: AnnotationCommand | null;
+    readonly textDraft: TextAnnotationDraft | null;
+    readonly annotationStyle: AnnotationStyle;
+    readonly selectedAnnotationBounds: LogicalRect | null;
+    readonly activeAnnotationTool: AnnotationTool | null;
+  };
+  readonly toolbar: {
+    readonly position: Point | null;
+    readonly width: number;
+    readonly isVisible: boolean;
+    readonly textFontSize: number;
+    readonly isTextSizingActive: boolean;
+    readonly isFillModeActive: boolean;
+  };
+  readonly dom: {
+    readonly textDraftInputRef: Ref<HTMLTextAreaElement>;
+    readonly selectionOverlay: {
+      readonly canvasRef: Ref<HTMLCanvasElement>;
+      readonly cssSize: CaptureSelectionOverlaySize | null;
+      readonly pixelRatio: number;
+    };
+  };
+  readonly magnifier: {
+    readonly isShown: boolean;
+    readonly cursorMonitor: MonitorSnapshotView | null;
+    readonly cursorViewportPoint: Point | null;
+    readonly cursorInMonitorPoint: Point | null;
+    readonly selection: LogicalRect | null;
+    readonly cursorColor: ColorSample | null;
+    readonly colorSampleFormat: ColorSampleFormat;
+  };
 }
+
+export type CaptureWorkspaceViewActions = Pick<
+  CaptureWorkspaceRuntimeActions,
+  | 'pointerDown'
+  | 'pointerMove'
+  | 'pointerUp'
+  | 'resizePointerDown'
+  | 'wheel'
+  | 'commitTextDraft'
+  | 'updateTextDraftText'
+  | 'discardTextDraft'
+  | 'selectMoveTool'
+  | 'toggleAnnotationTool'
+  | 'applySelectedAnnotationStyle'
+  | 'updateTextDraftFontSize'
+  | 'cancelSession'
+  | 'completePreviewSelection'
+>;
 
 interface CaptureWorkspaceViewProps {
   renderState: CaptureWorkspaceViewRenderState;
-  actions: CaptureWorkspaceRuntimeActions;
+  actions: CaptureWorkspaceViewActions;
 }
 
 interface CaptureWorkspaceDomPointerEvent {
@@ -132,10 +188,13 @@ export function CaptureWorkspaceView({
   if (renderState.status === 'idle') return null;
 
   const completeSelection = (
-    action: Parameters<CaptureWorkspaceRuntimeActions['completePreviewSelection']>[0],
+    action: Parameters<CaptureWorkspaceViewActions['completePreviewSelection']>[0],
   ) => {
-    if (!renderState.selection) return;
-    return actions.completePreviewSelection(action, renderState.selection);
+    if (!renderState.editor.selection) return;
+    return actions.completePreviewSelection(
+      action,
+      renderState.editor.selection,
+    );
   };
   const handleRootPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (!renderState.selectionBounds) return;
@@ -174,9 +233,9 @@ export function CaptureWorkspaceView({
     if (
       actions.wheel({
         deltaY: event.deltaY,
-        metaKey: event.metaKey,
-        ctrlKey: event.ctrlKey,
-        altKey: event.altKey,
+        metaKey: event.metaKey ?? false,
+        ctrlKey: event.ctrlKey ?? false,
+        altKey: event.altKey ?? false,
       })
     ) {
       event.preventDefault();
@@ -208,38 +267,40 @@ export function CaptureWorkspaceView({
       )}
 
       {renderState.status === 'preview' &&
-        renderState.selection &&
-        renderState.selectionViewportRect && (
+        renderState.editor.selection &&
+        renderState.editor.selectionViewportRect && (
           <>
             <CapturePreviewImage
-              imageBase64={renderState.previewImageBase64}
-              selectionViewportRect={renderState.selectionViewportRect}
+              imageBase64={renderState.editor.previewImageBase64}
+              selectionViewportRect={renderState.editor.selectionViewportRect}
             />
             <CaptureDraftAnnotationOverlay
-              draftAnnotation={renderState.draftAnnotation}
-              selectionViewportRect={renderState.selectionViewportRect}
+              draftAnnotation={renderState.editor.draftAnnotation}
+              selectionViewportRect={renderState.editor.selectionViewportRect}
             />
-            {renderState.textDraft && (
+            {renderState.editor.textDraft && (
               <CaptureTextDraftEditor
-                inputRef={renderState.textDraftInputRef}
-                textDraft={renderState.textDraft}
-                selectionViewportRect={renderState.selectionViewportRect}
-                annotationStyle={renderState.annotationStyle}
+                inputRef={renderState.dom.textDraftInputRef}
+                textDraft={renderState.editor.textDraft}
+                selectionViewportRect={renderState.editor.selectionViewportRect}
+                annotationStyle={renderState.editor.annotationStyle}
                 onCommit={actions.commitTextDraft}
                 onTextChange={actions.updateTextDraftText}
                 onDiscard={actions.discardTextDraft}
               />
             )}
             <CaptureSelectedAnnotationBoundsOverlay
-              selectedAnnotationBounds={renderState.selectedAnnotationBounds}
-              selectionViewportRect={renderState.selectionViewportRect}
+              selectedAnnotationBounds={
+                renderState.editor.selectedAnnotationBounds
+              }
+              selectionViewportRect={renderState.editor.selectionViewportRect}
             />
             <div
               className={getCaptureEditorSelectionClassName(
                 renderState.status,
-                Boolean(renderState.activeAnnotationTool),
+                Boolean(renderState.editor.activeAnnotationTool),
               )}
-              style={rectStyle(renderState.selectionViewportRect)}
+              style={rectStyle(renderState.editor.selectionViewportRect)}
               onPointerDown={(event) => {
                 dispatchCaptureWorkspacePreviewPointerDown({
                   event,
@@ -249,7 +310,7 @@ export function CaptureWorkspaceView({
               }}
             />
             <CaptureSelectionResizeHandles
-              selectionViewportRect={renderState.selectionViewportRect}
+              selectionViewportRect={renderState.editor.selectionViewportRect}
               onResizeHandlePointerDown={(handle, event) => {
                 dispatchCaptureWorkspaceResizePointerDown({
                   handle,
@@ -259,57 +320,56 @@ export function CaptureWorkspaceView({
                 });
               }}
             />
-            {renderState.toolbarPosition &&
-              renderState.isAnnotationToolbarVisible && (
-                <CaptureEditorToolbar
-                  position={renderState.toolbarPosition}
-                  width={renderState.toolbarWidth}
-                  activeAnnotationTool={renderState.activeAnnotationTool}
-                  annotationStyle={renderState.annotationStyle}
-                  textFontSize={renderState.textFontSize}
-                  textDraftActive={renderState.textDraft !== null}
-                  isTextSizingActive={renderState.isTextSizingActive}
-                  isFillModeActive={renderState.isFillModeActive}
-                  isRenderingOutput={renderState.isRenderingOutput}
-                  onSelectMove={actions.selectMoveTool}
-                  onToggleAnnotationTool={actions.toggleAnnotationTool}
-                  onApplyAnnotationStyle={actions.applySelectedAnnotationStyle}
-                  onTextDraftFontSizeChange={actions.updateTextDraftFontSize}
-                  onCancel={actions.cancelSession}
-                  onRunOcr={() => completeSelection('ocr')}
-                  onCopy={() => completeSelection('copy')}
-                  onSave={() => completeSelection('save')}
-                  onQuickSave={() => completeSelection('quick-save')}
-                />
-              )}
+            {renderState.toolbar.position && renderState.toolbar.isVisible && (
+              <CaptureEditorToolbar
+                position={renderState.toolbar.position}
+                width={renderState.toolbar.width}
+                activeAnnotationTool={renderState.editor.activeAnnotationTool}
+                annotationStyle={renderState.editor.annotationStyle}
+                textFontSize={renderState.toolbar.textFontSize}
+                textDraftActive={renderState.editor.textDraft !== null}
+                isTextSizingActive={renderState.toolbar.isTextSizingActive}
+                isFillModeActive={renderState.toolbar.isFillModeActive}
+                isRenderingOutput={renderState.isRenderingOutput}
+                onSelectMove={actions.selectMoveTool}
+                onToggleAnnotationTool={actions.toggleAnnotationTool}
+                onApplyAnnotationStyle={actions.applySelectedAnnotationStyle}
+                onTextDraftFontSizeChange={actions.updateTextDraftFontSize}
+                onCancel={actions.cancelSession}
+                onRunOcr={() => completeSelection('ocr')}
+                onCopy={() => completeSelection('copy')}
+                onSave={() => completeSelection('save')}
+                onQuickSave={() => completeSelection('quick-save')}
+              />
+            )}
             <CaptureRenderingOutputBar
               isRenderingOutput={renderState.isRenderingOutput}
-              selectionViewportRect={renderState.selectionViewportRect}
+              selectionViewportRect={renderState.editor.selectionViewportRect}
             />
           </>
         )}
       <CaptureSelectionOverlayCanvas
-        canvasRef={renderState.selectionOverlayCanvasRef}
-        cssSize={renderState.selectionOverlayCssSize}
-        pixelRatio={renderState.selectionOverlayPixelRatio}
+        canvasRef={renderState.dom.selectionOverlay.canvasRef}
+        cssSize={renderState.dom.selectionOverlay.cssSize}
+        pixelRatio={renderState.dom.selectionOverlay.pixelRatio}
       />
-      {renderState.isMagnifierShown &&
-        renderState.cursorMonitor &&
-        renderState.cursorViewportPoint &&
-        renderState.cursorInMonitorPoint &&
+      {renderState.magnifier.isShown &&
+        renderState.magnifier.cursorMonitor &&
+        renderState.magnifier.cursorViewportPoint &&
+        renderState.magnifier.cursorInMonitorPoint &&
         renderState.viewportBounds && (
           <CaptureMagnifierOverlay
-            imageBase64={renderState.cursorMonitor.image_base64}
-            viewportCursor={renderState.cursorViewportPoint}
-            imageCursor={renderState.cursorInMonitorPoint}
+            imageBase64={renderState.magnifier.cursorMonitor.image_base64}
+            viewportCursor={renderState.magnifier.cursorViewportPoint}
+            imageCursor={renderState.magnifier.cursorInMonitorPoint}
             viewportBounds={renderState.viewportBounds}
             imageSize={{
-              width: renderState.cursorMonitor.logical_bounds.width,
-              height: renderState.cursorMonitor.logical_bounds.height,
+              width: renderState.magnifier.cursorMonitor.logical_bounds.width,
+              height: renderState.magnifier.cursorMonitor.logical_bounds.height,
             }}
-            selection={renderState.magnifierSelection}
-            color={renderState.cursorColor}
-            colorFormat={renderState.colorSampleFormat}
+            selection={renderState.magnifier.selection}
+            color={renderState.magnifier.cursorColor}
+            colorFormat={renderState.magnifier.colorSampleFormat}
           />
         )}
     </div>
