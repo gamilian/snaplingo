@@ -770,6 +770,87 @@ describe('capture workspace runtime', () => {
     });
   });
 
+  it('detaches an unresolved preview scheduler when a replacement session starts', async () => {
+    const oldPreview = deferred<string>();
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockImplementation(async (sessionId) =>
+      createSession({ id: sessionId }),
+    );
+    platform.commands.renderCaptureOutput
+      .mockImplementationOnce(() => oldPreview.promise)
+      .mockResolvedValueOnce('replacement-preview');
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession('screenshot', 'session-preview-old');
+    const oldRendering = runtime.actions.renderSelectionPreview(selection);
+    await vi.waitFor(() =>
+      expect(platform.commands.renderCaptureOutput).toHaveBeenCalledTimes(1),
+    );
+
+    await runtime.actions.startSession('screenshot', 'session-preview-new');
+    const replacementRendering =
+      runtime.actions.renderSelectionPreview(selection);
+
+    try {
+      await vi.waitFor(() =>
+        expect(platform.commands.renderCaptureOutput).toHaveBeenCalledTimes(2),
+      );
+      await replacementRendering;
+      expect(runtime.renderState).toMatchObject({
+        sessionId: 'session-preview-new',
+        status: 'preview',
+        previewImageBase64: 'replacement-preview',
+        error: null,
+      });
+    } finally {
+      oldPreview.reject(new Error('late old preview failure'));
+      await Promise.all([oldRendering, replacementRendering]);
+    }
+
+    expect(runtime.renderState).toMatchObject({
+      sessionId: 'session-preview-new',
+      status: 'preview',
+      previewImageBase64: 'replacement-preview',
+      error: null,
+    });
+  });
+
+  it('detaches an unresolved preview scheduler when preview state resets', async () => {
+    const oldPreview = deferred<string>();
+    const platform = createPlatform({
+      session: createSession({ id: 'session-preview-reset-owner' }),
+    });
+    platform.commands.renderCaptureOutput
+      .mockImplementationOnce(() => oldPreview.promise)
+      .mockResolvedValueOnce('reset-owner-preview');
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession(
+      'screenshot',
+      'session-preview-reset-owner',
+    );
+    const oldRendering = runtime.actions.renderSelectionPreview(selection);
+    await vi.waitFor(() =>
+      expect(platform.commands.renderCaptureOutput).toHaveBeenCalledTimes(1),
+    );
+
+    runtime.actions.resetPreview();
+    const resetRendering = runtime.actions.renderSelectionPreview(selection);
+    await vi.waitFor(() =>
+      expect(platform.commands.renderCaptureOutput).toHaveBeenCalledTimes(2),
+    );
+    await resetRendering;
+    expect(runtime.renderState.previewImageBase64).toBe('reset-owner-preview');
+
+    oldPreview.reject(new Error('late reset-owner failure'));
+    await oldRendering;
+    expect(runtime.renderState).toMatchObject({
+      status: 'preview',
+      previewImageBase64: 'reset-owner-preview',
+      error: null,
+    });
+  });
+
   it('executes copy once with current annotations while a preview is pending', async () => {
     const pendingPreview = deferred<string>();
     const platform = createPlatform({
@@ -824,6 +905,94 @@ describe('capture workspace runtime', () => {
 
     pendingPreview.resolve('stale-preview');
     await vi.waitFor(() => expect(runtime.renderState.status).toBe('idle'));
+  });
+
+  it('scopes terminal output exclusion to the current session owner', async () => {
+    const oldOutput = deferred<void>();
+    const currentOutput = deferred<void>();
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockImplementation(async (sessionId) =>
+      createSession({ id: sessionId }),
+    );
+    platform.commands.outputCapture
+      .mockImplementationOnce(() => oldOutput.promise)
+      .mockImplementationOnce(() => currentOutput.promise);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession('screenshot', 'session-output-old');
+    await runtime.actions.renderSelectionPreview(selection);
+    const oldCompletion = runtime.actions.completePreviewSelection(
+      'copy',
+      selection,
+    );
+    await vi.waitFor(() =>
+      expect(platform.commands.outputCapture).toHaveBeenCalledTimes(1),
+    );
+
+    await runtime.actions.startSession('screenshot', 'session-output-new');
+    await runtime.actions.renderSelectionPreview(selection);
+    const currentCompletion = runtime.actions.completePreviewSelection(
+      'copy',
+      selection,
+    );
+
+    try {
+      await vi.waitFor(() =>
+        expect(platform.commands.outputCapture).toHaveBeenCalledTimes(2),
+      );
+      oldOutput.resolve();
+      await oldCompletion;
+
+      await runtime.actions.completePreviewSelection('copy', selection);
+      expect(platform.commands.outputCapture).toHaveBeenCalledTimes(2);
+    } finally {
+      oldOutput.resolve();
+      currentOutput.resolve();
+      await Promise.all([oldCompletion, currentCompletion]);
+    }
+  });
+
+  it('scopes terminal output exclusion to the reset preview generation', async () => {
+    const oldOutput = deferred<void>();
+    const resetOutput = deferred<void>();
+    const platform = createPlatform({
+      session: createSession({ id: 'session-output-reset-owner' }),
+    });
+    platform.commands.outputCapture
+      .mockImplementationOnce(() => oldOutput.promise)
+      .mockImplementationOnce(() => resetOutput.promise);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession(
+      'screenshot',
+      'session-output-reset-owner',
+    );
+    await runtime.actions.renderSelectionPreview(selection);
+    const oldCompletion = runtime.actions.completePreviewSelection(
+      'copy',
+      selection,
+    );
+    await vi.waitFor(() =>
+      expect(platform.commands.outputCapture).toHaveBeenCalledTimes(1),
+    );
+
+    runtime.actions.resetPreview();
+    await runtime.actions.renderSelectionPreview(selection);
+    const resetCompletion = runtime.actions.completePreviewSelection(
+      'copy',
+      selection,
+    );
+    await vi.waitFor(() =>
+      expect(platform.commands.outputCapture).toHaveBeenCalledTimes(2),
+    );
+
+    oldOutput.resolve();
+    await oldCompletion;
+    await runtime.actions.completePreviewSelection('copy', selection);
+    expect(platform.commands.outputCapture).toHaveBeenCalledTimes(2);
+
+    resetOutput.resolve();
+    await resetCompletion;
   });
 
   it('coalesces rapid style previews to the latest selected annotation style', async () => {

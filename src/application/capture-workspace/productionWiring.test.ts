@@ -142,7 +142,9 @@ describe('capture workspace production runtime wiring', () => {
   it('lets runtime terminal exclusion handle copy while editor previews are pending', () => {
     expect(controller).not.toContain('isRenderingOutputRef');
     expect(controller).not.toContain('guardCompletion');
-    expect(runtime).toContain('terminalOutputInFlight');
+    expect(runtime).toContain('interface TerminalOutputOperation');
+    expect(runtime).toContain('terminalOutputOperation === operation');
+    expect(runtime).not.toContain('terminalOutputInFlight');
     expect(runtime).not.toContain('if (!session || state.isRenderingOutput)');
   });
 
