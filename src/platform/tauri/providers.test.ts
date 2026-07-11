@@ -1,10 +1,38 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, expectTypeOf, it, vi } from 'vitest';
+import type { ProviderInfo } from './providers';
 
 const invoke = vi.fn();
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke }));
 
 describe('Tauri providers command adapter', () => {
+  it('models built-in provider metadata as explicit nulls', async () => {
+    const { listTranslationProviders } = await import('./providers');
+    const expected: ProviderInfo[] = [
+      {
+        id: 'google-translate',
+        name: 'Google Translate',
+        is_configured: true,
+        requires_api_key: false,
+        is_active: true,
+        is_builtin: true,
+        protocol: null,
+        endpoint: null,
+        model: null,
+        reasoning_level: null,
+        prompt_strategy_id: null,
+        prompt_fallback_strategy_id: null,
+      },
+    ];
+    invoke.mockResolvedValueOnce(expected);
+
+    await expect(listTranslationProviders()).resolves.toEqual(expected);
+    expect(invoke).toHaveBeenCalledWith('list_translation_providers');
+    expectTypeOf<ProviderInfo['protocol']>().toEqualTypeOf<string | null>();
+    expectTypeOf<ProviderInfo['reasoning_level']>()
+      .toEqualTypeOf<string | null>();
+  });
+
   it('activates translation provider with backend parameter name', async () => {
     const { activateTranslationProvider } = await import('./providers');
     invoke.mockResolvedValueOnce(undefined);

@@ -41,7 +41,7 @@ function captureOutputArgs(input: RenderCaptureOutputInput) {
   };
 }
 
-export async function openCaptureWindow(mode: CaptureMode | string) {
+export async function openCaptureWindow(mode: CaptureMode) {
   return invoke<void>('open_capture_window', { mode });
 }
 
@@ -61,7 +61,7 @@ export async function hydrateCaptureSessionSnapshots(sessionId: string) {
 
 export function logCaptureFrontendPerf(input: {
   event: string;
-  mode: CaptureMode | string;
+  mode: CaptureMode;
   sessionId?: string | null;
   elapsedMs: number;
 }) {

@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import type { CaptureSessionView } from '../../domain/capture';
+import { describe, expect, expectTypeOf, it, vi } from 'vitest';
+import type { CaptureMode, CaptureSessionView } from '../../domain/capture';
 
 const { invoke } = vi.hoisted(() => ({
   invoke: vi.fn(),
@@ -8,6 +8,14 @@ const { invoke } = vi.hoisted(() => ({
 vi.mock('@tauri-apps/api/core', () => ({ invoke }));
 
 describe('Tauri capture command adapter', () => {
+  it('accepts only the domain capture mode vocabulary', async () => {
+    const { logCaptureFrontendPerf, openCaptureWindow } = await import('./capture');
+
+    expectTypeOf(openCaptureWindow).parameter(0).toEqualTypeOf<CaptureMode>();
+    expectTypeOf<Parameters<typeof logCaptureFrontendPerf>[0]['mode']>()
+      .toEqualTypeOf<CaptureMode>();
+  });
+
   it('omits includeCursor when false', async () => {
     const { renderCaptureOutput } = await import('./capture');
     invoke.mockResolvedValueOnce('base64');

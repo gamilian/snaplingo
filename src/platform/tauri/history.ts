@@ -8,10 +8,10 @@ export interface BackendTranslationEntry {
   target_lang: string;
   providers_used: string[];
   results: Array<{
-    provider_id?: string;
+    provider_id: string;
     translated_text: string;
-    detected_language?: string;
-    confidence?: number;
+    detected_language: string | null;
+    confidence: number | null;
   }>;
   duration_ms: number;
 }
@@ -19,15 +19,17 @@ export interface BackendTranslationEntry {
 export interface BackendOcrEntry {
   id: number;
   timestamp: string;
+  image_hash: string;
+  language: string | null;
+  provider_used: string;
   recognized_text: string;
-  language?: string;
+  confidence: number | null;
+  duration_ms: number;
 }
 
-export interface BackendHistoryEntry {
-  id: number;
-  timestamp: string;
-  entry_type: string;
-}
+export type BackendHistoryEntry =
+  | (BackendTranslationEntry & { type: 'Translation' })
+  | (BackendOcrEntry & { type: 'Ocr' });
 
 export function getTranslationHistory(limit: number, offset: number) {
   return invoke<BackendTranslationEntry[]>('get_translation_history', { limit, offset });

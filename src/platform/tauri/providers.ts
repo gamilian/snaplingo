@@ -13,12 +13,12 @@ export interface ProviderInfo {
   requires_api_key: boolean;
   is_active: boolean;
   is_builtin: boolean;
-  protocol?: string;
-  endpoint?: string;
-  model?: string;
-  reasoning_level?: string;
-  prompt_strategy_id?: string;
-  prompt_fallback_strategy_id?: string;
+  protocol: string | null;
+  endpoint: string | null;
+  model: string | null;
+  reasoning_level: string | null;
+  prompt_strategy_id: string | null;
+  prompt_fallback_strategy_id: string | null;
 }
 
 export interface OcrProviderInfo {
