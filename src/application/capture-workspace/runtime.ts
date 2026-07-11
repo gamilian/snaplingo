@@ -10,6 +10,8 @@ import type {
 } from '../../views/CaptureWorkspace/captureActions';
 import {
   canToggleCapturedCursor,
+  getCandidateCycleDirectionFromShortcut,
+  getCursorNudgeDeltaFromShortcut,
   getHoverSelectionCompletionActionFromShortcut,
   getPreviewCaptureCompletionActionFromShortcut,
   getSelectionHistoryStepFromShortcut,
@@ -45,8 +47,11 @@ import {
 } from '../../views/CaptureWorkspace/selection';
 import {
   planCaptureDraftSelectionCommit,
+  planCaptureDraftSelectionKeyboardNudge,
   planCaptureDraftSelectionPointerMove,
   planCaptureDraftSelectionStart,
+  planCaptureHoverSelectionCycle,
+  planCaptureSelectionCursorKeyboardNudge,
 } from '../../views/CaptureWorkspace/captureSelectionRuntime';
 import { shouldRevealCaptureWindow } from '../../views/CaptureWorkspace/captureWindowVisibility';
 import {
@@ -896,6 +901,74 @@ export function createCaptureWorkspaceRuntime({
         await completeManualSelection(
           getCurrentMonitorBounds(state.session.monitors, point),
         );
+        return true;
+      }
+      const cursorNudgeDelta = getCursorNudgeDeltaFromShortcut(event);
+      if (
+        state.status === 'selecting' &&
+        state.session &&
+        state.startPoint &&
+        state.cursorPoint &&
+        state.selection &&
+        cursorNudgeDelta
+      ) {
+        const draftNudge = planCaptureDraftSelectionKeyboardNudge({
+          anchorPoint: state.startPoint,
+          cursorPoint: state.cursorPoint,
+          delta: cursorNudgeDelta,
+          selectionBounds: getVirtualDesktopBounds(state.session.monitors),
+        });
+        patch({
+          cursorPoint: draftNudge.cursorPoint,
+          selection: draftNudge.selection,
+          previewImageBase64: draftNudge.previewImageBase64,
+          isRenderingOutput: draftNudge.renderingOutput,
+        });
+        return true;
+      }
+      if (
+        state.status === 'selecting' &&
+        state.session &&
+        state.cursorPoint &&
+        cursorNudgeDelta
+      ) {
+        const cursorNudge = planCaptureSelectionCursorKeyboardNudge({
+          cursorPoint: state.cursorPoint,
+          delta: cursorNudgeDelta,
+          selectionBounds: getVirtualDesktopBounds(state.session.monitors),
+        });
+        const cursorPoint = cursorNudge.cursorPoint;
+        patch({
+          cursorPoint,
+          hoverSelection:
+            getBestCandidateAtPoint(
+              buildCaptureCandidates(
+                state.session.monitors,
+                state.session.candidates,
+              ),
+              cursorPoint,
+            )?.rect ?? null,
+        });
+        return true;
+      }
+      const cycleDirection = getCandidateCycleDirectionFromShortcut(event);
+      if (
+        state.status === 'selecting' &&
+        state.session &&
+        state.cursorPoint &&
+        cycleDirection
+      ) {
+        patch({
+          hoverSelection: planCaptureHoverSelectionCycle({
+            captureCandidates: buildCaptureCandidates(
+              state.session.monitors,
+              state.session.candidates,
+            ),
+            cursorPoint: state.cursorPoint,
+            hoverSelection: state.hoverSelection,
+            direction: cycleDirection,
+          }).hoverSelection,
+        });
         return true;
       }
       const hoverAction = getHoverSelectionCompletionActionFromShortcut(event, {

@@ -201,10 +201,210 @@ export function handleCaptureWorkspaceEditorKeyDown(
     actions: CaptureWorkspaceKeyboardEditorActions;
   },
 ) {
-  handleCaptureWorkspaceKeyDown(event, {
-    ...context,
-    actions: context.actions as CaptureWorkspaceKeyboardActions,
-  });
+  const { state, refs, derived, actions } = context;
+  const {
+    activeAnnotationTool,
+    annotationGesture,
+    annotationHistory,
+    annotationMoveGesture,
+    cursorPoint,
+    editGesture,
+    selectedAnnotationIndex,
+    selection,
+    status,
+    textDraft,
+  } = state;
+  if (status !== 'preview') {
+    if (isMagnifierShortcut(event)) {
+      event.preventDefault();
+      actions.setIsMagnifierRequested(true);
+    }
+    return;
+  }
+
+  const { annotations, cursorColor, hasAnnotationEditingContext } = derived;
+  const undoRedoAction = getUndoRedoActionFromShortcut(event);
+  const cursorNudgeDelta = getCursorNudgeDeltaFromShortcut(event);
+  const cycledAnnotationTool = nextAnnotationToolFromCycleShortcut(
+    event,
+    activeAnnotationTool,
+  );
+
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    actions.dismissCaptureLayer();
+  } else if (isMagnifierShortcut(event)) {
+    event.preventDefault();
+    actions.setIsMagnifierRequested(true);
+  } else if (isClearAnnotationsShortcut(event)) {
+    event.preventDefault();
+    actions.clearAnnotations();
+  } else if (
+    undoRedoAction === 'undo' &&
+    annotationGesture?.tool === 'polyline'
+  ) {
+    event.preventDefault();
+    actions.undoPolylineGesturePoint();
+  } else if (undoRedoAction) {
+    event.preventDefault();
+    if (undoRedoAction === 'undo') actions.undoAnnotation();
+    else actions.redoAnnotation();
+  } else if (
+    annotationGesture?.tool === 'polyline' &&
+    isUndoAnnotationGesturePointShortcut(event)
+  ) {
+    event.preventDefault();
+    actions.undoPolylineGesturePoint();
+  } else if (
+    selectedAnnotationIndex !== null &&
+    isDeleteSelectedAnnotationShortcut(event)
+  ) {
+    event.preventDefault();
+    actions.deleteSelectedAnnotation();
+  } else if (
+    !textDraft &&
+    derived.isMagnifierShown &&
+    cursorColor &&
+    isColorSampleCopyShortcut(event)
+  ) {
+    event.preventDefault();
+    void actions.copyCurrentColor();
+  } else if (
+    !textDraft &&
+    derived.isMagnifierShown &&
+    cursorColor &&
+    !event.repeat &&
+    isColorSampleFormatToggleShortcut(event)
+  ) {
+    event.preventDefault();
+    actions.setColorSampleFormat((format) =>
+      format === 'hex' ? 'rgb' : 'hex',
+    );
+  } else if (
+    !textDraft &&
+    editGesture &&
+    selection &&
+    cursorPoint &&
+    derived.selectionBounds &&
+    cursorNudgeDelta
+  ) {
+    event.preventDefault();
+    const editNudge = planCaptureSelectionEditKeyboardNudge({
+      gesture: editGesture,
+      selection,
+      cursorPoint,
+      delta: cursorNudgeDelta,
+      selectionBounds: derived.selectionBounds,
+      minSelectionSize: MIN_SELECTION_SIZE,
+      preserveAspect: event.shiftKey,
+    });
+    refs.keyboardEditCursorPointRef.current =
+      editNudge.keyboardEditCursorPoint;
+    actions.setCursorPoint(editNudge.cursorPoint);
+    actions.setSelection(editNudge.selection);
+    actions.setEditGesture(editNudge.editGesture);
+    actions.setPreviewImageBase64(editNudge.previewImageBase64);
+    actions.setRenderingOutput(editNudge.renderingOutput);
+  } else if (
+    !textDraft &&
+    getCaptureKeyboardToolbarAction(event, derived.isAnnotationToolbarVisible) ===
+      'toggle'
+  ) {
+    event.preventDefault();
+    actions.setIsAnnotationToolbarVisible((visible) => !visible);
+  } else if (
+    !textDraft &&
+    (event.key === '[' ||
+      event.key === ']' ||
+      (hasAnnotationEditingContext &&
+        (event.key === '1' || event.key === '2')))
+  ) {
+    const direction = annotationSizeDirectionFromShortcut(event, {
+      editing: hasAnnotationEditingContext,
+    });
+    if (direction) {
+      event.preventDefault();
+      actions.adjustAnnotationSize(direction);
+    }
+  } else if (
+    !textDraft &&
+    derived.isFillModeActive &&
+    !annotationGesture &&
+    !annotationMoveGesture &&
+    isAnnotationFillToggleShortcut(event)
+  ) {
+    event.preventDefault();
+    actions.toggleAnnotationFill();
+  } else if (
+    !textDraft &&
+    cycledAnnotationTool &&
+    !annotationGesture &&
+    !annotationMoveGesture
+  ) {
+    event.preventDefault();
+    const activation = planCaptureAnnotationToolActivation({
+      currentTool: activeAnnotationTool,
+      nextTool: cycledAnnotationTool,
+      selectedAnnotationIndex,
+      clearSelectedAnnotation: true,
+      toggle: false,
+    });
+    actions.setActiveAnnotationTool(activation.activeAnnotationTool);
+    actions.setSelectedAnnotationIndex(activation.selectedAnnotationIndex);
+    actions.setAnnotationGesture(activation.annotationGesture);
+    actions.setAnnotationMoveGesture(activation.annotationMoveGesture);
+    actions.setDraftAnnotation(activation.draftAnnotation);
+  } else if (
+    !textDraft &&
+    !annotationGesture &&
+    !annotationMoveGesture &&
+    selectedAnnotationIndex !== null &&
+    isArrowKey(event.key)
+  ) {
+    event.preventDefault();
+    const nudge = planCaptureSelectedAnnotationKeyboardNudge({
+      annotationHistory,
+      annotations,
+      selectedAnnotationIndex,
+      key: event.key,
+      fast: event.shiftKey,
+      keyboardNudgeStep: KEYBOARD_NUDGE_STEP,
+      keyboardFastNudgeStep: KEYBOARD_FAST_NUDGE_STEP,
+    });
+    if (nudge.previewAnnotations && selection) {
+      actions.setAnnotationHistory(nudge.annotationHistory);
+      void actions.renderSelectionPreview(selection, nudge.previewAnnotations);
+    }
+  } else if (!textDraft && !annotationGesture && !annotationMoveGesture) {
+    const color = annotationColorFromShortcut(event);
+    if (color) {
+      event.preventDefault();
+      actions.selectAnnotationColor(color);
+      return;
+    }
+    const tool = annotationToolFromShortcut(event);
+    if (tool) {
+      event.preventDefault();
+      actions.toggleAnnotationTool(tool);
+      return;
+    }
+    const selectionArrowAction = getSelectionArrowActionFromShortcut(event, {
+      editing: false,
+    });
+    if (selection && derived.selectionBounds && selectionArrowAction) {
+      event.preventDefault();
+      const preview = planCaptureSelectionArrowPreview({
+        selection,
+        selectionBounds: derived.selectionBounds,
+        selectionArrowAction,
+        minSelectionSize: MIN_SELECTION_SIZE,
+        keyboardNudgeStep: KEYBOARD_NUDGE_STEP,
+      });
+      actions.setSelection(preview.selection);
+      actions.setPreviewImageBase64(preview.previewImageBase64);
+      void actions.renderSelectionPreview(preview.previewRender.rect);
+    }
+  }
 }
 
 function isArrowKey(key: string): key is ArrowKey {

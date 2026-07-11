@@ -10,6 +10,14 @@ const captureViewRoot = readFileSync(
   'utf8',
 );
 const runtime = readFileSync(new URL('./runtime.ts', import.meta.url), 'utf8');
+const keyboard = readFileSync(
+  new URL('../../views/CaptureWorkspace/captureWorkspaceKeyboard.ts', import.meta.url),
+  'utf8',
+);
+const deletedEditorInput = new URL(
+  '../../views/CaptureWorkspace/useCaptureWorkspaceEditorInput.ts',
+  import.meta.url,
+);
 const viewSources = Object.entries(
   import.meta.glob('../../views/CaptureWorkspace/*.{ts,tsx}', {
     eager: true,
@@ -50,6 +58,7 @@ describe('capture workspace production runtime wiring', () => {
   });
 
   it('rejects renamed wide input forwarding modules anywhere in the CaptureWorkspace View', () => {
+    expect(() => readFileSync(deletedEditorInput, 'utf8')).toThrow();
     expect(viewSources.map(({ name }) => name)).not.toContain(
       'useCaptureWorkspaceEditorInput.ts',
     );
@@ -71,5 +80,22 @@ describe('capture workspace production runtime wiring', () => {
         )
         .map(({ name }) => name),
     ).toEqual([]);
+  });
+
+  it('keeps selecting keyboard workflows out of the editor-only handler', () => {
+    const editorHandler = keyboard.slice(
+      keyboard.indexOf('export function handleCaptureWorkspaceEditorKeyDown'),
+      keyboard.indexOf('function isArrowKey'),
+    );
+    expect(editorHandler).not.toContain(
+      'actions as CaptureWorkspaceKeyboardActions',
+    );
+    expect(editorHandler).not.toContain('handleCaptureWorkspaceKeyDown(');
+    expect(editorHandler).not.toContain('planCaptureDraftSelectionKeyboardNudge');
+    expect(editorHandler).not.toContain('planCaptureSelectionCursorKeyboardNudge');
+    expect(editorHandler).not.toContain('planCaptureHoverSelectionCycle');
+    expect(runtime).toContain('planCaptureDraftSelectionKeyboardNudge');
+    expect(runtime).toContain('planCaptureSelectionCursorKeyboardNudge');
+    expect(runtime).toContain('planCaptureHoverSelectionCycle');
   });
 });

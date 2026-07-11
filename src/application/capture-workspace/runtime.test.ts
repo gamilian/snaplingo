@@ -243,6 +243,66 @@ describe('capture workspace runtime', () => {
     });
   });
 
+  it('nudges an active selecting draft through the runtime keyboard path', async () => {
+    const platform = createPlatform();
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-draft-nudge');
+    runtime.actions.pointerDown({ x: 20, y: 30 });
+    runtime.actions.pointerMove({ x: 100, y: 80 });
+
+    await expect(runtime.actions.keyDown({ key: 'd' })).resolves.toBe(true);
+
+    expect(runtime.renderState).toMatchObject({
+      startPoint: { x: 20, y: 30 },
+      cursorPoint: { x: 101, y: 80 },
+      selection: { x: 20, y: 30, width: 81, height: 50 },
+    });
+  });
+
+  it('nudges a floating selecting cursor and refreshes its hover candidate', async () => {
+    const platform = createPlatform({
+      session: createSession({
+        candidates: [
+          { id: 'window-1', kind: 'window', rect: selection, priority: 10 },
+        ],
+      }),
+    });
+    platform.commands.currentCaptureCursorPosition.mockResolvedValue({
+      x: 39,
+      y: 50,
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-cursor-nudge');
+
+    await expect(runtime.actions.keyDown({ key: 'd' })).resolves.toBe(true);
+
+    expect(runtime.renderState).toMatchObject({
+      cursorPoint: { x: 40, y: 50 },
+      hoverSelection: selection,
+    });
+  });
+
+  it('cycles overlapping selecting candidates through the runtime keyboard path', async () => {
+    const higher = { x: 20, y: 30, width: 120, height: 80 };
+    const lower = { x: 10, y: 20, width: 160, height: 120 };
+    const platform = createPlatform({
+      session: createSession({
+        candidates: [
+          { id: 'higher', kind: 'window', rect: higher, priority: 20 },
+          { id: 'lower', kind: 'window', rect: lower, priority: 10 },
+        ],
+      }),
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-cycle');
+    runtime.actions.pointerMove({ x: 40, y: 50 });
+    expect(runtime.renderState.hoverSelection).toEqual(higher);
+
+    await expect(runtime.actions.keyDown({ key: 'Tab' })).resolves.toBe(true);
+
+    expect(runtime.renderState.hoverSelection).toEqual(lower);
+  });
+
   it('keeps the newest session authoritative when an older start resolves later', async () => {
     const oldSession = deferred<ReturnType<typeof createSession>>();
     const platform = createPlatform();
