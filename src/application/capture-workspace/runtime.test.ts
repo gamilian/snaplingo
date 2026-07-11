@@ -284,6 +284,65 @@ describe('capture workspace runtime', () => {
     });
   });
 
+  it('does not apply a stale manual preview after a replacement session starts', async () => {
+    const preview = deferred<string>();
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockImplementation(async (sessionId) =>
+      createSession({ id: sessionId }),
+    );
+    platform.commands.renderCaptureOutput.mockImplementation(() => preview.promise);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession('screenshot', 'session-old');
+    runtime.actions.pointerDown({ x: 20, y: 30 });
+    runtime.actions.pointerMove({ x: 140, y: 110 });
+    const oldPreview = runtime.actions.pointerUp({ x: 140, y: 110 });
+    await runtime.actions.startSession('screenshot', 'session-new');
+    preview.resolve('stale-preview');
+    await oldPreview;
+
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
+      'session-old',
+    );
+    expect(runtime.renderState).toMatchObject({
+      status: 'selecting',
+      sessionId: 'session-new',
+      previewImageBase64: null,
+      isRenderingOutput: false,
+      error: null,
+    });
+  });
+
+  it('does not open an OCR result for a stale completion', async () => {
+    const ocr = deferred<{ text: string; confidence: null }>();
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockImplementation(async (sessionId) =>
+      createSession({ id: sessionId }),
+    );
+    platform.commands.runCaptureOcr.mockImplementation(() => ocr.promise);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession('screenshot-ocr', 'session-old');
+    runtime.actions.pointerDown({ x: 20, y: 30 });
+    runtime.actions.pointerMove({ x: 140, y: 110 });
+    const oldCompletion = runtime.actions.pointerUp({ x: 140, y: 110 });
+    await runtime.actions.startSession('screenshot', 'session-new');
+    ocr.resolve({ text: 'stale text', confidence: null });
+    await oldCompletion;
+
+    expect(platform.commands.openCaptureOcrResultWindow).not.toHaveBeenCalled();
+    expect(platform.commands.renderCaptureOutput).not.toHaveBeenCalled();
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
+      'session-old',
+    );
+    expect(runtime.renderState).toMatchObject({
+      status: 'selecting',
+      sessionId: 'session-new',
+      isRenderingOutput: false,
+      error: null,
+    });
+  });
+
   it('does not let an old pending dismiss reset a replacement session', async () => {
     const dismiss = deferred<void>();
     const platform = createPlatform();
@@ -339,10 +398,11 @@ describe('capture workspace runtime', () => {
     });
   });
 
-  it('does not silently complete modes whose runtime effects are not implemented yet', async () => {
+  it('renders a manual screenshot selection into preview without finishing the session', async () => {
     const platform = createPlatform({
       session: createSession({ id: 'session-preview' }),
     });
+    platform.commands.renderCaptureOutput.mockResolvedValue('preview-image');
     const runtime = createCaptureWorkspaceRuntime({ platform });
 
     await runtime.actions.startSession('screenshot', 'session-preview');
@@ -350,13 +410,89 @@ describe('capture workspace runtime', () => {
     runtime.actions.pointerMove({ x: 140, y: 110 });
     await runtime.actions.pointerUp({ x: 140, y: 110 });
 
-    expect(platform.commands.outputCapture).not.toHaveBeenCalled();
+    expect(platform.commands.renderCaptureOutput).toHaveBeenCalledWith({
+      sessionId: 'session-preview',
+      rect: selection,
+      annotations: [],
+    });
     expect(platform.dismiss).not.toHaveBeenCalled();
     expect(platform.commands.cancelCaptureSession).not.toHaveBeenCalled();
     expect(runtime.renderState).toMatchObject({
-      status: 'selecting',
+      status: 'preview',
       sessionId: 'session-preview',
       selection,
+      previewImageBase64: 'preview-image',
+      isRenderingOutput: false,
+      error: null,
+    });
+  });
+
+  it.each([
+    {
+      mode: 'screenshot-ocr' as const,
+      expectedText: 'recognized text',
+      assertResult: (platform: ReturnType<typeof createPlatform>) => {
+        expect(platform.commands.renderCaptureOutput).toHaveBeenCalledWith({
+          sessionId: 'session-ocr',
+          rect: selection,
+          annotations: [],
+        });
+        expect(platform.commands.openCaptureOcrResultWindow).toHaveBeenCalledWith(
+          'recognized text',
+          'preview-image',
+        );
+      },
+    },
+    {
+      mode: 'silent-screenshot-ocr' as const,
+      expectedText: 'recognized text',
+      assertResult: (platform: ReturnType<typeof createPlatform>) => {
+        expect(platform.commands.copyTextToClipboard).toHaveBeenCalledWith(
+          'recognized text',
+        );
+      },
+    },
+    {
+      mode: 'screenshot-translate' as const,
+      expectedText: 'recognized text',
+      assertResult: (platform: ReturnType<typeof createPlatform>) => {
+        expect(
+          platform.commands.openCaptureTranslationResultWindow,
+        ).toHaveBeenCalledWith('recognized text');
+      },
+    },
+  ])('executes $mode completion effects before finishing', async ({
+    assertResult,
+    mode,
+  }) => {
+    const platform = createPlatform({
+      session: createSession({ id: 'session-ocr' }),
+    });
+    platform.commands.runCaptureOcr.mockResolvedValue({
+      text: ' recognized text ',
+      confidence: null,
+    });
+    platform.commands.renderCaptureOutput.mockResolvedValue('preview-image');
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession(mode, 'session-ocr');
+    runtime.actions.pointerDown({ x: 20, y: 30 });
+    runtime.actions.pointerMove({ x: 140, y: 110 });
+    await runtime.actions.pointerUp({ x: 140, y: 110 });
+
+    expect(platform.commands.runCaptureOcr).toHaveBeenCalledWith(
+      'session-ocr',
+      selection,
+    );
+    assertResult(platform);
+    expect(platform.dismiss).toHaveBeenCalledTimes(1);
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
+      'session-ocr',
+    );
+    expect(runtime.renderState).toMatchObject({
+      status: 'idle',
+      sessionId: null,
+      isRenderingOutput: false,
       error: null,
     });
   });

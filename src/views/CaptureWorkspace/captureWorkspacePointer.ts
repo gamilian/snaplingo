@@ -97,15 +97,30 @@ export interface CaptureWorkspacePointerDerivedState {
   shouldTrackMagnifierCursor: boolean;
 }
 
-export interface CaptureWorkspacePointerActions {
+export interface CaptureWorkspacePointerEditorActions {
   commitTextDraft(): void;
   commitAnnotationGestureAtPoint(
     localPoint: Point,
     constrainGesture: boolean,
   ): boolean | void;
   dismissCaptureLayer(): void;
+  adjustAnnotationSize(direction: AnnotationSizeDirection): void;
+}
+
+export interface CaptureWorkspacePointerHostActions {
   resetPreviewSelection(): void;
   cancelSession(): MaybePromiseVoid;
+  renderSelectionPreview(
+    rect: LogicalRect,
+    annotations?: AnnotationCommand[],
+    includeCursor?: boolean,
+  ): MaybePromiseVoid;
+  completeManualSelection(rect: LogicalRect): void;
+  pinSelection(): MaybePromiseVoid;
+  copySelection(): MaybePromiseVoid;
+}
+
+export interface CaptureWorkspacePointerStateActions {
   setCursorPoint(point: Point): void;
   setStartPointWithRef(point: Point | null): void;
   setSelection(selection: LogicalRect | null): void;
@@ -136,19 +151,15 @@ export interface CaptureWorkspacePointerActions {
   setTextDraftAnnotationIndex(index: number | null): void;
   setAnnotationHistory(history: CaptureWorkspaceState['annotationHistory']): void;
   syncHoverSelection(selection: LogicalRect | null): void;
-  renderSelectionPreview(
-    rect: LogicalRect,
-    annotations?: AnnotationCommand[],
-    includeCursor?: boolean,
-  ): MaybePromiseVoid;
-  completeManualSelection(rect: LogicalRect): void;
-  pinSelection(): MaybePromiseVoid;
   setEditGesture(gesture: CaptureWorkspaceState['editGesture']): void;
   setAnnotationStyle(style: AnnotationStyle): void;
   setTextFontSize(fontSize: number): void;
-  copySelection(): MaybePromiseVoid;
-  adjustAnnotationSize(direction: AnnotationSizeDirection): void;
 }
+
+export interface CaptureWorkspacePointerActions
+  extends CaptureWorkspacePointerEditorActions,
+    CaptureWorkspacePointerHostActions,
+    CaptureWorkspacePointerStateActions {}
 
 export interface CaptureWorkspacePointerContext {
   state: CaptureWorkspaceState;

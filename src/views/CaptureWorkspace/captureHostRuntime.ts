@@ -32,7 +32,9 @@ import type {
   Point,
 } from './types';
 
-type CaptureSelectionStorage = Parameters<typeof saveLastCaptureSelection>[0];
+export type CaptureSelectionStorage = Parameters<
+  typeof saveLastCaptureSelection
+>[0];
 type CaptureHotkeyEvent = { payload: unknown };
 
 export interface ExecuteCaptureRuntimeEffectContext {
