@@ -6,11 +6,6 @@ interface SourceFile {
   source: string;
 }
 
-interface TauriImport {
-  path: string;
-  specifier: string;
-}
-
 interface TauriEventUse {
   path: string;
   eventName: string;
@@ -21,28 +16,13 @@ interface ModuleImport {
   specifier: string;
 }
 
-const LEGACY_TAURI_IMPORTS = new Set([
-  'src/tauri/captureSession.ts -> @tauri-apps/api/core',
-  'src/tauri/events.ts -> @tauri-apps/api/event',
-  'src/tauri/history.ts -> @tauri-apps/api/core',
-  'src/tauri/hotkeys.ts -> @tauri-apps/api/core',
-  'src/tauri/ocr.ts -> @tauri-apps/api/core',
-  'src/tauri/ocr.ts -> @tauri-apps/plugin-dialog',
-  'src/tauri/pinnedImage.ts -> @tauri-apps/api/core',
-  'src/tauri/providers.ts -> @tauri-apps/api/core',
-  'src/tauri/settings.ts -> @tauri-apps/api/core',
-  'src/tauri/translation.ts -> @tauri-apps/api/core',
-  'src/tauri/window.ts -> @tauri-apps/api/webviewWindow',
-  'src/tauri/window.ts -> @tauri-apps/api/window',
-]);
-
-const LEGACY_TAURI_EVENT_USES = new Set<string>();
-
 const TAURI_EVENT_LISTENER_NAMES = new Set([
   'listenTauriEvent',
   'listenForEvent',
   'listenForHotkey',
 ]);
+
+const LEGACY_TAURI_ROOT = ['src', 'tauri'].join('/');
 
 function isProductionTypeScript(path: string) {
   return (
@@ -73,6 +53,19 @@ function productionSourceFiles(): SourceFile[] {
     .filter(({ path }) => isProductionTypeScript(path));
 }
 
+function allSourceFiles(): SourceFile[] {
+  const modules = import.meta.glob('../**/*.{ts,tsx}', {
+    eager: true,
+    import: 'default',
+    query: '?raw',
+  }) as Record<string, string>;
+
+  return Object.entries(modules).map(([path, source]) => ({
+    path: `src/${path.replace(/^\.\.\//, '')}`,
+    source,
+  }));
+}
+
 function viewSourceFilesIncludingTests(): SourceFile[] {
   const modules = import.meta.glob('../views/**/*.{ts,tsx}', {
     eager: true,
@@ -96,16 +89,10 @@ function parseSourceFile({ path, source }: SourceFile) {
   );
 }
 
-function tauriImports(files: SourceFile[]): TauriImport[] {
+function moduleImports(files: SourceFile[]): ModuleImport[] {
   return files.flatMap((file) => {
     const sourceFile = parseSourceFile(file);
-    const imports: TauriImport[] = [];
-
-    function recordModuleReference(specifier: string) {
-      if (specifier.startsWith('@tauri-apps/')) {
-        imports.push({ path: file.path, specifier });
-      }
-    }
+    const imports: ModuleImport[] = [];
 
     function visit(node: ts.Node) {
       if (
@@ -113,7 +100,7 @@ function tauriImports(files: SourceFile[]): TauriImport[] {
         node.moduleSpecifier &&
         ts.isStringLiteral(node.moduleSpecifier)
       ) {
-        recordModuleReference(node.moduleSpecifier.text);
+        imports.push({ path: file.path, specifier: node.moduleSpecifier.text });
       } else if (
         ts.isCallExpression(node) &&
         node.expression.kind === ts.SyntaxKind.ImportKeyword
@@ -124,7 +111,7 @@ function tauriImports(files: SourceFile[]): TauriImport[] {
           (ts.isStringLiteral(specifier) ||
             ts.isNoSubstitutionTemplateLiteral(specifier))
         ) {
-          recordModuleReference(specifier.text);
+          imports.push({ path: file.path, specifier: specifier.text });
         }
       }
 
@@ -132,46 +119,23 @@ function tauriImports(files: SourceFile[]): TauriImport[] {
     }
 
     visit(sourceFile);
+
     return imports;
   });
 }
 
-function moduleImports(files: SourceFile[]): ModuleImport[] {
-  return files.flatMap((file) => {
-    const sourceFile = parseSourceFile(file);
-    const imports: ModuleImport[] = [];
-
-    sourceFile.forEachChild((node) => {
-      if (
-        ts.isImportDeclaration(node) &&
-        ts.isStringLiteral(node.moduleSpecifier)
-      ) {
-        imports.push({ path: file.path, specifier: node.moduleSpecifier.text });
+function forbiddenPlatformImports(files: SourceFile[]) {
+  return moduleImports(files)
+    .filter(({ path, specifier }) => {
+      if (path.startsWith('src/platform/tauri/')) return false;
+      if (specifier.startsWith('@tauri-apps/')) return true;
+      if (/(?:^|\/)platform(?:\/|$)/.test(specifier)) {
+        return path !== 'src/App.tsx';
       }
-    });
-
-    return imports;
-  });
-}
-
-function tauriImportInventoryViolations(
-  files: SourceFile[],
-  legacyAllowlist: ReadonlySet<string>,
-) {
-  const actualLegacyImports = new Set(
-    tauriImports(files)
-      .filter(({ path }) => !path.startsWith('src/platform/tauri/'))
-      .map(({ path, specifier }) => `${path} -> ${specifier}`),
-  );
-
-  return [
-    ...Array.from(actualLegacyImports).filter(
-      (entry) => !legacyAllowlist.has(entry),
-    ),
-    ...Array.from(legacyAllowlist).filter(
-      (entry) => !actualLegacyImports.has(entry),
-    ),
-  ].sort();
+      return /(?:^|\/)tauri(?:\/|$)/.test(specifier);
+    })
+    .map(({ path, specifier }) => `${path} -> ${specifier}`)
+    .sort();
 }
 
 function tauriEventUses(files: SourceFile[]): TauriEventUse[] {
@@ -280,14 +244,11 @@ function tauriEventUses(files: SourceFile[]): TauriEventUse[] {
   });
 }
 
-function unexpectedTauriEventUses(
-  files: SourceFile[],
-  legacyAllowlist: ReadonlySet<string>,
-) {
+function unexpectedTauriEventUses(files: SourceFile[]) {
   return tauriEventUses(files)
     .filter(({ path, eventName }) => {
       if (path.startsWith('src/platform/tauri/')) return false;
-      return !legacyAllowlist.has(`${path} -> ${eventName}`);
+      return eventName.length > 0;
     })
     .map(({ path, eventName }) => `${path} -> ${eventName}`)
     .sort();
@@ -364,37 +325,23 @@ describe('frontend dependency rules', () => {
     );
     expect(imports.some((specifier) => specifier.startsWith('./platform/tauri/'))).toBe(true);
     expect(imports.some((specifier) => specifier.startsWith('./tauri/'))).toBe(false);
+    expect(imports.some((specifier) => specifier.startsWith('@tauri-apps/'))).toBe(false);
   });
 
-  test('@tauri-apps imports stay behind the Tauri platform boundary', () => {
-    const productionFiles = productionSourceFiles();
-    const legacyInventory = tauriImports(productionFiles)
-      .filter(({ path }) => !path.startsWith('src/platform/tauri/'))
-      .map(({ path, specifier }) => `${path} -> ${specifier}`)
-      .sort();
-
-    expect(legacyInventory).toEqual(Array.from(LEGACY_TAURI_IMPORTS).sort());
+  test('the legacy frontend Tauri seam is deleted', () => {
     expect(
-      tauriImportInventoryViolations(productionFiles, LEGACY_TAURI_IMPORTS),
+      allSourceFiles()
+        .map(({ path }) => path)
+        .filter((path) => path.startsWith(`${LEGACY_TAURI_ROOT}/`)),
     ).toEqual([]);
+  });
+
+  test('only the Tauri platform boundary imports Platform or Tauri modules', () => {
+    expect(forbiddenPlatformImports(allSourceFiles())).toEqual([]);
   });
 
   test('raw Tauri event strings stay behind the Tauri platform boundary', () => {
-    const productionFiles = productionSourceFiles();
-    const legacyInventory = tauriEventUses(productionFiles)
-      .filter(({ path }) => !path.startsWith('src/platform/tauri/'))
-      .map(({ path, eventName }) => `${path} -> ${eventName}`)
-      .sort();
-
-    expect(legacyInventory).toEqual(
-      Array.from(LEGACY_TAURI_EVENT_USES).sort(),
-    );
-    expect(
-      unexpectedTauriEventUses(
-        productionFiles,
-        LEGACY_TAURI_EVENT_USES,
-      ),
-    ).toEqual([]);
+    expect(unexpectedTauriEventUses(allSourceFiles())).toEqual([]);
   });
 
   test('rejects a new @tauri-apps import from a View', () => {
@@ -404,7 +351,7 @@ describe('frontend dependency rules', () => {
     };
 
     expect(
-      tauriImportInventoryViolations([syntheticView], new Set()),
+      forbiddenPlatformImports([syntheticView]),
     ).toEqual([
       'src/views/ExampleView.tsx -> @tauri-apps/api/core',
     ]);
@@ -427,10 +374,7 @@ describe('frontend dependency rules', () => {
     };
 
     expect(
-      unexpectedTauriEventUses(
-        [syntheticView],
-        LEGACY_TAURI_EVENT_USES,
-      ),
+      unexpectedTauriEventUses([syntheticView]),
     ).toEqual([
       'src/views/ExampleView.tsx -> new-event',
     ]);
@@ -446,10 +390,7 @@ describe('frontend dependency rules', () => {
     };
 
     expect(
-      unexpectedTauriEventUses(
-        [syntheticView],
-        LEGACY_TAURI_EVENT_USES,
-      ),
+      unexpectedTauriEventUses([syntheticView]),
     ).toEqual(['src/views/ExampleView.tsx -> CAPTURE_EVENT']);
   });
 
@@ -463,7 +404,7 @@ describe('frontend dependency rules', () => {
     };
 
     expect(
-      unexpectedTauriEventUses([syntheticView], LEGACY_TAURI_EVENT_USES),
+      unexpectedTauriEventUses([syntheticView]),
     ).toEqual(['src/views/ExampleView.tsx -> new-event']);
   });
 
@@ -474,7 +415,7 @@ describe('frontend dependency rules', () => {
     };
 
     expect(
-      unexpectedTauriEventUses([syntheticView], LEGACY_TAURI_EVENT_USES),
+      unexpectedTauriEventUses([syntheticView]),
     ).toEqual(['src/views/ExampleView.tsx -> new-event']);
   });
 
@@ -487,20 +428,8 @@ describe('frontend dependency rules', () => {
       `,
     };
 
-    expect(tauriImportInventoryViolations([syntheticView], new Set())).toEqual(
-      [],
-    );
-    expect(unexpectedTauriEventUses([syntheticView], new Set())).toEqual([]);
-  });
-
-  test('rejects stale legacy Tauri import allowlist entries', () => {
-    const staleAllowlist = new Set([
-      'src/tauri/removed.ts -> @tauri-apps/api/core',
-    ]);
-
-    expect(tauriImportInventoryViolations([], staleAllowlist)).toEqual([
-      'src/tauri/removed.ts -> @tauri-apps/api/core',
-    ]);
+    expect(forbiddenPlatformImports([syntheticView])).toEqual([]);
+    expect(unexpectedTauriEventUses([syntheticView])).toEqual([]);
   });
 
   test('rejects dynamic @tauri-apps imports outside the platform boundary', () => {
@@ -510,7 +439,7 @@ describe('frontend dependency rules', () => {
     };
 
     expect(
-      tauriImportInventoryViolations([syntheticView], new Set()),
+      forbiddenPlatformImports([syntheticView]),
     ).toEqual(['src/views/ExampleView.tsx -> @tauri-apps/api/core']);
   });
 
@@ -521,7 +450,7 @@ describe('frontend dependency rules', () => {
     };
 
     expect(
-      tauriImportInventoryViolations([syntheticView], new Set()),
+      forbiddenPlatformImports([syntheticView]),
     ).toEqual(['src/views/ExampleView.tsx -> @tauri-apps/api/core']);
   });
 
@@ -535,7 +464,7 @@ describe('frontend dependency rules', () => {
     };
 
     expect(
-      unexpectedTauriEventUses([syntheticView], LEGACY_TAURI_EVENT_USES),
+      unexpectedTauriEventUses([syntheticView]),
     ).toEqual(['src/views/ExampleView.tsx -> new-event']);
   });
 
@@ -551,7 +480,7 @@ describe('frontend dependency rules', () => {
     };
 
     expect(
-      unexpectedTauriEventUses([syntheticView], LEGACY_TAURI_EVENT_USES),
+      unexpectedTauriEventUses([syntheticView]),
     ).toEqual([
       'src/views/ExampleView.ts -> as-event',
       'src/views/ExampleView.ts -> asserted-event',
