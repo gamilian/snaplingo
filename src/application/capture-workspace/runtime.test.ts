@@ -129,6 +129,12 @@ describe('capture workspace runtime', () => {
     expect(platform.commands.hydrateCaptureSessionSnapshots).toHaveBeenCalledTimes(
       2,
     );
+    expect(
+      platform.commands.hydrateCaptureSessionSnapshots,
+    ).toHaveBeenNthCalledWith(1, 'session-hydration');
+    expect(
+      platform.commands.hydrateCaptureSessionSnapshots,
+    ).toHaveBeenNthCalledWith(2, 'session-hydration');
     expect(runtime.renderState).toMatchObject({
       status: 'selecting',
       sessionId: 'session-hydration',
