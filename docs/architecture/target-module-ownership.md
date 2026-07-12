@@ -40,5 +40,5 @@ An allowlisted dependency is not accepted architecture, an exception to the targ
 ## Accepted ADR Alignment
 
 - [ADR 0004](../adr/0004-coordinator-consolidation.md) remains accepted. Translation and OCR Provider Coordinators remain deep modules that own activation, persistence, execution, and coordination; they are not split into shallow forwarding modules.
-- [ADR 0005](../adr/0005-runtime-provider-reconfiguration.md) remains accepted for runtime Provider reconfiguration through the Coordinator interface. Its requirement to retain the older single-`api_key` compatibility command is superseded by the approved Architecture Rebuild Design; removal of that command and its frontend compatibility adapter belongs to the planned migration and is not recorded here as complete.
+- [ADR 0005](../adr/0005-runtime-provider-reconfiguration.md) remains accepted for runtime Provider reconfiguration through the Coordinator interface. Its older single-`api_key` compatibility-command requirement is superseded and removed by [ADR 0006](../adr/0006-remove-provider-compatibility-command.md).
 - [ADR 0006](../adr/0006-menu-bar-app-shell.md) remains accepted. SnapLingo keeps a menu-bar resident shell, with Settings opened explicitly and business workflows independent of the Settings Window lifecycle.

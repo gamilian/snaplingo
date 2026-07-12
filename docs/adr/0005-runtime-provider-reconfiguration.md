@@ -1,5 +1,7 @@
 # ADR 0005: Runtime Provider Reconfiguration
 
+> The single-`api_key` compatibility-command portion of this ADR is superseded by [ADR 0006](0006-remove-provider-compatibility-command.md). The runtime reconfiguration decision remains accepted.
+
 ## Status
 Accepted
 
