@@ -10,7 +10,6 @@ use crate::domain::hotkey_config::{
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct HotkeyActionBinding {
     pub action: AppAction,
-    pub trigger_on_release: bool,
 }
 
 pub(crate) fn hotkey_action_binding(
@@ -44,15 +43,7 @@ pub(crate) fn hotkey_action_binding(
         _ => return None,
     };
 
-    let trigger_on_release = matches!(
-        action,
-        AppAction::OpenCapture(_) | AppAction::TranslateSelection
-    );
-
-    Some(HotkeyActionBinding {
-        action,
-        trigger_on_release,
-    })
+    Some(HotkeyActionBinding { action })
 }
 
 pub(crate) fn trigger_hotkey_action(app: tauri::AppHandle, category: String, action_key: String) {
@@ -79,99 +70,85 @@ mod tests {
     };
 
     #[test]
-    fn maps_hotkey_keys_to_app_actions_and_trigger_timing() {
+    fn maps_hotkey_keys_to_app_actions() {
         let cases = [
             (
                 SCREENSHOT_CATEGORY,
                 SCREENSHOT_ACTION,
                 AppAction::OpenCapture(CaptureLaunchMode::Screenshot),
-                true,
             ),
             (
                 SCREENSHOT_CATEGORY,
                 SCREENSHOT_COPY_ACTION,
                 AppAction::OpenCapture(CaptureLaunchMode::ScreenshotCopy),
-                true,
             ),
             (
                 SCREENSHOT_CATEGORY,
                 SCREENSHOT_CUSTOM_ACTION,
                 AppAction::OpenCapture(CaptureLaunchMode::Screenshot),
-                true,
             ),
             (
                 SCREENSHOT_CATEGORY,
                 PIN_ACTION,
                 AppAction::PinClipboardImage,
-                false,
             ),
             (
                 SCREENSHOT_CATEGORY,
                 PIN_TOGGLE_ALL_ACTION,
                 AppAction::TogglePinnedImagesVisibility,
-                false,
             ),
             (
                 SCREENSHOT_CATEGORY,
                 PIN_SWITCH_GROUP_ACTION,
                 AppAction::SwitchPinnedImageGroup,
-                false,
             ),
             (
                 TRANSLATION_CATEGORY,
                 SELECTION_TRANSLATE_ACTION,
                 AppAction::TranslateSelection,
-                true,
             ),
             (
                 TRANSLATION_CATEGORY,
                 SCREENSHOT_TRANSLATE_ACTION,
                 AppAction::OpenCapture(CaptureLaunchMode::ScreenshotTranslate),
-                true,
             ),
             (
                 TRANSLATION_CATEGORY,
                 INPUT_TRANSLATE_ACTION,
                 AppAction::OpenInputTranslation,
-                false,
             ),
             (
                 TRANSLATION_CATEGORY,
                 SHOW_TRANSLATION_WINDOW_ACTION,
                 AppAction::OpenTranslationWindow,
-                false,
             ),
             (
                 OCR_CATEGORY,
                 SCREENSHOT_OCR_ACTION,
                 AppAction::OpenCapture(CaptureLaunchMode::ScreenshotOcr),
-                true,
             ),
             (
                 OCR_CATEGORY,
                 SILENT_SCREENSHOT_OCR_ACTION,
                 AppAction::OpenCapture(CaptureLaunchMode::SilentScreenshotOcr),
-                true,
             ),
-            (OCR_CATEGORY, FILE_OCR_ACTION, AppAction::RunFileOcr, false),
+            (OCR_CATEGORY, FILE_OCR_ACTION, AppAction::RunFileOcr),
             (
                 OCR_CATEGORY,
                 SHOW_OCR_WINDOW_ACTION,
                 AppAction::OpenOcrWindow,
-                false,
             ),
         ];
 
-        for (category, action_key, expected_action, expected_trigger_on_release) in cases {
+        for (category, action_key, expected_action) in cases {
             let binding = hotkey_action_binding(category, action_key).unwrap();
 
             assert_eq!(binding.action, expected_action);
-            assert_eq!(binding.trigger_on_release, expected_trigger_on_release);
         }
 
         let covered: HashSet<_> = cases
             .iter()
-            .map(|(category, action, _, _)| (*category, *action))
+            .map(|(category, action, _)| (*category, *action))
             .collect();
         let defaults: HashSet<_> = DEFAULT_HOTKEYS
             .iter()
