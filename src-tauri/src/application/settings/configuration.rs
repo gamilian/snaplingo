@@ -4,26 +4,25 @@ use std::sync::Arc;
 use serde::Deserialize;
 
 use crate::application::capture::configured_capture_save_dir;
+use crate::application::settings::SettingsStore;
 use crate::domain::{GeneralSettings, ScreenshotSettings, SettingsSnapshot, TranslationSettings};
-use crate::infrastructure::storage::ConfigFile;
 use crate::{AppError, Result};
 
-const SETTINGS_CONFIG_KEY: &str = "settings";
 const LEGACY_LOCAL_STORAGE_KEY: &str = "snaplingo-settings";
 
 pub struct SettingsConfiguration {
-    config_file: Arc<ConfigFile>,
+    store: Arc<dyn SettingsStore>,
     home_dir: Option<PathBuf>,
     default_screenshot_save_dir: PathBuf,
     legacy_local_storage_root: Option<PathBuf>,
 }
 
 impl SettingsConfiguration {
-    pub fn new(config_file: Arc<ConfigFile>) -> Self {
+    pub fn new(store: Arc<dyn SettingsStore>) -> Self {
         let home_dir = dirs::home_dir();
 
         Self::with_paths(
-            config_file,
+            store,
             home_dir.clone(),
             default_screenshot_save_dir(),
             home_dir.map(|path| path.join("Library/WebKit/com.snaplingo.app")),
@@ -31,13 +30,13 @@ impl SettingsConfiguration {
     }
 
     pub(crate) fn with_paths(
-        config_file: Arc<ConfigFile>,
+        store: Arc<dyn SettingsStore>,
         home_dir: Option<PathBuf>,
         default_screenshot_save_dir: PathBuf,
         legacy_local_storage_root: Option<PathBuf>,
     ) -> Self {
         Self {
-            config_file,
+            store,
             home_dir,
             default_screenshot_save_dir,
             legacy_local_storage_root,
@@ -45,10 +44,7 @@ impl SettingsConfiguration {
     }
 
     pub fn snapshot(&self) -> Result<SettingsSnapshot> {
-        match self
-            .config_file
-            .load::<SettingsSnapshot>(SETTINGS_CONFIG_KEY)
-        {
+        match self.store.load_settings() {
             Ok(snapshot) => Ok(self.normalized_snapshot(snapshot)),
             Err(AppError::Config(_)) => {
                 if let Some(snapshot) = self.migrate_legacy_durable_settings()? {
@@ -81,7 +77,7 @@ impl SettingsConfiguration {
 
     fn save_snapshot(&self, snapshot: SettingsSnapshot) -> Result<SettingsSnapshot> {
         let snapshot = self.normalized_snapshot(snapshot);
-        self.config_file.save(SETTINGS_CONFIG_KEY, &snapshot)?;
+        self.store.save_settings(&snapshot)?;
         Ok(snapshot)
     }
 

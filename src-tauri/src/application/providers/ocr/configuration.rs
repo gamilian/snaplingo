@@ -2,13 +2,13 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::application::providers::common::CredentialField;
-use crate::infrastructure::storage::Keychain;
+use crate::application::providers::ProviderCredentialStore;
 
 use super::OcrCoordinator;
 
 pub struct OcrProviderConfiguration {
     coordinator: Arc<OcrCoordinator>,
-    keychain: Arc<Keychain>,
+    credential_store: Arc<dyn ProviderCredentialStore>,
 }
 
 #[cfg(test)]
@@ -17,7 +17,7 @@ mod tests {
     use crate::application::providers::common::Provider;
     use crate::application::providers::ocr::OcrProvider;
     use crate::domain::ocr::{OcrRequest, OcrResult};
-    use crate::infrastructure::storage::{ConfigFile, KeychainBackend};
+    use crate::infrastructure::storage::{ConfigFile, Keychain, KeychainBackend};
     use async_trait::async_trait;
     use std::sync::Mutex;
 
@@ -118,10 +118,13 @@ mod tests {
 }
 
 impl OcrProviderConfiguration {
-    pub fn new(coordinator: Arc<OcrCoordinator>, keychain: Arc<Keychain>) -> Self {
+    pub fn new(
+        coordinator: Arc<OcrCoordinator>,
+        credential_store: Arc<dyn ProviderCredentialStore>,
+    ) -> Self {
         Self {
             coordinator,
-            keychain,
+            credential_store,
         }
     }
 
@@ -165,22 +168,19 @@ impl OcrProviderConfiguration {
             .map(|field| field.name.clone())
             .collect();
         let snapshot = self
-            .keychain
+            .credential_store
             .snapshot_provider_credentials(provider_id, &field_names)
             .map_err(|e| format!("Failed to snapshot credentials: {}", e))?;
 
-        self.keychain.save_provider_credentials_transactional(
-            provider_id,
-            credentials,
-            &snapshot,
-        )?;
+        self.credential_store
+            .save_provider_credentials_transactional(provider_id, credentials, &snapshot)?;
 
         if let Err(e) = self
             .coordinator
             .reconfigure_provider(provider_id, credentials)
         {
             let _ = self
-                .keychain
+                .credential_store
                 .restore_provider_credentials(provider_id, &snapshot);
             return Err(format!("Failed to reconfigure provider: {}", e).into());
         }

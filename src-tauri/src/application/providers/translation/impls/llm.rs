@@ -1,12 +1,11 @@
 use crate::application::providers::common::Provider;
 use crate::application::providers::translation::TranslationProvider;
 use crate::application::providers::{
-    merge_prompt_strategy_config, render_translation_system_prompt, ProviderPromptStrategy,
-    TranslationPromptStrategyConfig,
+    merge_prompt_strategy_config, render_translation_system_prompt, ProviderConfigStore,
+    ProviderPromptStrategy,
 };
 use crate::domain::translation::{TranslationRequest, TranslationResult};
 use crate::infrastructure::llm::{LLMClient, LLMOptions, LLMRequest, ReasoningLevel};
-use crate::infrastructure::storage::ConfigFile;
 use crate::Result;
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -20,7 +19,7 @@ pub struct LLMTranslationProvider {
     name: String,
     reasoning_level: Option<ReasoningLevel>,
     prompt_strategy: ProviderPromptStrategy,
-    config_file: Arc<ConfigFile>,
+    config_store: Arc<dyn ProviderConfigStore>,
 }
 
 impl LLMTranslationProvider {
@@ -30,7 +29,7 @@ impl LLMTranslationProvider {
         name: String,
         reasoning_level: Option<ReasoningLevel>,
         prompt_strategy: ProviderPromptStrategy,
-        config_file: Arc<ConfigFile>,
+        config_store: Arc<dyn ProviderConfigStore>,
     ) -> Self {
         Self {
             llm_client,
@@ -38,15 +37,12 @@ impl LLMTranslationProvider {
             name,
             reasoning_level,
             prompt_strategy,
-            config_file,
+            config_store,
         }
     }
 
     fn system_prompt(&self, request: &TranslationRequest) -> String {
-        let config = self
-            .config_file
-            .load::<TranslationPromptStrategyConfig>("translation_prompt_strategies")
-            .ok();
+        let config = self.config_store.load_translation_prompt_strategies().ok();
         let config = merge_prompt_strategy_config(config);
 
         render_translation_system_prompt(&config.strategies, &self.prompt_strategy, request)
@@ -98,7 +94,9 @@ impl TranslationProvider for LLMTranslationProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::application::providers::TranslationPromptStrategyConfig;
     use crate::infrastructure::llm::{LLMClient, LLMRequest, LLMResponse};
+    use crate::infrastructure::storage::ConfigFile;
     use async_trait::async_trait;
 
     struct MockLLMClient {

@@ -3,43 +3,39 @@ use std::sync::Arc;
 
 use serde::Deserialize;
 
+use crate::application::hotkeys::HotkeyStore;
 use crate::domain::hotkey_config::{
     default_hotkey_snapshot, hotkey_category_mut, validate_hotkey_action, HotkeySettingsSnapshot,
 };
-use crate::infrastructure::storage::ConfigFile;
 use crate::{AppError, Result};
 
-const HOTKEY_CONFIG_KEY: &str = "hotkeys";
 const LEGACY_LOCAL_STORAGE_KEY: &str = "snaplingo-settings";
 
 pub struct HotkeyConfiguration {
-    config_file: Arc<ConfigFile>,
+    store: Arc<dyn HotkeyStore>,
     legacy_local_storage_root: Option<PathBuf>,
 }
 
 impl HotkeyConfiguration {
-    pub fn new(config_file: Arc<ConfigFile>) -> Self {
+    pub fn new(store: Arc<dyn HotkeyStore>) -> Self {
         Self::with_legacy_root(
-            config_file,
+            store,
             dirs::home_dir().map(|path| path.join("Library/WebKit/com.snaplingo.app")),
         )
     }
 
     pub(crate) fn with_legacy_root(
-        config_file: Arc<ConfigFile>,
+        store: Arc<dyn HotkeyStore>,
         legacy_local_storage_root: Option<PathBuf>,
     ) -> Self {
         Self {
-            config_file,
+            store,
             legacy_local_storage_root,
         }
     }
 
     pub fn snapshot(&self) -> Result<HotkeySettingsSnapshot> {
-        match self
-            .config_file
-            .load::<HotkeySettingsSnapshot>(HOTKEY_CONFIG_KEY)
-        {
+        match self.store.load_hotkeys() {
             Ok(snapshot) => Ok(normalized_snapshot(snapshot)),
             Err(AppError::Config(_)) => {
                 if let Some(snapshot) = self.migrate_legacy_hotkeys()? {
@@ -69,7 +65,7 @@ impl HotkeyConfiguration {
 
     fn save_snapshot(&self, snapshot: HotkeySettingsSnapshot) -> Result<HotkeySettingsSnapshot> {
         let snapshot = normalized_snapshot(snapshot);
-        self.config_file.save(HOTKEY_CONFIG_KEY, &snapshot)?;
+        self.store.save_hotkeys(&snapshot)?;
         Ok(snapshot)
     }
 

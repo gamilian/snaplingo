@@ -22,6 +22,7 @@ mod linux;
 #[cfg(target_os = "linux")]
 use linux::LinuxKeychain as PlatformKeychainImpl;
 
+use crate::application::providers::{CredentialSnapshot, ProviderCredentialStore};
 use crate::error::{AppError, Result};
 use std::collections::HashMap;
 
@@ -30,25 +31,6 @@ pub fn is_keychain_not_found(error: &crate::AppError) -> bool {
     match error {
         crate::AppError::Keychain(e) => matches!(e, keyring::Error::NoEntry),
         _ => false,
-    }
-}
-
-/// Snapshot of provider credentials for rollback
-#[derive(Debug, Clone)]
-pub struct CredentialSnapshot {
-    /// Simple API key: Present(value) or Absent
-    pub api_key: Option<Option<String>>,
-    /// Structured credentials: field_name -> Present(value) or Absent
-    pub structured: HashMap<String, Option<String>>,
-}
-
-impl CredentialSnapshot {
-    /// Create an empty snapshot
-    pub fn new() -> Self {
-        Self {
-            api_key: None,
-            structured: HashMap::new(),
-        }
     }
 }
 
@@ -290,6 +272,61 @@ impl Keychain {
 impl Default for Keychain {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl ProviderCredentialStore for Keychain {
+    fn save_provider_credential(&self, provider_id: &str, api_key: &str) -> Result<()> {
+        Keychain::save_provider_credential(self, provider_id, api_key)
+    }
+
+    fn load_provider_credential(&self, provider_id: &str) -> Result<String> {
+        Keychain::load_provider_credential(self, provider_id)
+    }
+
+    fn delete_provider_credential(&self, provider_id: &str) -> Result<()> {
+        Keychain::delete_provider_credential(self, provider_id)
+    }
+
+    fn save_provider_credentials_transactional(
+        &self,
+        provider_id: &str,
+        credentials: &HashMap<String, String>,
+        snapshot: &CredentialSnapshot,
+    ) -> Result<()> {
+        Keychain::save_provider_credentials_transactional(self, provider_id, credentials, snapshot)
+    }
+
+    fn snapshot_provider_credentials(
+        &self,
+        provider_id: &str,
+        field_names: &[String],
+    ) -> Result<CredentialSnapshot> {
+        Keychain::snapshot_provider_credentials(self, provider_id, field_names)
+    }
+
+    fn restore_provider_credentials(
+        &self,
+        provider_id: &str,
+        snapshot: &CredentialSnapshot,
+    ) -> Result<()> {
+        Keychain::restore_provider_credentials(self, provider_id, snapshot)
+    }
+
+    fn load_provider_credentials(
+        &self,
+        provider_id: &str,
+        field_names: &[String],
+    ) -> Result<HashMap<String, String>> {
+        Keychain::load_provider_credentials(self, provider_id, field_names)
+    }
+
+    fn delete_provider_credentials(&self, provider_id: &str, field_names: &[String]) -> Result<()> {
+        Keychain::delete_provider_credentials(self, provider_id, field_names)
+    }
+
+    fn is_not_found(&self, error: &AppError) -> bool {
+        is_keychain_not_found(error)
     }
 }
 

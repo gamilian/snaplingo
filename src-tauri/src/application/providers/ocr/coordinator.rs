@@ -1,8 +1,8 @@
 use super::OcrProvider;
+use crate::application::providers::ProviderConfigStore;
 use crate::domain::events::DomainEvent;
 use crate::domain::ocr::{OcrRequest, OcrResult};
 use crate::infrastructure::events::EventBus;
-use crate::infrastructure::storage::ConfigFile;
 use crate::Result;
 use chrono::Utc;
 use parking_lot::RwLock;
@@ -27,19 +27,19 @@ pub struct OcrCoordinator {
     providers: Mutex<HashMap<String, Arc<RwLock<dyn OcrProvider>>>>,
     /// Currently active provider ID (single-select)
     active_provider_id: Arc<Mutex<Option<String>>>,
-    /// Configuration file for persisting active provider
-    config: Arc<ConfigFile>,
+    /// Configuration store for persisting active provider
+    config_store: Arc<dyn ProviderConfigStore>,
     /// Optional event bus for publishing domain events
     event_bus: Option<Arc<EventBus>>,
 }
 
 impl OcrCoordinator {
-    /// Creates a new OcrCoordinator with the given config.
-    pub fn new(config: Arc<ConfigFile>) -> Self {
+    /// Creates a new OcrCoordinator with the given config store.
+    pub fn new(config_store: Arc<dyn ProviderConfigStore>) -> Self {
         Self {
             providers: Mutex::new(HashMap::new()),
             active_provider_id: Arc::new(Mutex::new(None)),
-            config,
+            config_store,
             event_bus: None,
         }
     }
@@ -93,7 +93,7 @@ impl OcrCoordinator {
         drop(providers);
 
         // Persist to disk
-        self.config.save("active_ocr_provider", &id.to_string())?;
+        self.config_store.save_active_ocr_provider(id)?;
 
         // Update memory only after successful persistence
         *active = Some(id.to_string());
@@ -140,7 +140,7 @@ impl OcrCoordinator {
     ///
     /// Skips if the provider ID is not registered.
     pub fn restore_from_config(&self) -> Result<()> {
-        if let Ok(active_id) = self.config.load::<String>("active_ocr_provider") {
+        if let Ok(active_id) = self.config_store.load_active_ocr_provider() {
             // Lock order: active_provider_id first (consistent with activate)
             let mut active = self.active_provider_id.lock().unwrap();
 

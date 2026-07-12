@@ -22,9 +22,13 @@ use crate::app_state::{
     AppState, CaptureRuntimeState, HistoryRuntime, ProviderRuntime, SelectionRuntime,
     SettingsRuntime,
 };
+use crate::application::hotkeys::HotkeyStore;
 use crate::application::providers::ocr::OcrProviderConfiguration;
-use crate::application::providers::TranslationPromptConfiguration;
+use crate::application::providers::{
+    ProviderConfigStore, ProviderCredentialStore, TranslationPromptConfiguration,
+};
 use crate::application::result_window::ResultWindowRuntime;
+use crate::application::settings::SettingsStore;
 use crate::infrastructure::events::EventBus;
 use crate::infrastructure::http::{HttpClient, ReqwestHttpClient};
 use crate::infrastructure::storage::{ConfigFile, Keychain};
@@ -36,10 +40,14 @@ use crate::{HotkeyConfiguration, HotkeyRuntime, SettingsConfiguration};
 
 pub(crate) fn build_app_state(config_path: PathBuf, app: AppHandle) -> AppState {
     let config_file = Arc::new(ConfigFile::new(config_path));
-    let settings_configuration = Arc::new(SettingsConfiguration::new(config_file.clone()));
-    let hotkey_configuration = Arc::new(HotkeyConfiguration::new(config_file.clone()));
+    let settings_store: Arc<dyn SettingsStore> = config_file.clone();
+    let hotkey_store: Arc<dyn HotkeyStore> = config_file.clone();
+    let provider_config_store: Arc<dyn ProviderConfigStore> = config_file.clone();
+    let settings_configuration = Arc::new(SettingsConfiguration::new(settings_store));
+    let hotkey_configuration = Arc::new(HotkeyConfiguration::new(hotkey_store));
     let hotkey_runtime = Arc::new(HotkeyRuntime::new(hotkey_configuration));
     let keychain = Arc::new(Keychain::new());
+    let provider_credential_store: Arc<dyn ProviderCredentialStore> = keychain.clone();
     let http_client: Arc<dyn HttpClient> = Arc::new(ReqwestHttpClient::new());
     let event_bus = Arc::new(EventBus::new());
 
@@ -47,28 +55,28 @@ pub(crate) fn build_app_state(config_path: PathBuf, app: AppHandle) -> AppState 
 
     let llm_introspection = build_llm_introspection(http_client.clone());
     let translation_coordinator = build_translation_coordinator(
-        config_file.clone(),
-        keychain.clone(),
+        provider_config_store.clone(),
         http_client.clone(),
         event_bus.clone(),
     );
     let provider_configuration = build_provider_configuration(
-        config_file.clone(),
-        keychain.clone(),
+        provider_config_store.clone(),
+        provider_credential_store.clone(),
         http_client.clone(),
         translation_coordinator.clone(),
         llm_introspection.clone(),
     );
-    let prompt_strategies = Arc::new(TranslationPromptConfiguration::new(config_file.clone()));
+    let prompt_strategies = Arc::new(TranslationPromptConfiguration::new(
+        provider_config_store.clone(),
+    ));
     let ocr_coordinator = build_ocr_coordinator(
-        config_file.clone(),
-        keychain.clone(),
+        provider_config_store.clone(),
         http_client.clone(),
         event_bus.clone(),
     );
     let ocr_configuration = Arc::new(OcrProviderConfiguration::new(
         ocr_coordinator.clone(),
-        keychain.clone(),
+        provider_credential_store.clone(),
     ));
 
     let capture_runtime = build_capture_runtime(app.clone(), ocr_coordinator.clone());
@@ -80,7 +88,7 @@ pub(crate) fn build_app_state(config_path: PathBuf, app: AppHandle) -> AppState 
     ));
 
     hydrate_provider_credentials_in_background(
-        keychain,
+        provider_credential_store,
         provider_configuration.clone(),
         ocr_coordinator.clone(),
     );
@@ -116,11 +124,11 @@ pub(crate) fn build_app_state(config_path: PathBuf, app: AppHandle) -> AppState 
 }
 
 fn hydrate_provider_credentials_in_background(
-    keychain: Arc<Keychain>,
+    credential_store: Arc<dyn ProviderCredentialStore>,
     provider_configuration: Arc<crate::application::providers::ProviderConfiguration>,
     ocr_coordinator: Arc<crate::application::providers::ocr::OcrCoordinator>,
 ) {
     tauri::async_runtime::spawn_blocking(move || {
-        hydrate_provider_credentials(provider_configuration, keychain, ocr_coordinator);
+        hydrate_provider_credentials(provider_configuration, credential_store, ocr_coordinator);
     });
 }

@@ -1,8 +1,8 @@
 use super::TranslationProvider;
+use crate::application::providers::ProviderConfigStore;
 use crate::domain::events::DomainEvent;
 use crate::domain::translation::{TranslationRequest, TranslationResult};
 use crate::infrastructure::events::EventBus;
-use crate::infrastructure::storage::ConfigFile;
 use crate::Result;
 use chrono::Utc;
 use parking_lot::RwLock;
@@ -25,19 +25,19 @@ pub struct TranslationCoordinator {
     /// List of active provider IDs (in order of activation)
     /// Wrapped in Arc<Mutex<>> for interior mutability
     active: Arc<Mutex<Vec<String>>>,
-    /// Configuration file for persisting active providers
-    config: Arc<ConfigFile>,
+    /// Configuration store for persisting active providers
+    config_store: Arc<dyn ProviderConfigStore>,
     /// Optional event bus for publishing domain events
     event_bus: Option<Arc<EventBus>>,
 }
 
 impl TranslationCoordinator {
-    /// Creates a new TranslationCoordinator with the given config.
-    pub fn new(config: Arc<ConfigFile>) -> Self {
+    /// Creates a new TranslationCoordinator with the given config store.
+    pub fn new(config_store: Arc<dyn ProviderConfigStore>) -> Self {
         Self {
             providers: Arc::new(RwLock::new(HashMap::new())),
             active: Arc::new(Mutex::new(Vec::new())),
-            config,
+            config_store,
             event_bus: None,
         }
     }
@@ -108,8 +108,8 @@ impl TranslationCoordinator {
                 .collect();
 
             // Persist first
-            self.config
-                .save("active_translation_providers", &new_active)?;
+            self.config_store
+                .save_active_translation_providers(&new_active)?;
 
             // Only modify memory after successful persistence
             *active = new_active;
@@ -154,8 +154,8 @@ impl TranslationCoordinator {
         };
 
         // Persist first
-        self.config
-            .save("active_translation_providers", &new_active)?;
+        self.config_store
+            .save_active_translation_providers(&new_active)?;
 
         // Only update memory after successful persistence
         *active = new_active;
@@ -196,8 +196,8 @@ impl TranslationCoordinator {
         }
 
         // Persist first
-        self.config
-            .save("active_translation_providers", &new_active)?;
+        self.config_store
+            .save_active_translation_providers(&new_active)?;
 
         // Only update memory after successful persistence
         *active = new_active;
@@ -235,8 +235,8 @@ impl TranslationCoordinator {
         }
 
         // Persist first
-        self.config
-            .save("active_translation_providers", &ordered_ids)?;
+        self.config_store
+            .save_active_translation_providers(&ordered_ids)?;
 
         // Only update memory after successful persistence
         *active = ordered_ids;
@@ -286,10 +286,7 @@ impl TranslationCoordinator {
     ///
     /// Skips any provider IDs that are not registered.
     pub fn restore_from_config(&self) -> Result<()> {
-        if let Ok(active_ids) = self
-            .config
-            .load::<Vec<String>>("active_translation_providers")
-        {
+        if let Ok(active_ids) = self.config_store.load_active_translation_providers() {
             let mut active = self.active.lock().unwrap();
             let providers = self.providers.read();
             active.clear();

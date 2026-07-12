@@ -11,10 +11,11 @@ use crate::application::providers::translation::{
     BaiduTranslateProvider, DeepLProvider, GoogleTranslateProvider as GoogleTranslateProviderV2,
     TranslationCoordinator,
 };
-use crate::application::providers::{LlmIntrospection, ProviderConfiguration};
+use crate::application::providers::{
+    LlmIntrospection, ProviderConfigStore, ProviderConfiguration, ProviderCredentialStore,
+};
 use crate::infrastructure::events::EventBus;
 use crate::infrastructure::http::HttpClient;
-use crate::infrastructure::storage::{ConfigFile, Keychain};
 use crate::infrastructure::system::ocr::get_tesseract_engine;
 #[cfg(target_os = "macos")]
 use crate::infrastructure::system::ocr::MacOSVisionOcrEngine;
@@ -24,8 +25,8 @@ pub(crate) fn build_llm_introspection(http_client: Arc<dyn HttpClient>) -> Arc<L
 }
 
 pub(crate) fn build_provider_configuration(
-    config_file: Arc<ConfigFile>,
-    keychain: Arc<Keychain>,
+    config_store: Arc<dyn ProviderConfigStore>,
+    credential_store: Arc<dyn ProviderCredentialStore>,
     http_client: Arc<dyn HttpClient>,
     translation_coordinator: Arc<
         crate::application::providers::translation::TranslationCoordinator,
@@ -33,8 +34,8 @@ pub(crate) fn build_provider_configuration(
     llm_introspection: Arc<LlmIntrospection>,
 ) -> Arc<ProviderConfiguration> {
     Arc::new(ProviderConfiguration::new(
-        config_file,
-        keychain,
+        config_store,
+        credential_store,
         http_client,
         translation_coordinator,
         llm_introspection,
@@ -42,12 +43,11 @@ pub(crate) fn build_provider_configuration(
 }
 
 pub(crate) fn build_translation_coordinator(
-    config_file: Arc<ConfigFile>,
-    _keychain: Arc<Keychain>,
+    config_store: Arc<dyn ProviderConfigStore>,
     http_client: Arc<dyn HttpClient>,
     event_bus: Arc<EventBus>,
 ) -> Arc<TranslationCoordinator> {
-    let translation_coordinator = TranslationCoordinator::new(config_file.clone());
+    let translation_coordinator = TranslationCoordinator::new(config_store);
 
     let google_provider = GoogleTranslateProviderV2::new(http_client.clone());
     if let Err(e) = translation_coordinator.register(google_provider) {
@@ -73,12 +73,11 @@ pub(crate) fn build_translation_coordinator(
 }
 
 pub(crate) fn build_ocr_coordinator(
-    config_file: Arc<ConfigFile>,
-    _keychain: Arc<Keychain>,
+    config_store: Arc<dyn ProviderConfigStore>,
     http_client: Arc<dyn HttpClient>,
     event_bus: Arc<EventBus>,
 ) -> Arc<OcrCoordinator> {
-    let ocr_coordinator = OcrCoordinator::new(config_file);
+    let ocr_coordinator = OcrCoordinator::new(config_store);
 
     let tesseract_provider = TesseractProvider::new(get_tesseract_engine());
     ocr_coordinator.register(tesseract_provider).ok();
@@ -99,35 +98,40 @@ pub(crate) fn build_ocr_coordinator(
 
 pub(crate) fn hydrate_provider_credentials(
     provider_configuration: Arc<ProviderConfiguration>,
-    keychain: Arc<Keychain>,
+    credential_store: Arc<dyn ProviderCredentialStore>,
     ocr_coordinator: Arc<OcrCoordinator>,
 ) {
     if let Err(e) = provider_configuration.hydrate_credentials() {
         log::warn!("Failed to hydrate translation provider credentials: {}", e);
     }
-    hydrate_ocr_provider_credentials(&ocr_coordinator, &keychain);
+    hydrate_ocr_provider_credentials(&ocr_coordinator, credential_store.as_ref());
 }
 
-fn hydrate_ocr_provider_credentials(ocr_coordinator: &OcrCoordinator, keychain: &Keychain) {
-    if let Some(credentials) = load_baidu_ocr_credentials(keychain) {
+fn hydrate_ocr_provider_credentials(
+    ocr_coordinator: &OcrCoordinator,
+    credential_store: &dyn ProviderCredentialStore,
+) {
+    if let Some(credentials) = load_baidu_ocr_credentials(credential_store) {
         if let Err(e) = ocr_coordinator.reconfigure_provider("baidu-ocr", &credentials) {
             log::warn!("Failed to hydrate Baidu OCR credentials: {}", e);
         }
     }
 }
 
-fn load_baidu_ocr_credentials(keychain: &Keychain) -> Option<HashMap<String, String>> {
-    keychain
+fn load_baidu_ocr_credentials(
+    credential_store: &dyn ProviderCredentialStore,
+) -> Option<HashMap<String, String>> {
+    credential_store
         .load_provider_credentials(
             "baidu-ocr",
             &["api_key".to_string(), "secret_key".to_string()],
         )
         .ok()
         .or_else(|| {
-            let api_key = keychain
+            let api_key = credential_store
                 .load_provider_credential("baidu_ocr_api_key")
                 .ok()?;
-            let secret_key = keychain
+            let secret_key = credential_store
                 .load_provider_credential("baidu_ocr_secret_key")
                 .ok()?;
             Some(HashMap::from([
@@ -141,6 +145,7 @@ fn load_baidu_ocr_credentials(keychain: &Keychain) -> Option<HashMap<String, Str
 mod tests {
     use super::*;
     use crate::infrastructure::http::HttpResponse;
+    use crate::infrastructure::storage::ConfigFile;
     use async_trait::async_trait;
     use std::collections::HashMap;
 
@@ -170,7 +175,6 @@ mod tests {
     fn build_ocr_coordinator_registers_system_ocr_provider_on_macos() {
         let coordinator = build_ocr_coordinator(
             Arc::new(ConfigFile::new_temp()),
-            Arc::new(Keychain::new()),
             Arc::new(StubHttpClient),
             Arc::new(EventBus::new()),
         );

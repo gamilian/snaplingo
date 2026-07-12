@@ -10,7 +10,7 @@ mod history_db_test;
 
 pub use config_file::ConfigFile;
 pub use history_db::{HistoryDatabase, HistoryEntry, OcrHistoryEntry, TranslationHistoryEntry};
-pub use keychain::{is_keychain_not_found, CredentialSnapshot, Keychain};
+pub use keychain::{is_keychain_not_found, Keychain};
 
 #[cfg(test)]
 pub use keychain::KeychainBackend;

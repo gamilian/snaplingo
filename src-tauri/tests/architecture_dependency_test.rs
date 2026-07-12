@@ -7,21 +7,9 @@ use syn::{
     Attribute, ExprBlock, Field, ForeignItem, ImplItem, Item, ItemUse, TraitItem, UseTree, Variant,
 };
 
-const CONFIGURATION_DEPENDENCIES: &[&str] = &[
-    "src/application/hotkeys/configuration.rs -> crate::infrastructure::storage::ConfigFile",
-    "src/application/providers/configuration.rs -> crate::infrastructure::storage::ConfigFile",
-    "src/application/providers/ocr/coordinator.rs -> crate::infrastructure::storage::ConfigFile",
-    "src/application/providers/translation/coordinator.rs -> crate::infrastructure::storage::ConfigFile",
-    "src/application/providers/translation/impls/llm.rs -> crate::infrastructure::storage::ConfigFile",
-    "src/application/providers/translation_prompt.rs -> crate::infrastructure::storage::ConfigFile",
-    "src/application/settings/configuration.rs -> crate::infrastructure::storage::ConfigFile",
-];
+const CONFIGURATION_DEPENDENCIES: &[&str] = &[];
 
-const CREDENTIAL_DEPENDENCIES: &[&str] = &[
-    "src/application/providers/configuration.rs -> crate::infrastructure::storage::Keychain",
-    "src/application/providers/configuration.rs -> crate::infrastructure::storage::is_keychain_not_found",
-    "src/application/providers/ocr/configuration.rs -> crate::infrastructure::storage::Keychain",
-];
+const CREDENTIAL_DEPENDENCIES: &[&str] = &[];
 
 const HTTP_LLM_DEPENDENCIES: &[&str] = &[
     "src/application/providers/configuration.rs -> crate::infrastructure::http::HttpClient",

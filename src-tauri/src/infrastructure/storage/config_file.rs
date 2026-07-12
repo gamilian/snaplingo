@@ -1,3 +1,10 @@
+use crate::application::hotkeys::HotkeyStore;
+use crate::application::providers::{
+    CustomTranslationProviderDef, ProviderConfigStore, TranslationPromptStrategyConfig,
+};
+use crate::application::settings::SettingsStore;
+use crate::domain::hotkey_config::HotkeySettingsSnapshot;
+use crate::domain::SettingsSnapshot;
 use crate::error::{AppError, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -99,6 +106,66 @@ impl ConfigFile {
     pub fn new_temp() -> Self {
         let temp_path = unique_temp_write_path(&std::env::temp_dir()).with_extension("json");
         Self::new(temp_path)
+    }
+}
+
+impl SettingsStore for ConfigFile {
+    fn load_settings(&self) -> Result<SettingsSnapshot> {
+        self.load("settings")
+    }
+
+    fn save_settings(&self, snapshot: &SettingsSnapshot) -> Result<()> {
+        self.save("settings", snapshot)
+    }
+}
+
+impl HotkeyStore for ConfigFile {
+    fn load_hotkeys(&self) -> Result<HotkeySettingsSnapshot> {
+        self.load("hotkeys")
+    }
+
+    fn save_hotkeys(&self, snapshot: &HotkeySettingsSnapshot) -> Result<()> {
+        self.save("hotkeys", snapshot)
+    }
+}
+
+impl ProviderConfigStore for ConfigFile {
+    fn load_custom_translation_providers(&self) -> Result<Vec<CustomTranslationProviderDef>> {
+        self.load("custom_translation_providers")
+    }
+
+    fn save_custom_translation_providers(
+        &self,
+        providers: &[CustomTranslationProviderDef],
+    ) -> Result<()> {
+        self.save("custom_translation_providers", &providers)
+    }
+
+    fn load_active_translation_providers(&self) -> Result<Vec<String>> {
+        self.load("active_translation_providers")
+    }
+
+    fn save_active_translation_providers(&self, provider_ids: &[String]) -> Result<()> {
+        self.save("active_translation_providers", &provider_ids)
+    }
+
+    fn load_active_ocr_provider(&self) -> Result<String> {
+        self.load("active_ocr_provider")
+    }
+
+    fn save_active_ocr_provider(&self, provider_id: &str) -> Result<()> {
+        self.save("active_ocr_provider", &provider_id.to_string())
+    }
+
+    fn load_translation_prompt_strategies(&self) -> Result<TranslationPromptStrategyConfig> {
+        self.load("translation_prompt_strategies")
+    }
+
+    fn save_translation_prompt_strategies(
+        &self,
+        config: &TranslationPromptStrategyConfig,
+    ) -> Result<()> {
+        self.save("translation_prompt_strategies", config)
     }
 }
 
