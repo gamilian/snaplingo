@@ -3,6 +3,7 @@ pub mod history;
 pub mod hotkeys;
 pub mod pinned_image;
 pub mod providers;
+pub mod result_window;
 pub mod selected_text;
 pub mod settings;
 
