@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
@@ -52,13 +54,14 @@ impl ResultWindowWindowPort for FakeResultWindow {
         *self.open_calls.lock().unwrap() += 1;
         self.opening_started.notify_one();
 
-        match self
+        let outcome = self
             .open_outcomes
             .lock()
             .unwrap()
             .pop_front()
-            .unwrap_or(WindowOpenOutcome::Succeeds)
-        {
+            .unwrap_or(WindowOpenOutcome::Succeeds);
+
+        match outcome {
             WindowOpenOutcome::Succeeds => Ok(()),
             WindowOpenOutcome::Fails(message) => Err(message.into()),
             WindowOpenOutcome::BlocksThenFails(message) => {
