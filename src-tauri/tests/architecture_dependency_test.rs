@@ -181,7 +181,10 @@ fn expand_use_tree(tree: &UseTree, mut prefix: Vec<String>, output: &mut BTreeSe
 
 fn record_dependency(path: Vec<String>, output: &mut BTreeSet<String>) {
     if path.get(0).map(String::as_str) == Some("crate")
-        && path.get(1).map(String::as_str) == Some("infrastructure")
+        && matches!(
+            path.get(1).map(String::as_str),
+            Some("infrastructure") | Some("startup_shortcuts")
+        )
     {
         output.insert(path.join("::"));
     }
@@ -199,7 +202,21 @@ fn has_cfg_test(attributes: &[Attribute]) -> bool {
 #[test]
 fn application_production_sources_do_not_import_infrastructure() {
     assert_eq!(
-        dependency_inventory(&production_application_sources()),
+        dependency_inventory(&production_application_sources())
+            .into_iter()
+            .filter(|dependency| dependency.contains(" -> crate::infrastructure"))
+            .collect::<BTreeSet<_>>(),
+        BTreeSet::<String>::new()
+    );
+}
+
+#[test]
+fn application_production_sources_do_not_import_root_adapters() {
+    assert_eq!(
+        dependency_inventory(&production_application_sources())
+            .into_iter()
+            .filter(|dependency| dependency.contains(" -> crate::startup_shortcuts"))
+            .collect::<BTreeSet<_>>(),
         BTreeSet::<String>::new()
     );
 }

@@ -1,5 +1,7 @@
+use crate::application::hotkeys::{HotkeyRegistrar, HotkeyRegistration, HotkeyTriggerTiming};
 use crate::error::{AppError, Result};
 use std::str::FromStr;
+use std::sync::Arc;
 use tauri::AppHandle;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
@@ -7,6 +9,46 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 pub enum ShortcutTriggerTiming {
     Pressed,
     Released,
+}
+
+pub(crate) struct TauriHotkeyRegistrar {
+    app: AppHandle,
+    trigger: Arc<dyn Fn(AppHandle, String, String) + Send + Sync>,
+}
+
+impl TauriHotkeyRegistrar {
+    pub(crate) fn new(
+        app: AppHandle,
+        trigger: impl Fn(AppHandle, String, String) + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            app,
+            trigger: Arc::new(trigger),
+        }
+    }
+}
+
+impl HotkeyRegistrar for TauriHotkeyRegistrar {
+    fn register(&self, registration: HotkeyRegistration) -> Result<()> {
+        let category = registration.category.clone();
+        let action = registration.action.clone();
+        let app = self.app.clone();
+        let trigger = self.trigger.clone();
+        let handler = move || trigger(app.clone(), category.clone(), action.clone());
+
+        match registration.timing {
+            HotkeyTriggerTiming::Pressed => {
+                register_shortcut(&self.app, &registration.accelerator, handler)
+            }
+            HotkeyTriggerTiming::Released => {
+                register_shortcut_on_release(&self.app, &registration.accelerator, handler)
+            }
+        }
+    }
+
+    fn unregister(&self, accelerator: &str) -> Result<()> {
+        unregister_shortcut(&self.app, accelerator)
+    }
 }
 
 /// Register a global shortcut

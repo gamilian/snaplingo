@@ -34,7 +34,10 @@ pub fn configure_hotkey(
         .settings
         .hotkeys
         .update_hotkey_with(
-            &crate::startup_shortcuts::TauriHotkeyRegistrar::new(app),
+            &crate::infrastructure::system::TauriHotkeyRegistrar::new(
+                app,
+                crate::startup_shortcuts::trigger_hotkey_action,
+            ),
             category,
             action,
             hotkey,
@@ -54,7 +57,10 @@ pub fn configure_translation_hotkey(
         .settings
         .hotkeys
         .update_hotkey_with(
-            &crate::startup_shortcuts::TauriHotkeyRegistrar::new(app),
+            &crate::infrastructure::system::TauriHotkeyRegistrar::new(
+                app,
+                crate::startup_shortcuts::trigger_hotkey_action,
+            ),
             "translation".to_string(),
             action,
             hotkey,

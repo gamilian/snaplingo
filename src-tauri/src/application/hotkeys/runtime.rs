@@ -4,10 +4,13 @@ use std::sync::{Arc, Mutex};
 use serde::Serialize;
 
 use crate::application::hotkeys::configuration::HotkeyConfiguration;
+use crate::application::hotkeys::{
+    display_hotkey_to_accelerator, should_register_hotkey_on_release,
+};
 use crate::domain::hotkey_config::{
     hotkey_category, validate_hotkey_action, HotkeySettingsSnapshot, DEFAULT_HOTKEYS,
 };
-use crate::{startup_shortcuts, Result};
+use crate::Result;
 
 pub struct HotkeyRuntime {
     configuration: Arc<HotkeyConfiguration>,
@@ -185,7 +188,7 @@ fn resolve_hotkey_accelerator(
     hotkey: &str,
 ) -> Result<Option<String>> {
     validate_hotkey_action(category, action)?;
-    startup_shortcuts::display_hotkey_to_accelerator(hotkey)
+    display_hotkey_to_accelerator(hotkey)
 }
 
 fn register_hotkey_action(
@@ -235,7 +238,7 @@ fn rollback_registration_change(
 }
 
 fn hotkey_trigger_timing(category: &str, action: &str) -> HotkeyTriggerTiming {
-    if startup_shortcuts::should_register_hotkey_on_release(category, action) {
+    if should_register_hotkey_on_release(category, action) {
         HotkeyTriggerTiming::Released
     } else {
         HotkeyTriggerTiming::Pressed

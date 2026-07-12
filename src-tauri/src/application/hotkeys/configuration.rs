@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use serde::Deserialize;
 
-use crate::application::hotkeys::HotkeyStore;
+use crate::application::hotkeys::{display_hotkey_to_accelerator, HotkeyStore};
 use crate::domain::hotkey_config::{
     default_hotkey_snapshot, hotkey_category_mut, validate_hotkey_action, HotkeySettingsSnapshot,
 };
@@ -55,7 +55,7 @@ impl HotkeyConfiguration {
         hotkey: &str,
     ) -> Result<HotkeySettingsSnapshot> {
         validate_hotkey_action(category, action)?;
-        crate::startup_shortcuts::display_hotkey_to_accelerator(hotkey)?;
+        display_hotkey_to_accelerator(hotkey)?;
 
         let mut snapshot = self.snapshot()?;
         hotkey_category_mut(&mut snapshot, category)?
@@ -148,7 +148,7 @@ fn merge_saved_category(
 
 fn validate_saved_hotkey(category: &str, action: &str, hotkey: &str) -> Result<()> {
     validate_hotkey_action(category, action)?;
-    crate::startup_shortcuts::display_hotkey_to_accelerator(hotkey)?;
+    display_hotkey_to_accelerator(hotkey)?;
     Ok(())
 }
 

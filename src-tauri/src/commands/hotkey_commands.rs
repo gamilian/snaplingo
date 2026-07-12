@@ -4,7 +4,7 @@ use tauri::State;
 use crate::application::hotkeys::runtime::HotkeyRegistrar;
 use crate::application::HotkeyRuntime;
 use crate::domain::HotkeySettingsSnapshot;
-use crate::startup_shortcuts::TauriHotkeyRegistrar;
+use crate::infrastructure::system::TauriHotkeyRegistrar;
 use crate::HotkeyUpdateOutcome;
 
 #[tauri::command]
@@ -25,7 +25,12 @@ pub fn update_hotkey(
     state
         .settings
         .hotkeys
-        .update_hotkey_with(&TauriHotkeyRegistrar::new(app), category, action, hotkey)
+        .update_hotkey_with(
+            &TauriHotkeyRegistrar::new(app, crate::startup_shortcuts::trigger_hotkey_action),
+            category,
+            action,
+            hotkey,
+        )
         .map_err(|err| err.to_string())
 }
 
