@@ -47,10 +47,11 @@ Infrastructure Layer (基础设施层)
 - `src-tauri/src/startup_shortcuts.rs` 是 Hotkey category/action binding、display parser 和 pressed/released timing adapter。
 - 两个 adapter 都调用同一个 `dispatch_app_action` interface。
 - `src-tauri/src/application/settings/configuration.rs` 是 Settings Configuration module，拥有 durable settings 默认值、路径归一化、section 更新和 legacy migration。
-- `src-tauri/src/application/selected_text/mod.rs` 是 Selected Text acquisition workflow，拥有取词方法顺序和诊断；平台取词 mechanics 留在 `infrastructure/system/selection/*`。
+- `src-tauri/src/application/selected_text/mod.rs` 是 Selected Text acquisition workflow，拥有 method ports、method lookup、取词方法顺序和诊断；平台取词 mechanics 留在 `infrastructure/system/selection/*`。
 - `application/capture/runtime.rs` 是 Capture Session Runtime，统一编排截图输出和 OCR；render/output 细节在 `capture/render.rs` helper module 中以显式输入运行。
 - `application/capture/source.rs` 是 Capture Session 拥有的 inward source port；portable snapshot/layout/cursor/window candidate types 位于 `domain/capture.rs`，三个 screenshot platform adapters 只实现该 port。
 - `application/providers/ocr/tesseract_engine.rs` 是 Tesseract Provider-facing port；语言策略留在 Provider，executable/process/native mechanics 位于 `infrastructure/system/ocr/tesseract.rs`。
+- `application/providers/ocr/system_engine.rs` 是 System OCR Provider-facing port；macOS Vision adapter 只由 Composition 条件注册。
 - `application/pinned_image/runtime.rs` 是 Pinned Image Runtime，统一编排 state、image output 和 window effects；Commands 不直接调用 `pinned_window` adapter。
 - `src/components/ScreenshotSession/captureInteractionRuntime.ts` 是前端 Capture Interaction Runtime，负责纯 effect-plan 决策。
 - `src/components/ScreenshotSession/useCaptureWorkspace*Controller.ts` 是前端 Capture Workspace controller seam：composition、host、editor、input 四个 hook 分别拥有状态组合、host workflow、编辑事务和输入分发。
@@ -279,8 +280,8 @@ providers/ocr/
 
 **Selected Text acquisition 边界：**
 - `SelectedTextAcquirer` 拥有取词方法顺序、成功短路和失败诊断格式
-- `SelectionMethodRegistry` 只按 `SelectionMethodKind` 找 method，不做 workflow 决策
-- macOS/Windows/Linux method 实现留在 `infrastructure/system/selection/*`
+- `application/selected_text/method.rs` 定义 inward method/context/platform provider ports，Acquirer 自己持有 method lookup collection
+- macOS/Windows/Linux method 实现留在 `infrastructure/system/selection/*` 并实现这些 Application ports
 - Windows/Linux 目前通过 `ShortcutCopy` adapter 执行 `Ctrl+C` + clipboard transaction；macOS 仍保留 SelfWebview、Accessibility、BrowserScript、MenuCopy、ShortcutCopy 的原顺序
 
 ---
@@ -756,6 +757,7 @@ Backend Command → Backend Application ← Composition → Infrastructure adapt
 - Capture Session Runtime 已集中截图会话的 render/output/OCR 编排，render helper module 不再伪装成 `CaptureSessions` 扩展。
 - Capture Session portable contract 已由 `domain/capture.rs` 和 Application-owned `CaptureSessionSource` 持有；screenshot Infrastructure 仅实现平台 adapter。
 - Tesseract Provider 只拥有 OCR 语言策略和 Provider 语义；executable discovery、process/native mechanics 已收敛到 Infrastructure engine adapter。
+- System OCR Provider 拥有自己的 engine port；Composition 仅在 macOS Vision adapter 可用时条件注入。
 - Pinned Image Runtime 已集中 state transition、image output 和 window workflow；Commands 与 App Actions 不直接依赖 `pinned_window` adapter。
 - AppState 形状位于 `src-tauri/src/app_state.rs`，当前只暴露 `settings`、`providers`、`capture`、`history`、`selection` runtime slices；`lib.rs` 保留 Tauri builder/plugin setup、command 注册、启动模块调用和 lifecycle event wiring。
 - Application Composition 由 `src-tauri/src/composition.rs` assembly shell 和 `src-tauri/src/composition/*_runtime.rs` 构造策略 builders 组成。

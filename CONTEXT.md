@@ -264,8 +264,8 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 划词翻译中从当前前台应用获取用户选中文本的 workflow。
 
 **核心模块：**
-- `SelectedTextAcquirer`：Application 层 workflow，负责 method ordering、成功短路、失败诊断聚合
-- `SelectionMethodRegistry`：按 `SelectionMethodKind` 找到具体 method
+- `SelectedTextAcquirer`：Application 层 workflow，拥有按 `SelectionMethodKind` 查找的 method collection，负责 method ordering、成功短路、失败诊断聚合
+- `application/selected_text/method.rs`：Application-owned 的 method、context 和 platform provider ports
 - `infrastructure/system/selection/*`：平台 method mechanics，包括 macOS 专用方法以及 Windows/Linux `ShortcutCopy`
 
 **平台策略：**
@@ -276,7 +276,7 @@ Provider 激活状态自动保存到磁盘。Coordinator 模块内部处理持�
 **诊断规则：**
 - 所有失败最终仍返回一个字符串 error surface 给 `open_selection_translation_window_for_state(...)`
 - 诊断字符串包含尝试过的方法名，并区分 `unsupported`、`unavailable`、`failed` 和 empty text
-- 平台适配器负责产出平台原因，`SelectedTextAcquirer` 只负责排序和聚合
+- 平台适配器负责产出平台原因并实现 Application ports，`SelectedTextAcquirer` 负责排序、查找和聚合
 
 ### Capture Session（截图会话）
 一次截图从快捷键触发到输出完成或取消的完整生命周期。Capture Session 不是简单的截图 API 调用，而是 SnapLingo 截图链路的核心领域对象。
@@ -386,6 +386,9 @@ Provider 类型：
 
 ### Tesseract Engine Adapter（Tesseract 引擎适配器）
 `TesseractProvider` 拥有语言代码映射、默认语言策略和 OCR result 语义；`TesseractEngine` port 隔离系统 mechanics。
+
+### System OCR Engine Adapter（System OCR 引擎适配器）
+`SystemOcrProvider` 拥有 `SystemOcrEngine` port，Composition 仅在 macOS Vision adapter 可用时注册该 Provider。Vision 的 native framework 调用和语言 hint mechanics 留在 `infrastructure/system/ocr/macos.rs`。
 
 Infrastructure adapter 负责：
 - Tesseract executable discovery、`PATH` 和平台 fallback paths
