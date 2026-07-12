@@ -1,28 +1,140 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use super::{
-    ResultWindowClipboardPort, ResultWindowNotifierPort, ResultWindowOpenRequest,
+    ResultWindowClipboardPort, ResultWindowMode, ResultWindowNotifierPort, ResultWindowOpenRequest,
     ResultWindowPayload, ResultWindowWindowPort,
 };
 
-#[allow(dead_code)]
-pub(crate) struct ResultWindowRuntime;
+pub(crate) struct ResultWindowRuntime {
+    window: Arc<dyn ResultWindowWindowPort>,
+    clipboard: Arc<dyn ResultWindowClipboardPort>,
+    notifier: Arc<dyn ResultWindowNotifierPort>,
+    state: Mutex<ResultWindowState>,
+}
 
-#[allow(dead_code)]
+struct ResultWindowState {
+    latest_request_id: u64,
+    pending: Option<PendingResultWindowPayload>,
+}
+
+struct PendingResultWindowPayload {
+    request_id: u64,
+    payload: ResultWindowPayload,
+}
+
 impl ResultWindowRuntime {
     pub(crate) fn new(
-        _window: Arc<dyn ResultWindowWindowPort>,
-        _clipboard: Arc<dyn ResultWindowClipboardPort>,
-        _notifier: Arc<dyn ResultWindowNotifierPort>,
+        window: Arc<dyn ResultWindowWindowPort>,
+        clipboard: Arc<dyn ResultWindowClipboardPort>,
+        notifier: Arc<dyn ResultWindowNotifierPort>,
     ) -> Self {
-        unimplemented!("ResultWindowRuntime is introduced by the next task")
+        Self {
+            window,
+            clipboard,
+            notifier,
+            state: Mutex::new(ResultWindowState {
+                latest_request_id: 0,
+                pending: None,
+            }),
+        }
     }
 
-    pub(crate) async fn open(&self, _request: ResultWindowOpenRequest) -> crate::Result<()> {
-        unimplemented!("ResultWindowRuntime is introduced by the next task")
+    pub(crate) async fn open(&self, request: ResultWindowOpenRequest) -> crate::Result<()> {
+        let request_id = self.next_request_id()?;
+        let payload = self.payload_for(request).await;
+
+        if !self.store_if_current(request_id, payload)? {
+            return Ok(());
+        }
+
+        if let Err(error) = self.window.show_or_create().await {
+            self.remove_if_current(request_id)?;
+            return Err(error);
+        }
+
+        self.notifier.notify_payload_ready().await
     }
 
     pub(crate) fn take(&self) -> crate::Result<Option<ResultWindowPayload>> {
-        unimplemented!("ResultWindowRuntime is introduced by the next task")
+        let mut state = self.lock_state()?;
+        Ok(state.pending.take().map(|pending| pending.payload))
+    }
+
+    fn next_request_id(&self) -> crate::Result<u64> {
+        let mut state = self.lock_state()?;
+        state.latest_request_id = state
+            .latest_request_id
+            .checked_add(1)
+            .ok_or("Result window request ID exhausted")?;
+        Ok(state.latest_request_id)
+    }
+
+    async fn payload_for(&self, request: ResultWindowOpenRequest) -> ResultWindowPayload {
+        match request {
+            ResultWindowOpenRequest::Translation {
+                text,
+                auto_translate,
+            } => translation_payload(text, auto_translate),
+            ResultWindowOpenRequest::InputTranslation => {
+                let text = self.clipboard.read_text().await.unwrap_or_default();
+                translation_payload(text, true)
+            }
+            ResultWindowOpenRequest::Ocr {
+                text,
+                intent,
+                image_base64,
+            } => ResultWindowPayload {
+                mode: ResultWindowMode::Ocr,
+                text,
+                auto_translate: false,
+                ocr_intent: Some(intent),
+                image_base64,
+            },
+        }
+    }
+
+    fn store_if_current(
+        &self,
+        request_id: u64,
+        payload: ResultWindowPayload,
+    ) -> crate::Result<bool> {
+        let mut state = self.lock_state()?;
+        if state.latest_request_id != request_id {
+            return Ok(false);
+        }
+
+        state.pending = Some(PendingResultWindowPayload {
+            request_id,
+            payload,
+        });
+        Ok(true)
+    }
+
+    fn remove_if_current(&self, request_id: u64) -> crate::Result<()> {
+        let mut state = self.lock_state()?;
+        if state
+            .pending
+            .as_ref()
+            .is_some_and(|pending| pending.request_id == request_id)
+        {
+            state.pending = None;
+        }
+        Ok(())
+    }
+
+    fn lock_state(&self) -> crate::Result<std::sync::MutexGuard<'_, ResultWindowState>> {
+        self.state
+            .lock()
+            .map_err(|_| "Result window runtime lock poisoned".into())
+    }
+}
+
+fn translation_payload(text: String, auto_translate: bool) -> ResultWindowPayload {
+    ResultWindowPayload {
+        mode: ResultWindowMode::Translation,
+        text,
+        auto_translate,
+        ocr_intent: None,
+        image_base64: None,
     }
 }
