@@ -8,7 +8,9 @@ mod shortcut_copy;
 
 use crate::domain::{SelectionContext, SelectionMethodKind};
 
-use super::backend::{SelectionContextProvider, SelectionMethod, SystemSelectionProvider};
+use crate::application::selected_text::{
+    SelectionContextProvider, SelectionMethod, SystemSelectionProvider,
+};
 
 pub struct MacSelectionProvider {
     app: tauri::AppHandle,

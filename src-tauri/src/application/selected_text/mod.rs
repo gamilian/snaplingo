@@ -1,11 +1,15 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::domain::{
     MethodAvailability, SelectedTextSnapshot, SelectionAttemptStatus, SelectionContext,
     SelectionMethodKind,
 };
-use crate::infrastructure::system::selection::{SelectionContextProvider, SelectionMethodRegistry};
 use crate::{AppError, Result};
+
+mod method;
+
+pub use method::{SelectionContextProvider, SelectionMethod, SystemSelectionProvider};
 
 pub struct SelectionScheme {
     ordered_methods: Vec<SelectionMethodKind>,
@@ -19,19 +23,22 @@ impl SelectionScheme {
 
 pub struct SelectedTextAcquirer {
     scheme: SelectionScheme,
-    registry: SelectionMethodRegistry,
+    methods: HashMap<SelectionMethodKind, Box<dyn SelectionMethod>>,
     context_provider: Arc<dyn SelectionContextProvider>,
 }
 
 impl SelectedTextAcquirer {
     pub fn new(
         scheme: SelectionScheme,
-        registry: SelectionMethodRegistry,
+        methods: Vec<Box<dyn SelectionMethod>>,
         context_provider: Arc<dyn SelectionContextProvider>,
     ) -> Self {
         Self {
             scheme,
-            registry,
+            methods: methods
+                .into_iter()
+                .map(|method| (method.kind(), method))
+                .collect(),
             context_provider,
         }
     }
@@ -48,7 +55,7 @@ impl SelectedTextAcquirer {
         let mut diagnostics = Vec::new();
 
         for kind in &self.scheme.ordered_methods {
-            let Some(method) = self.registry.get(*kind) else {
+            let Some(method) = self.methods.get(kind).map(Box::as_ref) else {
                 diagnostics.push(format!("{kind:?}: not registered"));
                 continue;
             };
@@ -99,9 +106,6 @@ mod selected_text_acquirer_tests {
     use crate::domain::{
         MethodAvailability, SelectionAttempt, SelectionContext, SelectionMethodKind,
         SelectionSource,
-    };
-    use crate::infrastructure::system::selection::{
-        SelectionContextProvider, SelectionMethod, SelectionMethodRegistry,
     };
     use async_trait::async_trait;
     use std::sync::{Arc, Mutex};
@@ -166,7 +170,7 @@ mod selected_text_acquirer_tests {
                 SelectionMethodKind::MenuCopy,
                 SelectionMethodKind::ShortcutCopy,
             ]),
-            SelectionMethodRegistry::new(vec![
+            vec![
                 Box::new(FakeMethod {
                     kind: SelectionMethodKind::Accessibility,
                     availability: MethodAvailability::Available,
@@ -191,7 +195,7 @@ mod selected_text_acquirer_tests {
                     ),
                     calls: calls.clone(),
                 }),
-            ]),
+            ],
             Arc::new(FakeContextProvider),
         );
 
@@ -218,7 +222,7 @@ mod selected_text_acquirer_tests {
                 SelectionMethodKind::BrowserScript,
                 SelectionMethodKind::MenuCopy,
             ]),
-            SelectionMethodRegistry::new(vec![
+            vec![
                 Box::new(FakeMethod {
                     kind: SelectionMethodKind::BrowserScript,
                     availability: MethodAvailability::Unavailable("not browser".to_string()),
@@ -237,7 +241,7 @@ mod selected_text_acquirer_tests {
                     ),
                     calls: calls.clone(),
                 }),
-            ]),
+            ],
             Arc::new(FakeContextProvider),
         );
 
@@ -258,7 +262,7 @@ mod selected_text_acquirer_tests {
                 SelectionMethodKind::Accessibility,
                 SelectionMethodKind::ShortcutCopy,
             ]),
-            SelectionMethodRegistry::new(vec![
+            vec![
                 Box::new(FakeMethod {
                     kind: SelectionMethodKind::Accessibility,
                     availability: MethodAvailability::Available,
@@ -274,7 +278,7 @@ mod selected_text_acquirer_tests {
                     ),
                     calls: calls.clone(),
                 }),
-            ]),
+            ],
             Arc::new(FakeContextProvider),
         );
 
@@ -300,7 +304,7 @@ mod selected_text_acquirer_tests {
                 SelectionMethodKind::Accessibility,
                 SelectionMethodKind::ShortcutCopy,
             ]),
-            SelectionMethodRegistry::new(vec![
+            vec![
                 Box::new(FakeMethod {
                     kind: SelectionMethodKind::Accessibility,
                     availability: MethodAvailability::Available,
@@ -313,7 +317,7 @@ mod selected_text_acquirer_tests {
                     result: SelectionAttemptStatusForTest::Empty,
                     calls: Arc::new(Mutex::new(Vec::new())),
                 }),
-            ]),
+            ],
             Arc::new(FakeContextProvider),
         );
 
@@ -338,7 +342,7 @@ mod selected_text_acquirer_tests {
                 SelectionMethodKind::BrowserScript,
                 SelectionMethodKind::ShortcutCopy,
             ]),
-            SelectionMethodRegistry::new(vec![
+            vec![
                 Box::new(FakeMethod {
                     kind: SelectionMethodKind::SelfWebview,
                     availability: MethodAvailability::Unsupported("requires macOS".to_string()),
@@ -362,7 +366,7 @@ mod selected_text_acquirer_tests {
                     result: SelectionAttemptStatusForTest::Failed("shortcut failed"),
                     calls: Arc::new(Mutex::new(Vec::new())),
                 }),
-            ]),
+            ],
             Arc::new(FakeContextProvider),
         );
 
@@ -391,7 +395,7 @@ mod selected_text_acquirer_tests {
                 SelectionMethodKind::MenuCopy,
                 SelectionMethodKind::ShortcutCopy,
             ]),
-            SelectionMethodRegistry::new(vec![
+            vec![
                 Box::new(FakeMethod {
                     kind: SelectionMethodKind::SelfWebview,
                     availability: MethodAvailability::Available,
@@ -425,7 +429,7 @@ mod selected_text_acquirer_tests {
                     ),
                     calls: calls.clone(),
                 }),
-            ]),
+            ],
             Arc::new(FakeContextProvider),
         );
 

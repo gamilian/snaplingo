@@ -12,5 +12,8 @@ pub use history::History;
 pub use hotkeys::{HotkeyConfiguration, HotkeyRuntime, HotkeyUpdateOutcome};
 pub use pinned_image::PinnedImageRuntime;
 pub use providers::Provider;
-pub use selected_text::{SelectedTextAcquirer, SelectionScheme};
+pub use selected_text::{
+    SelectedTextAcquirer, SelectionContextProvider, SelectionMethod, SelectionScheme,
+    SystemSelectionProvider,
+};
 pub use settings::SettingsConfiguration;

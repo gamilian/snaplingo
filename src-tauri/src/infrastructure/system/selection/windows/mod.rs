@@ -2,7 +2,9 @@ mod shortcut_copy;
 
 use crate::domain::{SelectionContext, SelectionMethodKind};
 
-use super::backend::{SelectionContextProvider, SelectionMethod, SystemSelectionProvider};
+use crate::application::selected_text::{
+    SelectionContextProvider, SelectionMethod, SystemSelectionProvider,
+};
 
 pub struct PlatformSelectionProvider;
 
@@ -30,9 +32,9 @@ pub fn platform_selection_provider(
 }
 
 #[cfg(test)]
-mod selection_registry_tests {
+mod selection_provider_tests {
     use super::*;
-    use crate::infrastructure::system::selection::backend::SystemSelectionProvider;
+    use crate::application::selected_text::SystemSelectionProvider;
 
     mod windows {
         mod shortcut_copy {

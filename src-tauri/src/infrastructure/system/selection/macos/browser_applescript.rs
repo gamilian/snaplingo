@@ -2,10 +2,10 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 
+use crate::application::selected_text::SelectionMethod;
 use crate::domain::{
     MethodAvailability, SelectionAttempt, SelectionContext, SelectionMethodKind, SelectionSource,
 };
-use crate::infrastructure::system::selection::SelectionMethod;
 
 const APPLESCRIPT_TIMEOUT: Duration = Duration::from_millis(300);
 const SAFARI: &str = "com.apple.Safari";

@@ -46,8 +46,6 @@ const LEGACY_DEPENDENCIES: &[&str] = &[
     "src/application/providers/ocr/coordinator.rs -> crate::infrastructure::events::EventBus",
     "src/application/providers/ocr/coordinator.rs -> crate::infrastructure::storage::ConfigFile",
     "src/application/providers/ocr/impls/baidu_ocr.rs -> crate::infrastructure::http::HttpClient",
-    "src/application/providers/ocr/impls/system_ocr.rs -> crate::infrastructure::system::ocr::SystemOcrEngine",
-    "src/application/providers/ocr/impls/system_ocr.rs -> crate::infrastructure::system::ocr::get_system_ocr_engine",
     "src/application/providers/translation/coordinator.rs -> crate::infrastructure::events::EventBus",
     "src/application/providers/translation/coordinator.rs -> crate::infrastructure::storage::ConfigFile",
     "src/application/providers/translation/impls/baidu.rs -> crate::infrastructure::http::HttpClient",
@@ -59,8 +57,6 @@ const LEGACY_DEPENDENCIES: &[&str] = &[
     "src/application/providers/translation/impls/llm.rs -> crate::infrastructure::llm::ReasoningLevel",
     "src/application/providers/translation/impls/llm.rs -> crate::infrastructure::storage::ConfigFile",
     "src/application/providers/translation_prompt.rs -> crate::infrastructure::storage::ConfigFile",
-    "src/application/selected_text/mod.rs -> crate::infrastructure::system::selection::SelectionContextProvider",
-    "src/application/selected_text/mod.rs -> crate::infrastructure::system::selection::SelectionMethodRegistry",
     "src/application/settings/configuration.rs -> crate::infrastructure::storage::ConfigFile",
 ];
 

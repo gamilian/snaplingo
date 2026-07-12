@@ -7,10 +7,10 @@ use std::{
 
 use async_trait::async_trait;
 
+use crate::application::selected_text::SelectionMethod;
 use crate::domain::{
     MethodAvailability, SelectionAttempt, SelectionContext, SelectionMethodKind, SelectionSource,
 };
-use crate::infrastructure::system::selection::backend::SelectionMethod;
 use crate::infrastructure::system::selection::common::clipboard_transaction;
 
 const CLIPBOARD_TIMEOUT: Duration = Duration::from_millis(700);
@@ -190,7 +190,7 @@ mod linux {
         use super::super::{
             selection_attempt_from_shortcut_copy_result, ShortcutCopySelectionMethod,
         };
-        use crate::infrastructure::system::selection::backend::SelectionMethod;
+        use crate::application::selected_text::SelectionMethod;
 
         #[test]
         fn method_kind_is_shortcut_copy() {

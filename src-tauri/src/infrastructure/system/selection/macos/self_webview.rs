@@ -4,10 +4,10 @@ use std::time::Duration;
 use async_trait::async_trait;
 use tauri::Manager;
 
+use crate::application::selected_text::SelectionMethod;
 use crate::domain::{
     MethodAvailability, SelectionAttempt, SelectionContext, SelectionMethodKind, SelectionSource,
 };
-use crate::infrastructure::system::selection::SelectionMethod;
 use crate::settings_window::SETTINGS_WINDOW_LABEL;
 
 const EVAL_TIMEOUT: Duration = Duration::from_millis(300);

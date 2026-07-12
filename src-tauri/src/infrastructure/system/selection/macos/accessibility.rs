@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 
+use crate::application::selected_text::SelectionMethod;
 use crate::domain::{
     MethodAvailability, SelectionAttempt, SelectionContext, SelectionMethodKind, SelectionSource,
 };
-use crate::infrastructure::system::selection::SelectionMethod;
 
 pub struct AccessibilitySelectionMethod;
 

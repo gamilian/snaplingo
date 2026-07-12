@@ -2,11 +2,11 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 
+use crate::application::selected_text::SelectionMethod;
 use crate::domain::{
     MethodAvailability, SelectionAttempt, SelectionContext, SelectionMethodKind, SelectionSource,
 };
 use crate::infrastructure::system::selection::common::shortcut_copy::wait_for_shortcut_modifiers_to_clear_with;
-use crate::infrastructure::system::selection::SelectionMethod;
 
 const MODIFIER_RELEASE_TIMEOUT: Duration = Duration::from_millis(1500);
 const MODIFIER_POLL_INTERVAL: Duration = Duration::from_millis(15);

@@ -2,10 +2,8 @@ use std::sync::Arc;
 
 use tauri::AppHandle;
 
-use crate::application::{SelectedTextAcquirer, SelectionScheme};
-use crate::infrastructure::system::selection::{
-    platform_selection_provider, SelectionMethodRegistry, SystemSelectionProvider,
-};
+use crate::application::{SelectedTextAcquirer, SelectionScheme, SystemSelectionProvider};
+use crate::infrastructure::system::selection::platform_selection_provider;
 
 pub(crate) fn build_selected_text_acquirer(app: AppHandle) -> Arc<SelectedTextAcquirer> {
     let self_bundle_id = Some(app.config().identifier.clone());
@@ -14,7 +12,7 @@ pub(crate) fn build_selected_text_acquirer(app: AppHandle) -> Arc<SelectedTextAc
 
     Arc::new(SelectedTextAcquirer::new(
         selection_scheme,
-        SelectionMethodRegistry::new(selection_provider.methods()),
+        selection_provider.methods(),
         selection_provider,
     ))
 }

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+#[cfg(target_os = "macos")]
 use crate::application::providers::ocr::impls::SystemOcrProvider;
 use crate::application::providers::ocr::{
     impls::{BaiduOcrProvider, TesseractProvider},
