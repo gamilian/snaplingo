@@ -7,21 +7,23 @@ use syn::{
     Attribute, ExprBlock, Field, ForeignItem, ImplItem, Item, ItemUse, TraitItem, UseTree, Variant,
 };
 
-const LEGACY_DEPENDENCIES: &[&str] = &[
-    "src/application/capture/runtime.rs -> crate::infrastructure::system::capture_window::begin_capture_presentation",
-    "src/application/capture/runtime.rs -> crate::infrastructure::system::capture_window::capture_window_bounds",
-    "src/application/capture/runtime.rs -> crate::infrastructure::system::capture_window::destroy_inactive_capture_window",
-    "src/application/capture/runtime.rs -> crate::infrastructure::system::capture_window::end_capture_presentation",
-    "src/application/capture/runtime.rs -> crate::infrastructure::system::capture_window::hide_capture_window",
-    "src/application/capture/runtime.rs -> crate::infrastructure::system::capture_window::open_capture_window_for_session",
-    "src/application/capture/runtime.rs -> crate::infrastructure::system::capture_window::restore_capture_snapshot_windows",
-    "src/application/history/mod.rs -> crate::infrastructure::events::EventSubscriber",
-    "src/application/history/mod.rs -> crate::infrastructure::storage::HistoryDatabase",
-    "src/application/history/mod.rs -> crate::infrastructure::storage::HistoryEntry",
-    "src/application/history/mod.rs -> crate::infrastructure::storage::OcrHistoryEntry",
-    "src/application/history/mod.rs -> crate::infrastructure::storage::TranslationHistoryEntry",
+const CONFIGURATION_DEPENDENCIES: &[&str] = &[
     "src/application/hotkeys/configuration.rs -> crate::infrastructure::storage::ConfigFile",
-    "src/application/hotkeys/runtime.rs -> crate::infrastructure",
+    "src/application/providers/configuration.rs -> crate::infrastructure::storage::ConfigFile",
+    "src/application/providers/ocr/coordinator.rs -> crate::infrastructure::storage::ConfigFile",
+    "src/application/providers/translation/coordinator.rs -> crate::infrastructure::storage::ConfigFile",
+    "src/application/providers/translation/impls/llm.rs -> crate::infrastructure::storage::ConfigFile",
+    "src/application/providers/translation_prompt.rs -> crate::infrastructure::storage::ConfigFile",
+    "src/application/settings/configuration.rs -> crate::infrastructure::storage::ConfigFile",
+];
+
+const CREDENTIAL_DEPENDENCIES: &[&str] = &[
+    "src/application/providers/configuration.rs -> crate::infrastructure::storage::Keychain",
+    "src/application/providers/configuration.rs -> crate::infrastructure::storage::is_keychain_not_found",
+    "src/application/providers/ocr/configuration.rs -> crate::infrastructure::storage::Keychain",
+];
+
+const HTTP_LLM_DEPENDENCIES: &[&str] = &[
     "src/application/providers/configuration.rs -> crate::infrastructure::http::HttpClient",
     "src/application/providers/configuration.rs -> crate::infrastructure::llm::AnthropicLLMClient",
     "src/application/providers/configuration.rs -> crate::infrastructure::llm::GeminiLLMClient",
@@ -29,9 +31,6 @@ const LEGACY_DEPENDENCIES: &[&str] = &[
     "src/application/providers/configuration.rs -> crate::infrastructure::llm::LLMProtocol",
     "src/application/providers/configuration.rs -> crate::infrastructure::llm::OpenAILLMClient",
     "src/application/providers/configuration.rs -> crate::infrastructure::llm::ReasoningLevel",
-    "src/application/providers/configuration.rs -> crate::infrastructure::storage::ConfigFile",
-    "src/application/providers/configuration.rs -> crate::infrastructure::storage::Keychain",
-    "src/application/providers/configuration.rs -> crate::infrastructure::storage::is_keychain_not_found",
     "src/application/providers/llm_introspection.rs -> crate::infrastructure::http::HttpClient",
     "src/application/providers/llm_introspection.rs -> crate::infrastructure::llm::AnthropicLLMClient",
     "src/application/providers/llm_introspection.rs -> crate::infrastructure::llm::GeminiLLMClient",
@@ -42,12 +41,7 @@ const LEGACY_DEPENDENCIES: &[&str] = &[
     "src/application/providers/llm_introspection.rs -> crate::infrastructure::llm::LlmModelLister",
     "src/application/providers/llm_introspection.rs -> crate::infrastructure::llm::ModelInfo",
     "src/application/providers/llm_introspection.rs -> crate::infrastructure::llm::OpenAILLMClient",
-    "src/application/providers/ocr/configuration.rs -> crate::infrastructure::storage::Keychain",
-    "src/application/providers/ocr/coordinator.rs -> crate::infrastructure::events::EventBus",
-    "src/application/providers/ocr/coordinator.rs -> crate::infrastructure::storage::ConfigFile",
     "src/application/providers/ocr/impls/baidu_ocr.rs -> crate::infrastructure::http::HttpClient",
-    "src/application/providers/translation/coordinator.rs -> crate::infrastructure::events::EventBus",
-    "src/application/providers/translation/coordinator.rs -> crate::infrastructure::storage::ConfigFile",
     "src/application/providers/translation/impls/baidu.rs -> crate::infrastructure::http::HttpClient",
     "src/application/providers/translation/impls/deepl.rs -> crate::infrastructure::http::HttpClient",
     "src/application/providers/translation/impls/google.rs -> crate::infrastructure::http::HttpClient",
@@ -55,9 +49,27 @@ const LEGACY_DEPENDENCIES: &[&str] = &[
     "src/application/providers/translation/impls/llm.rs -> crate::infrastructure::llm::LLMOptions",
     "src/application/providers/translation/impls/llm.rs -> crate::infrastructure::llm::LLMRequest",
     "src/application/providers/translation/impls/llm.rs -> crate::infrastructure::llm::ReasoningLevel",
-    "src/application/providers/translation/impls/llm.rs -> crate::infrastructure::storage::ConfigFile",
-    "src/application/providers/translation_prompt.rs -> crate::infrastructure::storage::ConfigFile",
-    "src/application/settings/configuration.rs -> crate::infrastructure::storage::ConfigFile",
+];
+
+const EVENTS_HISTORY_DEPENDENCIES: &[&str] = &[
+    "src/application/history/mod.rs -> crate::infrastructure::events::EventSubscriber",
+    "src/application/history/mod.rs -> crate::infrastructure::storage::HistoryDatabase",
+    "src/application/history/mod.rs -> crate::infrastructure::storage::HistoryEntry",
+    "src/application/history/mod.rs -> crate::infrastructure::storage::OcrHistoryEntry",
+    "src/application/history/mod.rs -> crate::infrastructure::storage::TranslationHistoryEntry",
+    "src/application/providers/ocr/coordinator.rs -> crate::infrastructure::events::EventBus",
+    "src/application/providers/translation/coordinator.rs -> crate::infrastructure::events::EventBus",
+];
+
+const RUNTIME_HOST_DEPENDENCIES: &[&str] = &[
+    "src/application/capture/runtime.rs -> crate::infrastructure::system::capture_window::begin_capture_presentation",
+    "src/application/capture/runtime.rs -> crate::infrastructure::system::capture_window::capture_window_bounds",
+    "src/application/capture/runtime.rs -> crate::infrastructure::system::capture_window::destroy_inactive_capture_window",
+    "src/application/capture/runtime.rs -> crate::infrastructure::system::capture_window::end_capture_presentation",
+    "src/application/capture/runtime.rs -> crate::infrastructure::system::capture_window::hide_capture_window",
+    "src/application/capture/runtime.rs -> crate::infrastructure::system::capture_window::open_capture_window_for_session",
+    "src/application/capture/runtime.rs -> crate::infrastructure::system::capture_window::restore_capture_snapshot_windows",
+    "src/application/hotkeys/runtime.rs -> crate::infrastructure",
 ];
 
 #[derive(Clone)]
@@ -191,7 +203,13 @@ fn dependency_inventory_violations(
     files: &[SourceFile],
     allowlist: &BTreeSet<String>,
 ) -> Vec<String> {
-    let actual = files
+    let actual = dependency_inventory(files);
+
+    actual.symmetric_difference(allowlist).cloned().collect()
+}
+
+fn dependency_inventory(files: &[SourceFile]) -> BTreeSet<String> {
+    files
         .iter()
         .flat_map(|file| {
             let syntax = syn::parse_file(&file.source)
@@ -204,9 +222,7 @@ fn dependency_inventory_violations(
                 .map(|dependency| format!("{} -> {dependency}", file.path))
                 .collect::<Vec<_>>()
         })
-        .collect::<BTreeSet<_>>();
-
-    actual.symmetric_difference(allowlist).cloned().collect()
+        .collect::<BTreeSet<_>>()
 }
 
 fn expand_use_tree(tree: &UseTree, mut prefix: Vec<String>, output: &mut BTreeSet<String>) {
@@ -255,10 +271,35 @@ fn has_cfg_test(attributes: &[Attribute]) -> bool {
 }
 
 fn legacy_allowlist() -> BTreeSet<String> {
-    LEGACY_DEPENDENCIES
-        .iter()
+    legacy_dependency_groups()
+        .into_iter()
+        .flat_map(|(_, dependencies)| dependencies.iter())
         .map(|entry| (*entry).to_string())
         .collect()
+}
+
+fn legacy_dependency_groups() -> [(&'static str, &'static [&'static str]); 5] {
+    [
+        ("configuration", CONFIGURATION_DEPENDENCIES),
+        ("credentials", CREDENTIAL_DEPENDENCIES),
+        ("http_llm", HTTP_LLM_DEPENDENCIES),
+        ("events_history", EVENTS_HISTORY_DEPENDENCIES),
+        ("runtime_host", RUNTIME_HOST_DEPENDENCIES),
+    ]
+}
+
+fn assert_dependency_group_inventory(group_name: &str, expected_dependencies: &[&str]) {
+    let actual = dependency_inventory(&production_application_sources());
+    let stale_entries = expected_dependencies
+        .iter()
+        .filter(|dependency| !actual.contains(**dependency))
+        .copied()
+        .collect::<Vec<_>>();
+
+    assert!(
+        stale_entries.is_empty(),
+        "{group_name} dependency inventory is stale; missing dependencies: {stale_entries:#?}"
+    );
 }
 
 #[test]
@@ -267,6 +308,50 @@ fn application_infrastructure_dependencies_match_the_legacy_inventory() {
         dependency_inventory_violations(&production_application_sources(), &legacy_allowlist()),
         Vec::<String>::new()
     );
+}
+
+#[test]
+fn remaining_configuration_dependencies_are_inventoried() {
+    assert_dependency_group_inventory("configuration", CONFIGURATION_DEPENDENCIES);
+}
+
+#[test]
+fn remaining_credential_dependencies_are_inventoried() {
+    assert_dependency_group_inventory("credentials", CREDENTIAL_DEPENDENCIES);
+}
+
+#[test]
+fn remaining_http_llm_dependencies_are_inventoried() {
+    assert_dependency_group_inventory("http_llm", HTTP_LLM_DEPENDENCIES);
+}
+
+#[test]
+fn remaining_events_history_dependencies_are_inventoried() {
+    assert_dependency_group_inventory("events_history", EVENTS_HISTORY_DEPENDENCIES);
+}
+
+#[test]
+fn remaining_runtime_host_dependencies_are_inventoried() {
+    assert_dependency_group_inventory("runtime_host", RUNTIME_HOST_DEPENDENCIES);
+}
+
+#[test]
+fn dependency_groups_partition_the_legacy_inventory() {
+    let grouped_inventory = legacy_dependency_groups()
+        .into_iter()
+        .flat_map(|(_, dependencies)| dependencies.iter())
+        .collect::<Vec<_>>();
+    let grouped_set = grouped_inventory
+        .iter()
+        .map(|dependency| (**dependency).to_string())
+        .collect::<BTreeSet<_>>();
+
+    assert_eq!(
+        grouped_inventory.len(),
+        grouped_set.len(),
+        "legacy dependency groups must not contain duplicate entries"
+    );
+    assert_eq!(grouped_set, legacy_allowlist());
 }
 
 #[test]
