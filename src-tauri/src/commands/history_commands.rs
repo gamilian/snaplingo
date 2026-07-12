@@ -1,4 +1,4 @@
-use crate::infrastructure::storage::{HistoryEntry, OcrHistoryEntry, TranslationHistoryEntry};
+use crate::application::history::{HistoryEntry, OcrHistoryEntry, TranslationHistoryEntry};
 use crate::AppState;
 use tauri::State;
 

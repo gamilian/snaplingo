@@ -1,23 +1,9 @@
+use crate::application::history::EventSubscriber;
+use crate::application::providers::ProviderEventSink;
 use crate::domain::events::DomainEvent;
-use async_trait::async_trait;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-
-/// Trait for event subscribers.
-///
-/// Implementations receive domain events and can react accordingly.
-/// Subscribers should not panic - any errors should be handled internally.
-#[async_trait]
-pub trait EventSubscriber: Send + Sync {
-    /// Handle a domain event
-    async fn handle(&self, event: &DomainEvent);
-
-    /// Optional: subscriber name for debugging
-    fn name(&self) -> &str {
-        "unnamed_subscriber"
-    }
-}
 
 /// Central event bus for domain events.
 ///
@@ -122,5 +108,11 @@ impl EventBus {
 impl Default for EventBus {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl ProviderEventSink for EventBus {
+    fn publish(&self, event: DomainEvent) {
+        EventBus::publish(self, event);
     }
 }

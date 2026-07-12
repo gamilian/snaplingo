@@ -13,8 +13,9 @@ use crate::application::providers::translation::{
 };
 use crate::application::providers::{
     HttpClient, LlmIntrospection, LlmRuntime, ProviderConfigStore, ProviderConfiguration,
-    ProviderCredentialStore,
+    ProviderCredentialStore, ProviderEventSink,
 };
+#[cfg(test)]
 use crate::infrastructure::events::EventBus;
 use crate::infrastructure::llm::InfrastructureLlmRuntime;
 use crate::infrastructure::system::ocr::get_tesseract_engine;
@@ -50,7 +51,7 @@ pub(crate) fn build_provider_configuration(
 pub(crate) fn build_translation_coordinator(
     config_store: Arc<dyn ProviderConfigStore>,
     http_client: Arc<dyn HttpClient>,
-    event_bus: Arc<EventBus>,
+    event_sink: Arc<dyn ProviderEventSink>,
 ) -> Arc<TranslationCoordinator> {
     let translation_coordinator = TranslationCoordinator::new(config_store);
 
@@ -74,13 +75,13 @@ pub(crate) fn build_translation_coordinator(
         log::warn!("Failed to restore active providers from config: {}", e);
     }
 
-    Arc::new(translation_coordinator.with_event_bus(event_bus))
+    Arc::new(translation_coordinator.with_event_sink(event_sink))
 }
 
 pub(crate) fn build_ocr_coordinator(
     config_store: Arc<dyn ProviderConfigStore>,
     http_client: Arc<dyn HttpClient>,
-    event_bus: Arc<EventBus>,
+    event_sink: Arc<dyn ProviderEventSink>,
 ) -> Arc<OcrCoordinator> {
     let ocr_coordinator = OcrCoordinator::new(config_store);
 
@@ -98,7 +99,7 @@ pub(crate) fn build_ocr_coordinator(
     ocr_coordinator.register(baidu_ocr_provider).ok();
     ocr_coordinator.restore_from_config().ok();
 
-    Arc::new(ocr_coordinator.with_event_bus(event_bus))
+    Arc::new(ocr_coordinator.with_event_sink(event_sink))
 }
 
 pub(crate) fn hydrate_provider_credentials(

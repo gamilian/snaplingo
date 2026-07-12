@@ -1,14 +1,16 @@
 use crate::domain::events::DomainEvent;
-use crate::infrastructure::events::EventSubscriber;
-use crate::infrastructure::storage::{
-    HistoryDatabase, HistoryEntry, OcrHistoryEntry, TranslationHistoryEntry,
-};
 use crate::Result;
 use async_trait::async_trait;
 use std::sync::Arc;
 
+mod event_source;
+mod repository;
+
 #[cfg(test)]
 mod tests;
+
+pub use event_source::EventSubscriber;
+pub use repository::{HistoryEntry, HistoryRepository, OcrHistoryEntry, TranslationHistoryEntry};
 
 /// Owns history recording, queries, and deletion.
 ///
@@ -16,13 +18,13 @@ mod tests;
 /// translation and OCR operations when they complete. It also provides
 /// query and management APIs for history records.
 pub struct History {
-    db: Arc<HistoryDatabase>,
+    repository: Arc<dyn HistoryRepository>,
 }
 
 impl History {
     /// Create a new History module.
-    pub fn new(db: Arc<HistoryDatabase>) -> Self {
-        Self { db }
+    pub fn new(repository: Arc<dyn HistoryRepository>) -> Self {
+        Self { repository }
     }
 
     /// Get translation history with pagination
@@ -31,7 +33,7 @@ impl History {
         limit: usize,
         offset: usize,
     ) -> Result<Vec<TranslationHistoryEntry>> {
-        self.db.query_translations(limit, offset).await
+        self.repository.query_translations(limit, offset).await
     }
 
     /// Get OCR history with pagination
@@ -40,22 +42,22 @@ impl History {
         limit: usize,
         offset: usize,
     ) -> Result<Vec<OcrHistoryEntry>> {
-        self.db.query_ocr(limit, offset).await
+        self.repository.query_ocr(limit, offset).await
     }
 
     /// Search history by query string
     pub async fn search_history(&self, query: &str) -> Result<Vec<HistoryEntry>> {
-        self.db.search(query).await
+        self.repository.search(query).await
     }
 
     /// Delete a history entry by ID
     pub async fn delete_history(&self, id: i64) -> Result<()> {
-        self.db.delete(id).await
+        self.repository.delete(id).await
     }
 
     /// Clear all history
     pub async fn clear_all_history(&self) -> Result<()> {
-        self.db.clear_all().await
+        self.repository.clear_all().await
     }
 }
 
@@ -71,7 +73,7 @@ impl EventSubscriber for History {
                 duration_ms,
             } => {
                 if let Err(e) = self
-                    .db
+                    .repository
                     .insert_translation(request, results, providers_used, *timestamp, *duration_ms)
                     .await
                 {
@@ -86,7 +88,7 @@ impl EventSubscriber for History {
                 duration_ms,
             } => {
                 if let Err(e) = self
-                    .db
+                    .repository
                     .insert_ocr(request, result, provider_used, *timestamp, *duration_ms)
                     .await
                 {

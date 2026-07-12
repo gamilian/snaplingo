@@ -2,6 +2,7 @@ pub mod common;
 mod config_store;
 pub mod configuration;
 mod credential_store;
+mod event_sink;
 mod http_transport;
 pub mod llm_introspection;
 mod llm_runtime;
@@ -18,6 +19,7 @@ pub use configuration::{
     ProviderConfiguration, UpdateCustomTranslationProviderInput,
 };
 pub(crate) use credential_store::{CredentialSnapshot, ProviderCredentialStore};
+pub use event_sink::ProviderEventSink;
 pub use http_transport::{HttpClient, HttpResponse};
 pub use llm_introspection::LlmIntrospection;
 pub use llm_runtime::{

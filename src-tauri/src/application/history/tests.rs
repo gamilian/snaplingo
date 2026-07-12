@@ -1,16 +1,15 @@
 #[cfg(test)]
 mod tests {
-    use crate::application::history::History;
+    use crate::application::history::{EventSubscriber, History, HistoryRepository};
     use crate::domain::events::DomainEvent;
     use crate::domain::ocr::{OcrRequest, OcrResult};
     use crate::domain::translation::{TranslationRequest, TranslationResult};
-    use crate::infrastructure::events::EventSubscriber;
     use crate::infrastructure::storage::HistoryDatabase;
     use chrono::Utc;
     use std::sync::Arc;
     use tempfile::NamedTempFile;
 
-    fn create_temp_db() -> Arc<HistoryDatabase> {
+    fn create_temp_db() -> Arc<dyn HistoryRepository> {
         let temp_file = NamedTempFile::new().unwrap();
         let path = temp_file.path().to_path_buf();
         std::mem::forget(temp_file);

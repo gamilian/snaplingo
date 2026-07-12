@@ -417,8 +417,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_coordinator_publishes_event_when_translation_completes() {
+        use crate::application::history::EventSubscriber;
         use crate::domain::events::DomainEvent;
-        use crate::infrastructure::events::{EventBus, EventSubscriber};
+        use crate::infrastructure::events::EventBus;
         use tokio::sync::Mutex as TokioMutex;
 
         // Mock subscriber to capture events

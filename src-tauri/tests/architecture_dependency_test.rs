@@ -13,15 +13,7 @@ const CREDENTIAL_DEPENDENCIES: &[&str] = &[];
 
 const HTTP_LLM_DEPENDENCIES: &[&str] = &[];
 
-const EVENTS_HISTORY_DEPENDENCIES: &[&str] = &[
-    "src/application/history/mod.rs -> crate::infrastructure::events::EventSubscriber",
-    "src/application/history/mod.rs -> crate::infrastructure::storage::HistoryDatabase",
-    "src/application/history/mod.rs -> crate::infrastructure::storage::HistoryEntry",
-    "src/application/history/mod.rs -> crate::infrastructure::storage::OcrHistoryEntry",
-    "src/application/history/mod.rs -> crate::infrastructure::storage::TranslationHistoryEntry",
-    "src/application/providers/ocr/coordinator.rs -> crate::infrastructure::events::EventBus",
-    "src/application/providers/translation/coordinator.rs -> crate::infrastructure::events::EventBus",
-];
+const EVENTS_HISTORY_DEPENDENCIES: &[&str] = &[];
 
 const RUNTIME_HOST_DEPENDENCIES: &[&str] = &[
     "src/application/capture/runtime.rs -> crate::infrastructure::system::capture_window::begin_capture_presentation",

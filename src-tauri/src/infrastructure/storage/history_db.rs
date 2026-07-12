@@ -1,6 +1,7 @@
 use crate::domain::ocr::{OcrRequest, OcrResult};
 use crate::domain::translation::{TranslationRequest, TranslationResult};
 use crate::Result;
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
@@ -349,5 +350,118 @@ impl HistoryDatabase {
         conn.execute("DELETE FROM ocr_history", [])?;
 
         Ok(())
+    }
+}
+
+impl From<TranslationHistoryEntry> for crate::application::history::TranslationHistoryEntry {
+    fn from(entry: TranslationHistoryEntry) -> Self {
+        Self {
+            id: entry.id,
+            timestamp: entry.timestamp,
+            source_text: entry.source_text,
+            source_lang: entry.source_lang,
+            target_lang: entry.target_lang,
+            providers_used: entry.providers_used,
+            results: entry.results,
+            duration_ms: entry.duration_ms,
+        }
+    }
+}
+
+impl From<OcrHistoryEntry> for crate::application::history::OcrHistoryEntry {
+    fn from(entry: OcrHistoryEntry) -> Self {
+        Self {
+            id: entry.id,
+            timestamp: entry.timestamp,
+            image_hash: entry.image_hash,
+            language: entry.language,
+            provider_used: entry.provider_used,
+            recognized_text: entry.recognized_text,
+            confidence: entry.confidence,
+            duration_ms: entry.duration_ms,
+        }
+    }
+}
+
+impl From<HistoryEntry> for crate::application::history::HistoryEntry {
+    fn from(entry: HistoryEntry) -> Self {
+        match entry {
+            HistoryEntry::Translation(entry) => {
+                crate::application::history::HistoryEntry::Translation(entry.into())
+            }
+            HistoryEntry::Ocr(entry) => {
+                crate::application::history::HistoryEntry::Ocr(entry.into())
+            }
+        }
+    }
+}
+
+#[async_trait]
+impl crate::application::history::HistoryRepository for HistoryDatabase {
+    async fn insert_translation(
+        &self,
+        request: &TranslationRequest,
+        results: &[TranslationResult],
+        providers_used: &[String],
+        timestamp: DateTime<Utc>,
+        duration_ms: u64,
+    ) -> Result<()> {
+        self.insert_translation(request, results, providers_used, timestamp, duration_ms)
+            .await
+    }
+
+    async fn insert_ocr(
+        &self,
+        request: &OcrRequest,
+        result: &OcrResult,
+        provider_used: &str,
+        timestamp: DateTime<Utc>,
+        duration_ms: u64,
+    ) -> Result<()> {
+        self.insert_ocr(request, result, provider_used, timestamp, duration_ms)
+            .await
+    }
+
+    async fn query_translations(
+        &self,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<crate::application::history::TranslationHistoryEntry>> {
+        Ok(self
+            .query_translations(limit, offset)
+            .await?
+            .into_iter()
+            .map(Into::into)
+            .collect())
+    }
+
+    async fn query_ocr(
+        &self,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<crate::application::history::OcrHistoryEntry>> {
+        Ok(self
+            .query_ocr(limit, offset)
+            .await?
+            .into_iter()
+            .map(Into::into)
+            .collect())
+    }
+
+    async fn search(&self, query: &str) -> Result<Vec<crate::application::history::HistoryEntry>> {
+        Ok(self
+            .search(query)
+            .await?
+            .into_iter()
+            .map(Into::into)
+            .collect())
+    }
+
+    async fn delete(&self, id: i64) -> Result<()> {
+        self.delete(id).await
+    }
+
+    async fn clear_all(&self) -> Result<()> {
+        self.clear_all().await
     }
 }

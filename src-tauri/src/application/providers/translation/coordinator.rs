@@ -1,8 +1,7 @@
 use super::TranslationProvider;
-use crate::application::providers::ProviderConfigStore;
+use crate::application::providers::{ProviderConfigStore, ProviderEventSink};
 use crate::domain::events::DomainEvent;
 use crate::domain::translation::{TranslationRequest, TranslationResult};
-use crate::infrastructure::events::EventBus;
 use crate::Result;
 use chrono::Utc;
 use parking_lot::RwLock;
@@ -27,8 +26,8 @@ pub struct TranslationCoordinator {
     active: Arc<Mutex<Vec<String>>>,
     /// Configuration store for persisting active providers
     config_store: Arc<dyn ProviderConfigStore>,
-    /// Optional event bus for publishing domain events
-    event_bus: Option<Arc<EventBus>>,
+    /// Optional event sink for publishing domain events
+    event_sink: Option<Arc<dyn ProviderEventSink>>,
 }
 
 impl TranslationCoordinator {
@@ -38,14 +37,19 @@ impl TranslationCoordinator {
             providers: Arc::new(RwLock::new(HashMap::new())),
             active: Arc::new(Mutex::new(Vec::new())),
             config_store,
-            event_bus: None,
+            event_sink: None,
         }
     }
 
-    /// Attach an event bus for publishing domain events
-    pub fn with_event_bus(mut self, event_bus: Arc<EventBus>) -> Self {
-        self.event_bus = Some(event_bus);
+    /// Attach an event sink for publishing domain events
+    pub fn with_event_sink(mut self, event_sink: Arc<dyn ProviderEventSink>) -> Self {
+        self.event_sink = Some(event_sink);
         self
+    }
+
+    /// Attach an event sink for publishing domain events.
+    pub fn with_event_bus(self, event_sink: Arc<dyn ProviderEventSink>) -> Self {
+        self.with_event_sink(event_sink)
     }
 
     /// Registers a new translation provider.
@@ -373,14 +377,14 @@ impl TranslationCoordinator {
             }
         }
 
-        // Publish domain event if event bus is attached
-        if let Some(event_bus) = &self.event_bus {
+        // Publish domain event if event sink is attached
+        if let Some(event_sink) = &self.event_sink {
             let providers_used: Vec<String> = active_providers
                 .iter()
                 .map(|p| p.read().id().to_string())
                 .collect();
 
-            event_bus.publish(DomainEvent::TranslationCompleted {
+            event_sink.publish(DomainEvent::TranslationCompleted {
                 request: request.clone(),
                 results: results.clone(),
                 providers_used,
@@ -436,8 +440,8 @@ impl TranslationCoordinator {
 
         // Publish event on failure
         if let Err(ref e) = result {
-            if let Some(event_bus) = &self.event_bus {
-                event_bus.publish(DomainEvent::ProviderConfigurationFailed {
+            if let Some(event_sink) = &self.event_sink {
+                event_sink.publish(DomainEvent::ProviderConfigurationFailed {
                     provider_id: provider_id.to_string(),
                     error_message: e.to_string(),
                     timestamp: Utc::now(),

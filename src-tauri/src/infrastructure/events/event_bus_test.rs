@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use super::super::{EventBus, EventSubscriber};
+    use super::super::EventBus;
+    use crate::application::history::EventSubscriber;
     use crate::domain::events::DomainEvent;
     use crate::domain::ocr::{OcrRequest, OcrResult};
     use crate::domain::translation::{TranslationRequest, TranslationResult};

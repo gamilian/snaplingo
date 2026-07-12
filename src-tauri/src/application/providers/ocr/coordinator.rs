@@ -1,8 +1,7 @@
 use super::OcrProvider;
-use crate::application::providers::ProviderConfigStore;
+use crate::application::providers::{ProviderConfigStore, ProviderEventSink};
 use crate::domain::events::DomainEvent;
 use crate::domain::ocr::{OcrRequest, OcrResult};
-use crate::infrastructure::events::EventBus;
 use crate::Result;
 use chrono::Utc;
 use parking_lot::RwLock;
@@ -29,8 +28,8 @@ pub struct OcrCoordinator {
     active_provider_id: Arc<Mutex<Option<String>>>,
     /// Configuration store for persisting active provider
     config_store: Arc<dyn ProviderConfigStore>,
-    /// Optional event bus for publishing domain events
-    event_bus: Option<Arc<EventBus>>,
+    /// Optional event sink for publishing domain events
+    event_sink: Option<Arc<dyn ProviderEventSink>>,
 }
 
 impl OcrCoordinator {
@@ -40,14 +39,19 @@ impl OcrCoordinator {
             providers: Mutex::new(HashMap::new()),
             active_provider_id: Arc::new(Mutex::new(None)),
             config_store,
-            event_bus: None,
+            event_sink: None,
         }
     }
 
-    /// Attach an event bus for publishing domain events
-    pub fn with_event_bus(mut self, event_bus: Arc<EventBus>) -> Self {
-        self.event_bus = Some(event_bus);
+    /// Attach an event sink for publishing domain events
+    pub fn with_event_sink(mut self, event_sink: Arc<dyn ProviderEventSink>) -> Self {
+        self.event_sink = Some(event_sink);
         self
+    }
+
+    /// Attach an event sink for publishing domain events.
+    pub fn with_event_bus(self, event_sink: Arc<dyn ProviderEventSink>) -> Self {
+        self.with_event_sink(event_sink)
     }
 
     /// Registers a new OCR provider.
@@ -188,9 +192,9 @@ impl OcrCoordinator {
             provider.recognize(request).await?
         };
 
-        // Publish domain event if event bus is attached
-        if let Some(event_bus) = &self.event_bus {
-            event_bus.publish(DomainEvent::OcrCompleted {
+        // Publish domain event if event sink is attached
+        if let Some(event_sink) = &self.event_sink {
+            event_sink.publish(DomainEvent::OcrCompleted {
                 request: request.clone(),
                 result: result.clone(),
                 provider_used: provider_id,
@@ -242,8 +246,8 @@ impl OcrCoordinator {
         };
 
         if let Err(ref e) = result {
-            if let Some(event_bus) = &self.event_bus {
-                event_bus.publish(DomainEvent::ProviderConfigurationFailed {
+            if let Some(event_sink) = &self.event_sink {
+                event_sink.publish(DomainEvent::ProviderConfigurationFailed {
                     provider_id: provider_id.to_string(),
                     error_message: e.to_string(),
                     timestamp: Utc::now(),
