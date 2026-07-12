@@ -52,6 +52,10 @@ impl ResultWindowRuntime {
             return Err(error);
         }
 
+        if !self.is_current(request_id)? {
+            return Ok(());
+        }
+
         self.notifier.notify_payload_ready().await
     }
 
@@ -66,6 +70,7 @@ impl ResultWindowRuntime {
             .latest_request_id
             .checked_add(1)
             .ok_or("Result window request ID exhausted")?;
+        state.pending = None;
         Ok(state.latest_request_id)
     }
 
@@ -120,6 +125,11 @@ impl ResultWindowRuntime {
             state.pending = None;
         }
         Ok(())
+    }
+
+    fn is_current(&self, request_id: u64) -> crate::Result<bool> {
+        let state = self.lock_state()?;
+        Ok(state.latest_request_id == request_id)
     }
 
     fn lock_state(&self) -> crate::Result<std::sync::MutexGuard<'_, ResultWindowState>> {

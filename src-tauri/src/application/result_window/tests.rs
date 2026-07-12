@@ -130,6 +130,39 @@ impl ResultWindowClipboardPort for FakeClipboard {
     }
 }
 
+struct BlockingClipboard {
+    text: String,
+    reading_started: Notify,
+    unblock_read: Notify,
+}
+
+impl BlockingClipboard {
+    fn new(text: &str) -> Self {
+        Self {
+            text: text.to_string(),
+            reading_started: Notify::new(),
+            unblock_read: Notify::new(),
+        }
+    }
+
+    async fn wait_until_reading_starts(&self) {
+        self.reading_started.notified().await;
+    }
+
+    fn unblock_read(&self) {
+        self.unblock_read.notify_one();
+    }
+}
+
+#[async_trait]
+impl ResultWindowClipboardPort for BlockingClipboard {
+    async fn read_text(&self) -> crate::Result<String> {
+        self.reading_started.notify_one();
+        self.unblock_read.notified().await;
+        Ok(self.text.clone())
+    }
+}
+
 struct FakePayloadNotifier {
     outcomes: Mutex<VecDeque<std::result::Result<(), String>>>,
     notifications: Mutex<usize>,
@@ -274,6 +307,39 @@ async fn input_translation_uses_empty_text_when_clipboard_read_fails() {
     assert_eq!(window.open_calls(), 1);
     assert_eq!(notifier.notifications(), 1);
     assert_eq!(runtime.take().unwrap(), Some(translation_payload("", true)));
+}
+
+#[tokio::test]
+async fn newer_input_translation_invalidates_an_older_pending_payload_while_clipboard_is_pending() {
+    let events = Arc::new(Mutex::new(Vec::new()));
+    let window = Arc::new(FakeResultWindow::new([], events.clone()));
+    let clipboard = Arc::new(BlockingClipboard::new("new clipboard text"));
+    let notifier = Arc::new(FakePayloadNotifier::new([], events));
+    let runtime = Arc::new(ResultWindowRuntime::new(
+        window,
+        clipboard.clone(),
+        notifier,
+    ));
+
+    runtime.open(translation_request("older")).await.unwrap();
+
+    let newer_runtime = runtime.clone();
+    let newer_open = tokio::spawn(async move {
+        newer_runtime
+            .open(ResultWindowOpenRequest::InputTranslation)
+            .await
+    });
+    clipboard.wait_until_reading_starts().await;
+
+    assert_eq!(runtime.take().unwrap(), None);
+
+    clipboard.unblock_read();
+    newer_open.await.unwrap().unwrap();
+
+    assert_eq!(
+        runtime.take().unwrap(),
+        Some(translation_payload("new clipboard text", true))
+    );
 }
 
 #[tokio::test]
@@ -432,5 +498,31 @@ async fn newer_request_survives_an_older_concurrent_open_failure() {
     assert_eq!(
         runtime.take().unwrap(),
         Some(translation_payload("same text", false))
+    );
+}
+
+#[tokio::test]
+async fn older_successful_open_does_not_notify_after_a_newer_request_starts() {
+    let (runtime, window, _clipboard, notifier) = make_runtime(
+        [
+            WindowOpenOutcome::BlocksThenSucceeds,
+            WindowOpenOutcome::Succeeds,
+        ],
+        [],
+    );
+    let older_runtime = runtime.clone();
+
+    let older_open =
+        tokio::spawn(async move { older_runtime.open(translation_request("older")).await });
+    window.wait_until_opening_starts().await;
+
+    runtime.open(translation_request("newer")).await.unwrap();
+    window.unblock_open();
+    older_open.await.unwrap().unwrap();
+
+    assert_eq!(notifier.notifications(), 1);
+    assert_eq!(
+        runtime.take().unwrap(),
+        Some(translation_payload("newer", false))
     );
 }
