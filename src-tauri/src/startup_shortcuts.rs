@@ -1,4 +1,5 @@
 use crate::app_actions::{dispatch_app_action, AppAction, CaptureLaunchMode};
+use crate::application::hotkeys::{HotkeyRegistrar, HotkeyRegistration, HotkeyTriggerTiming};
 use crate::domain::hotkey_config::{
     FILE_OCR_ACTION, INPUT_TRANSLATE_ACTION, OCR_CATEGORY, PIN_ACTION, PIN_SWITCH_GROUP_ACTION,
     PIN_TOGGLE_ALL_ACTION, SCREENSHOT_ACTION, SCREENSHOT_CATEGORY, SCREENSHOT_COPY_ACTION,
@@ -7,6 +8,42 @@ use crate::domain::hotkey_config::{
     SILENT_SCREENSHOT_OCR_ACTION, TRANSLATION_CATEGORY,
 };
 use crate::Result;
+
+pub(crate) struct TauriHotkeyRegistrar {
+    app: tauri::AppHandle,
+}
+
+impl TauriHotkeyRegistrar {
+    pub(crate) fn new(app: tauri::AppHandle) -> Self {
+        Self { app }
+    }
+}
+
+impl HotkeyRegistrar for TauriHotkeyRegistrar {
+    fn register(&self, registration: HotkeyRegistration) -> Result<()> {
+        let category = registration.category.clone();
+        let action = registration.action.clone();
+        let app = self.app.clone();
+
+        if registration.timing == HotkeyTriggerTiming::Released {
+            return crate::infrastructure::system::register_shortcut_on_release(
+                &self.app,
+                &registration.accelerator,
+                move || trigger_hotkey_action(app.clone(), category.clone(), action.clone()),
+            );
+        }
+
+        crate::infrastructure::system::register_shortcut(
+            &self.app,
+            &registration.accelerator,
+            move || trigger_hotkey_action(app.clone(), category.clone(), action.clone()),
+        )
+    }
+
+    fn unregister(&self, accelerator: &str) -> Result<()> {
+        crate::infrastructure::system::unregister_shortcut(&self.app, accelerator)
+    }
+}
 
 #[cfg(test)]
 fn resolve_hotkey_accelerator(

@@ -7,7 +7,7 @@ use crate::application::hotkeys::configuration::HotkeyConfiguration;
 use crate::domain::hotkey_config::{
     hotkey_category, validate_hotkey_action, HotkeySettingsSnapshot, DEFAULT_HOTKEYS,
 };
-use crate::{infrastructure, startup_shortcuts, Result};
+use crate::{startup_shortcuts, Result};
 
 pub struct HotkeyRuntime {
     configuration: Arc<HotkeyConfiguration>,
@@ -49,22 +49,6 @@ impl HotkeyRuntime {
 
     pub fn snapshot(&self) -> Result<HotkeySettingsSnapshot> {
         self.configuration.snapshot()
-    }
-
-    pub fn register_startup_hotkeys(&self, app: &tauri::AppHandle) -> Result<()> {
-        let registrar = TauriHotkeyRegistrar { app };
-        self.register_startup_hotkeys_with(&registrar)
-    }
-
-    pub fn update_hotkey(
-        &self,
-        app: &tauri::AppHandle,
-        category: String,
-        action: String,
-        hotkey: String,
-    ) -> Result<HotkeyUpdateOutcome> {
-        let registrar = TauriHotkeyRegistrar { app };
-        self.update_hotkey_with(&registrar, category, action, hotkey)
     }
 
     pub(crate) fn register_startup_hotkeys_with(
@@ -192,40 +176,6 @@ impl HotkeyRuntime {
         }
 
         Ok(())
-    }
-}
-
-struct TauriHotkeyRegistrar<'a> {
-    app: &'a tauri::AppHandle,
-}
-
-impl HotkeyRegistrar for TauriHotkeyRegistrar<'_> {
-    fn register(&self, registration: HotkeyRegistration) -> Result<()> {
-        let category = registration.category.clone();
-        let action = registration.action.clone();
-        let app = self.app.clone();
-
-        if registration.timing == HotkeyTriggerTiming::Released {
-            return infrastructure::system::register_shortcut_on_release(
-                self.app,
-                &registration.accelerator,
-                move || {
-                    startup_shortcuts::trigger_hotkey_action(
-                        app.clone(),
-                        category.clone(),
-                        action.clone(),
-                    );
-                },
-            );
-        }
-
-        infrastructure::system::register_shortcut(self.app, &registration.accelerator, move || {
-            startup_shortcuts::trigger_hotkey_action(app.clone(), category.clone(), action.clone());
-        })
-    }
-
-    fn unregister(&self, accelerator: &str) -> Result<()> {
-        infrastructure::system::unregister_shortcut(self.app, accelerator)
     }
 }
 

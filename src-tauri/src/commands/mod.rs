@@ -33,7 +33,12 @@ pub fn configure_hotkey(
     let outcome = state
         .settings
         .hotkeys
-        .update_hotkey(&app, category, action, hotkey)
+        .update_hotkey_with(
+            &crate::startup_shortcuts::TauriHotkeyRegistrar::new(app),
+            category,
+            action,
+            hotkey,
+        )
         .map_err(|e| e.to_string())?;
     Ok(outcome.accelerator)
 }
@@ -48,7 +53,12 @@ pub fn configure_translation_hotkey(
     let outcome = state
         .settings
         .hotkeys
-        .update_hotkey(&app, "translation".to_string(), action, hotkey)
+        .update_hotkey_with(
+            &crate::startup_shortcuts::TauriHotkeyRegistrar::new(app),
+            "translation".to_string(),
+            action,
+            hotkey,
+        )
         .map_err(|e| e.to_string())?;
     Ok(outcome.accelerator)
 }

@@ -15,8 +15,7 @@ const HTTP_LLM_DEPENDENCIES: &[&str] = &[];
 
 const EVENTS_HISTORY_DEPENDENCIES: &[&str] = &[];
 
-const RUNTIME_HOST_DEPENDENCIES: &[&str] =
-    &["src/application/hotkeys/runtime.rs -> crate::infrastructure"];
+const RUNTIME_HOST_DEPENDENCIES: &[&str] = &[];
 
 #[derive(Clone)]
 struct SourceFile {
