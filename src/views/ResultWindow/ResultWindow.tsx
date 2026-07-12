@@ -20,12 +20,10 @@ import {
 import { useTranslate } from '../../hooks/useTranslate';
 import TranslationCard from './TranslationCard';
 import { CustomSelect } from '../../components/common/CustomSelect';
-import { runOcrFileWorkflow } from './ocrFileWorkflow';
-import { closeResultWindowForPresentation } from './resultWindowClose';
 import { getTranslationProviderDisplayName } from './translationProviderDisplayName';
 import IconActionButton from './IconActionButton';
 import ResultWindowScrollArea from './ResultWindowScrollArea';
-import { normalizeOcrText, ocrCopyTokens } from '../../utils/ocrTextProcessing';
+import { ocrCopyTokens } from '../../utils/ocrTextProcessing';
 import {
   resultWindowContentClassName,
   resultWindowAdaptiveTextStyle,
@@ -44,7 +42,6 @@ import {
   resultWindowPinButtonClassName,
   resultWindowResultsSectionClassName,
   resultWindowResultsListClassName,
-  resultWindowStandaloneWindowHeight,
   resultWindowTranslationMeasuredPanelHeight,
   resultWindowTranslationSubtitle,
   resultWindowTextAreaClassName,
@@ -56,7 +53,6 @@ import {
   shouldCloseFromContainerClick,
   shouldCloseFromEscapeKey,
   shouldCloseFromWindowBlur,
-  type ResultWindowPresentation,
 } from './presentation';
 import {
   ClearTextIcon,
@@ -71,15 +67,18 @@ import {
   VolumeIcon,
 } from './icons';
 import { speakResultWindowText } from './speech';
-import type { ResultWindowPlatformRuntime } from '../../application/result-window/platformRuntime';
 import {
   ResultWindowRuntimeProvider,
   useResultWindowRuntime,
 } from './runtimeContext';
+import type {
+  ResultWindowPresentation,
+  ResultWindowRuntime,
+} from '../../application/result-window/runtime';
 
 interface ResultWindowProps {
   presentation?: ResultWindowPresentation;
-  runtime: ResultWindowPlatformRuntime;
+  runtime: ResultWindowRuntime;
 }
 
 function Header({
@@ -152,12 +151,6 @@ function Header({
       </IconActionButton>
     </div>
   );
-}
-
-function base64ToBytes(base64: string) {
-  const payload = base64.includes(',') ? base64.split(',').pop() ?? '' : base64;
-  const binary = window.atob(payload);
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
 
 function LanguageSelect({
@@ -266,9 +259,6 @@ function ResultWindowContent({
     setTargetLang,
     setOcrText,
     setOcrImageBase64,
-    setOcrRunning,
-    setOcrError,
-    hideResultWindow,
   } = useAppStore();
   const translationProviders = useProviderStore((state) => state.translationProviders);
   const loadTranslationProviders = useProviderStore(
@@ -363,12 +353,8 @@ function ResultWindowContent({
   }, [providerTranslations.length, resultWindowMode, resultWindowVisible]);
 
   const closeResultWindow = useCallback(() => {
-    closeResultWindowForPresentation({
-      presentation,
-      hideResultWindow,
-      hideNativeWindow: runtime.dismiss,
-    });
-  }, [hideResultWindow, presentation]);
+    void runtime.close(presentation);
+  }, [presentation, runtime]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -418,10 +404,11 @@ function ResultWindowContent({
       const updateOcrWindowHeight = () => {
         const panelHeight = Math.ceil(panel.scrollHeight);
 
-        void runtime.resizeTo(
-          660,
-          resultWindowStandaloneWindowHeight(panelHeight),
-        );
+        void runtime.resizeStandaloneWindow({
+          presentation,
+          visible: resultWindowVisible,
+          panelHeightPx: panelHeight,
+        });
       };
 
       updateOcrWindowHeight();
@@ -434,10 +421,11 @@ function ResultWindowContent({
       return () => resizeObserver.disconnect();
     }
 
-    void runtime.resizeTo(
-      660,
-      resultWindowStandaloneWindowHeight(translationPanelHeightPx),
-    );
+    void runtime.resizeStandaloneWindow({
+      presentation,
+      visible: resultWindowVisible,
+      panelHeightPx: translationPanelHeightPx,
+    });
   }, [
     ocrTokens.length,
     ocrError,
@@ -563,31 +551,11 @@ function ResultWindowContent({
   };
 
   const handleUploadImage = () => {
-    setOcrImageBase64(null);
-    void runOcrFileWorkflow({
-      selectImageFile: runtime.commands.selectImageFile,
-      recognizeImageFile: runtime.commands.recognizeImageFile,
-      setText: setOcrText,
-      setRunning: setOcrRunning,
-      setError: setOcrError,
-    });
+    void runtime.startFileOcr();
   };
 
   const handleRecognizeCurrentOcrImage = () => {
-    if (!ocrImageBase64) return;
-
-    setOcrError(null);
-    setOcrRunning(true);
-    void runtime.commands.recognizeImageData(base64ToBytes(ocrImageBase64))
-      .then((result) => {
-        setOcrText(normalizeOcrText(result.text));
-      })
-      .catch((err) => {
-        setOcrError(err instanceof Error ? err.message : String(err));
-      })
-      .finally(() => {
-        setOcrRunning(false);
-      });
+    void runtime.recognizeCurrentOcrImage(ocrImageBase64);
   };
 
   const isOcrMode = resultWindowMode === 'ocr';

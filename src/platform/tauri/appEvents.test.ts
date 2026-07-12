@@ -30,18 +30,32 @@ describe('Tauri app event adapter', () => {
     );
   });
 
-  it('subscribes to result payload readiness without exposing the Tauri event', async () => {
+  it('subscribes to result payload readiness with a safe request ID', async () => {
     const handler = vi.fn();
 
     const unsubscribe = await resultWindowEvents.subscribeResultPayloadReady(
       handler,
     );
-    listeners.get('capture-result-payload-ready')?.({ payload: undefined });
+    listeners.get('capture-result-payload-ready')?.({
+      payload: { requestId: '9007199254740992' },
+    });
     unsubscribe();
 
-    expect(handler).toHaveBeenCalledWith();
+    expect(handler).toHaveBeenCalledWith('9007199254740992');
     expect(cleanup).toHaveBeenCalledOnce();
   });
+
+  it.each([undefined, null, {}, { requestId: 42 }])(
+    'ignores malformed result payload readiness event %j',
+    async (payload) => {
+      const handler = vi.fn();
+
+      await resultWindowEvents.subscribeResultPayloadReady(handler);
+      listeners.get('capture-result-payload-ready')?.({ payload });
+
+      expect(handler).not.toHaveBeenCalled();
+    },
+  );
 
   it.each([
     ['capture cancel', 'capture-cancel-requested', 'subscribeCaptureCancel'],

@@ -1,10 +1,12 @@
-import type { CaptureResultWindowPayload } from '../../application/result-window/ports';
+import type { CaptureResultWindowPayload } from './ports';
 import { normalizeOcrText } from '../../utils/ocrTextProcessing';
 
 export function shouldApplyTranslationPayloadText(
   payload: CaptureResultWindowPayload,
 ) {
-  return payload.mode === 'translation' && (payload.autoTranslate || payload.text.length > 0);
+  return (
+    payload.mode === 'translation' && (payload.autoTranslate || payload.text.length > 0)
+  );
 }
 
 export function shouldClearTranslationResultsForPayload(
@@ -17,7 +19,9 @@ export function shouldApplyOcrPayloadText(payload: CaptureResultWindowPayload) {
   return payload.mode === 'ocr' && payload.ocrIntent === 'display-text';
 }
 
-export function shouldClearOcrResultsForPayload(payload: CaptureResultWindowPayload) {
+export function shouldClearOcrResultsForPayload(
+  payload: CaptureResultWindowPayload,
+) {
   return (
     payload.mode === 'ocr' &&
     (payload.ocrIntent === 'display-text' || payload.ocrIntent === 'file')

@@ -1,16 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { SettingsWindow } from './views/SettingsWindow';
 import ResultWindow from './views/ResultWindow';
-import { runOcrFileWorkflow } from './views/ResultWindow/ocrFileWorkflow';
-import {
-  ocrPayloadDisplayText,
-  shouldApplyOcrPayloadText,
-  shouldClearOcrResultsForPayload,
-  shouldStartFileOcrForPayload,
-  shouldApplyTranslationPayloadText,
-  shouldClearTranslationResultsForPayload,
-  translationPayloadSourceText,
-} from './views/ResultWindow/resultPayload';
 import {
   PinnedImageWindow,
   readPinnedImageLaunch,
@@ -22,6 +12,7 @@ import {
 } from './views/CaptureWorkspace/windowMode';
 import { createCaptureWorkspacePlatformRuntime } from './application/capture-workspace/platformRuntime';
 import { createResultWindowPlatformRuntime } from './application/result-window/platformRuntime';
+import { createResultWindowRuntime } from './application/result-window/runtime';
 import { createPinnedImagePlatformRuntime } from './application/pinned-image/platformRuntime';
 import { createSettingsRuntime } from './application/settings/runtime';
 import { useAppStore } from './stores/appStore';
@@ -42,6 +33,7 @@ import {
 import { captureWorkspaceEvents, resultWindowEvents } from './platform/tauri/appEvents';
 import {
   captureWorkspaceCommands,
+  currentCaptureResultWindowRequestId,
   takeCaptureResultWindowPayload,
   triggerScreenshot,
 } from './platform/tauri/capture';
@@ -76,16 +68,34 @@ const captureWorkspaceRuntime = createCaptureWorkspacePlatformRuntime({
   commands: captureWorkspaceCommands,
   clipboard: { writeText: writeClipboardText },
 });
-const resultWindowRuntime = createResultWindowPlatformRuntime({
+const resultWindowPlatformRuntime = createResultWindowPlatformRuntime({
   events: resultWindowEvents,
   window: resultWindow,
   clipboard: { writeText: writeClipboardText },
   commands: {
+    currentPayloadRequestId: currentCaptureResultWindowRequestId,
     takePayload: takeCaptureResultWindowPayload,
     selectImageFile,
     recognizeImageFile,
     recognizeImageData,
     translateTextWithProvider,
+  },
+});
+const resultWindowRuntime = createResultWindowRuntime({
+  platform: resultWindowPlatformRuntime,
+  state: {
+    setSourceText: (text) => useAppStore.getState().setSourceText(text),
+    clearTranslationResults: () =>
+      useAppStore.getState().clearTranslationResults(),
+    setOcrText: (text) => useAppStore.getState().setOcrText(text),
+    setOcrImageBase64: (imageBase64) =>
+      useAppStore.getState().setOcrImageBase64(imageBase64),
+    setOcrRunning: (value) => useAppStore.getState().setOcrRunning(value),
+    setOcrError: (message) => useAppStore.getState().setOcrError(message),
+    requestAutoTranslate: () => useAppStore.getState().requestAutoTranslate(),
+    showResultWindow: () => useAppStore.getState().showResultWindow(),
+    showOcrWindow: () => useAppStore.getState().showOcrWindow(),
+    hideResultWindow: () => useAppStore.getState().hideResultWindow(),
   },
 });
 const pinnedImageRuntime = createPinnedImagePlatformRuntime({
@@ -114,15 +124,6 @@ const isSettingsWindow = isSettingsWindowLaunch(
 
 function App() {
   const resultWindowVisible = useAppStore((state) => state.resultWindowVisible);
-  const setSourceText = useAppStore((state) => state.setSourceText);
-  const clearTranslationResults = useAppStore((state) => state.clearTranslationResults);
-  const setOcrText = useAppStore((state) => state.setOcrText);
-  const setOcrImageBase64 = useAppStore((state) => state.setOcrImageBase64);
-  const setOcrRunning = useAppStore((state) => state.setOcrRunning);
-  const setOcrError = useAppStore((state) => state.setOcrError);
-  const requestAutoTranslate = useAppStore((state) => state.requestAutoTranslate);
-  const showResultWindow = useAppStore((state) => state.showResultWindow);
-  const showOcrWindow = useAppStore((state) => state.showOcrWindow);
   const applyTranslationDefaults = useAppStore(
     (state) => state.applyTranslationDefaults,
   );
@@ -151,26 +152,6 @@ function App() {
     };
   }, [applyTranslationDefaults, hydrateSettings]);
 
-  const startFileOcr = useCallback(() => {
-    showOcrWindow();
-    setOcrText('');
-    setOcrImageBase64(null);
-    setOcrError(null);
-    void runOcrFileWorkflow({
-      selectImageFile: resultWindowRuntime.commands.selectImageFile,
-      recognizeImageFile: resultWindowRuntime.commands.recognizeImageFile,
-      setText: setOcrText,
-      setRunning: setOcrRunning,
-      setError: setOcrError,
-    });
-  }, [
-    setOcrError,
-    setOcrImageBase64,
-    setOcrRunning,
-    setOcrText,
-    showOcrWindow,
-  ]);
-
   useEffect(() => {
     if (!isSettingsWindow) return;
 
@@ -179,68 +160,29 @@ function App() {
     });
   }, [hydrateHotkeys, isSettingsWindow]);
 
-  const loadCaptureResultPayload = useCallback(async () => {
-    const payload = await resultWindowRuntime.commands.takePayload();
-    if (!payload) return;
-
-    setHasLoadedCaptureResultPayload(true);
-
-    if (payload.mode === 'translation') {
-      if (shouldClearTranslationResultsForPayload(payload)) {
-        clearTranslationResults();
-      }
-      if (shouldApplyTranslationPayloadText(payload)) {
-        setSourceText(translationPayloadSourceText(payload));
-      }
-      if (payload.autoTranslate) {
-        requestAutoTranslate();
-      }
-      showResultWindow();
-      return;
-    }
-
-    if (shouldClearOcrResultsForPayload(payload)) {
-      setOcrText('');
-      setOcrImageBase64(null);
-      setOcrError(null);
-    }
-    if (shouldApplyOcrPayloadText(payload)) {
-      setOcrText(ocrPayloadDisplayText(payload));
-      setOcrImageBase64(payload.imageBase64 ?? null);
-    }
-    if (shouldStartFileOcrForPayload(payload)) {
-      startFileOcr();
-      return;
-    }
-    showOcrWindow();
-  }, [
-    requestAutoTranslate,
-    clearTranslationResults,
-    setOcrError,
-    setOcrImageBase64,
-    setOcrText,
-    setSourceText,
-    showOcrWindow,
-    showResultWindow,
-    startFileOcr,
-  ]);
-
   useEffect(() => {
     if (!isCaptureResultWindow) return;
 
     let disposed = false;
     let unlisten: (() => void) | undefined;
 
-    loadCaptureResultPayload().catch((err) => {
-      console.error('Failed to load capture result window payload:', err);
-    });
-
-    resultWindowRuntime.onPayloadReady(() => {
-      if (disposed) return;
-      void loadCaptureResultPayload().catch((err) => {
-        console.error('Failed to reload capture result window payload:', err);
+    resultWindowRuntime
+      .loadCurrentPayload()
+      .then((loaded) => {
+        if (!disposed && loaded) {
+          setHasLoadedCaptureResultPayload(true);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load capture result window payload:', err);
       });
-    })
+
+    resultWindowRuntime
+      .subscribeToPayloads(() => {
+        if (!disposed) {
+          setHasLoadedCaptureResultPayload(true);
+        }
+      })
       .then((nextUnlisten) => {
         if (disposed) {
           nextUnlisten();
@@ -256,7 +198,7 @@ function App() {
       disposed = true;
       unlisten?.();
     };
-  }, [isCaptureResultWindow, loadCaptureResultPayload]);
+  }, [isCaptureResultWindow]);
 
   useEffect(() => {
     if (

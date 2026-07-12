@@ -119,9 +119,14 @@ export async function openCaptureTranslationResultWindow(text: string) {
   return invoke<void>('open_capture_translation_result_window', { text });
 }
 
-export async function takeCaptureResultWindowPayload() {
+export async function currentCaptureResultWindowRequestId() {
+  return invoke<string | null>('current_capture_result_window_request_id');
+}
+
+export async function takeCaptureResultWindowPayload(requestId: string) {
   return invoke<CaptureResultWindowPayload | null>(
     'take_capture_result_window_payload',
+    { requestId },
   );
 }
 

@@ -60,9 +60,27 @@ async function subscribeToSignal(
   return () => unlisten();
 }
 
+function parseResultPayloadReady(payload: unknown) {
+  if (!payload || typeof payload !== 'object') return null;
+
+  const requestId = (payload as { requestId?: unknown }).requestId;
+  return typeof requestId === 'string' ? requestId : null;
+}
+
 export const resultWindowEvents: ResultWindowEventsPort = {
-  subscribeResultPayloadReady: (handler) =>
-    subscribeToSignal(RESULT_PAYLOAD_READY_EVENT, handler),
+  async subscribeResultPayloadReady(handler) {
+    const unlisten = await listen<unknown>(
+      RESULT_PAYLOAD_READY_EVENT,
+      (event) => {
+        const requestId = parseResultPayloadReady(event.payload);
+        if (!requestId) return;
+
+        void handler(requestId);
+      },
+    );
+
+    return () => unlisten();
+  },
 };
 
 export const captureWorkspaceEvents: CaptureWorkspaceEventsPort = {

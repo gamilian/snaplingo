@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { runOcrFileWorkflow } from './ocrFileWorkflow';
+import { runOcrFileWorkflow } from './fileOcrWorkflow';
 
 describe('OCR file workflow', () => {
   it('does nothing when the user cancels file selection', async () => {

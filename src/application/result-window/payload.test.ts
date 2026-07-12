@@ -6,7 +6,7 @@ import {
   shouldApplyTranslationPayloadText,
   shouldClearTranslationResultsForPayload,
   shouldStartFileOcrForPayload,
-} from './resultPayload';
+} from './payload';
 
 describe('result payload application', () => {
   it('does not clear existing translation content for empty manual opens', () => {

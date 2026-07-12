@@ -1,5 +1,8 @@
 export type ResultWindowUnsubscribe = () => void;
-export type ResultPayloadReadyHandler = () => void | Promise<void>;
+export type ResultWindowRequestId = string;
+export type ResultPayloadReadyHandler = (
+  requestId: ResultWindowRequestId,
+) => void | Promise<void>;
 
 export interface ResultWindowEventsPort {
   subscribeResultPayloadReady(
@@ -22,7 +25,10 @@ export interface CaptureResultWindowPayload {
 }
 
 export interface ResultWindowCommandsPort {
-  takePayload(): Promise<CaptureResultWindowPayload | null>;
+  currentPayloadRequestId(): Promise<ResultWindowRequestId | null>;
+  takePayload(
+    requestId: ResultWindowRequestId,
+  ): Promise<CaptureResultWindowPayload | null>;
   selectImageFile(): Promise<string | null>;
   recognizeImageFile(path: string): Promise<OcrResult>;
   recognizeImageData(imageData: Uint8Array | number[]): Promise<OcrResult>;

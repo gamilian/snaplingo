@@ -106,6 +106,33 @@ describe('Tauri capture command adapter', () => {
     );
   });
 
+  it('loads the current result window request ID for standalone bootstrap', async () => {
+    const { currentCaptureResultWindowRequestId } = await import('./capture');
+    invoke.mockResolvedValueOnce('42');
+
+    await expect(currentCaptureResultWindowRequestId()).resolves.toBe('42');
+
+    expect(invoke).toHaveBeenCalledWith(
+      'current_capture_result_window_request_id',
+    );
+  });
+
+  it('takes a capture result payload by request ID', async () => {
+    const { takeCaptureResultWindowPayload } = await import('./capture');
+    const payload = {
+      mode: 'translation',
+      text: 'hello',
+      autoTranslate: false,
+    };
+    invoke.mockResolvedValueOnce(payload);
+
+    await expect(takeCaptureResultWindowPayload('42')).resolves.toBe(payload);
+
+    expect(invoke).toHaveBeenCalledWith('take_capture_result_window_payload', {
+      requestId: '42',
+    });
+  });
+
   it('keeps the Advanced Settings screenshot entrypoint on the capture adapter', async () => {
     const { triggerScreenshot } = await import('./capture');
     invoke.mockResolvedValueOnce(undefined);

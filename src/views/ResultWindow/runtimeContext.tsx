@@ -1,15 +1,15 @@
 import { createContext, useContext, type ReactNode } from 'react';
-import type { ResultWindowPlatformRuntime } from '../../application/result-window/platformRuntime';
+import type { ResultWindowRuntime } from '../../application/result-window/runtime';
 
 const ResultWindowRuntimeContext =
-  createContext<ResultWindowPlatformRuntime | null>(null);
+  createContext<ResultWindowRuntime | null>(null);
 
 export function ResultWindowRuntimeProvider({
   children,
   runtime,
 }: {
   children: ReactNode;
-  runtime: ResultWindowPlatformRuntime;
+  runtime: ResultWindowRuntime;
 }) {
   return (
     <ResultWindowRuntimeContext.Provider value={runtime}>
