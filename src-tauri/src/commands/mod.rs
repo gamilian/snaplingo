@@ -1,4 +1,5 @@
 mod capture_session_commands;
+mod clipboard_commands;
 mod history_commands;
 mod hotkey_commands;
 mod ocr_commands;
@@ -9,6 +10,7 @@ mod settings_commands;
 mod translation_commands;
 
 pub use capture_session_commands::*;
+pub use clipboard_commands::*;
 pub use history_commands::*;
 pub use hotkey_commands::*;
 pub use ocr_commands::*;
@@ -19,15 +21,6 @@ pub use settings_commands::*;
 pub use translation_commands::*;
 
 use tauri::State;
-
-#[tauri::command]
-pub fn copy_text_to_clipboard(text: String) -> Result<(), String> {
-    let mut clipboard =
-        arboard::Clipboard::new().map_err(|e| format!("Failed to open clipboard: {}", e))?;
-    clipboard
-        .set_text(text)
-        .map_err(|e| format!("Failed to write text to clipboard: {}", e))
-}
 
 #[tauri::command]
 pub fn configure_hotkey(
