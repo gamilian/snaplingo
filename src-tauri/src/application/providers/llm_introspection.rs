@@ -1,19 +1,17 @@
-use crate::application::providers::HttpClient;
-use crate::infrastructure::llm::{
-    AnthropicLLMClient, GeminiLLMClient, LLMClient, LLMOptions, LLMProtocol, LLMRequest,
-    LlmModelLister, ModelInfo, OpenAILLMClient,
+use crate::application::providers::{
+    LLMOptions, LLMProtocol, LLMRequest, LlmClientConfig, LlmRuntime, ModelInfo,
 };
 use anyhow::Result;
 use std::sync::Arc;
 
 /// Facade for LLM provider introspection: list models and test connectivity before saving configuration.
 pub struct LlmIntrospection {
-    http_client: Arc<dyn HttpClient>,
+    llm_runtime: Arc<dyn LlmRuntime>,
 }
 
 impl LlmIntrospection {
-    pub fn new(http_client: Arc<dyn HttpClient>) -> Self {
-        Self { http_client }
+    pub fn new(llm_runtime: Arc<dyn LlmRuntime>) -> Self {
+        Self { llm_runtime }
     }
 
     /// List models available from the provider at the given endpoint.
@@ -23,28 +21,12 @@ impl LlmIntrospection {
         endpoint: &str,
         api_key: &str,
     ) -> Result<Vec<ModelInfo>> {
-        let lister: Arc<dyn LlmModelLister> = match protocol {
-            LLMProtocol::OpenAI | LLMProtocol::OpenAIResponses => {
-                Arc::new(OpenAILLMClient::new_chat_completions(
-                    self.http_client.clone(),
-                    endpoint.to_string(),
-                    String::new(), // model not needed for listing
-                    api_key.to_string(),
-                ))
-            }
-            LLMProtocol::Anthropic => Arc::new(AnthropicLLMClient::new(
-                self.http_client.clone(),
-                endpoint.to_string(),
-                String::new(),
-                api_key.to_string(),
-            )),
-            LLMProtocol::Gemini => Arc::new(GeminiLLMClient::new(
-                self.http_client.clone(),
-                endpoint.to_string(),
-                String::new(),
-                api_key.to_string(),
-            )),
-        };
+        let lister = self.llm_runtime.model_lister(LlmClientConfig {
+            protocol,
+            endpoint: endpoint.to_string(),
+            model: String::new(),
+            api_key: api_key.to_string(),
+        });
         lister.list_models().await
     }
 
@@ -56,32 +38,12 @@ impl LlmIntrospection {
         model: &str,
         api_key: &str,
     ) -> Result<()> {
-        let client: Arc<dyn LLMClient> = match protocol {
-            LLMProtocol::OpenAI => Arc::new(OpenAILLMClient::new_chat_completions(
-                self.http_client.clone(),
-                endpoint.to_string(),
-                model.to_string(),
-                api_key.to_string(),
-            )),
-            LLMProtocol::OpenAIResponses => Arc::new(OpenAILLMClient::new_responses(
-                self.http_client.clone(),
-                endpoint.to_string(),
-                model.to_string(),
-                api_key.to_string(),
-            )),
-            LLMProtocol::Anthropic => Arc::new(AnthropicLLMClient::new(
-                self.http_client.clone(),
-                endpoint.to_string(),
-                model.to_string(),
-                api_key.to_string(),
-            )),
-            LLMProtocol::Gemini => Arc::new(GeminiLLMClient::new(
-                self.http_client.clone(),
-                endpoint.to_string(),
-                model.to_string(),
-                api_key.to_string(),
-            )),
-        };
+        let client = self.llm_runtime.translation_client(LlmClientConfig {
+            protocol,
+            endpoint: endpoint.to_string(),
+            model: model.to_string(),
+            api_key: api_key.to_string(),
+        });
 
         let request = LLMRequest {
             system_prompt: Some("You are a translation engine. Return only OK.".to_string()),
@@ -142,10 +104,16 @@ mod tests {
         })
     }
 
+    fn mock_llm_runtime(get_body: &str, post_body: &str) -> Arc<dyn LlmRuntime> {
+        Arc::new(crate::infrastructure::llm::InfrastructureLlmRuntime::new(
+            mock_http_client(get_body, post_body),
+        ))
+    }
+
     #[tokio::test]
     async fn list_models_dispatches_openai_protocol() {
-        let http = mock_http_client(r#"{"data":[{"id":"gpt-4"}]}"#, "");
-        let introspection = LlmIntrospection::new(http);
+        let introspection =
+            LlmIntrospection::new(mock_llm_runtime(r#"{"data":[{"id":"gpt-4"}]}"#, ""));
 
         let models = introspection
             .list_models(LLMProtocol::OpenAI, "https://api.openai.com/v1", "test-key")
@@ -158,8 +126,8 @@ mod tests {
 
     #[tokio::test]
     async fn list_models_dispatches_openai_responses_to_same_client() {
-        let http = mock_http_client(r#"{"data":[{"id":"gpt-4o"}]}"#, "");
-        let introspection = LlmIntrospection::new(http);
+        let introspection =
+            LlmIntrospection::new(mock_llm_runtime(r#"{"data":[{"id":"gpt-4o"}]}"#, ""));
 
         let models = introspection
             .list_models(
@@ -176,8 +144,10 @@ mod tests {
 
     #[tokio::test]
     async fn list_models_dispatches_anthropic_protocol() {
-        let http = mock_http_client(r#"{"data":[{"id":"claude-3-5-sonnet-20241022"}]}"#, "");
-        let introspection = LlmIntrospection::new(http);
+        let introspection = LlmIntrospection::new(mock_llm_runtime(
+            r#"{"data":[{"id":"claude-3-5-sonnet-20241022"}]}"#,
+            "",
+        ));
 
         let models = introspection
             .list_models(
@@ -194,8 +164,10 @@ mod tests {
 
     #[tokio::test]
     async fn list_models_dispatches_gemini_protocol() {
-        let http = mock_http_client(r#"{"models":[{"name":"models/gemini-pro"}]}"#, "");
-        let introspection = LlmIntrospection::new(http);
+        let introspection = LlmIntrospection::new(mock_llm_runtime(
+            r#"{"models":[{"name":"models/gemini-pro"}]}"#,
+            "",
+        ));
 
         let models = introspection
             .list_models(
@@ -212,8 +184,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_sends_generate_request_for_openai() {
-        let http = mock_http_client("", r#"{"choices":[{"message":{"content":"OK"}}]}"#);
-        let introspection = LlmIntrospection::new(http);
+        let introspection = LlmIntrospection::new(mock_llm_runtime(
+            "",
+            r#"{"choices":[{"message":{"content":"OK"}}]}"#,
+        ));
 
         let result = introspection
             .test(
@@ -229,8 +203,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_sends_generate_request_for_anthropic() {
-        let http = mock_http_client("", r#"{"content":[{"type":"text","text":"OK"}]}"#);
-        let introspection = LlmIntrospection::new(http);
+        let introspection = LlmIntrospection::new(mock_llm_runtime(
+            "",
+            r#"{"content":[{"type":"text","text":"OK"}]}"#,
+        ));
 
         let result = introspection
             .test(
@@ -246,11 +222,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_sends_generate_request_for_gemini() {
-        let http = mock_http_client(
+        let introspection = LlmIntrospection::new(mock_llm_runtime(
             "",
             r#"{"candidates":[{"content":{"parts":[{"text":"OK"}]}}]}"#,
-        );
-        let introspection = LlmIntrospection::new(http);
+        ));
 
         let result = introspection
             .test(

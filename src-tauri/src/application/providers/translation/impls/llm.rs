@@ -4,8 +4,8 @@ use crate::application::providers::{
     merge_prompt_strategy_config, render_translation_system_prompt, ProviderConfigStore,
     ProviderPromptStrategy,
 };
+use crate::application::providers::{LLMClient, LLMOptions, LLMRequest, ReasoningLevel};
 use crate::domain::translation::{TranslationRequest, TranslationResult};
-use crate::infrastructure::llm::{LLMClient, LLMOptions, LLMRequest, ReasoningLevel};
 use crate::Result;
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -95,7 +95,7 @@ impl TranslationProvider for LLMTranslationProvider {
 mod tests {
     use super::*;
     use crate::application::providers::TranslationPromptStrategyConfig;
-    use crate::infrastructure::llm::{LLMClient, LLMRequest, LLMResponse};
+    use crate::application::providers::{LLMClient, LLMRequest, LLMResponse};
     use crate::infrastructure::storage::ConfigFile;
     use async_trait::async_trait;
 

@@ -12,22 +12,27 @@ use crate::application::providers::translation::{
     TranslationCoordinator,
 };
 use crate::application::providers::{
-    HttpClient, LlmIntrospection, ProviderConfigStore, ProviderConfiguration,
+    HttpClient, LlmIntrospection, LlmRuntime, ProviderConfigStore, ProviderConfiguration,
     ProviderCredentialStore,
 };
 use crate::infrastructure::events::EventBus;
+use crate::infrastructure::llm::InfrastructureLlmRuntime;
 use crate::infrastructure::system::ocr::get_tesseract_engine;
 #[cfg(target_os = "macos")]
 use crate::infrastructure::system::ocr::MacOSVisionOcrEngine;
 
-pub(crate) fn build_llm_introspection(http_client: Arc<dyn HttpClient>) -> Arc<LlmIntrospection> {
-    Arc::new(LlmIntrospection::new(http_client))
+pub(crate) fn build_llm_runtime(http_client: Arc<dyn HttpClient>) -> Arc<dyn LlmRuntime> {
+    Arc::new(InfrastructureLlmRuntime::new(http_client))
+}
+
+pub(crate) fn build_llm_introspection(llm_runtime: Arc<dyn LlmRuntime>) -> Arc<LlmIntrospection> {
+    Arc::new(LlmIntrospection::new(llm_runtime))
 }
 
 pub(crate) fn build_provider_configuration(
     config_store: Arc<dyn ProviderConfigStore>,
     credential_store: Arc<dyn ProviderCredentialStore>,
-    http_client: Arc<dyn HttpClient>,
+    llm_runtime: Arc<dyn LlmRuntime>,
     translation_coordinator: Arc<
         crate::application::providers::translation::TranslationCoordinator,
     >,
@@ -36,7 +41,7 @@ pub(crate) fn build_provider_configuration(
     Arc::new(ProviderConfiguration::new(
         config_store,
         credential_store,
-        http_client,
+        llm_runtime,
         translation_coordinator,
         llm_introspection,
     ))

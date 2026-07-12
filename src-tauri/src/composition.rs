@@ -11,8 +11,8 @@ mod selection_runtime;
 use capture_runtime::build_capture_runtime;
 use history_runtime::build_history;
 use provider_runtime::{
-    build_llm_introspection, build_ocr_coordinator, build_provider_configuration,
-    build_translation_coordinator, hydrate_provider_credentials,
+    build_llm_introspection, build_llm_runtime, build_ocr_coordinator,
+    build_provider_configuration, build_translation_coordinator, hydrate_provider_credentials,
 };
 use selection_runtime::build_selected_text_acquirer;
 
@@ -54,7 +54,8 @@ pub(crate) fn build_app_state(config_path: PathBuf, app: AppHandle) -> AppState 
 
     let history = build_history();
 
-    let llm_introspection = build_llm_introspection(http_client.clone());
+    let llm_runtime = build_llm_runtime(http_client.clone());
+    let llm_introspection = build_llm_introspection(llm_runtime.clone());
     let translation_coordinator = build_translation_coordinator(
         provider_config_store.clone(),
         http_client.clone(),
@@ -63,7 +64,7 @@ pub(crate) fn build_app_state(config_path: PathBuf, app: AppHandle) -> AppState 
     let provider_configuration = build_provider_configuration(
         provider_config_store.clone(),
         provider_credential_store.clone(),
-        http_client.clone(),
+        llm_runtime,
         translation_coordinator.clone(),
         llm_introspection.clone(),
     );

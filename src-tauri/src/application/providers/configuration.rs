@@ -5,13 +5,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::application::providers::common::CredentialField;
 use crate::application::providers::translation::{LLMTranslationProvider, TranslationCoordinator};
-use crate::application::providers::HttpClient;
 use crate::application::providers::{
-    ProviderConfigStore, ProviderCredentialStore, ProviderPromptStrategy,
-    DEFAULT_PROMPT_STRATEGY_ID, SMART_PROMPT_STRATEGY_ID,
-};
-use crate::infrastructure::llm::{
-    AnthropicLLMClient, GeminiLLMClient, LLMClient, LLMProtocol, OpenAILLMClient, ReasoningLevel,
+    LLMProtocol, LlmClientConfig, LlmRuntime, ProviderConfigStore, ProviderCredentialStore,
+    ProviderPromptStrategy, ReasoningLevel, DEFAULT_PROMPT_STRATEGY_ID, SMART_PROMPT_STRATEGY_ID,
 };
 use crate::AppError;
 
@@ -93,7 +89,7 @@ pub(crate) fn add_custom_translation_provider(
     input: AddCustomTranslationProviderInput,
     config_store: Arc<dyn ProviderConfigStore>,
     credential_store: &dyn ProviderCredentialStore,
-    http_client: Arc<dyn HttpClient>,
+    llm_runtime: Arc<dyn LlmRuntime>,
     translation_coordinator: &TranslationCoordinator,
 ) -> crate::Result<CustomTranslationProviderView> {
     let id = create_custom_translation_provider_id();
@@ -125,7 +121,7 @@ pub(crate) fn add_custom_translation_provider(
         })?;
 
     let provider =
-        create_llm_translation_provider(&def, http_client, input.api_key, config_store.clone());
+        create_llm_translation_provider(&def, llm_runtime, input.api_key, config_store.clone());
     translation_coordinator.register(provider).map_err(|e| {
         let mut rollback_errors: Vec<String> = Vec::new();
         custom_defs.pop();
@@ -304,36 +300,16 @@ pub fn custom_translation_provider_view(
 
 pub fn create_llm_translation_provider(
     def: &CustomTranslationProviderDef,
-    http_client: Arc<dyn HttpClient>,
+    llm_runtime: Arc<dyn LlmRuntime>,
     api_key: String,
     config_store: Arc<dyn ProviderConfigStore>,
 ) -> LLMTranslationProvider {
-    let llm_client: Arc<dyn LLMClient> = match def.protocol {
-        LLMProtocol::OpenAI => Arc::new(OpenAILLMClient::new_chat_completions(
-            http_client,
-            def.endpoint.clone(),
-            def.model.clone(),
-            api_key,
-        )),
-        LLMProtocol::OpenAIResponses => Arc::new(OpenAILLMClient::new_responses(
-            http_client,
-            def.endpoint.clone(),
-            def.model.clone(),
-            api_key,
-        )),
-        LLMProtocol::Anthropic => Arc::new(AnthropicLLMClient::new(
-            http_client,
-            def.endpoint.clone(),
-            def.model.clone(),
-            api_key,
-        )),
-        LLMProtocol::Gemini => Arc::new(GeminiLLMClient::new(
-            http_client,
-            def.endpoint.clone(),
-            def.model.clone(),
-            api_key,
-        )),
-    };
+    let llm_client = llm_runtime.translation_client(LlmClientConfig {
+        protocol: def.protocol,
+        endpoint: def.endpoint.clone(),
+        model: def.model.clone(),
+        api_key,
+    });
 
     LLMTranslationProvider::new(
         llm_client,
@@ -428,10 +404,12 @@ mod tests {
 
     use crate::application::providers::common::{CredentialField, Provider};
     use crate::application::providers::translation::TranslationProvider;
-    use crate::application::providers::{HttpClient, HttpResponse};
+    use crate::application::providers::{
+        LLMClient, LLMProtocol, LLMRequest, LLMResponse, LlmClientConfig, LlmModelLister,
+        LlmRuntime, ModelInfo, ReasoningLevel,
+    };
     use crate::application::providers::{DEFAULT_PROMPT_STRATEGY_ID, SMART_PROMPT_STRATEGY_ID};
     use crate::domain::translation::TranslationRequest;
-    use crate::infrastructure::llm::{LLMProtocol, ReasoningLevel};
     use crate::infrastructure::storage::ConfigFile;
     use anyhow::Result;
     use async_trait::async_trait;
@@ -443,25 +421,45 @@ mod tests {
         UpdateCustomTranslationProviderInput,
     };
 
-    struct MockHttpClient {
-        response: HttpResponse,
-        post_bodies: Arc<Mutex<Vec<String>>>,
+    struct MockLlmClient {
+        response: String,
+        requests: Arc<Mutex<Vec<LLMRequest>>>,
     }
 
     #[async_trait]
-    impl HttpClient for MockHttpClient {
-        async fn post(
-            &self,
-            _url: &str,
-            _headers: HashMap<String, String>,
-            body: String,
-        ) -> Result<HttpResponse> {
-            self.post_bodies.lock().unwrap().push(body);
-            Ok(self.response.clone())
+    impl LLMClient for MockLlmClient {
+        async fn generate(&self, request: &LLMRequest) -> Result<LLMResponse> {
+            self.requests.lock().unwrap().push(request.clone());
+            Ok(LLMResponse {
+                text: self.response.clone(),
+            })
+        }
+    }
+
+    struct MockModelLister;
+
+    #[async_trait]
+    impl LlmModelLister for MockModelLister {
+        async fn list_models(&self) -> Result<Vec<ModelInfo>> {
+            Ok(Vec::new())
+        }
+    }
+
+    struct MockLlmRuntime {
+        response: String,
+        requests: Arc<Mutex<Vec<LLMRequest>>>,
+    }
+
+    impl LlmRuntime for MockLlmRuntime {
+        fn translation_client(&self, _config: LlmClientConfig) -> Arc<dyn LLMClient> {
+            Arc::new(MockLlmClient {
+                response: self.response.clone(),
+                requests: self.requests.clone(),
+            })
         }
 
-        async fn get(&self, _url: &str, _headers: HashMap<String, String>) -> Result<HttpResponse> {
-            unimplemented!()
+        fn model_lister(&self, _config: LlmClientConfig) -> Arc<dyn LlmModelLister> {
+            Arc::new(MockModelLister)
         }
     }
 
@@ -486,14 +484,10 @@ mod tests {
         }
     }
 
-    fn mock_http_client(response_body: &str) -> Arc<dyn HttpClient> {
-        Arc::new(MockHttpClient {
-            response: HttpResponse {
-                status: 200,
-                body: response_body.to_string(),
-                headers: HashMap::new(),
-            },
-            post_bodies: Arc::new(Mutex::new(Vec::new())),
+    fn mock_llm_runtime(response: &str) -> Arc<dyn LlmRuntime> {
+        Arc::new(MockLlmRuntime {
+            response: response.to_string(),
+            requests: Arc::new(Mutex::new(Vec::new())),
         })
     }
 
@@ -637,7 +631,7 @@ mod tests {
 
         let provider = create_llm_translation_provider(
             &def,
-            mock_http_client(r#"{"choices":[]}"#),
+            mock_llm_runtime("Bonjour"),
             "key".into(),
             Arc::new(ConfigFile::new_temp()),
         );
@@ -649,29 +643,17 @@ mod tests {
     #[tokio::test]
     async fn create_llm_translation_provider_accepts_supported_protocols() {
         let cases = [
-            (
-                LLMProtocol::OpenAI,
-                r#"{"choices":[{"message":{"content":"Bonjour"}}]}"#,
-            ),
-            (
-                LLMProtocol::OpenAIResponses,
-                r#"{"output":[{"type":"message","content":[{"type":"output_text","text":"Bonjour"}]}]}"#,
-            ),
-            (
-                LLMProtocol::Anthropic,
-                r#"{"content":[{"type":"text","text":"Bonjour"}]}"#,
-            ),
-            (
-                LLMProtocol::Gemini,
-                r#"{"candidates":[{"content":{"parts":[{"text":"Bonjour"}]}}]}"#,
-            ),
+            LLMProtocol::OpenAI,
+            LLMProtocol::OpenAIResponses,
+            LLMProtocol::Anthropic,
+            LLMProtocol::Gemini,
         ];
 
-        for (protocol, response_body) in cases {
+        for protocol in cases {
             let def = custom_provider_def(protocol);
             let provider = create_llm_translation_provider(
                 &def,
-                mock_http_client(response_body),
+                mock_llm_runtime("Bonjour"),
                 "key".into(),
                 Arc::new(ConfigFile::new_temp()),
             );
@@ -685,14 +667,10 @@ mod tests {
 
     #[tokio::test]
     async fn create_llm_translation_provider_preserves_reasoning_level() {
-        let post_bodies = Arc::new(Mutex::new(Vec::new()));
-        let http_client = Arc::new(MockHttpClient {
-            response: HttpResponse {
-                status: 200,
-                body: r#"{"choices":[{"message":{"content":"Bonjour"}}]}"#.to_string(),
-                headers: HashMap::new(),
-            },
-            post_bodies: post_bodies.clone(),
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let llm_runtime = Arc::new(MockLlmRuntime {
+            response: "Bonjour".to_string(),
+            requests: requests.clone(),
         });
         let def = CustomTranslationProviderDef {
             model: "o3-mini".to_string(),
@@ -702,15 +680,16 @@ mod tests {
 
         let provider = create_llm_translation_provider(
             &def,
-            http_client,
+            llm_runtime,
             "key".into(),
             Arc::new(ConfigFile::new_temp()),
         );
         provider.translate(&translation_request()).await.unwrap();
 
-        let body: serde_json::Value =
-            serde_json::from_str(&post_bodies.lock().unwrap()[0]).unwrap();
-        assert_eq!(body["reasoning_effort"], "high");
+        assert_eq!(
+            requests.lock().unwrap()[0].options.reasoning,
+            Some(ReasoningLevel::High)
+        );
     }
 
     #[test]
@@ -731,7 +710,7 @@ mod tests {
 pub struct ProviderConfiguration {
     config_store: Arc<dyn ProviderConfigStore>,
     credential_store: Arc<dyn ProviderCredentialStore>,
-    http_client: Arc<dyn HttpClient>,
+    llm_runtime: Arc<dyn LlmRuntime>,
     translation_coordinator: Arc<TranslationCoordinator>,
     llm_introspection: Arc<crate::application::providers::LlmIntrospection>,
     /// Serializes all provider state mutations (config + keychain + coordinator).
@@ -743,14 +722,14 @@ impl ProviderConfiguration {
     pub fn new(
         config_store: Arc<dyn ProviderConfigStore>,
         credential_store: Arc<dyn ProviderCredentialStore>,
-        http_client: Arc<dyn HttpClient>,
+        llm_runtime: Arc<dyn LlmRuntime>,
         translation_coordinator: Arc<TranslationCoordinator>,
         llm_introspection: Arc<crate::application::providers::LlmIntrospection>,
     ) -> Self {
         Self {
             config_store,
             credential_store,
-            http_client,
+            llm_runtime,
             translation_coordinator,
             llm_introspection,
             provider_state_lock: std::sync::Mutex::new(()),
@@ -811,7 +790,7 @@ impl ProviderConfiguration {
 
             let provider = create_llm_translation_provider(
                 &def,
-                self.http_client.clone(),
+                self.llm_runtime.clone(),
                 api_key,
                 self.config_store.clone(),
             );
@@ -835,7 +814,7 @@ impl ProviderConfiguration {
             input,
             self.config_store.clone(),
             self.credential_store.as_ref(),
-            self.http_client.clone(),
+            self.llm_runtime.clone(),
             &self.translation_coordinator,
         )
     }
@@ -941,7 +920,7 @@ impl ProviderConfiguration {
         // Step 3: Create and register the updated provider
         let provider = create_llm_translation_provider(
             &updated_def,
-            self.http_client.clone(),
+            self.llm_runtime.clone(),
             api_key,
             self.config_store.clone(),
         );
@@ -1080,7 +1059,7 @@ impl ProviderConfiguration {
                     .unwrap_or_default();
                 let provider = create_llm_translation_provider(
                     &removed_def,
-                    self.http_client.clone(),
+                    self.llm_runtime.clone(),
                     api_key,
                     self.config_store.clone(),
                 );
@@ -1369,7 +1348,7 @@ impl ProviderConfiguration {
 mod provider_configuration_tests {
     use super::*;
     use crate::application::providers::translation::TranslationCoordinator;
-    use crate::application::providers::{HttpClient, HttpResponse};
+    use crate::application::providers::{HttpClient, HttpResponse, LlmRuntime};
     use crate::infrastructure::storage::{ConfigFile, Keychain, KeychainBackend};
     use anyhow::Result;
     use async_trait::async_trait;
@@ -1439,13 +1418,20 @@ mod provider_configuration_tests {
         }
     }
 
+    fn llm_runtime_from_http(http_client: Arc<dyn HttpClient>) -> Arc<dyn LlmRuntime> {
+        Arc::new(crate::infrastructure::llm::InfrastructureLlmRuntime::new(
+            http_client,
+        ))
+    }
+
     fn test_provider_configuration() -> ProviderConfiguration {
         let keychain = Arc::new(Keychain::with_backend(StubKeychainBackend::new()));
         let config_file = Arc::new(ConfigFile::new_temp());
         let http_client: Arc<dyn HttpClient> = Arc::new(MockHttpClient);
+        let llm_runtime = llm_runtime_from_http(http_client.clone());
         let coordinator = Arc::new(TranslationCoordinator::new(config_file.clone()));
         let llm_introspection = Arc::new(crate::application::providers::LlmIntrospection::new(
-            http_client.clone(),
+            llm_runtime.clone(),
         ));
 
         // Register builtin DeepL provider for testing
@@ -1456,7 +1442,7 @@ mod provider_configuration_tests {
         ProviderConfiguration::new(
             config_file,
             keychain,
-            http_client,
+            llm_runtime,
             coordinator,
             llm_introspection,
         )
@@ -1746,15 +1732,16 @@ mod provider_configuration_tests {
         let keychain = Arc::new(Keychain::with_backend(failing_backend));
         let config_file = Arc::new(ConfigFile::new_temp());
         let http_client: Arc<dyn HttpClient> = Arc::new(MockHttpClient);
+        let llm_runtime = llm_runtime_from_http(http_client.clone());
         let coordinator = Arc::new(TranslationCoordinator::new(config_file.clone()));
         let llm_introspection = Arc::new(crate::application::providers::LlmIntrospection::new(
-            http_client.clone(),
+            llm_runtime.clone(),
         ));
 
         let config = ProviderConfiguration::new(
             config_file.clone(),
             keychain.clone(),
-            http_client.clone(),
+            llm_runtime.clone(),
             coordinator.clone(),
             llm_introspection,
         );
@@ -1778,7 +1765,7 @@ mod provider_configuration_tests {
         // Register the provider
         let provider = create_llm_translation_provider(
             &def,
-            http_client.clone(),
+            llm_runtime,
             "test-key".to_string(),
             config_file.clone(),
         );

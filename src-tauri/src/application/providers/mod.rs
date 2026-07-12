@@ -4,6 +4,7 @@ pub mod configuration;
 mod credential_store;
 mod http_transport;
 pub mod llm_introspection;
+mod llm_runtime;
 pub mod ocr;
 pub mod translation;
 pub mod translation_prompt;
@@ -19,6 +20,10 @@ pub use configuration::{
 pub(crate) use credential_store::{CredentialSnapshot, ProviderCredentialStore};
 pub use http_transport::{HttpClient, HttpResponse};
 pub use llm_introspection::LlmIntrospection;
+pub use llm_runtime::{
+    LLMClient, LLMOptions, LLMProtocol, LLMRequest, LLMResponse, LlmClientConfig, LlmModelLister,
+    LlmRuntime, ModelInfo, ReasoningLevel,
+};
 pub use ocr::OcrProvider;
 pub use translation::TranslationProvider;
 pub use translation_prompt::{

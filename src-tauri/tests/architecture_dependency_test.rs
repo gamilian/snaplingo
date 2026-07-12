@@ -11,27 +11,7 @@ const CONFIGURATION_DEPENDENCIES: &[&str] = &[];
 
 const CREDENTIAL_DEPENDENCIES: &[&str] = &[];
 
-const HTTP_LLM_DEPENDENCIES: &[&str] = &[
-    "src/application/providers/configuration.rs -> crate::infrastructure::llm::AnthropicLLMClient",
-    "src/application/providers/configuration.rs -> crate::infrastructure::llm::GeminiLLMClient",
-    "src/application/providers/configuration.rs -> crate::infrastructure::llm::LLMClient",
-    "src/application/providers/configuration.rs -> crate::infrastructure::llm::LLMProtocol",
-    "src/application/providers/configuration.rs -> crate::infrastructure::llm::OpenAILLMClient",
-    "src/application/providers/configuration.rs -> crate::infrastructure::llm::ReasoningLevel",
-    "src/application/providers/llm_introspection.rs -> crate::infrastructure::llm::AnthropicLLMClient",
-    "src/application/providers/llm_introspection.rs -> crate::infrastructure::llm::GeminiLLMClient",
-    "src/application/providers/llm_introspection.rs -> crate::infrastructure::llm::LLMClient",
-    "src/application/providers/llm_introspection.rs -> crate::infrastructure::llm::LLMOptions",
-    "src/application/providers/llm_introspection.rs -> crate::infrastructure::llm::LLMProtocol",
-    "src/application/providers/llm_introspection.rs -> crate::infrastructure::llm::LLMRequest",
-    "src/application/providers/llm_introspection.rs -> crate::infrastructure::llm::LlmModelLister",
-    "src/application/providers/llm_introspection.rs -> crate::infrastructure::llm::ModelInfo",
-    "src/application/providers/llm_introspection.rs -> crate::infrastructure::llm::OpenAILLMClient",
-    "src/application/providers/translation/impls/llm.rs -> crate::infrastructure::llm::LLMClient",
-    "src/application/providers/translation/impls/llm.rs -> crate::infrastructure::llm::LLMOptions",
-    "src/application/providers/translation/impls/llm.rs -> crate::infrastructure::llm::LLMRequest",
-    "src/application/providers/translation/impls/llm.rs -> crate::infrastructure::llm::ReasoningLevel",
-];
+const HTTP_LLM_DEPENDENCIES: &[&str] = &[];
 
 const EVENTS_HISTORY_DEPENDENCIES: &[&str] = &[
     "src/application/history/mod.rs -> crate::infrastructure::events::EventSubscriber",
