@@ -7,16 +7,6 @@ use syn::{
     Attribute, ExprBlock, Field, ForeignItem, ImplItem, Item, ItemUse, TraitItem, UseTree, Variant,
 };
 
-const CONFIGURATION_DEPENDENCIES: &[&str] = &[];
-
-const CREDENTIAL_DEPENDENCIES: &[&str] = &[];
-
-const HTTP_LLM_DEPENDENCIES: &[&str] = &[];
-
-const EVENTS_HISTORY_DEPENDENCIES: &[&str] = &[];
-
-const RUNTIME_HOST_DEPENDENCIES: &[&str] = &[];
-
 #[derive(Clone)]
 struct SourceFile {
     path: String,
@@ -144,15 +134,6 @@ fn is_production_rust(path: &Path) -> bool {
     name != "tests.rs" && !name.ends_with("_test.rs")
 }
 
-fn dependency_inventory_violations(
-    files: &[SourceFile],
-    allowlist: &BTreeSet<String>,
-) -> Vec<String> {
-    let actual = dependency_inventory(files);
-
-    actual.symmetric_difference(allowlist).cloned().collect()
-}
-
 fn dependency_inventory(files: &[SourceFile]) -> BTreeSet<String> {
     files
         .iter()
@@ -215,88 +196,12 @@ fn has_cfg_test(attributes: &[Attribute]) -> bool {
     })
 }
 
-fn legacy_allowlist() -> BTreeSet<String> {
-    legacy_dependency_groups()
-        .into_iter()
-        .flat_map(|(_, dependencies)| dependencies.iter())
-        .map(|entry| (*entry).to_string())
-        .collect()
-}
-
-fn legacy_dependency_groups() -> [(&'static str, &'static [&'static str]); 5] {
-    [
-        ("configuration", CONFIGURATION_DEPENDENCIES),
-        ("credentials", CREDENTIAL_DEPENDENCIES),
-        ("http_llm", HTTP_LLM_DEPENDENCIES),
-        ("events_history", EVENTS_HISTORY_DEPENDENCIES),
-        ("runtime_host", RUNTIME_HOST_DEPENDENCIES),
-    ]
-}
-
-fn assert_dependency_group_inventory(group_name: &str, expected_dependencies: &[&str]) {
-    let actual = dependency_inventory(&production_application_sources());
-    let stale_entries = expected_dependencies
-        .iter()
-        .filter(|dependency| !actual.contains(**dependency))
-        .copied()
-        .collect::<Vec<_>>();
-
-    assert!(
-        stale_entries.is_empty(),
-        "{group_name} dependency inventory is stale; missing dependencies: {stale_entries:#?}"
-    );
-}
-
 #[test]
-fn application_infrastructure_dependencies_match_the_legacy_inventory() {
+fn application_production_sources_do_not_import_infrastructure() {
     assert_eq!(
-        dependency_inventory_violations(&production_application_sources(), &legacy_allowlist()),
-        Vec::<String>::new()
+        dependency_inventory(&production_application_sources()),
+        BTreeSet::<String>::new()
     );
-}
-
-#[test]
-fn remaining_configuration_dependencies_are_inventoried() {
-    assert_dependency_group_inventory("configuration", CONFIGURATION_DEPENDENCIES);
-}
-
-#[test]
-fn remaining_credential_dependencies_are_inventoried() {
-    assert_dependency_group_inventory("credentials", CREDENTIAL_DEPENDENCIES);
-}
-
-#[test]
-fn remaining_http_llm_dependencies_are_inventoried() {
-    assert_dependency_group_inventory("http_llm", HTTP_LLM_DEPENDENCIES);
-}
-
-#[test]
-fn remaining_events_history_dependencies_are_inventoried() {
-    assert_dependency_group_inventory("events_history", EVENTS_HISTORY_DEPENDENCIES);
-}
-
-#[test]
-fn remaining_runtime_host_dependencies_are_inventoried() {
-    assert_dependency_group_inventory("runtime_host", RUNTIME_HOST_DEPENDENCIES);
-}
-
-#[test]
-fn dependency_groups_partition_the_legacy_inventory() {
-    let grouped_inventory = legacy_dependency_groups()
-        .into_iter()
-        .flat_map(|(_, dependencies)| dependencies.iter())
-        .collect::<Vec<_>>();
-    let grouped_set = grouped_inventory
-        .iter()
-        .map(|dependency| (**dependency).to_string())
-        .collect::<BTreeSet<_>>();
-
-    assert_eq!(
-        grouped_inventory.len(),
-        grouped_set.len(),
-        "legacy dependency groups must not contain duplicate entries"
-    );
-    assert_eq!(grouped_set, legacy_allowlist());
 }
 
 #[test]
@@ -332,7 +237,7 @@ fn rejects_an_unlisted_synthetic_dependency() {
     }];
 
     assert_eq!(
-        dependency_inventory_violations(&files, &BTreeSet::new()),
+        dependency_inventory(&files).into_iter().collect::<Vec<_>>(),
         vec![
             "src/application/example.rs -> crate::infrastructure::Enum::Variant",
             "src/application/example.rs -> crate::infrastructure::Foo",
