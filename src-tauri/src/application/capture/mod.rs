@@ -2,6 +2,7 @@ mod image_composer;
 mod output;
 mod render;
 mod runtime;
+mod runtime_host;
 mod session;
 mod source;
 
@@ -18,6 +19,6 @@ pub(crate) use output::configured_capture_save_dir;
 pub use output::{CaptureOutput, ClipboardCaptureOutput};
 pub use render::CaptureSessionOutput;
 pub use runtime::CaptureSessionRuntime;
-pub(crate) use runtime::TauriCaptureSessionRuntimeHost;
+pub(crate) use runtime_host::CaptureSessionRuntimeHost;
 pub use session::CaptureSessions;
 pub use source::CaptureSessionSource;

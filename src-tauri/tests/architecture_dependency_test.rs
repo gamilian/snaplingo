@@ -15,16 +15,8 @@ const HTTP_LLM_DEPENDENCIES: &[&str] = &[];
 
 const EVENTS_HISTORY_DEPENDENCIES: &[&str] = &[];
 
-const RUNTIME_HOST_DEPENDENCIES: &[&str] = &[
-    "src/application/capture/runtime.rs -> crate::infrastructure::system::capture_window::begin_capture_presentation",
-    "src/application/capture/runtime.rs -> crate::infrastructure::system::capture_window::capture_window_bounds",
-    "src/application/capture/runtime.rs -> crate::infrastructure::system::capture_window::destroy_inactive_capture_window",
-    "src/application/capture/runtime.rs -> crate::infrastructure::system::capture_window::end_capture_presentation",
-    "src/application/capture/runtime.rs -> crate::infrastructure::system::capture_window::hide_capture_window",
-    "src/application/capture/runtime.rs -> crate::infrastructure::system::capture_window::open_capture_window_for_session",
-    "src/application/capture/runtime.rs -> crate::infrastructure::system::capture_window::restore_capture_snapshot_windows",
-    "src/application/hotkeys/runtime.rs -> crate::infrastructure",
-];
+const RUNTIME_HOST_DEPENDENCIES: &[&str] =
+    &["src/application/hotkeys/runtime.rs -> crate::infrastructure"];
 
 #[derive(Clone)]
 struct SourceFile {

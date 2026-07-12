@@ -2,9 +2,10 @@ use std::sync::Arc;
 
 use tauri::AppHandle;
 
-use crate::application::capture::{CaptureImageComposer, TauriCaptureSessionRuntimeHost};
+use crate::application::capture::CaptureImageComposer;
 use crate::application::pinned_image::PinnedImageState;
 use crate::application::providers::ocr::OcrCoordinator;
+use crate::infrastructure::system::capture_window::TauriCaptureSessionRuntimeHost;
 use crate::infrastructure::system::pinned_window::TauriPinnedImageRuntimeHost;
 use crate::infrastructure::system::screenshot::get_capture_session_source;
 use crate::{CaptureOutput, CaptureSessionRuntime, CaptureSessions, PinnedImageRuntime};

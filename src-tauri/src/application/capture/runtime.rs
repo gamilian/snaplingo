@@ -1,146 +1,17 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use async_trait::async_trait;
-use tauri::AppHandle;
-
 use super::render::{
     output_capture_selection, recognize_capture_selection_text, render_capture_png_base64,
 };
+use super::runtime_host::{CaptureSessionRuntimeHost, UnconfiguredCaptureSessionRuntimeHost};
 use super::{CaptureImageComposer, CaptureOutput, CaptureSessionOutput, CaptureSessions};
 use crate::application::providers::ocr::OcrCoordinator;
 use crate::domain::capture::{
     AnnotationCommand, CaptureOutputAction, CaptureSessionId, CaptureSessionView, LogicalRect,
 };
 use crate::domain::ocr::OcrResult;
-use crate::infrastructure::system::capture_window::{
-    begin_capture_presentation, capture_window_bounds, destroy_inactive_capture_window,
-    end_capture_presentation, hide_capture_window, open_capture_window_for_session,
-    restore_capture_snapshot_windows,
-};
 use crate::Result;
-
-#[async_trait]
-pub(crate) trait CaptureSessionRuntimeHost: Send + Sync {
-    async fn begin_capture_presentation(&self) -> Result<()>;
-    async fn end_capture_presentation(&self) -> Result<()>;
-    async fn hide_capture_window(&self) -> Result<()>;
-    async fn destroy_inactive_capture_window(&self) -> Result<()>;
-    async fn open_capture_window_for_session(
-        &self,
-        mode: &str,
-        session_id: &str,
-        bounds: &LogicalRect,
-    ) -> Result<()>;
-    async fn restore_capture_snapshot_windows(
-        &self,
-        hidden_window_labels: Vec<String>,
-    ) -> Result<()>;
-}
-
-struct UnconfiguredCaptureSessionRuntimeHost;
-
-#[async_trait]
-impl CaptureSessionRuntimeHost for UnconfiguredCaptureSessionRuntimeHost {
-    async fn begin_capture_presentation(&self) -> Result<()> {
-        Err("Capture session host is not configured".into())
-    }
-
-    async fn end_capture_presentation(&self) -> Result<()> {
-        Err("Capture session host is not configured".into())
-    }
-
-    async fn hide_capture_window(&self) -> Result<()> {
-        Err("Capture session host is not configured".into())
-    }
-
-    async fn destroy_inactive_capture_window(&self) -> Result<()> {
-        Err("Capture session host is not configured".into())
-    }
-
-    async fn open_capture_window_for_session(
-        &self,
-        _mode: &str,
-        _session_id: &str,
-        _bounds: &LogicalRect,
-    ) -> Result<()> {
-        Err("Capture session host is not configured".into())
-    }
-
-    async fn restore_capture_snapshot_windows(
-        &self,
-        _hidden_window_labels: Vec<String>,
-    ) -> Result<()> {
-        Err("Capture session host is not configured".into())
-    }
-}
-
-pub(crate) struct TauriCaptureSessionRuntimeHost {
-    app: AppHandle,
-}
-
-impl TauriCaptureSessionRuntimeHost {
-    pub(crate) fn new(app: AppHandle) -> Self {
-        Self { app }
-    }
-}
-
-#[async_trait]
-impl CaptureSessionRuntimeHost for TauriCaptureSessionRuntimeHost {
-    async fn begin_capture_presentation(&self) -> Result<()> {
-        run_on_main_thread(&self.app, "begin capture presentation", |app| {
-            begin_capture_presentation(&app)
-        })
-        .await
-    }
-
-    async fn end_capture_presentation(&self) -> Result<()> {
-        run_on_main_thread(&self.app, "end capture presentation", |app| {
-            end_capture_presentation(&app)
-        })
-        .await
-    }
-
-    async fn hide_capture_window(&self) -> Result<()> {
-        run_on_main_thread(&self.app, "hide capture window", |app| {
-            hide_capture_window(&app)
-        })
-        .await
-    }
-
-    async fn destroy_inactive_capture_window(&self) -> Result<()> {
-        run_on_main_thread(&self.app, "destroy inactive capture window", |app| {
-            destroy_inactive_capture_window(&app)
-        })
-        .await
-    }
-
-    async fn open_capture_window_for_session(
-        &self,
-        mode: &str,
-        session_id: &str,
-        bounds: &LogicalRect,
-    ) -> Result<()> {
-        let mode = mode.to_string();
-        let session_id = session_id.to_string();
-        let bounds = bounds.clone();
-
-        run_on_main_thread(&self.app, "open capture window", move |app| {
-            open_capture_window_for_session(&app, &mode, &session_id, &bounds)
-        })
-        .await
-    }
-
-    async fn restore_capture_snapshot_windows(
-        &self,
-        hidden_window_labels: Vec<String>,
-    ) -> Result<()> {
-        run_on_main_thread(&self.app, "restore capture snapshot windows", move |app| {
-            restore_capture_snapshot_windows(&app, &hidden_window_labels)
-        })
-        .await
-    }
-}
 
 /// Coordinates Capture Session operations that span several application modules.
 pub struct CaptureSessionRuntime {
@@ -245,7 +116,7 @@ impl CaptureSessionRuntime {
         let view_base64_bytes = capture_session_view_base64_bytes(&session);
 
         let open_start = Instant::now();
-        let open_result = match capture_window_bounds(&session.monitors) {
+        let open_result = match self.host.capture_window_bounds(&session.monitors) {
             Some(bounds) => {
                 self.host
                     .open_capture_window_for_session(mode, &session.id.0, &bounds)
@@ -454,28 +325,6 @@ fn elapsed_ms(start: Instant) -> f64 {
     start.elapsed().as_secs_f64() * 1000.0
 }
 
-async fn run_on_main_thread<T, F>(
-    app: &AppHandle,
-    operation_name: &'static str,
-    operation: F,
-) -> Result<T>
-where
-    T: Send + 'static,
-    F: FnOnce(AppHandle) -> std::result::Result<T, String> + Send + 'static,
-{
-    let (sender, receiver) = tokio::sync::oneshot::channel();
-    let app_for_operation = app.clone();
-    app.run_on_main_thread(move || {
-        let _ = sender.send(operation(app_for_operation));
-    })
-    .map_err(|e| format!("Failed to dispatch {operation_name}: {e}"))?;
-
-    receiver
-        .await
-        .map_err(|e| format!("Failed to receive {operation_name} result: {e}"))?
-        .map_err(Into::into)
-}
-
 #[cfg(test)]
 mod tests {
     use std::sync::{Arc, Mutex};
@@ -595,6 +444,28 @@ mod tests {
                 .unwrap()
                 .push(HostCall::RestoreSnapshotWindows(hidden_window_labels));
             self.restore_result.clone().map_err(AppError::from)
+        }
+
+        fn capture_window_bounds(
+            &self,
+            monitors: &[crate::domain::capture::MonitorSnapshotView],
+        ) -> Option<LogicalRect> {
+            let first = monitors.first()?.logical_bounds.clone();
+            Some(monitors.iter().skip(1).fold(first, |bounds, monitor| {
+                let monitor_bounds = &monitor.logical_bounds;
+                let min_x = bounds.x.min(monitor_bounds.x);
+                let min_y = bounds.y.min(monitor_bounds.y);
+                let max_x = (bounds.x + bounds.width).max(monitor_bounds.x + monitor_bounds.width);
+                let max_y =
+                    (bounds.y + bounds.height).max(monitor_bounds.y + monitor_bounds.height);
+
+                LogicalRect {
+                    x: min_x,
+                    y: min_y,
+                    width: max_x - min_x,
+                    height: max_y - min_y,
+                }
+            }))
         }
     }
 
