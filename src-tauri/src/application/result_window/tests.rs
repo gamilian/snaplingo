@@ -668,3 +668,37 @@ async fn stale_notification_cannot_take_a_newer_payload() {
         Some(translation_payload("newer", false))
     );
 }
+
+#[tokio::test]
+async fn late_subscriber_bootstraps_from_the_current_pending_request_id() {
+    let (runtime, _window, _clipboard, _notifier) = make_runtime([], []);
+
+    runtime
+        .open(translation_request("missed event"))
+        .await
+        .unwrap();
+
+    let request_id = runtime.current_request_id().unwrap().unwrap();
+    assert_eq!(
+        runtime.take_if_current(request_id).unwrap(),
+        Some(translation_payload("missed event", false))
+    );
+}
+
+#[tokio::test]
+async fn stale_bootstrap_id_cannot_take_a_newer_pending_payload() {
+    let (runtime, _window, _clipboard, _notifier) = make_runtime([], []);
+
+    runtime.open(translation_request("older")).await.unwrap();
+    let older_request_id = runtime.current_request_id().unwrap().unwrap();
+
+    runtime.open(translation_request("newer")).await.unwrap();
+
+    assert_eq!(runtime.take_if_current(older_request_id).unwrap(), None);
+
+    let newer_request_id = runtime.current_request_id().unwrap().unwrap();
+    assert_eq!(
+        runtime.take_if_current(newer_request_id).unwrap(),
+        Some(translation_payload("newer", false))
+    );
+}

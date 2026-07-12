@@ -79,6 +79,14 @@ impl ResultWindowRuntime {
         Ok(state.pending.take().map(|pending| pending.payload))
     }
 
+    /// Returns the pending payload's identity for a late subscriber to claim.
+    pub(crate) fn current_request_id(&self) -> crate::Result<Option<ResultWindowRequestId>> {
+        let state = self.lock_state()?;
+        Ok(state.pending.as_ref().and_then(|pending| {
+            (pending.request_id.0 == state.latest_request_id).then_some(pending.request_id)
+        }))
+    }
+
     fn next_request_id(&self) -> crate::Result<ResultWindowRequestId> {
         let mut state = self.lock_state()?;
         state.latest_request_id = state

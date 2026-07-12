@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 
+/// Identifies a single result-window payload handoff.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct ResultWindowRequestId(pub(crate) u64);
 
