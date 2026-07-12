@@ -1,7 +1,7 @@
 use crate::application::providers::common::Provider;
 use crate::application::providers::translation::TranslationProvider;
+use crate::application::providers::HttpClient;
 use crate::domain::translation::{TranslationRequest, TranslationResult};
-use crate::infrastructure::http::HttpClient;
 use crate::{AppError, Result};
 use async_trait::async_trait;
 use serde_json::Value;
@@ -94,7 +94,7 @@ impl TranslationProvider for GoogleTranslateProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::infrastructure::http::HttpResponse;
+    use crate::application::providers::HttpResponse;
     use std::collections::HashMap;
 
     struct MockHttpClient {

@@ -2,6 +2,7 @@ pub mod common;
 mod config_store;
 pub mod configuration;
 mod credential_store;
+mod http_transport;
 pub mod llm_introspection;
 pub mod ocr;
 pub mod translation;
@@ -16,6 +17,7 @@ pub use configuration::{
     ProviderConfiguration, UpdateCustomTranslationProviderInput,
 };
 pub(crate) use credential_store::{CredentialSnapshot, ProviderCredentialStore};
+pub use http_transport::{HttpClient, HttpResponse};
 pub use llm_introspection::LlmIntrospection;
 pub use ocr::OcrProvider;
 pub use translation::TranslationProvider;

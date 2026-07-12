@@ -24,13 +24,14 @@ use crate::app_state::{
 };
 use crate::application::hotkeys::HotkeyStore;
 use crate::application::providers::ocr::OcrProviderConfiguration;
+use crate::application::providers::HttpClient;
 use crate::application::providers::{
     ProviderConfigStore, ProviderCredentialStore, TranslationPromptConfiguration,
 };
 use crate::application::result_window::ResultWindowRuntime;
 use crate::application::settings::SettingsStore;
 use crate::infrastructure::events::EventBus;
-use crate::infrastructure::http::{HttpClient, ReqwestHttpClient};
+use crate::infrastructure::http::ReqwestHttpClient;
 use crate::infrastructure::storage::{ConfigFile, Keychain};
 use crate::infrastructure::system::clipboard::ArboardResultWindowClipboard;
 use crate::infrastructure::system::result_window::{

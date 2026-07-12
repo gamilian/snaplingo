@@ -5,11 +5,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::application::providers::common::CredentialField;
 use crate::application::providers::translation::{LLMTranslationProvider, TranslationCoordinator};
+use crate::application::providers::HttpClient;
 use crate::application::providers::{
     ProviderConfigStore, ProviderCredentialStore, ProviderPromptStrategy,
     DEFAULT_PROMPT_STRATEGY_ID, SMART_PROMPT_STRATEGY_ID,
 };
-use crate::infrastructure::http::HttpClient;
 use crate::infrastructure::llm::{
     AnthropicLLMClient, GeminiLLMClient, LLMClient, LLMProtocol, OpenAILLMClient, ReasoningLevel,
 };
@@ -428,9 +428,9 @@ mod tests {
 
     use crate::application::providers::common::{CredentialField, Provider};
     use crate::application::providers::translation::TranslationProvider;
+    use crate::application::providers::{HttpClient, HttpResponse};
     use crate::application::providers::{DEFAULT_PROMPT_STRATEGY_ID, SMART_PROMPT_STRATEGY_ID};
     use crate::domain::translation::TranslationRequest;
-    use crate::infrastructure::http::{HttpClient, HttpResponse};
     use crate::infrastructure::llm::{LLMProtocol, ReasoningLevel};
     use crate::infrastructure::storage::ConfigFile;
     use anyhow::Result;
@@ -1369,7 +1369,7 @@ impl ProviderConfiguration {
 mod provider_configuration_tests {
     use super::*;
     use crate::application::providers::translation::TranslationCoordinator;
-    use crate::infrastructure::http::{HttpClient, HttpResponse};
+    use crate::application::providers::{HttpClient, HttpResponse};
     use crate::infrastructure::storage::{ConfigFile, Keychain, KeychainBackend};
     use anyhow::Result;
     use async_trait::async_trait;

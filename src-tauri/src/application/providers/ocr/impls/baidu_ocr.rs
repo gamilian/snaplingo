@@ -1,7 +1,7 @@
 use crate::application::providers::common::{CredentialField, Provider};
 use crate::application::providers::ocr::OcrProvider;
+use crate::application::providers::HttpClient;
 use crate::domain::ocr::{OcrRequest, OcrResult};
-use crate::infrastructure::http::HttpClient;
 use crate::{AppError, Result};
 use async_trait::async_trait;
 use base64::engine::general_purpose::STANDARD;
@@ -246,7 +246,7 @@ impl OcrProvider for BaiduOcrProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::infrastructure::http::HttpResponse;
+    use crate::application::providers::HttpResponse;
 
     struct MockHttpClient {
         responses: Vec<HttpResponse>,

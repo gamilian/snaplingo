@@ -12,10 +12,10 @@ use crate::application::providers::translation::{
     TranslationCoordinator,
 };
 use crate::application::providers::{
-    LlmIntrospection, ProviderConfigStore, ProviderConfiguration, ProviderCredentialStore,
+    HttpClient, LlmIntrospection, ProviderConfigStore, ProviderConfiguration,
+    ProviderCredentialStore,
 };
 use crate::infrastructure::events::EventBus;
-use crate::infrastructure::http::HttpClient;
 use crate::infrastructure::system::ocr::get_tesseract_engine;
 #[cfg(target_os = "macos")]
 use crate::infrastructure::system::ocr::MacOSVisionOcrEngine;
@@ -144,7 +144,7 @@ fn load_baidu_ocr_credentials(
 #[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
-    use crate::infrastructure::http::HttpResponse;
+    use crate::application::providers::HttpResponse;
     use crate::infrastructure::storage::ConfigFile;
     use async_trait::async_trait;
     use std::collections::HashMap;

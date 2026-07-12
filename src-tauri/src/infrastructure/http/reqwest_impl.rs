@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use reqwest;
 use std::collections::HashMap;
 
-use super::client::{HttpClient, HttpResponse};
+use crate::application::providers::{HttpClient, HttpResponse};
 
 /// HTTP client implementation using Reqwest
 pub struct ReqwestHttpClient {

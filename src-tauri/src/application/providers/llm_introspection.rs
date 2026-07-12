@@ -1,4 +1,4 @@
-use crate::infrastructure::http::HttpClient;
+use crate::application::providers::HttpClient;
 use crate::infrastructure::llm::{
     AnthropicLLMClient, GeminiLLMClient, LLMClient, LLMOptions, LLMProtocol, LLMRequest,
     LlmModelLister, ModelInfo, OpenAILLMClient,
@@ -100,7 +100,7 @@ impl LlmIntrospection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::infrastructure::http::{HttpClient, HttpResponse};
+    use crate::application::providers::{HttpClient, HttpResponse};
     use anyhow::Result;
     use async_trait::async_trait;
     use std::collections::HashMap;

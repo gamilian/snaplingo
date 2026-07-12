@@ -1,7 +1,7 @@
 use crate::application::providers::common::{CredentialField, Provider};
 use crate::application::providers::translation::TranslationProvider;
+use crate::application::providers::HttpClient;
 use crate::domain::translation::{TranslationRequest, TranslationResult};
-use crate::infrastructure::http::HttpClient;
 use crate::{AppError, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -315,7 +315,7 @@ impl DeepLProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::infrastructure::http::HttpResponse;
+    use crate::application::providers::HttpResponse;
 
     struct MockHttpClient {
         response: HttpResponse,
