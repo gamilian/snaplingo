@@ -5,29 +5,28 @@ use objc2_app_kit::{
 };
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
-use super::backend::{result_window_url, RESULT_WINDOW_LABEL};
+use super::backend::{result_window_definition, RESULT_WINDOW_LABEL};
 
 pub fn show_or_create_result_window(app: &AppHandle) -> Result<WebviewWindow, String> {
     let window = match app.get_webview_window(RESULT_WINDOW_LABEL) {
         Some(window) => window,
-        None => WebviewWindowBuilder::new(
-            app,
-            RESULT_WINDOW_LABEL,
-            WebviewUrl::App(result_window_url()),
-        )
-        .title("SnapLingo Result")
-        .inner_size(660.0, 660.0)
-        .position(120.0, 120.0)
-        .decorations(false)
-        .always_on_top(true)
-        .visible_on_all_workspaces(true)
-        .transparent(true)
-        .visible(false)
-        .skip_taskbar(true)
-        .focused(false)
-        .shadow(true)
-        .build()
-        .map_err(|e| e.to_string())?,
+        None => {
+            let definition = result_window_definition();
+            WebviewWindowBuilder::new(app, definition.label, WebviewUrl::App(definition.url))
+                .title(definition.title)
+                .inner_size(definition.inner_size.0, definition.inner_size.1)
+                .position(definition.position.0, definition.position.1)
+                .decorations(definition.decorations)
+                .always_on_top(definition.always_on_top)
+                .visible_on_all_workspaces(definition.visible_on_all_workspaces)
+                .transparent(definition.transparent)
+                .visible(definition.visible)
+                .skip_taskbar(definition.skip_taskbar)
+                .focused(definition.focused)
+                .shadow(definition.shadow)
+                .build()
+                .map_err(|e| e.to_string())?
+        }
     };
 
     reveal_result_window(&window)?;

@@ -5,6 +5,7 @@ use crate::application::providers::translation::TranslationCoordinator;
 use crate::application::providers::{
     LlmIntrospection, ProviderConfiguration, TranslationPromptConfiguration,
 };
+use crate::application::result_window::ResultWindowRuntime;
 use crate::application::{
     CaptureOutput, CaptureSessionRuntime, CaptureSessions, History, HotkeyRuntime,
     PinnedImageRuntime, SelectedTextAcquirer, SettingsConfiguration,
@@ -48,6 +49,8 @@ pub struct AppState {
     pub capture: Arc<CaptureRuntimeState>,
     pub history: Arc<HistoryRuntime>,
     pub selection: Arc<SelectionRuntime>,
+    #[allow(dead_code)] // Wired in Task 3; commands consume it in the following Task 4.
+    pub(crate) result_window: Arc<ResultWindowRuntime>,
 }
 
 impl AppState {
@@ -68,5 +71,23 @@ impl AppState {
 
         log::info!("Graceful shutdown complete");
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use crate::application::result_window::ResultWindowRuntime;
+
+    use super::AppState;
+
+    #[test]
+    fn app_state_exposes_shared_result_window_runtime() {
+        fn runtime(state: &AppState) -> &Arc<ResultWindowRuntime> {
+            &state.result_window
+        }
+
+        let _ = runtime;
     }
 }

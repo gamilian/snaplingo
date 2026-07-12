@@ -24,9 +24,14 @@ use crate::app_state::{
 };
 use crate::application::providers::ocr::OcrProviderConfiguration;
 use crate::application::providers::TranslationPromptConfiguration;
+use crate::application::result_window::ResultWindowRuntime;
 use crate::infrastructure::events::EventBus;
 use crate::infrastructure::http::{HttpClient, ReqwestHttpClient};
 use crate::infrastructure::storage::{ConfigFile, Keychain};
+use crate::infrastructure::system::clipboard::ArboardResultWindowClipboard;
+use crate::infrastructure::system::result_window::{
+    TauriResultWindowNotifier, TauriResultWindowRuntimeHost,
+};
 use crate::{HotkeyConfiguration, HotkeyRuntime, SettingsConfiguration};
 
 pub(crate) fn build_app_state(config_path: PathBuf, app: AppHandle) -> AppState {
@@ -67,7 +72,12 @@ pub(crate) fn build_app_state(config_path: PathBuf, app: AppHandle) -> AppState 
     ));
 
     let capture_runtime = build_capture_runtime(app.clone(), ocr_coordinator.clone());
-    let selected_text_acquirer = build_selected_text_acquirer(app);
+    let selected_text_acquirer = build_selected_text_acquirer(app.clone());
+    let result_window = Arc::new(ResultWindowRuntime::new(
+        Arc::new(TauriResultWindowRuntimeHost::new(app.clone())),
+        Arc::new(ArboardResultWindowClipboard::new()),
+        Arc::new(TauriResultWindowNotifier::new(app)),
+    ));
 
     hydrate_provider_credentials_in_background(
         keychain,
@@ -101,6 +111,7 @@ pub(crate) fn build_app_state(config_path: PathBuf, app: AppHandle) -> AppState 
         selection: Arc::new(SelectionRuntime {
             acquirer: selected_text_acquirer,
         }),
+        result_window,
     }
 }
 
