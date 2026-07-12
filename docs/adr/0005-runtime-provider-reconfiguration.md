@@ -1,6 +1,6 @@
 # ADR 0005: Runtime Provider Reconfiguration
 
-> The single-`api_key` compatibility-command portion of this ADR is superseded by [ADR 0006](0006-remove-provider-compatibility-command.md). The runtime reconfiguration decision remains accepted.
+> The single-`api_key` compatibility-command portion of this ADR is superseded by [ADR 0007](0007-remove-provider-compatibility-command.md). The runtime reconfiguration decision remains accepted.
 
 ## Status
 Accepted
@@ -17,7 +17,7 @@ Provider Coordinators own this behavior through their public Interface:
 - `TranslationCoordinator::reconfigure_provider(...)`
 - `OcrCoordinator::reconfigure_provider(...)`
 
-Frontend code must configure Translation Provider credentials through the credential-map Adapter (`configureTranslationProviderCredentials(...)`) and backend command (`configure_translation_provider_credentials`). The older single `api_key` command remains only as a compatibility Adapter and delegates to the same credential-map implementation.
+Frontend code configures Translation Provider credentials through the credential-map Adapter (`configureTranslationProviderCredentials(...)`) and backend command (`configure_translation_provider_credentials`).
 
 Credential validation and custom Translation Provider definition handling live in the Provider Configuration Module. Credentials still persist through Keychain, but runtime mutation happens through the registered Provider behind the Coordinator seam.
 

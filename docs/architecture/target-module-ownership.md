@@ -1,8 +1,8 @@
 # Target Module Ownership
 
-**Status:** Approved target; migration in progress
+**Status:** Implemented and enforced
 
-This document records the target ownership boundaries approved in the [Architecture Rebuild Design](../superpowers/specs/2026-07-11-architecture-rebuild-design.md). It does not claim that any implementation phase is complete. `ARCHITECTURE.md` remains a current-state overview that is updated as migrations land.
+This document records the ownership boundaries implemented from the [Architecture Rebuild Design](../superpowers/specs/2026-07-11-architecture-rebuild-design.md). `ARCHITECTURE.md` remains the current-state overview.
 
 ## Vocabulary
 
@@ -31,14 +31,12 @@ The target favors deep modules: narrow interfaces should hide meaningful workflo
 
 The dependency direction follows ownership: Views consume Frontend Application interfaces; Frontend Platform adapters satisfy the platform seam; Backend Commands call Backend Application interfaces; Backend Application owns ports; Composition selects and injects Infrastructure adapters. This preserves locality inside workflow modules and gives their interfaces leverage across production callers and tests.
 
-## Migration Inventory Is Not Architecture
+## Enforcement
 
-The frontend and backend dependency allowlists added by the architecture foundation are frozen migration inventory. They record the current direct Tauri imports, raw event-string callers, and Backend Application-to-Infrastructure dependencies so automated checks can reject new leakage while later phases move each seam.
-
-An allowlisted dependency is not accepted architecture, an exception to the target ownership rules, or permission to add a similar dependency. The inventories must shrink as their owning seams migrate and are removed when the strict target rule takes effect. Their presence proves only that the baseline is known and cannot grow.
+The frontend and backend architecture suites enforce these ownership boundaries without a migration inventory or allowlist. Production frontend Views and Application modules cannot import Platform/Tauri mechanics. Production backend Application modules cannot import Infrastructure or crate-root startup adapters.
 
 ## Accepted ADR Alignment
 
 - [ADR 0004](../adr/0004-coordinator-consolidation.md) remains accepted. Translation and OCR Provider Coordinators remain deep modules that own activation, persistence, execution, and coordination; they are not split into shallow forwarding modules.
-- [ADR 0005](../adr/0005-runtime-provider-reconfiguration.md) remains accepted for runtime Provider reconfiguration through the Coordinator interface. Its older single-`api_key` compatibility-command requirement is superseded and removed by [ADR 0006](../adr/0006-remove-provider-compatibility-command.md).
+- [ADR 0005](../adr/0005-runtime-provider-reconfiguration.md) remains accepted for runtime Provider reconfiguration through the Coordinator interface. Its older single-`api_key` compatibility-command requirement is superseded and removed by [ADR 0007](../adr/0007-remove-provider-compatibility-command.md).
 - [ADR 0006](../adr/0006-menu-bar-app-shell.md) remains accepted. SnapLingo keeps a menu-bar resident shell, with Settings opened explicitly and business workflows independent of the Settings Window lifecycle.

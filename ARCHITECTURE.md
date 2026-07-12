@@ -79,4 +79,4 @@ Portable data and policy are kept in Domain or Application. OS-specific code is 
 
 ## Compatibility Policy
 
-The app is pre-release. IPC payloads, persisted settings, credentials, and history formats may change with the architecture. The removed single-key Provider configuration command is not retained as a compatibility path; see [ADR 0006](docs/adr/0006-remove-provider-compatibility-command.md).
+The app is pre-release. IPC payloads, persisted settings, credentials, and history formats may change with the architecture. The removed single-key Provider configuration command is not retained as a compatibility path; see [ADR 0007](docs/adr/0007-remove-provider-compatibility-command.md).

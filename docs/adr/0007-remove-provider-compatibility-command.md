@@ -1,4 +1,4 @@
-# ADR 0006: Remove the Provider compatibility command
+# ADR 0007: Remove the Provider compatibility command
 
 ## Status
 
