@@ -1,6 +1,6 @@
 use crate::domain::ocr::{OcrRequest, OcrResult};
 use crate::Result;
 
-pub trait SystemOcrEngine: Send + Sync {
+pub(crate) trait SystemOcrEngine: Send + Sync {
     fn recognize(&self, request: &OcrRequest) -> Result<OcrResult>;
 }

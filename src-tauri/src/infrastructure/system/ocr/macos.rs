@@ -1,4 +1,4 @@
-use super::SystemOcrEngine;
+use crate::application::providers::ocr::SystemOcrEngine;
 use crate::domain::ocr::{OcrRequest, OcrResult};
 use crate::{AppError, Result};
 use objc2::runtime::AnyObject;

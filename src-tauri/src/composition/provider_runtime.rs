@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-#[cfg(target_os = "macos")]
 use crate::application::providers::ocr::impls::SystemOcrProvider;
 use crate::application::providers::ocr::{
     impls::{BaiduOcrProvider, TesseractProvider},
@@ -16,6 +15,8 @@ use crate::infrastructure::events::EventBus;
 use crate::infrastructure::http::HttpClient;
 use crate::infrastructure::storage::{ConfigFile, Keychain};
 use crate::infrastructure::system::ocr::get_tesseract_engine;
+#[cfg(target_os = "macos")]
+use crate::infrastructure::system::ocr::MacOSVisionOcrEngine;
 
 pub(crate) fn build_llm_introspection(http_client: Arc<dyn HttpClient>) -> Arc<LlmIntrospection> {
     Arc::new(LlmIntrospection::new(http_client))
@@ -82,7 +83,11 @@ pub(crate) fn build_ocr_coordinator(
     ocr_coordinator.register(tesseract_provider).ok();
 
     #[cfg(target_os = "macos")]
-    ocr_coordinator.register(SystemOcrProvider::new()).ok();
+    ocr_coordinator
+        .register(SystemOcrProvider::new(
+            Arc::new(MacOSVisionOcrEngine::new()),
+        ))
+        .ok();
 
     let baidu_ocr_provider = BaiduOcrProvider::new(http_client);
     ocr_coordinator.register(baidu_ocr_provider).ok();

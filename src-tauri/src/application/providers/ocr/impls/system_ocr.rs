@@ -1,7 +1,6 @@
 use crate::application::providers::common::Provider;
-use crate::application::providers::ocr::OcrProvider;
+use crate::application::providers::ocr::{OcrProvider, SystemOcrEngine};
 use crate::domain::ocr::{OcrRequest, OcrResult};
-use crate::infrastructure::system::ocr::{get_system_ocr_engine, SystemOcrEngine};
 use crate::Result;
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -12,21 +11,8 @@ pub struct SystemOcrProvider {
 }
 
 impl SystemOcrProvider {
-    pub fn new() -> Self {
-        Self {
-            engine: get_system_ocr_engine(),
-        }
-    }
-
-    #[cfg(test)]
-    fn with_engine(engine: Arc<dyn SystemOcrEngine>) -> Self {
+    pub(crate) fn new(engine: Arc<dyn SystemOcrEngine>) -> Self {
         Self { engine }
-    }
-}
-
-impl Default for SystemOcrProvider {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -72,7 +58,7 @@ mod tests {
 
     #[test]
     fn system_ocr_provider_is_local_and_ready_without_credentials() {
-        let provider = SystemOcrProvider::new();
+        let provider = SystemOcrProvider::new(Arc::new(StubSystemOcrEngine));
 
         assert_eq!(provider.id(), "system-ocr");
         assert_eq!(provider.name(), "System OCR");
@@ -82,7 +68,7 @@ mod tests {
 
     #[tokio::test]
     async fn system_ocr_provider_delegates_recognition_to_infrastructure_engine() {
-        let provider = SystemOcrProvider::with_engine(Arc::new(StubSystemOcrEngine));
+        let provider = SystemOcrProvider::new(Arc::new(StubSystemOcrEngine));
         let request = OcrRequest {
             image_data: vec![1, 2, 3],
             language: Some("en".to_string()),
