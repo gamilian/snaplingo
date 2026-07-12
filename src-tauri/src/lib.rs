@@ -90,6 +90,7 @@ pub fn run() {
             commands::open_translation_result_window,
             commands::open_capture_ocr_result_window,
             commands::open_capture_translation_result_window,
+            commands::current_capture_result_window_request_id,
             commands::take_capture_result_window_payload,
             commands::open_selection_translation_window,
             commands::copy_text_to_clipboard,

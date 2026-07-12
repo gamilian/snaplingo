@@ -1,3 +1,4 @@
+use crate::application::result_window::{ResultWindowOpenRequest, ResultWindowRuntime};
 use crate::{commands, settings_window, AppState};
 use tauri::Manager;
 
@@ -49,9 +50,16 @@ pub(crate) fn dispatch_app_action(app: tauri::AppHandle, action: AppAction) {
         AppAction::TranslateSelection => {
             tauri::async_runtime::spawn(async move {
                 let state = app.state::<AppState>();
-                if let Err(err) = commands::open_selection_translation_window_for_state(
-                    app.clone(),
-                    state.inner(),
+                let snapshot = match state.selection.acquirer.acquire().await {
+                    Ok(snapshot) => snapshot,
+                    Err(err) => {
+                        log::error!("Failed to acquire selected text: {}", err);
+                        return;
+                    }
+                };
+                if let Err(err) = open_result_window_request(
+                    &state.result_window,
+                    ResultWindowOpenRequest::automatic_translation(snapshot.text),
                 )
                 .await
                 {
@@ -60,24 +68,16 @@ pub(crate) fn dispatch_app_action(app: tauri::AppHandle, action: AppAction) {
             });
         }
         AppAction::OpenInputTranslation => {
-            if let Err(err) = commands::open_input_translation_window(app) {
-                log::error!("Failed to open input translation window: {}", err);
-            }
+            dispatch_result_window_open(app, ResultWindowOpenRequest::input_translation());
         }
         AppAction::OpenTranslationWindow => {
-            if let Err(err) = commands::show_translation_window(app) {
-                log::error!("Failed to show translation window: {}", err);
-            }
+            dispatch_result_window_open(app, ResultWindowOpenRequest::show_translation());
         }
         AppAction::RunFileOcr => {
-            if let Err(err) = commands::start_file_ocr(app) {
-                log::error!("Failed to start file OCR: {}", err);
-            }
+            dispatch_result_window_open(app, ResultWindowOpenRequest::file_ocr());
         }
         AppAction::OpenOcrWindow => {
-            if let Err(err) = commands::show_ocr_window(app) {
-                log::error!("Failed to show OCR window: {}", err);
-            }
+            dispatch_result_window_open(app, ResultWindowOpenRequest::show_ocr());
         }
         AppAction::PinClipboardImage => {
             tauri::async_runtime::spawn(async move {
@@ -117,9 +117,38 @@ pub(crate) fn dispatch_app_action(app: tauri::AppHandle, action: AppAction) {
     }
 }
 
+fn dispatch_result_window_open(app: tauri::AppHandle, request: ResultWindowOpenRequest) {
+    tauri::async_runtime::spawn(async move {
+        let state = app.state::<AppState>();
+        if let Err(err) = open_result_window_request(&state.result_window, request).await {
+            log::error!("Failed to open result window: {}", err);
+        }
+    });
+}
+
+async fn open_result_window_request(
+    runtime: &ResultWindowRuntime,
+    request: ResultWindowOpenRequest,
+) -> Result<(), String> {
+    runtime
+        .open(request)
+        .await
+        .map_err(|error| error.to_string())
+}
+
 #[cfg(test)]
 mod tests {
-    use super::CaptureLaunchMode;
+    use std::sync::Arc;
+
+    use async_trait::async_trait;
+
+    use crate::application::result_window::{
+        ResultWindowClipboardPort, ResultWindowMode, ResultWindowNotifierPort,
+        ResultWindowOpenRequest, ResultWindowRequestId, ResultWindowRuntime,
+        ResultWindowWindowPort,
+    };
+
+    use super::{open_result_window_request, CaptureLaunchMode};
 
     #[test]
     fn capture_launch_modes_keep_existing_ipc_strings() {
@@ -137,5 +166,51 @@ mod tests {
             CaptureLaunchMode::SilentScreenshotOcr.as_str(),
             "silent-screenshot-ocr"
         );
+    }
+
+    struct Window;
+
+    #[async_trait]
+    impl ResultWindowWindowPort for Window {
+        async fn show_or_create(&self) -> crate::Result<()> {
+            Ok(())
+        }
+    }
+
+    struct Clipboard;
+
+    #[async_trait]
+    impl ResultWindowClipboardPort for Clipboard {
+        async fn read_text(&self) -> crate::Result<String> {
+            Ok(String::new())
+        }
+    }
+
+    struct Notifier;
+
+    #[async_trait]
+    impl ResultWindowNotifierPort for Notifier {
+        async fn notify_payload_ready(&self, _: ResultWindowRequestId) -> crate::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn result_window_actions_delegate_open_requests_to_the_runtime() {
+        let runtime =
+            ResultWindowRuntime::new(Arc::new(Window), Arc::new(Clipboard), Arc::new(Notifier));
+
+        open_result_window_request(
+            &runtime,
+            ResultWindowOpenRequest::automatic_translation("selection".into()),
+        )
+        .await
+        .unwrap();
+
+        let request_id = runtime.current_request_id().unwrap().unwrap();
+        let payload = runtime.take_if_current(request_id).unwrap().unwrap();
+        assert_eq!(payload.mode, ResultWindowMode::Translation);
+        assert_eq!(payload.text, "selection");
+        assert!(payload.auto_translate);
     }
 }
