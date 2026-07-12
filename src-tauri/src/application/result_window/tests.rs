@@ -8,7 +8,8 @@ use tokio::sync::Notify;
 
 use super::{
     ResultWindowClipboardPort, ResultWindowMode, ResultWindowNotifierPort, ResultWindowOcrIntent,
-    ResultWindowOpenRequest, ResultWindowPayload, ResultWindowRuntime, ResultWindowWindowPort,
+    ResultWindowOpenRequest, ResultWindowPayload, ResultWindowRequestId, ResultWindowRuntime,
+    ResultWindowWindowPort,
 };
 
 #[derive(Clone, Debug)]
@@ -23,6 +24,22 @@ enum WindowOpenOutcome {
 enum PresentationEvent {
     WindowOpened,
     PayloadReadyNotified,
+}
+
+#[derive(Clone, Debug)]
+enum NotificationOutcome {
+    Succeeds,
+    Fails(String),
+    BlocksThenSucceeds,
+}
+
+impl From<std::result::Result<(), String>> for NotificationOutcome {
+    fn from(outcome: std::result::Result<(), String>) -> Self {
+        match outcome {
+            Ok(()) => Self::Succeeds,
+            Err(message) => Self::Fails(message),
+        }
+    }
 }
 
 struct FakeResultWindow {
@@ -164,9 +181,11 @@ impl ResultWindowClipboardPort for BlockingClipboard {
 }
 
 struct FakePayloadNotifier {
-    outcomes: Mutex<VecDeque<std::result::Result<(), String>>>,
-    notifications: Mutex<usize>,
+    outcomes: Mutex<VecDeque<NotificationOutcome>>,
+    notification_ids: Mutex<Vec<ResultWindowRequestId>>,
     events: Arc<Mutex<Vec<PresentationEvent>>>,
+    notification_started: Notify,
+    unblock_notification: Notify,
 }
 
 impl FakePayloadNotifier {
@@ -175,31 +194,70 @@ impl FakePayloadNotifier {
         events: Arc<Mutex<Vec<PresentationEvent>>>,
     ) -> Self {
         Self {
-            outcomes: Mutex::new(outcomes.into_iter().collect()),
-            notifications: Mutex::new(0),
+            outcomes: Mutex::new(outcomes.into_iter().map(Into::into).collect()),
+            notification_ids: Mutex::new(Vec::new()),
             events,
+            notification_started: Notify::new(),
+            unblock_notification: Notify::new(),
+        }
+    }
+
+    fn with_outcomes(
+        outcomes: impl IntoIterator<Item = NotificationOutcome>,
+        events: Arc<Mutex<Vec<PresentationEvent>>>,
+    ) -> Self {
+        Self {
+            outcomes: Mutex::new(outcomes.into_iter().collect()),
+            notification_ids: Mutex::new(Vec::new()),
+            events,
+            notification_started: Notify::new(),
+            unblock_notification: Notify::new(),
         }
     }
 
     fn notifications(&self) -> usize {
-        *self.notifications.lock().unwrap()
+        self.notification_ids.lock().unwrap().len()
+    }
+
+    fn notification_ids(&self) -> Vec<ResultWindowRequestId> {
+        self.notification_ids.lock().unwrap().clone()
+    }
+
+    async fn wait_until_notification_starts(&self) -> ResultWindowRequestId {
+        self.notification_started.notified().await;
+        *self.notification_ids.lock().unwrap().last().unwrap()
+    }
+
+    fn unblock_notification(&self) {
+        self.unblock_notification.notify_one();
     }
 }
 
 #[async_trait]
 impl ResultWindowNotifierPort for FakePayloadNotifier {
-    async fn notify_payload_ready(&self) -> crate::Result<()> {
-        *self.notifications.lock().unwrap() += 1;
+    async fn notify_payload_ready(&self, request_id: ResultWindowRequestId) -> crate::Result<()> {
+        self.notification_ids.lock().unwrap().push(request_id);
         self.events
             .lock()
             .unwrap()
             .push(PresentationEvent::PayloadReadyNotified);
-        self.outcomes
+        self.notification_started.notify_one();
+
+        let outcome = self
+            .outcomes
             .lock()
             .unwrap()
             .pop_front()
-            .unwrap_or(Ok(()))
-            .map_err(Into::into)
+            .unwrap_or(NotificationOutcome::Succeeds);
+
+        match outcome {
+            NotificationOutcome::Succeeds => Ok(()),
+            NotificationOutcome::Fails(message) => Err(message.into()),
+            NotificationOutcome::BlocksThenSucceeds => {
+                self.unblock_notification.notified().await;
+                Ok(())
+            }
+        }
     }
 }
 
@@ -285,7 +343,9 @@ async fn open_reads_clipboard_stores_input_translation_payload_opens_window_and_
     assert_eq!(window.open_calls(), 1);
     assert_eq!(notifier.notifications(), 1);
     assert_eq!(
-        runtime.take().unwrap(),
+        runtime
+            .take_if_current(notifier.notification_ids()[0])
+            .unwrap(),
         Some(translation_payload("clipboard text", true))
     );
 }
@@ -306,7 +366,12 @@ async fn input_translation_uses_empty_text_when_clipboard_read_fails() {
     assert_eq!(clipboard.reads(), 1);
     assert_eq!(window.open_calls(), 1);
     assert_eq!(notifier.notifications(), 1);
-    assert_eq!(runtime.take().unwrap(), Some(translation_payload("", true)));
+    assert_eq!(
+        runtime
+            .take_if_current(notifier.notification_ids()[0])
+            .unwrap(),
+        Some(translation_payload("", true))
+    );
 }
 
 #[tokio::test]
@@ -318,7 +383,7 @@ async fn newer_input_translation_invalidates_an_older_pending_payload_while_clip
     let runtime = Arc::new(ResultWindowRuntime::new(
         window,
         clipboard.clone(),
-        notifier,
+        notifier.clone(),
     ));
 
     runtime.open(translation_request("older")).await.unwrap();
@@ -331,20 +396,27 @@ async fn newer_input_translation_invalidates_an_older_pending_payload_while_clip
     });
     clipboard.wait_until_reading_starts().await;
 
-    assert_eq!(runtime.take().unwrap(), None);
+    assert_eq!(
+        runtime
+            .take_if_current(notifier.notification_ids()[0])
+            .unwrap(),
+        None
+    );
 
     clipboard.unblock_read();
     newer_open.await.unwrap().unwrap();
 
     assert_eq!(
-        runtime.take().unwrap(),
+        runtime
+            .take_if_current(notifier.notification_ids()[1])
+            .unwrap(),
         Some(translation_payload("new clipboard text", true))
     );
 }
 
 #[tokio::test]
 async fn open_stores_the_pending_payload_before_opening_and_notifies_afterward() {
-    let (runtime, window, _clipboard, _notifier) =
+    let (runtime, window, _clipboard, notifier) =
         make_runtime([WindowOpenOutcome::BlocksThenSucceeds], []);
     let opening_runtime = runtime.clone();
 
@@ -352,10 +424,6 @@ async fn open_stores_the_pending_payload_before_opening_and_notifies_afterward()
         tokio::spawn(async move { opening_runtime.open(translation_request("hello")).await });
     window.wait_until_opening_starts().await;
 
-    assert_eq!(
-        runtime.take().unwrap(),
-        Some(translation_payload("hello", false))
-    );
     window.unblock_open();
     opening.await.unwrap().unwrap();
 
@@ -366,28 +434,37 @@ async fn open_stores_the_pending_payload_before_opening_and_notifies_afterward()
             PresentationEvent::PayloadReadyNotified,
         ]
     );
+    assert_eq!(
+        runtime
+            .take_if_current(notifier.notification_ids()[0])
+            .unwrap(),
+        Some(translation_payload("hello", false))
+    );
 }
 
 #[tokio::test]
 async fn take_transfers_the_pending_payload_once() {
-    let (runtime, _window, _clipboard, _notifier) = make_runtime([], []);
+    let (runtime, _window, _clipboard, notifier) = make_runtime([], []);
     let payload = translation_payload("hello", false);
 
     runtime.open(translation_request("hello")).await.unwrap();
 
-    assert_eq!(runtime.take().unwrap(), Some(payload));
-    assert_eq!(runtime.take().unwrap(), None);
+    let request_id = notifier.notification_ids()[0];
+    assert_eq!(runtime.take_if_current(request_id).unwrap(), Some(payload));
+    assert_eq!(runtime.take_if_current(request_id).unwrap(), None);
 }
 
 #[tokio::test]
 async fn newer_open_request_replaces_an_untaken_payload() {
-    let (runtime, _window, _clipboard, _notifier) = make_runtime([], []);
+    let (runtime, _window, _clipboard, notifier) = make_runtime([], []);
 
     runtime.open(translation_request("older")).await.unwrap();
     runtime.open(translation_request("newer")).await.unwrap();
 
     assert_eq!(
-        runtime.take().unwrap(),
+        runtime
+            .take_if_current(notifier.notification_ids()[1])
+            .unwrap(),
         Some(translation_payload("newer", false))
     );
 }
@@ -426,11 +503,16 @@ async fn ocr_open_requests_preserve_each_intent_and_source_image() {
     ];
 
     for (request, expected_payload) in cases {
-        let (runtime, _window, _clipboard, _notifier) = make_runtime([], []);
+        let (runtime, _window, _clipboard, notifier) = make_runtime([], []);
 
         runtime.open(request).await.unwrap();
 
-        assert_eq!(runtime.take().unwrap(), Some(expected_payload));
+        assert_eq!(
+            runtime
+                .take_if_current(notifier.notification_ids()[0])
+                .unwrap(),
+            Some(expected_payload)
+        );
     }
 }
 
@@ -448,7 +530,10 @@ async fn failed_open_removes_its_still_current_payload() {
 
     assert!(error.to_string().contains("window unavailable"));
     assert_eq!(notifier.notifications(), 0);
-    assert_eq!(runtime.take().unwrap(), None);
+    assert_eq!(
+        runtime.take_if_current(ResultWindowRequestId(1)).unwrap(),
+        None
+    );
 }
 
 #[tokio::test]
@@ -465,14 +550,16 @@ async fn failed_notification_retains_the_pending_payload() {
     assert_eq!(window.open_calls(), 1);
     assert_eq!(notifier.notifications(), 1);
     assert_eq!(
-        runtime.take().unwrap(),
+        runtime
+            .take_if_current(notifier.notification_ids()[0])
+            .unwrap(),
         Some(translation_payload("still pending", false))
     );
 }
 
 #[tokio::test]
 async fn newer_request_survives_an_older_concurrent_open_failure() {
-    let (runtime, window, _clipboard, _notifier) = make_runtime(
+    let (runtime, window, _clipboard, notifier) = make_runtime(
         [
             WindowOpenOutcome::BlocksThenFails("older open failed".to_string()),
             WindowOpenOutcome::Succeeds,
@@ -496,7 +583,9 @@ async fn newer_request_survives_an_older_concurrent_open_failure() {
     let error = older_open.await.unwrap().unwrap_err();
     assert!(error.to_string().contains("older open failed"));
     assert_eq!(
-        runtime.take().unwrap(),
+        runtime
+            .take_if_current(notifier.notification_ids()[0])
+            .unwrap(),
         Some(translation_payload("same text", false))
     );
 }
@@ -522,7 +611,60 @@ async fn older_successful_open_does_not_notify_after_a_newer_request_starts() {
 
     assert_eq!(notifier.notifications(), 1);
     assert_eq!(
-        runtime.take().unwrap(),
+        runtime
+            .take_if_current(notifier.notification_ids()[0])
+            .unwrap(),
+        Some(translation_payload("newer", false))
+    );
+}
+
+#[tokio::test]
+async fn stale_notification_cannot_take_a_newer_payload() {
+    let events = Arc::new(Mutex::new(Vec::new()));
+    let window = Arc::new(FakeResultWindow::new(
+        [
+            WindowOpenOutcome::Succeeds,
+            WindowOpenOutcome::BlocksThenSucceeds,
+        ],
+        events.clone(),
+    ));
+    let clipboard = Arc::new(FakeClipboard::new("clipboard text"));
+    let notifier = Arc::new(FakePayloadNotifier::with_outcomes(
+        [
+            NotificationOutcome::BlocksThenSucceeds,
+            NotificationOutcome::Succeeds,
+        ],
+        events,
+    ));
+    let runtime = Arc::new(ResultWindowRuntime::new(
+        window.clone(),
+        clipboard,
+        notifier.clone(),
+    ));
+
+    let older_runtime = runtime.clone();
+    let older_open =
+        tokio::spawn(async move { older_runtime.open(translation_request("older")).await });
+    window.wait_until_opening_starts().await;
+    let older_request_id = notifier.wait_until_notification_starts().await;
+
+    let newer_runtime = runtime.clone();
+    let newer_open =
+        tokio::spawn(async move { newer_runtime.open(translation_request("newer")).await });
+    window.wait_until_opening_starts().await;
+
+    notifier.unblock_notification();
+    older_open.await.unwrap().unwrap();
+
+    assert_eq!(runtime.take_if_current(older_request_id).unwrap(), None);
+
+    window.unblock_open();
+    newer_open.await.unwrap().unwrap();
+
+    let notification_ids = notifier.notification_ids();
+    assert_eq!(notification_ids.len(), 2);
+    assert_eq!(
+        runtime.take_if_current(notification_ids[1]).unwrap(),
         Some(translation_payload("newer", false))
     );
 }

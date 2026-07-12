@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use super::{
     ResultWindowClipboardPort, ResultWindowMode, ResultWindowNotifierPort, ResultWindowOpenRequest,
-    ResultWindowPayload, ResultWindowWindowPort,
+    ResultWindowPayload, ResultWindowRequestId, ResultWindowWindowPort,
 };
 
 pub(crate) struct ResultWindowRuntime {
@@ -18,7 +18,7 @@ struct ResultWindowState {
 }
 
 struct PendingResultWindowPayload {
-    request_id: u64,
+    request_id: ResultWindowRequestId,
     payload: ResultWindowPayload,
 }
 
@@ -56,22 +56,37 @@ impl ResultWindowRuntime {
             return Ok(());
         }
 
-        self.notifier.notify_payload_ready().await
+        self.notifier.notify_payload_ready(request_id).await
     }
 
-    pub(crate) fn take(&self) -> crate::Result<Option<ResultWindowPayload>> {
+    pub(crate) fn take_if_current(
+        &self,
+        request_id: ResultWindowRequestId,
+    ) -> crate::Result<Option<ResultWindowPayload>> {
         let mut state = self.lock_state()?;
+        if state.latest_request_id != request_id.0 {
+            return Ok(None);
+        }
+
+        if !state
+            .pending
+            .as_ref()
+            .is_some_and(|pending| pending.request_id == request_id)
+        {
+            return Ok(None);
+        }
+
         Ok(state.pending.take().map(|pending| pending.payload))
     }
 
-    fn next_request_id(&self) -> crate::Result<u64> {
+    fn next_request_id(&self) -> crate::Result<ResultWindowRequestId> {
         let mut state = self.lock_state()?;
         state.latest_request_id = state
             .latest_request_id
             .checked_add(1)
             .ok_or("Result window request ID exhausted")?;
         state.pending = None;
-        Ok(state.latest_request_id)
+        Ok(ResultWindowRequestId(state.latest_request_id))
     }
 
     async fn payload_for(&self, request: ResultWindowOpenRequest) -> ResultWindowPayload {
@@ -100,11 +115,11 @@ impl ResultWindowRuntime {
 
     fn store_if_current(
         &self,
-        request_id: u64,
+        request_id: ResultWindowRequestId,
         payload: ResultWindowPayload,
     ) -> crate::Result<bool> {
         let mut state = self.lock_state()?;
-        if state.latest_request_id != request_id {
+        if state.latest_request_id != request_id.0 {
             return Ok(false);
         }
 
@@ -115,7 +130,7 @@ impl ResultWindowRuntime {
         Ok(true)
     }
 
-    fn remove_if_current(&self, request_id: u64) -> crate::Result<()> {
+    fn remove_if_current(&self, request_id: ResultWindowRequestId) -> crate::Result<()> {
         let mut state = self.lock_state()?;
         if state
             .pending
@@ -127,9 +142,9 @@ impl ResultWindowRuntime {
         Ok(())
     }
 
-    fn is_current(&self, request_id: u64) -> crate::Result<bool> {
+    fn is_current(&self, request_id: ResultWindowRequestId) -> crate::Result<bool> {
         let state = self.lock_state()?;
-        Ok(state.latest_request_id == request_id)
+        Ok(state.latest_request_id == request_id.0)
     }
 
     fn lock_state(&self) -> crate::Result<std::sync::MutexGuard<'_, ResultWindowState>> {

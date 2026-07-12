@@ -1,5 +1,8 @@
 use async_trait::async_trait;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct ResultWindowRequestId(pub(crate) u64);
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum ResultWindowMode {
     Translation,
@@ -48,5 +51,5 @@ pub(crate) trait ResultWindowClipboardPort: Send + Sync {
 
 #[async_trait]
 pub(crate) trait ResultWindowNotifierPort: Send + Sync {
-    async fn notify_payload_ready(&self) -> crate::Result<()>;
+    async fn notify_payload_ready(&self, request_id: ResultWindowRequestId) -> crate::Result<()>;
 }

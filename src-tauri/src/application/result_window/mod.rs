@@ -9,7 +9,7 @@ mod tests;
 #[cfg_attr(not(test), allow(unused_imports))]
 pub(crate) use port::{
     ResultWindowClipboardPort, ResultWindowMode, ResultWindowNotifierPort, ResultWindowOcrIntent,
-    ResultWindowOpenRequest, ResultWindowPayload, ResultWindowWindowPort,
+    ResultWindowOpenRequest, ResultWindowPayload, ResultWindowRequestId, ResultWindowWindowPort,
 };
 #[cfg_attr(not(test), allow(unused_imports))]
 pub(crate) use runtime::ResultWindowRuntime;
