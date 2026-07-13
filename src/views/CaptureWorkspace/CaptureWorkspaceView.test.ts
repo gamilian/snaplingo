@@ -410,6 +410,9 @@ describe("CaptureWorkspaceView runtime seam", () => {
     const palette = container.querySelector<HTMLInputElement>(
       'input[aria-label="Color palette"]',
     );
+    expect(palette!.className).toContain("absolute");
+    expect(palette!.className).toContain("inset-0");
+    expect(palette!.className).not.toContain("sr-only");
     const paletteClick = vi.spyOn(palette!, "click");
     await act(async () => {
       container
@@ -467,6 +470,56 @@ describe("CaptureWorkspaceView runtime seam", () => {
       [255, 77, 79, 255],
       [24, 144, 255, 255],
     ]);
+  });
+
+  it("rolls back an optimistic preset change when persistence fails", async () => {
+    const actions = createActions();
+    const updateAnnotationColorPresets = vi
+      .fn()
+      .mockRejectedValue(new Error("database unavailable"));
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    mountedRoots.push({ container, root });
+
+    await act(async () => {
+      root.render(
+        createElement(CaptureWorkspaceView, {
+          renderState: createRenderState(),
+          actions,
+          annotationColorPresets: [[255, 77, 79, 255]],
+          onUpdateAnnotationColorPresets: updateAnnotationColorPresets,
+        }),
+      );
+    });
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          'button[aria-label="Annotation color"]',
+        )!
+        .click();
+    });
+    const palette = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Color palette"]',
+    )!;
+    await act(async () => {
+      palette.value = "#663399";
+      palette.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          'button[aria-label="Add preset color"]',
+        )!
+        .click();
+    });
+
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      "颜色预设保存失败",
+    );
+    expect(
+      container.querySelector('button[aria-label="Use preset #663399"]'),
+    ).toBeNull();
   });
 
   it("keeps a restored preview usable while showing its replacement error", async () => {

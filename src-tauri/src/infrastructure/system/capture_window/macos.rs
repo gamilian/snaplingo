@@ -15,6 +15,7 @@ static CAPTURE_PRESENTATION_DEPTH: AtomicUsize = AtomicUsize::new(0);
 static CAPTURE_WINDOW_ACTIVATION_SUPPRESSED: AtomicBool = AtomicBool::new(false);
 static CAPTURE_CANCEL_SHORTCUT_REGISTERED: AtomicBool = AtomicBool::new(false);
 static CAPTURE_COPY_SHORTCUT_REGISTERED: AtomicBool = AtomicBool::new(false);
+static CAPTURE_SAVE_SHORTCUT_REGISTERED: AtomicBool = AtomicBool::new(false);
 static CAPTURE_UNDO_SHORTCUT_REGISTERED: AtomicBool = AtomicBool::new(false);
 static CAPTURE_REDO_SHORTCUT_REGISTERED: AtomicBool = AtomicBool::new(false);
 static CAPTURE_CROSSHAIR_CURSOR_PUSHED: AtomicBool = AtomicBool::new(false);
@@ -23,10 +24,12 @@ static PREVIOUS_FRONTMOST_APP_PID: AtomicI32 = AtomicI32::new(NO_PREVIOUS_FRONTM
 const NO_PREVIOUS_FRONTMOST_APP_PID: i32 = -1;
 const CAPTURE_CANCEL_SHORTCUT_ACCELERATOR: &str = "Escape";
 const CAPTURE_COPY_SHORTCUT_ACCELERATOR: &str = "CmdOrCtrl+KeyC";
+const CAPTURE_SAVE_SHORTCUT_ACCELERATOR: &str = "CmdOrCtrl+KeyS";
 const CAPTURE_UNDO_SHORTCUT_ACCELERATOR: &str = "CmdOrCtrl+KeyZ";
 const CAPTURE_REDO_SHORTCUT_ACCELERATOR: &str = "CmdOrCtrl+KeyY";
 const CAPTURE_CANCEL_REQUESTED_EVENT: &str = "capture-cancel-requested";
 const CAPTURE_COPY_REQUESTED_EVENT: &str = "capture-copy-requested";
+const CAPTURE_SAVE_REQUESTED_EVENT: &str = "capture-save-requested";
 const CAPTURE_UNDO_REQUESTED_EVENT: &str = "capture-undo-requested";
 const CAPTURE_REDO_REQUESTED_EVENT: &str = "capture-redo-requested";
 
@@ -57,6 +60,11 @@ pub(super) fn begin_capture_presentation(app: &AppHandle) -> Result<(), String> 
                 log::warn!("Failed to register capture copy shortcut: {}", err);
             }
         }
+        if capture_overlay_uses_global_save_shortcut() {
+            if let Err(err) = register_capture_save_shortcut(app) {
+                log::warn!("Failed to register capture save shortcut: {}", err);
+            }
+        }
         if capture_overlay_uses_global_undo_shortcuts() {
             if let Err(err) = register_capture_undo_shortcut(app) {
                 log::warn!("Failed to register capture undo shortcut: {}", err);
@@ -82,6 +90,9 @@ pub(super) fn end_capture_presentation(app: &AppHandle) -> Result<(), String> {
         }
         if capture_overlay_uses_global_copy_shortcut() {
             unregister_capture_copy_shortcut(app);
+        }
+        if capture_overlay_uses_global_save_shortcut() {
+            unregister_capture_save_shortcut(app);
         }
         if capture_overlay_uses_global_undo_shortcuts() {
             unregister_capture_undo_shortcut(app);
@@ -440,6 +451,10 @@ fn capture_copy_shortcut_accelerator() -> &'static str {
     CAPTURE_COPY_SHORTCUT_ACCELERATOR
 }
 
+fn capture_save_shortcut_accelerator() -> &'static str {
+    CAPTURE_SAVE_SHORTCUT_ACCELERATOR
+}
+
 fn capture_undo_shortcut_accelerator() -> &'static str {
     CAPTURE_UNDO_SHORTCUT_ACCELERATOR
 }
@@ -454,6 +469,10 @@ fn capture_cancel_requested_event_name() -> &'static str {
 
 fn capture_copy_requested_event_name() -> &'static str {
     CAPTURE_COPY_REQUESTED_EVENT
+}
+
+fn capture_save_requested_event_name() -> &'static str {
+    CAPTURE_SAVE_REQUESTED_EVENT
 }
 
 fn capture_undo_requested_event_name() -> &'static str {
@@ -477,7 +496,11 @@ fn capture_overlay_uses_global_cancel_shortcut() -> bool {
 }
 
 fn capture_overlay_uses_global_copy_shortcut() -> bool {
-    false
+    true
+}
+
+fn capture_overlay_uses_global_save_shortcut() -> bool {
+    true
 }
 
 fn capture_overlay_uses_global_undo_shortcuts() -> bool {
@@ -518,6 +541,21 @@ fn register_capture_copy_shortcut(app: &AppHandle) -> Result<(), String> {
     })
     .map_err(|e| {
         CAPTURE_COPY_SHORTCUT_REGISTERED.store(false, Ordering::SeqCst);
+        e.to_string()
+    })
+}
+
+fn register_capture_save_shortcut(app: &AppHandle) -> Result<(), String> {
+    if CAPTURE_SAVE_SHORTCUT_REGISTERED.swap(true, Ordering::SeqCst) {
+        return Ok(());
+    }
+
+    let app_clone = app.clone();
+    shortcut::register_shortcut(app, capture_save_shortcut_accelerator(), move || {
+        emit_capture_save_requested(&app_clone);
+    })
+    .map_err(|e| {
+        CAPTURE_SAVE_SHORTCUT_REGISTERED.store(false, Ordering::SeqCst);
         e.to_string()
     })
 }
@@ -572,6 +610,16 @@ fn unregister_capture_copy_shortcut(app: &AppHandle) {
     }
 }
 
+fn unregister_capture_save_shortcut(app: &AppHandle) {
+    if !CAPTURE_SAVE_SHORTCUT_REGISTERED.swap(false, Ordering::SeqCst) {
+        return;
+    }
+
+    if let Err(err) = shortcut::unregister_shortcut(app, capture_save_shortcut_accelerator()) {
+        log::warn!("Failed to unregister capture save shortcut: {}", err);
+    }
+}
+
 fn unregister_capture_undo_shortcut(app: &AppHandle) {
     if !CAPTURE_UNDO_SHORTCUT_REGISTERED.swap(false, Ordering::SeqCst) {
         return;
@@ -609,6 +657,16 @@ fn emit_capture_copy_requested(app: &AppHandle) {
 
     if let Err(err) = window.emit(capture_copy_requested_event_name(), ()) {
         log::warn!("Failed to emit capture copy request: {}", err);
+    }
+}
+
+fn emit_capture_save_requested(app: &AppHandle) {
+    let Some(window) = app.get_webview_window(CAPTURE_WINDOW_LABEL) else {
+        return;
+    };
+
+    if let Err(err) = window.emit(capture_save_requested_event_name(), ()) {
+        log::warn!("Failed to emit capture save request: {}", err);
     }
 }
 
@@ -857,9 +915,10 @@ mod tests {
     }
 
     #[test]
-    fn capture_keyboard_input_is_owned_by_the_focused_window() {
+    fn capture_keyboard_input_keeps_completion_shortcuts_available() {
         assert!(capture_overlay_uses_global_cancel_shortcut());
-        assert!(!capture_overlay_uses_global_copy_shortcut());
+        assert!(capture_overlay_uses_global_copy_shortcut());
+        assert!(capture_overlay_uses_global_save_shortcut());
         assert!(capture_overlay_focuses_webview_on_reveal());
         assert!(!capture_overlay_requires_first_responder_for_reveal());
     }
@@ -880,6 +939,13 @@ mod tests {
     #[test]
     fn capture_copy_shortcut_uses_primary_copy_accelerator() {
         assert_eq!(capture_copy_shortcut_accelerator(), "CmdOrCtrl+KeyC");
+        assert!(capture_overlay_uses_global_copy_shortcut());
+    }
+
+    #[test]
+    fn capture_save_shortcut_uses_primary_save_accelerator() {
+        assert_eq!(capture_save_shortcut_accelerator(), "CmdOrCtrl+KeyS");
+        assert!(capture_overlay_uses_global_save_shortcut());
     }
 
     #[test]
@@ -894,6 +960,14 @@ mod tests {
         assert_eq!(
             capture_copy_requested_event_name(),
             "capture-copy-requested"
+        );
+    }
+
+    #[test]
+    fn capture_save_event_matches_frontend_listener() {
+        assert_eq!(
+            capture_save_requested_event_name(),
+            "capture-save-requested"
         );
     }
 

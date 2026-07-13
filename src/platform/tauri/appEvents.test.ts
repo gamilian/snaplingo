@@ -61,6 +61,7 @@ describe('Tauri app event adapter', () => {
   it.each([
     ['capture cancel', 'capture-cancel-requested', 'subscribeCaptureCancel'],
     ['capture copy', 'capture-copy-requested', 'subscribeCaptureCopy'],
+    ['capture save', 'capture-save-requested', 'subscribeCaptureSave'],
     ['capture undo', 'capture-undo-requested', 'subscribeCaptureUndo'],
     ['capture redo', 'capture-redo-requested', 'subscribeCaptureRedo'],
   ] as const)('subscribes to %s requests with portable callbacks', async (

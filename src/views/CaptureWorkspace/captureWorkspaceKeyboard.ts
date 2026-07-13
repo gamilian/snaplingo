@@ -106,6 +106,7 @@ export interface CaptureWorkspaceKeyboardEditorContext {
   state: CaptureWorkspaceState;
   refs: CaptureWorkspaceKeyboardRefs;
   derived: CaptureWorkspaceKeyboardDerivedState;
+  annotationColorPresets: readonly AnnotationColor[];
   actions: CaptureWorkspaceKeyboardEditorActions;
 }
 
@@ -275,7 +276,10 @@ export function handleCaptureWorkspaceEditorKeyDown(
       actions.setAnnotationHistory(nudge.annotationHistory);
     }
   } else if (!textDraft && !annotationGesture && !annotationMoveGesture) {
-    const color = annotationColorFromShortcut(event);
+    const color = annotationColorFromShortcut(
+      event,
+      context.annotationColorPresets,
+    );
     if (color) {
       event.preventDefault();
       actions.selectAnnotationColor(color);

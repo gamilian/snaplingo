@@ -10,6 +10,7 @@ import {
 const RESULT_PAYLOAD_READY_EVENT = 'capture-result-payload-ready';
 const CAPTURE_CANCEL_EVENT = 'capture-cancel-requested';
 const CAPTURE_COPY_EVENT = 'capture-copy-requested';
+const CAPTURE_SAVE_EVENT = 'capture-save-requested';
 const CAPTURE_UNDO_EVENT = 'capture-undo-requested';
 const CAPTURE_REDO_EVENT = 'capture-redo-requested';
 const HOTKEY_TRIGGERED_EVENT = 'hotkey-triggered';
@@ -94,6 +95,8 @@ export const captureWorkspaceEvents: CaptureWorkspaceEventsPort = {
     subscribeToSignal(CAPTURE_CANCEL_EVENT, handler),
   subscribeCaptureCopy: (handler) =>
     subscribeToSignal(CAPTURE_COPY_EVENT, handler),
+  subscribeCaptureSave: (handler) =>
+    subscribeToSignal(CAPTURE_SAVE_EVENT, handler),
   subscribeCaptureUndo: (handler) =>
     subscribeToSignal(CAPTURE_UNDO_EVENT, handler),
   subscribeCaptureRedo: (handler) =>

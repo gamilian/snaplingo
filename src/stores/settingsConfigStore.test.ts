@@ -108,6 +108,33 @@ describe('settingsConfigStore', () => {
     expect(useSettingsConfigStore.getState().general?.theme).toBe('dark');
   });
 
+  it('does not let an older refresh overwrite a newer update', async () => {
+    let resolveRefresh!: (snapshot: typeof backendSnapshot) => void;
+    const staleRefresh = new Promise<typeof backendSnapshot>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    const updatedSnapshot = {
+      ...backendSnapshot,
+      general: { ...backendSnapshot.general, theme: 'dark' },
+    };
+    const { initializeSettingsConfigStore, useSettingsConfigStore } =
+      await import('./settingsConfigStore');
+    initializeSettingsConfigStore(settingsRuntime);
+    settingsRuntime.load.mockReturnValueOnce(staleRefresh);
+    settingsRuntime.updateGeneral.mockResolvedValueOnce(updatedSnapshot);
+
+    const refresh = useSettingsConfigStore.getState().refresh();
+    const update = useSettingsConfigStore
+      .getState()
+      .updateGeneralSettings(updatedSnapshot.general);
+    await update;
+    resolveRefresh(structuredClone(backendSnapshot));
+    const effectiveRefreshSnapshot = await refresh;
+
+    expect(useSettingsConfigStore.getState().general?.theme).toBe('dark');
+    expect(effectiveRefreshSnapshot.general.theme).toBe('dark');
+  });
+
   it('ignores legacy durable values and uses the backend snapshot', async () => {
     legacyPersistedState({
       activeMainTab: 'translation',

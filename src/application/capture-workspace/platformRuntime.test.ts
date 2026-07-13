@@ -5,6 +5,7 @@ describe('capture workspace platform runtime', () => {
   it('translates capture workspace actions into portable event and window calls', async () => {
     const cancelUnsubscribe = vi.fn();
     const copyUnsubscribe = vi.fn();
+    const saveUnsubscribe = vi.fn();
     const undoUnsubscribe = vi.fn();
     const redoUnsubscribe = vi.fn();
     const hotkeyUnsubscribe = vi.fn();
@@ -14,6 +15,7 @@ describe('capture workspace platform runtime', () => {
       events: {
         subscribeCaptureCancel: vi.fn(async () => cancelUnsubscribe),
         subscribeCaptureCopy: vi.fn(async () => copyUnsubscribe),
+        subscribeCaptureSave: vi.fn(async () => saveUnsubscribe),
         subscribeCaptureUndo: vi.fn(async () => undoUnsubscribe),
         subscribeCaptureRedo: vi.fn(async () => redoUnsubscribe),
         subscribeHotkeyTriggered: vi.fn(async () => hotkeyUnsubscribe),
@@ -27,6 +29,7 @@ describe('capture workspace platform runtime', () => {
     const runtime = createCaptureWorkspacePlatformRuntime(ports);
     const onCancel = vi.fn();
     const onCopy = vi.fn();
+    const onSave = vi.fn();
     const onUndo = vi.fn();
     const onRedo = vi.fn();
     const onHotkey = vi.fn();
@@ -36,6 +39,9 @@ describe('capture workspace platform runtime', () => {
     );
     await expect(runtime.onCopyRequested(onCopy)).resolves.toBe(
       copyUnsubscribe,
+    );
+    await expect(runtime.onSaveRequested(onSave)).resolves.toBe(
+      saveUnsubscribe,
     );
     await expect(runtime.onUndoRequested(onUndo)).resolves.toBe(
       undoUnsubscribe,
@@ -53,6 +59,7 @@ describe('capture workspace platform runtime', () => {
 
     expect(ports.events.subscribeCaptureCancel).toHaveBeenCalledWith(onCancel);
     expect(ports.events.subscribeCaptureCopy).toHaveBeenCalledWith(onCopy);
+    expect(ports.events.subscribeCaptureSave).toHaveBeenCalledWith(onSave);
     expect(ports.events.subscribeCaptureUndo).toHaveBeenCalledWith(onUndo);
     expect(ports.events.subscribeCaptureRedo).toHaveBeenCalledWith(onRedo);
     expect(ports.events.subscribeHotkeyTriggered).toHaveBeenCalledWith(onHotkey);

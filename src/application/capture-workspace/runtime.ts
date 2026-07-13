@@ -49,6 +49,7 @@ import {
   undoAnnotationHistory,
 } from '../../views/CaptureWorkspace/annotationHistory';
 import {
+  ANNOTATION_COLORS,
   type AnnotationColor,
   type AnnotationSizeDirection,
   type AnnotationStyle,
@@ -204,6 +205,7 @@ export function createCaptureWorkspaceRuntime({
   host,
   keyboard,
   onInactive,
+  annotationColorPresets,
   screenshotSavePath,
   storage,
 }: {
@@ -211,6 +213,7 @@ export function createCaptureWorkspaceRuntime({
   host?: CaptureWorkspaceRuntimeHost;
   keyboard?: CaptureWorkspaceRuntimeKeyboard;
   onInactive?: () => void | Promise<void>;
+  annotationColorPresets?: () => readonly AnnotationColor[];
   screenshotSavePath?: () => string | undefined;
   storage?: CaptureSelectionStorage;
 }): CaptureWorkspaceRuntime {
@@ -1017,6 +1020,7 @@ export function createCaptureWorkspaceRuntime({
     return {
       state,
       refs: { keyboardEditCursorPointRef },
+      annotationColorPresets: annotationColorPresets?.() ?? ANNOTATION_COLORS,
       derived: {
         annotations: derived.annotations,
         selectionBounds: derived.selectionBounds,
@@ -1205,6 +1209,32 @@ export function createCaptureWorkspaceRuntime({
               !state.textDraft
             ) {
               await completeCandidateSelection(state.hoverSelection, 'copy');
+            }
+          }),
+        );
+        if (disposed || connection.isClosed) return connection.disconnect;
+
+        connection.retain(
+          await platform.onSaveRequested(async () => {
+            if (disposed) return;
+            if (state.status === 'preview' && state.selection) {
+              await runCompletionEffects(
+                state.selection,
+                planCandidateSelectionCompletion('save'),
+                commitTextDraftToHistory().annotations,
+                state.includeCapturedCursor &&
+                  canToggleCapturedCursor(state.session),
+              );
+              return;
+            }
+
+            if (
+              state.status === 'selecting' &&
+              !state.startPoint &&
+              state.hoverSelection &&
+              !state.textDraft
+            ) {
+              await completeCandidateSelection(state.hoverSelection, 'save');
             }
           }),
         );
@@ -1596,7 +1626,14 @@ export function createCaptureWorkspaceRuntime({
           return true;
         }
         if (source === 'root') {
-          actions.resetPreview();
+          const context = editorContext();
+          if (!context.derived.selectionBounds) return false;
+          const editorEvent = createEditorPointerEvent(
+            pointer,
+            context.derived.selectionBounds,
+          );
+          handleCaptureWorkspaceEditorPointerDown(editorEvent.event, context);
+          return editorEvent.handled();
         } else {
           const context = editorContext();
           if (!context.derived.selectionBounds) return false;

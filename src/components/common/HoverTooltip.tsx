@@ -17,7 +17,7 @@ export default function HoverTooltip({
     return null;
   }
 
-  const gapPx = 10;
+  const gapPx = placement === 'bottom' ? 16 : 10;
   const left = anchorRect.left + anchorRect.width / 2;
   const top = placement === 'bottom' ? anchorRect.bottom + gapPx : anchorRect.top - gapPx;
   const tooltipStyle = {

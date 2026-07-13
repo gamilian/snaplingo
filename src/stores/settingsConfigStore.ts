@@ -11,9 +11,13 @@ import type {
 type DurableSettingsRuntime = SettingsRuntime['durableSettings'];
 
 let durableSettingsRuntime: DurableSettingsRuntime | null = null;
+let nextSnapshotRequest = 0;
+let latestAppliedSnapshotRequest = 0;
 
 export function initializeSettingsConfigStore(runtime: DurableSettingsRuntime) {
   durableSettingsRuntime = runtime;
+  nextSnapshotRequest = 0;
+  latestAppliedSnapshotRequest = 0;
 }
 
 function settingsRuntime() {
@@ -51,6 +55,21 @@ function applySnapshot(
   });
 }
 
+async function applyLatestSnapshot(
+  set: (partial: Partial<SettingsConfigState>) => void,
+  get: () => SettingsConfigState,
+  request: () => Promise<SettingsSnapshot>,
+) {
+  const requestId = ++nextSnapshotRequest;
+  const snapshot = await request();
+  if (requestId > latestAppliedSnapshotRequest) {
+    latestAppliedSnapshotRequest = requestId;
+    applySnapshot(set, snapshot);
+    return snapshot;
+  }
+  return currentSnapshot(get()) ?? snapshot;
+}
+
 function currentSnapshot(state: SettingsConfigState): SettingsSnapshot | null {
   if (!state.general || !state.screenshot || !state.translation) {
     return null;
@@ -75,33 +94,21 @@ export const useSettingsConfigStore = create<SettingsConfigState>((set, get) => 
       return existingSnapshot;
     }
 
-    const snapshot = await settingsRuntime().load();
-    applySnapshot(set, snapshot);
-    return snapshot;
+    return applyLatestSnapshot(set, get, () => settingsRuntime().load());
   },
-  refresh: async () => {
-    const snapshot = await settingsRuntime().load();
-    applySnapshot(set, snapshot);
-    return snapshot;
-  },
-  updateGeneralSettings: async (input) => {
-    const snapshot = await settingsRuntime().updateGeneral(input);
-    applySnapshot(set, snapshot);
-    return snapshot;
-  },
-  updateScreenshotSettings: async (input) => {
-    const snapshot = await settingsRuntime().updateScreenshot(input);
-    applySnapshot(set, snapshot);
-    return snapshot;
-  },
-  updateAnnotationColors: async (colors) => {
-    const snapshot = await settingsRuntime().updateAnnotationColors(colors);
-    applySnapshot(set, snapshot);
-    return snapshot;
-  },
-  updateTranslationSettings: async (input) => {
-    const snapshot = await settingsRuntime().updateTranslation(input);
-    applySnapshot(set, snapshot);
-    return snapshot;
-  },
+  refresh: () => applyLatestSnapshot(set, get, () => settingsRuntime().load()),
+  updateGeneralSettings: (input) =>
+    applyLatestSnapshot(set, get, () => settingsRuntime().updateGeneral(input)),
+  updateScreenshotSettings: (input) =>
+    applyLatestSnapshot(set, get, () =>
+      settingsRuntime().updateScreenshot(input),
+    ),
+  updateAnnotationColors: (colors) =>
+    applyLatestSnapshot(set, get, () =>
+      settingsRuntime().updateAnnotationColors(colors),
+    ),
+  updateTranslationSettings: (input) =>
+    applyLatestSnapshot(set, get, () =>
+      settingsRuntime().updateTranslation(input),
+    ),
 }));

@@ -162,7 +162,7 @@ describe('capture workspace editor pointer dispatch', () => {
     );
   });
 
-  it('ignores a selection click outside the active textarea', () => {
+  it('commits text when clicking the selection outside the active textarea', () => {
     const { actions, context } = createContext({
       state: {
         status: 'preview',
@@ -177,11 +177,11 @@ describe('capture workspace editor pointer dispatch', () => {
 
     expect(event.preventDefault).toHaveBeenCalledOnce();
     expect(event.stopPropagation).toHaveBeenCalledOnce();
-    expect(actions.commitTextDraft).not.toHaveBeenCalled();
+    expect(actions.commitTextDraft).toHaveBeenCalledOnce();
     expect(actions.setAnnotationGesture).not.toHaveBeenCalled();
   });
 
-  it('ignores a preview click outside the selection while a textarea is active', () => {
+  it('commits text when clicking outside the selection while a textarea is active', () => {
     const { actions, context } = createContext({
       state: {
         status: 'preview',
@@ -196,7 +196,7 @@ describe('capture workspace editor pointer dispatch', () => {
 
     expect(event.preventDefault).toHaveBeenCalledOnce();
     expect(event.stopPropagation).toHaveBeenCalledOnce();
-    expect(actions.commitTextDraft).not.toHaveBeenCalled();
+    expect(actions.commitTextDraft).toHaveBeenCalledOnce();
   });
 
   it('updates an active selection edit without entering selecting workflows', () => {

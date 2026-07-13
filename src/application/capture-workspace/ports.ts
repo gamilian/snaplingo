@@ -22,6 +22,9 @@ export interface CaptureWorkspaceEventsPort {
   subscribeCaptureCopy(
     handler: CaptureWorkspaceRequestHandler,
   ): Promise<CaptureWorkspaceUnsubscribe>;
+  subscribeCaptureSave(
+    handler: CaptureWorkspaceRequestHandler,
+  ): Promise<CaptureWorkspaceUnsubscribe>;
   subscribeCaptureUndo(
     handler: CaptureWorkspaceRequestHandler,
   ): Promise<CaptureWorkspaceUnsubscribe>;

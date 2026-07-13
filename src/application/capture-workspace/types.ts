@@ -169,6 +169,7 @@ export interface CaptureWorkspaceRuntimePlatform {
   };
   onCancelRequested(handler: () => void | Promise<void>): Promise<() => void>;
   onCopyRequested(handler: () => void | Promise<void>): Promise<() => void>;
+  onSaveRequested(handler: () => void | Promise<void>): Promise<() => void>;
   onUndoRequested(handler: () => void | Promise<void>): Promise<() => void>;
   onRedoRequested(handler: () => void | Promise<void>): Promise<() => void>;
   onHotkeyTriggered(

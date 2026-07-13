@@ -16,6 +16,7 @@ import {
 import { useCaptureMagnifierPixelSource } from './captureMagnifierRuntime';
 import { useCaptureSelectionOverlay } from './captureSelectionOverlayRuntime';
 import { getCaptureWorkspaceDerivedState } from './captureWorkspaceDerived';
+import { ANNOTATION_COLORS, type AnnotationColor } from './annotationStyle';
 import type {
   CaptureWorkspaceViewActions,
   CaptureWorkspaceViewRenderState,
@@ -31,6 +32,7 @@ interface CaptureWorkspaceRuntimeViewOptions {
   initialMode?: CaptureMode;
   initialSessionId?: string;
   onInactive?: () => void | Promise<void>;
+  annotationColorPresets?: readonly AnnotationColor[];
   screenshotSavePath?: string;
 }
 
@@ -43,10 +45,12 @@ export function useCaptureWorkspaceRuntimeView({
   initialMode,
   initialSessionId,
   onInactive,
+  annotationColorPresets,
   screenshotSavePath,
 }: CaptureWorkspaceRuntimeViewOptions): CaptureWorkspaceRuntimeView {
   const platformRuntime = useCaptureWorkspaceRuntime();
   const onInactiveRef = useRef(onInactive);
+  const annotationColorPresetsRef = useRef(annotationColorPresets);
   const screenshotSavePathRef = useRef(screenshotSavePath);
   const hostBridgeRef = useRef<{
     reset(): void;
@@ -58,6 +62,7 @@ export function useCaptureWorkspaceRuntimeView({
     scheduleSelectionOverlayPaint: () => undefined,
   });
   onInactiveRef.current = onInactive;
+  annotationColorPresetsRef.current = annotationColorPresets;
   screenshotSavePathRef.current = screenshotSavePath;
 
   const [runtimeRevision, setRuntimeRevision] = useState(0);
@@ -67,6 +72,8 @@ export function useCaptureWorkspaceRuntimeView({
       createCaptureWorkspaceRuntime({
         platform: platformRuntime,
         onInactive: () => onInactiveRef.current?.(),
+        annotationColorPresets: () =>
+          annotationColorPresetsRef.current ?? ANNOTATION_COLORS,
         screenshotSavePath: () => screenshotSavePathRef.current,
         storage: window.localStorage,
         host: {

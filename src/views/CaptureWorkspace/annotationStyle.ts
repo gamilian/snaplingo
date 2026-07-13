@@ -113,12 +113,13 @@ export function nextAnnotationToolFromCycleShortcut(
 
 export function annotationColorFromShortcut(
   event: AnnotationToolShortcutEvent,
+  colors: readonly AnnotationColor[] = ANNOTATION_COLORS,
 ): AnnotationColor | null {
   if (event.metaKey || event.ctrlKey || event.altKey) return null;
   if (!/^[1-9]$/.test(event.key)) return null;
 
   const colorIndex = Number(event.key) - 1;
-  return ANNOTATION_COLORS[colorIndex] ?? null;
+  return colors[colorIndex] ?? null;
 }
 
 export function isAnnotationFillToggleShortcut(

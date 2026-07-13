@@ -183,6 +183,9 @@ function createPlatform() {
     onCopyRequested: vi.fn<
       CaptureWorkspacePlatformRuntime['onCopyRequested']
     >(async () => () => undefined),
+    onSaveRequested: vi.fn<
+      CaptureWorkspacePlatformRuntime['onSaveRequested']
+    >(async () => () => undefined),
     onUndoRequested: vi.fn<
       CaptureWorkspacePlatformRuntime['onUndoRequested']
     >(async () => () => undefined),

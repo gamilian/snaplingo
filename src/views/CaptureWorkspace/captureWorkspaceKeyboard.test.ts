@@ -98,6 +98,10 @@ function createContext({
     state,
     refs,
     derived,
+    annotationColorPresets: [
+      [12, 34, 56, 255],
+      [101, 102, 103, 255],
+    ],
     actions,
   };
   return { actions, context };
@@ -106,6 +110,18 @@ function createContext({
 const selection: LogicalRect = { x: 10, y: 20, width: 120, height: 80 };
 
 describe('handleCaptureWorkspaceEditorKeyDown', () => {
+  it('selects number-key colors from the current preset list', () => {
+    const { actions, context } = createContext({
+      state: { status: 'preview' },
+    });
+
+    handleCaptureWorkspaceEditorKeyDown(createKeyboardEvent('2'), context);
+
+    expect(actions.selectAnnotationColor).toHaveBeenCalledWith([
+      101, 102, 103, 255,
+    ]);
+  });
+
   it('prevents Escape before dismissing the preview editor layer', () => {
     const calls: string[] = [];
     const { actions, context } = createContext({

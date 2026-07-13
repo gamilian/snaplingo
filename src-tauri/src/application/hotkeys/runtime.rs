@@ -14,6 +14,7 @@ use crate::Result;
 
 pub struct HotkeyRuntime {
     configuration: Arc<HotkeyConfiguration>,
+    operation_lock: Mutex<()>,
     registrations: Mutex<HashMap<String, String>>,
 }
 
@@ -37,6 +38,14 @@ pub(crate) struct HotkeyRegistration {
     pub timing: HotkeyTriggerTiming,
 }
 
+struct HotkeyRegistrationChange {
+    category: String,
+    action: String,
+    registration_key: String,
+    previous_accelerator: Option<String>,
+    next_accelerator: Option<String>,
+}
+
 pub(crate) trait HotkeyRegistrar {
     fn register(&self, registration: HotkeyRegistration) -> Result<()>;
     fn unregister(&self, accelerator: &str) -> Result<()>;
@@ -46,6 +55,7 @@ impl HotkeyRuntime {
     pub fn new(configuration: Arc<HotkeyConfiguration>) -> Self {
         Self {
             configuration,
+            operation_lock: Mutex::new(()),
             registrations: Mutex::new(HashMap::new()),
         }
     }
@@ -83,6 +93,9 @@ impl HotkeyRuntime {
         registrar: &impl HotkeyRegistrar,
         category: String,
     ) -> Result<HotkeySettingsSnapshot> {
+        let _operation_guard = self.operation_lock.lock().map_err(|err| {
+            crate::AppError::Other(format!("Shortcut operation lock poisoned: {err}"))
+        })?;
         let defaults = self.default_snapshot();
         let mut entries: Vec<_> = hotkey_category(&defaults, &category)
             .ok_or_else(|| {
@@ -93,11 +106,78 @@ impl HotkeyRuntime {
             .collect();
         entries.sort_by(|left, right| left.0.cmp(&right.0));
 
-        let mut snapshot = self.snapshot()?;
+        let mut registrations = self.registrations.lock().map_err(|err| {
+            crate::AppError::Other(format!("Shortcut registry lock poisoned: {err}"))
+        })?;
+        let mut changes = Vec::new();
         for (action, hotkey) in entries {
-            snapshot = self
-                .update_hotkey_with(registrar, category.clone(), action, hotkey)?
-                .snapshot;
+            let registration_key = hotkey_registration_key(&category, &action);
+            let previous_accelerator = registrations.get(&registration_key).cloned();
+            let next_accelerator = resolve_hotkey_accelerator(&category, &action, &hotkey)?;
+            if previous_accelerator != next_accelerator {
+                changes.push(HotkeyRegistrationChange {
+                    category: category.clone(),
+                    action,
+                    registration_key,
+                    previous_accelerator,
+                    next_accelerator,
+                });
+            }
+        }
+
+        let mut unregistered_previous = Vec::new();
+        for (index, change) in changes.iter().enumerate() {
+            let Some(accelerator) = change.previous_accelerator.as_deref() else {
+                continue;
+            };
+            if let Err(err) = registrar.unregister(accelerator) {
+                restore_previous_registrations(registrar, &changes, &unregistered_previous);
+                return Err(err);
+            }
+            unregistered_previous.push(index);
+        }
+
+        let mut registered_next = Vec::new();
+        for (index, change) in changes.iter().enumerate() {
+            let Some(accelerator) = change.next_accelerator.as_deref() else {
+                continue;
+            };
+            if let Err(err) =
+                register_hotkey_action(registrar, &change.category, &change.action, accelerator)
+            {
+                rollback_category_registration_changes(
+                    registrar,
+                    &changes,
+                    &registered_next,
+                    &unregistered_previous,
+                );
+                return Err(err);
+            }
+            registered_next.push(index);
+        }
+
+        let snapshot = match self.configuration.reset_category(&category) {
+            Ok(snapshot) => snapshot,
+            Err(err) => {
+                rollback_category_registration_changes(
+                    registrar,
+                    &changes,
+                    &registered_next,
+                    &unregistered_previous,
+                );
+                return Err(err);
+            }
+        };
+
+        for change in changes {
+            match change.next_accelerator {
+                Some(accelerator) => {
+                    registrations.insert(change.registration_key, accelerator);
+                }
+                None => {
+                    registrations.remove(&change.registration_key);
+                }
+            }
         }
         Ok(snapshot)
     }
@@ -106,6 +186,9 @@ impl HotkeyRuntime {
         &self,
         registrar: &impl HotkeyRegistrar,
     ) -> Result<()> {
+        let _operation_guard = self.operation_lock.lock().map_err(|err| {
+            crate::AppError::Other(format!("Shortcut operation lock poisoned: {err}"))
+        })?;
         let snapshot = self.configuration.snapshot()?;
 
         for default_hotkey in DEFAULT_HOTKEYS {
@@ -146,6 +229,9 @@ impl HotkeyRuntime {
         action: String,
         hotkey: String,
     ) -> Result<HotkeyUpdateOutcome> {
+        let _operation_guard = self.operation_lock.lock().map_err(|err| {
+            crate::AppError::Other(format!("Shortcut operation lock poisoned: {err}"))
+        })?;
         let next_accelerator = resolve_hotkey_accelerator(&category, &action, &hotkey)?;
         let registration_key = hotkey_registration_key(&category, &action);
         let previous_accelerator = self.previous_accelerator(&registration_key)?;
@@ -285,6 +371,54 @@ fn rollback_registration_change(
     }
 }
 
+fn rollback_category_registration_changes(
+    registrar: &impl HotkeyRegistrar,
+    changes: &[HotkeyRegistrationChange],
+    registered_next: &[usize],
+    unregistered_previous: &[usize],
+) {
+    for index in registered_next.iter().rev() {
+        let change = &changes[*index];
+        let Some(accelerator) = change.next_accelerator.as_deref() else {
+            continue;
+        };
+        if let Err(err) = registrar.unregister(accelerator) {
+            log::warn!(
+                "Failed to roll back hotkey registration {} for {}:{}: {}",
+                accelerator,
+                change.category,
+                change.action,
+                err
+            );
+        }
+    }
+    restore_previous_registrations(registrar, changes, unregistered_previous);
+}
+
+fn restore_previous_registrations(
+    registrar: &impl HotkeyRegistrar,
+    changes: &[HotkeyRegistrationChange],
+    unregistered_previous: &[usize],
+) {
+    for index in unregistered_previous.iter().rev() {
+        let change = &changes[*index];
+        let Some(accelerator) = change.previous_accelerator.as_deref() else {
+            continue;
+        };
+        if let Err(err) =
+            register_hotkey_action(registrar, &change.category, &change.action, accelerator)
+        {
+            log::warn!(
+                "Failed to restore previous hotkey {} for {}:{}: {}",
+                accelerator,
+                change.category,
+                change.action,
+                err
+            );
+        }
+    }
+}
+
 fn hotkey_trigger_timing(category: &str, action: &str) -> HotkeyTriggerTiming {
     if should_register_hotkey_on_release(category, action) {
         HotkeyTriggerTiming::Released
@@ -304,9 +438,10 @@ mod hotkey_runtime_tests {
     use super::{HotkeyRegistrar, HotkeyRegistration, HotkeyRuntime, HotkeyTriggerTiming};
     use crate::application::hotkeys::configuration::HotkeyConfiguration;
     use crate::domain::hotkey_config::{
-        SCREENSHOT_ACTION, SCREENSHOT_CATEGORY, SELECTION_TRANSLATE_ACTION, TRANSLATION_CATEGORY,
+        INPUT_TRANSLATE_ACTION, SCREENSHOT_ACTION, SCREENSHOT_CATEGORY,
+        SCREENSHOT_TRANSLATE_ACTION, SELECTION_TRANSLATE_ACTION, TRANSLATION_CATEGORY,
     };
-    use crate::infrastructure::storage::SqliteConfigStore;
+    use crate::infrastructure::storage::{Database, SqliteConfigStore};
     use crate::Result;
 
     #[derive(Clone, Debug, PartialEq, Eq)]
@@ -529,6 +664,84 @@ mod hotkey_runtime_tests {
                 .get(SELECTION_TRANSLATE_ACTION),
             Some(&"⌥D".to_string())
         );
+    }
+
+    #[test]
+    fn hotkey_runtime_category_reset_rolls_back_when_a_registration_fails() {
+        let (runtime, configuration) = runtime_with_configuration();
+        configuration
+            .update_hotkey(TRANSLATION_CATEGORY, INPUT_TRANSLATE_ACTION, "⇧⌥A")
+            .unwrap();
+        configuration
+            .update_hotkey(TRANSLATION_CATEGORY, SCREENSHOT_TRANSLATE_ACTION, "⇧⌥S")
+            .unwrap();
+        configuration
+            .update_hotkey(TRANSLATION_CATEGORY, SELECTION_TRANSLATE_ACTION, "⇧⌥D")
+            .unwrap();
+        let before = runtime.snapshot().unwrap();
+        let registrar = FakeHotkeyRegistrar::default();
+        runtime.register_startup_hotkeys_with(&registrar).unwrap();
+        registrar.clear();
+        registrar.fail_register_for("Alt+KeyS");
+
+        let result = runtime.reset_category_with(&registrar, TRANSLATION_CATEGORY.to_string());
+
+        assert!(result.is_err());
+        assert_eq!(runtime.snapshot().unwrap(), before);
+        assert!(registrar.operations().contains(&Operation::Register {
+            category: TRANSLATION_CATEGORY.to_string(),
+            action: INPUT_TRANSLATE_ACTION.to_string(),
+            accelerator: "Shift+Alt+KeyA".to_string(),
+            timing: HotkeyTriggerTiming::Pressed,
+        }));
+        assert!(registrar.operations().contains(&Operation::Register {
+            category: TRANSLATION_CATEGORY.to_string(),
+            action: SCREENSHOT_TRANSLATE_ACTION.to_string(),
+            accelerator: "Shift+Alt+KeyS".to_string(),
+            timing: HotkeyTriggerTiming::Released,
+        }));
+    }
+
+    #[test]
+    fn hotkey_runtime_category_reset_restores_registrations_when_persistence_fails() {
+        let database = Arc::new(Database::in_memory().unwrap());
+        let store = Arc::new(SqliteConfigStore::new(database.clone()));
+        let configuration = Arc::new(HotkeyConfiguration::new(store));
+        configuration
+            .update_hotkey(TRANSLATION_CATEGORY, SELECTION_TRANSLATE_ACTION, "⇧⌥D")
+            .unwrap();
+        let runtime = HotkeyRuntime::new(configuration);
+        let before = runtime.snapshot().unwrap();
+        let registrar = FakeHotkeyRegistrar::default();
+        runtime.register_startup_hotkeys_with(&registrar).unwrap();
+        database
+            .with_connection(|connection| {
+                connection.execute_batch(
+                    "CREATE TRIGGER reject_hotkey_updates
+                     BEFORE UPDATE ON settings
+                     WHEN OLD.namespace = 'hotkeys'
+                     BEGIN
+                       SELECT RAISE(FAIL, 'forced hotkey persistence failure');
+                     END;",
+                )?;
+                Ok(())
+            })
+            .unwrap();
+        registrar.clear();
+
+        let result = runtime.reset_category_with(&registrar, TRANSLATION_CATEGORY.to_string());
+
+        assert!(result.is_err());
+        assert_eq!(runtime.snapshot().unwrap(), before);
+        assert!(registrar
+            .operations()
+            .contains(&Operation::Unregister("Alt+KeyD".to_string())));
+        assert!(registrar.operations().contains(&Operation::Register {
+            category: TRANSLATION_CATEGORY.to_string(),
+            action: SELECTION_TRANSLATE_ACTION.to_string(),
+            accelerator: "Shift+Alt+KeyD".to_string(),
+            timing: HotkeyTriggerTiming::Released,
+        }));
     }
 
     #[test]

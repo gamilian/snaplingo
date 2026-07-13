@@ -423,6 +423,15 @@ describe('annotation style', () => {
     expect(annotationColorFromShortcut({ ...plainKey, key: '6' })).toEqual(
       ANNOTATION_COLORS[5],
     );
+    expect(
+      annotationColorFromShortcut(
+        { ...plainKey, key: '2' },
+        [
+          [12, 34, 56, 255],
+          [101, 102, 103, 255],
+        ],
+      ),
+    ).toEqual([101, 102, 103, 255]);
   });
 
   it('does not map modified or unavailable color shortcut keys', () => {
@@ -449,6 +458,17 @@ describe('annotation style', () => {
         ctrlKey: false,
         altKey: false,
       }),
+    ).toBeNull();
+    expect(
+      annotationColorFromShortcut(
+        {
+          key: '2',
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+        },
+        [[12, 34, 56, 255]],
+      ),
     ).toBeNull();
   });
 

@@ -438,9 +438,11 @@ describe('capture workspace runtime', () => {
     const unlistenHotkey = vi.fn();
     const unlistenCancel = vi.fn();
     const unlistenCopy = vi.fn();
+    const unlistenSave = vi.fn();
     platform.onHotkeyTriggered.mockResolvedValue(unlistenHotkey);
     platform.onCancelRequested.mockResolvedValue(unlistenCancel);
     platform.onCopyRequested.mockResolvedValue(unlistenCopy);
+    platform.onSaveRequested.mockResolvedValue(unlistenSave);
     const runtime = createCaptureWorkspaceRuntime({ platform });
 
     const disconnect = await runtime.actions.connectHost();
@@ -453,32 +455,40 @@ describe('capture workspace runtime', () => {
     });
     expect(platform.onCancelRequested).toHaveBeenCalledTimes(1);
     expect(platform.onCopyRequested).toHaveBeenCalledTimes(1);
+    expect(platform.onSaveRequested).toHaveBeenCalledTimes(1);
 
     disconnect();
     expect(unlistenHotkey).toHaveBeenCalledTimes(1);
     expect(unlistenCancel).toHaveBeenCalledTimes(1);
     expect(unlistenCopy).toHaveBeenCalledTimes(1);
+    expect(unlistenSave).toHaveBeenCalledTimes(1);
   });
 
   it.each([
     ['second', 'cancel'],
     ['third', 'copy'],
+    ['fourth', 'save'],
   ] as const)('cleans partial subscriptions when the %s registration fails', async (_label, failure) => {
     const platform = createPlatform();
     const keyboardTarget = createKeyboardTarget();
     const unlistenHotkey = vi.fn();
     const unlistenCancel =
-      failure === 'copy'
+      failure === 'copy' || failure === 'save'
         ? vi.fn(() => {
             throw new Error('cancel dispose failed');
           })
         : vi.fn();
+    const unlistenCopy = vi.fn();
     platform.onHotkeyTriggered.mockResolvedValue(unlistenHotkey);
     if (failure === 'cancel') {
       platform.onCancelRequested.mockRejectedValue(new Error('cancel listen failed'));
-    } else {
+    } else if (failure === 'copy') {
       platform.onCancelRequested.mockResolvedValue(unlistenCancel);
       platform.onCopyRequested.mockRejectedValue(new Error('copy listen failed'));
+    } else {
+      platform.onCancelRequested.mockResolvedValue(unlistenCancel);
+      platform.onCopyRequested.mockResolvedValue(unlistenCopy);
+      platform.onSaveRequested.mockRejectedValue(new Error('save listen failed'));
     }
     const runtime = createCaptureWorkspaceRuntime({
       platform,
@@ -490,7 +500,8 @@ describe('capture workspace runtime', () => {
     await runtime.actions.connectHost();
 
     expect(unlistenHotkey).toHaveBeenCalledOnce();
-    expect(unlistenCancel).toHaveBeenCalledTimes(failure === 'copy' ? 1 : 0);
+    expect(unlistenCancel).toHaveBeenCalledTimes(failure === 'cancel' ? 0 : 1);
+    expect(unlistenCopy).toHaveBeenCalledTimes(failure === 'save' ? 1 : 0);
     expect(keyboardTarget.listenerCount('keydown')).toBe(0);
     expect(keyboardTarget.listenerCount('keyup')).toBe(0);
     expect(keyboardTarget.listenerCount('blur')).toBe(0);
@@ -534,6 +545,31 @@ describe('capture workspace runtime', () => {
     expect(platform.dismiss).toHaveBeenCalledTimes(1);
     expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
       'session-native-copy',
+    );
+  });
+
+  it('handles native preview save through runtime-owned completion effects', async () => {
+    const platform = createPlatform({
+      session: createSession({ id: 'session-native-save' }),
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-native-save');
+    await runtime.actions.renderSelectionPreview(selection);
+    await runtime.actions.connectHost();
+
+    const save = platform.onSaveRequested.mock.calls[0]?.[0];
+    await save?.();
+
+    expect(platform.commands.defaultCaptureSavePath).toHaveBeenCalledOnce();
+    expect(platform.commands.outputCapture).toHaveBeenCalledWith({
+      sessionId: 'session-native-save',
+      rect: selection,
+      annotations: [],
+      action: { type: 'save', path: '/captures/capture.png' },
+    });
+    expect(platform.dismiss).toHaveBeenCalledTimes(1);
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
+      'session-native-save',
     );
   });
 
@@ -1649,6 +1685,29 @@ describe('capture workspace runtime', () => {
     });
   });
 
+  it('ignores a blank root click after the selection enters preview editing', async () => {
+    const platform = createPlatform({
+      session: createSession({ id: 'session-editor-blank-click' }),
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession(
+      'screenshot',
+      'session-editor-blank-click',
+    );
+    await runtime.actions.renderSelectionPreview(selection);
+
+    expect(
+      runtime.actions.pointerDown({
+        point: { x: 5, y: 5 },
+        source: 'root',
+      }),
+    ).toBe(false);
+    expect(runtime.renderState.status).toBe('preview');
+    expect(runtime.renderState.selection).toEqual(selection);
+    expect(runtime.renderState.startPoint).toBeNull();
+  });
+
   it('owns delete, erase, clear, and preview failure state', async () => {
     const platform = createPlatform({
       session: createSession({ id: 'session-editor-delete' }),
@@ -2451,6 +2510,9 @@ function createPlatform({
     >(async () => () => undefined),
     onCopyRequested: vi.fn<
       CaptureWorkspacePlatformRuntime['onCopyRequested']
+    >(async () => () => undefined),
+    onSaveRequested: vi.fn<
+      CaptureWorkspacePlatformRuntime['onSaveRequested']
     >(async () => () => undefined),
     onUndoRequested: vi.fn<
       CaptureWorkspacePlatformRuntime['onUndoRequested']

@@ -129,7 +129,6 @@ export default function IconActionButton({
     <button
       ref={buttonRef}
       type="button"
-      title={title}
       aria-label={buttonProps['aria-label'] ?? title}
       {...buttonProps}
       onMouseEnter={handleMouseEnter}

@@ -312,11 +312,10 @@ export function getSelectionArrowActionFromShortcut(
 
 export function isCopyCaptureKeyboardShortcut(event: CaptureShortcutEvent) {
   return (
-    isPlainCaptureCompletionShortcut(event) ||
-    (event.key.toLowerCase() === 'c' &&
-      (event.metaKey || event.ctrlKey) &&
-      !event.altKey &&
-      !event.shiftKey)
+    event.key.toLowerCase() === 'c' &&
+    (event.metaKey || event.ctrlKey) &&
+    !event.altKey &&
+    !event.shiftKey
   );
 }
 

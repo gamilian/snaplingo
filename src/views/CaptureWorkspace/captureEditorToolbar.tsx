@@ -163,6 +163,8 @@ export function CaptureEditorToolbar({
   const [selectedColorPresetIndex, setSelectedColorPresetIndex] = useState<
     number | null
   >(null);
+  const [colorPresetError, setColorPresetError] = useState<string | null>(null);
+  const colorPresetMutationIdRef = useRef(0);
   const sizeValue = isTextSizingActive
     ? textFontSize
     : annotationStyle.strokeWidth;
@@ -208,6 +210,7 @@ export function CaptureEditorToolbar({
     }
 
     const currentColor = annotationStyle.color;
+    setColorPresetError(null);
     setVisibleColorPresets([...annotationColorPresets]);
     setColorDraft(annotationColorToHex(currentColor));
     const selectedIndex = annotationColorPresets.findIndex((color) =>
@@ -221,17 +224,31 @@ export function CaptureEditorToolbar({
     if (!color) return;
     applyColor(color);
   };
-  const persistColorPresets = (colors: AnnotationColor[]) => {
+  const persistColorPresets = async (
+    colors: AnnotationColor[],
+    nextSelectedIndex: number | null,
+  ) => {
+    const previousColors = visibleColorPresets;
+    const previousSelectedIndex = selectedColorPresetIndex;
+    const mutationId = ++colorPresetMutationIdRef.current;
     setVisibleColorPresets(colors);
-    void onUpdateAnnotationColorPresets(colors);
+    setSelectedColorPresetIndex(nextSelectedIndex);
+    setColorPresetError(null);
+    try {
+      await onUpdateAnnotationColorPresets(colors);
+    } catch {
+      if (mutationId !== colorPresetMutationIdRef.current) return;
+      setVisibleColorPresets(previousColors);
+      setSelectedColorPresetIndex(previousSelectedIndex);
+      setColorPresetError("颜色预设保存失败，请重试。");
+    }
   };
   const addColorPreset = () => {
     const color = annotationColorFromHex(colorDraft);
     if (!color) return;
     const nextColors = addAnnotationColorPreset(visibleColorPresets, color);
     if (nextColors.length === visibleColorPresets.length) return;
-    setSelectedColorPresetIndex(nextColors.length - 1);
-    persistColorPresets(nextColors);
+    void persistColorPresets(nextColors, nextColors.length - 1);
   };
   const replaceColorPreset = () => {
     if (selectedColorPresetIndex === null) return;
@@ -242,7 +259,7 @@ export function CaptureEditorToolbar({
       selectedColorPresetIndex,
       color,
     );
-    persistColorPresets(nextColors);
+    void persistColorPresets(nextColors, selectedColorPresetIndex);
   };
   const deleteColorPreset = () => {
     if (selectedColorPresetIndex === null) return;
@@ -250,8 +267,7 @@ export function CaptureEditorToolbar({
       visibleColorPresets,
       selectedColorPresetIndex,
     );
-    setSelectedColorPresetIndex(null);
-    persistColorPresets(nextColors);
+    void persistColorPresets(nextColors, null);
   };
 
   return (
@@ -275,6 +291,7 @@ export function CaptureEditorToolbar({
         className={getCaptureEditorIconButtonClassName(!activeAnnotationTool)}
         disabled={isRenderingOutput}
         title="Select and move"
+        tooltipPlacement="bottom"
         aria-label="Select and move"
         onClick={() => {
           setOpenPicker(null);
@@ -313,6 +330,7 @@ export function CaptureEditorToolbar({
           )}
           disabled={isRenderingOutput}
           title={button.title}
+          tooltipPlacement="bottom"
           aria-label={button.ariaLabel}
           onClick={() => {
             setOpenPicker(null);
@@ -327,6 +345,7 @@ export function CaptureEditorToolbar({
         className={getCaptureEditorIconButtonClassName(false)}
         disabled={isRenderingOutput || !canUndo}
         title="Undo (Ctrl/Cmd+Z)"
+        tooltipPlacement="bottom"
         aria-label="Undo annotation"
         onClick={onUndo}
       >
@@ -336,6 +355,7 @@ export function CaptureEditorToolbar({
         className={getCaptureEditorIconButtonClassName(false)}
         disabled={isRenderingOutput || !canRedo}
         title="Redo (Ctrl/Cmd+Y)"
+        tooltipPlacement="bottom"
         aria-label="Redo annotation"
         onClick={onRedo}
       >
@@ -350,6 +370,7 @@ export function CaptureEditorToolbar({
           }}
           disabled={isRenderingOutput}
           title="Annotation color"
+          tooltipPlacement="bottom"
           aria-label="Annotation color"
           aria-haspopup="dialog"
           aria-expanded={openPicker === "color"}
@@ -362,6 +383,7 @@ export function CaptureEditorToolbar({
             colors={visibleColorPresets}
             draftColor={colorDraft}
             selectedIndex={selectedColorPresetIndex}
+            error={colorPresetError}
             opensUpward={position.y + 292 > window.innerHeight}
             onClose={() => setOpenPicker(null)}
             onSelect={(color, index) => {
@@ -480,7 +502,7 @@ export function CaptureEditorToolbar({
         type="button"
         className={getCaptureEditorCommandButtonClassName("primary")}
         disabled={isRenderingOutput}
-        title="Copy (Enter)"
+        title="Copy (Cmd/Ctrl+C)"
         aria-label="Copy selection"
         onClick={() => {
           void onCopy();
@@ -496,6 +518,7 @@ function ColorPickerPopover({
   colors,
   draftColor,
   selectedIndex,
+  error,
   opensUpward,
   onClose,
   onSelect,
@@ -507,6 +530,7 @@ function ColorPickerPopover({
   colors: readonly AnnotationColor[];
   draftColor: string;
   selectedIndex: number | null;
+  error: string | null;
   opensUpward: boolean;
   onClose: () => void;
   onSelect: (color: AnnotationColor, index: number) => void;
@@ -535,7 +559,7 @@ function ColorPickerPopover({
   return (
     <div
       className={`absolute left-1/2 z-20 w-[248px] -translate-x-1/2 rounded-[12px] border border-slate-200 bg-white/95 p-3 text-slate-700 shadow-[0_14px_34px_rgba(15,23,42,0.22)] backdrop-blur-xl ${
-        opensUpward ? "bottom-[calc(100%+7px)]" : "top-[calc(100%+7px)]"
+        opensUpward ? "bottom-[calc(100%+3px)]" : "top-[calc(100%+3px)]"
       }`}
       role="dialog"
       aria-label="Annotation colors"
@@ -579,35 +603,37 @@ function ColorPickerPopover({
         </div>
       )}
 
-      <button
-        type="button"
-        className="mt-3 flex h-9 w-full items-center gap-2 rounded-[8px] border border-slate-200 bg-slate-50 px-2.5 text-left text-[11px] font-semibold text-slate-700 hover:bg-slate-100"
-        aria-label="Open system color palette"
-        aria-haspopup="dialog"
-        onClick={() => systemPaletteInputRef.current?.click()}
-      >
-        <span
-          className="h-5 w-5 rounded-full border border-white shadow-sm"
-          style={{
-            background:
-              "conic-gradient(#ff4d4f, #faad14, #52c41a, #1890ff, #722ed1, #ff4d4f)",
-          }}
-          aria-hidden="true"
+      <div className="relative mt-3 h-9">
+        <button
+          type="button"
+          className="flex h-full w-full items-center gap-2 rounded-[8px] border border-slate-200 bg-slate-50 px-2.5 text-left text-[11px] font-semibold text-slate-700 hover:bg-slate-100"
+          aria-label="Open system color palette"
+          aria-haspopup="dialog"
+          onClick={() => systemPaletteInputRef.current?.click()}
+        >
+          <span
+            className="h-5 w-5 rounded-full border border-white shadow-sm"
+            style={{
+              background:
+                "conic-gradient(#ff4d4f, #faad14, #52c41a, #1890ff, #722ed1, #ff4d4f)",
+            }}
+            aria-hidden="true"
+          />
+          <span className="flex-1">系统调色板</span>
+          <span className="font-mono text-[10px] text-slate-400">
+            {draftColor}
+          </span>
+        </button>
+        <input
+          ref={systemPaletteInputRef}
+          className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
+          type="color"
+          value={draftColor}
+          tabIndex={-1}
+          aria-label="Color palette"
+          onInput={(event) => onDraftChange(event.currentTarget.value)}
         />
-        <span className="flex-1">系统调色板</span>
-        <span className="font-mono text-[10px] text-slate-400">
-          {draftColor}
-        </span>
-      </button>
-      <input
-        ref={systemPaletteInputRef}
-        className="sr-only"
-        type="color"
-        value={draftColor}
-        tabIndex={-1}
-        aria-label="Color palette"
-        onInput={(event) => onDraftChange(event.currentTarget.value)}
-      />
+      </div>
 
       <div className="mt-2.5 grid grid-cols-3 gap-1.5 border-t border-slate-100 pt-2.5">
         <button
@@ -638,6 +664,11 @@ function ColorPickerPopover({
           删除
         </button>
       </div>
+      {error && (
+        <p className="mt-2 text-[10px] text-red-600" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -961,6 +992,7 @@ function ToolGroupButton({
         className={getCaptureEditorIconButtonClassName(isActive, "w-8 px-0")}
         disabled={disabled}
         title={label}
+        tooltipPlacement="bottom"
         aria-label={label}
         aria-expanded={isOpen}
         onClick={() => {
@@ -1007,6 +1039,7 @@ function ToolPicker({
             activeTool === tool.tool,
           )}
           title={tool.title}
+          tooltipPlacement="bottom"
           aria-label={tool.ariaLabel}
           onClick={() => onSelect(tool.tool)}
         >

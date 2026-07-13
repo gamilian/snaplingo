@@ -2,7 +2,8 @@ use std::sync::{Arc, Mutex};
 
 use crate::application::hotkeys::{display_hotkey_to_accelerator, HotkeyStore};
 use crate::domain::hotkey_config::{
-    default_hotkey_snapshot, hotkey_category_mut, validate_hotkey_action, HotkeySettingsSnapshot,
+    default_hotkey_snapshot, hotkey_category, hotkey_category_mut, validate_hotkey_action,
+    HotkeySettingsSnapshot,
 };
 use crate::{AppError, Result};
 
@@ -40,6 +41,17 @@ impl HotkeyConfiguration {
         let mut snapshot = self.snapshot()?;
         hotkey_category_mut(&mut snapshot, category)?
             .insert(action.to_string(), hotkey.to_string());
+        self.save_snapshot(snapshot)
+    }
+
+    pub(crate) fn reset_category(&self, category: &str) -> Result<HotkeySettingsSnapshot> {
+        let _guard = self.update_lock.lock().unwrap();
+        let defaults = default_hotkey_snapshot();
+        let default_category = hotkey_category(&defaults, category)
+            .cloned()
+            .ok_or_else(|| AppError::Other(format!("Unknown hotkey category '{}'", category)))?;
+        let mut snapshot = self.snapshot()?;
+        *hotkey_category_mut(&mut snapshot, category)? = default_category;
         self.save_snapshot(snapshot)
     }
 

@@ -41,6 +41,7 @@ function CaptureWorkspaceContent({
     initialMode,
     initialSessionId,
     onInactive,
+    annotationColorPresets,
     screenshotSavePath,
   });
 

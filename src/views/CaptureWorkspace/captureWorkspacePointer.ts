@@ -138,6 +138,7 @@ export function handleCaptureWorkspaceEditorPointerDown(
   if (textDraft && event.button === 0) {
     event.preventDefault();
     event.stopPropagation();
+    actions.commitTextDraft();
     return;
   }
 
@@ -370,6 +371,7 @@ export function handleCaptureWorkspaceEditorPreviewPointerDown(
   if (textDraft) {
     event.preventDefault();
     event.stopPropagation();
+    actions.commitTextDraft();
     return;
   }
 

@@ -1284,14 +1284,14 @@ describe('capture session actions', () => {
     ).toBeNull();
   });
 
-  it('uses Enter or Cmd/Ctrl+C for copying the current selection', () => {
+  it('uses Cmd/Ctrl+C for copying the current selection', () => {
     expect(
       isCopyCaptureKeyboardShortcut({
         key: 'Enter',
         metaKey: false,
         ctrlKey: false,
       }),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       isCopyCaptureKeyboardShortcut({
         key: 'c',
@@ -1363,13 +1363,22 @@ describe('capture session actions', () => {
   it('maps preview capture output shortcuts to one completion action', () => {
     expect(
       getPreviewCaptureCompletionActionFromShortcut({
+        key: 'c',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe('copy');
+    expect(
+      getPreviewCaptureCompletionActionFromShortcut({
         key: 'Enter',
         metaKey: false,
         ctrlKey: false,
         altKey: false,
         shiftKey: false,
       }),
-    ).toBe('copy');
+    ).toBeNull();
     expect(
       getPreviewCaptureCompletionActionFromShortcut({
         key: 's',
