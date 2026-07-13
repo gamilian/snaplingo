@@ -76,24 +76,34 @@ impl History {
 
     /// Delete a history entry by ID
     pub async fn delete_history(&self, id: i64) -> Result<()> {
-        self.repository.delete(id).await
+        self.repository.delete(id).await?;
+        self.notify_changed();
+        Ok(())
     }
 
     pub async fn set_history_favorite(&self, id: i64, favorite: bool) -> Result<()> {
-        self.repository.set_favorite(id, favorite).await
+        self.repository.set_favorite(id, favorite).await?;
+        self.notify_changed();
+        Ok(())
     }
 
     pub async fn update_history_note(&self, id: i64, note: Option<String>) -> Result<()> {
-        self.repository.update_note(id, note).await
+        self.repository.update_note(id, note).await?;
+        self.notify_changed();
+        Ok(())
     }
 
     pub async fn replace_history_tags(&self, id: i64, tags: Vec<String>) -> Result<()> {
-        self.repository.replace_tags(id, tags).await
+        self.repository.replace_tags(id, tags).await?;
+        self.notify_changed();
+        Ok(())
     }
 
     /// Clear all history
     pub async fn clear_all_history(&self) -> Result<()> {
-        self.repository.clear_all().await
+        self.repository.clear_all().await?;
+        self.notify_changed();
+        Ok(())
     }
 }
 

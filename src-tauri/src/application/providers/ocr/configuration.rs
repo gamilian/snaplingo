@@ -2,13 +2,14 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::application::providers::common::CredentialField;
-use crate::application::providers::ProviderCredentialStore;
+use crate::application::providers::{ProviderChangeNotifier, ProviderCredentialStore};
 
 use super::OcrCoordinator;
 
 pub struct OcrProviderConfiguration {
     coordinator: Arc<OcrCoordinator>,
     credential_store: Arc<dyn ProviderCredentialStore>,
+    change_notifier: Option<Arc<dyn ProviderChangeNotifier>>,
 }
 
 #[cfg(test)]
@@ -125,7 +126,16 @@ impl OcrProviderConfiguration {
         Self {
             coordinator,
             credential_store,
+            change_notifier: None,
         }
+    }
+
+    pub fn with_change_notifier(
+        mut self,
+        change_notifier: Arc<dyn ProviderChangeNotifier>,
+    ) -> Self {
+        self.change_notifier = Some(change_notifier);
+        self
     }
 
     pub fn credential_schema(&self, provider_id: &str) -> crate::Result<Vec<CredentialField>> {
@@ -185,6 +195,9 @@ impl OcrProviderConfiguration {
             return Err(format!("Failed to reconfigure provider: {}", e).into());
         }
 
+        if let Some(notifier) = &self.change_notifier {
+            notifier.providers_changed();
+        }
         Ok(())
     }
 }

@@ -8,14 +8,32 @@ use crate::{AppError, Result};
 
 pub struct SettingsConfiguration {
     store: Arc<dyn SettingsStore>,
+    change_notifier: Option<Arc<dyn SettingsChangeNotifier>>,
     home_dir: Option<PathBuf>,
     default_screenshot_save_dir: PathBuf,
     update_lock: Mutex<()>,
 }
 
+pub trait SettingsChangeNotifier: Send + Sync {
+    fn settings_changed(&self);
+}
+
 impl SettingsConfiguration {
     pub fn new(store: Arc<dyn SettingsStore>) -> Self {
         Self::with_paths(store, dirs::home_dir(), default_screenshot_save_dir())
+    }
+
+    pub fn with_change_notifier(
+        store: Arc<dyn SettingsStore>,
+        change_notifier: Arc<dyn SettingsChangeNotifier>,
+    ) -> Self {
+        Self {
+            store,
+            change_notifier: Some(change_notifier),
+            home_dir: dirs::home_dir(),
+            default_screenshot_save_dir: default_screenshot_save_dir(),
+            update_lock: Mutex::new(()),
+        }
     }
 
     pub(crate) fn with_paths(
@@ -25,6 +43,7 @@ impl SettingsConfiguration {
     ) -> Self {
         Self {
             store,
+            change_notifier: None,
             home_dir,
             default_screenshot_save_dir,
             update_lock: Mutex::new(()),
@@ -70,6 +89,9 @@ impl SettingsConfiguration {
     fn save_snapshot(&self, snapshot: SettingsSnapshot) -> Result<SettingsSnapshot> {
         let snapshot = self.normalized_snapshot(snapshot);
         self.store.save_settings(&snapshot)?;
+        if let Some(notifier) = &self.change_notifier {
+            notifier.settings_changed();
+        }
         Ok(snapshot)
     }
 
@@ -117,13 +139,22 @@ fn default_screenshot_save_dir() -> PathBuf {
 
 #[cfg(test)]
 mod settings_configuration_tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
 
     use tempfile::tempdir;
 
-    use super::SettingsConfiguration;
+    use super::{SettingsChangeNotifier, SettingsConfiguration};
     use crate::domain::{GeneralSettings, ScreenshotSettings, TranslationSettings};
     use crate::infrastructure::storage::SqliteConfigStore;
+
+    struct CountingNotifier(AtomicUsize);
+
+    impl SettingsChangeNotifier for CountingNotifier {
+        fn settings_changed(&self) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
 
     #[test]
     fn loads_default_snapshot_when_no_settings_are_stored() {
@@ -209,5 +240,27 @@ mod settings_configuration_tests {
         );
         assert_eq!(updated.screenshot.format, "webp");
         assert_eq!(updated.screenshot.quality, 77);
+    }
+
+    #[test]
+    fn successful_settings_updates_notify_runtime_observers() {
+        let store = Arc::new(SqliteConfigStore::new_in_memory());
+        let notifier = Arc::new(CountingNotifier(AtomicUsize::new(0)));
+        let configuration = SettingsConfiguration::with_change_notifier(store, notifier.clone());
+
+        configuration
+            .update_general(GeneralSettings::default())
+            .unwrap();
+        configuration
+            .update_screenshot(ScreenshotSettings::default())
+            .unwrap();
+        configuration
+            .update_annotation_colors(vec![[1, 2, 3, 255]])
+            .unwrap();
+        configuration
+            .update_translation(TranslationSettings::default())
+            .unwrap();
+
+        assert_eq!(notifier.0.load(Ordering::SeqCst), 4);
     }
 }

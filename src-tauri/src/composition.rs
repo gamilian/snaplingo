@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 
 mod capture_runtime;
 mod history_runtime;
@@ -22,14 +22,16 @@ use crate::app_state::{
     AppState, CaptureRuntimeState, HistoryRuntime, ProviderRuntime, SelectionRuntime,
     SettingsRuntime,
 };
+use crate::application::hotkeys::HotkeyChangeNotifier;
 use crate::application::hotkeys::HotkeyStore;
 use crate::application::providers::ocr::OcrProviderConfiguration;
 use crate::application::providers::HttpClient;
 use crate::application::providers::{
-    ProviderConfigStore, ProviderCredentialStore, TranslationPromptConfiguration,
+    ProviderChangeNotifier, ProviderConfigStore, ProviderCredentialStore,
+    TranslationPromptConfiguration,
 };
 use crate::application::result_window::ResultWindowRuntime;
-use crate::application::settings::SettingsStore;
+use crate::application::settings::{SettingsChangeNotifier, SettingsStore};
 use crate::infrastructure::events::EventBus;
 use crate::infrastructure::http::ReqwestHttpClient;
 use crate::infrastructure::storage::{Database, Keychain, SqliteConfigStore};
@@ -39,19 +41,63 @@ use crate::infrastructure::system::result_window::{
 };
 use crate::{HotkeyConfiguration, HotkeyRuntime, SettingsConfiguration};
 
+struct TauriSettingsChangeNotifier {
+    app: AppHandle,
+}
+
+impl SettingsChangeNotifier for TauriSettingsChangeNotifier {
+    fn settings_changed(&self) {
+        if let Err(error) = self.app.emit("settings-changed", ()) {
+            log::warn!("Failed to emit settings-changed: {}", error);
+        }
+    }
+}
+
+struct TauriHotkeyChangeNotifier {
+    app: AppHandle,
+}
+
+impl HotkeyChangeNotifier for TauriHotkeyChangeNotifier {
+    fn hotkeys_changed(&self) {
+        if let Err(error) = self.app.emit("hotkeys-changed", ()) {
+            log::warn!("Failed to emit hotkeys-changed: {}", error);
+        }
+    }
+}
+
+struct TauriProviderChangeNotifier {
+    app: AppHandle,
+}
+
+impl ProviderChangeNotifier for TauriProviderChangeNotifier {
+    fn providers_changed(&self) {
+        if let Err(error) = self.app.emit("providers-changed", ()) {
+            log::warn!("Failed to emit providers-changed: {}", error);
+        }
+    }
+}
+
 pub(crate) fn build_app_state(database_path: PathBuf, app: AppHandle) -> AppState {
     let database = Arc::new(Database::open(database_path).expect("Failed to initialize database"));
     let config_store = Arc::new(SqliteConfigStore::new(database.clone()));
     let settings_store: Arc<dyn SettingsStore> = config_store.clone();
     let hotkey_store: Arc<dyn HotkeyStore> = config_store.clone();
     let provider_config_store: Arc<dyn ProviderConfigStore> = config_store.clone();
-    let settings_configuration = Arc::new(SettingsConfiguration::new(settings_store));
+    let settings_configuration = Arc::new(SettingsConfiguration::with_change_notifier(
+        settings_store,
+        Arc::new(TauriSettingsChangeNotifier { app: app.clone() }),
+    ));
     let hotkey_configuration = Arc::new(HotkeyConfiguration::new(hotkey_store));
-    let hotkey_runtime = Arc::new(HotkeyRuntime::new(hotkey_configuration));
+    let hotkey_runtime = Arc::new(HotkeyRuntime::with_change_notifier(
+        hotkey_configuration,
+        Arc::new(TauriHotkeyChangeNotifier { app: app.clone() }),
+    ));
     let keychain = Arc::new(Keychain::new());
     let provider_credential_store: Arc<dyn ProviderCredentialStore> = keychain.clone();
     let http_client: Arc<dyn HttpClient> = Arc::new(ReqwestHttpClient::new());
     let event_bus = Arc::new(EventBus::new());
+    let provider_change_notifier: Arc<dyn ProviderChangeNotifier> =
+        Arc::new(TauriProviderChangeNotifier { app: app.clone() });
 
     let history = build_history(database.clone(), app.clone());
 
@@ -68,19 +114,22 @@ pub(crate) fn build_app_state(database_path: PathBuf, app: AppHandle) -> AppStat
         llm_runtime,
         translation_coordinator.clone(),
         llm_introspection.clone(),
+        provider_change_notifier.clone(),
     );
-    let prompt_strategies = Arc::new(TranslationPromptConfiguration::new(
-        provider_config_store.clone(),
-    ));
+    let prompt_strategies = Arc::new(
+        TranslationPromptConfiguration::new(provider_config_store.clone())
+            .with_change_notifier(provider_change_notifier.clone()),
+    );
     let ocr_coordinator = build_ocr_coordinator(
         provider_config_store.clone(),
         http_client.clone(),
         event_bus.clone(),
+        provider_change_notifier.clone(),
     );
-    let ocr_configuration = Arc::new(OcrProviderConfiguration::new(
-        ocr_coordinator.clone(),
-        provider_credential_store.clone(),
-    ));
+    let ocr_configuration = Arc::new(
+        OcrProviderConfiguration::new(ocr_coordinator.clone(), provider_credential_store.clone())
+            .with_change_notifier(provider_change_notifier),
+    );
 
     let capture_runtime = build_capture_runtime(app.clone(), ocr_coordinator.clone());
     let selected_text_acquirer = build_selected_text_acquirer(app.clone());

@@ -14,8 +14,13 @@ use crate::Result;
 
 pub struct HotkeyRuntime {
     configuration: Arc<HotkeyConfiguration>,
+    change_notifier: Option<Arc<dyn HotkeyChangeNotifier>>,
     operation_lock: Mutex<()>,
     registrations: Mutex<HashMap<String, String>>,
+}
+
+pub trait HotkeyChangeNotifier: Send + Sync {
+    fn hotkeys_changed(&self);
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -55,8 +60,27 @@ impl HotkeyRuntime {
     pub fn new(configuration: Arc<HotkeyConfiguration>) -> Self {
         Self {
             configuration,
+            change_notifier: None,
             operation_lock: Mutex::new(()),
             registrations: Mutex::new(HashMap::new()),
+        }
+    }
+
+    pub fn with_change_notifier(
+        configuration: Arc<HotkeyConfiguration>,
+        change_notifier: Arc<dyn HotkeyChangeNotifier>,
+    ) -> Self {
+        Self {
+            configuration,
+            change_notifier: Some(change_notifier),
+            operation_lock: Mutex::new(()),
+            registrations: Mutex::new(HashMap::new()),
+        }
+    }
+
+    fn notify_changed(&self) {
+        if let Some(notifier) = &self.change_notifier {
+            notifier.hotkeys_changed();
         }
     }
 
@@ -179,6 +203,8 @@ impl HotkeyRuntime {
                 }
             }
         }
+        drop(registrations);
+        self.notify_changed();
         Ok(snapshot)
     }
 
@@ -240,6 +266,7 @@ impl HotkeyRuntime {
             let snapshot = self
                 .configuration
                 .update_hotkey(&category, &action, &hotkey)?;
+            self.notify_changed();
             return Ok(HotkeyUpdateOutcome {
                 snapshot,
                 accelerator: next_accelerator,
@@ -252,13 +279,19 @@ impl HotkeyRuntime {
 
         if let Some(accelerator) = &previous_accelerator {
             if let Err(err) = registrar.unregister(accelerator) {
-                log::warn!(
-                    "Failed to unregister previous hotkey {} for {}:{}: {}",
-                    accelerator,
-                    category,
-                    action,
-                    err
-                );
+                if let Some(next_accelerator) = next_accelerator.as_deref() {
+                    if let Err(rollback_err) = registrar.unregister(next_accelerator) {
+                        log::warn!(
+                            "Failed to roll back hotkey registration {} for {}:{} after unregistering {} failed: {}",
+                            next_accelerator,
+                            category,
+                            action,
+                            accelerator,
+                            rollback_err
+                        );
+                    }
+                }
+                return Err(err);
             }
         }
 
@@ -280,6 +313,7 @@ impl HotkeyRuntime {
         };
 
         self.set_registration(registration_key, next_accelerator.clone())?;
+        self.notify_changed();
 
         Ok(HotkeyUpdateOutcome {
             snapshot,
@@ -433,9 +467,14 @@ fn hotkey_registration_key(category: &str, action: &str) -> String {
 
 #[cfg(test)]
 mod hotkey_runtime_tests {
+    use std::collections::HashSet;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};
 
-    use super::{HotkeyRegistrar, HotkeyRegistration, HotkeyRuntime, HotkeyTriggerTiming};
+    use super::{
+        HotkeyChangeNotifier, HotkeyRegistrar, HotkeyRegistration, HotkeyRuntime,
+        HotkeyTriggerTiming,
+    };
     use crate::application::hotkeys::configuration::HotkeyConfiguration;
     use crate::domain::hotkey_config::{
         INPUT_TRANSLATE_ACTION, SCREENSHOT_ACTION, SCREENSHOT_CATEGORY,
@@ -443,6 +482,14 @@ mod hotkey_runtime_tests {
     };
     use crate::infrastructure::storage::{Database, SqliteConfigStore};
     use crate::Result;
+
+    struct CountingNotifier(AtomicUsize);
+
+    impl HotkeyChangeNotifier for CountingNotifier {
+        fn hotkeys_changed(&self) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
 
     #[derive(Clone, Debug, PartialEq, Eq)]
     enum Operation {
@@ -459,6 +506,8 @@ mod hotkey_runtime_tests {
     struct FakeHotkeyRegistrar {
         operations: Mutex<Vec<Operation>>,
         fail_register_for: Mutex<Option<String>>,
+        fail_unregister_for: Mutex<Option<String>>,
+        registered: Mutex<HashSet<String>>,
     }
 
     impl FakeHotkeyRegistrar {
@@ -472,6 +521,14 @@ mod hotkey_runtime_tests {
 
         fn fail_register_for(&self, accelerator: &str) {
             *self.fail_register_for.lock().unwrap() = Some(accelerator.to_string());
+        }
+
+        fn fail_unregister_for(&self, accelerator: &str) {
+            *self.fail_unregister_for.lock().unwrap() = Some(accelerator.to_string());
+        }
+
+        fn is_registered(&self, accelerator: &str) -> bool {
+            self.registered.lock().unwrap().contains(accelerator)
         }
     }
 
@@ -490,6 +547,10 @@ mod hotkey_runtime_tests {
                 return Err(crate::AppError::Other("registration failed".to_string()));
             }
 
+            self.registered
+                .lock()
+                .unwrap()
+                .insert(registration.accelerator);
             Ok(())
         }
 
@@ -498,6 +559,10 @@ mod hotkey_runtime_tests {
                 .lock()
                 .unwrap()
                 .push(Operation::Unregister(accelerator.to_string()));
+            if self.fail_unregister_for.lock().unwrap().as_deref() == Some(accelerator) {
+                return Err(crate::AppError::Other("unregistration failed".to_string()));
+            }
+            self.registered.lock().unwrap().remove(accelerator);
             Ok(())
         }
     }
@@ -667,6 +732,34 @@ mod hotkey_runtime_tests {
     }
 
     #[test]
+    fn hotkey_runtime_unregistration_failure_keeps_the_previous_hotkey_active() {
+        let (runtime, _configuration) = runtime_with_configuration();
+        let registrar = FakeHotkeyRegistrar::default();
+        runtime.register_startup_hotkeys_with(&registrar).unwrap();
+        registrar.clear();
+        registrar.fail_unregister_for("Alt+KeyD");
+
+        let result = runtime.update_hotkey_with(
+            &registrar,
+            TRANSLATION_CATEGORY.to_string(),
+            SELECTION_TRANSLATE_ACTION.to_string(),
+            "⇧⌥D".to_string(),
+        );
+
+        assert!(result.is_err());
+        assert!(registrar.is_registered("Alt+KeyD"));
+        assert!(!registrar.is_registered("Shift+Alt+KeyD"));
+        assert_eq!(
+            runtime
+                .snapshot()
+                .unwrap()
+                .translation
+                .get(SELECTION_TRANSLATE_ACTION),
+            Some(&"⌥D".to_string())
+        );
+    }
+
+    #[test]
     fn hotkey_runtime_category_reset_rolls_back_when_a_registration_fails() {
         let (runtime, configuration) = runtime_with_configuration();
         configuration
@@ -757,6 +850,27 @@ mod hotkey_runtime_tests {
             accelerator: "Shift+CmdOrCtrl+KeyR".to_string(),
             timing: HotkeyTriggerTiming::Released,
         }));
+    }
+
+    #[test]
+    fn successful_hotkey_update_notifies_runtime_observers() {
+        let config_file = Arc::new(SqliteConfigStore::new_temp());
+        let configuration = Arc::new(HotkeyConfiguration::new(config_file));
+        let notifier = Arc::new(CountingNotifier(AtomicUsize::new(0)));
+        let runtime = HotkeyRuntime::with_change_notifier(configuration, notifier.clone());
+        let registrar = FakeHotkeyRegistrar::default();
+        runtime.register_startup_hotkeys_with(&registrar).unwrap();
+
+        runtime
+            .update_hotkey_with(
+                &registrar,
+                TRANSLATION_CATEGORY.to_string(),
+                SELECTION_TRANSLATE_ACTION.to_string(),
+                "⇧⌥D".to_string(),
+            )
+            .unwrap();
+
+        assert_eq!(notifier.0.load(Ordering::SeqCst), 1);
     }
 
     fn runtime_with_configuration() -> (HotkeyRuntime, Arc<HotkeyConfiguration>) {

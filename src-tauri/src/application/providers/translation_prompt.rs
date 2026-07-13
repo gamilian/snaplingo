@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use crate::application::providers::ProviderConfigStore;
+use crate::application::providers::{ProviderChangeNotifier, ProviderConfigStore};
 use crate::domain::translation::TranslationRequest;
 
 pub const SMART_PROMPT_STRATEGY_ID: &str = "smart";
@@ -24,11 +24,23 @@ pub struct TranslationPromptStrategyConfig {
 
 pub struct TranslationPromptConfiguration {
     config_store: Arc<dyn ProviderConfigStore>,
+    change_notifier: Option<Arc<dyn ProviderChangeNotifier>>,
 }
 
 impl TranslationPromptConfiguration {
     pub fn new(config_store: Arc<dyn ProviderConfigStore>) -> Self {
-        Self { config_store }
+        Self {
+            config_store,
+            change_notifier: None,
+        }
+    }
+
+    pub fn with_change_notifier(
+        mut self,
+        change_notifier: Arc<dyn ProviderChangeNotifier>,
+    ) -> Self {
+        self.change_notifier = Some(change_notifier);
+        self
     }
 
     pub fn list(&self) -> TranslationPromptStrategyConfig {
@@ -45,6 +57,9 @@ impl TranslationPromptConfiguration {
         self.config_store
             .save_translation_prompt_strategies(&config)
             .map_err(|e| format!("Failed to save prompt strategies: {}", e))?;
+        if let Some(notifier) = &self.change_notifier {
+            notifier.providers_changed();
+        }
         Ok(config)
     }
 }
@@ -326,7 +341,19 @@ fn contains_ascii_word(text: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
     use super::*;
+    use crate::application::providers::ProviderChangeNotifier;
+    use crate::infrastructure::storage::SqliteConfigStore;
+
+    struct CountingNotifier(AtomicUsize);
+
+    impl ProviderChangeNotifier for CountingNotifier {
+        fn providers_changed(&self) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
 
     fn request(text: &str) -> TranslationRequest {
         TranslationRequest {
@@ -348,6 +375,20 @@ mod tests {
         assert_eq!(general.name, "通用翻译");
         assert!(!general.is_deletable);
         assert!(general.system_prompt.contains("{target_lang}"));
+    }
+
+    #[test]
+    fn saving_prompt_strategies_notifies_runtime_observers() {
+        let notifier = Arc::new(CountingNotifier(AtomicUsize::new(0)));
+        let configuration =
+            TranslationPromptConfiguration::new(Arc::new(SqliteConfigStore::new_in_memory()))
+                .with_change_notifier(notifier.clone());
+
+        configuration
+            .save(default_prompt_strategy_config())
+            .unwrap();
+
+        assert_eq!(notifier.0.load(Ordering::SeqCst), 1);
     }
 
     #[test]

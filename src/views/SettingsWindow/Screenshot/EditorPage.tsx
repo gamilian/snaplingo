@@ -1,20 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { CustomSelect } from '../../../components/common/CustomSelect';
 import { CustomRange } from '../../../components/common/CustomRange';
-import { useSettingsConfigStore } from '../../../stores/settingsConfigStore';
+import {
+  annotationColorFromHex,
+  annotationColorToCss,
+  annotationColorToHex,
+} from '../../../components/common/annotationColorPresentation';
 import {
   addAnnotationColorPreset,
-  annotationColorFromHex,
-  annotationColorToHex,
+  ANNOTATION_COLORS,
   annotationColorsEqual,
   removeAnnotationColorPreset,
   replaceAnnotationColorPreset,
-} from '../../CaptureWorkspace/annotationColorPresets';
-import {
-  ANNOTATION_COLORS,
-  annotationColorToCss,
   type AnnotationColor,
-} from '../../CaptureWorkspace/annotationStyle';
+} from '../../../domain/annotationColor';
+import { useSettingsConfigStore } from '../../../stores/settingsConfigStore';
 
 export function EditorPage() {
   const [fontSize, setFontSize] = useState('12');

@@ -38,14 +38,18 @@ pub(crate) fn build_provider_configuration(
         crate::application::providers::translation::TranslationCoordinator,
     >,
     llm_introspection: Arc<LlmIntrospection>,
+    change_notifier: Arc<dyn crate::application::providers::ProviderChangeNotifier>,
 ) -> Arc<ProviderConfiguration> {
-    Arc::new(ProviderConfiguration::new(
-        config_store,
-        credential_store,
-        llm_runtime,
-        translation_coordinator,
-        llm_introspection,
-    ))
+    Arc::new(
+        ProviderConfiguration::new(
+            config_store,
+            credential_store,
+            llm_runtime,
+            translation_coordinator,
+            llm_introspection,
+        )
+        .with_change_notifier(change_notifier),
+    )
 }
 
 pub(crate) fn build_translation_coordinator(
@@ -82,6 +86,7 @@ pub(crate) fn build_ocr_coordinator(
     config_store: Arc<dyn ProviderConfigStore>,
     http_client: Arc<dyn HttpClient>,
     event_sink: Arc<dyn ProviderEventSink>,
+    change_notifier: Arc<dyn crate::application::providers::ProviderChangeNotifier>,
 ) -> Arc<OcrCoordinator> {
     let ocr_coordinator = OcrCoordinator::new(config_store);
 
@@ -99,7 +104,11 @@ pub(crate) fn build_ocr_coordinator(
     ocr_coordinator.register(baidu_ocr_provider).ok();
     ocr_coordinator.restore_from_config().ok();
 
-    Arc::new(ocr_coordinator.with_event_sink(event_sink))
+    Arc::new(
+        ocr_coordinator
+            .with_event_sink(event_sink)
+            .with_change_notifier(change_notifier),
+    )
 }
 
 pub(crate) fn hydrate_provider_credentials(
@@ -183,8 +192,15 @@ mod tests {
             Arc::new(SqliteConfigStore::new_temp()),
             Arc::new(StubHttpClient),
             Arc::new(EventBus::new()),
+            Arc::new(TestProviderChangeNotifier),
         );
 
         assert!(coordinator.get("system-ocr").is_some());
+    }
+
+    struct TestProviderChangeNotifier;
+
+    impl crate::application::providers::ProviderChangeNotifier for TestProviderChangeNotifier {
+        fn providers_changed(&self) {}
     }
 }

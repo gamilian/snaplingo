@@ -713,6 +713,7 @@ pub struct ProviderConfiguration {
     llm_runtime: Arc<dyn LlmRuntime>,
     translation_coordinator: Arc<TranslationCoordinator>,
     llm_introspection: Arc<crate::application::providers::LlmIntrospection>,
+    change_notifier: Option<Arc<dyn crate::application::providers::ProviderChangeNotifier>>,
     /// Serializes all provider state mutations (config + keychain + coordinator).
     /// Prevents concurrent add/update/remove from causing config/keychain/coordinator divergence.
     provider_state_lock: std::sync::Mutex<()>,
@@ -732,7 +733,22 @@ impl ProviderConfiguration {
             llm_runtime,
             translation_coordinator,
             llm_introspection,
+            change_notifier: None,
             provider_state_lock: std::sync::Mutex::new(()),
+        }
+    }
+
+    pub fn with_change_notifier(
+        mut self,
+        change_notifier: Arc<dyn crate::application::providers::ProviderChangeNotifier>,
+    ) -> Self {
+        self.change_notifier = Some(change_notifier);
+        self
+    }
+
+    fn notify_changed(&self) {
+        if let Some(notifier) = &self.change_notifier {
+            notifier.providers_changed();
         }
     }
 
@@ -810,13 +826,15 @@ impl ProviderConfiguration {
         input: AddCustomTranslationProviderInput,
     ) -> crate::Result<CustomTranslationProviderView> {
         let _guard = self.lock_provider_state()?;
-        add_custom_translation_provider(
+        let view = add_custom_translation_provider(
             input,
             self.config_store.clone(),
             self.credential_store.as_ref(),
             self.llm_runtime.clone(),
             &self.translation_coordinator,
-        )
+        )?;
+        self.notify_changed();
+        Ok(view)
     }
 
     /// Update an existing custom translation provider.
@@ -959,7 +977,9 @@ impl ProviderConfiguration {
             }
         }
 
-        Ok(custom_translation_provider_view(&updated_def))
+        let view = custom_translation_provider_view(&updated_def);
+        self.notify_changed();
+        Ok(view)
     }
 
     /// Remove a custom translation provider.
@@ -1127,6 +1147,7 @@ impl ProviderConfiguration {
             }
         }
 
+        self.notify_changed();
         Ok(())
     }
 
@@ -1278,6 +1299,7 @@ impl ProviderConfiguration {
             )));
         }
 
+        self.notify_changed();
         Ok(())
     }
 
@@ -1286,7 +1308,9 @@ impl ProviderConfiguration {
         let _guard = self.lock_provider_state()?;
         self.translation_coordinator
             .activate(&id)
-            .map_err(|e| AppError::Other(format!("Failed to activate provider: {}", e)))
+            .map_err(|e| AppError::Other(format!("Failed to activate provider: {}", e)))?;
+        self.notify_changed();
+        Ok(())
     }
 
     /// Deactivate a translation provider by ID (with provider state lock).
@@ -1294,7 +1318,9 @@ impl ProviderConfiguration {
         let _guard = self.lock_provider_state()?;
         self.translation_coordinator
             .deactivate(&id)
-            .map_err(|e| AppError::Other(format!("Failed to deactivate provider: {}", e)))
+            .map_err(|e| AppError::Other(format!("Failed to deactivate provider: {}", e)))?;
+        self.notify_changed();
+        Ok(())
     }
 
     /// Reorder active translation providers (with provider state lock).
@@ -1302,7 +1328,9 @@ impl ProviderConfiguration {
         let _guard = self.lock_provider_state()?;
         self.translation_coordinator
             .reorder_active(ordered_ids)
-            .map_err(|e| AppError::Other(format!("Failed to reorder active providers: {}", e)))
+            .map_err(|e| AppError::Other(format!("Failed to reorder active providers: {}", e)))?;
+        self.notify_changed();
+        Ok(())
     }
 
     /// Test a custom translation provider by ID.

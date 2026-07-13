@@ -1,5 +1,7 @@
 #[cfg(test)]
 mod tests {
+    use std::time::{Duration, Instant};
+
     use image::ImageEncoder;
 
     use crate::application::capture::{CaptureImageComposer, ImageAnnotation, PngPlacement};
@@ -491,6 +493,52 @@ mod tests {
         assert_eq!(png_pixel(&output, 1, 1), [127, 127, 127, 255]);
         assert_eq!(png_pixel(&output, 3, 0), [11, 21, 31, 255]);
         assert_eq!(png_pixel(&output, 3, 2), [93, 94, 95, 255]);
+    }
+
+    #[test]
+    fn composes_a_long_mosaic_brush_within_the_interactive_save_budget() {
+        let composer = CaptureImageComposer::new();
+        let size = 768;
+        let png = make_solid_png(size, size, [120, 130, 140, 255]);
+        let points = (0..size)
+            .map(|coordinate| PhysicalPoint {
+                x: coordinate as i32,
+                y: coordinate as i32,
+            })
+            .collect();
+        let started = Instant::now();
+
+        composer
+            .compose_png_with_annotations(
+                size,
+                size,
+                &[PngPlacement {
+                    png_data: png.as_slice(),
+                    source_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: size,
+                        height: size,
+                    },
+                    destination_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: size,
+                        height: size,
+                    },
+                }],
+                &[ImageAnnotation::Mosaic {
+                    points,
+                    stroke_width: 32,
+                    block_size: 12,
+                }],
+            )
+            .unwrap();
+
+        assert!(
+            started.elapsed() < Duration::from_secs(1),
+            "long mosaic rendering exceeded the one-second interactive budget"
+        );
     }
 
     #[test]

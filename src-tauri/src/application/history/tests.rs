@@ -182,4 +182,39 @@ mod tests {
         let entries = history.get_translation_history(10, 0).await.unwrap();
         assert_eq!(entries.len(), 0);
     }
+
+    #[tokio::test]
+    async fn successful_history_mutations_notify_runtime_observers() {
+        let db = create_temp_db();
+        let notifier = Arc::new(CountingNotifier(AtomicUsize::new(0)));
+        let history = History::with_change_notifier(db, notifier.clone());
+        let event = DomainEvent::TranslationCompleted {
+            request: TranslationRequest {
+                text: "Mutable".to_string(),
+                source_lang: "en".to_string(),
+                target_lang: "zh-CN".to_string(),
+            },
+            results: vec![],
+            providers_used: vec![],
+            timestamp: Utc::now(),
+            duration_ms: 1,
+        };
+        history.handle(&event).await;
+        let id = history.get_translation_history(1, 0).await.unwrap()[0].id;
+        notifier.0.store(0, Ordering::SeqCst);
+
+        history.set_history_favorite(id, true).await.unwrap();
+        history
+            .update_history_note(id, Some("note".to_string()))
+            .await
+            .unwrap();
+        history
+            .replace_history_tags(id, vec!["tag".to_string()])
+            .await
+            .unwrap();
+        history.delete_history(id).await.unwrap();
+        history.clear_all_history().await.unwrap();
+
+        assert_eq!(notifier.0.load(Ordering::SeqCst), 5);
+    }
 }

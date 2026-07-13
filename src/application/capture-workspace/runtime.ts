@@ -5,6 +5,10 @@ import type {
   LogicalRect,
   Point,
 } from '../../domain/capture';
+import {
+  ANNOTATION_COLORS,
+  type AnnotationColor,
+} from '../../domain/annotationColor';
 import type {
   HoverSelectionCompletionAction,
 } from '../../views/CaptureWorkspace/captureActions';
@@ -49,8 +53,6 @@ import {
   undoAnnotationHistory,
 } from '../../views/CaptureWorkspace/annotationHistory';
 import {
-  ANNOTATION_COLORS,
-  type AnnotationColor,
   type AnnotationSizeDirection,
   type AnnotationStyle,
   type AnnotationTool,

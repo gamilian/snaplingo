@@ -1,4 +1,4 @@
-use tauri::{AppHandle, State};
+use tauri::State;
 
 use crate::application::SettingsConfiguration;
 use crate::domain::{GeneralSettings, ScreenshotSettings, SettingsSnapshot, TranslationSettings};
@@ -13,51 +13,33 @@ pub fn get_settings_snapshot(
 #[tauri::command]
 pub fn update_general_settings(
     input: GeneralSettings,
-    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<SettingsSnapshot, String> {
-    let snapshot =
-        update_general_settings_for_configuration(state.settings.configuration.as_ref(), input)?;
-    super::state_events::emit_state_changed(&app, super::state_events::SETTINGS_CHANGED_EVENT);
-    Ok(snapshot)
+    update_general_settings_for_configuration(state.settings.configuration.as_ref(), input)
 }
 
 #[tauri::command]
 pub fn update_screenshot_settings(
     input: ScreenshotSettings,
-    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<SettingsSnapshot, String> {
-    let snapshot =
-        update_screenshot_settings_for_configuration(state.settings.configuration.as_ref(), input)?;
-    super::state_events::emit_state_changed(&app, super::state_events::SETTINGS_CHANGED_EVENT);
-    Ok(snapshot)
+    update_screenshot_settings_for_configuration(state.settings.configuration.as_ref(), input)
 }
 
 #[tauri::command]
 pub fn update_annotation_colors(
     colors: Vec<[u8; 4]>,
-    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<SettingsSnapshot, String> {
-    let snapshot =
-        update_annotation_colors_for_configuration(state.settings.configuration.as_ref(), colors)?;
-    super::state_events::emit_state_changed(&app, super::state_events::SETTINGS_CHANGED_EVENT);
-    Ok(snapshot)
+    update_annotation_colors_for_configuration(state.settings.configuration.as_ref(), colors)
 }
 
 #[tauri::command]
 pub fn update_translation_settings(
     input: TranslationSettings,
-    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<SettingsSnapshot, String> {
-    let snapshot = update_translation_settings_for_configuration(
-        state.settings.configuration.as_ref(),
-        input,
-    )?;
-    super::state_events::emit_state_changed(&app, super::state_events::SETTINGS_CHANGED_EVENT);
-    Ok(snapshot)
+    update_translation_settings_for_configuration(state.settings.configuration.as_ref(), input)
 }
 
 fn get_settings_snapshot_for_configuration(

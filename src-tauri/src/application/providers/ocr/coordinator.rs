@@ -1,5 +1,7 @@
 use super::OcrProvider;
-use crate::application::providers::{ProviderConfigStore, ProviderEventSink};
+use crate::application::providers::{
+    ProviderChangeNotifier, ProviderConfigStore, ProviderEventSink,
+};
 use crate::domain::events::DomainEvent;
 use crate::domain::ocr::{OcrRequest, OcrResult};
 use crate::Result;
@@ -30,6 +32,7 @@ pub struct OcrCoordinator {
     config_store: Arc<dyn ProviderConfigStore>,
     /// Optional event sink for publishing domain events
     event_sink: Option<Arc<dyn ProviderEventSink>>,
+    change_notifier: Option<Arc<dyn ProviderChangeNotifier>>,
 }
 
 impl OcrCoordinator {
@@ -40,6 +43,7 @@ impl OcrCoordinator {
             active_provider_id: Arc::new(Mutex::new(None)),
             config_store,
             event_sink: None,
+            change_notifier: None,
         }
     }
 
@@ -52,6 +56,14 @@ impl OcrCoordinator {
     /// Attach an event sink for publishing domain events.
     pub fn with_event_bus(self, event_sink: Arc<dyn ProviderEventSink>) -> Self {
         self.with_event_sink(event_sink)
+    }
+
+    pub fn with_change_notifier(
+        mut self,
+        change_notifier: Arc<dyn ProviderChangeNotifier>,
+    ) -> Self {
+        self.change_notifier = Some(change_notifier);
+        self
     }
 
     /// Registers a new OCR provider.
@@ -102,6 +114,9 @@ impl OcrCoordinator {
         // Update memory only after successful persistence
         *active = Some(id.to_string());
 
+        if let Some(notifier) = &self.change_notifier {
+            notifier.providers_changed();
+        }
         Ok(())
     }
 

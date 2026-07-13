@@ -27,7 +27,7 @@ pub fn update_hotkey(
     app: tauri::AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<HotkeyUpdateOutcome, String> {
-    let outcome = state
+    state
         .settings
         .hotkeys
         .update_hotkey_with(
@@ -39,9 +39,7 @@ pub fn update_hotkey(
             action,
             hotkey,
         )
-        .map_err(|err| err.to_string())?;
-    super::state_events::emit_state_changed(&app, super::state_events::HOTKEYS_CHANGED_EVENT);
-    Ok(outcome)
+        .map_err(|err| err.to_string())
 }
 
 #[tauri::command]
@@ -51,7 +49,7 @@ pub fn reset_hotkey(
     app: tauri::AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<HotkeyUpdateOutcome, String> {
-    let outcome = state
+    state
         .settings
         .hotkeys
         .reset_hotkey_with(
@@ -62,9 +60,7 @@ pub fn reset_hotkey(
             category,
             action,
         )
-        .map_err(|err| err.to_string())?;
-    super::state_events::emit_state_changed(&app, super::state_events::HOTKEYS_CHANGED_EVENT);
-    Ok(outcome)
+        .map_err(|err| err.to_string())
 }
 
 #[tauri::command]
@@ -73,7 +69,7 @@ pub fn reset_hotkey_category(
     app: tauri::AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<HotkeySettingsSnapshot, String> {
-    let snapshot = state
+    state
         .settings
         .hotkeys
         .reset_category_with(
@@ -83,9 +79,7 @@ pub fn reset_hotkey_category(
             ),
             category,
         )
-        .map_err(|err| err.to_string())?;
-    super::state_events::emit_state_changed(&app, super::state_events::HOTKEYS_CHANGED_EVENT);
-    Ok(snapshot)
+        .map_err(|err| err.to_string())
 }
 
 fn get_hotkey_snapshot_for_runtime(

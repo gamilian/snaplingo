@@ -7,7 +7,6 @@ mod pinned_image_commands;
 mod provider_commands;
 mod result_window_commands;
 mod settings_commands;
-mod state_events;
 mod translation_commands;
 
 pub use capture_session_commands::*;

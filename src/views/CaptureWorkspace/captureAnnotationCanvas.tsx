@@ -24,6 +24,7 @@ function drawPath(
 
 function drawPixelatedRect(
   context: CanvasRenderingContext2D,
+  source: HTMLCanvasElement,
   rect: LogicalRect,
   blockSize: number,
   buffer: HTMLCanvasElement,
@@ -41,7 +42,7 @@ function drawPixelatedRect(
   bufferContext.clearRect(0, 0, sampleWidth, sampleHeight);
   bufferContext.imageSmoothingEnabled = true;
   bufferContext.drawImage(
-    context.canvas,
+    source,
     rect.x * pixelRatio,
     rect.y * pixelRatio,
     width * pixelRatio,
@@ -121,6 +122,7 @@ function appendBrushPath(
 
 function drawPixelatedBrush(
   context: CanvasRenderingContext2D,
+  source: HTMLCanvasElement,
   points: Point[],
   diameter: number,
   blockSize: number,
@@ -131,7 +133,7 @@ function drawPixelatedBrush(
   context.save();
   appendBrushPath(context, points, diameter);
   context.clip();
-  drawPixelatedRect(context, rect, blockSize, buffer);
+  drawPixelatedRect(context, source, rect, blockSize, buffer);
   context.restore();
 }
 
@@ -152,11 +154,13 @@ export function drawCaptureAnnotation(
   annotation: AnnotationCommand,
   buffers?: {
     mosaic: HTMLCanvasElement;
+    source: HTMLCanvasElement;
   },
 ) {
   if (annotation.type === 'mosaic') {
     drawPixelatedBrush(
       context,
+      buffers?.source ?? context.canvas,
       annotation.points,
       annotation.stroke_width,
       annotation.block_size,
@@ -251,6 +255,7 @@ export function CaptureAnnotationCanvas({
 }: CaptureAnnotationCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const mosaicBufferRef = useRef<HTMLCanvasElement | null>(null);
+  const sourceBufferRef = useRef<HTMLCanvasElement | null>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
 
   useEffect(() => {
@@ -274,7 +279,16 @@ export function CaptureAnnotationCanvas({
         mosaic:
           mosaicBufferRef.current ??
           (mosaicBufferRef.current = document.createElement('canvas')),
+        source:
+          sourceBufferRef.current ??
+          (sourceBufferRef.current = document.createElement('canvas')),
       };
+      if (buffers.source.width !== pixelWidth) buffers.source.width = pixelWidth;
+      if (buffers.source.height !== pixelHeight) buffers.source.height = pixelHeight;
+      const sourceContext = buffers.source.getContext('2d');
+      if (!sourceContext) return;
+      sourceContext.clearRect(0, 0, pixelWidth, pixelHeight);
+      sourceContext.drawImage(image, 0, 0, pixelWidth, pixelHeight);
       context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
       context.clearRect(
         0,

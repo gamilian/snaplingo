@@ -677,22 +677,22 @@ fn draw_mosaic_annotation(
     stroke_width: u32,
     block_size: u32,
 ) {
-    let Some((left, top, right, bottom)) = brush_bounds(output, points, stroke_width) else {
+    let Some(mask) = rasterize_brush_mask(output, points, stroke_width) else {
         return;
     };
 
     let block_size = block_size.max(1) as i64;
-    let mut y = top;
-    while y < bottom {
-        let block_bottom = (y + block_size).min(bottom);
-        let mut x = left;
-        while x < right {
-            let block_right = (x + block_size).min(right);
+    let mut y = mask.top;
+    while y < mask.bottom {
+        let block_bottom = (y + block_size).min(mask.bottom);
+        let mut x = mask.left;
+        while x < mask.right {
+            let block_right = (x + block_size).min(mask.right);
             let color = average_block_color(source, x, y, block_right, block_bottom);
 
             for pixel_y in y..block_bottom {
                 for pixel_x in x..block_right {
-                    if point_in_brush(points, pixel_x, pixel_y, stroke_width) {
+                    if mask.contains(pixel_x, pixel_y) {
                         output.put_pixel(pixel_x as u32, pixel_y as u32, color);
                     }
                 }
@@ -711,13 +711,13 @@ fn erase_annotation(
     points: &[PhysicalPoint],
     stroke_width: u32,
 ) {
-    let Some((left, top, right, bottom)) = brush_bounds(output, points, stroke_width) else {
+    let Some(mask) = rasterize_brush_mask(output, points, stroke_width) else {
         return;
     };
 
-    for y in top..bottom {
-        for x in left..right {
-            if point_in_brush(points, x, y, stroke_width) {
+    for y in mask.top..mask.bottom {
+        for x in mask.left..mask.right {
+            if mask.contains(x, y) {
                 let pixel = *source.get_pixel(x as u32, y as u32);
                 output.put_pixel(x as u32, y as u32, pixel);
             }
@@ -725,11 +725,27 @@ fn erase_annotation(
     }
 }
 
-fn brush_bounds(
+struct BrushMask {
+    left: i64,
+    top: i64,
+    right: i64,
+    bottom: i64,
+    width: usize,
+    pixels: Vec<bool>,
+}
+
+impl BrushMask {
+    fn contains(&self, x: i64, y: i64) -> bool {
+        let index = (y - self.top) as usize * self.width + (x - self.left) as usize;
+        self.pixels[index]
+    }
+}
+
+fn rasterize_brush_mask(
     image: &image::RgbaImage,
     points: &[PhysicalPoint],
     stroke_width: u32,
-) -> Option<(i64, i64, i64, i64)> {
+) -> Option<BrushMask> {
     let first = points.first()?;
     let radius = (stroke_width.max(1) as i64 + 1) / 2;
     let (mut min_x, mut max_x) = (first.x as i64, first.x as i64);
@@ -741,46 +757,74 @@ fn brush_bounds(
         max_y = max_y.max(point.y as i64);
     }
 
-    Some((
-        (min_x - radius).max(0),
-        (min_y - radius).max(0),
-        (max_x + radius + 1).min(image.width() as i64),
-        (max_y + radius + 1).min(image.height() as i64),
-    ))
-}
-
-fn point_in_brush(points: &[PhysicalPoint], x: i64, y: i64, stroke_width: u32) -> bool {
-    let radius = stroke_width.max(1) as f64 / 2.0;
-    let point_x = x as f64 + 0.5;
-    let point_y = y as f64 + 0.5;
-    let first = match points.first() {
-        Some(point) => point,
-        None => return false,
+    let left = (min_x - radius).max(0);
+    let top = (min_y - radius).max(0);
+    let right = (max_x + radius + 1).min(image.width() as i64);
+    let bottom = (max_y + radius + 1).min(image.height() as i64);
+    if left >= right || top >= bottom {
+        return None;
+    }
+    let width = (right - left) as usize;
+    let mut mask = BrushMask {
+        left,
+        top,
+        right,
+        bottom,
+        width,
+        pixels: vec![false; width * (bottom - top) as usize],
     };
-    if points.len() == 1 {
-        let dx = point_x - first.x as f64;
-        let dy = point_y - first.y as f64;
-        return dx * dx + dy * dy <= radius * radius;
+    let segments: Vec<_> = if points.len() == 1 {
+        vec![(first, first)]
+    } else {
+        points
+            .windows(2)
+            .map(|segment| (&segment[0], &segment[1]))
+            .collect()
+    };
+    let radius = stroke_width.max(1) as f64 / 2.0;
+
+    for (start, end) in segments {
+        let segment_left = (i64::from(start.x.min(end.x)) - radius.ceil() as i64).max(left);
+        let segment_top = (i64::from(start.y.min(end.y)) - radius.ceil() as i64).max(top);
+        let segment_right = (i64::from(start.x.max(end.x)) + radius.ceil() as i64 + 1).min(right);
+        let segment_bottom = (i64::from(start.y.max(end.y)) + radius.ceil() as i64 + 1).min(bottom);
+
+        for y in segment_top..segment_bottom {
+            for x in segment_left..segment_right {
+                if point_within_segment_brush(start, end, x, y, radius) {
+                    let index = (y - top) as usize * width + (x - left) as usize;
+                    mask.pixels[index] = true;
+                }
+            }
+        }
     }
 
-    points.windows(2).any(|segment| {
-        let start = &segment[0];
-        let end = &segment[1];
-        let dx = (end.x - start.x) as f64;
-        let dy = (end.y - start.y) as f64;
-        let length_squared = dx * dx + dy * dy;
-        let t = if length_squared == 0.0 {
-            0.0
-        } else {
-            (((point_x - start.x as f64) * dx + (point_y - start.y as f64) * dy) / length_squared)
-                .clamp(0.0, 1.0)
-        };
-        let closest_x = start.x as f64 + t * dx;
-        let closest_y = start.y as f64 + t * dy;
-        let distance_x = point_x - closest_x;
-        let distance_y = point_y - closest_y;
-        distance_x * distance_x + distance_y * distance_y <= radius * radius
-    })
+    Some(mask)
+}
+
+fn point_within_segment_brush(
+    start: &PhysicalPoint,
+    end: &PhysicalPoint,
+    x: i64,
+    y: i64,
+    radius: f64,
+) -> bool {
+    let point_x = x as f64 + 0.5;
+    let point_y = y as f64 + 0.5;
+    let dx = (end.x - start.x) as f64;
+    let dy = (end.y - start.y) as f64;
+    let length_squared = dx * dx + dy * dy;
+    let t = if length_squared == 0.0 {
+        0.0
+    } else {
+        (((point_x - start.x as f64) * dx + (point_y - start.y as f64) * dy) / length_squared)
+            .clamp(0.0, 1.0)
+    };
+    let closest_x = start.x as f64 + t * dx;
+    let closest_y = start.y as f64 + t * dy;
+    let distance_x = point_x - closest_x;
+    let distance_y = point_y - closest_y;
+    distance_x * distance_x + distance_y * distance_y <= radius * radius
 }
 
 fn draw_text_annotation(

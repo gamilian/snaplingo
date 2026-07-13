@@ -1,3 +1,4 @@
+mod change_notifier;
 pub mod common;
 mod config_store;
 pub mod configuration;
@@ -10,6 +11,7 @@ pub mod ocr;
 pub mod translation;
 pub mod translation_prompt;
 
+pub use change_notifier::ProviderChangeNotifier;
 pub use common::Provider;
 pub(crate) use config_store::ProviderConfigStore;
 pub use configuration::{

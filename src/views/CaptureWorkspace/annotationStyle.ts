@@ -1,5 +1,13 @@
+import { annotationColorToCss } from '../../components/common/annotationColorPresentation';
+import {
+  ANNOTATION_COLORS,
+  type AnnotationColor,
+} from '../../domain/annotationColor';
 import { normalizeSelection } from './selection';
 import type { AnnotationCommand, Point, TextAnnotationCommand } from './types';
+
+export { ANNOTATION_COLORS, annotationColorToCss };
+export type { AnnotationColor };
 
 export type AnnotationTool =
   | 'rectangle'
@@ -12,7 +20,6 @@ export type AnnotationTool =
   | 'text'
   | 'eraser';
 export type DrawingAnnotationTool = Exclude<AnnotationTool, 'text'>;
-export type AnnotationColor = [number, number, number, number];
 
 export interface AnnotationStyle {
   color: AnnotationColor;
@@ -46,15 +53,6 @@ interface AnnotationSizeWheelEvent {
 }
 
 export type AnnotationSizeDirection = 'decrease' | 'increase';
-
-export const ANNOTATION_COLORS: AnnotationColor[] = [
-  [255, 77, 79, 255],
-  [40, 167, 69, 255],
-  [24, 144, 255, 255],
-  [250, 219, 20, 255],
-  [255, 255, 255, 255],
-  [0, 0, 0, 255],
-];
 
 export const ANNOTATION_STROKE_WIDTHS = [2, 4, 6, 8];
 export const DEFAULT_TEXT_FONT_SIZE = 24;
@@ -552,8 +550,4 @@ export function arrowHeadPoints(start: Point, end: Point, strokeWidth: number) {
   };
 
   return `${end.x},${end.y} ${wingA.x},${wingA.y} ${wingB.x},${wingB.y}`;
-}
-
-export function annotationColorToCss(color: AnnotationColor) {
-  return `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${color[3] / 255})`;
 }

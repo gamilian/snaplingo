@@ -125,6 +125,26 @@ fn production_application_sources() -> Vec<SourceFile> {
         .collect()
 }
 
+fn production_command_sources() -> Vec<SourceFile> {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let mut paths = Vec::new();
+    collect_rust_files(&manifest_dir.join("src/commands"), &mut paths);
+    paths.sort();
+
+    paths
+        .into_iter()
+        .filter(|path| is_production_rust(path))
+        .map(|path| SourceFile {
+            path: path
+                .strip_prefix(&manifest_dir)
+                .unwrap()
+                .to_string_lossy()
+                .replace('\\', "/"),
+            source: fs::read_to_string(&path).unwrap(),
+        })
+        .collect()
+}
+
 fn collect_rust_files(directory: &Path, paths: &mut Vec<PathBuf>) {
     for entry in fs::read_dir(directory).unwrap() {
         let path = entry.unwrap().path();
@@ -215,6 +235,23 @@ fn application_production_sources_do_not_import_outward_adapters() {
         dependency_inventory(&production_application_sources()),
         BTreeSet::<String>::new()
     );
+}
+
+#[test]
+fn commands_do_not_publish_durable_state_change_events() {
+    let violations = production_command_sources()
+        .into_iter()
+        .filter(|file| {
+            file.source.contains("emit_state_changed")
+                || file.source.contains("settings-changed")
+                || file.source.contains("hotkeys-changed")
+                || file.source.contains("providers-changed")
+                || file.source.contains("history-changed")
+        })
+        .map(|file| file.path)
+        .collect::<Vec<_>>();
+
+    assert_eq!(violations, Vec::<String>::new());
 }
 
 #[test]

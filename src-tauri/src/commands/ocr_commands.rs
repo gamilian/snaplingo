@@ -2,7 +2,7 @@ use crate::application::providers::common::CredentialField;
 use crate::domain::ocr::{OcrRequest, OcrResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tauri::{AppHandle, State};
+use tauri::State;
 
 #[cfg(test)]
 use crate::application::providers::ocr::OcrCoordinator;
@@ -91,16 +91,13 @@ pub async fn list_ocr_providers(
 #[tauri::command]
 pub async fn activate_ocr_provider(
     provider_id: String,
-    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     state
         .providers
         .ocr
         .activate(&provider_id)
-        .map_err(|e| e.to_string())?;
-    super::state_events::emit_state_changed(&app, super::state_events::PROVIDERS_CHANGED_EVENT);
-    Ok(())
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -108,7 +105,6 @@ pub async fn configure_ocr_provider(
     provider_id: String,
     api_key: String,
     secret_key: Option<String>,
-    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     let mut credentials = HashMap::new();
@@ -122,9 +118,7 @@ pub async fn configure_ocr_provider(
         .providers
         .ocr_configuration
         .save_credentials(&provider_id, &credentials)
-        .map_err(|e| e.to_string())?;
-    super::state_events::emit_state_changed(&app, super::state_events::PROVIDERS_CHANGED_EVENT);
-    Ok(())
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -143,16 +137,13 @@ pub async fn get_ocr_provider_credential_schema(
 pub async fn configure_ocr_provider_credentials(
     provider_id: String,
     credentials: HashMap<String, String>,
-    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     state
         .providers
         .ocr_configuration
         .save_credentials(&provider_id, &credentials)
-        .map_err(|e| e.to_string())?;
-    super::state_events::emit_state_changed(&app, super::state_events::PROVIDERS_CHANGED_EVENT);
-    Ok(())
+        .map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
