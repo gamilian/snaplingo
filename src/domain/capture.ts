@@ -112,13 +112,6 @@ export interface LineAnnotationCommand {
   stroke_width: number;
 }
 
-export interface PolylineAnnotationCommand {
-  type: 'polyline';
-  points: Point[];
-  color: [number, number, number, number];
-  stroke_width: number;
-}
-
 export interface FreehandAnnotationCommand {
   type: 'freehand';
   points: Point[];
@@ -135,14 +128,15 @@ export interface HighlightAnnotationCommand {
 
 export interface MosaicAnnotationCommand {
   type: 'mosaic';
-  rect: LogicalRect;
+  points: Point[];
+  stroke_width: number;
   block_size: number;
 }
 
-export interface BlurAnnotationCommand {
-  type: 'blur';
-  rect: LogicalRect;
-  radius: number;
+export interface EraserAnnotationCommand {
+  type: 'eraser';
+  points: Point[];
+  stroke_width: number;
 }
 
 export interface TextAnnotationCommand {
@@ -158,9 +152,8 @@ export type AnnotationCommand =
   | EllipseAnnotationCommand
   | ArrowAnnotationCommand
   | LineAnnotationCommand
-  | PolylineAnnotationCommand
   | FreehandAnnotationCommand
   | HighlightAnnotationCommand
   | MosaicAnnotationCommand
-  | BlurAnnotationCommand
+  | EraserAnnotationCommand
   | TextAnnotationCommand;

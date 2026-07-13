@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   ANNOTATION_COLORS,
-  appendAnnotationGesturePoint,
   annotationColorFromShortcut,
   annotationFromGestureDraft,
   annotationFromText,
@@ -17,7 +16,6 @@ import {
   isCommittedAnnotation,
   nextAnnotationStrokeWidth,
   nextTextFontSize,
-  undoAnnotationGesturePoint,
   type AnnotationStyle,
 } from './annotationStyle';
 
@@ -126,23 +124,6 @@ describe('annotation style', () => {
     });
   });
 
-  it('creates polyline annotations from clicked vertices', () => {
-    expect(
-      annotationFromGesture(
-        'polyline',
-        { x: 1, y: 2 },
-        { x: 14, y: 9 },
-        style,
-        [{ x: 1, y: 2 }, { x: 8, y: 2 }, { x: 14, y: 9 }],
-      ),
-    ).toEqual({
-      type: 'polyline',
-      points: [{ x: 1, y: 2 }, { x: 8, y: 2 }, { x: 14, y: 9 }],
-      color: [40, 167, 69, 255],
-      stroke_width: 5,
-    });
-  });
-
   it('creates freehand annotations from the captured stroke points', () => {
     expect(
       annotationFromGesture(
@@ -177,7 +158,7 @@ describe('annotation style', () => {
     });
   });
 
-  it('creates mosaic annotations with the selected block size', () => {
+  it('creates mosaic brush annotations with the selected pixel block size', () => {
     expect(
       annotationFromGesture(
         'mosaic',
@@ -187,23 +168,9 @@ describe('annotation style', () => {
       ),
     ).toEqual({
       type: 'mosaic',
-      rect: { x: 4, y: 6, width: 8, height: 14 },
-      block_size: 5,
-    });
-  });
-
-  it('creates blur annotations with the selected radius', () => {
-    expect(
-      annotationFromGesture(
-        'blur',
-        { x: 12, y: 20 },
-        { x: 4, y: 6 },
-        style,
-      ),
-    ).toEqual({
-      type: 'blur',
-      rect: { x: 4, y: 6, width: 8, height: 14 },
-      radius: 5,
+      points: [{ x: 12, y: 20 }, { x: 4, y: 6 }],
+      stroke_width: 25,
+      block_size: 15,
     });
   });
 
@@ -236,39 +203,6 @@ describe('annotation style', () => {
       end: { x: 34, y: 10 },
       color: [40, 167, 69, 255],
       stroke_width: 5,
-    });
-
-    expect(
-      annotationFromGestureDraft(
-        {
-          tool: 'polyline',
-          startPoint: { x: 1, y: 2 },
-          points: [{ x: 1, y: 2 }, { x: 8, y: 2 }],
-        },
-        { x: 14, y: 9 },
-        style,
-      ),
-    ).toEqual({
-      type: 'polyline',
-      points: [{ x: 1, y: 2 }, { x: 8, y: 2 }, { x: 14, y: 9 }],
-      color: [40, 167, 69, 255],
-      stroke_width: 5,
-    });
-
-    expect(
-      annotationFromGestureDraft(
-        {
-          tool: 'polyline',
-          startPoint: { x: 1, y: 2 },
-          points: [{ x: 1, y: 2 }, { x: 8, y: 2 }],
-        },
-        { x: 14, y: 9 },
-        style,
-        true,
-      ),
-    ).toMatchObject({
-      type: 'polyline',
-      points: [{ x: 1, y: 2 }, { x: 8, y: 2 }, { x: 14, y: 8 }],
     });
 
     expect(
@@ -348,48 +282,6 @@ describe('annotation style', () => {
     });
   });
 
-  it('appends constrained polyline vertices while holding shift', () => {
-    expect(
-      appendAnnotationGesturePoint(
-        {
-          tool: 'polyline',
-          startPoint: { x: 1, y: 2 },
-          points: [{ x: 1, y: 2 }, { x: 8, y: 2 }],
-        },
-        { x: 14, y: 9 },
-        true,
-      ),
-    ).toEqual([{ x: 1, y: 2 }, { x: 8, y: 2 }, { x: 14, y: 8 }]);
-  });
-
-  it('undoes fixed polyline vertices from the active gesture', () => {
-    expect(
-      undoAnnotationGesturePoint({
-        tool: 'polyline',
-        startPoint: { x: 1, y: 2 },
-        points: [{ x: 1, y: 2 }, { x: 8, y: 2 }, { x: 14, y: 8 }],
-      }),
-    ).toEqual({
-      tool: 'polyline',
-      startPoint: { x: 1, y: 2 },
-      points: [{ x: 1, y: 2 }, { x: 8, y: 2 }],
-    });
-
-    expect(
-      undoAnnotationGesturePoint({
-        tool: 'polyline',
-        startPoint: { x: 1, y: 2 },
-        points: [{ x: 1, y: 2 }],
-      }),
-    ).toBeNull();
-    expect(
-      undoAnnotationGesturePoint({
-        tool: 'line',
-        startPoint: { x: 1, y: 2 },
-      }),
-    ).toBeNull();
-  });
-
   it('constrains annotation gestures while holding shift', () => {
     expect(
       constrainAnnotationGesturePoint(
@@ -421,13 +313,6 @@ describe('annotation style', () => {
     ).toEqual({ x: 10, y: 40 });
     expect(
       constrainAnnotationGesturePoint(
-        'polyline',
-        { x: 10, y: 10 },
-        { x: 20, y: 40 },
-      ),
-    ).toEqual({ x: 10, y: 40 });
-    expect(
-      constrainAnnotationGesturePoint(
         'pen',
         { x: 10, y: 10 },
         { x: 30, y: 18 },
@@ -444,7 +329,6 @@ describe('annotation style', () => {
     expect(annotationToolFromShortcut({ ...plainKey, key: 'p' })).toBe('pen');
     expect(annotationToolFromShortcut({ ...plainKey, key: 'h' })).toBe('highlight');
     expect(annotationToolFromShortcut({ ...plainKey, key: 'm' })).toBe('mosaic');
-    expect(annotationToolFromShortcut({ ...plainKey, key: 'b' })).toBe('blur');
     expect(annotationToolFromShortcut({ ...plainKey, key: 't' })).toBe('text');
     expect(annotationToolFromShortcut({ ...plainKey, key: 'E' })).toBe('eraser');
   });
@@ -520,7 +404,6 @@ describe('annotation style', () => {
     };
 
     expect(nextAnnotationToolFromCycleShortcut(plainTab, 'line')).toBe('arrow');
-    expect(nextAnnotationToolFromCycleShortcut(plainTab, 'polyline')).toBeNull();
     expect(nextAnnotationToolFromCycleShortcut(plainTab, 'arrow')).toBe('line');
     expect(nextAnnotationToolFromCycleShortcut(plainTab, 'rectangle')).toBeNull();
     expect(
@@ -774,31 +657,19 @@ describe('annotation style', () => {
       applyAnnotationStyle(
         {
           type: 'mosaic',
-          rect: { x: 1, y: 2, width: 10, height: 8 },
+          points: [{ x: 1, y: 2 }, { x: 4, y: 6 }],
+          stroke_width: 12,
           block_size: 2,
         },
         style,
       ),
     ).toEqual({
       type: 'mosaic',
-      rect: { x: 1, y: 2, width: 10, height: 8 },
-      block_size: 5,
+      points: [{ x: 1, y: 2 }, { x: 4, y: 6 }],
+      stroke_width: 25,
+      block_size: 15,
     });
 
-    expect(
-      applyAnnotationStyle(
-        {
-          type: 'blur',
-          rect: { x: 1, y: 2, width: 10, height: 8 },
-          radius: 2,
-        },
-        style,
-      ),
-    ).toEqual({
-      type: 'blur',
-      rect: { x: 1, y: 2, width: 10, height: 8 },
-      radius: 5,
-    });
   });
 
   it('updates text annotations with the selected color and font size', () => {
@@ -823,7 +694,7 @@ describe('annotation style', () => {
     });
   });
 
-  it('rejects tiny annotations', () => {
+  it('keeps a single-click mosaic brush while rejecting tiny geometric annotations', () => {
     expect(
       isCommittedAnnotation(
         annotationFromGesture(
@@ -833,17 +704,7 @@ describe('annotation style', () => {
           style,
         ),
       ),
-    ).toBe(false);
-    expect(
-      isCommittedAnnotation(
-        annotationFromGesture(
-          'blur',
-          { x: 1, y: 1 },
-          { x: 2, y: 2 },
-          style,
-        ),
-      ),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       isCommittedAnnotation(
         annotationFromGesture(

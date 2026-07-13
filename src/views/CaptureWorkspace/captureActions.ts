@@ -16,7 +16,7 @@ export type CaptureImagePrinter = (
 ) => Promise<void> | void;
 
 export interface CaptureActionClient {
-  defaultCaptureSavePath: () => Promise<string>;
+  defaultCaptureSavePath: () => Promise<string | null>;
   quickCaptureSavePath: (directory?: string) => Promise<string>;
   outputCapture: (input: OutputCaptureInput) => Promise<void>;
   createCaptureSession: () => Promise<CaptureSessionView>;
@@ -539,6 +539,7 @@ export async function saveCaptureSelection(
   client: CaptureActionClient,
 ) {
   const path = await client.defaultCaptureSavePath();
+  if (!path) return;
 
   await client.outputCapture({
     sessionId,

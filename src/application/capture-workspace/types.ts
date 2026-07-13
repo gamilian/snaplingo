@@ -104,6 +104,10 @@ export interface CaptureWorkspaceRuntimeActions {
     handle: SelectionHandle,
     input: Point | CaptureWorkspacePointerInput,
   ): boolean;
+  resizeAnnotationPointerDown(
+    handle: SelectionHandle,
+    input: Point | CaptureWorkspacePointerInput,
+  ): boolean;
   wheel(input: CaptureWorkspaceWheelInput): boolean;
   commitTextDraft(): void;
   updateTextDraftText(text: string): void;
@@ -115,6 +119,8 @@ export interface CaptureWorkspaceRuntimeActions {
     textFontSize: number,
   ): void;
   updateTextDraftFontSize(fontSize: number): void;
+  undoAnnotation(): void;
+  redoAnnotation(): void;
   updateCursorColor(color: ColorSample | null): void;
   updatePolledCursor(point: Point): void;
   updatePolledHover(selection: LogicalRect | null): void;
@@ -163,6 +169,8 @@ export interface CaptureWorkspaceRuntimePlatform {
   };
   onCancelRequested(handler: () => void | Promise<void>): Promise<() => void>;
   onCopyRequested(handler: () => void | Promise<void>): Promise<() => void>;
+  onUndoRequested(handler: () => void | Promise<void>): Promise<() => void>;
+  onRedoRequested(handler: () => void | Promise<void>): Promise<() => void>;
   onHotkeyTriggered(
     handler: (launch: CaptureLaunch) => void | Promise<void>,
   ): Promise<() => void>;

@@ -106,6 +106,7 @@ pub fn run() {
             commands::trigger_screenshot,
             commands::update_general_settings,
             commands::update_screenshot_settings,
+            commands::update_annotation_colors,
             commands::update_translation_settings,
             commands::open_capture_window,
             commands::translate_text_v2,

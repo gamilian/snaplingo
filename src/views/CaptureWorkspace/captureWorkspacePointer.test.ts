@@ -162,6 +162,43 @@ describe('capture workspace editor pointer dispatch', () => {
     );
   });
 
+  it('ignores a selection click outside the active textarea', () => {
+    const { actions, context } = createContext({
+      state: {
+        status: 'preview',
+        selection,
+        textDraft: { position: { x: 10, y: 12 }, text: 'Snap', fontSize: 24 },
+      },
+      derived: { selectionBounds },
+    });
+    const event = createPointerEvent({ clientX: 110, clientY: 120 });
+
+    handleCaptureWorkspaceEditorPreviewPointerDown(event, context);
+
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(event.stopPropagation).toHaveBeenCalledOnce();
+    expect(actions.commitTextDraft).not.toHaveBeenCalled();
+    expect(actions.setAnnotationGesture).not.toHaveBeenCalled();
+  });
+
+  it('ignores a preview click outside the selection while a textarea is active', () => {
+    const { actions, context } = createContext({
+      state: {
+        status: 'preview',
+        selection,
+        textDraft: { position: { x: 10, y: 12 }, text: 'Snap', fontSize: 24 },
+      },
+      derived: { selectionBounds },
+    });
+    const event = createPointerEvent({ clientX: 10, clientY: 12 });
+
+    handleCaptureWorkspaceEditorPointerDown(event, context);
+
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(event.stopPropagation).toHaveBeenCalledOnce();
+    expect(actions.commitTextDraft).not.toHaveBeenCalled();
+  });
+
   it('updates an active selection edit without entering selecting workflows', () => {
     const editGesture = {
       type: 'move' as const,
@@ -186,6 +223,40 @@ describe('capture workspace editor pointer dispatch', () => {
       height: 90,
     });
     expect(actions.setPreviewImageBase64).toHaveBeenCalledWith(null);
+  });
+
+  it('updates freehand gesture and draft atomically during pointer movement', () => {
+    const annotationGesture = {
+      tool: 'pen' as const,
+      startPoint: { x: 10, y: 10 },
+      points: [{ x: 10, y: 10 }],
+    };
+    const { actions, context } = createContext({
+      state: {
+        status: 'preview',
+        selection,
+        annotationGesture,
+      },
+      derived: { selectionBounds },
+    });
+
+    handleCaptureWorkspaceEditorPointerMove(
+      createPointerEvent({ clientX: 80, clientY: 100 }),
+      context,
+    );
+
+    expect(actions.setAnnotationGesture).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tool: 'pen',
+        points: [
+          { x: 10, y: 10 },
+          { x: 30, y: 40 },
+        ],
+      }),
+      expect.objectContaining({ type: 'freehand' }),
+    );
+    expect(actions.setDraftAnnotation).not.toHaveBeenCalled();
+    expect(actions.scheduleSelectionOverlayPaint).not.toHaveBeenCalled();
   });
 
   it('commits a selection edit and rerenders its preview', () => {

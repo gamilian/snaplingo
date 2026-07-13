@@ -8,7 +8,6 @@ import type {
 } from './annotationStyle';
 import {
   appendAnnotationPoint,
-  appendAnnotationGesturePoint,
   annotationFromGesture,
   annotationFromGestureDraft,
   applyAnnotationStyle,
@@ -16,7 +15,6 @@ import {
   isPointStrokeAnnotationTool,
   nextAnnotationStrokeWidth,
   nextTextFontSize,
-  undoAnnotationGesturePoint,
 } from './annotationStyle';
 import type { AnnotationHistory } from './annotationHistory';
 import {
@@ -24,7 +22,6 @@ import {
   emptyAnnotationHistory,
   replaceAnnotationInHistory,
 } from './annotationHistory';
-import { eraseAnnotationAtPoint } from './annotationEraser';
 import type {
   CaptureRuntimeEffect,
   ManualSelectionCompletionPlan,
@@ -35,7 +32,9 @@ import {
   getAnnotationKeyboardNudgeDelta,
   hitTestAnnotations,
   moveAnnotationByDelta,
+  resizeRectAnnotation,
 } from './annotationGeometry';
+import type { SelectionHandle } from './selection';
 import type { AnnotationCommand, LogicalRect, Point } from './types';
 import {
   commitTextAnnotationDraft,
@@ -57,17 +56,17 @@ export function deriveCaptureEditorToolbarState(
       ...currentState,
       annotationStyle: {
         ...currentState.annotationStyle,
-        strokeWidth: annotation.block_size,
+        strokeWidth: Math.max(1, Math.round(annotation.stroke_width / 5)),
       },
     };
   }
 
-  if (annotation.type === 'blur') {
+  if (annotation.type === 'eraser') {
     return {
       ...currentState,
       annotationStyle: {
         ...currentState.annotationStyle,
-        strokeWidth: annotation.radius,
+        strokeWidth: Math.max(1, Math.round(annotation.stroke_width / 4)),
       },
     };
   }
@@ -343,49 +342,6 @@ export function planCaptureAnnotationFillToggle({
   };
 }
 
-export interface UndoPolylineCaptureGestureOptions {
-  gesture: AnnotationGestureDraft;
-  selection: LogicalRect;
-  cursorPoint: Point | null;
-  annotationStyle: AnnotationStyle;
-}
-
-export interface UndoPolylineCaptureGestureResult {
-  gesture: AnnotationGestureDraft;
-  draftAnnotation: AnnotationCommand;
-}
-
-export function undoPolylineCaptureGesture({
-  gesture,
-  selection,
-  cursorPoint,
-  annotationStyle,
-}: UndoPolylineCaptureGestureOptions): UndoPolylineCaptureGestureResult | null {
-  const nextGesture = undoAnnotationGesturePoint(gesture);
-  if (!nextGesture) return null;
-
-  const fallbackPoint =
-    nextGesture.points?.[nextGesture.points.length - 1] ?? nextGesture.startPoint;
-  const localPoint = cursorPoint
-    ? clampPointToSelection(
-        { x: cursorPoint.x - selection.x, y: cursorPoint.y - selection.y },
-        selection,
-      )
-    : fallbackPoint;
-
-  const draftAnnotation = annotationFromGestureDraft(
-    nextGesture,
-    localPoint,
-    annotationStyle,
-  );
-  if (!draftAnnotation) return null;
-
-  return {
-    gesture: nextGesture,
-    draftAnnotation,
-  };
-}
-
 export interface CommitCaptureEditorTextDraftOptions {
   annotationHistory: AnnotationHistory;
   selectedAnnotationIndex: number | null;
@@ -475,9 +431,16 @@ export function completeCaptureEditorGesture({
     };
   }
 
+  const nextHistory = addAnnotationToHistory(annotationHistory, nextAnnotation);
+  const nextSelectedAnnotationIndex =
+    nextAnnotation.type === 'rectangle' ||
+    nextAnnotation.type === 'ellipse'
+      ? nextHistory.annotations.length - 1
+      : null;
+
   return {
-    annotationHistory: addAnnotationToHistory(annotationHistory, nextAnnotation),
-    selectedAnnotationIndex: null,
+    annotationHistory: nextHistory,
+    selectedAnnotationIndex: nextSelectedAnnotationIndex,
     annotationGesture: null,
     draftAnnotation: null,
   };
@@ -561,7 +524,7 @@ interface CaptureEffectsManualSelectionState
 export type CaptureManualSelectionTransition =
   | {
       type: 'preview';
-      clearOverlay: false;
+      clearOverlay: true;
       nextState: CapturePreviewManualSelectionState;
       previewRender: {
         rect: LogicalRect;
@@ -602,7 +565,7 @@ export function planCaptureManualSelectionTransition({
   if (completion.type === 'preview') {
     return {
       type: 'preview',
-      clearOverlay: false,
+      clearOverlay: true,
       nextState: {
         ...baseState,
         isAnnotationToolbarVisible: true,
@@ -645,7 +608,7 @@ export function planCaptureAnnotationToolStart({
   annotationStyle: AnnotationStyle;
 }): CaptureAnnotationToolStartPlan {
   const points =
-    isPointStrokeAnnotationTool(tool) || tool === 'polyline'
+  isPointStrokeAnnotationTool(tool)
       ? [localPoint]
       : undefined;
   const annotationGesture: AnnotationGestureDraft = {
@@ -663,42 +626,6 @@ export function planCaptureAnnotationToolStart({
       localPoint,
       annotationStyle,
       points,
-    ),
-  };
-}
-
-export interface CapturePolylineAnnotationContinuePlan {
-  annotationGesture: AnnotationGestureDraft;
-  draftAnnotation: AnnotationCommand;
-}
-
-export function planCapturePolylineAnnotationContinue({
-  gesture,
-  localPoint,
-  annotationStyle,
-  constrainGesture,
-}: {
-  gesture: AnnotationGestureDraft;
-  localPoint: Point;
-  annotationStyle: AnnotationStyle;
-  constrainGesture: boolean;
-}): CapturePolylineAnnotationContinuePlan {
-  const nextGesture = {
-    ...gesture,
-    points: appendAnnotationGesturePoint(
-      gesture,
-      localPoint,
-      constrainGesture,
-    ),
-  };
-
-  return {
-    annotationGesture: nextGesture,
-    draftAnnotation: annotationFromGestureDraft(
-      nextGesture,
-      localPoint,
-      annotationStyle,
-      constrainGesture,
     ),
   };
 }
@@ -741,35 +668,12 @@ export function planCaptureAnnotationGestureMove({
   };
 }
 
-export interface CaptureAnnotationErasePlan {
-  annotationMoveGesture: null;
-  draftAnnotation: null;
-  annotationHistory: AnnotationHistory;
-  previewAnnotations: AnnotationCommand[] | null;
-}
-
-export function planCaptureAnnotationErase({
-  annotationHistory,
-  localPoint,
-}: {
-  annotationHistory: AnnotationHistory;
-  localPoint: Point;
-}): CaptureAnnotationErasePlan {
-  const nextHistory = eraseAnnotationAtPoint(annotationHistory, localPoint);
-
-  return {
-    annotationMoveGesture: null,
-    draftAnnotation: null,
-    annotationHistory: nextHistory,
-    previewAnnotations:
-      nextHistory === annotationHistory ? null : nextHistory.annotations,
-  };
-}
 
 export interface CaptureAnnotationMoveGesture {
   annotationIndex: number;
   startPoint: Point;
   startAnnotation: AnnotationCommand;
+  resizeHandle?: SelectionHandle;
 }
 
 export type CaptureExistingAnnotationPointerDownPlan =
@@ -781,8 +685,6 @@ export type CaptureExistingAnnotationPointerDownPlan =
       textDraft: TextAnnotationDraft;
       textDraftAnnotationIndex: number;
       toolbarState: CaptureEditorToolbarState;
-      previewImageBase64: null;
-      previewAnnotations: AnnotationCommand[];
     }
   | {
       type: 'move-annotation';
@@ -820,10 +722,6 @@ export function planCaptureExistingAnnotationPointerDown({
       textDraft: startTextAnnotationDraftFromAnnotation(hitAnnotation),
       textDraftAnnotationIndex: hitAnnotationIndex,
       toolbarState: nextToolbarState,
-      previewImageBase64: null,
-      previewAnnotations: annotations.filter(
-        (_, index) => index !== hitAnnotationIndex,
-      ),
     };
   }
 
@@ -840,7 +738,6 @@ export function planCaptureExistingAnnotationPointerDown({
 }
 
 export interface CaptureAnnotationMovePlan {
-  previewImageBase64: null;
   draftAnnotation: AnnotationCommand;
 }
 
@@ -849,20 +746,35 @@ export function planCaptureAnnotationMove({
   startPoint,
   localPoint,
   constrainMove,
+  resizeHandle,
+  selectionBounds,
 }: {
   startAnnotation: AnnotationCommand;
   startPoint: Point;
   localPoint: Point;
   constrainMove: boolean;
+  resizeHandle?: SelectionHandle;
+  selectionBounds?: LogicalRect;
 }): CaptureAnnotationMovePlan {
   const delta = {
     x: localPoint.x - startPoint.x,
     y: localPoint.y - startPoint.y,
   };
+  if (resizeHandle && selectionBounds) {
+    return {
+      draftAnnotation: resizeRectAnnotation(
+        startAnnotation,
+        resizeHandle,
+        delta,
+        selectionBounds,
+        constrainMove,
+      ),
+    };
+  }
+
   const moveDelta = constrainMove ? constrainAnnotationMoveDelta(delta) : delta;
 
   return {
-    previewImageBase64: null,
     draftAnnotation: moveAnnotationByDelta(startAnnotation, moveDelta),
   };
 }
@@ -872,31 +784,34 @@ export interface CaptureAnnotationMoveCommitPlan {
   draftAnnotation: null;
   annotationHistory: AnnotationHistory;
   selectedAnnotationIndex?: number;
-  previewAnnotations: AnnotationCommand[];
 }
 
 export function planCaptureAnnotationMoveCommit({
   annotationHistory,
-  annotations,
   annotationIndex,
   startAnnotation,
   startPoint,
   localPoint,
   constrainMove,
+  resizeHandle,
+  selectionBounds,
 }: {
   annotationHistory: AnnotationHistory;
-  annotations: AnnotationCommand[];
   annotationIndex: number;
   startAnnotation: AnnotationCommand;
   startPoint: Point;
   localPoint: Point;
   constrainMove: boolean;
+  resizeHandle?: SelectionHandle;
+  selectionBounds?: LogicalRect;
 }): CaptureAnnotationMoveCommitPlan {
   const annotationMove = planCaptureAnnotationMove({
     startAnnotation,
     startPoint,
     localPoint,
     constrainMove,
+    resizeHandle,
+    selectionBounds,
   });
   const nextHistory = replaceAnnotationInHistory(
     annotationHistory,
@@ -910,14 +825,5 @@ export function planCaptureAnnotationMoveCommit({
     annotationHistory: nextHistory,
     selectedAnnotationIndex:
       nextHistory === annotationHistory ? undefined : annotationIndex,
-    previewAnnotations:
-      nextHistory === annotationHistory ? annotations : nextHistory.annotations,
-  };
-}
-
-function clampPointToSelection(point: Point, rect: LogicalRect): Point {
-  return {
-    x: Math.min(Math.max(point.x, 0), rect.width),
-    y: Math.min(Math.max(point.y, 0), rect.height),
   };
 }

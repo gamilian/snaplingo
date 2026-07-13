@@ -1,4 +1,5 @@
 import type {
+  AnnotationColorPreset,
   DurableSettingsPort,
   GeneralSettings,
   HotkeySnapshot,
@@ -35,6 +36,9 @@ export interface SettingsRuntime {
     load(): Promise<SettingsSnapshot>;
     updateGeneral(input: GeneralSettings): Promise<SettingsSnapshot>;
     updateScreenshot(input: ScreenshotSettings): Promise<SettingsSnapshot>;
+    updateAnnotationColors(
+      colors: AnnotationColorPreset[],
+    ): Promise<SettingsSnapshot>;
     updateTranslation(input: TranslationSettings): Promise<SettingsSnapshot>;
   };
   providers: SettingsProvidersPort;
@@ -72,6 +76,8 @@ export function createSettingsRuntime(
         ports.durableSettings.updateGeneralSettings(input),
       updateScreenshot: (input) =>
         ports.durableSettings.updateScreenshotSettings(input),
+      updateAnnotationColors: (colors) =>
+        ports.durableSettings.updateAnnotationColors(colors),
       updateTranslation: (input) =>
         ports.durableSettings.updateTranslationSettings(input),
     },

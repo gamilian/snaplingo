@@ -22,6 +22,12 @@ export interface CaptureWorkspaceEventsPort {
   subscribeCaptureCopy(
     handler: CaptureWorkspaceRequestHandler,
   ): Promise<CaptureWorkspaceUnsubscribe>;
+  subscribeCaptureUndo(
+    handler: CaptureWorkspaceRequestHandler,
+  ): Promise<CaptureWorkspaceUnsubscribe>;
+  subscribeCaptureRedo(
+    handler: CaptureWorkspaceRequestHandler,
+  ): Promise<CaptureWorkspaceUnsubscribe>;
   subscribeHotkeyTriggered(
     handler: CaptureHotkeyHandler,
   ): Promise<CaptureWorkspaceUnsubscribe>;
@@ -63,7 +69,7 @@ export interface CaptureWorkspaceCommandsPort {
   cancelCaptureSession(sessionId: string): Promise<void>;
   restoreCaptureSnapshotWindowsForSession(sessionId: string): Promise<void>;
   renderCaptureOutput(input: RenderCaptureOutputInput): Promise<string>;
-  defaultCaptureSavePath(): Promise<string>;
+  defaultCaptureSavePath(): Promise<string | null>;
   quickCaptureSavePath(directory?: string): Promise<string>;
   outputCapture(input: OutputCaptureInput): Promise<void>;
   runCaptureOcr(sessionId: string, rect: LogicalRect): Promise<OcrResult>;

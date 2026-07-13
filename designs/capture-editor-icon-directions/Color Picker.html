@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SnapLingo 颜色弹层</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: #e9e5de;
+      --paper: #fffdfa;
+      --ink: #302d29;
+      --muted: #77716a;
+      --line: #d8d1c8;
+      --accent: #c96747;
+    }
+    * { box-sizing: border-box; }
+    body {
+      display: grid;
+      min-height: 100vh;
+      margin: 0;
+      place-items: center;
+      background: var(--canvas);
+      color: var(--ink);
+      font-family: -apple-system, "SF Pro Text", "PingFang SC", "Noto Sans SC", sans-serif;
+    }
+    main { width: min(760px, calc(100vw - 40px)); }
+    h1 { margin: 0 0 7px; font-size: 22px; letter-spacing: -.03em; }
+    .intro { margin: 0 0 20px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+    .stage {
+      min-height: 390px;
+      padding: 72px 28px;
+      border: 1px solid rgb(75 66 58 / 12%);
+      border-radius: 18px;
+      background: #dcd6cf;
+      box-shadow: 0 20px 56px rgb(69 57 45 / 12%);
+    }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      height: 42px;
+      padding: 6px;
+      border: 1px solid rgb(79 70 60 / 10%);
+      border-radius: 12px;
+      background: rgb(255 253 250 / 97%);
+      box-shadow: 0 10px 26px rgb(59 48 39 / 16%);
+    }
+    .tool, .action {
+      display: inline-grid;
+      width: 29px;
+      height: 29px;
+      padding: 0;
+      place-items: center;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: transparent;
+      color: #5d5954;
+      font: inherit;
+      cursor: pointer;
+    }
+    .tool:hover, .action:hover { background: #efebe5; color: var(--ink); }
+    .divider { width: 1px; height: 19px; background: #dfd9d1; }
+    .color-control { position: relative; }
+    .color-button {
+      background: #ff4d4f;
+      box-shadow: 0 0 0 2px rgb(255 77 79 / 14%);
+    }
+    .color-button:hover { background: #ff4d4f; }
+    .slider { width: 64px; accent-color: #5b7fff; }
+    .fill-toggle { accent-color: #5b7fff; }
+    .spacer { flex: 1; }
+    .text-action { width: auto; padding: 0 9px; border-color: #ded8d0; background: white; font-size: 10px; font-weight: 650; }
+    .copy { background: var(--accent); color: white; }
+    .copy:hover { background: #b95a3d; color: white; }
+    .popover {
+      position: absolute;
+      z-index: 5;
+      top: calc(100% + 8px);
+      left: 50%;
+      width: 248px;
+      padding: 12px;
+      transform: translateX(-50%);
+      border: 1px solid #ded8d0;
+      border-radius: 12px;
+      background: rgb(255 253 250 / 98%);
+      box-shadow: 0 16px 36px rgb(30 25 20 / 22%);
+      backdrop-filter: blur(18px);
+    }
+    .popover[hidden] { display: none; }
+    .popover-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 11px; font-size: 12px; font-weight: 650; }
+    .close { width: 22px; height: 22px; border: 0; border-radius: 6px; background: transparent; color: #9b948c; cursor: pointer; }
+    .close:hover { background: #f0ece7; color: var(--ink); }
+    .presets { display: grid; grid-template-columns: repeat(7, 1fr); gap: 7px; }
+    .preset {
+      width: 25px;
+      height: 25px;
+      padding: 0;
+      border: 1px solid rgb(0 0 0 / 12%);
+      border-radius: 7px;
+      box-shadow: 0 1px 2px rgb(30 25 20 / 10%);
+      cursor: pointer;
+    }
+    .preset.selected { outline: 2px solid #5b7fff; outline-offset: 2px; }
+    .empty { padding: 15px; border: 1px dashed #ddd6ce; border-radius: 8px; color: #9b948c; font-size: 11px; text-align: center; }
+    .system-palette {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      height: 37px;
+      gap: 8px;
+      margin-top: 12px;
+      padding: 0 10px;
+      border: 1px solid #ded8d0;
+      border-radius: 8px;
+      background: #f4f1ed;
+      color: #4f4a45;
+      font: inherit;
+      font-size: 11px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+    .palette-wheel { width: 20px; height: 20px; border: 1px solid white; border-radius: 50%; background: conic-gradient(#ff4d4f, #faad14, #52c41a, #1890ff, #722ed1, #ff4d4f); box-shadow: 0 1px 2px rgb(30 25 20 / 15%); }
+    .system-palette code { margin-left: auto; color: #908980; font-size: 10px; }
+    .system-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+    .preset-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #ece7e1; }
+    .preset-actions button { height: 28px; border: 1px solid #ded8d0; border-radius: 7px; background: white; color: #5d5954; font: inherit; font-size: 10px; font-weight: 650; cursor: pointer; }
+    .preset-actions button:hover:not(:disabled) { background: #f4f1ed; }
+    .preset-actions .delete { border-color: #efc7bf; color: #b94f3b; }
+    .preset-actions button:disabled { opacity: .35; cursor: default; }
+    .hint { margin: 14px 0 0; color: #7e776f; font-size: 11px; text-align: center; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>颜色控制 · 两级弹层</h1>
+    <p class="intro">点击色块打开预设管理；点击“系统调色板”后，才进入 macOS 原生调色板。新增、修改、删除只作用于预设列表。</p>
+    <section class="stage" aria-label="颜色弹层交互预览">
+      <div class="toolbar" role="toolbar" aria-label="截图编辑工具栏">
+        <button class="tool" type="button" aria-label="撤销">↶</button>
+        <button class="tool" type="button" aria-label="重做">↷</button>
+        <span class="divider"></span>
+        <div class="color-control">
+          <button id="colorButton" class="tool color-button" type="button" aria-label="颜色" aria-haspopup="dialog" aria-expanded="true"></button>
+          <div id="popover" class="popover" role="dialog" aria-label="预设颜色">
+            <div class="popover-head"><span>颜色</span><button id="close" class="close" type="button" aria-label="关闭">×</button></div>
+            <div id="presets" class="presets"></div>
+            <button id="systemPalette" class="system-palette" type="button" aria-haspopup="dialog">
+              <span class="palette-wheel"></span><span>系统调色板</span><code id="hexValue">#FF4D4F</code>
+            </button>
+            <input id="systemInput" class="system-input" type="color" value="#ff4d4f" aria-label="系统调色板">
+            <div class="preset-actions">
+              <button id="add" type="button">新增</button>
+              <button id="replace" type="button">修改</button>
+              <button id="delete" class="delete" type="button">删除</button>
+            </div>
+          </div>
+        </div>
+        <input class="slider" type="range" min="1" max="8" value="3" aria-label="粗细">
+        <input class="fill-toggle" type="checkbox" aria-label="填充">
+        <span class="spacer"></span>
+        <button class="action text-action" type="button">ESC</button>
+        <button class="action text-action" type="button">OCR</button>
+        <button class="action copy" type="button" aria-label="复制">▣</button>
+      </div>
+      <p class="hint">选择系统颜色只更新当前颜色；点击“新增”或“修改”后才保存为预设。</p>
+    </section>
+  </main>
+  <script>
+    const initialColors = ['#FF4D4F', '#28A745', '#1890FF', '#FADB14', '#FFFFFF', '#000000'];
+    let colors = [...initialColors];
+    let draft = colors[0];
+    let selectedIndex = 0;
+
+    const colorButton = document.querySelector('#colorButton');
+    const popover = document.querySelector('#popover');
+    const presetRoot = document.querySelector('#presets');
+    const systemInput = document.querySelector('#systemInput');
+    const hexValue = document.querySelector('#hexValue');
+    const addButton = document.querySelector('#add');
+    const replaceButton = document.querySelector('#replace');
+    const deleteButton = document.querySelector('#delete');
+
+    function render() {
+      presetRoot.innerHTML = colors.length
+        ? colors.map((color, index) => `<button class="preset${selectedIndex === index ? ' selected' : ''}" type="button" data-index="${index}" style="background:${color}" aria-label="选择 ${color}"></button>`).join('')
+        : '<div class="empty" style="grid-column:1/-1">暂无预设颜色</div>';
+      colorButton.style.background = draft;
+      systemInput.value = draft.toLowerCase();
+      hexValue.textContent = draft;
+      const duplicate = colors.indexOf(draft);
+      addButton.disabled = duplicate >= 0;
+      replaceButton.disabled = selectedIndex < 0 || duplicate >= 0 || colors[selectedIndex] === draft;
+      deleteButton.disabled = selectedIndex < 0;
+    }
+
+    colorButton.addEventListener('click', () => {
+      popover.hidden = !popover.hidden;
+      colorButton.setAttribute('aria-expanded', String(!popover.hidden));
+    });
+    document.querySelector('#close').addEventListener('click', () => {
+      popover.hidden = true;
+      colorButton.setAttribute('aria-expanded', 'false');
+    });
+    presetRoot.addEventListener('click', (event) => {
+      const button = event.target.closest('.preset');
+      if (!button) return;
+      selectedIndex = Number(button.dataset.index);
+      draft = colors[selectedIndex];
+      render();
+    });
+    document.querySelector('#systemPalette').addEventListener('click', () => systemInput.click());
+    systemInput.addEventListener('input', () => {
+      draft = systemInput.value.toUpperCase();
+      render();
+    });
+    addButton.addEventListener('click', () => {
+      if (colors.includes(draft)) return;
+      colors.push(draft);
+      selectedIndex = colors.length - 1;
+      render();
+    });
+    replaceButton.addEventListener('click', () => {
+      if (selectedIndex < 0 || colors.includes(draft)) return;
+      colors[selectedIndex] = draft;
+      render();
+    });
+    deleteButton.addEventListener('click', () => {
+      if (selectedIndex < 0) return;
+      colors.splice(selectedIndex, 1);
+      selectedIndex = -1;
+      render();
+    });
+    render();
+  </script>
+</body>
+</html>

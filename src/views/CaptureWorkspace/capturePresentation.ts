@@ -1,3 +1,8 @@
+import {
+  annotationBrushDiameter,
+  type AnnotationTool,
+} from './annotationStyle';
+
 type CapturePresentationStatus = 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
 type CaptureEditorCommandButtonVariant = 'default' | 'icon' | 'primary';
 
@@ -7,8 +12,51 @@ export function getCaptureRootClassName(_status: CapturePresentationStatus) {
   ].join(' ');
 }
 
-export function getCaptureRootCursorStyle(status: CapturePresentationStatus) {
-  return status === 'selecting' ? 'none' : 'crosshair';
+export function getCaptureRootCursorStyle(
+  status: CapturePresentationStatus,
+  activeAnnotationTool: AnnotationTool | null = null,
+  strokeWidth = 2,
+) {
+  if (status === 'selecting') return 'none';
+  return getCaptureEditorCursorStyle(activeAnnotationTool, strokeWidth);
+}
+
+export function getCaptureEditorCursorStyle(
+  activeAnnotationTool: AnnotationTool | null,
+  strokeWidth = 2,
+) {
+  if (activeAnnotationTool === 'text') return 'text';
+  if (activeAnnotationTool === 'mosaic') return brushCursor('mosaic', strokeWidth);
+  if (activeAnnotationTool === 'eraser') return brushCursor('eraser', strokeWidth);
+  if (activeAnnotationTool === 'pen' || activeAnnotationTool === 'highlight') {
+    return pencilCursor();
+  }
+  return 'default';
+}
+
+function cursorDataUrl(svg: string, hotspotX: number, hotspotY: number) {
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${hotspotX} ${hotspotY}, auto`;
+}
+
+function pencilCursor() {
+  return cursorDataUrl(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path d="m3 14.8 9.8-9.8 3 3L6 17.8H3v-3Z" fill="white" stroke="black" stroke-width="1.2"/><path d="m12.8 5 1.2-1.2a1.6 1.6 0 0 1 2.3 2.3L15 7.3" fill="#f5c98a" stroke="black" stroke-width="1.2"/><path d="m3 18 2.5-.8-1.7-1.7L3 18Z" fill="#222"/></svg>',
+    2,
+    18,
+  );
+}
+
+function brushCursor(
+  tool: Extract<AnnotationTool, 'mosaic' | 'eraser'>,
+  strokeWidth: number,
+) {
+  const diameter = annotationBrushDiameter(tool, strokeWidth);
+  const radius = diameter / 2;
+  return cursorDataUrl(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${diameter}" height="${diameter}" viewBox="0 0 ${diameter} ${diameter}"><circle cx="${radius}" cy="${radius}" r="${radius - 1}" fill="rgba(107,114,128,.28)" stroke="#6b7280" stroke-width="1.25"/></svg>`,
+    radius,
+    radius,
+  );
 }
 
 export function shouldShowCaptureLoadingMask(_status: CapturePresentationStatus) {
@@ -29,21 +77,34 @@ export function getCaptureEditorToolbarClassName() {
 
 export function getCaptureEditorSelectionClassName(
   status: CapturePresentationStatus,
-  _hasActiveAnnotationTool = false,
+  activeAnnotationTool: AnnotationTool | null = null,
 ) {
   return [
     'absolute rounded-[8px] bg-transparent',
     status === 'preview'
-      ? 'cursor-crosshair'
+      ? getCaptureEditorCursorClassName(activeAnnotationTool)
       : '',
   ]
     .filter(Boolean)
     .join(' ');
 }
 
-export function getCaptureEditorIconButtonClassName(isActive = false) {
+function getCaptureEditorCursorClassName(
+  activeAnnotationTool: AnnotationTool | null,
+) {
+  if (activeAnnotationTool === 'text') return 'cursor-text';
+  if (activeAnnotationTool === 'mosaic' || activeAnnotationTool === 'eraser') {
+    return 'cursor-crosshair';
+  }
+  return 'cursor-default';
+}
+
+export function getCaptureEditorIconButtonClassName(
+  isActive = false,
+  widthClassName = 'w-7',
+) {
   return [
-    'flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] border leading-none',
+    `flex h-7 ${widthClassName} shrink-0 items-center justify-center rounded-[8px] border leading-none`,
     'transition-colors disabled:cursor-not-allowed disabled:opacity-40',
     isActive
       ? 'border-[#5b7fff] bg-[#eef3ff] text-[#4a6fe8] shadow-[0_0_0_2px_rgba(91,127,255,0.2)]'

@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import type { AnnotationColorPreset } from '../../application/settings/ports';
 
 interface BackendGeneralSettings {
   language: string;
@@ -10,6 +11,7 @@ interface BackendScreenshotSettings {
   save_path: string;
   format: string;
   quality: number;
+  annotation_colors: AnnotationColorPreset[];
 }
 
 interface BackendTranslationSettings {
@@ -33,6 +35,7 @@ interface ScreenshotSettingsInput {
   savePath: string;
   format: string;
   quality: number;
+  annotationColors: AnnotationColorPreset[];
 }
 
 interface TranslationSettingsInput {
@@ -51,6 +54,7 @@ function normalizeSnapshot(snapshot: BackendSettingsSnapshot) {
       savePath: snapshot.screenshot.save_path,
       format: snapshot.screenshot.format,
       quality: snapshot.screenshot.quality,
+      annotationColors: snapshot.screenshot.annotation_colors,
     },
     translation: {
       defaultSourceLang: snapshot.translation.default_source_lang,
@@ -84,7 +88,16 @@ export async function updateScreenshotSettings(input: ScreenshotSettingsInput) {
         save_path: input.savePath,
         format: input.format,
         quality: input.quality,
+        annotation_colors: input.annotationColors,
       },
+    }),
+  );
+}
+
+export async function updateAnnotationColors(colors: AnnotationColorPreset[]) {
+  return normalizeSnapshot(
+    await invoke<BackendSettingsSnapshot>('update_annotation_colors', {
+      colors,
     }),
   );
 }

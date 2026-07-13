@@ -4,7 +4,13 @@ import type {
   CaptureWorkspacePointerInput,
   CaptureWorkspaceRuntimeActions,
 } from '../../application/capture-workspace/types';
-import type { AnnotationStyle, AnnotationTool } from './annotationStyle';
+import {
+  ANNOTATION_COLORS,
+  type AnnotationColor,
+  type AnnotationStyle,
+  type AnnotationTool,
+} from './annotationStyle';
+import { CaptureAnnotationCanvas } from './captureAnnotationCanvas';
 import { CaptureEditorToolbar } from './captureEditorToolbar';
 import { CaptureMagnifierOverlay } from './captureMagnifierOverlay';
 import {
@@ -14,7 +20,6 @@ import {
   shouldShowCaptureLoadingMask,
 } from './capturePresentation';
 import {
-  CaptureDraftAnnotationOverlay,
   CapturePreviewImage,
   CaptureRenderingOutputBar,
   CaptureSelectedAnnotationBoundsOverlay,
@@ -49,6 +54,7 @@ export interface CaptureWorkspaceViewRenderState {
     readonly selection: LogicalRect | null;
     readonly selectionViewportRect: LogicalRect | null;
     readonly previewImageBase64: string | null;
+    readonly annotations: AnnotationCommand[];
     readonly draftAnnotation: AnnotationCommand | null;
     readonly textDraft: TextAnnotationDraft | null;
     readonly annotationStyle: AnnotationStyle;
@@ -62,6 +68,8 @@ export interface CaptureWorkspaceViewRenderState {
     readonly textFontSize: number;
     readonly isTextSizingActive: boolean;
     readonly isFillModeActive: boolean;
+    readonly canUndo: boolean;
+    readonly canRedo: boolean;
   };
   readonly dom: {
     readonly textDraftInputRef: Ref<HTMLTextAreaElement>;
@@ -88,6 +96,7 @@ export type CaptureWorkspaceViewActions = Pick<
   | 'pointerMove'
   | 'pointerUp'
   | 'resizePointerDown'
+  | 'resizeAnnotationPointerDown'
   | 'wheel'
   | 'commitTextDraft'
   | 'updateTextDraftText'
@@ -96,6 +105,8 @@ export type CaptureWorkspaceViewActions = Pick<
   | 'toggleAnnotationTool'
   | 'applySelectedAnnotationStyle'
   | 'updateTextDraftFontSize'
+  | 'undoAnnotation'
+  | 'redoAnnotation'
   | 'cancelSession'
   | 'completePreviewSelection'
 >;
@@ -103,7 +114,13 @@ export type CaptureWorkspaceViewActions = Pick<
 interface CaptureWorkspaceViewProps {
   renderState: CaptureWorkspaceViewRenderState;
   actions: CaptureWorkspaceViewActions;
+  annotationColorPresets?: readonly AnnotationColor[];
+  onUpdateAnnotationColorPresets?: (
+    colors: AnnotationColor[],
+  ) => void | Promise<unknown>;
 }
+
+function ignoreAnnotationColorPresetUpdate() {}
 
 interface CaptureWorkspaceDomPointerEvent {
   clientX: number;
@@ -184,6 +201,8 @@ export function dispatchCaptureWorkspaceResizePointerDown({
 export function CaptureWorkspaceView({
   renderState,
   actions,
+  annotationColorPresets = ANNOTATION_COLORS,
+  onUpdateAnnotationColorPresets = ignoreAnnotationColorPresetUpdate,
 }: CaptureWorkspaceViewProps) {
   if (renderState.status === 'idle') return null;
 
@@ -248,7 +267,11 @@ export function CaptureWorkspaceView({
       style={{
         width: `${renderState.viewportBounds?.width ?? window.innerWidth}px`,
         height: `${renderState.viewportBounds?.height ?? window.innerHeight}px`,
-        cursor: getCaptureRootCursorStyle(renderState.status),
+        cursor: getCaptureRootCursorStyle(
+          renderState.status,
+          renderState.editor.activeAnnotationTool,
+          renderState.editor.annotationStyle.strokeWidth,
+        ),
       }}
       onPointerDown={handleRootPointerDown}
       onPointerMove={handleRootPointerMove}
@@ -274,7 +297,9 @@ export function CaptureWorkspaceView({
               imageBase64={renderState.editor.previewImageBase64}
               selectionViewportRect={renderState.editor.selectionViewportRect}
             />
-            <CaptureDraftAnnotationOverlay
+            <CaptureAnnotationCanvas
+              imageBase64={renderState.editor.previewImageBase64}
+              annotations={renderState.editor.annotations}
               draftAnnotation={renderState.editor.draftAnnotation}
               selectionViewportRect={renderState.editor.selectionViewportRect}
             />
@@ -294,13 +319,28 @@ export function CaptureWorkspaceView({
                 renderState.editor.selectedAnnotationBounds
               }
               selectionViewportRect={renderState.editor.selectionViewportRect}
+              onResizeHandlePointerDown={(handle, event) => {
+                dispatchCaptureWorkspaceResizePointerDown({
+                  handle,
+                  event,
+                  selectionBounds: renderState.selectionBounds,
+                  resizePointerDown: actions.resizeAnnotationPointerDown,
+                });
+              }}
             />
             <div
               className={getCaptureEditorSelectionClassName(
                 renderState.status,
-                Boolean(renderState.editor.activeAnnotationTool),
+                renderState.editor.activeAnnotationTool,
               )}
-              style={rectStyle(renderState.editor.selectionViewportRect)}
+              style={{
+                ...rectStyle(renderState.editor.selectionViewportRect),
+                cursor: getCaptureRootCursorStyle(
+                  renderState.status,
+                  renderState.editor.activeAnnotationTool,
+                  renderState.editor.annotationStyle.strokeWidth,
+                ),
+              }}
               onPointerDown={(event) => {
                 dispatchCaptureWorkspacePreviewPointerDown({
                   event,
@@ -326,20 +366,29 @@ export function CaptureWorkspaceView({
                 width={renderState.toolbar.width}
                 activeAnnotationTool={renderState.editor.activeAnnotationTool}
                 annotationStyle={renderState.editor.annotationStyle}
+                annotationColorPresets={annotationColorPresets}
                 textFontSize={renderState.toolbar.textFontSize}
                 textDraftActive={renderState.editor.textDraft !== null}
                 isTextSizingActive={renderState.toolbar.isTextSizingActive}
                 isFillModeActive={renderState.toolbar.isFillModeActive}
+                canUndo={renderState.toolbar.canUndo}
+                canRedo={renderState.toolbar.canRedo}
                 isRenderingOutput={renderState.isRenderingOutput}
                 onSelectMove={actions.selectMoveTool}
                 onToggleAnnotationTool={actions.toggleAnnotationTool}
                 onApplyAnnotationStyle={actions.applySelectedAnnotationStyle}
+                onUpdateAnnotationColorPresets={
+                  onUpdateAnnotationColorPresets
+                }
                 onTextDraftFontSizeChange={actions.updateTextDraftFontSize}
+                onUndo={actions.undoAnnotation}
+                onRedo={actions.redoAnnotation}
                 onCancel={actions.cancelSession}
                 onRunOcr={() => completeSelection('ocr')}
                 onCopy={() => completeSelection('copy')}
                 onSave={() => completeSelection('save')}
                 onQuickSave={() => completeSelection('quick-save')}
+                onPin={() => completeSelection('pin')}
               />
             )}
             <CaptureRenderingOutputBar

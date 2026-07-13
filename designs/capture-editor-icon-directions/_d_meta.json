@@ -1,0 +1,27 @@
+{
+  "type": "design",
+  "designSystems": [],
+  "primaryDesignSystem": null,
+  "assets": {
+    "Icon Directions": {
+      "versions": [
+        {
+          "path": "Icon Directions.html",
+          "createdAt": "2026-07-12T23:56:45.324Z",
+          "status": "needs-review"
+        }
+      ]
+    },
+    "Color Picker": {
+      "versions": [
+        {
+          "path": "Color Picker.html",
+          "createdAt": "2026-07-13T01:31:38.273Z",
+          "status": "needs-review"
+        }
+      ]
+    }
+  },
+  "createdAt": "2026-07-12T23:56:45.325Z",
+  "updatedAt": "2026-07-13T01:39:38.848Z"
+}

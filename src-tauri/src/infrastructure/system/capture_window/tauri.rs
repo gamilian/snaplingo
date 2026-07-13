@@ -96,9 +96,7 @@ pub fn reveal_capture_window(app: &AppHandle) -> Result<(), String> {
 
     #[cfg(target_os = "macos")]
     {
-        suppress_capture_window_activation(app)?;
         reveal_capture_window_for_current_space(&window)?;
-        restore_capture_window_activation();
     }
 
     #[cfg(not(target_os = "macos"))]
@@ -320,7 +318,7 @@ fn capture_window_accepts_first_mouse() -> bool {
 }
 
 fn capture_window_is_focusable() -> bool {
-    false
+    true
 }
 
 fn capture_window_is_transparent() -> bool {
@@ -391,8 +389,8 @@ mod tests {
     }
 
     #[test]
-    fn capture_window_is_not_focusable_on_reveal() {
-        assert!(!capture_window_is_focusable());
+    fn capture_window_is_focusable_on_reveal() {
+        assert!(capture_window_is_focusable());
     }
 
     #[test]

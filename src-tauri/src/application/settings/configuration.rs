@@ -69,6 +69,12 @@ impl SettingsConfiguration {
         self.save_snapshot(snapshot)
     }
 
+    pub fn update_annotation_colors(&self, colors: Vec<[u8; 4]>) -> Result<SettingsSnapshot> {
+        let mut snapshot = self.snapshot()?;
+        snapshot.screenshot.annotation_colors = colors;
+        self.save_snapshot(snapshot)
+    }
+
     pub fn update_translation(&self, input: TranslationSettings) -> Result<SettingsSnapshot> {
         let mut snapshot = self.snapshot()?;
         snapshot.translation = input;
@@ -370,6 +376,7 @@ mod settings_configuration_tests {
                 save_path: "~/captures".to_string(),
                 format: "webp".to_string(),
                 quality: 77,
+                ..ScreenshotSettings::default()
             })
             .unwrap();
 
@@ -383,6 +390,7 @@ mod settings_configuration_tests {
                     .to_string(),
                 format: "webp".to_string(),
                 quality: 77,
+                ..ScreenshotSettings::default()
             }
         );
     }
@@ -444,6 +452,7 @@ mod settings_configuration_tests {
                     .to_string(),
                 format: "jpg".to_string(),
                 quality: 81,
+                ..ScreenshotSettings::default()
             }
         );
         assert_eq!(

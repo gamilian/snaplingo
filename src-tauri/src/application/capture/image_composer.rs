@@ -6,7 +6,7 @@ use ab_glyph::{point, Font, FontArc, Glyph, PxScale, ScaleFont};
 use crate::domain::capture::{PhysicalPoint, PhysicalRect};
 use crate::error::{AppError, Result};
 
-const TEXT_FONT_BYTES: &[u8] = include_bytes!("../../../assets/fonts/NotoSans-Regular.ttf");
+const TEXT_FONT_BYTES: &[u8] = include_bytes!("../../../assets/fonts/NotoSansCJKsc-Regular.otf");
 const TEXT_PIN_FONT_SIZE: f32 = 20.0;
 const TEXT_PIN_MAX_TEXT_WIDTH: f32 = 640.0;
 const TEXT_PIN_PADDING: f32 = 16.0;
@@ -49,11 +49,6 @@ pub enum ImageAnnotation {
         color: [u8; 4],
         stroke_width: u32,
     },
-    Polyline {
-        points: Vec<PhysicalPoint>,
-        color: [u8; 4],
-        stroke_width: u32,
-    },
     Freehand {
         points: Vec<PhysicalPoint>,
         color: [u8; 4],
@@ -65,12 +60,13 @@ pub enum ImageAnnotation {
         stroke_width: u32,
     },
     Mosaic {
-        rect: PhysicalRect,
+        points: Vec<PhysicalPoint>,
+        stroke_width: u32,
         block_size: u32,
     },
-    Blur {
-        rect: PhysicalRect,
-        radius: u32,
+    Eraser {
+        points: Vec<PhysicalPoint>,
+        stroke_width: u32,
     },
     Text {
         position: PhysicalPoint,
@@ -211,8 +207,9 @@ impl CaptureImageComposer {
                 placement.destination_rect.y.into(),
             );
         }
+        let source = output.clone();
         for annotation in annotations {
-            draw_annotation(&mut output, annotation);
+            draw_annotation(&mut output, &source, annotation);
         }
 
         let mut output_png = Vec::new();
@@ -390,7 +387,11 @@ fn text_width(font: &FontArc, font_size: f32, text: &str) -> f32 {
         .sum()
 }
 
-fn draw_annotation(output: &mut image::RgbaImage, annotation: &ImageAnnotation) {
+fn draw_annotation(
+    output: &mut image::RgbaImage,
+    source: &image::RgbaImage,
+    annotation: &ImageAnnotation,
+) {
     match annotation {
         ImageAnnotation::Rectangle {
             rect,
@@ -416,11 +417,6 @@ fn draw_annotation(output: &mut image::RgbaImage, annotation: &ImageAnnotation) 
             color,
             stroke_width,
         } => draw_line_annotation(output, start, end, *color, *stroke_width),
-        ImageAnnotation::Polyline {
-            points,
-            color,
-            stroke_width,
-        } => draw_polyline_annotation(output, points, *color, *stroke_width),
         ImageAnnotation::Freehand {
             points,
             color,
@@ -431,10 +427,15 @@ fn draw_annotation(output: &mut image::RgbaImage, annotation: &ImageAnnotation) 
             color,
             stroke_width,
         } => draw_highlight_annotation(output, points, *color, *stroke_width),
-        ImageAnnotation::Mosaic { rect, block_size } => {
-            draw_mosaic_annotation(output, rect, *block_size)
-        }
-        ImageAnnotation::Blur { rect, radius } => draw_blur_annotation(output, rect, *radius),
+        ImageAnnotation::Mosaic {
+            points,
+            stroke_width,
+            block_size,
+        } => draw_mosaic_annotation(output, source, points, *stroke_width, *block_size),
+        ImageAnnotation::Eraser {
+            points,
+            stroke_width,
+        } => erase_annotation(output, source, points, *stroke_width),
         ImageAnnotation::Text {
             position,
             text,
@@ -621,15 +622,6 @@ fn draw_line_annotation(
     );
 }
 
-fn draw_polyline_annotation(
-    output: &mut image::RgbaImage,
-    points: &[PhysicalPoint],
-    color: [u8; 4],
-    stroke_width: u32,
-) {
-    draw_freehand_annotation(output, points, color, stroke_width);
-}
-
 fn draw_freehand_annotation(
     output: &mut image::RgbaImage,
     points: &[PhysicalPoint],
@@ -678,20 +670,16 @@ fn draw_highlight_annotation(
     }
 }
 
-fn draw_mosaic_annotation(output: &mut image::RgbaImage, rect: &PhysicalRect, block_size: u32) {
-    if rect.width == 0 || rect.height == 0 {
+fn draw_mosaic_annotation(
+    output: &mut image::RgbaImage,
+    source: &image::RgbaImage,
+    points: &[PhysicalPoint],
+    stroke_width: u32,
+    block_size: u32,
+) {
+    let Some((left, top, right, bottom)) = brush_bounds(output, points, stroke_width) else {
         return;
-    }
-
-    let output_width = output.width() as i64;
-    let output_height = output.height() as i64;
-    let left = (rect.x as i64).max(0);
-    let top = (rect.y as i64).max(0);
-    let right = (rect.x as i64 + rect.width as i64).min(output_width);
-    let bottom = (rect.y as i64 + rect.height as i64).min(output_height);
-    if left >= right || top >= bottom {
-        return;
-    }
+    };
 
     let block_size = block_size.max(1) as i64;
     let mut y = top;
@@ -700,11 +688,13 @@ fn draw_mosaic_annotation(output: &mut image::RgbaImage, rect: &PhysicalRect, bl
         let mut x = left;
         while x < right {
             let block_right = (x + block_size).min(right);
-            let color = average_block_color(output, x, y, block_right, block_bottom);
+            let color = average_block_color(source, x, y, block_right, block_bottom);
 
             for pixel_y in y..block_bottom {
                 for pixel_x in x..block_right {
-                    output.put_pixel(pixel_x as u32, pixel_y as u32, color);
+                    if point_in_brush(points, pixel_x, pixel_y, stroke_width) {
+                        output.put_pixel(pixel_x as u32, pixel_y as u32, color);
+                    }
                 }
             }
 
@@ -715,27 +705,82 @@ fn draw_mosaic_annotation(output: &mut image::RgbaImage, rect: &PhysicalRect, bl
     }
 }
 
-fn draw_blur_annotation(output: &mut image::RgbaImage, rect: &PhysicalRect, radius: u32) {
-    if rect.width == 0 || rect.height == 0 {
+fn erase_annotation(
+    output: &mut image::RgbaImage,
+    source: &image::RgbaImage,
+    points: &[PhysicalPoint],
+    stroke_width: u32,
+) {
+    let Some((left, top, right, bottom)) = brush_bounds(output, points, stroke_width) else {
         return;
+    };
+
+    for y in top..bottom {
+        for x in left..right {
+            if point_in_brush(points, x, y, stroke_width) {
+                let pixel = *source.get_pixel(x as u32, y as u32);
+                output.put_pixel(x as u32, y as u32, pixel);
+            }
+        }
+    }
+}
+
+fn brush_bounds(
+    image: &image::RgbaImage,
+    points: &[PhysicalPoint],
+    stroke_width: u32,
+) -> Option<(i64, i64, i64, i64)> {
+    let first = points.first()?;
+    let radius = (stroke_width.max(1) as i64 + 1) / 2;
+    let (mut min_x, mut max_x) = (first.x as i64, first.x as i64);
+    let (mut min_y, mut max_y) = (first.y as i64, first.y as i64);
+    for point in points.iter().skip(1) {
+        min_x = min_x.min(point.x as i64);
+        max_x = max_x.max(point.x as i64);
+        min_y = min_y.min(point.y as i64);
+        max_y = max_y.max(point.y as i64);
     }
 
-    let output_width = output.width() as i64;
-    let output_height = output.height() as i64;
-    let left = (rect.x as i64).max(0);
-    let top = (rect.y as i64).max(0);
-    let right = (rect.x as i64 + rect.width as i64).min(output_width);
-    let bottom = (rect.y as i64 + rect.height as i64).min(output_height);
-    if left >= right || top >= bottom {
-        return;
+    Some((
+        (min_x - radius).max(0),
+        (min_y - radius).max(0),
+        (max_x + radius + 1).min(image.width() as i64),
+        (max_y + radius + 1).min(image.height() as i64),
+    ))
+}
+
+fn point_in_brush(points: &[PhysicalPoint], x: i64, y: i64, stroke_width: u32) -> bool {
+    let radius = stroke_width.max(1) as f64 / 2.0;
+    let point_x = x as f64 + 0.5;
+    let point_y = y as f64 + 0.5;
+    let first = match points.first() {
+        Some(point) => point,
+        None => return false,
+    };
+    if points.len() == 1 {
+        let dx = point_x - first.x as f64;
+        let dy = point_y - first.y as f64;
+        return dx * dx + dy * dy <= radius * radius;
     }
 
-    let width = (right - left) as u32;
-    let height = (bottom - top) as u32;
-    let region =
-        image::imageops::crop_imm(output, left as u32, top as u32, width, height).to_image();
-    let blurred = image::imageops::blur(&region, radius.max(1) as f32);
-    image::imageops::overlay(output, &blurred, left, top);
+    points.windows(2).any(|segment| {
+        let start = &segment[0];
+        let end = &segment[1];
+        let dx = (end.x - start.x) as f64;
+        let dy = (end.y - start.y) as f64;
+        let length_squared = dx * dx + dy * dy;
+        let t = if length_squared == 0.0 {
+            0.0
+        } else {
+            (((point_x - start.x as f64) * dx + (point_y - start.y as f64) * dy) / length_squared)
+                .clamp(0.0, 1.0)
+        };
+        let closest_x = start.x as f64 + t * dx;
+        let closest_y = start.y as f64 + t * dy;
+        let distance_x = point_x - closest_x;
+        let distance_y = point_y - closest_y;
+        distance_x * distance_x + distance_y * distance_y <= radius * radius
+    })
 }
 
 fn draw_text_annotation(

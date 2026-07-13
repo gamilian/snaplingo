@@ -1,7 +1,7 @@
 #[cfg(target_os = "macos")]
 use objc2_app_kit::{
-    NSScreenSaverWindowLevel, NSWindow, NSWindowAnimationBehavior, NSWindowCollectionBehavior,
-    NSWindowStyleMask,
+    NSApplicationActivationOptions, NSRunningApplication, NSScreenSaverWindowLevel, NSWindow,
+    NSWindowAnimationBehavior, NSWindowCollectionBehavior, NSWindowStyleMask,
 };
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
@@ -92,7 +92,15 @@ fn reveal_result_window(window: &WebviewWindow) -> Result<(), String> {
         }
 
         let ns_window: &NSWindow = unsafe { &*ns_window.cast() };
-        ns_window.orderFrontRegardless();
+        if result_window_activates_application_on_reveal() {
+            NSRunningApplication::currentApplication()
+                .activateWithOptions(NSApplicationActivationOptions::empty());
+        }
+        if result_window_becomes_key_on_reveal() {
+            ns_window.makeKeyAndOrderFront(None);
+        } else {
+            ns_window.orderFrontRegardless();
+        }
         window.set_focus().map_err(|e| e.to_string())?;
     }
 
@@ -136,11 +144,27 @@ fn result_window_disables_window_animation() -> bool {
     true
 }
 
+#[cfg(target_os = "macos")]
+fn result_window_activates_application_on_reveal() -> bool {
+    true
+}
+
+#[cfg(target_os = "macos")]
+fn result_window_becomes_key_on_reveal() -> bool {
+    true
+}
+
 #[cfg(all(test, target_os = "macos"))]
 mod tests {
     #[test]
     fn result_window_disables_appkit_window_animation() {
         assert!(super::result_window_disables_window_animation());
+    }
+
+    #[test]
+    fn result_window_takes_keyboard_focus_on_reveal() {
+        assert!(super::result_window_activates_application_on_reveal());
+        assert!(super::result_window_becomes_key_on_reveal());
     }
 }
 

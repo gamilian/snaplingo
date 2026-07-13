@@ -18,7 +18,6 @@ import {
   isClearAnnotationsShortcut,
   isDeleteSelectedAnnotationShortcut,
   isMagnifierShortcut,
-  isUndoAnnotationGesturePointShortcut,
 } from './captureActions';
 import {
   planCaptureAnnotationToolActivation,
@@ -78,7 +77,6 @@ export interface CaptureWorkspaceKeyboardEditorActions {
   ): Promise<void> | void;
   setIsMagnifierRequested(value: boolean): void;
   clearAnnotations(): void;
-  undoPolylineGesturePoint(): boolean | void;
   undoAnnotation(): void;
   redoAnnotation(): void;
   deleteSelectedAnnotation(): void;
@@ -153,22 +151,10 @@ export function handleCaptureWorkspaceEditorKeyDown(
   } else if (isClearAnnotationsShortcut(event)) {
     event.preventDefault();
     actions.clearAnnotations();
-  } else if (
-    undoRedoAction === 'undo' &&
-    annotationGesture?.tool === 'polyline'
-  ) {
-    event.preventDefault();
-    actions.undoPolylineGesturePoint();
   } else if (undoRedoAction) {
     event.preventDefault();
     if (undoRedoAction === 'undo') actions.undoAnnotation();
     else actions.redoAnnotation();
-  } else if (
-    annotationGesture?.tool === 'polyline' &&
-    isUndoAnnotationGesturePointShortcut(event)
-  ) {
-    event.preventDefault();
-    actions.undoPolylineGesturePoint();
   } else if (
     selectedAnnotationIndex !== null &&
     isDeleteSelectedAnnotationShortcut(event)
@@ -287,7 +273,6 @@ export function handleCaptureWorkspaceEditorKeyDown(
     });
     if (nudge.previewAnnotations && selection) {
       actions.setAnnotationHistory(nudge.annotationHistory);
-      void actions.renderSelectionPreview(selection, nudge.previewAnnotations);
     }
   } else if (!textDraft && !annotationGesture && !annotationMoveGesture) {
     const color = annotationColorFromShortcut(event);

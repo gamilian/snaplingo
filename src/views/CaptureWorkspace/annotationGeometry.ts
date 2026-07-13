@@ -1,4 +1,5 @@
 import type { AnnotationCommand, LogicalRect, Point } from './types';
+import { resizeSelectionByHandle, type SelectionHandle } from './selection';
 
 const TEXT_WIDTH_FACTOR = 0.6;
 const TEXT_LINE_HEIGHT = 1.2;
@@ -35,9 +36,7 @@ function textBounds(annotation: Extract<AnnotationCommand, { type: 'text' }>) {
 export function getAnnotationBounds(annotation: AnnotationCommand): LogicalRect {
   if (
     annotation.type === 'rectangle' ||
-    annotation.type === 'ellipse' ||
-    annotation.type === 'mosaic' ||
-    annotation.type === 'blur'
+    annotation.type === 'ellipse'
   ) {
     return annotation.rect;
   }
@@ -52,7 +51,8 @@ export function getAnnotationBounds(annotation: AnnotationCommand): LogicalRect 
   if (
     annotation.type === 'freehand' ||
     annotation.type === 'highlight' ||
-    annotation.type === 'polyline'
+    annotation.type === 'mosaic' ||
+    annotation.type === 'eraser'
   ) {
     return boundsFromPoints(annotation.points, annotation.stroke_width / 2);
   }
@@ -96,9 +96,7 @@ export function moveAnnotationByDelta(
 ): AnnotationCommand {
   if (
     annotation.type === 'rectangle' ||
-    annotation.type === 'ellipse' ||
-    annotation.type === 'mosaic' ||
-    annotation.type === 'blur'
+    annotation.type === 'ellipse'
   ) {
     return {
       ...annotation,
@@ -121,7 +119,8 @@ export function moveAnnotationByDelta(
   if (
     annotation.type === 'freehand' ||
     annotation.type === 'highlight' ||
-    annotation.type === 'polyline'
+    annotation.type === 'mosaic' ||
+    annotation.type === 'eraser'
   ) {
     return {
       ...annotation,
@@ -132,6 +131,33 @@ export function moveAnnotationByDelta(
   return {
     ...annotation,
     position: movePointByDelta(annotation.position, delta),
+  };
+}
+
+export function resizeRectAnnotation(
+  annotation: AnnotationCommand,
+  handle: SelectionHandle,
+  delta: Point,
+  bounds: LogicalRect,
+  preserveAspect = false,
+): AnnotationCommand {
+  if (
+    annotation.type !== 'rectangle' &&
+    annotation.type !== 'ellipse'
+  ) {
+    return annotation;
+  }
+
+  return {
+    ...annotation,
+    rect: resizeSelectionByHandle(
+      annotation.rect,
+      handle,
+      delta,
+      bounds,
+      4,
+      preserveAspect,
+    ),
   };
 }
 

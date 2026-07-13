@@ -155,15 +155,6 @@ export function HotkeysPage() {
           defaultValue={defaultHotkeys['screenshot-copy'] ?? '未设置'}
         />
         <HotkeyRow
-          label="自定义截屏"
-          value={hotkeys['screenshot-custom']}
-          onRecord={() => handleRecord('screenshot-custom')}
-          onClear={() => handleClear('screenshot-custom')}
-          onReset={() => handleReset('screenshot-custom')}
-          isRecording={recordingKey === 'screenshot-custom'}
-          defaultValue={defaultHotkeys['screenshot-custom'] ?? '未设置'}
-        />
-        <HotkeyRow
           label="贴图"
           value={hotkeys['pin']}
           onRecord={() => handleRecord('pin')}

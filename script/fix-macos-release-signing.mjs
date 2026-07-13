@@ -14,6 +14,7 @@ import { join, resolve } from "node:path";
 import { homedir, tmpdir } from "node:os";
 import { randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { findAttachedDiskImageDevices } from "./macos-disk-image.mjs";
 
 const root = process.cwd();
 const config = JSON.parse(readFileSync(resolve(root, "src-tauri/tauri.conf.json"), "utf8"));
@@ -265,6 +266,13 @@ function findDmgPaths() {
     .map((name) => resolve(dmgDir, name));
 }
 
+function detachExistingDmgAttachments(dmgPath) {
+  const info = run("/usr/bin/hdiutil", ["info"]);
+  for (const device of findAttachedDiskImageDevices(info, dmgPath)) {
+    run("/usr/bin/hdiutil", ["detach", device]);
+  }
+}
+
 function recreateDmg(dmgPath) {
   const stagingDir = mkdtempSync(join(tmpdir(), "snaplingo-dmg-"));
   const stagedAppPath = join(stagingDir, `${productName}.app`);
@@ -277,6 +285,7 @@ function recreateDmg(dmgPath) {
     });
     symlinkSync("/Applications", join(stagingDir, "Applications"));
 
+    detachExistingDmgAttachments(dmgPath);
     run("/usr/bin/hdiutil", [
       "create",
       "-volname",

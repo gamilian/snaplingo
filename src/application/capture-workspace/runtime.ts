@@ -64,7 +64,6 @@ import {
   planCaptureAnnotationSizeAdjustment,
   planCaptureAnnotationToolActivation,
   planCaptureManualSelectionTransition,
-  undoPolylineCaptureGesture,
 } from '../../views/CaptureWorkspace/captureEditorRuntime';
 import { getCaptureWorkspaceDerivedState } from '../../views/CaptureWorkspace/captureWorkspaceDerived';
 import {
@@ -480,10 +479,10 @@ export function createCaptureWorkspaceRuntime({
 
       const action =
         effect.action === 'save'
-          ? {
-              type: 'save' as const,
-              path: await platform.commands.defaultCaptureSavePath(),
-            }
+          ? await (async () => {
+              const path = await platform.commands.defaultCaptureSavePath();
+              return path ? ({ type: 'save' as const, path } as const) : null;
+            })()
           : effect.action === 'quick-save'
             ? {
                 type: 'save' as const,
@@ -494,6 +493,7 @@ export function createCaptureWorkspaceRuntime({
             : effect.action === 'pin'
               ? { type: 'pin' as const }
               : { type: 'copy' as const };
+      if (!action) return true;
       if (await cancelIfStale()) return;
       await platform.commands.outputCapture({
         sessionId,
@@ -576,7 +576,7 @@ export function createCaptureWorkspaceRuntime({
 
     try {
       for (const effect of effects) {
-        await executeEffect(
+        const cancelled = await executeEffect(
           effect,
           session.id,
           rect,
@@ -585,6 +585,7 @@ export function createCaptureWorkspaceRuntime({
           actionGeneration,
           cancelNativeSession,
         );
+        if (cancelled) return;
         if (
           generation !== actionGeneration ||
           state.session?.id !== session.id
@@ -617,6 +618,7 @@ export function createCaptureWorkspaceRuntime({
     rect: LogicalRect,
     annotations: AnnotationCommand[] = [],
     includeCursor = false,
+    preservePreviewImage = false,
   ) => {
     const session = state.session;
     if (!session) return;
@@ -649,7 +651,7 @@ export function createCaptureWorkspaceRuntime({
       status: 'preview',
       selection: rect,
       hoverSelection: null,
-      previewImageBase64: null,
+      ...(preservePreviewImage ? {} : { previewImageBase64: null }),
       isRenderingOutput: true,
       error: null,
     });
@@ -734,16 +736,10 @@ export function createCaptureWorkspaceRuntime({
 
   const renderEditorSelectionPreview = (
     rect: LogicalRect,
-    annotations: AnnotationCommand[] = state.annotationHistory.annotations,
+    _annotations: AnnotationCommand[] = state.annotationHistory.annotations,
     includeCursor =
       state.includeCapturedCursor && canToggleCapturedCursor(state.session),
-  ) => renderSelectionPreview(rect, annotations, includeCursor);
-
-  const renderCurrentSelection = (annotations: AnnotationCommand[]) => {
-    const selection = state.selection;
-    if (!selection) return;
-    launch(() => renderEditorSelectionPreview(selection, annotations));
-  };
+  ) => renderSelectionPreview(rect, [], includeCursor, true);
 
   const commitTextDraftToHistory = () => {
     const result = commitCaptureEditorTextDraft({
@@ -781,9 +777,6 @@ export function createCaptureWorkspaceRuntime({
       textFontSize: nextTextFontSize,
       annotationHistory: nextHistory,
     });
-    if (nextHistory !== previousHistory) {
-      renderCurrentSelection(nextHistory.annotations);
-    }
   };
 
   const adjustAnnotationSize = (direction: AnnotationSizeDirection) => {
@@ -824,7 +817,6 @@ export function createCaptureWorkspaceRuntime({
       annotationMoveGesture: null,
       annotationHistory: nextHistory,
     });
-    renderCurrentSelection(nextHistory.annotations);
   };
 
   const redoAnnotation = () => {
@@ -835,32 +827,6 @@ export function createCaptureWorkspaceRuntime({
       annotationMoveGesture: null,
       annotationHistory: nextHistory,
     });
-    renderCurrentSelection(nextHistory.annotations);
-  };
-
-  const undoPolylineGesturePoint = () => {
-    if (
-      !state.annotationGesture ||
-      state.annotationGesture.tool !== 'polyline' ||
-      !state.selection
-    ) {
-      return false;
-    }
-    const next = undoPolylineCaptureGesture({
-      gesture: state.annotationGesture,
-      selection: state.selection,
-      cursorPoint: state.cursorPoint,
-      annotationStyle: state.annotationStyle,
-    });
-    patch(
-      next
-        ? {
-            annotationGesture: next.gesture,
-            draftAnnotation: next.draftAnnotation,
-          }
-        : { annotationGesture: null, draftAnnotation: null },
-    );
-    return true;
   };
 
   const clearAnnotations = () => {
@@ -876,7 +842,6 @@ export function createCaptureWorkspaceRuntime({
       textDraftAnnotationIndex: null,
       annotationHistory: nextHistory,
     });
-    renderCurrentSelection(nextHistory.annotations);
   };
 
   const deleteSelectedAnnotation = () => {
@@ -891,7 +856,6 @@ export function createCaptureWorkspaceRuntime({
       annotationMoveGesture: null,
       annotationHistory: nextHistory,
     });
-    renderCurrentSelection(nextHistory.annotations);
   };
 
   const commitAnnotationGestureAtPoint = (
@@ -911,12 +875,12 @@ export function createCaptureWorkspaceRuntime({
     patch({
       annotationHistory: result.annotationHistory,
       selectedAnnotationIndex: result.selectedAnnotationIndex,
+      ...(result.selectedAnnotationIndex === null
+        ? {}
+        : { activeAnnotationTool: null }),
       annotationGesture: result.annotationGesture,
       draftAnnotation: result.draftAnnotation,
     });
-    if (result.annotationHistory !== previousHistory) {
-      renderCurrentSelection(result.annotationHistory.annotations);
-    }
     return true;
   };
 
@@ -933,7 +897,6 @@ export function createCaptureWorkspaceRuntime({
       patch({ textDraft: null, textDraftAnnotationIndex: null });
     } else if (action === 'revert-annotation-move') {
       patch({ annotationMoveGesture: null, draftAnnotation: null });
-      renderCurrentSelection(state.annotationHistory.annotations);
     } else if (action === 'clear-draft-selection-move') {
       patch({ draftSelectionMoveGesture: null });
     } else if (action === 'clear-selected-annotation') {
@@ -950,11 +913,7 @@ export function createCaptureWorkspaceRuntime({
   };
 
   const toggleAnnotationTool = (nextTool: AnnotationTool) => {
-    const previousHistory = state.annotationHistory;
-    const nextHistory = commitTextDraftToHistory();
-    if (nextHistory !== previousHistory) {
-      renderCurrentSelection(nextHistory.annotations);
-    }
+    commitTextDraftToHistory();
     const activation = planCaptureAnnotationToolActivation({
       currentTool: state.activeAnnotationTool,
       nextTool,
@@ -968,11 +927,8 @@ export function createCaptureWorkspaceRuntime({
   const editorActions: CaptureWorkspacePointerEditorActions &
     CaptureWorkspaceKeyboardEditorActions = {
     commitTextDraft() {
-      const previousHistory = state.annotationHistory;
-      const nextHistory = commitTextDraftToHistory();
-      if (nextHistory !== previousHistory) {
-        renderCurrentSelection(nextHistory.annotations);
-      }
+      commitTextDraftToHistory();
+      patch({ activeAnnotationTool: null, selectedAnnotationIndex: null });
     },
     commitAnnotationGestureAtPoint,
     dismissCaptureLayer,
@@ -984,7 +940,15 @@ export function createCaptureWorkspaceRuntime({
     setPreviewImageBase64: (previewImageBase64) => patch({ previewImageBase64 }),
     setRenderingOutput: (isRenderingOutput) => patch({ isRenderingOutput }),
     setStatus: (status) => patch({ status }),
-    setAnnotationGesture: (annotationGesture) => patch({ annotationGesture }),
+    setAnnotationGesture: (
+      annotationGesture,
+      draftAnnotation?: AnnotationCommand | null,
+    ) =>
+      patch(
+        draftAnnotation === undefined
+          ? { annotationGesture }
+          : { annotationGesture, draftAnnotation },
+      ),
     setDraftAnnotation: (draftAnnotation) => patch({ draftAnnotation }),
     setSelectedAnnotationIndex: (selectedAnnotationIndex) =>
       patch({ selectedAnnotationIndex }),
@@ -1000,7 +964,6 @@ export function createCaptureWorkspaceRuntime({
     setIsMagnifierRequested: (isMagnifierRequested) =>
       patch({ isMagnifierRequested }),
     clearAnnotations,
-    undoPolylineGesturePoint,
     undoAnnotation,
     redoAnnotation,
     deleteSelectedAnnotation,
@@ -1083,6 +1046,7 @@ export function createCaptureWorkspaceRuntime({
   const completeManualSelection = async (rect: LogicalRect) => {
     const completion = planManualSelectionCompletion(state.mode);
     const transition = planCaptureManualSelectionTransition({ rect, completion });
+    if (transition.clearOverlay) host?.resetInteraction();
     if (transition.type === 'preview') {
       patch({
         ...transition.nextState,
@@ -1241,6 +1205,24 @@ export function createCaptureWorkspaceRuntime({
               !state.textDraft
             ) {
               await completeCandidateSelection(state.hoverSelection, 'copy');
+            }
+          }),
+        );
+        if (disposed || connection.isClosed) return connection.disconnect;
+
+        connection.retain(
+          await platform.onUndoRequested(() => {
+            if (state.status === 'preview' && !state.textDraft) {
+              undoAnnotation();
+            }
+          }),
+        );
+        if (disposed || connection.isClosed) return connection.disconnect;
+
+        connection.retain(
+          await platform.onRedoRequested(() => {
+            if (state.status === 'preview' && !state.textDraft) {
+              redoAnnotation();
             }
           }),
         );
@@ -1774,6 +1756,40 @@ export function createCaptureWorkspaceRuntime({
       return editorEvent.handled();
     },
 
+    resizeAnnotationPointerDown(handle: SelectionHandle, input) {
+      if (
+        state.status !== 'preview' ||
+        !state.selection ||
+        state.selectedAnnotationIndex === null
+      ) {
+        return false;
+      }
+      const annotation =
+        state.annotationHistory.annotations[state.selectedAnnotationIndex];
+      if (
+        !annotation ||
+        (annotation.type !== 'rectangle' &&
+          annotation.type !== 'ellipse')
+      ) {
+        return false;
+      }
+      const pointer = pointerInput(input);
+      const localPoint = {
+        x: pointer.point.x - state.selection.x,
+        y: pointer.point.y - state.selection.y,
+      };
+      patch({
+        annotationMoveGesture: {
+          annotationIndex: state.selectedAnnotationIndex,
+          startPoint: localPoint,
+          startAnnotation: annotation,
+          resizeHandle: handle,
+        },
+        draftAnnotation: annotation,
+      });
+      return true;
+    },
+
     wheel(input) {
       let handled = false;
       handleCaptureWorkspaceEditorWheel(
@@ -1798,11 +1814,7 @@ export function createCaptureWorkspaceRuntime({
       }
     },
     discardTextDraft() {
-      const shouldRender = state.textDraftAnnotationIndex !== null;
       patch({ textDraft: null, textDraftAnnotationIndex: null });
-      if (shouldRender) {
-        renderCurrentSelection(state.annotationHistory.annotations);
-      }
     },
     selectMoveTool() {
       patch({ activeAnnotationTool: null });
@@ -1815,6 +1827,8 @@ export function createCaptureWorkspaceRuntime({
         textDraft: state.textDraft ? { ...state.textDraft, fontSize } : null,
       });
     },
+    undoAnnotation,
+    redoAnnotation,
     updateCursorColor(cursorColor) {
       patch({ cursorColor });
     },

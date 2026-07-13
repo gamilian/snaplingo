@@ -40,7 +40,6 @@ function createActions(
     renderSelectionPreview: vi.fn(),
     setIsMagnifierRequested: vi.fn(),
     clearAnnotations: vi.fn(),
-    undoPolylineGesturePoint: vi.fn(),
     undoAnnotation: vi.fn(),
     redoAnnotation: vi.fn(),
     deleteSelectedAnnotation: vi.fn(),
@@ -163,9 +162,7 @@ describe('handleCaptureWorkspaceEditorKeyDown', () => {
       undoSnapshots: [[arrow]],
       redoSnapshots: [],
     });
-    expect(actions.renderSelectionPreview).toHaveBeenCalledWith(selection, [
-      movedArrow,
-    ]);
+    expect(actions.renderSelectionPreview).not.toHaveBeenCalled();
   });
 
   it('prioritizes selected annotation nudges over selection movement', () => {

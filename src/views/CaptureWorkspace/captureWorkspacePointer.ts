@@ -3,15 +3,12 @@ import type {
   AnnotationStyle,
 } from './annotationStyle';
 import { startTextAnnotationDraft } from './textAnnotationDraft';
-import { isFinishAnnotationGestureDoubleClick } from './captureActions';
 import {
-  planCaptureAnnotationErase,
   planCaptureAnnotationGestureMove,
   planCaptureAnnotationMove,
   planCaptureAnnotationMoveCommit,
   planCaptureAnnotationToolStart,
   planCaptureExistingAnnotationPointerDown,
-  planCapturePolylineAnnotationContinue,
 } from './captureEditorRuntime';
 import {
   getCaptureSelectionLocalPoint,
@@ -94,6 +91,7 @@ export interface CaptureWorkspacePointerEditorActions {
   setStatus(status: CaptureWorkspaceState['status']): void;
   setAnnotationGesture(
     gesture: CaptureWorkspaceState['annotationGesture'],
+    draftAnnotation?: AnnotationCommand | null,
   ): void;
   setDraftAnnotation(annotation: AnnotationCommand | null): void;
   setSelectedAnnotationIndex(index: number | null): void;
@@ -136,6 +134,12 @@ export function handleCaptureWorkspaceEditorPointerDown(
     actions,
   } = context;
   if (status !== 'preview') return;
+
+  if (textDraft && event.button === 0) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
 
   const plan = planCaptureRootPointerDown(event, {
     status,
@@ -205,7 +209,6 @@ export function handleCaptureWorkspaceEditorPointerMove(
   const point = getCaptureWorkspacePointerPoint(event, selectionBounds);
   refs.cursorPointRef.current = point;
   if (shouldTrackMagnifierCursor) actions.setCursorPoint(point);
-  actions.scheduleSelectionOverlayPaint();
 
   if (annotationGesture && selection) {
     const move = planCaptureAnnotationGestureMove({
@@ -215,9 +218,13 @@ export function handleCaptureWorkspaceEditorPointerMove(
       constrainGesture: event.shiftKey,
     });
     if (move.annotationGesture !== annotationGesture) {
-      actions.setAnnotationGesture(move.annotationGesture);
+      actions.setAnnotationGesture(
+        move.annotationGesture,
+        move.draftAnnotation,
+      );
+    } else {
+      actions.setDraftAnnotation(move.draftAnnotation);
     }
-    actions.setDraftAnnotation(move.draftAnnotation);
     return;
   }
 
@@ -227,8 +234,14 @@ export function handleCaptureWorkspaceEditorPointerMove(
       startPoint: annotationMoveGesture.startPoint,
       localPoint: getCaptureSelectionLocalPoint(point, selection),
       constrainMove: event.shiftKey,
+      resizeHandle: annotationMoveGesture.resizeHandle,
+      selectionBounds: {
+        x: 0,
+        y: 0,
+        width: selection.width,
+        height: selection.height,
+      },
     });
-    actions.setPreviewImageBase64(move.previewImageBase64);
     actions.setDraftAnnotation(move.draftAnnotation);
     return;
   }
@@ -276,7 +289,6 @@ export function handleCaptureWorkspaceEditorPointerUp(
   actions.setCursorPoint(point);
 
   if (annotationGesture && selection) {
-    if (annotationGesture.tool === 'polyline') return;
     actions.commitAnnotationGestureAtPoint(
       getCaptureSelectionLocalPoint(point, selection),
       event.shiftKey,
@@ -287,12 +299,18 @@ export function handleCaptureWorkspaceEditorPointerUp(
   if (annotationMoveGesture && selection) {
     const commit = planCaptureAnnotationMoveCommit({
       annotationHistory,
-      annotations,
       annotationIndex: annotationMoveGesture.annotationIndex,
       startAnnotation: annotationMoveGesture.startAnnotation,
       startPoint: annotationMoveGesture.startPoint,
       localPoint: getCaptureSelectionLocalPoint(point, selection),
       constrainMove: event.shiftKey,
+      resizeHandle: annotationMoveGesture.resizeHandle,
+      selectionBounds: {
+        x: 0,
+        y: 0,
+        width: selection.width,
+        height: selection.height,
+      },
     });
     actions.setAnnotationMoveGesture(commit.annotationMoveGesture);
     actions.setDraftAnnotation(commit.draftAnnotation);
@@ -300,7 +318,6 @@ export function handleCaptureWorkspaceEditorPointerUp(
     if (commit.selectedAnnotationIndex !== undefined) {
       actions.setSelectedAnnotationIndex(commit.selectedAnnotationIndex);
     }
-    void actions.renderSelectionPreview(selection, commit.previewAnnotations);
     return;
   }
 
@@ -332,8 +349,6 @@ export function handleCaptureWorkspaceEditorPreviewPointerDown(
   const {
     state: {
       activeAnnotationTool,
-      annotationGesture,
-      annotationHistory,
       annotationStyle,
       textDraft,
       textFontSize,
@@ -352,46 +367,22 @@ export function handleCaptureWorkspaceEditorPreviewPointerDown(
     return;
   }
 
+  if (textDraft) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
+
   event.stopPropagation();
   const point = getCaptureWorkspacePointerPoint(event, selectionBounds);
   actions.setCursorPoint(point);
   if (activeAnnotationTool) {
     actions.setSelectedAnnotationIndex(null);
     const localPoint = getCaptureSelectionLocalPoint(point, selection);
-    if (annotationGesture?.tool === 'polyline') {
-      if (isFinishAnnotationGestureDoubleClick(event)) {
-        actions.commitAnnotationGestureAtPoint(localPoint, false);
-        return;
-      }
-      const continued = planCapturePolylineAnnotationContinue({
-        gesture: annotationGesture,
-        localPoint,
-        annotationStyle,
-        constrainGesture: event.shiftKey,
-      });
-      actions.setAnnotationGesture(continued.annotationGesture);
-      actions.setDraftAnnotation(continued.draftAnnotation);
-      return;
-    }
-
     if (activeAnnotationTool === 'text') {
       if (textDraft) return;
       actions.setTextDraft(startTextAnnotationDraft(localPoint, textFontSize));
       actions.setTextDraftAnnotationIndex(null);
-      return;
-    }
-
-    if (activeAnnotationTool === 'eraser') {
-      const erase = planCaptureAnnotationErase({
-        annotationHistory,
-        localPoint,
-      });
-      actions.setAnnotationMoveGesture(erase.annotationMoveGesture);
-      actions.setDraftAnnotation(erase.draftAnnotation);
-      if (erase.previewAnnotations) {
-        actions.setAnnotationHistory(erase.annotationHistory);
-        void actions.renderSelectionPreview(selection, erase.previewAnnotations);
-      }
       return;
     }
 
@@ -422,11 +413,6 @@ export function handleCaptureWorkspaceEditorPreviewPointerDown(
       actions.setDraftAnnotation(existing.draftAnnotation);
       actions.setTextDraft(existing.textDraft);
       actions.setTextDraftAnnotationIndex(existing.textDraftAnnotationIndex);
-      actions.setPreviewImageBase64(existing.previewImageBase64);
-      void actions.renderSelectionPreview(
-        selection,
-        existing.previewAnnotations,
-      );
       return;
     }
     actions.setAnnotationMoveGesture(existing.annotationMoveGesture);

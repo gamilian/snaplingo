@@ -2,7 +2,6 @@ export type {
   AnnotationCommand,
   ArrowAnnotationCommand,
   ArrowKey,
-  BlurAnnotationCommand,
   CapturedCursorView,
   CaptureCandidateKind,
   CaptureCandidateView,
@@ -10,6 +9,7 @@ export type {
   CaptureMode,
   CaptureSessionView,
   EllipseAnnotationCommand,
+  EraserAnnotationCommand,
   FreehandAnnotationCommand,
   HighlightAnnotationCommand,
   LineAnnotationCommand,
@@ -20,7 +20,6 @@ export type {
   PhysicalRect,
   PinnedImageView,
   Point,
-  PolylineAnnotationCommand,
   RectangleAnnotationCommand,
   TextAnnotationCommand,
 } from '../../domain/capture';

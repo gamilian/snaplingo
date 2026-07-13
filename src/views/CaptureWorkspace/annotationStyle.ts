@@ -6,14 +6,12 @@ export type AnnotationTool =
   | 'ellipse'
   | 'arrow'
   | 'line'
-  | 'polyline'
   | 'pen'
   | 'highlight'
   | 'mosaic'
-  | 'blur'
   | 'text'
   | 'eraser';
-export type DrawingAnnotationTool = Exclude<AnnotationTool, 'text' | 'eraser'>;
+export type DrawingAnnotationTool = Exclude<AnnotationTool, 'text'>;
 export type AnnotationColor = [number, number, number, number];
 
 export interface AnnotationStyle {
@@ -81,7 +79,6 @@ const ANNOTATION_TOOL_SHORTCUTS: Record<string, AnnotationTool> = {
   p: 'pen',
   h: 'highlight',
   m: 'mosaic',
-  b: 'blur',
   t: 'text',
   e: 'eraser',
 };
@@ -231,16 +228,13 @@ export function constrainAnnotationGesturePoint(
 ): Point {
   if (
     tool === 'rectangle' ||
-    tool === 'ellipse' ||
-    tool === 'mosaic' ||
-    tool === 'blur'
+    tool === 'ellipse'
   ) {
     return constrainToSquare(startPoint, currentPoint);
   }
 
   if (
     tool === 'line' ||
-    tool === 'polyline' ||
     tool === 'arrow' ||
     tool === 'pen' ||
     tool === 'highlight'
@@ -261,7 +255,12 @@ export function appendAnnotationPoint(points: Point[], point: Point) {
 }
 
 export function isPointStrokeAnnotationTool(tool: AnnotationTool) {
-  return tool === 'pen' || tool === 'highlight';
+  return (
+    tool === 'pen' ||
+    tool === 'highlight' ||
+    tool === 'mosaic' ||
+    tool === 'eraser'
+  );
 }
 
 function annotationGesturePoint(
@@ -269,43 +268,13 @@ function annotationGesturePoint(
   currentPoint: Point,
   constrainGesture: boolean,
 ) {
-  const constraintStartPoint =
-    gesture.tool === 'polyline'
-      ? gesture.points?.[gesture.points.length - 1] ?? gesture.startPoint
-      : gesture.startPoint;
-
   return constrainGesture
     ? constrainAnnotationGesturePoint(
-        gesture.tool,
-        constraintStartPoint,
+      gesture.tool,
+        gesture.startPoint,
         currentPoint,
       )
     : currentPoint;
-}
-
-export function appendAnnotationGesturePoint(
-  gesture: AnnotationGestureDraft,
-  currentPoint: Point,
-  constrainGesture = false,
-) {
-  return appendAnnotationPoint(
-    gesture.points ?? [gesture.startPoint],
-    annotationGesturePoint(gesture, currentPoint, constrainGesture),
-  );
-}
-
-export function undoAnnotationGesturePoint(
-  gesture: AnnotationGestureDraft,
-): AnnotationGestureDraft | null {
-  if (gesture.tool !== 'polyline') return null;
-
-  const points = gesture.points ?? [gesture.startPoint];
-  if (points.length <= 1) return null;
-
-  return {
-    ...gesture,
-    points: points.slice(0, -1),
-  };
 }
 
 function annotationGesturePoints(
@@ -318,10 +287,6 @@ function annotationGesturePoints(
     currentPoint,
     constrainGesture,
   );
-  if (gesture.tool === 'polyline') {
-    return appendAnnotationGesturePoint(gesture, currentPoint, constrainGesture);
-  }
-
   if (!isPointStrokeAnnotationTool(gesture.tool)) return undefined;
   if (constrainGesture) return [gesture.startPoint, gesturePoint];
 
@@ -373,28 +338,20 @@ export function annotationFromGesture(
     };
   }
 
-  if (tool === 'polyline') {
-    return {
-      type: 'polyline',
-      points: points ?? [startPoint, currentPoint],
-      color: style.color,
-      stroke_width: style.strokeWidth,
-    };
-  }
-
   if (tool === 'mosaic') {
     return {
       type: 'mosaic',
-      rect: normalizeSelection(startPoint, currentPoint),
-      block_size: style.strokeWidth,
+      points: points ?? [startPoint, currentPoint],
+      stroke_width: annotationBrushDiameter(tool, style.strokeWidth),
+      block_size: mosaicBlockSize(style.strokeWidth),
     };
   }
 
-  if (tool === 'blur') {
+  if (tool === 'eraser') {
     return {
-      type: 'blur',
-      rect: normalizeSelection(startPoint, currentPoint),
-      radius: style.strokeWidth,
+      type: 'eraser',
+      points: points ?? [startPoint, currentPoint],
+      stroke_width: annotationBrushDiameter(tool, style.strokeWidth),
     };
   }
 
@@ -477,14 +434,15 @@ export function applyAnnotationStyle(
   if (annotation.type === 'mosaic') {
     return {
       ...annotation,
-      block_size: style.strokeWidth,
+      stroke_width: annotationBrushDiameter('mosaic', style.strokeWidth),
+      block_size: mosaicBlockSize(style.strokeWidth),
     };
   }
 
-  if (annotation.type === 'blur') {
+  if (annotation.type === 'eraser') {
     return {
       ...annotation,
-      radius: style.strokeWidth,
+      stroke_width: annotationBrushDiameter('eraser', style.strokeWidth),
     };
   }
 
@@ -520,6 +478,19 @@ export function applyAnnotationStyle(
   };
 }
 
+function mosaicBlockSize(strokeWidth: number) {
+  return Math.max(6, Math.round(strokeWidth * 3));
+}
+
+export function annotationBrushDiameter(
+  tool: Extract<AnnotationTool, 'mosaic' | 'eraser'>,
+  strokeWidth: number,
+) {
+  const scale = tool === 'mosaic' ? 5 : 4;
+  const minimum = tool === 'mosaic' ? 18 : 14;
+  return Math.max(minimum, Math.round(strokeWidth * scale));
+}
+
 export function isCommittedAnnotation(annotation: AnnotationCommand) {
   if (annotation.type === 'text') {
     return annotation.text.trim().length > 0 && annotation.font_size > 0;
@@ -527,9 +498,7 @@ export function isCommittedAnnotation(annotation: AnnotationCommand) {
 
   if (
     annotation.type === 'rectangle' ||
-    annotation.type === 'ellipse' ||
-    annotation.type === 'mosaic' ||
-    annotation.type === 'blur'
+    annotation.type === 'ellipse'
   ) {
     return (
       annotation.rect.width >= MIN_ANNOTATION_SIZE &&
@@ -539,8 +508,7 @@ export function isCommittedAnnotation(annotation: AnnotationCommand) {
 
   if (
     annotation.type === 'freehand' ||
-    annotation.type === 'highlight' ||
-    annotation.type === 'polyline'
+    annotation.type === 'highlight'
   ) {
     if (annotation.points.length < 2) return false;
 
@@ -550,6 +518,10 @@ export function isCommittedAnnotation(annotation: AnnotationCommand) {
     }, 0);
 
     return pathLength >= MIN_ANNOTATION_SIZE;
+  }
+
+  if (annotation.type === 'mosaic' || annotation.type === 'eraser') {
+    return annotation.points.length > 0;
   }
 
   return (

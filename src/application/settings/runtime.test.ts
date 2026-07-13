@@ -14,13 +14,19 @@ describe('settings runtime', () => {
   it('translates durable settings actions into portable port calls', async () => {
     const snapshot = {
       general: { language: 'zh-CN', theme: 'system', startOnBoot: false },
-      screenshot: { savePath: '/tmp', format: 'png', quality: 90 },
+      screenshot: {
+        savePath: '/tmp',
+        format: 'png',
+        quality: 90,
+        annotationColors: [[255, 77, 79, 255]] as [number, number, number, number][],
+      },
       translation: { defaultSourceLang: 'auto', defaultTargetLang: 'en' },
     };
     const durableSettings = {
       getSettingsSnapshot: vi.fn(async () => snapshot),
       updateGeneralSettings: vi.fn(async () => snapshot),
       updateScreenshotSettings: vi.fn(async () => snapshot),
+      updateAnnotationColors: vi.fn(async () => snapshot),
       updateTranslationSettings: vi.fn(async () => snapshot),
     };
     const runtime = createSettingsRuntime(createPorts({ durableSettings }));
@@ -28,6 +34,9 @@ describe('settings runtime', () => {
     await expect(runtime.durableSettings.load()).resolves.toBe(snapshot);
     await runtime.durableSettings.updateGeneral(snapshot.general);
     await runtime.durableSettings.updateScreenshot(snapshot.screenshot);
+    await runtime.durableSettings.updateAnnotationColors(
+      snapshot.screenshot.annotationColors,
+    );
     await runtime.durableSettings.updateTranslation(snapshot.translation);
 
     expect(durableSettings.getSettingsSnapshot).toHaveBeenCalledTimes(1);
@@ -36,6 +45,9 @@ describe('settings runtime', () => {
     );
     expect(durableSettings.updateScreenshotSettings).toHaveBeenCalledWith(
       snapshot.screenshot,
+    );
+    expect(durableSettings.updateAnnotationColors).toHaveBeenCalledWith(
+      snapshot.screenshot.annotationColors,
     );
     expect(durableSettings.updateTranslationSettings).toHaveBeenCalledWith(
       snapshot.translation,
@@ -134,6 +146,7 @@ function createPorts(overrides: Record<string, unknown> = {}) {
       getSettingsSnapshot: vi.fn(),
       updateGeneralSettings: vi.fn(),
       updateScreenshotSettings: vi.fn(),
+      updateAnnotationColors: vi.fn(),
       updateTranslationSettings: vi.fn(),
     },
     providers: createProviderPort(),

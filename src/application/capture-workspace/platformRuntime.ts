@@ -20,6 +20,12 @@ export interface CaptureWorkspacePlatformRuntime
   onCopyRequested(
     handler: CaptureWorkspaceRequestHandler,
   ): Promise<CaptureWorkspaceUnsubscribe>;
+  onUndoRequested(
+    handler: CaptureWorkspaceRequestHandler,
+  ): Promise<CaptureWorkspaceUnsubscribe>;
+  onRedoRequested(
+    handler: CaptureWorkspaceRequestHandler,
+  ): Promise<CaptureWorkspaceUnsubscribe>;
   onHotkeyTriggered(
     handler: CaptureHotkeyHandler,
   ): Promise<CaptureWorkspaceUnsubscribe>;
@@ -46,6 +52,8 @@ export function createCaptureWorkspacePlatformRuntime(
     onCancelRequested: (handler) =>
       ports.events.subscribeCaptureCancel(handler),
     onCopyRequested: (handler) => ports.events.subscribeCaptureCopy(handler),
+    onUndoRequested: (handler) => ports.events.subscribeCaptureUndo(handler),
+    onRedoRequested: (handler) => ports.events.subscribeCaptureRedo(handler),
     onHotkeyTriggered: (handler) =>
       ports.events.subscribeHotkeyTriggered(handler),
     prepareForReveal: () => ports.window.prepareForReveal(),

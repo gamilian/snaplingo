@@ -27,6 +27,14 @@ pub fn update_screenshot_settings(
 }
 
 #[tauri::command]
+pub fn update_annotation_colors(
+    colors: Vec<[u8; 4]>,
+    state: State<'_, crate::AppState>,
+) -> Result<SettingsSnapshot, String> {
+    update_annotation_colors_for_configuration(state.settings.configuration.as_ref(), colors)
+}
+
+#[tauri::command]
 pub fn update_translation_settings(
     input: TranslationSettings,
     state: State<'_, crate::AppState>,
@@ -58,6 +66,15 @@ fn update_screenshot_settings_for_configuration(
         .map_err(|err| err.to_string())
 }
 
+fn update_annotation_colors_for_configuration(
+    configuration: &SettingsConfiguration,
+    colors: Vec<[u8; 4]>,
+) -> Result<SettingsSnapshot, String> {
+    configuration
+        .update_annotation_colors(colors)
+        .map_err(|err| err.to_string())
+}
+
 fn update_translation_settings_for_configuration(
     configuration: &SettingsConfiguration,
     input: TranslationSettings,
@@ -74,10 +91,11 @@ mod settings_commands_tests {
     use tempfile::tempdir;
 
     use super::{
-        get_settings_snapshot_for_configuration, update_translation_settings_for_configuration,
+        get_settings_snapshot_for_configuration, update_annotation_colors_for_configuration,
+        update_translation_settings_for_configuration,
     };
     use crate::application::SettingsConfiguration;
-    use crate::domain::{SettingsSnapshot, TranslationSettings};
+    use crate::domain::{ScreenshotSettings, SettingsSnapshot, TranslationSettings};
     use crate::infrastructure::storage::ConfigFile;
 
     #[test]
@@ -125,5 +143,34 @@ mod settings_commands_tests {
         assert_eq!(updated.translation.default_source_lang, "ja");
         assert_eq!(updated.translation.default_target_lang, "en");
         assert_eq!(updated.general, SettingsSnapshot::default().general);
+    }
+
+    #[test]
+    fn update_annotation_colors_preserves_other_screenshot_settings() {
+        let config_file = Arc::new(ConfigFile::new_temp());
+        let home_dir = tempdir().unwrap();
+        let configuration = SettingsConfiguration::with_paths(
+            config_file,
+            Some(home_dir.path().to_path_buf()),
+            home_dir.path().join("Snapshots"),
+            None,
+        );
+        configuration
+            .update_screenshot(ScreenshotSettings {
+                save_path: home_dir.path().join("Custom").to_string_lossy().to_string(),
+                format: "webp".to_string(),
+                quality: 72,
+                ..ScreenshotSettings::default()
+            })
+            .unwrap();
+        let colors = vec![[12, 34, 56, 255], [200, 150, 100, 255]];
+
+        let updated =
+            update_annotation_colors_for_configuration(&configuration, colors.clone()).unwrap();
+
+        assert_eq!(updated.screenshot.annotation_colors, colors);
+        assert_eq!(updated.screenshot.format, "webp");
+        assert_eq!(updated.screenshot.quality, 72);
+        assert_eq!(updated, configuration.snapshot().unwrap());
     }
 }

@@ -1,11 +1,13 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 import type { CaptureMode, CaptureSessionView } from '../../domain/capture';
 
-const { invoke } = vi.hoisted(() => ({
+const { invoke, save } = vi.hoisted(() => ({
   invoke: vi.fn(),
+  save: vi.fn(),
 }));
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke }));
+vi.mock('@tauri-apps/plugin-dialog', () => ({ save }));
 
 describe('Tauri capture command adapter', () => {
   it('accepts only the domain capture mode vocabulary', async () => {
@@ -52,6 +54,20 @@ describe('Tauri capture command adapter', () => {
       annotations: [],
       includeCursor: true,
       action: { type: 'pin' },
+    });
+  });
+
+  it('opens a PNG save dialog from the suggested capture path', async () => {
+    const { selectCaptureSavePath } = await import('./capture');
+    invoke.mockResolvedValueOnce('/Downloads/SnapLingo-1.png');
+    save.mockResolvedValueOnce('/Pictures/SnapLingo-1.png');
+
+    await expect(selectCaptureSavePath()).resolves.toBe(
+      '/Pictures/SnapLingo-1.png',
+    );
+    expect(save).toHaveBeenCalledWith({
+      defaultPath: '/Downloads/SnapLingo-1.png',
+      filters: [{ name: 'PNG image', extensions: ['png'] }],
     });
   });
 

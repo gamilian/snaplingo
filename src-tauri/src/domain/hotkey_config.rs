@@ -11,7 +11,6 @@ pub const OCR_CATEGORY: &str = "ocr";
 
 pub const SCREENSHOT_ACTION: &str = "screenshot";
 pub const SCREENSHOT_COPY_ACTION: &str = "screenshot-copy";
-pub const SCREENSHOT_CUSTOM_ACTION: &str = "screenshot-custom";
 pub const PIN_ACTION: &str = "pin";
 pub const PIN_TOGGLE_ALL_ACTION: &str = "pin-toggle-all";
 pub const PIN_SWITCH_GROUP_ACTION: &str = "pin-switch-group";
@@ -41,11 +40,6 @@ pub const DEFAULT_HOTKEYS: &[DefaultHotkey] = &[
         category: SCREENSHOT_CATEGORY,
         action: SCREENSHOT_COPY_ACTION,
         hotkey: "⌘F1",
-    },
-    DefaultHotkey {
-        category: SCREENSHOT_CATEGORY,
-        action: SCREENSHOT_CUSTOM_ACTION,
-        hotkey: "⇧F1",
     },
     DefaultHotkey {
         category: SCREENSHOT_CATEGORY,
@@ -189,10 +183,6 @@ mod hotkey_config_tests {
         assert_eq!(
             snapshot.screenshot.get("screenshot-copy"),
             Some(&"⌘F1".to_string())
-        );
-        assert_eq!(
-            snapshot.screenshot.get("screenshot-custom"),
-            Some(&"⇧F1".to_string())
         );
         assert_eq!(snapshot.screenshot.get("pin"), Some(&"F3".to_string()));
         assert_eq!(

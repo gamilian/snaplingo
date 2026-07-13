@@ -4,6 +4,7 @@ const settingsRuntime = vi.hoisted(() => ({
   load: vi.fn(),
   updateGeneral: vi.fn(),
   updateScreenshot: vi.fn(),
+  updateAnnotationColors: vi.fn(),
   updateTranslation: vi.fn(),
 }));
 
@@ -17,6 +18,7 @@ const backendSnapshot = {
     savePath: '/backend/captures',
     format: 'png',
     quality: 90,
+    annotationColors: [[255, 77, 79, 255]],
   },
   translation: {
     defaultSourceLang: 'auto',
@@ -108,6 +110,7 @@ describe('settingsConfigStore', () => {
         savePath: '~/legacy-captures',
         format: 'jpg',
         quality: 81,
+        annotationColors: [[255, 77, 79, 255]],
       },
     });
     settingsRuntime.updateTranslation.mockResolvedValueOnce({
@@ -120,6 +123,7 @@ describe('settingsConfigStore', () => {
         savePath: '~/legacy-captures',
         format: 'jpg',
         quality: 81,
+        annotationColors: [[255, 77, 79, 255]],
       },
       translation: {
         defaultSourceLang: 'ja',
@@ -162,6 +166,7 @@ describe('settingsConfigStore', () => {
       savePath: '~/legacy-captures',
       format: 'jpg',
       quality: 81,
+      annotationColors: [[255, 77, 79, 255]],
     });
     expect(settingsRuntime.updateTranslation).toHaveBeenCalledWith({
       defaultSourceLang: 'ja',
@@ -178,6 +183,7 @@ describe('settingsConfigStore', () => {
         savePath: '~/legacy-captures',
         format: 'jpg',
         quality: 81,
+        annotationColors: [[255, 77, 79, 255]],
       },
       translation: {
         defaultSourceLang: 'ja',
@@ -197,6 +203,31 @@ describe('settingsConfigStore', () => {
         capturedScreenshot: 'data:image/png;base64,abc',
       },
       version: 0,
+    });
+  });
+
+  it('updates annotation colors through the narrow durable settings action', async () => {
+    const colors: [number, number, number, number][] = [
+      [12, 34, 56, 255],
+      [200, 150, 100, 255],
+    ];
+    settingsRuntime.updateAnnotationColors.mockResolvedValueOnce({
+      ...backendSnapshot,
+      screenshot: {
+        ...backendSnapshot.screenshot,
+        annotationColors: colors,
+      },
+    });
+    const { initializeSettingsConfigStore, useSettingsConfigStore } =
+      await import('./settingsConfigStore');
+    initializeSettingsConfigStore(settingsRuntime);
+
+    await useSettingsConfigStore.getState().updateAnnotationColors(colors);
+
+    expect(settingsRuntime.updateAnnotationColors).toHaveBeenCalledWith(colors);
+    expect(useSettingsConfigStore.getState().screenshot).toEqual({
+      ...backendSnapshot.screenshot,
+      annotationColors: colors,
     });
   });
 

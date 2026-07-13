@@ -84,6 +84,19 @@ describe('capturePointerInteractionRuntime', () => {
     ).toEqual({
       type: 'ignore',
     });
+
+    expect(
+      planCaptureRootPointerDown(primaryPointer, {
+        status: 'preview',
+        hasSelectionBounds: true,
+        hasSelection: true,
+        hasTextDraft: false,
+        hasAnnotationGesture: false,
+        hasDismissibleLayer: false,
+      }),
+    ).toEqual({
+      type: 'ignore',
+    });
   });
 
   it('plans preview selection pointer down as pin, interaction, or ignore', () => {

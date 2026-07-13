@@ -15,14 +15,11 @@ import {
   planCaptureSelectedAnnotationKeyboardNudge,
   planCaptureAnnotationToolActivation,
   planCaptureAnnotationGestureMove,
-  planCaptureAnnotationErase,
   planCaptureExistingAnnotationPointerDown,
   planCaptureAnnotationMove,
   planCaptureAnnotationMoveCommit,
   planCaptureAnnotationToolStart,
-  planCapturePolylineAnnotationContinue,
   planCaptureManualSelectionTransition,
-  undoPolylineCaptureGesture,
 } from './captureEditorRuntime';
 import { emptyAnnotationHistory, type AnnotationHistory } from './annotationHistory';
 import type { AnnotationStyle } from './annotationStyle';
@@ -75,14 +72,15 @@ describe('captureEditorRuntime', () => {
         },
         {
           type: 'mosaic',
-          rect: { x: 1, y: 2, width: 20, height: 10 },
+          points: [{ x: 1, y: 2 }, { x: 20, y: 10 }],
+          stroke_width: 20,
           block_size: 7,
         },
       ),
     ).toEqual({
       annotationStyle: {
         color: [24, 144, 255, 255],
-        strokeWidth: 7,
+        strokeWidth: 4,
         filled: true,
       },
       textFontSize: 26,
@@ -426,46 +424,6 @@ describe('captureEditorRuntime', () => {
     });
   });
 
-  it('rebuilds a polyline draft from the undone gesture point and clears when no draft remains', () => {
-    const nextDraft = undoPolylineCaptureGesture({
-      gesture: {
-        tool: 'polyline',
-        startPoint: { x: 10, y: 10 },
-        points: [{ x: 10, y: 10 }, { x: 20, y: 20 }, { x: 30, y: 20 }],
-      },
-      selection: { x: 100, y: 100, width: 300, height: 200 },
-      cursorPoint: { x: 145, y: 155 },
-      annotationStyle: baseStyle,
-    });
-
-    expect(nextDraft).toEqual({
-      gesture: {
-        tool: 'polyline',
-        startPoint: { x: 10, y: 10 },
-        points: [{ x: 10, y: 10 }, { x: 20, y: 20 }],
-      },
-      draftAnnotation: {
-        type: 'polyline',
-        points: [{ x: 10, y: 10 }, { x: 20, y: 20 }, { x: 45, y: 55 }],
-        color: [255, 77, 79, 255],
-        stroke_width: 2,
-      },
-    });
-
-    expect(
-      undoPolylineCaptureGesture({
-        gesture: {
-          tool: 'polyline',
-          startPoint: { x: 10, y: 10 },
-          points: [{ x: 10, y: 10 }],
-        },
-        selection: { x: 100, y: 100, width: 300, height: 200 },
-        cursorPoint: { x: 145, y: 155 },
-        annotationStyle: baseStyle,
-      }),
-    ).toBeNull();
-  });
-
   it('commits a text draft into annotation history and clears editor draft state', () => {
     const history: AnnotationHistory = {
       ...emptyAnnotationHistory(),
@@ -554,6 +512,20 @@ describe('captureEditorRuntime', () => {
     expect(
       completeCaptureEditorGesture({
         annotationHistory: history,
+        selectedAnnotationIndex: null,
+        annotationGesture: {
+          tool: 'rectangle',
+          startPoint: { x: 10, y: 12 },
+        },
+        localPoint: { x: 30, y: 28 },
+        annotationStyle: baseStyle,
+        constrainGesture: false,
+      })?.selectedAnnotationIndex,
+    ).toBe(0);
+
+    expect(
+      completeCaptureEditorGesture({
+        annotationHistory: history,
         selectedAnnotationIndex: 2,
         annotationGesture: {
           tool: 'rectangle',
@@ -604,7 +576,7 @@ describe('captureEditorRuntime', () => {
       }),
     ).toEqual({
       type: 'preview',
-      clearOverlay: false,
+      clearOverlay: true,
       nextState: {
         startPoint: null,
         selection: rect,
@@ -760,33 +732,6 @@ describe('captureEditorRuntime', () => {
     });
   });
 
-  it('plans continuing a polyline annotation gesture with the next point', () => {
-    expect(
-      planCapturePolylineAnnotationContinue({
-        gesture: {
-          tool: 'polyline',
-          startPoint: { x: 0, y: 0 },
-          points: [{ x: 0, y: 0 }, { x: 10, y: 10 }],
-        },
-        localPoint: { x: 18, y: 12 },
-        annotationStyle: baseStyle,
-        constrainGesture: false,
-      }),
-    ).toEqual({
-      annotationGesture: {
-        tool: 'polyline',
-        startPoint: { x: 0, y: 0 },
-        points: [{ x: 0, y: 0 }, { x: 10, y: 10 }, { x: 18, y: 12 }],
-      },
-      draftAnnotation: {
-        type: 'polyline',
-        points: [{ x: 0, y: 0 }, { x: 10, y: 10 }, { x: 18, y: 12 }],
-        color: [255, 77, 79, 255],
-        stroke_width: 2,
-      },
-    });
-  });
-
   it('plans existing annotation pointer moves with optional axis constraint', () => {
     expect(
       planCaptureAnnotationMove({
@@ -802,7 +747,6 @@ describe('captureEditorRuntime', () => {
         constrainMove: false,
       }),
     ).toEqual({
-      previewImageBase64: null,
       draftAnnotation: {
         type: 'rectangle',
         rect: { x: 6, y: -1, width: 30, height: 18 },
@@ -826,7 +770,6 @@ describe('captureEditorRuntime', () => {
         constrainMove: true,
       }),
     ).toEqual({
-      previewImageBase64: null,
       draftAnnotation: {
         type: 'line',
         start: { x: 2, y: 22 },
@@ -834,59 +777,6 @@ describe('captureEditorRuntime', () => {
         color: [255, 77, 79, 255],
         stroke_width: 2,
       },
-    });
-  });
-
-  it('plans erasing annotations and only asks for preview rendering when history changes', () => {
-    const annotations: AnnotationCommand[] = [
-      {
-        type: 'arrow',
-        start: { x: 3, y: 4 },
-        end: { x: 20, y: 24 },
-        color: [255, 77, 79, 255],
-        stroke_width: 2,
-      },
-      {
-        type: 'rectangle',
-        rect: { x: 1, y: 2, width: 10, height: 8 },
-        color: [255, 77, 79, 255],
-        stroke_width: 2,
-        filled: false,
-      },
-    ];
-    const history: AnnotationHistory = {
-      ...emptyAnnotationHistory(),
-      annotations,
-    };
-
-    expect(
-      planCaptureAnnotationErase({
-        annotationHistory: history,
-        localPoint: { x: 5, y: 6 },
-      }),
-    ).toEqual({
-      annotationMoveGesture: null,
-      draftAnnotation: null,
-      annotationHistory: {
-        ...history,
-        annotations: [annotations[0]],
-        undoneAnnotations: [],
-        undoSnapshots: [history.annotations],
-        redoSnapshots: [],
-      },
-      previewAnnotations: [annotations[0]],
-    });
-
-    expect(
-      planCaptureAnnotationErase({
-        annotationHistory: history,
-        localPoint: { x: 80, y: 90 },
-      }),
-    ).toEqual({
-      annotationMoveGesture: null,
-      draftAnnotation: null,
-      annotationHistory: history,
-      previewAnnotations: null,
     });
   });
 
@@ -908,7 +798,6 @@ describe('captureEditorRuntime', () => {
     expect(
       planCaptureAnnotationMoveCommit({
         annotationHistory: history,
-        annotations,
         annotationIndex: 0,
         startAnnotation: annotations[0],
         startPoint: { x: 10, y: 10 },
@@ -934,21 +823,11 @@ describe('captureEditorRuntime', () => {
         redoSnapshots: [],
       },
       selectedAnnotationIndex: 0,
-      previewAnnotations: [
-        {
-          type: 'rectangle',
-          rect: { x: 6, y: -1, width: 30, height: 18 },
-          color: [255, 77, 79, 255],
-          stroke_width: 2,
-          filled: false,
-        },
-      ],
     });
 
     expect(
       planCaptureAnnotationMoveCommit({
         annotationHistory: history,
-        annotations,
         annotationIndex: 0,
         startAnnotation: annotations[0],
         startPoint: { x: 10, y: 10 },
@@ -960,7 +839,6 @@ describe('captureEditorRuntime', () => {
       draftAnnotation: null,
       annotationHistory: history,
       selectedAnnotationIndex: undefined,
-      previewAnnotations: annotations,
     });
   });
 
@@ -1010,8 +888,6 @@ describe('captureEditorRuntime', () => {
         },
         textFontSize: 32,
       },
-      previewImageBase64: null,
-      previewAnnotations: [annotations[0]],
     });
   });
 

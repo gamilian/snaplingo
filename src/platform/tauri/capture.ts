@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { save } from '@tauri-apps/plugin-dialog';
 import type {
   CaptureMode,
   CaptureSessionView,
@@ -78,6 +79,14 @@ export async function defaultCaptureSavePath() {
   return invoke<string>('default_capture_save_path');
 }
 
+export async function selectCaptureSavePath() {
+  const defaultPath = await defaultCaptureSavePath();
+  return save({
+    defaultPath,
+    filters: [{ name: 'PNG image', extensions: ['png'] }],
+  });
+}
+
 export async function quickCaptureSavePath(directory?: string) {
   return invoke<string>('quick_capture_save_path', { directory });
 }
@@ -147,7 +156,7 @@ export const captureWorkspaceCommands: CaptureWorkspaceCommandsPort = {
   cancelCaptureSession,
   restoreCaptureSnapshotWindowsForSession,
   renderCaptureOutput,
-  defaultCaptureSavePath,
+  defaultCaptureSavePath: selectCaptureSavePath,
   quickCaptureSavePath,
   outputCapture,
   runCaptureOcr,

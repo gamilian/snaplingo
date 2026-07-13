@@ -16,6 +16,7 @@ const backendSnapshot = {
     save_path: '/captures',
     format: 'webp',
     quality: 77,
+    annotation_colors: [[255, 77, 79, 255]],
   },
   translation: {
     default_source_lang: 'ja',
@@ -42,6 +43,7 @@ describe('Tauri settings command adapter', () => {
         savePath: '/captures',
         format: 'webp',
         quality: 77,
+        annotationColors: [[255, 77, 79, 255]],
       },
       translation: {
         defaultSourceLang: 'ja',
@@ -78,6 +80,7 @@ describe('Tauri settings command adapter', () => {
       savePath: '/captures',
       format: 'jpg',
       quality: 81,
+      annotationColors: [[12, 34, 56, 255]],
     });
 
     expect(invoke).toHaveBeenCalledWith('update_screenshot_settings', {
@@ -85,7 +88,23 @@ describe('Tauri settings command adapter', () => {
         save_path: '/captures',
         format: 'jpg',
         quality: 81,
+        annotation_colors: [[12, 34, 56, 255]],
       },
+    });
+  });
+
+  it('updates only annotation colors through the narrow backend command', async () => {
+    const { updateAnnotationColors } = await import('./settings');
+    invoke.mockResolvedValueOnce(backendSnapshot);
+    const colors: [number, number, number, number][] = [
+      [12, 34, 56, 255],
+      [200, 150, 100, 255],
+    ];
+
+    await updateAnnotationColors(colors);
+
+    expect(invoke).toHaveBeenCalledWith('update_annotation_colors', {
+      colors,
     });
   });
 

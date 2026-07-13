@@ -15,14 +15,20 @@ static CAPTURE_PRESENTATION_DEPTH: AtomicUsize = AtomicUsize::new(0);
 static CAPTURE_WINDOW_ACTIVATION_SUPPRESSED: AtomicBool = AtomicBool::new(false);
 static CAPTURE_CANCEL_SHORTCUT_REGISTERED: AtomicBool = AtomicBool::new(false);
 static CAPTURE_COPY_SHORTCUT_REGISTERED: AtomicBool = AtomicBool::new(false);
+static CAPTURE_UNDO_SHORTCUT_REGISTERED: AtomicBool = AtomicBool::new(false);
+static CAPTURE_REDO_SHORTCUT_REGISTERED: AtomicBool = AtomicBool::new(false);
 static CAPTURE_CROSSHAIR_CURSOR_PUSHED: AtomicBool = AtomicBool::new(false);
 static PREVIOUS_FRONTMOST_APP_PID: AtomicI32 = AtomicI32::new(NO_PREVIOUS_FRONTMOST_APP_PID);
 
 const NO_PREVIOUS_FRONTMOST_APP_PID: i32 = -1;
 const CAPTURE_CANCEL_SHORTCUT_ACCELERATOR: &str = "Escape";
 const CAPTURE_COPY_SHORTCUT_ACCELERATOR: &str = "CmdOrCtrl+KeyC";
+const CAPTURE_UNDO_SHORTCUT_ACCELERATOR: &str = "CmdOrCtrl+KeyZ";
+const CAPTURE_REDO_SHORTCUT_ACCELERATOR: &str = "CmdOrCtrl+KeyY";
 const CAPTURE_CANCEL_REQUESTED_EVENT: &str = "capture-cancel-requested";
 const CAPTURE_COPY_REQUESTED_EVENT: &str = "capture-copy-requested";
+const CAPTURE_UNDO_REQUESTED_EVENT: &str = "capture-undo-requested";
+const CAPTURE_REDO_REQUESTED_EVENT: &str = "capture-redo-requested";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RestorePreviousFrontmostDisposition {
@@ -41,11 +47,23 @@ pub(super) fn begin_capture_presentation(app: &AppHandle) -> Result<(), String> 
                 return Err(err.to_string());
             }
         }
-        if let Err(err) = register_capture_cancel_shortcut(app) {
-            log::warn!("Failed to register capture cancel shortcut: {}", err);
+        if capture_overlay_uses_global_cancel_shortcut() {
+            if let Err(err) = register_capture_cancel_shortcut(app) {
+                log::warn!("Failed to register capture cancel shortcut: {}", err);
+            }
         }
-        if let Err(err) = register_capture_copy_shortcut(app) {
-            log::warn!("Failed to register capture copy shortcut: {}", err);
+        if capture_overlay_uses_global_copy_shortcut() {
+            if let Err(err) = register_capture_copy_shortcut(app) {
+                log::warn!("Failed to register capture copy shortcut: {}", err);
+            }
+        }
+        if capture_overlay_uses_global_undo_shortcuts() {
+            if let Err(err) = register_capture_undo_shortcut(app) {
+                log::warn!("Failed to register capture undo shortcut: {}", err);
+            }
+            if let Err(err) = register_capture_redo_shortcut(app) {
+                log::warn!("Failed to register capture redo shortcut: {}", err);
+            }
         }
     }
 
@@ -56,16 +74,29 @@ pub(super) fn end_capture_presentation(app: &AppHandle) -> Result<(), String> {
     let previous_depth = decrement_capture_presentation_depth();
 
     if previous_depth == 1 {
+        let has_key_non_capture_window = has_key_non_capture_window(app);
         let activation_suppressed = take_capture_window_activation_suppressed();
         restore_native_crosshair_cursor();
-        unregister_capture_cancel_shortcut(app);
-        unregister_capture_copy_shortcut(app);
+        if capture_overlay_uses_global_cancel_shortcut() {
+            unregister_capture_cancel_shortcut(app);
+        }
+        if capture_overlay_uses_global_copy_shortcut() {
+            unregister_capture_copy_shortcut(app);
+        }
+        if capture_overlay_uses_global_undo_shortcuts() {
+            unregister_capture_undo_shortcut(app);
+            unregister_capture_redo_shortcut(app);
+        }
         let activation_policy_result = if activation_suppressed {
             crate::app_shell::apply_resting_activation_policy(app)
         } else {
             Ok(())
         };
-        restore_previous_frontmost_application(RestorePreviousFrontmostDisposition::Clear);
+        if should_restore_previous_frontmost_after_capture(has_key_non_capture_window) {
+            restore_previous_frontmost_application(RestorePreviousFrontmostDisposition::Clear);
+        } else {
+            clear_previous_frontmost_application();
+        }
         activation_policy_result?;
     }
 
@@ -136,12 +167,33 @@ pub(super) fn reveal_capture_window_for_current_space(
 
     let ns_window: &NSWindow = unsafe { &*ns_window.cast() };
     ns_window.setAlphaValue(1.0);
+    activate_current_application();
     if should_make_capture_overlay_key_on_reveal() {
         ns_window.makeKeyAndOrderFront(None);
     } else if capture_overlay_uses_order_front_regardless() {
         ns_window.orderFrontRegardless();
     } else {
         ns_window.orderFront(None);
+    }
+    window.set_focus().map_err(|e| e.to_string())?;
+    if capture_overlay_focuses_webview_on_reveal() {
+        let ns_view = window.ns_view().map_err(|e| e.to_string())?;
+        if ns_view.is_null() {
+            return Err("Capture window has no native NSView".to_string());
+        }
+
+        let ns_view: &NSView = unsafe { &*ns_view.cast() };
+        let webview = ns_view.subviews().firstObject();
+        let focused = webview
+            .as_deref()
+            .map(|webview| ns_window.makeFirstResponder(Some(webview)))
+            .unwrap_or_else(|| ns_window.makeFirstResponder(Some(ns_view)));
+        if !focused && capture_overlay_requires_first_responder_for_reveal() {
+            return Err("Capture window could not focus its webview".to_string());
+        }
+        if !focused {
+            log::warn!("Capture window could not focus its webview during reveal");
+        }
     }
     push_native_crosshair_cursor();
 
@@ -214,7 +266,7 @@ fn capture_overlay_collection_behavior(
 }
 
 fn capture_overlay_style_mask(base: NSWindowStyleMask) -> NSWindowStyleMask {
-    base | NSWindowStyleMask::NonactivatingPanel
+    base & !NSWindowStyleMask::NonactivatingPanel
 }
 
 fn capture_presentation_activation_policy() -> Option<tauri::ActivationPolicy> {
@@ -251,6 +303,25 @@ fn has_visible_non_capture_window_on_active_space(app: &AppHandle) -> bool {
         .any(|(_, window)| window_is_visible_on_active_space(&window))
 }
 
+fn has_key_non_capture_window(app: &AppHandle) -> bool {
+    app.webview_windows()
+        .into_iter()
+        .filter(|(label, _)| label.as_str() != CAPTURE_WINDOW_LABEL)
+        .any(|(_, window)| window_is_key(&window))
+}
+
+fn window_is_key(window: &WebviewWindow) -> bool {
+    let Ok(ns_window) = window.ns_window() else {
+        return false;
+    };
+    if ns_window.is_null() {
+        return false;
+    }
+
+    let ns_window: &NSWindow = unsafe { &*ns_window.cast() };
+    ns_window.isKeyWindow()
+}
+
 fn window_is_visible_on_active_space(window: &WebviewWindow) -> bool {
     let Ok(ns_window) = window.ns_window() else {
         return false;
@@ -284,11 +355,11 @@ fn capture_overlay_accepts_mouse_moved_events() -> bool {
 }
 
 fn capture_overlay_uses_native_crosshair_cursor() -> bool {
-    true
+    false
 }
 
 fn capture_overlay_uses_native_crosshair_cursor_rect() -> bool {
-    true
+    false
 }
 
 fn should_restore_native_crosshair_cursor(cursor_pushed: bool) -> bool {
@@ -353,7 +424,12 @@ fn should_make_capture_overlay_key_on_reveal() -> bool {
 fn should_make_capture_overlay_key_on_reveal_for_activation_suppressed(
     _activation_suppressed: bool,
 ) -> bool {
-    false
+    true
+}
+
+fn activate_current_application() {
+    NSRunningApplication::currentApplication()
+        .activateWithOptions(NSApplicationActivationOptions::empty());
 }
 
 fn capture_cancel_shortcut_accelerator() -> &'static str {
@@ -364,6 +440,14 @@ fn capture_copy_shortcut_accelerator() -> &'static str {
     CAPTURE_COPY_SHORTCUT_ACCELERATOR
 }
 
+fn capture_undo_shortcut_accelerator() -> &'static str {
+    CAPTURE_UNDO_SHORTCUT_ACCELERATOR
+}
+
+fn capture_redo_shortcut_accelerator() -> &'static str {
+    CAPTURE_REDO_SHORTCUT_ACCELERATOR
+}
+
 fn capture_cancel_requested_event_name() -> &'static str {
     CAPTURE_CANCEL_REQUESTED_EVENT
 }
@@ -372,11 +456,39 @@ fn capture_copy_requested_event_name() -> &'static str {
     CAPTURE_COPY_REQUESTED_EVENT
 }
 
+fn capture_undo_requested_event_name() -> &'static str {
+    CAPTURE_UNDO_REQUESTED_EVENT
+}
+
+fn capture_redo_requested_event_name() -> &'static str {
+    CAPTURE_REDO_REQUESTED_EVENT
+}
+
 fn capture_overlay_disables_window_animation() -> bool {
     true
 }
 
 fn capture_overlay_uses_order_front_regardless() -> bool {
+    false
+}
+
+fn capture_overlay_uses_global_cancel_shortcut() -> bool {
+    true
+}
+
+fn capture_overlay_uses_global_copy_shortcut() -> bool {
+    false
+}
+
+fn capture_overlay_uses_global_undo_shortcuts() -> bool {
+    true
+}
+
+fn capture_overlay_focuses_webview_on_reveal() -> bool {
+    true
+}
+
+fn capture_overlay_requires_first_responder_for_reveal() -> bool {
     false
 }
 
@@ -410,6 +522,36 @@ fn register_capture_copy_shortcut(app: &AppHandle) -> Result<(), String> {
     })
 }
 
+fn register_capture_undo_shortcut(app: &AppHandle) -> Result<(), String> {
+    if CAPTURE_UNDO_SHORTCUT_REGISTERED.swap(true, Ordering::SeqCst) {
+        return Ok(());
+    }
+
+    let app_clone = app.clone();
+    shortcut::register_shortcut(app, capture_undo_shortcut_accelerator(), move || {
+        emit_capture_undo_requested(&app_clone);
+    })
+    .map_err(|e| {
+        CAPTURE_UNDO_SHORTCUT_REGISTERED.store(false, Ordering::SeqCst);
+        e.to_string()
+    })
+}
+
+fn register_capture_redo_shortcut(app: &AppHandle) -> Result<(), String> {
+    if CAPTURE_REDO_SHORTCUT_REGISTERED.swap(true, Ordering::SeqCst) {
+        return Ok(());
+    }
+
+    let app_clone = app.clone();
+    shortcut::register_shortcut(app, capture_redo_shortcut_accelerator(), move || {
+        emit_capture_redo_requested(&app_clone);
+    })
+    .map_err(|e| {
+        CAPTURE_REDO_SHORTCUT_REGISTERED.store(false, Ordering::SeqCst);
+        e.to_string()
+    })
+}
+
 fn unregister_capture_cancel_shortcut(app: &AppHandle) {
     if !CAPTURE_CANCEL_SHORTCUT_REGISTERED.swap(false, Ordering::SeqCst) {
         return;
@@ -430,6 +572,26 @@ fn unregister_capture_copy_shortcut(app: &AppHandle) {
     }
 }
 
+fn unregister_capture_undo_shortcut(app: &AppHandle) {
+    if !CAPTURE_UNDO_SHORTCUT_REGISTERED.swap(false, Ordering::SeqCst) {
+        return;
+    }
+
+    if let Err(err) = shortcut::unregister_shortcut(app, capture_undo_shortcut_accelerator()) {
+        log::warn!("Failed to unregister capture undo shortcut: {}", err);
+    }
+}
+
+fn unregister_capture_redo_shortcut(app: &AppHandle) {
+    if !CAPTURE_REDO_SHORTCUT_REGISTERED.swap(false, Ordering::SeqCst) {
+        return;
+    }
+
+    if let Err(err) = shortcut::unregister_shortcut(app, capture_redo_shortcut_accelerator()) {
+        log::warn!("Failed to unregister capture redo shortcut: {}", err);
+    }
+}
+
 fn emit_capture_cancel_requested(app: &AppHandle) {
     let Some(window) = app.get_webview_window(CAPTURE_WINDOW_LABEL) else {
         return;
@@ -447,6 +609,26 @@ fn emit_capture_copy_requested(app: &AppHandle) {
 
     if let Err(err) = window.emit(capture_copy_requested_event_name(), ()) {
         log::warn!("Failed to emit capture copy request: {}", err);
+    }
+}
+
+fn emit_capture_undo_requested(app: &AppHandle) {
+    let Some(window) = app.get_webview_window(CAPTURE_WINDOW_LABEL) else {
+        return;
+    };
+
+    if let Err(err) = window.emit(capture_undo_requested_event_name(), ()) {
+        log::warn!("Failed to emit capture undo request: {}", err);
+    }
+}
+
+fn emit_capture_redo_requested(app: &AppHandle) {
+    let Some(window) = app.get_webview_window(CAPTURE_WINDOW_LABEL) else {
+        return;
+    };
+
+    if let Err(err) = window.emit(capture_redo_requested_event_name(), ()) {
+        log::warn!("Failed to emit capture redo request: {}", err);
     }
 }
 
@@ -480,6 +662,14 @@ fn restore_previous_frontmost_application(disposition: RestorePreviousFrontmostD
     if let Some(application) = NSRunningApplication::runningApplicationWithProcessIdentifier(pid) {
         application.activateWithOptions(NSApplicationActivationOptions::empty());
     }
+}
+
+fn clear_previous_frontmost_application() {
+    PREVIOUS_FRONTMOST_APP_PID.store(NO_PREVIOUS_FRONTMOST_APP_PID, Ordering::SeqCst);
+}
+
+fn should_restore_previous_frontmost_after_capture(has_key_non_capture_window: bool) -> bool {
+    !has_key_non_capture_window
 }
 
 fn should_restore_capture_window_activation(
@@ -559,11 +749,11 @@ mod tests {
     }
 
     #[test]
-    fn capture_overlay_uses_nonactivating_panel_style_for_fullscreen_spaces() {
+    fn capture_overlay_can_activate_for_keyboard_input() {
         let style = capture_overlay_style_mask(NSWindowStyleMask::Borderless);
 
         assert!(style.contains(NSWindowStyleMask::Borderless));
-        assert!(style.contains(NSWindowStyleMask::NonactivatingPanel));
+        assert!(!style.contains(NSWindowStyleMask::NonactivatingPanel));
     }
 
     #[test]
@@ -631,13 +821,13 @@ mod tests {
     }
 
     #[test]
-    fn capture_overlay_declares_native_crosshair_cursor() {
-        assert!(capture_overlay_uses_native_crosshair_cursor());
+    fn capture_overlay_leaves_cursor_state_to_the_webview() {
+        assert!(!capture_overlay_uses_native_crosshair_cursor());
     }
 
     #[test]
-    fn capture_overlay_declares_native_crosshair_cursor_rect() {
-        assert!(capture_overlay_uses_native_crosshair_cursor_rect());
+    fn capture_overlay_does_not_override_webview_cursor_rects() {
+        assert!(!capture_overlay_uses_native_crosshair_cursor_rect());
     }
 
     #[test]
@@ -647,13 +837,13 @@ mod tests {
     }
 
     #[test]
-    fn capture_overlay_does_not_become_key_on_reveal() {
-        assert!(!should_make_capture_overlay_key_on_reveal_for_activation_suppressed(false));
+    fn capture_overlay_becomes_key_on_reveal() {
+        assert!(should_make_capture_overlay_key_on_reveal_for_activation_suppressed(false));
     }
 
     #[test]
-    fn capture_overlay_does_not_become_key_when_activation_is_suppressed() {
-        assert!(!should_make_capture_overlay_key_on_reveal_for_activation_suppressed(true));
+    fn capture_overlay_becomes_key_after_activation_suppression() {
+        assert!(should_make_capture_overlay_key_on_reveal_for_activation_suppressed(true));
     }
 
     #[test]
@@ -664,6 +854,14 @@ mod tests {
     #[test]
     fn capture_overlay_avoids_order_front_regardless() {
         assert!(!capture_overlay_uses_order_front_regardless());
+    }
+
+    #[test]
+    fn capture_keyboard_input_is_owned_by_the_focused_window() {
+        assert!(capture_overlay_uses_global_cancel_shortcut());
+        assert!(!capture_overlay_uses_global_copy_shortcut());
+        assert!(capture_overlay_focuses_webview_on_reveal());
+        assert!(!capture_overlay_requires_first_responder_for_reveal());
     }
 
     #[test]
@@ -682,6 +880,13 @@ mod tests {
     #[test]
     fn capture_copy_shortcut_uses_primary_copy_accelerator() {
         assert_eq!(capture_copy_shortcut_accelerator(), "CmdOrCtrl+KeyC");
+    }
+
+    #[test]
+    fn capture_undo_and_redo_shortcuts_use_primary_accelerators() {
+        assert_eq!(capture_undo_shortcut_accelerator(), "CmdOrCtrl+KeyZ");
+        assert_eq!(capture_redo_shortcut_accelerator(), "CmdOrCtrl+KeyY");
+        assert!(capture_overlay_uses_global_undo_shortcuts());
     }
 
     #[test]
@@ -778,5 +983,11 @@ mod tests {
             ),
             None
         );
+    }
+
+    #[test]
+    fn result_window_focus_survives_capture_presentation_cleanup() {
+        assert!(!should_restore_previous_frontmost_after_capture(true));
+        assert!(should_restore_previous_frontmost_after_capture(false));
     }
 }

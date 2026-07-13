@@ -122,10 +122,7 @@ export function planCaptureRootPointerDown(
     };
   }
 
-  if (
-    (state.status === 'selecting' || state.status === 'preview') &&
-    state.hasSelectionBounds
-  ) {
+  if (state.status === 'selecting' && state.hasSelectionBounds) {
     return {
       type: 'start-draft-selection',
     };

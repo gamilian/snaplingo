@@ -15,6 +15,38 @@ Object.defineProperty(window, 'localStorage', {
 });
 
 describe('CaptureWorkspace React lifecycle', () => {
+  it('reveals after session metadata loads before capture images are hydrated', async () => {
+    const sessionRequest = deferred<ReturnType<typeof createSession>>();
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockImplementation(
+      () => sessionRequest.promise,
+    );
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        createElement(CaptureWorkspace, {
+          runtime: platform,
+          initialMode: 'screenshot',
+          initialSessionId: 'metadata-session',
+        }),
+      );
+    });
+
+    await act(async () => {
+      sessionRequest.resolve(createSession('metadata-session'));
+      await sessionRequest.promise;
+    });
+
+    await vi.waitFor(() => expect(platform.reveal).toHaveBeenCalledOnce());
+    expect(platform.prepareForReveal).toHaveBeenCalledOnce();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it('replaces the disposed StrictMode runtime and cleans late work on unmount', async () => {
     const oldSessionRequest = deferred<ReturnType<typeof createSession>>();
     const currentSessionRequest = deferred<ReturnType<typeof createSession>>();
@@ -150,6 +182,12 @@ function createPlatform() {
     >(async () => () => undefined),
     onCopyRequested: vi.fn<
       CaptureWorkspacePlatformRuntime['onCopyRequested']
+    >(async () => () => undefined),
+    onUndoRequested: vi.fn<
+      CaptureWorkspacePlatformRuntime['onUndoRequested']
+    >(async () => () => undefined),
+    onRedoRequested: vi.fn<
+      CaptureWorkspacePlatformRuntime['onRedoRequested']
     >(async () => () => undefined),
     onHotkeyTriggered: vi.fn<
       CaptureWorkspacePlatformRuntime['onHotkeyTriggered']

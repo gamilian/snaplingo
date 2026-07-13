@@ -8,10 +8,13 @@ export interface GeneralSettings {
   startOnBoot: boolean;
 }
 
+export type AnnotationColorPreset = [number, number, number, number];
+
 export interface ScreenshotSettings {
   savePath: string;
   format: string;
   quality: number;
+  annotationColors: AnnotationColorPreset[];
 }
 
 export interface TranslationSettings {
@@ -30,6 +33,9 @@ export interface DurableSettingsPort {
   updateGeneralSettings(input: GeneralSettings): Promise<SettingsSnapshot>;
   updateScreenshotSettings(
     input: ScreenshotSettings,
+  ): Promise<SettingsSnapshot>;
+  updateAnnotationColors(
+    colors: AnnotationColorPreset[],
   ): Promise<SettingsSnapshot>;
   updateTranslationSettings(
     input: TranslationSettings,

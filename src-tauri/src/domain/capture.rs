@@ -218,11 +218,6 @@ pub enum AnnotationCommand {
         color: [u8; 4],
         stroke_width: u32,
     },
-    Polyline {
-        points: Vec<LogicalPoint>,
-        color: [u8; 4],
-        stroke_width: u32,
-    },
     Freehand {
         points: Vec<LogicalPoint>,
         color: [u8; 4],
@@ -234,12 +229,13 @@ pub enum AnnotationCommand {
         stroke_width: u32,
     },
     Mosaic {
-        rect: LogicalRect,
+        points: Vec<LogicalPoint>,
+        stroke_width: u32,
         block_size: u32,
     },
-    Blur {
-        rect: LogicalRect,
-        radius: u32,
+    Eraser {
+        points: Vec<LogicalPoint>,
+        stroke_width: u32,
     },
     Text {
         position: LogicalPoint,
@@ -365,26 +361,6 @@ mod tests {
     }
 
     #[test]
-    fn polyline_annotation_serializes_with_type_tag() {
-        let annotation = AnnotationCommand::Polyline {
-            points: vec![
-                LogicalPoint { x: 1.0, y: 2.0 },
-                LogicalPoint { x: 3.0, y: 4.0 },
-                LogicalPoint { x: 6.0, y: 4.0 },
-            ],
-            color: [24, 144, 255, 255],
-            stroke_width: 2,
-        };
-
-        let serialized = serde_json::to_value(&annotation).unwrap();
-
-        assert_eq!(serialized["type"], "polyline");
-        assert_eq!(serialized["points"][0]["x"], 1.0);
-        assert_eq!(serialized["points"][2]["x"], 6.0);
-        assert_eq!(serialized["stroke_width"], 2);
-    }
-
-    #[test]
     fn freehand_annotation_serializes_with_type_tag() {
         let annotation = AnnotationCommand::Freehand {
             points: vec![
@@ -426,39 +402,20 @@ mod tests {
     #[test]
     fn mosaic_annotation_serializes_with_type_tag() {
         let annotation = AnnotationCommand::Mosaic {
-            rect: LogicalRect {
-                x: 1.0,
-                y: 2.0,
-                width: 3.0,
-                height: 4.0,
-            },
+            points: vec![
+                LogicalPoint { x: 1.0, y: 2.0 },
+                LogicalPoint { x: 3.0, y: 4.0 },
+            ],
+            stroke_width: 20,
             block_size: 6,
         };
 
         let serialized = serde_json::to_value(&annotation).unwrap();
 
         assert_eq!(serialized["type"], "mosaic");
-        assert_eq!(serialized["rect"]["x"], 1.0);
+        assert_eq!(serialized["points"][0]["x"], 1.0);
+        assert_eq!(serialized["stroke_width"], 20);
         assert_eq!(serialized["block_size"], 6);
-    }
-
-    #[test]
-    fn blur_annotation_serializes_with_type_tag() {
-        let annotation = AnnotationCommand::Blur {
-            rect: LogicalRect {
-                x: 1.0,
-                y: 2.0,
-                width: 3.0,
-                height: 4.0,
-            },
-            radius: 6,
-        };
-
-        let serialized = serde_json::to_value(&annotation).unwrap();
-
-        assert_eq!(serialized["type"], "blur");
-        assert_eq!(serialized["rect"]["x"], 1.0);
-        assert_eq!(serialized["radius"], 6);
     }
 
     #[test]

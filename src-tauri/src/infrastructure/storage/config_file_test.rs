@@ -18,6 +18,17 @@ fn settings_snapshot_defaults_are_sectioned() {
     );
     assert_eq!(snapshot.screenshot.format, "png");
     assert_eq!(snapshot.screenshot.quality, 90);
+    assert_eq!(
+        snapshot.screenshot.annotation_colors,
+        vec![
+            [255, 77, 79, 255],
+            [40, 167, 69, 255],
+            [24, 144, 255, 255],
+            [250, 219, 20, 255],
+            [255, 255, 255, 255],
+            [0, 0, 0, 255],
+        ]
+    );
     assert_ne!(snapshot.screenshot.save_path, "~/Pictures/SnapLingo");
     assert_eq!(
         snapshot.translation,
@@ -86,6 +97,7 @@ fn settings_snapshot_round_trips_through_config_file() {
             save_path: "/tmp/snaps".to_string(),
             format: "jpg".to_string(),
             quality: 80,
+            annotation_colors: vec![[12, 34, 56, 255], [200, 150, 100, 255]],
         },
         translation: TranslationSettings {
             default_source_lang: "ja".to_string(),
@@ -135,6 +147,7 @@ fn test_save_multiple_keys() {
             save_path: "/tmp/config1".to_string(),
             format: "png".to_string(),
             quality: 90,
+            ..ScreenshotSettings::default()
         },
         translation: TranslationSettings {
             default_source_lang: "auto".to_string(),
@@ -153,6 +166,7 @@ fn test_save_multiple_keys() {
             save_path: "/tmp/config2".to_string(),
             format: "webp".to_string(),
             quality: 75,
+            ..ScreenshotSettings::default()
         },
         translation: TranslationSettings {
             default_source_lang: "ja".to_string(),

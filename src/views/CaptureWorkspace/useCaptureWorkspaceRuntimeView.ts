@@ -24,7 +24,7 @@ import type { CaptureMode, LogicalRect } from './types';
 import { useCaptureWorkspaceRuntime } from './runtimeContext';
 
 const TOOLBAR_GAP = 14;
-const TOOLBAR_SIZE = { width: 640, height: 42 };
+const TOOLBAR_SIZE = { width: 700, height: 42 };
 const CAPTURE_HOVER_POLL_INTERVAL_MS = 16;
 
 interface CaptureWorkspaceRuntimeViewOptions {
@@ -203,7 +203,12 @@ export function useCaptureWorkspaceRuntimeView({
     void workflowRuntime.actions.updateHostReadiness(
       derived.areCaptureImagesReady,
     );
-  }, [derived.areCaptureImagesReady, workflowRuntime]);
+  }, [
+    derived.areCaptureImagesReady,
+    runtimeRenderState.sessionId,
+    runtimeRenderState.status,
+    workflowRuntime,
+  ]);
 
   const ensureCaptureSnapshotsHydrated = useCallback(
     async () => {
@@ -239,6 +244,11 @@ export function useCaptureWorkspaceRuntimeView({
         selection: runtimeRenderState.selection,
         selectionViewportRect: derived.selectionViewportRect,
         previewImageBase64: runtimeRenderState.previewImageBase64,
+        annotations: derived.annotations.filter(
+          (_, index) =>
+            index !== runtimeRenderState.annotationMoveGesture?.annotationIndex &&
+            index !== runtimeRenderState.textDraftAnnotationIndex,
+        ),
         draftAnnotation: runtimeRenderState.draftAnnotation,
         textDraft: runtimeRenderState.textDraft,
         annotationStyle: runtimeRenderState.annotationStyle,
@@ -252,6 +262,8 @@ export function useCaptureWorkspaceRuntimeView({
         textFontSize: runtimeRenderState.textFontSize,
         isTextSizingActive: derived.isTextSizingActive,
         isFillModeActive: derived.isFillModeActive,
+        canUndo: derived.canUndoAnnotation,
+        canRedo: derived.canRedoAnnotation,
       },
       dom: {
         textDraftInputRef,
@@ -286,6 +298,8 @@ export function useCaptureWorkspaceRuntimeView({
       pointerMove: workflowRuntime.actions.pointerMove,
       pointerUp: workflowRuntime.actions.pointerUp,
       resizePointerDown: workflowRuntime.actions.resizePointerDown,
+      resizeAnnotationPointerDown:
+        workflowRuntime.actions.resizeAnnotationPointerDown,
       wheel: workflowRuntime.actions.wheel,
       commitTextDraft: workflowRuntime.actions.commitTextDraft,
       updateTextDraftText: workflowRuntime.actions.updateTextDraftText,
@@ -295,6 +309,8 @@ export function useCaptureWorkspaceRuntimeView({
       applySelectedAnnotationStyle:
         workflowRuntime.actions.applySelectedAnnotationStyle,
       updateTextDraftFontSize: workflowRuntime.actions.updateTextDraftFontSize,
+      undoAnnotation: workflowRuntime.actions.undoAnnotation,
+      redoAnnotation: workflowRuntime.actions.redoAnnotation,
       cancelSession: workflowRuntime.actions.cancelSession,
       completePreviewSelection:
         workflowRuntime.actions.completePreviewSelection,

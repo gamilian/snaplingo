@@ -33,15 +33,6 @@ mod tests {
         image.get_pixel(x, y).0
     }
 
-    fn count_pixels_with_color(png: &[u8], rgba: [u8; 4]) -> usize {
-        image::load_from_memory(png)
-            .unwrap()
-            .to_rgba8()
-            .pixels()
-            .filter(|pixel| pixel.0 == rgba)
-            .count()
-    }
-
     fn count_pixels_matching(png: &[u8], matches: impl Fn([u8; 4]) -> bool) -> usize {
         image::load_from_memory(png)
             .unwrap()
@@ -377,48 +368,6 @@ mod tests {
     }
 
     #[test]
-    fn composes_png_with_polyline_annotation() {
-        let composer = CaptureImageComposer::new();
-        let white = make_solid_png(8, 8, [255, 255, 255, 255]);
-
-        let output = composer
-            .compose_png_with_annotations(
-                8,
-                8,
-                &[PngPlacement {
-                    png_data: white.as_slice(),
-                    source_rect: PhysicalRect {
-                        x: 0,
-                        y: 0,
-                        width: 8,
-                        height: 8,
-                    },
-                    destination_rect: PhysicalRect {
-                        x: 0,
-                        y: 0,
-                        width: 8,
-                        height: 8,
-                    },
-                }],
-                &[ImageAnnotation::Polyline {
-                    points: vec![
-                        PhysicalPoint { x: 1, y: 1 },
-                        PhysicalPoint { x: 5, y: 1 },
-                        PhysicalPoint { x: 5, y: 6 },
-                    ],
-                    color: [255, 0, 0, 255],
-                    stroke_width: 1,
-                }],
-            )
-            .unwrap();
-
-        assert_eq!(png_pixel(&output, 1, 1), [255, 0, 0, 255]);
-        assert_eq!(png_pixel(&output, 5, 1), [255, 0, 0, 255]);
-        assert_eq!(png_pixel(&output, 5, 6), [255, 0, 0, 255]);
-        assert_eq!(png_pixel(&output, 2, 5), [255, 255, 255, 255]);
-    }
-
-    #[test]
     fn composes_png_with_freehand_annotation() {
         let composer = CaptureImageComposer::new();
         let white = make_solid_png(8, 8, [255, 255, 255, 255]);
@@ -531,12 +480,8 @@ mod tests {
                     },
                 }],
                 &[ImageAnnotation::Mosaic {
-                    rect: PhysicalRect {
-                        x: 0,
-                        y: 0,
-                        width: 2,
-                        height: 2,
-                    },
+                    points: vec![PhysicalPoint { x: 1, y: 1 }],
+                    stroke_width: 4,
                     block_size: 2,
                 }],
             )
@@ -544,57 +489,51 @@ mod tests {
 
         assert_eq!(png_pixel(&output, 0, 0), [127, 127, 127, 255]);
         assert_eq!(png_pixel(&output, 1, 1), [127, 127, 127, 255]);
-        assert_eq!(png_pixel(&output, 2, 0), [10, 20, 30, 255]);
-        assert_eq!(png_pixel(&output, 0, 2), [90, 91, 92, 255]);
+        assert_eq!(png_pixel(&output, 3, 0), [11, 21, 31, 255]);
+        assert_eq!(png_pixel(&output, 3, 2), [93, 94, 95, 255]);
     }
 
     #[test]
-    fn composes_png_with_blur_annotation() {
+    fn eraser_restores_only_the_brushed_pixels() {
         let composer = CaptureImageComposer::new();
-        let png = make_png_from_pixels(
-            5,
-            1,
-            &[
-                10, 10, 10, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255, 20, 20, 20, 255,
-            ],
-        );
+        let png = make_solid_png(5, 3, [12, 34, 56, 255]);
 
         let output = composer
             .compose_png_with_annotations(
                 5,
-                1,
+                3,
                 &[PngPlacement {
                     png_data: png.as_slice(),
                     source_rect: PhysicalRect {
                         x: 0,
                         y: 0,
                         width: 5,
-                        height: 1,
+                        height: 3,
                     },
                     destination_rect: PhysicalRect {
                         x: 0,
                         y: 0,
                         width: 5,
-                        height: 1,
+                        height: 3,
                     },
                 }],
-                &[ImageAnnotation::Blur {
-                    rect: PhysicalRect {
-                        x: 1,
-                        y: 0,
-                        width: 3,
-                        height: 1,
+                &[
+                    ImageAnnotation::Line {
+                        start: PhysicalPoint { x: 0, y: 1 },
+                        end: PhysicalPoint { x: 4, y: 1 },
+                        color: [255, 77, 79, 255],
+                        stroke_width: 1,
                     },
-                    radius: 2,
-                }],
+                    ImageAnnotation::Eraser {
+                        points: vec![PhysicalPoint { x: 2, y: 1 }],
+                        stroke_width: 3,
+                    },
+                ],
             )
             .unwrap();
 
-        let blurred_center = png_pixel(&output, 2, 0);
-        assert_ne!(blurred_center, [255, 255, 255, 255]);
-        assert!(blurred_center[0] > 0);
-        assert_eq!(png_pixel(&output, 0, 0), [10, 10, 10, 255]);
-        assert_eq!(png_pixel(&output, 4, 0), [20, 20, 20, 255]);
+        assert_eq!(png_pixel(&output, 2, 1), [12, 34, 56, 255]);
+        assert_eq!(png_pixel(&output, 4, 1), [255, 77, 79, 255]);
     }
 
     #[test]
@@ -630,8 +569,44 @@ mod tests {
             )
             .unwrap();
 
-        assert!(count_pixels_with_color(&output, [255, 0, 0, 255]) > 8);
+        assert!(count_non_white_pixels(&output) > 8);
         assert_eq!(png_pixel(&output, 79, 31), [255, 255, 255, 255]);
+    }
+
+    #[test]
+    fn composes_png_with_chinese_text_annotation() {
+        let composer = CaptureImageComposer::new();
+        let white = make_solid_png(96, 40, [255, 255, 255, 255]);
+
+        let output = composer
+            .compose_png_with_annotations(
+                96,
+                40,
+                &[PngPlacement {
+                    png_data: white.as_slice(),
+                    source_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 96,
+                        height: 40,
+                    },
+                    destination_rect: PhysicalRect {
+                        x: 0,
+                        y: 0,
+                        width: 96,
+                        height: 40,
+                    },
+                }],
+                &[ImageAnnotation::Text {
+                    position: PhysicalPoint { x: 4, y: 28 },
+                    text: "中文".to_string(),
+                    color: [255, 0, 0, 255],
+                    font_size: 24,
+                }],
+            )
+            .unwrap();
+
+        assert!(count_non_white_pixels(&output) > 8);
     }
 
     #[test]

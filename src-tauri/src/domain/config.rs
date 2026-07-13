@@ -24,6 +24,7 @@ pub struct ScreenshotSettings {
     pub save_path: String,
     pub format: String,
     pub quality: u8,
+    pub annotation_colors: Vec<[u8; 4]>,
 }
 
 impl Default for ScreenshotSettings {
@@ -32,6 +33,14 @@ impl Default for ScreenshotSettings {
             save_path: String::new(),
             format: "png".to_string(),
             quality: 90,
+            annotation_colors: vec![
+                [255, 77, 79, 255],
+                [40, 167, 69, 255],
+                [24, 144, 255, 255],
+                [250, 219, 20, 255],
+                [255, 255, 255, 255],
+                [0, 0, 0, 255],
+            ],
         }
     }
 }

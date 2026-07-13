@@ -11,6 +11,7 @@ const settingsConfig = vi.hoisted(() => ({
       savePath: '/captures',
       format: 'png',
       quality: 90,
+      annotationColors: [[255, 77, 79, 255]],
     },
     updateScreenshotSettings: vi.fn(),
   },
@@ -63,16 +64,19 @@ describe('SaveSettingsPage durable settings', () => {
       savePath: '/next',
       format: 'png',
       quality: 90,
+      annotationColors: [[255, 77, 79, 255]],
     });
     expect(settingsConfig.state.updateScreenshotSettings).toHaveBeenNthCalledWith(2, {
       savePath: '/captures',
       format: 'jpg',
       quality: 90,
+      annotationColors: [[255, 77, 79, 255]],
     });
     expect(settingsConfig.state.updateScreenshotSettings).toHaveBeenNthCalledWith(3, {
       savePath: '/captures',
       format: 'png',
       quality: 82,
+      annotationColors: [[255, 77, 79, 255]],
     });
   });
 });

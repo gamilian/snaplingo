@@ -2,9 +2,9 @@ use crate::app_actions::{dispatch_app_action, AppAction, CaptureLaunchMode};
 use crate::domain::hotkey_config::{
     FILE_OCR_ACTION, INPUT_TRANSLATE_ACTION, OCR_CATEGORY, PIN_ACTION, PIN_SWITCH_GROUP_ACTION,
     PIN_TOGGLE_ALL_ACTION, SCREENSHOT_ACTION, SCREENSHOT_CATEGORY, SCREENSHOT_COPY_ACTION,
-    SCREENSHOT_CUSTOM_ACTION, SCREENSHOT_OCR_ACTION, SCREENSHOT_TRANSLATE_ACTION,
-    SELECTION_TRANSLATE_ACTION, SHOW_OCR_WINDOW_ACTION, SHOW_TRANSLATION_WINDOW_ACTION,
-    SILENT_SCREENSHOT_OCR_ACTION, TRANSLATION_CATEGORY,
+    SCREENSHOT_OCR_ACTION, SCREENSHOT_TRANSLATE_ACTION, SELECTION_TRANSLATE_ACTION,
+    SHOW_OCR_WINDOW_ACTION, SHOW_TRANSLATION_WINDOW_ACTION, SILENT_SCREENSHOT_OCR_ACTION,
+    TRANSLATION_CATEGORY,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -17,7 +17,7 @@ pub(crate) fn hotkey_action_binding(
     action_key: &str,
 ) -> Option<HotkeyActionBinding> {
     let action = match (category, action_key) {
-        (SCREENSHOT_CATEGORY, SCREENSHOT_ACTION | SCREENSHOT_CUSTOM_ACTION) => {
+        (SCREENSHOT_CATEGORY, SCREENSHOT_ACTION) => {
             AppAction::OpenCapture(CaptureLaunchMode::Screenshot)
         }
         (SCREENSHOT_CATEGORY, SCREENSHOT_COPY_ACTION) => {
@@ -64,9 +64,9 @@ mod tests {
     use crate::domain::hotkey_config::{
         DEFAULT_HOTKEYS, FILE_OCR_ACTION, INPUT_TRANSLATE_ACTION, OCR_CATEGORY, PIN_ACTION,
         PIN_SWITCH_GROUP_ACTION, PIN_TOGGLE_ALL_ACTION, SCREENSHOT_ACTION, SCREENSHOT_CATEGORY,
-        SCREENSHOT_COPY_ACTION, SCREENSHOT_CUSTOM_ACTION, SCREENSHOT_OCR_ACTION,
-        SCREENSHOT_TRANSLATE_ACTION, SELECTION_TRANSLATE_ACTION, SHOW_OCR_WINDOW_ACTION,
-        SHOW_TRANSLATION_WINDOW_ACTION, SILENT_SCREENSHOT_OCR_ACTION, TRANSLATION_CATEGORY,
+        SCREENSHOT_COPY_ACTION, SCREENSHOT_OCR_ACTION, SCREENSHOT_TRANSLATE_ACTION,
+        SELECTION_TRANSLATE_ACTION, SHOW_OCR_WINDOW_ACTION, SHOW_TRANSLATION_WINDOW_ACTION,
+        SILENT_SCREENSHOT_OCR_ACTION, TRANSLATION_CATEGORY,
     };
 
     #[test]
@@ -81,11 +81,6 @@ mod tests {
                 SCREENSHOT_CATEGORY,
                 SCREENSHOT_COPY_ACTION,
                 AppAction::OpenCapture(CaptureLaunchMode::ScreenshotCopy),
-            ),
-            (
-                SCREENSHOT_CATEGORY,
-                SCREENSHOT_CUSTOM_ACTION,
-                AppAction::OpenCapture(CaptureLaunchMode::Screenshot),
             ),
             (
                 SCREENSHOT_CATEGORY,
@@ -155,7 +150,7 @@ mod tests {
             .map(|hotkey| (hotkey.category, hotkey.action))
             .collect();
 
-        assert_eq!(cases.len(), 14);
+        assert_eq!(cases.len(), 13);
         assert_eq!(cases.len(), DEFAULT_HOTKEYS.len());
         assert_eq!(covered, defaults);
         assert!(hotkey_action_binding("unknown", "unknown").is_none());

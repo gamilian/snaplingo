@@ -5,6 +5,8 @@ describe('capture workspace platform runtime', () => {
   it('translates capture workspace actions into portable event and window calls', async () => {
     const cancelUnsubscribe = vi.fn();
     const copyUnsubscribe = vi.fn();
+    const undoUnsubscribe = vi.fn();
+    const redoUnsubscribe = vi.fn();
     const hotkeyUnsubscribe = vi.fn();
     const ports = {
       commands: {} as never,
@@ -12,6 +14,8 @@ describe('capture workspace platform runtime', () => {
       events: {
         subscribeCaptureCancel: vi.fn(async () => cancelUnsubscribe),
         subscribeCaptureCopy: vi.fn(async () => copyUnsubscribe),
+        subscribeCaptureUndo: vi.fn(async () => undoUnsubscribe),
+        subscribeCaptureRedo: vi.fn(async () => redoUnsubscribe),
         subscribeHotkeyTriggered: vi.fn(async () => hotkeyUnsubscribe),
       },
       window: {
@@ -23,6 +27,8 @@ describe('capture workspace platform runtime', () => {
     const runtime = createCaptureWorkspacePlatformRuntime(ports);
     const onCancel = vi.fn();
     const onCopy = vi.fn();
+    const onUndo = vi.fn();
+    const onRedo = vi.fn();
     const onHotkey = vi.fn();
 
     await expect(runtime.onCancelRequested(onCancel)).resolves.toBe(
@@ -30,6 +36,12 @@ describe('capture workspace platform runtime', () => {
     );
     await expect(runtime.onCopyRequested(onCopy)).resolves.toBe(
       copyUnsubscribe,
+    );
+    await expect(runtime.onUndoRequested(onUndo)).resolves.toBe(
+      undoUnsubscribe,
+    );
+    await expect(runtime.onRedoRequested(onRedo)).resolves.toBe(
+      redoUnsubscribe,
     );
     await expect(runtime.onHotkeyTriggered(onHotkey)).resolves.toBe(
       hotkeyUnsubscribe,
@@ -41,6 +53,8 @@ describe('capture workspace platform runtime', () => {
 
     expect(ports.events.subscribeCaptureCancel).toHaveBeenCalledWith(onCancel);
     expect(ports.events.subscribeCaptureCopy).toHaveBeenCalledWith(onCopy);
+    expect(ports.events.subscribeCaptureUndo).toHaveBeenCalledWith(onUndo);
+    expect(ports.events.subscribeCaptureRedo).toHaveBeenCalledWith(onRedo);
     expect(ports.events.subscribeHotkeyTriggered).toHaveBeenCalledWith(onHotkey);
     expect(ports.window.prepareForReveal).toHaveBeenCalledTimes(1);
     expect(ports.window.reveal).toHaveBeenCalledTimes(1);

@@ -1,24 +1,30 @@
 import type { PointerEvent, Ref } from 'react';
 import {
   annotationColorToCss,
-  arrowHeadPoints,
   type AnnotationStyle,
 } from './annotationStyle';
 import type { SelectionHandle } from './selection';
 import type { TextAnnotationDraft } from './textAnnotationDraft';
-import type { AnnotationCommand, LogicalRect, Point } from './types';
+import type { LogicalRect } from './types';
 
 const SELECTION_HANDLES: SelectionHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
 const resizeHandleClassNames: Record<SelectionHandle, string> = {
-  nw: '-left-1.5 -top-1.5 cursor-nwse-resize',
-  n: 'left-1/2 -top-1.5 -translate-x-1/2 cursor-ns-resize',
-  ne: '-right-1.5 -top-1.5 cursor-nesw-resize',
-  e: '-right-1.5 top-1/2 -translate-y-1/2 cursor-ew-resize',
-  se: '-bottom-1.5 -right-1.5 cursor-nwse-resize',
-  s: '-bottom-1.5 left-1/2 -translate-x-1/2 cursor-ns-resize',
-  sw: '-bottom-1.5 -left-1.5 cursor-nesw-resize',
-  w: '-left-1.5 top-1/2 -translate-y-1/2 cursor-ew-resize',
+  nw: '-left-0.5 -top-0.5 cursor-nwse-resize',
+  n: 'left-1/2 -top-0.5 -translate-x-1/2 cursor-ns-resize',
+  ne: '-right-0.5 -top-0.5 cursor-nesw-resize',
+  e: '-right-0.5 top-1/2 -translate-y-1/2 cursor-ew-resize',
+  se: '-bottom-0.5 -right-0.5 cursor-nwse-resize',
+  s: '-bottom-0.5 left-1/2 -translate-x-1/2 cursor-ns-resize',
+  sw: '-bottom-0.5 -left-0.5 cursor-nesw-resize',
+  w: '-left-0.5 top-1/2 -translate-y-1/2 cursor-ew-resize',
+};
+
+const resizeEdgeClassNames: Record<'n' | 'e' | 's' | 'w', string> = {
+  n: 'left-2 right-2 -top-1.5 h-3 cursor-ns-resize',
+  e: '-right-1.5 top-2 bottom-2 w-3 cursor-ew-resize',
+  s: 'left-2 right-2 -bottom-1.5 h-3 cursor-ns-resize',
+  w: '-left-1.5 top-2 bottom-2 w-3 cursor-ew-resize',
 };
 
 export function rectStyle(rect: LogicalRect) {
@@ -42,10 +48,6 @@ export function annotationRectToViewportRect(
   };
 }
 
-function svgPolylinePoints(points: Point[]) {
-  return points.map((point) => `${point.x},${point.y}`).join(' ');
-}
-
 interface CapturePreviewImageProps {
   imageBase64: string | null;
   selectionViewportRect: LogicalRect;
@@ -67,218 +69,54 @@ export function CapturePreviewImage({
   );
 }
 
-interface CaptureDraftAnnotationOverlayProps {
-  draftAnnotation: AnnotationCommand | null;
-  selectionViewportRect: LogicalRect;
-}
-
-export function CaptureDraftAnnotationOverlay({
-  draftAnnotation,
-  selectionViewportRect,
-}: CaptureDraftAnnotationOverlayProps) {
-  if (!draftAnnotation) return null;
-
-  if (draftAnnotation.type === 'rectangle') {
-    return (
-      <div
-        className="pointer-events-none absolute"
-        style={{
-          ...rectStyle(
-            annotationRectToViewportRect(
-              draftAnnotation.rect,
-              selectionViewportRect,
-            ),
-          ),
-          border: `${draftAnnotation.stroke_width}px solid ${annotationColorToCss(
-            draftAnnotation.color,
-          )}`,
-          backgroundColor: draftAnnotation.filled
-            ? annotationColorToCss(draftAnnotation.color)
-            : 'transparent',
-        }}
-      />
-    );
-  }
-
-  if (draftAnnotation.type === 'ellipse') {
-    return (
-      <svg
-        className="pointer-events-none absolute overflow-visible"
-        style={rectStyle(selectionViewportRect)}
-        viewBox={`0 0 ${selectionViewportRect.width} ${selectionViewportRect.height}`}
-        fill={
-          draftAnnotation.filled
-            ? annotationColorToCss(draftAnnotation.color)
-            : 'none'
-        }
-      >
-        <ellipse
-          cx={draftAnnotation.rect.x + draftAnnotation.rect.width / 2}
-          cy={draftAnnotation.rect.y + draftAnnotation.rect.height / 2}
-          rx={draftAnnotation.rect.width / 2}
-          ry={draftAnnotation.rect.height / 2}
-          stroke={annotationColorToCss(draftAnnotation.color)}
-          strokeWidth={draftAnnotation.stroke_width}
-        />
-      </svg>
-    );
-  }
-
-  if (draftAnnotation.type === 'mosaic') {
-    return (
-      <div
-        className="pointer-events-none absolute border border-white/70 bg-black/35"
-        style={{
-          ...rectStyle(
-            annotationRectToViewportRect(
-              draftAnnotation.rect,
-              selectionViewportRect,
-            ),
-          ),
-          backgroundImage:
-            'linear-gradient(45deg, rgba(255,255,255,0.2) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.2) 75%), linear-gradient(45deg, rgba(255,255,255,0.2) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.2) 75%)',
-          backgroundPosition: '0 0, 4px 4px',
-          backgroundSize: '8px 8px',
-        }}
-      />
-    );
-  }
-
-  if (draftAnnotation.type === 'blur') {
-    return (
-      <div
-        className="pointer-events-none absolute border border-white/70 bg-white/10"
-        style={{
-          ...rectStyle(
-            annotationRectToViewportRect(
-              draftAnnotation.rect,
-              selectionViewportRect,
-            ),
-          ),
-          backdropFilter: `blur(${draftAnnotation.radius}px)`,
-        }}
-      />
-    );
-  }
-
-  if (draftAnnotation.type === 'line') {
-    return (
-      <svg
-        className="pointer-events-none absolute overflow-visible"
-        style={rectStyle(selectionViewportRect)}
-        viewBox={`0 0 ${selectionViewportRect.width} ${selectionViewportRect.height}`}
-        fill="none"
-      >
-        <line
-          x1={draftAnnotation.start.x}
-          y1={draftAnnotation.start.y}
-          x2={draftAnnotation.end.x}
-          y2={draftAnnotation.end.y}
-          stroke={annotationColorToCss(draftAnnotation.color)}
-          strokeWidth={draftAnnotation.stroke_width}
-          strokeLinecap="round"
-        />
-      </svg>
-    );
-  }
-
-  if (draftAnnotation.type === 'arrow') {
-    const points = arrowHeadPoints(
-      draftAnnotation.start,
-      draftAnnotation.end,
-      draftAnnotation.stroke_width,
-    );
-
-    return (
-      <svg
-        className="pointer-events-none absolute overflow-visible"
-        style={rectStyle(selectionViewportRect)}
-        viewBox={`0 0 ${selectionViewportRect.width} ${selectionViewportRect.height}`}
-        fill="none"
-      >
-        <line
-          x1={draftAnnotation.start.x}
-          y1={draftAnnotation.start.y}
-          x2={draftAnnotation.end.x}
-          y2={draftAnnotation.end.y}
-          stroke={annotationColorToCss(draftAnnotation.color)}
-          strokeWidth={draftAnnotation.stroke_width}
-          strokeLinecap="round"
-        />
-        {points && (
-          <polygon
-            points={points}
-            fill={annotationColorToCss(draftAnnotation.color)}
-          />
-        )}
-      </svg>
-    );
-  }
-
-  if (draftAnnotation.type === 'freehand' || draftAnnotation.type === 'highlight') {
-    return (
-      <svg
-        className="pointer-events-none absolute overflow-visible"
-        style={rectStyle(selectionViewportRect)}
-        viewBox={`0 0 ${selectionViewportRect.width} ${selectionViewportRect.height}`}
-        fill="none"
-      >
-        <polyline
-          points={svgPolylinePoints(draftAnnotation.points)}
-          stroke={annotationColorToCss(draftAnnotation.color)}
-          strokeWidth={draftAnnotation.stroke_width}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    );
-  }
-
-  if (draftAnnotation.type === 'text') {
-    return (
-      <div
-        className="pointer-events-none absolute whitespace-pre"
-        style={{
-          left: `${selectionViewportRect.x + draftAnnotation.position.x}px`,
-          top: `${
-            selectionViewportRect.y +
-            draftAnnotation.position.y -
-            draftAnnotation.font_size
-          }px`,
-          color: annotationColorToCss(draftAnnotation.color),
-          fontSize: `${draftAnnotation.font_size}px`,
-          lineHeight: 1,
-        }}
-      >
-        {draftAnnotation.text}
-      </div>
-    );
-  }
-
-  return null;
-}
-
 interface CaptureSelectedAnnotationBoundsOverlayProps {
   selectedAnnotationBounds: LogicalRect | null;
   selectionViewportRect: LogicalRect;
+  onResizeHandlePointerDown: (
+    handle: SelectionHandle,
+    event: PointerEvent<HTMLButtonElement>,
+  ) => void;
 }
 
 export function CaptureSelectedAnnotationBoundsOverlay({
   selectedAnnotationBounds,
   selectionViewportRect,
+  onResizeHandlePointerDown,
 }: CaptureSelectedAnnotationBoundsOverlayProps) {
   if (!selectedAnnotationBounds) return null;
 
   return (
     <div
-      className="pointer-events-none absolute border border-dashed border-white shadow-[0_0_0_1px_rgba(0,0,0,0.55)]"
-      style={rectStyle(
-        annotationRectToViewportRect(
-          selectedAnnotationBounds,
-          selectionViewportRect,
+      className="pointer-events-none absolute border border-dashed border-white/75 shadow-[0_0_0_1px_rgba(0,0,0,0.45)]"
+      style={{
+        ...rectStyle(
+          annotationRectToViewportRect(
+            selectedAnnotationBounds,
+            selectionViewportRect,
+          ),
         ),
-      )}
-    />
+        zIndex: 4,
+      }}
+    >
+      {(['n', 'e', 's', 'w'] as const).map((handle) => (
+        <button
+          key={`edge-${handle}`}
+          type="button"
+          className={`pointer-events-auto absolute border-0 bg-transparent p-0 ${resizeEdgeClassNames[handle]}`}
+          aria-label={`Resize annotation edge ${handle}`}
+          onPointerDown={(event) => onResizeHandlePointerDown(handle, event)}
+        />
+      ))}
+      {SELECTION_HANDLES.map((handle) => (
+        <button
+          key={handle}
+          type="button"
+          className={`pointer-events-auto absolute z-[3] h-1.5 w-1.5 rounded-full border border-white/80 bg-slate-700/55 p-0 shadow-[0_0_0_1px_rgba(0,0,0,0.3)] ${resizeHandleClassNames[handle]}`}
+          aria-label={`Resize annotation ${handle}`}
+          onPointerDown={(event) => onResizeHandlePointerDown(handle, event)}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -301,11 +139,18 @@ export function CaptureTextDraftEditor({
   onTextChange,
   onDiscard,
 }: CaptureTextDraftEditorProps) {
+  const lines = textDraft.text.split('\n');
+  const longestLine = Math.max(...lines.map((line) => line.length), 1);
+  const inputWidth = Math.min(
+    Math.max(40, Math.ceil(longestLine * textDraft.fontSize * 0.62 + 12)),
+    Math.max(40, selectionViewportRect.width - textDraft.position.x),
+  );
+
   return (
     <textarea
       ref={inputRef}
       data-screenshot-text-draft="true"
-      className="absolute resize-none overflow-hidden border border-white/70 bg-black/15 px-1 py-0 text-left outline-none ring-1 ring-black/35"
+      className="absolute resize-none overflow-hidden border border-transparent bg-transparent px-1 py-0 text-left outline-none ring-0 hover:border-white/70 focus:border-white/70 focus:shadow-[0_0_0_1px_rgba(0,0,0,0.45)]"
       style={{
         left: `${selectionViewportRect.x + textDraft.position.x}px`,
         top: `${
@@ -313,8 +158,8 @@ export function CaptureTextDraftEditor({
           textDraft.position.y -
           textDraft.fontSize
         }px`,
-        width: `${Math.max(160, selectionViewportRect.width - textDraft.position.x)}px`,
-        minHeight: `${Math.ceil(textDraft.fontSize * 1.35)}px`,
+        width: `${inputWidth}px`,
+        minHeight: `${Math.ceil(textDraft.fontSize * 1.35 * lines.length)}px`,
         color: annotationColorToCss(annotationStyle.color),
         fontSize: `${textDraft.fontSize}px`,
         lineHeight: 1.2,
@@ -382,6 +227,14 @@ export function CaptureSelectionResizeHandles({
       className="absolute pointer-events-none"
       style={{ ...rectStyle(selectionViewportRect), zIndex: 2 }}
     >
+      {(['n', 'e', 's', 'w'] as const).map((handle) => (
+        <button
+          key={`edge-${handle}`}
+          className={`pointer-events-auto absolute border-0 bg-transparent p-0 ${resizeEdgeClassNames[handle]}`}
+          aria-label={`Resize selection edge ${handle}`}
+          onPointerDown={(event) => onResizeHandlePointerDown(handle, event)}
+        />
+      ))}
       {SELECTION_HANDLES.map((handle) => (
         <button
           key={handle}

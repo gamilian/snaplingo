@@ -7,6 +7,16 @@ use syn::{
     Attribute, ExprBlock, Field, ForeignItem, ImplItem, Item, ItemUse, TraitItem, UseTree, Variant,
 };
 
+const FORBIDDEN_APPLICATION_DEPENDENCIES: &[&str] = &[
+    "infrastructure",
+    "commands",
+    "composition",
+    "app_actions",
+    "app_shell",
+    "settings_window",
+    "startup_shortcuts",
+];
+
 #[derive(Clone)]
 struct SourceFile {
     path: String,
@@ -180,12 +190,12 @@ fn expand_use_tree(tree: &UseTree, mut prefix: Vec<String>, output: &mut BTreeSe
 }
 
 fn record_dependency(path: Vec<String>, output: &mut BTreeSet<String>) {
-    if path.get(0).map(String::as_str) == Some("crate")
-        && matches!(
-            path.get(1).map(String::as_str),
-            Some("infrastructure") | Some("startup_shortcuts")
-        )
-    {
+    let is_forbidden = path.first().map(String::as_str) == Some("crate")
+        && path
+            .get(1)
+            .is_some_and(|module| FORBIDDEN_APPLICATION_DEPENDENCIES.contains(&module.as_str()));
+
+    if is_forbidden {
         output.insert(path.join("::"));
     }
 }
@@ -200,33 +210,25 @@ fn has_cfg_test(attributes: &[Attribute]) -> bool {
 }
 
 #[test]
-fn application_production_sources_do_not_import_infrastructure() {
+fn application_production_sources_do_not_import_outward_adapters() {
     assert_eq!(
-        dependency_inventory(&production_application_sources())
-            .into_iter()
-            .filter(|dependency| dependency.contains(" -> crate::infrastructure"))
-            .collect::<BTreeSet<_>>(),
+        dependency_inventory(&production_application_sources()),
         BTreeSet::<String>::new()
     );
 }
 
 #[test]
-fn application_production_sources_do_not_import_root_adapters() {
-    assert_eq!(
-        dependency_inventory(&production_application_sources())
-            .into_iter()
-            .filter(|dependency| dependency.contains(" -> crate::startup_shortcuts"))
-            .collect::<BTreeSet<_>>(),
-        BTreeSet::<String>::new()
-    );
-}
-
-#[test]
-fn rejects_an_unlisted_synthetic_dependency() {
+fn rejects_forbidden_synthetic_dependencies() {
     let files = [SourceFile {
         path: "src/application/example.rs".to_string(),
         source: r#"
+            use crate::app_actions::AppAction;
+            use crate::app_shell::apply_resting_activation_policy;
+            use crate::commands::trigger_screenshot;
+            use crate::composition::build_app_state;
             use crate::infrastructure::storage::{ConfigFile, Keychain};
+            use crate::settings_window::show_settings_window;
+            use crate::startup_shortcuts::trigger_hotkey_action;
             fn call() { crate::infrastructure::http::send(); }
             // use crate::infrastructure::comments::Ignored;
             const TEXT: &str = "crate::infrastructure::strings::Ignored";
@@ -256,6 +258,10 @@ fn rejects_an_unlisted_synthetic_dependency() {
     assert_eq!(
         dependency_inventory(&files).into_iter().collect::<Vec<_>>(),
         vec![
+            "src/application/example.rs -> crate::app_actions::AppAction",
+            "src/application/example.rs -> crate::app_shell::apply_resting_activation_policy",
+            "src/application/example.rs -> crate::commands::trigger_screenshot",
+            "src/application/example.rs -> crate::composition::build_app_state",
             "src/application/example.rs -> crate::infrastructure::Enum::Variant",
             "src/application/example.rs -> crate::infrastructure::Foo",
             "src/application/example.rs -> crate::infrastructure::SomeImplTrait",
@@ -263,6 +269,8 @@ fn rejects_an_unlisted_synthetic_dependency() {
             "src/application/example.rs -> crate::infrastructure::http::send",
             "src/application/example.rs -> crate::infrastructure::storage::ConfigFile",
             "src/application/example.rs -> crate::infrastructure::storage::Keychain",
+            "src/application/example.rs -> crate::settings_window::show_settings_window",
+            "src/application/example.rs -> crate::startup_shortcuts::trigger_hotkey_action",
         ]
     );
 }

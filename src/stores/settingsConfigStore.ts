@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { SettingsRuntime } from '../application/settings/runtime';
 import type {
+  AnnotationColorPreset,
   GeneralSettings,
   ScreenshotSettings,
   SettingsSnapshot,
@@ -48,6 +49,9 @@ interface SettingsConfigState {
   hydrate: () => Promise<SettingsSnapshot>;
   updateGeneralSettings: (input: GeneralSettings) => Promise<SettingsSnapshot>;
   updateScreenshotSettings: (input: ScreenshotSettings) => Promise<SettingsSnapshot>;
+  updateAnnotationColors: (
+    colors: AnnotationColorPreset[],
+  ) => Promise<SettingsSnapshot>;
   updateTranslationSettings: (input: TranslationSettings) => Promise<SettingsSnapshot>;
 }
 
@@ -170,6 +174,7 @@ async function migrateLegacyDurableSettings(snapshot: SettingsSnapshot) {
       quality: hasNumber(state.screenshotQuality)
         ? state.screenshotQuality
         : nextSnapshot.screenshot.quality,
+      annotationColors: nextSnapshot.screenshot.annotationColors,
     });
     migrated = true;
   }
@@ -220,6 +225,11 @@ export const useSettingsConfigStore = create<SettingsConfigState>((set, get) => 
   },
   updateScreenshotSettings: async (input) => {
     const snapshot = await settingsRuntime().updateScreenshot(input);
+    applySnapshot(set, snapshot);
+    return snapshot;
+  },
+  updateAnnotationColors: async (colors) => {
+    const snapshot = await settingsRuntime().updateAnnotationColors(colors);
     applySnapshot(set, snapshot);
     return snapshot;
   },
