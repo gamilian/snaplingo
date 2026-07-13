@@ -226,7 +226,7 @@ fn rejects_forbidden_synthetic_dependencies() {
             use crate::app_shell::apply_resting_activation_policy;
             use crate::commands::trigger_screenshot;
             use crate::composition::build_app_state;
-            use crate::infrastructure::storage::{ConfigFile, Keychain};
+            use crate::infrastructure::storage::{SqliteConfigStore, Keychain};
             use crate::settings_window::show_settings_window;
             use crate::startup_shortcuts::trigger_hotkey_action;
             fn call() { crate::infrastructure::http::send(); }
@@ -267,8 +267,8 @@ fn rejects_forbidden_synthetic_dependencies() {
             "src/application/example.rs -> crate::infrastructure::SomeImplTrait",
             "src/application/example.rs -> crate::infrastructure::SomeTraitBound",
             "src/application/example.rs -> crate::infrastructure::http::send",
-            "src/application/example.rs -> crate::infrastructure::storage::ConfigFile",
             "src/application/example.rs -> crate::infrastructure::storage::Keychain",
+            "src/application/example.rs -> crate::infrastructure::storage::SqliteConfigStore",
             "src/application/example.rs -> crate::settings_window::show_settings_window",
             "src/application/example.rs -> crate::startup_shortcuts::trigger_hotkey_action",
         ]

@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import type {
   OcrHistoryEntry,
   TranslationHistoryEntry,
@@ -65,16 +64,16 @@ interface HistoryState {
   addTranslationHistory: (item: Omit<TranslationHistoryItem, 'id' | 'timestamp' | 'favorite' | 'entryId' | 'resultIndex'>) => void;
   deleteTranslationHistory: (id: string) => Promise<void>;
   deleteTranslationEntry: (entryId: number) => Promise<void>; // 删除整个 entry
-  toggleTranslationFavorite: (id: string) => void;
-  updateTranslationNote: (id: string, note: string) => void;
+  toggleTranslationFavorite: (id: string) => Promise<void>;
+  updateTranslationNote: (id: string, note: string) => Promise<void>;
   clearTranslationHistory: () => Promise<void>;
 
   // OCR 历史
   loadOcrHistory: (limit?: number, offset?: number) => Promise<void>;
   addOcrHistory: (item: Omit<OcrHistoryItem, 'id' | 'timestamp' | 'favorite'>) => void;
   deleteOcrHistory: (id: string) => Promise<void>;
-  toggleOcrFavorite: (id: string) => void;
-  updateOcrNote: (id: string, note: string) => void;
+  toggleOcrFavorite: (id: string) => Promise<void>;
+  updateOcrNote: (id: string, note: string) => Promise<void>;
   clearOcrHistory: () => Promise<void>;
 }
 
@@ -92,14 +91,27 @@ function flattenTranslationEntries(entries: TranslationHistoryEntry[]): Translat
       targetLang: entry.targetLang,
       provider: result.providerId || entry.providersUsed[index] || 'Unknown',
       timestamp: new Date(entry.timestamp).getTime(),
-      favorite: false,
+      favorite: entry.favorite,
+      note: entry.note ?? undefined,
+      tags: entry.tags,
     }));
   });
 }
 
-export const useHistoryStore = create<HistoryState>()(
-  persist(
-    (set, get) => ({
+function flattenOcrEntries(entries: OcrHistoryEntry[]): OcrHistoryItem[] {
+  return entries.map((entry) => ({
+    id: String(entry.id),
+    type: 'screenshot' as const,
+    text: entry.recognizedText,
+    language: entry.language || 'Unknown',
+    timestamp: new Date(entry.timestamp).getTime(),
+    favorite: entry.favorite,
+    note: entry.note ?? undefined,
+    tags: entry.tags,
+  }));
+}
+
+export const useHistoryStore = create<HistoryState>((set, get) => ({
       // 原始数据
       rawTranslationEntries: [],
       rawOcrEntries: [],
@@ -125,17 +137,9 @@ export const useHistoryStore = create<HistoryState>()(
       loadOcrHistory: async (limit = 100, offset = 0) => {
         try {
           const entries = await runtime().loadOcr(limit, offset);
-          const converted = entries.map((entry) => ({
-            id: String(entry.id),
-            type: 'screenshot' as const,
-            text: entry.recognizedText,
-            language: entry.language || 'Unknown',
-            timestamp: new Date(entry.timestamp).getTime(),
-            favorite: false,
-          }));
           set({
             rawOcrEntries: entries,
-            ocrHistory: converted,
+            ocrHistory: flattenOcrEntries(entries),
           });
         } catch (error) {
           console.error('Failed to load OCR history:', error);
@@ -206,19 +210,37 @@ export const useHistoryStore = create<HistoryState>()(
         }
       },
 
-      toggleTranslationFavorite: (id) =>
-        set((state) => ({
-          translationHistory: state.translationHistory.map((item) =>
-            item.id === id ? { ...item, favorite: !item.favorite } : item
-          ),
-        })),
+      toggleTranslationFavorite: async (id) => {
+        const item = get().translationHistory.find((entry) => entry.id === id);
+        if (!item) return;
 
-      updateTranslationNote: (id, note) =>
+        const favorite = !item.favorite;
+        await runtime().setFavorite(item.entryId, favorite);
         set((state) => ({
-          translationHistory: state.translationHistory.map((item) =>
-            item.id === id ? { ...item, note } : item
+          rawTranslationEntries: state.rawTranslationEntries.map((entry) =>
+            entry.id === item.entryId ? { ...entry, favorite } : entry
           ),
-        })),
+          translationHistory: state.translationHistory.map((entry) =>
+            entry.entryId === item.entryId ? { ...entry, favorite } : entry
+          ),
+        }));
+      },
+
+      updateTranslationNote: async (id, note) => {
+        const item = get().translationHistory.find((entry) => entry.id === id);
+        if (!item) return;
+
+        const persistedNote = note.trim() || null;
+        await runtime().updateNote(item.entryId, persistedNote);
+        set((state) => ({
+          rawTranslationEntries: state.rawTranslationEntries.map((entry) =>
+            entry.id === item.entryId ? { ...entry, note: persistedNote } : entry
+          ),
+          translationHistory: state.translationHistory.map((entry) =>
+            entry.entryId === item.entryId ? { ...entry, note: persistedNote ?? undefined } : entry
+          ),
+        }));
+      },
 
       clearTranslationHistory: async () => {
         try {
@@ -255,18 +277,9 @@ export const useHistoryStore = create<HistoryState>()(
           await runtime().deleteEntry(dbId);
 
           const newRawEntries = get().rawOcrEntries.filter(e => e.id !== dbId);
-          const converted = newRawEntries.map((entry) => ({
-            id: String(entry.id),
-            type: 'screenshot' as const,
-            text: entry.recognizedText,
-            language: entry.language || 'Unknown',
-            timestamp: new Date(entry.timestamp).getTime(),
-            favorite: false,
-          }));
-
           set({
             rawOcrEntries: newRawEntries,
-            ocrHistory: converted,
+            ocrHistory: flattenOcrEntries(newRawEntries),
           });
         } catch (error) {
           console.error('Failed to delete OCR history:', error);
@@ -274,19 +287,39 @@ export const useHistoryStore = create<HistoryState>()(
         }
       },
 
-      toggleOcrFavorite: (id) =>
-        set((state) => ({
-          ocrHistory: state.ocrHistory.map((item) =>
-            item.id === id ? { ...item, favorite: !item.favorite } : item
-          ),
-        })),
+      toggleOcrFavorite: async (id) => {
+        const item = get().ocrHistory.find((entry) => entry.id === id);
+        if (!item) return;
 
-      updateOcrNote: (id, note) =>
+        const historyId = Number(id);
+        const favorite = !item.favorite;
+        await runtime().setFavorite(historyId, favorite);
         set((state) => ({
-          ocrHistory: state.ocrHistory.map((item) =>
-            item.id === id ? { ...item, note } : item
+          rawOcrEntries: state.rawOcrEntries.map((entry) =>
+            entry.id === historyId ? { ...entry, favorite } : entry
           ),
-        })),
+          ocrHistory: state.ocrHistory.map((entry) =>
+            entry.id === id ? { ...entry, favorite } : entry
+          ),
+        }));
+      },
+
+      updateOcrNote: async (id, note) => {
+        const item = get().ocrHistory.find((entry) => entry.id === id);
+        if (!item) return;
+
+        const historyId = Number(id);
+        const persistedNote = note.trim() || null;
+        await runtime().updateNote(historyId, persistedNote);
+        set((state) => ({
+          rawOcrEntries: state.rawOcrEntries.map((entry) =>
+            entry.id === historyId ? { ...entry, note: persistedNote } : entry
+          ),
+          ocrHistory: state.ocrHistory.map((entry) =>
+            entry.id === id ? { ...entry, note: persistedNote ?? undefined } : entry
+          ),
+        }));
+      },
 
       clearOcrHistory: async () => {
         try {
@@ -302,9 +335,4 @@ export const useHistoryStore = create<HistoryState>()(
           throw error;
         }
       },
-    }),
-    {
-      name: 'snaplingo-history',
-    }
-  )
-);
+}));

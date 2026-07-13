@@ -2,6 +2,7 @@ import type {
   AnnotationColorPreset,
   DurableSettingsPort,
   GeneralSettings,
+  HotkeyCategory,
   HotkeySnapshot,
   HotkeyUpdateInput,
   HotkeyUpdateOutcome,
@@ -44,7 +45,10 @@ export interface SettingsRuntime {
   providers: SettingsProvidersPort;
   hotkeys: {
     load(): Promise<HotkeySnapshot>;
+    loadDefaults(): Promise<HotkeySnapshot>;
     update(input: HotkeyUpdateInput): Promise<HotkeyUpdateOutcome>;
+    reset(category: HotkeyCategory, action: string): Promise<HotkeyUpdateOutcome>;
+    resetCategory(category: HotkeyCategory): Promise<HotkeySnapshot>;
   };
   history: {
     loadTranslation(
@@ -53,6 +57,9 @@ export interface SettingsRuntime {
     ): Promise<TranslationHistoryEntry[]>;
     loadOcr(limit: number, offset: number): Promise<OcrHistoryEntry[]>;
     deleteEntry(id: number): Promise<void>;
+    setFavorite(id: number, favorite: boolean): Promise<void>;
+    updateNote(id: number, note: string | null): Promise<void>;
+    replaceTags(id: number, tags: string[]): Promise<void>;
     clear(): Promise<void>;
   };
   clipboard: {
@@ -84,13 +91,19 @@ export function createSettingsRuntime(
     providers: ports.providers,
     hotkeys: {
       load: () => ports.hotkeys.getHotkeySnapshot(),
+      loadDefaults: () => ports.hotkeys.getDefaultHotkeySnapshot(),
       update: (input) => ports.hotkeys.updateHotkey(input),
+      reset: (category, action) => ports.hotkeys.resetHotkey(category, action),
+      resetCategory: (category) => ports.hotkeys.resetHotkeyCategory(category),
     },
     history: {
       loadTranslation: (limit, offset) =>
         ports.history.getTranslationHistory(limit, offset),
       loadOcr: (limit, offset) => ports.history.getOcrHistory(limit, offset),
       deleteEntry: (id) => ports.history.deleteHistory(id),
+      setFavorite: (id, favorite) => ports.history.setHistoryFavorite(id, favorite),
+      updateNote: (id, note) => ports.history.updateHistoryNote(id, note),
+      replaceTags: (id, tags) => ports.history.replaceHistoryTags(id, tags),
       clear: () => ports.history.clearAllHistory(),
     },
     clipboard: {

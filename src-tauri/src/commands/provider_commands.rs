@@ -7,7 +7,7 @@ use crate::application::providers::{
 use crate::infrastructure::llm::LLMProtocol;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tauri::State;
+use tauri::{AppHandle, State};
 
 impl From<CustomTranslationProviderView> for ProviderInfo {
     fn from(view: CustomTranslationProviderView) -> Self {
@@ -65,37 +65,46 @@ fn order_provider_infos_for_display(
 #[tauri::command]
 pub async fn activate_translation_provider(
     provider_id: String,
+    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     state
         .providers
         .configuration
         .activate_provider(provider_id)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    super::state_events::emit_state_changed(&app, super::state_events::PROVIDERS_CHANGED_EVENT);
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn deactivate_translation_provider(
     provider_id: String,
+    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     state
         .providers
         .configuration
         .deactivate_provider(provider_id)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    super::state_events::emit_state_changed(&app, super::state_events::PROVIDERS_CHANGED_EVENT);
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn reorder_active_translation_providers(
     provider_ids: Vec<String>,
+    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     state
         .providers
         .configuration
         .reorder_active_providers(provider_ids)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    super::state_events::emit_state_changed(&app, super::state_events::PROVIDERS_CHANGED_EVENT);
+    Ok(())
 }
 
 #[tauri::command]
@@ -114,6 +123,7 @@ pub async fn get_provider_credential_schema(
 pub async fn configure_translation_provider_credentials(
     provider_id: String,
     credentials: HashMap<String, String>,
+    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     let cred_values: Vec<CredentialValue> = credentials
@@ -125,7 +135,9 @@ pub async fn configure_translation_provider_credentials(
         .providers
         .configuration
         .save_credentials(provider_id, cred_values)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    super::state_events::emit_state_changed(&app, super::state_events::PROVIDERS_CHANGED_EVENT);
+    Ok(())
 }
 
 #[derive(Serialize, Deserialize)]
@@ -173,6 +185,7 @@ pub struct OpenAICompatibleModelInfo {
 #[tauri::command]
 pub async fn add_custom_translation_provider(
     request: AddCustomTranslationProviderRequest,
+    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<ProviderInfo, String> {
     let input = AddCustomTranslationProviderInput {
@@ -192,6 +205,7 @@ pub async fn add_custom_translation_provider(
         .add(input)
         .map_err(|e| e.to_string())?;
 
+    super::state_events::emit_state_changed(&app, super::state_events::PROVIDERS_CHANGED_EVENT);
     Ok(ProviderInfo::from(view))
 }
 
@@ -199,6 +213,7 @@ pub async fn add_custom_translation_provider(
 pub async fn update_custom_translation_provider(
     provider_id: String,
     request: UpdateCustomTranslationProviderRequest,
+    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<ProviderInfo, String> {
     let input = UpdateCustomTranslationProviderInput {
@@ -225,6 +240,7 @@ pub async fn update_custom_translation_provider(
         .get_active()
         .iter()
         .any(|provider| provider.read().id() == provider_id);
+    super::state_events::emit_state_changed(&app, super::state_events::PROVIDERS_CHANGED_EVENT);
     Ok(info)
 }
 
@@ -238,13 +254,16 @@ pub async fn list_translation_prompt_strategies(
 #[tauri::command]
 pub async fn save_translation_prompt_strategies(
     config: TranslationPromptStrategyConfig,
+    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<TranslationPromptStrategyConfig, String> {
-    state
+    let config = state
         .providers
         .prompt_strategies
         .save(config)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    super::state_events::emit_state_changed(&app, super::state_events::PROVIDERS_CHANGED_EVENT);
+    Ok(config)
 }
 
 #[tauri::command]
@@ -397,13 +416,16 @@ pub async fn test_custom_translation_provider(
 #[tauri::command]
 pub async fn remove_custom_translation_provider(
     provider_id: String,
+    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     state
         .providers
         .configuration
         .remove(provider_id)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    super::state_events::emit_state_changed(&app, super::state_events::PROVIDERS_CHANGED_EVENT);
+    Ok(())
 }
 
 fn validate_non_blank<'a>(value: &'a str, label: &str) -> Result<&'a str, String> {

@@ -410,7 +410,7 @@ mod tests {
     };
     use crate::application::providers::{DEFAULT_PROMPT_STRATEGY_ID, SMART_PROMPT_STRATEGY_ID};
     use crate::domain::translation::TranslationRequest;
-    use crate::infrastructure::storage::ConfigFile;
+    use crate::infrastructure::storage::SqliteConfigStore;
     use anyhow::Result;
     use async_trait::async_trait;
 
@@ -633,7 +633,7 @@ mod tests {
             &def,
             mock_llm_runtime("Bonjour"),
             "key".into(),
-            Arc::new(ConfigFile::new_temp()),
+            Arc::new(SqliteConfigStore::new_temp()),
         );
 
         assert_eq!(provider.id(), "custom-test");
@@ -655,7 +655,7 @@ mod tests {
                 &def,
                 mock_llm_runtime("Bonjour"),
                 "key".into(),
-                Arc::new(ConfigFile::new_temp()),
+                Arc::new(SqliteConfigStore::new_temp()),
             );
 
             let result = provider.translate(&translation_request()).await.unwrap();
@@ -682,7 +682,7 @@ mod tests {
             &def,
             llm_runtime,
             "key".into(),
-            Arc::new(ConfigFile::new_temp()),
+            Arc::new(SqliteConfigStore::new_temp()),
         );
         provider.translate(&translation_request()).await.unwrap();
 
@@ -1349,7 +1349,7 @@ mod provider_configuration_tests {
     use super::*;
     use crate::application::providers::translation::TranslationCoordinator;
     use crate::application::providers::{HttpClient, HttpResponse, LlmRuntime};
-    use crate::infrastructure::storage::{ConfigFile, Keychain, KeychainBackend};
+    use crate::infrastructure::storage::{Database, Keychain, KeychainBackend, SqliteConfigStore};
     use anyhow::Result;
     use async_trait::async_trait;
     use std::collections::HashMap;
@@ -1425,11 +1425,16 @@ mod provider_configuration_tests {
     }
 
     fn test_provider_configuration() -> ProviderConfiguration {
+        test_provider_configuration_with_database().0
+    }
+
+    fn test_provider_configuration_with_database() -> (ProviderConfiguration, Arc<Database>) {
         let keychain = Arc::new(Keychain::with_backend(StubKeychainBackend::new()));
-        let config_file = Arc::new(ConfigFile::new_temp());
+        let database = Arc::new(Database::in_memory().unwrap());
+        let config_store = Arc::new(SqliteConfigStore::new(database.clone()));
         let http_client: Arc<dyn HttpClient> = Arc::new(MockHttpClient);
         let llm_runtime = llm_runtime_from_http(http_client.clone());
-        let coordinator = Arc::new(TranslationCoordinator::new(config_file.clone()));
+        let coordinator = Arc::new(TranslationCoordinator::new(config_store.clone()));
         let llm_introspection = Arc::new(crate::application::providers::LlmIntrospection::new(
             llm_runtime.clone(),
         ));
@@ -1439,13 +1444,55 @@ mod provider_configuration_tests {
         let deeplx_provider = DeepLProvider::new(http_client.clone());
         let _ = coordinator.register(deeplx_provider);
 
-        ProviderConfiguration::new(
-            config_file,
-            keychain,
-            llm_runtime,
-            coordinator,
-            llm_introspection,
+        (
+            ProviderConfiguration::new(
+                config_store,
+                keychain,
+                llm_runtime,
+                coordinator,
+                llm_introspection,
+            ),
+            database,
         )
+    }
+
+    #[test]
+    fn custom_provider_credentials_are_not_written_to_sqlite() {
+        let (config, database) = test_provider_configuration_with_database();
+        let secret = "sqlite-secret-sentinel";
+
+        let view = config
+            .add(AddCustomTranslationProviderInput {
+                name: "Credential Boundary Test".to_string(),
+                protocol: "openai".to_string(),
+                endpoint: "https://api.example.com/v1".to_string(),
+                model: "test-model".to_string(),
+                api_key: secret.to_string(),
+                reasoning_level: None,
+                prompt_strategy_id: None,
+                prompt_fallback_strategy_id: None,
+            })
+            .unwrap();
+
+        let sqlite_payloads = database
+            .with_connection(|connection| {
+                Ok(connection.query_row(
+                    "SELECT COALESCE(group_concat(payload_json, '\n'), '') FROM settings",
+                    [],
+                    |row| row.get::<_, String>(0),
+                )?)
+            })
+            .unwrap();
+
+        assert!(sqlite_payloads.contains("Credential Boundary Test"));
+        assert!(!sqlite_payloads.contains(secret));
+        assert_eq!(
+            config
+                .credential_store
+                .load_provider_credential(&view.id)
+                .unwrap(),
+            secret
+        );
     }
 
     #[test]
@@ -1730,7 +1777,7 @@ mod provider_configuration_tests {
         let backend_for_config = failing_backend.clone();
 
         let keychain = Arc::new(Keychain::with_backend(failing_backend));
-        let config_file = Arc::new(ConfigFile::new_temp());
+        let config_file = Arc::new(SqliteConfigStore::new_temp());
         let http_client: Arc<dyn HttpClient> = Arc::new(MockHttpClient);
         let llm_runtime = llm_runtime_from_http(http_client.clone());
         let coordinator = Arc::new(TranslationCoordinator::new(config_file.clone()));

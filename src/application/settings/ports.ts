@@ -181,12 +181,21 @@ export interface HotkeyUpdateOutcome {
 
 export interface SettingsHotkeysPort {
   getHotkeySnapshot(): Promise<HotkeySnapshot>;
+  getDefaultHotkeySnapshot(): Promise<HotkeySnapshot>;
   updateHotkey(input: HotkeyUpdateInput): Promise<HotkeyUpdateOutcome>;
+  resetHotkey(
+    category: HotkeyCategory,
+    action: string,
+  ): Promise<HotkeyUpdateOutcome>;
+  resetHotkeyCategory(category: HotkeyCategory): Promise<HotkeySnapshot>;
 }
 
 export interface TranslationHistoryEntry {
-  id: number;
-  timestamp: string;
+    id: number;
+    timestamp: string;
+    favorite: boolean;
+    note: string | null;
+    tags: string[];
   sourceText: string;
   sourceLang: string;
   targetLang: string;
@@ -201,8 +210,11 @@ export interface TranslationHistoryEntry {
 }
 
 export interface OcrHistoryEntry {
-  id: number;
-  timestamp: string;
+    id: number;
+    timestamp: string;
+    favorite: boolean;
+    note: string | null;
+    tags: string[];
   imageHash: string;
   language: string | null;
   providerUsed: string;
@@ -222,6 +234,9 @@ export interface SettingsHistoryPort {
   ): Promise<TranslationHistoryEntry[]>;
   getOcrHistory(limit: number, offset: number): Promise<OcrHistoryEntry[]>;
   deleteHistory(id: number): Promise<void>;
+  setHistoryFavorite(id: number, favorite: boolean): Promise<void>;
+  updateHistoryNote(id: number, note: string | null): Promise<void>;
+  replaceHistoryTags(id: number, tags: string[]): Promise<void>;
   clearAllHistory(): Promise<void>;
 }
 

@@ -9,6 +9,7 @@ vi.mock('@tauri-apps/api/event', () => ({ listen }));
 
 import {
   captureWorkspaceEvents,
+  persistentStateEvents,
   resultWindowEvents,
 } from './appEvents';
 
@@ -70,6 +71,26 @@ describe('Tauri app event adapter', () => {
     const handler = vi.fn();
 
     const unsubscribe = await captureWorkspaceEvents[method](handler);
+    listeners.get(eventName)?.({ payload: undefined });
+    unsubscribe();
+
+    expect(handler).toHaveBeenCalledWith();
+    expect(cleanup).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['settings', 'settings-changed', 'subscribeSettingsChanged'],
+    ['hotkeys', 'hotkeys-changed', 'subscribeHotkeysChanged'],
+    ['providers', 'providers-changed', 'subscribeProvidersChanged'],
+    ['history', 'history-changed', 'subscribeHistoryChanged'],
+  ] as const)('subscribes to %s state changes', async (
+    _state,
+    eventName,
+    method,
+  ) => {
+    const handler = vi.fn();
+
+    const unsubscribe = await persistentStateEvents[method](handler);
     listeners.get(eventName)?.({ payload: undefined });
     unsubscribe();
 

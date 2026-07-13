@@ -19,12 +19,36 @@ pub use repository::{HistoryEntry, HistoryRepository, OcrHistoryEntry, Translati
 /// query and management APIs for history records.
 pub struct History {
     repository: Arc<dyn HistoryRepository>,
+    change_notifier: Option<Arc<dyn HistoryChangeNotifier>>,
+}
+
+pub trait HistoryChangeNotifier: Send + Sync {
+    fn history_changed(&self);
 }
 
 impl History {
     /// Create a new History module.
     pub fn new(repository: Arc<dyn HistoryRepository>) -> Self {
-        Self { repository }
+        Self {
+            repository,
+            change_notifier: None,
+        }
+    }
+
+    pub fn with_change_notifier(
+        repository: Arc<dyn HistoryRepository>,
+        change_notifier: Arc<dyn HistoryChangeNotifier>,
+    ) -> Self {
+        Self {
+            repository,
+            change_notifier: Some(change_notifier),
+        }
+    }
+
+    fn notify_changed(&self) {
+        if let Some(notifier) = &self.change_notifier {
+            notifier.history_changed();
+        }
     }
 
     /// Get translation history with pagination
@@ -55,6 +79,18 @@ impl History {
         self.repository.delete(id).await
     }
 
+    pub async fn set_history_favorite(&self, id: i64, favorite: bool) -> Result<()> {
+        self.repository.set_favorite(id, favorite).await
+    }
+
+    pub async fn update_history_note(&self, id: i64, note: Option<String>) -> Result<()> {
+        self.repository.update_note(id, note).await
+    }
+
+    pub async fn replace_history_tags(&self, id: i64, tags: Vec<String>) -> Result<()> {
+        self.repository.replace_tags(id, tags).await
+    }
+
     /// Clear all history
     pub async fn clear_all_history(&self) -> Result<()> {
         self.repository.clear_all().await
@@ -72,12 +108,13 @@ impl EventSubscriber for History {
                 timestamp,
                 duration_ms,
             } => {
-                if let Err(e) = self
+                match self
                     .repository
                     .insert_translation(request, results, providers_used, *timestamp, *duration_ms)
                     .await
                 {
-                    eprintln!("[History] Failed to record translation: {}", e);
+                    Ok(_) => self.notify_changed(),
+                    Err(e) => eprintln!("[History] Failed to record translation: {}", e),
                 }
             }
             DomainEvent::OcrCompleted {
@@ -87,12 +124,13 @@ impl EventSubscriber for History {
                 timestamp,
                 duration_ms,
             } => {
-                if let Err(e) = self
+                match self
                     .repository
                     .insert_ocr(request, result, provider_used, *timestamp, *duration_ms)
                     .await
                 {
-                    eprintln!("[History] Failed to record OCR: {}", e);
+                    Ok(_) => self.notify_changed(),
+                    Err(e) => eprintln!("[History] Failed to record OCR: {}", e),
                 }
             }
             DomainEvent::ProviderConfigurationFailed {

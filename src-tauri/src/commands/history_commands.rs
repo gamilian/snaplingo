@@ -1,6 +1,6 @@
 use crate::application::history::{HistoryEntry, OcrHistoryEntry, TranslationHistoryEntry};
 use crate::AppState;
-use tauri::State;
+use tauri::{AppHandle, State};
 
 /// Get translation history with pagination
 #[tauri::command]
@@ -45,16 +45,74 @@ pub async fn search_history(
 
 /// Delete a history entry by ID
 #[tauri::command]
-pub async fn delete_history(id: i64, state: State<'_, AppState>) -> Result<(), String> {
+pub async fn delete_history(
+    id: i64,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
     let result: crate::Result<()> = state.history.history.delete_history(id).await;
+    result.map_err(|e| e.to_string())?;
+    super::state_events::emit_state_changed(&app, super::state_events::HISTORY_CHANGED_EVENT);
+    Ok(())
+}
 
-    result.map_err(|e| e.to_string())
+#[tauri::command]
+pub async fn set_history_favorite(
+    id: i64,
+    favorite: bool,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .history
+        .history
+        .set_history_favorite(id, favorite)
+        .await
+        .map_err(|error| error.to_string())?;
+    super::state_events::emit_state_changed(&app, super::state_events::HISTORY_CHANGED_EVENT);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn update_history_note(
+    id: i64,
+    note: Option<String>,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .history
+        .history
+        .update_history_note(id, note)
+        .await
+        .map_err(|error| error.to_string())?;
+    super::state_events::emit_state_changed(&app, super::state_events::HISTORY_CHANGED_EVENT);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn replace_history_tags(
+    id: i64,
+    tags: Vec<String>,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .history
+        .history
+        .replace_history_tags(id, tags)
+        .await
+        .map_err(|error| error.to_string())?;
+    super::state_events::emit_state_changed(&app, super::state_events::HISTORY_CHANGED_EVENT);
+    Ok(())
 }
 
 /// Clear all history
 #[tauri::command]
-pub async fn clear_all_history(state: State<'_, AppState>) -> Result<(), String> {
+pub async fn clear_all_history(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
     let result: crate::Result<()> = state.history.history.clear_all_history().await;
 
-    result.map_err(|e| e.to_string())
+    result.map_err(|e| e.to_string())?;
+    super::state_events::emit_state_changed(&app, super::state_events::HISTORY_CHANGED_EVENT);
+    Ok(())
 }

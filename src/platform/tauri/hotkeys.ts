@@ -15,33 +15,12 @@ export interface HotkeyUpdateOutcome {
   accelerator: string | null;
 }
 
-export type TranslationHotkeyAction =
-  | 'selection-translate'
-  | 'screenshot-translate'
-  | 'input-translate'
-  | 'show-window';
-
-export async function configureHotkey(
-  category: HotkeyCategory,
-  action: string,
-  hotkey: string,
-) {
-  return invoke<string | null>('configure_hotkey', {
-    category,
-    action,
-    hotkey,
-  });
-}
-
-export async function configureTranslationHotkey(
-  action: TranslationHotkeyAction,
-  hotkey: string,
-) {
-  return configureHotkey('translation', action, hotkey);
-}
-
 export async function getHotkeySnapshot(): Promise<HotkeySnapshot> {
   return invoke<HotkeySnapshot>('get_hotkey_snapshot');
+}
+
+export async function getDefaultHotkeySnapshot(): Promise<HotkeySnapshot> {
+  return invoke<HotkeySnapshot>('get_default_hotkey_snapshot');
 }
 
 export async function updateHotkey(input: HotkeyUpdateInput): Promise<HotkeyUpdateOutcome> {
@@ -50,4 +29,17 @@ export async function updateHotkey(input: HotkeyUpdateInput): Promise<HotkeyUpda
     action: input.action,
     hotkey: input.hotkey,
   });
+}
+
+export async function resetHotkey(
+  category: HotkeyCategory,
+  action: string,
+): Promise<HotkeyUpdateOutcome> {
+  return invoke<HotkeyUpdateOutcome>('reset_hotkey', { category, action });
+}
+
+export async function resetHotkeyCategory(
+  category: HotkeyCategory,
+): Promise<HotkeySnapshot> {
+  return invoke<HotkeySnapshot>('reset_hotkey_category', { category });
 }

@@ -2,7 +2,7 @@ use crate::application::providers::common::CredentialField;
 use crate::domain::ocr::{OcrRequest, OcrResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tauri::State;
+use tauri::{AppHandle, State};
 
 #[cfg(test)]
 use crate::application::providers::ocr::OcrCoordinator;
@@ -91,13 +91,16 @@ pub async fn list_ocr_providers(
 #[tauri::command]
 pub async fn activate_ocr_provider(
     provider_id: String,
+    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     state
         .providers
         .ocr
         .activate(&provider_id)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    super::state_events::emit_state_changed(&app, super::state_events::PROVIDERS_CHANGED_EVENT);
+    Ok(())
 }
 
 #[tauri::command]
@@ -105,6 +108,7 @@ pub async fn configure_ocr_provider(
     provider_id: String,
     api_key: String,
     secret_key: Option<String>,
+    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     let mut credentials = HashMap::new();
@@ -118,7 +122,9 @@ pub async fn configure_ocr_provider(
         .providers
         .ocr_configuration
         .save_credentials(&provider_id, &credentials)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    super::state_events::emit_state_changed(&app, super::state_events::PROVIDERS_CHANGED_EVENT);
+    Ok(())
 }
 
 #[tauri::command]
@@ -137,13 +143,16 @@ pub async fn get_ocr_provider_credential_schema(
 pub async fn configure_ocr_provider_credentials(
     provider_id: String,
     credentials: HashMap<String, String>,
+    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     state
         .providers
         .ocr_configuration
         .save_credentials(&provider_id, &credentials)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    super::state_events::emit_state_changed(&app, super::state_events::PROVIDERS_CHANGED_EVENT);
+    Ok(())
 }
 
 #[cfg(test)]
@@ -163,7 +172,7 @@ fn ocr_provider_credential_schema(
 mod tests {
     use crate::application::providers::ocr::impls::TesseractProvider;
     use crate::application::providers::ocr::{OcrCoordinator, TesseractEngine};
-    use crate::infrastructure::storage::ConfigFile;
+    use crate::infrastructure::storage::SqliteConfigStore;
     use std::sync::Arc;
 
     struct StubTesseractEngine;
@@ -180,7 +189,7 @@ mod tests {
 
     #[test]
     fn ocr_provider_credential_schema_returns_empty_fields_for_tesseract() {
-        let coordinator = OcrCoordinator::new(Arc::new(ConfigFile::new_temp()));
+        let coordinator = OcrCoordinator::new(Arc::new(SqliteConfigStore::new_temp()));
         coordinator
             .register(TesseractProvider::new(Arc::new(StubTesseractEngine)))
             .unwrap();
@@ -192,7 +201,7 @@ mod tests {
 
     #[test]
     fn ocr_provider_credential_schema_reports_missing_ocr_provider() {
-        let coordinator = OcrCoordinator::new(Arc::new(ConfigFile::new_temp()));
+        let coordinator = OcrCoordinator::new(Arc::new(SqliteConfigStore::new_temp()));
 
         let error = super::ocr_provider_credential_schema(&coordinator, "ghost").unwrap_err();
 

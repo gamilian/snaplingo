@@ -151,7 +151,7 @@ fn load_baidu_ocr_credentials(
 mod tests {
     use super::*;
     use crate::application::providers::HttpResponse;
-    use crate::infrastructure::storage::ConfigFile;
+    use crate::infrastructure::storage::SqliteConfigStore;
     use async_trait::async_trait;
     use std::collections::HashMap;
 
@@ -180,7 +180,7 @@ mod tests {
     #[test]
     fn build_ocr_coordinator_registers_system_ocr_provider_on_macos() {
         let coordinator = build_ocr_coordinator(
-            Arc::new(ConfigFile::new_temp()),
+            Arc::new(SqliteConfigStore::new_temp()),
             Arc::new(StubHttpClient),
             Arc::new(EventBus::new()),
         );

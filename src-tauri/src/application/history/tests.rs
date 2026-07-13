@@ -1,19 +1,26 @@
 #[cfg(test)]
 mod tests {
-    use crate::application::history::{EventSubscriber, History, HistoryRepository};
+    use crate::application::history::{
+        EventSubscriber, History, HistoryChangeNotifier, HistoryRepository,
+    };
     use crate::domain::events::DomainEvent;
     use crate::domain::ocr::{OcrRequest, OcrResult};
     use crate::domain::translation::{TranslationRequest, TranslationResult};
-    use crate::infrastructure::storage::HistoryDatabase;
+    use crate::infrastructure::storage::SqliteHistoryRepository;
     use chrono::Utc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
-    use tempfile::NamedTempFile;
+
+    struct CountingNotifier(AtomicUsize);
+
+    impl HistoryChangeNotifier for CountingNotifier {
+        fn history_changed(&self) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
 
     fn create_temp_db() -> Arc<dyn HistoryRepository> {
-        let temp_file = NamedTempFile::new().unwrap();
-        let path = temp_file.path().to_path_buf();
-        std::mem::forget(temp_file);
-        Arc::new(HistoryDatabase::new(path).unwrap())
+        Arc::new(SqliteHistoryRepository::new_in_memory().unwrap())
     }
 
     #[tokio::test]
@@ -47,6 +54,28 @@ mod tests {
         assert_eq!(history.len(), 1);
         assert_eq!(history[0].source_text, "Hello world");
         assert_eq!(history[0].target_lang, "es");
+    }
+
+    #[tokio::test]
+    async fn successful_event_recording_notifies_runtime_observers() {
+        let db = create_temp_db();
+        let notifier = Arc::new(CountingNotifier(AtomicUsize::new(0)));
+        let history = History::with_change_notifier(db, notifier.clone());
+        let event = DomainEvent::TranslationCompleted {
+            request: TranslationRequest {
+                text: "Hello".to_string(),
+                source_lang: "en".to_string(),
+                target_lang: "zh-CN".to_string(),
+            },
+            results: vec![],
+            providers_used: vec![],
+            timestamp: Utc::now(),
+            duration_ms: 5,
+        };
+
+        history.handle(&event).await;
+
+        assert_eq!(notifier.0.load(Ordering::SeqCst), 1);
     }
 
     #[tokio::test]

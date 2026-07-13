@@ -557,3 +557,31 @@ npm run build
 - [ ] `cargo test`、`npm test`、`npm run build` 全部通过。
 
 推荐执行顺序：**数据库基础 → 设置/快捷键/Provider → 前端单一数据源 → 历史 → 资产**。每个 Phase 独立完成并通过验证后再进入下一阶段。
+
+---
+
+## 13. 实施状态（2026-07-13）
+
+已完成：
+
+- 一个共享的 `snaplingo.db`、SQLite PRAGMA、`user_version = 1` migration、内存测试数据库和 migration 回滚测试。
+- 设置、快捷键、Provider 非敏感配置迁入 SQLite；凭证继续留在 Keychain。
+- 删除 `ConfigFile`、`config.json`、独立 `history.db` 及其路径和兼容读取逻辑。
+- 前端设置、Provider、历史业务 Store 不再持久化业务副本；`settingsStore` 只保留可丢失的设置页导航状态。
+- 设置、快捷键、Provider、历史的跨 WebView 变更事件与后端重新加载。
+- 快捷键默认值和单项/整组恢复由 Rust 后端负责，并同步更新全局快捷键注册。
+- 翻译/OCR 历史使用统一主键，收藏、备注、标签写入 SQLite；自动产生的新历史在提交后广播变更。
+- 自定义 Provider 凭证边界测试直接检查 SQLite payload，确认 API Key 只写入 Keychain。
+- Infrastructure README 和架构依赖测试已更新。
+
+当前实现的有意收敛：
+
+- 设置沿用一个类型化 `settings` 快照 namespace；更新命令在后端按具体业务操作串行执行，避免前端直接保存整份旧快照。
+- 跨窗口事件作为失效通知，接收方重新读取后端权威状态；目前不向前端暴露 revision 冲突协议。
+- 当前产品没有“截图收藏”入口，贴图也明确是进程内临时状态，没有跨重启位置、透明度、层级或可见状态需求。因此不预建 assets 空表；出现实际持久化入口时再新增下一版 migration 和文件型 AssetStore。
+
+验证结果：
+
+- `cargo test --manifest-path src-tauri/Cargo.toml`：448 个单元测试及全部集成测试通过。
+- `npm run build`：通过。
+- `npm test`：732/732 通过；旧的 `capture-workspace/productionWiring.test.ts` 结构断言已更新为当前颜色预设接口契约。

@@ -8,6 +8,9 @@ import type {
 interface BackendTranslationEntry {
   id: number;
   timestamp: string;
+  favorite: boolean;
+  note: string | null;
+  tags: string[];
   source_text: string;
   source_lang: string;
   target_lang: string;
@@ -24,6 +27,9 @@ interface BackendTranslationEntry {
 interface BackendOcrEntry {
   id: number;
   timestamp: string;
+  favorite: boolean;
+  note: string | null;
+  tags: string[];
   image_hash: string;
   language: string | null;
   provider_used: string;
@@ -42,6 +48,9 @@ function toTranslationHistoryEntry(
   return {
     id: entry.id,
     timestamp: entry.timestamp,
+    favorite: entry.favorite,
+    note: entry.note,
+    tags: entry.tags,
     sourceText: entry.source_text,
     sourceLang: entry.source_lang,
     targetLang: entry.target_lang,
@@ -60,6 +69,9 @@ function toOcrHistoryEntry(entry: BackendOcrEntry): OcrHistoryEntry {
   return {
     id: entry.id,
     timestamp: entry.timestamp,
+    favorite: entry.favorite,
+    note: entry.note,
+    tags: entry.tags,
     imageHash: entry.image_hash,
     language: entry.language,
     providerUsed: entry.provider_used,
@@ -102,6 +114,18 @@ export async function searchHistory(query: string) {
 
 export function deleteHistory(id: number) {
   return invoke<void>('delete_history', { id });
+}
+
+export function setHistoryFavorite(id: number, favorite: boolean) {
+  return invoke<void>('set_history_favorite', { id, favorite });
+}
+
+export function updateHistoryNote(id: number, note: string | null) {
+  return invoke<void>('update_history_note', { id, note });
+}
+
+export function replaceHistoryTags(id: number, tags: string[]) {
+  return invoke<void>('replace_history_tags', { id, tags });
 }
 
 export function clearAllHistory() {

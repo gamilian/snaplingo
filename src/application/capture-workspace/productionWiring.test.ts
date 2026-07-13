@@ -162,11 +162,17 @@ describe('capture workspace production runtime wiring', () => {
     expect(runtime).not.toContain('if (!session || state.isRenderingOutput)');
   });
 
-  it('deletes the wide controller and keeps a two-field View seam', () => {
+  it('deletes the wide controller and keeps the runtime View seam narrow', () => {
     expect(() => readFileSync(deletedController, 'utf8')).toThrow();
     expect(() => readFileSync(deletedStateHook, 'utf8')).toThrow();
+    expect(captureViewRoot).toContain('<CaptureWorkspaceView');
+    expect(captureViewRoot).toContain('renderState={renderState}');
+    expect(captureViewRoot).toContain('actions={actions}');
     expect(captureViewRoot).toContain(
-      '<CaptureWorkspaceView renderState={renderState} actions={actions} />',
+      'annotationColorPresets={annotationColorPresets}',
+    );
+    expect(captureViewRoot).toContain(
+      'onUpdateAnnotationColorPresets={updateAnnotationColorPresets}',
     );
     expect(captureViewRoot).not.toContain('viewProps');
     expect(captureView).toContain('renderState,\n  actions,');

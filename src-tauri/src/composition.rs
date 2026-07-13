@@ -32,18 +32,19 @@ use crate::application::result_window::ResultWindowRuntime;
 use crate::application::settings::SettingsStore;
 use crate::infrastructure::events::EventBus;
 use crate::infrastructure::http::ReqwestHttpClient;
-use crate::infrastructure::storage::{ConfigFile, Keychain};
+use crate::infrastructure::storage::{Database, Keychain, SqliteConfigStore};
 use crate::infrastructure::system::clipboard::ArboardResultWindowClipboard;
 use crate::infrastructure::system::result_window::{
     TauriResultWindowNotifier, TauriResultWindowRuntimeHost,
 };
 use crate::{HotkeyConfiguration, HotkeyRuntime, SettingsConfiguration};
 
-pub(crate) fn build_app_state(config_path: PathBuf, app: AppHandle) -> AppState {
-    let config_file = Arc::new(ConfigFile::new(config_path));
-    let settings_store: Arc<dyn SettingsStore> = config_file.clone();
-    let hotkey_store: Arc<dyn HotkeyStore> = config_file.clone();
-    let provider_config_store: Arc<dyn ProviderConfigStore> = config_file.clone();
+pub(crate) fn build_app_state(database_path: PathBuf, app: AppHandle) -> AppState {
+    let database = Arc::new(Database::open(database_path).expect("Failed to initialize database"));
+    let config_store = Arc::new(SqliteConfigStore::new(database.clone()));
+    let settings_store: Arc<dyn SettingsStore> = config_store.clone();
+    let hotkey_store: Arc<dyn HotkeyStore> = config_store.clone();
+    let provider_config_store: Arc<dyn ProviderConfigStore> = config_store.clone();
     let settings_configuration = Arc::new(SettingsConfiguration::new(settings_store));
     let hotkey_configuration = Arc::new(HotkeyConfiguration::new(hotkey_store));
     let hotkey_runtime = Arc::new(HotkeyRuntime::new(hotkey_configuration));
@@ -52,7 +53,7 @@ pub(crate) fn build_app_state(config_path: PathBuf, app: AppHandle) -> AppState 
     let http_client: Arc<dyn HttpClient> = Arc::new(ReqwestHttpClient::new());
     let event_bus = Arc::new(EventBus::new());
 
-    let history = build_history();
+    let history = build_history(database.clone(), app.clone());
 
     let llm_runtime = build_llm_runtime(http_client.clone());
     let llm_introspection = build_llm_introspection(llm_runtime.clone());

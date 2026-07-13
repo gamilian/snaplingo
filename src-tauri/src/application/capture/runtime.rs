@@ -342,7 +342,7 @@ mod tests {
         MonitorSnapshot, PhysicalRect, ScreenRegion, WindowCandidate,
     };
     use crate::error::AppError;
-    use crate::infrastructure::storage::ConfigFile;
+    use crate::infrastructure::storage::SqliteConfigStore;
 
     #[derive(Debug, Clone, PartialEq)]
     enum HostCall {
@@ -572,7 +572,7 @@ mod tests {
             sessions.clone(),
             Arc::new(CaptureImageComposer::new()),
             Arc::new(CaptureOutput::new()),
-            Arc::new(OcrCoordinator::new(Arc::new(ConfigFile::new_temp()))),
+            Arc::new(OcrCoordinator::new(Arc::new(SqliteConfigStore::new_temp()))),
             host,
         );
 

@@ -13,6 +13,10 @@ const CAPTURE_COPY_EVENT = 'capture-copy-requested';
 const CAPTURE_UNDO_EVENT = 'capture-undo-requested';
 const CAPTURE_REDO_EVENT = 'capture-redo-requested';
 const HOTKEY_TRIGGERED_EVENT = 'hotkey-triggered';
+const SETTINGS_CHANGED_EVENT = 'settings-changed';
+const HOTKEYS_CHANGED_EVENT = 'hotkeys-changed';
+const PROVIDERS_CHANGED_EVENT = 'providers-changed';
+const HISTORY_CHANGED_EVENT = 'history-changed';
 
 function isCaptureMode(value: unknown): value is CaptureMode {
   return (
@@ -104,4 +108,15 @@ export const captureWorkspaceEvents: CaptureWorkspaceEventsPort = {
 
     return () => unlisten();
   },
+};
+
+export const persistentStateEvents = {
+  subscribeSettingsChanged: (handler: () => void | Promise<void>) =>
+    subscribeToSignal(SETTINGS_CHANGED_EVENT, handler),
+  subscribeHotkeysChanged: (handler: () => void | Promise<void>) =>
+    subscribeToSignal(HOTKEYS_CHANGED_EVENT, handler),
+  subscribeProvidersChanged: (handler: () => void | Promise<void>) =>
+    subscribeToSignal(PROVIDERS_CHANGED_EVENT, handler),
+  subscribeHistoryChanged: (handler: () => void | Promise<void>) =>
+    subscribeToSignal(HISTORY_CHANGED_EVENT, handler),
 };

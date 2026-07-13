@@ -24,13 +24,23 @@ import {
   initializeSettingsConfigStore,
   useSettingsConfigStore,
 } from './stores/settingsConfigStore';
-import { initializeProviderStore } from './stores/providerStore';
-import { initializeHistoryStore } from './stores/historyStore';
+import {
+  initializeProviderStore,
+  useProviderStore,
+} from './stores/providerStore';
+import {
+  initializeHistoryStore,
+  useHistoryStore,
+} from './stores/historyStore';
 import {
   isCaptureResultWindowLaunch,
   isSettingsWindowLaunch,
 } from './appWindowRouting';
-import { captureWorkspaceEvents, resultWindowEvents } from './platform/tauri/appEvents';
+import {
+  captureWorkspaceEvents,
+  persistentStateEvents,
+  resultWindowEvents,
+} from './platform/tauri/appEvents';
 import {
   captureWorkspaceCommands,
   currentCaptureResultWindowRequestId,
@@ -159,6 +169,76 @@ function App() {
       console.warn('Failed to hydrate hotkey configuration:', err);
     });
   }, [hydrateHotkeys, isSettingsWindow]);
+
+  useEffect(() => {
+    let disposed = false;
+    const unlisteners: Array<() => void> = [];
+
+    const track = (subscription: Promise<() => void>, label: string) => {
+      subscription
+        .then((unlisten) => {
+          if (disposed) {
+            unlisten();
+          } else {
+            unlisteners.push(unlisten);
+          }
+        })
+        .catch((err) => {
+          console.warn(`Failed to subscribe to ${label} changes:`, err);
+        });
+    };
+
+    track(
+      persistentStateEvents.subscribeSettingsChanged(async () => {
+        try {
+          const snapshot = await useSettingsConfigStore.getState().refresh();
+          applyTranslationDefaults(snapshot.translation);
+        } catch (err) {
+          console.warn('Failed to refresh durable settings:', err);
+        }
+      }),
+      'settings',
+    );
+
+    track(
+      persistentStateEvents.subscribeProvidersChanged(async () => {
+        const providers = useProviderStore.getState();
+        await Promise.all([
+          providers.loadTranslationProviders(),
+          providers.loadOcrProviders(),
+        ]);
+      }),
+      'provider',
+    );
+
+    if (isSettingsWindow) {
+      track(
+        persistentStateEvents.subscribeHotkeysChanged(async () => {
+          try {
+            await useHotkeyConfigStore.getState().refresh();
+          } catch (err) {
+            console.warn('Failed to refresh hotkey configuration:', err);
+          }
+        }),
+        'hotkey',
+      );
+      track(
+        persistentStateEvents.subscribeHistoryChanged(async () => {
+          const historyState = useHistoryStore.getState();
+          await Promise.all([
+            historyState.loadTranslationHistory(),
+            historyState.loadOcrHistory(),
+          ]);
+        }),
+        'history',
+      );
+    }
+
+    return () => {
+      disposed = true;
+      unlisteners.forEach((unlisten) => unlisten());
+    };
+  }, [applyTranslationDefaults, isSettingsWindow]);
 
   useEffect(() => {
     if (!isCaptureResultWindow) return;

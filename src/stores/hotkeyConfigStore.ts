@@ -26,6 +26,7 @@ interface HotkeyConfigState {
   snapshot: HotkeySnapshot | null;
   defaultSnapshot: HotkeySnapshot | null;
   hydrate: () => Promise<HotkeySnapshot>;
+  refresh: () => Promise<HotkeySnapshot>;
   updateHotkey: (
     category: HotkeyCategory,
     action: string,
@@ -53,10 +54,6 @@ function applySnapshot(
   });
 }
 
-async function defaultSnapshotFor(state: HotkeyConfigState) {
-  return state.defaultSnapshot ?? state.hydrate();
-}
-
 export const useHotkeyConfigStore = create<HotkeyConfigState>((set, get) => ({
   hydrated: false,
   snapshot: null,
@@ -69,12 +66,20 @@ export const useHotkeyConfigStore = create<HotkeyConfigState>((set, get) => ({
       return cloneSnapshot(existingSnapshot);
     }
 
-    const snapshot = await runtime().load();
+    const [snapshot, defaults] = await Promise.all([
+      runtime().load(),
+      runtime().loadDefaults(),
+    ]);
     set({
       hydrated: true,
       snapshot: cloneSnapshot(snapshot),
-      defaultSnapshot: cloneSnapshot(snapshot),
+      defaultSnapshot: cloneSnapshot(defaults),
     });
+    return cloneSnapshot(snapshot);
+  },
+  refresh: async () => {
+    const snapshot = await runtime().load();
+    applySnapshot(set, snapshot);
     return cloneSnapshot(snapshot);
   },
   updateHotkey: async (category, action, hotkey) => {
@@ -83,23 +88,13 @@ export const useHotkeyConfigStore = create<HotkeyConfigState>((set, get) => ({
     return cloneSnapshot(outcome.snapshot);
   },
   resetHotkey: async (category, action) => {
-    const defaults = await defaultSnapshotFor(get());
-    const hotkey = defaults[category][action];
-
-    if (typeof hotkey !== 'string') {
-      throw new Error(`Unknown hotkey action '${category}:${action}'`);
-    }
-
-    return get().updateHotkey(category, action, hotkey);
+    const outcome = await runtime().reset(category, action);
+    applySnapshot(set, outcome.snapshot);
+    return cloneSnapshot(outcome.snapshot);
   },
   resetCategory: async (category) => {
-    const defaults = await defaultSnapshotFor(get());
-    let snapshot = get().snapshot ?? (await get().hydrate());
-
-    for (const [action, hotkey] of Object.entries(defaults[category])) {
-      snapshot = await get().updateHotkey(category, action, hotkey);
-    }
-
+    const snapshot = await runtime().resetCategory(category);
+    applySnapshot(set, snapshot);
     return cloneSnapshot(snapshot);
   },
 }));

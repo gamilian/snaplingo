@@ -17,7 +17,7 @@ mod tests {
     use crate::application::providers::common::Provider;
     use crate::application::providers::ocr::OcrProvider;
     use crate::domain::ocr::{OcrRequest, OcrResult};
-    use crate::infrastructure::storage::{ConfigFile, Keychain, KeychainBackend};
+    use crate::infrastructure::storage::{Keychain, KeychainBackend, SqliteConfigStore};
     use async_trait::async_trait;
     use std::sync::Mutex;
 
@@ -101,7 +101,7 @@ mod tests {
 
     #[test]
     fn save_credentials_uses_provider_validation_before_persisting() {
-        let coordinator = Arc::new(OcrCoordinator::new(Arc::new(ConfigFile::new_temp())));
+        let coordinator = Arc::new(OcrCoordinator::new(Arc::new(SqliteConfigStore::new_temp())));
         coordinator.register(RejectingOcrProvider).unwrap();
         let keychain = Arc::new(Keychain::with_backend(StubKeychainBackend::new()));
         let configuration = OcrProviderConfiguration::new(coordinator, keychain.clone());

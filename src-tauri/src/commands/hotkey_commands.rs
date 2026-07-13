@@ -15,6 +15,11 @@ pub fn get_hotkey_snapshot(
 }
 
 #[tauri::command]
+pub fn get_default_hotkey_snapshot(state: State<'_, crate::AppState>) -> HotkeySettingsSnapshot {
+    state.settings.hotkeys.default_snapshot()
+}
+
+#[tauri::command]
 pub fn update_hotkey(
     category: String,
     action: String,
@@ -22,16 +27,65 @@ pub fn update_hotkey(
     app: tauri::AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<HotkeyUpdateOutcome, String> {
-    state
+    let outcome = state
         .settings
         .hotkeys
         .update_hotkey_with(
-            &TauriHotkeyRegistrar::new(app, crate::startup_shortcuts::trigger_hotkey_action),
+            &TauriHotkeyRegistrar::new(
+                app.clone(),
+                crate::startup_shortcuts::trigger_hotkey_action,
+            ),
             category,
             action,
             hotkey,
         )
-        .map_err(|err| err.to_string())
+        .map_err(|err| err.to_string())?;
+    super::state_events::emit_state_changed(&app, super::state_events::HOTKEYS_CHANGED_EVENT);
+    Ok(outcome)
+}
+
+#[tauri::command]
+pub fn reset_hotkey(
+    category: String,
+    action: String,
+    app: tauri::AppHandle,
+    state: State<'_, crate::AppState>,
+) -> Result<HotkeyUpdateOutcome, String> {
+    let outcome = state
+        .settings
+        .hotkeys
+        .reset_hotkey_with(
+            &TauriHotkeyRegistrar::new(
+                app.clone(),
+                crate::startup_shortcuts::trigger_hotkey_action,
+            ),
+            category,
+            action,
+        )
+        .map_err(|err| err.to_string())?;
+    super::state_events::emit_state_changed(&app, super::state_events::HOTKEYS_CHANGED_EVENT);
+    Ok(outcome)
+}
+
+#[tauri::command]
+pub fn reset_hotkey_category(
+    category: String,
+    app: tauri::AppHandle,
+    state: State<'_, crate::AppState>,
+) -> Result<HotkeySettingsSnapshot, String> {
+    let snapshot = state
+        .settings
+        .hotkeys
+        .reset_category_with(
+            &TauriHotkeyRegistrar::new(
+                app.clone(),
+                crate::startup_shortcuts::trigger_hotkey_action,
+            ),
+            category,
+        )
+        .map_err(|err| err.to_string())?;
+    super::state_events::emit_state_changed(&app, super::state_events::HOTKEYS_CHANGED_EVENT);
+    Ok(snapshot)
 }
 
 fn get_hotkey_snapshot_for_runtime(
@@ -63,7 +117,7 @@ mod hotkey_commands_tests {
         HotkeyRegistrar, HotkeyRegistration, HotkeyRuntime,
     };
     use crate::domain::hotkey_config::{SELECTION_TRANSLATE_ACTION, TRANSLATION_CATEGORY};
-    use crate::infrastructure::storage::ConfigFile;
+    use crate::infrastructure::storage::SqliteConfigStore;
     use crate::Result;
 
     #[derive(Default)]
@@ -138,8 +192,8 @@ mod hotkey_commands_tests {
     }
 
     fn test_runtime() -> HotkeyRuntime {
-        let config_file = Arc::new(ConfigFile::new_temp());
-        let configuration = Arc::new(HotkeyConfiguration::with_legacy_root(config_file, None));
+        let config_file = Arc::new(SqliteConfigStore::new_temp());
+        let configuration = Arc::new(HotkeyConfiguration::new(config_file));
         HotkeyRuntime::new(configuration)
     }
 }

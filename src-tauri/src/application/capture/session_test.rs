@@ -21,7 +21,7 @@ mod tests {
     };
     use crate::domain::ocr::{OcrRequest, OcrResult};
     use crate::error::AppError;
-    use crate::infrastructure::storage::ConfigFile;
+    use crate::infrastructure::storage::SqliteConfigStore;
 
     struct MockCaptureSessionSource {
         snapshots: Vec<MonitorSnapshot>,
@@ -763,7 +763,7 @@ mod tests {
     #[tokio::test]
     async fn recognize_selection_text_expands_tight_selection_png_for_ocr() {
         let observed_request = Arc::new(Mutex::new(None));
-        let ocr = OcrCoordinator::new(Arc::new(ConfigFile::new_temp()));
+        let ocr = OcrCoordinator::new(Arc::new(SqliteConfigStore::new_temp()));
         ocr.register(RecordingOcrProvider {
             observed_request: observed_request.clone(),
         })
@@ -812,7 +812,7 @@ mod tests {
     #[tokio::test]
     async fn capture_session_runtime_recognizes_selection_text_through_one_interface() {
         let observed_request = Arc::new(Mutex::new(None));
-        let ocr = OcrCoordinator::new(Arc::new(ConfigFile::new_temp()));
+        let ocr = OcrCoordinator::new(Arc::new(SqliteConfigStore::new_temp()));
         ocr.register(RecordingOcrProvider {
             observed_request: observed_request.clone(),
         })

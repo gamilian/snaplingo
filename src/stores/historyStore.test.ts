@@ -4,6 +4,9 @@ const historyRuntime = vi.hoisted(() => ({
   loadTranslation: vi.fn(),
   loadOcr: vi.fn(),
   deleteEntry: vi.fn(),
+  setFavorite: vi.fn(),
+  updateNote: vi.fn(),
+  replaceTags: vi.fn(),
   clear: vi.fn(),
 }));
 
@@ -18,6 +21,9 @@ describe('historyStore', () => {
       {
         id: 7,
         timestamp: '2026-07-11T03:00:00Z',
+        favorite: false,
+        note: null,
+        tags: [],
         sourceText: 'hello',
         sourceLang: 'en',
         targetLang: 'zh-CN',
@@ -48,5 +54,39 @@ describe('historyStore', () => {
         provider: 'provider-1',
       },
     ]);
+  });
+
+  it('persists a favorite change through the injected runtime', async () => {
+    historyRuntime.loadTranslation.mockResolvedValueOnce([
+      {
+        id: 9,
+        timestamp: '2026-07-11T03:00:00Z',
+        favorite: false,
+        note: null,
+        tags: [],
+        sourceText: 'hello',
+        sourceLang: 'en',
+        targetLang: 'zh-CN',
+        providersUsed: ['provider-1'],
+        results: [
+          {
+            providerId: 'provider-1',
+            translatedText: '你好',
+            detectedLanguage: 'en',
+            confidence: 1,
+          },
+        ],
+        durationMs: 12,
+      },
+    ]);
+    const { initializeHistoryStore, useHistoryStore } =
+      await import('./historyStore');
+    initializeHistoryStore(historyRuntime);
+
+    await useHistoryStore.getState().loadTranslationHistory();
+    await useHistoryStore.getState().toggleTranslationFavorite('9-0');
+
+    expect(historyRuntime.setFavorite).toHaveBeenCalledWith(9, true);
+    expect(useHistoryStore.getState().translationHistory[0]?.favorite).toBe(true);
   });
 });

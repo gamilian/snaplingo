@@ -9,6 +9,9 @@ use serde::{Deserialize, Serialize};
 pub struct TranslationHistoryEntry {
     pub id: i64,
     pub timestamp: DateTime<Utc>,
+    pub favorite: bool,
+    pub note: Option<String>,
+    pub tags: Vec<String>,
     pub source_text: String,
     pub source_lang: String,
     pub target_lang: String,
@@ -21,6 +24,9 @@ pub struct TranslationHistoryEntry {
 pub struct OcrHistoryEntry {
     pub id: i64,
     pub timestamp: DateTime<Utc>,
+    pub favorite: bool,
+    pub note: Option<String>,
+    pub tags: Vec<String>,
     pub image_hash: String,
     pub language: Option<String>,
     pub provider_used: String,
@@ -67,6 +73,12 @@ pub trait HistoryRepository: Send + Sync {
     async fn search(&self, query: &str) -> Result<Vec<HistoryEntry>>;
 
     async fn delete(&self, id: i64) -> Result<()>;
+
+    async fn set_favorite(&self, id: i64, favorite: bool) -> Result<()>;
+
+    async fn update_note(&self, id: i64, note: Option<String>) -> Result<()>;
+
+    async fn replace_tags(&self, id: i64, tags: Vec<String>) -> Result<()>;
 
     async fn clear_all(&self) -> Result<()>;
 }
@@ -122,6 +134,18 @@ mod tests {
         }
 
         async fn delete(&self, _id: i64) -> Result<()> {
+            Ok(())
+        }
+
+        async fn set_favorite(&self, _id: i64, _favorite: bool) -> Result<()> {
+            Ok(())
+        }
+
+        async fn update_note(&self, _id: i64, _note: Option<String>) -> Result<()> {
+            Ok(())
+        }
+
+        async fn replace_tags(&self, _id: i64, _tags: Vec<String>) -> Result<()> {
             Ok(())
         }
 

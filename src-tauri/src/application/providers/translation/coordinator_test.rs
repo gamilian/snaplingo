@@ -4,10 +4,10 @@ mod tests {
     use super::super::TranslationProvider;
     use crate::application::providers::common::Provider;
     use crate::domain::translation::{TranslationRequest, TranslationResult};
-    use crate::infrastructure::storage::ConfigFile;
+    use crate::infrastructure::storage::SqliteConfigStore;
     use crate::Result;
     use async_trait::async_trait;
-    use std::sync::Arc; // Still needed for Arc<ConfigFile>
+    use std::sync::Arc; // Still needed for Arc<SqliteConfigStore>
 
     // Mock provider for testing
     struct MockTranslationProvider {
@@ -106,7 +106,7 @@ mod tests {
 
     #[test]
     fn test_register_provider() {
-        let config = Arc::new(ConfigFile::new_temp());
+        let config = Arc::new(SqliteConfigStore::new_temp());
         let coordinator = TranslationCoordinator::new(config);
         let provider = MockTranslationProvider::new("google", "Google Translate");
 
@@ -119,7 +119,7 @@ mod tests {
 
     #[test]
     fn test_register_duplicate_provider_fails() {
-        let config = Arc::new(ConfigFile::new_temp());
+        let config = Arc::new(SqliteConfigStore::new_temp());
         let coordinator = TranslationCoordinator::new(config);
 
         coordinator
@@ -132,7 +132,7 @@ mod tests {
 
     #[test]
     fn test_replace_provider_preserves_active_order() {
-        let config = Arc::new(ConfigFile::new_temp());
+        let config = Arc::new(SqliteConfigStore::new_temp());
         let coordinator = TranslationCoordinator::new(config);
         coordinator
             .register(MockTranslationProvider::new("google", "Google Translate"))
@@ -166,7 +166,7 @@ mod tests {
 
     #[test]
     fn test_activate_multiple_providers() {
-        let config = Arc::new(ConfigFile::new_temp());
+        let config = Arc::new(SqliteConfigStore::new_temp());
         let coordinator = TranslationCoordinator::new(config);
         coordinator
             .register(MockTranslationProvider::new("google", "Google Translate"))
@@ -186,7 +186,7 @@ mod tests {
 
     #[test]
     fn test_deactivate_provider() {
-        let config = Arc::new(ConfigFile::new_temp());
+        let config = Arc::new(SqliteConfigStore::new_temp());
         let coordinator = TranslationCoordinator::new(config);
         coordinator
             .register(MockTranslationProvider::new("google", "Google Translate"))
@@ -201,7 +201,7 @@ mod tests {
 
     #[test]
     fn test_activate_nonexistent_provider() {
-        let config = Arc::new(ConfigFile::new_temp());
+        let config = Arc::new(SqliteConfigStore::new_temp());
         let coordinator = TranslationCoordinator::new(config);
 
         let result = coordinator.activate("nonexistent");
@@ -216,7 +216,7 @@ mod tests {
 
     #[test]
     fn test_activate_persists() {
-        let config = Arc::new(ConfigFile::new_temp());
+        let config = Arc::new(SqliteConfigStore::new_temp());
         let coordinator = TranslationCoordinator::new(config.clone());
         coordinator
             .register(MockTranslationProvider::new("google", "Google"))
@@ -230,7 +230,7 @@ mod tests {
 
     #[test]
     fn test_restore_from_config_skips_unregistered() {
-        let config = Arc::new(ConfigFile::new_temp());
+        let config = Arc::new(SqliteConfigStore::new_temp());
         config
             .save(
                 "active_translation_providers",
@@ -252,7 +252,7 @@ mod tests {
 
     #[test]
     fn test_restore_from_config_maps_legacy_deepl_to_deeplx() {
-        let config = Arc::new(ConfigFile::new_temp());
+        let config = Arc::new(SqliteConfigStore::new_temp());
         config
             .save(
                 "active_translation_providers",
@@ -282,7 +282,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_translate_with_single_provider() {
-        let config = Arc::new(ConfigFile::new_temp());
+        let config = Arc::new(SqliteConfigStore::new_temp());
         let coordinator = TranslationCoordinator::new(config);
         coordinator
             .register(MockTranslationProvider::with_response(
@@ -301,7 +301,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_translate_with_specific_provider() {
-        let config = Arc::new(ConfigFile::new_temp());
+        let config = Arc::new(SqliteConfigStore::new_temp());
         let coordinator = TranslationCoordinator::new(config);
         coordinator
             .register(MockTranslationProvider::with_response(
@@ -329,7 +329,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_translate_with_specific_provider_reports_missing_provider() {
-        let config = Arc::new(ConfigFile::new_temp());
+        let config = Arc::new(SqliteConfigStore::new_temp());
         let coordinator = TranslationCoordinator::new(config);
 
         let result = coordinator
@@ -342,7 +342,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_translate_with_multiple_providers() {
-        let config = Arc::new(ConfigFile::new_temp());
+        let config = Arc::new(SqliteConfigStore::new_temp());
         let coordinator = TranslationCoordinator::new(config);
         coordinator
             .register(MockTranslationProvider::with_response(
@@ -371,7 +371,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_translate_includes_active_provider_failure_results() {
-        let config = Arc::new(ConfigFile::new_temp());
+        let config = Arc::new(SqliteConfigStore::new_temp());
         let coordinator = TranslationCoordinator::new(config);
         coordinator
             .register(MockTranslationProvider::with_response(
@@ -403,7 +403,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_translate_with_no_active_provider() {
-        let config = Arc::new(ConfigFile::new_temp());
+        let config = Arc::new(SqliteConfigStore::new_temp());
         let coordinator = TranslationCoordinator::new(config);
 
         let result = coordinator.translate(&sample_request()).await;
@@ -438,7 +438,7 @@ mod tests {
         }
 
         // Arrange
-        let config = Arc::new(ConfigFile::new_temp());
+        let config = Arc::new(SqliteConfigStore::new_temp());
         let event_bus = Arc::new(EventBus::new());
         let subscriber = Arc::new(MockSubscriber {
             events: Arc::new(TokioMutex::new(Vec::new())),
@@ -489,7 +489,7 @@ mod tests {
     #[tokio::test]
     async fn test_unregister_provider() {
         // Arrange
-        let config = Arc::new(ConfigFile::new_temp());
+        let config = Arc::new(SqliteConfigStore::new_temp());
         let coordinator = TranslationCoordinator::new(config);
 
         coordinator
@@ -507,7 +507,7 @@ mod tests {
     #[tokio::test]
     async fn test_unregister_active_provider() {
         // Arrange
-        let config = Arc::new(ConfigFile::new_temp());
+        let config = Arc::new(SqliteConfigStore::new_temp());
         let coordinator = TranslationCoordinator::new(config);
 
         coordinator
@@ -526,7 +526,7 @@ mod tests {
     #[tokio::test]
     async fn test_unregister_nonexistent_provider_fails() {
         // Arrange
-        let config = Arc::new(ConfigFile::new_temp());
+        let config = Arc::new(SqliteConfigStore::new_temp());
         let coordinator = TranslationCoordinator::new(config);
 
         // Act & Assert

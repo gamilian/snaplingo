@@ -68,9 +68,23 @@ describe('settings runtime', () => {
         translation: {},
         ocr: {},
       })),
+      getDefaultHotkeySnapshot: vi.fn(async () => ({
+        screenshot: { screenshot: '⇧⌘R' },
+        translation: {},
+        ocr: {},
+      })),
       updateHotkey: vi.fn(async () => ({
         snapshot: { screenshot: {}, translation: {}, ocr: {} },
         accelerator: 'CommandOrControl+Shift+S',
+      })),
+      resetHotkey: vi.fn(async () => ({
+        snapshot: { screenshot: {}, translation: {}, ocr: {} },
+        accelerator: 'CommandOrControl+Shift+R',
+      })),
+      resetHotkeyCategory: vi.fn(async () => ({
+        screenshot: { screenshot: '⇧⌘R' },
+        translation: {},
+        ocr: {},
       })),
     };
     const runtime = createSettingsRuntime(createPorts({ hotkeys }));
@@ -81,15 +95,22 @@ describe('settings runtime', () => {
     };
 
     const snapshot = await runtime.hotkeys.load();
+    const defaults = await runtime.hotkeys.loadDefaults();
     const outcome = await runtime.hotkeys.update(input);
+    await runtime.hotkeys.reset('screenshot', 'capture');
+    await runtime.hotkeys.resetCategory('screenshot');
 
     expect(hotkeys.getHotkeySnapshot).toHaveBeenCalledTimes(1);
+    expect(hotkeys.getDefaultHotkeySnapshot).toHaveBeenCalledTimes(1);
     expect(snapshot).toEqual({ screenshot: {}, translation: {}, ocr: {} });
+    expect(defaults.screenshot.screenshot).toBe('⇧⌘R');
     expect(hotkeys.updateHotkey).toHaveBeenCalledWith(input);
     expect(outcome).toEqual({
       snapshot: { screenshot: {}, translation: {}, ocr: {} },
       accelerator: 'CommandOrControl+Shift+S',
     });
+    expect(hotkeys.resetHotkey).toHaveBeenCalledWith('screenshot', 'capture');
+    expect(hotkeys.resetHotkeyCategory).toHaveBeenCalledWith('screenshot');
   });
 
   it('translates history actions into portable port calls', async () => {
@@ -97,6 +118,9 @@ describe('settings runtime', () => {
       getTranslationHistory: vi.fn(async () => []),
       getOcrHistory: vi.fn(async () => []),
       deleteHistory: vi.fn(async () => undefined),
+      setHistoryFavorite: vi.fn(async () => undefined),
+      updateHistoryNote: vi.fn(async () => undefined),
+      replaceHistoryTags: vi.fn(async () => undefined),
       clearAllHistory: vi.fn(async () => undefined),
     };
     const runtime = createSettingsRuntime(createPorts({ history }));
@@ -104,11 +128,17 @@ describe('settings runtime', () => {
     await runtime.history.loadTranslation(20, 40);
     await runtime.history.loadOcr(10, 0);
     await runtime.history.deleteEntry(42);
+    await runtime.history.setFavorite(42, true);
+    await runtime.history.updateNote(42, 'keep this');
+    await runtime.history.replaceTags(42, ['work']);
     await runtime.history.clear();
 
     expect(history.getTranslationHistory).toHaveBeenCalledWith(20, 40);
     expect(history.getOcrHistory).toHaveBeenCalledWith(10, 0);
     expect(history.deleteHistory).toHaveBeenCalledWith(42);
+    expect(history.setHistoryFavorite).toHaveBeenCalledWith(42, true);
+    expect(history.updateHistoryNote).toHaveBeenCalledWith(42, 'keep this');
+    expect(history.replaceHistoryTags).toHaveBeenCalledWith(42, ['work']);
     expect(history.clearAllHistory).toHaveBeenCalledTimes(1);
   });
 
@@ -152,12 +182,18 @@ function createPorts(overrides: Record<string, unknown> = {}) {
     providers: createProviderPort(),
     hotkeys: {
       getHotkeySnapshot: vi.fn(),
+      getDefaultHotkeySnapshot: vi.fn(),
       updateHotkey: vi.fn(),
+      resetHotkey: vi.fn(),
+      resetHotkeyCategory: vi.fn(),
     },
     history: {
       getTranslationHistory: vi.fn(),
       getOcrHistory: vi.fn(),
       deleteHistory: vi.fn(),
+      setHistoryFavorite: vi.fn(),
+      updateHistoryNote: vi.fn(),
+      replaceHistoryTags: vi.fn(),
       clearAllHistory: vi.fn(),
     },
     clipboard: { writeText: vi.fn() },

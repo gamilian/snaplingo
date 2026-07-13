@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import type {
   AddCustomTranslationProviderRequest as ApplicationAddCustomTranslationProviderRequest,
   OcrProviderInfo,
@@ -184,9 +183,7 @@ function toUpdateCustomTranslationRequest(
   };
 }
 
-export const useProviderStore = create<ProviderState>()(
-  persist(
-    (set, get) => ({
+export const useProviderStore = create<ProviderState>((set, get) => ({
       // 初始数据
       ocrProviders: [], // 从后端加载
       translationProviders: [], // 从后端加载
@@ -367,16 +364,4 @@ export const useProviderStore = create<ProviderState>()(
           throw error;
         }
       },
-    }),
-    {
-      name: 'snaplingo-providers',
-      // 不再持久化 translationProviders 和 activeTranslationProviders
-      partialize: (state) => ({
-        ocrProviders: state.ocrProviders,
-        ttsProviders: state.ttsProviders,
-        activeOcrProvider: state.activeOcrProvider,
-        activeTtsProvider: state.activeTtsProvider,
-      }),
-    }
-  )
-);
+}));

@@ -1,18 +1,30 @@
 use std::sync::Arc;
 
-use crate::application::history::{EventSubscriber, HistoryRepository};
+use tauri::{AppHandle, Emitter};
+
+use crate::application::history::{EventSubscriber, HistoryChangeNotifier, HistoryRepository};
 use crate::application::History;
-use crate::infrastructure::storage::HistoryDatabase;
-use crate::infrastructure::system::paths::get_history_db_path;
+use crate::infrastructure::storage::{Database, SqliteHistoryRepository};
 use crate::AppState;
 
-pub(crate) fn build_history() -> Arc<History> {
-    let history_db_path = get_history_db_path().expect("Failed to get history database path");
-    let history_db = Arc::new(
-        HistoryDatabase::new(history_db_path).expect("Failed to initialize history database"),
-    );
-    let repository: Arc<dyn HistoryRepository> = history_db;
-    Arc::new(History::new(repository))
+struct TauriHistoryChangeNotifier {
+    app: AppHandle,
+}
+
+impl HistoryChangeNotifier for TauriHistoryChangeNotifier {
+    fn history_changed(&self) {
+        if let Err(error) = self.app.emit("history-changed", ()) {
+            log::warn!("Failed to emit history-changed: {}", error);
+        }
+    }
+}
+
+pub(crate) fn build_history(database: Arc<Database>, app: AppHandle) -> Arc<History> {
+    let repository: Arc<dyn HistoryRepository> = Arc::new(SqliteHistoryRepository::new(database));
+    Arc::new(History::with_change_notifier(
+        repository,
+        Arc::new(TauriHistoryChangeNotifier { app }),
+    ))
 }
 
 pub(crate) fn subscribe_history(app_state: &AppState) {

@@ -90,46 +90,25 @@ describe('settingsConfigStore', () => {
     });
   });
 
-  it('migrates legacy durable values once and clears only migrated keys', async () => {
-    settingsRuntime.updateGeneral.mockResolvedValueOnce({
+  it('refreshes an already hydrated snapshot from the backend', async () => {
+    const refreshedSnapshot = {
       ...backendSnapshot,
-      general: {
-        language: 'en',
-        theme: 'dark',
-        startOnBoot: true,
-      },
-    });
-    settingsRuntime.updateScreenshot.mockResolvedValueOnce({
-      ...backendSnapshot,
-      general: {
-        language: 'en',
-        theme: 'dark',
-        startOnBoot: true,
-      },
-      screenshot: {
-        savePath: '~/legacy-captures',
-        format: 'jpg',
-        quality: 81,
-        annotationColors: [[255, 77, 79, 255]],
-      },
-    });
-    settingsRuntime.updateTranslation.mockResolvedValueOnce({
-      general: {
-        language: 'en',
-        theme: 'dark',
-        startOnBoot: true,
-      },
-      screenshot: {
-        savePath: '~/legacy-captures',
-        format: 'jpg',
-        quality: 81,
-        annotationColors: [[255, 77, 79, 255]],
-      },
-      translation: {
-        defaultSourceLang: 'ja',
-        defaultTargetLang: 'fr',
-      },
-    });
+      general: { ...backendSnapshot.general, theme: 'dark' },
+    };
+    const { initializeSettingsConfigStore, useSettingsConfigStore } =
+      await import('./settingsConfigStore');
+    initializeSettingsConfigStore(settingsRuntime);
+
+    await useSettingsConfigStore.getState().hydrate();
+    settingsRuntime.load.mockResolvedValueOnce(refreshedSnapshot);
+    const snapshot = await useSettingsConfigStore.getState().refresh();
+
+    expect(settingsRuntime.load).toHaveBeenCalledTimes(2);
+    expect(snapshot).toEqual(refreshedSnapshot);
+    expect(useSettingsConfigStore.getState().general?.theme).toBe('dark');
+  });
+
+  it('ignores legacy durable values and uses the backend snapshot', async () => {
     legacyPersistedState({
       activeMainTab: 'translation',
       screenshotSubTab: 'save-settings',
@@ -157,38 +136,14 @@ describe('settingsConfigStore', () => {
     await useSettingsConfigStore.getState().hydrate();
 
     expect(settingsRuntime.load).toHaveBeenCalledTimes(1);
-    expect(settingsRuntime.updateGeneral).toHaveBeenCalledWith({
-      language: 'en',
-      theme: 'dark',
-      startOnBoot: true,
-    });
-    expect(settingsRuntime.updateScreenshot).toHaveBeenCalledWith({
-      savePath: '~/legacy-captures',
-      format: 'jpg',
-      quality: 81,
-      annotationColors: [[255, 77, 79, 255]],
-    });
-    expect(settingsRuntime.updateTranslation).toHaveBeenCalledWith({
-      defaultSourceLang: 'ja',
-      defaultTargetLang: 'fr',
-    });
+    expect(settingsRuntime.updateGeneral).not.toHaveBeenCalled();
+    expect(settingsRuntime.updateScreenshot).not.toHaveBeenCalled();
+    expect(settingsRuntime.updateTranslation).not.toHaveBeenCalled();
     expect(useSettingsConfigStore.getState()).toMatchObject({
       hydrated: true,
-      general: {
-        language: 'en',
-        theme: 'dark',
-        startOnBoot: true,
-      },
-      screenshot: {
-        savePath: '~/legacy-captures',
-        format: 'jpg',
-        quality: 81,
-        annotationColors: [[255, 77, 79, 255]],
-      },
-      translation: {
-        defaultSourceLang: 'ja',
-        defaultTargetLang: 'fr',
-      },
+      general: backendSnapshot.general,
+      screenshot: backendSnapshot.screenshot,
+      translation: backendSnapshot.translation,
     });
 
     expect(JSON.parse(localStorage.getItem('snaplingo-settings') ?? '{}')).toEqual({
@@ -201,6 +156,14 @@ describe('settingsConfigStore', () => {
           ocr: { 'screenshot-ocr': 'F9' },
         },
         capturedScreenshot: 'data:image/png;base64,abc',
+        language: 'en',
+        theme: 'dark',
+        startOnBoot: true,
+        screenshotSavePath: '~/legacy-captures',
+        screenshotFormat: 'jpg',
+        screenshotQuality: 81,
+        defaultSourceLang: 'ja',
+        defaultTargetLang: 'fr',
       },
       version: 0,
     });

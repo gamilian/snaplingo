@@ -96,7 +96,7 @@ mod tests {
     use super::*;
     use crate::application::providers::TranslationPromptStrategyConfig;
     use crate::application::providers::{LLMClient, LLMRequest, LLMResponse};
-    use crate::infrastructure::storage::ConfigFile;
+    use crate::infrastructure::storage::SqliteConfigStore;
     use async_trait::async_trait;
 
     struct MockLLMClient {
@@ -128,7 +128,7 @@ mod tests {
             "Test LLM".to_string(),
             None,
             ProviderPromptStrategy::default(),
-            Arc::new(ConfigFile::new_temp()),
+            Arc::new(SqliteConfigStore::new_temp()),
         );
 
         let request = TranslationRequest {
@@ -155,7 +155,7 @@ mod tests {
             "Test LLM Reasoning".to_string(),
             Some(ReasoningLevel::High),
             ProviderPromptStrategy::default(),
-            Arc::new(ConfigFile::new_temp()),
+            Arc::new(SqliteConfigStore::new_temp()),
         );
 
         let request = TranslationRequest {
@@ -170,7 +170,7 @@ mod tests {
 
     #[tokio::test]
     async fn llm_translation_uses_edited_general_prompt_from_config() {
-        let config_file = Arc::new(ConfigFile::new_temp());
+        let config_file = Arc::new(SqliteConfigStore::new_temp());
         config_file
             .save(
                 "translation_prompt_strategies",

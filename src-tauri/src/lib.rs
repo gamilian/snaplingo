@@ -25,12 +25,6 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let config_dir = dirs::home_dir()
-        .expect("Cannot determine home directory")
-        .join(".snaplingo");
-    std::fs::create_dir_all(&config_dir).expect("Failed to create config directory");
-    let config_path = config_dir.join("config.json");
-
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -54,7 +48,9 @@ pub fn run() {
             }
         })
         .setup(|app| {
-            let app_state = composition::build_app_state(config_path, app.handle().clone());
+            let database_path = infrastructure::system::get_database_path()
+                .expect("Failed to resolve application database path");
+            let app_state = composition::build_app_state(database_path, app.handle().clone());
             composition::subscribe_history(&app_state);
             let hotkey_runtime = app_state.settings.hotkeys.clone();
 
@@ -98,10 +94,11 @@ pub fn run() {
             commands::take_capture_result_window_payload,
             commands::open_selection_translation_window,
             commands::copy_text_to_clipboard,
-            commands::configure_hotkey,
-            commands::configure_translation_hotkey,
             commands::get_hotkey_snapshot,
+            commands::get_default_hotkey_snapshot,
             commands::update_hotkey,
+            commands::reset_hotkey,
+            commands::reset_hotkey_category,
             commands::get_settings_snapshot,
             commands::trigger_screenshot,
             commands::update_general_settings,
@@ -168,6 +165,9 @@ pub fn run() {
             commands::get_ocr_history,
             commands::search_history,
             commands::delete_history,
+            commands::set_history_favorite,
+            commands::update_history_note,
+            commands::replace_history_tags,
             commands::clear_all_history,
         ])
         .build(tauri::generate_context!())

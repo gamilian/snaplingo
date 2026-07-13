@@ -54,6 +54,54 @@ impl HotkeyRuntime {
         self.configuration.snapshot()
     }
 
+    pub fn default_snapshot(&self) -> HotkeySettingsSnapshot {
+        crate::domain::hotkey_config::default_hotkey_snapshot()
+    }
+
+    pub(crate) fn reset_hotkey_with(
+        &self,
+        registrar: &impl HotkeyRegistrar,
+        category: String,
+        action: String,
+    ) -> Result<HotkeyUpdateOutcome> {
+        validate_hotkey_action(&category, &action)?;
+        let hotkey = hotkey_category(&self.default_snapshot(), &category)
+            .and_then(|hotkeys| hotkeys.get(&action))
+            .cloned()
+            .ok_or_else(|| {
+                crate::AppError::Other(format!(
+                    "Missing default hotkey for '{}:{}'",
+                    category, action
+                ))
+            })?;
+
+        self.update_hotkey_with(registrar, category, action, hotkey)
+    }
+
+    pub(crate) fn reset_category_with(
+        &self,
+        registrar: &impl HotkeyRegistrar,
+        category: String,
+    ) -> Result<HotkeySettingsSnapshot> {
+        let defaults = self.default_snapshot();
+        let mut entries: Vec<_> = hotkey_category(&defaults, &category)
+            .ok_or_else(|| {
+                crate::AppError::Other(format!("Unknown hotkey category '{}'", category))
+            })?
+            .iter()
+            .map(|(action, hotkey)| (action.clone(), hotkey.clone()))
+            .collect();
+        entries.sort_by(|left, right| left.0.cmp(&right.0));
+
+        let mut snapshot = self.snapshot()?;
+        for (action, hotkey) in entries {
+            snapshot = self
+                .update_hotkey_with(registrar, category.clone(), action, hotkey)?
+                .snapshot;
+        }
+        Ok(snapshot)
+    }
+
     pub(crate) fn register_startup_hotkeys_with(
         &self,
         registrar: &impl HotkeyRegistrar,
@@ -258,7 +306,7 @@ mod hotkey_runtime_tests {
     use crate::domain::hotkey_config::{
         SCREENSHOT_ACTION, SCREENSHOT_CATEGORY, SELECTION_TRANSLATE_ACTION, TRANSLATION_CATEGORY,
     };
-    use crate::infrastructure::storage::ConfigFile;
+    use crate::infrastructure::storage::SqliteConfigStore;
     use crate::Result;
 
     #[derive(Clone, Debug, PartialEq, Eq)]
@@ -425,6 +473,36 @@ mod hotkey_runtime_tests {
     }
 
     #[test]
+    fn hotkey_runtime_reset_uses_domain_default_instead_of_saved_value() {
+        let (runtime, _configuration) = runtime_with_configuration();
+        let registrar = FakeHotkeyRegistrar::default();
+        runtime.register_startup_hotkeys_with(&registrar).unwrap();
+        runtime
+            .update_hotkey_with(
+                &registrar,
+                TRANSLATION_CATEGORY.to_string(),
+                SELECTION_TRANSLATE_ACTION.to_string(),
+                "⇧⌥D".to_string(),
+            )
+            .unwrap();
+        registrar.clear();
+
+        let outcome = runtime
+            .reset_hotkey_with(
+                &registrar,
+                TRANSLATION_CATEGORY.to_string(),
+                SELECTION_TRANSLATE_ACTION.to_string(),
+            )
+            .unwrap();
+
+        assert_eq!(
+            outcome.snapshot.translation.get(SELECTION_TRANSLATE_ACTION),
+            Some(&"⌥D".to_string())
+        );
+        assert_eq!(outcome.accelerator, Some("Alt+KeyD".to_string()));
+    }
+
+    #[test]
     fn hotkey_runtime_registration_failure_does_not_persist_new_hotkey() {
         let (runtime, _configuration) = runtime_with_configuration();
         let registrar = FakeHotkeyRegistrar::default();
@@ -469,8 +547,8 @@ mod hotkey_runtime_tests {
     }
 
     fn runtime_with_configuration() -> (HotkeyRuntime, Arc<HotkeyConfiguration>) {
-        let config_file = Arc::new(ConfigFile::new_temp());
-        let configuration = Arc::new(HotkeyConfiguration::with_legacy_root(config_file, None));
+        let config_file = Arc::new(SqliteConfigStore::new_temp());
+        let configuration = Arc::new(HotkeyConfiguration::new(config_file));
         let runtime = HotkeyRuntime::new(configuration.clone());
         (runtime, configuration)
     }

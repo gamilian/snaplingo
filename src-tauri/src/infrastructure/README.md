@@ -1,200 +1,60 @@
 # Infrastructure Layer
 
-The infrastructure layer provides platform-agnostic abstractions for external system interactions. All production code depends on traits; platform-specific implementations live in the `adapters/` directory.
+The infrastructure layer contains SnapLingo's adapters for persistence, HTTP, and operating-system integration. Application services depend on ports defined in the application layer; composition creates the concrete adapters once at startup.
 
-## Architecture
+## Structure
 
-```
+```text
 infrastructure/
-├── storage/           # Persistent data storage
-│   ├── traits.rs      # ConfigStore, SecretStore traits
-│   └── adapters/      # Platform implementations
-│       ├── config_file.rs
-│       └── keychain.rs
-├── http/              # HTTP client abstraction
-│   ├── traits.rs      # HttpClient trait
-│   └── adapters/
-│       └── reqwest_client.rs
-├── system/            # System integration (hotkeys, clipboard)
-│   ├── traits.rs      # HotkeyManager, ClipboardManager traits
-│   └── adapters/      # Platform implementations (future)
-└── mod.rs
+├── storage/
+│   ├── database/       # Shared SQLite connection, migrations, config and history repositories
+│   └── keychain/       # Provider credentials
+├── http/               # Reqwest transport adapter
+├── llm/                # Provider protocol clients
+├── events/             # In-process domain event bus
+└── system/             # Clipboard, capture, OCR, shortcuts and window adapters
 ```
 
-## Design Principles
+## Persistence
 
-1. **Dependency Inversion**: Business logic depends on traits, not concrete implementations
-2. **Platform Adaptation**: Platform-specific code isolated in `adapters/`
-3. **Testability**: All traits have mock implementations for testing
-4. **Async-First**: All I/O operations are async
+All non-secret durable state uses one database in the platform application-data directory:
 
-## Components
-
-### Storage
-
-**ConfigStore** - Application configuration persistence
-- File-based storage (JSON)
-- Atomic writes via temp file + rename
-- Directory creation on demand
-
-```rust
-use snaplingo_lib::infrastructure::storage::{ConfigStore, ConfigFile};
-
-let store = ConfigFile::new("config.json");
-store.save(&config).await?;
-let loaded = store.load::<AppConfig>().await?;
+```text
+snaplingo/
+└── snaplingo.db
 ```
 
-**SecretStore** - Secure credential storage
-- macOS: Keychain Services
-- Windows: Credential Manager (future)
-- Linux: Secret Service API (future)
+`Database` owns the shared `rusqlite::Connection`, guarded by a mutex. Opening it enables foreign keys, WAL mode, normal synchronous writes, and a five-second busy timeout, then applies sequential migrations through `PRAGMA user_version`.
 
-```rust
-use snaplingo_lib::infrastructure::storage::{SecretStore, Keychain};
+The current repositories are:
 
-let store = Keychain::new("com.snaplingo.app");
-store.save_secret("api_key", "sk-xxx").await?;
-let key = store.load_secret("api_key").await?;
-```
+- `SqliteConfigStore`: versioned JSON namespaces for settings, hotkeys, Provider definitions/order, and prompt strategies.
+- `SqliteHistoryRepository`: relational translation/OCR history with one global history ID plus favorites, notes, and tags.
+- `Keychain`: API keys, tokens, and other Provider credentials. Secrets must never be added to SQLite payloads.
 
-### HTTP
+The database is created once in `composition.rs` and shared by the repositories. Tests use `Database::in_memory()` or a temporary database instead of production paths.
 
-**HttpClient** - HTTP request abstraction
-- Wraps `reqwest` with custom error handling
-- JSON request/response convenience methods
-- Timeout and retry logic (future)
+## Storage Rules
 
-```rust
-use snaplingo_lib::infrastructure::http::{HttpClient, ReqwestClient};
+- Rust domain types define defaults; SQL migrations do not insert default configuration rows.
+- A missing configuration namespace is handled by the owning application service.
+- SQLite schema changes require a new ordered migration and a `user_version` increment.
+- A database with a newer schema version is rejected instead of being rebuilt.
+- Images and other large assets belong in the filesystem; SQLite stores only metadata when a durable asset feature is introduced.
+- Provider secrets stay in the system Keychain and use stable Provider IDs.
 
-let client = ReqwestClient::new();
-let response: ApiResponse = client.post_json(url, &request).await?;
-```
+## Testing
 
-### System (Future)
-
-**HotkeyManager** - Global hotkey registration
-- Cross-platform hotkey handling
-- Conflict detection
-- Event delivery to application
-
-**ClipboardManager** - Clipboard access
-- Read/write text content
-- Format detection (future)
-
-## Testing Strategy
-
-### Unit Tests
-- Mock implementations for all traits (`MockConfigStore`, `MockSecretStore`, `MockHttpClient`)
-- Test business logic in isolation
-- Fast, deterministic, no I/O
-
-### Integration Tests
-- Real adapter implementations against test fixtures
-- File system interactions use temp directories
-- HTTP tests use mock servers (future)
-
-### Running Tests
+Run the infrastructure and full backend suites from the repository root:
 
 ```bash
-# All tests
-cargo test
-
-# Infrastructure layer only
-cargo test --lib infrastructure
-
-# Specific component
-cargo test --lib infrastructure::storage
-cargo test --lib infrastructure::http
+cargo test --manifest-path src-tauri/Cargo.toml --lib infrastructure
+cargo test --manifest-path src-tauri/Cargo.toml --test infrastructure_integration_test
+cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-## Platform Support
+Repository tests should verify restart persistence, foreign-key behavior, transaction rollback, and that secret values do not appear in SQLite.
 
-| Component | macOS | Windows | Linux |
-|-----------|-------|---------|-------|
-| ConfigFile | ✅ | ✅ | ✅ |
-| Keychain | ✅ | 🚧 | 🚧 |
-| HttpClient | ✅ | ✅ | ✅ |
-| HotkeyManager | 🚧 | 🚧 | 🚧 |
-| ClipboardManager | 🚧 | 🚧 | 🚧 |
+## Dependency Direction
 
-✅ Implemented | 🚧 Planned
-
-## Error Handling
-
-All infrastructure operations return `InfrastructureError`:
-
-```rust
-pub enum InfrastructureError {
-    IoError(String),
-    SerializationError(String),
-    NetworkError(String),
-    NotFound(String),
-    PermissionDenied(String),
-}
-```
-
-Errors are propagated up to the application layer for user-facing messages.
-
-## Future Enhancements
-
-- [ ] Windows Credential Manager for `SecretStore`
-- [ ] Linux Secret Service API for `SecretStore`
-- [ ] HTTP client retry logic with exponential backoff
-- [ ] Request timeout configuration
-- [ ] Global hotkey management
-- [ ] Clipboard access
-- [ ] File system watcher for config changes
-- [ ] Logging integration
-
-## Dependencies
-
-- `serde` - Serialization framework
-- `serde_json` - JSON format
-- `reqwest` - HTTP client
-- `tokio` - Async runtime
-- `security-framework` (macOS) - Keychain access
-
-## Usage in Application
-
-The infrastructure layer is initialized at startup and injected into the application:
-
-```rust
-// src-tauri/src/main.rs
-use snaplingo_lib::infrastructure::{
-    storage::{ConfigFile, Keychain},
-    http::ReqwestClient,
-};
-
-#[tokio::main]
-async fn main() {
-    let config_store = ConfigFile::new("config.json");
-    let secret_store = Keychain::new("com.snaplingo.app");
-    let http_client = ReqwestClient::new();
-    
-    // Inject into application layer
-    let app = App::new(config_store, secret_store, http_client);
-    app.run().await;
-}
-```
-
-For testing, use mock implementations:
-
-```rust
-#[cfg(test)]
-mod tests {
-    use snaplingo_lib::infrastructure::storage::MockConfigStore;
-    
-    #[tokio::test]
-    async fn test_app_logic() {
-        let config_store = MockConfigStore::new();
-        let app = App::new(config_store, /* ... */);
-        // Test without file I/O
-    }
-}
-```
-
----
-
-**Status**: Phase 1 Infrastructure Layer - COMPLETE ✅
+Production application code must not import infrastructure implementations. Concrete adapters are assembled in the composition layer and injected behind application ports. The architecture dependency test enforces this boundary.

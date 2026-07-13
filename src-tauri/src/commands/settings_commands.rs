@@ -1,4 +1,4 @@
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::application::SettingsConfiguration;
 use crate::domain::{GeneralSettings, ScreenshotSettings, SettingsSnapshot, TranslationSettings};
@@ -13,33 +13,51 @@ pub fn get_settings_snapshot(
 #[tauri::command]
 pub fn update_general_settings(
     input: GeneralSettings,
+    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<SettingsSnapshot, String> {
-    update_general_settings_for_configuration(state.settings.configuration.as_ref(), input)
+    let snapshot =
+        update_general_settings_for_configuration(state.settings.configuration.as_ref(), input)?;
+    super::state_events::emit_state_changed(&app, super::state_events::SETTINGS_CHANGED_EVENT);
+    Ok(snapshot)
 }
 
 #[tauri::command]
 pub fn update_screenshot_settings(
     input: ScreenshotSettings,
+    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<SettingsSnapshot, String> {
-    update_screenshot_settings_for_configuration(state.settings.configuration.as_ref(), input)
+    let snapshot =
+        update_screenshot_settings_for_configuration(state.settings.configuration.as_ref(), input)?;
+    super::state_events::emit_state_changed(&app, super::state_events::SETTINGS_CHANGED_EVENT);
+    Ok(snapshot)
 }
 
 #[tauri::command]
 pub fn update_annotation_colors(
     colors: Vec<[u8; 4]>,
+    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<SettingsSnapshot, String> {
-    update_annotation_colors_for_configuration(state.settings.configuration.as_ref(), colors)
+    let snapshot =
+        update_annotation_colors_for_configuration(state.settings.configuration.as_ref(), colors)?;
+    super::state_events::emit_state_changed(&app, super::state_events::SETTINGS_CHANGED_EVENT);
+    Ok(snapshot)
 }
 
 #[tauri::command]
 pub fn update_translation_settings(
     input: TranslationSettings,
+    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<SettingsSnapshot, String> {
-    update_translation_settings_for_configuration(state.settings.configuration.as_ref(), input)
+    let snapshot = update_translation_settings_for_configuration(
+        state.settings.configuration.as_ref(),
+        input,
+    )?;
+    super::state_events::emit_state_changed(&app, super::state_events::SETTINGS_CHANGED_EVENT);
+    Ok(snapshot)
 }
 
 fn get_settings_snapshot_for_configuration(
@@ -96,18 +114,17 @@ mod settings_commands_tests {
     };
     use crate::application::SettingsConfiguration;
     use crate::domain::{ScreenshotSettings, SettingsSnapshot, TranslationSettings};
-    use crate::infrastructure::storage::ConfigFile;
+    use crate::infrastructure::storage::SqliteConfigStore;
 
     #[test]
     fn get_settings_snapshot_reads_from_backend_configuration() {
-        let config_file = Arc::new(ConfigFile::new_temp());
+        let config_file = Arc::new(SqliteConfigStore::new_temp());
         let home_dir = tempdir().unwrap();
         let default_save_dir = home_dir.path().join("Snapshots");
         let configuration = SettingsConfiguration::with_paths(
             config_file,
             Some(home_dir.path().to_path_buf()),
             default_save_dir.clone(),
-            None,
         );
 
         let snapshot = get_settings_snapshot_for_configuration(&configuration).unwrap();
@@ -121,13 +138,12 @@ mod settings_commands_tests {
 
     #[test]
     fn update_translation_settings_delegates_and_returns_updated_snapshot() {
-        let config_file = Arc::new(ConfigFile::new_temp());
+        let config_file = Arc::new(SqliteConfigStore::new_temp());
         let home_dir = tempdir().unwrap();
         let configuration = SettingsConfiguration::with_paths(
             config_file,
             Some(home_dir.path().to_path_buf()),
             home_dir.path().join("Snapshots"),
-            None,
         );
 
         let updated = update_translation_settings_for_configuration(
@@ -147,13 +163,12 @@ mod settings_commands_tests {
 
     #[test]
     fn update_annotation_colors_preserves_other_screenshot_settings() {
-        let config_file = Arc::new(ConfigFile::new_temp());
+        let config_file = Arc::new(SqliteConfigStore::new_temp());
         let home_dir = tempdir().unwrap();
         let configuration = SettingsConfiguration::with_paths(
             config_file,
             Some(home_dir.path().to_path_buf()),
             home_dir.path().join("Snapshots"),
-            None,
         );
         configuration
             .update_screenshot(ScreenshotSettings {
