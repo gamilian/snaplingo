@@ -2492,6 +2492,39 @@ describe('capture workspace runtime', () => {
     });
   });
 
+  it('does not restore a hover selection while direct OCR completion is pending', async () => {
+    const ocr = deferred<{ text: string; confidence: null }>();
+    const platform = createPlatform({
+      session: createSession({ id: 'session-pending-ocr' }),
+    });
+    platform.commands.runCaptureOcr.mockImplementation(() => ocr.promise);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession(
+      'screenshot-ocr',
+      'session-pending-ocr',
+    );
+    runtime.actions.pointerDown({ x: 20, y: 30 });
+    runtime.actions.pointerMove({ x: 140, y: 110 });
+    const completion = runtime.actions.pointerUp({ x: 140, y: 110 });
+
+    expect(runtime.renderState).toMatchObject({
+      status: 'loading',
+      cursorPoint: null,
+      hoverSelection: null,
+      selection,
+      isRenderingOutput: true,
+    });
+
+    runtime.actions.updatePolledCursor({ x: 60, y: 70 });
+    runtime.actions.updatePolledHover({ x: 40, y: 50, width: 80, height: 60 });
+    expect(runtime.renderState.cursorPoint).toBeNull();
+    expect(runtime.renderState.hoverSelection).toBeNull();
+
+    ocr.resolve({ text: 'recognized text', confidence: null });
+    await completion;
+  });
+
   it('opens the OCR result even when automatic clipboard copy fails', async () => {
     const platform = createPlatform({
       session: createSession({ id: 'session-ocr' }),

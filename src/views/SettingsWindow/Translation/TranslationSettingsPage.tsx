@@ -144,8 +144,10 @@ export function TranslationSettingsPage() {
         {/* 窗口置顶 */}
         <div className="flex items-center justify-between">
           <div>
-            <div className="font-medium text-gray-700">翻译窗口置顶</div>
-            <div className="text-sm text-gray-500 mt-1">翻译窗口始终显示在最前面</div>
+            <div className="font-medium text-gray-700">结果窗口置顶</div>
+            <div className="text-sm text-gray-500 mt-1">
+              翻译和 OCR 结果窗口始终显示在最前面
+            </div>
           </div>
           <SettingsToggle
             checked={translation.windowAlwaysOnTop}
@@ -160,7 +162,7 @@ export function TranslationSettingsPage() {
           <div>
             <div className="font-medium text-gray-700">失去焦点时隐藏</div>
             <div className="text-sm text-gray-500 mt-1">
-              点击窗口外部区域时自动隐藏翻译窗口
+              点击窗口外部区域时自动隐藏翻译和 OCR 结果窗口
             </div>
           </div>
           <SettingsToggle

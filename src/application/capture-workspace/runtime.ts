@@ -640,7 +640,9 @@ export function createCaptureWorkspaceRuntime({
     terminalOutputOperation = operation;
     const cancelNativeSession = createNativeSessionCancellation(session.id);
 
+    const preservesPreview = state.status === 'preview';
     patch({
+      ...(preservesPreview ? {} : { status: 'loading', cursorPoint: null }),
       selection: rect,
       hoverSelection: null,
       isRenderingOutput: true,

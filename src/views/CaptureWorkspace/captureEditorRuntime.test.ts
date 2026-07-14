@@ -628,7 +628,7 @@ describe('captureEditorRuntime', () => {
         annotationHistory: emptyAnnotationHistory(),
         isMagnifierRequested: false,
         isAnnotationToolbarVisible: false,
-        status: 'selecting',
+        status: 'loading',
         renderingOutput: true,
         error: null,
       },

@@ -6,6 +6,7 @@ import { createRoot } from 'react-dom/client';
 import type { ResultWindowRuntime } from '../../application/result-window/runtime';
 import { useAppStore } from '../../stores/appStore';
 import { useProviderStore } from '../../stores/providerStore';
+import { useSettingsConfigStore } from '../../stores/settingsConfigStore';
 import ResultWindow from './ResultWindow';
 
 const runtime = {
@@ -15,6 +16,7 @@ const runtime = {
   },
   clipboard: { copyText: vi.fn() },
   resizeStandaloneWindow: vi.fn(),
+  setAlwaysOnTop: vi.fn(),
   close: vi.fn(),
   startFileOcr: vi.fn(),
   translate: vi.fn(),
@@ -39,6 +41,7 @@ describe('result window text actions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useAppStore.getState().reset();
+    useSettingsConfigStore.setState({ translation: null, ocr: null });
     useProviderStore.setState({
       translationProviders: [],
       activeTranslationProviders: [],
@@ -120,4 +123,35 @@ describe('result window text actions', () => {
     });
     await view.unmount();
   });
+
+  it.each(['translation', 'ocr'] as const)(
+    'hides an unpinned standalone %s result after it loses focus',
+    async (resultWindowMode) => {
+      useSettingsConfigStore.setState({
+        translation: {
+          defaultSourceLang: 'auto',
+          defaultTargetLang: 'zh-CN',
+          autoTranslate: true,
+          autoCopy: false,
+          preserveLineBreaks: true,
+          incrementalTranslation: false,
+          windowAlwaysOnTop: true,
+          hideOnBlur: true,
+        },
+      });
+      useAppStore.setState({
+        resultWindowVisible: true,
+        resultWindowMode,
+      });
+      const now = vi.spyOn(performance, 'now').mockReturnValue(0);
+      const view = await renderResultWindow();
+      now.mockReturnValue(400);
+
+      await act(async () => window.dispatchEvent(new Event('blur')));
+
+      expect(runtime.close).toHaveBeenCalledWith('standalone');
+      now.mockRestore();
+      await view.unmount();
+    },
+  );
 });

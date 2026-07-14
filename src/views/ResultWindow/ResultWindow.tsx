@@ -479,7 +479,6 @@ function ResultWindowContent({
   useEffect(() => {
     if (
       !resultWindowVisible ||
-      resultWindowMode !== 'translation' ||
       !translationSettings?.hideOnBlur ||
       !shouldCloseFromWindowBlur(presentation, isResultWindowPinned)
     ) return;
@@ -503,7 +502,6 @@ function ResultWindowContent({
     closeResultWindow,
     isResultWindowPinned,
     presentation,
-    resultWindowMode,
     resultWindowVisible,
     translationSettings?.hideOnBlur,
   ]);

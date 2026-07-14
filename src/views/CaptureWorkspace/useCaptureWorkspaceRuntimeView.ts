@@ -156,14 +156,16 @@ export function useCaptureWorkspaceRuntimeView({
       candidates: derived.captureCandidates,
       shouldTrackMagnifierCursor,
       intervalMs: CAPTURE_HOVER_POLL_INTERVAL_MS,
-      canPoll: () =>
-        shouldPollCaptureHoverSelection({
-          status: runtimeRenderState.status,
-          hasSession: true,
+      canPoll: () => {
+        const currentState = workflowRuntime.renderState;
+        return shouldPollCaptureHoverSelection({
+          status: currentState.status,
+          hasSession: currentState.sessionId !== null,
           hasSelectionBounds: true,
-          hasActiveStartPoint: runtimeRenderState.startPoint !== null,
-          hasEditGesture: runtimeRenderState.editGesture !== null,
-        }),
+          hasActiveStartPoint: currentState.startPoint !== null,
+          hasEditGesture: currentState.editGesture !== null,
+        });
+      },
       getCursorPosition: platformRuntime.commands.currentCaptureCursorPosition,
       setCursorPointRef: workflowRuntime.actions.updatePolledCursor,
       setCursorPoint: () => undefined,

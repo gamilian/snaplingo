@@ -435,7 +435,7 @@ describe('result window presentation', () => {
     expect(shouldCloseFromContainerClick('standalone', target, target, true)).toBe(false);
   });
 
-  it('ignores initial standalone window blur while capture cleanup settles', () => {
+  it('closes unpinned standalone result windows after the initial blur grace period', () => {
     expect(shouldCloseFromWindowBlur('standalone', false, 100)).toBe(false);
     expect(shouldCloseFromWindowBlur('standalone', false, 400)).toBe(true);
     expect(shouldCloseFromWindowBlur('overlay')).toBe(false);

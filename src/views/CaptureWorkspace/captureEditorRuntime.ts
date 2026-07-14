@@ -516,7 +516,7 @@ interface CapturePreviewManualSelectionState
 interface CaptureEffectsManualSelectionState
   extends CaptureManualSelectionBaseState {
   isAnnotationToolbarVisible: false;
-  status: 'selecting';
+  status: 'loading';
   renderingOutput: true;
   error: null;
 }
@@ -584,7 +584,7 @@ export function planCaptureManualSelectionTransition({
     nextState: {
       ...baseState,
       isAnnotationToolbarVisible: false,
-      status: 'selecting',
+      status: 'loading',
       renderingOutput: true,
       error: null,
     },

@@ -88,7 +88,7 @@ impl Default for TranslationSettings {
             preserve_line_breaks: true,
             incremental_translation: false,
             window_always_on_top: true,
-            hide_on_blur: false,
+            hide_on_blur: true,
         }
     }
 }
