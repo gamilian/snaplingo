@@ -8,8 +8,8 @@ use crate::application::providers::{
 use crate::application::result_window::ResultWindowRuntime;
 use crate::application::{
     CaptureOutput, CaptureSessionRuntime, CaptureSessions, Favorites, History, HotkeyRuntime,
-    OcrHistoryReplay, PinnedImageRuntime, ScreenshotFavoriteCapture, ScreenshotFavorites,
-    SelectedTextAcquirer, SettingsConfiguration,
+    LibraryIndex, OcrHistoryReplay, PinnedImageRuntime, ScreenshotFavoriteCapture,
+    ScreenshotFavorites, SelectedTextAcquirer, SettingsConfiguration,
 };
 use crate::infrastructure::events::EventBus;
 use crate::Result;
@@ -61,6 +61,7 @@ pub struct AppState {
     pub history: Arc<HistoryRuntime>,
     pub favorites: Arc<FavoritesRuntime>,
     pub screenshot_favorites: Arc<ScreenshotFavoritesRuntime>,
+    pub library_index: Arc<LibraryIndex>,
     pub selection: Arc<SelectionRuntime>,
     #[allow(dead_code)] // Wired in Task 3; commands consume it in the following Task 4.
     pub(crate) result_window: Arc<ResultWindowRuntime>,

@@ -23,7 +23,7 @@ React Views
   - `capture-workspace`: capture launch/session/effect workflow.
   - `result-window`: translation and file-OCR workflows.
   - `pinned-image`: pinned-image workflow.
-  - `settings`: settings-window hydration and update workflow.
+  - `settings`: settings-window hydration and update workflow, including Library cross-source filtering, ordering, and pagination.
 - `src/platform/tauri/` owns typed command invocation, event parsing, and Tauri-window effects. It implements the frontend ports.
 - `src/domain/` holds portable frontend data types and vocabulary.
 
@@ -34,6 +34,8 @@ React Views
   - `providers` owns Provider coordination, runtime configuration, credentials, HTTP/LLM vocabulary, and Provider event publication through local ports.
   - `settings` and `hotkeys` own their independent durable-store ports.
   - `history` owns its repository and event-source ports.
+  - `favorite_capacity` owns the global Favorites maximum and serializes capacity check plus insertion across regular and screenshot Favorites.
+  - `library_index` owns lightweight cross-source ordering so only final-page History and Favorites records are hydrated.
   - `capture`, `result_window`, and `pinned_image` own window/runtime-host ports.
   - `selected_text` owns its method and context ports.
 - `src-tauri/src/infrastructure/` implements OS, Tauri-window, shortcut, storage, network, native OCR, database, and event capabilities.
@@ -58,6 +60,9 @@ React Views
 Provider Configuration -> ProviderConfigStore / ProviderCredentialStore
 Provider execution     -> HttpClient / LlmRuntime / ProviderEventSink
 History                -> HistoryEventSource / HistoryRepository
+Library                -> SettingsHistoryPort / SettingsFavoritesPort / SettingsScreenshotFavoritesPort
+Library Index          -> LibraryIndexRepository
+Favorite Capacity      -> FavoriteCapacityRepository / FavoriteCapacityPolicyProvider
 Capture                -> CaptureSessionSource / CaptureRuntimeHost
 Hotkeys                -> HotkeyStore / HotkeyRegistrar
 ```

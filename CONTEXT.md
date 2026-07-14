@@ -63,6 +63,16 @@ Application runtimes that own their workflows and request runtime-host effects. 
 
 The History module turns Application events into stored records and serves history queries. It depends only on its event-source and repository ports.
 
+### Library
+
+The Library is the Settings Window's unified browsing surface for History and Favorites across screenshot, translation, and OCR content. Its frontend Application module owns cross-source filtering, ordering, pagination, and mutation sequencing; Views own rendering and local interaction state. A backend Library Index port performs lightweight global ordering before the frontend loads only the final page's source records and thumbnails.
+
+History and Favorites remain separate backend Application modules with independent persistence and mutation rules. The read-only Library Index combines ordering metadata without merging their storage models.
+
+### Favorite Capacity
+
+Favorite Capacity is the backend Application module that owns the global maximum across translation, OCR, and screenshot Favorites. All favorite insertion workflows share its atomic in-process gate; its repository port reports the combined persisted count without leaking one favorite storage model into another.
+
 ## Dependency Direction
 
 ```text

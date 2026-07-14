@@ -5,6 +5,7 @@ use base64::Engine;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use crate::application::favorite_capacity::FavoriteCapacity;
 use crate::domain::ocr::OcrResult;
 use crate::domain::translation::{TranslationRequest, TranslationResult};
 use crate::Result;
@@ -106,11 +107,6 @@ pub trait FavoriteRepository: Send + Sync {
         -> Result<()>;
     async fn delete(&self, id: i64) -> Result<()>;
     async fn list_tags(&self, kind: FavoriteKind) -> Result<Vec<String>>;
-    async fn count_all(&self) -> Result<usize>;
-}
-
-pub trait FavoritePolicyProvider: Send + Sync {
-    fn maximum_favorites(&self) -> Result<u32>;
 }
 
 pub trait FavoriteAssetStore: Send + Sync {
@@ -127,19 +123,20 @@ pub struct Favorites {
     repository: Arc<dyn FavoriteRepository>,
     assets: Arc<dyn FavoriteAssetStore>,
     notifier: Option<Arc<dyn FavoriteChangeNotifier>>,
-    policy_provider: Option<Arc<dyn FavoritePolicyProvider>>,
+    capacity: Arc<FavoriteCapacity>,
 }
 
 impl Favorites {
     pub fn new(
         repository: Arc<dyn FavoriteRepository>,
         assets: Arc<dyn FavoriteAssetStore>,
+        capacity: Arc<FavoriteCapacity>,
     ) -> Self {
         Self {
             repository,
             assets,
             notifier: None,
-            policy_provider: None,
+            capacity,
         }
     }
 
@@ -147,26 +144,27 @@ impl Favorites {
         repository: Arc<dyn FavoriteRepository>,
         assets: Arc<dyn FavoriteAssetStore>,
         notifier: Arc<dyn FavoriteChangeNotifier>,
+        capacity: Arc<FavoriteCapacity>,
     ) -> Self {
         Self {
             repository,
             assets,
             notifier: Some(notifier),
-            policy_provider: None,
+            capacity,
         }
     }
 
-    pub fn with_notifier_and_policy(
+    pub fn with_notifier_and_capacity(
         repository: Arc<dyn FavoriteRepository>,
         assets: Arc<dyn FavoriteAssetStore>,
         notifier: Arc<dyn FavoriteChangeNotifier>,
-        policy_provider: Arc<dyn FavoritePolicyProvider>,
+        capacity: Arc<FavoriteCapacity>,
     ) -> Self {
         Self {
             repository,
             assets,
             notifier: Some(notifier),
-            policy_provider: Some(policy_provider),
+            capacity,
         }
     }
 
@@ -206,39 +204,49 @@ impl Favorites {
         if let Some(record) = self.repository.find_by_fingerprint(&fingerprint).await? {
             return self.hydrate(record);
         }
-        self.ensure_capacity().await?;
 
-        let stored = if image_data.is_empty() {
-            None
-        } else {
-            Some(self.assets.store_ocr(&image_data)?)
-        };
-        let content = FavoriteContent::Ocr(OcrFavoriteSnapshot {
-            image_hash,
-            recognized_text: result.text,
-            language,
-            provider_used,
-            confidence: result.confidence,
-            source_asset_path: stored.as_ref().map(|assets| assets.source_path.clone()),
-            thumbnail_asset_path: stored.as_ref().map(|assets| assets.thumbnail_path.clone()),
-        });
-        match self
-            .repository
-            .insert(&fingerprint, source_history_id, &content, Utc::now())
-            .await
-        {
-            Ok(record) => {
-                self.notify();
-                self.hydrate(record)
-            }
-            Err(error) => {
-                if let Some(stored) = stored {
-                    let _ = self.assets.delete(&stored.source_path);
-                    let _ = self.assets.delete(&stored.thumbnail_path);
-                }
-                Err(error)
-            }
-        }
+        let record = self
+            .capacity
+            .add_idempotent(
+                || self.repository.find_by_fingerprint(&fingerprint),
+                || async {
+                    let stored = if image_data.is_empty() {
+                        None
+                    } else {
+                        Some(self.assets.store_ocr(&image_data)?)
+                    };
+                    let content = FavoriteContent::Ocr(OcrFavoriteSnapshot {
+                        image_hash,
+                        recognized_text: result.text,
+                        language,
+                        provider_used,
+                        confidence: result.confidence,
+                        source_asset_path: stored.as_ref().map(|assets| assets.source_path.clone()),
+                        thumbnail_asset_path: stored
+                            .as_ref()
+                            .map(|assets| assets.thumbnail_path.clone()),
+                    });
+                    match self
+                        .repository
+                        .insert(&fingerprint, source_history_id, &content, Utc::now())
+                        .await
+                    {
+                        Ok(record) => {
+                            self.notify();
+                            Ok(record)
+                        }
+                        Err(error) => {
+                            if let Some(stored) = stored {
+                                let _ = self.assets.delete(&stored.source_path);
+                                let _ = self.assets.delete(&stored.thumbnail_path);
+                            }
+                            Err(error)
+                        }
+                    }
+                },
+            )
+            .await?;
+        self.hydrate(record)
     }
 
     pub async fn query(&self, query: FavoriteQuery) -> Result<FavoritePage> {
@@ -307,26 +315,19 @@ impl Favorites {
         if let Some(record) = self.repository.find_by_fingerprint(&fingerprint).await? {
             return Ok(record);
         }
-        self.ensure_capacity().await?;
-        let record = self
-            .repository
-            .insert(&fingerprint, source_history_id, &content, Utc::now())
-            .await?;
-        self.notify();
-        Ok(record)
-    }
-
-    async fn ensure_capacity(&self) -> Result<()> {
-        let Some(provider) = &self.policy_provider else {
-            return Ok(());
-        };
-        let maximum = provider.maximum_favorites()? as usize;
-        if maximum > 0 && self.repository.count_all().await? >= maximum {
-            return Err(
-                format!("收藏夹容量已满（最多 {maximum} 项），请先删除不需要的收藏").into(),
-            );
-        }
-        Ok(())
+        self.capacity
+            .add_idempotent(
+                || self.repository.find_by_fingerprint(&fingerprint),
+                || async {
+                    let record = self
+                        .repository
+                        .insert(&fingerprint, source_history_id, &content, Utc::now())
+                        .await?;
+                    self.notify();
+                    Ok(record)
+                },
+            )
+            .await
     }
 
     fn hydrate(&self, mut record: FavoriteRecord) -> Result<FavoriteRecord> {

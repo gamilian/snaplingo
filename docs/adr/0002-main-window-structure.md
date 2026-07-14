@@ -1,7 +1,9 @@
 # ADR 0002: 主窗口结构 - 功能域独立架构
 
 ## Status
-Accepted (2026-06-13)
+Accepted (2026-06-13), amended by ADR 0008
+
+The feature-domain settings structure remains accepted. ADR 0008 supersedes this ADR's History and Favorites navigation placement and the rejection of a unified Library surface.
 
 **原型验证**：已通过 UI 原型验证，确认 6 标签页 + 二级导航结构可行。
 

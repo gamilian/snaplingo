@@ -21,6 +21,7 @@ import type {
   ScreenshotFavoriteQuery,
   SettingsClipboardPort,
   SettingsHistoryPort,
+  SettingsLibraryIndexPort,
   SettingsFavoritesPort,
   SettingsScreenshotFavoritesPort,
   SettingsHotkeysPort,
@@ -31,6 +32,7 @@ import type {
   TranslationFavoriteInput,
   TranslationSettings,
 } from './ports';
+import { createSettingsLibrary, type SettingsLibrary } from './library';
 
 export interface SettingsRuntimePorts {
   window: SettingsWindowPort;
@@ -38,12 +40,14 @@ export interface SettingsRuntimePorts {
   providers: SettingsProvidersPort;
   hotkeys: SettingsHotkeysPort;
   history: SettingsHistoryPort;
+  libraryIndex: SettingsLibraryIndexPort;
   favorites: SettingsFavoritesPort;
   screenshotFavorites: SettingsScreenshotFavoritesPort;
   clipboard: SettingsClipboardPort;
 }
 
 export interface SettingsRuntime {
+  library: SettingsLibrary;
   window: {
     open(): Promise<void>;
     selectScreenshotDirectory(): Promise<string | null>;
@@ -113,6 +117,13 @@ export function createSettingsRuntime(
   ports: SettingsRuntimePorts,
 ): SettingsRuntime {
   return {
+    library: createSettingsLibrary({
+      history: ports.history,
+      favorites: ports.favorites,
+      screenshotFavorites: ports.screenshotFavorites,
+      index: ports.libraryIndex,
+      clipboard: ports.clipboard,
+    }),
     window: {
       open: () => ports.window.openSettings(),
       selectScreenshotDirectory: () => ports.window.selectScreenshotDirectory(),

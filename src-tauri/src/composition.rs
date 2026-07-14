@@ -37,13 +37,18 @@ use crate::application::result_window::ResultWindowRuntime;
 use crate::application::settings::{SettingsChangeNotifier, SettingsStore};
 use crate::infrastructure::events::EventBus;
 use crate::infrastructure::http::ReqwestHttpClient;
-use crate::infrastructure::storage::{Database, Keychain, SqliteConfigStore};
+use crate::infrastructure::storage::{
+    Database, Keychain, SqliteConfigStore, SqliteFavoriteCapacityRepository,
+    SqliteLibraryIndexRepository,
+};
 use crate::infrastructure::storage::{FilesystemOcrHistoryAssets, SqliteFavoriteRepository};
 use crate::infrastructure::system::clipboard::ArboardResultWindowClipboard;
 use crate::infrastructure::system::result_window::{
     TauriResultWindowNotifier, TauriResultWindowRuntimeHost,
 };
-use crate::{HotkeyConfiguration, HotkeyRuntime, SettingsConfiguration};
+use crate::{
+    FavoriteCapacity, HotkeyConfiguration, HotkeyRuntime, LibraryIndex, SettingsConfiguration,
+};
 
 struct TauriSettingsChangeNotifier {
     app: AppHandle,
@@ -127,13 +132,20 @@ pub(crate) fn build_app_state(database_path: PathBuf, app: AppHandle) -> AppStat
     );
     let favorite_repository: Arc<dyn FavoriteRepository> =
         Arc::new(SqliteFavoriteRepository::new(database.clone()));
-    let favorites = Arc::new(crate::application::Favorites::with_notifier_and_policy(
+    let favorite_capacity = Arc::new(FavoriteCapacity::new(
+        Arc::new(SqliteFavoriteCapacityRepository::new(database.clone())),
+        settings_configuration.clone(),
+    ));
+    let library_index = Arc::new(LibraryIndex::new(Arc::new(
+        SqliteLibraryIndexRepository::new(database.clone()),
+    )));
+    let favorites = Arc::new(crate::application::Favorites::with_notifier_and_capacity(
         favorite_repository,
         Arc::new(FilesystemOcrHistoryAssets::new(
             asset_root.join("favorites"),
         )),
         Arc::new(TauriFavoriteChangeNotifier { app: app.clone() }),
-        settings_configuration.clone(),
+        favorite_capacity.clone(),
     ));
 
     let llm_runtime = build_llm_runtime(http_client.clone());
@@ -178,7 +190,7 @@ pub(crate) fn build_app_state(database_path: PathBuf, app: AppHandle) -> AppStat
         asset_root,
         capture_runtime.runtime.clone(),
         capture_runtime.output.clone(),
-        settings_configuration.clone(),
+        favorite_capacity,
         app.clone(),
     );
     let selected_text_acquirer = build_selected_text_acquirer(app.clone());
@@ -223,6 +235,7 @@ pub(crate) fn build_app_state(database_path: PathBuf, app: AppHandle) -> AppStat
             favorites: screenshot_favorites,
             capture: screenshot_favorite_capture,
         }),
+        library_index,
         selection: Arc::new(SelectionRuntime {
             acquirer: selected_text_acquirer,
         }),

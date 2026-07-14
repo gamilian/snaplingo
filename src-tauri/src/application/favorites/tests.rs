@@ -4,6 +4,9 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 
 use super::*;
+use crate::application::favorite_capacity::{
+    FavoriteCapacityPolicyProvider, FavoriteCapacityRepository,
+};
 use crate::application::history::{EventSubscriber, History, HistoryRepository};
 use crate::domain::events::DomainEvent;
 use crate::infrastructure::storage::{Database, SqliteFavoriteRepository, SqliteHistoryRepository};
@@ -91,8 +94,11 @@ impl FavoriteRepository for FakeRepository {
     async fn list_tags(&self, _kind: FavoriteKind) -> Result<Vec<String>> {
         Ok(Vec::new())
     }
+}
 
-    async fn count_all(&self) -> Result<usize> {
+#[async_trait]
+impl FavoriteCapacityRepository for FakeRepository {
+    async fn current_count(&self) -> Result<usize> {
         Ok(self.records.lock().unwrap().len())
     }
 }
@@ -104,7 +110,7 @@ struct FakeAssets {
 
 struct FakePolicy(u32);
 
-impl FavoritePolicyProvider for FakePolicy {
+impl FavoriteCapacityPolicyProvider for FakePolicy {
     fn maximum_favorites(&self) -> Result<u32> {
         Ok(self.0)
     }
@@ -114,6 +120,10 @@ struct FakeNotifier;
 
 impl FavoriteChangeNotifier for FakeNotifier {
     fn favorites_changed(&self) {}
+}
+
+fn unlimited_capacity() -> Arc<FavoriteCapacity> {
+    Arc::new(FavoriteCapacity::unlimited())
 }
 
 impl FavoriteAssetStore for FakeAssets {
@@ -150,7 +160,11 @@ impl FavoriteAssetStore for FakeAssets {
 #[tokio::test]
 async fn translation_favorite_is_an_independent_snapshot_and_is_deduplicated() {
     let repository = Arc::new(FakeRepository::default());
-    let favorites = Favorites::new(repository.clone(), Arc::new(FakeAssets::default()));
+    let favorites = Favorites::new(
+        repository.clone(),
+        Arc::new(FakeAssets::default()),
+        unlimited_capacity(),
+    );
     let request = TranslationRequest {
         text: "hello".to_string(),
         source_lang: "en".to_string(),
@@ -180,11 +194,15 @@ async fn translation_favorite_is_an_independent_snapshot_and_is_deduplicated() {
 #[tokio::test]
 async fn capacity_rejects_new_favorites_but_keeps_duplicate_adds_idempotent() {
     let repository = Arc::new(FakeRepository::default());
-    let favorites = Favorites::with_notifier_and_policy(
+    let capacity = Arc::new(FavoriteCapacity::new(
+        repository.clone(),
+        Arc::new(FakePolicy(1)),
+    ));
+    let favorites = Favorites::with_notifier_and_capacity(
         repository.clone(),
         Arc::new(FakeAssets::default()),
         Arc::new(FakeNotifier),
-        Arc::new(FakePolicy(1)),
+        capacity,
     );
     let request = TranslationRequest {
         text: "hello".to_string(),
@@ -233,6 +251,7 @@ async fn ocr_favorite_owns_its_snapshot_and_thumbnail() {
     let favorites = Favorites::new(
         Arc::new(FakeRepository::default()),
         Arc::new(FakeAssets::default()),
+        unlimited_capacity(),
     );
 
     let saved = favorites
@@ -260,7 +279,11 @@ async fn ocr_favorite_owns_its_snapshot_and_thumbnail() {
 #[tokio::test]
 async fn equal_ocr_text_from_different_images_creates_distinct_favorites() {
     let repository = Arc::new(FakeRepository::default());
-    let favorites = Favorites::new(repository.clone(), Arc::new(FakeAssets::default()));
+    let favorites = Favorites::new(
+        repository.clone(),
+        Arc::new(FakeAssets::default()),
+        unlimited_capacity(),
+    );
 
     for image in [vec![1, 2, 3], vec![4, 5, 6]] {
         favorites
@@ -290,6 +313,7 @@ async fn clearing_history_does_not_remove_an_independent_favorite_snapshot() {
     let favorites = Favorites::new(
         Arc::new(SqliteFavoriteRepository::new(database)),
         Arc::new(FakeAssets::default()),
+        unlimited_capacity(),
     );
     let request = TranslationRequest {
         text: "hello".to_string(),

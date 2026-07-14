@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use crate::application::capture::configured_capture_save_dir;
-use crate::application::favorites::FavoritePolicyProvider;
+use crate::application::favorite_capacity::FavoriteCapacityPolicyProvider;
 use crate::application::history::{HistoryCleanupPolicy, HistoryPolicyProvider};
 use crate::application::settings::SettingsStore;
 use crate::domain::{
@@ -30,7 +30,7 @@ impl HistoryPolicyProvider for SettingsConfiguration {
     }
 }
 
-impl FavoritePolicyProvider for SettingsConfiguration {
+impl FavoriteCapacityPolicyProvider for SettingsConfiguration {
     fn maximum_favorites(&self) -> Result<u32> {
         Ok(self.snapshot()?.history.maximum_favorites)
     }

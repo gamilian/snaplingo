@@ -68,6 +68,7 @@ Tests target these interfaces rather than private SQL helpers or React implement
 - Completed: shared-tag cleanup protects tags still referenced by screenshot favorites.
 - Completed: OCR source images and thumbnails are persisted outside SQLite, cleaned with records, displayed in Settings, and can be re-recognized.
 - Completed: durable automatic cleanup policy, startup/post-insert cleanup, maximum-count enforcement, and favorite exclusion.
+- Completed: one atomic in-process Favorite Capacity seam enforces the global maximum across translation, OCR, and screenshot Favorites through a combined-count SQLite adapter.
 - Completed: authoritative tag filtering and complete tag lists across favorite pages.
 - Completed: translation favorite JSON export.
 - Intentional scope decision: source-type filters were removed because the existing records did not contain trustworthy capture-origin metadata. Reintroducing those filters requires provenance to be added at translation/OCR entry points; displaying guessed values would be incorrect.

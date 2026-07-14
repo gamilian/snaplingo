@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import type {
-  FavoriteItem,
-  FavoriteKind,
-  ScreenshotFavoriteItem,
-} from '../../../application/settings/ports';
+  FavoriteLibraryItem,
+  LibraryFavoritesFilter,
+} from '../../../application/settings/library';
 import { useFavoritesStore } from '../../../stores/favoritesStore';
 import { useScreenshotFavoritesStore } from '../../../stores/screenshotFavoritesStore';
 import { formatRelativeTime } from '../../../utils/formatTime';
@@ -19,28 +18,10 @@ import {
   SmallActionButton,
   type LibraryFilter,
 } from './LibraryLayout';
-import { mergeTimestampedPage } from './libraryPagination';
 
 const PAGE_SIZE = 20;
-const SCREENSHOT_QUERY_CHUNK = 100;
 
-type FavoritesFilter = 'all' | FavoriteKind | 'screenshot';
-
-type FavoriteLibraryItem =
-  | {
-      key: string;
-      kind: 'translation' | 'ocr';
-      timestamp: number;
-      entry: FavoriteItem;
-    }
-  | {
-      key: string;
-      kind: 'screenshot';
-      timestamp: number;
-      entry: ScreenshotFavoriteItem;
-    };
-
-const filters: LibraryFilter<FavoritesFilter>[] = [
+const filters: LibraryFilter<LibraryFavoritesFilter>[] = [
   { key: 'all', label: '全部' },
   { key: 'translation', label: '翻译' },
   { key: 'ocr', label: 'OCR' },
@@ -53,7 +34,7 @@ export function FavoritesLibraryPage() {
   const screenshotRevision = useScreenshotFavoritesStore(
     (state) => state.revision,
   );
-  const [filter, setFilter] = useState<FavoritesFilter>('all');
+  const [filter, setFilter] = useState<LibraryFavoritesFilter>('all');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [items, setItems] = useState<FavoriteLibraryItem[]>([]);
@@ -65,56 +46,8 @@ export function FavoritesLibraryPage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    const offset = page * PAGE_SIZE;
-
-    const load = async () => {
-      if (filter === 'translation' || filter === 'ocr') {
-        const result = await runtime.favorites.query({
-          kind: filter,
-          search,
-          limit: PAGE_SIZE,
-          offset,
-        });
-        return {
-          total: result.total,
-          items: result.items.map(toFavoriteItem),
-        };
-      }
-      if (filter === 'screenshot') {
-        const result = await runtime.screenshotFavorites.query({
-          search,
-          limit: PAGE_SIZE,
-          offset,
-        });
-        return {
-          total: result.total,
-          items: result.items.map(toScreenshotItem),
-        };
-      }
-
-      const prefixLimit = offset + PAGE_SIZE;
-      const [favorites, screenshots] = await Promise.all([
-        runtime.favorites.query({
-          search,
-          limit: prefixLimit,
-          offset: 0,
-        }),
-        queryScreenshotPrefix(runtime, search, prefixLimit),
-      ]);
-      return {
-        total: favorites.total + screenshots.total,
-        items: mergeTimestampedPage(
-          [
-            favorites.items.map(toFavoriteItem),
-            screenshots.items.map(toScreenshotItem),
-          ],
-          offset,
-          PAGE_SIZE,
-        ),
-      };
-    };
-
-    void load()
+    void runtime.library
+      .queryFavorites({ filter, search, page, pageSize: PAGE_SIZE })
       .then((result) => {
         if (cancelled) return;
         setItems(result.items);
@@ -141,11 +74,7 @@ export function FavoritesLibraryPage() {
 
   const deleteSelected = async () => {
     if (!selected) return;
-    if (selected.kind === 'screenshot') {
-      await runtime.screenshotFavorites.delete(selected.entry.id);
-    } else {
-      await runtime.favorites.delete(selected.entry.id);
-    }
+    await runtime.library.deleteFavorite(selected);
     setRefresh((value) => value + 1);
   };
 
@@ -197,9 +126,7 @@ export function FavoritesLibraryPage() {
             onDelete={() => void deleteSelected()}
             onCopy={(text) => void runtime.clipboard.copyText(text)}
             onRerunOcr={(id) =>
-              void runtime.favorites
-                .rerunOcr(id)
-                .then((text) => runtime.clipboard.copyText(text))
+              void runtime.library.rerunFavoriteOcrAndCopy(id)
             }
             onCopyScreenshot={(id) =>
               void runtime.screenshotFavorites.copy(id)
@@ -208,19 +135,7 @@ export function FavoritesLibraryPage() {
               void runtime.screenshotFavorites.reveal(id)
             }
             onUpdateMetadata={async (note, tags) => {
-              if (selected.kind === 'screenshot') {
-                await runtime.screenshotFavorites.updateMetadata(
-                  selected.entry.id,
-                  note,
-                  tags,
-                );
-              } else {
-                await runtime.favorites.updateMetadata(
-                  selected.entry.id,
-                  note,
-                  tags,
-                );
-              }
+              await runtime.library.updateFavoriteMetadata(selected, note, tags);
               setRefresh((value) => value + 1);
             }}
           />
@@ -429,44 +344,6 @@ function FavoriteDetail({
   );
 }
 
-async function queryScreenshotPrefix(
-  runtime: ReturnType<typeof useSettingsRuntime>,
-  search: string,
-  limit: number,
-) {
-  const items: ScreenshotFavoriteItem[] = [];
-  let total = 0;
-  while (items.length < limit) {
-    const page = await runtime.screenshotFavorites.query({
-      search,
-      limit: Math.min(SCREENSHOT_QUERY_CHUNK, limit - items.length),
-      offset: items.length,
-    });
-    total = page.total;
-    items.push(...page.items);
-    if (page.items.length === 0 || items.length >= total) break;
-  }
-  return { items, total };
-}
-
-function toFavoriteItem(entry: FavoriteItem): FavoriteLibraryItem {
-  return {
-    key: `${entry.content.contentKind}:${entry.id}`,
-    kind: entry.content.contentKind,
-    timestamp: new Date(entry.createdAt).getTime(),
-    entry,
-  };
-}
-
-function toScreenshotItem(entry: ScreenshotFavoriteItem): FavoriteLibraryItem {
-  return {
-    key: `screenshot:${entry.id}`,
-    kind: 'screenshot',
-    timestamp: new Date(entry.createdAt).getTime(),
-    entry,
-  };
-}
-
 function favoriteKindLabel(kind: FavoriteLibraryItem['kind']) {
   if (kind === 'translation') return '翻译';
   if (kind === 'ocr') return 'OCR';
@@ -504,7 +381,12 @@ function favoritePreview(item: FavoriteLibraryItem) {
 }
 
 function firstMeaningfulLine(value: string) {
-  return value.split(/\r?\n/).find((line) => line.trim())?.trim() || '空白收藏';
+  return (
+    value
+      .split(/\r?\n/)
+      .find((line) => line.trim())
+      ?.trim() || '空白收藏'
+  );
 }
 
 function formatDetailDate(value: string) {

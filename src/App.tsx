@@ -57,6 +57,7 @@ import {
 import { captureWindow } from './platform/tauri/captureWindow';
 import { writeClipboardText } from './platform/tauri/clipboard';
 import * as history from './platform/tauri/history';
+import { libraryIndex } from './platform/tauri/libraryIndex';
 import { favorites } from './platform/tauri/favorites';
 import { screenshotFavorites } from './platform/tauri/screenshotFavorites';
 import * as hotkeys from './platform/tauri/hotkeys';
@@ -81,6 +82,7 @@ const settingsRuntime = createSettingsRuntime({
   providers: settingsProviders,
   hotkeys,
   history,
+  libraryIndex,
   favorites,
   screenshotFavorites,
   clipboard: { writeText: writeClipboardText },

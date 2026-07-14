@@ -168,6 +168,8 @@ pub fn run() {
             commands::get_ocr_history,
             commands::query_translation_history,
             commands::query_ocr_history,
+            commands::query_library_history_index,
+            commands::query_library_favorite_index,
             commands::search_history,
             commands::delete_history,
             commands::favorite_translation_result,

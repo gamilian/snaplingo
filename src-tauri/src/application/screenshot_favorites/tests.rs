@@ -5,6 +5,9 @@ use async_trait::async_trait;
 use chrono::Utc;
 
 use super::*;
+use crate::application::favorite_capacity::{
+    FavoriteCapacityPolicyProvider, FavoriteCapacityRepository,
+};
 use crate::{AppError, Result};
 
 #[derive(Default)]
@@ -73,8 +76,11 @@ impl ScreenshotFavoriteRepository for FakeRepository {
             .retain(|record| record.id != id);
         Ok(())
     }
+}
 
-    async fn count_all(&self) -> Result<usize> {
+#[async_trait]
+impl FavoriteCapacityRepository for FakeRepository {
+    async fn current_count(&self) -> Result<usize> {
         Ok(self.records.lock().unwrap().len())
     }
 }
@@ -132,7 +138,7 @@ impl ScreenshotFavoriteHost for FakeHost {
 
 struct FakePolicy(u32);
 
-impl FavoritePolicyProvider for FakePolicy {
+impl FavoriteCapacityPolicyProvider for FakePolicy {
     fn maximum_favorites(&self) -> Result<u32> {
         Ok(self.0)
     }
@@ -149,7 +155,13 @@ fn service(
     assets: Arc<FakeAssets>,
     clipboard: Arc<FakeClipboard>,
 ) -> ScreenshotFavorites {
-    ScreenshotFavorites::new(repository, assets, clipboard, Arc::new(FakeHost))
+    ScreenshotFavorites::new(
+        repository,
+        assets,
+        clipboard,
+        Arc::new(FakeHost),
+        Arc::new(FavoriteCapacity::unlimited()),
+    )
 }
 
 #[tokio::test]
@@ -171,13 +183,17 @@ async fn full_capacity_rejects_a_screenshot_before_writing_assets() {
             tags: vec![],
         });
     let assets = Arc::new(FakeAssets::default());
-    let favorites = ScreenshotFavorites::with_change_notifier_and_policy(
+    let capacity = Arc::new(FavoriteCapacity::new(
+        repository.clone(),
+        Arc::new(FakePolicy(1)),
+    ));
+    let favorites = ScreenshotFavorites::with_change_notifier_and_capacity(
         repository,
         assets.clone(),
         Arc::new(FakeClipboard::default()),
         Arc::new(FakeHost),
         Arc::new(FakeNotifier),
-        Arc::new(FakePolicy(1)),
+        capacity,
     );
 
     let error = favorites.add_png(&[1, 2, 3]).await.unwrap_err();

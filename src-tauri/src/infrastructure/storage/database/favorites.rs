@@ -189,20 +189,6 @@ impl FavoriteRepository for SqliteFavoriteRepository {
             Ok(tags)
         })
     }
-
-    async fn count_all(&self) -> Result<usize> {
-        self.database.with_connection(|connection| {
-            connection
-                .query_row(
-                    "SELECT (SELECT COUNT(*) FROM favorites) +
-                            (SELECT COUNT(*) FROM screenshot_favorites)",
-                    [],
-                    |row| row.get::<_, i64>(0),
-                )
-                .map(|count| count as usize)
-                .map_err(Into::into)
-        })
-    }
 }
 
 fn favorite_from_row(connection: &Connection, row: &Row<'_>) -> rusqlite::Result<FavoriteRecord> {

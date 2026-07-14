@@ -11,6 +11,8 @@ ResultWindow         -> application/result-window
 PinnedImageWindow    -> application/pinned-image
 ```
 
+The Settings runtime includes the Library workflow. It combines History, Favorites, and Screenshot Favorites through narrow ports while Views retain only rendering and local interaction state. A backend Library Index returns the final page's ordered source references before the frontend hydrates those records.
+
 The runtime receives typed adapters from `src/platform/tauri/`. Those adapters own Tauri command names, event payload parsing, subscriptions, and Tauri-window effects. Views and frontend Application modules do not import Tauri packages or Platform modules.
 
 ## Backend Runtime

@@ -1,12 +1,16 @@
 mod config_store;
+mod favorite_capacity;
 mod favorites;
 mod history;
+mod library_index;
 mod migrations;
 mod screenshot_favorites;
 
 pub use config_store::SqliteConfigStore;
+pub use favorite_capacity::SqliteFavoriteCapacityRepository;
 pub use favorites::SqliteFavoriteRepository;
 pub use history::SqliteHistoryRepository;
+pub use library_index::SqliteLibraryIndexRepository;
 pub use screenshot_favorites::SqliteScreenshotFavoriteRepository;
 
 use std::path::Path;

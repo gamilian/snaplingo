@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import type {
-  OcrHistoryEntry,
-  TranslationHistoryEntry,
-} from '../../../application/settings/ports';
 import { ocrFavoriteKey, translationFavoriteKey } from '../../../application/favorites/identity';
+import type {
+  HistoryLibraryItem,
+  LibraryHistoryFilter,
+} from '../../../application/settings/library';
 import { useFavoritesStore } from '../../../stores/favoritesStore';
 import { useHistoryStore } from '../../../stores/historyStore';
 import { formatRelativeTime } from '../../../utils/formatTime';
@@ -18,27 +18,10 @@ import {
   SmallActionButton,
   type LibraryFilter,
 } from './LibraryLayout';
-import { mergeTimestampedPage } from './libraryPagination';
 
 const PAGE_SIZE = 20;
 
-type HistoryFilter = 'all' | 'translation' | 'ocr';
-
-type HistoryLibraryItem =
-  | {
-      key: string;
-      kind: 'translation';
-      timestamp: number;
-      entry: TranslationHistoryEntry;
-    }
-  | {
-      key: string;
-      kind: 'ocr';
-      timestamp: number;
-      entry: OcrHistoryEntry;
-    };
-
-const filters: LibraryFilter<HistoryFilter>[] = [
+const filters: LibraryFilter<LibraryHistoryFilter>[] = [
   { key: 'all', label: '全部' },
   { key: 'translation', label: '翻译' },
   { key: 'ocr', label: 'OCR' },
@@ -51,7 +34,7 @@ export function HistoryLibraryPage() {
   const hydrateFavoriteKeys = useFavoritesStore((state) => state.hydrateKeys);
   const addTranslationFavorite = useFavoritesStore((state) => state.addTranslation);
   const addOcrFavorite = useFavoritesStore((state) => state.addOcr);
-  const [filter, setFilter] = useState<HistoryFilter>('all');
+  const [filter, setFilter] = useState<LibraryHistoryFilter>('all');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [items, setItems] = useState<HistoryLibraryItem[]>([]);
@@ -70,52 +53,8 @@ export function HistoryLibraryPage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    const offset = page * PAGE_SIZE;
-    const query = { search, limit: PAGE_SIZE, offset };
-
-    const load = async () => {
-      if (filter === 'translation') {
-        const result = await runtime.history.queryTranslation(query);
-        return {
-          total: result.total,
-          items: result.items.map(toTranslationItem),
-        };
-      }
-      if (filter === 'ocr') {
-        const result = await runtime.history.queryOcr(query);
-        return {
-          total: result.total,
-          items: result.items.map(toOcrItem),
-        };
-      }
-
-      const prefixLimit = offset + PAGE_SIZE;
-      const [translations, ocr] = await Promise.all([
-        runtime.history.queryTranslation({
-          search,
-          limit: prefixLimit,
-          offset: 0,
-        }),
-        runtime.history.queryOcr({
-          search,
-          limit: prefixLimit,
-          offset: 0,
-        }),
-      ]);
-      return {
-        total: translations.total + ocr.total,
-        items: mergeTimestampedPage(
-          [
-            translations.items.map(toTranslationItem),
-            ocr.items.map(toOcrItem),
-          ],
-          offset,
-          PAGE_SIZE,
-        ),
-      };
-    };
-
-    void load()
+    void runtime.library
+      .queryHistory({ filter, search, page, pageSize: PAGE_SIZE })
       .then((result) => {
         if (cancelled) return;
         setItems(result.items);
@@ -142,7 +81,7 @@ export function HistoryLibraryPage() {
 
   const deleteSelected = async () => {
     if (!selected) return;
-    await runtime.history.deleteEntry(selected.entry.id);
+    await runtime.library.deleteHistory(selected);
     setRefresh((value) => value + 1);
   };
 
@@ -150,11 +89,7 @@ export function HistoryLibraryPage() {
     const label =
       filter === 'all' ? '全部' : filter === 'translation' ? '翻译' : 'OCR';
     if (!confirm(`确定要清空${label}历史记录吗？独立收藏不会被删除。`)) return;
-    if (filter === 'all') {
-      await runtime.history.clear();
-    } else {
-      await runtime.history.clearKind(filter);
-    }
+    await runtime.library.clearHistory(filter);
     setRefresh((value) => value + 1);
   };
 
@@ -236,9 +171,7 @@ export function HistoryLibraryPage() {
                 void runtime.clipboard.copyText(selected.entry.recognizedText)
               }
               onRerun={() =>
-                void runtime.history
-                  .rerunOcr(selected.entry.id)
-                  .then((text) => runtime.clipboard.copyText(text))
+                void runtime.library.rerunHistoryOcrAndCopy(selected.entry.id)
               }
               onDelete={() => void deleteSelected()}
               onFavorite={() =>
@@ -429,24 +362,6 @@ function OcrHistoryDetail({
       </DetailCard>
     </div>
   );
-}
-
-function toTranslationItem(entry: TranslationHistoryEntry): HistoryLibraryItem {
-  return {
-    key: `translation:${entry.id}`,
-    kind: 'translation',
-    timestamp: new Date(entry.timestamp).getTime(),
-    entry,
-  };
-}
-
-function toOcrItem(entry: OcrHistoryEntry): HistoryLibraryItem {
-  return {
-    key: `ocr:${entry.id}`,
-    kind: 'ocr',
-    timestamp: new Date(entry.timestamp).getTime(),
-    entry,
-  };
 }
 
 function historyTitle(item: HistoryLibraryItem) {

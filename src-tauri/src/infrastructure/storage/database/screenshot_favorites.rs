@@ -180,20 +180,6 @@ impl ScreenshotFavoriteRepository for SqliteScreenshotFavoriteRepository {
             Ok(())
         })
     }
-
-    async fn count_all(&self) -> Result<usize> {
-        self.database.with_connection(|connection| {
-            connection
-                .query_row(
-                    "SELECT (SELECT COUNT(*) FROM favorites) +
-                            (SELECT COUNT(*) FROM screenshot_favorites)",
-                    [],
-                    |row| row.get::<_, i64>(0),
-                )
-                .map(|count| count as usize)
-                .map_err(Into::into)
-        })
-    }
 }
 
 fn read_tags(connection: &Connection, favorite_id: i64) -> Result<Vec<String>> {

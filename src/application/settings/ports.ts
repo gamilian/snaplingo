@@ -300,6 +300,30 @@ export interface ScreenshotFavoritePage {
   total: number;
 }
 
+export type LibraryIndexKind = 'translation' | 'ocr' | 'screenshot';
+
+export interface LibraryIndexItem {
+  id: number;
+  kind: LibraryIndexKind;
+  sourceOffset: number;
+}
+
+export interface LibraryIndexQuery {
+  search: string;
+  limit: number;
+  offset: number;
+}
+
+export interface LibraryIndexPage {
+  items: LibraryIndexItem[];
+  total: number;
+}
+
+export interface SettingsLibraryIndexPort {
+  queryHistoryIndex(query: LibraryIndexQuery): Promise<LibraryIndexPage>;
+  queryFavoriteIndex(query: LibraryIndexQuery): Promise<LibraryIndexPage>;
+}
+
 export type FavoriteKind = 'translation' | 'ocr';
 
 export interface TranslationFavoriteInput {
