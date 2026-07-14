@@ -184,7 +184,13 @@ pub struct PinnedImageView {
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum CaptureOutputAction {
     Copy,
-    Save { path: String },
+    Save {
+        path: String,
+        format: String,
+        quality: u8,
+        #[serde(rename = "copyAfterSave")]
+        copy_after_save: bool,
+    },
     Pin,
 }
 
@@ -297,12 +303,18 @@ mod tests {
     fn capture_output_action_serializes_with_type_tag() {
         let action = CaptureOutputAction::Save {
             path: "/tmp/snap.png".to_string(),
+            format: "png".to_string(),
+            quality: 90,
+            copy_after_save: false,
         };
 
         let serialized = serde_json::to_value(&action).unwrap();
 
         assert_eq!(serialized["type"], "save");
         assert_eq!(serialized["path"], "/tmp/snap.png");
+        assert_eq!(serialized["format"], "png");
+        assert_eq!(serialized["quality"], 90);
+        assert_eq!(serialized["copyAfterSave"], false);
     }
 
     #[test]

@@ -6,6 +6,14 @@ import {
   quickCaptureSavePath,
 } from './capture';
 
+async function defaultPinnedCaptureSavePath() {
+  return defaultCaptureSavePath();
+}
+
+async function quickPinnedCaptureSavePath(directory?: string) {
+  return quickCaptureSavePath({ directory });
+}
+
 export async function getPinnedImage(imageId: string) {
   return invoke<PinnedImageView>('get_pinned_image', { imageId });
 }
@@ -54,8 +62,8 @@ export async function destroyPinnedImageGroup(imageId: string) {
 
 export const pinnedImageCommands: PinnedImageCommandsPort = {
   getPinnedImage,
-  defaultCaptureSavePath,
-  quickCaptureSavePath,
+  defaultCaptureSavePath: defaultPinnedCaptureSavePath,
+  quickCaptureSavePath: quickPinnedCaptureSavePath,
   copyPinnedImage,
   replacePinnedImageFromClipboard,
   savePinnedImage,

@@ -1,5 +1,6 @@
 export interface SettingsWindowPort {
   openSettings(): Promise<void>;
+  selectScreenshotDirectory(): Promise<string | null>;
 }
 
 export interface GeneralSettings {
@@ -9,11 +10,23 @@ export interface GeneralSettings {
 }
 
 export type AnnotationColorPreset = [number, number, number, number];
+export type ScreenshotFormat = 'png' | 'jpg' | 'webp';
+export type ScreenshotNamingRule = 'timestamp' | 'date' | 'counter' | 'custom';
 
 export interface ScreenshotSettings {
   savePath: string;
-  format: string;
+  format: ScreenshotFormat;
   quality: number;
+  namingRule: ScreenshotNamingRule;
+  customFileName: string;
+  autoCopy: boolean;
+  defaultStrokeWidth: number;
+  defaultFontSize: number;
+  rememberLastTool: boolean;
+  showSelectionSize: boolean;
+  showMagnifier: boolean;
+  pinOpacity: number;
+  pinShadow: boolean;
   annotationColors: AnnotationColorPreset[];
 }
 

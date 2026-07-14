@@ -552,7 +552,22 @@ describe('capture workspace runtime', () => {
     const platform = createPlatform({
       session: createSession({ id: 'session-native-save' }),
     });
-    const runtime = createCaptureWorkspaceRuntime({ platform });
+    const runtime = createCaptureWorkspaceRuntime({
+      platform,
+      screenshotPreferences: () => ({
+        savePath: '/custom/captures',
+        format: 'webp',
+        quality: 73,
+        namingRule: 'custom',
+        customFileName: 'Review',
+        autoCopy: true,
+        defaultStrokeWidth: 6,
+        defaultFontSize: 20,
+        rememberLastTool: false,
+        showSelectionSize: false,
+        showMagnifier: true,
+      }),
+    });
     await runtime.actions.startSession('screenshot', 'session-native-save');
     await runtime.actions.renderSelectionPreview(selection);
     await runtime.actions.connectHost();
@@ -560,12 +575,23 @@ describe('capture workspace runtime', () => {
     const save = platform.onSaveRequested.mock.calls[0]?.[0];
     await save?.();
 
-    expect(platform.commands.defaultCaptureSavePath).toHaveBeenCalledOnce();
+    expect(platform.commands.defaultCaptureSavePath).toHaveBeenCalledWith({
+      directory: '/custom/captures',
+      format: 'webp',
+      namingRule: 'custom',
+      customFileName: 'Review',
+    });
     expect(platform.commands.outputCapture).toHaveBeenCalledWith({
       sessionId: 'session-native-save',
       rect: selection,
       annotations: [],
-      action: { type: 'save', path: '/captures/capture.png' },
+      action: {
+        type: 'save',
+        path: '/captures/capture.png',
+        format: 'webp',
+        quality: 73,
+        copyAfterSave: true,
+      },
     });
     expect(platform.dismiss).toHaveBeenCalledTimes(1);
     expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(

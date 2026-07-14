@@ -202,13 +202,27 @@ interface RuntimeReplacementSnapshot {
   keyboardEditCursorPoint: Point | null;
 }
 
+export interface CaptureScreenshotPreferences {
+  savePath?: string;
+  format: 'png' | 'jpg' | 'webp';
+  quality: number;
+  namingRule: 'timestamp' | 'date' | 'counter' | 'custom';
+  customFileName: string;
+  autoCopy: boolean;
+  defaultStrokeWidth: number;
+  defaultFontSize: number;
+  rememberLastTool: boolean;
+  showSelectionSize: boolean;
+  showMagnifier: boolean;
+}
+
 export function createCaptureWorkspaceRuntime({
   platform,
   host,
   keyboard,
   onInactive,
   annotationColorPresets,
-  screenshotSavePath,
+  screenshotPreferences,
   storage,
 }: {
   platform: CaptureWorkspaceRuntimePlatform;
@@ -216,10 +230,10 @@ export function createCaptureWorkspaceRuntime({
   keyboard?: CaptureWorkspaceRuntimeKeyboard;
   onInactive?: () => void | Promise<void>;
   annotationColorPresets?: () => readonly AnnotationColor[];
-  screenshotSavePath?: () => string | undefined;
+  screenshotPreferences?: () => CaptureScreenshotPreferences | undefined;
   storage?: CaptureSelectionStorage;
 }): CaptureWorkspaceRuntime {
-  let state = createInitialState();
+  let state = createInitialState('screenshot', undefined, screenshotPreferences?.());
   let generation = 0;
   let disposed = false;
   let hydratedSessionId: string | null = null;
@@ -396,7 +410,7 @@ export function createCaptureWorkspaceRuntime({
       connection.disconnect();
     }
     listeners.clear();
-    state = createInitialState(state.mode, state);
+    state = createInitialState(state.mode, state, screenshotPreferences?.());
     try {
       host?.resetSession();
     } catch {
@@ -414,7 +428,7 @@ export function createCaptureWorkspaceRuntime({
     if (disposed) return;
     detachPreviewScheduler();
     terminalOutputOperation = null;
-    state = createInitialState(state.mode, state);
+    state = createInitialState(state.mode, state, screenshotPreferences?.());
     cursorPointRef.current = null;
     keyboardEditCursorPointRef.current = null;
     hasKeyboardAdjustedDraft = false;
@@ -485,16 +499,33 @@ export function createCaptureWorkspaceRuntime({
       const action =
         effect.action === 'save'
           ? await (async () => {
-              const path = await platform.commands.defaultCaptureSavePath();
-              return path ? ({ type: 'save' as const, path } as const) : null;
+              const preferences = screenshotPreferences?.();
+              const path = await platform.commands.defaultCaptureSavePath(
+                captureSavePathOptions(preferences),
+              );
+              return path
+                ? ({
+                    type: 'save' as const,
+                    path,
+                    format: preferences?.format ?? 'png',
+                    quality: preferences?.quality ?? 90,
+                    copyAfterSave: preferences?.autoCopy ?? false,
+                  } as const)
+                : null;
             })()
           : effect.action === 'quick-save'
-            ? {
-                type: 'save' as const,
-                path: await platform.commands.quickCaptureSavePath(
-                  screenshotSavePath?.(),
-                ),
-              }
+            ? await (async () => {
+                const preferences = screenshotPreferences?.();
+                return {
+                  type: 'save' as const,
+                  path: await platform.commands.quickCaptureSavePath(
+                    captureSavePathOptions(preferences),
+                  ),
+                  format: preferences?.format ?? 'png',
+                  quality: preferences?.quality ?? 90,
+                  copyAfterSave: preferences?.autoCopy ?? false,
+                };
+              })()
             : effect.action === 'pin'
               ? { type: 'pin' as const }
               : effect.action === 'favorite'
@@ -654,10 +685,12 @@ export function createCaptureWorkspaceRuntime({
     };
     scheduler.queuedPreview = request;
 
+    const preferences = screenshotPreferences?.();
     patch({
       status: 'preview',
       selection: rect,
       hoverSelection: null,
+      activeAnnotationTool: rememberedAnnotationTool(preferences, storage),
       ...(preservePreviewImage ? {} : { previewImageBase64: null }),
       isRenderingOutput: true,
       error: null,
@@ -929,6 +962,9 @@ export function createCaptureWorkspaceRuntime({
       toggle: true,
     });
     patch(activation);
+    if (activation.activeAnnotationTool && screenshotPreferences?.()?.rememberLastTool) {
+      storage?.setItem('snaplingo.capture.lastAnnotationTool', activation.activeAnnotationTool);
+    }
   };
 
   const editorActions: CaptureWorkspacePointerEditorActions &
@@ -1355,7 +1391,7 @@ export function createCaptureWorkspaceRuntime({
       };
       markPerf('start_session', null);
       state = {
-        ...createInitialState(mode, state),
+        ...createInitialState(mode, state, screenshotPreferences?.()),
         status: 'loading',
       };
       listeners.forEach((listener) => listener());
@@ -1451,7 +1487,7 @@ export function createCaptureWorkspaceRuntime({
       hasRevealed = false;
       revealAttempt = null;
       state = {
-        ...createInitialState(state.mode, state),
+        ...createInitialState(state.mode, state, screenshotPreferences?.()),
         status: 'loading',
       };
       listeners.forEach((listener) => listener());
@@ -2181,14 +2217,55 @@ export function createCaptureWorkspaceRuntime({
 function createInitialState(
   mode: CaptureMode = 'screenshot',
   previous?: Pick<RuntimeState, 'annotationStyle' | 'textFontSize'>,
+  preferences?: CaptureScreenshotPreferences,
 ): RuntimeState {
   const initial = createInitialCaptureWorkspaceState();
   return {
     ...initial,
     mode,
-    annotationStyle: previous?.annotationStyle ?? initial.annotationStyle,
-    textFontSize: previous?.textFontSize ?? initial.textFontSize,
+    annotationStyle: {
+      ...(previous?.annotationStyle ?? initial.annotationStyle),
+      strokeWidth:
+        preferences?.defaultStrokeWidth ??
+        previous?.annotationStyle.strokeWidth ??
+        initial.annotationStyle.strokeWidth,
+    },
+    textFontSize:
+      preferences?.defaultFontSize ?? previous?.textFontSize ?? initial.textFontSize,
   };
+}
+
+function captureSavePathOptions(preferences?: CaptureScreenshotPreferences) {
+  if (!preferences) return undefined;
+  return {
+    directory: preferences.savePath,
+    format: preferences.format,
+    namingRule: preferences.namingRule,
+    customFileName: preferences.customFileName,
+  };
+}
+
+function rememberedAnnotationTool(
+  preferences: CaptureScreenshotPreferences | undefined,
+  storage: CaptureSelectionStorage | undefined,
+): AnnotationTool | null {
+  if (!preferences?.rememberLastTool) return null;
+  const tool = storage?.getItem('snaplingo.capture.lastAnnotationTool');
+  return tool && isAnnotationTool(tool) ? tool : null;
+}
+
+function isAnnotationTool(value: string): value is AnnotationTool {
+  return [
+    'rectangle',
+    'ellipse',
+    'arrow',
+    'line',
+    'pen',
+    'highlight',
+    'mosaic',
+    'text',
+    'eraser',
+  ].includes(value);
 }
 
 function errorMessage(error: unknown) {

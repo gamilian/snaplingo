@@ -11,6 +11,16 @@ const settingsConfig = vi.hoisted(() => ({
       savePath: '/captures',
       format: 'png',
       quality: 90,
+      namingRule: 'timestamp',
+      customFileName: 'SnapLingo',
+      autoCopy: false,
+      defaultStrokeWidth: 2,
+      defaultFontSize: 24,
+      rememberLastTool: true,
+      showSelectionSize: true,
+      showMagnifier: false,
+      pinOpacity: 100,
+      pinShadow: true,
       annotationColors: [[255, 77, 79, 255]],
     },
     updateScreenshotSettings: vi.fn(),
@@ -28,6 +38,12 @@ vi.mock('react', async () => {
 vi.mock('../../../stores/settingsConfigStore', () => ({
   useSettingsConfigStore: (selector: (state: typeof settingsConfig.state) => unknown) =>
     selector(settingsConfig.state),
+}));
+
+vi.mock('../runtimeContext', () => ({
+  useSettingsRuntime: () => ({
+    window: { selectScreenshotDirectory: vi.fn() },
+  }),
 }));
 
 import { SaveSettingsPage } from './SaveSettingsPage';
@@ -64,18 +80,48 @@ describe('SaveSettingsPage durable settings', () => {
       savePath: '/next',
       format: 'png',
       quality: 90,
+      namingRule: 'timestamp',
+      customFileName: 'SnapLingo',
+      autoCopy: false,
+      defaultStrokeWidth: 2,
+      defaultFontSize: 24,
+      rememberLastTool: true,
+      showSelectionSize: true,
+      showMagnifier: false,
+      pinOpacity: 100,
+      pinShadow: true,
       annotationColors: [[255, 77, 79, 255]],
     });
     expect(settingsConfig.state.updateScreenshotSettings).toHaveBeenNthCalledWith(2, {
       savePath: '/captures',
       format: 'jpg',
       quality: 90,
+      namingRule: 'timestamp',
+      customFileName: 'SnapLingo',
+      autoCopy: false,
+      defaultStrokeWidth: 2,
+      defaultFontSize: 24,
+      rememberLastTool: true,
+      showSelectionSize: true,
+      showMagnifier: false,
+      pinOpacity: 100,
+      pinShadow: true,
       annotationColors: [[255, 77, 79, 255]],
     });
     expect(settingsConfig.state.updateScreenshotSettings).toHaveBeenNthCalledWith(3, {
       savePath: '/captures',
       format: 'png',
       quality: 82,
+      namingRule: 'timestamp',
+      customFileName: 'SnapLingo',
+      autoCopy: false,
+      defaultStrokeWidth: 2,
+      defaultFontSize: 24,
+      rememberLastTool: true,
+      showSelectionSize: true,
+      showMagnifier: false,
+      pinOpacity: 100,
+      pinShadow: true,
       annotationColors: [[255, 77, 79, 255]],
     });
   });

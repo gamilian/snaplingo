@@ -99,8 +99,18 @@ pub async fn output_capture_selection(
     )?;
 
     match action {
-        CaptureOutputAction::Save { path } => {
-            output.save_png(&png_data, Path::new(&path)).await?;
+        CaptureOutputAction::Save {
+            path,
+            format,
+            quality,
+            copy_after_save,
+        } => {
+            output
+                .save_image(&png_data, Path::new(&path), &format, quality)
+                .await?;
+            if copy_after_save {
+                output.copy_png(&png_data).await?;
+            }
             Ok(CaptureSessionOutput::Completed)
         }
         CaptureOutputAction::Copy => {

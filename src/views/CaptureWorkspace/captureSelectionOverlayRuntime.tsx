@@ -39,6 +39,7 @@ interface UseCaptureSelectionOverlayOptions {
   cursorPointRef: RefObject<Point | null>;
   draftSelectionRef: RefObject<LogicalRect | null>;
   hoverSelectionRef: RefObject<LogicalRect | null>;
+  showSelectionSize?: boolean;
 }
 
 interface CaptureSelectionOverlayCanvasProps {
@@ -91,6 +92,7 @@ export function useCaptureSelectionOverlay({
   cursorPointRef,
   draftSelectionRef,
   hoverSelectionRef,
+  showSelectionSize = true,
   selection,
   selectionBounds,
   status,
@@ -138,6 +140,7 @@ export function useCaptureSelectionOverlay({
         selection: activeSelection,
         draftSelection,
         hoverSelection,
+        showSelectionSize,
       });
 
       if (animationFrameRef.current !== null) return;
@@ -147,7 +150,15 @@ export function useCaptureSelectionOverlay({
         paintFrame(frameRef.current);
       });
     },
-    [draftSelectionRef, hoverSelectionRef, paintFrame, selection, selectionBounds, status],
+    [
+      draftSelectionRef,
+      hoverSelectionRef,
+      paintFrame,
+      selection,
+      selectionBounds,
+      showSelectionSize,
+      status,
+    ],
   );
 
   const reset = useCallback(() => {

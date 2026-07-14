@@ -128,6 +128,25 @@ impl SettingsConfiguration {
     fn normalized_snapshot(&self, mut snapshot: SettingsSnapshot) -> SettingsSnapshot {
         snapshot.screenshot.save_path =
             self.normalize_screenshot_save_path(&snapshot.screenshot.save_path);
+        if !matches!(snapshot.screenshot.format.as_str(), "png" | "jpg" | "webp") {
+            snapshot.screenshot.format = "png".to_string();
+        }
+        if !matches!(
+            snapshot.screenshot.naming_rule.as_str(),
+            "timestamp" | "date" | "counter" | "custom"
+        ) {
+            snapshot.screenshot.naming_rule = "timestamp".to_string();
+        }
+        snapshot.screenshot.quality = snapshot.screenshot.quality.clamp(50, 100);
+        snapshot.screenshot.default_stroke_width =
+            snapshot.screenshot.default_stroke_width.clamp(1, 8);
+        snapshot.screenshot.default_font_size = snapshot.screenshot.default_font_size.clamp(12, 48);
+        snapshot.screenshot.pin_opacity = snapshot.screenshot.pin_opacity.clamp(20, 100);
+        snapshot.screenshot.custom_file_name =
+            snapshot.screenshot.custom_file_name.trim().to_string();
+        if snapshot.screenshot.custom_file_name.is_empty() {
+            snapshot.screenshot.custom_file_name = "SnapLingo".to_string();
+        }
         snapshot.history.retention_days = snapshot.history.retention_days.clamp(1, 3650);
         snapshot.history.maximum_records = snapshot.history.maximum_records.clamp(100, 100_000);
         snapshot
@@ -263,6 +282,38 @@ mod settings_configuration_tests {
         );
         assert_eq!(updated.screenshot.format, "webp");
         assert_eq!(updated.screenshot.quality, 77);
+    }
+
+    #[test]
+    fn screenshot_editor_settings_are_normalized_before_persisting() {
+        let store = Arc::new(SqliteConfigStore::new_in_memory());
+        let home_dir = tempdir().unwrap();
+        let configuration = SettingsConfiguration::with_paths(
+            store,
+            Some(home_dir.path().to_path_buf()),
+            home_dir.path().join("Snapshots"),
+        );
+
+        let updated = configuration
+            .update_screenshot(ScreenshotSettings {
+                format: "invalid".to_string(),
+                quality: 1,
+                naming_rule: "invalid".to_string(),
+                custom_file_name: "  ".to_string(),
+                default_stroke_width: 99,
+                default_font_size: 1,
+                pin_opacity: 1,
+                ..ScreenshotSettings::default()
+            })
+            .unwrap();
+
+        assert_eq!(updated.screenshot.format, "png");
+        assert_eq!(updated.screenshot.quality, 50);
+        assert_eq!(updated.screenshot.naming_rule, "timestamp");
+        assert_eq!(updated.screenshot.custom_file_name, "SnapLingo");
+        assert_eq!(updated.screenshot.default_stroke_width, 8);
+        assert_eq!(updated.screenshot.default_font_size, 12);
+        assert_eq!(updated.screenshot.pin_opacity, 20);
     }
 
     #[test]

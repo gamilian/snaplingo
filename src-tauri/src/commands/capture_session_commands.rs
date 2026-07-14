@@ -248,11 +248,22 @@ pub async fn render_capture_output(
 }
 
 #[tauri::command]
-pub fn default_capture_save_path(state: State<'_, crate::AppState>) -> Result<String, String> {
+pub fn default_capture_save_path(
+    directory: Option<String>,
+    format: Option<String>,
+    naming_rule: Option<String>,
+    custom_file_name: Option<String>,
+    state: State<'_, crate::AppState>,
+) -> Result<String, String> {
     Ok(state
         .capture
         .output
-        .default_capture_save_path()
+        .default_capture_save_path(
+            directory.as_deref(),
+            format.as_deref().unwrap_or("png"),
+            naming_rule.as_deref().unwrap_or("timestamp"),
+            custom_file_name.as_deref().unwrap_or("SnapLingo"),
+        )
         .to_string_lossy()
         .to_string())
 }
@@ -260,12 +271,20 @@ pub fn default_capture_save_path(state: State<'_, crate::AppState>) -> Result<St
 #[tauri::command]
 pub fn quick_capture_save_path(
     directory: Option<String>,
+    format: Option<String>,
+    naming_rule: Option<String>,
+    custom_file_name: Option<String>,
     state: State<'_, crate::AppState>,
 ) -> Result<String, String> {
     Ok(state
         .capture
         .output
-        .quick_capture_save_path(directory.as_deref())
+        .quick_capture_save_path(
+            directory.as_deref(),
+            format.as_deref().unwrap_or("png"),
+            naming_rule.as_deref().unwrap_or("timestamp"),
+            custom_file_name.as_deref().unwrap_or("SnapLingo"),
+        )
         .to_string_lossy()
         .to_string())
 }

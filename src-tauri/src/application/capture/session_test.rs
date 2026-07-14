@@ -868,6 +868,9 @@ mod tests {
             false,
             CaptureOutputAction::Save {
                 path: path.to_string_lossy().to_string(),
+                format: "png".to_string(),
+                quality: 90,
+                copy_after_save: false,
             },
         )
         .await

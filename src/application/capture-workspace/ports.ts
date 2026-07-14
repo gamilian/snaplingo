@@ -44,7 +44,13 @@ export interface CaptureWindowPort {
 
 export type CaptureOutputAction =
   | { type: 'copy' }
-  | { type: 'save'; path: string }
+  | {
+      type: 'save';
+      path: string;
+      format: 'png' | 'jpg' | 'webp';
+      quality: number;
+      copyAfterSave: boolean;
+    }
   | { type: 'pin' }
   | { type: 'favorite' };
 
@@ -73,13 +79,20 @@ export interface CaptureWorkspaceCommandsPort {
   cancelCaptureSession(sessionId: string): Promise<void>;
   restoreCaptureSnapshotWindowsForSession(sessionId: string): Promise<void>;
   renderCaptureOutput(input: RenderCaptureOutputInput): Promise<string>;
-  defaultCaptureSavePath(): Promise<string | null>;
-  quickCaptureSavePath(directory?: string): Promise<string>;
+  defaultCaptureSavePath(options?: CaptureSavePathOptions): Promise<string | null>;
+  quickCaptureSavePath(options?: CaptureSavePathOptions): Promise<string>;
   outputCapture(input: OutputCaptureInput): Promise<void>;
   runCaptureOcr(sessionId: string, rect: LogicalRect): Promise<OcrResult>;
   openCaptureOcrResultWindow(text: string, imageBase64?: string): Promise<void>;
   openCaptureTranslationResultWindow(text: string): Promise<void>;
   copyTextToClipboard(text: string): Promise<void>;
+}
+
+export interface CaptureSavePathOptions {
+  directory?: string;
+  format?: 'png' | 'jpg' | 'webp';
+  namingRule?: 'timestamp' | 'date' | 'counter' | 'custom';
+  customFileName?: string;
 }
 
 export interface CaptureWorkspaceClipboardPort {

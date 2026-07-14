@@ -3,10 +3,11 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use arboard::ImageData;
+    use chrono::TimeZone;
     use image::ImageEncoder;
 
     use crate::application::capture::output::{
-        capture_save_path, configured_capture_save_dir, quick_capture_save_file_path,
+        configured_capture_save_dir, configured_capture_save_path,
     };
     use crate::application::capture::CaptureOutput;
 
@@ -44,21 +45,41 @@ mod tests {
         let _ = std::fs::remove_file(saved_path);
     }
 
-    #[test]
-    fn capture_save_path_uses_timestamped_png_name() {
-        let path = capture_save_path(std::path::Path::new("/tmp"), "20260617-023000");
+    #[tokio::test]
+    async fn save_image_encodes_jpeg_and_webp() {
+        let output = CaptureOutput::new();
+        let png = make_test_png(3, 2);
+        let directory = tempfile::tempdir().unwrap();
 
-        assert_eq!(path.to_string_lossy(), "/tmp/SnapLingo-20260617-023000.png");
+        for (format, extension) in [("jpg", "jpg"), ("webp", "webp")] {
+            let path = directory.path().join(format!("capture.{extension}"));
+            output.save_image(&png, &path, format, 72).await.unwrap();
+
+            let saved = std::fs::read(path).unwrap();
+            let decoded = image::load_from_memory(&saved).unwrap();
+            assert_eq!((decoded.width(), decoded.height()), (3, 2));
+        }
     }
 
     #[test]
-    fn quick_capture_save_path_uses_configured_directory() {
-        let path =
-            quick_capture_save_file_path(std::path::Path::new("/tmp/SnapLingo"), "20260617-023000");
+    fn configured_capture_path_uses_format_and_naming_rule() {
+        let now = chrono::Local
+            .with_ymd_and_hms(2026, 7, 14, 13, 30, 45)
+            .unwrap();
+        let base = std::path::Path::new("/tmp/captures");
 
         assert_eq!(
-            path.to_string_lossy(),
-            "/tmp/SnapLingo/SnapLingo-20260617-023000.png"
+            configured_capture_save_path(base, "jpg", "timestamp", "", now).to_string_lossy(),
+            "/tmp/captures/SnapLingo-20260714-133045.jpg"
+        );
+        assert_eq!(
+            configured_capture_save_path(base, "webp", "date", "", now).to_string_lossy(),
+            "/tmp/captures/SnapLingo-2026-07-14.webp"
+        );
+        assert_eq!(
+            configured_capture_save_path(base, "png", "custom", "Work/Notes", now)
+                .to_string_lossy(),
+            "/tmp/captures/Work_Notes.png"
         );
     }
 

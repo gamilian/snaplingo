@@ -14,6 +14,7 @@ export interface PinnedImagePlatformRuntime {
   resizeTo(width: number, height: number): Promise<void>;
   moveBy(deltaX: number, deltaY: number): Promise<void>;
   beginDrag(): Promise<void>;
+  setShadow(enabled: boolean): Promise<void>;
   dismiss(): Promise<void>;
 }
 
@@ -36,6 +37,7 @@ export function createPinnedImagePlatformRuntime(
     resizeTo: (width, height) => ports.window.resize(width, height),
     moveBy: (deltaX, deltaY) => ports.window.moveBy(deltaX, deltaY),
     beginDrag: () => ports.window.startDragging(),
+    setShadow: (enabled) => ports.window.setShadow(enabled),
     dismiss: () => ports.window.close(),
   };
 }

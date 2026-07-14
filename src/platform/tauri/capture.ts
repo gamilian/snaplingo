@@ -9,6 +9,7 @@ import type {
 } from '../../domain/capture';
 import type {
   CaptureWorkspaceCommandsPort,
+  CaptureSavePathOptions,
   OutputCaptureInput,
   RenderCaptureOutputInput,
 } from '../../application/capture-workspace/ports';
@@ -75,20 +76,35 @@ export async function renderCaptureOutput(input: RenderCaptureOutputInput) {
   return invoke<string>('render_capture_output', captureOutputArgs(input));
 }
 
-export async function defaultCaptureSavePath() {
-  return invoke<string>('default_capture_save_path');
+function captureSavePathArgs(options?: CaptureSavePathOptions) {
+  return {
+    directory: options?.directory,
+    format: options?.format,
+    namingRule: options?.namingRule,
+    customFileName: options?.customFileName,
+  };
 }
 
-export async function selectCaptureSavePath() {
-  const defaultPath = await defaultCaptureSavePath();
+export async function defaultCaptureSavePath(options?: CaptureSavePathOptions) {
+  return invoke<string>('default_capture_save_path', captureSavePathArgs(options));
+}
+
+export async function selectCaptureSavePath(options?: CaptureSavePathOptions) {
+  const format = options?.format ?? 'png';
+  const defaultPath = await defaultCaptureSavePath(options);
   return save({
     defaultPath,
-    filters: [{ name: 'PNG image', extensions: ['png'] }],
+    filters: [
+      {
+        name: format === 'jpg' ? 'JPEG image' : format === 'webp' ? 'WebP image' : 'PNG image',
+        extensions: [format],
+      },
+    ],
   });
 }
 
-export async function quickCaptureSavePath(directory?: string) {
-  return invoke<string>('quick_capture_save_path', { directory });
+export async function quickCaptureSavePath(options?: CaptureSavePathOptions) {
+  return invoke<string>('quick_capture_save_path', captureSavePathArgs(options));
 }
 
 export async function outputCapture(input: OutputCaptureInput) {

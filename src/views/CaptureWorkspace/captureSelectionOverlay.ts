@@ -8,7 +8,7 @@ export type CaptureSelectionOverlayVariant = 'draft' | 'hover' | 'preview';
 export interface CaptureSelectionOverlayFrame {
   variant: CaptureSelectionOverlayVariant;
   rect: LogicalRect;
-  label: string;
+  label: string | null;
 }
 
 export interface CaptureSelectionOverlayFrameInput {
@@ -17,6 +17,7 @@ export interface CaptureSelectionOverlayFrameInput {
   selection: LogicalRect | null;
   draftSelection: LogicalRect | null;
   hoverSelection: LogicalRect | null;
+  showSelectionSize?: boolean;
 }
 
 export interface CaptureSelectionOverlayCursorInput {
@@ -55,6 +56,7 @@ export function getCaptureSelectionOverlayFrame({
   selection,
   draftSelection,
   hoverSelection,
+  showSelectionSize = true,
 }: CaptureSelectionOverlayFrameInput): CaptureSelectionOverlayFrame | null {
   if (!selectionBounds) return null;
 
@@ -63,6 +65,7 @@ export function getCaptureSelectionOverlayFrame({
       'preview',
       selection,
       selectionBounds,
+      showSelectionSize,
     );
   }
 
@@ -75,6 +78,7 @@ export function getCaptureSelectionOverlayFrame({
     draftSelection ? 'draft' : 'hover',
     activeSelection,
     selectionBounds,
+    showSelectionSize,
   );
 }
 
@@ -82,11 +86,14 @@ function buildCaptureSelectionOverlayFrame(
   variant: CaptureSelectionOverlayVariant,
   selection: LogicalRect,
   selectionBounds: LogicalRect,
+  showSelectionSize: boolean,
 ): CaptureSelectionOverlayFrame {
   return {
     variant,
     rect: virtualRectToViewportRect(selection, selectionBounds),
-    label: `${Math.round(selection.width)} x ${Math.round(selection.height)} px`,
+    label: showSelectionSize
+      ? `${Math.round(selection.width)} x ${Math.round(selection.height)} px`
+      : null,
   };
 }
 
@@ -111,7 +118,7 @@ export function drawCaptureSelectionOverlayFrame(
   if (frame) {
     drawDimMask(context, size, frame.rect);
     drawSelectionRect(context, frame);
-    drawSizeLabel(context, size, frame);
+    if (frame.label) drawSizeLabel(context, size, frame);
   }
 
   if (cursor) {
@@ -172,11 +179,13 @@ function drawSizeLabel(
   frame: CaptureSelectionOverlayFrame,
 ) {
   const { rect } = frame;
+  const label = frame.label;
+  if (!label) return;
 
   context.font = '500 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   context.textBaseline = 'top';
 
-  const labelWidth = Math.ceil(context.measureText(frame.label).width) + LABEL_PADDING_X * 2;
+  const labelWidth = Math.ceil(context.measureText(label).width) + LABEL_PADDING_X * 2;
   const labelX = snapCanvasTextPosition(
     clamp(rect.x, 0, Math.max(0, size.width - labelWidth)),
   );
@@ -194,7 +203,7 @@ function drawSizeLabel(
   context.fillRect(labelX, labelY, labelWidth, LABEL_HEIGHT);
   context.fillStyle = 'rgba(255, 255, 255, 0.95)';
   context.fillText(
-    frame.label,
+    label,
     snapCanvasTextPosition(labelX + LABEL_PADDING_X),
     snapCanvasTextPosition(labelY + 4),
   );

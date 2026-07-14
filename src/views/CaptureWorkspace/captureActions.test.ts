@@ -120,6 +120,9 @@ describe('capture session actions', () => {
           action: {
             type: 'save',
             path: '/tmp/SnapLingo-20260617-023000.png',
+            format: 'png',
+            quality: 90,
+            copyAfterSave: false,
           },
           annotations,
         },
@@ -166,6 +169,9 @@ describe('capture session actions', () => {
           action: {
             type: 'save',
             path: '/Users/alice/Pictures/SnapLingo/SnapLingo-20260617-023000.png',
+            format: 'png',
+            quality: 90,
+            copyAfterSave: false,
           },
           annotations,
         },

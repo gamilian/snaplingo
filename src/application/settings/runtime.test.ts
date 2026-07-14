@@ -3,7 +3,10 @@ import { createSettingsRuntime } from './runtime';
 
 describe('settings runtime', () => {
   it('opens the Settings window through its portable port', async () => {
-    const window = { openSettings: vi.fn(async () => undefined) };
+    const window = {
+      openSettings: vi.fn(async () => undefined),
+      selectScreenshotDirectory: vi.fn(async () => null),
+    };
     const runtime = createSettingsRuntime(createPorts({ window }));
 
     await runtime.window.open();
@@ -16,8 +19,18 @@ describe('settings runtime', () => {
       general: { language: 'zh-CN', theme: 'system', startOnBoot: false },
       screenshot: {
         savePath: '/tmp',
-        format: 'png',
+        format: 'png' as const,
         quality: 90,
+        namingRule: 'timestamp' as const,
+        customFileName: 'SnapLingo',
+        autoCopy: false,
+        defaultStrokeWidth: 2,
+        defaultFontSize: 24,
+        rememberLastTool: true,
+        showSelectionSize: true,
+        showMagnifier: false,
+        pinOpacity: 100,
+        pinShadow: true,
         annotationColors: [[255, 77, 79, 255]] as [number, number, number, number][],
       },
       translation: { defaultSourceLang: 'auto', defaultTargetLang: 'en' },
@@ -185,7 +198,10 @@ describe('settings runtime', () => {
 
 function createPorts(overrides: Record<string, unknown> = {}) {
   return {
-    window: { openSettings: vi.fn(async () => undefined) },
+    window: {
+      openSettings: vi.fn(async () => undefined),
+      selectScreenshotDirectory: vi.fn(async () => null),
+    },
     durableSettings: {
       getSettingsSnapshot: vi.fn(),
       updateGeneralSettings: vi.fn(),

@@ -2,6 +2,7 @@ export interface PinnedWindowPort {
   resize(width: number, height: number): Promise<void>;
   moveBy(deltaX: number, deltaY: number): Promise<void>;
   startDragging(): Promise<void>;
+  setShadow(enabled: boolean): Promise<void>;
   close(): Promise<void>;
 }
 

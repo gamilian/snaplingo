@@ -111,9 +111,17 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
   const screenshotSavePath = useSettingsConfigStore(
     (state) => state.screenshot?.savePath,
   );
+  const configuredPinOpacity = useSettingsConfigStore(
+    (state) => state.screenshot?.pinOpacity,
+  );
+  const defaultPinOpacity = (configuredPinOpacity ?? 100) / 100;
+  const pinShadow = useSettingsConfigStore(
+    (state) => state.screenshot?.pinShadow ?? true,
+  );
   const [image, setImage] = useState<PinnedImageView | null>(null);
   const [zoom, setZoom] = useState(1);
-  const [opacity, setOpacity] = useState(1);
+  const [opacity, setOpacity] = useState(defaultPinOpacity);
+  const hasAppliedConfiguredOpacityRef = useRef(configuredPinOpacity !== undefined);
   const [isThumbnailMode, setIsThumbnailMode] = useState(false);
   const [transform, setTransform] = useState(createDefaultPinnedTransform);
   const [visualFilter, setVisualFilter] = useState(createDefaultPinnedVisualFilter);
@@ -132,6 +140,21 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
     y: number;
   } | null>(null);
   const [cursorColor, setCursorColor] = useState<ColorSample | null>(null);
+
+  useEffect(() => {
+    void runtime.setShadow(pinShadow);
+  }, [pinShadow, runtime]);
+
+  useEffect(() => {
+    if (
+      configuredPinOpacity === undefined ||
+      hasAppliedConfiguredOpacityRef.current
+    ) {
+      return;
+    }
+    hasAppliedConfiguredOpacityRef.current = true;
+    setOpacity(configuredPinOpacity / 100);
+  }, [configuredPinOpacity]);
   const [colorSampleFormat, setColorSampleFormat] =
     useState<ColorSampleFormat>('hex');
   const [isMagnifierRequested, setIsMagnifierRequested] = useState(false);
@@ -320,7 +343,7 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
 
   const resetPinnedSizeAndOpacity = useCallback(() => {
     setZoom(1);
-    setOpacity(1);
+    setOpacity(defaultPinOpacity);
     setIsThumbnailMode(false);
     setContextMenuPosition(null);
     void resizePinnedWindow(1, transform, image, false);

@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
 use arboard::{Clipboard, ImageData};
-use image::ImageEncoder;
+use image::{DynamicImage, ImageEncoder};
 
 use crate::error::{AppError, Result};
 
@@ -18,25 +18,49 @@ impl CaptureOutput {
         Self
     }
 
-    pub fn default_capture_save_path(&self) -> PathBuf {
-        let base_dir = dirs::download_dir()
+    pub fn default_capture_save_path(
+        &self,
+        directory: Option<&str>,
+        format: &str,
+        naming_rule: &str,
+        custom_file_name: &str,
+    ) -> PathBuf {
+        let base_dir = directory
+            .map(str::trim)
+            .filter(|path| !path.is_empty())
+            .map(configured_capture_save_dir_for_system)
+            .or_else(dirs::download_dir)
             .or_else(dirs::picture_dir)
             .or_else(dirs::home_dir)
             .unwrap_or_else(std::env::temp_dir);
-        let timestamp = chrono::Local::now().format("%Y%m%d-%H%M%S").to_string();
-
-        capture_save_path(&base_dir, &timestamp)
+        configured_capture_save_path(
+            &base_dir,
+            format,
+            naming_rule,
+            custom_file_name,
+            chrono::Local::now(),
+        )
     }
 
-    pub fn quick_capture_save_path(&self, directory: Option<&str>) -> PathBuf {
+    pub fn quick_capture_save_path(
+        &self,
+        directory: Option<&str>,
+        format: &str,
+        naming_rule: &str,
+        custom_file_name: &str,
+    ) -> PathBuf {
         let base_dir = directory
             .map(str::trim)
             .filter(|path| !path.is_empty())
             .map(configured_capture_save_dir_for_system)
             .unwrap_or_else(default_quick_capture_save_dir);
-        let timestamp = chrono::Local::now().format("%Y%m%d-%H%M%S").to_string();
-
-        quick_capture_save_file_path(&base_dir, &timestamp)
+        configured_capture_save_path(
+            &base_dir,
+            format,
+            naming_rule,
+            custom_file_name,
+            chrono::Local::now(),
+        )
     }
 
     pub async fn save_png(&self, data: &[u8], path: &Path) -> Result<PathBuf> {
@@ -46,6 +70,21 @@ impl CaptureOutput {
 
         std::fs::write(path, data)?;
 
+        Ok(path.to_path_buf())
+    }
+
+    pub async fn save_image(
+        &self,
+        png_data: &[u8],
+        path: &Path,
+        format: &str,
+        quality: u8,
+    ) -> Result<PathBuf> {
+        let encoded = encode_capture_image(png_data, format, quality)?;
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(path, encoded)?;
         Ok(path.to_path_buf())
     }
 
@@ -122,12 +161,112 @@ impl CaptureOutput {
     }
 }
 
-pub(crate) fn capture_save_path(base_dir: &Path, timestamp: &str) -> PathBuf {
-    base_dir.join(format!("SnapLingo-{}.png", timestamp))
+pub(crate) fn configured_capture_save_path(
+    base_dir: &Path,
+    format: &str,
+    naming_rule: &str,
+    custom_file_name: &str,
+    now: chrono::DateTime<chrono::Local>,
+) -> PathBuf {
+    let extension = capture_extension(format);
+    let base_name = match naming_rule {
+        "date" => format!("SnapLingo-{}", now.format("%Y-%m-%d")),
+        "counter" => "Screenshot".to_string(),
+        "custom" => sanitize_file_name(custom_file_name),
+        _ => format!("SnapLingo-{}", now.format("%Y%m%d-%H%M%S")),
+    };
+
+    if naming_rule == "counter" {
+        return first_available_capture_path(base_dir, &base_name, extension, 1, 3);
+    }
+
+    let direct = base_dir.join(format!("{base_name}.{extension}"));
+    if !direct.exists() {
+        return direct;
+    }
+    first_available_capture_path(base_dir, &base_name, extension, 2, 0)
 }
 
-pub(crate) fn quick_capture_save_file_path(base_dir: &Path, timestamp: &str) -> PathBuf {
-    capture_save_path(base_dir, timestamp)
+fn first_available_capture_path(
+    base_dir: &Path,
+    base_name: &str,
+    extension: &str,
+    start: u32,
+    width: usize,
+) -> PathBuf {
+    for counter in start..u32::MAX {
+        let suffix = if width == 0 {
+            counter.to_string()
+        } else {
+            format!("{counter:0width$}")
+        };
+        let path = base_dir.join(format!("{base_name}_{suffix}.{extension}"));
+        if !path.exists() {
+            return path;
+        }
+    }
+    base_dir.join(format!("{base_name}.{extension}"))
+}
+
+fn capture_extension(format: &str) -> &'static str {
+    match format {
+        "jpg" | "jpeg" => "jpg",
+        "webp" => "webp",
+        _ => "png",
+    }
+}
+
+fn sanitize_file_name(value: &str) -> String {
+    let sanitized: String = value
+        .trim()
+        .chars()
+        .map(|character| match character {
+            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
+            _ => character,
+        })
+        .collect();
+    if sanitized.is_empty() {
+        "SnapLingo".to_string()
+    } else {
+        sanitized
+    }
+}
+
+fn encode_capture_image(png_data: &[u8], format: &str, quality: u8) -> Result<Vec<u8>> {
+    if format == "png" {
+        return Ok(png_data.to_vec());
+    }
+
+    let image = image::load_from_memory(png_data)
+        .map_err(|error| AppError::System(format!("Failed to decode capture image: {error}")))?;
+    match format {
+        "jpg" | "jpeg" => encode_jpeg(&image, quality),
+        "webp" => encode_webp(&image, quality),
+        _ => Ok(png_data.to_vec()),
+    }
+}
+
+fn encode_jpeg(image: &DynamicImage, quality: u8) -> Result<Vec<u8>> {
+    let rgb = image.to_rgb8();
+    let mut encoded = Vec::new();
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut encoded, quality.clamp(1, 100))
+        .write_image(
+            rgb.as_raw(),
+            rgb.width(),
+            rgb.height(),
+            image::ExtendedColorType::Rgb8,
+        )
+        .map_err(|error| AppError::System(format!("Failed to encode JPEG: {error}")))?;
+    Ok(encoded)
+}
+
+fn encode_webp(image: &DynamicImage, quality: u8) -> Result<Vec<u8>> {
+    let rgba = image.to_rgba8();
+    Ok(
+        webp::Encoder::from_rgba(rgba.as_raw(), rgba.width(), rgba.height())
+            .encode(quality.clamp(1, 100) as f32)
+            .to_vec(),
+    )
 }
 
 fn default_quick_capture_save_dir() -> PathBuf {

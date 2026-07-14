@@ -45,6 +45,7 @@ export interface SettingsRuntimePorts {
 export interface SettingsRuntime {
   window: {
     open(): Promise<void>;
+    selectScreenshotDirectory(): Promise<string | null>;
   };
   durableSettings: {
     load(): Promise<SettingsSnapshot>;
@@ -112,6 +113,7 @@ export function createSettingsRuntime(
   return {
     window: {
       open: () => ports.window.openSettings(),
+      selectScreenshotDirectory: () => ports.window.selectScreenshotDirectory(),
     },
     durableSettings: {
       load: () => ports.durableSettings.getSettingsSnapshot(),

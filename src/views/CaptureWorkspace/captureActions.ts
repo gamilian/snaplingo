@@ -550,6 +550,9 @@ export async function saveCaptureSelection(
     action: {
       type: 'save',
       path,
+      format: 'png',
+      quality: 90,
+      copyAfterSave: false,
     },
   });
 }
@@ -572,6 +575,9 @@ export async function quickSaveCaptureSelection(
     action: {
       type: 'save',
       path,
+      format: 'png',
+      quality: 90,
+      copyAfterSave: false,
     },
   });
 }

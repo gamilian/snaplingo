@@ -28,9 +28,7 @@ function CaptureWorkspaceContent({
   initialSessionId,
   onInactive,
 }: Omit<CaptureWorkspaceProps, 'runtime'>) {
-  const screenshotSavePath = useSettingsConfigStore(
-    (state) => state.screenshot?.savePath,
-  );
+  const screenshotPreferences = useSettingsConfigStore((state) => state.screenshot);
   const annotationColorPresets = useSettingsConfigStore(
     (state) => state.screenshot?.annotationColors ?? ANNOTATION_COLORS,
   );
@@ -42,7 +40,7 @@ function CaptureWorkspaceContent({
     initialSessionId,
     onInactive,
     annotationColorPresets,
-    screenshotSavePath,
+    screenshotPreferences: screenshotPreferences ?? undefined,
   });
 
   return (

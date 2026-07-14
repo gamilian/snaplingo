@@ -6,7 +6,10 @@ import {
   useState,
 } from 'react';
 
-import { createCaptureWorkspaceRuntime } from '../../application/capture-workspace/runtime';
+import {
+  createCaptureWorkspaceRuntime,
+  type CaptureScreenshotPreferences,
+} from '../../application/capture-workspace/runtime';
 import type { CaptureWorkspaceRuntime } from '../../application/capture-workspace/types';
 import { prepareCaptureSurfaceForReveal } from './captureHostRuntime';
 import {
@@ -33,7 +36,7 @@ interface CaptureWorkspaceRuntimeViewOptions {
   initialSessionId?: string;
   onInactive?: () => void | Promise<void>;
   annotationColorPresets?: readonly AnnotationColor[];
-  screenshotSavePath?: string;
+  screenshotPreferences?: CaptureScreenshotPreferences;
 }
 
 export interface CaptureWorkspaceRuntimeView {
@@ -46,12 +49,12 @@ export function useCaptureWorkspaceRuntimeView({
   initialSessionId,
   onInactive,
   annotationColorPresets,
-  screenshotSavePath,
+  screenshotPreferences,
 }: CaptureWorkspaceRuntimeViewOptions): CaptureWorkspaceRuntimeView {
   const platformRuntime = useCaptureWorkspaceRuntime();
   const onInactiveRef = useRef(onInactive);
   const annotationColorPresetsRef = useRef(annotationColorPresets);
-  const screenshotSavePathRef = useRef(screenshotSavePath);
+  const screenshotPreferencesRef = useRef(screenshotPreferences);
   const hostBridgeRef = useRef<{
     reset(): void;
     prepareSurface(): Promise<void>;
@@ -63,7 +66,7 @@ export function useCaptureWorkspaceRuntimeView({
   });
   onInactiveRef.current = onInactive;
   annotationColorPresetsRef.current = annotationColorPresets;
-  screenshotSavePathRef.current = screenshotSavePath;
+  screenshotPreferencesRef.current = screenshotPreferences;
 
   const [runtimeRevision, setRuntimeRevision] = useState(0);
   const disposedRuntimeRef = useRef<CaptureWorkspaceRuntime | null>(null);
@@ -74,7 +77,7 @@ export function useCaptureWorkspaceRuntimeView({
         onInactive: () => onInactiveRef.current?.(),
         annotationColorPresets: () =>
           annotationColorPresetsRef.current ?? ANNOTATION_COLORS,
-        screenshotSavePath: () => screenshotSavePathRef.current,
+        screenshotPreferences: () => screenshotPreferencesRef.current,
         storage: window.localStorage,
         host: {
           resetInteraction: () => hostBridgeRef.current.reset(),
@@ -131,7 +134,13 @@ export function useCaptureWorkspaceRuntimeView({
     cursorPointRef,
     draftSelectionRef,
     hoverSelectionRef,
+    showSelectionSize: screenshotPreferences?.showSelectionSize ?? true,
   });
+
+  const isMagnifierEnabled = screenshotPreferences?.showMagnifier ?? false;
+  const shouldTrackMagnifierCursor =
+    isMagnifierEnabled && derived.shouldTrackMagnifierCursor;
+  const isMagnifierShown = isMagnifierEnabled && derived.isMagnifierShown;
 
   useEffect(() => {
     if (!runtimeRenderState.session || !derived.selectionBounds) return;
@@ -139,7 +148,7 @@ export function useCaptureWorkspaceRuntimeView({
     return startCaptureHoverSelectionPolling({
       sessionId: runtimeRenderState.session.id,
       candidates: derived.captureCandidates,
-      shouldTrackMagnifierCursor: derived.shouldTrackMagnifierCursor,
+      shouldTrackMagnifierCursor,
       intervalMs: CAPTURE_HOVER_POLL_INTERVAL_MS,
       canPoll: () =>
         shouldPollCaptureHoverSelection({
@@ -160,7 +169,7 @@ export function useCaptureWorkspaceRuntimeView({
   }, [
     derived.captureCandidates,
     derived.selectionBounds,
-    derived.shouldTrackMagnifierCursor,
+    shouldTrackMagnifierCursor,
     overlay.schedulePaint,
     platformRuntime.commands.currentCaptureCursorPosition,
     runtimeRenderState.editGesture,
@@ -227,7 +236,7 @@ export function useCaptureWorkspaceRuntimeView({
     session: runtimeRenderState.session,
     hasHydratedPixelSource: runtimeRenderState.hasHydratedPixelSource,
     isMagnifierRequested: runtimeRenderState.isMagnifierRequested,
-    isMagnifierShown: derived.isMagnifierShown,
+    isMagnifierShown,
     cursorMonitor: derived.cursorMonitor,
     cursorInMonitorPoint: derived.cursorInMonitorPoint,
     setCursorColor: workflowRuntime.actions.updateCursorColor,
@@ -281,7 +290,7 @@ export function useCaptureWorkspaceRuntimeView({
         },
       },
       magnifier: {
-        isShown: derived.isMagnifierShown,
+        isShown: isMagnifierShown,
         cursorMonitor: derived.cursorMonitor,
         cursorViewportPoint: derived.cursorViewportPoint,
         cursorInMonitorPoint: derived.cursorInMonitorPoint,
@@ -296,6 +305,7 @@ export function useCaptureWorkspaceRuntimeView({
       overlay.canvasRef,
       overlay.cssSize,
       overlay.pixelRatio,
+      isMagnifierShown,
       runtimeRenderState,
     ],
   );

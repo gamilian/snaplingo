@@ -1,15 +1,14 @@
-import { useState } from 'react';
 import { useSettingsConfigStore } from '../../../stores/settingsConfigStore';
 import { CustomRange } from '../../../components/common/CustomRange';
 import { CustomSelect } from '../../../components/common/CustomSelect';
+import { useSettingsRuntime } from '../runtimeContext';
 
 export function SaveSettingsPage() {
+  const runtime = useSettingsRuntime();
   const screenshot = useSettingsConfigStore((state) => state.screenshot);
   const updateScreenshotSettings = useSettingsConfigStore(
     (state) => state.updateScreenshotSettings,
   );
-
-  const [namingRule, setNamingRule] = useState('timestamp');
 
   if (!screenshot) {
     return <div className="text-sm text-gray-500">设置加载中...</div>;
@@ -22,9 +21,9 @@ export function SaveSettingsPage() {
     });
   };
 
-  const handleBrowse = () => {
-    // TODO: 调用 Tauri 文件选择对话框
-    alert('浏览文件夹功能待实现');
+  const handleBrowse = async () => {
+    const savePath = await runtime.window.selectScreenshotDirectory();
+    if (savePath) updateScreenshot({ savePath });
   };
 
   return (
@@ -66,7 +65,9 @@ export function SaveSettingsPage() {
                 name="format"
                 value="png"
                 checked={screenshot.format === 'png'}
-                onChange={(e) => updateScreenshot({ format: e.target.value })}
+                onChange={(e) =>
+                  updateScreenshot({ format: e.target.value as typeof screenshot.format })
+                }
                 className="w-4 h-4 text-primary-600 focus:ring-primary-500"
               />
               <span className="text-sm text-gray-700">PNG</span>
@@ -77,7 +78,9 @@ export function SaveSettingsPage() {
                 name="format"
                 value="jpg"
                 checked={screenshot.format === 'jpg'}
-                onChange={(e) => updateScreenshot({ format: e.target.value })}
+                onChange={(e) =>
+                  updateScreenshot({ format: e.target.value as typeof screenshot.format })
+                }
                 className="w-4 h-4 text-primary-600 focus:ring-primary-500"
               />
               <span className="text-sm text-gray-700">JPG</span>
@@ -88,7 +91,9 @@ export function SaveSettingsPage() {
                 name="format"
                 value="webp"
                 checked={screenshot.format === 'webp'}
-                onChange={(e) => updateScreenshot({ format: e.target.value })}
+                onChange={(e) =>
+                  updateScreenshot({ format: e.target.value as typeof screenshot.format })
+                }
                 className="w-4 h-4 text-primary-600 focus:ring-primary-500"
               />
               <span className="text-sm text-gray-700">WebP</span>
@@ -121,14 +126,25 @@ export function SaveSettingsPage() {
           <label className="block font-medium text-gray-700 mb-2">文件命名规则</label>
           <CustomSelect
             options={[
-              { value: 'timestamp', label: '时间戳（20260613_142530）' },
-              { value: 'date', label: '日期（2026-06-13）' },
+              { value: 'timestamp', label: '时间戳（SnapLingo-20260714-133045）' },
+              { value: 'date', label: '日期（SnapLingo-2026-07-14）' },
               { value: 'counter', label: '计数器（Screenshot_001）' },
               { value: 'custom', label: '自定义' },
             ]}
-            value={namingRule}
-            onChange={setNamingRule}
+            value={screenshot.namingRule}
+            onChange={(namingRule) =>
+              updateScreenshot({ namingRule: namingRule as typeof screenshot.namingRule })
+            }
           />
+          {screenshot.namingRule === 'custom' && (
+            <input
+              type="text"
+              value={screenshot.customFileName}
+              onChange={(event) => updateScreenshot({ customFileName: event.target.value })}
+              className="mt-3 w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              placeholder="自定义文件名前缀"
+            />
+          )}
           <p className="text-sm text-gray-500 mt-2">截图文件的命名方式</p>
         </div>
 
@@ -139,9 +155,19 @@ export function SaveSettingsPage() {
             <div className="text-sm text-gray-500 mt-1">截图完成后自动将图片复制到剪贴板</div>
           </div>
           <button
-            className="relative w-12 h-6 rounded-full bg-gray-300 transition-colors"
+            type="button"
+            role="switch"
+            aria-checked={screenshot.autoCopy}
+            onClick={() => updateScreenshot({ autoCopy: !screenshot.autoCopy })}
+            className={`relative w-12 h-6 rounded-full transition-colors ${
+              screenshot.autoCopy ? 'bg-primary-600' : 'bg-gray-300'
+            }`}
           >
-            <span className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform" />
+            <span
+              className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                screenshot.autoCopy ? 'translate-x-6' : ''
+              }`}
+            />
           </button>
         </div>
       </div>

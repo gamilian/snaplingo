@@ -1,5 +1,9 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { AnnotationColorPreset } from '../../application/settings/ports';
+import type {
+  AnnotationColorPreset,
+  ScreenshotFormat,
+  ScreenshotNamingRule,
+} from '../../application/settings/ports';
 
 interface BackendGeneralSettings {
   language: string;
@@ -9,8 +13,18 @@ interface BackendGeneralSettings {
 
 interface BackendScreenshotSettings {
   save_path: string;
-  format: string;
+  format: ScreenshotFormat;
   quality: number;
+  naming_rule: ScreenshotNamingRule;
+  custom_file_name: string;
+  auto_copy: boolean;
+  default_stroke_width: number;
+  default_font_size: number;
+  remember_last_tool: boolean;
+  show_selection_size: boolean;
+  show_magnifier: boolean;
+  pin_opacity: number;
+  pin_shadow: boolean;
   annotation_colors: AnnotationColorPreset[];
 }
 
@@ -40,8 +54,18 @@ interface GeneralSettingsInput {
 
 interface ScreenshotSettingsInput {
   savePath: string;
-  format: string;
+  format: ScreenshotFormat;
   quality: number;
+  namingRule: ScreenshotNamingRule;
+  customFileName: string;
+  autoCopy: boolean;
+  defaultStrokeWidth: number;
+  defaultFontSize: number;
+  rememberLastTool: boolean;
+  showSelectionSize: boolean;
+  showMagnifier: boolean;
+  pinOpacity: number;
+  pinShadow: boolean;
   annotationColors: AnnotationColorPreset[];
 }
 
@@ -61,6 +85,16 @@ function normalizeSnapshot(snapshot: BackendSettingsSnapshot) {
       savePath: snapshot.screenshot.save_path,
       format: snapshot.screenshot.format,
       quality: snapshot.screenshot.quality,
+      namingRule: snapshot.screenshot.naming_rule,
+      customFileName: snapshot.screenshot.custom_file_name,
+      autoCopy: snapshot.screenshot.auto_copy,
+      defaultStrokeWidth: snapshot.screenshot.default_stroke_width,
+      defaultFontSize: snapshot.screenshot.default_font_size,
+      rememberLastTool: snapshot.screenshot.remember_last_tool,
+      showSelectionSize: snapshot.screenshot.show_selection_size,
+      showMagnifier: snapshot.screenshot.show_magnifier,
+      pinOpacity: snapshot.screenshot.pin_opacity,
+      pinShadow: snapshot.screenshot.pin_shadow,
       annotationColors: snapshot.screenshot.annotation_colors,
     },
     translation: {
@@ -100,6 +134,16 @@ export async function updateScreenshotSettings(input: ScreenshotSettingsInput) {
         save_path: input.savePath,
         format: input.format,
         quality: input.quality,
+        naming_rule: input.namingRule,
+        custom_file_name: input.customFileName,
+        auto_copy: input.autoCopy,
+        default_stroke_width: input.defaultStrokeWidth,
+        default_font_size: input.defaultFontSize,
+        remember_last_tool: input.rememberLastTool,
+        show_selection_size: input.showSelectionSize,
+        show_magnifier: input.showMagnifier,
+        pin_opacity: input.pinOpacity,
+        pin_shadow: input.pinShadow,
         annotation_colors: input.annotationColors,
       },
     }),

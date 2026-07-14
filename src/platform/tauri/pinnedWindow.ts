@@ -21,6 +21,9 @@ export const pinnedWindow: PinnedWindowPort = {
   startDragging() {
     return getCurrentWindow().startDragging();
   },
+  setShadow(enabled) {
+    return getCurrentWindow().setShadow(enabled);
+  },
   close() {
     return getCurrentWebviewWindow().close();
   },
