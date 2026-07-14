@@ -5,6 +5,7 @@ use base64::Engine;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use crate::application::favorites::FavoritePolicyProvider;
 use crate::domain::capture::{AnnotationCommand, CaptureSessionId, LogicalRect};
 use crate::Result;
 
@@ -78,6 +79,7 @@ pub trait ScreenshotFavoriteRepository: Send + Sync {
     async fn update_metadata(&self, id: i64, note: Option<String>, tags: Vec<String>)
         -> Result<()>;
     async fn delete(&self, id: i64) -> Result<()>;
+    async fn count_all(&self) -> Result<usize>;
 }
 
 pub trait ScreenshotFavoriteAssetStore: Send + Sync {
@@ -116,6 +118,7 @@ pub struct ScreenshotFavorites {
     clipboard: Arc<dyn ScreenshotFavoriteClipboard>,
     host: Arc<dyn ScreenshotFavoriteHost>,
     change_notifier: Option<Arc<dyn ScreenshotFavoriteChangeNotifier>>,
+    policy_provider: Option<Arc<dyn FavoritePolicyProvider>>,
 }
 
 pub struct ScreenshotFavoriteCapture {
@@ -161,6 +164,7 @@ impl ScreenshotFavorites {
             clipboard,
             host,
             change_notifier: None,
+            policy_provider: None,
         }
     }
 
@@ -177,6 +181,25 @@ impl ScreenshotFavorites {
             clipboard,
             host,
             change_notifier: Some(change_notifier),
+            policy_provider: None,
+        }
+    }
+
+    pub fn with_change_notifier_and_policy(
+        repository: Arc<dyn ScreenshotFavoriteRepository>,
+        assets: Arc<dyn ScreenshotFavoriteAssetStore>,
+        clipboard: Arc<dyn ScreenshotFavoriteClipboard>,
+        host: Arc<dyn ScreenshotFavoriteHost>,
+        change_notifier: Arc<dyn ScreenshotFavoriteChangeNotifier>,
+        policy_provider: Arc<dyn FavoritePolicyProvider>,
+    ) -> Self {
+        Self {
+            repository,
+            assets,
+            clipboard,
+            host,
+            change_notifier: Some(change_notifier),
+            policy_provider: Some(policy_provider),
         }
     }
 
@@ -187,6 +210,7 @@ impl ScreenshotFavorites {
     }
 
     pub async fn add_png(&self, png_data: &[u8]) -> Result<ScreenshotFavoriteRecord> {
+        self.ensure_capacity().await?;
         let stored = self.assets.store(png_data)?;
         let favorite = NewScreenshotFavorite {
             created_at: Utc::now(),
@@ -207,6 +231,19 @@ impl ScreenshotFavorites {
                 Err(error)
             }
         }
+    }
+
+    async fn ensure_capacity(&self) -> Result<()> {
+        let Some(provider) = &self.policy_provider else {
+            return Ok(());
+        };
+        let maximum = provider.maximum_favorites()? as usize;
+        if maximum > 0 && self.repository.count_all().await? >= maximum {
+            return Err(
+                format!("收藏夹容量已满（最多 {maximum} 项），请先删除不需要的收藏").into(),
+            );
+        }
+        Ok(())
     }
 
     pub async fn query(

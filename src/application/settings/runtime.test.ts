@@ -54,6 +54,7 @@ describe('settings runtime', () => {
         autoCleanupEnabled: false,
         retentionDays: 30,
         maximumRecords: 5000,
+        maximumFavorites: 1000,
       },
     };
     const durableSettings = {

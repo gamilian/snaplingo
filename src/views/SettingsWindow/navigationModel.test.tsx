@@ -16,6 +16,8 @@ describe('settings navigation model', () => {
       { key: 'services', label: '服务' },
       { key: 'general', label: '通用' },
       { key: 'advanced', label: '高级' },
+      { key: 'favorites', label: '收藏夹' },
+      { key: 'history', label: '历史记录' },
     ]);
   });
 
@@ -24,19 +26,14 @@ describe('settings navigation model', () => {
       'hotkeys',
       'save-settings',
       'editor',
-      'favorites',
     ]);
     expect(secondaryKeys('translation')).toEqual([
       'hotkeys',
       'translation-settings',
-      'history',
-      'favorites',
     ]);
     expect(secondaryKeys('ocr')).toEqual([
       'hotkeys',
       'ocr-settings',
-      'history',
-      'favorites',
     ]);
     expect(secondaryKeys('services')).toEqual(['ocr', 'translation', 'tts']);
   });

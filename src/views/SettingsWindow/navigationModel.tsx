@@ -2,33 +2,32 @@ import type { ReactElement } from 'react';
 
 import { AdvancedPage } from './Advanced/AdvancedPage';
 import { GeneralPage } from './General/GeneralPage';
-import { FavoritesPage as OcrFavoritesPage } from './OCR/FavoritesPage';
-import { HistoryPage as OcrHistoryPage } from './OCR/HistoryPage';
 import { HotkeysPage as OcrHotkeysPage } from './OCR/HotkeysPage';
 import { OcrSettingsPage } from './OCR/OcrSettingsPage';
-import { FavoritesPage as ScreenshotFavoritesPage } from './Screenshot/FavoritesPage';
 import { HotkeysPage as ScreenshotHotkeysPage } from './Screenshot/HotkeysPage';
 import { SaveSettingsPage } from './Screenshot/SaveSettingsPage';
 import { EditorPage as ScreenshotEditorPage } from './Screenshot/EditorPage';
 import { OcrProvidersPage } from './Services/OcrProvidersPage';
 import { TranslationProvidersPage } from './Services/TranslationProvidersPage';
 import { TtsProvidersPage } from './Services/TtsProvidersPage';
-import { FavoritesPage as TranslationFavoritesPage } from './Translation/FavoritesPage';
-import { HistoryPage as TranslationHistoryPage } from './Translation/HistoryPage';
 import { HotkeysPage as TranslationHotkeysPage } from './Translation/HotkeysPage';
 import { TranslationSettingsPage } from './Translation/TranslationSettingsPage';
+import { FavoritesLibraryPage } from './Library/FavoritesLibraryPage';
+import { HistoryLibraryPage } from './Library/HistoryLibraryPage';
 
 export type MainTab =
   | 'screenshot'
   | 'translation'
   | 'ocr'
   | 'services'
+  | 'favorites'
+  | 'history'
   | 'general'
   | 'advanced';
 
-export type ScreenshotSubTab = 'hotkeys' | 'save-settings' | 'editor' | 'favorites';
-export type TranslationSubTab = 'hotkeys' | 'translation-settings' | 'history' | 'favorites';
-export type OcrSubTab = 'hotkeys' | 'ocr-settings' | 'history' | 'favorites';
+export type ScreenshotSubTab = 'hotkeys' | 'save-settings' | 'editor';
+export type TranslationSubTab = 'hotkeys' | 'translation-settings';
+export type OcrSubTab = 'hotkeys' | 'ocr-settings';
 export type ServicesSubTab = 'ocr' | 'translation' | 'tts';
 
 export interface SecondaryNavItem<Key extends string = string> {
@@ -54,6 +53,8 @@ export type SettingsSection =
   | SecondarySettingsSection<'translation', TranslationSubTab>
   | SecondarySettingsSection<'ocr', OcrSubTab>
   | SecondarySettingsSection<'services', ServicesSubTab>
+  | SimpleSettingsSection<'favorites'>
+  | SimpleSettingsSection<'history'>
   | SimpleSettingsSection<'general'>
   | SimpleSettingsSection<'advanced'>;
 
@@ -65,7 +66,6 @@ export const settingsSections: SettingsSection[] = [
       { key: 'hotkeys', label: '快捷键', render: () => <ScreenshotHotkeysPage /> },
       { key: 'save-settings', label: '保存设置', render: () => <SaveSettingsPage /> },
       { key: 'editor', label: '编辑器', render: () => <ScreenshotEditorPage /> },
-      { key: 'favorites', label: '收藏夹', render: () => <ScreenshotFavoritesPage /> },
     ],
   },
   {
@@ -74,8 +74,6 @@ export const settingsSections: SettingsSection[] = [
     secondary: [
       { key: 'hotkeys', label: '快捷键', render: () => <TranslationHotkeysPage /> },
       { key: 'translation-settings', label: '翻译设置', render: () => <TranslationSettingsPage /> },
-      { key: 'history', label: '历史记录', render: () => <TranslationHistoryPage /> },
-      { key: 'favorites', label: '收藏夹', render: () => <TranslationFavoritesPage /> },
     ],
   },
   {
@@ -84,8 +82,6 @@ export const settingsSections: SettingsSection[] = [
     secondary: [
       { key: 'hotkeys', label: '快捷键', render: () => <OcrHotkeysPage /> },
       { key: 'ocr-settings', label: 'OCR 设置', render: () => <OcrSettingsPage /> },
-      { key: 'history', label: '历史记录', render: () => <OcrHistoryPage /> },
-      { key: 'favorites', label: '收藏夹', render: () => <OcrFavoritesPage /> },
     ],
   },
   {
@@ -106,6 +102,16 @@ export const settingsSections: SettingsSection[] = [
     key: 'advanced',
     label: '高级',
     render: () => <AdvancedPage />,
+  },
+  {
+    key: 'favorites',
+    label: '收藏夹',
+    render: () => <FavoritesLibraryPage />,
+  },
+  {
+    key: 'history',
+    label: '历史记录',
+    render: () => <HistoryLibraryPage />,
   },
 ];
 

@@ -1,0 +1,27 @@
+{
+  "type": "design",
+  "designSystems": [],
+  "primaryDesignSystem": null,
+  "assets": {
+    "SnapLingo History Favorites Three-Column UI Options": {
+      "versions": [
+        {
+          "path": "Classic Three-Column Options.html",
+          "createdAt": "2026-07-14T15:53:06.915Z",
+          "status": "needs-review"
+        }
+      ]
+    },
+    "SnapLingo 历史与收藏经典三栏方案": {
+      "versions": [
+        {
+          "path": "Classic Three-Column Options.html",
+          "createdAt": "2026-07-14T16:46:53.663Z",
+          "status": "approved"
+        }
+      ]
+    }
+  },
+  "createdAt": "2026-07-14T15:53:06.920Z",
+  "updatedAt": "2026-07-14T16:49:05.147Z"
+}

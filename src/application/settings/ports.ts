@@ -53,6 +53,7 @@ export interface HistorySettings {
   autoCleanupEnabled: boolean;
   retentionDays: number;
   maximumRecords: number;
+  maximumFavorites: number;
 }
 
 export interface SettingsSnapshot {

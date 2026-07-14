@@ -4,6 +4,7 @@ use crate::application::screenshot_favorites::{
     ScreenshotFavoriteCapture, ScreenshotFavoriteCaptureRenderer, ScreenshotFavoriteChangeNotifier,
     ScreenshotFavorites,
 };
+use crate::application::settings::SettingsConfiguration;
 use crate::application::CaptureSessionRuntime;
 use crate::domain::capture::{AnnotationCommand, CaptureSessionId, LogicalRect};
 use crate::infrastructure::storage::{
@@ -49,14 +50,16 @@ pub(crate) fn build_screenshot_favorites(
     asset_root: std::path::PathBuf,
     capture_runtime: Arc<CaptureSessionRuntime>,
     capture_output: Arc<CaptureOutput>,
+    settings: Arc<SettingsConfiguration>,
     app: AppHandle,
 ) -> (Arc<ScreenshotFavorites>, Arc<ScreenshotFavoriteCapture>) {
-    let favorites = Arc::new(ScreenshotFavorites::with_change_notifier(
+    let favorites = Arc::new(ScreenshotFavorites::with_change_notifier_and_policy(
         Arc::new(SqliteScreenshotFavoriteRepository::new(database)),
         Arc::new(FilesystemScreenshotFavoriteAssets::new(asset_root)),
         Arc::new(CaptureOutputScreenshotClipboard::new(capture_output)),
         Arc::new(SystemScreenshotFavoriteHost),
         Arc::new(TauriScreenshotFavoriteChangeNotifier { app }),
+        settings,
     ));
     let capture = Arc::new(ScreenshotFavoriteCapture::new(
         favorites.clone(),

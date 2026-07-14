@@ -18,6 +18,7 @@ export function AdvancedPage() {
     autoCleanupEnabled: false,
     retentionDays: 30,
     maximumRecords: 5000,
+    maximumFavorites: 1000,
   };
 
   return (
@@ -185,6 +186,22 @@ export function AdvancedPage() {
             step={100}
           />
           <p className="text-sm text-gray-500 mt-2">收藏记录不计入自动清理上限</p>
+        </div>
+
+        <div className="pt-6 border-t border-gray-100">
+          <label className="block font-medium text-gray-700 mb-2">收藏夹容量</label>
+          <CustomNumberInput
+            value={historyPolicy.maximumFavorites}
+            onChange={(maximumFavorites) =>
+              void updateHistorySettings({ ...historyPolicy, maximumFavorites })
+            }
+            min={100}
+            max={100000}
+            step={100}
+          />
+          <p className="text-sm text-gray-500 mt-2">
+            达到上限后停止新增收藏，不会自动删除已收藏内容
+          </p>
         </div>
 
         {/* 清除数据 */}

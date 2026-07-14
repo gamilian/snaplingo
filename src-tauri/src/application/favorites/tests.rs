@@ -91,11 +91,29 @@ impl FavoriteRepository for FakeRepository {
     async fn list_tags(&self, _kind: FavoriteKind) -> Result<Vec<String>> {
         Ok(Vec::new())
     }
+
+    async fn count_all(&self) -> Result<usize> {
+        Ok(self.records.lock().unwrap().len())
+    }
 }
 
 #[derive(Default)]
 struct FakeAssets {
     files: Mutex<HashMap<String, Vec<u8>>>,
+}
+
+struct FakePolicy(u32);
+
+impl FavoritePolicyProvider for FakePolicy {
+    fn maximum_favorites(&self) -> Result<u32> {
+        Ok(self.0)
+    }
+}
+
+struct FakeNotifier;
+
+impl FavoriteChangeNotifier for FakeNotifier {
+    fn favorites_changed(&self) {}
 }
 
 impl FavoriteAssetStore for FakeAssets {
@@ -156,6 +174,57 @@ async fn translation_favorite_is_an_independent_snapshot_and_is_deduplicated() {
 
     assert_eq!(first.id, duplicate.id);
     assert_eq!(first.source_history_id, Some(41));
+    assert_eq!(repository.records.lock().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn capacity_rejects_new_favorites_but_keeps_duplicate_adds_idempotent() {
+    let repository = Arc::new(FakeRepository::default());
+    let favorites = Favorites::with_notifier_and_policy(
+        repository.clone(),
+        Arc::new(FakeAssets::default()),
+        Arc::new(FakeNotifier),
+        Arc::new(FakePolicy(1)),
+    );
+    let request = TranslationRequest {
+        text: "hello".to_string(),
+        source_lang: "en".to_string(),
+        target_lang: "zh-CN".to_string(),
+    };
+    let result = TranslationResult {
+        provider_id: "google".to_string(),
+        translated_text: "你好".to_string(),
+        detected_language: Some("en".to_string()),
+        confidence: None,
+    };
+
+    favorites
+        .add_translation(None, request.clone(), result.clone())
+        .await
+        .unwrap();
+    favorites
+        .add_translation(None, request, result)
+        .await
+        .unwrap();
+    let error = favorites
+        .add_translation(
+            None,
+            TranslationRequest {
+                text: "goodbye".to_string(),
+                source_lang: "en".to_string(),
+                target_lang: "zh-CN".to_string(),
+            },
+            TranslationResult {
+                provider_id: "google".to_string(),
+                translated_text: "再见".to_string(),
+                detected_language: Some("en".to_string()),
+                confidence: None,
+            },
+        )
+        .await
+        .unwrap_err();
+
+    assert!(error.to_string().contains("收藏夹容量已满"));
     assert_eq!(repository.records.lock().unwrap().len(), 1);
 }
 

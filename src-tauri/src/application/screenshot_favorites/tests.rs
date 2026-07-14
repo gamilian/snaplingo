@@ -73,6 +73,10 @@ impl ScreenshotFavoriteRepository for FakeRepository {
             .retain(|record| record.id != id);
         Ok(())
     }
+
+    async fn count_all(&self) -> Result<usize> {
+        Ok(self.records.lock().unwrap().len())
+    }
 }
 
 #[derive(Default)]
@@ -126,12 +130,60 @@ impl ScreenshotFavoriteHost for FakeHost {
     }
 }
 
+struct FakePolicy(u32);
+
+impl FavoritePolicyProvider for FakePolicy {
+    fn maximum_favorites(&self) -> Result<u32> {
+        Ok(self.0)
+    }
+}
+
+struct FakeNotifier;
+
+impl ScreenshotFavoriteChangeNotifier for FakeNotifier {
+    fn screenshot_favorites_changed(&self) {}
+}
+
 fn service(
     repository: Arc<FakeRepository>,
     assets: Arc<FakeAssets>,
     clipboard: Arc<FakeClipboard>,
 ) -> ScreenshotFavorites {
     ScreenshotFavorites::new(repository, assets, clipboard, Arc::new(FakeHost))
+}
+
+#[tokio::test]
+async fn full_capacity_rejects_a_screenshot_before_writing_assets() {
+    let repository = Arc::new(FakeRepository::default());
+    repository
+        .records
+        .lock()
+        .unwrap()
+        .push(ScreenshotFavoriteRecord {
+            id: 1,
+            content_kind: "screenshot".to_string(),
+            created_at: Utc::now(),
+            asset_path: "existing.png".to_string(),
+            thumbnail_path: "existing-thumb.png".to_string(),
+            width: 100,
+            height: 50,
+            note: None,
+            tags: vec![],
+        });
+    let assets = Arc::new(FakeAssets::default());
+    let favorites = ScreenshotFavorites::with_change_notifier_and_policy(
+        repository,
+        assets.clone(),
+        Arc::new(FakeClipboard::default()),
+        Arc::new(FakeHost),
+        Arc::new(FakeNotifier),
+        Arc::new(FakePolicy(1)),
+    );
+
+    let error = favorites.add_png(&[1, 2, 3]).await.unwrap_err();
+
+    assert!(error.to_string().contains("收藏夹容量已满"));
+    assert!(assets.files.lock().unwrap().is_empty());
 }
 
 #[tokio::test]

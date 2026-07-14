@@ -43,6 +43,7 @@ const backendSnapshot = {
     autoCleanupEnabled: false,
     retentionDays: 30,
     maximumRecords: 5000,
+    maximumFavorites: 1000,
   },
 };
 

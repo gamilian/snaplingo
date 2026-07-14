@@ -51,6 +51,7 @@ interface BackendHistorySettings {
   auto_cleanup_enabled: boolean;
   retention_days: number;
   maximum_records: number;
+  maximum_favorites: number;
 }
 
 interface BackendSettingsSnapshot {
@@ -147,6 +148,7 @@ function normalizeSnapshot(snapshot: BackendSettingsSnapshot) {
       autoCleanupEnabled: snapshot.history.auto_cleanup_enabled,
       retentionDays: snapshot.history.retention_days,
       maximumRecords: snapshot.history.maximum_records,
+      maximumFavorites: snapshot.history.maximum_favorites,
     },
   };
 }
@@ -237,6 +239,7 @@ export async function updateHistorySettings(input: {
   autoCleanupEnabled: boolean;
   retentionDays: number;
   maximumRecords: number;
+  maximumFavorites: number;
 }) {
   return normalizeSnapshot(
     await invoke<BackendSettingsSnapshot>('update_history_settings', {
@@ -244,6 +247,7 @@ export async function updateHistorySettings(input: {
         auto_cleanup_enabled: input.autoCleanupEnabled,
         retention_days: input.retentionDays,
         maximum_records: input.maximumRecords,
+        maximum_favorites: input.maximumFavorites,
       },
     }),
   );

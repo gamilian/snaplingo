@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use crate::application::capture::configured_capture_save_dir;
+use crate::application::favorites::FavoritePolicyProvider;
 use crate::application::history::{HistoryCleanupPolicy, HistoryPolicyProvider};
 use crate::application::settings::SettingsStore;
 use crate::domain::{
@@ -26,6 +27,12 @@ impl HistoryPolicyProvider for SettingsConfiguration {
             retention_days: settings.retention_days,
             maximum_records: settings.maximum_records,
         })
+    }
+}
+
+impl FavoritePolicyProvider for SettingsConfiguration {
+    fn maximum_favorites(&self) -> Result<u32> {
+        Ok(self.snapshot()?.history.maximum_favorites)
     }
 }
 
@@ -157,6 +164,7 @@ impl SettingsConfiguration {
         }
         snapshot.history.retention_days = snapshot.history.retention_days.clamp(1, 3650);
         snapshot.history.maximum_records = snapshot.history.maximum_records.clamp(100, 100_000);
+        snapshot.history.maximum_favorites = snapshot.history.maximum_favorites.clamp(100, 100_000);
         snapshot.ocr.recognition_language = snapshot.ocr.recognition_language.trim().to_string();
         if snapshot.ocr.recognition_language.is_empty() {
             snapshot.ocr.recognition_language = "auto".to_string();
@@ -199,7 +207,9 @@ mod settings_configuration_tests {
     use tempfile::tempdir;
 
     use super::{SettingsChangeNotifier, SettingsConfiguration};
-    use crate::domain::{GeneralSettings, OcrSettings, ScreenshotSettings, TranslationSettings};
+    use crate::domain::{
+        GeneralSettings, HistorySettings, OcrSettings, ScreenshotSettings, TranslationSettings,
+    };
     use crate::infrastructure::storage::SqliteConfigStore;
 
     struct CountingNotifier(AtomicUsize);
@@ -329,6 +339,23 @@ mod settings_configuration_tests {
     }
 
     #[test]
+    fn library_capacities_are_normalized_before_persisting() {
+        let store = Arc::new(SqliteConfigStore::new_in_memory());
+        let configuration = SettingsConfiguration::new(store);
+
+        let updated = configuration
+            .update_history(HistorySettings {
+                maximum_records: 200_000,
+                maximum_favorites: 1,
+                ..HistorySettings::default()
+            })
+            .unwrap();
+
+        assert_eq!(updated.history.maximum_records, 100_000);
+        assert_eq!(updated.history.maximum_favorites, 100);
+    }
+
+    #[test]
     fn successful_settings_updates_notify_runtime_observers() {
         let store = Arc::new(SqliteConfigStore::new_in_memory());
         let notifier = Arc::new(CountingNotifier(AtomicUsize::new(0)));
@@ -347,7 +374,10 @@ mod settings_configuration_tests {
             .update_translation(TranslationSettings::default())
             .unwrap();
         configuration.update_ocr(OcrSettings::default()).unwrap();
+        configuration
+            .update_history(HistorySettings::default())
+            .unwrap();
 
-        assert_eq!(notifier.0.load(Ordering::SeqCst), 5);
+        assert_eq!(notifier.0.load(Ordering::SeqCst), 6);
     }
 }

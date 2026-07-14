@@ -106,6 +106,11 @@ pub trait FavoriteRepository: Send + Sync {
         -> Result<()>;
     async fn delete(&self, id: i64) -> Result<()>;
     async fn list_tags(&self, kind: FavoriteKind) -> Result<Vec<String>>;
+    async fn count_all(&self) -> Result<usize>;
+}
+
+pub trait FavoritePolicyProvider: Send + Sync {
+    fn maximum_favorites(&self) -> Result<u32>;
 }
 
 pub trait FavoriteAssetStore: Send + Sync {
@@ -122,6 +127,7 @@ pub struct Favorites {
     repository: Arc<dyn FavoriteRepository>,
     assets: Arc<dyn FavoriteAssetStore>,
     notifier: Option<Arc<dyn FavoriteChangeNotifier>>,
+    policy_provider: Option<Arc<dyn FavoritePolicyProvider>>,
 }
 
 impl Favorites {
@@ -133,6 +139,7 @@ impl Favorites {
             repository,
             assets,
             notifier: None,
+            policy_provider: None,
         }
     }
 
@@ -145,6 +152,21 @@ impl Favorites {
             repository,
             assets,
             notifier: Some(notifier),
+            policy_provider: None,
+        }
+    }
+
+    pub fn with_notifier_and_policy(
+        repository: Arc<dyn FavoriteRepository>,
+        assets: Arc<dyn FavoriteAssetStore>,
+        notifier: Arc<dyn FavoriteChangeNotifier>,
+        policy_provider: Arc<dyn FavoritePolicyProvider>,
+    ) -> Self {
+        Self {
+            repository,
+            assets,
+            notifier: Some(notifier),
+            policy_provider: Some(policy_provider),
         }
     }
 
@@ -184,6 +206,7 @@ impl Favorites {
         if let Some(record) = self.repository.find_by_fingerprint(&fingerprint).await? {
             return self.hydrate(record);
         }
+        self.ensure_capacity().await?;
 
         let stored = if image_data.is_empty() {
             None
@@ -284,12 +307,26 @@ impl Favorites {
         if let Some(record) = self.repository.find_by_fingerprint(&fingerprint).await? {
             return Ok(record);
         }
+        self.ensure_capacity().await?;
         let record = self
             .repository
             .insert(&fingerprint, source_history_id, &content, Utc::now())
             .await?;
         self.notify();
         Ok(record)
+    }
+
+    async fn ensure_capacity(&self) -> Result<()> {
+        let Some(provider) = &self.policy_provider else {
+            return Ok(());
+        };
+        let maximum = provider.maximum_favorites()? as usize;
+        if maximum > 0 && self.repository.count_all().await? >= maximum {
+            return Err(
+                format!("收藏夹容量已满（最多 {maximum} 项），请先删除不需要的收藏").into(),
+            );
+        }
+        Ok(())
     }
 
     fn hydrate(&self, mut record: FavoriteRecord) -> Result<FavoriteRecord> {

@@ -7,12 +7,12 @@ describe('settings navigation state', () => {
   it('keeps a valid persisted secondary key active', () => {
     const state = createSettingsNavigationState(
       findSettingsSection('translation'),
-      secondaryKeys({ translation: 'history' }),
+      secondaryKeys({ translation: 'translation-settings' }),
       noopSetters(),
     );
 
-    expect(state.activeKey).toBe('history');
-    expect(state.activeItem?.key).toBe('history');
+    expect(state.activeKey).toBe('translation-settings');
+    expect(state.activeItem?.key).toBe('translation-settings');
   });
 
   it('falls back to the first secondary key when persisted state is stale', () => {

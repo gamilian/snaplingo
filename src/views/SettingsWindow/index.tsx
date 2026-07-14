@@ -46,6 +46,9 @@ function SettingsSectionContent({ section }: { section: SettingsSection }) {
   const setServicesSubTab = useSettingsStore((state) => state.setServicesSubTab);
 
   if (!('secondary' in section)) {
+    if (section.key === 'favorites' || section.key === 'history') {
+      return section.render();
+    }
     return <ContentFrame>{section.render()}</ContentFrame>;
   }
 

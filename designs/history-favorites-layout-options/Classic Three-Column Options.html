@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
+    <title>SnapLingo · 经典三栏方案</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Noto Sans SC", sans-serif;
+        --blue: #2563eb;
+        --blue-soft: #eff6ff;
+        --ink: #111827;
+        --muted: #6b7280;
+        --line: #e5e7eb;
+        --surface: #ffffff;
+        --canvas: #f5f5f7;
+        --nav-width: 216px;
+        --list-width: 382px;
+        --radius: 12px;
+        --row-height: 94px;
+        --detail-pad: 34px;
+      }
+
+      * { box-sizing: border-box; }
+      html, body { width: 100%; min-width: 1120px; height: 100%; margin: 0; overflow: hidden; }
+      body { background: #e8e9ed; color: var(--ink); }
+      button, input { font: inherit; }
+      button { color: inherit; }
+
+      .prototype-shell {
+        display: grid;
+        grid-template-rows: 68px minmax(0, 1fr);
+        width: 100vw;
+        height: 100vh;
+      }
+
+      .variant-bar {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        padding: 10px 18px;
+        border-bottom: 1px solid #d5d7dc;
+        background: rgba(247, 247, 249, 0.96);
+      }
+
+      .variant-heading { min-width: 270px; }
+      .variant-heading strong { display: block; font-size: 14px; letter-spacing: -0.01em; }
+      .variant-heading span { display: block; margin-top: 3px; color: #7b7f88; font-size: 11px; }
+
+      .variant-switcher {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(155px, 1fr));
+        gap: 8px;
+        flex: 1;
+      }
+
+      .variant-button {
+        display: grid;
+        grid-template-columns: 28px 1fr;
+        gap: 8px;
+        align-items: center;
+        min-height: 46px;
+        padding: 7px 10px;
+        border: 1px solid #dfe1e6;
+        border-radius: 10px;
+        background: #fff;
+        text-align: left;
+        cursor: pointer;
+        transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+      }
+
+      .variant-button:hover { transform: translateY(-1px); border-color: #b8c5db; }
+      .variant-button.active { border-color: #7aa2f7; box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.10); }
+      .variant-index {
+        display: grid;
+        width: 28px;
+        height: 28px;
+        place-items: center;
+        border-radius: 8px;
+        background: #f0f1f4;
+        color: #626771;
+        font-size: 11px;
+        font-weight: 750;
+      }
+      .variant-button.active .variant-index { background: var(--blue); color: #fff; }
+      .variant-copy strong { display: block; font-size: 12px; }
+      .variant-copy span { display: block; margin-top: 2px; color: #8a8e96; font-size: 10px; }
+
+      .app-window {
+        display: grid;
+        grid-template-columns: var(--nav-width) var(--list-width) minmax(0, 1fr);
+        min-height: 0;
+        margin: 0 10px 10px;
+        overflow: hidden;
+        border: 1px solid rgba(20, 25, 35, 0.10);
+        border-radius: 16px;
+        background: var(--surface);
+        box-shadow: 0 20px 55px rgba(24, 29, 38, 0.12);
+      }
+
+      .primary-nav {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        padding: 22px 14px 16px;
+        border-right: 1px solid var(--line);
+        background: var(--surface);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        height: 42px;
+        padding: 0 10px 18px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 32px;
+        height: 32px;
+        flex: 0 0 auto;
+        place-items: center;
+        border-radius: 10px;
+        background: #2f6feb;
+        color: #fff;
+        font-size: 16px;
+        font-weight: 850;
+      }
+      .brand-name { font-size: 15px; font-weight: 760; letter-spacing: -0.02em; }
+
+      .nav-group { display: grid; gap: 5px; margin-top: 20px; }
+      .nav-label { padding: 0 11px 6px; color: #a0a4ad; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; }
+      .nav-button {
+        display: grid;
+        grid-template-columns: 28px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        min-height: 42px;
+        padding: 6px 9px;
+        border: 0;
+        border-radius: 9px;
+        background: transparent;
+        color: #59606b;
+        text-align: left;
+        cursor: pointer;
+      }
+      .nav-button:hover { background: #f4f5f7; color: #252a32; }
+      .nav-button.active { background: #eef2f8; color: #151922; font-weight: 700; }
+      .nav-icon {
+        display: grid;
+        width: 28px;
+        height: 28px;
+        place-items: center;
+        border-radius: 8px;
+        background: #eff0f2;
+        color: #737984;
+        font-size: 13px;
+        font-weight: 800;
+      }
+      .nav-button.active .nav-icon { background: #dbe8ff; color: #245fc9; }
+      .nav-text { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+      .nav-count { color: #a0a4ad; font-size: 10px; font-variant-numeric: tabular-nums; }
+
+      .storage-card {
+        display: grid;
+        gap: 10px;
+        margin-top: auto;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 11px;
+        background: #fafafa;
+      }
+      .storage-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      .storage-head strong { font-size: 11px; }
+      .storage-head button { border: 0; background: transparent; color: var(--blue); font-size: 11px; cursor: pointer; }
+      .storage-meter { display: grid; gap: 6px; }
+      .storage-row { display: grid; grid-template-columns: 42px 1fr auto; align-items: center; gap: 7px; color: #7a808a; font-size: 10px; }
+      .meter-track { height: 4px; overflow: hidden; border-radius: 999px; background: #e5e7eb; }
+      .meter-fill { height: 100%; border-radius: inherit; background: #6b95eb; }
+
+      .record-list-pane {
+        display: flex;
+        min-width: 0;
+        min-height: 0;
+        flex-direction: column;
+        border-right: 1px solid var(--line);
+        background: #fbfbfc;
+      }
+
+      .list-header { display: grid; gap: 12px; padding: 19px 18px 14px; border-bottom: 1px solid var(--line); background: var(--surface); }
+      .title-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+      .title-row h1 { margin: 0; font-size: 20px; letter-spacing: -0.035em; }
+      .title-row span { color: #989da6; font-size: 11px; }
+
+      .search-box { position: relative; }
+      .search-box::before { content: "⌕"; position: absolute; left: 11px; top: 7px; color: #9ba0a9; font-size: 16px; }
+      .search-box input {
+        width: 100%;
+        height: 34px;
+        padding: 0 11px 0 32px;
+        border: 1px solid #e1e3e8;
+        border-radius: 8px;
+        outline: none;
+        background: #f7f7f9;
+        color: #30343b;
+        font-size: 12px;
+      }
+      .search-box input:focus { border-color: #8db0f5; background: #fff; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08); }
+
+      .type-filter { display: flex; gap: 5px; overflow-x: auto; }
+      .filter-button {
+        flex: 0 0 auto;
+        height: 28px;
+        padding: 0 10px;
+        border: 1px solid #e2e4e8;
+        border-radius: 7px;
+        background: #fff;
+        color: #747a84;
+        font-size: 11px;
+        cursor: pointer;
+      }
+      .filter-button.active { border-color: #c7d9fb; background: var(--blue-soft); color: #245fc9; font-weight: 700; }
+
+      .record-list { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; }
+      .record-item {
+        display: grid;
+        min-height: var(--row-height);
+        align-content: center;
+        gap: 6px;
+        width: 100%;
+        padding: 13px 17px;
+        border: 0;
+        border-bottom: 1px solid var(--line);
+        background: transparent;
+        text-align: left;
+        cursor: pointer;
+      }
+      .record-item:hover { background: #f4f5f7; }
+      .record-item.active { background: #e8e9ec; }
+      .record-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+      .record-kind { display: inline-flex; align-items: center; gap: 5px; color: #6d7480; font-size: 10px; font-weight: 720; }
+      .kind-dot { width: 6px; height: 6px; border-radius: 999px; background: #3b82f6; }
+      .kind-dot.ocr { background: #8b5cf6; }
+      .kind-dot.capture { background: #10b981; }
+      .record-time { color: #aaadb4; font-size: 9px; }
+      .record-title {
+        display: -webkit-box;
+        overflow: hidden;
+        color: #252930;
+        font-size: 13px;
+        font-weight: 650;
+        line-height: 1.42;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+      }
+      .record-preview { overflow: hidden; color: #8b9099; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+
+      .list-footer { display: flex; align-items: center; justify-content: space-between; height: 42px; padding: 0 16px; border-top: 1px solid var(--line); background: var(--surface); color: #90959f; font-size: 10px; }
+      .list-footer button { border: 0; background: transparent; color: #767c86; cursor: pointer; }
+
+      .detail-pane { min-width: 0; min-height: 0; overflow-y: auto; padding: var(--detail-pad); background: var(--canvas); }
+      .detail-shell { max-width: 900px; margin: 0 auto; }
+      .detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 20px; }
+      .detail-date { color: #30343b; font-size: 18px; font-weight: 720; letter-spacing: -0.02em; }
+      .detail-subtitle { margin-top: 5px; color: #9297a0; font-size: 11px; }
+      .detail-actions { display: flex; gap: 6px; }
+      .icon-button {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border: 1px solid transparent;
+        border-radius: 9px;
+        background: transparent;
+        color: #7b818b;
+        font-size: 16px;
+        cursor: pointer;
+      }
+      .icon-button:hover { border-color: #dfe2e7; background: #fff; color: #343942; }
+      .icon-button.favorite { color: #d49b18; }
+
+      .detail-card {
+        margin-bottom: 14px;
+        padding: 19px;
+        border: 1px solid rgba(25, 30, 40, 0.06);
+        border-radius: var(--radius);
+        background: #fff;
+        box-shadow: 0 1px 2px rgba(20, 25, 35, 0.03);
+      }
+      .card-label { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; color: #8d929a; font-size: 10px; font-weight: 750; letter-spacing: 0.05em; text-transform: uppercase; }
+      .detail-text { margin: 0; color: #282c33; font-size: 14px; line-height: 1.75; white-space: pre-wrap; }
+      .inline-actions { display: flex; gap: 5px; margin-top: 14px; }
+      .text-button { height: 28px; padding: 0 9px; border: 1px solid #e2e4e8; border-radius: 7px; background: #fff; color: #717782; font-size: 10px; cursor: pointer; }
+      .text-button:hover { border-color: #bdc7d8; color: #303640; }
+      .language-row { display: flex; align-items: center; gap: 9px; margin: 2px 0 14px; }
+      .language-chip { padding: 8px 12px; border-radius: 8px; background: #fff; color: #50555e; font-size: 11px; font-weight: 650; }
+      .language-arrow { color: #8e949e; }
+      .provider-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 15px; padding-top: 12px; border-top: 1px solid #eff0f2; }
+      .provider-name { display: flex; align-items: center; gap: 8px; color: #555b65; font-size: 11px; font-weight: 700; }
+      .provider-badge { display: grid; width: 20px; height: 20px; place-items: center; border-radius: 6px; background: #edf3ff; color: #2d67cf; font-size: 9px; font-weight: 850; }
+      .thumbnail { display: block; width: 100%; max-height: 250px; object-fit: cover; border-radius: 9px; background: #eef0f3; }
+
+      .empty-state { display: grid; min-height: 460px; place-items: center; color: #979ca5; font-size: 12px; text-align: center; }
+
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        display: none;
+        place-items: center;
+        padding: 20px;
+        background: rgba(18, 23, 32, 0.30);
+        backdrop-filter: blur(3px);
+      }
+      .modal-backdrop.open { display: grid; }
+      .settings-dialog { width: min(440px, 100%); overflow: hidden; border: 1px solid rgba(0, 0, 0, 0.08); border-radius: 16px; background: #fff; box-shadow: 0 24px 70px rgba(20, 25, 35, 0.24); }
+      .dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 20px; border-bottom: 1px solid var(--line); }
+      .dialog-header h2 { margin: 0; font-size: 16px; }
+      .dialog-header button { border: 0; background: transparent; color: #8d929b; cursor: pointer; }
+      .dialog-content { display: grid; gap: 15px; padding: 18px 20px; }
+      .capacity-field { display: grid; grid-template-columns: minmax(0, 1fr) 120px; align-items: center; gap: 18px; }
+      .capacity-copy strong { display: block; font-size: 12px; }
+      .capacity-copy span { display: block; margin-top: 4px; color: #9297a0; font-size: 10px; line-height: 1.5; }
+      .number-control { display: grid; grid-template-columns: 32px 1fr 32px; overflow: hidden; border: 1px solid #dfe2e7; border-radius: 8px; }
+      .number-control button { border: 0; background: #f6f7f8; color: #676d77; cursor: pointer; }
+      .number-control input { min-width: 0; height: 34px; border: 0; outline: none; text-align: center; font-size: 11px; font-variant-numeric: tabular-nums; }
+      .dialog-note { padding: 10px 12px; border-radius: 8px; background: #f7f8fa; color: #7b818a; font-size: 10px; line-height: 1.55; }
+      .dialog-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 20px; border-top: 1px solid var(--line); background: #fafafa; }
+      .dialog-button { height: 34px; padding: 0 14px; border: 1px solid #dfe2e7; border-radius: 8px; background: #fff; font-size: 11px; cursor: pointer; }
+      .dialog-button.primary { border-color: #2563eb; background: #2563eb; color: #fff; }
+
+      .toast { position: fixed; right: 24px; bottom: 24px; z-index: 30; padding: 10px 14px; border-radius: 9px; background: #1f2937; color: #fff; font-size: 11px; opacity: 0; transform: translateY(8px); pointer-events: none; transition: opacity 160ms ease, transform 160ms ease; }
+      .toast.show { opacity: 1; transform: translateY(0); }
+
+      /* B · 紧凑高密度 */
+      body[data-variant="compact"] { --nav-width: 190px; --list-width: 430px; --row-height: 72px; --detail-pad: 28px; --radius: 9px; }
+      body[data-variant="compact"] .primary-nav { padding: 15px 10px 12px; background: #f9fafb; }
+      body[data-variant="compact"] .brand { height: 38px; padding: 0 8px 13px; }
+      body[data-variant="compact"] .nav-group { gap: 2px; margin-top: 13px; }
+      body[data-variant="compact"] .nav-button { min-height: 35px; border-radius: 7px; }
+      body[data-variant="compact"] .nav-icon { width: 24px; height: 24px; border-radius: 6px; font-size: 11px; }
+      body[data-variant="compact"] .record-item { position: relative; gap: 3px; padding: 9px 15px; }
+      body[data-variant="compact"] .record-item.active { background: #f1f6ff; }
+      body[data-variant="compact"] .record-item.active::before { content: ""; position: absolute; inset: 9px auto 9px 0; width: 3px; border-radius: 0 4px 4px 0; background: var(--blue); }
+      body[data-variant="compact"] .record-title { font-size: 12px; -webkit-line-clamp: 1; }
+      body[data-variant="compact"] .detail-card { margin-bottom: 10px; padding: 16px; }
+
+      /* C · 柔和卡片 */
+      body[data-variant="cards"] { --nav-width: 220px; --list-width: 400px; --row-height: 92px; --detail-pad: 30px; --radius: 15px; }
+      body[data-variant="cards"] .primary-nav { background: #f8f9fb; }
+      body[data-variant="cards"] .record-list-pane { background: #f2f4f7; }
+      body[data-variant="cards"] .record-list { display: grid; align-content: start; gap: 8px; padding: 10px; }
+      body[data-variant="cards"] .record-item { border: 1px solid #e6e8ec; border-radius: 11px; background: #fff; box-shadow: 0 1px 2px rgba(20, 25, 35, 0.03); }
+      body[data-variant="cards"] .record-item.active { border-color: #a9c3f5; background: #f8fbff; box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.08); }
+      body[data-variant="cards"] .detail-pane { background: #eef1f5; }
+      body[data-variant="cards"] .detail-card { border-color: transparent; box-shadow: 0 8px 24px rgba(29, 37, 49, 0.06); }
+      body[data-variant="cards"] .language-chip { box-shadow: 0 4px 12px rgba(25, 30, 40, 0.04); }
+
+      /* D · 阅读优先 */
+      body[data-variant="focus"] { --nav-width: 176px; --list-width: 332px; --row-height: 82px; --detail-pad: 42px; --radius: 8px; }
+      body[data-variant="focus"] .brand-name, body[data-variant="focus"] .nav-count { display: none; }
+      body[data-variant="focus"] .brand { justify-content: center; padding-inline: 0; }
+      body[data-variant="focus"] .nav-label { padding-left: 6px; }
+      body[data-variant="focus"] .nav-button { grid-template-columns: 28px minmax(0, 1fr); }
+      body[data-variant="focus"] .nav-button.active { background: #1f2937; color: #fff; }
+      body[data-variant="focus"] .nav-button.active .nav-icon { background: rgba(255, 255, 255, 0.12); color: #fff; }
+      body[data-variant="focus"] .record-preview { display: none; }
+      body[data-variant="focus"] .record-item.active { background: #f1f3f5; }
+      body[data-variant="focus"] .detail-shell { max-width: 760px; }
+      body[data-variant="focus"] .detail-card { border: 0; border-radius: 0; box-shadow: none; }
+      body[data-variant="focus"] .detail-card + .detail-card { border-top: 1px solid var(--line); }
+      body[data-variant="focus"] .detail-pane { background: #fff; }
+      body[data-variant="focus"] .language-chip { border: 1px solid var(--line); }
+
+      @media (max-width: 1250px) {
+        :root { --nav-width: 184px; --list-width: 340px; --detail-pad: 24px; }
+        .variant-heading { display: none; }
+      }
+    </style>
+  </head>
+  <body data-variant="faithful">
+    <main class="prototype-shell" data-screen-label="经典三栏布局方案">
+      <header class="variant-bar">
+        <div class="variant-heading">
+          <strong>历史记录 / 收藏夹 · 经典三栏</strong>
+          <span>四个 UI 方向，共用同一套信息结构与交互</span>
+        </div>
+        <div class="variant-switcher" aria-label="选择设计方案">
+          <button class="variant-button active" data-variant-option="faithful">
+            <span class="variant-index">A</span><span class="variant-copy"><strong>原生工具感</strong><span>最接近参考图</span></span>
+          </button>
+          <button class="variant-button" data-variant-option="compact">
+            <span class="variant-index">B</span><span class="variant-copy"><strong>紧凑高密度</strong><span>一次看到更多记录</span></span>
+          </button>
+          <button class="variant-button" data-variant-option="cards">
+            <span class="variant-index">C</span><span class="variant-copy"><strong>柔和卡片</strong><span>层次清晰、现代</span></span>
+          </button>
+          <button class="variant-button" data-variant-option="focus">
+            <span class="variant-index">D</span><span class="variant-copy"><strong>阅读优先</strong><span>给右侧详情更多空间</span></span>
+          </button>
+        </div>
+      </header>
+
+      <section class="app-window">
+        <aside class="primary-nav">
+          <div class="brand"><span class="brand-mark">S</span><span class="brand-name">SnapLingo</span></div>
+          <div class="nav-group">
+            <div class="nav-label">设置</div>
+            <button class="nav-button"><span class="nav-icon">通</span><span class="nav-text">通用</span></button>
+            <button class="nav-button"><span class="nav-icon">▣</span><span class="nav-text">截图</span></button>
+            <button class="nav-button"><span class="nav-icon">译</span><span class="nav-text">翻译</span></button>
+            <button class="nav-button"><span class="nav-icon">识</span><span class="nav-text">OCR</span></button>
+            <button class="nav-button"><span class="nav-icon">服</span><span class="nav-text">服务</span></button>
+            <button class="nav-button"><span class="nav-icon">高</span><span class="nav-text">高级</span></button>
+          </div>
+          <div class="nav-group">
+            <div class="nav-label">资料库</div>
+            <button class="nav-button" data-view="favorites"><span class="nav-icon">★</span><span class="nav-text">收藏夹</span><span class="nav-count" id="favoriteNavCount">28</span></button>
+            <button class="nav-button active" data-view="history"><span class="nav-icon">◷</span><span class="nav-text">历史记录</span><span class="nav-count" id="historyNavCount">56</span></button>
+          </div>
+          <div class="storage-card">
+            <div class="storage-head"><strong>容量</strong><button id="openCapacity">设置</button></div>
+            <div class="storage-meter">
+              <div class="storage-row"><span>历史</span><span class="meter-track"><span class="meter-fill" style="width: 5.6%"></span></span><span id="historyCapacityLabel">56 / 1000</span></div>
+              <div class="storage-row"><span>收藏</span><span class="meter-track"><span class="meter-fill" style="width: 2.8%"></span></span><span id="favoriteCapacityLabel">28 / 1000</span></div>
+            </div>
+          </div>
+        </aside>
+
+        <section class="record-list-pane">
+          <header class="list-header">
+            <div class="title-row"><h1 id="listTitle">历史记录</h1><span id="listCount">56 项</span></div>
+            <label class="search-box"><input id="searchInput" type="search" placeholder="搜索历史记录" /></label>
+            <div class="type-filter" id="typeFilter"></div>
+          </header>
+          <div class="record-list" id="recordList"></div>
+          <footer class="list-footer"><span id="footerCount">显示 8 / 56</span><button id="clearRecords">清空记录</button></footer>
+        </section>
+
+        <article class="detail-pane" id="detailPane"></article>
+      </section>
+    </main>
+
+    <div class="modal-backdrop" id="capacityModal" role="dialog" aria-modal="true" aria-labelledby="capacityTitle">
+      <section class="settings-dialog">
+        <header class="dialog-header"><h2 id="capacityTitle">资料库容量</h2><button id="closeCapacity" aria-label="关闭">×</button></header>
+        <div class="dialog-content">
+          <div class="capacity-field">
+            <div class="capacity-copy"><strong>历史记录容量</strong><span>超过上限后自动删除最早的非收藏记录</span></div>
+            <div class="number-control"><button data-step="history" data-delta="-100">−</button><input id="historyCapacity" value="1000" inputmode="numeric" /><button data-step="history" data-delta="100">+</button></div>
+          </div>
+          <div class="capacity-field">
+            <div class="capacity-copy"><strong>收藏夹容量</strong><span>超过上限后停止新增，并提示先整理收藏</span></div>
+            <div class="number-control"><button data-step="favorite" data-delta="-100">−</button><input id="favoriteCapacity" value="1000" inputmode="numeric" /><button data-step="favorite" data-delta="100">+</button></div>
+          </div>
+          <div class="dialog-note">建议收藏夹不要自动淘汰，避免用户保存的重要内容在无感知的情况下消失；容量不足时阻止新增更安全。</div>
+        </div>
+        <footer class="dialog-footer"><button class="dialog-button" id="cancelCapacity">取消</button><button class="dialog-button primary" id="saveCapacity">保存设置</button></footer>
+      </section>
+    </div>
+    <div class="toast" id="toast">已保存容量设置</div>
+
+    <script>
+      const records = {
+        history: [
+          { id: "h1", kind: "translation", kindLabel: "翻译", time: "刚刚", title: "Extension session metadata updates", preview: "扩展会话元数据更新 · DeepL X", date: "2026 年 07 月 14 日 23:41", source: "Extension session metadata updates — Extensions can observe session name changes through session_info_changed.\n\nModern Azure Foundry endpoint support — Azure OpenAI Responses provider setup supports current Microsoft Foundry endpoint URLs.", target: "扩展会话元数据更新——扩展可以通过 session_info_changed 观察会话名称变化。\n\n现代 Azure Foundry 端点支持——Azure OpenAI Responses 提供程序设置支持当前的 Microsoft Foundry 端点 URL。", provider: "DeepL X", lang: "英语 → 中文简体" },
+          { id: "h2", kind: "ocr", kindLabel: "OCR", time: "3 分钟前", title: "54 个测试文件、412 个测试全部通过", preview: "系统 OCR · 中文简体", date: "2026 年 07 月 14 日 23:38", source: "54 个测试文件、412 个测试全部通过。构建用时 4.35 秒。", target: "", provider: "系统 OCR", lang: "中文简体" },
+          { id: "h3", kind: "translation", kindLabel: "翻译", time: "18 分钟前", title: "Anthropic Claude Sonnet 5 support", preview: "Claude Sonnet 5 is now available…", date: "2026 年 07 月 14 日 23:23", source: "Anthropic Claude Sonnet 5 support is now available for custom providers.", target: "自定义提供商现已支持 Anthropic Claude Sonnet 5。", provider: "Google 翻译", lang: "英语 → 中文简体" },
+          { id: "h4", kind: "ocr", kindLabel: "OCR", time: "42 分钟前", title: "截图结束后会注销这些快捷键", preview: "避免影响其他窗口", date: "2026 年 07 月 14 日 22:59", source: "截图结束后会注销这些快捷键，避免影响其他窗口。", target: "", provider: "系统 OCR", lang: "中文简体" },
+          { id: "h5", kind: "translation", kindLabel: "翻译", time: "1 小时前", title: "Added inherited model support", preview: "OpenAI compatible provider", date: "2026 年 07 月 14 日 22:31", source: "Added inherited model support for OpenAI-compatible providers.", target: "为 OpenAI 兼容提供商增加了继承模型支持。", provider: "DeepL X", lang: "英语 → 中文简体" },
+          { id: "h6", kind: "ocr", kindLabel: "OCR", time: "昨天", title: "问题点找到了，右侧是特殊值", preview: "识别置信度 98%", date: "2026 年 07 月 13 日 20:16", source: "问题点找到了，右侧现在确实是特殊值：内容容器左边是 10px。", target: "", provider: "系统 OCR", lang: "中文简体" },
+          { id: "h7", kind: "translation", kindLabel: "翻译", time: "昨天", title: "Result window scroll container", preview: "Layout and source text mirror", date: "2026 年 07 月 13 日 18:42", source: "The result window now uses a single scroll container.", target: "结果窗口现在使用单一滚动容器。", provider: "Google 翻译", lang: "英语 → 中文简体" },
+          { id: "h8", kind: "ocr", kindLabel: "OCR", time: "2 天前", title: "已按 Bob 的方向处理了", preview: "保留左上固定窗口按钮", date: "2026 年 07 月 12 日 15:27", source: "已按 Bob 的方向处理了：保留左上固定窗口按钮。", target: "", provider: "系统 OCR", lang: "中文简体" }
+        ],
+        favorites: [
+          { id: "f1", kind: "translation", kindLabel: "翻译", time: "今天", title: "Extension session metadata updates", preview: "DeepL X · 英语 → 中文简体", date: "收藏于 2026 年 07 月 14 日", source: "Extension session metadata updates — Extensions can observe session name changes through session_info_changed.", target: "扩展会话元数据更新——扩展可以通过 session_info_changed 观察会话名称变化。", provider: "DeepL X", lang: "英语 → 中文简体" },
+          { id: "f2", kind: "ocr", kindLabel: "OCR", time: "今天", title: "54 个测试文件、412 个测试全部通过", preview: "标签：测试、发布", date: "收藏于 2026 年 07 月 14 日", source: "54 个测试文件、412 个测试全部通过。", target: "", provider: "系统 OCR", lang: "中文简体" },
+          { id: "f3", kind: "capture", kindLabel: "截图", time: "昨天", title: "结果窗口布局参考", preview: "1440 × 900 · 标签：设计", date: "收藏于 2026 年 07 月 13 日", source: "", target: "", provider: "截图收藏", lang: "1440 × 900" },
+          { id: "f4", kind: "translation", kindLabel: "翻译", time: "3 天前", title: "Modern Azure Foundry endpoint support", preview: "Google 翻译", date: "收藏于 2026 年 07 月 11 日", source: "Modern Azure Foundry endpoint support.", target: "支持现代 Azure Foundry 端点。", provider: "Google 翻译", lang: "英语 → 中文简体" }
+        ]
+      };
+
+      const state = { variant: "faithful", view: "history", filter: "all", selectedId: "h1", historyCapacity: 1000, favoriteCapacity: 1000 };
+      const variantLabels = { faithful: "A · 原生工具感", compact: "B · 紧凑高密度", cards: "C · 柔和卡片", focus: "D · 阅读优先" };
+      const filterLabels = { all: "全部", translation: "翻译", ocr: "OCR", capture: "截图" };
+
+      function visibleRecords() {
+        const query = document.getElementById("searchInput").value.trim().toLowerCase();
+        return records[state.view].filter((item) => {
+          const typeMatches = state.filter === "all" || item.kind === state.filter;
+          const queryMatches = !query || `${item.title} ${item.preview} ${item.source} ${item.target}`.toLowerCase().includes(query);
+          return typeMatches && queryMatches;
+        });
+      }
+
+      function ensureSelection(items) {
+        if (!items.some((item) => item.id === state.selectedId)) state.selectedId = items[0]?.id ?? null;
+      }
+
+      function renderFilters() {
+        const filters = state.view === "history" ? ["all", "translation", "ocr"] : ["all", "translation", "ocr", "capture"];
+        const root = document.getElementById("typeFilter");
+        root.innerHTML = filters.map((filter) => `<button class="filter-button ${state.filter === filter ? "active" : ""}" data-filter="${filter}">${filterLabels[filter]}</button>`).join("");
+        root.querySelectorAll("[data-filter]").forEach((button) => button.addEventListener("click", () => { state.filter = button.dataset.filter; renderAll(); }));
+      }
+
+      function renderList() {
+        const items = visibleRecords();
+        ensureSelection(items);
+        document.getElementById("recordList").innerHTML = items.length ? items.map((item) => `
+          <button class="record-item ${item.id === state.selectedId ? "active" : ""}" data-record-id="${item.id}">
+            <span class="record-meta"><span class="record-kind"><span class="kind-dot ${item.kind}"></span>${item.kindLabel}</span><span class="record-time">${item.time}</span></span>
+            <span class="record-title">${item.title}</span>
+            <span class="record-preview">${item.preview}</span>
+          </button>`).join("") : `<div class="empty-state"><div>没有匹配的${state.view === "history" ? "历史记录" : "收藏"}</div></div>`;
+        document.querySelectorAll("[data-record-id]").forEach((button) => button.addEventListener("click", () => { state.selectedId = button.dataset.recordId; renderAll(); }));
+        document.getElementById("footerCount").textContent = `显示 ${items.length} / ${state.view === "history" ? 56 : 28}`;
+      }
+
+      function renderDetail() {
+        const item = records[state.view].find((record) => record.id === state.selectedId);
+        const root = document.getElementById("detailPane");
+        if (!item) { root.innerHTML = `<div class="empty-state">选择一条记录查看详情</div>`; return; }
+        const isFavorite = state.view === "favorites";
+        const captureDetail = item.kind === "capture" ? `
+          <div class="detail-card">
+            <div class="card-label"><span>截图预览</span><span>${item.lang}</span></div>
+            <div class="thumbnail" style="height: 220px; display:grid; place-items:center; background:linear-gradient(135deg,#e9edf5,#f8fafc)"><div style="color:#768196;font-size:12px">结果窗口布局参考图</div></div>
+            <div class="inline-actions"><button class="text-button">复制图片</button><button class="text-button">显示文件</button></div>
+          </div>` : `
+          <div class="detail-card">
+            <div class="card-label"><span>${item.kind === "ocr" ? "识别文本" : "原文"}</span><span>${item.source.length} chars</span></div>
+            <p class="detail-text">${item.source}</p>
+            <div class="inline-actions"><button class="text-button">朗读</button><button class="text-button">复制</button></div>
+          </div>
+          ${item.target ? `<div class="language-row"><span class="language-chip">英语</span><span class="language-arrow">→</span><span class="language-chip">中文简体</span></div><div class="detail-card"><div class="card-label"><span>译文</span><span>${item.provider}</span></div><p class="detail-text">${item.target}</p><div class="provider-row"><div class="inline-actions" style="margin:0"><button class="text-button">朗读</button><button class="text-button">复制</button></div><span class="provider-name"><span class="provider-badge">${item.provider.slice(0,1)}</span>${item.provider}</span></div></div>` : ""}`;
+        root.innerHTML = `<div class="detail-shell">
+          <header class="detail-header"><div><div class="detail-date">${item.date}</div><div class="detail-subtitle">${item.kindLabel} · ${item.lang}</div></div><div class="detail-actions"><button class="icon-button" title="删除">⌫</button><button class="icon-button ${isFavorite ? "favorite" : ""}" title="${isFavorite ? "取消收藏" : "收藏"}">${isFavorite ? "★" : "☆"}</button></div></header>
+          ${captureDetail}
+          ${isFavorite ? `<div class="detail-card"><div class="card-label"><span>收藏信息</span><span>可编辑</span></div><p class="detail-text" style="font-size:12px;color:#747a84">备注：用于结果窗口布局实现参考<br />标签：设计 · SnapLingo</p><div class="inline-actions"><button class="text-button">编辑备注与标签</button></div></div>` : ""}
+        </div>`;
+      }
+
+      function renderAll() {
+        document.body.dataset.variant = state.variant;
+        document.querySelectorAll("[data-variant-option]").forEach((button) => button.classList.toggle("active", button.dataset.variantOption === state.variant));
+        document.querySelectorAll("[data-view]").forEach((button) => button.classList.toggle("active", button.dataset.view === state.view));
+        const isHistory = state.view === "history";
+        document.getElementById("listTitle").textContent = isHistory ? "历史记录" : "收藏夹";
+        document.getElementById("listCount").textContent = isHistory ? "56 项" : "28 项";
+        document.getElementById("searchInput").placeholder = isHistory ? "搜索历史记录" : "搜索收藏夹";
+        document.getElementById("clearRecords").textContent = isHistory ? "清空记录" : "整理收藏";
+        renderFilters(); renderList(); renderDetail();
+        document.title = `SnapLingo · ${variantLabels[state.variant]}`;
+      }
+
+      function setView(view) {
+        state.view = view;
+        state.filter = "all";
+        state.selectedId = records[view][0]?.id ?? null;
+        document.getElementById("searchInput").value = "";
+        renderAll();
+      }
+
+      document.querySelectorAll("[data-variant-option]").forEach((button) => button.addEventListener("click", () => { state.variant = button.dataset.variantOption; renderAll(); }));
+      document.querySelectorAll("[data-view]").forEach((button) => button.addEventListener("click", () => setView(button.dataset.view)));
+      document.getElementById("searchInput").addEventListener("input", renderAll);
+
+      const modal = document.getElementById("capacityModal");
+      const openModal = () => modal.classList.add("open");
+      const closeModal = () => modal.classList.remove("open");
+      document.getElementById("openCapacity").addEventListener("click", openModal);
+      document.getElementById("closeCapacity").addEventListener("click", closeModal);
+      document.getElementById("cancelCapacity").addEventListener("click", closeModal);
+      modal.addEventListener("click", (event) => { if (event.target === modal) closeModal(); });
+      document.querySelectorAll("[data-step]").forEach((button) => button.addEventListener("click", () => {
+        const input = document.getElementById(button.dataset.step === "history" ? "historyCapacity" : "favoriteCapacity");
+        input.value = Math.max(100, Number(input.value || 0) + Number(button.dataset.delta));
+      }));
+      document.getElementById("saveCapacity").addEventListener("click", () => {
+        state.historyCapacity = Math.max(100, Number(document.getElementById("historyCapacity").value || 100));
+        state.favoriteCapacity = Math.max(100, Number(document.getElementById("favoriteCapacity").value || 100));
+        document.getElementById("historyCapacityLabel").textContent = `56 / ${state.historyCapacity}`;
+        document.getElementById("favoriteCapacityLabel").textContent = `28 / ${state.favoriteCapacity}`;
+        closeModal();
+        const toast = document.getElementById("toast"); toast.classList.add("show"); setTimeout(() => toast.classList.remove("show"), 1500);
+      });
+      document.getElementById("clearRecords").addEventListener("click", () => { const toast = document.getElementById("toast"); toast.textContent = state.view === "history" ? "原型中未执行清空" : "已进入收藏整理模式"; toast.classList.add("show"); setTimeout(() => { toast.classList.remove("show"); toast.textContent = "已保存容量设置"; }, 1500); });
+
+      renderAll();
+    </script>
+  </body>
+</html>

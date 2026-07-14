@@ -76,6 +76,8 @@ function getActiveSecondaryKey(section: MainTab, activeKeys: SettingsSecondaryKe
       return activeKeys.ocr;
     case 'services':
       return activeKeys.services;
+    case 'favorites':
+    case 'history':
     case 'general':
     case 'advanced':
       return '';
@@ -108,6 +110,8 @@ function setSecondaryTab(
         setTab.services(key);
       }
       return;
+    case 'favorites':
+    case 'history':
     case 'general':
     case 'advanced':
       return;

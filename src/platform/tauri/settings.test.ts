@@ -49,6 +49,7 @@ const backendSnapshot = {
     auto_cleanup_enabled: true,
     retention_days: 45,
     maximum_records: 2000,
+    maximum_favorites: 800,
   },
 };
 
@@ -104,6 +105,7 @@ describe('Tauri settings command adapter', () => {
         autoCleanupEnabled: true,
         retentionDays: 45,
         maximumRecords: 2000,
+        maximumFavorites: 800,
       },
     });
     expect(invoke).toHaveBeenCalledWith('get_settings_snapshot');
@@ -244,6 +246,7 @@ describe('Tauri settings command adapter', () => {
       autoCleanupEnabled: true,
       retentionDays: 45,
       maximumRecords: 2000,
+      maximumFavorites: 800,
     });
 
     expect(invoke).toHaveBeenCalledWith('update_history_settings', {
@@ -251,6 +254,7 @@ describe('Tauri settings command adapter', () => {
         auto_cleanup_enabled: true,
         retention_days: 45,
         maximum_records: 2000,
+        maximum_favorites: 800,
       },
     });
   });

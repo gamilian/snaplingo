@@ -127,12 +127,13 @@ pub(crate) fn build_app_state(database_path: PathBuf, app: AppHandle) -> AppStat
     );
     let favorite_repository: Arc<dyn FavoriteRepository> =
         Arc::new(SqliteFavoriteRepository::new(database.clone()));
-    let favorites = Arc::new(crate::application::Favorites::with_notifier(
+    let favorites = Arc::new(crate::application::Favorites::with_notifier_and_policy(
         favorite_repository,
         Arc::new(FilesystemOcrHistoryAssets::new(
             asset_root.join("favorites"),
         )),
         Arc::new(TauriFavoriteChangeNotifier { app: app.clone() }),
+        settings_configuration.clone(),
     ));
 
     let llm_runtime = build_llm_runtime(http_client.clone());
@@ -177,6 +178,7 @@ pub(crate) fn build_app_state(database_path: PathBuf, app: AppHandle) -> AppStat
         asset_root,
         capture_runtime.runtime.clone(),
         capture_runtime.output.clone(),
+        settings_configuration.clone(),
         app.clone(),
     );
     let selected_text_acquirer = build_selected_text_acquirer(app.clone());

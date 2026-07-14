@@ -206,9 +206,9 @@ impl History {
         let Some(provider) = &self.policy_provider else {
             return Ok(0);
         };
-        let policy = provider.current_policy()?;
+        let mut policy = provider.current_policy()?;
         if !policy.enabled {
-            return Ok(0);
+            policy.retention_days = 0;
         }
         let (removed, assets) = self.repository.cleanup(policy).await?;
         self.delete_ocr_assets(assets);
