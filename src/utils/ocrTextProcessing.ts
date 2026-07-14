@@ -178,6 +178,31 @@ export function normalizeOcrText(text: string) {
   return normalizedLines.join('\n').trim();
 }
 
+export function applyOcrTextPreferences(
+  text: string,
+  preferences: {
+    preserveFormatting: boolean;
+    removeChineseSpaces: boolean;
+  },
+) {
+  let result = preferences.preserveFormatting
+    ? text.replace(/\r\n?/g, '\n').trim()
+    : normalizeOcrText(text);
+
+  if (preferences.removeChineseSpaces) {
+    result = result.replace(
+      /([\p{Script=Han}])[\t \u00a0]+(?=[\p{Script=Han}])/gu,
+      '$1',
+    );
+  }
+
+  if (!preferences.preserveFormatting) {
+    result = result.replace(/\s+/g, ' ').trim();
+  }
+
+  return result;
+}
+
 export function ocrCopyTokens(text: string): OcrCopyToken[] {
   const normalizedText = normalizeOcrText(text);
   const candidates = [

@@ -11,6 +11,9 @@ export const resultWindow: ResultWindowPort = {
   startDragging() {
     return getCurrentWindow().startDragging();
   },
+  setAlwaysOnTop(value) {
+    return getCurrentWindow().setAlwaysOnTop(value);
+  },
 };
 
 export function getCurrentWindowLabel() {

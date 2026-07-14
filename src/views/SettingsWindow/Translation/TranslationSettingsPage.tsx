@@ -12,10 +12,7 @@ export function TranslationSettingsPage() {
   }
 
   const updateTranslation = (input: Partial<typeof translation>) => {
-    void updateTranslationSettings({
-      ...translation,
-      ...input,
-    });
+    void updateTranslationSettings(input);
   };
 
   return (
@@ -83,44 +80,60 @@ export function TranslationSettingsPage() {
         <div className="flex items-center justify-between">
           <div>
             <div className="font-medium text-gray-700">自动翻译</div>
-            <div className="text-sm text-gray-500 mt-1">输入文本后自动开始翻译，无需点击按钮</div>
+            <div className="text-sm text-gray-500 mt-1">
+              输入文本后自动开始翻译，无需点击按钮
+            </div>
           </div>
-          <button className="relative w-12 h-6 rounded-full bg-primary-600 transition-colors">
-            <span className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow translate-x-6 transition-transform" />
-          </button>
+          <SettingsToggle
+            checked={translation.autoTranslate}
+            onChange={(autoTranslate) => updateTranslation({ autoTranslate })}
+          />
         </div>
 
         {/* 自动复制 */}
         <div className="flex items-center justify-between pt-6 border-t border-gray-100">
           <div>
             <div className="font-medium text-gray-700">翻译后自动复制</div>
-            <div className="text-sm text-gray-500 mt-1">翻译完成后自动复制结果到剪贴板</div>
+            <div className="text-sm text-gray-500 mt-1">
+              翻译完成后自动复制结果到剪贴板
+            </div>
           </div>
-          <button className="relative w-12 h-6 rounded-full bg-gray-300 transition-colors">
-            <span className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform" />
-          </button>
+          <SettingsToggle
+            checked={translation.autoCopy}
+            onChange={(autoCopy) => updateTranslation({ autoCopy })}
+          />
         </div>
 
         {/* 保留换行 */}
         <div className="flex items-center justify-between pt-6 border-t border-gray-100">
           <div>
             <div className="font-medium text-gray-700">保留原文换行</div>
-            <div className="text-sm text-gray-500 mt-1">翻译时保留原文的换行和段落格式</div>
+            <div className="text-sm text-gray-500 mt-1">
+              翻译时保留原文的换行和段落格式
+            </div>
           </div>
-          <button className="relative w-12 h-6 rounded-full bg-primary-600 transition-colors">
-            <span className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow translate-x-6 transition-transform" />
-          </button>
+          <SettingsToggle
+            checked={translation.preserveLineBreaks}
+            onChange={(preserveLineBreaks) =>
+              updateTranslation({ preserveLineBreaks })
+            }
+          />
         </div>
 
         {/* 增量翻译 */}
         <div className="flex items-center justify-between pt-6 border-t border-gray-100">
           <div>
             <div className="font-medium text-gray-700">增量翻译</div>
-            <div className="text-sm text-gray-500 mt-1">输入时实时翻译，而不是等待输入完成</div>
+            <div className="text-sm text-gray-500 mt-1">
+              输入时实时翻译，而不是等待输入完成
+            </div>
           </div>
-          <button className="relative w-12 h-6 rounded-full bg-gray-300 transition-colors">
-            <span className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform" />
-          </button>
+          <SettingsToggle
+            checked={translation.incrementalTranslation}
+            onChange={(incrementalTranslation) =>
+              updateTranslation({ incrementalTranslation })
+            }
+          />
         </div>
       </div>
 
@@ -134,22 +147,54 @@ export function TranslationSettingsPage() {
             <div className="font-medium text-gray-700">翻译窗口置顶</div>
             <div className="text-sm text-gray-500 mt-1">翻译窗口始终显示在最前面</div>
           </div>
-          <button className="relative w-12 h-6 rounded-full bg-primary-600 transition-colors">
-            <span className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow translate-x-6 transition-transform" />
-          </button>
+          <SettingsToggle
+            checked={translation.windowAlwaysOnTop}
+            onChange={(windowAlwaysOnTop) =>
+              updateTranslation({ windowAlwaysOnTop })
+            }
+          />
         </div>
 
         {/* 失焦隐藏 */}
         <div className="flex items-center justify-between pt-6 border-t border-gray-100">
           <div>
             <div className="font-medium text-gray-700">失去焦点时隐藏</div>
-            <div className="text-sm text-gray-500 mt-1">点击窗口外部区域时自动隐藏翻译窗口</div>
+            <div className="text-sm text-gray-500 mt-1">
+              点击窗口外部区域时自动隐藏翻译窗口
+            </div>
           </div>
-          <button className="relative w-12 h-6 rounded-full bg-gray-300 transition-colors">
-            <span className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform" />
-          </button>
+          <SettingsToggle
+            checked={translation.hideOnBlur}
+            onChange={(hideOnBlur) => updateTranslation({ hideOnBlur })}
+          />
         </div>
       </div>
     </div>
+  );
+}
+
+function SettingsToggle({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={`relative w-12 h-6 rounded-full transition-colors ${
+        checked ? 'bg-primary-600' : 'bg-gray-300'
+      }`}
+    >
+      <span
+        className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+          checked ? 'translate-x-6' : ''
+        }`}
+      />
+    </button>
   );
 }

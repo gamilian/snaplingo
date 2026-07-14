@@ -1,4 +1,5 @@
 import type { TranslationResult } from '../../types';
+import type { OcrSettings, TranslationSettings } from '../settings/ports';
 import { resolveTranslationRequestLanguages } from '../translation/languages';
 import type { ResultWindowPlatformRuntime } from './platformRuntime';
 import type {
@@ -6,6 +7,7 @@ import type {
   ResultWindowUnsubscribe,
 } from './ports';
 import { runOcrFileWorkflow } from './fileOcrWorkflow';
+import { applyOcrTextPreferences } from '../../utils/ocrTextProcessing';
 import {
   ocrPayloadDisplayText,
   shouldApplyOcrPayloadText,
@@ -22,6 +24,7 @@ export interface ResultWindowStatePort {
   setSourceText(text: string): void;
   clearTranslationResults(): void;
   setOcrText(text: string): void;
+  setOcrConfidence(confidence: number | null): void;
   setOcrImageBase64(imageBase64: string | null): void;
   setOcrRunning(value: boolean): void;
   setOcrError(message: string | null): void;
@@ -50,6 +53,8 @@ export interface ResultWindowStatePort {
 export interface ResultWindowRuntimePorts {
   platform: ResultWindowPlatformRuntime;
   state: ResultWindowStatePort;
+  getTranslationSettings?: () => TranslationSettings | undefined;
+  getOcrSettings?: () => OcrSettings | undefined;
 }
 
 export interface ResultWindowResizeInput {
@@ -68,7 +73,15 @@ export function resultWindowStandaloneWindowHeight(panelHeightPx: number) {
 export function createResultWindowRuntime({
   platform,
   state,
+  getTranslationSettings,
+  getOcrSettings,
 }: ResultWindowRuntimePorts) {
+  function translationRequestText(text: string) {
+    return getTranslationSettings?.()?.preserveLineBreaks === false
+      ? text.replace(/\s+/g, ' ').trim()
+      : text;
+  }
+
   async function persistTranslationHistory(input: {
     text: string;
     sourceLang: string;
@@ -96,8 +109,11 @@ export function createResultWindowRuntime({
   }) {
     if (!input.text.trim()) return;
 
+    const settings = getTranslationSettings?.();
+    const requestText = translationRequestText(input.text);
+
     const request = resolveTranslationRequestLanguages(
-      input.text,
+      requestText,
       input.sourceLang,
       input.targetLang,
     );
@@ -117,7 +133,7 @@ export function createResultWindowRuntime({
           const result = await platform.commands.translateTextWithProvider(
             providerId,
             {
-              text: input.text,
+              text: requestText,
               sourceLang: request.sourceLang,
               targetLang: request.targetLang,
             },
@@ -146,6 +162,13 @@ export function createResultWindowRuntime({
         results: completedResults,
         startedAt,
       });
+      if (settings?.autoCopy) {
+        try {
+          await platform.clipboard.copyText(completedResults[0].translated_text);
+        } catch (error) {
+          console.error('Failed to auto-copy translation result:', error);
+        }
+      }
     }
   }
 
@@ -154,7 +177,7 @@ export function createResultWindowRuntime({
     if (!session.sessionId || !session.sourceText.trim()) return;
 
     const request = resolveTranslationRequestLanguages(
-      session.sourceText,
+      translationRequestText(session.sourceText),
       session.sourceLang,
       session.targetLang,
     );
@@ -165,7 +188,7 @@ export function createResultWindowRuntime({
       const result = await platform.commands.translateTextWithProvider(
         providerId,
         {
-          text: session.sourceText,
+          text: translationRequestText(session.sourceText),
           sourceLang: request.sourceLang,
           targetLang: request.targetLang,
         },
@@ -204,11 +227,13 @@ export function createResultWindowRuntime({
 
     if (shouldClearOcrResultsForPayload(payload)) {
       state.setOcrText('');
+      state.setOcrConfidence(null);
       state.setOcrImageBase64(null);
       state.setOcrError(null);
     }
     if (shouldApplyOcrPayloadText(payload)) {
       state.setOcrText(ocrPayloadDisplayText(payload));
+      state.setOcrConfidence(payload.confidence ?? null);
       state.setOcrImageBase64(payload.imageBase64 ?? null);
     }
     if (shouldStartFileOcrForPayload(payload)) {
@@ -250,23 +275,43 @@ export function createResultWindowRuntime({
   }
 
   async function startFileOcr() {
+    const settings = getOcrSettings?.();
     state.showOcrWindow();
     state.setOcrText('');
+    state.setOcrConfidence(null);
     state.setOcrImageBase64(null);
     state.setOcrError(null);
     await runOcrFileWorkflow({
       selectImageFile: platform.commands.selectImageFile,
       recognizeImageFile: platform.commands.recognizeImageFile,
+      language:
+        settings?.recognitionLanguage === 'auto'
+          ? undefined
+          : settings?.recognitionLanguage,
+      transformText: (text) =>
+        settings ? applyOcrTextPreferences(text, settings) : text,
+      copyText: settings?.autoCopy
+        ? (text) => platform.clipboard.copyText(text)
+        : undefined,
       setText: state.setOcrText,
+      setConfidence: state.setOcrConfidence,
+      setImageDataUrl: state.setOcrImageBase64,
       setRunning: state.setOcrRunning,
       setError: state.setOcrError,
     });
   }
 
-  async function favoriteOcrResult(imageBase64: string | null, text: string) {
+  async function favoriteOcrResult(
+    imageBase64: string | null,
+    text: string,
+    confidence: number | null,
+  ) {
+    const recognitionLanguage = getOcrSettings?.()?.recognitionLanguage;
     return platform.commands.favoriteOcrResult({
       imageData: imageBase64 ? base64ToBytes(imageBase64) : [],
-      result: { text, confidence: null },
+      result: { text, confidence },
+      language:
+        recognitionLanguage === 'auto' ? undefined : recognitionLanguage,
     });
   }
 
@@ -309,6 +354,7 @@ export function createResultWindowRuntime({
     resizeStandaloneWindow,
     dismiss: platform.dismiss,
     beginDrag: platform.beginDrag,
+    setAlwaysOnTop: platform.setAlwaysOnTop,
   };
 }
 

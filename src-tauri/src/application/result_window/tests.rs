@@ -275,6 +275,7 @@ fn translation_payload(text: &str, auto_translate: bool) -> ResultWindowPayload 
         auto_translate,
         ocr_intent: None,
         image_base64: None,
+        confidence: None,
     }
 }
 
@@ -289,6 +290,7 @@ fn ocr_payload(
         auto_translate: false,
         ocr_intent: Some(intent),
         image_base64: image_base64.map(str::to_string),
+        confidence: None,
     }
 }
 
@@ -477,6 +479,7 @@ async fn ocr_open_requests_preserve_each_intent_and_source_image() {
                 text: "recognized text".to_string(),
                 intent: ResultWindowOcrIntent::DisplayText,
                 image_base64: Some("source-image".to_string()),
+                confidence: None,
             },
             ocr_payload(
                 "recognized text",
@@ -489,6 +492,7 @@ async fn ocr_open_requests_preserve_each_intent_and_source_image() {
                 text: String::new(),
                 intent: ResultWindowOcrIntent::File,
                 image_base64: None,
+                confidence: None,
             },
             ocr_payload("", ResultWindowOcrIntent::File, None),
         ),

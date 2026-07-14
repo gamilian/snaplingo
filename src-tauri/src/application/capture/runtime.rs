@@ -264,6 +264,7 @@ impl CaptureSessionRuntime {
         &self,
         session_id: &CaptureSessionId,
         rect: &LogicalRect,
+        language: Option<String>,
     ) -> Result<OcrResult> {
         self.ensure_selection_snapshots_ready(session_id, rect)?;
 
@@ -273,6 +274,7 @@ impl CaptureSessionRuntime {
             &self.ocr,
             session_id,
             rect,
+            language,
         )
         .await
     }

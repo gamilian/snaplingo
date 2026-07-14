@@ -328,6 +328,7 @@ pub async fn output_capture(
 pub async fn run_capture_ocr(
     session_id: String,
     rect: LogicalRect,
+    language: Option<String>,
     state: State<'_, crate::AppState>,
 ) -> Result<OcrResult, String> {
     let capture_session_id = CaptureSessionId(session_id.clone());
@@ -335,7 +336,7 @@ pub async fn run_capture_ocr(
     let result = state
         .capture
         .runtime
-        .recognize_selection_text(&capture_session_id, &rect)
+        .recognize_selection_text(&capture_session_id, &rect, language)
         .await
         .map_err(|e| e.to_string())?;
 

@@ -4,6 +4,7 @@ import type {
   AnnotationColorPreset,
   GeneralSettings,
   HistorySettings,
+  OcrSettings,
   ScreenshotSettings,
   SettingsSnapshot,
   TranslationSettings,
@@ -14,11 +15,13 @@ type DurableSettingsRuntime = SettingsRuntime['durableSettings'];
 let durableSettingsRuntime: DurableSettingsRuntime | null = null;
 let nextSnapshotRequest = 0;
 let latestAppliedSnapshotRequest = 0;
+let settingsUpdateQueue: Promise<void> = Promise.resolve();
 
 export function initializeSettingsConfigStore(runtime: DurableSettingsRuntime) {
   durableSettingsRuntime = runtime;
   nextSnapshotRequest = 0;
   latestAppliedSnapshotRequest = 0;
+  settingsUpdateQueue = Promise.resolve();
 }
 
 function settingsRuntime() {
@@ -34,6 +37,7 @@ interface SettingsConfigState {
   general: GeneralSettings | null;
   screenshot: ScreenshotSettings | null;
   translation: TranslationSettings | null;
+  ocr: OcrSettings | null;
   history: HistorySettings | null;
   hydrate: () => Promise<SettingsSnapshot>;
   refresh: () => Promise<SettingsSnapshot>;
@@ -42,7 +46,10 @@ interface SettingsConfigState {
   updateAnnotationColors: (
     colors: AnnotationColorPreset[],
   ) => Promise<SettingsSnapshot>;
-  updateTranslationSettings: (input: TranslationSettings) => Promise<SettingsSnapshot>;
+  updateTranslationSettings: (
+    input: Partial<TranslationSettings>,
+  ) => Promise<SettingsSnapshot>;
+  updateOcrSettings: (input: Partial<OcrSettings>) => Promise<SettingsSnapshot>;
   updateHistorySettings: (input: HistorySettings) => Promise<SettingsSnapshot>;
 }
 
@@ -55,6 +62,7 @@ function applySnapshot(
     general: snapshot.general,
     screenshot: snapshot.screenshot,
     translation: snapshot.translation,
+    ocr: snapshot.ocr,
     history: snapshot.history,
   });
 }
@@ -75,7 +83,13 @@ async function applyLatestSnapshot(
 }
 
 function currentSnapshot(state: SettingsConfigState): SettingsSnapshot | null {
-  if (!state.general || !state.screenshot || !state.translation || !state.history) {
+  if (
+    !state.general ||
+    !state.screenshot ||
+    !state.translation ||
+    !state.ocr ||
+    !state.history
+  ) {
     return null;
   }
 
@@ -83,8 +97,18 @@ function currentSnapshot(state: SettingsConfigState): SettingsSnapshot | null {
     general: state.general,
     screenshot: state.screenshot,
     translation: state.translation,
+    ocr: state.ocr,
     history: state.history,
   };
+}
+
+function enqueueSettingsUpdate<T>(request: () => Promise<T>) {
+  const result = settingsUpdateQueue.then(request, request);
+  settingsUpdateQueue = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
 }
 
 export const useSettingsConfigStore = create<SettingsConfigState>((set, get) => ({
@@ -92,6 +116,7 @@ export const useSettingsConfigStore = create<SettingsConfigState>((set, get) => 
   general: null,
   screenshot: null,
   translation: null,
+  ocr: null,
   history: null,
   hydrate: async () => {
     const existingSnapshot = currentSnapshot(get());
@@ -114,9 +139,25 @@ export const useSettingsConfigStore = create<SettingsConfigState>((set, get) => 
       settingsRuntime().updateAnnotationColors(colors),
     ),
   updateTranslationSettings: (input) =>
-    applyLatestSnapshot(set, get, () =>
-      settingsRuntime().updateTranslation(input),
-    ),
+    enqueueSettingsUpdate(() => {
+      const translation = get().translation;
+      if (!translation) {
+        throw new Error('Translation settings have not been loaded');
+      }
+      return applyLatestSnapshot(set, get, () =>
+        settingsRuntime().updateTranslation({ ...translation, ...input }),
+      );
+    }),
+  updateOcrSettings: (input) =>
+    enqueueSettingsUpdate(() => {
+      const ocr = get().ocr;
+      if (!ocr) {
+        throw new Error('OCR settings have not been loaded');
+      }
+      return applyLatestSnapshot(set, get, () =>
+        settingsRuntime().updateOcr({ ...ocr, ...input }),
+      );
+    }),
   updateHistorySettings: (input) =>
     applyLatestSnapshot(set, get, () => settingsRuntime().updateHistory(input)),
 }));

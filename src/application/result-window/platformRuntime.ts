@@ -18,6 +18,7 @@ export interface ResultWindowPlatformRuntime {
   resizeTo(width: number, height: number): Promise<void>;
   dismiss(): Promise<void>;
   beginDrag(): Promise<void>;
+  setAlwaysOnTop(value: boolean): Promise<void>;
 }
 
 interface ResultWindowPlatformPorts {
@@ -40,5 +41,6 @@ export function createResultWindowPlatformRuntime(
     resizeTo: (width, height) => ports.window.resize(width, height),
     dismiss: () => ports.window.hide(),
     beginDrag: () => ports.window.startDragging(),
+    setAlwaysOnTop: (value) => ports.window.setAlwaysOnTop(value),
   };
 }

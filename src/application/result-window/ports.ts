@@ -14,6 +14,7 @@ export interface ResultWindowPort {
   resize(width: number, height: number): Promise<void>;
   hide(): Promise<void>;
   startDragging(): Promise<void>;
+  setAlwaysOnTop(value: boolean): Promise<void>;
 }
 
 export interface CaptureResultWindowPayload {
@@ -22,6 +23,7 @@ export interface CaptureResultWindowPayload {
   autoTranslate: boolean;
   ocrIntent?: 'display-text' | 'file';
   imageBase64?: string;
+  confidence?: number;
 }
 
 export interface ResultWindowCommandsPort {
@@ -30,7 +32,7 @@ export interface ResultWindowCommandsPort {
     requestId: ResultWindowRequestId,
   ): Promise<CaptureResultWindowPayload | null>;
   selectImageFile(): Promise<string | null>;
-  recognizeImageFile(path: string): Promise<OcrResult>;
+  recognizeImageFile(path: string, language?: string): Promise<OcrFileResult>;
   translateTextWithProvider(
     providerId: string,
     input: { text: string; sourceLang: string; targetLang: string },
@@ -51,7 +53,13 @@ export interface ResultWindowCommandsPort {
   favoriteOcrResult(input: {
     imageData: Uint8Array | number[];
     result: OcrResult;
+    language?: string;
+    providerUsed?: string;
   }): Promise<number>;
+}
+
+export interface OcrFileResult extends OcrResult {
+  imageDataUrl: string;
 }
 
 export interface ResultWindowClipboardPort {

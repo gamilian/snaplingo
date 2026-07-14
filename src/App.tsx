@@ -112,22 +112,39 @@ const resultWindowPlatformRuntime = createResultWindowPlatformRuntime({
         detectedLanguage: input.result.detected_language,
         confidence: input.result.confidence,
       }),
-    favoriteOcrResult: (input) =>
-      favorites.addOcrFavorite({
+    favoriteOcrResult: async (input) => {
+      if (!useProviderStore.getState().activeOcrProvider) {
+        try {
+          await useProviderStore.getState().loadOcrProviders();
+        } catch (error) {
+          console.error('Failed to load OCR provider metadata:', error);
+        }
+      }
+      return favorites.addOcrFavorite({
         imageData: input.imageData,
         recognizedText: input.result.text,
-        providerUsed: 'manual',
+        language: input.language,
+        providerUsed:
+          input.providerUsed ??
+          useProviderStore.getState().activeOcrProvider ??
+          'manual',
         confidence: input.result.confidence,
-      }),
+      });
+    },
   },
 });
 const resultWindowRuntime = createResultWindowRuntime({
   platform: resultWindowPlatformRuntime,
+  getTranslationSettings: () =>
+    useSettingsConfigStore.getState().translation ?? undefined,
+  getOcrSettings: () => useSettingsConfigStore.getState().ocr ?? undefined,
   state: {
     setSourceText: (text) => useAppStore.getState().setSourceText(text),
     clearTranslationResults: () =>
       useAppStore.getState().clearTranslationResults(),
     setOcrText: (text) => useAppStore.getState().setOcrText(text),
+    setOcrConfidence: (confidence) =>
+      useAppStore.getState().setOcrConfidence(confidence),
     setOcrImageBase64: (imageBase64) =>
       useAppStore.getState().setOcrImageBase64(imageBase64),
     setOcrRunning: (value) => useAppStore.getState().setOcrRunning(value),

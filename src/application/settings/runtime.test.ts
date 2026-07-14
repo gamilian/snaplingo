@@ -33,7 +33,28 @@ describe('settings runtime', () => {
         pinShadow: true,
         annotationColors: [[255, 77, 79, 255]] as [number, number, number, number][],
       },
-      translation: { defaultSourceLang: 'auto', defaultTargetLang: 'en' },
+      translation: {
+        defaultSourceLang: 'auto',
+        defaultTargetLang: 'en',
+        autoTranslate: true,
+        autoCopy: false,
+        preserveLineBreaks: true,
+        incrementalTranslation: false,
+        windowAlwaysOnTop: true,
+        hideOnBlur: false,
+      },
+      ocr: {
+        recognitionLanguage: 'auto',
+        autoCopy: true,
+        preserveFormatting: true,
+        removeChineseSpaces: true,
+        showConfidence: false,
+      },
+      history: {
+        autoCleanupEnabled: false,
+        retentionDays: 30,
+        maximumRecords: 5000,
+      },
     };
     const durableSettings = {
       getSettingsSnapshot: vi.fn(async () => snapshot),
@@ -41,6 +62,8 @@ describe('settings runtime', () => {
       updateScreenshotSettings: vi.fn(async () => snapshot),
       updateAnnotationColors: vi.fn(async () => snapshot),
       updateTranslationSettings: vi.fn(async () => snapshot),
+      updateOcrSettings: vi.fn(async () => snapshot),
+      updateHistorySettings: vi.fn(async () => snapshot),
     };
     const runtime = createSettingsRuntime(createPorts({ durableSettings }));
 
@@ -51,6 +74,7 @@ describe('settings runtime', () => {
       snapshot.screenshot.annotationColors,
     );
     await runtime.durableSettings.updateTranslation(snapshot.translation);
+    await runtime.durableSettings.updateOcr(snapshot.ocr);
 
     expect(durableSettings.getSettingsSnapshot).toHaveBeenCalledTimes(1);
     expect(durableSettings.updateGeneralSettings).toHaveBeenCalledWith(
@@ -65,6 +89,7 @@ describe('settings runtime', () => {
     expect(durableSettings.updateTranslationSettings).toHaveBeenCalledWith(
       snapshot.translation,
     );
+    expect(durableSettings.updateOcrSettings).toHaveBeenCalledWith(snapshot.ocr);
   });
 
   it('exposes the injected provider facet without duplicate wrappers', () => {
@@ -208,6 +233,7 @@ function createPorts(overrides: Record<string, unknown> = {}) {
       updateScreenshotSettings: vi.fn(),
       updateAnnotationColors: vi.fn(),
       updateTranslationSettings: vi.fn(),
+      updateOcrSettings: vi.fn(),
       updateHistorySettings: vi.fn(),
     },
     providers: createProviderPort(),

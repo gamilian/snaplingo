@@ -82,8 +82,8 @@ export interface CaptureWorkspaceCommandsPort {
   defaultCaptureSavePath(options?: CaptureSavePathOptions): Promise<string | null>;
   quickCaptureSavePath(options?: CaptureSavePathOptions): Promise<string>;
   outputCapture(input: OutputCaptureInput): Promise<void>;
-  runCaptureOcr(sessionId: string, rect: LogicalRect): Promise<OcrResult>;
-  openCaptureOcrResultWindow(text: string, imageBase64?: string): Promise<void>;
+  runCaptureOcr(sessionId: string, rect: LogicalRect, language?: string): Promise<OcrResult>;
+  openCaptureOcrResultWindow(text: string, imageBase64?: string, confidence?: number): Promise<void>;
   openCaptureTranslationResultWindow(text: string): Promise<void>;
   copyTextToClipboard(text: string): Promise<void>;
 }

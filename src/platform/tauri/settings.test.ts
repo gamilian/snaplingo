@@ -31,6 +31,19 @@ const backendSnapshot = {
   translation: {
     default_source_lang: 'ja',
     default_target_lang: 'fr',
+    auto_translate: true,
+    auto_copy: false,
+    preserve_line_breaks: true,
+    incremental_translation: false,
+    window_always_on_top: true,
+    hide_on_blur: false,
+  },
+  ocr: {
+    recognition_language: 'auto',
+    auto_copy: true,
+    preserve_formatting: true,
+    remove_chinese_spaces: true,
+    show_confidence: false,
   },
   history: {
     auto_cleanup_enabled: true,
@@ -73,6 +86,19 @@ describe('Tauri settings command adapter', () => {
       translation: {
         defaultSourceLang: 'ja',
         defaultTargetLang: 'fr',
+        autoTranslate: true,
+        autoCopy: false,
+        preserveLineBreaks: true,
+        incrementalTranslation: false,
+        windowAlwaysOnTop: true,
+        hideOnBlur: false,
+      },
+      ocr: {
+        recognitionLanguage: 'auto',
+        autoCopy: true,
+        preserveFormatting: true,
+        removeChineseSpaces: true,
+        showConfidence: false,
       },
       history: {
         autoCleanupEnabled: true,
@@ -165,12 +191,47 @@ describe('Tauri settings command adapter', () => {
     await updateTranslationSettings({
       defaultSourceLang: 'auto',
       defaultTargetLang: 'en',
+      autoTranslate: true,
+      autoCopy: false,
+      preserveLineBreaks: true,
+      incrementalTranslation: false,
+      windowAlwaysOnTop: true,
+      hideOnBlur: false,
     });
 
     expect(invoke).toHaveBeenCalledWith('update_translation_settings', {
       input: {
         default_source_lang: 'auto',
         default_target_lang: 'en',
+        auto_translate: true,
+        auto_copy: false,
+        preserve_line_breaks: true,
+        incremental_translation: false,
+        window_always_on_top: true,
+        hide_on_blur: false,
+      },
+    });
+  });
+
+  it('maps OCR settings updates to the backend payload shape', async () => {
+    const { updateOcrSettings } = await import('./settings');
+    invoke.mockResolvedValueOnce(backendSnapshot);
+
+    await updateOcrSettings({
+      recognitionLanguage: 'ja',
+      autoCopy: false,
+      preserveFormatting: false,
+      removeChineseSpaces: true,
+      showConfidence: true,
+    });
+
+    expect(invoke).toHaveBeenCalledWith('update_ocr_settings', {
+      input: {
+        recognition_language: 'ja',
+        auto_copy: false,
+        preserve_formatting: false,
+        remove_chinese_spaces: true,
+        show_confidence: true,
       },
     });
   });

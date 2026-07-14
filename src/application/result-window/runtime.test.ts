@@ -106,8 +106,35 @@ describe('result window application runtime', () => {
       '/tmp/example.png',
     );
     expect(state.setOcrText).toHaveBeenLastCalledWith('file text');
+    expect(state.setOcrImageBase64).toHaveBeenLastCalledWith(
+      'data:image/png;base64,aW1hZ2U=',
+    );
     expect(state.setOcrRunning).toHaveBeenNthCalledWith(1, true);
     expect(state.setOcrRunning).toHaveBeenLastCalledWith(false);
+  });
+
+  it('favorites OCR with the retained image and configured language', async () => {
+    const { runtime, platform } = createRuntime({
+      ocrSettings: {
+        recognitionLanguage: 'ja',
+        autoCopy: false,
+        preserveFormatting: true,
+        removeChineseSpaces: true,
+        showConfidence: true,
+      },
+    });
+
+    await runtime.favoriteOcrResult(
+      'data:image/png;base64,AQID',
+      'recognized',
+      0.9,
+    );
+
+    expect(platform.commands.favoriteOcrResult).toHaveBeenCalledWith({
+      imageData: new Uint8Array([1, 2, 3]),
+      result: { text: 'recognized', confidence: 0.9 },
+      language: 'ja',
+    });
   });
 
   it('owns provider fan-out and records one aggregate translation history entry', async () => {
@@ -151,6 +178,89 @@ describe('result window application runtime', () => {
         ],
       }),
     );
+  });
+
+  it('applies translation text and clipboard preferences', async () => {
+    const { runtime, platform, state } = createRuntime({
+      activeProviderIds: ['google'],
+      translationSettings: {
+        defaultSourceLang: 'auto',
+        defaultTargetLang: 'zh-CN',
+        autoTranslate: true,
+        autoCopy: true,
+        preserveLineBreaks: false,
+        incrementalTranslation: false,
+        windowAlwaysOnTop: true,
+        hideOnBlur: false,
+      },
+      translationResults: {
+        google: {
+          provider_id: 'google',
+          translated_text: '译文',
+          detected_language: 'en',
+          confidence: null,
+        },
+      },
+    });
+
+    await runtime.translate({
+      text: 'first\n  second',
+      sourceLang: 'en',
+      targetLang: 'zh-CN',
+    });
+
+    expect(state.startTranslationSession).toHaveBeenCalledWith(
+      'first\n  second',
+      ['google'],
+    );
+    expect(platform.commands.translateTextWithProvider).toHaveBeenCalledWith(
+      'google',
+      expect.objectContaining({ text: 'first second' }),
+    );
+    expect(platform.commands.recordTranslationHistory).toHaveBeenCalledWith(
+      expect.objectContaining({ text: 'first\n  second' }),
+    );
+    expect(platform.clipboard.copyText).toHaveBeenCalledWith('译文');
+  });
+
+  it('keeps a completed translation when automatic copy fails', async () => {
+    const { runtime, platform, state } = createRuntime({
+      activeProviderIds: ['google'],
+      translationSettings: {
+        defaultSourceLang: 'auto',
+        defaultTargetLang: 'zh-CN',
+        autoTranslate: true,
+        autoCopy: true,
+        preserveLineBreaks: true,
+        incrementalTranslation: false,
+        windowAlwaysOnTop: true,
+        hideOnBlur: false,
+      },
+      translationResults: {
+        google: {
+          provider_id: 'google',
+          translated_text: '译文',
+          detected_language: 'en',
+          confidence: null,
+        },
+      },
+    });
+    platform.clipboard.copyText.mockRejectedValue(
+      new Error('clipboard unavailable'),
+    );
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(
+      runtime.translate({
+        text: 'hello',
+        sourceLang: 'en',
+        targetLang: 'zh-CN',
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(state.completeProviderTranslation).toHaveBeenCalledTimes(1);
+    expect(platform.commands.recordTranslationHistory).toHaveBeenCalledTimes(1);
+    consoleError.mockRestore();
   });
 
   it('records a successful provider retry instead of bypassing history', async () => {
@@ -247,6 +357,8 @@ function createRuntime(options: {
     targetLang: string;
   };
   translationResults?: Record<string, import('../../types').TranslationResult>;
+  translationSettings?: import('../settings/ports').TranslationSettings;
+  ocrSettings?: import('../settings/ports').OcrSettings;
 } = {}) {
   let payloadReadyHandler: ResultPayloadReadyHandler | null = null;
   const unsubscribe: ResultWindowUnsubscribe = vi.fn();
@@ -263,6 +375,7 @@ function createRuntime(options: {
       recognizeImageFile: vi.fn(async () => ({
         text: options.recognizedFileText ?? '',
         confidence: null,
+        imageDataUrl: 'data:image/png;base64,aW1hZ2U=',
       })),
       translateTextWithProvider: vi.fn(async (providerId: string) => {
         const result = options.translationResults?.[providerId];
@@ -283,11 +396,13 @@ function createRuntime(options: {
       if (options.dismissError) throw options.dismissError;
     }),
     beginDrag: vi.fn(async () => undefined),
+    setAlwaysOnTop: vi.fn(async () => undefined),
   };
   const state = {
     setSourceText: vi.fn(),
     clearTranslationResults: vi.fn(),
     setOcrText: vi.fn(),
+    setOcrConfidence: vi.fn(),
     setOcrImageBase64: vi.fn(),
     setOcrRunning: vi.fn(),
     setOcrError: vi.fn(),
@@ -312,7 +427,12 @@ function createRuntime(options: {
     failProviderTranslation: vi.fn(),
     setTranslating: vi.fn(),
   };
-  const runtime = createResultWindowRuntime({ platform, state });
+  const runtime = createResultWindowRuntime({
+    platform,
+    state,
+    getTranslationSettings: () => options.translationSettings,
+    getOcrSettings: () => options.ocrSettings,
+  });
 
   return {
     runtime,

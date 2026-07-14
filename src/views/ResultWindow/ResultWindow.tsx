@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useProviderStore } from '../../stores/providerStore';
+import { useSettingsConfigStore } from '../../stores/settingsConfigStore';
 import { translationFavoriteKey } from '../../application/favorites/identity';
 import {
   defaultTargetLanguageForSource,
@@ -250,6 +251,7 @@ function ResultWindowContent({
     providerTranslations,
     isTranslating,
     ocrText,
+    ocrConfidence,
     ocrImageBase64,
     isOcrRunning,
     ocrError,
@@ -266,8 +268,13 @@ function ResultWindowContent({
   const loadTranslationProviders = useProviderStore(
     (state) => state.loadTranslationProviders,
   );
+  const translationSettings = useSettingsConfigStore(
+    (state) => state.translation,
+  );
+  const ocrSettings = useSettingsConfigStore((state) => state.ocr);
 
   const lastAutoTranslateRequestId = useRef(0);
+  const lastAutomaticTranslationKey = useRef('');
   const resultWindowPanelRef = useRef<HTMLDivElement>(null);
   const sourceTextAreaRef = useRef<HTMLTextAreaElement>(null);
   const sourceTextMirrorRef = useRef<HTMLDivElement>(null);
@@ -395,7 +402,7 @@ function ResultWindowContent({
 
     setOcrFavoritePending(true);
     try {
-      await runtime.favoriteOcrResult(ocrImageBase64, ocrText);
+      await runtime.favoriteOcrResult(ocrImageBase64, ocrText, ocrConfidence);
       setFavoritedOcrSignature(ocrFavoriteSignature);
     } catch (error) {
       console.error('Failed to favorite OCR result:', error);
@@ -406,6 +413,7 @@ function ResultWindowContent({
     isOcrFavoritePending,
     ocrFavoriteSignature,
     ocrImageBase64,
+    ocrConfidence,
     ocrText,
     runtime,
   ]);
@@ -469,7 +477,12 @@ function ResultWindowContent({
   }, [closeResultWindow, resultWindowVisible]);
 
   useEffect(() => {
-    if (!resultWindowVisible || !shouldCloseFromWindowBlur(presentation, isResultWindowPinned)) return;
+    if (
+      !resultWindowVisible ||
+      resultWindowMode !== 'translation' ||
+      !translationSettings?.hideOnBlur ||
+      !shouldCloseFromWindowBlur(presentation, isResultWindowPinned)
+    ) return;
 
     const visibleStartedAtMs = performance.now();
     const handleBlur = () => {
@@ -486,7 +499,19 @@ function ResultWindowContent({
 
     window.addEventListener('blur', handleBlur);
     return () => window.removeEventListener('blur', handleBlur);
-  }, [closeResultWindow, isResultWindowPinned, presentation, resultWindowVisible]);
+  }, [
+    closeResultWindow,
+    isResultWindowPinned,
+    presentation,
+    resultWindowMode,
+    resultWindowVisible,
+    translationSettings?.hideOnBlur,
+  ]);
+
+  useEffect(() => {
+    if (presentation !== 'standalone' || !translationSettings) return;
+    void runtime.setAlwaysOnTop(translationSettings.windowAlwaysOnTop);
+  }, [presentation, runtime, translationSettings?.windowAlwaysOnTop]);
 
   useEffect(() => {
     if (resultWindowVisible) return;
@@ -607,6 +632,7 @@ function ResultWindowContent({
     }
 
     lastAutoTranslateRequestId.current = autoTranslateRequestId;
+    lastAutomaticTranslationKey.current = `${sourceLang}\u0000${targetLang}\u0000${sourceText}`;
     void runtime.translate({ text: sourceText, sourceLang, targetLang });
   }, [
     autoTranslateRequestId,
@@ -615,6 +641,38 @@ function ResultWindowContent({
     sourceText,
     targetLang,
     runtime,
+  ]);
+
+  useEffect(() => {
+    if (
+      !resultWindowVisible ||
+      resultWindowMode !== 'translation' ||
+      !translationSettings?.autoTranslate ||
+      !sourceText.trim() ||
+      isTranslating
+    ) {
+      return;
+    }
+
+    const key = `${sourceLang}\u0000${targetLang}\u0000${sourceText}`;
+    if (key === lastAutomaticTranslationKey.current) return;
+
+    const timeout = window.setTimeout(() => {
+      lastAutomaticTranslationKey.current = key;
+      void runtime.translate({ text: sourceText, sourceLang, targetLang });
+    }, translationSettings.incrementalTranslation ? 150 : 500);
+
+    return () => window.clearTimeout(timeout);
+  }, [
+    isTranslating,
+    resultWindowMode,
+    resultWindowVisible,
+    runtime,
+    sourceLang,
+    sourceText,
+    targetLang,
+    translationSettings?.autoTranslate,
+    translationSettings?.incrementalTranslation,
   ]);
 
   if (!resultWindowVisible) return null;
@@ -652,6 +710,7 @@ function ResultWindowContent({
   };
 
   const handleTranslate = () => {
+    lastAutomaticTranslationKey.current = `${sourceLang}\u0000${targetLang}\u0000${sourceText}`;
     void runtime.translate({ text: sourceText, sourceLang, targetLang });
   };
 
@@ -667,7 +726,11 @@ function ResultWindowContent({
   const ocrSubtitle = isOcrRunning
     ? '识别中'
     : ocrText
-      ? `已识别 ${ocrText.length} 个字符`
+      ? `已识别 ${ocrText.length} 个字符${
+          ocrSettings?.showConfidence && ocrConfidence !== null
+            ? ` · 置信度 ${Math.round(ocrConfidence * 100)}%`
+            : ''
+        }`
       : '等待上传';
   const detectedSourceLanguage =
     providerTranslations.find((translation) => translation.detected_language)
@@ -716,7 +779,11 @@ function ResultWindowContent({
                   </div>
                   <div className={resultWindowOcrImagePanelClassName()}>
                     <img
-                      src={`data:image/png;base64,${ocrImageBase64}`}
+                      src={
+                        ocrImageBase64.startsWith('data:')
+                          ? ocrImageBase64
+                          : `data:image/png;base64,${ocrImageBase64}`
+                      }
                       alt=""
                       className="block max-h-[220px] w-full object-contain"
                       draggable={false}

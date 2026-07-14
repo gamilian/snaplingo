@@ -11,6 +11,7 @@ import {
   type CaptureScreenshotPreferences,
 } from '../../application/capture-workspace/runtime';
 import type { CaptureWorkspaceRuntime } from '../../application/capture-workspace/types';
+import type { OcrSettings } from '../../application/settings/ports';
 import { prepareCaptureSurfaceForReveal } from './captureHostRuntime';
 import {
   shouldPollCaptureHoverSelection,
@@ -37,6 +38,7 @@ interface CaptureWorkspaceRuntimeViewOptions {
   onInactive?: () => void | Promise<void>;
   annotationColorPresets?: readonly AnnotationColor[];
   screenshotPreferences?: CaptureScreenshotPreferences;
+  ocrPreferences?: OcrSettings;
 }
 
 export interface CaptureWorkspaceRuntimeView {
@@ -50,11 +52,13 @@ export function useCaptureWorkspaceRuntimeView({
   onInactive,
   annotationColorPresets,
   screenshotPreferences,
+  ocrPreferences,
 }: CaptureWorkspaceRuntimeViewOptions): CaptureWorkspaceRuntimeView {
   const platformRuntime = useCaptureWorkspaceRuntime();
   const onInactiveRef = useRef(onInactive);
   const annotationColorPresetsRef = useRef(annotationColorPresets);
   const screenshotPreferencesRef = useRef(screenshotPreferences);
+  const ocrPreferencesRef = useRef(ocrPreferences);
   const hostBridgeRef = useRef<{
     reset(): void;
     prepareSurface(): Promise<void>;
@@ -67,6 +71,7 @@ export function useCaptureWorkspaceRuntimeView({
   onInactiveRef.current = onInactive;
   annotationColorPresetsRef.current = annotationColorPresets;
   screenshotPreferencesRef.current = screenshotPreferences;
+  ocrPreferencesRef.current = ocrPreferences;
 
   const [runtimeRevision, setRuntimeRevision] = useState(0);
   const disposedRuntimeRef = useRef<CaptureWorkspaceRuntime | null>(null);
@@ -78,6 +83,7 @@ export function useCaptureWorkspaceRuntimeView({
         annotationColorPresets: () =>
           annotationColorPresetsRef.current ?? ANNOTATION_COLORS,
         screenshotPreferences: () => screenshotPreferencesRef.current,
+        ocrPreferences: () => ocrPreferencesRef.current,
         storage: window.localStorage,
         host: {
           resetInteraction: () => hostBridgeRef.current.reset(),

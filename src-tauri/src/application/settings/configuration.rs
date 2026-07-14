@@ -5,7 +5,8 @@ use crate::application::capture::configured_capture_save_dir;
 use crate::application::history::{HistoryCleanupPolicy, HistoryPolicyProvider};
 use crate::application::settings::SettingsStore;
 use crate::domain::{
-    GeneralSettings, HistorySettings, ScreenshotSettings, SettingsSnapshot, TranslationSettings,
+    GeneralSettings, HistorySettings, OcrSettings, ScreenshotSettings, SettingsSnapshot,
+    TranslationSettings,
 };
 use crate::{AppError, Result};
 
@@ -100,6 +101,13 @@ impl SettingsConfiguration {
         self.save_snapshot(snapshot)
     }
 
+    pub fn update_ocr(&self, input: OcrSettings) -> Result<SettingsSnapshot> {
+        let _guard = self.update_lock.lock().unwrap();
+        let mut snapshot = self.snapshot()?;
+        snapshot.ocr = input;
+        self.save_snapshot(snapshot)
+    }
+
     pub fn update_history(&self, input: HistorySettings) -> Result<SettingsSnapshot> {
         let _guard = self.update_lock.lock().unwrap();
         let mut snapshot = self.snapshot()?;
@@ -149,6 +157,10 @@ impl SettingsConfiguration {
         }
         snapshot.history.retention_days = snapshot.history.retention_days.clamp(1, 3650);
         snapshot.history.maximum_records = snapshot.history.maximum_records.clamp(100, 100_000);
+        snapshot.ocr.recognition_language = snapshot.ocr.recognition_language.trim().to_string();
+        if snapshot.ocr.recognition_language.is_empty() {
+            snapshot.ocr.recognition_language = "auto".to_string();
+        }
         snapshot
     }
 
@@ -187,7 +199,7 @@ mod settings_configuration_tests {
     use tempfile::tempdir;
 
     use super::{SettingsChangeNotifier, SettingsConfiguration};
-    use crate::domain::{GeneralSettings, ScreenshotSettings, TranslationSettings};
+    use crate::domain::{GeneralSettings, OcrSettings, ScreenshotSettings, TranslationSettings};
     use crate::infrastructure::storage::SqliteConfigStore;
 
     struct CountingNotifier(AtomicUsize);
@@ -334,7 +346,8 @@ mod settings_configuration_tests {
         configuration
             .update_translation(TranslationSettings::default())
             .unwrap();
+        configuration.update_ocr(OcrSettings::default()).unwrap();
 
-        assert_eq!(notifier.0.load(Ordering::SeqCst), 4);
+        assert_eq!(notifier.0.load(Ordering::SeqCst), 5);
     }
 }

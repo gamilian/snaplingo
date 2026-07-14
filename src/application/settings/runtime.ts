@@ -15,6 +15,7 @@ import type {
   HistoryQuery,
   OcrHistoryEntry,
   OcrFavoriteInput,
+  OcrSettings,
   ScreenshotSettings,
   ScreenshotFavoritePage,
   ScreenshotFavoriteQuery,
@@ -55,6 +56,7 @@ export interface SettingsRuntime {
       colors: AnnotationColorPreset[],
     ): Promise<SettingsSnapshot>;
     updateTranslation(input: TranslationSettings): Promise<SettingsSnapshot>;
+    updateOcr(input: OcrSettings): Promise<SettingsSnapshot>;
     updateHistory(input: HistorySettings): Promise<SettingsSnapshot>;
   };
   providers: SettingsProvidersPort;
@@ -125,6 +127,7 @@ export function createSettingsRuntime(
         ports.durableSettings.updateAnnotationColors(colors),
       updateTranslation: (input) =>
         ports.durableSettings.updateTranslationSettings(input),
+      updateOcr: (input) => ports.durableSettings.updateOcrSettings(input),
       updateHistory: (input) => ports.durableSettings.updateHistorySettings(input),
     },
     providers: ports.providers,

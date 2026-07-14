@@ -33,6 +33,20 @@ export interface ScreenshotSettings {
 export interface TranslationSettings {
   defaultSourceLang: string;
   defaultTargetLang: string;
+  autoTranslate: boolean;
+  autoCopy: boolean;
+  preserveLineBreaks: boolean;
+  incrementalTranslation: boolean;
+  windowAlwaysOnTop: boolean;
+  hideOnBlur: boolean;
+}
+
+export interface OcrSettings {
+  recognitionLanguage: string;
+  autoCopy: boolean;
+  preserveFormatting: boolean;
+  removeChineseSpaces: boolean;
+  showConfidence: boolean;
 }
 
 export interface HistorySettings {
@@ -45,6 +59,7 @@ export interface SettingsSnapshot {
   general: GeneralSettings;
   screenshot: ScreenshotSettings;
   translation: TranslationSettings;
+  ocr: OcrSettings;
   history: HistorySettings;
 }
 
@@ -60,6 +75,7 @@ export interface DurableSettingsPort {
   updateTranslationSettings(
     input: TranslationSettings,
   ): Promise<SettingsSnapshot>;
+  updateOcrSettings(input: OcrSettings): Promise<SettingsSnapshot>;
   updateHistorySettings(input: HistorySettings): Promise<SettingsSnapshot>;
 }
 

@@ -14,6 +14,7 @@ describe('result window platform runtime', () => {
         resize: vi.fn(async () => undefined),
         hide: vi.fn(async () => undefined),
         startDragging: vi.fn(async () => undefined),
+        setAlwaysOnTop: vi.fn(async () => undefined),
       },
     };
     const runtime = createResultWindowPlatformRuntime(ports);
@@ -25,6 +26,7 @@ describe('result window platform runtime', () => {
     await runtime.resizeTo(640, 480);
     await runtime.dismiss();
     await runtime.beginDrag();
+    await runtime.setAlwaysOnTop(true);
     await runtime.clipboard.copyText('sample');
 
     expect(ports.events.subscribeResultPayloadReady).toHaveBeenCalledWith(
@@ -33,6 +35,7 @@ describe('result window platform runtime', () => {
     expect(ports.window.resize).toHaveBeenCalledWith(640, 480);
     expect(ports.window.hide).toHaveBeenCalledTimes(1);
     expect(ports.window.startDragging).toHaveBeenCalledTimes(1);
+    expect(ports.window.setAlwaysOnTop).toHaveBeenCalledWith(true);
     expect(ports.clipboard.writeText).toHaveBeenCalledWith('sample');
   });
 });

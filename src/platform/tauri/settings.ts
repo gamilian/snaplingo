@@ -31,6 +31,20 @@ interface BackendScreenshotSettings {
 interface BackendTranslationSettings {
   default_source_lang: string;
   default_target_lang: string;
+  auto_translate: boolean;
+  auto_copy: boolean;
+  preserve_line_breaks: boolean;
+  incremental_translation: boolean;
+  window_always_on_top: boolean;
+  hide_on_blur: boolean;
+}
+
+interface BackendOcrSettings {
+  recognition_language: string;
+  auto_copy: boolean;
+  preserve_formatting: boolean;
+  remove_chinese_spaces: boolean;
+  show_confidence: boolean;
 }
 
 interface BackendHistorySettings {
@@ -43,6 +57,7 @@ interface BackendSettingsSnapshot {
   general: BackendGeneralSettings;
   screenshot: BackendScreenshotSettings;
   translation: BackendTranslationSettings;
+  ocr: BackendOcrSettings;
   history: BackendHistorySettings;
 }
 
@@ -72,6 +87,20 @@ interface ScreenshotSettingsInput {
 interface TranslationSettingsInput {
   defaultSourceLang: string;
   defaultTargetLang: string;
+  autoTranslate: boolean;
+  autoCopy: boolean;
+  preserveLineBreaks: boolean;
+  incrementalTranslation: boolean;
+  windowAlwaysOnTop: boolean;
+  hideOnBlur: boolean;
+}
+
+interface OcrSettingsInput {
+  recognitionLanguage: string;
+  autoCopy: boolean;
+  preserveFormatting: boolean;
+  removeChineseSpaces: boolean;
+  showConfidence: boolean;
 }
 
 function normalizeSnapshot(snapshot: BackendSettingsSnapshot) {
@@ -100,6 +129,19 @@ function normalizeSnapshot(snapshot: BackendSettingsSnapshot) {
     translation: {
       defaultSourceLang: snapshot.translation.default_source_lang,
       defaultTargetLang: snapshot.translation.default_target_lang,
+      autoTranslate: snapshot.translation.auto_translate,
+      autoCopy: snapshot.translation.auto_copy,
+      preserveLineBreaks: snapshot.translation.preserve_line_breaks,
+      incrementalTranslation: snapshot.translation.incremental_translation,
+      windowAlwaysOnTop: snapshot.translation.window_always_on_top,
+      hideOnBlur: snapshot.translation.hide_on_blur,
+    },
+    ocr: {
+      recognitionLanguage: snapshot.ocr.recognition_language,
+      autoCopy: snapshot.ocr.auto_copy,
+      preserveFormatting: snapshot.ocr.preserve_formatting,
+      removeChineseSpaces: snapshot.ocr.remove_chinese_spaces,
+      showConfidence: snapshot.ocr.show_confidence,
     },
     history: {
       autoCleanupEnabled: snapshot.history.auto_cleanup_enabled,
@@ -166,6 +208,26 @@ export async function updateTranslationSettings(
       input: {
         default_source_lang: input.defaultSourceLang,
         default_target_lang: input.defaultTargetLang,
+        auto_translate: input.autoTranslate,
+        auto_copy: input.autoCopy,
+        preserve_line_breaks: input.preserveLineBreaks,
+        incremental_translation: input.incrementalTranslation,
+        window_always_on_top: input.windowAlwaysOnTop,
+        hide_on_blur: input.hideOnBlur,
+      },
+    }),
+  );
+}
+
+export async function updateOcrSettings(input: OcrSettingsInput) {
+  return normalizeSnapshot(
+    await invoke<BackendSettingsSnapshot>('update_ocr_settings', {
+      input: {
+        recognition_language: input.recognitionLanguage,
+        auto_copy: input.autoCopy,
+        preserve_formatting: input.preserveFormatting,
+        remove_chinese_spaces: input.removeChineseSpaces,
+        show_confidence: input.showConfidence,
       },
     }),
   );

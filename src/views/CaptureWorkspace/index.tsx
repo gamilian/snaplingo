@@ -29,6 +29,7 @@ function CaptureWorkspaceContent({
   onInactive,
 }: Omit<CaptureWorkspaceProps, 'runtime'>) {
   const screenshotPreferences = useSettingsConfigStore((state) => state.screenshot);
+  const ocrPreferences = useSettingsConfigStore((state) => state.ocr);
   const annotationColorPresets = useSettingsConfigStore(
     (state) => state.screenshot?.annotationColors ?? ANNOTATION_COLORS,
   );
@@ -41,6 +42,7 @@ function CaptureWorkspaceContent({
     onInactive,
     annotationColorPresets,
     screenshotPreferences: screenshotPreferences ?? undefined,
+    ocrPreferences: ocrPreferences ?? undefined,
   });
 
   return (

@@ -117,8 +117,12 @@ export async function outputCapture(input: OutputCaptureInput) {
   });
 }
 
-export async function runCaptureOcr(sessionId: string, rect: LogicalRect) {
-  return invoke<OcrResult>('run_capture_ocr', { sessionId, rect });
+export async function runCaptureOcr(sessionId: string, rect: LogicalRect, language?: string) {
+  return invoke<OcrResult>('run_capture_ocr', {
+    sessionId,
+    rect,
+    ...(language && language !== 'auto' ? { language } : {}),
+  });
 }
 
 export async function openResultWindow(text: string) {
@@ -136,10 +140,12 @@ export async function openTranslationResultWindow(text: string) {
 export async function openCaptureOcrResultWindow(
   text: string,
   imageBase64?: string,
+  confidence?: number,
 ) {
   return invoke<void>('open_capture_ocr_result_window', {
     text,
     ...(imageBase64 ? { imageBase64 } : {}),
+    ...(confidence !== undefined ? { confidence } : {}),
   });
 }
 

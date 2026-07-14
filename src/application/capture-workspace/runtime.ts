@@ -109,7 +109,11 @@ import {
   getCurrentMonitorBounds,
   getVirtualDesktopBounds,
 } from '../../views/CaptureWorkspace/virtualDesktop';
-import { normalizeOcrText } from '../../utils/ocrTextProcessing';
+import {
+  applyOcrTextPreferences,
+  normalizeOcrText,
+} from '../../utils/ocrTextProcessing';
+import type { OcrSettings } from '../settings/ports';
 import type {
   CaptureWorkspaceRuntime,
   CaptureWorkspacePointerInput,
@@ -223,6 +227,7 @@ export function createCaptureWorkspaceRuntime({
   onInactive,
   annotationColorPresets,
   screenshotPreferences,
+  ocrPreferences,
   storage,
 }: {
   platform: CaptureWorkspaceRuntimePlatform;
@@ -231,6 +236,7 @@ export function createCaptureWorkspaceRuntime({
   onInactive?: () => void | Promise<void>;
   annotationColorPresets?: () => readonly AnnotationColor[];
   screenshotPreferences?: () => CaptureScreenshotPreferences | undefined;
+  ocrPreferences?: () => OcrSettings | undefined;
   storage?: CaptureSelectionStorage;
 }): CaptureWorkspaceRuntime {
   let state = createInitialState('screenshot', undefined, screenshotPreferences?.());
@@ -544,9 +550,30 @@ export function createCaptureWorkspaceRuntime({
     }
 
     if (effect.type === 'run-ocr') {
-      const result = await platform.commands.runCaptureOcr(sessionId, rect);
+      const ocrSettings = ocrPreferences?.();
+      const recognitionLanguage =
+        ocrSettings?.recognitionLanguage === 'auto'
+          ? undefined
+          : ocrSettings?.recognitionLanguage;
+      const result = recognitionLanguage
+        ? await platform.commands.runCaptureOcr(
+            sessionId,
+            rect,
+            recognitionLanguage,
+          )
+        : await platform.commands.runCaptureOcr(sessionId, rect);
       if (await cancelIfStale()) return;
-      const text = normalizeOcrText(result.text);
+      const text = ocrSettings
+        ? applyOcrTextPreferences(result.text, ocrSettings)
+        : normalizeOcrText(result.text);
+
+      if (effect.target !== 'clipboard' && ocrSettings?.autoCopy) {
+        try {
+          await platform.commands.copyTextToClipboard(text);
+        } catch (error) {
+          console.error('Failed to auto-copy OCR text:', error);
+        }
+      }
 
       if (effect.target === 'translation-window') {
         await platform.commands.openCaptureTranslationResultWindow(text);
@@ -560,7 +587,15 @@ export function createCaptureWorkspaceRuntime({
           annotations,
         });
         if (await cancelIfStale()) return;
-        await platform.commands.openCaptureOcrResultWindow(text, imageBase64);
+        if (result.confidence === null) {
+          await platform.commands.openCaptureOcrResultWindow(text, imageBase64);
+        } else {
+          await platform.commands.openCaptureOcrResultWindow(
+            text,
+            imageBase64,
+            result.confidence,
+          );
+        }
         return;
       }
 

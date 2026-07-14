@@ -70,6 +70,12 @@ impl Default for ScreenshotSettings {
 pub struct TranslationSettings {
     pub default_source_lang: String,
     pub default_target_lang: String,
+    pub auto_translate: bool,
+    pub auto_copy: bool,
+    pub preserve_line_breaks: bool,
+    pub incremental_translation: bool,
+    pub window_always_on_top: bool,
+    pub hide_on_blur: bool,
 }
 
 impl Default for TranslationSettings {
@@ -77,6 +83,34 @@ impl Default for TranslationSettings {
         Self {
             default_source_lang: "auto".to_string(),
             default_target_lang: "zh-CN".to_string(),
+            auto_translate: true,
+            auto_copy: false,
+            preserve_line_breaks: true,
+            incremental_translation: false,
+            window_always_on_top: true,
+            hide_on_blur: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct OcrSettings {
+    pub recognition_language: String,
+    pub auto_copy: bool,
+    pub preserve_formatting: bool,
+    pub remove_chinese_spaces: bool,
+    pub show_confidence: bool,
+}
+
+impl Default for OcrSettings {
+    fn default() -> Self {
+        Self {
+            recognition_language: "auto".to_string(),
+            auto_copy: true,
+            preserve_formatting: true,
+            remove_chinese_spaces: true,
+            show_confidence: false,
         }
     }
 }
@@ -105,5 +139,6 @@ pub struct SettingsSnapshot {
     pub general: GeneralSettings,
     pub screenshot: ScreenshotSettings,
     pub translation: TranslationSettings,
+    pub ocr: OcrSettings,
     pub history: HistorySettings,
 }

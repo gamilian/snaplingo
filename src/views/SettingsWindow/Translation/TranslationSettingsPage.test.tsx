@@ -6,6 +6,12 @@ const settingsConfig = vi.hoisted(() => ({
     translation: {
       defaultSourceLang: 'auto',
       defaultTargetLang: 'zh-CN',
+      autoTranslate: true,
+      autoCopy: false,
+      preserveLineBreaks: true,
+      incrementalTranslation: false,
+      windowAlwaysOnTop: true,
+      hideOnBlur: false,
     },
     updateTranslationSettings: vi.fn(),
   },
@@ -38,10 +44,8 @@ describe('TranslationSettingsPage durable settings', () => {
 
     expect(settingsConfig.state.updateTranslationSettings).toHaveBeenNthCalledWith(1, {
       defaultSourceLang: 'ja',
-      defaultTargetLang: 'zh-CN',
     });
     expect(settingsConfig.state.updateTranslationSettings).toHaveBeenNthCalledWith(2, {
-      defaultSourceLang: 'auto',
       defaultTargetLang: 'en',
     });
   });

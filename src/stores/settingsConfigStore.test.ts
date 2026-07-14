@@ -6,6 +6,7 @@ const settingsRuntime = vi.hoisted(() => ({
   updateScreenshot: vi.fn(),
   updateAnnotationColors: vi.fn(),
   updateTranslation: vi.fn(),
+  updateOcr: vi.fn(),
   updateHistory: vi.fn(),
 }));
 
@@ -24,6 +25,19 @@ const backendSnapshot = {
   translation: {
     defaultSourceLang: 'auto',
     defaultTargetLang: 'zh-CN',
+    autoTranslate: true,
+    autoCopy: false,
+    preserveLineBreaks: true,
+    incrementalTranslation: false,
+    windowAlwaysOnTop: true,
+    hideOnBlur: false,
+  },
+  ocr: {
+    recognitionLanguage: 'auto',
+    autoCopy: true,
+    preserveFormatting: true,
+    removeChineseSpaces: true,
+    showConfidence: false,
   },
   history: {
     autoCleanupEnabled: false,
@@ -139,6 +153,52 @@ describe('settingsConfigStore', () => {
 
     expect(useSettingsConfigStore.getState().general?.theme).toBe('dark');
     expect(effectiveRefreshSnapshot.general.theme).toBe('dark');
+  });
+
+  it('serializes partial settings updates against the latest snapshot', async () => {
+    let resolveFirst!: (snapshot: typeof backendSnapshot) => void;
+    const firstResponse = new Promise<typeof backendSnapshot>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const firstSnapshot = {
+      ...backendSnapshot,
+      translation: { ...backendSnapshot.translation, autoCopy: true },
+    };
+    const secondSnapshot = {
+      ...firstSnapshot,
+      translation: {
+        ...firstSnapshot.translation,
+        preserveLineBreaks: false,
+      },
+    };
+    const { initializeSettingsConfigStore, useSettingsConfigStore } =
+      await import('./settingsConfigStore');
+    initializeSettingsConfigStore(settingsRuntime);
+    await useSettingsConfigStore.getState().hydrate();
+    settingsRuntime.updateTranslation
+      .mockReturnValueOnce(firstResponse)
+      .mockResolvedValueOnce(secondSnapshot);
+
+    const first = useSettingsConfigStore
+      .getState()
+      .updateTranslationSettings({ autoCopy: true });
+    const second = useSettingsConfigStore
+      .getState()
+      .updateTranslationSettings({ preserveLineBreaks: false });
+
+    await Promise.resolve();
+    expect(settingsRuntime.updateTranslation).toHaveBeenCalledTimes(1);
+    resolveFirst(firstSnapshot);
+    await first;
+    await second;
+
+    expect(settingsRuntime.updateTranslation).toHaveBeenNthCalledWith(2, {
+      ...firstSnapshot.translation,
+      preserveLineBreaks: false,
+    });
+    expect(useSettingsConfigStore.getState().translation).toEqual(
+      secondSnapshot.translation,
+    );
   });
 
   it('ignores legacy durable values and uses the backend snapshot', async () => {

@@ -794,6 +794,7 @@ mod tests {
                 width: 2.0,
                 height: 2.0,
             },
+            None,
         )
         .await
         .unwrap();
@@ -839,6 +840,7 @@ mod tests {
                     width: 2.0,
                     height: 2.0,
                 },
+                None,
             )
             .await
             .unwrap();

@@ -2491,6 +2491,42 @@ describe('capture workspace runtime', () => {
       error: null,
     });
   });
+
+  it('opens the OCR result even when automatic clipboard copy fails', async () => {
+    const platform = createPlatform({
+      session: createSession({ id: 'session-ocr' }),
+    });
+    platform.commands.runCaptureOcr.mockResolvedValue({
+      text: 'recognized text',
+      confidence: null,
+    });
+    platform.commands.copyTextToClipboard.mockRejectedValue(
+      new Error('clipboard unavailable'),
+    );
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const runtime = createCaptureWorkspaceRuntime({
+      platform,
+      ocrPreferences: () => ({
+        recognitionLanguage: 'auto',
+        autoCopy: true,
+        preserveFormatting: true,
+        removeChineseSpaces: true,
+        showConfidence: false,
+      }),
+    });
+
+    await runtime.actions.startSession('screenshot-ocr', 'session-ocr');
+    runtime.actions.pointerDown({ x: 20, y: 30 });
+    runtime.actions.pointerMove({ x: 140, y: 110 });
+    await runtime.actions.pointerUp({ x: 140, y: 110 });
+
+    expect(platform.commands.openCaptureOcrResultWindow).toHaveBeenCalledWith(
+      'recognized text',
+      'preview-image',
+    );
+    expect(platform.dismiss).toHaveBeenCalledTimes(1);
+    consoleError.mockRestore();
+  });
 });
 
 function createPlatform({

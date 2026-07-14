@@ -5,21 +5,21 @@ use serde::Serialize;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct ResultWindowRequestId(pub(crate) u64);
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum ResultWindowMode {
     Translation,
     Ocr,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum ResultWindowOcrIntent {
     DisplayText,
     File,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ResultWindowPayload {
     pub(crate) mode: ResultWindowMode,
@@ -29,9 +29,11 @@ pub(crate) struct ResultWindowPayload {
     pub(crate) ocr_intent: Option<ResultWindowOcrIntent>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) image_base64: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) confidence: Option<f32>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) enum ResultWindowOpenRequest {
     Translation {
         text: String,
@@ -42,6 +44,7 @@ pub(crate) enum ResultWindowOpenRequest {
         text: String,
         intent: ResultWindowOcrIntent,
         image_base64: Option<String>,
+        confidence: Option<f32>,
     },
 }
 
@@ -73,14 +76,20 @@ impl ResultWindowOpenRequest {
             text,
             intent: ResultWindowOcrIntent::DisplayText,
             image_base64: None,
+            confidence: None,
         }
     }
 
-    pub(crate) fn capture_ocr(text: String, image_base64: Option<String>) -> Self {
+    pub(crate) fn capture_ocr(
+        text: String,
+        image_base64: Option<String>,
+        confidence: Option<f32>,
+    ) -> Self {
         Self::Ocr {
             text,
             intent: ResultWindowOcrIntent::DisplayText,
             image_base64,
+            confidence,
         }
     }
 
@@ -89,6 +98,7 @@ impl ResultWindowOpenRequest {
             text: String::new(),
             intent: ResultWindowOcrIntent::File,
             image_base64: None,
+            confidence: None,
         }
     }
 }

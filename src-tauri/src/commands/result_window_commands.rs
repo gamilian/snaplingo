@@ -36,19 +36,22 @@ pub(crate) async fn open_ocr_result_window_for_runtime(
 pub async fn open_capture_ocr_result_window(
     text: String,
     image_base64: Option<String>,
+    confidence: Option<f32>,
     state: tauri::State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    open_capture_ocr_result_window_for_runtime(&state.result_window, text, image_base64).await
+    open_capture_ocr_result_window_for_runtime(&state.result_window, text, image_base64, confidence)
+        .await
 }
 
 pub(crate) async fn open_capture_ocr_result_window_for_runtime(
     runtime: &ResultWindowRuntime,
     text: String,
     image_base64: Option<String>,
+    confidence: Option<f32>,
 ) -> Result<(), String> {
     open_result_window_request(
         runtime,
-        ResultWindowOpenRequest::capture_ocr(text, image_base64),
+        ResultWindowOpenRequest::capture_ocr(text, image_base64, confidence),
     )
     .await
 }
@@ -235,6 +238,7 @@ mod tests {
             &runtime,
             "recognized".into(),
             Some("image-base64".into()),
+            Some(0.94),
         )
         .await
         .unwrap();
@@ -259,6 +263,7 @@ mod tests {
                 "autoTranslate": false,
                 "ocrIntent": "display-text",
                 "imageBase64": "image-base64",
+                "confidence": 0.94_f32,
             })
         );
     }

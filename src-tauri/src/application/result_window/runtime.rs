@@ -111,12 +111,14 @@ impl ResultWindowRuntime {
                 text,
                 intent,
                 image_base64,
+                confidence,
             } => ResultWindowPayload {
                 mode: ResultWindowMode::Ocr,
                 text,
                 auto_translate: false,
                 ocr_intent: Some(intent),
                 image_base64,
+                confidence,
             },
         }
     }
@@ -169,5 +171,6 @@ fn translation_payload(text: String, auto_translate: bool) -> ResultWindowPayloa
         auto_translate,
         ocr_intent: None,
         image_base64: None,
+        confidence: None,
     }
 }

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeOcrText, ocrCopyTokens } from './ocrTextProcessing';
+import {
+  applyOcrTextPreferences,
+  normalizeOcrText,
+  ocrCopyTokens,
+} from './ocrTextProcessing';
 
 describe('normalizeOcrText', () => {
   it('joins OCR line breaks inside URLs emails phones and English phrases', () => {
@@ -30,6 +34,35 @@ describe('normalizeOcrText', () => {
     expect(
       normalizeOcrText('第一段文字。\n\n第二段文字\n• 列表项一\n- 列表项二'),
     ).toBe('第一段文字。\n\n第二段文字\n• 列表项一\n- 列表项二');
+  });
+});
+
+describe('applyOcrTextPreferences', () => {
+  it('removes recognition spaces between Chinese characters', () => {
+    expect(
+      applyOcrTextPreferences('你 好 世 界', {
+        preserveFormatting: true,
+        removeChineseSpaces: true,
+      }),
+    ).toBe('你好世界');
+  });
+
+  it('keeps Chinese line and paragraph breaks while removing horizontal spaces', () => {
+    expect(
+      applyOcrTextPreferences('第 一 行\n\n第 二 行', {
+        preserveFormatting: true,
+        removeChineseSpaces: true,
+      }),
+    ).toBe('第一行\n\n第二行');
+  });
+
+  it('flattens whitespace when formatting is disabled', () => {
+    expect(
+      applyOcrTextPreferences('first\n\n second', {
+        preserveFormatting: false,
+        removeChineseSpaces: false,
+      }),
+    ).toBe('first second');
   });
 });
 
