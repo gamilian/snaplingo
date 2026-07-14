@@ -83,20 +83,6 @@ pub async fn delete_history(id: i64, state: State<'_, AppState>) -> Result<(), S
 }
 
 #[tauri::command]
-pub async fn set_history_favorite(
-    id: i64,
-    favorite: bool,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    state
-        .history
-        .history
-        .set_history_favorite(id, favorite)
-        .await
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
 pub async fn favorite_translation_result(
     source_history_id: Option<i64>,
     request: TranslationRequest,
@@ -274,33 +260,6 @@ pub async fn rerun_ocr_history(id: i64, state: State<'_, AppState>) -> Result<Oc
         .history
         .ocr_replay
         .run(id)
-        .await
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub async fn export_translation_favorites(
-    path: String,
-    state: State<'_, AppState>,
-) -> Result<usize, String> {
-    state
-        .history
-        .history
-        .export_translation_favorites(&path)
-        .await
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub async fn list_history_tags(
-    kind: HistoryKind,
-    favorite_only: bool,
-    state: State<'_, AppState>,
-) -> Result<Vec<String>, String> {
-    state
-        .history
-        .history
-        .list_tags(kind, favorite_only)
         .await
         .map_err(|error| error.to_string())
 }

@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 pub struct TranslationHistoryEntry {
     pub id: i64,
     pub timestamp: DateTime<Utc>,
-    pub favorite: bool,
     pub note: Option<String>,
     pub tags: Vec<String>,
     pub source_text: String,
@@ -24,7 +23,6 @@ pub struct TranslationHistoryEntry {
 pub struct OcrHistoryEntry {
     pub id: i64,
     pub timestamp: DateTime<Utc>,
-    pub favorite: bool,
     pub note: Option<String>,
     pub tags: Vec<String>,
     pub image_hash: String,
@@ -55,10 +53,6 @@ pub trait HistoryPolicyProvider: Send + Sync {
     fn current_policy(&self) -> Result<HistoryCleanupPolicy>;
 }
 
-pub trait TranslationFavoritesWriter: Send + Sync {
-    fn write(&self, path: &str, entries: &[TranslationHistoryEntry]) -> Result<()>;
-}
-
 pub trait OcrHistoryAssetStore: Send + Sync {
     fn store(&self, image_data: &[u8]) -> Result<StoredOcrHistoryAssets>;
     fn read(&self, relative_path: &str) -> Result<Vec<u8>>;
@@ -77,7 +71,6 @@ pub enum HistoryEntry {
 pub struct HistoryQuery {
     pub search: Option<String>,
     pub tag: Option<String>,
-    pub favorite_only: bool,
     pub limit: usize,
     pub offset: usize,
 }
@@ -144,8 +137,6 @@ pub trait HistoryRepository: Send + Sync {
 
     async fn delete(&self, id: i64) -> Result<()>;
 
-    async fn set_favorite(&self, id: i64, favorite: bool) -> Result<()>;
-
     async fn update_note(&self, id: i64, note: Option<String>) -> Result<()>;
 
     async fn replace_tags(&self, id: i64, tags: Vec<String>) -> Result<()>;
@@ -158,8 +149,6 @@ pub trait HistoryRepository: Send + Sync {
 
     async fn cleanup(&self, policy: HistoryCleanupPolicy)
         -> Result<(usize, Vec<(String, String)>)>;
-
-    async fn list_tags(&self, kind: HistoryKind, favorite_only: bool) -> Result<Vec<String>>;
 }
 
 #[cfg(test)]
@@ -237,10 +226,6 @@ mod tests {
             Ok(())
         }
 
-        async fn set_favorite(&self, _id: i64, _favorite: bool) -> Result<()> {
-            Ok(())
-        }
-
         async fn update_note(&self, _id: i64, _note: Option<String>) -> Result<()> {
             Ok(())
         }
@@ -266,10 +251,6 @@ mod tests {
             _policy: HistoryCleanupPolicy,
         ) -> Result<(usize, Vec<(String, String)>)> {
             Ok((0, Vec::new()))
-        }
-
-        async fn list_tags(&self, _kind: HistoryKind, _favorite_only: bool) -> Result<Vec<String>> {
-            Ok(Vec::new())
         }
     }
 

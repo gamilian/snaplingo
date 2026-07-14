@@ -5,6 +5,7 @@ import { formatRelativeTime } from '../../../utils/formatTime';
 import IconActionButton from '../../../components/common/IconActionButton';
 import { HistoryPagination } from '../HistoryPagination';
 import { useFavoritesStore } from '../../../stores/favoritesStore';
+import { ocrFavoriteKey } from '../../../application/favorites/identity';
 
 export function HistoryPage() {
   const runtime = useSettingsRuntime();
@@ -14,8 +15,8 @@ export function HistoryPage() {
   const revision = useHistoryStore((state) => state.revision);
   const deleteItem = useHistoryStore((state) => state.deleteOcrHistory);
   const addFavorite = useFavoritesStore((state) => state.addOcr);
-  const favoriteRevision = useFavoritesStore((state) => state.revision);
-  const [favoritedIds, setFavoritedIds] = useState<Set<string>>(new Set());
+  const favoriteKeys = useFavoritesStore((state) => state.keys);
+  const hydrateFavoriteKeys = useFavoritesStore((state) => state.hydrateKeys);
   const clearHistory = useHistoryStore((state) => state.clearOcrHistory);
 
   const [search, setSearch] = useState('');
@@ -31,18 +32,8 @@ export function HistoryPage() {
   }, [page, queryHistory, revision, search]);
 
   useEffect(() => {
-    void runtime.favorites.query({ kind: 'ocr', limit: 1000, offset: 0 }).then((result) => {
-      setFavoritedIds(
-        new Set(
-          result.items
-            .filter((item) => item.content.contentKind === 'ocr')
-            .map((item) => item.sourceHistoryId)
-            .filter((id): id is number => id !== null)
-            .map(String),
-        ),
-      );
-    });
-  }, [favoriteRevision, runtime]);
+    void hydrateFavoriteKeys('ocr');
+  }, [hydrateFavoriteKeys]);
 
   const handleCopy = (text: string) => {
     void runtime.clipboard.copyText(text);
@@ -113,24 +104,40 @@ export function HistoryPage() {
                   </IconActionButton>
                   <IconActionButton
                     onClick={() => {
-                      if (favoritedIds.has(item.id)) return;
-                      void addFavorite({
+                      const input = {
                         sourceHistoryId: Number(item.id),
                         recognizedText: item.text,
                         language: item.language === 'Unknown' ? null : item.language,
                         providerUsed: item.providerUsed,
                         confidence: item.confidence,
-                      }).then(() => {
-                        setFavoritedIds((current) => new Set(current).add(item.id));
-                      });
+                      };
+                      if (!favoriteKeys.has(ocrFavoriteKey(input))) {
+                        void addFavorite(input);
+                      }
                     }}
-                    title={favoritedIds.has(item.id) ? '已收藏' : '收藏'}
-                    disabled={favoritedIds.has(item.id)}
+                    title={favoriteKeys.has(ocrFavoriteKey({
+                      recognizedText: item.text,
+                      language: item.language === 'Unknown' ? null : item.language,
+                      providerUsed: item.providerUsed,
+                    })) ? '已收藏' : '收藏'}
+                    disabled={favoriteKeys.has(ocrFavoriteKey({
+                      recognizedText: item.text,
+                      language: item.language === 'Unknown' ? null : item.language,
+                      providerUsed: item.providerUsed,
+                    }))}
                     className={`w-6 h-6 flex items-center justify-center rounded transition-colors ${
-                      favoritedIds.has(item.id) ? 'text-yellow-500' : 'text-gray-300 hover:text-gray-400'
+                      favoriteKeys.has(ocrFavoriteKey({
+                        recognizedText: item.text,
+                        language: item.language === 'Unknown' ? null : item.language,
+                        providerUsed: item.providerUsed,
+                      })) ? 'text-yellow-500' : 'text-gray-300 hover:text-gray-400'
                     }`}
                   >
-                    {favoritedIds.has(item.id) ? '★' : '☆'}
+                    {favoriteKeys.has(ocrFavoriteKey({
+                      recognizedText: item.text,
+                      language: item.language === 'Unknown' ? null : item.language,
+                      providerUsed: item.providerUsed,
+                    })) ? '★' : '☆'}
                   </IconActionButton>
                   <IconActionButton
                     onClick={() => deleteItem(item.id)}

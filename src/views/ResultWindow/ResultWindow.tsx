@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useProviderStore } from '../../stores/providerStore';
+import { translationFavoriteKey } from '../../application/favorites/identity';
 import {
   defaultTargetLanguageForSource,
   getTranslationLanguageDisplayName,
@@ -16,8 +17,7 @@ import {
   resolveTranslationRequestLanguages,
   swapTranslationLanguagePair,
   TRANSLATION_LANGUAGES,
-} from '../../hooks/translationLanguages';
-import { useTranslate } from '../../hooks/useTranslate';
+} from '../../application/translation/languages';
 import TranslationCard from './TranslationCard';
 import { CustomSelect } from '../../components/common/CustomSelect';
 import { getTranslationProviderDisplayName } from './translationProviderDisplayName';
@@ -267,10 +267,6 @@ function ResultWindowContent({
     (state) => state.loadTranslationProviders,
   );
 
-  const { translate, retryProvider } = useTranslate(
-    runtime.commands.translateTextWithProvider,
-    runtime.commands.recordTranslationHistory,
-  );
   const lastAutoTranslateRequestId = useRef(0);
   const resultWindowPanelRef = useRef<HTMLDivElement>(null);
   const sourceTextAreaRef = useRef<HTMLTextAreaElement>(null);
@@ -290,8 +286,9 @@ function ResultWindowContent({
     null,
   );
   const [isOcrFavoritePending, setOcrFavoritePending] = useState(false);
-  const [favoritedTranslationSignature, setFavoritedTranslationSignature] =
-    useState<string | null>(null);
+  const [favoritedTranslationKeys, setFavoritedTranslationKeys] = useState(
+    () => new Set<string>(),
+  );
   const [isTranslationFavoritePending, setTranslationFavoritePending] =
     useState(false);
   const sourceTextStyle = useMemo(
@@ -331,12 +328,22 @@ function ResultWindowContent({
         .targetLang,
     [sourceLang, sourceText, targetLang],
   );
-  const translationFavoriteSignature = JSON.stringify({
-    sourceText,
-    sourceLang,
-    targetLang: resolvedTargetLanguage,
-    results: completedTranslationResults,
-  });
+  const translationResultFavoriteKey = useCallback(
+    (result: (typeof completedTranslationResults)[number]) =>
+      translationFavoriteKey({
+        sourceText,
+        sourceLang,
+        targetLang: resolvedTargetLanguage,
+        providerId: result.provider_id,
+        translatedText: result.translated_text,
+      }),
+    [resolvedTargetLanguage, sourceLang, sourceText],
+  );
+  const areAllTranslationResultsFavorited =
+    completedTranslationResults.length > 0 &&
+    completedTranslationResults.every((result) =>
+      favoritedTranslationKeys.has(translationResultFavoriteKey(result)),
+    );
   const translationPanelHeightPx =
     measuredTranslationPanelHeightPx ?? translationLayout.windowHeightPx;
   const sourceTextAreaStyle =
@@ -428,7 +435,13 @@ function ResultWindowContent({
           }),
         ),
       );
-      setFavoritedTranslationSignature(translationFavoriteSignature);
+      setFavoritedTranslationKeys((current) => {
+        const next = new Set(current);
+        completedTranslationResults.forEach((result) =>
+          next.add(translationResultFavoriteKey(result)),
+        );
+        return next;
+      });
     } catch (error) {
       console.error('Failed to favorite translation results:', error);
     } finally {
@@ -441,7 +454,7 @@ function ResultWindowContent({
     runtime,
     sourceLang,
     sourceText,
-    translationFavoriteSignature,
+    translationResultFavoriteKey,
   ]);
 
   useEffect(() => {
@@ -594,14 +607,14 @@ function ResultWindowContent({
     }
 
     lastAutoTranslateRequestId.current = autoTranslateRequestId;
-    void translate(sourceText, sourceLang, targetLang);
+    void runtime.translate({ text: sourceText, sourceLang, targetLang });
   }, [
     autoTranslateRequestId,
     resultWindowVisible,
     sourceLang,
     sourceText,
     targetLang,
-    translate,
+    runtime,
   ]);
 
   if (!resultWindowVisible) return null;
@@ -639,7 +652,7 @@ function ResultWindowContent({
   };
 
   const handleTranslate = () => {
-    void translate();
+    void runtime.translate({ text: sourceText, sourceLang, targetLang });
   };
 
   const handleUploadImage = () => {
@@ -986,20 +999,17 @@ function ResultWindowContent({
                   <div className="flex items-center gap-2">
                     <IconActionButton
                       title={
-                        favoritedTranslationSignature ===
-                        translationFavoriteSignature
+                        areAllTranslationResultsFavorited
                           ? '已收藏'
                           : '收藏'
                       }
                       aria-pressed={
-                        favoritedTranslationSignature ===
-                        translationFavoriteSignature
+                        areAllTranslationResultsFavorited
                       }
                       disabled={
                         completedTranslationResults.length === 0 ||
                         isTranslationFavoritePending ||
-                        favoritedTranslationSignature ===
-                          translationFavoriteSignature
+                        areAllTranslationResultsFavorited
                       }
                       className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
                       onClick={() => void handleFavoriteTranslation()}
@@ -1007,8 +1017,7 @@ function ResultWindowContent({
                       <FavoriteIcon
                         className="h-4 w-4"
                         fill={
-                          favoritedTranslationSignature ===
-                          translationFavoriteSignature
+                          areAllTranslationResultsFavorited
                             ? 'currentColor'
                             : 'none'
                         }
@@ -1093,7 +1102,7 @@ function ResultWindowContent({
                         ] ?? 44
                       }
                       onRetry={() => {
-                        void retryProvider(result.provider_id);
+                        void runtime.retryTranslationProvider(result.provider_id);
                       }}
                       onFavorite={() =>
                         runtime.commands.favoriteTranslationResult({
@@ -1106,8 +1115,17 @@ function ResultWindowContent({
                             detected_language: result.detected_language,
                             confidence: result.confidence,
                           },
-                        }).then(() => undefined)
+                        }).then(() => {
+                          setFavoritedTranslationKeys((current) =>
+                            new Set(current).add(
+                              translationResultFavoriteKey(result),
+                            ),
+                          );
+                        })
                       }
+                      isFavorite={favoritedTranslationKeys.has(
+                        translationResultFavoriteKey(result),
+                      )}
                       copyText={runtime.clipboard.copyText}
                     />
                   ))}

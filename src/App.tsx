@@ -53,7 +53,6 @@ import {
   captureWorkspaceCommands,
   currentCaptureResultWindowRequestId,
   takeCaptureResultWindowPayload,
-  triggerScreenshot,
 } from './platform/tauri/capture';
 import { captureWindow } from './platform/tauri/captureWindow';
 import { writeClipboardText } from './platform/tauri/clipboard';
@@ -85,7 +84,6 @@ const settingsRuntime = createSettingsRuntime({
   favorites,
   screenshotFavorites,
   clipboard: { writeText: writeClipboardText },
-  capture: { triggerScreenshot },
 });
 const captureWorkspaceRuntime = createCaptureWorkspacePlatformRuntime({
   events: captureWorkspaceEvents,
@@ -138,6 +136,30 @@ const resultWindowRuntime = createResultWindowRuntime({
     showResultWindow: () => useAppStore.getState().showResultWindow(),
     showOcrWindow: () => useAppStore.getState().showOcrWindow(),
     hideResultWindow: () => useAppStore.getState().hideResultWindow(),
+    loadActiveTranslationProviderIds: async () => {
+      await useProviderStore.getState().loadTranslationProviders();
+      return useProviderStore.getState().activeTranslationProviders;
+    },
+    getTranslationSession: () => {
+      const state = useAppStore.getState();
+      return {
+        sessionId: state.translationSessionId,
+        sourceText: state.sourceText,
+        sourceLang: state.sourceLang,
+        targetLang: state.targetLang,
+      };
+    },
+    startTranslationSession: (text, providerIds) =>
+      useAppStore.getState().startTranslationSession(text, providerIds),
+    beginProviderTranslation: (sessionId, providerId) =>
+      useAppStore.getState().beginProviderTranslation(sessionId, providerId),
+    completeProviderTranslation: (sessionId, result) =>
+      useAppStore.getState().completeProviderTranslation(sessionId, result),
+    failProviderTranslation: (sessionId, providerId, message) =>
+      useAppStore
+        .getState()
+        .failProviderTranslation(sessionId, providerId, message),
+    setTranslating: (value) => useAppStore.getState().setTranslating(value),
   },
 });
 const pinnedImageRuntime = createPinnedImagePlatformRuntime({

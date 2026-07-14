@@ -10,8 +10,6 @@ import ResultWindow from './ResultWindow';
 
 const runtime = {
   commands: {
-    translateTextWithProvider: vi.fn(),
-    recordTranslationHistory: vi.fn(),
     favoriteTranslationResult: vi.fn(),
     favoriteOcrResult: vi.fn(),
   },
@@ -19,6 +17,8 @@ const runtime = {
   resizeStandaloneWindow: vi.fn(),
   close: vi.fn(),
   startFileOcr: vi.fn(),
+  translate: vi.fn(),
+  retryTranslationProvider: vi.fn(),
 } as unknown as ResultWindowRuntime;
 
 async function renderResultWindow() {
@@ -97,10 +97,7 @@ describe('result window text actions', () => {
     await view.unmount();
   });
 
-  it('records one history entry after all active translation providers return', async () => {
-    useProviderStore.setState({
-      activeTranslationProviders: ['google', 'deeplx'],
-    });
+  it('delegates translation workflow to the application runtime', async () => {
     useAppStore.setState({
       resultWindowVisible: true,
       resultWindowMode: 'translation',
@@ -108,15 +105,6 @@ describe('result window text actions', () => {
       sourceLang: 'en',
       targetLang: 'zh-CN',
     });
-    vi.mocked(runtime.commands.translateTextWithProvider).mockImplementation(
-      async (providerId) => ({
-        provider_id: providerId,
-        translated_text: providerId === 'google' ? '你好' : '您好',
-        detected_language: 'en',
-        confidence: null,
-      }),
-    );
-
     const view = await renderResultWindow();
     const retryButton = view.container.querySelector<HTMLButtonElement>(
       '[aria-label="重试"]',
@@ -125,18 +113,11 @@ describe('result window text actions', () => {
 
     await act(async () => retryButton?.click());
 
-    expect(runtime.commands.recordTranslationHistory).toHaveBeenCalledTimes(1);
-    expect(runtime.commands.recordTranslationHistory).toHaveBeenCalledWith(
-      expect.objectContaining({
-        text: 'hello',
-        sourceLang: 'en',
-        targetLang: 'zh-CN',
-        results: expect.arrayContaining([
-          expect.objectContaining({ provider_id: 'google' }),
-          expect.objectContaining({ provider_id: 'deeplx' }),
-        ]),
-      }),
-    );
+    expect(runtime.translate).toHaveBeenCalledWith({
+      text: 'hello',
+      sourceLang: 'en',
+      targetLang: 'zh-CN',
+    });
     await view.unmount();
   });
 });

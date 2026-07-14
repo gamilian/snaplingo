@@ -10,7 +10,7 @@ use crate::application::settings::SettingsConfiguration;
 use crate::application::History;
 use crate::domain::ocr::OcrResult;
 use crate::infrastructure::storage::{
-    Database, FilesystemOcrHistoryAssets, JsonTranslationFavoritesWriter, SqliteHistoryRepository,
+    Database, FilesystemOcrHistoryAssets, SqliteHistoryRepository,
 };
 use crate::AppState;
 use crate::Result;
@@ -56,7 +56,6 @@ pub(crate) fn build_history(
         Arc::new(TauriHistoryChangeNotifier { app }),
         Arc::new(FilesystemOcrHistoryAssets::new(asset_root)),
         settings,
-        Arc::new(JsonTranslationFavoritesWriter),
     ))
 }
 

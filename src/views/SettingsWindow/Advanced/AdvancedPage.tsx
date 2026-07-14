@@ -20,39 +20,11 @@ export function AdvancedPage() {
     maximumRecords: 5000,
   };
 
-  const handleTestScreenshot = async () => {
-    try {
-      console.log('Calling trigger_screenshot command...');
-      await runtime.advanced.triggerCapture();
-      console.log('Screenshot triggered successfully');
-    } catch (error) {
-      console.error('Failed to trigger screenshot:', error);
-      alert(`触发截图失败: ${error}`);
-    }
-  };
-
   return (
     <div className="max-w-4xl space-y-8">
       <div>
         <h2 className="text-3xl font-bold text-gray-900 mb-2">高级设置</h2>
         <p className="text-gray-600">面向高级用户的配置选项</p>
-      </div>
-
-      {/* 测试工具 */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
-        <h3 className="text-lg font-semibold text-gray-800">测试工具</h3>
-
-        <div>
-          <button
-            onClick={handleTestScreenshot}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-          >
-            测试截图功能（后端事件）
-          </button>
-          <p className="text-sm text-gray-500 mt-2">
-            通过后端触发截图事件，测试 Tauri 事件系统是否正常工作
-          </p>
-        </div>
       </div>
 
       {/* 网络设置 */}

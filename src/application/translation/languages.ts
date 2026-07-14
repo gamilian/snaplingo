@@ -24,14 +24,11 @@ export const TRANSLATION_LANGUAGES = [
 
 function languageByCode(languageCode: string) {
   if (languageCode === 'zh') {
-    return {
-      code: 'zh',
-      chineseName: '中文',
-      englishName: 'Chinese',
-    };
+    return { code: 'zh', chineseName: '中文', englishName: 'Chinese' };
   }
-
-  return TRANSLATION_LANGUAGES.find((language) => language.code === languageCode);
+  return TRANSLATION_LANGUAGES.find(
+    (language) => language.code === languageCode,
+  );
 }
 
 function isChineseLanguage(lang: string) {
@@ -57,18 +54,17 @@ export function defaultTargetLanguageForSource(sourceLang: string) {
   return isChineseLanguage(sourceLang) ? 'en' : 'zh-CN';
 }
 
-export function swapTranslationLanguagePair(sourceLang: string, targetLang: string) {
+export function swapTranslationLanguagePair(
+  sourceLang: string,
+  targetLang: string,
+) {
   if (sourceLang === 'auto') {
     return {
       sourceLang: targetLang,
       targetLang: defaultTargetLanguageForSource(targetLang),
     };
   }
-
-  return {
-    sourceLang: targetLang,
-    targetLang: sourceLang,
-  };
+  return { sourceLang: targetLang, targetLang: sourceLang };
 }
 
 export function resolveTranslationRequestLanguages(
@@ -89,8 +85,5 @@ export function resolveTranslationRequestLanguages(
     resolvedTarget = defaultTargetLanguageForSource(inferredSource);
   }
 
-  return {
-    sourceLang,
-    targetLang: resolvedTarget,
-  };
+  return { sourceLang, targetLang: resolvedTarget };
 }

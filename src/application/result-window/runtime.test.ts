@@ -110,6 +110,81 @@ describe('result window application runtime', () => {
     expect(state.setOcrRunning).toHaveBeenLastCalledWith(false);
   });
 
+  it('owns provider fan-out and records one aggregate translation history entry', async () => {
+    const { runtime, platform, state } = createRuntime({
+      activeProviderIds: ['google', 'deeplx'],
+      translationResults: {
+        google: {
+          provider_id: 'google',
+          translated_text: '你好',
+          detected_language: 'en',
+          confidence: null,
+        },
+        deeplx: {
+          provider_id: 'deeplx',
+          translated_text: '您好',
+          detected_language: 'en',
+          confidence: null,
+        },
+      },
+    });
+
+    await runtime.translate({
+      text: 'hello',
+      sourceLang: 'en',
+      targetLang: 'zh-CN',
+    });
+
+    expect(state.startTranslationSession).toHaveBeenCalledWith('hello', [
+      'google',
+      'deeplx',
+    ]);
+    expect(platform.commands.translateTextWithProvider).toHaveBeenCalledTimes(2);
+    expect(platform.commands.recordTranslationHistory).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: 'hello',
+        sourceLang: 'en',
+        targetLang: 'zh-CN',
+        results: [
+          expect.objectContaining({ provider_id: 'google' }),
+          expect.objectContaining({ provider_id: 'deeplx' }),
+        ],
+      }),
+    );
+  });
+
+  it('records a successful provider retry instead of bypassing history', async () => {
+    const { runtime, platform, state } = createRuntime({
+      translationSession: {
+        sessionId: 'translation-1',
+        sourceText: 'hello',
+        sourceLang: 'en',
+        targetLang: 'zh-CN',
+      },
+      translationResults: {
+        google: {
+          provider_id: 'google',
+          translated_text: '你好',
+          detected_language: 'en',
+          confidence: null,
+        },
+      },
+    });
+
+    await runtime.retryTranslationProvider('google');
+
+    expect(state.beginProviderTranslation).toHaveBeenCalledWith(
+      'translation-1',
+      'google',
+    );
+    expect(platform.commands.recordTranslationHistory).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: 'hello',
+        results: [expect.objectContaining({ provider_id: 'google' })],
+      }),
+    );
+  });
+
   it('closes overlay state locally and standalone state plus native window', async () => {
     const { runtime, platform, state } = createRuntime();
 
@@ -164,6 +239,14 @@ function createRuntime(options: {
   recognizedFileText?: string;
   takePayloadError?: unknown;
   dismissError?: unknown;
+  activeProviderIds?: string[];
+  translationSession?: {
+    sessionId: string | null;
+    sourceText: string;
+    sourceLang: string;
+    targetLang: string;
+  };
+  translationResults?: Record<string, import('../../types').TranslationResult>;
 } = {}) {
   let payloadReadyHandler: ResultPayloadReadyHandler | null = null;
   const unsubscribe: ResultWindowUnsubscribe = vi.fn();
@@ -181,7 +264,11 @@ function createRuntime(options: {
         text: options.recognizedFileText ?? '',
         confidence: null,
       })),
-      translateTextWithProvider: vi.fn(),
+      translateTextWithProvider: vi.fn(async (providerId: string) => {
+        const result = options.translationResults?.[providerId];
+        if (!result) throw new Error(`missing result for ${providerId}`);
+        return result;
+      }),
       recordTranslationHistory: vi.fn(async () => undefined),
       favoriteTranslationResult: vi.fn(async () => 1),
       favoriteOcrResult: vi.fn(async () => 1),
@@ -208,6 +295,22 @@ function createRuntime(options: {
     showResultWindow: vi.fn(),
     showOcrWindow: vi.fn(),
     hideResultWindow: vi.fn(),
+    loadActiveTranslationProviderIds: vi.fn(
+      async () => options.activeProviderIds ?? [],
+    ),
+    getTranslationSession: vi.fn(() =>
+      options.translationSession ?? {
+        sessionId: null,
+        sourceText: '',
+        sourceLang: 'auto',
+        targetLang: 'zh-CN',
+      },
+    ),
+    startTranslationSession: vi.fn(() => 'translation-1'),
+    beginProviderTranslation: vi.fn(),
+    completeProviderTranslation: vi.fn(),
+    failProviderTranslation: vi.fn(),
+    setTranslating: vi.fn(),
   };
   const runtime = createResultWindowRuntime({ platform, state });
 

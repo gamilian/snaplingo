@@ -11,7 +11,6 @@ describe('Tauri history command adapter', () => {
       {
         id: 1,
         timestamp: '2026-07-11T02:00:00Z',
-        favorite: false,
         note: null,
         tags: ['work'],
         source_text: 'hello',
@@ -34,7 +33,6 @@ describe('Tauri history command adapter', () => {
       {
         id: 1,
         timestamp: '2026-07-11T02:00:00Z',
-        favorite: false,
         note: null,
         tags: ['work'],
         sourceText: 'hello',
@@ -64,7 +62,6 @@ describe('Tauri history command adapter', () => {
       {
         id: 2,
         timestamp: '2026-07-11T02:01:00Z',
-        favorite: true,
         note: 'keep',
         tags: [],
         image_hash: 'sha256:image',
@@ -80,7 +77,6 @@ describe('Tauri history command adapter', () => {
       {
         id: 2,
         timestamp: '2026-07-11T02:01:00Z',
-        favorite: true,
         note: 'keep',
         tags: [],
         imageHash: 'sha256:image',
@@ -89,6 +85,7 @@ describe('Tauri history command adapter', () => {
         recognizedText: 'recognized',
         confidence: null,
         durationMs: 8,
+        thumbnailDataUrl: undefined,
       },
     ]);
   });
@@ -157,7 +154,6 @@ describe('Tauri history command adapter', () => {
       deleteHistory,
       queryTranslationHistory,
       replaceHistoryTags,
-      setHistoryFavorite,
       updateHistoryNote,
     } = await import('./history');
     invoke.mockResolvedValue(undefined);
@@ -165,13 +161,11 @@ describe('Tauri history command adapter', () => {
     invoke.mockResolvedValueOnce({ items: [], total: 0 });
     await queryTranslationHistory({
       search: 'hello',
-      favoriteOnly: true,
       limit: 20,
       offset: 0,
     });
 
     await deleteHistory(7);
-    await setHistoryFavorite(7, true);
     await updateHistoryNote(7, 'keep this');
     await replaceHistoryTags(7, ['work']);
     await clearAllHistory();
@@ -180,14 +174,12 @@ describe('Tauri history command adapter', () => {
     expect(invoke).toHaveBeenCalledWith('query_translation_history', {
       query: {
         search: 'hello',
-        favoriteOnly: true,
         limit: 20,
         offset: 0,
       },
     });
 
     expect(invoke).toHaveBeenCalledWith('delete_history', { id: 7 });
-    expect(invoke).toHaveBeenCalledWith('set_history_favorite', { id: 7, favorite: true });
     expect(invoke).toHaveBeenCalledWith('update_history_note', { id: 7, note: 'keep this' });
     expect(invoke).toHaveBeenCalledWith('replace_history_tags', { id: 7, tags: ['work'] });
     expect(invoke).toHaveBeenCalledWith('clear_all_history');

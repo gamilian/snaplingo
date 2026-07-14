@@ -1,8 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::application::history::{
-        EventSubscriber, History, HistoryChangeNotifier, HistoryKind, HistoryQuery,
-        HistoryRepository,
+        EventSubscriber, History, HistoryChangeNotifier, HistoryKind, HistoryRepository,
     };
     use crate::domain::events::DomainEvent;
     use crate::domain::ocr::{OcrRequest, OcrResult};
@@ -243,7 +242,6 @@ mod tests {
         let id = history.get_translation_history(1, 0).await.unwrap()[0].id;
         notifier.0.store(0, Ordering::SeqCst);
 
-        history.set_history_favorite(id, true).await.unwrap();
         history
             .update_history_note(id, Some("note".to_string()))
             .await
@@ -255,47 +253,7 @@ mod tests {
         history.delete_history(id).await.unwrap();
         history.clear_all_history().await.unwrap();
 
-        assert_eq!(notifier.0.load(Ordering::SeqCst), 5);
-    }
-
-    #[tokio::test]
-    async fn favorite_translation_query_reads_all_matching_records_from_the_repository() {
-        let db = create_temp_db();
-        let history = History::new(db);
-        for text in ["first", "second"] {
-            history
-                .handle(&DomainEvent::TranslationCompleted {
-                    request: TranslationRequest {
-                        text: text.to_string(),
-                        source_lang: "en".to_string(),
-                        target_lang: "zh-CN".to_string(),
-                    },
-                    results: vec![],
-                    providers_used: vec![],
-                    timestamp: Utc::now(),
-                    duration_ms: 1,
-                })
-                .await;
-        }
-        let entries = history.get_translation_history(10, 0).await.unwrap();
-        history
-            .set_history_favorite(entries[1].id, true)
-            .await
-            .unwrap();
-
-        let page = history
-            .query_translation_history(HistoryQuery {
-                favorite_only: true,
-                limit: 1,
-                offset: 0,
-                ..HistoryQuery::default()
-            })
-            .await
-            .unwrap();
-
-        assert_eq!(page.total, 1);
-        assert_eq!(page.items.len(), 1);
-        assert_eq!(page.items[0].source_text, "first");
+        assert_eq!(notifier.0.load(Ordering::SeqCst), 4);
     }
 
     #[tokio::test]

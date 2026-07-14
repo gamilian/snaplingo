@@ -201,7 +201,6 @@ export interface SettingsHotkeysPort {
 export interface TranslationHistoryEntry {
     id: number;
     timestamp: string;
-    favorite: boolean;
     note: string | null;
     tags: string[];
   sourceText: string;
@@ -220,7 +219,6 @@ export interface TranslationHistoryEntry {
 export interface OcrHistoryEntry {
     id: number;
     timestamp: string;
-    favorite: boolean;
     note: string | null;
     tags: string[];
   imageHash: string;
@@ -241,7 +239,6 @@ export type HistoryKind = 'translation' | 'ocr';
 export interface HistoryQuery {
   search: string;
   tag?: string;
-  favoriteOnly: boolean;
   limit: number;
   offset: number;
 }
@@ -393,20 +390,13 @@ export interface SettingsHistoryPort {
   ): Promise<HistoryPage<TranslationHistoryEntry>>;
   queryOcrHistory(query: HistoryQuery): Promise<HistoryPage<OcrHistoryEntry>>;
   deleteHistory(id: number): Promise<void>;
-  setHistoryFavorite(id: number, favorite: boolean): Promise<void>;
   updateHistoryNote(id: number, note: string | null): Promise<void>;
   replaceHistoryTags(id: number, tags: string[]): Promise<void>;
   clearAllHistory(): Promise<void>;
   clearHistory(kind: HistoryKind): Promise<void>;
   rerunOcrHistory(id: number): Promise<string>;
-  exportTranslationFavorites(): Promise<number | null>;
-  listHistoryTags(kind: HistoryKind, favoriteOnly: boolean): Promise<string[]>;
 }
 
 export interface SettingsClipboardPort {
   writeText(text: string): Promise<void>;
-}
-
-export interface SettingsCapturePort {
-  triggerScreenshot(): Promise<void>;
 }

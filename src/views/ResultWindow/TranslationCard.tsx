@@ -22,6 +22,7 @@ interface TranslationCardProps {
   bodyHeightPx?: number;
   onRetry?: () => void;
   onFavorite?: () => Promise<void>;
+  isFavorite?: boolean;
   copyText: (text: string) => Promise<void>;
 }
 
@@ -41,11 +42,11 @@ export default function TranslationCard({
   bodyHeightPx = 62,
   onRetry,
   onFavorite,
+  isFavorite = false,
   copyText,
 }: TranslationCardProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isFavoritePending, setIsFavoritePending] = useState(false);
-  const [isFavorite, setIsFavorite] = useState(false);
 
   const providerColor = providerColors[providerId.toLowerCase()] || '#6b7280';
   const isPending = status === 'pending';
@@ -53,7 +54,6 @@ export default function TranslationCard({
   const displayText = text.trim();
 
   useEffect(() => {
-    setIsFavorite(false);
     setIsFavoritePending(false);
   }, [providerId, text]);
 
@@ -126,7 +126,6 @@ export default function TranslationCard({
                 event.stopPropagation();
                 setIsFavoritePending(true);
                 void onFavorite()
-                  .then(() => setIsFavorite(true))
                   .catch((error) => {
                     console.error('Failed to favorite translation result:', error);
                   })

@@ -18,7 +18,6 @@ import type {
   ScreenshotSettings,
   ScreenshotFavoritePage,
   ScreenshotFavoriteQuery,
-  SettingsCapturePort,
   SettingsClipboardPort,
   SettingsHistoryPort,
   SettingsFavoritesPort,
@@ -41,7 +40,6 @@ export interface SettingsRuntimePorts {
   favorites: SettingsFavoritesPort;
   screenshotFavorites: SettingsScreenshotFavoritesPort;
   clipboard: SettingsClipboardPort;
-  capture: SettingsCapturePort;
 }
 
 export interface SettingsRuntime {
@@ -77,14 +75,11 @@ export interface SettingsRuntime {
     ): Promise<HistoryPage<TranslationHistoryEntry>>;
     queryOcr(query: HistoryQuery): Promise<HistoryPage<OcrHistoryEntry>>;
     deleteEntry(id: number): Promise<void>;
-    setFavorite(id: number, favorite: boolean): Promise<void>;
     updateNote(id: number, note: string | null): Promise<void>;
     replaceTags(id: number, tags: string[]): Promise<void>;
     clear(): Promise<void>;
     clearKind(kind: HistoryKind): Promise<void>;
     rerunOcr(id: number): Promise<string>;
-    exportTranslationFavorites(): Promise<number | null>;
-    listTags(kind: HistoryKind, favoriteOnly: boolean): Promise<string[]>;
   };
   favorites: {
     addTranslation(input: TranslationFavoriteInput): Promise<number>;
@@ -108,9 +103,6 @@ export interface SettingsRuntime {
   };
   clipboard: {
     copyText(text: string): Promise<void>;
-  };
-  advanced: {
-    triggerCapture(): Promise<void>;
   };
 }
 
@@ -149,16 +141,11 @@ export function createSettingsRuntime(
         ports.history.queryTranslationHistory(query),
       queryOcr: (query) => ports.history.queryOcrHistory(query),
       deleteEntry: (id) => ports.history.deleteHistory(id),
-      setFavorite: (id, favorite) => ports.history.setHistoryFavorite(id, favorite),
       updateNote: (id, note) => ports.history.updateHistoryNote(id, note),
       replaceTags: (id, tags) => ports.history.replaceHistoryTags(id, tags),
       clear: () => ports.history.clearAllHistory(),
       clearKind: (kind) => ports.history.clearHistory(kind),
       rerunOcr: (id) => ports.history.rerunOcrHistory(id),
-      exportTranslationFavorites: () =>
-        ports.history.exportTranslationFavorites(),
-      listTags: (kind, favoriteOnly) =>
-        ports.history.listHistoryTags(kind, favoriteOnly),
     },
     favorites: {
       addTranslation: (input) => ports.favorites.addTranslationFavorite(input),
@@ -184,9 +171,6 @@ export function createSettingsRuntime(
     },
     clipboard: {
       copyText: (text) => ports.clipboard.writeText(text),
-    },
-    advanced: {
-      triggerCapture: () => ports.capture.triggerScreenshot(),
     },
   };
 }

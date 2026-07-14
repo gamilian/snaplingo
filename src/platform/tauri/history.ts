@@ -1,5 +1,4 @@
 import { invoke } from '@tauri-apps/api/core';
-import { save } from '@tauri-apps/plugin-dialog';
 import type {
   HistoryEntry,
   HistoryPage,
@@ -12,7 +11,6 @@ import type {
 interface BackendTranslationEntry {
   id: number;
   timestamp: string;
-  favorite: boolean;
   note: string | null;
   tags: string[];
   source_text: string;
@@ -31,7 +29,6 @@ interface BackendTranslationEntry {
 interface BackendOcrEntry {
   id: number;
   timestamp: string;
-  favorite: boolean;
   note: string | null;
   tags: string[];
   image_hash: string;
@@ -58,7 +55,6 @@ function toTranslationHistoryEntry(
   return {
     id: entry.id,
     timestamp: entry.timestamp,
-    favorite: entry.favorite,
     note: entry.note,
     tags: entry.tags,
     sourceText: entry.source_text,
@@ -79,7 +75,6 @@ function toOcrHistoryEntry(entry: BackendOcrEntry): OcrHistoryEntry {
   return {
     id: entry.id,
     timestamp: entry.timestamp,
-    favorite: entry.favorite,
     note: entry.note,
     tags: entry.tags,
     imageHash: entry.image_hash,
@@ -153,10 +148,6 @@ export function deleteHistory(id: number) {
   return invoke<void>('delete_history', { id });
 }
 
-export function setHistoryFavorite(id: number, favorite: boolean) {
-  return invoke<void>('set_history_favorite', { id, favorite });
-}
-
 export function updateHistoryNote(id: number, note: string | null) {
   return invoke<void>('update_history_note', { id, note });
 }
@@ -176,17 +167,4 @@ export function clearHistory(kind: HistoryKind) {
 export async function rerunOcrHistory(id: number) {
   const result = await invoke<{ text: string }>('rerun_ocr_history', { id });
   return result.text;
-}
-
-export async function exportTranslationFavorites() {
-  const path = await save({
-    defaultPath: 'SnapLingo-translation-favorites.json',
-    filters: [{ name: 'JSON', extensions: ['json'] }],
-  });
-  if (!path) return null;
-  return invoke<number>('export_translation_favorites', { path });
-}
-
-export function listHistoryTags(kind: HistoryKind, favoriteOnly: boolean) {
-  return invoke<string[]>('list_history_tags', { kind, favoriteOnly });
 }

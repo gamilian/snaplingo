@@ -17,7 +17,7 @@ pub use event_source::EventSubscriber;
 pub use repository::{
     HistoryCleanupPolicy, HistoryEntry, HistoryKind, HistoryPage, HistoryPolicyProvider,
     HistoryQuery, HistoryRepository, OcrHistoryAssetStore, OcrHistoryEntry, StoredOcrHistoryAssets,
-    TranslationFavoritesWriter, TranslationHistoryEntry,
+    TranslationHistoryEntry,
 };
 
 /// Owns history recording, queries, and deletion.
@@ -30,7 +30,6 @@ pub struct History {
     change_notifier: Option<Arc<dyn HistoryChangeNotifier>>,
     ocr_assets: Option<Arc<dyn OcrHistoryAssetStore>>,
     policy_provider: Option<Arc<dyn HistoryPolicyProvider>>,
-    translation_favorites_writer: Option<Arc<dyn TranslationFavoritesWriter>>,
 }
 
 pub trait HistoryChangeNotifier: Send + Sync {
@@ -45,7 +44,6 @@ impl History {
             change_notifier: None,
             ocr_assets: None,
             policy_provider: None,
-            translation_favorites_writer: None,
         }
     }
 
@@ -58,7 +56,6 @@ impl History {
             change_notifier: Some(change_notifier),
             ocr_assets: None,
             policy_provider: None,
-            translation_favorites_writer: None,
         }
     }
 
@@ -72,7 +69,6 @@ impl History {
             change_notifier: Some(change_notifier),
             ocr_assets: Some(ocr_assets),
             policy_provider: None,
-            translation_favorites_writer: None,
         }
     }
 
@@ -81,14 +77,12 @@ impl History {
         change_notifier: Arc<dyn HistoryChangeNotifier>,
         ocr_assets: Arc<dyn OcrHistoryAssetStore>,
         policy_provider: Arc<dyn HistoryPolicyProvider>,
-        translation_favorites_writer: Arc<dyn TranslationFavoritesWriter>,
     ) -> Self {
         Self {
             repository,
             change_notifier: Some(change_notifier),
             ocr_assets: Some(ocr_assets),
             policy_provider: Some(policy_provider),
-            translation_favorites_writer: Some(translation_favorites_writer),
         }
     }
 
@@ -161,12 +155,6 @@ impl History {
         Ok(())
     }
 
-    pub async fn set_history_favorite(&self, id: i64, favorite: bool) -> Result<()> {
-        self.repository.set_favorite(id, favorite).await?;
-        self.notify_changed();
-        Ok(())
-    }
-
     pub async fn update_history_note(&self, id: i64, note: Option<String>) -> Result<()> {
         self.repository.update_note(id, note).await?;
         self.notify_changed();
@@ -228,39 +216,6 @@ impl History {
             self.notify_changed();
         }
         Ok(removed)
-    }
-
-    pub async fn export_translation_favorites(&self, path: &str) -> Result<usize> {
-        let writer = self
-            .translation_favorites_writer
-            .as_ref()
-            .ok_or_else(|| "Translation favorite export is unavailable".to_string())?;
-        let mut offset = 0;
-        let mut entries = Vec::new();
-        loop {
-            let page = self
-                .repository
-                .query_translation_page(&HistoryQuery {
-                    search: None,
-                    tag: None,
-                    favorite_only: true,
-                    limit: 500,
-                    offset,
-                })
-                .await?;
-            let count = page.items.len();
-            entries.extend(page.items);
-            offset += count;
-            if count == 0 || offset >= page.total {
-                break;
-            }
-        }
-        writer.write(path, &entries)?;
-        Ok(entries.len())
-    }
-
-    pub async fn list_tags(&self, kind: HistoryKind, favorite_only: bool) -> Result<Vec<String>> {
-        self.repository.list_tags(kind, favorite_only).await
     }
 
     fn hydrate_ocr_thumbnails(
