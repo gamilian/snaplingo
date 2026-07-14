@@ -497,6 +497,8 @@ export function createCaptureWorkspaceRuntime({
               }
             : effect.action === 'pin'
               ? { type: 'pin' as const }
+              : effect.action === 'favorite'
+                ? { type: 'favorite' as const }
               : { type: 'copy' as const };
       if (!action) return true;
       if (await cancelIfStale()) return;

@@ -6,6 +6,7 @@ const settingsRuntime = vi.hoisted(() => ({
   updateScreenshot: vi.fn(),
   updateAnnotationColors: vi.fn(),
   updateTranslation: vi.fn(),
+  updateHistory: vi.fn(),
 }));
 
 const backendSnapshot = {
@@ -23,6 +24,11 @@ const backendSnapshot = {
   translation: {
     defaultSourceLang: 'auto',
     defaultTargetLang: 'zh-CN',
+  },
+  history: {
+    autoCleanupEnabled: false,
+    retentionDays: 30,
+    maximumRecords: 5000,
   },
 };
 

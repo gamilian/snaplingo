@@ -45,7 +45,8 @@ export interface CaptureWindowPort {
 export type CaptureOutputAction =
   | { type: 'copy' }
   | { type: 'save'; path: string }
-  | { type: 'pin' };
+  | { type: 'pin' }
+  | { type: 'favorite' };
 
 export interface RenderCaptureOutputInput {
   sessionId: string;

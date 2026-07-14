@@ -389,6 +389,7 @@ export function CaptureWorkspaceView({
                 onSave={() => completeSelection('save')}
                 onQuickSave={() => completeSelection('quick-save')}
                 onPin={() => completeSelection('pin')}
+                onFavorite={() => completeSelection('favorite')}
               />
             )}
             <CaptureRenderingOutputBar

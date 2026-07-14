@@ -58,6 +58,7 @@ interface CaptureEditorToolbarProps {
   onSave: () => void | Promise<void>;
   onQuickSave: () => void | Promise<void>;
   onPin: () => void | Promise<void>;
+  onFavorite: () => void | Promise<void>;
 }
 
 interface AnnotationToolButton {
@@ -150,6 +151,7 @@ export function CaptureEditorToolbar({
   onSave,
   onQuickSave,
   onPin,
+  onFavorite,
 }: CaptureEditorToolbarProps) {
   const [openPicker, setOpenPicker] = useState<
     "shape" | "arrow" | "color" | null
@@ -477,6 +479,16 @@ export function CaptureEditorToolbar({
         }}
       >
         OCR
+      </button>
+      <button
+        type="button"
+        className={getCaptureEditorCommandButtonClassName("icon")}
+        disabled={isRenderingOutput}
+        title="Add to favorites"
+        aria-label="Add capture to favorites"
+        onClick={() => void onFavorite()}
+      >
+        <FavoriteIcon />
       </button>
       <button
         type="button"
@@ -957,6 +969,24 @@ function PinIcon() {
     <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" aria-hidden="true">
       <path
         d="m14.3 3.4 6.3 6.3-2 2-1.6-1.6-3.2 3.2.7 2.7-1.4 1.4-3.6-3.6-5.2 5.2-1-1 5.2-5.2-3.6-3.6 1.4-1.4 2.7.7 3.2-3.2-1.6-1.6 2-2Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function FavoriteIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" aria-hidden="true">
+      <path
+        d="M6.2 4.5h11.6v15l-5.8-3.4-5.8 3.4v-15Z"
+        fill="none"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="1.65"
+      />
+      <path
+        d="m12 7.2 1.1 2.2 2.4.3-1.7 1.7.4 2.4-2.2-1.1-2.2 1.1.4-2.4-1.7-1.7 2.4-.3L12 7.2Z"
         fill="currentColor"
       />
     </svg>

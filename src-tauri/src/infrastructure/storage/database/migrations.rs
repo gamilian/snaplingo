@@ -2,7 +2,7 @@ use rusqlite::{Connection, Transaction};
 
 use crate::{AppError, Result};
 
-const CURRENT_SCHEMA_VERSION: i32 = 1;
+const CURRENT_SCHEMA_VERSION: i32 = 3;
 
 pub(super) fn migrate(connection: &mut Connection) -> Result<()> {
     let mut version: i32 = connection.query_row("PRAGMA user_version", [], |row| row.get(0))?;
@@ -19,6 +19,8 @@ pub(super) fn migrate(connection: &mut Connection) -> Result<()> {
         let transaction = connection.transaction()?;
         match next_version {
             1 => migrate_to_v1(&transaction)?,
+            2 => migrate_to_v2(&transaction)?,
+            3 => migrate_to_v3(&transaction)?,
             _ => unreachable!("missing migration for version {}", next_version),
         }
         transaction.pragma_update(None, "user_version", next_version)?;
@@ -26,6 +28,61 @@ pub(super) fn migrate(connection: &mut Connection) -> Result<()> {
         version = next_version;
     }
 
+    Ok(())
+}
+
+fn migrate_to_v3(transaction: &Transaction<'_>) -> Result<()> {
+    transaction.execute_batch(
+        "CREATE TABLE favorites (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kind TEXT NOT NULL CHECK(kind IN ('translation', 'ocr')),
+            source_history_id INTEGER,
+            created_at TEXT NOT NULL,
+            fingerprint TEXT NOT NULL UNIQUE,
+            content_json TEXT NOT NULL CHECK(json_valid(content_json)),
+            note TEXT
+        );
+
+        CREATE TABLE favorite_tags (
+            favorite_id INTEGER NOT NULL REFERENCES favorites(id) ON DELETE CASCADE,
+            tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+            PRIMARY KEY(favorite_id, tag_id)
+        );
+
+        CREATE INDEX idx_favorites_kind_created_at
+            ON favorites(kind, created_at DESC);
+        CREATE INDEX idx_favorite_tags_tag_id
+            ON favorite_tags(tag_id);",
+    )?;
+    Ok(())
+}
+
+fn migrate_to_v2(transaction: &Transaction<'_>) -> Result<()> {
+    transaction.execute_batch(
+        "ALTER TABLE ocr_history ADD COLUMN source_asset_path TEXT;
+        ALTER TABLE ocr_history ADD COLUMN thumbnail_asset_path TEXT;
+
+        CREATE TABLE screenshot_favorites (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at TEXT NOT NULL,
+            asset_path TEXT NOT NULL UNIQUE,
+            thumbnail_path TEXT NOT NULL UNIQUE,
+            width INTEGER NOT NULL,
+            height INTEGER NOT NULL,
+            note TEXT
+        );
+
+        CREATE TABLE screenshot_favorite_tags (
+            favorite_id INTEGER NOT NULL REFERENCES screenshot_favorites(id) ON DELETE CASCADE,
+            tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+            PRIMARY KEY(favorite_id, tag_id)
+        );
+
+        CREATE INDEX idx_screenshot_favorites_created_at
+            ON screenshot_favorites(created_at DESC);
+        CREATE INDEX idx_screenshot_favorite_tags_tag_id
+            ON screenshot_favorite_tags(tag_id);",
+    )?;
     Ok(())
 }
 

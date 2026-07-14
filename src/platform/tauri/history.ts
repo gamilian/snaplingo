@@ -1,6 +1,10 @@
 import { invoke } from '@tauri-apps/api/core';
+import { save } from '@tauri-apps/plugin-dialog';
 import type {
   HistoryEntry,
+  HistoryPage,
+  HistoryQuery,
+  HistoryKind,
   OcrHistoryEntry,
   TranslationHistoryEntry,
 } from '../../application/settings/ports';
@@ -36,11 +40,17 @@ interface BackendOcrEntry {
   recognized_text: string;
   confidence: number | null;
   duration_ms: number;
+  thumbnail_data_url: string | null;
 }
 
 type BackendHistoryEntry =
   | (BackendTranslationEntry & { type: 'Translation' })
   | (BackendOcrEntry & { type: 'Ocr' });
+
+interface BackendHistoryPage<T> {
+  items: T[];
+  total: number;
+}
 
 function toTranslationHistoryEntry(
   entry: BackendTranslationEntry,
@@ -78,6 +88,7 @@ function toOcrHistoryEntry(entry: BackendOcrEntry): OcrHistoryEntry {
     recognizedText: entry.recognized_text,
     confidence: entry.confidence,
     durationMs: entry.duration_ms,
+    thumbnailDataUrl: entry.thumbnail_data_url,
   };
 }
 
@@ -105,6 +116,32 @@ export async function getOcrHistory(limit: number, offset: number) {
   return entries.map(toOcrHistoryEntry);
 }
 
+export async function queryTranslationHistory(
+  query: HistoryQuery,
+): Promise<HistoryPage<TranslationHistoryEntry>> {
+  const page = await invoke<BackendHistoryPage<BackendTranslationEntry>>(
+    'query_translation_history',
+    { query },
+  );
+  return {
+    items: page.items.map(toTranslationHistoryEntry),
+    total: page.total,
+  };
+}
+
+export async function queryOcrHistory(
+  query: HistoryQuery,
+): Promise<HistoryPage<OcrHistoryEntry>> {
+  const page = await invoke<BackendHistoryPage<BackendOcrEntry>>(
+    'query_ocr_history',
+    { query },
+  );
+  return {
+    items: page.items.map(toOcrHistoryEntry),
+    total: page.total,
+  };
+}
+
 export async function searchHistory(query: string) {
   const entries = await invoke<BackendHistoryEntry[]>('search_history', {
     query,
@@ -130,4 +167,26 @@ export function replaceHistoryTags(id: number, tags: string[]) {
 
 export function clearAllHistory() {
   return invoke<void>('clear_all_history');
+}
+
+export function clearHistory(kind: HistoryKind) {
+  return invoke<void>('clear_history', { kind });
+}
+
+export async function rerunOcrHistory(id: number) {
+  const result = await invoke<{ text: string }>('rerun_ocr_history', { id });
+  return result.text;
+}
+
+export async function exportTranslationFavorites() {
+  const path = await save({
+    defaultPath: 'SnapLingo-translation-favorites.json',
+    filters: [{ name: 'JSON', extensions: ['json'] }],
+  });
+  if (!path) return null;
+  return invoke<number>('export_translation_favorites', { path });
+}
+
+export function listHistoryTags(kind: HistoryKind, favoriteOnly: boolean) {
+  return invoke<string[]>('list_history_tags', { kind, favoriteOnly });
 }

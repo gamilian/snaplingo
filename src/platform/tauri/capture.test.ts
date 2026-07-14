@@ -57,6 +57,26 @@ describe('Tauri capture command adapter', () => {
     });
   });
 
+  it('routes favorite output through the screenshot favorite workflow', async () => {
+    const { outputCapture } = await import('./capture');
+    invoke.mockResolvedValueOnce(undefined);
+
+    await outputCapture({
+      sessionId: 'capture-1',
+      rect: { x: 1, y: 2, width: 3, height: 4 },
+      annotations: [],
+      includeCursor: true,
+      action: { type: 'favorite' },
+    });
+
+    expect(invoke).toHaveBeenCalledWith('favorite_capture_selection', {
+      sessionId: 'capture-1',
+      rect: { x: 1, y: 2, width: 3, height: 4 },
+      annotations: [],
+      includeCursor: true,
+    });
+  });
+
   it('opens a PNG save dialog from the suggested capture path', async () => {
     const { selectCaptureSavePath } = await import('./capture');
     invoke.mockResolvedValueOnce('/Downloads/SnapLingo-1.png');

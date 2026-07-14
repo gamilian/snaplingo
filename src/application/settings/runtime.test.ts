@@ -117,29 +117,58 @@ describe('settings runtime', () => {
     const history = {
       getTranslationHistory: vi.fn(async () => []),
       getOcrHistory: vi.fn(async () => []),
+      queryTranslationHistory: vi.fn(async () => ({ items: [], total: 0 })),
+      queryOcrHistory: vi.fn(async () => ({ items: [], total: 0 })),
       deleteHistory: vi.fn(async () => undefined),
       setHistoryFavorite: vi.fn(async () => undefined),
       updateHistoryNote: vi.fn(async () => undefined),
       replaceHistoryTags: vi.fn(async () => undefined),
       clearAllHistory: vi.fn(async () => undefined),
+      clearHistory: vi.fn(async () => undefined),
     };
     const runtime = createSettingsRuntime(createPorts({ history }));
 
     await runtime.history.loadTranslation(20, 40);
     await runtime.history.loadOcr(10, 0);
+    await runtime.history.queryTranslation({
+      search: 'hello',
+      favoriteOnly: true,
+      limit: 20,
+      offset: 40,
+    });
+    await runtime.history.queryOcr({
+      search: '',
+      favoriteOnly: false,
+      limit: 20,
+      offset: 0,
+    });
     await runtime.history.deleteEntry(42);
     await runtime.history.setFavorite(42, true);
     await runtime.history.updateNote(42, 'keep this');
     await runtime.history.replaceTags(42, ['work']);
     await runtime.history.clear();
+    await runtime.history.clearKind('translation');
 
     expect(history.getTranslationHistory).toHaveBeenCalledWith(20, 40);
     expect(history.getOcrHistory).toHaveBeenCalledWith(10, 0);
+    expect(history.queryTranslationHistory).toHaveBeenCalledWith({
+      search: 'hello',
+      favoriteOnly: true,
+      limit: 20,
+      offset: 40,
+    });
+    expect(history.queryOcrHistory).toHaveBeenCalledWith({
+      search: '',
+      favoriteOnly: false,
+      limit: 20,
+      offset: 0,
+    });
     expect(history.deleteHistory).toHaveBeenCalledWith(42);
     expect(history.setHistoryFavorite).toHaveBeenCalledWith(42, true);
     expect(history.updateHistoryNote).toHaveBeenCalledWith(42, 'keep this');
     expect(history.replaceHistoryTags).toHaveBeenCalledWith(42, ['work']);
     expect(history.clearAllHistory).toHaveBeenCalledTimes(1);
+    expect(history.clearHistory).toHaveBeenCalledWith('translation');
   });
 
   it('copies Settings text through the clipboard port', async () => {
@@ -160,7 +189,9 @@ describe('settings runtime', () => {
   });
 
   it('enters capture from Advanced settings through the capture port', async () => {
-    const capture = { triggerScreenshot: vi.fn(async () => undefined) };
+    const capture = {
+      triggerScreenshot: vi.fn(async () => undefined),
+    };
     const runtime = createSettingsRuntime(createPorts({ capture }));
 
     await runtime.advanced.triggerCapture();
@@ -178,6 +209,7 @@ function createPorts(overrides: Record<string, unknown> = {}) {
       updateScreenshotSettings: vi.fn(),
       updateAnnotationColors: vi.fn(),
       updateTranslationSettings: vi.fn(),
+      updateHistorySettings: vi.fn(),
     },
     providers: createProviderPort(),
     hotkeys: {
@@ -190,11 +222,33 @@ function createPorts(overrides: Record<string, unknown> = {}) {
     history: {
       getTranslationHistory: vi.fn(),
       getOcrHistory: vi.fn(),
+      queryTranslationHistory: vi.fn(),
+      queryOcrHistory: vi.fn(),
       deleteHistory: vi.fn(),
       setHistoryFavorite: vi.fn(),
       updateHistoryNote: vi.fn(),
       replaceHistoryTags: vi.fn(),
       clearAllHistory: vi.fn(),
+      clearHistory: vi.fn(),
+      rerunOcrHistory: vi.fn(),
+      exportTranslationFavorites: vi.fn(),
+      listHistoryTags: vi.fn(),
+    },
+    favorites: {
+      addTranslationFavorite: vi.fn(),
+      addOcrFavorite: vi.fn(),
+      queryFavorites: vi.fn(),
+      updateFavoriteMetadata: vi.fn(),
+      deleteFavorite: vi.fn(),
+      rerunOcrFavorite: vi.fn(),
+      listFavoriteTags: vi.fn(),
+    },
+    screenshotFavorites: {
+      queryScreenshotFavorites: vi.fn(),
+      updateScreenshotFavoriteMetadata: vi.fn(),
+      deleteScreenshotFavorite: vi.fn(),
+      copyScreenshotFavorite: vi.fn(),
+      revealScreenshotFavorite: vi.fn(),
     },
     clipboard: { writeText: vi.fn() },
     capture: { triggerScreenshot: vi.fn() },

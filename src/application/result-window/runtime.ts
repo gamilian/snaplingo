@@ -13,7 +13,6 @@ import {
   shouldStartFileOcrForPayload,
   translationPayloadSourceText,
 } from './payload';
-import { normalizeOcrText } from '../../utils/ocrTextProcessing';
 
 export type ResultWindowPresentation = 'overlay' | 'standalone';
 
@@ -128,21 +127,11 @@ export function createResultWindowRuntime({
     });
   }
 
-  async function recognizeCurrentOcrImage(imageBase64: string | null) {
-    if (!imageBase64) return;
-
-    state.setOcrError(null);
-    state.setOcrRunning(true);
-    try {
-      const result = await platform.commands.recognizeImageData(
-        base64ToBytes(imageBase64),
-      );
-      state.setOcrText(normalizeOcrText(result.text));
-    } catch (err) {
-      state.setOcrError(errorMessage(err));
-    } finally {
-      state.setOcrRunning(false);
-    }
+  async function favoriteOcrResult(imageBase64: string | null, text: string) {
+    return platform.commands.favoriteOcrResult({
+      imageData: imageBase64 ? base64ToBytes(imageBase64) : [],
+      result: { text, confidence: null },
+    });
   }
 
   async function close(presentation: ResultWindowPresentation) {
@@ -177,7 +166,7 @@ export function createResultWindowRuntime({
     applyPayload,
     subscribeToPayloads,
     startFileOcr,
-    recognizeCurrentOcrImage,
+    favoriteOcrResult,
     close,
     resizeStandaloneWindow,
     dismiss: platform.dismiss,
@@ -191,9 +180,4 @@ function base64ToBytes(base64: string) {
   const payload = base64.includes(',') ? base64.split(',').pop() ?? '' : base64;
   const binary = globalThis.atob(payload);
   return Uint8Array.from(binary, (char) => char.charCodeAt(0));
-}
-
-function errorMessage(err: unknown) {
-  if (err instanceof Error) return err.message;
-  return String(err);
 }

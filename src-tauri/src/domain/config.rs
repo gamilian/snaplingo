@@ -61,10 +61,29 @@ impl Default for TranslationSettings {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct HistorySettings {
+    pub auto_cleanup_enabled: bool,
+    pub retention_days: u32,
+    pub maximum_records: u32,
+}
+
+impl Default for HistorySettings {
+    fn default() -> Self {
+        Self {
+            auto_cleanup_enabled: false,
+            retention_days: 30,
+            maximum_records: 5000,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(default)]
 pub struct SettingsSnapshot {
     pub general: GeneralSettings,
     pub screenshot: ScreenshotSettings,
     pub translation: TranslationSettings,
+    pub history: HistorySettings,
 }

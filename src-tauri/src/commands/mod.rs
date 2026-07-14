@@ -6,6 +6,7 @@ mod ocr_commands;
 mod pinned_image_commands;
 mod provider_commands;
 mod result_window_commands;
+mod screenshot_favorite_commands;
 mod settings_commands;
 mod translation_commands;
 
@@ -17,6 +18,7 @@ pub use ocr_commands::*;
 pub use pinned_image_commands::*;
 pub use provider_commands::*;
 pub use result_window_commands::*;
+pub use screenshot_favorite_commands::*;
 pub use settings_commands::*;
 pub use translation_commands::*;
 

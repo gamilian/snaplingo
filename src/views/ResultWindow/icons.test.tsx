@@ -1,6 +1,12 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { ClearTextIcon, PinIcon, RetryIcon, SwapIcon } from './icons';
+import {
+  ClearTextIcon,
+  FavoriteIcon,
+  PinIcon,
+  RetryIcon,
+  SwapIcon,
+} from './icons';
 
 describe('result window icons', () => {
   it('renders the compact pro retry icon path', () => {
@@ -35,5 +41,11 @@ describe('result window icons', () => {
     expect(markup).toContain('m15 4 3 3-3 3');
     expect(markup).toContain('M18 17H6');
     expect(markup).toContain('m9 14-3 3 3 3');
+  });
+
+  it('renders a recognizable favorite star', () => {
+    const markup = renderToStaticMarkup(<FavoriteIcon />);
+
+    expect(markup).toContain('m12 3 2.75 5.57');
   });
 });

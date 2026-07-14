@@ -8,7 +8,7 @@ pub struct OcrRequest {
 }
 
 /// Result from OCR service
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct OcrResult {
     pub text: String,
     pub confidence: Option<f32>,

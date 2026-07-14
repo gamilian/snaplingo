@@ -153,23 +153,46 @@ describe('Tauri history command adapter', () => {
   it('delegates history metadata and destructive actions', async () => {
     const {
       clearAllHistory,
+      clearHistory,
       deleteHistory,
+      queryTranslationHistory,
       replaceHistoryTags,
       setHistoryFavorite,
       updateHistoryNote,
     } = await import('./history');
     invoke.mockResolvedValue(undefined);
 
+    invoke.mockResolvedValueOnce({ items: [], total: 0 });
+    await queryTranslationHistory({
+      search: 'hello',
+      favoriteOnly: true,
+      limit: 20,
+      offset: 0,
+    });
+
     await deleteHistory(7);
     await setHistoryFavorite(7, true);
     await updateHistoryNote(7, 'keep this');
     await replaceHistoryTags(7, ['work']);
     await clearAllHistory();
+    await clearHistory('translation');
+
+    expect(invoke).toHaveBeenCalledWith('query_translation_history', {
+      query: {
+        search: 'hello',
+        favoriteOnly: true,
+        limit: 20,
+        offset: 0,
+      },
+    });
 
     expect(invoke).toHaveBeenCalledWith('delete_history', { id: 7 });
     expect(invoke).toHaveBeenCalledWith('set_history_favorite', { id: 7, favorite: true });
     expect(invoke).toHaveBeenCalledWith('update_history_note', { id: 7, note: 'keep this' });
     expect(invoke).toHaveBeenCalledWith('replace_history_tags', { id: 7, tags: ['work'] });
     expect(invoke).toHaveBeenCalledWith('clear_all_history');
+    expect(invoke).toHaveBeenCalledWith('clear_history', {
+      kind: 'translation',
+    });
   });
 });

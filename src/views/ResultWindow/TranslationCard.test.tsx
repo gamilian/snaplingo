@@ -75,4 +75,19 @@ describe('translation card presentation', () => {
     expect(markup).toContain('>translated result</p>');
     expect(markup).not.toContain('>\n\ntranslated result\n</p>');
   });
+
+  it('renders an independent favorite action for a completed provider result', () => {
+    const markup = renderToStaticMarkup(
+      <TranslationCard
+        providerId="google"
+        status="success"
+        text="你好"
+        onFavorite={async () => undefined}
+        copyText={async () => undefined}
+      />,
+    );
+
+    expect(markup).toContain('aria-label="收藏"');
+    expect(markup).toContain('aria-pressed="false"');
+  });
 });

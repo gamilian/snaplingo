@@ -1,7 +1,9 @@
 use tauri::State;
 
 use crate::application::SettingsConfiguration;
-use crate::domain::{GeneralSettings, ScreenshotSettings, SettingsSnapshot, TranslationSettings};
+use crate::domain::{
+    GeneralSettings, HistorySettings, ScreenshotSettings, SettingsSnapshot, TranslationSettings,
+};
 
 #[tauri::command]
 pub fn get_settings_snapshot(
@@ -40,6 +42,18 @@ pub fn update_translation_settings(
     state: State<'_, crate::AppState>,
 ) -> Result<SettingsSnapshot, String> {
     update_translation_settings_for_configuration(state.settings.configuration.as_ref(), input)
+}
+
+#[tauri::command]
+pub fn update_history_settings(
+    input: HistorySettings,
+    state: State<'_, crate::AppState>,
+) -> Result<SettingsSnapshot, String> {
+    state
+        .settings
+        .configuration
+        .update_history(input)
+        .map_err(|error| error.to_string())
 }
 
 fn get_settings_snapshot_for_configuration(

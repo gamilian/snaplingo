@@ -3,8 +3,7 @@ use crate::domain::hotkey_config::{
     FILE_OCR_ACTION, INPUT_TRANSLATE_ACTION, OCR_CATEGORY, PIN_ACTION, PIN_SWITCH_GROUP_ACTION,
     PIN_TOGGLE_ALL_ACTION, SCREENSHOT_ACTION, SCREENSHOT_CATEGORY, SCREENSHOT_COPY_ACTION,
     SCREENSHOT_OCR_ACTION, SCREENSHOT_TRANSLATE_ACTION, SELECTION_TRANSLATE_ACTION,
-    SHOW_OCR_WINDOW_ACTION, SHOW_TRANSLATION_WINDOW_ACTION, SILENT_SCREENSHOT_OCR_ACTION,
-    TRANSLATION_CATEGORY,
+    SHOW_TRANSLATION_WINDOW_ACTION, SILENT_SCREENSHOT_OCR_ACTION, TRANSLATION_CATEGORY,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -39,7 +38,6 @@ pub(crate) fn hotkey_action_binding(
             AppAction::OpenCapture(CaptureLaunchMode::SilentScreenshotOcr)
         }
         (OCR_CATEGORY, FILE_OCR_ACTION) => AppAction::RunFileOcr,
-        (OCR_CATEGORY, SHOW_OCR_WINDOW_ACTION) => AppAction::OpenOcrWindow,
         _ => return None,
     };
 
@@ -65,8 +63,8 @@ mod tests {
         DEFAULT_HOTKEYS, FILE_OCR_ACTION, INPUT_TRANSLATE_ACTION, OCR_CATEGORY, PIN_ACTION,
         PIN_SWITCH_GROUP_ACTION, PIN_TOGGLE_ALL_ACTION, SCREENSHOT_ACTION, SCREENSHOT_CATEGORY,
         SCREENSHOT_COPY_ACTION, SCREENSHOT_OCR_ACTION, SCREENSHOT_TRANSLATE_ACTION,
-        SELECTION_TRANSLATE_ACTION, SHOW_OCR_WINDOW_ACTION, SHOW_TRANSLATION_WINDOW_ACTION,
-        SILENT_SCREENSHOT_OCR_ACTION, TRANSLATION_CATEGORY,
+        SELECTION_TRANSLATE_ACTION, SHOW_TRANSLATION_WINDOW_ACTION, SILENT_SCREENSHOT_OCR_ACTION,
+        TRANSLATION_CATEGORY,
     };
 
     #[test]
@@ -128,11 +126,6 @@ mod tests {
                 AppAction::OpenCapture(CaptureLaunchMode::SilentScreenshotOcr),
             ),
             (OCR_CATEGORY, FILE_OCR_ACTION, AppAction::RunFileOcr),
-            (
-                OCR_CATEGORY,
-                SHOW_OCR_WINDOW_ACTION,
-                AppAction::OpenOcrWindow,
-            ),
         ];
 
         for (category, action_key, expected_action) in cases {
@@ -150,7 +143,7 @@ mod tests {
             .map(|hotkey| (hotkey.category, hotkey.action))
             .collect();
 
-        assert_eq!(cases.len(), 13);
+        assert_eq!(cases.len(), 12);
         assert_eq!(cases.len(), DEFAULT_HOTKEYS.len());
         assert_eq!(covered, defaults);
         assert!(hotkey_action_binding("unknown", "unknown").is_none());

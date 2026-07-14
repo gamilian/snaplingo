@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ProviderTranslationStatus } from '../../stores/appStore';
 import {
   ChevronDownIcon,
   ChevronUpIcon,
   CopyIcon,
+  FavoriteIcon,
   RetryIcon,
   VolumeIcon,
 } from './icons';
@@ -20,6 +21,7 @@ interface TranslationCardProps {
   languageCode?: string;
   bodyHeightPx?: number;
   onRetry?: () => void;
+  onFavorite?: () => Promise<void>;
   copyText: (text: string) => Promise<void>;
 }
 
@@ -38,14 +40,22 @@ export default function TranslationCard({
   languageCode,
   bodyHeightPx = 62,
   onRetry,
+  onFavorite,
   copyText,
 }: TranslationCardProps) {
   const [isExpanded, setIsExpanded] = useState(true);
+  const [isFavoritePending, setIsFavoritePending] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
 
   const providerColor = providerColors[providerId.toLowerCase()] || '#6b7280';
   const isPending = status === 'pending';
   const isError = status === 'error';
   const displayText = text.trim();
+
+  useEffect(() => {
+    setIsFavorite(false);
+    setIsFavoritePending(false);
+  }, [providerId, text]);
 
   return (
     <div className="overflow-hidden rounded-[14px] border border-slate-200 bg-white">
@@ -100,6 +110,35 @@ export default function TranslationCard({
           >
             <VolumeIcon className="h-[15px] w-[15px]" />
           </IconActionButton>
+
+          {onFavorite && !isPending && !isError && (
+            <IconActionButton
+              title={isFavorite ? '已收藏' : '收藏'}
+              aria-pressed={isFavorite}
+              disabled={isFavorite || isFavoritePending || !displayText}
+              className={`grid h-6 w-6 place-items-center rounded-[7px] border transition-colors duration-150 disabled:cursor-not-allowed ${
+                isFavorite
+                  ? 'border-amber-200 bg-amber-50 text-amber-600'
+                  : 'border-slate-200 bg-white text-slate-500 hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600'
+              }`}
+              tooltipPlacement="bottom"
+              onClick={(event) => {
+                event.stopPropagation();
+                setIsFavoritePending(true);
+                void onFavorite()
+                  .then(() => setIsFavorite(true))
+                  .catch((error) => {
+                    console.error('Failed to favorite translation result:', error);
+                  })
+                  .finally(() => setIsFavoritePending(false));
+              }}
+            >
+              <FavoriteIcon
+                className="h-[15px] w-[15px]"
+                fill={isFavorite ? 'currentColor' : 'none'}
+              />
+            </IconActionButton>
+          )}
 
           <IconActionButton
             title="复制"

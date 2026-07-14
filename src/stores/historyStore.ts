@@ -44,6 +44,8 @@ export interface OcrHistoryItem {
   text: string;
   imageThumbnail?: string;
   language: string;
+  providerUsed: string;
+  confidence: number | null;
   timestamp: number;
   favorite: boolean;
   note?: string;
@@ -51,6 +53,8 @@ export interface OcrHistoryItem {
 }
 
 interface HistoryState {
+  revision: number;
+  invalidate: () => void;
   // 原始后端数据
   rawTranslationEntries: TranslationHistoryEntry[];
   rawOcrEntries: OcrHistoryEntry[];
@@ -58,23 +62,42 @@ interface HistoryState {
   // 展开后的视图数据（computed）
   translationHistory: TranslationHistoryItem[];
   ocrHistory: OcrHistoryItem[];
+  translationFavorites: TranslationHistoryItem[];
+  ocrFavorites: OcrHistoryItem[];
+  translationHistoryTotal: number;
+  ocrHistoryTotal: number;
+  translationFavoritesTotal: number;
+  ocrFavoritesTotal: number;
 
   // 翻译历史
   loadTranslationHistory: (limit?: number, offset?: number) => Promise<void>;
+  queryTranslationHistory: (options: HistoryListOptions) => Promise<void>;
+  loadTranslationFavorites: (options: HistoryListOptions) => Promise<void>;
   addTranslationHistory: (item: Omit<TranslationHistoryItem, 'id' | 'timestamp' | 'favorite' | 'entryId' | 'resultIndex'>) => void;
   deleteTranslationHistory: (id: string) => Promise<void>;
   deleteTranslationEntry: (entryId: number) => Promise<void>; // 删除整个 entry
   toggleTranslationFavorite: (id: string) => Promise<void>;
   updateTranslationNote: (id: string, note: string) => Promise<void>;
+  updateTranslationTags: (id: string, tags: string[]) => Promise<void>;
   clearTranslationHistory: () => Promise<void>;
 
   // OCR 历史
   loadOcrHistory: (limit?: number, offset?: number) => Promise<void>;
+  queryOcrHistory: (options: HistoryListOptions) => Promise<void>;
+  loadOcrFavorites: (options: HistoryListOptions) => Promise<void>;
   addOcrHistory: (item: Omit<OcrHistoryItem, 'id' | 'timestamp' | 'favorite'>) => void;
   deleteOcrHistory: (id: string) => Promise<void>;
   toggleOcrFavorite: (id: string) => Promise<void>;
   updateOcrNote: (id: string, note: string) => Promise<void>;
+  updateOcrTags: (id: string, tags: string[]) => Promise<void>;
   clearOcrHistory: () => Promise<void>;
+}
+
+interface HistoryListOptions {
+  search: string;
+  tag?: string;
+  limit: number;
+  offset: number;
 }
 
 // 辅助函数：将后端 entries 展平为前端历史记录
@@ -103,7 +126,10 @@ function flattenOcrEntries(entries: OcrHistoryEntry[]): OcrHistoryItem[] {
     id: String(entry.id),
     type: 'screenshot' as const,
     text: entry.recognizedText,
+    imageThumbnail: entry.thumbnailDataUrl ?? undefined,
     language: entry.language || 'Unknown',
+    providerUsed: entry.providerUsed,
+    confidence: entry.confidence,
     timestamp: new Date(entry.timestamp).getTime(),
     favorite: entry.favorite,
     note: entry.note ?? undefined,
@@ -112,6 +138,8 @@ function flattenOcrEntries(entries: OcrHistoryEntry[]): OcrHistoryItem[] {
 }
 
 export const useHistoryStore = create<HistoryState>((set, get) => ({
+      revision: 0,
+      invalidate: () => set((state) => ({ revision: state.revision + 1 })),
       // 原始数据
       rawTranslationEntries: [],
       rawOcrEntries: [],
@@ -119,6 +147,12 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
       // 展开后的视图数据
       translationHistory: [],
       ocrHistory: [],
+      translationFavorites: [],
+      ocrFavorites: [],
+      translationHistoryTotal: 0,
+      ocrHistoryTotal: 0,
+      translationFavoritesTotal: 0,
+      ocrFavoritesTotal: 0,
 
       // 从后端加载翻译历史
       loadTranslationHistory: async (limit = 100, offset = 0) => {
@@ -127,10 +161,40 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
           set({
             rawTranslationEntries: entries,
             translationHistory: flattenTranslationEntries(entries),
+            translationHistoryTotal: entries.length,
           });
         } catch (error) {
           console.error('Failed to load translation history:', error);
         }
+      },
+
+      queryTranslationHistory: async ({ search, tag, limit, offset }) => {
+        const page = await runtime().queryTranslation({
+          search,
+          tag,
+          favoriteOnly: false,
+          limit,
+          offset,
+        });
+        set({
+          rawTranslationEntries: page.items,
+          translationHistory: flattenTranslationEntries(page.items),
+          translationHistoryTotal: page.total,
+        });
+      },
+
+      loadTranslationFavorites: async ({ search, tag, limit, offset }) => {
+        const page = await runtime().queryTranslation({
+          search,
+          tag,
+          favoriteOnly: true,
+          limit,
+          offset,
+        });
+        set({
+          translationFavorites: flattenTranslationEntries(page.items),
+          translationFavoritesTotal: page.total,
+        });
       },
 
       // 从后端加载 OCR 历史
@@ -140,10 +204,40 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
           set({
             rawOcrEntries: entries,
             ocrHistory: flattenOcrEntries(entries),
+            ocrHistoryTotal: entries.length,
           });
         } catch (error) {
           console.error('Failed to load OCR history:', error);
         }
+      },
+
+      queryOcrHistory: async ({ search, tag, limit, offset }) => {
+        const page = await runtime().queryOcr({
+          search,
+          tag,
+          favoriteOnly: false,
+          limit,
+          offset,
+        });
+        set({
+          rawOcrEntries: page.items,
+          ocrHistory: flattenOcrEntries(page.items),
+          ocrHistoryTotal: page.total,
+        });
+      },
+
+      loadOcrFavorites: async ({ search, tag, limit, offset }) => {
+        const page = await runtime().queryOcr({
+          search,
+          tag,
+          favoriteOnly: true,
+          limit,
+          offset,
+        });
+        set({
+          ocrFavorites: flattenOcrEntries(page.items),
+          ocrFavoritesTotal: page.total,
+        });
       },
 
       // 翻译历史
@@ -211,7 +305,10 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
       },
 
       toggleTranslationFavorite: async (id) => {
-        const item = get().translationHistory.find((entry) => entry.id === id);
+        const item = [
+          ...get().translationHistory,
+          ...get().translationFavorites,
+        ].find((entry) => entry.id === id);
         if (!item) return;
 
         const favorite = !item.favorite;
@@ -222,6 +319,15 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
           ),
           translationHistory: state.translationHistory.map((entry) =>
             entry.entryId === item.entryId ? { ...entry, favorite } : entry
+          ),
+          translationFavorites: favorite
+            ? mergeTranslationFavorite(state.translationFavorites, item)
+            : state.translationFavorites.filter(
+                (entry) => entry.entryId !== item.entryId,
+              ),
+          translationFavoritesTotal: Math.max(
+            0,
+            state.translationFavoritesTotal + (favorite ? 1 : -1),
           ),
         }));
       },
@@ -239,17 +345,42 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
           translationHistory: state.translationHistory.map((entry) =>
             entry.entryId === item.entryId ? { ...entry, note: persistedNote ?? undefined } : entry
           ),
+          translationFavorites: state.translationFavorites.map((entry) =>
+            entry.entryId === item.entryId
+              ? { ...entry, note: persistedNote ?? undefined }
+              : entry,
+          ),
+        }));
+      },
+
+      updateTranslationTags: async (id, tags) => {
+        const item = [...get().translationHistory, ...get().translationFavorites].find(
+          (entry) => entry.id === id,
+        );
+        if (!item) return;
+        await runtime().replaceTags(item.entryId, tags);
+        set((state) => ({
+          rawTranslationEntries: state.rawTranslationEntries.map((entry) =>
+            entry.id === item.entryId ? { ...entry, tags } : entry,
+          ),
+          translationHistory: state.translationHistory.map((entry) =>
+            entry.entryId === item.entryId ? { ...entry, tags } : entry,
+          ),
+          translationFavorites: state.translationFavorites.map((entry) =>
+            entry.entryId === item.entryId ? { ...entry, tags } : entry,
+          ),
         }));
       },
 
       clearTranslationHistory: async () => {
         try {
-          await runtime().clear();
+          await runtime().clearKind('translation');
           set({
             rawTranslationEntries: [],
-            rawOcrEntries: [],
             translationHistory: [],
-            ocrHistory: [],
+            translationFavorites: [],
+            translationHistoryTotal: 0,
+            translationFavoritesTotal: 0,
           });
         } catch (error) {
           console.error('Failed to clear history:', error);
@@ -288,7 +419,9 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
       },
 
       toggleOcrFavorite: async (id) => {
-        const item = get().ocrHistory.find((entry) => entry.id === id);
+        const item = [...get().ocrHistory, ...get().ocrFavorites].find(
+          (entry) => entry.id === id,
+        );
         if (!item) return;
 
         const historyId = Number(id);
@@ -300,6 +433,13 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
           ),
           ocrHistory: state.ocrHistory.map((entry) =>
             entry.id === id ? { ...entry, favorite } : entry
+          ),
+          ocrFavorites: favorite
+            ? mergeOcrFavorite(state.ocrFavorites, item)
+            : state.ocrFavorites.filter((entry) => entry.id !== id),
+          ocrFavoritesTotal: Math.max(
+            0,
+            state.ocrFavoritesTotal + (favorite ? 1 : -1),
           ),
         }));
       },
@@ -318,17 +458,43 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
           ocrHistory: state.ocrHistory.map((entry) =>
             entry.id === id ? { ...entry, note: persistedNote ?? undefined } : entry
           ),
+          ocrFavorites: state.ocrFavorites.map((entry) =>
+            entry.id === id
+              ? { ...entry, note: persistedNote ?? undefined }
+              : entry,
+          ),
+        }));
+      },
+
+      updateOcrTags: async (id, tags) => {
+        const item = [...get().ocrHistory, ...get().ocrFavorites].find(
+          (entry) => entry.id === id,
+        );
+        if (!item) return;
+        const historyId = Number(id);
+        await runtime().replaceTags(historyId, tags);
+        set((state) => ({
+          rawOcrEntries: state.rawOcrEntries.map((entry) =>
+            entry.id === historyId ? { ...entry, tags } : entry,
+          ),
+          ocrHistory: state.ocrHistory.map((entry) =>
+            entry.id === id ? { ...entry, tags } : entry,
+          ),
+          ocrFavorites: state.ocrFavorites.map((entry) =>
+            entry.id === id ? { ...entry, tags } : entry,
+          ),
         }));
       },
 
       clearOcrHistory: async () => {
         try {
-          await runtime().clear();
+          await runtime().clearKind('ocr');
           set({
-            rawTranslationEntries: [],
             rawOcrEntries: [],
-            translationHistory: [],
             ocrHistory: [],
+            ocrFavorites: [],
+            ocrHistoryTotal: 0,
+            ocrFavoritesTotal: 0,
           });
         } catch (error) {
           console.error('Failed to clear OCR history:', error);
@@ -336,3 +502,16 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
         }
       },
 }));
+
+function mergeTranslationFavorite(
+  favorites: TranslationHistoryItem[],
+  item: TranslationHistoryItem,
+) {
+  if (favorites.some((entry) => entry.id === item.id)) return favorites;
+  return [{ ...item, favorite: true }, ...favorites];
+}
+
+function mergeOcrFavorite(favorites: OcrHistoryItem[], item: OcrHistoryItem) {
+  if (favorites.some((entry) => entry.id === item.id)) return favorites;
+  return [{ ...item, favorite: true }, ...favorites];
+}

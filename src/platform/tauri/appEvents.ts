@@ -18,6 +18,8 @@ const SETTINGS_CHANGED_EVENT = 'settings-changed';
 const HOTKEYS_CHANGED_EVENT = 'hotkeys-changed';
 const PROVIDERS_CHANGED_EVENT = 'providers-changed';
 const HISTORY_CHANGED_EVENT = 'history-changed';
+const FAVORITES_CHANGED_EVENT = 'favorites-changed';
+const SCREENSHOT_FAVORITES_CHANGED_EVENT = 'screenshot-favorites-changed';
 
 function isCaptureMode(value: unknown): value is CaptureMode {
   return (
@@ -122,4 +124,8 @@ export const persistentStateEvents = {
     subscribeToSignal(PROVIDERS_CHANGED_EVENT, handler),
   subscribeHistoryChanged: (handler: () => void | Promise<void>) =>
     subscribeToSignal(HISTORY_CHANGED_EVENT, handler),
+  subscribeFavoritesChanged: (handler: () => void | Promise<void>) =>
+    subscribeToSignal(FAVORITES_CHANGED_EVENT, handler),
+  subscribeScreenshotFavoritesChanged: (handler: () => void | Promise<void>) =>
+    subscribeToSignal(SCREENSHOT_FAVORITES_CHANGED_EVENT, handler),
 };

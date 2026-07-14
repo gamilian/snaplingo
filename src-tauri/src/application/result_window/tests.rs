@@ -474,14 +474,6 @@ async fn ocr_open_requests_preserve_each_intent_and_source_image() {
     let cases = [
         (
             ResultWindowOpenRequest::Ocr {
-                text: String::new(),
-                intent: ResultWindowOcrIntent::Show,
-                image_base64: None,
-            },
-            ocr_payload("", ResultWindowOcrIntent::Show, None),
-        ),
-        (
-            ResultWindowOpenRequest::Ocr {
                 text: "recognized text".to_string(),
                 intent: ResultWindowOcrIntent::DisplayText,
                 image_base64: Some("source-image".to_string()),

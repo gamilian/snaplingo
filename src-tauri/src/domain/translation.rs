@@ -47,7 +47,7 @@ impl TranslationRequestBuilder {
 }
 
 /// Result from translation service
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TranslationResult {
     pub provider_id: String,
     pub translated_text: String,

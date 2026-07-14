@@ -19,10 +19,17 @@ interface BackendTranslationSettings {
   default_target_lang: string;
 }
 
+interface BackendHistorySettings {
+  auto_cleanup_enabled: boolean;
+  retention_days: number;
+  maximum_records: number;
+}
+
 interface BackendSettingsSnapshot {
   general: BackendGeneralSettings;
   screenshot: BackendScreenshotSettings;
   translation: BackendTranslationSettings;
+  history: BackendHistorySettings;
 }
 
 interface GeneralSettingsInput {
@@ -59,6 +66,11 @@ function normalizeSnapshot(snapshot: BackendSettingsSnapshot) {
     translation: {
       defaultSourceLang: snapshot.translation.default_source_lang,
       defaultTargetLang: snapshot.translation.default_target_lang,
+    },
+    history: {
+      autoCleanupEnabled: snapshot.history.auto_cleanup_enabled,
+      retentionDays: snapshot.history.retention_days,
+      maximumRecords: snapshot.history.maximum_records,
     },
   };
 }
@@ -110,6 +122,22 @@ export async function updateTranslationSettings(
       input: {
         default_source_lang: input.defaultSourceLang,
         default_target_lang: input.defaultTargetLang,
+      },
+    }),
+  );
+}
+
+export async function updateHistorySettings(input: {
+  autoCleanupEnabled: boolean;
+  retentionDays: number;
+  maximumRecords: number;
+}) {
+  return normalizeSnapshot(
+    await invoke<BackendSettingsSnapshot>('update_history_settings', {
+      input: {
+        auto_cleanup_enabled: input.autoCleanupEnabled,
+        retention_days: input.retentionDays,
+        maximum_records: input.maximumRecords,
       },
     }),
   );

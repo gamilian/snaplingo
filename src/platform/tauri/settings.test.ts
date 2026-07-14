@@ -22,6 +22,11 @@ const backendSnapshot = {
     default_source_lang: 'ja',
     default_target_lang: 'fr',
   },
+  history: {
+    auto_cleanup_enabled: true,
+    retention_days: 45,
+    maximum_records: 2000,
+  },
 };
 
 describe('Tauri settings command adapter', () => {
@@ -48,6 +53,11 @@ describe('Tauri settings command adapter', () => {
       translation: {
         defaultSourceLang: 'ja',
         defaultTargetLang: 'fr',
+      },
+      history: {
+        autoCleanupEnabled: true,
+        retentionDays: 45,
+        maximumRecords: 2000,
       },
     });
     expect(invoke).toHaveBeenCalledWith('get_settings_snapshot');
@@ -121,6 +131,25 @@ describe('Tauri settings command adapter', () => {
       input: {
         default_source_lang: 'auto',
         default_target_lang: 'en',
+      },
+    });
+  });
+
+  it('maps history cleanup settings to the backend payload shape', async () => {
+    const { updateHistorySettings } = await import('./settings');
+    invoke.mockResolvedValueOnce(backendSnapshot);
+
+    await updateHistorySettings({
+      autoCleanupEnabled: true,
+      retentionDays: 45,
+      maximumRecords: 2000,
+    });
+
+    expect(invoke).toHaveBeenCalledWith('update_history_settings', {
+      input: {
+        auto_cleanup_enabled: true,
+        retention_days: 45,
+        maximum_records: 2000,
       },
     });
   });

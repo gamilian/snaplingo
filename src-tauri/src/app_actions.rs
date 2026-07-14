@@ -30,7 +30,6 @@ pub(crate) enum AppAction {
     OpenInputTranslation,
     OpenTranslationWindow,
     RunFileOcr,
-    OpenOcrWindow,
     PinClipboardImage,
     TogglePinnedImagesVisibility,
     SwitchPinnedImageGroup,
@@ -75,9 +74,6 @@ pub(crate) fn dispatch_app_action(app: tauri::AppHandle, action: AppAction) {
         }
         AppAction::RunFileOcr => {
             dispatch_result_window_open(app, ResultWindowOpenRequest::file_ocr());
-        }
-        AppAction::OpenOcrWindow => {
-            dispatch_result_window_open(app, ResultWindowOpenRequest::show_ocr());
         }
         AppAction::PinClipboardImage => {
             tauri::async_runtime::spawn(async move {

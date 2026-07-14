@@ -39,7 +39,7 @@ pub(crate) fn setup_menu_bar(app: &tauri::App) -> Result<(), String> {
     let screenshot_translate = menu_item(app, SCREENSHOT_TRANSLATE_ID, "Screenshot Translate")?;
     let input_translation = menu_item(app, INPUT_TRANSLATION_ID, "Input Translation")?;
     let screenshot_ocr = menu_item(app, SCREENSHOT_OCR_ID, "Screenshot OCR")?;
-    let file_ocr = menu_item(app, FILE_OCR_ID, "File OCR")?;
+    let file_ocr = menu_item(app, FILE_OCR_ID, "Upload Image OCR")?;
     let settings = menu_item(app, SETTINGS_ID, "Settings")?;
     let about = menu_item(app, ABOUT_ID, "About SnapLingo")?;
     let quit = menu_item(app, QUIT_ID, "Quit SnapLingo")?;

@@ -33,6 +33,36 @@ pub struct OcrHistoryEntry {
     pub recognized_text: String,
     pub confidence: Option<f64>,
     pub duration_ms: u64,
+    pub source_asset_path: Option<String>,
+    pub thumbnail_asset_path: Option<String>,
+    pub thumbnail_data_url: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoredOcrHistoryAssets {
+    pub source_path: String,
+    pub thumbnail_path: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HistoryCleanupPolicy {
+    pub enabled: bool,
+    pub retention_days: u32,
+    pub maximum_records: u32,
+}
+
+pub trait HistoryPolicyProvider: Send + Sync {
+    fn current_policy(&self) -> Result<HistoryCleanupPolicy>;
+}
+
+pub trait TranslationFavoritesWriter: Send + Sync {
+    fn write(&self, path: &str, entries: &[TranslationHistoryEntry]) -> Result<()>;
+}
+
+pub trait OcrHistoryAssetStore: Send + Sync {
+    fn store(&self, image_data: &[u8]) -> Result<StoredOcrHistoryAssets>;
+    fn read(&self, relative_path: &str) -> Result<Vec<u8>>;
+    fn delete(&self, relative_path: &str) -> Result<()>;
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,6 +70,38 @@ pub struct OcrHistoryEntry {
 pub enum HistoryEntry {
     Translation(TranslationHistoryEntry),
     Ocr(OcrHistoryEntry),
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryQuery {
+    pub search: Option<String>,
+    pub tag: Option<String>,
+    pub favorite_only: bool,
+    pub limit: usize,
+    pub offset: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HistoryPage<T> {
+    pub items: Vec<T>,
+    pub total: usize,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum HistoryKind {
+    Translation,
+    Ocr,
+}
+
+impl HistoryKind {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Translation => "translation",
+            Self::Ocr => "ocr",
+        }
+    }
 }
 
 #[async_trait]
@@ -60,6 +122,7 @@ pub trait HistoryRepository: Send + Sync {
         provider_used: &str,
         timestamp: DateTime<Utc>,
         duration_ms: u64,
+        assets: Option<&StoredOcrHistoryAssets>,
     ) -> Result<()>;
 
     async fn query_translations(
@@ -69,6 +132,13 @@ pub trait HistoryRepository: Send + Sync {
     ) -> Result<Vec<TranslationHistoryEntry>>;
 
     async fn query_ocr(&self, limit: usize, offset: usize) -> Result<Vec<OcrHistoryEntry>>;
+
+    async fn query_translation_page(
+        &self,
+        query: &HistoryQuery,
+    ) -> Result<HistoryPage<TranslationHistoryEntry>>;
+
+    async fn query_ocr_page(&self, query: &HistoryQuery) -> Result<HistoryPage<OcrHistoryEntry>>;
 
     async fn search(&self, query: &str) -> Result<Vec<HistoryEntry>>;
 
@@ -81,6 +151,15 @@ pub trait HistoryRepository: Send + Sync {
     async fn replace_tags(&self, id: i64, tags: Vec<String>) -> Result<()>;
 
     async fn clear_all(&self) -> Result<()>;
+
+    async fn clear_kind(&self, kind: HistoryKind) -> Result<()>;
+
+    async fn ocr_asset_paths(&self, id: Option<i64>) -> Result<Vec<(String, String)>>;
+
+    async fn cleanup(&self, policy: HistoryCleanupPolicy)
+        -> Result<(usize, Vec<(String, String)>)>;
+
+    async fn list_tags(&self, kind: HistoryKind, favorite_only: bool) -> Result<Vec<String>>;
 }
 
 #[cfg(test)]
@@ -113,6 +192,7 @@ mod tests {
             _provider_used: &str,
             _timestamp: DateTime<Utc>,
             _duration_ms: u64,
+            _assets: Option<&StoredOcrHistoryAssets>,
         ) -> Result<()> {
             Ok(())
         }
@@ -127,6 +207,26 @@ mod tests {
 
         async fn query_ocr(&self, _limit: usize, _offset: usize) -> Result<Vec<OcrHistoryEntry>> {
             Ok(Vec::new())
+        }
+
+        async fn query_translation_page(
+            &self,
+            _query: &HistoryQuery,
+        ) -> Result<HistoryPage<TranslationHistoryEntry>> {
+            Ok(HistoryPage {
+                items: Vec::new(),
+                total: 0,
+            })
+        }
+
+        async fn query_ocr_page(
+            &self,
+            _query: &HistoryQuery,
+        ) -> Result<HistoryPage<OcrHistoryEntry>> {
+            Ok(HistoryPage {
+                items: Vec::new(),
+                total: 0,
+            })
         }
 
         async fn search(&self, _query: &str) -> Result<Vec<HistoryEntry>> {
@@ -151,6 +251,25 @@ mod tests {
 
         async fn clear_all(&self) -> Result<()> {
             Ok(())
+        }
+
+        async fn clear_kind(&self, _kind: HistoryKind) -> Result<()> {
+            Ok(())
+        }
+
+        async fn ocr_asset_paths(&self, _id: Option<i64>) -> Result<Vec<(String, String)>> {
+            Ok(Vec::new())
+        }
+
+        async fn cleanup(
+            &self,
+            _policy: HistoryCleanupPolicy,
+        ) -> Result<(usize, Vec<(String, String)>)> {
+            Ok((0, Vec::new()))
+        }
+
+        async fn list_tags(&self, _kind: HistoryKind, _favorite_only: bool) -> Result<Vec<String>> {
+            Ok(Vec::new())
         }
     }
 

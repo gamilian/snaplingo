@@ -58,6 +58,7 @@ import {
   ClearTextIcon,
   CloseIcon,
   CopyIcon,
+  FavoriteIcon,
   LanguageIcon,
   PinIcon,
   RetryIcon,
@@ -283,6 +284,10 @@ function ResultWindowContent({
   const [measuredTranslationPanelHeightPx, setMeasuredTranslationPanelHeightPx] =
     useState<number | undefined>(undefined);
   const [isResultWindowPinned, setResultWindowPinned] = useState(false);
+  const [favoritedOcrSignature, setFavoritedOcrSignature] = useState<string | null>(
+    null,
+  );
+  const [isOcrFavoritePending, setOcrFavoritePending] = useState(false);
   const sourceTextStyle = useMemo(
     () => resultWindowAdaptiveTextStyle(sourceText, 'source'),
     [sourceText],
@@ -292,6 +297,7 @@ function ResultWindowContent({
     [ocrText],
   );
   const ocrTokens = useMemo(() => ocrCopyTokens(ocrText), [ocrText]);
+  const ocrFavoriteSignature = `${ocrImageBase64 ?? ''}\u0000${ocrText}`;
   const translationLayout = useMemo(
     () =>
       resultWindowTranslationLayout(
@@ -355,6 +361,26 @@ function ResultWindowContent({
   const closeResultWindow = useCallback(() => {
     void runtime.close(presentation);
   }, [presentation, runtime]);
+
+  const handleFavoriteOcr = useCallback(async () => {
+    if (!ocrText.trim() || isOcrFavoritePending) return;
+
+    setOcrFavoritePending(true);
+    try {
+      await runtime.favoriteOcrResult(ocrImageBase64, ocrText);
+      setFavoritedOcrSignature(ocrFavoriteSignature);
+    } catch (error) {
+      console.error('Failed to favorite OCR result:', error);
+    } finally {
+      setOcrFavoritePending(false);
+    }
+  }, [
+    isOcrFavoritePending,
+    ocrFavoriteSignature,
+    ocrImageBase64,
+    ocrText,
+    runtime,
+  ]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -554,10 +580,6 @@ function ResultWindowContent({
     void runtime.startFileOcr();
   };
 
-  const handleRecognizeCurrentOcrImage = () => {
-    void runtime.recognizeCurrentOcrImage(ocrImageBase64);
-  };
-
   const isOcrMode = resultWindowMode === 'ocr';
   const translationSubtitle = resultWindowTranslationSubtitle(
     providerTranslations,
@@ -626,11 +648,11 @@ function ResultWindowContent({
                   <button
                     type="button"
                     className={resultWindowOcrImageActionButtonClassName()}
-                    onClick={handleRecognizeCurrentOcrImage}
-                    disabled={isOcrRunning || !ocrImageBase64}
+                    onClick={handleUploadImage}
+                    disabled={isOcrRunning}
                   >
-                    <ScanIcon className="h-4 w-4" />
-                    {isOcrRunning ? '识别中...' : ocrText ? '重新 OCR' : 'OCR'}
+                    <UploadIcon className="h-4 w-4" />
+                    {isOcrRunning ? '识别中...' : '上传图片 OCR'}
                   </button>
                 </div>
 
@@ -687,6 +709,32 @@ function ResultWindowContent({
                         {ocrText.length} chars
                       </span>
                       <div className="flex items-center gap-2">
+                        <IconActionButton
+                          title={
+                            favoritedOcrSignature === ocrFavoriteSignature
+                              ? '已收藏'
+                              : '收藏'
+                          }
+                          aria-pressed={
+                            favoritedOcrSignature === ocrFavoriteSignature
+                          }
+                          disabled={
+                            !ocrText.trim() ||
+                            isOcrFavoritePending ||
+                            favoritedOcrSignature === ocrFavoriteSignature
+                          }
+                          className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+                          onClick={() => void handleFavoriteOcr()}
+                        >
+                          <FavoriteIcon
+                            className="h-4 w-4"
+                            fill={
+                              favoritedOcrSignature === ocrFavoriteSignature
+                                ? 'currentColor'
+                                : 'none'
+                            }
+                          />
+                        </IconActionButton>
                         <IconActionButton
                           title="复制"
                           disabled={!ocrText.trim()}
@@ -746,15 +794,6 @@ function ResultWindowContent({
                   </div>
                 )}
 
-                <button
-                  type="button"
-                  onClick={handleUploadImage}
-                  disabled={isOcrRunning}
-                  className="grid h-10 w-full place-items-center rounded-[14px] bg-emerald-600 text-[14px] font-bold text-white shadow-[0_10px_24px_rgba(5,150,105,0.18)] transition-colors duration-150 hover:bg-emerald-700 disabled:bg-slate-300 disabled:shadow-none"
-                >
-                  {ocrText ? '重新选择图片' : '选择图片'}
-                </button>
-
                 <div className="min-h-0 space-y-3">
                   <div className="flex min-h-[18px] items-center justify-between gap-3">
                     <h3 className="text-[13px] font-bold text-slate-600">识别文本</h3>
@@ -777,6 +816,32 @@ function ResultWindowContent({
                         {ocrText.length} chars
                       </span>
                       <div className="flex items-center gap-2">
+                        <IconActionButton
+                          title={
+                            favoritedOcrSignature === ocrFavoriteSignature
+                              ? '已收藏'
+                              : '收藏'
+                          }
+                          aria-pressed={
+                            favoritedOcrSignature === ocrFavoriteSignature
+                          }
+                          disabled={
+                            !ocrText.trim() ||
+                            isOcrFavoritePending ||
+                            favoritedOcrSignature === ocrFavoriteSignature
+                          }
+                          className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+                          onClick={() => void handleFavoriteOcr()}
+                        >
+                          <FavoriteIcon
+                            className="h-4 w-4"
+                            fill={
+                              favoritedOcrSignature === ocrFavoriteSignature
+                                ? 'currentColor'
+                                : 'none'
+                            }
+                          />
+                        </IconActionButton>
                         <IconActionButton
                           title="复制"
                           disabled={!ocrText.trim()}
@@ -916,6 +981,19 @@ function ResultWindowContent({
                       onRetry={() => {
                         void retryProvider(result.provider_id);
                       }}
+                      onFavorite={() =>
+                        runtime.commands.favoriteTranslationResult({
+                          text: sourceText,
+                          sourceLang,
+                          targetLang: resolvedTargetLanguage,
+                          result: {
+                            provider_id: result.provider_id,
+                            translated_text: result.translated_text,
+                            detected_language: result.detected_language,
+                            confidence: result.confidence,
+                          },
+                        }).then(() => undefined)
+                      }
                       copyText={runtime.clipboard.copyText}
                     />
                   ))}

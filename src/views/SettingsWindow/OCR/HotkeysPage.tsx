@@ -153,7 +153,7 @@ export function HotkeysPage() {
           defaultValue={defaultHotkeys['silent-screenshot-ocr'] ?? '未设置'}
         />
         <HotkeyRow
-          label="访问选图 OCR"
+          label="上传图片 OCR"
           value={hotkeys['file-ocr']}
           description="通过文件选择器选择图片进行 OCR"
           onRecord={() => handleRecord('file-ocr')}
@@ -161,16 +161,6 @@ export function HotkeysPage() {
           onReset={() => handleReset('file-ocr')}
           isRecording={recordingKey === 'file-ocr'}
           defaultValue={defaultHotkeys['file-ocr'] ?? '未设置'}
-        />
-        <HotkeyRow
-          label="显示 OCR 窗口"
-          value={hotkeys['show-window']}
-          description="直接显示 OCR 窗口"
-          onRecord={() => handleRecord('show-window')}
-          onClear={() => handleClear('show-window')}
-          onReset={() => handleReset('show-window')}
-          isRecording={recordingKey === 'show-window'}
-          defaultValue={defaultHotkeys['show-window'] ?? '未设置'}
         />
       </div>
 

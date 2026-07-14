@@ -92,6 +92,9 @@ export async function quickCaptureSavePath(directory?: string) {
 }
 
 export async function outputCapture(input: OutputCaptureInput) {
+  if (input.action.type === 'favorite') {
+    return invoke<void>('favorite_capture_selection', captureOutputArgs(input));
+  }
   return invoke<void>('output_capture', {
     ...captureOutputArgs(input),
     action: input.action,

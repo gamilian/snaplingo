@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { CustomSelect } from '../../../components/common/CustomSelect';
 import { CustomNumberInput } from '../../../components/common/CustomNumberInput';
 import { useSettingsRuntime } from '../runtimeContext';
+import { useSettingsConfigStore } from '../../../stores/settingsConfigStore';
 
 export function AdvancedPage() {
   const runtime = useSettingsRuntime();
@@ -9,7 +10,15 @@ export function AdvancedPage() {
   const [retryCount, setRetryCount] = useState('3');
   const [logLevel, setLogLevel] = useState('error');
   const [timeout, setTimeout] = useState(10);
-  const [historyDays, setHistoryDays] = useState(30);
+  const historySettings = useSettingsConfigStore((state) => state.history);
+  const updateHistorySettings = useSettingsConfigStore(
+    (state) => state.updateHistorySettings,
+  );
+  const historyPolicy = historySettings ?? {
+    autoCleanupEnabled: false,
+    retentionDays: 30,
+    maximumRecords: 5000,
+  };
 
   const handleTestScreenshot = async () => {
     try {
@@ -133,8 +142,24 @@ export function AdvancedPage() {
             <div className="font-medium text-gray-700">保存日志到文件</div>
             <div className="text-sm text-gray-500 mt-1">将日志输出到文件，便于排查问题</div>
           </div>
-          <button className="relative w-12 h-6 rounded-full bg-primary-600 transition-colors">
-            <span className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow translate-x-6 transition-transform" />
+          <button
+            type="button"
+            aria-pressed={historyPolicy.autoCleanupEnabled}
+            onClick={() =>
+              void updateHistorySettings({
+                ...historyPolicy,
+                autoCleanupEnabled: !historyPolicy.autoCleanupEnabled,
+              })
+            }
+            className={`relative h-6 w-12 rounded-full transition-colors ${
+              historyPolicy.autoCleanupEnabled ? 'bg-primary-600' : 'bg-gray-300'
+            }`}
+          >
+            <span
+              className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                historyPolicy.autoCleanupEnabled ? 'translate-x-6' : ''
+              }`}
+            />
           </button>
         </div>
 
@@ -165,8 +190,10 @@ export function AdvancedPage() {
         <div className="pt-6 border-t border-gray-100">
           <label className="block font-medium text-gray-700 mb-2">历史记录保留天数</label>
           <CustomNumberInput
-            value={historyDays}
-            onChange={setHistoryDays}
+            value={historyPolicy.retentionDays}
+            onChange={(retentionDays) =>
+              void updateHistorySettings({ ...historyPolicy, retentionDays })
+            }
             min={1}
             max={365}
             step={1}
@@ -174,9 +201,31 @@ export function AdvancedPage() {
           <p className="text-sm text-gray-500 mt-2">超过此天数的历史记录将被自动删除</p>
         </div>
 
+        <div className="pt-6 border-t border-gray-100">
+          <label className="block font-medium text-gray-700 mb-2">最多保留记录数</label>
+          <CustomNumberInput
+            value={historyPolicy.maximumRecords}
+            onChange={(maximumRecords) =>
+              void updateHistorySettings({ ...historyPolicy, maximumRecords })
+            }
+            min={100}
+            max={100000}
+            step={100}
+          />
+          <p className="text-sm text-gray-500 mt-2">收藏记录不计入自动清理上限</p>
+        </div>
+
         {/* 清除数据 */}
         <div className="pt-6 border-t border-gray-100 space-y-3">
-          <button className="w-full px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-left">
+          <button
+            type="button"
+            onClick={() => {
+              if (confirm('确定要清空全部翻译和 OCR 历史吗？独立收藏不会被删除。')) {
+                void runtime.history.clear();
+              }
+            }}
+            className="w-full px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-left"
+          >
             清除所有历史记录
           </button>
           <button className="w-full px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-left">

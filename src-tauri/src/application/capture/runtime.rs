@@ -241,6 +241,25 @@ impl CaptureSessionRuntime {
         )
     }
 
+    pub fn render_png(
+        &self,
+        session_id: &CaptureSessionId,
+        rect: &LogicalRect,
+        annotations: &[AnnotationCommand],
+        include_cursor: bool,
+    ) -> Result<Vec<u8>> {
+        self.ensure_selection_snapshots_ready(session_id, rect)?;
+
+        super::render::render_capture_png(
+            &self.sessions,
+            &self.image_composition,
+            session_id,
+            rect,
+            annotations,
+            include_cursor,
+        )
+    }
+
     pub async fn recognize_selection_text(
         &self,
         session_id: &CaptureSessionId,

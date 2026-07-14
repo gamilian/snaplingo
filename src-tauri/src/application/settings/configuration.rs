@@ -2,8 +2,11 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use crate::application::capture::configured_capture_save_dir;
+use crate::application::history::{HistoryCleanupPolicy, HistoryPolicyProvider};
 use crate::application::settings::SettingsStore;
-use crate::domain::{GeneralSettings, ScreenshotSettings, SettingsSnapshot, TranslationSettings};
+use crate::domain::{
+    GeneralSettings, HistorySettings, ScreenshotSettings, SettingsSnapshot, TranslationSettings,
+};
 use crate::{AppError, Result};
 
 pub struct SettingsConfiguration {
@@ -12,6 +15,17 @@ pub struct SettingsConfiguration {
     home_dir: Option<PathBuf>,
     default_screenshot_save_dir: PathBuf,
     update_lock: Mutex<()>,
+}
+
+impl HistoryPolicyProvider for SettingsConfiguration {
+    fn current_policy(&self) -> Result<HistoryCleanupPolicy> {
+        let settings = self.snapshot()?.history;
+        Ok(HistoryCleanupPolicy {
+            enabled: settings.auto_cleanup_enabled,
+            retention_days: settings.retention_days,
+            maximum_records: settings.maximum_records,
+        })
+    }
 }
 
 pub trait SettingsChangeNotifier: Send + Sync {
@@ -86,6 +100,13 @@ impl SettingsConfiguration {
         self.save_snapshot(snapshot)
     }
 
+    pub fn update_history(&self, input: HistorySettings) -> Result<SettingsSnapshot> {
+        let _guard = self.update_lock.lock().unwrap();
+        let mut snapshot = self.snapshot()?;
+        snapshot.history = input;
+        self.save_snapshot(snapshot)
+    }
+
     fn save_snapshot(&self, snapshot: SettingsSnapshot) -> Result<SettingsSnapshot> {
         let snapshot = self.normalized_snapshot(snapshot);
         self.store.save_settings(&snapshot)?;
@@ -107,6 +128,8 @@ impl SettingsConfiguration {
     fn normalized_snapshot(&self, mut snapshot: SettingsSnapshot) -> SettingsSnapshot {
         snapshot.screenshot.save_path =
             self.normalize_screenshot_save_path(&snapshot.screenshot.save_path);
+        snapshot.history.retention_days = snapshot.history.retention_days.clamp(1, 3650);
+        snapshot.history.maximum_records = snapshot.history.maximum_records.clamp(100, 100_000);
         snapshot
     }
 

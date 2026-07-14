@@ -33,6 +33,14 @@ import {
   useHistoryStore,
 } from './stores/historyStore';
 import {
+  initializeScreenshotFavoritesStore,
+  useScreenshotFavoritesStore,
+} from './stores/screenshotFavoritesStore';
+import {
+  initializeFavoritesStore,
+  useFavoritesStore,
+} from './stores/favoritesStore';
+import {
   isCaptureResultWindowLaunch,
   isSettingsWindowLaunch,
 } from './appWindowRouting';
@@ -50,8 +58,10 @@ import {
 import { captureWindow } from './platform/tauri/captureWindow';
 import { writeClipboardText } from './platform/tauri/clipboard';
 import * as history from './platform/tauri/history';
+import { favorites } from './platform/tauri/favorites';
+import { screenshotFavorites } from './platform/tauri/screenshotFavorites';
 import * as hotkeys from './platform/tauri/hotkeys';
-import { recognizeImageData, recognizeImageFile, selectImageFile } from './platform/tauri/ocr';
+import { recognizeImageFile, selectImageFile } from './platform/tauri/ocr';
 import { pinnedImageCommands } from './platform/tauri/pinnedImage';
 import { pinnedWindow } from './platform/tauri/pinnedWindow';
 import { settingsProviders } from './platform/tauri/providers';
@@ -69,6 +79,8 @@ const settingsRuntime = createSettingsRuntime({
   providers: settingsProviders,
   hotkeys,
   history,
+  favorites,
+  screenshotFavorites,
   clipboard: { writeText: writeClipboardText },
   capture: { triggerScreenshot },
 });
@@ -87,8 +99,24 @@ const resultWindowPlatformRuntime = createResultWindowPlatformRuntime({
     takePayload: takeCaptureResultWindowPayload,
     selectImageFile,
     recognizeImageFile,
-    recognizeImageData,
     translateTextWithProvider,
+    favoriteTranslationResult: (input) =>
+      favorites.addTranslationFavorite({
+        sourceText: input.text,
+        sourceLang: input.sourceLang,
+        targetLang: input.targetLang,
+        providerId: input.result.provider_id,
+        translatedText: input.result.translated_text,
+        detectedLanguage: input.result.detected_language,
+        confidence: input.result.confidence,
+      }),
+    favoriteOcrResult: (input) =>
+      favorites.addOcrFavorite({
+        imageData: input.imageData,
+        recognizedText: input.result.text,
+        providerUsed: 'manual',
+        confidence: input.result.confidence,
+      }),
   },
 });
 const resultWindowRuntime = createResultWindowRuntime({
@@ -119,6 +147,8 @@ initializeSettingsConfigStore(settingsRuntime.durableSettings);
 initializeHotkeyConfigStore(settingsRuntime.hotkeys);
 initializeProviderStore(settingsRuntime.providers);
 initializeHistoryStore(settingsRuntime.history);
+initializeFavoritesStore(settingsRuntime.favorites);
+initializeScreenshotFavoritesStore(settingsRuntime.screenshotFavorites);
 
 const currentWindowLabel = getCurrentWindowLabel();
 const captureLaunch = readCaptureLaunch(window.location.search);
@@ -223,14 +253,22 @@ function App() {
         'hotkey',
       );
       track(
-        persistentStateEvents.subscribeHistoryChanged(async () => {
-          const historyState = useHistoryStore.getState();
-          await Promise.all([
-            historyState.loadTranslationHistory(),
-            historyState.loadOcrHistory(),
-          ]);
+        persistentStateEvents.subscribeHistoryChanged(() => {
+          useHistoryStore.getState().invalidate();
         }),
         'history',
+      );
+      track(
+        persistentStateEvents.subscribeFavoritesChanged(() => {
+          useFavoritesStore.getState().invalidate();
+        }),
+        'favorites',
+      );
+      track(
+        persistentStateEvents.subscribeScreenshotFavoritesChanged(() => {
+          useScreenshotFavoritesStore.getState().invalidate();
+        }),
+        'screenshot favorites',
       );
     }
 

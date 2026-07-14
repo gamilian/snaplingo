@@ -21,7 +21,6 @@ pub const SHOW_TRANSLATION_WINDOW_ACTION: &str = "show-window";
 pub const SCREENSHOT_OCR_ACTION: &str = "screenshot-ocr";
 pub const SILENT_SCREENSHOT_OCR_ACTION: &str = "silent-screenshot-ocr";
 pub const FILE_OCR_ACTION: &str = "file-ocr";
-pub const SHOW_OCR_WINDOW_ACTION: &str = "show-window";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DefaultHotkey {
@@ -89,11 +88,6 @@ pub const DEFAULT_HOTKEYS: &[DefaultHotkey] = &[
     DefaultHotkey {
         category: OCR_CATEGORY,
         action: FILE_OCR_ACTION,
-        hotkey: HOTKEY_UNSET,
-    },
-    DefaultHotkey {
-        category: OCR_CATEGORY,
-        action: SHOW_OCR_WINDOW_ACTION,
         hotkey: HOTKEY_UNSET,
     },
 ];
@@ -220,10 +214,7 @@ mod hotkey_config_tests {
             snapshot.ocr.get("file-ocr"),
             Some(&HOTKEY_UNSET.to_string())
         );
-        assert_eq!(
-            snapshot.ocr.get("show-window"),
-            Some(&HOTKEY_UNSET.to_string())
-        );
+        assert!(!snapshot.ocr.contains_key("show-window"));
     }
 
     #[test]

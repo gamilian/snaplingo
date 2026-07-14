@@ -62,14 +62,6 @@ describe('result payload application', () => {
         ocrIntent: 'display-text',
       }),
     ).toBe(true);
-    expect(
-      shouldApplyOcrPayloadText({
-        mode: 'ocr',
-        text: '',
-        autoTranslate: false,
-        ocrIntent: 'show',
-      }),
-    ).toBe(false);
   });
 
   it('normalizes OCR display text before putting it into the result window', () => {
@@ -83,7 +75,7 @@ describe('result payload application', () => {
     ).toBe('Visit https://example.com');
   });
 
-  it('clears OCR results for new OCR work but not for show-window', () => {
+  it('clears OCR results for display and uploaded-image OCR work', () => {
     expect(
       shouldClearOcrResultsForPayload({
         mode: 'ocr',
@@ -100,14 +92,6 @@ describe('result payload application', () => {
         ocrIntent: 'file',
       }),
     ).toBe(true);
-    expect(
-      shouldClearOcrResultsForPayload({
-        mode: 'ocr',
-        text: '',
-        autoTranslate: false,
-        ocrIntent: 'show',
-      }),
-    ).toBe(false);
   });
 
   it('starts file OCR only for file intent', () => {
@@ -119,13 +103,5 @@ describe('result payload application', () => {
         ocrIntent: 'file',
       }),
     ).toBe(true);
-    expect(
-      shouldStartFileOcrForPayload({
-        mode: 'ocr',
-        text: '',
-        autoTranslate: false,
-        ocrIntent: 'show',
-      }),
-    ).toBe(false);
   });
 });

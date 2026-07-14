@@ -11,6 +11,7 @@ export type CaptureRuntimeOutputAction =
   | 'save'
   | 'quick-save'
   | 'pin'
+  | 'favorite'
   | 'print';
 
 export type CaptureRuntimeOcrTarget =
@@ -110,6 +111,7 @@ function isOutputCaptureAction(
     action === 'save' ||
     action === 'quick-save' ||
     action === 'pin' ||
+    action === 'favorite' ||
     action === 'print'
   );
 }

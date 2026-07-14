@@ -16,6 +16,7 @@ export type CaptureCompletionEffect =
   | 'save'
   | 'quick-save'
   | 'pin'
+  | 'favorite'
   | 'ocr'
   | 'print'
   | 'cancel';

@@ -110,21 +110,6 @@ describe('result window application runtime', () => {
     expect(state.setOcrRunning).toHaveBeenLastCalledWith(false);
   });
 
-  it('recognizes the current OCR image data through the injected commands', async () => {
-    const { runtime, platform, state } = createRuntime({
-      recognizedImageText: 'image text',
-    });
-
-    await runtime.recognizeCurrentOcrImage('aGVsbG8=');
-
-    expect(platform.commands.recognizeImageData).toHaveBeenCalledWith(
-      new Uint8Array([104, 101, 108, 108, 111]),
-    );
-    expect(state.setOcrText).toHaveBeenCalledWith('image text');
-    expect(state.setOcrRunning).toHaveBeenNthCalledWith(1, true);
-    expect(state.setOcrRunning).toHaveBeenLastCalledWith(false);
-  });
-
   it('closes overlay state locally and standalone state plus native window', async () => {
     const { runtime, platform, state } = createRuntime();
 
@@ -177,7 +162,6 @@ function createRuntime(options: {
   payloads?: Record<string, CaptureResultWindowPayload | null>;
   selectedImagePath?: string | null;
   recognizedFileText?: string;
-  recognizedImageText?: string;
   takePayloadError?: unknown;
   dismissError?: unknown;
 } = {}) {
@@ -197,11 +181,9 @@ function createRuntime(options: {
         text: options.recognizedFileText ?? '',
         confidence: null,
       })),
-      recognizeImageData: vi.fn(async () => ({
-        text: options.recognizedImageText ?? '',
-        confidence: null,
-      })),
       translateTextWithProvider: vi.fn(),
+      favoriteTranslationResult: vi.fn(async () => 1),
+      favoriteOcrResult: vi.fn(async () => 1),
     },
     clipboard: { copyText: vi.fn() },
     onPayloadReady: vi.fn(async (handler: ResultPayloadReadyHandler) => {

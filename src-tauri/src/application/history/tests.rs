@@ -1,13 +1,17 @@
 #[cfg(test)]
 mod tests {
     use crate::application::history::{
-        EventSubscriber, History, HistoryChangeNotifier, HistoryRepository,
+        EventSubscriber, History, HistoryChangeNotifier, HistoryKind, HistoryQuery,
+        HistoryRepository,
     };
     use crate::domain::events::DomainEvent;
     use crate::domain::ocr::{OcrRequest, OcrResult};
     use crate::domain::translation::{TranslationRequest, TranslationResult};
+    use crate::infrastructure::storage::FilesystemOcrHistoryAssets;
     use crate::infrastructure::storage::SqliteHistoryRepository;
     use chrono::Utc;
+    use image::{ImageBuffer, ImageFormat, Rgba};
+    use std::io::Cursor;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
 
@@ -216,5 +220,147 @@ mod tests {
         history.clear_all_history().await.unwrap();
 
         assert_eq!(notifier.0.load(Ordering::SeqCst), 5);
+    }
+
+    #[tokio::test]
+    async fn favorite_translation_query_reads_all_matching_records_from_the_repository() {
+        let db = create_temp_db();
+        let history = History::new(db);
+        for text in ["first", "second"] {
+            history
+                .handle(&DomainEvent::TranslationCompleted {
+                    request: TranslationRequest {
+                        text: text.to_string(),
+                        source_lang: "en".to_string(),
+                        target_lang: "zh-CN".to_string(),
+                    },
+                    results: vec![],
+                    providers_used: vec![],
+                    timestamp: Utc::now(),
+                    duration_ms: 1,
+                })
+                .await;
+        }
+        let entries = history.get_translation_history(10, 0).await.unwrap();
+        history
+            .set_history_favorite(entries[1].id, true)
+            .await
+            .unwrap();
+
+        let page = history
+            .query_translation_history(HistoryQuery {
+                favorite_only: true,
+                limit: 1,
+                offset: 0,
+                ..HistoryQuery::default()
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(page.total, 1);
+        assert_eq!(page.items.len(), 1);
+        assert_eq!(page.items[0].source_text, "first");
+    }
+
+    #[tokio::test]
+    async fn clearing_translation_history_preserves_ocr_history() {
+        let db = create_temp_db();
+        let history = History::new(db);
+        history
+            .handle(&DomainEvent::TranslationCompleted {
+                request: TranslationRequest {
+                    text: "translate".to_string(),
+                    source_lang: "en".to_string(),
+                    target_lang: "zh-CN".to_string(),
+                },
+                results: vec![],
+                providers_used: vec![],
+                timestamp: Utc::now(),
+                duration_ms: 1,
+            })
+            .await;
+        history
+            .handle(&DomainEvent::OcrCompleted {
+                request: OcrRequest {
+                    image_data: vec![1, 2, 3],
+                    language: None,
+                },
+                result: OcrResult {
+                    text: "ocr".to_string(),
+                    confidence: None,
+                },
+                provider_used: "test".to_string(),
+                timestamp: Utc::now(),
+                duration_ms: 1,
+            })
+            .await;
+
+        history
+            .clear_history(HistoryKind::Translation)
+            .await
+            .unwrap();
+
+        assert!(history
+            .get_translation_history(10, 0)
+            .await
+            .unwrap()
+            .is_empty());
+        assert_eq!(history.get_ocr_history(10, 0).await.unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn ocr_history_persists_thumbnail_and_deletes_assets_with_record() {
+        let repository = Arc::new(SqliteHistoryRepository::new_in_memory().unwrap());
+        let asset_dir = tempfile::tempdir().unwrap();
+        let notifier = Arc::new(CountingNotifier(AtomicUsize::new(0)));
+        let history = History::with_dependencies(
+            repository,
+            notifier,
+            Arc::new(FilesystemOcrHistoryAssets::new(
+                asset_dir.path().to_path_buf(),
+            )),
+        );
+        let image = ImageBuffer::from_pixel(8, 4, Rgba([10u8, 20, 30, 255]));
+        let mut png = Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgba8(image)
+            .write_to(&mut png, ImageFormat::Png)
+            .unwrap();
+
+        history
+            .handle(&DomainEvent::OcrCompleted {
+                request: OcrRequest {
+                    image_data: png.into_inner(),
+                    language: None,
+                },
+                result: OcrResult {
+                    text: "ocr".to_string(),
+                    confidence: None,
+                },
+                provider_used: "test".to_string(),
+                timestamp: Utc::now(),
+                duration_ms: 1,
+            })
+            .await;
+
+        let entry = history.get_ocr_history(10, 0).await.unwrap().remove(0);
+        assert!(entry
+            .thumbnail_data_url
+            .as_deref()
+            .unwrap()
+            .starts_with("data:image/png;base64,"));
+        let source = asset_dir
+            .path()
+            .join("ocr")
+            .join(entry.source_asset_path.as_deref().unwrap());
+        let thumbnail = asset_dir
+            .path()
+            .join("ocr")
+            .join(entry.thumbnail_asset_path.as_deref().unwrap());
+        assert!(source.exists());
+        assert!(thumbnail.exists());
+
+        history.delete_history(entry.id).await.unwrap();
+        assert!(!source.exists());
+        assert!(!thumbnail.exists());
     }
 }

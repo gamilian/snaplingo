@@ -15,7 +15,6 @@ pub(crate) enum ResultWindowMode {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum ResultWindowOcrIntent {
-    Show,
     DisplayText,
     File,
 }
@@ -82,14 +81,6 @@ impl ResultWindowOpenRequest {
             text,
             intent: ResultWindowOcrIntent::DisplayText,
             image_base64,
-        }
-    }
-
-    pub(crate) fn show_ocr() -> Self {
-        Self::Ocr {
-            text: String::new(),
-            intent: ResultWindowOcrIntent::Show,
-            image_base64: None,
         }
     }
 

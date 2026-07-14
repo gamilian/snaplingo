@@ -3,6 +3,7 @@ import type { SettingsRuntime } from '../application/settings/runtime';
 import type {
   AnnotationColorPreset,
   GeneralSettings,
+  HistorySettings,
   ScreenshotSettings,
   SettingsSnapshot,
   TranslationSettings,
@@ -33,6 +34,7 @@ interface SettingsConfigState {
   general: GeneralSettings | null;
   screenshot: ScreenshotSettings | null;
   translation: TranslationSettings | null;
+  history: HistorySettings | null;
   hydrate: () => Promise<SettingsSnapshot>;
   refresh: () => Promise<SettingsSnapshot>;
   updateGeneralSettings: (input: GeneralSettings) => Promise<SettingsSnapshot>;
@@ -41,6 +43,7 @@ interface SettingsConfigState {
     colors: AnnotationColorPreset[],
   ) => Promise<SettingsSnapshot>;
   updateTranslationSettings: (input: TranslationSettings) => Promise<SettingsSnapshot>;
+  updateHistorySettings: (input: HistorySettings) => Promise<SettingsSnapshot>;
 }
 
 function applySnapshot(
@@ -52,6 +55,7 @@ function applySnapshot(
     general: snapshot.general,
     screenshot: snapshot.screenshot,
     translation: snapshot.translation,
+    history: snapshot.history,
   });
 }
 
@@ -71,7 +75,7 @@ async function applyLatestSnapshot(
 }
 
 function currentSnapshot(state: SettingsConfigState): SettingsSnapshot | null {
-  if (!state.general || !state.screenshot || !state.translation) {
+  if (!state.general || !state.screenshot || !state.translation || !state.history) {
     return null;
   }
 
@@ -79,6 +83,7 @@ function currentSnapshot(state: SettingsConfigState): SettingsSnapshot | null {
     general: state.general,
     screenshot: state.screenshot,
     translation: state.translation,
+    history: state.history,
   };
 }
 
@@ -87,6 +92,7 @@ export const useSettingsConfigStore = create<SettingsConfigState>((set, get) => 
   general: null,
   screenshot: null,
   translation: null,
+  history: null,
   hydrate: async () => {
     const existingSnapshot = currentSnapshot(get());
 
@@ -111,4 +117,6 @@ export const useSettingsConfigStore = create<SettingsConfigState>((set, get) => 
     applyLatestSnapshot(set, get, () =>
       settingsRuntime().updateTranslation(input),
     ),
+  updateHistorySettings: (input) =>
+    applyLatestSnapshot(set, get, () => settingsRuntime().updateHistory(input)),
 }));

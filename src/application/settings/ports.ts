@@ -22,10 +22,17 @@ export interface TranslationSettings {
   defaultTargetLang: string;
 }
 
+export interface HistorySettings {
+  autoCleanupEnabled: boolean;
+  retentionDays: number;
+  maximumRecords: number;
+}
+
 export interface SettingsSnapshot {
   general: GeneralSettings;
   screenshot: ScreenshotSettings;
   translation: TranslationSettings;
+  history: HistorySettings;
 }
 
 export interface DurableSettingsPort {
@@ -40,6 +47,7 @@ export interface DurableSettingsPort {
   updateTranslationSettings(
     input: TranslationSettings,
   ): Promise<SettingsSnapshot>;
+  updateHistorySettings(input: HistorySettings): Promise<SettingsSnapshot>;
 }
 
 export interface CredentialField {
@@ -221,11 +229,158 @@ export interface OcrHistoryEntry {
   recognizedText: string;
   confidence: number | null;
   durationMs: number;
+  thumbnailDataUrl: string | null;
 }
 
 export type HistoryEntry =
   | (TranslationHistoryEntry & { type: 'translation' })
   | (OcrHistoryEntry & { type: 'ocr' });
+
+export type HistoryKind = 'translation' | 'ocr';
+
+export interface HistoryQuery {
+  search: string;
+  tag?: string;
+  favoriteOnly: boolean;
+  limit: number;
+  offset: number;
+}
+
+export interface HistoryPage<T> {
+  items: T[];
+  total: number;
+}
+
+export interface ScreenshotFavoriteQuery {
+  search: string;
+  limit: number;
+  offset: number;
+}
+
+export interface ScreenshotFavoriteItem {
+  id: number;
+  contentKind: 'screenshot';
+  createdAt: string;
+  thumbnailDataUrl: string;
+  width: number;
+  height: number;
+  note: string | null;
+  tags: string[];
+}
+
+export interface ScreenshotFavoritePage {
+  items: ScreenshotFavoriteItem[];
+  total: number;
+}
+
+export type FavoriteKind = 'translation' | 'ocr';
+
+export interface TranslationFavoriteInput {
+  sourceHistoryId?: number | null;
+  sourceText: string;
+  sourceLang: string;
+  targetLang: string;
+  providerId: string;
+  translatedText: string;
+  detectedLanguage?: string | null;
+  confidence?: number | null;
+}
+
+export interface OcrFavoriteInput {
+  sourceHistoryId?: number | null;
+  imageData?: Uint8Array | number[];
+  recognizedText: string;
+  language?: string | null;
+  providerUsed: string;
+  confidence?: number | null;
+}
+
+export interface TranslationFavoriteItem {
+  id: number;
+  createdAt: string;
+  sourceHistoryId: number | null;
+  content: {
+    contentKind: 'translation';
+    snapshot: {
+      sourceText: string;
+      sourceLang: string;
+      targetLang: string;
+      result: {
+        provider_id: string;
+        translated_text: string;
+        detected_language: string | null;
+        confidence: number | null;
+      };
+    };
+  };
+  note: string | null;
+  tags: string[];
+  thumbnailDataUrl: null;
+}
+
+export interface OcrFavoriteItem {
+  id: number;
+  createdAt: string;
+  sourceHistoryId: number | null;
+  content: {
+    contentKind: 'ocr';
+    snapshot: {
+      imageHash: string;
+      recognizedText: string;
+      language: string | null;
+      providerUsed: string;
+      confidence: number | null;
+      sourceAssetPath: string | null;
+      thumbnailAssetPath: string | null;
+    };
+  };
+  note: string | null;
+  tags: string[];
+  thumbnailDataUrl: string | null;
+}
+
+export type FavoriteItem = TranslationFavoriteItem | OcrFavoriteItem;
+
+export interface FavoriteQuery {
+  kind?: FavoriteKind;
+  search?: string;
+  tag?: string;
+  limit: number;
+  offset: number;
+}
+
+export interface FavoritePage {
+  items: FavoriteItem[];
+  total: number;
+}
+
+export interface SettingsFavoritesPort {
+  addTranslationFavorite(input: TranslationFavoriteInput): Promise<number>;
+  addOcrFavorite(input: OcrFavoriteInput): Promise<number>;
+  queryFavorites(query: FavoriteQuery): Promise<FavoritePage>;
+  updateFavoriteMetadata(
+    id: number,
+    note: string | null,
+    tags: string[],
+  ): Promise<void>;
+  deleteFavorite(id: number): Promise<void>;
+  rerunOcrFavorite(id: number): Promise<string>;
+  listFavoriteTags(kind: FavoriteKind): Promise<string[]>;
+}
+
+export interface SettingsScreenshotFavoritesPort {
+  queryScreenshotFavorites(
+    query: ScreenshotFavoriteQuery,
+  ): Promise<ScreenshotFavoritePage>;
+  updateScreenshotFavoriteMetadata(
+    id: number,
+    note: string | null,
+    tags: string[],
+  ): Promise<void>;
+  deleteScreenshotFavorite(id: number): Promise<void>;
+  copyScreenshotFavorite(id: number): Promise<void>;
+  revealScreenshotFavorite(id: number): Promise<void>;
+}
 
 export interface SettingsHistoryPort {
   getTranslationHistory(
@@ -233,11 +388,19 @@ export interface SettingsHistoryPort {
     offset: number,
   ): Promise<TranslationHistoryEntry[]>;
   getOcrHistory(limit: number, offset: number): Promise<OcrHistoryEntry[]>;
+  queryTranslationHistory(
+    query: HistoryQuery,
+  ): Promise<HistoryPage<TranslationHistoryEntry>>;
+  queryOcrHistory(query: HistoryQuery): Promise<HistoryPage<OcrHistoryEntry>>;
   deleteHistory(id: number): Promise<void>;
   setHistoryFavorite(id: number, favorite: boolean): Promise<void>;
   updateHistoryNote(id: number, note: string | null): Promise<void>;
   replaceHistoryTags(id: number, tags: string[]): Promise<void>;
   clearAllHistory(): Promise<void>;
+  clearHistory(kind: HistoryKind): Promise<void>;
+  rerunOcrHistory(id: number): Promise<string>;
+  exportTranslationFavorites(): Promise<number | null>;
+  listHistoryTags(kind: HistoryKind, favoriteOnly: boolean): Promise<string[]>;
 }
 
 export interface SettingsClipboardPort {

@@ -81,6 +81,7 @@ export type CaptureCompletionAction =
   | 'save'
   | 'quick-save'
   | 'pin'
+  | 'favorite'
   | 'ocr'
   | 'silent-ocr'
   | 'ocr-translate'
@@ -88,7 +89,7 @@ export type CaptureCompletionAction =
   | 'cancel';
 export type PreviewCaptureCompletionAction = Extract<
   CaptureCompletionAction,
-  'copy' | 'save' | 'quick-save' | 'pin' | 'print' | 'ocr'
+  'copy' | 'save' | 'quick-save' | 'pin' | 'favorite' | 'print' | 'ocr'
 >;
 type PreviewCaptureShortcutCompletionAction = Exclude<
   PreviewCaptureCompletionAction,
@@ -120,7 +121,8 @@ export function shouldRecordSuccessfulCaptureSelection(
     action === 'copy' ||
     action === 'save' ||
     action === 'quick-save' ||
-    action === 'pin'
+    action === 'pin' ||
+    action === 'favorite'
   );
 }
 

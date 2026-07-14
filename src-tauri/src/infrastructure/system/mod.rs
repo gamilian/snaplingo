@@ -5,6 +5,7 @@ pub mod paths;
 pub mod pinned_window;
 pub mod result_window;
 pub mod screenshot;
+pub mod screenshot_favorites;
 pub mod selection;
 pub mod shortcut;
 

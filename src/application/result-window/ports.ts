@@ -20,7 +20,7 @@ export interface CaptureResultWindowPayload {
   mode: 'translation' | 'ocr';
   text: string;
   autoTranslate: boolean;
-  ocrIntent?: 'show' | 'display-text' | 'file';
+  ocrIntent?: 'display-text' | 'file';
   imageBase64?: string;
 }
 
@@ -31,11 +31,20 @@ export interface ResultWindowCommandsPort {
   ): Promise<CaptureResultWindowPayload | null>;
   selectImageFile(): Promise<string | null>;
   recognizeImageFile(path: string): Promise<OcrResult>;
-  recognizeImageData(imageData: Uint8Array | number[]): Promise<OcrResult>;
   translateTextWithProvider(
     providerId: string,
     input: { text: string; sourceLang: string; targetLang: string },
   ): Promise<TranslationResult>;
+  favoriteTranslationResult(input: {
+    text: string;
+    sourceLang: string;
+    targetLang: string;
+    result: TranslationResult;
+  }): Promise<number>;
+  favoriteOcrResult(input: {
+    imageData: Uint8Array | number[];
+    result: OcrResult;
+  }): Promise<number>;
 }
 
 export interface ResultWindowClipboardPort {
