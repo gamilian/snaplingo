@@ -71,7 +71,10 @@ import {
 } from './platform/tauri/resultWindow';
 import * as durableSettings from './platform/tauri/settings';
 import { settingsWindow } from './platform/tauri/settingsWindow';
-import { translateTextWithProvider } from './platform/tauri/translation';
+import {
+  recordTranslationHistory,
+  translateTextWithProvider,
+} from './platform/tauri/translation';
 
 const settingsRuntime = createSettingsRuntime({
   window: settingsWindow,
@@ -100,6 +103,7 @@ const resultWindowPlatformRuntime = createResultWindowPlatformRuntime({
     selectImageFile,
     recognizeImageFile,
     translateTextWithProvider,
+    recordTranslationHistory,
     favoriteTranslationResult: (input) =>
       favorites.addTranslationFavorite({
         sourceText: input.text,

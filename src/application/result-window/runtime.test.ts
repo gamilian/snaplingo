@@ -182,6 +182,7 @@ function createRuntime(options: {
         confidence: null,
       })),
       translateTextWithProvider: vi.fn(),
+      recordTranslationHistory: vi.fn(async () => undefined),
       favoriteTranslationResult: vi.fn(async () => 1),
       favoriteOcrResult: vi.fn(async () => 1),
     },

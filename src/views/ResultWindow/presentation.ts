@@ -111,12 +111,18 @@ export function resultWindowContentClassName({
   return `flex min-h-0 ${heightClassName} flex-col gap-3 overflow-y-auto overflow-x-hidden pl-3 pr-3 ${bottomPaddingClassName} pt-3 result-window-scrollbar`;
 }
 
-export function resultWindowOcrContentClassName({
-  hasSourceImage,
-}: {
-  hasSourceImage: boolean;
-}) {
-  return resultWindowContentClassName({ stretch: hasSourceImage });
+export function resultWindowOcrContentClassName() {
+  return resultWindowContentClassName();
+}
+
+export function resultWindowOcrPanelHeight(
+  contentHeightPx: number,
+  availableHeightPx: number,
+) {
+  return Math.min(
+    Math.ceil(contentHeightPx),
+    Math.max(0, Math.floor(availableHeightPx) - 32),
+  );
 }
 
 export function resultWindowHeaderDragHandleClassName(isDraggable: boolean) {

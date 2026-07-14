@@ -1,8 +1,10 @@
 use crate::domain::events::DomainEvent;
 use crate::domain::ocr::OcrResult;
+use crate::domain::translation::{TranslationRequest, TranslationResult};
 use crate::Result;
 use async_trait::async_trait;
 use base64::Engine;
+use chrono::{DateTime, Utc};
 use std::sync::Arc;
 
 mod event_source;
@@ -110,6 +112,20 @@ impl History {
         query: HistoryQuery,
     ) -> Result<HistoryPage<TranslationHistoryEntry>> {
         self.repository.query_translation_page(&query).await
+    }
+
+    pub async fn record_translation(
+        &self,
+        request: TranslationRequest,
+        results: Vec<TranslationResult>,
+        duration_ms: u64,
+    ) -> Result<()> {
+        let providers_used = results
+            .iter()
+            .map(|result| result.provider_id.clone())
+            .collect::<Vec<_>>();
+        self.store_translation(&request, &results, &providers_used, Utc::now(), duration_ms)
+            .await
     }
 
     /// Get OCR history with pagination
@@ -275,6 +291,24 @@ impl History {
             let _ = store.delete(&thumbnail);
         }
     }
+
+    async fn store_translation(
+        &self,
+        request: &TranslationRequest,
+        results: &[TranslationResult],
+        providers_used: &[String],
+        timestamp: DateTime<Utc>,
+        duration_ms: u64,
+    ) -> Result<()> {
+        self.repository
+            .insert_translation(request, results, providers_used, timestamp, duration_ms)
+            .await?;
+        self.notify_changed();
+        if let Err(error) = self.run_cleanup().await {
+            eprintln!("[History] Failed to run automatic cleanup: {}", error);
+        }
+        Ok(())
+    }
 }
 
 pub struct OcrHistoryReplay {
@@ -312,18 +346,11 @@ impl EventSubscriber for History {
                 timestamp,
                 duration_ms,
             } => {
-                match self
-                    .repository
-                    .insert_translation(request, results, providers_used, *timestamp, *duration_ms)
+                if let Err(e) = self
+                    .store_translation(request, results, providers_used, *timestamp, *duration_ms)
                     .await
                 {
-                    Ok(_) => {
-                        self.notify_changed();
-                        if let Err(error) = self.run_cleanup().await {
-                            eprintln!("[History] Failed to run automatic cleanup: {}", error);
-                        }
-                    }
-                    Err(e) => eprintln!("[History] Failed to record translation: {}", e),
+                    eprintln!("[History] Failed to record translation: {}", e);
                 }
             }
             DomainEvent::OcrCompleted {

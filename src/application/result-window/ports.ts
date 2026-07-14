@@ -35,6 +35,13 @@ export interface ResultWindowCommandsPort {
     providerId: string,
     input: { text: string; sourceLang: string; targetLang: string },
   ): Promise<TranslationResult>;
+  recordTranslationHistory(input: {
+    text: string;
+    sourceLang: string;
+    targetLang: string;
+    results: TranslationResult[];
+    durationMs: number;
+  }): Promise<void>;
   favoriteTranslationResult(input: {
     text: string;
     sourceLang: string;

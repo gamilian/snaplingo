@@ -61,6 +61,42 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn records_one_translation_session_with_all_provider_results() {
+        let db = create_temp_db();
+        let history = History::new(db.clone());
+        let request = TranslationRequest {
+            text: "Hello world".to_string(),
+            source_lang: "en".to_string(),
+            target_lang: "zh-CN".to_string(),
+        };
+        let results = vec![
+            TranslationResult {
+                provider_id: "google".to_string(),
+                translated_text: "你好，世界".to_string(),
+                detected_language: Some("en".to_string()),
+                confidence: None,
+            },
+            TranslationResult {
+                provider_id: "deeplx".to_string(),
+                translated_text: "你好世界".to_string(),
+                detected_language: Some("en".to_string()),
+                confidence: None,
+            },
+        ];
+
+        history
+            .record_translation(request, results, 42)
+            .await
+            .unwrap();
+
+        let entries = db.query_translations(10, 0).await.unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].providers_used, vec!["google", "deeplx"]);
+        assert_eq!(entries[0].results.len(), 2);
+        assert_eq!(entries[0].duration_ms, 42);
+    }
+
+    #[tokio::test]
     async fn successful_event_recording_notifies_runtime_observers() {
         let db = create_temp_db();
         let notifier = Arc::new(CountingNotifier(AtomicUsize::new(0)));

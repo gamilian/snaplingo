@@ -16,6 +16,7 @@ export async function activeTranslationProviderIds() {
 
 export function useTranslate(
   translateTextWithProvider: ResultWindowCommandsPort['translateTextWithProvider'],
+  recordTranslationHistory: ResultWindowCommandsPort['recordTranslationHistory'],
 ) {
   const {
     sourceText,
@@ -48,7 +49,8 @@ export function useTranslate(
       return;
     }
 
-    await Promise.allSettled(
+    const startedAt = performance.now();
+    const results = await Promise.all(
       providerIds.map(async (providerId) => {
         beginProviderTranslation(sessionId, providerId);
         try {
@@ -58,12 +60,29 @@ export function useTranslate(
             targetLang: requestLanguages.targetLang,
           });
           completeProviderTranslation(sessionId, result);
+          return result;
         } catch (error) {
           console.error(`Translation failed for provider ${providerId}:`, error);
           failProviderTranslation(sessionId, providerId, errorMessage(error));
+          return null;
         }
       }),
     );
+
+    const completedResults = results.filter((result) => result !== null);
+    if (completedResults.length > 0) {
+      try {
+        await recordTranslationHistory({
+          text: textToTranslate,
+          sourceLang: requestLanguages.sourceLang,
+          targetLang: requestLanguages.targetLang,
+          results: completedResults,
+          durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
+        });
+      } catch (error) {
+        console.error('Failed to record translation history:', error);
+      }
+    }
   };
 
   const retryProvider = async (providerId: string) => {

@@ -7,6 +7,11 @@ export interface TranslateTextInput {
   targetLang: string;
 }
 
+export interface RecordTranslationHistoryInput extends TranslateTextInput {
+  results: TranslationResult[];
+  durationMs: number;
+}
+
 export async function translateText(input: TranslateTextInput) {
   return invoke<TranslationResult[]>('translate_text_v2', {
     request: {
@@ -28,5 +33,17 @@ export async function translateTextWithProvider(
       source_lang: input.sourceLang === 'auto' ? null : input.sourceLang,
       target_lang: input.targetLang,
     },
+  });
+}
+
+export function recordTranslationHistory(input: RecordTranslationHistoryInput) {
+  return invoke<void>('record_translation_history', {
+    request: {
+      text: input.text,
+      source_lang: input.sourceLang === 'auto' ? null : input.sourceLang,
+      target_lang: input.targetLang,
+    },
+    results: input.results,
+    durationMs: input.durationMs,
   });
 }

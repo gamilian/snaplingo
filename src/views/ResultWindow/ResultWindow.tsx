@@ -35,6 +35,7 @@ import {
   resultWindowOcrFullTextBoxClassName,
   resultWindowOcrImageActionButtonClassName,
   resultWindowOcrImagePanelClassName,
+  resultWindowOcrPanelHeight,
   resultWindowOcrResultStackClassName,
   resultWindowOcrResultTextAreaClassName,
   resultWindowOcrTokenButtonClassName,
@@ -268,6 +269,7 @@ function ResultWindowContent({
 
   const { translate, retryProvider } = useTranslate(
     runtime.commands.translateTextWithProvider,
+    runtime.commands.recordTranslationHistory,
   );
   const lastAutoTranslateRequestId = useRef(0);
   const resultWindowPanelRef = useRef<HTMLDivElement>(null);
@@ -288,6 +290,10 @@ function ResultWindowContent({
     null,
   );
   const [isOcrFavoritePending, setOcrFavoritePending] = useState(false);
+  const [favoritedTranslationSignature, setFavoritedTranslationSignature] =
+    useState<string | null>(null);
+  const [isTranslationFavoritePending, setTranslationFavoritePending] =
+    useState(false);
   const sourceTextStyle = useMemo(
     () => resultWindowAdaptiveTextStyle(sourceText, 'source'),
     [sourceText],
@@ -298,6 +304,15 @@ function ResultWindowContent({
   );
   const ocrTokens = useMemo(() => ocrCopyTokens(ocrText), [ocrText]);
   const ocrFavoriteSignature = `${ocrImageBase64 ?? ''}\u0000${ocrText}`;
+  const completedTranslationResults = useMemo(
+    () =>
+      providerTranslations.filter(
+        (translation) =>
+          translation.status === 'success' &&
+          translation.translated_text.trim().length > 0,
+      ),
+    [providerTranslations],
+  );
   const translationLayout = useMemo(
     () =>
       resultWindowTranslationLayout(
@@ -316,6 +331,12 @@ function ResultWindowContent({
         .targetLang,
     [sourceLang, sourceText, targetLang],
   );
+  const translationFavoriteSignature = JSON.stringify({
+    sourceText,
+    sourceLang,
+    targetLang: resolvedTargetLanguage,
+    results: completedTranslationResults,
+  });
   const translationPanelHeightPx =
     measuredTranslationPanelHeightPx ?? translationLayout.windowHeightPx;
   const sourceTextAreaStyle =
@@ -382,6 +403,47 @@ function ResultWindowContent({
     runtime,
   ]);
 
+  const handleFavoriteTranslation = useCallback(async () => {
+    if (
+      completedTranslationResults.length === 0 ||
+      isTranslationFavoritePending
+    ) {
+      return;
+    }
+
+    setTranslationFavoritePending(true);
+    try {
+      await Promise.all(
+        completedTranslationResults.map((result) =>
+          runtime.commands.favoriteTranslationResult({
+            text: sourceText,
+            sourceLang,
+            targetLang: resolvedTargetLanguage,
+            result: {
+              provider_id: result.provider_id,
+              translated_text: result.translated_text,
+              detected_language: result.detected_language,
+              confidence: result.confidence,
+            },
+          }),
+        ),
+      );
+      setFavoritedTranslationSignature(translationFavoriteSignature);
+    } catch (error) {
+      console.error('Failed to favorite translation results:', error);
+    } finally {
+      setTranslationFavoritePending(false);
+    }
+  }, [
+    completedTranslationResults,
+    isTranslationFavoritePending,
+    resolvedTargetLanguage,
+    runtime,
+    sourceLang,
+    sourceText,
+    translationFavoriteSignature,
+  ]);
+
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (shouldCloseFromEscapeKey(e.key) && resultWindowVisible) {
@@ -428,7 +490,11 @@ function ResultWindowContent({
       if (!panel) return;
 
       const updateOcrWindowHeight = () => {
-        const panelHeight = Math.ceil(panel.scrollHeight);
+        const availableHeight = window.screen?.availHeight || window.innerHeight;
+        const panelHeight = resultWindowOcrPanelHeight(
+          panel.scrollHeight,
+          availableHeight,
+        );
 
         void runtime.resizeStandaloneWindow({
           presentation,
@@ -626,9 +692,7 @@ function ResultWindowContent({
 
         {isOcrMode ? (
           <ResultWindowScrollArea
-            className={resultWindowOcrContentClassName({
-              hasSourceImage: Boolean(ocrImageBase64),
-            })}
+            className={resultWindowOcrContentClassName()}
           >
             {ocrImageBase64 ? (
               <div className={resultWindowOcrResultStackClassName()}>
@@ -709,6 +773,16 @@ function ResultWindowContent({
                         {ocrText.length} chars
                       </span>
                       <div className="flex items-center gap-2">
+                        <IconActionButton
+                          title="朗读"
+                          disabled={!ocrText.trim()}
+                          className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
+                          onClick={() => {
+                            void speakResultWindowText(ocrText);
+                          }}
+                        >
+                          <VolumeIcon className="h-4 w-4" />
+                        </IconActionButton>
                         <IconActionButton
                           title={
                             favoritedOcrSignature === ocrFavoriteSignature
@@ -817,6 +891,16 @@ function ResultWindowContent({
                       </span>
                       <div className="flex items-center gap-2">
                         <IconActionButton
+                          title="朗读"
+                          disabled={!ocrText.trim()}
+                          className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
+                          onClick={() => {
+                            void speakResultWindowText(ocrText);
+                          }}
+                        >
+                          <VolumeIcon className="h-4 w-4" />
+                        </IconActionButton>
+                        <IconActionButton
                           title={
                             favoritedOcrSignature === ocrFavoriteSignature
                               ? '已收藏'
@@ -900,6 +984,36 @@ function ResultWindowContent({
                     </span>
                   </span>
                   <div className="flex items-center gap-2">
+                    <IconActionButton
+                      title={
+                        favoritedTranslationSignature ===
+                        translationFavoriteSignature
+                          ? '已收藏'
+                          : '收藏'
+                      }
+                      aria-pressed={
+                        favoritedTranslationSignature ===
+                        translationFavoriteSignature
+                      }
+                      disabled={
+                        completedTranslationResults.length === 0 ||
+                        isTranslationFavoritePending ||
+                        favoritedTranslationSignature ===
+                          translationFavoriteSignature
+                      }
+                      className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+                      onClick={() => void handleFavoriteTranslation()}
+                    >
+                      <FavoriteIcon
+                        className="h-4 w-4"
+                        fill={
+                          favoritedTranslationSignature ===
+                          translationFavoriteSignature
+                            ? 'currentColor'
+                            : 'none'
+                        }
+                      />
+                    </IconActionButton>
                     <IconActionButton
                       title="复制"
                       disabled={!sourceText.trim()}

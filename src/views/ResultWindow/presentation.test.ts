@@ -10,6 +10,7 @@ import {
   resultWindowOcrFullTextBoxClassName,
   resultWindowOcrImageActionButtonClassName,
   resultWindowOcrImagePanelClassName,
+  resultWindowOcrPanelHeight,
   resultWindowOcrResultStackClassName,
   resultWindowOcrResultTextAreaClassName,
   resultWindowOcrTokenButtonClassName,
@@ -124,7 +125,7 @@ describe('result window presentation', () => {
   });
 
   it('lets OCR content with a source image scroll inside a constrained result window', () => {
-    const className = resultWindowOcrContentClassName({ hasSourceImage: true });
+    const className = resultWindowOcrContentClassName();
 
     expect(className).toContain('flex-1');
     expect(className).toContain('overflow-y-auto');
@@ -132,11 +133,18 @@ describe('result window presentation', () => {
     expect(className).not.toContain('flex-none');
   });
 
-  it('keeps OCR upload-only content compact', () => {
-    const className = resultWindowOcrContentClassName({ hasSourceImage: false });
+  it('lets OCR upload-only content use the same overall scrollbar', () => {
+    const className = resultWindowOcrContentClassName();
 
-    expect(className).toContain('flex-none');
-    expect(className).not.toContain('flex-1');
+    expect(className).toContain('flex-1');
+    expect(className).toContain('overflow-y-auto');
+    expect(className).toContain('result-window-scrollbar');
+    expect(className).not.toContain('flex-none');
+  });
+
+  it('caps the OCR panel below the available screen height so its overall scrollbar remains usable', () => {
+    expect(resultWindowOcrPanelHeight(1400, 1000)).toBe(968);
+    expect(resultWindowOcrPanelHeight(600, 1000)).toBe(600);
   });
 
   it('uses expanding text boxes without individual scrollbars', () => {

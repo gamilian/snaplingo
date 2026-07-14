@@ -109,6 +109,7 @@ pub fn run() {
             commands::open_capture_window,
             commands::translate_text_v2,
             commands::translate_text_with_provider,
+            commands::record_translation_history,
             commands::list_translation_providers,
             commands::activate_translation_provider,
             commands::deactivate_translation_provider,
