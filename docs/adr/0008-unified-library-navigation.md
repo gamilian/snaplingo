@@ -10,7 +10,7 @@ ADR 0002 placed History and Favorites inside screenshot, translation, and OCR se
 
 The selected three-column design establishes two information groups in the Settings Window:
 
-- Settings: General, Screenshot, Translation, OCR, Services, and Advanced.
+- Settings: General, Screenshot, Translation, OCR, and Services. Former Advanced settings live in General.
 - Library: Favorites and History.
 
 History and Favorites each need one chronological surface that can filter content by screenshot, translation, or OCR. Building that surface requires cross-source querying, global ordering, and pagination. Those decisions are workflow policy, not React rendering behavior.

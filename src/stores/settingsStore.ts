@@ -2,69 +2,70 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type {
   MainTab,
-  OcrSubTab,
-  ScreenshotSubTab,
   ServicesSubTab,
-  TranslationSubTab,
 } from '../views/SettingsWindow/navigationModel';
+import type { SettingsNavigationRequest } from '../application/settings/navigation';
 
 interface SettingsState {
   activeMainTab: MainTab;
-  screenshotSubTab: ScreenshotSubTab;
-  translationSubTab: TranslationSubTab;
-  ocrSubTab: OcrSubTab;
   servicesSubTab: ServicesSubTab;
+  requestedSection: string | null;
 
   setActiveMainTab: (tab: MainTab) => void;
-  setScreenshotSubTab: (tab: SettingsState['screenshotSubTab']) => void;
-  setTranslationSubTab: (tab: SettingsState['translationSubTab']) => void;
-  setOcrSubTab: (tab: SettingsState['ocrSubTab']) => void;
   setServicesSubTab: (tab: SettingsState['servicesSubTab']) => void;
+  navigate: (request: SettingsNavigationRequest) => void;
+  consumeRequestedSection: () => void;
 }
 
 interface PersistedSettingsState {
   activeMainTab?: MainTab;
-  screenshotSubTab?: ScreenshotSubTab;
-  translationSubTab?: TranslationSubTab;
-  ocrSubTab?: OcrSubTab;
   servicesSubTab?: ServicesSubTab;
 }
 
 function mergePersistedState(state: SettingsState, persistedState: unknown): SettingsState {
   const persisted = (persistedState ?? {}) as PersistedSettingsState;
+  const activeMainTab = isMainTab(persisted.activeMainTab)
+    ? persisted.activeMainTab
+    : state.activeMainTab;
 
   return {
     ...state,
-    activeMainTab: persisted.activeMainTab ?? state.activeMainTab,
-    screenshotSubTab: persisted.screenshotSubTab ?? state.screenshotSubTab,
-    translationSubTab: persisted.translationSubTab ?? state.translationSubTab,
-    ocrSubTab: persisted.ocrSubTab ?? state.ocrSubTab,
+    activeMainTab,
     servicesSubTab: persisted.servicesSubTab ?? state.servicesSubTab,
+    requestedSection: null,
   };
+}
+
+function isMainTab(value: unknown): value is MainTab {
+  return [
+    'general',
+    'screenshot',
+    'translation',
+    'ocr',
+    'services',
+    'favorites',
+    'history',
+  ].includes(String(value));
 }
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       activeMainTab: 'screenshot',
-      screenshotSubTab: 'hotkeys',
-      translationSubTab: 'hotkeys',
-      ocrSubTab: 'hotkeys',
       servicesSubTab: 'ocr',
-      setActiveMainTab: (tab) => set({ activeMainTab: tab }),
-      setScreenshotSubTab: (tab) => set({ screenshotSubTab: tab }),
-      setTranslationSubTab: (tab) => set({ translationSubTab: tab }),
-      setOcrSubTab: (tab) => set({ ocrSubTab: tab }),
+      requestedSection: null,
+      setActiveMainTab: (tab) =>
+        set({ activeMainTab: tab, requestedSection: null }),
       setServicesSubTab: (tab) => set({ servicesSubTab: tab }),
+      navigate: ({ tab, section }) =>
+        set({ activeMainTab: tab, requestedSection: section ?? null }),
+      consumeRequestedSection: () => set({ requestedSection: null }),
     }),
     {
       name: 'snaplingo-settings',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         activeMainTab: state.activeMainTab,
-        screenshotSubTab: state.screenshotSubTab,
-        translationSubTab: state.translationSubTab,
-        ocrSubTab: state.ocrSubTab,
         servicesSubTab: state.servicesSubTab,
       }),
       merge: (persistedState, currentState) =>

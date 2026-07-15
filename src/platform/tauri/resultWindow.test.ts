@@ -1,24 +1,56 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { getCurrentWindow, hide, setSize, startDragging } = vi.hoisted(() => {
+const {
+  currentMonitor,
+  cursorPosition,
+  getCurrentWindow,
+  hide,
+  innerSize,
+  monitorFromPoint,
+  setPosition,
+  setSize,
+  startDragging,
+} = vi.hoisted(() => {
   const hide = vi.fn();
   const setSize = vi.fn();
   const startDragging = vi.fn();
+  const innerSize = vi.fn();
+  const setPosition = vi.fn();
 
   return {
-    getCurrentWindow: vi.fn(() => ({ hide, setSize, startDragging })),
+    currentMonitor: vi.fn(),
+    cursorPosition: vi.fn(),
+    getCurrentWindow: vi.fn(() => ({
+      hide,
+      innerSize,
+      setPosition,
+      setSize,
+      startDragging,
+    })),
     hide,
+    innerSize,
+    monitorFromPoint: vi.fn(),
+    setPosition,
     setSize,
     startDragging,
   };
 });
 
 vi.mock('@tauri-apps/api/window', () => ({
+  currentMonitor,
+  cursorPosition,
   getCurrentWindow,
   LogicalSize: class LogicalSize {
     constructor(
       public width: number,
       public height: number,
+    ) {}
+  },
+  monitorFromPoint,
+  PhysicalPosition: class PhysicalPosition {
+    constructor(
+      public x: number,
+      public y: number,
     ) {}
   },
 }));
@@ -30,6 +62,17 @@ describe('Tauri result window adapter', () => {
     getCurrentWindow.mockClear();
     hide.mockReset().mockResolvedValue(undefined);
     setSize.mockReset().mockResolvedValue(undefined);
+    setPosition.mockReset().mockResolvedValue(undefined);
+    cursorPosition.mockReset().mockResolvedValue({ x: 1500, y: 900 });
+    monitorFromPoint.mockReset().mockResolvedValue({
+      scaleFactor: 2,
+      workArea: {
+        position: { x: 1000, y: 100 },
+        size: { width: 1200, height: 900 },
+      },
+    });
+    currentMonitor.mockReset().mockResolvedValue(null);
+    innerSize.mockReset().mockResolvedValue({ width: 600, height: 400 });
     startDragging.mockReset().mockResolvedValue(undefined);
   });
 
@@ -43,6 +86,20 @@ describe('Tauri result window adapter', () => {
     await resultWindow.hide();
 
     expect(hide).toHaveBeenCalledOnce();
+  });
+
+  it('centers the result window inside the cursor monitor work area', async () => {
+    await resultWindow.place('center');
+
+    expect(setPosition).toHaveBeenCalledWith({ x: 1300, y: 350 });
+  });
+
+  it('places below the cursor and clamps the window into the work area', async () => {
+    cursorPosition.mockResolvedValue({ x: 2100, y: 800 });
+
+    await resultWindow.place('below-cursor');
+
+    expect(setPosition).toHaveBeenCalledWith({ x: 1600, y: 600 });
   });
 
   it('starts dragging the current result window', async () => {

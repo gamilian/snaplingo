@@ -44,6 +44,11 @@ interface Size {
   height: number;
 }
 
+export interface CaptureSelectionOverlayStyle {
+  borderWidth?: number;
+  maskColor?: [number, number, number, number];
+}
+
 const LABEL_HEIGHT = 20;
 const LABEL_PADDING_X = 8;
 const LABEL_SELECTION_GAP = 6;
@@ -112,12 +117,13 @@ export function drawCaptureSelectionOverlayFrame(
   size: Size,
   frame: CaptureSelectionOverlayFrame | null,
   cursor: Point | null = null,
+  style: CaptureSelectionOverlayStyle = {},
 ) {
   context.clearRect(0, 0, size.width, size.height);
 
   if (frame) {
-    drawDimMask(context, size, frame.rect);
-    drawSelectionRect(context, frame);
+    drawDimMask(context, size, frame.rect, style.maskColor);
+    drawSelectionRect(context, frame, style.borderWidth);
     if (frame.label) drawSizeLabel(context, size, frame);
   }
 
@@ -130,11 +136,14 @@ function drawDimMask(
   context: CaptureSelectionOverlayContext,
   size: Size,
   rect: LogicalRect,
+  maskColor?: [number, number, number, number],
 ) {
   const rectRight = rect.x + rect.width;
   const rectBottom = rect.y + rect.height;
 
-  context.fillStyle = 'rgba(0, 0, 0, 0.18)';
+  context.fillStyle = maskColor
+    ? `rgba(${maskColor[0]}, ${maskColor[1]}, ${maskColor[2]}, ${maskColor[3] / 255})`
+    : 'rgba(0, 0, 0, 0.18)';
   context.fillRect(0, 0, size.width, rect.y);
   context.fillRect(0, rectBottom, size.width, size.height - rectBottom);
   context.fillRect(0, rect.y, rect.x, rect.height);
@@ -144,6 +153,7 @@ function drawDimMask(
 function drawSelectionRect(
   context: CaptureSelectionOverlayContext,
   frame: CaptureSelectionOverlayFrame,
+  borderWidth?: number,
 ) {
   const { rect } = frame;
 
@@ -152,7 +162,7 @@ function drawSelectionRect(
     context.fillRect(rect.x, rect.y, rect.width, rect.height);
   }
   context.strokeStyle = getSelectionStrokeStyle(frame.variant);
-  context.lineWidth = getSelectionLineWidth(frame.variant);
+  context.lineWidth = getSelectionLineWidth(frame.variant, borderWidth);
   context.strokeRect(
     rect.x + 0.5,
     rect.y + 0.5,
@@ -167,7 +177,13 @@ function getSelectionStrokeStyle(variant: CaptureSelectionOverlayVariant) {
   return 'rgba(255, 255, 255, 0.78)';
 }
 
-function getSelectionLineWidth(variant: CaptureSelectionOverlayVariant) {
+function getSelectionLineWidth(
+  variant: CaptureSelectionOverlayVariant,
+  configuredWidth?: number,
+) {
+  if (configuredWidth !== undefined) {
+    return Math.min(8, Math.max(1, configuredWidth));
+  }
   if (variant === 'preview') return 3;
   if (variant === 'draft') return 2;
   return 1;

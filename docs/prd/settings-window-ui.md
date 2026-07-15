@@ -30,7 +30,7 @@ SnapLingo 目前缺少一个主设置窗口（Settings Window），用户无法�
 9. As a user, I want a "恢复所有默认值" button at the bottom of hotkey pages, so that I can reset all hotkeys in that category
 10. As a user, I want a "检测冲突" button at the bottom of hotkey pages, so that I can check if my hotkeys conflict with system shortcuts
 11. As a user, I want to switch to the "翻译" tab, so that I can configure translation settings
-12. As a user, I want to see translation hotkeys (划词翻译/截图翻译/输入翻译/显示翻译窗口), so that I can customize translation shortcuts
+12. As a user, I want to see translation hotkeys (划词翻译/截图翻译/显示翻译窗口), so that I can customize translation shortcuts
 13. As a user, I want to access translation history in the 翻译 tab, so that I can review past translations
 14. As a user, I want to favorite translations, so that I can quickly find important translations later
 15. As a user, I want to switch to the "OCR" tab, so that I can configure OCR settings

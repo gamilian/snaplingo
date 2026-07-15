@@ -193,6 +193,30 @@ describe('capture selection canvas overlay', () => {
     ]);
   });
 
+  it('uses the configured selection mask and border width', () => {
+    const context = createRecordingContext();
+
+    drawCaptureSelectionOverlayFrame(
+      context,
+      { width: 500, height: 300 },
+      {
+        variant: 'draft',
+        rect: { x: 80, y: 40, width: 120, height: 60 },
+        label: null,
+      },
+      null,
+      {
+        borderWidth: 4,
+        maskColor: [32, 36, 44, 72],
+      },
+    );
+
+    expect(context.calls).toContain(
+      `fillStyle:rgba(32, 36, 44, ${72 / 255})`,
+    );
+    expect(context.calls).toContain('lineWidth:4');
+  });
+
   it('draws the preview size label above the selection top left', () => {
     const context = createRecordingContext();
 

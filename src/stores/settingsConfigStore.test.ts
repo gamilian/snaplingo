@@ -34,7 +34,6 @@ const backendSnapshot = {
   },
   ocr: {
     recognitionLanguage: 'auto',
-    autoCopy: true,
     preserveFormatting: true,
     removeChineseSpaces: true,
     showConfidence: false,
@@ -141,6 +140,7 @@ describe('settingsConfigStore', () => {
     const { initializeSettingsConfigStore, useSettingsConfigStore } =
       await import('./settingsConfigStore');
     initializeSettingsConfigStore(settingsRuntime);
+    await useSettingsConfigStore.getState().hydrate();
     settingsRuntime.load.mockReturnValueOnce(staleRefresh);
     settingsRuntime.updateGeneral.mockResolvedValueOnce(updatedSnapshot);
 
@@ -200,6 +200,46 @@ describe('settingsConfigStore', () => {
     expect(useSettingsConfigStore.getState().translation).toEqual(
       secondSnapshot.translation,
     );
+  });
+
+  it('serializes screenshot updates without restoring stale fields', async () => {
+    let resolveFirst!: (snapshot: typeof backendSnapshot) => void;
+    const firstResponse = new Promise<typeof backendSnapshot>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const firstSnapshot = {
+      ...backendSnapshot,
+      screenshot: { ...backendSnapshot.screenshot, quality: 80 },
+    };
+    const secondSnapshot = {
+      ...firstSnapshot,
+      screenshot: { ...firstSnapshot.screenshot, format: 'jpg' },
+    };
+    const { initializeSettingsConfigStore, useSettingsConfigStore } =
+      await import('./settingsConfigStore');
+    initializeSettingsConfigStore(settingsRuntime);
+    await useSettingsConfigStore.getState().hydrate();
+    settingsRuntime.updateScreenshot
+      .mockReturnValueOnce(firstResponse)
+      .mockResolvedValueOnce(secondSnapshot);
+
+    const first = useSettingsConfigStore
+      .getState()
+      .updateScreenshotSettings({ quality: 80 });
+    const second = useSettingsConfigStore
+      .getState()
+      .updateScreenshotSettings({ format: 'jpg' });
+
+    await Promise.resolve();
+    expect(settingsRuntime.updateScreenshot).toHaveBeenCalledTimes(1);
+    resolveFirst(firstSnapshot);
+    await first;
+    await second;
+
+    expect(settingsRuntime.updateScreenshot).toHaveBeenNthCalledWith(2, {
+      ...firstSnapshot.screenshot,
+      format: 'jpg',
+    });
   });
 
   it('ignores legacy durable values and uses the backend snapshot', async () => {
@@ -314,9 +354,9 @@ describe('settingsConfigStore', () => {
     const state = useSettingsStore.getState() as unknown as Record<string, unknown>;
 
     expect(state.activeMainTab).toBe('translation');
-    expect(state.screenshotSubTab).toBe('save-settings');
-    expect(state.translationSubTab).toBe('translation-settings');
-    expect(state.ocrSubTab).toBe('favorites');
+    expect('screenshotSubTab' in state).toBe(false);
+    expect('translationSubTab' in state).toBe(false);
+    expect('ocrSubTab' in state).toBe(false);
     expect(state.servicesSubTab).toBe('translation');
     expect('hotkeys' in state).toBe(false);
     expect('language' in state).toBe(false);
@@ -343,5 +383,38 @@ describe('settingsConfigStore', () => {
         },
       },
     });
+  });
+
+  it('falls back when persisted navigation points at the removed advanced page', async () => {
+    legacyPersistedState({
+      activeMainTab: 'advanced',
+      servicesSubTab: 'translation',
+    });
+
+    const { useSettingsStore } = await import('./settingsStore');
+
+    expect(useSettingsStore.getState().activeMainTab).toBe('screenshot');
+    expect(useSettingsStore.getState().servicesSubTab).toBe('translation');
+  });
+
+  it('keeps one-shot section requests out of persisted navigation state', async () => {
+    const { useSettingsStore } = await import('./settingsStore');
+
+    useSettingsStore.getState().navigate({ tab: 'general', section: 'about' });
+
+    expect(useSettingsStore.getState()).toMatchObject({
+      activeMainTab: 'general',
+      requestedSection: 'about',
+    });
+    expect(
+      JSON.parse(localStorage.getItem('snaplingo-settings') ?? '{}').state,
+    ).not.toHaveProperty('requestedSection');
+
+    useSettingsStore.getState().setActiveMainTab('screenshot');
+    expect(useSettingsStore.getState().requestedSection).toBeNull();
+
+    useSettingsStore.getState().navigate({ tab: 'general', section: 'about' });
+    useSettingsStore.getState().consumeRequestedSection();
+    expect(useSettingsStore.getState().requestedSection).toBeNull();
   });
 });

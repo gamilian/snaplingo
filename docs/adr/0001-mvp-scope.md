@@ -30,7 +30,7 @@ Accepted
    - OCR/翻译 Provider 选择
 
 ### P1 - 可以包含（第一版发布）
-1. **Input Translation Mode** - 弹窗输入文字翻译
+1. **Manual Translation Window** - 打开统一翻译结果窗口并手动输入文字（独立“输入翻译”入口已由 ADR 0006 退役）
 2. **贴图功能** - 截图后固定到屏幕
 3. **历史记录** - 记录和搜索历史操作
 4. **多 Provider 支持** - 同时激活多个翻译 Provider，对比结果

@@ -222,7 +222,7 @@ Initial menu:
 SnapLingo
 ├─ Translate Selection
 ├─ Screenshot Translate
-├─ Input Translation
+├─ Show Translation Window
 ├─ Screenshot OCR
 ├─ File OCR
 ├─ Settings...
@@ -234,7 +234,7 @@ Behavior:
 
 - `Translate Selection`: same backend path as selection translation hotkey.
 - `Screenshot Translate`: same backend path as screenshot translation hotkey.
-- `Input Translation`: opens the result/input window, not Settings.
+- `Show Translation Window`: opens the manual translation result window, not Settings.
 - `Screenshot OCR`: opens capture overlay in OCR mode.
 - `File OCR`: opens result/OCR workflow or file picker path, not Settings.
 - `Settings...`: calls `settings_window::show_settings_window`.
@@ -323,7 +323,7 @@ Verification:
 
 - App shows menu bar item.
 - Menu item "Settings..." opens Settings.
-- Menu item "Input Translation" opens result/input window only.
+- Menu item "Show Translation Window" opens the manual translation window only.
 - Menu item "Quit" exits.
 
 ### Phase 5: Stop Creating Settings At Startup
@@ -409,7 +409,7 @@ Checklist:
 - Close Settings: app remains running.
 - Trigger selection translation: only result window appears.
 - Trigger screenshot translation: only capture overlay and result window appear.
-- Trigger input translation: only result/input window appears.
+- Trigger Show Translation Window: only the manual translation window appears.
 - Trigger file OCR: no Settings Window appears.
 - Click menu bar "Quit": app exits.
 - Reopen app after quit: no Settings Window appears until requested.

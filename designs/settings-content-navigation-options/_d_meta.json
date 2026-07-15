@@ -1,0 +1,33 @@
+{
+  "type": "design",
+  "designSystems": [],
+  "primaryDesignSystem": null,
+  "createdAt": "2026-07-15T00:05:23.277Z",
+  "updatedAt": "2026-07-15T01:22:28.434Z",
+  "assets": {
+    "SnapLingo 设置页取消二级栏方案": {
+      "versions": [
+        {
+          "path": "Settings Content Navigation Options v1.html",
+          "createdAt": "2026-07-15T00:53:35.596Z",
+          "status": "needs-review"
+        },
+        {
+          "path": "Settings Content Navigation Options v2.html",
+          "createdAt": "2026-07-15T00:59:10.344Z",
+          "status": "needs-review"
+        },
+        {
+          "path": "Settings Content Navigation Options v3.html",
+          "createdAt": "2026-07-15T01:22:28.402Z",
+          "status": "approved"
+        },
+        {
+          "path": "Settings Content Navigation Options.html",
+          "createdAt": "2026-07-15T01:22:28.433Z",
+          "status": "approved"
+        }
+      ]
+    }
+  }
+}

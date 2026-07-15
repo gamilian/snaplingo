@@ -11,6 +11,7 @@ import {
   captureWorkspaceEvents,
   persistentStateEvents,
   resultWindowEvents,
+  settingsWindowEvents,
 } from './appEvents';
 
 type Listener = (event: { payload: unknown }) => void;
@@ -150,6 +151,25 @@ describe('Tauri app event adapter', () => {
       expect(handler).not.toHaveBeenCalled();
     },
   );
+
+  it('subscribes to validated settings navigation requests', async () => {
+    const handler = vi.fn();
+
+    const unsubscribe = await settingsWindowEvents.subscribeNavigationRequested(
+      handler,
+    );
+    listeners.get('settings-navigation-requested')?.({
+      payload: { tab: 'general', section: 'about' },
+    });
+    listeners.get('settings-navigation-requested')?.({
+      payload: { tab: 'advanced', section: 'about' },
+    });
+    unsubscribe();
+
+    expect(handler).toHaveBeenCalledOnce();
+    expect(handler).toHaveBeenCalledWith({ tab: 'general', section: 'about' });
+    expect(cleanup).toHaveBeenCalledOnce();
+  });
 
   it('ignores a null hotkey payload', async () => {
     const handler = vi.fn((_launch: CaptureLaunch): void => undefined);

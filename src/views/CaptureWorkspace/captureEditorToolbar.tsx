@@ -50,6 +50,7 @@ interface CaptureEditorToolbarProps {
     colors: AnnotationColor[],
   ) => void | Promise<unknown>;
   onTextDraftFontSizeChange: (fontSize: number) => void;
+  onCommitSizeDefault: (kind: "stroke" | "font", value: number) => void;
   onUndo: () => void;
   onRedo: () => void;
   onCancel: () => void | Promise<void>;
@@ -143,6 +144,7 @@ export function CaptureEditorToolbar({
   onApplyAnnotationStyle,
   onUpdateAnnotationColorPresets,
   onTextDraftFontSizeChange,
+  onCommitSizeDefault,
   onUndo,
   onRedo,
   onCancel,
@@ -167,6 +169,10 @@ export function CaptureEditorToolbar({
   >(null);
   const [colorPresetError, setColorPresetError] = useState<string | null>(null);
   const colorPresetMutationIdRef = useRef(0);
+  const pendingSizeDefaultRef = useRef<{
+    kind: "stroke" | "font";
+    value: number;
+  } | null>(null);
   const sizeValue = isTextSizingActive
     ? textFontSize
     : annotationStyle.strokeWidth;
@@ -178,6 +184,13 @@ export function CaptureEditorToolbar({
     } else {
       void onSave();
     }
+  };
+
+  const commitSizeDefault = () => {
+    const pending = pendingSizeDefaultRef.current;
+    if (!pending) return;
+    pendingSizeDefaultRef.current = null;
+    onCommitSizeDefault(pending.kind, pending.value);
   };
 
   const activeShapeTool = SHAPE_TOOLS.find(
@@ -417,8 +430,12 @@ export function CaptureEditorToolbar({
         aria-label={
           isTextSizingActive ? "Text font size" : "Annotation stroke width"
         }
-        onChange={(event) => {
+        onInput={(event) => {
           const value = Number(event.currentTarget.value);
+          pendingSizeDefaultRef.current = {
+            kind: isTextSizingActive ? "font" : "stroke",
+            value,
+          };
           if (textDraftActive) {
             onTextDraftFontSizeChange(value);
             return;
@@ -437,6 +454,9 @@ export function CaptureEditorToolbar({
             textFontSize,
           );
         }}
+        onPointerUp={commitSizeDefault}
+        onKeyUp={commitSizeDefault}
+        onBlur={commitSizeDefault}
       />
       <input
         className="h-4 w-4 accent-[#5b7fff] disabled:opacity-40"

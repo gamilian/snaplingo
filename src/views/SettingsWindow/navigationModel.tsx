@@ -1,33 +1,18 @@
 import type { ReactElement } from 'react';
+import type { SettingsNavigationTab } from '../../application/settings/navigation';
 
-import { AdvancedPage } from './Advanced/AdvancedPage';
 import { GeneralPage } from './General/GeneralPage';
-import { HotkeysPage as OcrHotkeysPage } from './OCR/HotkeysPage';
-import { OcrSettingsPage } from './OCR/OcrSettingsPage';
-import { HotkeysPage as ScreenshotHotkeysPage } from './Screenshot/HotkeysPage';
-import { SaveSettingsPage } from './Screenshot/SaveSettingsPage';
-import { EditorPage as ScreenshotEditorPage } from './Screenshot/EditorPage';
+import { OcrSettingsScrollPage } from './OCR/OcrSettingsScrollPage';
+import { ScreenshotSettingsPage } from './Screenshot/ScreenshotSettingsPage';
 import { OcrProvidersPage } from './Services/OcrProvidersPage';
 import { TranslationProvidersPage } from './Services/TranslationProvidersPage';
 import { TtsProvidersPage } from './Services/TtsProvidersPage';
-import { HotkeysPage as TranslationHotkeysPage } from './Translation/HotkeysPage';
-import { TranslationSettingsPage } from './Translation/TranslationSettingsPage';
+import { TranslationSettingsScrollPage } from './Translation/TranslationSettingsScrollPage';
 import { FavoritesLibraryPage } from './Library/FavoritesLibraryPage';
 import { HistoryLibraryPage } from './Library/HistoryLibraryPage';
 
-export type MainTab =
-  | 'screenshot'
-  | 'translation'
-  | 'ocr'
-  | 'services'
-  | 'favorites'
-  | 'history'
-  | 'general'
-  | 'advanced';
+export type MainTab = SettingsNavigationTab;
 
-export type ScreenshotSubTab = 'hotkeys' | 'save-settings' | 'editor';
-export type TranslationSubTab = 'hotkeys' | 'translation-settings';
-export type OcrSubTab = 'hotkeys' | 'ocr-settings';
 export type ServicesSubTab = 'ocr' | 'translation' | 'tts';
 
 export interface SecondaryNavItem<Key extends string = string> {
@@ -49,40 +34,34 @@ interface SimpleSettingsSection<Key extends MainTab> {
 }
 
 export type SettingsSection =
-  | SecondarySettingsSection<'screenshot', ScreenshotSubTab>
-  | SecondarySettingsSection<'translation', TranslationSubTab>
-  | SecondarySettingsSection<'ocr', OcrSubTab>
   | SecondarySettingsSection<'services', ServicesSubTab>
+  | SimpleSettingsSection<'screenshot'>
+  | SimpleSettingsSection<'translation'>
+  | SimpleSettingsSection<'ocr'>
   | SimpleSettingsSection<'favorites'>
   | SimpleSettingsSection<'history'>
-  | SimpleSettingsSection<'general'>
-  | SimpleSettingsSection<'advanced'>;
+  | SimpleSettingsSection<'general'>;
 
 export const settingsSections: SettingsSection[] = [
   {
+    key: 'general',
+    label: '通用',
+    render: () => <GeneralPage />,
+  },
+  {
     key: 'screenshot',
     label: '截图',
-    secondary: [
-      { key: 'hotkeys', label: '快捷键', render: () => <ScreenshotHotkeysPage /> },
-      { key: 'save-settings', label: '保存设置', render: () => <SaveSettingsPage /> },
-      { key: 'editor', label: '编辑器', render: () => <ScreenshotEditorPage /> },
-    ],
+    render: () => <ScreenshotSettingsPage />,
   },
   {
     key: 'translation',
     label: '翻译',
-    secondary: [
-      { key: 'hotkeys', label: '快捷键', render: () => <TranslationHotkeysPage /> },
-      { key: 'translation-settings', label: '翻译设置', render: () => <TranslationSettingsPage /> },
-    ],
+    render: () => <TranslationSettingsScrollPage />,
   },
   {
     key: 'ocr',
     label: 'OCR',
-    secondary: [
-      { key: 'hotkeys', label: '快捷键', render: () => <OcrHotkeysPage /> },
-      { key: 'ocr-settings', label: 'OCR 设置', render: () => <OcrSettingsPage /> },
-    ],
+    render: () => <OcrSettingsScrollPage />,
   },
   {
     key: 'services',
@@ -92,16 +71,6 @@ export const settingsSections: SettingsSection[] = [
       { key: 'translation', label: '翻译服务', render: () => <TranslationProvidersPage /> },
       { key: 'tts', label: '语音合成', render: () => <TtsProvidersPage /> },
     ],
-  },
-  {
-    key: 'general',
-    label: '通用',
-    render: () => <GeneralPage />,
-  },
-  {
-    key: 'advanced',
-    label: '高级',
-    render: () => <AdvancedPage />,
   },
   {
     key: 'favorites',
@@ -128,18 +97,6 @@ export function findSecondaryNavItem(
   }
 
   return section.secondary.find((item) => item.key === key) ?? section.secondary[0] ?? null;
-}
-
-export function isScreenshotSubTab(key: string): key is ScreenshotSubTab {
-  return hasSecondaryKey('screenshot', key);
-}
-
-export function isTranslationSubTab(key: string): key is TranslationSubTab {
-  return hasSecondaryKey('translation', key);
-}
-
-export function isOcrSubTab(key: string): key is OcrSubTab {
-  return hasSecondaryKey('ocr', key);
 }
 
 export function isServicesSubTab(key: string): key is ServicesSubTab {

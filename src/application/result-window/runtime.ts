@@ -1,9 +1,14 @@
 import type { TranslationResult } from '../../types';
-import type { OcrSettings, TranslationSettings } from '../settings/ports';
+import type {
+  OcrSettings,
+  ResultWindowPosition,
+  TranslationSettings,
+} from '../settings/ports';
 import { resolveTranslationRequestLanguages } from '../translation/languages';
 import type { ResultWindowPlatformRuntime } from './platformRuntime';
 import type {
   CaptureResultWindowPayload,
+  ResultWindowOrigin,
   ResultWindowUnsubscribe,
 } from './ports';
 import { runOcrFileWorkflow } from './fileOcrWorkflow';
@@ -22,6 +27,7 @@ export type ResultWindowPresentation = 'overlay' | 'standalone';
 
 export interface ResultWindowStatePort {
   setSourceText(text: string): void;
+  setResultWindowOrigin(origin: ResultWindowOrigin): void;
   clearTranslationResults(): void;
   setOcrText(text: string): void;
   setOcrConfidence(confidence: number | null): void;
@@ -60,6 +66,8 @@ export interface ResultWindowRuntimePorts {
 export interface ResultWindowResizeInput {
   presentation: ResultWindowPresentation;
   visible: boolean;
+  mode: 'translation' | 'ocr';
+  origin?: ResultWindowOrigin;
   panelHeightPx: number;
 }
 
@@ -76,6 +84,9 @@ export function createResultWindowRuntime({
   getTranslationSettings,
   getOcrSettings,
 }: ResultWindowRuntimePorts) {
+  let needsPlacement = true;
+  let lastPlacedPosition: ResultWindowPosition | null = null;
+
   function translationRequestText(text: string) {
     return getTranslationSettings?.()?.preserveLineBreaks === false
       ? text.replace(/\s+/g, ' ').trim()
@@ -211,6 +222,10 @@ export function createResultWindowRuntime({
   }
 
   async function applyPayload(payload: CaptureResultWindowPayload) {
+    state.setResultWindowOrigin(
+      payload.origin ?? (payload.mode === 'ocr' ? 'ocr' : 'input'),
+    );
+    needsPlacement = true;
     if (payload.mode === 'translation') {
       if (shouldClearTranslationResultsForPayload(payload)) {
         state.clearTranslationResults();
@@ -290,9 +305,6 @@ export function createResultWindowRuntime({
           : settings?.recognitionLanguage,
       transformText: (text) =>
         settings ? applyOcrTextPreferences(text, settings) : text,
-      copyText: settings?.autoCopy
-        ? (text) => platform.clipboard.copyText(text)
-        : undefined,
       setText: state.setOcrText,
       setConfidence: state.setOcrConfidence,
       setImageDataUrl: state.setOcrImageBase64,
@@ -317,6 +329,7 @@ export function createResultWindowRuntime({
 
   async function close(presentation: ResultWindowPresentation) {
     state.hideResultWindow();
+    needsPlacement = true;
     if (presentation === 'standalone') {
       try {
         await platform.dismiss();
@@ -329,14 +342,36 @@ export function createResultWindowRuntime({
   async function resizeStandaloneWindow({
     presentation,
     visible,
+    mode,
+    origin,
     panelHeightPx,
   }: ResultWindowResizeInput) {
     if (presentation !== 'standalone' || !visible) return;
 
     await platform.resizeTo(
-      resultWindowStandaloneWidthPx,
+      Math.min(
+        1000,
+        Math.max(
+          300,
+          mode === 'translation'
+            ? getTranslationSettings?.()?.windowWidth ??
+                resultWindowStandaloneWidthPx
+            : resultWindowStandaloneWidthPx,
+        ),
+      ),
       resultWindowStandaloneWindowHeight(panelHeightPx),
     );
+    const position =
+      mode === 'ocr'
+        ? getOcrSettings?.()?.windowPosition ?? 'center'
+        : origin === 'input'
+          ? getTranslationSettings?.()?.inputWindowPosition ?? 'center'
+          : getTranslationSettings?.()?.selectionWindowPosition ?? 'below-cursor';
+    if (needsPlacement || position !== lastPlacedPosition) {
+      await platform.placeAt(position);
+      needsPlacement = false;
+      lastPlacedPosition = position;
+    }
   }
 
   return {

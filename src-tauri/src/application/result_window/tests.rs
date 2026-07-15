@@ -7,8 +7,8 @@ use async_trait::async_trait;
 use tokio::sync::Notify;
 
 use super::{
-    ResultWindowClipboardPort, ResultWindowMode, ResultWindowNotifierPort, ResultWindowOcrIntent,
-    ResultWindowOpenRequest, ResultWindowPayload, ResultWindowRequestId, ResultWindowRuntime,
+    ResultWindowMode, ResultWindowNotifierPort, ResultWindowOcrIntent, ResultWindowOpenRequest,
+    ResultWindowOrigin, ResultWindowPayload, ResultWindowRequestId, ResultWindowRuntime,
     ResultWindowWindowPort,
 };
 
@@ -113,73 +113,6 @@ impl ResultWindowWindowPort for FakeResultWindow {
     }
 }
 
-struct FakeClipboard {
-    outcome: std::result::Result<String, String>,
-    reads: Mutex<usize>,
-}
-
-impl FakeClipboard {
-    fn new(text: &str) -> Self {
-        Self::with_outcome(Ok(text.to_string()))
-    }
-
-    fn with_read_error(message: &str) -> Self {
-        Self::with_outcome(Err(message.to_string()))
-    }
-
-    fn with_outcome(outcome: std::result::Result<String, String>) -> Self {
-        Self {
-            outcome,
-            reads: Mutex::new(0),
-        }
-    }
-
-    fn reads(&self) -> usize {
-        *self.reads.lock().unwrap()
-    }
-}
-
-#[async_trait]
-impl ResultWindowClipboardPort for FakeClipboard {
-    async fn read_text(&self) -> crate::Result<String> {
-        *self.reads.lock().unwrap() += 1;
-        self.outcome.clone().map_err(Into::into)
-    }
-}
-
-struct BlockingClipboard {
-    text: String,
-    reading_started: Notify,
-    unblock_read: Notify,
-}
-
-impl BlockingClipboard {
-    fn new(text: &str) -> Self {
-        Self {
-            text: text.to_string(),
-            reading_started: Notify::new(),
-            unblock_read: Notify::new(),
-        }
-    }
-
-    async fn wait_until_reading_starts(&self) {
-        self.reading_started.notified().await;
-    }
-
-    fn unblock_read(&self) {
-        self.unblock_read.notify_one();
-    }
-}
-
-#[async_trait]
-impl ResultWindowClipboardPort for BlockingClipboard {
-    async fn read_text(&self) -> crate::Result<String> {
-        self.reading_started.notify_one();
-        self.unblock_read.notified().await;
-        Ok(self.text.clone())
-    }
-}
-
 struct FakePayloadNotifier {
     outcomes: Mutex<VecDeque<NotificationOutcome>>,
     notification_ids: Mutex<Vec<ResultWindowRequestId>>,
@@ -265,12 +198,14 @@ fn translation_request(text: &str) -> ResultWindowOpenRequest {
     ResultWindowOpenRequest::Translation {
         text: text.to_string(),
         auto_translate: false,
+        origin: ResultWindowOrigin::Input,
     }
 }
 
 fn translation_payload(text: &str, auto_translate: bool) -> ResultWindowPayload {
     ResultWindowPayload {
         mode: ResultWindowMode::Translation,
+        origin: ResultWindowOrigin::Input,
         text: text.to_string(),
         auto_translate,
         ocr_intent: None,
@@ -286,6 +221,7 @@ fn ocr_payload(
 ) -> ResultWindowPayload {
     ResultWindowPayload {
         mode: ResultWindowMode::Ocr,
+        origin: ResultWindowOrigin::Ocr,
         text: text.to_string(),
         auto_translate: false,
         ocr_intent: Some(intent),
@@ -300,126 +236,19 @@ fn make_runtime(
 ) -> (
     Arc<ResultWindowRuntime>,
     Arc<FakeResultWindow>,
-    Arc<FakeClipboard>,
-    Arc<FakePayloadNotifier>,
-) {
-    make_runtime_with_clipboard(
-        window_outcomes,
-        notification_outcomes,
-        Arc::new(FakeClipboard::new("clipboard text")),
-    )
-}
-
-fn make_runtime_with_clipboard(
-    window_outcomes: impl IntoIterator<Item = WindowOpenOutcome>,
-    notification_outcomes: impl IntoIterator<Item = std::result::Result<(), String>>,
-    clipboard: Arc<FakeClipboard>,
-) -> (
-    Arc<ResultWindowRuntime>,
-    Arc<FakeResultWindow>,
-    Arc<FakeClipboard>,
     Arc<FakePayloadNotifier>,
 ) {
     let events = Arc::new(Mutex::new(Vec::new()));
     let window = Arc::new(FakeResultWindow::new(window_outcomes, events.clone()));
     let notifier = Arc::new(FakePayloadNotifier::new(notification_outcomes, events));
-    let runtime = Arc::new(ResultWindowRuntime::new(
-        window.clone(),
-        clipboard.clone(),
-        notifier.clone(),
-    ));
+    let runtime = Arc::new(ResultWindowRuntime::new(window.clone(), notifier.clone()));
 
-    (runtime, window, clipboard, notifier)
-}
-
-#[tokio::test]
-async fn open_reads_clipboard_stores_input_translation_payload_opens_window_and_notifies() {
-    let (runtime, window, clipboard, notifier) = make_runtime([], []);
-
-    runtime
-        .open(ResultWindowOpenRequest::InputTranslation)
-        .await
-        .unwrap();
-
-    assert_eq!(clipboard.reads(), 1);
-    assert_eq!(window.open_calls(), 1);
-    assert_eq!(notifier.notifications(), 1);
-    assert_eq!(
-        runtime
-            .take_if_current(notifier.notification_ids()[0])
-            .unwrap(),
-        Some(translation_payload("clipboard text", true))
-    );
-}
-
-#[tokio::test]
-async fn input_translation_uses_empty_text_when_clipboard_read_fails() {
-    let (runtime, window, clipboard, notifier) = make_runtime_with_clipboard(
-        [],
-        [],
-        Arc::new(FakeClipboard::with_read_error("clipboard unavailable")),
-    );
-
-    runtime
-        .open(ResultWindowOpenRequest::InputTranslation)
-        .await
-        .unwrap();
-
-    assert_eq!(clipboard.reads(), 1);
-    assert_eq!(window.open_calls(), 1);
-    assert_eq!(notifier.notifications(), 1);
-    assert_eq!(
-        runtime
-            .take_if_current(notifier.notification_ids()[0])
-            .unwrap(),
-        Some(translation_payload("", true))
-    );
-}
-
-#[tokio::test]
-async fn newer_input_translation_invalidates_an_older_pending_payload_while_clipboard_is_pending() {
-    let events = Arc::new(Mutex::new(Vec::new()));
-    let window = Arc::new(FakeResultWindow::new([], events.clone()));
-    let clipboard = Arc::new(BlockingClipboard::new("new clipboard text"));
-    let notifier = Arc::new(FakePayloadNotifier::new([], events));
-    let runtime = Arc::new(ResultWindowRuntime::new(
-        window,
-        clipboard.clone(),
-        notifier.clone(),
-    ));
-
-    runtime.open(translation_request("older")).await.unwrap();
-
-    let newer_runtime = runtime.clone();
-    let newer_open = tokio::spawn(async move {
-        newer_runtime
-            .open(ResultWindowOpenRequest::InputTranslation)
-            .await
-    });
-    clipboard.wait_until_reading_starts().await;
-
-    assert_eq!(
-        runtime
-            .take_if_current(notifier.notification_ids()[0])
-            .unwrap(),
-        None
-    );
-
-    clipboard.unblock_read();
-    newer_open.await.unwrap().unwrap();
-
-    assert_eq!(
-        runtime
-            .take_if_current(notifier.notification_ids()[1])
-            .unwrap(),
-        Some(translation_payload("new clipboard text", true))
-    );
+    (runtime, window, notifier)
 }
 
 #[tokio::test]
 async fn open_stores_the_pending_payload_before_opening_and_notifies_afterward() {
-    let (runtime, window, _clipboard, notifier) =
-        make_runtime([WindowOpenOutcome::BlocksThenSucceeds], []);
+    let (runtime, window, notifier) = make_runtime([WindowOpenOutcome::BlocksThenSucceeds], []);
     let opening_runtime = runtime.clone();
 
     let opening =
@@ -446,7 +275,7 @@ async fn open_stores_the_pending_payload_before_opening_and_notifies_afterward()
 
 #[tokio::test]
 async fn take_transfers_the_pending_payload_once() {
-    let (runtime, _window, _clipboard, notifier) = make_runtime([], []);
+    let (runtime, _window, notifier) = make_runtime([], []);
     let payload = translation_payload("hello", false);
 
     runtime.open(translation_request("hello")).await.unwrap();
@@ -458,7 +287,7 @@ async fn take_transfers_the_pending_payload_once() {
 
 #[tokio::test]
 async fn newer_open_request_replaces_an_untaken_payload() {
-    let (runtime, _window, _clipboard, notifier) = make_runtime([], []);
+    let (runtime, _window, notifier) = make_runtime([], []);
 
     runtime.open(translation_request("older")).await.unwrap();
     runtime.open(translation_request("newer")).await.unwrap();
@@ -499,7 +328,7 @@ async fn ocr_open_requests_preserve_each_intent_and_source_image() {
     ];
 
     for (request, expected_payload) in cases {
-        let (runtime, _window, _clipboard, notifier) = make_runtime([], []);
+        let (runtime, _window, notifier) = make_runtime([], []);
 
         runtime.open(request).await.unwrap();
 
@@ -514,7 +343,7 @@ async fn ocr_open_requests_preserve_each_intent_and_source_image() {
 
 #[tokio::test]
 async fn failed_open_removes_its_still_current_payload() {
-    let (runtime, _window, _clipboard, notifier) = make_runtime(
+    let (runtime, _window, notifier) = make_runtime(
         [WindowOpenOutcome::Fails("window unavailable".to_string())],
         [],
     );
@@ -534,7 +363,7 @@ async fn failed_open_removes_its_still_current_payload() {
 
 #[tokio::test]
 async fn failed_notification_retains_the_pending_payload() {
-    let (runtime, window, _clipboard, notifier) =
+    let (runtime, window, notifier) =
         make_runtime([], [Err("notification unavailable".to_string())]);
 
     let error = runtime
@@ -555,7 +384,7 @@ async fn failed_notification_retains_the_pending_payload() {
 
 #[tokio::test]
 async fn newer_request_survives_an_older_concurrent_open_failure() {
-    let (runtime, window, _clipboard, notifier) = make_runtime(
+    let (runtime, window, notifier) = make_runtime(
         [
             WindowOpenOutcome::BlocksThenFails("older open failed".to_string()),
             WindowOpenOutcome::Succeeds,
@@ -588,7 +417,7 @@ async fn newer_request_survives_an_older_concurrent_open_failure() {
 
 #[tokio::test]
 async fn older_successful_open_does_not_notify_after_a_newer_request_starts() {
-    let (runtime, window, _clipboard, notifier) = make_runtime(
+    let (runtime, window, notifier) = make_runtime(
         [
             WindowOpenOutcome::BlocksThenSucceeds,
             WindowOpenOutcome::Succeeds,
@@ -624,7 +453,6 @@ async fn stale_notification_cannot_take_a_newer_payload() {
         ],
         events.clone(),
     ));
-    let clipboard = Arc::new(FakeClipboard::new("clipboard text"));
     let notifier = Arc::new(FakePayloadNotifier::with_outcomes(
         [
             NotificationOutcome::BlocksThenSucceeds,
@@ -632,11 +460,7 @@ async fn stale_notification_cannot_take_a_newer_payload() {
         ],
         events,
     ));
-    let runtime = Arc::new(ResultWindowRuntime::new(
-        window.clone(),
-        clipboard,
-        notifier.clone(),
-    ));
+    let runtime = Arc::new(ResultWindowRuntime::new(window.clone(), notifier.clone()));
 
     let older_runtime = runtime.clone();
     let older_open =
@@ -667,7 +491,7 @@ async fn stale_notification_cannot_take_a_newer_payload() {
 
 #[tokio::test]
 async fn late_subscriber_bootstraps_from_the_current_pending_request_id() {
-    let (runtime, _window, _clipboard, _notifier) = make_runtime([], []);
+    let (runtime, _window, _notifier) = make_runtime([], []);
 
     runtime
         .open(translation_request("missed event"))
@@ -683,7 +507,7 @@ async fn late_subscriber_bootstraps_from_the_current_pending_request_id() {
 
 #[tokio::test]
 async fn stale_bootstrap_id_cannot_take_a_newer_pending_payload() {
-    let (runtime, _window, _clipboard, _notifier) = make_runtime([], []);
+    let (runtime, _window, _notifier) = make_runtime([], []);
 
     runtime.open(translation_request("older")).await.unwrap();
     let older_request_id = runtime.current_request_id().unwrap().unwrap();

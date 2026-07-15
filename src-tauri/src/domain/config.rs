@@ -35,6 +35,8 @@ pub struct ScreenshotSettings {
     pub pin_opacity: u8,
     pub pin_shadow: bool,
     pub annotation_colors: Vec<[u8; 4]>,
+    pub selection_border_width: u8,
+    pub selection_mask_color: [u8; 4],
 }
 
 impl Default for ScreenshotSettings {
@@ -61,6 +63,8 @@ impl Default for ScreenshotSettings {
                 [255, 255, 255, 255],
                 [0, 0, 0, 255],
             ],
+            selection_border_width: 2,
+            selection_mask_color: [0, 0, 0, 46],
         }
     }
 }
@@ -76,6 +80,13 @@ pub struct TranslationSettings {
     pub incremental_translation: bool,
     pub window_always_on_top: bool,
     pub hide_on_blur: bool,
+    pub selection_window_position: String,
+    pub input_window_position: String,
+    pub selection_input_state: String,
+    pub screenshot_input_state: String,
+    pub max_window_height_ratio: u8,
+    pub window_width: u16,
+    pub selection_text_mode: String,
 }
 
 impl Default for TranslationSettings {
@@ -89,6 +100,13 @@ impl Default for TranslationSettings {
             incremental_translation: false,
             window_always_on_top: true,
             hide_on_blur: true,
+            selection_window_position: "below-cursor".to_string(),
+            input_window_position: "center".to_string(),
+            selection_input_state: "last".to_string(),
+            screenshot_input_state: "last".to_string(),
+            max_window_height_ratio: 70,
+            window_width: 660,
+            selection_text_mode: "smart".to_string(),
         }
     }
 }
@@ -97,20 +115,22 @@ impl Default for TranslationSettings {
 #[serde(default)]
 pub struct OcrSettings {
     pub recognition_language: String,
-    pub auto_copy: bool,
     pub preserve_formatting: bool,
     pub remove_chinese_spaces: bool,
     pub show_confidence: bool,
+    pub window_position: String,
+    pub hide_silent_status: bool,
 }
 
 impl Default for OcrSettings {
     fn default() -> Self {
         Self {
             recognition_language: "auto".to_string(),
-            auto_copy: true,
             preserve_formatting: true,
             remove_chinese_spaces: true,
             show_confidence: false,
+            window_position: "cursor".to_string(),
+            hide_silent_status: false,
         }
     }
 }
@@ -143,4 +163,30 @@ pub struct SettingsSnapshot {
     pub translation: TranslationSettings,
     pub ocr: OcrSettings,
     pub history: HistorySettings,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SettingsSnapshot;
+
+    #[test]
+    fn legacy_settings_documents_receive_defaults_for_new_fields() {
+        let snapshot: SettingsSnapshot = serde_json::from_value(serde_json::json!({
+            "screenshot": { "quality": 80 },
+            "translation": {},
+            "ocr": {}
+        }))
+        .unwrap();
+
+        assert_eq!(snapshot.screenshot.quality, 80);
+        assert_eq!(snapshot.screenshot.selection_border_width, 2);
+        assert_eq!(snapshot.screenshot.selection_mask_color, [0, 0, 0, 46]);
+        assert_eq!(
+            snapshot.translation.selection_window_position,
+            "below-cursor"
+        );
+        assert_eq!(snapshot.translation.window_width, 660);
+        assert_eq!(snapshot.ocr.window_position, "cursor");
+        assert!(!snapshot.ocr.hide_silent_status);
+    }
 }

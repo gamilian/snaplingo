@@ -26,9 +26,9 @@ export function HotkeyRow({
   const isModified = defaultValue && value !== defaultValue;
 
   return (
-    <div className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
+    <div className="flex min-h-[58px] items-center justify-between py-2.5 transition-colors hover:bg-gray-50">
       <div className="flex-1">
-        <div className="text-gray-700 font-medium">{label}</div>
+        <div className="text-[13px] font-semibold text-gray-700">{label}</div>
         {description && <div className="text-xs text-gray-500 mt-1">{description}</div>}
       </div>
       <div className="flex items-center space-x-3">

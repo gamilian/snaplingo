@@ -42,7 +42,18 @@ describe('settings main navigation', () => {
     expect(container.textContent).toContain('设置');
     expect(container.textContent).toContain('资料库');
     expect(container.textContent).not.toContain('工作区');
+    expect(container.textContent).not.toContain('高级');
     expect(container.textContent).toContain('收藏上限');
     expect(container.textContent).toContain('1,000');
+
+    const settingsButton = [...container.querySelectorAll('button')].find(
+      (button) => button.textContent === '设置',
+    );
+    await act(async () => settingsButton?.click());
+
+    expect(container.textContent).toContain('自动清理历史记录');
+    expect(container.textContent).toContain('历史记录保留天数');
+    expect(container.textContent).toContain('最多保留记录数');
+    expect(container.textContent).toContain('收藏夹容量');
   });
 });

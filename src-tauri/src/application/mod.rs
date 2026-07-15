@@ -22,6 +22,6 @@ pub use providers::Provider;
 pub use screenshot_favorites::{ScreenshotFavoriteCapture, ScreenshotFavorites};
 pub use selected_text::{
     SelectedTextAcquirer, SelectionContextProvider, SelectionMethod, SelectionScheme,
-    SystemSelectionProvider,
+    SelectionTextMode, SystemSelectionProvider,
 };
 pub use settings::SettingsConfiguration;

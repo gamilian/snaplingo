@@ -48,6 +48,7 @@ import {
   captureWorkspaceEvents,
   persistentStateEvents,
   resultWindowEvents,
+  settingsWindowEvents,
 } from './platform/tauri/appEvents';
 import {
   captureWorkspaceCommands,
@@ -78,6 +79,7 @@ import {
 
 const settingsRuntime = createSettingsRuntime({
   window: settingsWindow,
+  windowEvents: settingsWindowEvents,
   durableSettings,
   providers: settingsProviders,
   hotkeys,
@@ -142,6 +144,8 @@ const resultWindowRuntime = createResultWindowRuntime({
   getOcrSettings: () => useSettingsConfigStore.getState().ocr ?? undefined,
   state: {
     setSourceText: (text) => useAppStore.getState().setSourceText(text),
+    setResultWindowOrigin: (origin) =>
+      useAppStore.getState().setResultWindowOrigin(origin),
     clearTranslationResults: () =>
       useAppStore.getState().clearTranslationResults(),
     setOcrText: (text) => useAppStore.getState().setOcrText(text),

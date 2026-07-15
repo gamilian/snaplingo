@@ -16,7 +16,6 @@ pub const PIN_TOGGLE_ALL_ACTION: &str = "pin-toggle-all";
 pub const PIN_SWITCH_GROUP_ACTION: &str = "pin-switch-group";
 pub const SELECTION_TRANSLATE_ACTION: &str = "selection-translate";
 pub const SCREENSHOT_TRANSLATE_ACTION: &str = "screenshot-translate";
-pub const INPUT_TRANSLATE_ACTION: &str = "input-translate";
 pub const SHOW_TRANSLATION_WINDOW_ACTION: &str = "show-window";
 pub const SCREENSHOT_OCR_ACTION: &str = "screenshot-ocr";
 pub const SILENT_SCREENSHOT_OCR_ACTION: &str = "silent-screenshot-ocr";
@@ -67,13 +66,8 @@ pub const DEFAULT_HOTKEYS: &[DefaultHotkey] = &[
     },
     DefaultHotkey {
         category: TRANSLATION_CATEGORY,
-        action: INPUT_TRANSLATE_ACTION,
-        hotkey: "⌥A",
-    },
-    DefaultHotkey {
-        category: TRANSLATION_CATEGORY,
         action: SHOW_TRANSLATION_WINDOW_ACTION,
-        hotkey: HOTKEY_UNSET,
+        hotkey: "⌥A",
     },
     DefaultHotkey {
         category: OCR_CATEGORY,
@@ -196,13 +190,10 @@ mod hotkey_config_tests {
             snapshot.translation.get("screenshot-translate"),
             Some(&"⌥S".to_string())
         );
-        assert_eq!(
-            snapshot.translation.get("input-translate"),
-            Some(&"⌥A".to_string())
-        );
+        assert!(!snapshot.translation.contains_key("input-translate"));
         assert_eq!(
             snapshot.translation.get("show-window"),
-            Some(&HOTKEY_UNSET.to_string())
+            Some(&"⌥A".to_string())
         );
 
         assert_eq!(snapshot.ocr.get("screenshot-ocr"), Some(&"⇧⌥S".to_string()));

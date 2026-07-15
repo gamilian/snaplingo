@@ -42,7 +42,6 @@ use crate::infrastructure::storage::{
     SqliteLibraryIndexRepository,
 };
 use crate::infrastructure::storage::{FilesystemOcrHistoryAssets, SqliteFavoriteRepository};
-use crate::infrastructure::system::clipboard::ArboardResultWindowClipboard;
 use crate::infrastructure::system::result_window::{
     TauriResultWindowNotifier, TauriResultWindowRuntimeHost,
 };
@@ -196,7 +195,6 @@ pub(crate) fn build_app_state(database_path: PathBuf, app: AppHandle) -> AppStat
     let selected_text_acquirer = build_selected_text_acquirer(app.clone());
     let result_window = Arc::new(ResultWindowRuntime::new(
         Arc::new(TauriResultWindowRuntimeHost::new(app.clone())),
-        Arc::new(ArboardResultWindowClipboard::new()),
         Arc::new(TauriResultWindowNotifier::new(app)),
     ));
 

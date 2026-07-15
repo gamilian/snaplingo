@@ -70,7 +70,7 @@ pub(crate) async fn open_capture_translation_result_window_for_runtime(
 ) -> Result<(), String> {
     open_result_window_request(
         runtime,
-        ResultWindowOpenRequest::automatic_translation(text),
+        ResultWindowOpenRequest::screenshot_translation(text),
     )
     .await
 }
@@ -89,7 +89,7 @@ pub(crate) async fn open_translation_result_window_for_runtime(
 ) -> Result<(), String> {
     open_result_window_request(
         runtime,
-        ResultWindowOpenRequest::automatic_translation(text),
+        ResultWindowOpenRequest::selection_translation(text),
     )
     .await
 }
@@ -130,10 +130,17 @@ pub(crate) fn take_capture_result_window_payload_for_runtime(
 pub(crate) async fn open_selection_translation_window_for_state(
     state: &crate::AppState,
 ) -> Result<(), String> {
+    let settings = state
+        .settings
+        .configuration
+        .snapshot()
+        .map_err(|error| error.to_string())?;
     let snapshot = state
         .selection
         .acquirer
-        .acquire()
+        .acquire_with_mode(crate::application::SelectionTextMode::from_setting(
+            &settings.translation.selection_text_mode,
+        ))
         .await
         .map_err(|error| error.to_string())?;
     open_translation_result_window_for_runtime(&state.result_window, snapshot.text).await
@@ -175,8 +182,8 @@ mod tests {
     use async_trait::async_trait;
 
     use crate::application::result_window::{
-        ResultWindowClipboardPort, ResultWindowMode, ResultWindowNotifierPort,
-        ResultWindowOcrIntent, ResultWindowRequestId, ResultWindowRuntime, ResultWindowWindowPort,
+        ResultWindowMode, ResultWindowNotifierPort, ResultWindowOcrIntent, ResultWindowRequestId,
+        ResultWindowRuntime, ResultWindowWindowPort,
     };
 
     struct Window;
@@ -185,15 +192,6 @@ mod tests {
     impl ResultWindowWindowPort for Window {
         async fn show_or_create(&self) -> crate::Result<()> {
             Ok(())
-        }
-    }
-
-    struct Clipboard;
-
-    #[async_trait]
-    impl ResultWindowClipboardPort for Clipboard {
-        async fn read_text(&self) -> crate::Result<String> {
-            Ok("clipboard text".to_string())
         }
     }
 
@@ -207,7 +205,7 @@ mod tests {
     }
 
     fn runtime() -> ResultWindowRuntime {
-        ResultWindowRuntime::new(Arc::new(Window), Arc::new(Clipboard), Arc::new(Notifier))
+        ResultWindowRuntime::new(Arc::new(Window), Arc::new(Notifier))
     }
 
     #[tokio::test]
@@ -259,6 +257,7 @@ mod tests {
             serde_json::to_value(payload).unwrap(),
             serde_json::json!({
                 "mode": "ocr",
+                "origin": "ocr",
                 "text": "recognized",
                 "autoTranslate": false,
                 "ocrIntent": "display-text",

@@ -13,6 +13,7 @@ describe('result window application runtime', () => {
   it('hydrates the current translation payload by request ID', async () => {
     const payload: CaptureResultWindowPayload = {
       mode: 'translation',
+      origin: 'selection',
       text: 'Visit https://example.\ncom',
       autoTranslate: true,
     };
@@ -26,6 +27,7 @@ describe('result window application runtime', () => {
     expect(platform.commands.currentPayloadRequestId).toHaveBeenCalledTimes(1);
     expect(platform.commands.takePayload).toHaveBeenCalledWith('42');
     expect(state.clearTranslationResults).toHaveBeenCalledTimes(1);
+    expect(state.setResultWindowOrigin).toHaveBeenCalledWith('selection');
     expect(state.setSourceText).toHaveBeenCalledWith(
       'Visit https://example.com',
     );
@@ -48,6 +50,7 @@ describe('result window application runtime', () => {
   it('subscribes to payload-ready events and takes only the matching payload', async () => {
     const payload: CaptureResultWindowPayload = {
       mode: 'ocr',
+      origin: 'ocr',
       text: 'recognized',
       autoTranslate: false,
       ocrIntent: 'display-text',
@@ -67,6 +70,7 @@ describe('result window application runtime', () => {
 
     expect(platform.commands.takePayload).toHaveBeenCalledWith('7');
     expect(state.setOcrText).toHaveBeenCalledWith('recognized');
+    expect(state.setResultWindowOrigin).toHaveBeenCalledWith('ocr');
     expect(state.setOcrImageBase64).toHaveBeenCalledWith('image-base64');
     expect(state.showOcrWindow).toHaveBeenCalledTimes(1);
     expect(onLoaded).toHaveBeenCalledTimes(1);
@@ -111,13 +115,13 @@ describe('result window application runtime', () => {
     );
     expect(state.setOcrRunning).toHaveBeenNthCalledWith(1, true);
     expect(state.setOcrRunning).toHaveBeenLastCalledWith(false);
+    expect(platform.clipboard.copyText).not.toHaveBeenCalled();
   });
 
   it('favorites OCR with the retained image and configured language', async () => {
     const { runtime, platform } = createRuntime({
       ocrSettings: {
         recognitionLanguage: 'ja',
-        autoCopy: false,
         preserveFormatting: true,
         removeChineseSpaces: true,
         showConfidence: true,
@@ -321,16 +325,19 @@ describe('result window application runtime', () => {
     await runtime.resizeStandaloneWindow({
       presentation: 'overlay',
       visible: true,
+      mode: 'translation',
       panelHeightPx: 300,
     });
     await runtime.resizeStandaloneWindow({
       presentation: 'standalone',
       visible: false,
+      mode: 'translation',
       panelHeightPx: 300,
     });
     await runtime.resizeStandaloneWindow({
       presentation: 'standalone',
       visible: true,
+      mode: 'translation',
       panelHeightPx: 300,
     });
 
@@ -339,6 +346,93 @@ describe('result window application runtime', () => {
       660,
       resultWindowStandaloneWindowHeight(300),
     );
+  });
+
+  it('applies configured width only to translation windows', async () => {
+    const { runtime, platform } = createRuntime({
+      translationSettings: {
+        defaultSourceLang: 'auto',
+        defaultTargetLang: 'auto',
+        autoTranslate: true,
+        autoCopy: false,
+        preserveLineBreaks: true,
+        incrementalTranslation: false,
+        windowAlwaysOnTop: true,
+        hideOnBlur: false,
+        windowWidth: 720,
+      },
+    });
+
+    await runtime.resizeStandaloneWindow({
+      presentation: 'standalone',
+      visible: true,
+      mode: 'translation',
+      panelHeightPx: 300,
+    });
+    await runtime.resizeStandaloneWindow({
+      presentation: 'standalone',
+      visible: true,
+      mode: 'ocr',
+      panelHeightPx: 300,
+    });
+
+    expect(platform.resizeTo).toHaveBeenNthCalledWith(
+      1,
+      720,
+      resultWindowStandaloneWindowHeight(300),
+    );
+    expect(platform.resizeTo).toHaveBeenNthCalledWith(
+      2,
+      660,
+      resultWindowStandaloneWindowHeight(300),
+    );
+  });
+
+  it('places translation and OCR windows from their configured trigger settings', async () => {
+    const translation = createRuntime({
+      translationSettings: {
+        defaultSourceLang: 'auto',
+        defaultTargetLang: 'auto',
+        autoTranslate: true,
+        autoCopy: false,
+        preserveLineBreaks: true,
+        incrementalTranslation: false,
+        windowAlwaysOnTop: true,
+        hideOnBlur: false,
+        selectionWindowPosition: 'cursor',
+        inputWindowPosition: 'center',
+      },
+    });
+
+    await translation.runtime.resizeStandaloneWindow({
+      presentation: 'standalone',
+      visible: true,
+      mode: 'translation',
+      origin: 'selection',
+      panelHeightPx: 300,
+    });
+
+    expect(translation.platform.placeAt).toHaveBeenCalledWith('cursor');
+
+    const ocr = createRuntime({
+      ocrSettings: {
+        recognitionLanguage: 'auto',
+        preserveFormatting: true,
+        removeChineseSpaces: true,
+        showConfidence: false,
+        windowPosition: 'below-cursor',
+      },
+    });
+
+    await ocr.runtime.resizeStandaloneWindow({
+      presentation: 'standalone',
+      visible: true,
+      mode: 'ocr',
+      origin: 'ocr',
+      panelHeightPx: 300,
+    });
+
+    expect(ocr.platform.placeAt).toHaveBeenCalledWith('below-cursor');
   });
 });
 
@@ -392,6 +486,7 @@ function createRuntime(options: {
       return unsubscribe;
     }),
     resizeTo: vi.fn(async () => undefined),
+    placeAt: vi.fn(async () => undefined),
     dismiss: vi.fn(async () => {
       if (options.dismissError) throw options.dismissError;
     }),
@@ -400,6 +495,7 @@ function createRuntime(options: {
   };
   const state = {
     setSourceText: vi.fn(),
+    setResultWindowOrigin: vi.fn(),
     clearTranslationResults: vi.fn(),
     setOcrText: vi.fn(),
     setOcrConfidence: vi.fn(),

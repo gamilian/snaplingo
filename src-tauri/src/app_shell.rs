@@ -9,7 +9,6 @@ const TRAY_ID: &str = "snaplingo";
 const SCREENSHOT_ID: &str = "screenshot";
 const TRANSLATE_SELECTION_ID: &str = "translate-selection";
 const SCREENSHOT_TRANSLATE_ID: &str = "screenshot-translate";
-const INPUT_TRANSLATION_ID: &str = "input-translation";
 const SCREENSHOT_OCR_ID: &str = "screenshot-ocr";
 const FILE_OCR_ID: &str = "file-ocr";
 const SETTINGS_ID: &str = "settings";
@@ -23,7 +22,6 @@ pub(crate) fn menu_action_for_id(id: &str) -> Option<AppAction> {
         SCREENSHOT_TRANSLATE_ID => Some(AppAction::OpenCapture(
             CaptureLaunchMode::ScreenshotTranslate,
         )),
-        INPUT_TRANSLATION_ID => Some(AppAction::OpenInputTranslation),
         SCREENSHOT_OCR_ID => Some(AppAction::OpenCapture(CaptureLaunchMode::ScreenshotOcr)),
         FILE_OCR_ID => Some(AppAction::RunFileOcr),
         SETTINGS_ID => Some(AppAction::OpenSettings),
@@ -37,7 +35,6 @@ pub(crate) fn setup_menu_bar(app: &tauri::App) -> Result<(), String> {
     let screenshot = menu_item(app, SCREENSHOT_ID, "Screenshot")?;
     let translate_selection = menu_item(app, TRANSLATE_SELECTION_ID, "Translate Selection")?;
     let screenshot_translate = menu_item(app, SCREENSHOT_TRANSLATE_ID, "Screenshot Translate")?;
-    let input_translation = menu_item(app, INPUT_TRANSLATION_ID, "Input Translation")?;
     let screenshot_ocr = menu_item(app, SCREENSHOT_OCR_ID, "Screenshot OCR")?;
     let file_ocr = menu_item(app, FILE_OCR_ID, "Upload Image OCR")?;
     let settings = menu_item(app, SETTINGS_ID, "Settings")?;
@@ -50,7 +47,6 @@ pub(crate) fn setup_menu_bar(app: &tauri::App) -> Result<(), String> {
             &screenshot,
             &translate_selection,
             &screenshot_translate,
-            &input_translation,
             &screenshot_ocr,
             &file_ocr,
             &settings,
@@ -141,10 +137,6 @@ mod tests {
             Some(AppAction::OpenCapture(
                 CaptureLaunchMode::ScreenshotTranslate
             ))
-        );
-        assert_eq!(
-            menu_action_for_id("input-translation"),
-            Some(AppAction::OpenInputTranslation)
         );
         assert_eq!(
             menu_action_for_id("screenshot-ocr"),

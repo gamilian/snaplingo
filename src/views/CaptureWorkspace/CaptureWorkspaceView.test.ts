@@ -35,6 +35,7 @@ describe("CaptureWorkspaceView runtime seam", () => {
       | "viewportBounds"
       | "selectionBounds"
       | "isRenderingOutput"
+      | "silentOcrHint"
       | "editor"
       | "toolbar"
       | "dom"
@@ -53,6 +54,7 @@ describe("CaptureWorkspaceView runtime seam", () => {
       | "toggleAnnotationTool"
       | "applySelectedAnnotationStyle"
       | "updateTextDraftFontSize"
+      | "commitAnnotationSizeDefault"
       | "undoAnnotation"
       | "redoAnnotation"
       | "cancelSession"
@@ -363,6 +365,20 @@ describe("CaptureWorkspaceView runtime seam", () => {
       "copy",
       selection,
     );
+
+    const sizeRange = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Annotation stroke width"]',
+    );
+    expect(sizeRange).not.toBeNull();
+    await act(async () => {
+      sizeRange!.value = "5";
+      sizeRange!.dispatchEvent(new Event("input", { bubbles: true }));
+      sizeRange!.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+    });
+    expect(actions.commitAnnotationSizeDefault).toHaveBeenCalledWith(
+      "stroke",
+      5,
+    );
   });
 
   it("opens the color palette and manages preset colors", async () => {
@@ -560,6 +576,7 @@ function createRenderState(): CaptureWorkspaceViewRenderState {
     viewportBounds: { x: 0, y: 0, width: 800, height: 600 },
     selectionBounds: { x: 100, y: 200, width: 800, height: 600 },
     isRenderingOutput: false,
+    silentOcrHint: null,
     editor: {
       selection,
       selectionViewportRect: { x: 20, y: 30, width: 160, height: 90 },
@@ -616,6 +633,7 @@ function createActions() {
     toggleAnnotationTool: vi.fn(),
     applySelectedAnnotationStyle: vi.fn(),
     updateTextDraftFontSize: vi.fn(),
+    commitAnnotationSizeDefault: vi.fn(),
     undoAnnotation: vi.fn(),
     redoAnnotation: vi.fn(),
     cancelSession: vi.fn(async () => undefined),

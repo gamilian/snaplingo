@@ -1,3 +1,5 @@
+import type { ResultWindowPosition } from '../settings/ports';
+
 export type ResultWindowUnsubscribe = () => void;
 export type ResultWindowRequestId = string;
 export type ResultPayloadReadyHandler = (
@@ -12,13 +14,17 @@ export interface ResultWindowEventsPort {
 
 export interface ResultWindowPort {
   resize(width: number, height: number): Promise<void>;
+  place(position: ResultWindowPosition): Promise<void>;
   hide(): Promise<void>;
   startDragging(): Promise<void>;
   setAlwaysOnTop(value: boolean): Promise<void>;
 }
 
+export type ResultWindowOrigin = 'selection' | 'screenshot' | 'input' | 'ocr';
+
 export interface CaptureResultWindowPayload {
   mode: 'translation' | 'ocr';
+  origin?: ResultWindowOrigin;
   text: string;
   autoTranslate: boolean;
   ocrIntent?: 'display-text' | 'file';

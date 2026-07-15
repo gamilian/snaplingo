@@ -1,13 +1,12 @@
 use std::sync::{Arc, Mutex};
 
 use super::{
-    ResultWindowClipboardPort, ResultWindowMode, ResultWindowNotifierPort, ResultWindowOpenRequest,
-    ResultWindowPayload, ResultWindowRequestId, ResultWindowWindowPort,
+    ResultWindowMode, ResultWindowNotifierPort, ResultWindowOpenRequest, ResultWindowPayload,
+    ResultWindowRequestId, ResultWindowWindowPort,
 };
 
 pub(crate) struct ResultWindowRuntime {
     window: Arc<dyn ResultWindowWindowPort>,
-    clipboard: Arc<dyn ResultWindowClipboardPort>,
     notifier: Arc<dyn ResultWindowNotifierPort>,
     state: Mutex<ResultWindowState>,
 }
@@ -25,12 +24,10 @@ struct PendingResultWindowPayload {
 impl ResultWindowRuntime {
     pub(crate) fn new(
         window: Arc<dyn ResultWindowWindowPort>,
-        clipboard: Arc<dyn ResultWindowClipboardPort>,
         notifier: Arc<dyn ResultWindowNotifierPort>,
     ) -> Self {
         Self {
             window,
-            clipboard,
             notifier,
             state: Mutex::new(ResultWindowState {
                 latest_request_id: 0,
@@ -41,7 +38,7 @@ impl ResultWindowRuntime {
 
     pub(crate) async fn open(&self, request: ResultWindowOpenRequest) -> crate::Result<()> {
         let request_id = self.next_request_id()?;
-        let payload = self.payload_for(request).await;
+        let payload = self.payload_for(request);
 
         if !self.store_if_current(request_id, payload)? {
             return Ok(());
@@ -97,16 +94,13 @@ impl ResultWindowRuntime {
         Ok(ResultWindowRequestId(state.latest_request_id))
     }
 
-    async fn payload_for(&self, request: ResultWindowOpenRequest) -> ResultWindowPayload {
+    fn payload_for(&self, request: ResultWindowOpenRequest) -> ResultWindowPayload {
         match request {
             ResultWindowOpenRequest::Translation {
                 text,
                 auto_translate,
-            } => translation_payload(text, auto_translate),
-            ResultWindowOpenRequest::InputTranslation => {
-                let text = self.clipboard.read_text().await.unwrap_or_default();
-                translation_payload(text, true)
-            }
+                origin,
+            } => translation_payload(text, auto_translate, origin),
             ResultWindowOpenRequest::Ocr {
                 text,
                 intent,
@@ -114,6 +108,7 @@ impl ResultWindowRuntime {
                 confidence,
             } => ResultWindowPayload {
                 mode: ResultWindowMode::Ocr,
+                origin: super::ResultWindowOrigin::Ocr,
                 text,
                 auto_translate: false,
                 ocr_intent: Some(intent),
@@ -164,9 +159,14 @@ impl ResultWindowRuntime {
     }
 }
 
-fn translation_payload(text: String, auto_translate: bool) -> ResultWindowPayload {
+fn translation_payload(
+    text: String,
+    auto_translate: bool,
+    origin: super::ResultWindowOrigin,
+) -> ResultWindowPayload {
     ResultWindowPayload {
         mode: ResultWindowMode::Translation,
+        origin,
         text,
         auto_translate,
         ocr_intent: None,

@@ -3,6 +3,9 @@ import type {
   AnnotationColorPreset,
   ScreenshotFormat,
   ScreenshotNamingRule,
+  ResultWindowPosition,
+  SelectionTextMode,
+  TranslationInputState,
 } from '../../application/settings/ports';
 
 interface BackendGeneralSettings {
@@ -26,6 +29,8 @@ interface BackendScreenshotSettings {
   pin_opacity: number;
   pin_shadow: boolean;
   annotation_colors: AnnotationColorPreset[];
+  selection_border_width?: number;
+  selection_mask_color?: AnnotationColorPreset;
 }
 
 interface BackendTranslationSettings {
@@ -37,14 +42,22 @@ interface BackendTranslationSettings {
   incremental_translation: boolean;
   window_always_on_top: boolean;
   hide_on_blur: boolean;
+  selection_window_position?: ResultWindowPosition;
+  input_window_position?: ResultWindowPosition;
+  selection_input_state?: TranslationInputState;
+  screenshot_input_state?: TranslationInputState;
+  max_window_height_ratio?: number;
+  window_width?: number;
+  selection_text_mode?: SelectionTextMode;
 }
 
 interface BackendOcrSettings {
   recognition_language: string;
-  auto_copy: boolean;
   preserve_formatting: boolean;
   remove_chinese_spaces: boolean;
   show_confidence: boolean;
+  window_position?: ResultWindowPosition;
+  hide_silent_status?: boolean;
 }
 
 interface BackendHistorySettings {
@@ -83,6 +96,8 @@ interface ScreenshotSettingsInput {
   pinOpacity: number;
   pinShadow: boolean;
   annotationColors: AnnotationColorPreset[];
+  selectionBorderWidth?: number;
+  selectionMaskColor?: AnnotationColorPreset;
 }
 
 interface TranslationSettingsInput {
@@ -94,14 +109,22 @@ interface TranslationSettingsInput {
   incrementalTranslation: boolean;
   windowAlwaysOnTop: boolean;
   hideOnBlur: boolean;
+  selectionWindowPosition?: ResultWindowPosition;
+  inputWindowPosition?: ResultWindowPosition;
+  selectionInputState?: TranslationInputState;
+  screenshotInputState?: TranslationInputState;
+  maxWindowHeightRatio?: number;
+  windowWidth?: number;
+  selectionTextMode?: SelectionTextMode;
 }
 
 interface OcrSettingsInput {
   recognitionLanguage: string;
-  autoCopy: boolean;
   preserveFormatting: boolean;
   removeChineseSpaces: boolean;
   showConfidence: boolean;
+  windowPosition?: ResultWindowPosition;
+  hideSilentStatus?: boolean;
 }
 
 function normalizeSnapshot(snapshot: BackendSettingsSnapshot) {
@@ -126,6 +149,8 @@ function normalizeSnapshot(snapshot: BackendSettingsSnapshot) {
       pinOpacity: snapshot.screenshot.pin_opacity,
       pinShadow: snapshot.screenshot.pin_shadow,
       annotationColors: snapshot.screenshot.annotation_colors,
+      selectionBorderWidth: snapshot.screenshot.selection_border_width ?? 2,
+      selectionMaskColor: snapshot.screenshot.selection_mask_color ?? [0, 0, 0, 46],
     },
     translation: {
       defaultSourceLang: snapshot.translation.default_source_lang,
@@ -136,13 +161,22 @@ function normalizeSnapshot(snapshot: BackendSettingsSnapshot) {
       incrementalTranslation: snapshot.translation.incremental_translation,
       windowAlwaysOnTop: snapshot.translation.window_always_on_top,
       hideOnBlur: snapshot.translation.hide_on_blur,
+      selectionWindowPosition:
+        snapshot.translation.selection_window_position ?? 'below-cursor',
+      inputWindowPosition: snapshot.translation.input_window_position ?? 'center',
+      selectionInputState: snapshot.translation.selection_input_state ?? 'last',
+      screenshotInputState: snapshot.translation.screenshot_input_state ?? 'last',
+      maxWindowHeightRatio: snapshot.translation.max_window_height_ratio ?? 70,
+      windowWidth: snapshot.translation.window_width ?? 660,
+      selectionTextMode: snapshot.translation.selection_text_mode ?? 'smart',
     },
     ocr: {
       recognitionLanguage: snapshot.ocr.recognition_language,
-      autoCopy: snapshot.ocr.auto_copy,
       preserveFormatting: snapshot.ocr.preserve_formatting,
       removeChineseSpaces: snapshot.ocr.remove_chinese_spaces,
       showConfidence: snapshot.ocr.show_confidence,
+      windowPosition: snapshot.ocr.window_position ?? 'cursor',
+      hideSilentStatus: snapshot.ocr.hide_silent_status ?? false,
     },
     history: {
       autoCleanupEnabled: snapshot.history.auto_cleanup_enabled,
@@ -189,6 +223,8 @@ export async function updateScreenshotSettings(input: ScreenshotSettingsInput) {
         pin_opacity: input.pinOpacity,
         pin_shadow: input.pinShadow,
         annotation_colors: input.annotationColors,
+        selection_border_width: input.selectionBorderWidth ?? 2,
+        selection_mask_color: input.selectionMaskColor ?? [0, 0, 0, 46],
       },
     }),
   );
@@ -216,6 +252,14 @@ export async function updateTranslationSettings(
         incremental_translation: input.incrementalTranslation,
         window_always_on_top: input.windowAlwaysOnTop,
         hide_on_blur: input.hideOnBlur,
+        selection_window_position:
+          input.selectionWindowPosition ?? 'below-cursor',
+        input_window_position: input.inputWindowPosition ?? 'center',
+        selection_input_state: input.selectionInputState ?? 'last',
+        screenshot_input_state: input.screenshotInputState ?? 'last',
+        max_window_height_ratio: input.maxWindowHeightRatio ?? 70,
+        window_width: input.windowWidth ?? 660,
+        selection_text_mode: input.selectionTextMode ?? 'smart',
       },
     }),
   );
@@ -226,10 +270,11 @@ export async function updateOcrSettings(input: OcrSettingsInput) {
     await invoke<BackendSettingsSnapshot>('update_ocr_settings', {
       input: {
         recognition_language: input.recognitionLanguage,
-        auto_copy: input.autoCopy,
         preserve_formatting: input.preserveFormatting,
         remove_chinese_spaces: input.removeChineseSpaces,
         show_confidence: input.showConfidence,
+        window_position: input.windowPosition ?? 'cursor',
+        hide_silent_status: input.hideSilentStatus ?? false,
       },
     }),
   );

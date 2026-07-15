@@ -70,6 +70,10 @@ export interface CaptureWorkspaceRenderState {
   readonly isMagnifierRequested: boolean;
   readonly includeCapturedCursor: boolean;
   readonly isRenderingOutput: boolean;
+  readonly silentOcrHint: {
+    readonly status: 'loading' | 'success';
+    readonly point: Point;
+  } | null;
   readonly hasHydratedPixelSource: boolean;
   readonly error: string | null;
 }
@@ -119,6 +123,10 @@ export interface CaptureWorkspaceRuntimeActions {
     textFontSize: number,
   ): void;
   updateTextDraftFontSize(fontSize: number): void;
+  commitAnnotationSizeDefault(
+    kind: 'stroke' | 'font',
+    value: number,
+  ): void;
   undoAnnotation(): void;
   redoAnnotation(): void;
   updateCursorColor(color: ColorSample | null): void;

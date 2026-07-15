@@ -1,3 +1,4 @@
+import { getVersion } from '@tauri-apps/api/app';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { open } from '@tauri-apps/plugin-dialog';
 import type { SettingsWindowPort } from '../../application/settings/ports';
@@ -16,4 +17,5 @@ export const settingsWindow: SettingsWindowPort = {
     const selected = await open({ directory: true, multiple: false });
     return typeof selected === 'string' ? selected : null;
   },
+  getAppVersion: () => getVersion(),
 };

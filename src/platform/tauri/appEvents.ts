@@ -1,6 +1,8 @@
 import { listen } from '@tauri-apps/api/event';
 import type { CaptureWorkspaceEventsPort } from '../../application/capture-workspace/ports';
 import type { ResultWindowEventsPort } from '../../application/result-window/ports';
+import { parseSettingsNavigationRequest } from '../../application/settings/navigation';
+import type { SettingsWindowEventsPort } from '../../application/settings/ports';
 import {
   CAPTURE_MODES,
   type CaptureLaunch,
@@ -20,6 +22,7 @@ const PROVIDERS_CHANGED_EVENT = 'providers-changed';
 const HISTORY_CHANGED_EVENT = 'history-changed';
 const FAVORITES_CHANGED_EVENT = 'favorites-changed';
 const SCREENSHOT_FAVORITES_CHANGED_EVENT = 'screenshot-favorites-changed';
+const SETTINGS_NAVIGATION_REQUESTED_EVENT = 'settings-navigation-requested';
 
 function isCaptureMode(value: unknown): value is CaptureMode {
   return (
@@ -111,6 +114,19 @@ export const captureWorkspaceEvents: CaptureWorkspaceEventsPort = {
       void handler(launch);
     });
 
+    return () => unlisten();
+  },
+};
+
+export const settingsWindowEvents: SettingsWindowEventsPort = {
+  async subscribeNavigationRequested(handler) {
+    const unlisten = await listen<unknown>(
+      SETTINGS_NAVIGATION_REQUESTED_EVENT,
+      (event) => {
+        const request = parseSettingsNavigationRequest(event.payload);
+        if (request) void handler(request);
+      },
+    );
     return () => unlisten();
   },
 };

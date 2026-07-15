@@ -1,9 +1,9 @@
 use crate::app_actions::{dispatch_app_action, AppAction, CaptureLaunchMode};
 use crate::domain::hotkey_config::{
-    FILE_OCR_ACTION, INPUT_TRANSLATE_ACTION, OCR_CATEGORY, PIN_ACTION, PIN_SWITCH_GROUP_ACTION,
-    PIN_TOGGLE_ALL_ACTION, SCREENSHOT_ACTION, SCREENSHOT_CATEGORY, SCREENSHOT_COPY_ACTION,
-    SCREENSHOT_OCR_ACTION, SCREENSHOT_TRANSLATE_ACTION, SELECTION_TRANSLATE_ACTION,
-    SHOW_TRANSLATION_WINDOW_ACTION, SILENT_SCREENSHOT_OCR_ACTION, TRANSLATION_CATEGORY,
+    FILE_OCR_ACTION, OCR_CATEGORY, PIN_ACTION, PIN_SWITCH_GROUP_ACTION, PIN_TOGGLE_ALL_ACTION,
+    SCREENSHOT_ACTION, SCREENSHOT_CATEGORY, SCREENSHOT_COPY_ACTION, SCREENSHOT_OCR_ACTION,
+    SCREENSHOT_TRANSLATE_ACTION, SELECTION_TRANSLATE_ACTION, SHOW_TRANSLATION_WINDOW_ACTION,
+    SILENT_SCREENSHOT_OCR_ACTION, TRANSLATION_CATEGORY,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -29,7 +29,6 @@ pub(crate) fn hotkey_action_binding(
             AppAction::OpenCapture(CaptureLaunchMode::ScreenshotTranslate)
         }
         (TRANSLATION_CATEGORY, SELECTION_TRANSLATE_ACTION) => AppAction::TranslateSelection,
-        (TRANSLATION_CATEGORY, INPUT_TRANSLATE_ACTION) => AppAction::OpenInputTranslation,
         (TRANSLATION_CATEGORY, SHOW_TRANSLATION_WINDOW_ACTION) => AppAction::OpenTranslationWindow,
         (OCR_CATEGORY, SCREENSHOT_OCR_ACTION) => {
             AppAction::OpenCapture(CaptureLaunchMode::ScreenshotOcr)
@@ -60,11 +59,10 @@ mod tests {
     use super::hotkey_action_binding;
     use crate::app_actions::{AppAction, CaptureLaunchMode};
     use crate::domain::hotkey_config::{
-        DEFAULT_HOTKEYS, FILE_OCR_ACTION, INPUT_TRANSLATE_ACTION, OCR_CATEGORY, PIN_ACTION,
-        PIN_SWITCH_GROUP_ACTION, PIN_TOGGLE_ALL_ACTION, SCREENSHOT_ACTION, SCREENSHOT_CATEGORY,
-        SCREENSHOT_COPY_ACTION, SCREENSHOT_OCR_ACTION, SCREENSHOT_TRANSLATE_ACTION,
-        SELECTION_TRANSLATE_ACTION, SHOW_TRANSLATION_WINDOW_ACTION, SILENT_SCREENSHOT_OCR_ACTION,
-        TRANSLATION_CATEGORY,
+        DEFAULT_HOTKEYS, FILE_OCR_ACTION, OCR_CATEGORY, PIN_ACTION, PIN_SWITCH_GROUP_ACTION,
+        PIN_TOGGLE_ALL_ACTION, SCREENSHOT_ACTION, SCREENSHOT_CATEGORY, SCREENSHOT_COPY_ACTION,
+        SCREENSHOT_OCR_ACTION, SCREENSHOT_TRANSLATE_ACTION, SELECTION_TRANSLATE_ACTION,
+        SHOW_TRANSLATION_WINDOW_ACTION, SILENT_SCREENSHOT_OCR_ACTION, TRANSLATION_CATEGORY,
     };
 
     #[test]
@@ -107,11 +105,6 @@ mod tests {
             ),
             (
                 TRANSLATION_CATEGORY,
-                INPUT_TRANSLATE_ACTION,
-                AppAction::OpenInputTranslation,
-            ),
-            (
-                TRANSLATION_CATEGORY,
                 SHOW_TRANSLATION_WINDOW_ACTION,
                 AppAction::OpenTranslationWindow,
             ),
@@ -143,7 +136,7 @@ mod tests {
             .map(|hotkey| (hotkey.category, hotkey.action))
             .collect();
 
-        assert_eq!(cases.len(), 12);
+        assert_eq!(cases.len(), 11);
         assert_eq!(cases.len(), DEFAULT_HOTKEYS.len());
         assert_eq!(covered, defaults);
         assert!(hotkey_action_binding("unknown", "unknown").is_none());

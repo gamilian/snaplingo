@@ -36,12 +36,18 @@ function CaptureWorkspaceContent({
   const updateAnnotationColorPresets = useSettingsConfigStore(
     (state) => state.updateAnnotationColors,
   );
+  const updateScreenshotSettings = useSettingsConfigStore(
+    (state) => state.updateScreenshotSettings,
+  );
   const { renderState, actions } = useCaptureWorkspaceRuntimeView({
     initialMode,
     initialSessionId,
     onInactive,
     annotationColorPresets,
     screenshotPreferences: screenshotPreferences ?? undefined,
+    persistScreenshotDefaults: (input) => {
+      void updateScreenshotSettings(input);
+    },
     ocrPreferences: ocrPreferences ?? undefined,
   });
 

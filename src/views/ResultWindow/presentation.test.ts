@@ -83,7 +83,7 @@ describe('result window presentation', () => {
     expect(resultWindowPanelClassName('overlay')).toContain('rounded-[14px]');
     expect(resultWindowPanelClassName('standalone')).toContain('rounded-[14px]');
     expect(resultWindowPanelClassName('overlay')).toContain('max-w-[660px]');
-    expect(resultWindowPanelClassName('standalone')).toContain('max-w-[660px]');
+    expect(resultWindowPanelClassName('standalone')).not.toContain('max-w-[660px]');
     expect(resultWindowPanelClassName('overlay')).toContain(
       '[clip-path:inset(0_round_14px)]',
     );

@@ -78,6 +78,10 @@ import type {
   ResultWindowPresentation,
   ResultWindowRuntime,
 } from '../../application/result-window/runtime';
+import {
+  rememberSourceInputCollapsed,
+  resolveSourceInputCollapsed,
+} from './sourceInputState';
 
 interface ResultWindowProps {
   presentation?: ResultWindowPresentation;
@@ -257,6 +261,7 @@ function ResultWindowContent({
     ocrError,
     resultWindowVisible,
     resultWindowMode,
+    resultWindowOrigin,
     autoTranslateRequestId,
     setSourceText,
     setSourceLang,
@@ -289,6 +294,7 @@ function ResultWindowContent({
   const [measuredTranslationPanelHeightPx, setMeasuredTranslationPanelHeightPx] =
     useState<number | undefined>(undefined);
   const [isResultWindowPinned, setResultWindowPinned] = useState(false);
+  const [isSourceInputCollapsed, setSourceInputCollapsed] = useState(false);
   const [favoritedOcrSignature, setFavoritedOcrSignature] = useState<string | null>(
     null,
   );
@@ -298,6 +304,34 @@ function ResultWindowContent({
   );
   const [isTranslationFavoritePending, setTranslationFavoritePending] =
     useState(false);
+
+  useLayoutEffect(() => {
+    if (!resultWindowVisible || resultWindowMode !== 'translation') return;
+
+    const setting =
+      resultWindowOrigin === 'selection'
+        ? translationSettings?.selectionInputState
+        : resultWindowOrigin === 'screenshot'
+          ? translationSettings?.screenshotInputState
+          : 'expanded';
+    setSourceInputCollapsed(
+      resolveSourceInputCollapsed(resultWindowOrigin, setting),
+    );
+  }, [
+    resultWindowMode,
+    resultWindowOrigin,
+    resultWindowVisible,
+    translationSettings?.screenshotInputState,
+    translationSettings?.selectionInputState,
+  ]);
+
+  const updateSourceInputCollapsed = useCallback(
+    (collapsed: boolean) => {
+      setSourceInputCollapsed(collapsed);
+      rememberSourceInputCollapsed(resultWindowOrigin, collapsed);
+    },
+    [resultWindowOrigin],
+  );
   const sourceTextStyle = useMemo(
     () => resultWindowAdaptiveTextStyle(sourceText, 'source'),
     [sourceText],
@@ -535,6 +569,8 @@ function ResultWindowContent({
         void runtime.resizeStandaloneWindow({
           presentation,
           visible: resultWindowVisible,
+          mode: 'ocr',
+          origin: resultWindowOrigin,
           panelHeightPx: panelHeight,
         });
       };
@@ -549,10 +585,19 @@ function ResultWindowContent({
       return () => resizeObserver.disconnect();
     }
 
+    const availableHeight = window.screen?.availHeight || window.innerHeight;
+    const maximumWindowHeight = Math.floor(
+      availableHeight * ((translationSettings?.maxWindowHeightRatio ?? 70) / 100),
+    );
     void runtime.resizeStandaloneWindow({
       presentation,
       visible: resultWindowVisible,
-      panelHeightPx: translationPanelHeightPx,
+      mode: 'translation',
+      origin: resultWindowOrigin,
+      panelHeightPx: Math.min(
+        translationPanelHeightPx,
+        Math.max(0, maximumWindowHeight - 16),
+      ),
     });
   }, [
     ocrTokens.length,
@@ -561,7 +606,12 @@ function ResultWindowContent({
     ocrText,
     presentation,
     resultWindowMode,
+    resultWindowOrigin,
     resultWindowVisible,
+    ocrSettings?.windowPosition,
+    translationSettings?.inputWindowPosition,
+    translationSettings?.maxWindowHeightRatio,
+    translationSettings?.selectionWindowPosition,
     translationPanelHeightPx,
   ]);
 
@@ -585,11 +635,16 @@ function ResultWindowContent({
 
     const resizeObserver = new ResizeObserver(() => {
       updateSourceTextAreaHeight();
+      updateMeasuredTranslationPanelHeight();
     });
     resizeObserver.observe(sourceBox);
 
     return () => resizeObserver.disconnect();
-  }, [resultWindowVisible, updateSourceTextAreaHeight]);
+  }, [
+    resultWindowVisible,
+    updateMeasuredTranslationPanelHeight,
+    updateSourceTextAreaHeight,
+  ]);
 
   useLayoutEffect(() => {
     if (!resultWindowVisible) return;
@@ -609,6 +664,7 @@ function ResultWindowContent({
 
     updateMeasuredTranslationPanelHeight();
   }, [
+    isSourceInputCollapsed,
     measuredTranslationPanelHeightPx,
     ocrImageBase64,
     ocrText,
@@ -1036,7 +1092,19 @@ function ResultWindowContent({
             })}
           >
             <div ref={translationSourceBoxRef} className="flex-none">
-              <div className={`${resultWindowTextBoxClassName()} relative`}>
+              {isSourceInputCollapsed ? (
+                <button
+                  type="button"
+                  onClick={() => updateSourceInputCollapsed(false)}
+                  className="flex h-10 w-full items-center justify-between gap-3 rounded-[12px] border border-slate-200 bg-slate-50/80 px-3 text-left text-xs text-slate-600 hover:bg-slate-50"
+                >
+                  <span className="min-w-0 truncate">
+                    {sourceText.trim() || '输入需要翻译的文本...'}
+                  </span>
+                  <span className="shrink-0 font-semibold text-blue-600">展开原文</span>
+                </button>
+              ) : (
+                <div className={`${resultWindowTextBoxClassName()} relative`}>
                 <div
                   ref={sourceTextMirrorRef}
                   aria-hidden="true"
@@ -1062,6 +1130,13 @@ function ResultWindowContent({
                     </span>
                   </span>
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => updateSourceInputCollapsed(true)}
+                      className="h-7 rounded-[7px] px-2 text-[11px] font-semibold text-slate-500 hover:bg-white hover:text-slate-700"
+                    >
+                      折叠
+                    </button>
                     <IconActionButton
                       title={
                         areAllTranslationResultsFavorited
@@ -1131,7 +1206,8 @@ function ResultWindowContent({
                     </IconActionButton>
                   </div>
                 </div>
-              </div>
+                </div>
+              )}
             </div>
 
             <div ref={translationLanguageSwitcherRef} className="flex-none">

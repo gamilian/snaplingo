@@ -88,7 +88,7 @@ export function resultWindowPanelClassName(
   { fitContent = false }: ResultWindowShellOptions = {},
 ) {
   const baseClassName =
-    `relative min-h-0 bg-white ${resultWindowSurfaceRadiusClassName} shadow-xl w-full max-w-[660px] overflow-hidden ${resultWindowSurfaceClipClassName} flex flex-col`;
+    `relative min-h-0 bg-white ${resultWindowSurfaceRadiusClassName} shadow-xl w-full overflow-hidden ${resultWindowSurfaceClipClassName} flex flex-col`;
 
   if (presentation === 'standalone') {
     if (fitContent) {
@@ -98,7 +98,7 @@ export function resultWindowPanelClassName(
     return `${baseClassName} h-full max-h-[calc(100vh-1rem)]`;
   }
 
-  return `${baseClassName} max-h-[90vh] animate-[slideIn_0.3s_ease-out]`;
+  return `${baseClassName} max-w-[660px] max-h-[90vh] animate-[slideIn_0.3s_ease-out]`;
 }
 
 export function resultWindowContentClassName({

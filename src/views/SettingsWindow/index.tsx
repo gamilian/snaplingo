@@ -1,5 +1,7 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 
+import { readSettingsNavigationLaunch } from '../../application/settings/navigation';
+import type { SettingsRuntime } from '../../application/settings/runtime';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { MainNav } from './Navigation/MainNav';
 import { SecondaryNav } from './Navigation/SecondaryNav';
@@ -8,8 +10,7 @@ import {
   type SettingsSection,
 } from './navigationModel';
 import { createSettingsNavigationState } from './settingsNavigationState';
-import type { SettingsRuntime } from '../../application/settings/runtime';
-import { SettingsRuntimeProvider } from './runtimeContext';
+import { SettingsRuntimeProvider, useSettingsRuntime } from './runtimeContext';
 
 export function SettingsWindow({ runtime }: { runtime: SettingsRuntime }) {
   return (
@@ -22,7 +23,31 @@ export function SettingsWindow({ runtime }: { runtime: SettingsRuntime }) {
 function SettingsWindowContent() {
   const activeMainTab = useSettingsStore((state) => state.activeMainTab);
   const setActiveMainTab = useSettingsStore((state) => state.setActiveMainTab);
+  const navigate = useSettingsStore((state) => state.navigate);
   const activeSection = findSettingsSection(activeMainTab);
+
+  const runtime = useSettingsRuntime();
+  useEffect(() => {
+    const initialRequest = readSettingsNavigationLaunch(window.location.search);
+    if (initialRequest) navigate(initialRequest);
+
+    let disposed = false;
+    let unsubscribe: (() => void) | undefined;
+    runtime.window
+      .subscribeNavigationRequested(navigate)
+      .then((dispose) => {
+        if (disposed) dispose();
+        else unsubscribe = dispose;
+      })
+      .catch((error) => {
+        console.warn('Failed to subscribe to settings navigation:', error);
+      });
+
+    return () => {
+      disposed = true;
+      unsubscribe?.();
+    };
+  }, [navigate, runtime]);
 
   return (
     <div className="flex h-screen bg-[#f5f5f7]">
@@ -36,36 +61,20 @@ function SettingsWindowContent() {
 }
 
 function SettingsSectionContent({ section }: { section: SettingsSection }) {
-  const screenshotSubTab = useSettingsStore((state) => state.screenshotSubTab);
-  const translationSubTab = useSettingsStore((state) => state.translationSubTab);
-  const ocrSubTab = useSettingsStore((state) => state.ocrSubTab);
   const servicesSubTab = useSettingsStore((state) => state.servicesSubTab);
-  const setScreenshotSubTab = useSettingsStore((state) => state.setScreenshotSubTab);
-  const setTranslationSubTab = useSettingsStore((state) => state.setTranslationSubTab);
-  const setOcrSubTab = useSettingsStore((state) => state.setOcrSubTab);
   const setServicesSubTab = useSettingsStore((state) => state.setServicesSubTab);
 
   if (!('secondary' in section)) {
     if (section.key === 'favorites' || section.key === 'history') {
       return section.render();
     }
-    return <ContentFrame>{section.render()}</ContentFrame>;
+    return section.render();
   }
 
   const navigationState = createSettingsNavigationState(
     section,
-    {
-      screenshot: screenshotSubTab,
-      translation: translationSubTab,
-      ocr: ocrSubTab,
-      services: servicesSubTab,
-    },
-    {
-      screenshot: setScreenshotSubTab,
-      translation: setTranslationSubTab,
-      ocr: setOcrSubTab,
-      services: setServicesSubTab,
-    },
+    { services: servicesSubTab },
+    { services: setServicesSubTab },
   );
 
   if (section.key === 'services') {
@@ -83,17 +92,6 @@ function SettingsSectionContent({ section }: { section: SettingsSection }) {
       </ContentFrame>
     );
   }
-
-  return (
-    <>
-      <SecondaryNav
-        items={section.secondary}
-        activeItem={navigationState.activeKey}
-        onItemChange={navigationState.setActiveKey}
-      />
-      <ContentFrame>{navigationState.activeItem?.render()}</ContentFrame>
-    </>
-  );
 }
 
 function ContentFrame({ children }: { children: ReactNode }) {

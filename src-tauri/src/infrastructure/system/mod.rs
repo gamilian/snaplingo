@@ -1,5 +1,4 @@
 pub mod capture_window;
-pub mod clipboard;
 pub mod ocr;
 pub mod paths;
 pub mod pinned_window;

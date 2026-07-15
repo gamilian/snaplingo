@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { TranslationResult } from '../types';
+import type { ResultWindowOrigin } from '../application/result-window/ports';
 
 export type ResultWindowMode = 'translation' | 'ocr';
 export type ProviderTranslationStatus = 'pending' | 'success' | 'error';
@@ -77,6 +78,7 @@ interface AppState {
   ocrError: string | null;
   resultWindowVisible: boolean;
   resultWindowMode: ResultWindowMode;
+  resultWindowOrigin: ResultWindowOrigin;
   autoTranslateRequestId: number;
 
   setSourceText: (text: string) => void;
@@ -100,6 +102,7 @@ interface AppState {
   setOcrRunning: (value: boolean) => void;
   setOcrError: (message: string | null) => void;
   requestAutoTranslate: () => void;
+  setResultWindowOrigin: (origin: ResultWindowOrigin) => void;
   showResultWindow: () => void;
   showTranslationWindow: () => void;
   showOcrWindow: () => void;
@@ -122,6 +125,7 @@ export const useAppStore = create<AppState>((set) => ({
   ocrError: null,
   resultWindowVisible: false,
   resultWindowMode: 'translation',
+  resultWindowOrigin: 'input',
   autoTranslateRequestId: 0,
 
   setSourceText: (text) => set({ sourceText: text }),
@@ -230,6 +234,7 @@ export const useAppStore = create<AppState>((set) => ({
   setOcrError: (message) => set({ ocrError: message }),
   requestAutoTranslate: () =>
     set((state) => ({ autoTranslateRequestId: state.autoTranslateRequestId + 1 })),
+  setResultWindowOrigin: (origin) => set({ resultWindowOrigin: origin }),
   showResultWindow: () => set({ resultWindowVisible: true, resultWindowMode: 'translation' }),
   showTranslationWindow: () => set({ resultWindowVisible: true, resultWindowMode: 'translation' }),
   showOcrWindow: () => set({ resultWindowVisible: true, resultWindowMode: 'ocr' }),

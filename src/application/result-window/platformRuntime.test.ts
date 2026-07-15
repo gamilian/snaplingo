@@ -12,6 +12,7 @@ describe('result window platform runtime', () => {
       },
       window: {
         resize: vi.fn(async () => undefined),
+        place: vi.fn(async () => undefined),
         hide: vi.fn(async () => undefined),
         startDragging: vi.fn(async () => undefined),
         setAlwaysOnTop: vi.fn(async () => undefined),
@@ -24,6 +25,7 @@ describe('result window platform runtime', () => {
       unsubscribe,
     );
     await runtime.resizeTo(640, 480);
+    await runtime.placeAt('below-cursor');
     await runtime.dismiss();
     await runtime.beginDrag();
     await runtime.setAlwaysOnTop(true);
@@ -33,6 +35,7 @@ describe('result window platform runtime', () => {
       onPayloadReady,
     );
     expect(ports.window.resize).toHaveBeenCalledWith(640, 480);
+    expect(ports.window.place).toHaveBeenCalledWith('below-cursor');
     expect(ports.window.hide).toHaveBeenCalledTimes(1);
     expect(ports.window.startDragging).toHaveBeenCalledTimes(1);
     expect(ports.window.setAlwaysOnTop).toHaveBeenCalledWith(true);

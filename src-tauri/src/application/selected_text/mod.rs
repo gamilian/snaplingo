@@ -15,6 +15,24 @@ pub struct SelectionScheme {
     ordered_methods: Vec<SelectionMethodKind>,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SelectionTextMode {
+    #[default]
+    Smart,
+    Quality,
+    Speed,
+}
+
+impl SelectionTextMode {
+    pub fn from_setting(value: &str) -> Self {
+        match value {
+            "quality" => Self::Quality,
+            "speed" => Self::Speed,
+            _ => Self::Smart,
+        }
+    }
+}
+
 impl SelectionScheme {
     pub fn new(ordered_methods: Vec<SelectionMethodKind>) -> Self {
         Self { ordered_methods }
@@ -44,17 +62,58 @@ impl SelectedTextAcquirer {
     }
 
     pub async fn acquire(&self) -> Result<SelectedTextSnapshot> {
-        self.acquire_with_context(self.context_provider.context())
-            .await
+        self.acquire_with_mode(SelectionTextMode::Smart).await
+    }
+
+    pub async fn acquire_with_mode(&self, mode: SelectionTextMode) -> Result<SelectedTextSnapshot> {
+        self.acquire_with_context_and_order(
+            self.context_provider.context(),
+            self.method_order(mode),
+        )
+        .await
     }
 
     pub async fn acquire_with_context(
         &self,
         context: SelectionContext,
     ) -> Result<SelectedTextSnapshot> {
+        self.acquire_with_context_and_order(context, self.method_order(SelectionTextMode::Smart))
+            .await
+    }
+
+    fn method_order(&self, mode: SelectionTextMode) -> &[SelectionMethodKind] {
+        const QUALITY: &[SelectionMethodKind] = &[
+            SelectionMethodKind::SelfWebview,
+            SelectionMethodKind::BrowserScript,
+            SelectionMethodKind::MenuCopy,
+            SelectionMethodKind::ShortcutCopy,
+            SelectionMethodKind::Accessibility,
+            SelectionMethodKind::PrimarySelection,
+        ];
+        const SPEED: &[SelectionMethodKind] = &[
+            SelectionMethodKind::SelfWebview,
+            SelectionMethodKind::Accessibility,
+            SelectionMethodKind::PrimarySelection,
+            SelectionMethodKind::BrowserScript,
+            SelectionMethodKind::MenuCopy,
+            SelectionMethodKind::ShortcutCopy,
+        ];
+
+        match mode {
+            SelectionTextMode::Smart => &self.scheme.ordered_methods,
+            SelectionTextMode::Quality => QUALITY,
+            SelectionTextMode::Speed => SPEED,
+        }
+    }
+
+    async fn acquire_with_context_and_order(
+        &self,
+        context: SelectionContext,
+        ordered_methods: &[SelectionMethodKind],
+    ) -> Result<SelectedTextSnapshot> {
         let mut diagnostics = Vec::new();
 
-        for kind in &self.scheme.ordered_methods {
+        for kind in ordered_methods {
             let Some(method) = self.methods.get(kind).map(Box::as_ref) else {
                 diagnostics.push(format!("{kind:?}: not registered"));
                 continue;
@@ -212,6 +271,48 @@ mod selected_text_acquirer_tests {
                 SelectionMethodKind::MenuCopy,
             ]
         );
+    }
+
+    #[tokio::test]
+    async fn configured_mode_changes_method_priority() {
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let acquirer = SelectedTextAcquirer::new(
+            SelectionScheme::new(vec![SelectionMethodKind::Accessibility]),
+            vec![
+                Box::new(FakeMethod {
+                    kind: SelectionMethodKind::Accessibility,
+                    availability: MethodAvailability::Available,
+                    result: SelectionAttemptStatusForTest::Text(
+                        "accessibility text",
+                        SelectionSource::Accessibility,
+                    ),
+                    calls: calls.clone(),
+                }),
+                Box::new(FakeMethod {
+                    kind: SelectionMethodKind::ShortcutCopy,
+                    availability: MethodAvailability::Available,
+                    result: SelectionAttemptStatusForTest::Text(
+                        "clipboard text",
+                        SelectionSource::ShortcutCopy,
+                    ),
+                    calls: calls.clone(),
+                }),
+            ],
+            Arc::new(FakeContextProvider),
+        );
+
+        let quality = acquirer
+            .acquire_with_mode(SelectionTextMode::Quality)
+            .await
+            .unwrap();
+        assert_eq!(quality.text, "clipboard text");
+
+        calls.lock().unwrap().clear();
+        let speed = acquirer
+            .acquire_with_mode(SelectionTextMode::Speed)
+            .await
+            .unwrap();
+        assert_eq!(speed.text, "accessibility text");
     }
 
     #[tokio::test]

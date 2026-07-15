@@ -83,6 +83,8 @@ describe('Tauri settings command adapter', () => {
         pinOpacity: 80,
         pinShadow: false,
         annotationColors: [[255, 77, 79, 255]],
+        selectionBorderWidth: 2,
+        selectionMaskColor: [0, 0, 0, 46],
       },
       translation: {
         defaultSourceLang: 'ja',
@@ -93,13 +95,21 @@ describe('Tauri settings command adapter', () => {
         incrementalTranslation: false,
         windowAlwaysOnTop: true,
         hideOnBlur: false,
+        selectionWindowPosition: 'below-cursor',
+        inputWindowPosition: 'center',
+        selectionInputState: 'last',
+        screenshotInputState: 'last',
+        maxWindowHeightRatio: 70,
+        windowWidth: 660,
+        selectionTextMode: 'smart',
       },
       ocr: {
         recognitionLanguage: 'auto',
-        autoCopy: true,
         preserveFormatting: true,
         removeChineseSpaces: true,
         showConfidence: false,
+        windowPosition: 'cursor',
+        hideSilentStatus: false,
       },
       history: {
         autoCleanupEnabled: true,
@@ -149,6 +159,8 @@ describe('Tauri settings command adapter', () => {
       pinOpacity: 75,
       pinShadow: false,
       annotationColors: [[12, 34, 56, 255]],
+      selectionBorderWidth: 4,
+      selectionMaskColor: [32, 36, 44, 72],
     });
 
     expect(invoke).toHaveBeenCalledWith('update_screenshot_settings', {
@@ -167,6 +179,8 @@ describe('Tauri settings command adapter', () => {
         pin_opacity: 75,
         pin_shadow: false,
         annotation_colors: [[12, 34, 56, 255]],
+        selection_border_width: 4,
+        selection_mask_color: [32, 36, 44, 72],
       },
     });
   });
@@ -199,6 +213,13 @@ describe('Tauri settings command adapter', () => {
       incrementalTranslation: false,
       windowAlwaysOnTop: true,
       hideOnBlur: false,
+      selectionWindowPosition: 'cursor',
+      inputWindowPosition: 'below-cursor',
+      selectionInputState: 'collapsed',
+      screenshotInputState: 'expanded',
+      maxWindowHeightRatio: 80,
+      windowWidth: 720,
+      selectionTextMode: 'quality',
     });
 
     expect(invoke).toHaveBeenCalledWith('update_translation_settings', {
@@ -211,6 +232,13 @@ describe('Tauri settings command adapter', () => {
         incremental_translation: false,
         window_always_on_top: true,
         hide_on_blur: false,
+        selection_window_position: 'cursor',
+        input_window_position: 'below-cursor',
+        selection_input_state: 'collapsed',
+        screenshot_input_state: 'expanded',
+        max_window_height_ratio: 80,
+        window_width: 720,
+        selection_text_mode: 'quality',
       },
     });
   });
@@ -221,19 +249,21 @@ describe('Tauri settings command adapter', () => {
 
     await updateOcrSettings({
       recognitionLanguage: 'ja',
-      autoCopy: false,
       preserveFormatting: false,
       removeChineseSpaces: true,
       showConfidence: true,
+      windowPosition: 'center',
+      hideSilentStatus: true,
     });
 
     expect(invoke).toHaveBeenCalledWith('update_ocr_settings', {
       input: {
         recognition_language: 'ja',
-        auto_copy: false,
         preserve_formatting: false,
         remove_chinese_spaces: true,
         show_confidence: true,
+        window_position: 'center',
+        hide_silent_status: true,
       },
     });
   });

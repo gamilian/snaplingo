@@ -14,6 +14,10 @@ Bob is a menu bar app, and Snipaste uses a tray/menu-bar resident model. SnapLin
 
 SnapLingo will use a menu bar resident app shell. Startup creates the app runtime, global shortcuts, and menu bar status item, but does not show Settings. Settings opens only through explicit Settings entrypoints.
 
+Menu actions express application intents, not UI implementation details. `Settings` opens the last Settings route, while `About` opens the Settings window at the General/About section. The Settings frontend owns tab selection and section scrolling after receiving that route intent.
+
+The retired `Input Translation` shell action is removed. Manual translation starts from `Show Translation Window`; saved legacy `input-translate` shortcuts migrate to that action.
+
 The Settings Window information architecture from ADR 0002 remains accepted. The app-shell assumption in ADR 0002 that SnapLingo needs a traditional primary main window is superseded.
 
 ## Consequences
@@ -21,5 +25,5 @@ The Settings Window information architecture from ADR 0002 remains accepted. The
 - Business workflows must not depend on Settings being open.
 - `RunEvent::Reopen` does not open Settings in menu bar mode.
 - Settings is lazy-created and hidden on close.
+- Shell routing may target a Settings section without making the backend own Settings navigation state.
 - Capture overlay macOS activation logic remains owned by capture infrastructure.
-

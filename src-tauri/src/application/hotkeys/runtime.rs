@@ -477,8 +477,8 @@ mod hotkey_runtime_tests {
     };
     use crate::application::hotkeys::configuration::HotkeyConfiguration;
     use crate::domain::hotkey_config::{
-        INPUT_TRANSLATE_ACTION, SCREENSHOT_ACTION, SCREENSHOT_CATEGORY,
-        SCREENSHOT_TRANSLATE_ACTION, SELECTION_TRANSLATE_ACTION, TRANSLATION_CATEGORY,
+        SCREENSHOT_ACTION, SCREENSHOT_CATEGORY, SCREENSHOT_TRANSLATE_ACTION,
+        SELECTION_TRANSLATE_ACTION, SHOW_TRANSLATION_WINDOW_ACTION, TRANSLATION_CATEGORY,
     };
     use crate::infrastructure::storage::{Database, SqliteConfigStore};
     use crate::Result;
@@ -763,7 +763,7 @@ mod hotkey_runtime_tests {
     fn hotkey_runtime_category_reset_rolls_back_when_a_registration_fails() {
         let (runtime, configuration) = runtime_with_configuration();
         configuration
-            .update_hotkey(TRANSLATION_CATEGORY, INPUT_TRANSLATE_ACTION, "⇧⌥A")
+            .update_hotkey(TRANSLATION_CATEGORY, SHOW_TRANSLATION_WINDOW_ACTION, "⇧⌥A")
             .unwrap();
         configuration
             .update_hotkey(TRANSLATION_CATEGORY, SCREENSHOT_TRANSLATE_ACTION, "⇧⌥S")
@@ -783,7 +783,7 @@ mod hotkey_runtime_tests {
         assert_eq!(runtime.snapshot().unwrap(), before);
         assert!(registrar.operations().contains(&Operation::Register {
             category: TRANSLATION_CATEGORY.to_string(),
-            action: INPUT_TRANSLATE_ACTION.to_string(),
+            action: SHOW_TRANSLATION_WINDOW_ACTION.to_string(),
             accelerator: "Shift+Alt+KeyA".to_string(),
             timing: HotkeyTriggerTiming::Pressed,
         }));

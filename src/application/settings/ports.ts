@@ -1,6 +1,15 @@
+import type { SettingsNavigationRequest } from './navigation';
+
 export interface SettingsWindowPort {
   openSettings(): Promise<void>;
   selectScreenshotDirectory(): Promise<string | null>;
+  getAppVersion(): Promise<string>;
+}
+
+export interface SettingsWindowEventsPort {
+  subscribeNavigationRequested(
+    handler: (request: SettingsNavigationRequest) => void | Promise<void>,
+  ): Promise<() => void>;
 }
 
 export interface GeneralSettings {
@@ -12,6 +21,9 @@ export interface GeneralSettings {
 export type AnnotationColorPreset = [number, number, number, number];
 export type ScreenshotFormat = 'png' | 'jpg' | 'webp';
 export type ScreenshotNamingRule = 'timestamp' | 'date' | 'counter' | 'custom';
+export type ResultWindowPosition = 'center' | 'below-cursor' | 'cursor';
+export type TranslationInputState = 'last' | 'collapsed' | 'expanded';
+export type SelectionTextMode = 'smart' | 'quality' | 'speed';
 
 export interface ScreenshotSettings {
   savePath: string;
@@ -28,6 +40,8 @@ export interface ScreenshotSettings {
   pinOpacity: number;
   pinShadow: boolean;
   annotationColors: AnnotationColorPreset[];
+  selectionBorderWidth?: number;
+  selectionMaskColor?: AnnotationColorPreset;
 }
 
 export interface TranslationSettings {
@@ -39,14 +53,22 @@ export interface TranslationSettings {
   incrementalTranslation: boolean;
   windowAlwaysOnTop: boolean;
   hideOnBlur: boolean;
+  selectionWindowPosition?: ResultWindowPosition;
+  inputWindowPosition?: ResultWindowPosition;
+  selectionInputState?: TranslationInputState;
+  screenshotInputState?: TranslationInputState;
+  maxWindowHeightRatio?: number;
+  windowWidth?: number;
+  selectionTextMode?: SelectionTextMode;
 }
 
 export interface OcrSettings {
   recognitionLanguage: string;
-  autoCopy: boolean;
   preserveFormatting: boolean;
   removeChineseSpaces: boolean;
   showConfidence: boolean;
+  windowPosition?: ResultWindowPosition;
+  hideSilentStatus?: boolean;
 }
 
 export interface HistorySettings {

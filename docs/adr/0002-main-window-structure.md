@@ -1,9 +1,9 @@
 # ADR 0002: 主窗口结构 - 功能域独立架构
 
 ## Status
-Accepted (2026-06-13), amended by ADR 0008
+Superseded by ADR 0008 and ADR 0009
 
-The feature-domain settings structure remains accepted. ADR 0008 supersedes this ADR's History and Favorites navigation placement and the rejection of a unified Library surface.
+This document records the original multi-page structure. ADR 0008 supersedes its History and Favorites placement; ADR 0009 supersedes its secondary settings pages and Advanced destination.
 
 **原型验证**：已通过 UI 原型验证，确认 6 标签页 + 二级导航结构可行。
 
@@ -40,7 +40,7 @@ SnapLingo 的需求：
 │   └─ 收藏夹
 │
 ├─ 🌐 翻译
-│   ├─ 快捷键（划词、截图翻译、输入翻译）
+│   ├─ 快捷键（划词、截图翻译、显示翻译窗口）
 │   ├─ 翻译设置
 │   ├─ 历史记录
 │   └─ 收藏夹
@@ -81,8 +81,7 @@ SnapLingo 的需求：
 **翻译相关**：
 - 划词翻译：⌥⇧⌘D
 - 截图翻译：⌥⇧⌘S（截图 → OCR → 自动翻译）
-- 输入翻译：⌥⇧⌘A
-- 显示翻译窗口：⌥⇧⌘
+- 显示翻译窗口：⌥⇧⌘A
 
 **OCR 相关**：
 - 截图 OCR：⌥⇧⌘S（与截图翻译共享触发方式，但结果不同）

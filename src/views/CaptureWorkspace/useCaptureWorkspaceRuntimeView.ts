@@ -26,6 +26,7 @@ import type {
   CaptureWorkspaceViewRenderState,
 } from './CaptureWorkspaceView';
 import type { CaptureMode, LogicalRect } from './types';
+import { virtualPointToViewportPoint } from './virtualDesktop';
 import { useCaptureWorkspaceRuntime } from './runtimeContext';
 
 const TOOLBAR_GAP = 14;
@@ -38,6 +39,11 @@ interface CaptureWorkspaceRuntimeViewOptions {
   onInactive?: () => void | Promise<void>;
   annotationColorPresets?: readonly AnnotationColor[];
   screenshotPreferences?: CaptureScreenshotPreferences;
+  persistScreenshotDefaults?: (
+    input: Partial<
+      Pick<CaptureScreenshotPreferences, 'defaultStrokeWidth' | 'defaultFontSize'>
+    >,
+  ) => void;
   ocrPreferences?: OcrSettings;
 }
 
@@ -52,12 +58,14 @@ export function useCaptureWorkspaceRuntimeView({
   onInactive,
   annotationColorPresets,
   screenshotPreferences,
+  persistScreenshotDefaults,
   ocrPreferences,
 }: CaptureWorkspaceRuntimeViewOptions): CaptureWorkspaceRuntimeView {
   const platformRuntime = useCaptureWorkspaceRuntime();
   const onInactiveRef = useRef(onInactive);
   const annotationColorPresetsRef = useRef(annotationColorPresets);
   const screenshotPreferencesRef = useRef(screenshotPreferences);
+  const persistScreenshotDefaultsRef = useRef(persistScreenshotDefaults);
   const ocrPreferencesRef = useRef(ocrPreferences);
   const hostBridgeRef = useRef<{
     reset(): void;
@@ -71,6 +79,7 @@ export function useCaptureWorkspaceRuntimeView({
   onInactiveRef.current = onInactive;
   annotationColorPresetsRef.current = annotationColorPresets;
   screenshotPreferencesRef.current = screenshotPreferences;
+  persistScreenshotDefaultsRef.current = persistScreenshotDefaults;
   ocrPreferencesRef.current = ocrPreferences;
 
   const [runtimeRevision, setRuntimeRevision] = useState(0);
@@ -83,6 +92,8 @@ export function useCaptureWorkspaceRuntimeView({
         annotationColorPresets: () =>
           annotationColorPresetsRef.current ?? ANNOTATION_COLORS,
         screenshotPreferences: () => screenshotPreferencesRef.current,
+        persistScreenshotDefaults: (input) =>
+          persistScreenshotDefaultsRef.current?.(input),
         ocrPreferences: () => ocrPreferencesRef.current,
         storage: window.localStorage,
         host: {
@@ -141,6 +152,8 @@ export function useCaptureWorkspaceRuntimeView({
     draftSelectionRef,
     hoverSelectionRef,
     showSelectionSize: screenshotPreferences?.showSelectionSize ?? true,
+    selectionBorderWidth: screenshotPreferences?.selectionBorderWidth,
+    selectionMaskColor: screenshotPreferences?.selectionMaskColor,
   });
 
   const isMagnifierEnabled = screenshotPreferences?.showMagnifier ?? false;
@@ -264,6 +277,16 @@ export function useCaptureWorkspaceRuntimeView({
       viewportBounds: derived.viewportBounds,
       selectionBounds: derived.selectionBounds,
       isRenderingOutput: runtimeRenderState.isRenderingOutput,
+      silentOcrHint:
+        runtimeRenderState.silentOcrHint && derived.selectionBounds
+          ? {
+              status: runtimeRenderState.silentOcrHint.status,
+              point: virtualPointToViewportPoint(
+                runtimeRenderState.silentOcrHint.point,
+                derived.selectionBounds,
+              ),
+            }
+          : null,
       editor: {
         selection: runtimeRenderState.selection,
         selectionViewportRect: derived.selectionViewportRect,
@@ -334,6 +357,8 @@ export function useCaptureWorkspaceRuntimeView({
       applySelectedAnnotationStyle:
         workflowRuntime.actions.applySelectedAnnotationStyle,
       updateTextDraftFontSize: workflowRuntime.actions.updateTextDraftFontSize,
+      commitAnnotationSizeDefault:
+        workflowRuntime.actions.commitAnnotationSizeDefault,
       undoAnnotation: workflowRuntime.actions.undoAnnotation,
       redoAnnotation: workflowRuntime.actions.redoAnnotation,
       cancelSession: workflowRuntime.actions.cancelSession,

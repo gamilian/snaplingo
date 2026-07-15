@@ -61,6 +61,7 @@ export interface CaptureWorkspaceState {
   colorSampleFormat: ColorSampleFormat;
   isMagnifierRequested: boolean;
   isRenderingOutput: boolean;
+  silentOcrHint: { status: 'loading' | 'success'; point: Point } | null;
   includeCapturedCursor: boolean;
   error: string | null;
 }
@@ -92,6 +93,7 @@ export function createInitialCaptureWorkspaceState(): CaptureWorkspaceState {
     colorSampleFormat: 'hex',
     isMagnifierRequested: false,
     isRenderingOutput: false,
+    silentOcrHint: null,
     includeCapturedCursor: false,
     error: null,
   };
@@ -119,6 +121,7 @@ export function resetCaptureInteractionStatePatch(): Partial<CaptureWorkspaceSta
     colorSampleFormat: 'hex',
     isMagnifierRequested: false,
     isRenderingOutput: false,
+    silentOcrHint: null,
     includeCapturedCursor: false,
     error: null,
   };

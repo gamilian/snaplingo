@@ -62,6 +62,7 @@ describe('captureWorkspaceState', () => {
       colorSampleFormat: 'hex',
       isMagnifierRequested: false,
       isRenderingOutput: false,
+      silentOcrHint: null,
       includeCapturedCursor: false,
       error: null,
     });
@@ -108,6 +109,7 @@ describe('captureWorkspaceState', () => {
       colorSampleFormat: 'hex',
       isMagnifierRequested: false,
       isRenderingOutput: false,
+      silentOcrHint: null,
       includeCapturedCursor: false,
       error: null,
     });

@@ -1,5 +1,12 @@
+// @vitest-environment happy-dom
+
+import { act, createElement } from 'react';
+import { createRoot } from 'react-dom/client';
 import type { ReactElement, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
+  true;
 
 const settingsConfig = vi.hoisted(() => ({
   state: {
@@ -11,13 +18,28 @@ const settingsConfig = vi.hoisted(() => ({
     updateGeneralSettings: vi.fn(),
   },
 }));
+const version = vi.hoisted(() => vi.fn(async () => '1.2.3'));
 
 vi.mock('../../../stores/settingsConfigStore', () => ({
   useSettingsConfigStore: (selector: (state: typeof settingsConfig.state) => unknown) =>
     selector(settingsConfig.state),
 }));
 
-import { GeneralPage } from './GeneralPage';
+vi.mock('../../../stores/settingsStore', () => ({
+  useSettingsStore: (selector: (state: {
+    requestedSection: null;
+    consumeRequestedSection: () => void;
+  }) => unknown) =>
+    selector({ requestedSection: null, consumeRequestedSection: vi.fn() }),
+}));
+
+vi.mock('../runtimeContext', () => ({
+  useSettingsRuntime: () => ({
+    window: { version },
+  }),
+}));
+
+import { AppVersionValue, GeneralPage } from './GeneralPage';
 
 describe('GeneralPage durable settings', () => {
   beforeEach(() => {
@@ -26,9 +48,20 @@ describe('GeneralPage durable settings', () => {
 
   it('reads and saves general settings through settingsConfigStore', () => {
     const view = GeneralPage();
+    const sections = (view.props as {
+      sections: { label: string; content: ReactNode }[];
+    }).sections;
+    expect(sections.map((section) => section.label)).toEqual([
+      '界面与启动',
+      '网络',
+      '日志与维护',
+      '实验性功能',
+      '关于',
+    ]);
+    const interfaceContent = sections[0].content;
     const selects = findElements(
-      view,
-      (element) => getElementName(element) === 'CustomSelect',
+      interfaceContent,
+      (element) => getElementName(element) === 'SelectField',
     );
 
     expect(selects[0].props.value).toBe('en');
@@ -37,25 +70,32 @@ describe('GeneralPage durable settings', () => {
     selects[0].props.onChange?.('ja');
     selects[1].props.onChange?.('system');
     findElement(
-      view,
-      (element) => element.type === 'button' && typeof element.props.onClick === 'function',
-    ).props.onClick?.();
+      interfaceContent,
+      (element) => getElementName(element) === 'SettingsToggle',
+    ).props.onChange?.(false);
 
     expect(settingsConfig.state.updateGeneralSettings).toHaveBeenNthCalledWith(1, {
       language: 'ja',
-      theme: 'dark',
-      startOnBoot: true,
     });
     expect(settingsConfig.state.updateGeneralSettings).toHaveBeenNthCalledWith(2, {
-      language: 'en',
       theme: 'system',
-      startOnBoot: true,
     });
     expect(settingsConfig.state.updateGeneralSettings).toHaveBeenNthCalledWith(3, {
-      language: 'en',
-      theme: 'dark',
       startOnBoot: false,
     });
+  });
+
+  it('displays the packaged application version', async () => {
+    const container = document.createElement('div');
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(createElement(AppVersionValue));
+    });
+
+    expect(container.textContent).toBe('1.2.3');
+    expect(version).toHaveBeenCalled();
+    act(() => root.unmount());
   });
 });
 
@@ -141,7 +181,7 @@ function getElementName(element: PageElement): string {
 
 type PageElement = ReactElement<{
   children?: ReactNode;
-  onChange?: (value: string) => unknown;
+  onChange?: (value: string | boolean) => unknown;
   onClick?: () => unknown;
   value?: string;
 }>;

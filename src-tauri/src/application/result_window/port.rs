@@ -14,6 +14,15 @@ pub(crate) enum ResultWindowMode {
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
+pub(crate) enum ResultWindowOrigin {
+    Selection,
+    Screenshot,
+    Input,
+    Ocr,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub(crate) enum ResultWindowOcrIntent {
     DisplayText,
     File,
@@ -23,6 +32,7 @@ pub(crate) enum ResultWindowOcrIntent {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ResultWindowPayload {
     pub(crate) mode: ResultWindowMode,
+    pub(crate) origin: ResultWindowOrigin,
     pub(crate) text: String,
     pub(crate) auto_translate: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -38,8 +48,8 @@ pub(crate) enum ResultWindowOpenRequest {
     Translation {
         text: String,
         auto_translate: bool,
+        origin: ResultWindowOrigin,
     },
-    InputTranslation,
     Ocr {
         text: String,
         intent: ResultWindowOcrIntent,
@@ -53,22 +63,28 @@ impl ResultWindowOpenRequest {
         Self::Translation {
             text,
             auto_translate: false,
+            origin: ResultWindowOrigin::Input,
         }
     }
 
-    pub(crate) fn automatic_translation(text: String) -> Self {
+    pub(crate) fn selection_translation(text: String) -> Self {
         Self::Translation {
             text,
             auto_translate: true,
+            origin: ResultWindowOrigin::Selection,
+        }
+    }
+
+    pub(crate) fn screenshot_translation(text: String) -> Self {
+        Self::Translation {
+            text,
+            auto_translate: true,
+            origin: ResultWindowOrigin::Screenshot,
         }
     }
 
     pub(crate) fn show_translation() -> Self {
         Self::manual_translation(String::new())
-    }
-
-    pub(crate) fn input_translation() -> Self {
-        Self::InputTranslation
     }
 
     pub(crate) fn display_ocr(text: String) -> Self {
@@ -106,11 +122,6 @@ impl ResultWindowOpenRequest {
 #[async_trait]
 pub(crate) trait ResultWindowWindowPort: Send + Sync {
     async fn show_or_create(&self) -> crate::Result<()>;
-}
-
-#[async_trait]
-pub(crate) trait ResultWindowClipboardPort: Send + Sync {
-    async fn read_text(&self) -> crate::Result<String>;
 }
 
 #[async_trait]

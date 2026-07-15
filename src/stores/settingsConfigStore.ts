@@ -41,8 +41,12 @@ interface SettingsConfigState {
   history: HistorySettings | null;
   hydrate: () => Promise<SettingsSnapshot>;
   refresh: () => Promise<SettingsSnapshot>;
-  updateGeneralSettings: (input: GeneralSettings) => Promise<SettingsSnapshot>;
-  updateScreenshotSettings: (input: ScreenshotSettings) => Promise<SettingsSnapshot>;
+  updateGeneralSettings: (
+    input: Partial<GeneralSettings>,
+  ) => Promise<SettingsSnapshot>;
+  updateScreenshotSettings: (
+    input: Partial<ScreenshotSettings>,
+  ) => Promise<SettingsSnapshot>;
   updateAnnotationColors: (
     colors: AnnotationColorPreset[],
   ) => Promise<SettingsSnapshot>;
@@ -129,11 +133,25 @@ export const useSettingsConfigStore = create<SettingsConfigState>((set, get) => 
   },
   refresh: () => applyLatestSnapshot(set, get, () => settingsRuntime().load()),
   updateGeneralSettings: (input) =>
-    applyLatestSnapshot(set, get, () => settingsRuntime().updateGeneral(input)),
+    enqueueSettingsUpdate(() => {
+      const general = get().general;
+      if (!general) {
+        throw new Error('General settings have not been loaded');
+      }
+      return applyLatestSnapshot(set, get, () =>
+        settingsRuntime().updateGeneral({ ...general, ...input }),
+      );
+    }),
   updateScreenshotSettings: (input) =>
-    applyLatestSnapshot(set, get, () =>
-      settingsRuntime().updateScreenshot(input),
-    ),
+    enqueueSettingsUpdate(() => {
+      const screenshot = get().screenshot;
+      if (!screenshot) {
+        throw new Error('Screenshot settings have not been loaded');
+      }
+      return applyLatestSnapshot(set, get, () =>
+        settingsRuntime().updateScreenshot({ ...screenshot, ...input }),
+      );
+    }),
   updateAnnotationColors: (colors) =>
     applyLatestSnapshot(set, get, () =>
       settingsRuntime().updateAnnotationColors(colors),

@@ -63,7 +63,29 @@ impl HotkeyConfiguration {
 }
 
 fn normalized_snapshot(snapshot: HotkeySettingsSnapshot) -> HotkeySettingsSnapshot {
-    merge_saved_hotkeys(default_hotkey_snapshot(), snapshot)
+    merge_saved_hotkeys(default_hotkey_snapshot(), migrate_legacy_hotkeys(snapshot))
+}
+
+fn migrate_legacy_hotkeys(mut snapshot: HotkeySettingsSnapshot) -> HotkeySettingsSnapshot {
+    const LEGACY_INPUT_TRANSLATE_ACTION: &str = "input-translate";
+    use crate::domain::hotkey_config::{HOTKEY_UNSET, SHOW_TRANSLATION_WINDOW_ACTION};
+
+    let legacy_hotkey = snapshot.translation.remove(LEGACY_INPUT_TRANSLATE_ACTION);
+    let show_window_is_unset = snapshot
+        .translation
+        .get(SHOW_TRANSLATION_WINDOW_ACTION)
+        .map(|hotkey| hotkey == HOTKEY_UNSET)
+        .unwrap_or(true);
+
+    if show_window_is_unset {
+        if let Some(hotkey) = legacy_hotkey {
+            snapshot
+                .translation
+                .insert(SHOW_TRANSLATION_WINDOW_ACTION.to_string(), hotkey);
+        }
+    }
+
+    snapshot
 }
 
 fn merge_saved_hotkeys(
@@ -131,8 +153,8 @@ mod hotkey_configuration_tests {
     use super::HotkeyConfiguration;
     use crate::application::hotkeys::HotkeyStore;
     use crate::domain::hotkey_config::{
-        default_hotkey_snapshot, HotkeySettingsSnapshot, SELECTION_TRANSLATE_ACTION,
-        TRANSLATION_CATEGORY,
+        default_hotkey_snapshot, HotkeySettingsSnapshot, HOTKEY_UNSET, SELECTION_TRANSLATE_ACTION,
+        SHOW_TRANSLATION_WINDOW_ACTION, TRANSLATION_CATEGORY,
     };
     use crate::infrastructure::storage::SqliteConfigStore;
 
@@ -208,5 +230,54 @@ mod hotkey_configuration_tests {
             Some(&"⇧⌥D".to_string())
         );
         assert!(!snapshot.translation.contains_key("surprise"));
+    }
+
+    #[test]
+    fn legacy_input_translate_hotkey_moves_to_show_window() {
+        let store = Arc::new(SqliteConfigStore::new_in_memory());
+        store
+            .save_hotkeys(&HotkeySettingsSnapshot {
+                translation: std::collections::HashMap::from([
+                    ("input-translate".to_string(), "⌥A".to_string()),
+                    (
+                        SHOW_TRANSLATION_WINDOW_ACTION.to_string(),
+                        HOTKEY_UNSET.to_string(),
+                    ),
+                ]),
+                ..HotkeySettingsSnapshot::default()
+            })
+            .unwrap();
+
+        let snapshot = HotkeyConfiguration::new(store).snapshot().unwrap();
+
+        assert_eq!(
+            snapshot.translation.get(SHOW_TRANSLATION_WINDOW_ACTION),
+            Some(&"⌥A".to_string())
+        );
+        assert!(!snapshot.translation.contains_key("input-translate"));
+    }
+
+    #[test]
+    fn explicit_show_window_hotkey_wins_over_legacy_value() {
+        let store = Arc::new(SqliteConfigStore::new_in_memory());
+        store
+            .save_hotkeys(&HotkeySettingsSnapshot {
+                translation: std::collections::HashMap::from([
+                    ("input-translate".to_string(), "⌥A".to_string()),
+                    (
+                        SHOW_TRANSLATION_WINDOW_ACTION.to_string(),
+                        "⇧⌥A".to_string(),
+                    ),
+                ]),
+                ..HotkeySettingsSnapshot::default()
+            })
+            .unwrap();
+
+        let snapshot = HotkeyConfiguration::new(store).snapshot().unwrap();
+
+        assert_eq!(
+            snapshot.translation.get(SHOW_TRANSLATION_WINDOW_ACTION),
+            Some(&"⇧⌥A".to_string())
+        );
     }
 }

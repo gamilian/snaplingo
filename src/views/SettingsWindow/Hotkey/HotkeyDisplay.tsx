@@ -22,8 +22,8 @@ export function HotkeyDisplay({ value, onClick, isRecording = false }: HotkeyDis
 
   // 统一的容器样式
   const containerClass = `
-    flex items-center justify-center space-x-1 px-4 py-2 bg-white border rounded-lg
-    min-w-[280px] transition-all duration-200 cursor-pointer
+    flex h-9 min-w-[156px] items-center justify-center space-x-1 rounded-lg border bg-white px-3
+    transition-all duration-200 cursor-pointer
     ${isRecording
       ? 'border-primary-500 ring-2 ring-primary-100 shadow-sm animate-pulse'
       : isUnset
@@ -38,20 +38,20 @@ export function HotkeyDisplay({ value, onClick, isRecording = false }: HotkeyDis
         {isRecording ? (
           <>
             {/* 录制中显示所有修饰键（灰色） */}
-            <span className="text-2xl text-gray-300">⇧</span>
-            <span className="text-2xl text-gray-300">⌥</span>
-            <span className="text-2xl text-gray-300">⌘</span>
-            <span className="text-2xl text-gray-300">⌃</span>
-            <span className="text-sm text-gray-400 ml-2 animate-pulse">按下快捷键...</span>
+            <span className="text-base text-gray-300">⇧</span>
+            <span className="text-base text-gray-300">⌥</span>
+            <span className="text-base text-gray-300">⌘</span>
+            <span className="text-base text-gray-300">⌃</span>
+            <span className="ml-1 text-[11px] text-gray-400 animate-pulse">按下快捷键...</span>
           </>
         ) : (
           <>
             {/* 未设置显示所有修饰键（灰色） */}
-            <span className="text-2xl text-gray-300">⇧</span>
-            <span className="text-2xl text-gray-300">⌥</span>
-            <span className="text-2xl text-gray-300">⌘</span>
-            <span className="text-2xl text-gray-300">⌃</span>
-            <span className="text-sm text-gray-400 ml-2">未设置</span>
+            <span className="text-base text-gray-300">⇧</span>
+            <span className="text-base text-gray-300">⌥</span>
+            <span className="text-base text-gray-300">⌘</span>
+            <span className="text-base text-gray-300">⌃</span>
+            <span className="ml-1 text-[11px] text-gray-400">未设置</span>
           </>
         )}
       </button>
@@ -61,21 +61,21 @@ export function HotkeyDisplay({ value, onClick, isRecording = false }: HotkeyDis
   return (
     <button onClick={handleClick} className={containerClass}>
       {/* Shift */}
-      <span className={`text-2xl ${hasShift ? 'text-gray-700' : 'text-gray-300'}`}>⇧</span>
+      <span className={`text-base ${hasShift ? 'text-gray-700' : 'text-gray-300'}`}>⇧</span>
 
       {/* Option */}
-      <span className={`text-2xl ${hasOption ? 'text-gray-700' : 'text-gray-300'}`}>⌥</span>
+      <span className={`text-base ${hasOption ? 'text-gray-700' : 'text-gray-300'}`}>⌥</span>
 
       {/* Command */}
-      <span className={`text-2xl ${hasCommand ? 'text-gray-700' : 'text-gray-300'}`}>⌘</span>
+      <span className={`text-base ${hasCommand ? 'text-gray-700' : 'text-gray-300'}`}>⌘</span>
 
       {/* Control */}
-      <span className={`text-2xl ${hasControl ? 'text-gray-700' : 'text-gray-300'}`}>⌃</span>
+      <span className={`text-base ${hasControl ? 'text-gray-700' : 'text-gray-300'}`}>⌃</span>
 
       {/* 字母键 */}
       {letterKey && (
         <span
-          className="text-2xl font-semibold text-primary-500 ml-2"
+          className="ml-1 text-base font-semibold text-primary-500"
           style={{
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji"',
             fontStyle: 'normal',

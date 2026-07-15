@@ -1,4 +1,5 @@
 use crate::application::result_window::{ResultWindowOpenRequest, ResultWindowRuntime};
+use crate::application::SelectionTextMode;
 use crate::{commands, settings_window, AppState};
 use tauri::Manager;
 
@@ -27,7 +28,6 @@ impl CaptureLaunchMode {
 pub(crate) enum AppAction {
     OpenCapture(CaptureLaunchMode),
     TranslateSelection,
-    OpenInputTranslation,
     OpenTranslationWindow,
     RunFileOcr,
     PinClipboardImage,
@@ -49,7 +49,16 @@ pub(crate) fn dispatch_app_action(app: tauri::AppHandle, action: AppAction) {
         AppAction::TranslateSelection => {
             tauri::async_runtime::spawn(async move {
                 let state = app.state::<AppState>();
-                let snapshot = match state.selection.acquirer.acquire().await {
+                let mode = match state.settings.configuration.snapshot() {
+                    Ok(settings) => {
+                        SelectionTextMode::from_setting(&settings.translation.selection_text_mode)
+                    }
+                    Err(err) => {
+                        log::error!("Failed to load selection translation settings: {}", err);
+                        return;
+                    }
+                };
+                let snapshot = match state.selection.acquirer.acquire_with_mode(mode).await {
                     Ok(snapshot) => snapshot,
                     Err(err) => {
                         log::error!("Failed to acquire selected text: {}", err);
@@ -58,16 +67,13 @@ pub(crate) fn dispatch_app_action(app: tauri::AppHandle, action: AppAction) {
                 };
                 if let Err(err) = open_result_window_request(
                     &state.result_window,
-                    ResultWindowOpenRequest::automatic_translation(snapshot.text),
+                    ResultWindowOpenRequest::selection_translation(snapshot.text),
                 )
                 .await
                 {
                     log::error!("Failed to open selection translation window: {}", err);
                 }
             });
-        }
-        AppAction::OpenInputTranslation => {
-            dispatch_result_window_open(app, ResultWindowOpenRequest::input_translation());
         }
         AppAction::OpenTranslationWindow => {
             dispatch_result_window_open(app, ResultWindowOpenRequest::show_translation());
@@ -102,9 +108,17 @@ pub(crate) fn dispatch_app_action(app: tauri::AppHandle, action: AppAction) {
                 }
             });
         }
-        AppAction::OpenSettings | AppAction::OpenAbout => {
+        AppAction::OpenSettings => {
             if let Err(err) = settings_window::show_settings_window(&app) {
                 log::error!("Failed to show settings window: {}", err);
+            }
+        }
+        AppAction::OpenAbout => {
+            if let Err(err) = settings_window::show_settings_window_at(
+                &app,
+                Some(settings_window::SettingsWindowRoute::About),
+            ) {
+                log::error!("Failed to show About settings: {}", err);
             }
         }
         AppAction::Quit => {
@@ -139,9 +153,8 @@ mod tests {
     use async_trait::async_trait;
 
     use crate::application::result_window::{
-        ResultWindowClipboardPort, ResultWindowMode, ResultWindowNotifierPort,
-        ResultWindowOpenRequest, ResultWindowRequestId, ResultWindowRuntime,
-        ResultWindowWindowPort,
+        ResultWindowMode, ResultWindowNotifierPort, ResultWindowOpenRequest, ResultWindowRequestId,
+        ResultWindowRuntime, ResultWindowWindowPort,
     };
 
     use super::{open_result_window_request, CaptureLaunchMode};
@@ -173,15 +186,6 @@ mod tests {
         }
     }
 
-    struct Clipboard;
-
-    #[async_trait]
-    impl ResultWindowClipboardPort for Clipboard {
-        async fn read_text(&self) -> crate::Result<String> {
-            Ok(String::new())
-        }
-    }
-
     struct Notifier;
 
     #[async_trait]
@@ -193,12 +197,11 @@ mod tests {
 
     #[tokio::test]
     async fn result_window_actions_delegate_open_requests_to_the_runtime() {
-        let runtime =
-            ResultWindowRuntime::new(Arc::new(Window), Arc::new(Clipboard), Arc::new(Notifier));
+        let runtime = ResultWindowRuntime::new(Arc::new(Window), Arc::new(Notifier));
 
         open_result_window_request(
             &runtime,
-            ResultWindowOpenRequest::automatic_translation("selection".into()),
+            ResultWindowOpenRequest::selection_translation("selection".into()),
         )
         .await
         .unwrap();

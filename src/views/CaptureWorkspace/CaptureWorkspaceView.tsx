@@ -50,6 +50,10 @@ export interface CaptureWorkspaceViewRenderState {
   readonly viewportBounds: LogicalRect | null;
   readonly selectionBounds: LogicalRect | null;
   readonly isRenderingOutput: boolean;
+  readonly silentOcrHint: {
+    readonly status: 'loading' | 'success';
+    readonly point: Point;
+  } | null;
   readonly editor: {
     readonly selection: LogicalRect | null;
     readonly selectionViewportRect: LogicalRect | null;
@@ -105,6 +109,7 @@ export type CaptureWorkspaceViewActions = Pick<
   | 'toggleAnnotationTool'
   | 'applySelectedAnnotationStyle'
   | 'updateTextDraftFontSize'
+  | 'commitAnnotationSizeDefault'
   | 'undoAnnotation'
   | 'redoAnnotation'
   | 'cancelSession'
@@ -289,6 +294,35 @@ export function CaptureWorkspaceView({
         </div>
       )}
 
+      {renderState.silentOcrHint && (
+        <div
+          role="status"
+          aria-label={
+            renderState.silentOcrHint.status === 'loading'
+              ? 'OCR 识别中'
+              : 'OCR 已复制'
+          }
+          className="pointer-events-none absolute z-[80] flex items-center gap-2 rounded-lg bg-slate-950/90 px-3 py-2 text-xs font-medium text-white shadow-xl"
+          style={{
+            left: renderState.silentOcrHint.point.x + 12,
+            top: renderState.silentOcrHint.point.y + 12,
+          }}
+        >
+          <span
+            className={
+              renderState.silentOcrHint.status === 'loading'
+                ? 'h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white'
+                : 'grid h-3.5 w-3.5 place-items-center rounded-full bg-emerald-500 text-[10px]'
+            }
+          >
+            {renderState.silentOcrHint.status === 'success' ? '✓' : ''}
+          </span>
+          {renderState.silentOcrHint.status === 'loading'
+            ? '正在识别…'
+            : '已复制到剪贴板'}
+        </div>
+      )}
+
       {renderState.status === 'preview' &&
         renderState.editor.selection &&
         renderState.editor.selectionViewportRect && (
@@ -381,6 +415,7 @@ export function CaptureWorkspaceView({
                   onUpdateAnnotationColorPresets
                 }
                 onTextDraftFontSizeChange={actions.updateTextDraftFontSize}
+                onCommitSizeDefault={actions.commitAnnotationSizeDefault}
                 onUndo={actions.undoAnnotation}
                 onRedo={actions.redoAnnotation}
                 onCancel={actions.cancelSession}

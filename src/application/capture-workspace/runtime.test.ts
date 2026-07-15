@@ -2468,7 +2468,10 @@ describe('capture workspace runtime', () => {
       confidence: null,
     });
     platform.commands.renderCaptureOutput.mockResolvedValue('preview-image');
-    const runtime = createCaptureWorkspaceRuntime({ platform });
+    const runtime = createCaptureWorkspaceRuntime({
+      platform,
+      delay: async () => undefined,
+    });
 
     await runtime.actions.startSession(mode, 'session-ocr');
     runtime.actions.pointerDown({ x: 20, y: 30 });
@@ -2490,6 +2493,70 @@ describe('capture workspace runtime', () => {
       isRenderingOutput: false,
       error: null,
     });
+  });
+
+  it('shows silent OCR progress at the cursor until copied successfully', async () => {
+    const pause = deferred<void>();
+    const platform = createPlatform({
+      session: createSession({ id: 'session-silent-ocr' }),
+    });
+    platform.commands.runCaptureOcr.mockResolvedValue({
+      text: 'recognized text',
+      confidence: null,
+    });
+    const delay = vi.fn(() => pause.promise);
+    const runtime = createCaptureWorkspaceRuntime({ platform, delay });
+
+    await runtime.actions.startSession('silent-screenshot-ocr', 'session-silent-ocr');
+    runtime.actions.pointerDown({ x: 20, y: 30 });
+    runtime.actions.pointerMove({ x: 140, y: 110 });
+    const completion = runtime.actions.pointerUp({ x: 140, y: 110 });
+
+    expect(runtime.renderState.silentOcrHint).toEqual({
+      status: 'loading',
+      point: { x: 140, y: 110 },
+    });
+    await vi.waitFor(() => expect(delay).toHaveBeenCalledWith(550));
+    expect(runtime.renderState.silentOcrHint).toEqual({
+      status: 'success',
+      point: { x: 140, y: 110 },
+    });
+
+    pause.resolve();
+    await completion;
+  });
+
+  it('suppresses silent OCR status when configured', async () => {
+    const platform = createPlatform({
+      session: createSession({ id: 'session-hidden-silent-ocr' }),
+    });
+    platform.commands.runCaptureOcr.mockResolvedValue({
+      text: 'recognized text',
+      confidence: null,
+    });
+    const delay = vi.fn(async () => undefined);
+    const runtime = createCaptureWorkspaceRuntime({
+      platform,
+      delay,
+      ocrPreferences: () => ({
+        recognitionLanguage: 'auto',
+        preserveFormatting: true,
+        removeChineseSpaces: true,
+        showConfidence: false,
+        hideSilentStatus: true,
+      }),
+    });
+
+    await runtime.actions.startSession(
+      'silent-screenshot-ocr',
+      'session-hidden-silent-ocr',
+    );
+    runtime.actions.pointerDown({ x: 20, y: 30 });
+    runtime.actions.pointerMove({ x: 140, y: 110 });
+    await runtime.actions.pointerUp({ x: 140, y: 110 });
+
+    expect(delay).not.toHaveBeenCalled();
+    expect(runtime.renderState.silentOcrHint).toBeNull();
   });
 
   it('does not restore a hover selection while direct OCR completion is pending', async () => {
@@ -2525,7 +2592,7 @@ describe('capture workspace runtime', () => {
     await completion;
   });
 
-  it('opens the OCR result even when automatic clipboard copy fails', async () => {
+  it('opens the OCR result without copying text for ordinary OCR', async () => {
     const platform = createPlatform({
       session: createSession({ id: 'session-ocr' }),
     });
@@ -2533,15 +2600,10 @@ describe('capture workspace runtime', () => {
       text: 'recognized text',
       confidence: null,
     });
-    platform.commands.copyTextToClipboard.mockRejectedValue(
-      new Error('clipboard unavailable'),
-    );
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     const runtime = createCaptureWorkspaceRuntime({
       platform,
       ocrPreferences: () => ({
         recognitionLanguage: 'auto',
-        autoCopy: true,
         preserveFormatting: true,
         removeChineseSpaces: true,
         showConfidence: false,
@@ -2557,8 +2619,24 @@ describe('capture workspace runtime', () => {
       'recognized text',
       'preview-image',
     );
+    expect(platform.commands.copyTextToClipboard).not.toHaveBeenCalled();
     expect(platform.dismiss).toHaveBeenCalledTimes(1);
-    consoleError.mockRestore();
+  });
+
+  it('persists font and stroke defaults only through the injected settings seam', () => {
+    const persistScreenshotDefaults = vi.fn();
+    const runtime = createCaptureWorkspaceRuntime({
+      platform: createPlatform(),
+      persistScreenshotDefaults,
+    });
+
+    runtime.actions.commitAnnotationSizeDefault('stroke', 5);
+    runtime.actions.commitAnnotationSizeDefault('font', 28);
+
+    expect(persistScreenshotDefaults.mock.calls).toEqual([
+      [{ defaultStrokeWidth: 5 }],
+      [{ defaultFontSize: 28 }],
+    ]);
   });
 });
 

@@ -28,6 +28,7 @@ import type {
   SettingsProvidersPort,
   SettingsSnapshot,
   SettingsWindowPort,
+  SettingsWindowEventsPort,
   TranslationHistoryEntry,
   TranslationFavoriteInput,
   TranslationSettings,
@@ -36,6 +37,7 @@ import { createSettingsLibrary, type SettingsLibrary } from './library';
 
 export interface SettingsRuntimePorts {
   window: SettingsWindowPort;
+  windowEvents: SettingsWindowEventsPort;
   durableSettings: DurableSettingsPort;
   providers: SettingsProvidersPort;
   hotkeys: SettingsHotkeysPort;
@@ -51,6 +53,8 @@ export interface SettingsRuntime {
   window: {
     open(): Promise<void>;
     selectScreenshotDirectory(): Promise<string | null>;
+    version(): Promise<string>;
+    subscribeNavigationRequested: SettingsWindowEventsPort['subscribeNavigationRequested'];
   };
   durableSettings: {
     load(): Promise<SettingsSnapshot>;
@@ -127,6 +131,9 @@ export function createSettingsRuntime(
     window: {
       open: () => ports.window.openSettings(),
       selectScreenshotDirectory: () => ports.window.selectScreenshotDirectory(),
+      version: () => ports.window.getAppVersion(),
+      subscribeNavigationRequested: (handler) =>
+        ports.windowEvents.subscribeNavigationRequested(handler),
     },
     durableSettings: {
       load: () => ports.durableSettings.getSettingsSnapshot(),

@@ -218,6 +218,8 @@ export interface CaptureScreenshotPreferences {
   rememberLastTool: boolean;
   showSelectionSize: boolean;
   showMagnifier: boolean;
+  selectionBorderWidth?: number;
+  selectionMaskColor?: [number, number, number, number];
 }
 
 export function createCaptureWorkspaceRuntime({
@@ -227,7 +229,9 @@ export function createCaptureWorkspaceRuntime({
   onInactive,
   annotationColorPresets,
   screenshotPreferences,
+  persistScreenshotDefaults,
   ocrPreferences,
+  delay,
   storage,
 }: {
   platform: CaptureWorkspaceRuntimePlatform;
@@ -236,9 +240,19 @@ export function createCaptureWorkspaceRuntime({
   onInactive?: () => void | Promise<void>;
   annotationColorPresets?: () => readonly AnnotationColor[];
   screenshotPreferences?: () => CaptureScreenshotPreferences | undefined;
+  persistScreenshotDefaults?: (
+    input: Partial<
+      Pick<CaptureScreenshotPreferences, 'defaultStrokeWidth' | 'defaultFontSize'>
+    >,
+  ) => void;
   ocrPreferences?: () => OcrSettings | undefined;
+  delay?: (milliseconds: number) => Promise<void>;
   storage?: CaptureSelectionStorage;
 }): CaptureWorkspaceRuntime {
+  const wait =
+    delay ??
+    ((milliseconds: number) =>
+      new Promise<void>((resolve) => globalThis.setTimeout(resolve, milliseconds)));
   let state = createInitialState('screenshot', undefined, screenshotPreferences?.());
   let generation = 0;
   let disposed = false;
@@ -567,14 +581,6 @@ export function createCaptureWorkspaceRuntime({
         ? applyOcrTextPreferences(result.text, ocrSettings)
         : normalizeOcrText(result.text);
 
-      if (effect.target !== 'clipboard' && ocrSettings?.autoCopy) {
-        try {
-          await platform.commands.copyTextToClipboard(text);
-        } catch (error) {
-          console.error('Failed to auto-copy OCR text:', error);
-        }
-      }
-
       if (effect.target === 'translation-window') {
         await platform.commands.openCaptureTranslationResultWindow(text);
         return;
@@ -600,6 +606,14 @@ export function createCaptureWorkspaceRuntime({
       }
 
       await platform.commands.copyTextToClipboard(text);
+      if (!ocrSettings?.hideSilentStatus) {
+        const point = state.silentOcrHint?.point ?? {
+          x: rect.x + rect.width / 2,
+          y: rect.y + rect.height / 2,
+        };
+        patch({ silentOcrHint: { status: 'success', point } });
+        await wait(550);
+      }
       return;
     }
 
@@ -641,11 +655,23 @@ export function createCaptureWorkspaceRuntime({
     const cancelNativeSession = createNativeSessionCancellation(session.id);
 
     const preservesPreview = state.status === 'preview';
+    const isSilentOcr = effects.some(
+      (effect) => effect.type === 'run-ocr' && effect.target === 'clipboard',
+    );
+    const showSilentOcrHint =
+      isSilentOcr && !ocrPreferences?.()?.hideSilentStatus;
+    const hintPoint = state.cursorPoint ?? {
+      x: rect.x + rect.width / 2,
+      y: rect.y + rect.height / 2,
+    };
     patch({
       ...(preservesPreview ? {} : { status: 'loading', cursorPoint: null }),
       selection: rect,
       hoverSelection: null,
       isRenderingOutput: true,
+      silentOcrHint: showSilentOcrHint
+        ? { status: 'loading', point: hintPoint }
+        : null,
       error: null,
     });
 
@@ -671,7 +697,11 @@ export function createCaptureWorkspaceRuntime({
       }
     } catch (error) {
       if (generation === actionGeneration && state.session?.id === session.id) {
-        patch({ status: 'error', error: errorMessage(error) });
+        patch({
+          status: 'error',
+          error: errorMessage(error),
+          silentOcrHint: null,
+        });
       } else if (state.session?.id !== session.id) {
         await cancelNativeSession().catch(() => undefined);
       }
@@ -1941,6 +1971,13 @@ export function createCaptureWorkspaceRuntime({
         textDraft: state.textDraft ? { ...state.textDraft, fontSize } : null,
       });
     },
+    commitAnnotationSizeDefault(kind, value) {
+      persistScreenshotDefaults?.(
+        kind === 'font'
+          ? { defaultFontSize: value }
+          : { defaultStrokeWidth: value },
+      );
+    },
     undoAnnotation,
     redoAnnotation,
     updateCursorColor(cursorColor) {
@@ -2236,6 +2273,7 @@ export function createCaptureWorkspaceRuntime({
         isMagnifierRequested: state.isMagnifierRequested,
         includeCapturedCursor: state.includeCapturedCursor,
         isRenderingOutput: state.isRenderingOutput,
+        silentOcrHint: state.silentOcrHint,
         hasHydratedPixelSource:
           state.session !== null && hydratedSessionId === state.session.id,
         error: state.error,

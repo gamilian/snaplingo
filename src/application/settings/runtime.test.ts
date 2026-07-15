@@ -6,12 +6,26 @@ describe('settings runtime', () => {
     const window = {
       openSettings: vi.fn(async () => undefined),
       selectScreenshotDirectory: vi.fn(async () => null),
+      getAppVersion: vi.fn(async () => '1.2.3'),
     };
-    const runtime = createSettingsRuntime(createPorts({ window }));
+    const navigationHandler = vi.fn();
+    const unsubscribe = vi.fn();
+    const windowEvents = {
+      subscribeNavigationRequested: vi.fn(async () => unsubscribe),
+    };
+    const runtime = createSettingsRuntime(createPorts({ window, windowEvents }));
 
     await runtime.window.open();
+    await expect(runtime.window.version()).resolves.toBe('1.2.3');
+    await expect(
+      runtime.window.subscribeNavigationRequested(navigationHandler),
+    ).resolves.toBe(unsubscribe);
 
     expect(window.openSettings).toHaveBeenCalledTimes(1);
+    expect(window.getAppVersion).toHaveBeenCalledTimes(1);
+    expect(windowEvents.subscribeNavigationRequested).toHaveBeenCalledWith(
+      navigationHandler,
+    );
   });
 
   it('translates durable settings actions into portable port calls', async () => {
@@ -45,7 +59,6 @@ describe('settings runtime', () => {
       },
       ocr: {
         recognitionLanguage: 'auto',
-        autoCopy: true,
         preserveFormatting: true,
         removeChineseSpaces: true,
         showConfidence: false,
@@ -227,6 +240,10 @@ function createPorts(overrides: Record<string, unknown> = {}) {
     window: {
       openSettings: vi.fn(async () => undefined),
       selectScreenshotDirectory: vi.fn(async () => null),
+      getAppVersion: vi.fn(async () => '0.1.0'),
+    },
+    windowEvents: {
+      subscribeNavigationRequested: vi.fn(async () => () => undefined),
     },
     durableSettings: {
       getSettingsSnapshot: vi.fn(),

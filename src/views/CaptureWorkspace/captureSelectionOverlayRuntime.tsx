@@ -40,6 +40,8 @@ interface UseCaptureSelectionOverlayOptions {
   draftSelectionRef: RefObject<LogicalRect | null>;
   hoverSelectionRef: RefObject<LogicalRect | null>;
   showSelectionSize?: boolean;
+  selectionBorderWidth?: number;
+  selectionMaskColor?: [number, number, number, number];
 }
 
 interface CaptureSelectionOverlayCanvasProps {
@@ -93,6 +95,8 @@ export function useCaptureSelectionOverlay({
   draftSelectionRef,
   hoverSelectionRef,
   showSelectionSize = true,
+  selectionBorderWidth,
+  selectionMaskColor,
   selection,
   selectionBounds,
   status,
@@ -123,9 +127,21 @@ export function useCaptureSelectionOverlay({
           selectionBounds,
           cursorPoint: cursorPointRef.current,
         }),
+        {
+          borderWidth: selectionBorderWidth,
+          maskColor: selectionMaskColor,
+        },
       );
     },
-    [cssSize, cursorPointRef, pixelRatio, selectionBounds, status],
+    [
+      cssSize,
+      cursorPointRef,
+      pixelRatio,
+      selectionBorderWidth,
+      selectionBounds,
+      selectionMaskColor,
+      status,
+    ],
   );
 
   const schedulePaint = useCallback(

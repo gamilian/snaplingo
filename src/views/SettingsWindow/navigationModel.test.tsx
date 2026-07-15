@@ -10,38 +10,27 @@ import {
 describe('settings navigation model', () => {
   it('describes the main settings sections in sidebar order', () => {
     expect(settingsSections.map(({ key, label }) => ({ key, label }))).toEqual([
+      { key: 'general', label: '通用' },
       { key: 'screenshot', label: '截图' },
       { key: 'translation', label: '翻译' },
       { key: 'ocr', label: 'OCR' },
       { key: 'services', label: '服务' },
-      { key: 'general', label: '通用' },
-      { key: 'advanced', label: '高级' },
       { key: 'favorites', label: '收藏夹' },
       { key: 'history', label: '历史记录' },
     ]);
   });
 
   it('keeps secondary navigation items with their owning sections', () => {
-    expect(secondaryKeys('screenshot')).toEqual([
-      'hotkeys',
-      'save-settings',
-      'editor',
-    ]);
-    expect(secondaryKeys('translation')).toEqual([
-      'hotkeys',
-      'translation-settings',
-    ]);
-    expect(secondaryKeys('ocr')).toEqual([
-      'hotkeys',
-      'ocr-settings',
-    ]);
+    expect(secondaryKeys('screenshot')).toEqual([]);
+    expect(secondaryKeys('translation')).toEqual([]);
+    expect(secondaryKeys('ocr')).toEqual([]);
     expect(secondaryKeys('services')).toEqual(['ocr', 'translation', 'tts']);
   });
 
   it('falls back to the first secondary item when a persisted key is stale', () => {
-    const section = findSettingsSection('translation');
+    const section = findSettingsSection('services');
 
-    expect(findSecondaryNavItem(section, 'removed-tab')?.key).toBe('hotkeys');
+    expect(findSecondaryNavItem(section, 'removed-tab')?.key).toBe('ocr');
   });
 });
 

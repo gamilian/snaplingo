@@ -6,29 +6,29 @@ import { createSettingsNavigationState, type SettingsSecondaryKeys } from './set
 describe('settings navigation state', () => {
   it('keeps a valid persisted secondary key active', () => {
     const state = createSettingsNavigationState(
-      findSettingsSection('translation'),
-      secondaryKeys({ translation: 'translation-settings' }),
+      findSettingsSection('services'),
+      secondaryKeys({ services: 'translation' }),
       noopSetters(),
     );
 
-    expect(state.activeKey).toBe('translation-settings');
-    expect(state.activeItem?.key).toBe('translation-settings');
+    expect(state.activeKey).toBe('translation');
+    expect(state.activeItem?.key).toBe('translation');
   });
 
   it('falls back to the first secondary key when persisted state is stale', () => {
     const state = createSettingsNavigationState(
-      findSettingsSection('translation'),
-      secondaryKeys({ translation: 'removed-tab' }),
+      findSettingsSection('services'),
+      secondaryKeys({ services: 'removed-tab' }),
       noopSetters(),
     );
 
-    expect(state.activeKey).toBe('hotkeys');
-    expect(state.activeItem?.key).toBe('hotkeys');
+    expect(state.activeKey).toBe('ocr');
+    expect(state.activeItem?.key).toBe('ocr');
   });
 
   it('returns no secondary key for a simple section', () => {
     const state = createSettingsNavigationState(
-      findSettingsSection('general'),
+      findSettingsSection('translation'),
       secondaryKeys(),
       noopSetters(),
     );
@@ -40,22 +40,19 @@ describe('settings navigation state', () => {
   it('ignores invalid secondary click keys', () => {
     const setters = noopSetters();
     const state = createSettingsNavigationState(
-      findSettingsSection('ocr'),
-      secondaryKeys({ ocr: 'hotkeys' }),
+      findSettingsSection('services'),
+      secondaryKeys({ services: 'ocr' }),
       setters,
     );
 
     state.setActiveKey('removed-tab');
 
-    expect(setters.ocr).not.toHaveBeenCalled();
+    expect(setters.services).not.toHaveBeenCalled();
   });
 });
 
 function secondaryKeys(overrides: Partial<SettingsSecondaryKeys> = {}): SettingsSecondaryKeys {
   return {
-    screenshot: 'hotkeys',
-    translation: 'hotkeys',
-    ocr: 'hotkeys',
     services: 'ocr',
     ...overrides,
   };
@@ -63,9 +60,6 @@ function secondaryKeys(overrides: Partial<SettingsSecondaryKeys> = {}): Settings
 
 function noopSetters() {
   return {
-    screenshot: vi.fn(),
-    translation: vi.fn(),
-    ocr: vi.fn(),
     services: vi.fn(),
   };
 }
