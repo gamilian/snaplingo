@@ -53,6 +53,7 @@ export interface CaptureHoverSelectionPollOptions {
   canPoll: () => boolean;
   isDisposed?: () => boolean;
   getCursorPosition: (sessionId: string) => Promise<Point | null>;
+  getHoverSelection?: (point: Point) => Promise<LogicalRect | null>;
   setCursorPointRef: (point: Point) => void;
   setCursorPoint: (point: Point) => void;
   scheduleSelectionOverlayPaint: () => void;
@@ -64,6 +65,7 @@ export async function runCaptureHoverSelectionPoll({
   candidates,
   canPoll,
   getCursorPosition,
+  getHoverSelection,
   isDisposed = () => false,
   scheduleNextPoll,
   scheduleSelectionOverlayPaint,
@@ -89,7 +91,11 @@ export async function runCaptureHoverSelectionPoll({
     if (shouldTrackMagnifierCursor) {
       setCursorPoint(point);
     }
-    syncHoverSelection(getPolledHoverSelection(candidates, point));
+    const hoverSelection = getHoverSelection
+      ? await getHoverSelection(point)
+      : getPolledHoverSelection(candidates, point);
+    if (isDisposed() || !canPoll()) return;
+    syncHoverSelection(hoverSelection);
     scheduleSelectionOverlayPaint();
     scheduleNextPoll();
   } catch {

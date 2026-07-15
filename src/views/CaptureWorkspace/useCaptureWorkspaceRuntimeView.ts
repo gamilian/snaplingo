@@ -180,6 +180,16 @@ export function useCaptureWorkspaceRuntimeView({
         });
       },
       getCursorPosition: platformRuntime.commands.currentCaptureCursorPosition,
+      getHoverSelection:
+        runtimeRenderState.candidateDetectionMode === 'control'
+          ? async (point) =>
+              (
+                await platformRuntime.commands.currentCaptureControlCandidate(
+                  runtimeRenderState.session!.id,
+                  point,
+                )
+              )?.rect ?? null
+          : undefined,
       setCursorPointRef: workflowRuntime.actions.updatePolledCursor,
       setCursorPoint: () => undefined,
       scheduleSelectionOverlayPaint: overlay.schedulePaint,
@@ -193,6 +203,8 @@ export function useCaptureWorkspaceRuntimeView({
     shouldTrackMagnifierCursor,
     overlay.schedulePaint,
     platformRuntime.commands.currentCaptureCursorPosition,
+    platformRuntime.commands.currentCaptureControlCandidate,
+    runtimeRenderState.candidateDetectionMode,
     runtimeRenderState.editGesture,
     runtimeRenderState.session,
     runtimeRenderState.startPoint,
@@ -273,6 +285,7 @@ export function useCaptureWorkspaceRuntimeView({
   const renderState = useMemo<CaptureWorkspaceViewRenderState>(
     () => ({
       status: runtimeRenderState.status,
+      candidateDetectionMode: runtimeRenderState.candidateDetectionMode,
       error: runtimeRenderState.error,
       viewportBounds: derived.viewportBounds,
       selectionBounds: derived.selectionBounds,
@@ -324,9 +337,8 @@ export function useCaptureWorkspaceRuntimeView({
         isShown: isMagnifierShown,
         cursorMonitor: derived.cursorMonitor,
         cursorViewportPoint: derived.cursorViewportPoint,
+        cursorScreenPoint: runtimeRenderState.cursorPoint,
         cursorInMonitorPoint: derived.cursorInMonitorPoint,
-        selection:
-          runtimeRenderState.selection ?? runtimeRenderState.hoverSelection,
         cursorColor: runtimeRenderState.cursorColor,
         colorSampleFormat: runtimeRenderState.colorSampleFormat,
       },

@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { save } from '@tauri-apps/plugin-dialog';
 import type {
   CaptureMode,
+  CaptureCandidateView,
   CaptureSessionView,
   LogicalRect,
   OcrResult,
@@ -58,6 +59,23 @@ export function logCaptureFrontendPerf(input: {
 
 export async function currentCaptureCursorPosition(sessionId: string) {
   return invoke<Point | null>('current_capture_cursor_position', { sessionId });
+}
+
+export async function currentCaptureControlCandidate(
+  sessionId: string,
+  point: Point,
+) {
+  return invoke<CaptureCandidateView | null>('current_capture_control_candidate', {
+    sessionId,
+    point,
+  });
+}
+
+export async function moveCaptureCursor(delta: Point) {
+  return invoke<void>('move_capture_cursor', {
+    deltaX: delta.x,
+    deltaY: delta.y,
+  });
 }
 
 export async function cancelCaptureSession(sessionId: string) {
@@ -178,6 +196,8 @@ export const captureWorkspaceCommands: CaptureWorkspaceCommandsPort = {
   hydrateCaptureSessionSnapshots,
   logCaptureFrontendPerf,
   currentCaptureCursorPosition,
+  currentCaptureControlCandidate,
+  moveCaptureCursor,
   cancelCaptureSession,
   restoreCaptureSnapshotWindowsForSession,
   renderCaptureOutput,

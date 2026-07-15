@@ -118,6 +118,33 @@ describe('Tauri capture command adapter', () => {
     expect(result.monitors[0].image_base64).toBe('pixels');
   });
 
+  it('queries control candidates and moves the native cursor through commands', async () => {
+    const { currentCaptureControlCandidate, moveCaptureCursor } = await import(
+      './capture'
+    );
+    const candidate = {
+      id: 'control-1',
+      kind: 'control' as const,
+      rect: { x: 10, y: 20, width: 80, height: 30 },
+      priority: 10_001,
+    };
+    invoke.mockResolvedValueOnce(candidate).mockResolvedValueOnce(undefined);
+
+    await expect(
+      currentCaptureControlCandidate('capture-1', { x: 30, y: 40 }),
+    ).resolves.toEqual(candidate);
+    await moveCaptureCursor({ x: -1, y: 0 });
+
+    expect(invoke).toHaveBeenCalledWith('current_capture_control_candidate', {
+      sessionId: 'capture-1',
+      point: { x: 30, y: 40 },
+    });
+    expect(invoke).toHaveBeenCalledWith('move_capture_cursor', {
+      deltaX: -1,
+      deltaY: 0,
+    });
+  });
+
   it('opens screenshot OCR results with the capture result command', async () => {
     const { openCaptureOcrResultWindow } = await import('./capture');
     invoke.mockResolvedValueOnce(undefined);

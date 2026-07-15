@@ -226,7 +226,10 @@ export function ScreenshotSettingsPage() {
             onChange={(showSelectionSize) => updateScreenshot({ showSelectionSize })}
           />
         </SettingRow>
-        <SettingRow label="显示放大镜" description="靠近选区边缘时显示像素放大镜">
+        <SettingRow
+          label="显示放大镜"
+          description="选择截图区域时跟随鼠标显示像素、坐标和颜色值"
+        >
           <SettingsToggle
             label="显示放大镜"
             checked={screenshot.showMagnifier}

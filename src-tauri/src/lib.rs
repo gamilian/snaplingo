@@ -142,6 +142,8 @@ pub fn run() {
             commands::hydrate_capture_session_snapshots,
             commands::log_capture_frontend_perf,
             commands::current_capture_cursor_position,
+            commands::current_capture_control_candidate,
+            commands::move_capture_cursor,
             commands::cancel_capture_session,
             commands::prepare_capture_window_for_reveal,
             commands::reveal_capture_window,

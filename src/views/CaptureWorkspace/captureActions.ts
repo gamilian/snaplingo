@@ -432,23 +432,36 @@ export function getCursorNudgeDeltaFromShortcut(
   return deltaByKey[event.key.toLowerCase()] ?? null;
 }
 
-export function getCandidateCycleDirectionFromShortcut(
+export function isCandidateDetectionModeToggleShortcut(
   event: CaptureShortcutEvent,
-): 1 | -1 | null {
-  if (event.key !== 'Tab' || event.metaKey || event.ctrlKey || event.altKey) {
-    return null;
-  }
-
-  return event.shiftKey ? -1 : 1;
-}
-
-export function isSelectAllCaptureShortcut(event: CaptureShortcutEvent) {
+) {
   return (
-    event.key.toLowerCase() === 'a' &&
-    (event.metaKey || event.ctrlKey) &&
+    event.key === 'Tab' &&
+    !event.metaKey &&
+    !event.ctrlKey &&
     !event.altKey &&
     !event.shiftKey
   );
+}
+
+export type CaptureScreenSelectionScope = 'current-monitor' | 'virtual-desktop';
+
+export function getCaptureScreenSelectionScopeFromShortcut(
+  event: CaptureShortcutEvent,
+): CaptureScreenSelectionScope | null {
+  if (
+    event.key.toLowerCase() !== 'a' ||
+    (!event.metaKey && !event.ctrlKey) ||
+    event.altKey
+  ) {
+    return null;
+  }
+
+  return event.shiftKey ? 'virtual-desktop' : 'current-monitor';
+}
+
+export function isSelectAllCaptureShortcut(event: CaptureShortcutEvent) {
+  return getCaptureScreenSelectionScopeFromShortcut(event) === 'current-monitor';
 }
 
 export function isCopyCaptureDoubleClick(event: CapturePointerEvent) {

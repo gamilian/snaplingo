@@ -115,6 +115,13 @@ pub struct WindowCandidate {
     pub logical_bounds: LogicalRect,
 }
 
+/// Interface element available for precise automatic Capture Session selection.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ControlCandidate {
+    pub id: String,
+    pub logical_bounds: LogicalRect,
+}
+
 pub fn monitor_snapshot_from_layout(layout: MonitorLayout, png_data: Vec<u8>) -> MonitorSnapshot {
     MonitorSnapshot {
         id: layout.id,

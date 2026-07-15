@@ -7,7 +7,7 @@ import {
   getPreviewCaptureCompletionActionFromShortcut,
   getCaptureKeyboardToolbarAction,
   getCaptureSelectionFlowForMode,
-  getCandidateCycleDirectionFromShortcut,
+  getCaptureScreenSelectionScopeFromShortcut,
   getCancelCapturePointerAction,
   getHoverSelectionCompletionActionFromPointer,
   getSelectionArrowActionFromShortcut,
@@ -24,6 +24,7 @@ import {
   getSaveCapturePointerAction,
   getHoverSelectionCompletionActionFromShortcut,
   isMagnifierShortcut,
+  isCandidateDetectionModeToggleShortcut,
   isPinCaptureShortcut,
   isPinCapturePointer,
   isPrintCaptureShortcut,
@@ -1072,7 +1073,7 @@ describe('capture session actions', () => {
     ).toBe(false);
   });
 
-  it('uses Cmd/Ctrl+A for selecting the full capture area', () => {
+  it('uses Cmd/Ctrl+A for the current screen and Shift for the virtual desktop', () => {
     expect(
       isSelectAllCaptureShortcut({
         key: 'a',
@@ -1101,14 +1102,23 @@ describe('capture session actions', () => {
       }),
     ).toBe(false);
     expect(
-      isSelectAllCaptureShortcut({
+      getCaptureScreenSelectionScopeFromShortcut({
+        key: 'a',
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe('current-monitor');
+    expect(
+      getCaptureScreenSelectionScopeFromShortcut({
         key: 'a',
         metaKey: true,
         ctrlKey: false,
         altKey: false,
         shiftKey: true,
       }),
-    ).toBe(false);
+    ).toBe('virtual-desktop');
   });
 
   it('uses an unmodified primary-button double click for copying the current selection', () => {
@@ -1614,43 +1624,43 @@ describe('capture session actions', () => {
     ).toBeNull();
   });
 
-  it('maps Tab shortcuts to capture candidate cycle direction', () => {
+  it('uses plain Tab to toggle window and interface-element detection', () => {
     expect(
-      getCandidateCycleDirectionFromShortcut({
+      isCandidateDetectionModeToggleShortcut({
         key: 'Tab',
         metaKey: false,
         ctrlKey: false,
         altKey: false,
         shiftKey: false,
       }),
-    ).toBe(1);
+    ).toBe(true);
     expect(
-      getCandidateCycleDirectionFromShortcut({
+      isCandidateDetectionModeToggleShortcut({
         key: 'Tab',
         metaKey: false,
         ctrlKey: false,
         altKey: false,
         shiftKey: true,
       }),
-    ).toBe(-1);
+    ).toBe(false);
     expect(
-      getCandidateCycleDirectionFromShortcut({
+      isCandidateDetectionModeToggleShortcut({
         key: 'Tab',
         metaKey: true,
         ctrlKey: false,
         altKey: false,
         shiftKey: false,
       }),
-    ).toBeNull();
+    ).toBe(false);
     expect(
-      getCandidateCycleDirectionFromShortcut({
+      isCandidateDetectionModeToggleShortcut({
         key: 'Enter',
         metaKey: false,
         ctrlKey: false,
         altKey: false,
         shiftKey: false,
       }),
-    ).toBeNull();
+    ).toBe(false);
   });
 
   it('uses an unmodified secondary-button press for canceling the current capture layer', () => {

@@ -202,7 +202,9 @@ describe('capture workspace production runtime wiring', () => {
     expect(editorHandler).not.toContain('planCaptureHoverSelectionCycle');
     expect(runtime).toContain('planCaptureDraftSelectionKeyboardNudge');
     expect(runtime).toContain('planCaptureSelectionCursorKeyboardNudge');
-    expect(runtime).toContain('planCaptureHoverSelectionCycle');
+    expect(runtime).toContain('isCandidateDetectionModeToggleShortcut');
+    expect(runtime).toContain('currentCaptureControlCandidate');
+    expect(runtime).toContain('moveCaptureCursor');
   });
 
   it('deletes compatibility-only full keyboard and pointer orchestrators', () => {

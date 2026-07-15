@@ -199,6 +199,27 @@ pub fn current_capture_cursor_position(
 }
 
 #[tauri::command]
+pub async fn current_capture_control_candidate(
+    session_id: String,
+    point: LogicalPoint,
+    state: State<'_, crate::AppState>,
+) -> Result<Option<crate::domain::capture::CaptureCandidateView>, String> {
+    state
+        .capture
+        .sessions
+        .control_candidate_at(&CaptureSessionId(session_id), &point)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn move_capture_cursor(delta_x: i32, delta_y: i32) {
+    use enigo::{Enigo, MouseControllable};
+
+    Enigo::new().mouse_move_relative(delta_x, delta_y);
+}
+
+#[tauri::command]
 pub async fn cancel_capture_session(
     session_id: String,
     state: State<'_, crate::AppState>,

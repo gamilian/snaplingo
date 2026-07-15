@@ -8,8 +8,8 @@ use base64::Engine;
 use super::CaptureSessionSource;
 use crate::domain::capture::{
     monitor_snapshot_from_layout, CaptureCandidateView, CaptureSessionId, CaptureSessionView,
-    CapturedCursor, CapturedCursorView, LogicalPoint, LogicalRect, MonitorSnapshot,
-    MonitorSnapshotView, PhysicalRect, ScreenRegion, WindowCandidate,
+    CapturedCursor, CapturedCursorView, ControlCandidate, LogicalPoint, LogicalRect,
+    MonitorSnapshot, MonitorSnapshotView, PhysicalRect, ScreenRegion, WindowCandidate,
 };
 use crate::error::{AppError, Result};
 
@@ -463,6 +463,20 @@ impl CaptureSessions {
             .current_cursor_position(&session.layout_snapshots)
     }
 
+    pub async fn control_candidate_at(
+        &self,
+        id: &CaptureSessionId,
+        point: &LogicalPoint,
+    ) -> Result<Option<CaptureCandidateView>> {
+        self.get_session(id)?;
+
+        Ok(self
+            .source
+            .capture_control_candidate(point)
+            .await?
+            .map(control_candidate_to_view))
+    }
+
     pub fn has_session(&self, id: &CaptureSessionId) -> bool {
         self.sessions
             .lock()
@@ -564,6 +578,15 @@ fn window_candidate_to_view(candidate: &WindowCandidate, index: usize) -> Captur
         kind: "window".to_string(),
         rect: candidate.logical_bounds.clone(),
         priority: window_candidate_priority(index),
+    }
+}
+
+fn control_candidate_to_view(candidate: ControlCandidate) -> CaptureCandidateView {
+    CaptureCandidateView {
+        id: candidate.id,
+        kind: "control".to_string(),
+        rect: candidate.logical_bounds,
+        priority: WINDOW_CANDIDATE_BASE_PRIORITY + 1,
     }
 }
 

@@ -1000,6 +1000,36 @@ describe('capture workspace runtime', () => {
     expect(runtime.renderState.status).toBe('preview');
   });
 
+  it('uses Shift+Cmd/Ctrl+A for the entire virtual desktop', async () => {
+    const platform = createPlatform({
+      session: createSession({
+        id: 'session-virtual-desktop',
+        monitors: [
+          createMonitor(),
+          {
+            ...createMonitor(),
+            id: 'monitor-2',
+            logical_bounds: { x: 500, y: -100, width: 300, height: 400 },
+            physical_bounds: { x: 1000, y: -200, width: 600, height: 800 },
+          },
+        ],
+      }),
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-virtual-desktop');
+
+    expect(
+      runtime.actions.keyDown({ key: 'a', metaKey: true, shiftKey: true }),
+    ).toBe(true);
+    await vi.waitFor(() => expect(runtime.renderState.status).toBe('preview'));
+
+    expect(platform.commands.renderCaptureOutput).toHaveBeenCalledWith({
+      sessionId: 'session-virtual-desktop',
+      rect: { x: 0, y: -100, width: 800, height: 400 },
+      annotations: [],
+    });
+  });
+
   it('owns preview output and remembered-selection keyboard workflows', async () => {
     const values = new Map<string, string>();
     const storage = {
@@ -1837,18 +1867,27 @@ describe('capture workspace runtime', () => {
       cursorPoint: { x: 40, y: 50 },
       hoverSelection: selection,
     });
+    expect(platform.commands.moveCaptureCursor).toHaveBeenCalledWith({
+      x: 1,
+      y: 0,
+    });
   });
 
-  it('cycles overlapping selecting candidates through the runtime keyboard path', async () => {
+  it('toggles between window and interface-element detection with Tab', async () => {
     const higher = { x: 20, y: 30, width: 120, height: 80 };
-    const lower = { x: 10, y: 20, width: 160, height: 120 };
+    const control = { x: 30, y: 40, width: 60, height: 24 };
     const platform = createPlatform({
       session: createSession({
         candidates: [
           { id: 'higher', kind: 'window', rect: higher, priority: 20 },
-          { id: 'lower', kind: 'window', rect: lower, priority: 10 },
         ],
       }),
+    });
+    platform.commands.currentCaptureControlCandidate.mockResolvedValue({
+      id: 'control-1',
+      kind: 'control',
+      rect: control,
+      priority: 10_001,
     });
     const runtime = createCaptureWorkspaceRuntime({ platform });
     await runtime.actions.startSession('screenshot', 'session-cycle');
@@ -1857,7 +1896,18 @@ describe('capture workspace runtime', () => {
 
     expect(runtime.actions.keyDown({ key: 'Tab' })).toBe(true);
 
-    expect(runtime.renderState.hoverSelection).toEqual(lower);
+    expect(runtime.renderState.candidateDetectionMode).toBe('control');
+    await vi.waitFor(() =>
+      expect(runtime.renderState.hoverSelection).toEqual(control),
+    );
+    expect(
+      platform.commands.currentCaptureControlCandidate,
+    ).toHaveBeenCalledWith('session-1', { x: 40, y: 50 });
+
+    expect(runtime.actions.keyDown({ key: 'Tab' })).toBe(true);
+
+    expect(runtime.renderState.candidateDetectionMode).toBe('window');
+    expect(runtime.renderState.hoverSelection).toEqual(higher);
   });
 
   it('commits the keyboard-adjusted draft endpoint on pointer release', async () => {
@@ -2658,6 +2708,12 @@ function createPlatform({
       currentCaptureCursorPosition: vi.fn<
         CaptureWorkspacePlatformRuntime['commands']['currentCaptureCursorPosition']
       >(async () => null),
+      currentCaptureControlCandidate: vi.fn<
+        CaptureWorkspacePlatformRuntime['commands']['currentCaptureControlCandidate']
+      >(async () => null),
+      moveCaptureCursor: vi.fn<
+        CaptureWorkspacePlatformRuntime['commands']['moveCaptureCursor']
+      >(async () => undefined),
       cancelCaptureSession: vi.fn<
         CaptureWorkspacePlatformRuntime['commands']['cancelCaptureSession']
       >(async () => undefined),

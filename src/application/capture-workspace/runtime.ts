@@ -14,14 +14,14 @@ import type {
 } from '../../views/CaptureWorkspace/captureActions';
 import {
   canToggleCapturedCursor,
-  getCandidateCycleDirectionFromShortcut,
+  getCaptureScreenSelectionScopeFromShortcut,
   getCursorNudgeDeltaFromShortcut,
   getHoverSelectionCompletionActionFromShortcut,
   getPreviewCaptureCompletionActionFromShortcut,
   getSelectionHistoryStepFromShortcut,
   isRefreshCaptureShortcut,
   isRestoreLastSelectionShortcut,
-  isSelectAllCaptureShortcut,
+  isCandidateDetectionModeToggleShortcut,
   isToggleCapturedCursorShortcut,
 } from '../../views/CaptureWorkspace/captureActions';
 import {
@@ -101,7 +101,6 @@ import {
   planCaptureDraftSelectionKeyboardNudge,
   planCaptureDraftSelectionPointerMove,
   planCaptureDraftSelectionStart,
-  planCaptureHoverSelectionCycle,
   planCaptureSelectionCursorKeyboardNudge,
 } from '../../views/CaptureWorkspace/captureSelectionRuntime';
 import { shouldRevealCaptureWindow } from '../../views/CaptureWorkspace/captureWindowVisibility';
@@ -1822,13 +1821,15 @@ export function createCaptureWorkspaceRuntime({
       patch({
         cursorPoint: point,
         hoverSelection:
-          getBestCandidateAtPoint(
-            buildCaptureCandidates(
-              state.session.monitors,
-              state.session.candidates,
-            ),
-            point,
-          )?.rect ?? null,
+          state.candidateDetectionMode === 'window'
+            ? getBestCandidateAtPoint(
+                buildCaptureCandidates(
+                  state.session.monitors,
+                  state.session.candidates,
+                ),
+                point,
+              )?.rect ?? null
+            : null,
       });
       return true;
     },
@@ -2057,8 +2058,10 @@ export function createCaptureWorkspaceRuntime({
         restoreLastSelection();
         return true;
       }
+      const screenSelectionScope =
+        getCaptureScreenSelectionScopeFromShortcut(event);
       if (
-        isSelectAllCaptureShortcut(event) &&
+        screenSelectionScope &&
         !state.textDraft &&
         state.session &&
         (state.status === 'selecting' || state.status === 'preview')
@@ -2067,7 +2070,10 @@ export function createCaptureWorkspaceRuntime({
           state.cursorPoint ??
           state.session.captured_cursor?.logical_position ??
           null;
-        const rect = getCurrentMonitorBounds(state.session.monitors, point);
+        const rect =
+          screenSelectionScope === 'virtual-desktop'
+            ? getVirtualDesktopBounds(state.session.monitors)
+            : getCurrentMonitorBounds(state.session.monitors, point);
         launch(() => completeManualSelection(rect));
         return true;
       }
@@ -2093,6 +2099,7 @@ export function createCaptureWorkspaceRuntime({
           previewImageBase64: draftNudge.previewImageBase64,
           isRenderingOutput: draftNudge.renderingOutput,
         });
+        launch(() => platform.commands.moveCaptureCursor(cursorNudgeDelta));
         return true;
       }
       if (
@@ -2107,37 +2114,79 @@ export function createCaptureWorkspaceRuntime({
           selectionBounds: getVirtualDesktopBounds(state.session.monitors),
         });
         const cursorPoint = cursorNudge.cursorPoint;
+        const candidateDetectionMode = state.candidateDetectionMode;
         patch({
           cursorPoint,
           hoverSelection:
-            getBestCandidateAtPoint(
-              buildCaptureCandidates(
-                state.session.monitors,
-                state.session.candidates,
-              ),
-              cursorPoint,
-            )?.rect ?? null,
+            candidateDetectionMode === 'window'
+              ? getBestCandidateAtPoint(
+                  buildCaptureCandidates(
+                    state.session.monitors,
+                    state.session.candidates,
+                  ),
+                  cursorPoint,
+                )?.rect ?? null
+              : null,
+        });
+        const sessionId = state.session.id;
+        launch(async () => {
+          await platform.commands.moveCaptureCursor(cursorNudgeDelta);
+          if (candidateDetectionMode !== 'control') return;
+          const candidate = await platform.commands.currentCaptureControlCandidate(
+            sessionId,
+            cursorPoint,
+          );
+          if (
+            state.status === 'selecting' &&
+            state.session?.id === sessionId &&
+            state.candidateDetectionMode === 'control' &&
+            arePointsEqual(state.cursorPoint, cursorPoint)
+          ) {
+            patch({ hoverSelection: candidate?.rect ?? null });
+          }
         });
         return true;
       }
-      const cycleDirection = getCandidateCycleDirectionFromShortcut(event);
       if (
         state.status === 'selecting' &&
         state.session &&
         state.cursorPoint &&
-        cycleDirection
+        isCandidateDetectionModeToggleShortcut(event)
       ) {
+        const candidateDetectionMode =
+          state.candidateDetectionMode === 'window' ? 'control' : 'window';
+        const sessionId = state.session.id;
+        const cursorPoint = state.cursorPoint;
         patch({
-          hoverSelection: planCaptureHoverSelectionCycle({
-            captureCandidates: buildCaptureCandidates(
-              state.session.monitors,
-              state.session.candidates,
-            ),
-            cursorPoint: state.cursorPoint,
-            hoverSelection: state.hoverSelection,
-            direction: cycleDirection,
-          }).hoverSelection,
+          candidateDetectionMode,
+          hoverSelection:
+            candidateDetectionMode === 'window'
+              ? getBestCandidateAtPoint(
+                  buildCaptureCandidates(
+                    state.session.monitors,
+                    state.session.candidates,
+                  ),
+                  cursorPoint,
+                )?.rect ?? null
+              : null,
         });
+        if (candidateDetectionMode === 'control') {
+          launch(async () => {
+            const candidate =
+              await platform.commands.currentCaptureControlCandidate(
+                sessionId,
+                cursorPoint,
+              );
+            if (
+              state.status === 'selecting' &&
+              state.session?.id === sessionId &&
+              state.candidateDetectionMode === 'control' &&
+              arePointsEqual(state.cursorPoint, cursorPoint)
+            ) {
+              patch({ hoverSelection: candidate?.rect ?? null });
+            }
+          });
+        }
         return true;
       }
       const hoverAction = getHoverSelectionCompletionActionFromShortcut(event, {
@@ -2254,6 +2303,7 @@ export function createCaptureWorkspaceRuntime({
         startPoint: state.startPoint,
         selection: state.selection,
         hoverSelection: state.hoverSelection,
+        candidateDetectionMode: state.candidateDetectionMode,
         previewImageBase64: state.previewImageBase64,
         editGesture: state.editGesture,
         activeAnnotationTool: state.activeAnnotationTool,

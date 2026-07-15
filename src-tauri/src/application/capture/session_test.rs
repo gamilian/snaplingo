@@ -16,8 +16,8 @@ mod tests {
     use crate::application::providers::common::Provider;
     use crate::application::providers::ocr::{OcrCoordinator, OcrProvider};
     use crate::domain::capture::{
-        CaptureOutputAction, CapturedCursor, LogicalPoint, LogicalRect, MonitorLayout,
-        MonitorSnapshot, ScreenRegion, WindowCandidate,
+        CaptureOutputAction, CapturedCursor, ControlCandidate, LogicalPoint, LogicalRect,
+        MonitorLayout, MonitorSnapshot, ScreenRegion, WindowCandidate,
     };
     use crate::domain::ocr::{OcrRequest, OcrResult};
     use crate::error::AppError;
@@ -29,6 +29,7 @@ mod tests {
         window_candidates: Vec<WindowCandidate>,
         captured_cursor: Option<CapturedCursor>,
         current_cursor_position: Option<LogicalPoint>,
+        control_candidate: Option<ControlCandidate>,
         capture_monitor_snapshots_calls: Arc<Mutex<usize>>,
         capture_monitor_layouts_calls: Arc<Mutex<usize>>,
         captured_regions: Arc<Mutex<Vec<ScreenRegion>>>,
@@ -95,6 +96,13 @@ mod tests {
             Ok(self.captured_cursor.clone())
         }
 
+        async fn capture_control_candidate(
+            &self,
+            _point: &LogicalPoint,
+        ) -> Result<Option<ControlCandidate>, AppError> {
+            Ok(self.control_candidate.clone())
+        }
+
         fn current_cursor_position(
             &self,
             _monitors: &[MonitorSnapshot],
@@ -136,6 +144,7 @@ mod tests {
             window_candidates: Vec::new(),
             captured_cursor: None,
             current_cursor_position: None,
+            control_candidate: None,
             capture_monitor_snapshots_calls: Arc::new(Mutex::new(0)),
             capture_monitor_layouts_calls: Arc::new(Mutex::new(0)),
             captured_regions: Arc::new(Mutex::new(Vec::new())),
@@ -186,6 +195,7 @@ mod tests {
             window_candidates: Vec::new(),
             captured_cursor: None,
             current_cursor_position: None,
+            control_candidate: None,
             capture_monitor_snapshots_calls: Arc::new(Mutex::new(0)),
             capture_monitor_layouts_calls: Arc::new(Mutex::new(0)),
             captured_regions: Arc::new(Mutex::new(Vec::new())),
@@ -253,6 +263,20 @@ mod tests {
         let mut backend = make_backend();
         backend.current_cursor_position =
             Some(crate::domain::capture::LogicalPoint { x: 6.0, y: 7.0 });
+        backend
+    }
+
+    fn make_backend_with_control_candidate() -> MockCaptureSessionSource {
+        let mut backend = make_backend();
+        backend.control_candidate = Some(ControlCandidate {
+            id: "control-1".to_string(),
+            logical_bounds: LogicalRect {
+                x: 2.0,
+                y: 3.0,
+                width: 4.0,
+                height: 5.0,
+            },
+        });
         backend
     }
 
@@ -652,6 +676,23 @@ mod tests {
             position,
             Some(crate::domain::capture::LogicalPoint { x: 6.0, y: 7.0 })
         );
+    }
+
+    #[tokio::test]
+    async fn returns_the_control_candidate_under_the_cursor() {
+        let sessions = CaptureSessions::new(Arc::new(make_backend_with_control_candidate()));
+        let view = sessions.create_session().await.unwrap();
+
+        let candidate = sessions
+            .control_candidate_at(&view.id, &LogicalPoint { x: 3.0, y: 4.0 })
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(candidate.id, "control-1");
+        assert_eq!(candidate.kind, "control");
+        assert_eq!(candidate.rect.x, 2.0);
+        assert_eq!(candidate.priority, 10_001);
     }
 
     #[tokio::test]

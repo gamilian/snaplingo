@@ -127,15 +127,40 @@ export function handleCaptureWorkspaceEditorKeyDown(
     status,
     textDraft,
   } = state;
+  const { annotations, cursorColor, hasAnnotationEditingContext } = derived;
+
+  if (isMagnifierShortcut(event)) {
+    event.preventDefault();
+    actions.setIsMagnifierRequested(true);
+    return;
+  }
+  if (
+    !textDraft &&
+    derived.isMagnifierShown &&
+    cursorColor &&
+    isColorSampleCopyShortcut(event)
+  ) {
+    event.preventDefault();
+    void actions.copyCurrentColor();
+    return;
+  }
+  if (
+    !textDraft &&
+    derived.isMagnifierShown &&
+    cursorColor &&
+    !event.repeat &&
+    isColorSampleFormatToggleShortcut(event)
+  ) {
+    event.preventDefault();
+    actions.setColorSampleFormat((format) =>
+      format === 'hex' ? 'rgb' : 'hex',
+    );
+    return;
+  }
   if (status !== 'preview') {
-    if (isMagnifierShortcut(event)) {
-      event.preventDefault();
-      actions.setIsMagnifierRequested(true);
-    }
     return;
   }
 
-  const { annotations, cursorColor, hasAnnotationEditingContext } = derived;
   const undoRedoAction = getUndoRedoActionFromShortcut(event);
   const cursorNudgeDelta = getCursorNudgeDeltaFromShortcut(event);
   const cycledAnnotationTool = nextAnnotationToolFromCycleShortcut(
@@ -146,9 +171,6 @@ export function handleCaptureWorkspaceEditorKeyDown(
   if (event.key === 'Escape') {
     event.preventDefault();
     actions.dismissCaptureLayer();
-  } else if (isMagnifierShortcut(event)) {
-    event.preventDefault();
-    actions.setIsMagnifierRequested(true);
   } else if (isClearAnnotationsShortcut(event)) {
     event.preventDefault();
     actions.clearAnnotations();
@@ -162,25 +184,6 @@ export function handleCaptureWorkspaceEditorKeyDown(
   ) {
     event.preventDefault();
     actions.deleteSelectedAnnotation();
-  } else if (
-    !textDraft &&
-    derived.isMagnifierShown &&
-    cursorColor &&
-    isColorSampleCopyShortcut(event)
-  ) {
-    event.preventDefault();
-    void actions.copyCurrentColor();
-  } else if (
-    !textDraft &&
-    derived.isMagnifierShown &&
-    cursorColor &&
-    !event.repeat &&
-    isColorSampleFormatToggleShortcut(event)
-  ) {
-    event.preventDefault();
-    actions.setColorSampleFormat((format) =>
-      format === 'hex' ? 'rgb' : 'hex',
-    );
   } else if (
     !textDraft &&
     editGesture &&

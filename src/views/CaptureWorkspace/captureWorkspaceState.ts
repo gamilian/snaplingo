@@ -34,6 +34,7 @@ export type CaptureSessionStatus =
   | 'selecting'
   | 'preview'
   | 'error';
+export type CaptureCandidateDetectionMode = 'window' | 'control';
 
 export interface CaptureWorkspaceState {
   status: CaptureSessionStatus;
@@ -43,6 +44,7 @@ export interface CaptureWorkspaceState {
   cursorPoint: Point | null;
   selection: LogicalRect | null;
   hoverSelection: LogicalRect | null;
+  candidateDetectionMode: CaptureCandidateDetectionMode;
   editGesture: CaptureSelectionEditGesture | null;
   activeAnnotationTool: AnnotationTool | null;
   annotationGesture: AnnotationGestureDraft | null;
@@ -75,6 +77,7 @@ export function createInitialCaptureWorkspaceState(): CaptureWorkspaceState {
     cursorPoint: null,
     selection: null,
     hoverSelection: null,
+    candidateDetectionMode: 'window',
     editGesture: null,
     activeAnnotationTool: null,
     annotationGesture: null,
@@ -105,6 +108,7 @@ export function resetCaptureInteractionStatePatch(): Partial<CaptureWorkspaceSta
     cursorPoint: null,
     selection: null,
     hoverSelection: null,
+    candidateDetectionMode: 'window',
     editGesture: null,
     activeAnnotationTool: null,
     annotationGesture: null,

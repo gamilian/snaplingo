@@ -1,4 +1,4 @@
-import type { PointerEvent, Ref, WheelEvent } from 'react';
+import type { PointerEvent, ReactNode, Ref, WheelEvent } from 'react';
 
 import type {
   CaptureWorkspacePointerInput,
@@ -30,6 +30,7 @@ import {
 import { CaptureSelectionOverlayCanvas } from './captureSelectionOverlayRuntime';
 import { getCaptureWorkspacePointerPoint } from './captureWorkspacePointer';
 import type { ColorSample, ColorSampleFormat } from './colorSampler';
+import type { CaptureCandidateDetectionMode } from './captureWorkspaceState';
 import type { SelectionHandle } from './selection';
 import type { TextAnnotationDraft } from './textAnnotationDraft';
 import type {
@@ -46,6 +47,7 @@ interface CaptureSelectionOverlaySize {
 
 export interface CaptureWorkspaceViewRenderState {
   readonly status: 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
+  readonly candidateDetectionMode: CaptureCandidateDetectionMode;
   readonly error: string | null;
   readonly viewportBounds: LogicalRect | null;
   readonly selectionBounds: LogicalRect | null;
@@ -87,8 +89,8 @@ export interface CaptureWorkspaceViewRenderState {
     readonly isShown: boolean;
     readonly cursorMonitor: MonitorSnapshotView | null;
     readonly cursorViewportPoint: Point | null;
+    readonly cursorScreenPoint: Point | null;
     readonly cursorInMonitorPoint: Point | null;
-    readonly selection: LogicalRect | null;
     readonly cursorColor: ColorSample | null;
     readonly colorSampleFormat: ColorSampleFormat;
   };
@@ -441,22 +443,77 @@ export function CaptureWorkspaceView({
       {renderState.magnifier.isShown &&
         renderState.magnifier.cursorMonitor &&
         renderState.magnifier.cursorViewportPoint &&
+        renderState.magnifier.cursorScreenPoint &&
         renderState.magnifier.cursorInMonitorPoint &&
         renderState.viewportBounds && (
           <CaptureMagnifierOverlay
             imageBase64={renderState.magnifier.cursorMonitor.image_base64}
             viewportCursor={renderState.magnifier.cursorViewportPoint}
+            screenCursor={renderState.magnifier.cursorScreenPoint}
             imageCursor={renderState.magnifier.cursorInMonitorPoint}
             viewportBounds={renderState.viewportBounds}
             imageSize={{
               width: renderState.magnifier.cursorMonitor.logical_bounds.width,
               height: renderState.magnifier.cursorMonitor.logical_bounds.height,
             }}
-            selection={renderState.magnifier.selection}
             color={renderState.magnifier.cursorColor}
             colorFormat={renderState.magnifier.colorSampleFormat}
           />
         )}
+      {renderState.status === 'selecting' && (
+        <CaptureSelectionShortcutHints
+          detectionMode={renderState.candidateDetectionMode}
+        />
+      )}
+    </div>
+  );
+}
+
+function CaptureSelectionShortcutHints({
+  detectionMode,
+}: {
+  detectionMode: CaptureCandidateDetectionMode;
+}) {
+  return (
+    <aside
+      aria-label="选区快捷键提示"
+      className="pointer-events-none absolute bottom-5 left-5 w-[330px] overflow-hidden rounded-lg border border-white/45 bg-neutral-950/80 text-[11px] text-white shadow-2xl backdrop-blur-md"
+    >
+      <HintRow keys={['W', 'A', 'S', 'D']}>
+        将鼠标指针移动 1 像素
+      </HintRow>
+      <HintRow keys={['Tab']}>
+        切换检测窗口 / 界面元素
+        <span className="ml-2 text-blue-300">
+          当前：{detectionMode === 'window' ? '窗口' : '界面元素'}
+        </span>
+      </HintRow>
+      <HintRow keys={['⌘', 'A']}>设置截屏区域为当前屏幕</HintRow>
+      <HintRow keys={['⇧', '⌘', 'A']}>设置截屏区域为全屏</HintRow>
+    </aside>
+  );
+}
+
+function HintRow({
+  keys,
+  children,
+}: {
+  keys: string[];
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex min-h-9 items-center gap-3 border-b border-white/10 px-3 last:border-b-0">
+      <span className="flex min-w-[84px] items-center gap-1">
+        {keys.map((key, index) => (
+          <kbd
+            key={`${key}-${index}`}
+            className="grid min-w-5 place-items-center rounded border border-white/45 bg-white/10 px-1 py-0.5 font-mono text-[10px] font-semibold shadow-sm"
+          >
+            {key}
+          </kbd>
+        ))}
+      </span>
+      <span className="leading-4 text-white/90">{children}</span>
     </div>
   );
 }

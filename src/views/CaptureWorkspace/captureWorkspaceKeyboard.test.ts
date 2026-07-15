@@ -257,4 +257,32 @@ describe('handleCaptureWorkspaceEditorKeyDown', () => {
     expect(formatUpdater('hex' satisfies ColorSampleFormat)).toBe('rgb');
     expect(formatUpdater('rgb' satisfies ColorSampleFormat)).toBe('hex');
   });
+
+  it('supports color copy and format switching while selecting a region', () => {
+    const cursorColor = { hex: '#112233', red: 17, green: 34, blue: 51 };
+    const copy = createContext({
+      state: { status: 'selecting', cursorColor },
+      derived: { cursorColor, isMagnifierShown: true },
+    });
+
+    handleCaptureWorkspaceEditorKeyDown(
+      createKeyboardEvent('c'),
+      copy.context,
+    );
+    expect(copy.actions.copyCurrentColor).toHaveBeenCalledOnce();
+
+    const toggle = createContext({
+      state: { status: 'selecting', cursorColor },
+      derived: { cursorColor, isMagnifierShown: true },
+    });
+    handleCaptureWorkspaceEditorKeyDown(
+      createKeyboardEvent('Shift', { shiftKey: true }),
+      toggle.context,
+    );
+
+    const [formatUpdater] = vi.mocked(
+      toggle.actions.setColorSampleFormat,
+    ).mock.calls[0];
+    expect(formatUpdater('hex' satisfies ColorSampleFormat)).toBe('rgb');
+  });
 });

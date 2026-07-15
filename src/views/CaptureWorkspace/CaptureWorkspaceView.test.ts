@@ -31,6 +31,7 @@ describe("CaptureWorkspaceView runtime seam", () => {
   it("exposes only presentation state and user-triggered actions", () => {
     type ExpectedRenderStateKeys =
       | "status"
+      | "candidateDetectionMode"
       | "error"
       | "viewportBounds"
       | "selectionBounds"
@@ -103,8 +104,8 @@ describe("CaptureWorkspaceView runtime seam", () => {
       | "isShown"
       | "cursorMonitor"
       | "cursorViewportPoint"
+      | "cursorScreenPoint"
       | "cursorInMonitorPoint"
-      | "selection"
       | "cursorColor"
       | "colorSampleFormat"
     >();
@@ -562,6 +563,90 @@ describe("CaptureWorkspaceView runtime seam", () => {
       container.querySelector('button[aria-label="Copy selection"]'),
     ).not.toBeNull();
   });
+
+  it("shows the pixel magnifier with screen coordinates, color, and shortcuts", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    mountedRoots.push({ container, root });
+    const renderState = createRenderState();
+
+    await act(async () => {
+      root.render(
+        createElement(CaptureWorkspaceView, {
+          renderState: {
+            ...renderState,
+            magnifier: {
+              isShown: true,
+              cursorMonitor: {
+                id: "main",
+                logical_bounds: { x: 0, y: 0, width: 800, height: 600 },
+                physical_bounds: { x: 0, y: 0, width: 1600, height: 1200 },
+                scale_factor: 2,
+                image_base64: "frozen-image",
+              },
+              cursorViewportPoint: { x: 140, y: 160 },
+              cursorScreenPoint: { x: 648, y: 587 },
+              cursorInMonitorPoint: { x: 648, y: 587 },
+              cursorColor: {
+                hex: "#AEC69C",
+                red: 174,
+                green: 198,
+                blue: 156,
+              },
+              colorSampleFormat: "rgb",
+            },
+          },
+          actions: createActions(),
+        }),
+      );
+    });
+
+    const magnifier = container.querySelector('[aria-label="像素放大镜"]');
+    expect(magnifier?.textContent).toContain("(648, 587)");
+    expect(magnifier?.textContent).toContain("174, 198, 156");
+    expect(magnifier?.textContent).toContain("按 C 复制颜色值");
+    expect(magnifier?.textContent).toContain("按 Shift 切换 RGB / HEX");
+  });
+
+  it("shows selection shortcuts only before the selection is confirmed", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    mountedRoots.push({ container, root });
+    const renderState = createRenderState();
+
+    await act(async () => {
+      root.render(
+        createElement(CaptureWorkspaceView, {
+          renderState: {
+            ...renderState,
+            status: "selecting",
+            candidateDetectionMode: "control",
+          },
+          actions: createActions(),
+        }),
+      );
+    });
+
+    const hints = container.querySelector('[aria-label="选区快捷键提示"]');
+    expect(hints?.textContent).toContain("WASD将鼠标指针移动 1 像素");
+    expect(hints?.textContent).toContain("当前：界面元素");
+    expect(hints?.textContent).toContain("设置截屏区域为当前屏幕");
+    expect(hints?.textContent).toContain("设置截屏区域为全屏");
+
+    await act(async () => {
+      root.render(
+        createElement(CaptureWorkspaceView, {
+          renderState,
+          actions: createActions(),
+        }),
+      );
+    });
+    expect(
+      container.querySelector('[aria-label="选区快捷键提示"]'),
+    ).toBeNull();
+  });
 });
 
 function createRenderState(): CaptureWorkspaceViewRenderState {
@@ -572,6 +657,7 @@ function createRenderState(): CaptureWorkspaceViewRenderState {
 
   return {
     status: "preview",
+    candidateDetectionMode: "window",
     error: null,
     viewportBounds: { x: 0, y: 0, width: 800, height: 600 },
     selectionBounds: { x: 100, y: 200, width: 800, height: 600 },
@@ -610,8 +696,8 @@ function createRenderState(): CaptureWorkspaceViewRenderState {
       isShown: false,
       cursorMonitor: null,
       cursorViewportPoint: null,
+      cursorScreenPoint: null,
       cursorInMonitorPoint: null,
-      selection,
       cursorColor: null,
       colorSampleFormat: "hex",
     },

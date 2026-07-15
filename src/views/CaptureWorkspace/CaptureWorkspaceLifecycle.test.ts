@@ -163,6 +163,8 @@ function createPlatform() {
       ),
       logCaptureFrontendPerf: vi.fn(async () => undefined),
       currentCaptureCursorPosition: vi.fn(async () => null),
+      currentCaptureControlCandidate: vi.fn(async () => null),
+      moveCaptureCursor: vi.fn(async () => undefined),
       cancelCaptureSession: vi.fn<
         CaptureWorkspacePlatformRuntime['commands']['cancelCaptureSession']
       >(async () => undefined),

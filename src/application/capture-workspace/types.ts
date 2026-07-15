@@ -33,6 +33,7 @@ import type { SelectionHandle } from '../../views/CaptureWorkspace/selection';
 import type {
   TextAnnotationDraft,
 } from '../../views/CaptureWorkspace/textAnnotationDraft';
+import type { CaptureCandidateDetectionMode } from '../../views/CaptureWorkspace/captureWorkspaceState';
 import type { CaptureWorkspaceCommandsPort } from './ports';
 
 export type CaptureWorkspaceRuntimeStatus =
@@ -51,6 +52,7 @@ export interface CaptureWorkspaceRenderState {
   readonly startPoint: Point | null;
   readonly selection: LogicalRect | null;
   readonly hoverSelection: LogicalRect | null;
+  readonly candidateDetectionMode: CaptureCandidateDetectionMode;
   readonly previewImageBase64: string | null;
   readonly editGesture: CaptureSelectionEditGesture | null;
   readonly activeAnnotationTool: AnnotationTool | null;

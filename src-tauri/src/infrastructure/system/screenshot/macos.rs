@@ -3,11 +3,20 @@ use super::geometry::{
 };
 use crate::application::CaptureSessionSource;
 use crate::domain::capture::{
-    CapturedCursor, LogicalPoint, LogicalRect, MonitorLayout, MonitorSnapshot, ScreenRegion,
-    WindowCandidate,
+    CapturedCursor, ControlCandidate, LogicalPoint, LogicalRect, MonitorLayout, MonitorSnapshot,
+    ScreenRegion, WindowCandidate,
 };
 use crate::error::AppError;
+use accessibility_sys::{
+    kAXErrorSuccess, kAXPositionAttribute, kAXSizeAttribute, kAXValueTypeCGPoint,
+    kAXValueTypeCGSize, AXIsProcessTrusted, AXUIElementCopyAttributeValue,
+    AXUIElementCopyElementAtPosition, AXUIElementCreateApplication, AXUIElementRef,
+    AXUIElementSetMessagingTimeout, AXValueGetValue, AXValueRef,
+};
+use core_foundation::base::{CFRelease, CFTypeRef, TCFType};
+use core_foundation::string::CFString;
 use core_graphics::display::{CGDisplay, CGRect};
+use core_graphics::geometry::{CGPoint, CGSize};
 use core_graphics::image::CGImage;
 use image::codecs::png::{
     CompressionType as PngCompressionType, FilterType as PngFilterType, PngEncoder,
@@ -15,6 +24,7 @@ use image::codecs::png::{
 use image::{ExtendedColorType, ImageEncoder};
 use objc2_app_kit::{NSCursor, NSEvent};
 use std::io::Cursor;
+use std::ptr;
 use std::time::Instant;
 use xcap::{Monitor, Window};
 
@@ -464,6 +474,128 @@ fn capture_visible_window_candidates(
     Ok(candidates)
 }
 
+fn capture_control_candidate_at(
+    point: &LogicalPoint,
+) -> Result<Option<ControlCandidate>, AppError> {
+    if !unsafe { AXIsProcessTrusted() } {
+        return Ok(None);
+    }
+
+    let Some(window) = visible_window_at_point(point)? else {
+        return Ok(None);
+    };
+    let pid = window
+        .pid()
+        .map_err(|e| AppError::System(format!("Failed to read window process: {}", e)))?;
+    let application = unsafe { AXUIElementCreateApplication(pid as i32) };
+    if application.is_null() {
+        return Ok(None);
+    }
+
+    let result = unsafe {
+        AXUIElementSetMessagingTimeout(application, 0.2);
+        control_candidate_from_application(application, point)
+    };
+    unsafe { CFRelease(application.cast()) };
+    Ok(result)
+}
+
+fn visible_window_at_point(point: &LogicalPoint) -> Result<Option<Window>, AppError> {
+    let windows = Window::all()
+        .map_err(|e| AppError::System(format!("Failed to enumerate windows: {}", e)))?;
+
+    Ok(windows.into_iter().find(|window| {
+        if window.is_minimized().unwrap_or(true) {
+            return false;
+        }
+        let title = window.title().unwrap_or_default();
+        let app_name = window.app_name().unwrap_or_default();
+        if should_skip_window_candidate(&title, &app_name) {
+            return false;
+        }
+        let Ok(x) = window.x() else { return false };
+        let Ok(y) = window.y() else { return false };
+        let Ok(width) = window.width() else {
+            return false;
+        };
+        let Ok(height) = window.height() else {
+            return false;
+        };
+        point.x >= x as f64
+            && point.x < x as f64 + width as f64
+            && point.y >= y as f64
+            && point.y < y as f64 + height as f64
+    }))
+}
+
+unsafe fn control_candidate_from_application(
+    application: AXUIElementRef,
+    point: &LogicalPoint,
+) -> Option<ControlCandidate> {
+    let mut element = ptr::null_mut();
+    if AXUIElementCopyElementAtPosition(application, point.x as f32, point.y as f32, &mut element)
+        != kAXErrorSuccess
+        || element.is_null()
+    {
+        return None;
+    }
+
+    let position = copy_ax_point(element, kAXPositionAttribute);
+    let size = copy_ax_size(element, kAXSizeAttribute);
+    CFRelease(element.cast());
+    let (position, size) = (position?, size?);
+    if size.width < 2.0 || size.height < 2.0 {
+        return None;
+    }
+
+    let bounds = LogicalRect {
+        x: position.x,
+        y: position.y,
+        width: size.width,
+        height: size.height,
+    };
+    Some(ControlCandidate {
+        id: format!(
+            "control-{:.0}-{:.0}-{:.0}-{:.0}",
+            bounds.x, bounds.y, bounds.width, bounds.height
+        ),
+        logical_bounds: bounds,
+    })
+}
+
+unsafe fn copy_ax_point(element: AXUIElementRef, attribute: &str) -> Option<CGPoint> {
+    let value = copy_ax_attribute(element, attribute)?;
+    let mut point = CGPoint::new(0.0, 0.0);
+    let copied = AXValueGetValue(
+        value as AXValueRef,
+        kAXValueTypeCGPoint,
+        (&mut point as *mut CGPoint).cast(),
+    );
+    CFRelease(value);
+    copied.then_some(point)
+}
+
+unsafe fn copy_ax_size(element: AXUIElementRef, attribute: &str) -> Option<CGSize> {
+    let value = copy_ax_attribute(element, attribute)?;
+    let mut size = CGSize::new(0.0, 0.0);
+    let copied = AXValueGetValue(
+        value as AXValueRef,
+        kAXValueTypeCGSize,
+        (&mut size as *mut CGSize).cast(),
+    );
+    CFRelease(value);
+    copied.then_some(size)
+}
+
+unsafe fn copy_ax_attribute(element: AXUIElementRef, attribute: &str) -> Option<CFTypeRef> {
+    let attribute = CFString::new(attribute);
+    let mut value = ptr::null();
+    (AXUIElementCopyAttributeValue(element, attribute.as_concrete_TypeRef(), &mut value)
+        == kAXErrorSuccess
+        && !value.is_null())
+    .then_some(value)
+}
+
 fn window_candidate_from_logical_geometry(
     id: String,
     title: String,
@@ -581,6 +713,13 @@ impl CaptureSessionSource for MacOSCaptureSessionSource {
             image_height,
             png_data,
         ))
+    }
+
+    async fn capture_control_candidate(
+        &self,
+        point: &LogicalPoint,
+    ) -> Result<Option<ControlCandidate>, AppError> {
+        capture_control_candidate_at(point)
     }
 
     fn current_cursor_position(

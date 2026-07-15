@@ -181,6 +181,38 @@ describe('capture hover polling', () => {
     expect(events).toEqual(['hover:none', 'next']);
   });
 
+  it('uses an injected interface-element hit test in control mode', async () => {
+    const getHoverSelection = vi.fn(async () => ({
+      x: 110,
+      y: 115,
+      width: 60,
+      height: 24,
+    }));
+    const syncHoverSelection = vi.fn();
+
+    await runCaptureHoverSelectionPoll({
+      sessionId: 'capture-1',
+      candidates: [],
+      shouldTrackMagnifierCursor: false,
+      canPoll: () => true,
+      getCursorPosition: async () => ({ x: 120, y: 120 }),
+      getHoverSelection,
+      setCursorPointRef: () => undefined,
+      setCursorPoint: () => undefined,
+      scheduleSelectionOverlayPaint: () => undefined,
+      syncHoverSelection,
+      scheduleNextPoll: () => undefined,
+    });
+
+    expect(getHoverSelection).toHaveBeenCalledWith({ x: 120, y: 120 });
+    expect(syncHoverSelection).toHaveBeenCalledWith({
+      x: 110,
+      y: 115,
+      width: 60,
+      height: 24,
+    });
+  });
+
   it('ignores a stale hover poll result after disposal', async () => {
     const events: string[] = [];
     let disposed = false;

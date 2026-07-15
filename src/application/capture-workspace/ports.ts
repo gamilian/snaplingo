@@ -1,5 +1,6 @@
 import type {
   AnnotationCommand,
+  CaptureCandidateView,
   CaptureLaunch,
   CaptureMode,
   CaptureSessionView,
@@ -76,6 +77,11 @@ export interface CaptureWorkspaceCommandsPort {
     elapsedMs: number;
   }): Promise<void>;
   currentCaptureCursorPosition(sessionId: string): Promise<Point | null>;
+  currentCaptureControlCandidate(
+    sessionId: string,
+    point: Point,
+  ): Promise<CaptureCandidateView | null>;
+  moveCaptureCursor(delta: Point): Promise<void>;
   cancelCaptureSession(sessionId: string): Promise<void>;
   restoreCaptureSnapshotWindowsForSession(sessionId: string): Promise<void>;
   renderCaptureOutput(input: RenderCaptureOutputInput): Promise<string>;
