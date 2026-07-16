@@ -4,6 +4,7 @@ import type {
   CaptureLaunch,
   CaptureMode,
   CaptureSessionView,
+  MonitorSnapshotView,
   LogicalRect,
   OcrResult,
   Point,
@@ -70,6 +71,10 @@ export interface CaptureWorkspaceCommandsPort {
   createCaptureSession(): Promise<CaptureSessionView>;
   getCaptureSession(sessionId: string): Promise<CaptureSessionView>;
   hydrateCaptureSessionSnapshots(sessionId: string): Promise<CaptureSessionView>;
+  hydrateCaptureMonitorSnapshot(
+    sessionId: string,
+    monitorId: string,
+  ): Promise<MonitorSnapshotView>;
   logCaptureFrontendPerf(input: {
     event: string;
     mode: CaptureMode;

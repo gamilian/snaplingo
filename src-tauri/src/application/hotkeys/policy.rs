@@ -50,7 +50,32 @@ pub(crate) fn display_hotkey_to_accelerator(hotkey: &str) -> Result<Option<Strin
 
     let accelerator_key = accelerator_key(&main_key)?;
     modifiers.push(accelerator_key.as_str());
-    Ok(Some(modifiers.join("+")))
+    let accelerator = modifiers.join("+");
+    if is_reserved_system_accelerator(&accelerator) {
+        return Err(AppError::Other(format!(
+            "Shortcut '{}' is reserved by the operating system",
+            hotkey
+        )));
+    }
+    Ok(Some(accelerator))
+}
+
+fn is_reserved_system_accelerator(accelerator: &str) -> bool {
+    matches!(
+        accelerator,
+        "CmdOrCtrl+KeyA"
+            | "CmdOrCtrl+KeyC"
+            | "CmdOrCtrl+KeyV"
+            | "CmdOrCtrl+KeyX"
+            | "CmdOrCtrl+KeyZ"
+            | "Shift+CmdOrCtrl+KeyZ"
+            | "Ctrl+KeyA"
+            | "Ctrl+KeyC"
+            | "Ctrl+KeyV"
+            | "Ctrl+KeyX"
+            | "Ctrl+KeyZ"
+            | "Shift+Ctrl+KeyZ"
+    )
 }
 
 fn accelerator_key(main_key: &str) -> Result<String> {
@@ -133,6 +158,16 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("has no main key"));
+    }
+
+    #[test]
+    fn rejects_system_edit_shortcuts_that_would_break_other_apps() {
+        for hotkey in ["⌘C", "⌘V", "⌘X", "⌘A", "⌘Z", "⇧⌘Z", "⌃C"] {
+            assert!(display_hotkey_to_accelerator(hotkey)
+                .unwrap_err()
+                .to_string()
+                .contains("reserved by the operating system"));
+        }
     }
 
     #[test]

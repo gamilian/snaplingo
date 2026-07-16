@@ -1,3 +1,4 @@
+mod app_logs;
 mod config_store;
 mod favorite_capacity;
 mod favorites;
@@ -6,6 +7,7 @@ mod library_index;
 mod migrations;
 mod screenshot_favorites;
 
+pub use app_logs::{AppLogEntry, SqliteAppLogRepository};
 pub use config_store::SqliteConfigStore;
 pub use favorite_capacity::SqliteFavoriteCapacityRepository;
 pub use favorites::SqliteFavoriteRepository;
@@ -102,7 +104,7 @@ mod tests {
                 Ok(connection.query_row("PRAGMA user_version", [], |row| row.get::<_, i32>(0))?)
             })
             .unwrap();
-        assert_eq!(version, 3);
+        assert_eq!(version, 4);
 
         drop(database);
         Database::open(&path).unwrap();
@@ -114,7 +116,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let path = dir.path().join("future.db");
         let connection = Connection::open(&path).unwrap();
-        connection.execute("PRAGMA user_version = 4", []).unwrap();
+        connection.execute("PRAGMA user_version = 5", []).unwrap();
         drop(connection);
 
         let error = Database::open(&path).err().expect("newer schema must fail");

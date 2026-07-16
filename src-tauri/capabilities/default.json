@@ -14,6 +14,7 @@
     "core:window:allow-start-dragging",
     "dialog:default",
     "shell:allow-open",
+    "autostart:default",
     "screenshots:default"
   ]
 }

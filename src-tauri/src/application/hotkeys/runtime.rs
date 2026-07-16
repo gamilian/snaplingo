@@ -223,10 +223,22 @@ impl HotkeyRuntime {
             else {
                 continue;
             };
-            let Some(accelerator) =
-                resolve_hotkey_accelerator(default_hotkey.category, default_hotkey.action, hotkey)?
-            else {
-                continue;
+            let accelerator = match resolve_hotkey_accelerator(
+                default_hotkey.category,
+                default_hotkey.action,
+                hotkey,
+            ) {
+                Ok(Some(accelerator)) => accelerator,
+                Ok(None) => continue,
+                Err(error) => {
+                    log::warn!(
+                        "Skipping invalid global shortcut for {}:{}: {}",
+                        default_hotkey.category,
+                        default_hotkey.action,
+                        error
+                    );
+                    continue;
+                }
             };
 
             let registration_key =
@@ -477,8 +489,9 @@ mod hotkey_runtime_tests {
     };
     use crate::application::hotkeys::configuration::HotkeyConfiguration;
     use crate::domain::hotkey_config::{
-        SCREENSHOT_ACTION, SCREENSHOT_CATEGORY, SCREENSHOT_TRANSLATE_ACTION,
-        SELECTION_TRANSLATE_ACTION, SHOW_TRANSLATION_WINDOW_ACTION, TRANSLATION_CATEGORY,
+        default_hotkey_snapshot, SCREENSHOT_ACTION, SCREENSHOT_CATEGORY,
+        SCREENSHOT_TRANSLATE_ACTION, SELECTION_TRANSLATE_ACTION, SHOW_TRANSLATION_WINDOW_ACTION,
+        TRANSLATION_CATEGORY,
     };
     use crate::infrastructure::storage::{Database, SqliteConfigStore};
     use crate::Result;
@@ -588,6 +601,36 @@ mod hotkey_runtime_tests {
             action: SELECTION_TRANSLATE_ACTION.to_string(),
             accelerator: "Alt+KeyD".to_string(),
             timing: HotkeyTriggerTiming::Released,
+        }));
+    }
+
+    #[test]
+    fn hotkey_runtime_skips_a_persisted_system_copy_shortcut() {
+        let store = Arc::new(SqliteConfigStore::new_temp());
+        let mut snapshot = default_hotkey_snapshot();
+        snapshot
+            .translation
+            .insert(SELECTION_TRANSLATE_ACTION.to_string(), "⌘C".to_string());
+        store.save("hotkeys", &snapshot).unwrap();
+        let configuration = Arc::new(HotkeyConfiguration::new(store));
+        let runtime = HotkeyRuntime::new(configuration);
+        let registrar = FakeHotkeyRegistrar::default();
+
+        runtime.register_startup_hotkeys_with(&registrar).unwrap();
+
+        assert!(!registrar.operations().iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Register { accelerator, .. }
+                    if accelerator == "CmdOrCtrl+KeyC"
+            )
+        }));
+        assert!(registrar.operations().iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Register { accelerator, .. }
+                    if accelerator == "Shift+CmdOrCtrl+KeyR"
+            )
         }));
     }
 

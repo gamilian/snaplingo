@@ -136,6 +136,7 @@ export interface CaptureWorkspaceRuntimeActions {
   updatePolledHover(selection: LogicalRect | null): void;
   keyDown(event: CaptureWorkspaceKeyInput): boolean;
   hydrateSnapshots(): Promise<void>;
+  hydrateMagnifierMonitor(monitorId: string): Promise<void>;
 }
 
 export interface CaptureWorkspacePointerInput {

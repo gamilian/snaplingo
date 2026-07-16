@@ -135,13 +135,18 @@ describe('TranslationProvidersPage', () => {
     const addButton = findElement(
       view,
       (element) =>
-        getElementName(element) === 'IconActionButton' &&
-        element.props.title === '添加自定义服务',
+        getElementName(element) === 'button' &&
+        element.props['aria-label'] === '添加自定义服务',
     );
 
+    expect(addButton.props.className).toContain('inline-flex');
     expect(addButton.props.className).toContain('absolute');
     expect(addButton.props.className).toContain('right-0');
+    expect(addButton.props.className).toContain('top-1');
     expect(addButton.props.className).toContain('bg-primary-600');
+    expect(addButton.props.children).toContainEqual(
+      expect.objectContaining({ props: expect.objectContaining({ children: '添加自定义服务' }) }),
+    );
   });
 
   it('reorders active providers when a dragged provider is dropped on another active provider', async () => {
@@ -205,8 +210,8 @@ describe('TranslationProvidersPage', () => {
     const addButton = findElement(
       view,
       (element) =>
-        getElementName(element) === 'IconActionButton' &&
-        element.props.title === '添加自定义服务',
+        getElementName(element) === 'button' &&
+        element.props['aria-label'] === '添加自定义服务',
     );
 
     addButton.props.onClick();

@@ -93,6 +93,8 @@ export interface CaptureWorkspaceViewRenderState {
     readonly cursorInMonitorPoint: Point | null;
     readonly cursorColor: ColorSample | null;
     readonly colorSampleFormat: ColorSampleFormat;
+    readonly sourceImage: HTMLImageElement | null;
+    readonly zoom: number;
   };
 }
 
@@ -445,9 +447,10 @@ export function CaptureWorkspaceView({
         renderState.magnifier.cursorViewportPoint &&
         renderState.magnifier.cursorScreenPoint &&
         renderState.magnifier.cursorInMonitorPoint &&
+        renderState.magnifier.sourceImage &&
         renderState.viewportBounds && (
           <CaptureMagnifierOverlay
-            imageBase64={renderState.magnifier.cursorMonitor.image_base64}
+            image={renderState.magnifier.sourceImage}
             viewportCursor={renderState.magnifier.cursorViewportPoint}
             screenCursor={renderState.magnifier.cursorScreenPoint}
             imageCursor={renderState.magnifier.cursorInMonitorPoint}
@@ -458,6 +461,7 @@ export function CaptureWorkspaceView({
             }}
             color={renderState.magnifier.cursorColor}
             colorFormat={renderState.magnifier.colorSampleFormat}
+            zoom={renderState.magnifier.zoom}
           />
         )}
       {renderState.status === 'selecting' && (
@@ -474,24 +478,38 @@ function CaptureSelectionShortcutHints({
 }: {
   detectionMode: CaptureCandidateDetectionMode;
 }) {
+  const shortcutKeys = getCaptureShortcutKeyLabels();
   return (
     <aside
       aria-label="选区快捷键提示"
-      className="pointer-events-none absolute bottom-5 left-5 w-[330px] overflow-hidden rounded-lg border border-white/45 bg-neutral-950/80 text-[11px] text-white shadow-2xl backdrop-blur-md"
+      className="pointer-events-none absolute bottom-5 left-5 w-[330px] overflow-hidden rounded-lg border border-white/25 bg-slate-900/[0.55] text-[11px] text-white/90 shadow-lg backdrop-blur-lg"
     >
       <HintRow keys={['W', 'A', 'S', 'D']}>
         将鼠标指针移动 1 像素
       </HintRow>
       <HintRow keys={['Tab']}>
         切换检测窗口 / 界面元素
-        <span className="ml-2 text-blue-300">
+        <span className="ml-2 text-blue-200/90">
           当前：{detectionMode === 'window' ? '窗口' : '界面元素'}
         </span>
       </HintRow>
-      <HintRow keys={['⌘', 'A']}>设置截屏区域为当前屏幕</HintRow>
-      <HintRow keys={['⇧', '⌘', 'A']}>设置截屏区域为全屏</HintRow>
+      <HintRow keys={[shortcutKeys.primary, 'A']}>
+        设置截屏区域为当前屏幕
+      </HintRow>
+      <HintRow keys={[shortcutKeys.shift, shortcutKeys.primary, 'A']}>
+        设置截屏区域为全屏
+      </HintRow>
     </aside>
   );
+}
+
+export function getCaptureShortcutKeyLabels(
+  platform = typeof navigator === 'undefined' ? '' : navigator.platform,
+) {
+  const isApplePlatform = /Mac|iPhone|iPad|iPod/i.test(platform);
+  return isApplePlatform
+    ? { primary: '⌘', shift: '⇧' }
+    : { primary: 'Ctrl', shift: 'Shift' };
 }
 
 function HintRow({
@@ -502,18 +520,18 @@ function HintRow({
   children: ReactNode;
 }) {
   return (
-    <div className="flex min-h-9 items-center gap-3 border-b border-white/10 px-3 last:border-b-0">
+    <div className="flex min-h-9 items-center gap-3 border-b border-white/[0.08] px-3 last:border-b-0">
       <span className="flex min-w-[84px] items-center gap-1">
         {keys.map((key, index) => (
           <kbd
             key={`${key}-${index}`}
-            className="grid min-w-5 place-items-center rounded border border-white/45 bg-white/10 px-1 py-0.5 font-mono text-[10px] font-semibold shadow-sm"
+            className="grid min-w-5 place-items-center rounded border border-white/30 bg-white/[0.08] px-1 py-0.5 font-mono text-[10px] font-semibold"
           >
             {key}
           </kbd>
         ))}
       </span>
-      <span className="leading-4 text-white/90">{children}</span>
+      <span className="leading-4 text-white/[0.85]">{children}</span>
     </div>
   );
 }

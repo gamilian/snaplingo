@@ -11,6 +11,11 @@ describe('settings main navigation', () => {
 
   beforeEach(() => {
     useSettingsConfigStore.setState({
+      general: {
+        language: 'zh-CN',
+        theme: 'system',
+        startOnBoot: false,
+      },
       history: {
         autoCleanupEnabled: true,
         retentionDays: 30,
@@ -43,8 +48,7 @@ describe('settings main navigation', () => {
     expect(container.textContent).toContain('资料库');
     expect(container.textContent).not.toContain('工作区');
     expect(container.textContent).not.toContain('高级');
-    expect(container.textContent).toContain('收藏上限');
-    expect(container.textContent).toContain('1,000');
+    expect(container.textContent).toContain('收藏已用');
 
     const settingsButton = [...container.querySelectorAll('button')].find(
       (button) => button.textContent === '设置',

@@ -6,7 +6,7 @@ use tauri::{AppHandle, Manager, State};
 use crate::application::capture::CaptureSessionOutput;
 use crate::domain::capture::{
     AnnotationCommand, CaptureOutputAction, CaptureSessionId, CaptureSessionView, LogicalPoint,
-    LogicalRect,
+    LogicalRect, MonitorSnapshotView,
 };
 use crate::domain::ocr::OcrResult;
 use crate::infrastructure::system::capture_window::{
@@ -171,12 +171,36 @@ pub async fn hydrate_capture_session_snapshots(
 }
 
 #[tauri::command]
+pub async fn hydrate_capture_monitor_snapshot(
+    session_id: String,
+    monitor_id: String,
+    state: State<'_, crate::AppState>,
+) -> Result<MonitorSnapshotView, String> {
+    state
+        .capture
+        .sessions
+        .hydrate_monitor_snapshot(&CaptureSessionId(session_id), &monitor_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn log_capture_frontend_perf(
     event: String,
     mode: String,
     session_id: Option<String>,
     elapsed_ms: f64,
+    state: State<'_, crate::AppState>,
 ) {
+    let enabled = state
+        .settings
+        .configuration
+        .snapshot()
+        .map(|snapshot| snapshot.general.performance_monitoring)
+        .unwrap_or(false);
+    if !enabled {
+        return;
+    }
     log::info!(
         "[capture-perf] frontend event={} mode={} session_id={} elapsed_ms={:.1}",
         event,

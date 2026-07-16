@@ -1,10 +1,12 @@
-use tauri::State;
+use tauri::{AppHandle, State};
+use tauri_plugin_autostart::ManagerExt;
 
 use crate::application::SettingsConfiguration;
 use crate::domain::{
     GeneralSettings, HistorySettings, OcrSettings, ScreenshotSettings, SettingsSnapshot,
     TranslationSettings,
 };
+use crate::infrastructure::storage::AppLogEntry;
 
 #[tauri::command]
 pub fn get_settings_snapshot(
@@ -16,9 +18,46 @@ pub fn get_settings_snapshot(
 #[tauri::command]
 pub fn update_general_settings(
     input: GeneralSettings,
+    app: AppHandle,
     state: State<'_, crate::AppState>,
 ) -> Result<SettingsSnapshot, String> {
-    update_general_settings_for_configuration(state.settings.configuration.as_ref(), input)
+    let previous = state
+        .settings
+        .configuration
+        .snapshot()
+        .map_err(|error| error.to_string())?
+        .general;
+    let start_on_boot_changed = input.start_on_boot != previous.start_on_boot;
+    if start_on_boot_changed {
+        if input.start_on_boot {
+            app.autolaunch()
+                .enable()
+                .map_err(|error| error.to_string())?;
+        } else {
+            app.autolaunch()
+                .disable()
+                .map_err(|error| error.to_string())?;
+        }
+    }
+    match update_general_settings_for_configuration(state.settings.configuration.as_ref(), input) {
+        Ok(snapshot) => Ok(snapshot),
+        Err(error) => {
+            if start_on_boot_changed {
+                let rollback = if previous.start_on_boot {
+                    app.autolaunch().enable()
+                } else {
+                    app.autolaunch().disable()
+                };
+                if let Err(rollback_error) = rollback {
+                    log::error!(
+                        "Failed to roll back start-on-boot state: {}",
+                        rollback_error
+                    );
+                }
+            }
+            Err(error)
+        }
+    }
 }
 
 #[tauri::command]
@@ -54,14 +93,42 @@ pub fn update_ocr_settings(
 }
 
 #[tauri::command]
-pub fn update_history_settings(
+pub async fn update_history_settings(
     input: HistorySettings,
     state: State<'_, crate::AppState>,
 ) -> Result<SettingsSnapshot, String> {
-    state
+    let snapshot = state
         .settings
         .configuration
         .update_history(input)
+        .map_err(|error| error.to_string())?;
+    if let Err(error) = state.history.history.run_cleanup().await {
+        log::warn!(
+            "Failed to apply history cleanup after settings update: {}",
+            error
+        );
+    }
+    Ok(snapshot)
+}
+
+#[tauri::command]
+pub fn list_app_logs(
+    limit: usize,
+    state: State<'_, crate::AppState>,
+) -> Result<Vec<AppLogEntry>, String> {
+    state
+        .logs
+        .repository
+        .list(limit)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn clear_app_logs(state: State<'_, crate::AppState>) -> Result<(), String> {
+    state
+        .logs
+        .repository
+        .clear()
         .map_err(|error| error.to_string())
 }
 

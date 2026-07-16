@@ -12,10 +12,31 @@ export interface SettingsWindowEventsPort {
   ): Promise<() => void>;
 }
 
+export interface AppLogEntry {
+  id: number;
+  timestamp: string;
+  level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
+  target: string;
+  message: string;
+}
+
+export interface SettingsMaintenancePort {
+  listAppLogs(limit: number): Promise<AppLogEntry[]>;
+  clearAppLogs(): Promise<void>;
+}
+
 export interface GeneralSettings {
   language: string;
   theme: string;
   startOnBoot: boolean;
+  proxyMode?: 'system' | 'none' | 'manual';
+  proxyUrl?: string;
+  requestTimeoutMs?: number;
+  retryCount?: number;
+  logLevel?: 'debug' | 'info' | 'warn' | 'error';
+  logRetentionDays?: number;
+  performanceMonitoring?: boolean;
+  experimentalGpuAcceleration?: boolean;
 }
 
 export type AnnotationColorPreset = [number, number, number, number];
@@ -37,10 +58,12 @@ export interface ScreenshotSettings {
   rememberLastTool: boolean;
   showSelectionSize: boolean;
   showMagnifier: boolean;
+  magnifierZoom?: number;
   pinOpacity: number;
   pinShadow: boolean;
   annotationColors: AnnotationColorPreset[];
   selectionBorderWidth?: number;
+  selectionBorderColor?: AnnotationColorPreset;
   selectionMaskColor?: AnnotationColorPreset;
 }
 

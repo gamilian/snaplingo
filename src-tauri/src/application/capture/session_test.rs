@@ -31,6 +31,7 @@ mod tests {
         current_cursor_position: Option<LogicalPoint>,
         control_candidate: Option<ControlCandidate>,
         capture_monitor_snapshots_calls: Arc<Mutex<usize>>,
+        capture_monitor_snapshot_calls: Arc<Mutex<Vec<String>>>,
         capture_monitor_layouts_calls: Arc<Mutex<usize>>,
         captured_regions: Arc<Mutex<Vec<ScreenRegion>>>,
         region_png_data: Vec<u8>,
@@ -75,6 +76,21 @@ mod tests {
         async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError> {
             *self.capture_monitor_snapshots_calls.lock().unwrap() += 1;
             Ok(self.snapshots.clone())
+        }
+
+        async fn capture_monitor_snapshot(
+            &self,
+            monitor_id: &str,
+        ) -> Result<MonitorSnapshot, AppError> {
+            self.capture_monitor_snapshot_calls
+                .lock()
+                .unwrap()
+                .push(monitor_id.to_string());
+            self.snapshots
+                .iter()
+                .find(|snapshot| snapshot.id == monitor_id)
+                .cloned()
+                .ok_or_else(|| AppError::System(format!("missing monitor: {monitor_id}")))
         }
 
         async fn capture_monitor_layouts(&self) -> Result<Vec<MonitorLayout>, AppError> {
@@ -146,6 +162,7 @@ mod tests {
             current_cursor_position: None,
             control_candidate: None,
             capture_monitor_snapshots_calls: Arc::new(Mutex::new(0)),
+            capture_monitor_snapshot_calls: Arc::new(Mutex::new(Vec::new())),
             capture_monitor_layouts_calls: Arc::new(Mutex::new(0)),
             captured_regions: Arc::new(Mutex::new(Vec::new())),
             region_png_data: vec![1, 2, 3],
@@ -197,6 +214,7 @@ mod tests {
             current_cursor_position: None,
             control_candidate: None,
             capture_monitor_snapshots_calls: Arc::new(Mutex::new(0)),
+            capture_monitor_snapshot_calls: Arc::new(Mutex::new(Vec::new())),
             capture_monitor_layouts_calls: Arc::new(Mutex::new(0)),
             captured_regions: Arc::new(Mutex::new(Vec::new())),
             region_png_data: vec![1, 2, 3],
@@ -391,6 +409,28 @@ mod tests {
                 },
             )
             .unwrap());
+    }
+
+    #[tokio::test]
+    async fn hydrate_monitor_snapshot_returns_only_the_requested_monitor_view() {
+        let backend = make_backend();
+        let snapshot_calls = backend.capture_monitor_snapshots_calls.clone();
+        let monitor_snapshot_calls = backend.capture_monitor_snapshot_calls.clone();
+        let sessions = CaptureSessions::new(Arc::new(backend));
+        let view = sessions.create_layout_session().await.unwrap();
+
+        let monitor = sessions
+            .hydrate_monitor_snapshot(&view.id, "primary")
+            .await
+            .unwrap();
+
+        assert_eq!(*snapshot_calls.lock().unwrap(), 0);
+        assert_eq!(
+            monitor_snapshot_calls.lock().unwrap().as_slice(),
+            &["primary".to_string()]
+        );
+        assert_eq!(monitor.id, "primary");
+        assert_eq!(monitor.image_base64, "AQID");
     }
 
     #[tokio::test]

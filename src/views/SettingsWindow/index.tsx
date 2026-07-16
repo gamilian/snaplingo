@@ -51,7 +51,11 @@ function SettingsWindowContent() {
 
   return (
     <div className="flex h-screen bg-[#f5f5f7]">
-      <MainNav activeTab={activeMainTab} onTabChange={setActiveMainTab} />
+      <MainNav
+        activeTab={activeMainTab}
+        onTabChange={setActiveMainTab}
+        library={runtime.library}
+      />
 
       <div className="flex-1 overflow-hidden flex">
         <SettingsSectionContent section={activeSection} />

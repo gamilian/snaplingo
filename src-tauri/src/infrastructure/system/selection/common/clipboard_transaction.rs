@@ -1,13 +1,43 @@
 use std::future::Future;
 use std::time::Duration;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClipboardTextChange {
+    pub text: String,
+    pub change_count: i64,
+}
+
 pub async fn wait_for_clipboard_text_after_action<Action, ActionFuture, ChangeCount, Read>(
+    action: Action,
+    clipboard_change_count: ChangeCount,
+    read_clipboard_text: Read,
+    timeout: Duration,
+    poll_interval: Duration,
+) -> Result<String, String>
+where
+    Action: FnOnce() -> ActionFuture,
+    ActionFuture: Future<Output = Result<(), String>>,
+    ChangeCount: FnMut() -> Result<i64, String>,
+    Read: FnOnce() -> Result<String, String>,
+{
+    wait_for_clipboard_text_change_after_action(
+        action,
+        clipboard_change_count,
+        read_clipboard_text,
+        timeout,
+        poll_interval,
+    )
+    .await
+    .map(|change| change.text)
+}
+
+pub async fn wait_for_clipboard_text_change_after_action<Action, ActionFuture, ChangeCount, Read>(
     action: Action,
     mut clipboard_change_count: ChangeCount,
     read_clipboard_text: Read,
     timeout: Duration,
     poll_interval: Duration,
-) -> Result<String, String>
+) -> Result<ClipboardTextChange, String>
 where
     Action: FnOnce() -> ActionFuture,
     ActionFuture: Future<Output = Result<(), String>>,
@@ -25,7 +55,10 @@ where
             if text.trim().is_empty() {
                 return Err("Selected text is empty".to_string());
             }
-            return Ok(text);
+            return Ok(ClipboardTextChange {
+                text,
+                change_count: current_change_count,
+            });
         }
 
         if started_at.elapsed() >= timeout {
@@ -76,5 +109,24 @@ mod clipboard_transaction_tests {
             err,
             "Timed out waiting for selected text to reach clipboard"
         );
+    }
+
+    #[tokio::test]
+    async fn exposes_the_observed_change_count_for_safe_restoration() {
+        let counts = Arc::new(Mutex::new(vec![4, 5]));
+        let read_counts = counts.clone();
+
+        let change = wait_for_clipboard_text_change_after_action(
+            || async { Ok(()) },
+            move || Ok(read_counts.lock().unwrap().remove(0)),
+            || Ok("selected text".to_string()),
+            Duration::ZERO,
+            Duration::ZERO,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(change.text, "selected text");
+        assert_eq!(change.change_count, 5);
     }
 }

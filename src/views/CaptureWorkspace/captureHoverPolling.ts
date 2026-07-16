@@ -99,7 +99,9 @@ export async function runCaptureHoverSelectionPoll({
     scheduleSelectionOverlayPaint();
     scheduleNextPoll();
   } catch {
+    if (isDisposed() || !canPoll()) return;
     syncHoverSelection(null);
+    scheduleNextPoll();
   }
 }
 

@@ -313,6 +313,23 @@ fn capture_visible_display_snapshots() -> Result<Vec<MonitorSnapshot>, AppError>
         .collect()
 }
 
+fn capture_visible_display_snapshot_by_id(monitor_id: &str) -> Result<MonitorSnapshot, AppError> {
+    let access = prepare_screen_capture_access();
+    let monitors = Monitor::all()
+        .map_err(|e| AppError::System(format!("Failed to enumerate monitors: {}", e)))?;
+    for monitor in &monitors {
+        let display_id = monitor
+            .id()
+            .map_err(|e| AppError::System(format!("Failed to read monitor id: {}", e)))?;
+        if format!("monitor-{display_id}") == monitor_id {
+            return capture_visible_display_snapshot(monitor, access);
+        }
+    }
+    Err(AppError::System(format!(
+        "Capture monitor not found: {monitor_id}"
+    )))
+}
+
 fn capture_visible_display_layouts() -> Result<Vec<MonitorLayout>, AppError> {
     let mut monitors = Monitor::all()
         .map_err(|e| AppError::System(format!("Failed to enumerate monitors: {}", e)))?;
@@ -478,7 +495,10 @@ fn capture_control_candidate_at(
     point: &LogicalPoint,
 ) -> Result<Option<ControlCandidate>, AppError> {
     if !unsafe { AXIsProcessTrusted() } {
-        return Ok(None);
+        return Err(AppError::System(
+            "界面元素检测需要 macOS 辅助功能权限。请在“系统设置 > 隐私与安全性 > 辅助功能”中允许 SnapLingo，然后重新截图"
+                .to_string(),
+        ));
     }
 
     let Some(window) = visible_window_at_point(point)? else {
@@ -665,6 +685,13 @@ fn should_skip_window_candidate(title: &str, app_name: &str) -> bool {
 impl CaptureSessionSource for MacOSCaptureSessionSource {
     async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError> {
         capture_visible_display_snapshots()
+    }
+
+    async fn capture_monitor_snapshot(
+        &self,
+        monitor_id: &str,
+    ) -> Result<MonitorSnapshot, AppError> {
+        capture_visible_display_snapshot_by_id(monitor_id)
     }
 
     async fn capture_monitor_layouts(&self) -> Result<Vec<MonitorLayout>, AppError> {

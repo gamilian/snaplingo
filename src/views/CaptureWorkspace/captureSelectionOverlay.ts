@@ -46,6 +46,7 @@ interface Size {
 
 export interface CaptureSelectionOverlayStyle {
   borderWidth?: number;
+  borderColor?: [number, number, number, number];
   maskColor?: [number, number, number, number];
 }
 
@@ -123,7 +124,7 @@ export function drawCaptureSelectionOverlayFrame(
 
   if (frame) {
     drawDimMask(context, size, frame.rect, style.maskColor);
-    drawSelectionRect(context, frame, style.borderWidth);
+    drawSelectionRect(context, frame, style.borderWidth, style.borderColor);
     if (frame.label) drawSizeLabel(context, size, frame);
   }
 
@@ -154,6 +155,7 @@ function drawSelectionRect(
   context: CaptureSelectionOverlayContext,
   frame: CaptureSelectionOverlayFrame,
   borderWidth?: number,
+  borderColor?: [number, number, number, number],
 ) {
   const { rect } = frame;
 
@@ -161,7 +163,9 @@ function drawSelectionRect(
   if (frame.variant !== 'preview') {
     context.fillRect(rect.x, rect.y, rect.width, rect.height);
   }
-  context.strokeStyle = getSelectionStrokeStyle(frame.variant);
+  context.strokeStyle = borderColor
+    ? `rgba(${borderColor[0]}, ${borderColor[1]}, ${borderColor[2]}, ${borderColor[3] / 255})`
+    : getSelectionStrokeStyle(frame.variant);
   context.lineWidth = getSelectionLineWidth(frame.variant, borderWidth);
   context.strokeRect(
     rect.x + 0.5,

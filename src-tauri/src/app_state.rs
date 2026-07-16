@@ -12,6 +12,7 @@ use crate::application::{
     ScreenshotFavorites, SelectedTextAcquirer, SettingsConfiguration,
 };
 use crate::infrastructure::events::EventBus;
+use crate::infrastructure::storage::SqliteAppLogRepository;
 use crate::Result;
 
 pub struct SettingsRuntime {
@@ -54,6 +55,10 @@ pub struct SelectionRuntime {
     pub acquirer: Arc<SelectedTextAcquirer>,
 }
 
+pub struct LogsRuntime {
+    pub repository: Arc<SqliteAppLogRepository>,
+}
+
 pub struct AppState {
     pub settings: Arc<SettingsRuntime>,
     pub providers: Arc<ProviderRuntime>,
@@ -63,6 +68,7 @@ pub struct AppState {
     pub screenshot_favorites: Arc<ScreenshotFavoritesRuntime>,
     pub library_index: Arc<LibraryIndex>,
     pub selection: Arc<SelectionRuntime>,
+    pub logs: Arc<LogsRuntime>,
     #[allow(dead_code)] // Wired in Task 3; commands consume it in the following Task 4.
     pub(crate) result_window: Arc<ResultWindowRuntime>,
 }

@@ -5,6 +5,7 @@ import type {
   CaptureCandidateView,
   CaptureSessionView,
   LogicalRect,
+  MonitorSnapshotView,
   OcrResult,
   Point,
 } from '../../domain/capture';
@@ -40,6 +41,16 @@ export async function getCaptureSession(sessionId: string) {
 export async function hydrateCaptureSessionSnapshots(sessionId: string) {
   return invoke<CaptureSessionView>('hydrate_capture_session_snapshots', {
     sessionId,
+  });
+}
+
+export async function hydrateCaptureMonitorSnapshot(
+  sessionId: string,
+  monitorId: string,
+) {
+  return invoke<MonitorSnapshotView>('hydrate_capture_monitor_snapshot', {
+    sessionId,
+    monitorId,
   });
 }
 
@@ -194,6 +205,7 @@ export const captureWorkspaceCommands: CaptureWorkspaceCommandsPort = {
   createCaptureSession,
   getCaptureSession,
   hydrateCaptureSessionSnapshots,
+  hydrateCaptureMonitorSnapshot,
   logCaptureFrontendPerf,
   currentCaptureCursorPosition,
   currentCaptureControlCandidate,

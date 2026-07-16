@@ -131,6 +131,16 @@ describe('CaptureWorkspace React lifecycle', () => {
     expect(listenerCalls(addEventListener, 'keydown')).toBe(
       listenerCalls(removeEventListener, 'keydown'),
     );
+    expect(addEventListener.mock.calls).toContainEqual([
+      'keydown',
+      expect.any(Function),
+      true,
+    ]);
+    expect(removeEventListener.mock.calls).toContainEqual([
+      'keydown',
+      expect.any(Function),
+      true,
+    ]);
     expect(listenerCalls(addEventListener, 'keyup')).toBe(
       listenerCalls(removeEventListener, 'keyup'),
     );
@@ -161,6 +171,13 @@ function createPlatform() {
       hydrateCaptureSessionSnapshots: vi.fn(async () =>
         createSession('hydrated'),
       ),
+      hydrateCaptureMonitorSnapshot: vi.fn(async (_sessionId, monitorId) => {
+        const monitor = createSession('hydrated').monitors.find(
+          (candidate) => candidate.id === monitorId,
+        );
+        if (!monitor) throw new Error(`Monitor not found: ${monitorId}`);
+        return monitor;
+      }),
       logCaptureFrontendPerf: vi.fn(async () => undefined),
       currentCaptureCursorPosition: vi.fn(async () => null),
       currentCaptureControlCandidate: vi.fn(async () => null),

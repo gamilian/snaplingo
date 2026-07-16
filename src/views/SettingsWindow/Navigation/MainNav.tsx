@@ -1,5 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useSettingsConfigStore } from '../../../stores/settingsConfigStore';
+import { useHistoryStore } from '../../../stores/historyStore';
+import { useFavoritesStore } from '../../../stores/favoritesStore';
+import { useScreenshotFavoritesStore } from '../../../stores/screenshotFavoritesStore';
 import {
   FavoritesIcon,
   HistoryIcon,
@@ -10,11 +13,14 @@ import {
   TranslationIcon,
 } from '../Icons';
 import type { MainTab } from '../navigationModel';
+import type { SettingsRuntime } from '../../../application/settings/runtime';
 import { CustomNumberInput } from '../../../components/common/CustomNumberInput';
+import { uiText } from '../../../application/settings/uiText';
 
 interface MainNavProps {
   activeTab: MainTab;
   onTabChange: (tab: MainTab) => void;
+  library?: SettingsRuntime['library'];
 }
 
 interface NavItem {
@@ -23,20 +29,9 @@ interface NavItem {
   icon: ReactNode;
 }
 
-const settingsItems: NavItem[] = [
-  { key: 'general', label: '通用', icon: <SettingsIcon /> },
-  { key: 'screenshot', label: '截图', icon: <ScreenshotIcon /> },
-  { key: 'translation', label: '翻译', icon: <TranslationIcon /> },
-  { key: 'ocr', label: 'OCR', icon: <OcrIcon /> },
-  { key: 'services', label: '服务', icon: <ServicesIcon /> },
-];
-
-const libraryItems: NavItem[] = [
-  { key: 'favorites', label: '收藏夹', icon: <FavoritesIcon /> },
-  { key: 'history', label: '历史记录', icon: <HistoryIcon /> },
-];
-
-export function MainNav({ activeTab, onTabChange }: MainNavProps) {
+export function MainNav({ activeTab, onTabChange, library }: MainNavProps) {
+  const language = useSettingsConfigStore((state) => state.general?.language);
+  const t = (key: Parameters<typeof uiText>[1]) => uiText(language, key);
   const history = useSettingsConfigStore((state) => state.history);
   const updateHistorySettings = useSettingsConfigStore(
     (state) => state.updateHistorySettings,
@@ -46,6 +41,24 @@ export function MainNav({ activeTab, onTabChange }: MainNavProps) {
   const [retentionDays, setRetentionDays] = useState(30);
   const [historyCapacity, setHistoryCapacity] = useState(5000);
   const [favoriteCapacity, setFavoriteCapacity] = useState(1000);
+  const [historyUsed, setHistoryUsed] = useState<number | null>(null);
+  const [favoritesUsed, setFavoritesUsed] = useState<number | null>(null);
+  const historyRevision = useHistoryStore((state) => state.revision);
+  const favoriteRevision = useFavoritesStore((state) => state.revision);
+  const screenshotFavoriteRevision = useScreenshotFavoritesStore(
+    (state) => state.revision,
+  );
+  const settingsItems: NavItem[] = [
+    { key: 'general', label: t('general'), icon: <SettingsIcon /> },
+    { key: 'screenshot', label: t('screenshot'), icon: <ScreenshotIcon /> },
+    { key: 'translation', label: t('translation'), icon: <TranslationIcon /> },
+    { key: 'ocr', label: t('ocr'), icon: <OcrIcon /> },
+    { key: 'services', label: t('services'), icon: <ServicesIcon /> },
+  ];
+  const libraryItems: NavItem[] = [
+    { key: 'favorites', label: t('favorites'), icon: <FavoritesIcon /> },
+    { key: 'history', label: t('history'), icon: <HistoryIcon /> },
+  ];
 
   useEffect(() => {
     if (!history) return;
@@ -54,6 +67,44 @@ export function MainNav({ activeTab, onTabChange }: MainNavProps) {
     setHistoryCapacity(history.maximumRecords);
     setFavoriteCapacity(history.maximumFavorites);
   }, [history]);
+
+  useEffect(() => {
+    if (!library) return;
+    let cancelled = false;
+    void Promise.all([
+      library.queryHistory({
+        filter: 'all',
+        search: '',
+        page: 0,
+        pageSize: 1,
+      }),
+      library.queryFavorites({
+        filter: 'all',
+        search: '',
+        page: 0,
+        pageSize: 1,
+      }),
+    ]).then(
+      ([historyPage, favoritesPage]) => {
+        if (cancelled) return;
+        setHistoryUsed(historyPage.total);
+        setFavoritesUsed(favoritesPage.total);
+      },
+      () => {
+        if (cancelled) return;
+        setHistoryUsed(null);
+        setFavoritesUsed(null);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    favoriteRevision,
+    historyRevision,
+    library,
+    screenshotFavoriteRevision,
+  ]);
 
   const openCapacity = () => {
     if (history) {
@@ -91,13 +142,13 @@ export function MainNav({ activeTab, onTabChange }: MainNavProps) {
 
         <nav className="min-h-0 flex-1 overflow-y-auto pt-4">
           <NavGroup
-            label="设置"
+            label={t('settings')}
             items={settingsItems}
             activeTab={activeTab}
             onTabChange={onTabChange}
           />
           <NavGroup
-            label="资料库"
+            label={t('library')}
             items={libraryItems}
             activeTab={activeTab}
             onTabChange={onTabChange}
@@ -106,27 +157,29 @@ export function MainNav({ activeTab, onTabChange }: MainNavProps) {
 
         <div className="rounded-[10px] border border-gray-200 bg-white p-3 shadow-sm">
           <div className="mb-2 flex items-center justify-between gap-2 border-b border-gray-100 pb-2">
-            <span className="text-[11px] font-bold text-gray-700">历史与收藏</span>
+            <span className="text-[11px] font-bold text-gray-700">{t('historyAndFavorites')}</span>
             <button
               type="button"
               onClick={openCapacity}
               className="h-6 rounded-md bg-primary-50 px-2 text-[10px] font-semibold text-primary-600 hover:bg-primary-100"
             >
-              设置
+              {t('configure')}
             </button>
           </div>
           <CapacitySummary
-            label="保留天数"
+            label={t('retentionDays')}
             value={history?.retentionDays ?? retentionDays}
-            suffix="天"
+            suffix={t('days')}
           />
           <CapacitySummary
-            label="历史上限"
-            value={history?.maximumRecords ?? historyCapacity}
+            label={t('historyUsed')}
+            value={historyUsed}
+            capacity={history?.maximumRecords ?? historyCapacity}
           />
           <CapacitySummary
-            label="收藏上限"
-            value={history?.maximumFavorites ?? favoriteCapacity}
+            label={t('favoritesUsed')}
+            value={favoritesUsed}
+            capacity={history?.maximumFavorites ?? favoriteCapacity}
           />
         </div>
       </aside>
@@ -141,16 +194,16 @@ export function MainNav({ activeTab, onTabChange }: MainNavProps) {
           <section className="w-full max-w-[440px] overflow-hidden rounded-2xl border border-black/10 bg-white shadow-2xl">
             <header className="flex items-start justify-between gap-4 border-b border-gray-100 px-5 py-4">
               <div>
-                <h2 className="text-base font-bold text-gray-900">历史与收藏</h2>
+                <h2 className="text-base font-bold text-gray-900">{t('historyAndFavorites')}</h2>
                 <p className="mt-1 text-xs text-gray-500">
-                  统一管理自动清理和资料库容量
+                  {t('capacityDescription')}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setCapacityOpen(false)}
                 className="grid h-8 w-8 place-items-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-                aria-label="关闭"
+                aria-label={t('close')}
               >
                 ×
               </button>
@@ -159,16 +212,16 @@ export function MainNav({ activeTab, onTabChange }: MainNavProps) {
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-5">
                 <div>
                   <div className="text-sm font-semibold text-gray-800">
-                    自动清理历史记录
+                    {t('autoCleanupHistory')}
                   </div>
                   <div className="mt-1 text-[11px] text-gray-500">
-                    删除超过保留天数的非收藏记录
+                    {t('autoCleanupHistoryDescription')}
                   </div>
                 </div>
                 <button
                   type="button"
                   role="switch"
-                  aria-label="自动清理历史记录"
+                  aria-label={t('autoCleanupHistory')}
                   aria-checked={autoCleanupEnabled}
                   onClick={() => setAutoCleanupEnabled((value) => !value)}
                   className={`relative h-[22px] w-10 rounded-full transition-colors ${
@@ -183,8 +236,8 @@ export function MainNav({ activeTab, onTabChange }: MainNavProps) {
                 </button>
               </div>
               <CapacityField
-                label="历史记录保留天数"
-                description="超过此天数的历史记录将被自动删除"
+                label={t('historyRetentionDays')}
+                description={t('historyRetentionDaysDescription')}
                 value={retentionDays}
                 onChange={setRetentionDays}
                 min={1}
@@ -192,8 +245,8 @@ export function MainNav({ activeTab, onTabChange }: MainNavProps) {
                 step={1}
               />
               <CapacityField
-                label="最多保留记录数"
-                description="收藏记录不计入自动清理上限"
+                label={t('maximumRecords')}
+                description={t('maximumRecordsDescription')}
                 value={historyCapacity}
                 onChange={setHistoryCapacity}
                 min={100}
@@ -201,8 +254,8 @@ export function MainNav({ activeTab, onTabChange }: MainNavProps) {
                 step={100}
               />
               <CapacityField
-                label="收藏夹容量"
-                description="达到上限后停止新增，不会自动删除收藏"
+                label={t('favoritesCapacity')}
+                description={t('favoritesCapacityDescription')}
                 value={favoriteCapacity}
                 onChange={setFavoriteCapacity}
                 min={100}
@@ -210,7 +263,7 @@ export function MainNav({ activeTab, onTabChange }: MainNavProps) {
                 step={100}
               />
               <p className="rounded-lg bg-gray-50 px-3 py-2.5 text-[11px] leading-relaxed text-gray-500">
-                收藏是用户主动保存的内容。容量不足时会提示先整理收藏，避免静默删除重要资料。
+                {t('capacityNotice')}
               </p>
             </div>
             <footer className="flex justify-end gap-2 border-t border-gray-100 bg-gray-50 px-5 py-3.5">
@@ -219,14 +272,14 @@ export function MainNav({ activeTab, onTabChange }: MainNavProps) {
                 onClick={() => setCapacityOpen(false)}
                 className="h-9 rounded-lg border border-gray-200 bg-white px-4 text-xs font-medium text-gray-600 hover:bg-gray-50"
               >
-                取消
+                {t('cancel')}
               </button>
               <button
                 type="button"
                 onClick={() => void saveCapacity()}
                 className="h-9 rounded-lg bg-primary-600 px-4 text-xs font-semibold text-white hover:bg-primary-700"
               >
-                保存设置
+                {t('saveSettings')}
               </button>
             </footer>
           </section>
@@ -288,16 +341,20 @@ function CapacitySummary({
   label,
   value,
   suffix,
+  capacity,
 }: {
   label: string;
-  value: number;
+  value: number | null;
   suffix?: string;
+  capacity?: number;
 }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1 text-[10px] text-gray-500">
       <span>{label}</span>
       <span className="font-medium tabular-nums text-gray-700">
-        {value.toLocaleString()}{suffix ? ` ${suffix}` : ''}
+        {value === null
+          ? '—'
+          : `${value.toLocaleString()}${capacity === undefined ? '' : ` / ${capacity.toLocaleString()}`}${suffix ? ` ${suffix}` : ''}`}
       </span>
     </div>
   );

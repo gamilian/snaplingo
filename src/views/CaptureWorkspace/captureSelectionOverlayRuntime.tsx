@@ -41,6 +41,7 @@ interface UseCaptureSelectionOverlayOptions {
   hoverSelectionRef: RefObject<LogicalRect | null>;
   showSelectionSize?: boolean;
   selectionBorderWidth?: number;
+  selectionBorderColor?: [number, number, number, number];
   selectionMaskColor?: [number, number, number, number];
 }
 
@@ -96,6 +97,7 @@ export function useCaptureSelectionOverlay({
   hoverSelectionRef,
   showSelectionSize = true,
   selectionBorderWidth,
+  selectionBorderColor,
   selectionMaskColor,
   selection,
   selectionBounds,
@@ -129,6 +131,7 @@ export function useCaptureSelectionOverlay({
         }),
         {
           borderWidth: selectionBorderWidth,
+          borderColor: selectionBorderColor,
           maskColor: selectionMaskColor,
         },
       );
@@ -137,6 +140,7 @@ export function useCaptureSelectionOverlay({
       cssSize,
       cursorPointRef,
       pixelRatio,
+      selectionBorderColor,
       selectionBorderWidth,
       selectionBounds,
       selectionMaskColor,

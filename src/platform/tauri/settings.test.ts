@@ -24,6 +24,7 @@ const backendSnapshot = {
     remember_last_tool: false,
     show_selection_size: false,
     show_magnifier: true,
+    magnifier_zoom: 16,
     pin_opacity: 80,
     pin_shadow: false,
     annotation_colors: [[255, 77, 79, 255]],
@@ -67,6 +68,14 @@ describe('Tauri settings command adapter', () => {
         language: 'en',
         theme: 'dark',
         startOnBoot: true,
+        proxyMode: 'system',
+        proxyUrl: '',
+        requestTimeoutMs: 10000,
+        retryCount: 1,
+        logLevel: 'info',
+        logRetentionDays: 7,
+        performanceMonitoring: false,
+        experimentalGpuAcceleration: false,
       },
       screenshot: {
         savePath: '/captures',
@@ -80,10 +89,12 @@ describe('Tauri settings command adapter', () => {
         rememberLastTool: false,
         showSelectionSize: false,
         showMagnifier: true,
+        magnifierZoom: 16,
         pinOpacity: 80,
         pinShadow: false,
         annotationColors: [[255, 77, 79, 255]],
         selectionBorderWidth: 2,
+        selectionBorderColor: [91, 127, 255, 242],
         selectionMaskColor: [0, 0, 0, 46],
       },
       translation: {
@@ -136,8 +147,36 @@ describe('Tauri settings command adapter', () => {
         language: 'en',
         theme: 'dark',
         start_on_boot: true,
+        proxy_mode: 'system',
+        proxy_url: '',
+        request_timeout_ms: 10000,
+        retry_count: 1,
+        log_level: 'info',
+        log_retention_days: 7,
+        performance_monitoring: false,
+        experimental_gpu_acceleration: false,
       },
     });
+  });
+
+  it('loads and clears SQLite application logs', async () => {
+    const { clearAppLogs, listAppLogs } = await import('./settings');
+    const logs = [
+      {
+        id: 1,
+        timestamp: '2026-07-16T00:00:00Z',
+        level: 'INFO' as const,
+        target: 'capture',
+        message: 'ready',
+      },
+    ];
+    invoke.mockResolvedValueOnce(logs).mockResolvedValueOnce(undefined);
+
+    await expect(listAppLogs(20)).resolves.toEqual(logs);
+    await clearAppLogs();
+
+    expect(invoke).toHaveBeenNthCalledWith(1, 'list_app_logs', { limit: 20 });
+    expect(invoke).toHaveBeenNthCalledWith(2, 'clear_app_logs');
   });
 
   it('maps screenshot settings updates to the backend payload shape', async () => {
@@ -156,10 +195,12 @@ describe('Tauri settings command adapter', () => {
       rememberLastTool: false,
       showSelectionSize: false,
       showMagnifier: true,
+      magnifierZoom: 14,
       pinOpacity: 75,
       pinShadow: false,
       annotationColors: [[12, 34, 56, 255]],
       selectionBorderWidth: 4,
+      selectionBorderColor: [255, 77, 79, 242],
       selectionMaskColor: [32, 36, 44, 72],
     });
 
@@ -176,10 +217,12 @@ describe('Tauri settings command adapter', () => {
         remember_last_tool: false,
         show_selection_size: false,
         show_magnifier: true,
+        magnifier_zoom: 14,
         pin_opacity: 75,
         pin_shadow: false,
         annotation_colors: [[12, 34, 56, 255]],
         selection_border_width: 4,
+        selection_border_color: [255, 77, 79, 242],
         selection_mask_color: [32, 36, 44, 72],
       },
     });

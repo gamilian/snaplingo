@@ -53,6 +53,31 @@ pub fn capture_all_monitor_snapshots() -> Result<Vec<MonitorSnapshot>, AppError>
 }
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]
+pub fn capture_monitor_snapshot_by_id(monitor_id: &str) -> Result<MonitorSnapshot, AppError> {
+    let mut monitors = Monitor::all()
+        .map_err(|e| with_platform_hint(format!("Failed to enumerate monitors: {}", e)))?;
+    monitors.sort_by_key(|monitor| {
+        if monitor.is_primary().unwrap_or(false) {
+            0
+        } else {
+            1
+        }
+    });
+    for (index, monitor) in monitors.iter().enumerate() {
+        let id = monitor
+            .id()
+            .map(|id| format!("monitor-{id}"))
+            .unwrap_or_else(|_| format!("monitor-{index}"));
+        if id == monitor_id {
+            return capture_monitor_snapshot(monitor, index);
+        }
+    }
+    Err(AppError::System(format!(
+        "Capture monitor not found: {monitor_id}"
+    )))
+}
+
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 pub fn capture_all_monitor_layouts() -> Result<Vec<MonitorLayout>, AppError> {
     let mut monitors = Monitor::all()
         .map_err(|e| with_platform_hint(format!("Failed to enumerate monitors: {}", e)))?;

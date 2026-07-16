@@ -118,6 +118,26 @@ describe('Tauri capture command adapter', () => {
     expect(result.monitors[0].image_base64).toBe('pixels');
   });
 
+  it('hydrates only the monitor needed by the magnifier', async () => {
+    const { hydrateCaptureMonitorSnapshot } = await import('./capture');
+    const monitor = {
+      id: 'monitor-1',
+      logical_bounds: { x: 0, y: 0, width: 100, height: 80 },
+      physical_bounds: { x: 0, y: 0, width: 200, height: 160 },
+      scale_factor: 2,
+      image_base64: 'pixels',
+    };
+    invoke.mockResolvedValueOnce(monitor);
+
+    await expect(
+      hydrateCaptureMonitorSnapshot('capture-1', 'monitor-1'),
+    ).resolves.toEqual(monitor);
+    expect(invoke).toHaveBeenCalledWith('hydrate_capture_monitor_snapshot', {
+      sessionId: 'capture-1',
+      monitorId: 'monitor-1',
+    });
+  });
+
   it('queries control candidates and moves the native cursor through commands', async () => {
     const { currentCaptureControlCandidate, moveCaptureCursor } = await import(
       './capture'

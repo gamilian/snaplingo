@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getCaptureMagnifierRuntimeState,
   shouldHydrateCaptureMagnifierPixels,
+  shouldRequestCaptureMagnifierPixels,
 } from './captureMagnifierRuntime';
 import type { CaptureSessionView } from './types';
 
@@ -30,11 +31,35 @@ function createCaptureSessionView(): CaptureSessionView {
 }
 
 describe('captureMagnifierRuntime', () => {
+  it('requests pixels automatically while selecting when the setting is enabled', () => {
+    expect(
+      shouldRequestCaptureMagnifierPixels({
+        enabled: true,
+        requested: false,
+        status: 'selecting',
+      }),
+    ).toBe(true);
+    expect(
+      shouldRequestCaptureMagnifierPixels({
+        enabled: false,
+        requested: true,
+        status: 'preview',
+      }),
+    ).toBe(true);
+    expect(
+      shouldRequestCaptureMagnifierPixels({
+        enabled: false,
+        requested: false,
+        status: 'selecting',
+      }),
+    ).toBe(false);
+  });
+
   it('hydrates snapshot pixels only after the magnifier is explicitly requested', () => {
     expect(
       shouldHydrateCaptureMagnifierPixels({
         hasSession: true,
-        hasHydratedPixelSource: false,
+        hasCursorMonitorPixelSource: false,
         isMagnifierRequested: true,
       }),
     ).toBe(true);
@@ -42,7 +67,7 @@ describe('captureMagnifierRuntime', () => {
     expect(
       shouldHydrateCaptureMagnifierPixels({
         hasSession: true,
-        hasHydratedPixelSource: false,
+        hasCursorMonitorPixelSource: false,
         isMagnifierRequested: false,
       }),
     ).toBe(false);
@@ -50,7 +75,7 @@ describe('captureMagnifierRuntime', () => {
     expect(
       shouldHydrateCaptureMagnifierPixels({
         hasSession: true,
-        hasHydratedPixelSource: true,
+        hasCursorMonitorPixelSource: true,
         isMagnifierRequested: true,
       }),
     ).toBe(false);

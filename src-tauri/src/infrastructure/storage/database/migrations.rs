@@ -2,7 +2,7 @@ use rusqlite::{Connection, Transaction};
 
 use crate::{AppError, Result};
 
-const CURRENT_SCHEMA_VERSION: i32 = 3;
+const CURRENT_SCHEMA_VERSION: i32 = 4;
 
 pub(super) fn migrate(connection: &mut Connection) -> Result<()> {
     let mut version: i32 = connection.query_row("PRAGMA user_version", [], |row| row.get(0))?;
@@ -21,6 +21,7 @@ pub(super) fn migrate(connection: &mut Connection) -> Result<()> {
             1 => migrate_to_v1(&transaction)?,
             2 => migrate_to_v2(&transaction)?,
             3 => migrate_to_v3(&transaction)?,
+            4 => migrate_to_v4(&transaction)?,
             _ => unreachable!("missing migration for version {}", next_version),
         }
         transaction.pragma_update(None, "user_version", next_version)?;
@@ -28,6 +29,21 @@ pub(super) fn migrate(connection: &mut Connection) -> Result<()> {
         version = next_version;
     }
 
+    Ok(())
+}
+
+fn migrate_to_v4(transaction: &Transaction<'_>) -> Result<()> {
+    transaction.execute_batch(
+        "CREATE TABLE app_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            level TEXT NOT NULL CHECK(level IN ('DEBUG', 'INFO', 'WARN', 'ERROR')),
+            target TEXT NOT NULL,
+            message TEXT NOT NULL
+        );
+
+        CREATE INDEX idx_app_logs_timestamp ON app_logs(timestamp DESC);",
+    )?;
     Ok(())
 }
 

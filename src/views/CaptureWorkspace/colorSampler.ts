@@ -14,6 +14,20 @@ export interface ColorSample {
 
 export type ColorSampleFormat = 'hex' | 'rgb';
 
+export function colorSamplesEqual(
+  first: ColorSample | null,
+  second: ColorSample | null,
+) {
+  return (
+    first === second ||
+    (first !== null &&
+      second !== null &&
+      first.red === second.red &&
+      first.green === second.green &&
+      first.blue === second.blue)
+  );
+}
+
 interface ColorSampleCopyShortcutEvent {
   key: string;
   metaKey: boolean;
@@ -92,6 +106,35 @@ export function sampleCanvasColor(
     height: canvas.height,
   });
   const [red, green, blue] = context.getImageData(point.x, point.y, 1, 1).data;
+
+  return {
+    hex: rgbaToHex(red, green, blue),
+    red,
+    green,
+    blue,
+  };
+}
+
+export function sampleImageColor(
+  image: HTMLImageElement,
+  sampleCanvas: HTMLCanvasElement,
+  cursor: Point,
+  logicalSize: Size,
+): ColorSample | null {
+  if (image.naturalWidth <= 0 || image.naturalHeight <= 0) return null;
+  if (sampleCanvas.width !== 1) sampleCanvas.width = 1;
+  if (sampleCanvas.height !== 1) sampleCanvas.height = 1;
+  const context = sampleCanvas.getContext('2d');
+  if (!context) return null;
+
+  const point = getImageSamplePoint(cursor, logicalSize, {
+    width: image.naturalWidth,
+    height: image.naturalHeight,
+  });
+  context.clearRect(0, 0, 1, 1);
+  context.imageSmoothingEnabled = false;
+  context.drawImage(image, point.x, point.y, 1, 1, 0, 0, 1, 1);
+  const [red, green, blue] = context.getImageData(0, 0, 1, 1).data;
 
   return {
     hex: rgbaToHex(red, green, blue),

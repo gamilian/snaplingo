@@ -3,8 +3,9 @@ mod keychain;
 mod screenshot_favorite_assets;
 
 pub use database::{
-    Database, SqliteConfigStore, SqliteFavoriteCapacityRepository, SqliteFavoriteRepository,
-    SqliteHistoryRepository, SqliteLibraryIndexRepository, SqliteScreenshotFavoriteRepository,
+    AppLogEntry, Database, SqliteAppLogRepository, SqliteConfigStore,
+    SqliteFavoriteCapacityRepository, SqliteFavoriteRepository, SqliteHistoryRepository,
+    SqliteLibraryIndexRepository, SqliteScreenshotFavoriteRepository,
 };
 pub use keychain::{is_keychain_not_found, Keychain};
 pub use screenshot_favorite_assets::{

@@ -18,6 +18,13 @@ impl CaptureSessionSource for WindowsCaptureSessionSource {
         xcap_common::capture_all_monitor_snapshots()
     }
 
+    async fn capture_monitor_snapshot(
+        &self,
+        monitor_id: &str,
+    ) -> Result<MonitorSnapshot, AppError> {
+        xcap_common::capture_monitor_snapshot_by_id(monitor_id)
+    }
+
     async fn capture_monitor_layouts(&self) -> Result<Vec<MonitorLayout>, AppError> {
         xcap_common::capture_all_monitor_layouts()
     }

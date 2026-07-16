@@ -89,7 +89,10 @@ import {
   createInitialCaptureWorkspaceState,
   type CaptureWorkspaceState,
 } from '../../views/CaptureWorkspace/captureWorkspaceState';
-import { colorSampleToClipboardText } from '../../views/CaptureWorkspace/colorSampler';
+import {
+  colorSamplesEqual,
+  colorSampleToClipboardText,
+} from '../../views/CaptureWorkspace/colorSampler';
 import { updateTextAnnotationDraft } from '../../views/CaptureWorkspace/textAnnotationDraft';
 import {
   normalizeSelection,
@@ -128,6 +131,10 @@ interface SnapshotHydration {
   generation: number;
   sessionId: string;
   promise: Promise<void>;
+}
+
+interface MagnifierMonitorHydration extends SnapshotHydration {
+  monitorId: string;
 }
 
 interface PreviewRenderRequest {
@@ -171,6 +178,7 @@ interface CaptureWorkspaceRuntimeKeyboard {
     addEventListener(
       type: 'keydown',
       listener: (event: KeyboardEvent) => void,
+      capture?: boolean,
     ): void;
     addEventListener(
       type: 'keyup',
@@ -180,6 +188,7 @@ interface CaptureWorkspaceRuntimeKeyboard {
     removeEventListener(
       type: 'keydown',
       listener: (event: KeyboardEvent) => void,
+      capture?: boolean,
     ): void;
     removeEventListener(
       type: 'keyup',
@@ -217,7 +226,9 @@ export interface CaptureScreenshotPreferences {
   rememberLastTool: boolean;
   showSelectionSize: boolean;
   showMagnifier: boolean;
+  magnifierZoom?: number;
   selectionBorderWidth?: number;
+  selectionBorderColor?: [number, number, number, number];
   selectionMaskColor?: [number, number, number, number];
 }
 
@@ -256,6 +267,7 @@ export function createCaptureWorkspaceRuntime({
   let generation = 0;
   let disposed = false;
   let hydratedSessionId: string | null = null;
+  let magnifierMonitorHydration: MagnifierMonitorHydration | null = null;
   let snapshotHydration: SnapshotHydration | null = null;
   const listeners = new Set<() => void>();
   let hasRevealed = false;
@@ -267,6 +279,8 @@ export function createCaptureWorkspaceRuntime({
   let previewScheduler: PreviewRenderScheduler | null = null;
   let terminalOutputSequence = 0;
   let terminalOutputOperation: TerminalOutputOperation | null = null;
+  let controlCandidateRequestRevision = 0;
+  let cursorMoveRequestRevision = 0;
   const hostConnections = new Set<HostConnection>();
   const nativeSessionCancellations = new Map<string, Promise<void>>();
   const provisionalSessionIds = new Set<string>();
@@ -1172,6 +1186,78 @@ export function createCaptureWorkspaceRuntime({
     await runCompletionEffects(rect, transition.effects);
   };
 
+  const windowCandidateAt = (point: Point) =>
+    state.session
+      ? getBestCandidateAtPoint(
+          buildCaptureCandidates(
+            state.session.monitors,
+            state.session.candidates,
+          ),
+          point,
+        )?.rect ?? null
+      : null;
+
+  const refreshControlCandidate = async (
+    sessionId: string,
+    cursorPoint: Point,
+  ) => {
+    const requestRevision = ++controlCandidateRequestRevision;
+    try {
+      const candidate = await platform.commands.currentCaptureControlCandidate(
+        sessionId,
+        cursorPoint,
+      );
+      if (
+        requestRevision === controlCandidateRequestRevision &&
+        state.status === 'selecting' &&
+        state.session?.id === sessionId &&
+        state.candidateDetectionMode === 'control' &&
+        arePointsEqual(state.cursorPoint, cursorPoint)
+      ) {
+        patch({ hoverSelection: candidate?.rect ?? null, error: null });
+      }
+    } catch (error) {
+      if (
+        requestRevision === controlCandidateRequestRevision &&
+        state.status === 'selecting' &&
+        state.session?.id === sessionId &&
+        state.candidateDetectionMode === 'control' &&
+        arePointsEqual(state.cursorPoint, cursorPoint)
+      ) {
+        patch({
+          candidateDetectionMode: 'window',
+          hoverSelection: windowCandidateAt(state.cursorPoint ?? cursorPoint),
+          error: `界面元素检测不可用：${errorMessage(error)}`,
+        });
+      }
+    }
+  };
+
+  const moveCaptureCursor = async (sessionId: string, delta: Point) => {
+    const requestRevision = ++cursorMoveRequestRevision;
+    try {
+      await platform.commands.moveCaptureCursor(delta);
+      if (
+        requestRevision === cursorMoveRequestRevision &&
+        state.status === 'selecting' &&
+        state.session?.id === sessionId &&
+        state.error?.startsWith('鼠标移动失败：')
+      ) {
+        patch({ error: null });
+      }
+      return true;
+    } catch (error) {
+      if (
+        requestRevision === cursorMoveRequestRevision &&
+        state.status === 'selecting' &&
+        state.session?.id === sessionId
+      ) {
+        patch({ error: `鼠标移动失败：${errorMessage(error)}` });
+      }
+      return false;
+    }
+  };
+
   const restoreLastSelection = () => {
     if (!storage || !state.session) return false;
     let restored = false;
@@ -1267,11 +1353,11 @@ export function createCaptureWorkspaceRuntime({
       };
 
       if (keyboard && !disposed && !connection.isClosed) {
-        keyboard.target.addEventListener('keydown', handleKeyDown);
+        keyboard.target.addEventListener('keydown', handleKeyDown, true);
         keyboard.target.addEventListener('keyup', handleKeyUp);
         keyboard.target.addEventListener('blur', handleBlur);
         connection.retain(() => {
-          keyboard.target.removeEventListener('keydown', handleKeyDown);
+          keyboard.target.removeEventListener('keydown', handleKeyDown, true);
           keyboard.target.removeEventListener('keyup', handleKeyUp);
           keyboard.target.removeEventListener('blur', handleBlur);
         });
@@ -1982,6 +2068,7 @@ export function createCaptureWorkspaceRuntime({
     undoAnnotation,
     redoAnnotation,
     updateCursorColor(cursorColor) {
+      if (colorSamplesEqual(state.cursorColor, cursorColor)) return;
       patch({ cursorColor });
     },
 
@@ -2099,7 +2186,8 @@ export function createCaptureWorkspaceRuntime({
           previewImageBase64: draftNudge.previewImageBase64,
           isRenderingOutput: draftNudge.renderingOutput,
         });
-        launch(() => platform.commands.moveCaptureCursor(cursorNudgeDelta));
+        const sessionId = state.session.id;
+        launch(() => moveCaptureCursor(sessionId, cursorNudgeDelta));
         return true;
       }
       if (
@@ -2130,19 +2218,9 @@ export function createCaptureWorkspaceRuntime({
         });
         const sessionId = state.session.id;
         launch(async () => {
-          await platform.commands.moveCaptureCursor(cursorNudgeDelta);
-          if (candidateDetectionMode !== 'control') return;
-          const candidate = await platform.commands.currentCaptureControlCandidate(
-            sessionId,
-            cursorPoint,
-          );
-          if (
-            state.status === 'selecting' &&
-            state.session?.id === sessionId &&
-            state.candidateDetectionMode === 'control' &&
-            arePointsEqual(state.cursorPoint, cursorPoint)
-          ) {
-            patch({ hoverSelection: candidate?.rect ?? null });
+          if (!(await moveCaptureCursor(sessionId, cursorNudgeDelta))) return;
+          if (candidateDetectionMode === 'control') {
+            await refreshControlCandidate(sessionId, cursorPoint);
           }
         });
         return true;
@@ -2150,42 +2228,27 @@ export function createCaptureWorkspaceRuntime({
       if (
         state.status === 'selecting' &&
         state.session &&
-        state.cursorPoint &&
         isCandidateDetectionModeToggleShortcut(event)
       ) {
         const candidateDetectionMode =
           state.candidateDetectionMode === 'window' ? 'control' : 'window';
+        controlCandidateRequestRevision += 1;
         const sessionId = state.session.id;
-        const cursorPoint = state.cursorPoint;
+        const cursorPoint =
+          state.cursorPoint ??
+          state.session.captured_cursor?.logical_position ??
+          null;
         patch({
           candidateDetectionMode,
+          cursorPoint,
+          error: null,
           hoverSelection:
-            candidateDetectionMode === 'window'
-              ? getBestCandidateAtPoint(
-                  buildCaptureCandidates(
-                    state.session.monitors,
-                    state.session.candidates,
-                  ),
-                  cursorPoint,
-                )?.rect ?? null
+            candidateDetectionMode === 'window' && cursorPoint
+              ? windowCandidateAt(cursorPoint)
               : null,
         });
-        if (candidateDetectionMode === 'control') {
-          launch(async () => {
-            const candidate =
-              await platform.commands.currentCaptureControlCandidate(
-                sessionId,
-                cursorPoint,
-              );
-            if (
-              state.status === 'selecting' &&
-              state.session?.id === sessionId &&
-              state.candidateDetectionMode === 'control' &&
-              arePointsEqual(state.cursorPoint, cursorPoint)
-            ) {
-              patch({ hoverSelection: candidate?.rect ?? null });
-            }
-          });
+        if (candidateDetectionMode === 'control' && cursorPoint) {
+          launch(() => refreshControlCandidate(sessionId, cursorPoint));
         }
         return true;
       }
@@ -2238,6 +2301,69 @@ export function createCaptureWorkspaceRuntime({
         return true;
       }
       return false;
+    },
+
+    async hydrateMagnifierMonitor(monitorId: string) {
+      if (disposed) return;
+      const sessionId = state.session?.id;
+      if (!sessionId) return;
+      const hasPixels = () =>
+        Boolean(
+          state.session?.monitors.find((monitor) => monitor.id === monitorId)
+            ?.image_base64,
+        );
+      if (hasPixels()) return;
+
+      const actionGeneration = generation;
+      if (
+        magnifierMonitorHydration?.generation === actionGeneration &&
+        magnifierMonitorHydration.sessionId === sessionId
+      ) {
+        await magnifierMonitorHydration.promise;
+        if (
+          disposed ||
+          generation !== actionGeneration ||
+          state.session?.id !== sessionId ||
+          hasPixels()
+        ) {
+          return;
+        }
+      }
+
+      let hydration: MagnifierMonitorHydration;
+      const promise = platform.commands
+        .hydrateCaptureMonitorSnapshot(sessionId, monitorId)
+        .then((snapshot) => {
+          if (
+            disposed ||
+            generation !== actionGeneration ||
+            state.session?.id !== sessionId ||
+            snapshot.id !== monitorId
+          ) {
+            return;
+          }
+          patch({
+            session: {
+              ...state.session,
+              monitors: state.session.monitors.map((monitor) =>
+                monitor.id === monitorId ? snapshot : monitor,
+              ),
+            },
+          });
+        })
+        .finally(() => {
+          if (magnifierMonitorHydration === hydration) {
+            magnifierMonitorHydration = null;
+          }
+        });
+      hydration = {
+        generation: actionGeneration,
+        sessionId,
+        monitorId,
+        promise,
+      };
+      magnifierMonitorHydration = hydration;
+      await promise;
     },
 
     async hydrateSnapshots() {

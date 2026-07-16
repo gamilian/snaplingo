@@ -5,6 +5,13 @@ interface Size {
   height: number;
 }
 
+interface Rect extends Point, Size {}
+
+export interface MagnifierCanvasBlit {
+  source: Rect;
+  destination: Rect;
+}
+
 interface MagnifierVisibilityState {
   requested: boolean;
   automatic: boolean;
@@ -25,6 +32,10 @@ interface CursorTrackingState extends AutoMagnifierState {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+export function normalizeMagnifierZoom(zoom: number) {
+  return clamp(Math.round(zoom), 4, 20);
 }
 
 export function shouldShowMagnifier(state: MagnifierVisibilityState) {
@@ -85,5 +96,76 @@ export function getMagnifierImageStyle(
     backgroundSize: `${backgroundWidth}px ${backgroundHeight}px`,
     backgroundPosition: `${backgroundX}px ${backgroundY}px`,
     imageRendering: 'pixelated' as const,
+  };
+}
+
+export function getMagnifierCanvasBlit(
+  cursor: Point,
+  logicalSize: Size,
+  pixelSize: Size,
+  lensSize: Size,
+  zoom: number,
+): MagnifierCanvasBlit | null {
+  if (
+    logicalSize.width <= 0 ||
+    logicalSize.height <= 0 ||
+    pixelSize.width <= 0 ||
+    pixelSize.height <= 0 ||
+    lensSize.width <= 0 ||
+    lensSize.height <= 0 ||
+    zoom <= 0
+  ) {
+    return null;
+  }
+
+  const centerPixelX = clamp(
+    Math.floor((cursor.x / logicalSize.width) * pixelSize.width),
+    0,
+    pixelSize.width - 1,
+  );
+  const centerPixelY = clamp(
+    Math.floor((cursor.y / logicalSize.height) * pixelSize.height),
+    0,
+    pixelSize.height - 1,
+  );
+  const sampleWidth = Math.min(
+    pixelSize.width,
+    Math.max(1, Math.round(lensSize.width / zoom)),
+  );
+  const sampleHeight = Math.min(
+    pixelSize.height,
+    Math.max(1, Math.round(lensSize.height / zoom)),
+  );
+  const desiredX = centerPixelX - Math.floor(sampleWidth / 2);
+  const desiredY = centerPixelY - Math.floor(sampleHeight / 2);
+  const sourceX = clamp(desiredX, 0, pixelSize.width);
+  const sourceY = clamp(desiredY, 0, pixelSize.height);
+  const sourceRight = clamp(
+    desiredX + sampleWidth,
+    0,
+    pixelSize.width,
+  );
+  const sourceBottom = clamp(
+    desiredY + sampleHeight,
+    0,
+    pixelSize.height,
+  );
+  const sourceWidth = sourceRight - sourceX;
+  const sourceHeight = sourceBottom - sourceY;
+  if (sourceWidth <= 0 || sourceHeight <= 0) return null;
+
+  return {
+    source: {
+      x: sourceX,
+      y: sourceY,
+      width: sourceWidth,
+      height: sourceHeight,
+    },
+    destination: {
+      x: (sourceX - desiredX) * zoom,
+      y: (sourceY - desiredY) * zoom,
+      width: sourceWidth * zoom,
+      height: sourceHeight * zoom,
+    },
   };
 }

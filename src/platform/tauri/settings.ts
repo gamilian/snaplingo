@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import type {
+  AppLogEntry,
   AnnotationColorPreset,
   ScreenshotFormat,
   ScreenshotNamingRule,
@@ -12,6 +13,14 @@ interface BackendGeneralSettings {
   language: string;
   theme: string;
   start_on_boot: boolean;
+  proxy_mode?: 'system' | 'none' | 'manual';
+  proxy_url?: string;
+  request_timeout_ms?: number;
+  retry_count?: number;
+  log_level?: 'debug' | 'info' | 'warn' | 'error';
+  log_retention_days?: number;
+  performance_monitoring?: boolean;
+  experimental_gpu_acceleration?: boolean;
 }
 
 interface BackendScreenshotSettings {
@@ -26,10 +35,12 @@ interface BackendScreenshotSettings {
   remember_last_tool: boolean;
   show_selection_size: boolean;
   show_magnifier: boolean;
+  magnifier_zoom?: number;
   pin_opacity: number;
   pin_shadow: boolean;
   annotation_colors: AnnotationColorPreset[];
   selection_border_width?: number;
+  selection_border_color?: AnnotationColorPreset;
   selection_mask_color?: AnnotationColorPreset;
 }
 
@@ -79,6 +90,14 @@ interface GeneralSettingsInput {
   language: string;
   theme: string;
   startOnBoot: boolean;
+  proxyMode?: 'system' | 'none' | 'manual';
+  proxyUrl?: string;
+  requestTimeoutMs?: number;
+  retryCount?: number;
+  logLevel?: 'debug' | 'info' | 'warn' | 'error';
+  logRetentionDays?: number;
+  performanceMonitoring?: boolean;
+  experimentalGpuAcceleration?: boolean;
 }
 
 interface ScreenshotSettingsInput {
@@ -93,10 +112,12 @@ interface ScreenshotSettingsInput {
   rememberLastTool: boolean;
   showSelectionSize: boolean;
   showMagnifier: boolean;
+  magnifierZoom?: number;
   pinOpacity: number;
   pinShadow: boolean;
   annotationColors: AnnotationColorPreset[];
   selectionBorderWidth?: number;
+  selectionBorderColor?: AnnotationColorPreset;
   selectionMaskColor?: AnnotationColorPreset;
 }
 
@@ -133,6 +154,15 @@ function normalizeSnapshot(snapshot: BackendSettingsSnapshot) {
       language: snapshot.general.language,
       theme: snapshot.general.theme,
       startOnBoot: snapshot.general.start_on_boot,
+      proxyMode: snapshot.general.proxy_mode ?? 'system',
+      proxyUrl: snapshot.general.proxy_url ?? '',
+      requestTimeoutMs: snapshot.general.request_timeout_ms ?? 10_000,
+      retryCount: snapshot.general.retry_count ?? 1,
+      logLevel: snapshot.general.log_level ?? 'info',
+      logRetentionDays: snapshot.general.log_retention_days ?? 7,
+      performanceMonitoring: snapshot.general.performance_monitoring ?? false,
+      experimentalGpuAcceleration:
+        snapshot.general.experimental_gpu_acceleration ?? false,
     },
     screenshot: {
       savePath: snapshot.screenshot.save_path,
@@ -146,10 +176,13 @@ function normalizeSnapshot(snapshot: BackendSettingsSnapshot) {
       rememberLastTool: snapshot.screenshot.remember_last_tool,
       showSelectionSize: snapshot.screenshot.show_selection_size,
       showMagnifier: snapshot.screenshot.show_magnifier,
+      magnifierZoom: snapshot.screenshot.magnifier_zoom ?? 12,
       pinOpacity: snapshot.screenshot.pin_opacity,
       pinShadow: snapshot.screenshot.pin_shadow,
       annotationColors: snapshot.screenshot.annotation_colors,
       selectionBorderWidth: snapshot.screenshot.selection_border_width ?? 2,
+      selectionBorderColor:
+        snapshot.screenshot.selection_border_color ?? [91, 127, 255, 242],
       selectionMaskColor: snapshot.screenshot.selection_mask_color ?? [0, 0, 0, 46],
     },
     translation: {
@@ -200,9 +233,26 @@ export async function updateGeneralSettings(input: GeneralSettingsInput) {
         language: input.language,
         theme: input.theme,
         start_on_boot: input.startOnBoot,
+        proxy_mode: input.proxyMode ?? 'system',
+        proxy_url: input.proxyUrl ?? '',
+        request_timeout_ms: input.requestTimeoutMs ?? 10_000,
+        retry_count: input.retryCount ?? 1,
+        log_level: input.logLevel ?? 'info',
+        log_retention_days: input.logRetentionDays ?? 7,
+        performance_monitoring: input.performanceMonitoring ?? false,
+        experimental_gpu_acceleration:
+          input.experimentalGpuAcceleration ?? false,
       },
     }),
   );
+}
+
+export async function listAppLogs(limit: number) {
+  return invoke<AppLogEntry[]>('list_app_logs', { limit });
+}
+
+export async function clearAppLogs() {
+  await invoke<void>('clear_app_logs');
 }
 
 export async function updateScreenshotSettings(input: ScreenshotSettingsInput) {
@@ -220,10 +270,13 @@ export async function updateScreenshotSettings(input: ScreenshotSettingsInput) {
         remember_last_tool: input.rememberLastTool,
         show_selection_size: input.showSelectionSize,
         show_magnifier: input.showMagnifier,
+        magnifier_zoom: input.magnifierZoom ?? 12,
         pin_opacity: input.pinOpacity,
         pin_shadow: input.pinShadow,
         annotation_colors: input.annotationColors,
         selection_border_width: input.selectionBorderWidth ?? 2,
+        selection_border_color:
+          input.selectionBorderColor ?? [91, 127, 255, 242],
         selection_mask_color: input.selectionMaskColor ?? [0, 0, 0, 46],
       },
     }),

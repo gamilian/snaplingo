@@ -21,7 +21,7 @@ use selection_runtime::build_selected_text_acquirer;
 pub(crate) use history_runtime::subscribe_history;
 
 use crate::app_state::{
-    AppState, CaptureRuntimeState, FavoritesRuntime, HistoryRuntime, ProviderRuntime,
+    AppState, CaptureRuntimeState, FavoritesRuntime, HistoryRuntime, LogsRuntime, ProviderRuntime,
     ScreenshotFavoritesRuntime, SelectionRuntime, SettingsRuntime,
 };
 use crate::application::favorites::{FavoriteChangeNotifier, FavoriteRepository};
@@ -38,8 +38,8 @@ use crate::application::settings::{SettingsChangeNotifier, SettingsStore};
 use crate::infrastructure::events::EventBus;
 use crate::infrastructure::http::ReqwestHttpClient;
 use crate::infrastructure::storage::{
-    Database, Keychain, SqliteConfigStore, SqliteFavoriteCapacityRepository,
-    SqliteLibraryIndexRepository,
+    Database, Keychain, SqliteAppLogRepository, SqliteConfigStore,
+    SqliteFavoriteCapacityRepository, SqliteLibraryIndexRepository,
 };
 use crate::infrastructure::storage::{FilesystemOcrHistoryAssets, SqliteFavoriteRepository};
 use crate::infrastructure::system::result_window::{
@@ -97,13 +97,19 @@ impl ProviderChangeNotifier for TauriProviderChangeNotifier {
     }
 }
 
-pub(crate) fn build_app_state(database_path: PathBuf, app: AppHandle) -> AppState {
+pub(crate) fn build_app_state(
+    database: Arc<Database>,
+    database_path: PathBuf,
+    app: AppHandle,
+) -> AppState {
     let asset_root = database_path
         .parent()
         .unwrap_or_else(|| std::path::Path::new("."))
         .join("assets");
-    let database = Arc::new(Database::open(database_path).expect("Failed to initialize database"));
     let config_store = Arc::new(SqliteConfigStore::new(database.clone()));
+    let logs = Arc::new(LogsRuntime {
+        repository: Arc::new(SqliteAppLogRepository::new(database.clone())),
+    });
     let settings_store: Arc<dyn SettingsStore> = config_store.clone();
     let hotkey_store: Arc<dyn HotkeyStore> = config_store.clone();
     let provider_config_store: Arc<dyn ProviderConfigStore> = config_store.clone();
@@ -118,7 +124,9 @@ pub(crate) fn build_app_state(database_path: PathBuf, app: AppHandle) -> AppStat
     ));
     let keychain = Arc::new(Keychain::new());
     let provider_credential_store: Arc<dyn ProviderCredentialStore> = keychain.clone();
-    let http_client: Arc<dyn HttpClient> = Arc::new(ReqwestHttpClient::new());
+    let http_client: Arc<dyn HttpClient> = Arc::new(ReqwestHttpClient::with_settings(
+        settings_configuration.clone(),
+    ));
     let event_bus = Arc::new(EventBus::new());
     let provider_change_notifier: Arc<dyn ProviderChangeNotifier> =
         Arc::new(TauriProviderChangeNotifier { app: app.clone() });
@@ -237,6 +245,7 @@ pub(crate) fn build_app_state(database_path: PathBuf, app: AppHandle) -> AppStat
         selection: Arc::new(SelectionRuntime {
             acquirer: selected_text_acquirer,
         }),
+        logs,
         result_window,
     }
 }

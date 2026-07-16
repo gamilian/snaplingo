@@ -7,6 +7,7 @@ import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 import { DEFAULT_ANNOTATION_STYLE } from "./annotationStyle";
 import {
   CaptureWorkspaceView,
+  getCaptureShortcutKeyLabels,
   type CaptureWorkspaceViewActions,
   type CaptureWorkspaceViewRenderState,
 } from "./CaptureWorkspaceView";
@@ -28,6 +29,17 @@ afterEach(() => {
 });
 
 describe("CaptureWorkspaceView runtime seam", () => {
+  it("uses platform-specific modifier labels in selection hints", () => {
+    expect(getCaptureShortcutKeyLabels("MacIntel")).toEqual({
+      primary: "⌘",
+      shift: "⇧",
+    });
+    expect(getCaptureShortcutKeyLabels("Win32")).toEqual({
+      primary: "Ctrl",
+      shift: "Shift",
+    });
+  });
+
   it("exposes only presentation state and user-triggered actions", () => {
     type ExpectedRenderStateKeys =
       | "status"
@@ -108,6 +120,8 @@ describe("CaptureWorkspaceView runtime seam", () => {
       | "cursorInMonitorPoint"
       | "cursorColor"
       | "colorSampleFormat"
+      | "sourceImage"
+      | "zoom"
     >();
 
     if (false) {
@@ -595,6 +609,8 @@ describe("CaptureWorkspaceView runtime seam", () => {
                 blue: 156,
               },
               colorSampleFormat: "rgb",
+              sourceImage: document.createElement("img"),
+              zoom: 16,
             },
           },
           actions: createActions(),
@@ -603,6 +619,14 @@ describe("CaptureWorkspaceView runtime seam", () => {
     });
 
     const magnifier = container.querySelector('[aria-label="像素放大镜"]');
+    const lens = magnifier?.querySelector("canvas");
+    expect(magnifier?.className).toContain("bg-transparent");
+    expect(magnifier?.className).not.toContain("backdrop-blur");
+    expect((magnifier as HTMLElement | null)?.style.transform).toContain(
+      "translate3d",
+    );
+    expect(lens?.width).toBe(228);
+    expect(lens?.height).toBe(132);
     expect(magnifier?.textContent).toContain("(648, 587)");
     expect(magnifier?.textContent).toContain("174, 198, 156");
     expect(magnifier?.textContent).toContain("按 C 复制颜色值");
@@ -630,6 +654,7 @@ describe("CaptureWorkspaceView runtime seam", () => {
     });
 
     const hints = container.querySelector('[aria-label="选区快捷键提示"]');
+    expect(hints?.className).toContain("bg-slate-900/[0.55]");
     expect(hints?.textContent).toContain("WASD将鼠标指针移动 1 像素");
     expect(hints?.textContent).toContain("当前：界面元素");
     expect(hints?.textContent).toContain("设置截屏区域为当前屏幕");
@@ -700,6 +725,8 @@ function createRenderState(): CaptureWorkspaceViewRenderState {
       cursorInMonitorPoint: null,
       cursorColor: null,
       colorSampleFormat: "hex",
+      sourceImage: null,
+      zoom: 12,
     },
   };
 }

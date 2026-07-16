@@ -193,7 +193,7 @@ describe('capture selection canvas overlay', () => {
     ]);
   });
 
-  it('uses the configured selection mask and border width', () => {
+  it('uses the configured selection mask, border width, and border color', () => {
     const context = createRecordingContext();
 
     drawCaptureSelectionOverlayFrame(
@@ -207,12 +207,16 @@ describe('capture selection canvas overlay', () => {
       null,
       {
         borderWidth: 4,
+        borderColor: [91, 127, 255, 242],
         maskColor: [32, 36, 44, 72],
       },
     );
 
     expect(context.calls).toContain(
       `fillStyle:rgba(32, 36, 44, ${72 / 255})`,
+    );
+    expect(context.calls).toContain(
+      `strokeStyle:rgba(91, 127, 255, ${242 / 255})`,
     );
     expect(context.calls).toContain('lineWidth:4');
   });

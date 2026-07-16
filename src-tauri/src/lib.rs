@@ -21,18 +21,46 @@ pub use error::{AppError, Result};
 #[allow(ambiguous_glob_reexports)]
 pub use infrastructure::*;
 
+use std::sync::Arc;
+
+use chrono::{Days, Local, NaiveDateTime, TimeZone};
 use tauri::Manager;
+use tauri_plugin_autostart::MacosLauncher;
+use tauri_plugin_log::{Target, TargetKind};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let database_path = infrastructure::system::get_database_path()
+        .expect("Failed to resolve application database path");
+    let database = Arc::new(
+        infrastructure::storage::Database::open(&database_path)
+            .expect("Failed to initialize database"),
+    );
+    let log_repository = infrastructure::storage::SqliteAppLogRepository::new(database.clone());
+    let app_database = database.clone();
+    let app_database_path = database_path.clone();
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            None::<Vec<&'static str>>,
+        ))
         .plugin(tauri_plugin_screenshots::init())
         .plugin(
             tauri_plugin_log::Builder::default()
-                .level(log::LevelFilter::Info)
+                .level(log::LevelFilter::Debug)
+                .clear_targets()
+                .target(Target::new(TargetKind::Dispatch(
+                    fern::Dispatch::new().chain(fern::Output::call(move |record| {
+                        let _ = log_repository.record(
+                            record.level().as_str(),
+                            record.target(),
+                            &record.args().to_string(),
+                        );
+                    })),
+                )))
                 .build(),
         )
         .on_window_event(|window, event| {
@@ -47,14 +75,35 @@ pub fn run() {
                 }
             }
         })
-        .setup(|app| {
-            let database_path = infrastructure::system::get_database_path()
-                .expect("Failed to resolve application database path");
-            let app_state = composition::build_app_state(database_path, app.handle().clone());
+        .setup(move |app| {
+            let app_state =
+                composition::build_app_state(app_database, app_database_path, app.handle().clone());
             composition::subscribe_history(&app_state);
+            let start_on_boot = app_state
+                .settings
+                .configuration
+                .snapshot()
+                .map(|snapshot| snapshot.general.start_on_boot)
+                .unwrap_or(false);
+            use tauri_plugin_autostart::ManagerExt;
+            let autostart_result = if start_on_boot {
+                app.handle().autolaunch().enable()
+            } else {
+                app.handle().autolaunch().disable()
+            };
+            if let Err(error) = autostart_result {
+                log::warn!("Failed to synchronize start on boot: {}", error);
+            }
             let hotkey_runtime = app_state.settings.hotkeys.clone();
+            let log_settings = app_state.settings.configuration.clone();
+            let scheduled_log_repository = app_state.logs.repository.clone();
 
             app.manage(app_state);
+
+            tauri::async_runtime::spawn(run_daily_log_cleanup(
+                log_settings,
+                scheduled_log_repository,
+            ));
 
             if let Err(err) = app_shell::apply_resting_activation_policy(app.handle()) {
                 log::warn!("Failed to apply resting activation policy: {}", err);
@@ -107,6 +156,8 @@ pub fn run() {
             commands::update_translation_settings,
             commands::update_ocr_settings,
             commands::update_history_settings,
+            commands::list_app_logs,
+            commands::clear_app_logs,
             commands::open_capture_window,
             commands::translate_text_v2,
             commands::translate_text_with_provider,
@@ -140,6 +191,7 @@ pub fn run() {
             commands::create_capture_session,
             commands::get_capture_session,
             commands::hydrate_capture_session_snapshots,
+            commands::hydrate_capture_monitor_snapshot,
             commands::log_capture_frontend_perf,
             commands::current_capture_cursor_position,
             commands::current_capture_control_candidate,
@@ -202,4 +254,61 @@ pub fn run() {
                 }
             }
         });
+}
+
+fn next_daily_log_cleanup_at(now: NaiveDateTime) -> NaiveDateTime {
+    let today_at_eight = now.date().and_hms_opt(8, 0, 0).expect("08:00 is valid");
+    if now < today_at_eight {
+        today_at_eight
+    } else {
+        today_at_eight
+            .checked_add_days(Days::new(1))
+            .expect("next cleanup date is valid")
+    }
+}
+
+async fn run_daily_log_cleanup(
+    settings: Arc<SettingsConfiguration>,
+    repository: Arc<infrastructure::storage::SqliteAppLogRepository>,
+) {
+    loop {
+        let now = Local::now();
+        let next = Local
+            .from_local_datetime(&next_daily_log_cleanup_at(now.naive_local()))
+            .earliest()
+            .expect("local 08:00 is valid");
+        let delay = (next - now).to_std().unwrap_or_default();
+        tokio::time::sleep(delay).await;
+
+        let retention_days = settings
+            .snapshot()
+            .map(|snapshot| snapshot.general.log_retention_days)
+            .unwrap_or(7);
+        if let Err(error) = repository.delete_expired(retention_days) {
+            log::warn!("Failed to delete expired application logs: {}", error);
+        }
+    }
+}
+
+#[cfg(test)]
+mod log_cleanup_schedule_tests {
+    use chrono::NaiveDate;
+
+    use super::next_daily_log_cleanup_at;
+
+    #[test]
+    fn schedules_the_same_day_before_eight_and_the_next_day_at_or_after_eight() {
+        let date = NaiveDate::from_ymd_opt(2026, 7, 16).unwrap();
+        assert_eq!(
+            next_daily_log_cleanup_at(date.and_hms_opt(7, 59, 59).unwrap()),
+            date.and_hms_opt(8, 0, 0).unwrap()
+        );
+        assert_eq!(
+            next_daily_log_cleanup_at(date.and_hms_opt(8, 0, 0).unwrap()),
+            NaiveDate::from_ymd_opt(2026, 7, 17)
+                .unwrap()
+                .and_hms_opt(8, 0, 0)
+                .unwrap()
+        );
+    }
 }

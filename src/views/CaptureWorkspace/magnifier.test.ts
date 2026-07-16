@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  getMagnifierCanvasBlit,
   getMagnifierImageStyle,
   getMagnifierPosition,
+  normalizeMagnifierZoom,
   shouldAutoShowCaptureMagnifier,
   shouldShowMagnifier,
   shouldTrackCaptureCursorForMagnifier,
@@ -11,6 +13,13 @@ import type { LogicalRect, Point } from './types';
 const bounds: LogicalRect = { x: 0, y: 0, width: 300, height: 200 };
 
 describe('capture magnifier', () => {
+  it('normalizes configured zoom to the supported integer range', () => {
+    expect(normalizeMagnifierZoom(12)).toBe(12);
+    expect(normalizeMagnifierZoom(3)).toBe(4);
+    expect(normalizeMagnifierZoom(21)).toBe(20);
+    expect(normalizeMagnifierZoom(9.6)).toBe(10);
+  });
+
   it('positions near the cursor and flips away from capture edges', () => {
     const size = { width: 120, height: 96 };
 
@@ -40,6 +49,36 @@ describe('capture magnifier', () => {
       backgroundSize: '1200px 800px',
       backgroundPosition: '-60px -32px',
       imageRendering: 'pixelated',
+    });
+  });
+
+  it('crops only nearby physical pixels for the high-zoom canvas lens', () => {
+    expect(
+      getMagnifierCanvasBlit(
+        { x: 50, y: 25 },
+        { width: 100, height: 50 },
+        { width: 200, height: 100 },
+        { width: 228, height: 132 },
+        12,
+      ),
+    ).toEqual({
+      source: { x: 91, y: 45, width: 19, height: 11 },
+      destination: { x: 0, y: 0, width: 228, height: 132 },
+    });
+  });
+
+  it('keeps the sampled cursor under the center crosshair near image edges', () => {
+    expect(
+      getMagnifierCanvasBlit(
+        { x: 0, y: 0 },
+        { width: 100, height: 50 },
+        { width: 200, height: 100 },
+        { width: 228, height: 132 },
+        12,
+      ),
+    ).toEqual({
+      source: { x: 0, y: 0, width: 10, height: 6 },
+      destination: { x: 108, y: 60, width: 120, height: 72 },
     });
   });
 

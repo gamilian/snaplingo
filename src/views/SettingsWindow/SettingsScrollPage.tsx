@@ -14,12 +14,14 @@ export function SettingsScrollPage({
   sections,
   requestedSectionId,
   onRequestedSectionHandled,
+  autoSaveLabel = '自动保存',
 }: {
   title: string;
   description: string;
   sections: SettingsScrollSection[];
   requestedSectionId?: string | null;
   onRequestedSectionHandled?: () => void;
+  autoSaveLabel?: string;
 }) {
   const [activeSection, setActiveSection] = useState(sections[0]?.id ?? '');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -79,7 +81,7 @@ export function SettingsScrollPage({
               </h1>
               <span className="flex items-center gap-1.5 text-[10px] font-medium text-gray-500">
                 <i className="h-1.5 w-1.5 rounded-full bg-green-500 ring-[3px] ring-green-100" />
-                自动保存
+                {autoSaveLabel}
               </span>
             </div>
             <p className="mt-1 text-[12px] text-gray-500">{description}</p>
@@ -114,9 +116,9 @@ export function SettingsScrollPage({
               ref={(node) => {
                 sectionRefs.current[section.id] = node;
               }}
-              className="scroll-mt-[94px] overflow-hidden rounded-[11px] border border-gray-200 bg-white shadow-sm"
+              className="scroll-mt-[94px] overflow-visible rounded-[11px] border border-gray-200 bg-white shadow-sm"
             >
-              <header className="flex items-center justify-between gap-5 border-b border-gray-100 bg-gray-50/30 px-[22px] py-4">
+              <header className="flex items-center justify-between gap-5 rounded-t-[10px] border-b border-gray-100 bg-gray-50/30 px-[22px] py-4">
                 <div className="flex items-start gap-3">
                   <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-primary-50 text-[10px] font-extrabold text-primary-600">
                     {String(index + 1).padStart(2, '0')}

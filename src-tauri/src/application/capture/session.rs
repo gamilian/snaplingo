@@ -205,37 +205,8 @@ impl CaptureSessions {
         id: &CaptureSessionId,
         cache: CaptureSessionSnapshotCache,
     ) -> Result<CaptureSessionView> {
-        let cached_snapshots = cache
-            .snapshots
-            .into_iter()
-            .map(|snapshot| (snapshot.id.clone(), snapshot))
-            .collect::<HashMap<_, _>>();
-        let mut sessions = self
-            .sessions
-            .lock()
-            .map_err(|_| AppError::System("Capture session lock poisoned".to_string()))?;
-        let session = sessions
-            .get_mut(id)
-            .ok_or_else(|| AppError::System(format!("Capture session not found: {}", id.0)))?;
-        let snapshots = session
-            .layout_snapshots
-            .iter()
-            .map(|layout| {
-                let cached = cached_snapshots.get(&layout.id).ok_or_else(|| {
-                    AppError::System(format!(
-                        "Capture session snapshot cache is missing monitor: {}",
-                        layout.id
-                    ))
-                })?;
-                let mut snapshot = layout.clone();
-                snapshot.png_data = cached.png_data.clone();
-                Ok(snapshot)
-            })
-            .collect::<Result<Vec<_>>>()?;
-        session.snapshots = snapshots;
-        session.captured_cursor = cache.captured_cursor;
-
-        Ok(session_to_view(session))
+        self.store_session_snapshot_cache_data(id, cache)?;
+        self.get_session_view(id)
     }
 
     pub async fn create_layout_session(&self) -> Result<CaptureSessionView> {
@@ -314,9 +285,45 @@ impl CaptureSessions {
         &self,
         id: &CaptureSessionId,
     ) -> Result<CaptureSessionView> {
+        self.ensure_session_snapshots_hydrated(id).await?;
+        self.hydrated_session_view(id)?.ok_or_else(|| {
+            AppError::System(format!(
+                "Capture session snapshots are unavailable: {}",
+                id.0
+            ))
+        })
+    }
+
+    pub async fn hydrate_monitor_snapshot(
+        &self,
+        id: &CaptureSessionId,
+        monitor_id: &str,
+    ) -> Result<MonitorSnapshotView> {
         loop {
-            if let Some(view) = self.hydrated_session_view(id)? {
-                return Ok(view);
+            let notified = self.hydration_notify.notified();
+            if let Some(snapshot) = self.cached_monitor_snapshot(id, monitor_id)? {
+                return Ok(snapshot_to_view(&snapshot));
+            }
+
+            if self.try_begin_session_hydration(id)? {
+                let result = self
+                    .capture_and_store_monitor_snapshot(id, monitor_id)
+                    .await;
+                self.finish_session_hydration(id)?;
+                self.hydration_notify.notify_waiters();
+                result?;
+                continue;
+            }
+
+            notified.await;
+        }
+    }
+
+    async fn ensure_session_snapshots_hydrated(&self, id: &CaptureSessionId) -> Result<()> {
+        loop {
+            let notified = self.hydration_notify.notified();
+            if self.has_hydrated_session_snapshots(id)? {
+                return Ok(());
             }
 
             if self.try_begin_session_hydration(id)? {
@@ -326,19 +333,89 @@ impl CaptureSessions {
                 return result;
             }
 
-            self.hydration_notify.notified().await;
+            notified.await;
         }
     }
 
-    async fn capture_and_store_session_snapshots(
+    async fn capture_and_store_monitor_snapshot(
         &self,
         id: &CaptureSessionId,
-    ) -> Result<CaptureSessionView> {
+        monitor_id: &str,
+    ) -> Result<()> {
+        self.get_session(id)?;
+        let snapshot = self.source.capture_monitor_snapshot(monitor_id).await?;
+        if snapshot.id != monitor_id {
+            return Err(AppError::System(format!(
+                "Capture source returned monitor '{}' for requested monitor '{monitor_id}'",
+                snapshot.id
+            )));
+        }
+
+        let mut sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| AppError::System("Capture session lock poisoned".to_string()))?;
+        let session = sessions
+            .get_mut(id)
+            .ok_or_else(|| AppError::System(format!("Capture session not found: {}", id.0)))?;
+        if !session
+            .layout_snapshots
+            .iter()
+            .any(|layout| layout.id == monitor_id)
+        {
+            return Err(AppError::System(format!(
+                "Capture session monitor not found: {monitor_id}"
+            )));
+        }
+        session.snapshots.retain(|cached| cached.id != monitor_id);
+        session.snapshots.push(snapshot);
+        Ok(())
+    }
+
+    async fn capture_and_store_session_snapshots(&self, id: &CaptureSessionId) -> Result<()> {
         self.get_session(id)?;
 
         let cache = self.capture_session_snapshot_cache().await?;
 
-        self.store_session_snapshot_cache(id, cache)
+        self.store_session_snapshot_cache_data(id, cache)
+    }
+
+    fn store_session_snapshot_cache_data(
+        &self,
+        id: &CaptureSessionId,
+        cache: CaptureSessionSnapshotCache,
+    ) -> Result<()> {
+        let mut cached_snapshots = cache
+            .snapshots
+            .into_iter()
+            .map(|snapshot| (snapshot.id.clone(), snapshot))
+            .collect::<HashMap<_, _>>();
+        let mut sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| AppError::System("Capture session lock poisoned".to_string()))?;
+        let session = sessions
+            .get_mut(id)
+            .ok_or_else(|| AppError::System(format!("Capture session not found: {}", id.0)))?;
+        let snapshots = session
+            .layout_snapshots
+            .iter()
+            .map(|layout| {
+                let cached = cached_snapshots.remove(&layout.id).ok_or_else(|| {
+                    AppError::System(format!(
+                        "Capture session snapshot cache is missing monitor: {}",
+                        layout.id
+                    ))
+                })?;
+                let mut snapshot = layout.clone();
+                snapshot.png_data = cached.png_data;
+                Ok(snapshot)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        session.snapshots = snapshots;
+        session.captured_cursor = cache.captured_cursor;
+
+        Ok(())
     }
 
     fn try_begin_session_hydration(&self, id: &CaptureSessionId) -> Result<bool> {
@@ -439,6 +516,46 @@ impl CaptureSessions {
             .ok_or_else(|| AppError::System(format!("Capture session not found: {}", id.0)))?;
 
         Ok(session_has_cached_monitor_snapshots(session).then(|| session_to_view(session)))
+    }
+
+    fn has_hydrated_session_snapshots(&self, id: &CaptureSessionId) -> Result<bool> {
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| AppError::System("Capture session lock poisoned".to_string()))?;
+        let session = sessions
+            .get(id)
+            .ok_or_else(|| AppError::System(format!("Capture session not found: {}", id.0)))?;
+
+        Ok(session_has_cached_monitor_snapshots(session))
+    }
+
+    fn cached_monitor_snapshot(
+        &self,
+        id: &CaptureSessionId,
+        monitor_id: &str,
+    ) -> Result<Option<MonitorSnapshot>> {
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| AppError::System("Capture session lock poisoned".to_string()))?;
+        let session = sessions
+            .get(id)
+            .ok_or_else(|| AppError::System(format!("Capture session not found: {}", id.0)))?;
+        if !session
+            .layout_snapshots
+            .iter()
+            .any(|layout| layout.id == monitor_id)
+        {
+            return Err(AppError::System(format!(
+                "Capture session monitor not found: {monitor_id}"
+            )));
+        }
+        Ok(session
+            .snapshots
+            .iter()
+            .find(|snapshot| snapshot.id == monitor_id && !snapshot.png_data.is_empty())
+            .cloned())
     }
 
     pub fn get_session_view(&self, id: &CaptureSessionId) -> Result<CaptureSessionView> {

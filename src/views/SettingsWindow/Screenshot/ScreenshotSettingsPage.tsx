@@ -18,7 +18,20 @@ const MASK_COLORS: AnnotationColorPreset[] = [
   [0, 0, 0, 46],
   [32, 36, 44, 72],
   [62, 70, 84, 72],
+  [20, 55, 92, 64],
+  [25, 82, 72, 64],
+  [88, 54, 112, 64],
+  [112, 68, 44, 64],
   [255, 255, 255, 72],
+];
+
+const BORDER_COLORS: AnnotationColorPreset[] = [
+  [91, 127, 255, 242],
+  [255, 77, 79, 242],
+  [40, 167, 69, 242],
+  [250, 219, 20, 242],
+  [255, 255, 255, 242],
+  [0, 0, 0, 242],
 ];
 
 const SCREENSHOT_HOTKEYS = [
@@ -42,6 +55,8 @@ export function ScreenshotSettingsPage() {
   const updateScreenshot = (input: Partial<ScreenshotSettings>) => {
     void updateScreenshotSettings(input);
   };
+  const selectionBorderColor =
+    screenshot.selectionBorderColor ?? BORDER_COLORS[0];
   const selectionMaskColor = screenshot.selectionMaskColor ?? MASK_COLORS[0];
 
   const outputSettings = (
@@ -159,8 +174,48 @@ export function ScreenshotSettingsPage() {
             />
           </RangeValue>
         </SettingRow>
-        <SettingRow label="遮罩颜色" description="选区外区域使用的遮罩颜色">
+        <SettingRow label="边框颜色" description="截图选区边框使用的颜色">
           <div className="flex items-center gap-2.5">
+            {BORDER_COLORS.map((color) => {
+              const selected = colorsEqual(selectionBorderColor, color);
+              return (
+                <button
+                  key={color.join('-')}
+                  type="button"
+                  aria-label={`边框颜色 ${color.slice(0, 3).join(',')}`}
+                  onClick={() => updateScreenshot({ selectionBorderColor: color })}
+                  className={`h-8 w-8 rounded-lg border-[3px] border-white shadow-sm ${
+                    selected ? 'ring-2 ring-primary-500' : 'ring-1 ring-gray-200'
+                  }`}
+                  style={{ backgroundColor: rgba(color) }}
+                />
+              );
+            })}
+            <label className="relative ml-1 flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-600 shadow-sm hover:bg-gray-50">
+              <span
+                className="h-4 w-4 rounded-full border border-black/10"
+                style={{ backgroundColor: maskColorHex(selectionBorderColor) }}
+              />
+              调色板
+              <input
+                type="color"
+                aria-label="自定义边框颜色"
+                value={maskColorHex(selectionBorderColor)}
+                onChange={(event) =>
+                  updateScreenshot({
+                    selectionBorderColor: maskColorWithHex(
+                      selectionBorderColor,
+                      event.currentTarget.value,
+                    ),
+                  })
+                }
+                className="absolute inset-0 cursor-pointer opacity-0"
+              />
+            </label>
+          </div>
+        </SettingRow>
+        <SettingRow label="遮罩颜色" description="选区外区域使用的遮罩颜色">
+          <div className="flex max-w-[520px] flex-wrap items-center justify-end gap-2.5">
             {MASK_COLORS.map((color) => {
               const selected = colorsEqual(selectionMaskColor, color);
               return (
@@ -228,13 +283,24 @@ export function ScreenshotSettingsPage() {
         </SettingRow>
         <SettingRow
           label="显示放大镜"
-          description="选择截图区域时跟随鼠标显示像素、坐标和颜色值"
+          description="选区时自动显示；关闭后仍可按住 Alt 临时查看"
         >
           <SettingsToggle
             label="显示放大镜"
             checked={screenshot.showMagnifier}
             onChange={(showMagnifier) => updateScreenshot({ showMagnifier })}
           />
+        </SettingRow>
+        <SettingRow label="放大镜倍率" description="调整选区放大镜显示的像素倍率">
+          <RangeValue value={`${screenshot.magnifierZoom ?? 12}×`}>
+            <CustomRange
+              value={screenshot.magnifierZoom ?? 12}
+              min={4}
+              max={20}
+              step={1}
+              onChange={(magnifierZoom) => updateScreenshot({ magnifierZoom })}
+            />
+          </RangeValue>
         </SettingRow>
       </SettingsGroup>
       <SettingsGroup title="编辑器与贴图">

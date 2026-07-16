@@ -44,6 +44,27 @@ function createKeyboardTarget() {
 }
 
 describe('capture workspace runtime', () => {
+  it('does not notify subscribers for duplicate magnifier color samples', () => {
+    const runtime = createCaptureWorkspaceRuntime({ platform: createPlatform() });
+    const listener = vi.fn();
+    runtime.subscribe(listener);
+
+    runtime.actions.updateCursorColor({
+      hex: '#0A141E',
+      red: 10,
+      green: 20,
+      blue: 30,
+    });
+    runtime.actions.updateCursorColor({
+      hex: '#0A141E',
+      red: 10,
+      green: 20,
+      blue: 30,
+    });
+
+    expect(listener).toHaveBeenCalledOnce();
+  });
+
   it('disposes acquired and late host registrations exactly once', async () => {
     const platform = createPlatform();
     const keyboardTarget = createKeyboardTarget();
@@ -1846,6 +1867,33 @@ describe('capture workspace runtime', () => {
     });
   });
 
+  it('keeps an active draft alive when the system cursor cannot be moved', async () => {
+    const platform = createPlatform();
+    platform.commands.moveCaptureCursor.mockRejectedValueOnce(
+      new Error('cursor unavailable'),
+    );
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-draft-move-error');
+    runtime.actions.pointerDown({ x: 20, y: 30 });
+    runtime.actions.pointerMove({ x: 100, y: 80 });
+
+    expect(runtime.actions.keyDown({ key: 'd' })).toBe(true);
+
+    await vi.waitFor(() =>
+      expect(runtime.renderState.error).toBe(
+        '鼠标移动失败：cursor unavailable',
+      ),
+    );
+    expect(runtime.renderState).toMatchObject({
+      status: 'selecting',
+      startPoint: { x: 20, y: 30 },
+      selection: { x: 20, y: 30, width: 81, height: 50 },
+    });
+
+    expect(runtime.actions.keyDown({ key: 'd' })).toBe(true);
+    await vi.waitFor(() => expect(runtime.renderState.error).toBeNull());
+  });
+
   it('nudges a floating selecting cursor and refreshes its hover candidate', async () => {
     const platform = createPlatform({
       session: createSession({
@@ -1908,6 +1956,84 @@ describe('capture workspace runtime', () => {
 
     expect(runtime.renderState.candidateDetectionMode).toBe('window');
     expect(runtime.renderState.hoverSelection).toEqual(higher);
+  });
+
+  it('consumes Tab before the initial cursor position is available', async () => {
+    const platform = createPlatform();
+    platform.commands.currentCaptureCursorPosition.mockResolvedValue(null);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-no-cursor');
+
+    expect(runtime.renderState.cursorPoint).toBeNull();
+    expect(runtime.actions.keyDown({ key: 'Tab' })).toBe(true);
+    expect(runtime.renderState).toMatchObject({
+      status: 'selecting',
+      candidateDetectionMode: 'control',
+      hoverSelection: null,
+    });
+    expect(
+      platform.commands.currentCaptureControlCandidate,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('ignores a stale control-detection failure after the cursor moves', async () => {
+    const staleCandidate = deferred<null>();
+    const control = { x: 31, y: 40, width: 60, height: 24 };
+    const platform = createPlatform();
+    platform.commands.currentCaptureControlCandidate
+      .mockImplementationOnce(() => staleCandidate.promise)
+      .mockResolvedValueOnce({
+        id: 'control-current',
+        kind: 'control',
+        rect: control,
+        priority: 10_001,
+      });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-stale-control');
+    runtime.actions.pointerMove({ x: 40, y: 50 });
+
+    expect(runtime.actions.keyDown({ key: 'Tab' })).toBe(true);
+    expect(runtime.actions.keyDown({ key: 'd' })).toBe(true);
+    await vi.waitFor(() =>
+      expect(runtime.renderState.hoverSelection).toEqual(control),
+    );
+
+    staleCandidate.reject(new Error('stale failure'));
+    await staleCandidate.promise.catch(() => undefined);
+    await Promise.resolve();
+    expect(runtime.renderState).toMatchObject({
+      status: 'selecting',
+      candidateDetectionMode: 'control',
+      hoverSelection: control,
+      error: null,
+    });
+  });
+
+  it('keeps the capture active and restores window detection when control detection fails', async () => {
+    const platform = createPlatform({
+      session: createSession({
+        candidates: [
+          { id: 'window-1', kind: 'window', rect: selection, priority: 10 },
+        ],
+      }),
+    });
+    platform.commands.currentCaptureControlCandidate.mockRejectedValue(
+      new Error('需要辅助功能权限'),
+    );
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-permission');
+    runtime.actions.pointerMove({ x: 40, y: 50 });
+
+    expect(runtime.actions.keyDown({ key: 'Tab' })).toBe(true);
+
+    await vi.waitFor(() =>
+      expect(runtime.renderState.candidateDetectionMode).toBe('window'),
+    );
+    expect(runtime.renderState).toMatchObject({
+      status: 'selecting',
+      hoverSelection: selection,
+      error: '界面元素检测不可用：需要辅助功能权限',
+    });
   });
 
   it('commits the keyboard-adjusted draft endpoint on pointer release', async () => {
@@ -2239,6 +2365,31 @@ describe('capture workspace runtime', () => {
       hasHydratedPixelSource: true,
       error: null,
     });
+  });
+
+  it('hydrates only the requested monitor for the magnifier and reuses it', async () => {
+    const platform = createPlatform({
+      session: createSession({ id: 'session-magnifier' }),
+    });
+    platform.commands.hydrateCaptureMonitorSnapshot.mockResolvedValue(
+      createMonitor({ image_base64: 'magnifier-pixels' }),
+    );
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession('screenshot', 'session-magnifier');
+    await runtime.actions.hydrateMagnifierMonitor('monitor-1');
+    await runtime.actions.hydrateMagnifierMonitor('monitor-1');
+
+    expect(
+      platform.commands.hydrateCaptureMonitorSnapshot,
+    ).toHaveBeenCalledOnce();
+    expect(
+      platform.commands.hydrateCaptureMonitorSnapshot,
+    ).toHaveBeenCalledWith('session-magnifier', 'monitor-1');
+    expect(runtime.renderState.session?.monitors[0].image_base64).toBe(
+      'magnifier-pixels',
+    );
+    expect(runtime.renderState.hasHydratedPixelSource).toBe(false);
   });
 
   it('keeps the preview open when the save dialog is cancelled', async () => {
@@ -2704,6 +2855,13 @@ function createPlatform({
       hydrateCaptureSessionSnapshots: vi.fn<
         CaptureWorkspacePlatformRuntime['commands']['hydrateCaptureSessionSnapshots']
       >(async () => session),
+      hydrateCaptureMonitorSnapshot: vi.fn<
+        CaptureWorkspacePlatformRuntime['commands']['hydrateCaptureMonitorSnapshot']
+      >(async (_sessionId, monitorId) => {
+        const monitor = session.monitors.find((candidate) => candidate.id === monitorId);
+        if (!monitor) throw new Error(`Monitor not found: ${monitorId}`);
+        return monitor;
+      }),
       logCaptureFrontendPerf: vi.fn(async () => undefined),
       currentCaptureCursorPosition: vi.fn<
         CaptureWorkspacePlatformRuntime['commands']['currentCaptureCursorPosition']

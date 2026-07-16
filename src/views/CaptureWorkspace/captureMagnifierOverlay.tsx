@@ -1,21 +1,22 @@
+import { useLayoutEffect, useRef } from 'react';
 import {
   colorSampleToClipboardText,
   type ColorSample,
   type ColorSampleFormat,
 } from './colorSampler';
 import {
-  getMagnifierImageStyle,
+  getMagnifierCanvasBlit,
   getMagnifierPosition,
+  normalizeMagnifierZoom,
 } from './magnifier';
 import type { LogicalRect, Point } from './types';
 
 const MAGNIFIER_GAP = 14;
-const MAGNIFIER_PANEL_SIZE = { width: 220, height: 226 };
-const MAGNIFIER_LENS_SIZE = { width: 220, height: 132 };
-const MAGNIFIER_ZOOM = 6;
+const MAGNIFIER_PANEL_SIZE = { width: 228, height: 226 };
+const MAGNIFIER_LENS_SIZE = { width: 228, height: 132 };
 
 interface CaptureMagnifierOverlayProps {
-  imageBase64: string;
+  image: HTMLImageElement;
   viewportCursor: Point;
   screenCursor: Point;
   imageCursor: Point;
@@ -23,10 +24,11 @@ interface CaptureMagnifierOverlayProps {
   imageSize: { width: number; height: number };
   color: ColorSample | null;
   colorFormat: ColorSampleFormat;
+  zoom: number;
 }
 
 export function CaptureMagnifierOverlay({
-  imageBase64,
+  image,
   viewportCursor,
   screenCursor,
   imageCursor,
@@ -34,6 +36,7 @@ export function CaptureMagnifierOverlay({
   imageSize,
   color,
   colorFormat,
+  zoom,
 }: CaptureMagnifierOverlayProps) {
   const position = getMagnifierPosition(
     viewportCursor,
@@ -41,13 +44,48 @@ export function CaptureMagnifierOverlay({
     MAGNIFIER_PANEL_SIZE,
     MAGNIFIER_GAP,
   );
-  const imageStyle = getMagnifierImageStyle(
-    imageBase64,
-    imageCursor,
-    imageSize,
-    MAGNIFIER_LENS_SIZE,
-    MAGNIFIER_ZOOM,
-  );
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useLayoutEffect(() => {
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext('2d');
+    if (!canvas || !context) return;
+
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = 'rgba(15, 23, 42, 0.62)';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    if (!image) return;
+
+    const blit = getMagnifierCanvasBlit(
+      imageCursor,
+      imageSize,
+      { width: image.naturalWidth, height: image.naturalHeight },
+      MAGNIFIER_LENS_SIZE,
+      normalizeMagnifierZoom(zoom),
+    );
+    if (!blit) return;
+
+    context.imageSmoothingEnabled = false;
+    context.drawImage(
+      image,
+      blit.source.x,
+      blit.source.y,
+      blit.source.width,
+      blit.source.height,
+      blit.destination.x,
+      blit.destination.y,
+      blit.destination.width,
+      blit.destination.height,
+    );
+  }, [
+    image,
+    imageCursor.x,
+    imageCursor.y,
+    imageSize.height,
+    imageSize.width,
+    zoom,
+  ]);
+
   const colorText = color
     ? colorFormat === 'rgb'
       ? `${color.red}, ${color.green}, ${color.blue}`
@@ -57,27 +95,24 @@ export function CaptureMagnifierOverlay({
   return (
     <div
       aria-label="像素放大镜"
-      className="pointer-events-none absolute overflow-hidden rounded-[5px] border border-white/70 bg-neutral-950 text-white shadow-2xl ring-1 ring-black/60"
+      className="pointer-events-none absolute left-0 top-0 z-[70] will-change-transform overflow-hidden rounded-[6px] border border-white/30 bg-transparent text-white shadow-xl ring-1 ring-black/20"
       style={{
-        left: `${position.x}px`,
-        top: `${position.y}px`,
+        transform: `translate3d(${position.x}px, ${position.y}px, 0)`,
         width: `${MAGNIFIER_PANEL_SIZE.width}px`,
       }}
     >
-      <div
-        className="relative border-b border-white/20"
-        style={{
-          ...imageStyle,
-          width: `${MAGNIFIER_LENS_SIZE.width}px`,
-          height: `${MAGNIFIER_LENS_SIZE.height}px`,
-          backgroundRepeat: 'no-repeat',
-        }}
-      >
-        <div className="absolute left-1/2 top-0 h-full w-[2px] -translate-x-1/2 bg-blue-500/75" />
-        <div className="absolute left-0 top-1/2 h-[2px] w-full -translate-y-1/2 bg-blue-500/75" />
+      <div className="relative border-b border-white/15">
+        <canvas
+          ref={canvasRef}
+          width={MAGNIFIER_LENS_SIZE.width}
+          height={MAGNIFIER_LENS_SIZE.height}
+          className="block [image-rendering:pixelated]"
+        />
+        <div className="absolute left-1/2 top-0 h-full w-[2px] -translate-x-1/2 bg-blue-400/[0.65]" />
+        <div className="absolute left-0 top-1/2 h-[2px] w-full -translate-y-1/2 bg-blue-400/[0.65]" />
         <div className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 border-2 border-white shadow-[0_0_0_1px_rgba(0,0,0,0.85)]" />
       </div>
-      <div className="bg-neutral-950 px-4 py-2.5 font-mono text-[12px] leading-5">
+      <div className="bg-slate-900/[0.58] px-4 py-2.5 font-mono text-[12px] leading-5">
         <div className="text-center font-semibold tracking-wide">
           ({Math.round(screenCursor.x)}, {Math.round(screenCursor.y)})
         </div>

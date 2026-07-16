@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
+import { CustomNumberInput } from '../../../components/common/CustomNumberInput';
 import { CustomSelect } from '../../../components/common/CustomSelect';
 import { useSettingsConfigStore } from '../../../stores/settingsConfigStore';
 import { useSettingsStore } from '../../../stores/settingsStore';
 import { SettingRow, SettingsGroup, SettingsToggle } from '../SettingsControls';
 import { SettingsScrollPage } from '../SettingsScrollPage';
 import { useSettingsRuntime } from '../runtimeContext';
+import { uiText } from '../../../application/settings/uiText';
 
 export function GeneralPage() {
+  const t = useUiText();
   const general = useSettingsConfigStore((state) => state.general);
   const updateGeneralSettings = useSettingsConfigStore(
     (state) => state.updateGeneralSettings,
@@ -17,7 +20,7 @@ export function GeneralPage() {
   );
 
   if (!general) {
-    return <div className="p-12 text-sm text-gray-500">设置加载中...</div>;
+    return <div className="p-12 text-sm text-gray-500">{t('loading')}</div>;
   }
 
   const updateGeneral = (input: Partial<typeof general>) => {
@@ -26,43 +29,41 @@ export function GeneralPage() {
 
   return (
     <SettingsScrollPage
-      title="通用"
-      description="应用界面、网络、日志与维护"
+      title={t('general')}
+      description={t('generalDescription')}
+      autoSaveLabel={t('autoSave')}
       requestedSectionId={requestedSection}
       onRequestedSectionHandled={consumeRequestedSection}
       sections={[
         {
           id: 'interface',
-          label: '界面与启动',
-          description: '应用外观与系统启动行为',
+          label: t('interfaceAndStartup'),
+          description: t('interfaceAndStartupDescription'),
           content: (
-            <SettingsGroup title="界面">
-              <SettingRow label="界面语言" description="选择应用显示的语言">
+            <SettingsGroup title={t('interface')}>
+              <SettingRow label={t('interfaceLanguage')} description={t('interfaceLanguageDescription')}>
                 <SelectField
                   value={general.language}
                   options={[
                     { value: 'zh-CN', label: '中文简体' },
-                    { value: 'zh-TW', label: '中文繁體' },
-                    { value: 'en', label: 'English' },
-                    { value: 'ja', label: '日本語' },
                   ]}
                   onChange={(language) => updateGeneral({ language })}
                 />
               </SettingRow>
-              <SettingRow label="主题" description="选择应用的外观主题">
+              <SettingRow label={t('theme')} description={t('themeDescription')}>
                 <SelectField
                   value={general.theme}
                   options={[
-                    { value: 'system', label: '跟随系统' },
-                    { value: 'light', label: '浅色' },
-                    { value: 'dark', label: '深色' },
+                    { value: 'system', label: t('followSystem') },
+                    { value: 'light', label: t('light') },
+                    { value: 'dark', label: t('dark') },
                   ]}
                   onChange={(theme) => updateGeneral({ theme })}
                 />
               </SettingRow>
-              <SettingRow label="开机自启" description="系统启动时自动运行 SnapLingo">
+              <SettingRow label={t('startOnBoot')} description={t('startOnBootDescription')}>
                 <SettingsToggle
-                  label="开机自启"
+                  label={t('startOnBoot')}
                   checked={general.startOnBoot}
                   onChange={(startOnBoot) => updateGeneral({ startOnBoot })}
                 />
@@ -72,36 +73,36 @@ export function GeneralPage() {
         },
         {
           id: 'network',
-          label: '网络',
-          description: '代理、超时与失败重试策略',
+          label: t('network'),
+          description: t('networkDescription'),
           content: <NetworkSettings />,
         },
         {
           id: 'maintenance',
-          label: '日志与维护',
-          description: '日志记录和本地数据维护工具',
+          label: t('logsAndMaintenance'),
+          description: t('logsAndMaintenanceDescription'),
           content: <MaintenanceSettings />,
         },
         {
           id: 'experimental',
-          label: '实验性功能',
-          description: '尚在验证中的性能功能',
+          label: t('experimental'),
+          description: t('experimentalDescription'),
           content: <ExperimentalSettings />,
         },
         {
           id: 'about',
-          label: '关于',
-          description: '版本、开源协议与更新',
+          label: t('about'),
+          description: t('aboutDescription'),
           content: (
             <SettingsGroup title="SnapLingo">
-              <SettingRow label="当前版本">
+              <SettingRow label={t('currentVersion')}>
                 <AppVersionValue />
               </SettingRow>
-              <SettingRow label="开源协议">
+              <SettingRow label={t('openSourceLicense')}>
                 <span className="text-xs font-medium text-gray-700">MIT License</span>
               </SettingRow>
-              <SettingRow label="软件更新">
-                <ActionButton disabled>暂未开放</ActionButton>
+              <SettingRow label={t('softwareUpdate')}>
+                <ActionButton disabled>{t('unavailable')}</ActionButton>
               </SettingRow>
             </SettingsGroup>
           ),
@@ -112,8 +113,10 @@ export function GeneralPage() {
 }
 
 export function AppVersionValue() {
+  const language = useSettingsConfigStore((state) => state.general?.language);
+  const t = (key: Parameters<typeof uiText>[1]) => uiText(language, key);
   const runtime = useSettingsRuntime();
-  const [version, setVersion] = useState('读取中…');
+  const [version, setVersion] = useState(t('reading'));
 
   useEffect(() => {
     let disposed = false;
@@ -122,66 +125,166 @@ export function AppVersionValue() {
         if (!disposed) setVersion(value);
       },
       () => {
-        if (!disposed) setVersion('未知');
+        if (!disposed) setVersion(t('unknown'));
       },
     );
     return () => {
       disposed = true;
     };
-  }, [runtime]);
+  }, [language, runtime]);
 
   return <span className="text-xs font-medium text-gray-700">{version}</span>;
 }
 
 function NetworkSettings() {
+  const t = useUiText();
+  const general = useSettingsConfigStore((state) => state.general);
+  const updateGeneralSettings = useSettingsConfigStore(
+    (state) => state.updateGeneralSettings,
+  );
+  if (!general) return null;
+  const updateGeneral = (input: Partial<typeof general>) => {
+    void updateGeneralSettings(input);
+  };
+
   return (
-    <SettingsGroup title="连接">
-      <SettingRow label="代理设置" description="当前版本使用系统网络设置">
-        <UnavailableBadge />
+    <SettingsGroup title={t('connection')}>
+      <SettingRow label={t('proxy')} description={t('proxyDescription')}>
+        <SelectField
+          value={general.proxyMode ?? 'system'}
+          options={[
+            { value: 'system', label: t('followSystem') },
+            { value: 'none', label: t('noProxy') },
+            { value: 'manual', label: t('manualProxy') },
+          ]}
+          onChange={(proxyMode) => updateGeneral({ proxyMode: proxyMode as 'system' | 'none' | 'manual' })}
+        />
       </SettingRow>
-      <SettingRow label="请求超时时间" description="尚未提供全局超时配置">
-        <UnavailableBadge />
+      {(general.proxyMode ?? 'system') === 'manual' && (
+        <SettingRow label={t('proxyAddress')} description={t('proxyAddressDescription')}>
+          <input
+            key={general.proxyUrl ?? ''}
+            defaultValue={general.proxyUrl ?? ''}
+            onBlur={(event) => updateGeneral({ proxyUrl: event.currentTarget.value })}
+            placeholder="http://127.0.0.1:7890"
+            className="h-9 w-[230px] rounded-lg border border-gray-200 bg-white px-3 text-xs text-gray-700 outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+          />
+        </SettingRow>
+      )}
+      <SettingRow label={t('requestTimeout')} description={t('requestTimeoutDescription')}>
+        <CustomNumberInput
+          value={general.requestTimeoutMs ?? 10_000}
+          onChange={(requestTimeoutMs) => updateGeneral({ requestTimeoutMs })}
+          min={1_000}
+          max={120_000}
+          step={1_000}
+          suffix="ms"
+          className="w-[230px]"
+        />
       </SettingRow>
-      <SettingRow label="失败重试次数" description="由各服务当前实现决定">
-        <UnavailableBadge />
+      <SettingRow label={t('retryCount')} description={t('retryCountDescription')}>
+        <CustomNumberInput
+          value={general.retryCount ?? 1}
+          onChange={(retryCount) => updateGeneral({ retryCount })}
+          min={0}
+          max={5}
+          step={1}
+          className="w-[230px]"
+        />
       </SettingRow>
     </SettingsGroup>
   );
 }
 
 function MaintenanceSettings() {
+  const t = useUiText();
   const runtime = useSettingsRuntime();
+  const general = useSettingsConfigStore((state) => state.general);
+  const updateGeneralSettings = useSettingsConfigStore(
+    (state) => state.updateGeneralSettings,
+  );
+  const [logs, setLogs] = useState<Array<{ id: number; timestamp: string; level: string; target: string; message: string }>>([]);
+  const reloadLogs = () => {
+    void runtime.maintenance.listAppLogs(8).then(setLogs, () => setLogs([]));
+  };
+
+  useEffect(() => {
+    reloadLogs();
+  }, [runtime]);
+
+  if (!general) return null;
 
   return (
     <>
-      <SettingsGroup title="日志">
-        <SettingRow label="日志级别" description="当前版本不支持运行时修改">
-          <UnavailableBadge />
+      <SettingsGroup title={t('logs')}>
+        <SettingRow label={t('logLevel')} description={t('logLevelDescription')}>
+          <SelectField
+            value={general.logLevel ?? 'info'}
+            options={[
+              { value: 'debug', label: 'Debug' },
+              { value: 'info', label: 'Info' },
+              { value: 'warn', label: 'Warn' },
+              { value: 'error', label: 'Error' },
+            ]}
+            onChange={(logLevel) => void updateGeneralSettings({ logLevel: logLevel as 'debug' | 'info' | 'warn' | 'error' })}
+          />
         </SettingRow>
-        <SettingRow label="保存日志到文件" description="便于排查问题">
-          <UnavailableBadge />
+        <SettingRow label={t('logRetentionDays')} description={t('logRetentionDaysDescription')}>
+          <CustomNumberInput
+            value={general.logRetentionDays ?? 7}
+            onChange={(logRetentionDays) =>
+              void updateGeneralSettings({ logRetentionDays })
+            }
+            min={1}
+            max={365}
+            step={1}
+            suffix={t('days')}
+            className="w-[230px]"
+          />
         </SettingRow>
-        <SettingRow label="日志目录">
-          <ActionButton disabled>暂未开放</ActionButton>
+        <SettingRow label={t('logStorage')} description={t('logStorageDescription')}>
+          <span className="text-xs font-medium text-gray-600">
+            {t('recentLogs').replace('{count}', String(logs.length))}
+          </span>
         </SettingRow>
+        <SettingRow label={t('logActions')}>
+          <div className="flex gap-2">
+            <ActionButton onClick={reloadLogs}>{t('refreshLogs')}</ActionButton>
+            <ActionButton
+              danger
+              onClick={() => {
+                if (!confirm(t('clearLogsConfirm'))) return;
+                void runtime.maintenance.clearAppLogs().then(reloadLogs);
+              }}
+            >
+              {t('clearLogs')}
+            </ActionButton>
+          </div>
+        </SettingRow>
+        {logs.length > 0 && (
+          <div className="max-h-40 overflow-auto rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 font-mono text-[10px] leading-5 text-gray-500">
+            {logs.map((entry) => (
+              <div key={entry.id} className="truncate">
+                [{entry.level}] {entry.message}
+              </div>
+            ))}
+          </div>
+        )}
       </SettingsGroup>
-      <SettingsGroup title="数据维护">
-        <SettingRow label="历史记录">
+      <SettingsGroup title={t('dataMaintenance')}>
+        <SettingRow label={t('historyRecords')}>
           <ActionButton
             onClick={() => {
-              if (confirm('确定要清空全部翻译和 OCR 历史吗？独立收藏不会被删除。')) {
+              if (confirm(t('clearHistoryConfirm'))) {
                 void runtime.history.clear();
               }
             }}
           >
-            清除所有历史记录
+            {t('clearAllHistory')}
           </ActionButton>
         </SettingRow>
-        <SettingRow label="本地缓存">
-          <ActionButton disabled>暂未开放</ActionButton>
-        </SettingRow>
-        <SettingRow label="应用设置" description="恢复为首次安装时的默认设置">
-          <ActionButton danger disabled>暂未开放</ActionButton>
+        <SettingRow label={t('appSettings')} description={t('resetSettingsDescription')}>
+          <ActionButton danger disabled>{t('unavailable')}</ActionButton>
         </SettingRow>
       </SettingsGroup>
     </>
@@ -189,16 +292,40 @@ function MaintenanceSettings() {
 }
 
 function ExperimentalSettings() {
+  const t = useUiText();
+  const general = useSettingsConfigStore((state) => state.general);
+  const updateGeneralSettings = useSettingsConfigStore(
+    (state) => state.updateGeneralSettings,
+  );
+  if (!general) return null;
+
   return (
-    <SettingsGroup title="性能">
-      <SettingRow label="GPU 加速" description="使用 GPU 加速 OCR 识别（规划中）">
-        <UnavailableBadge />
+    <SettingsGroup title={t('performance')}>
+      <SettingRow label={t('gpuComposition')} description={t('gpuCompositionDescription')}>
+        <SettingsToggle
+          label={t('gpuComposition')}
+          checked={general.experimentalGpuAcceleration ?? false}
+          onChange={(experimentalGpuAcceleration) =>
+            void updateGeneralSettings({ experimentalGpuAcceleration })
+          }
+        />
       </SettingRow>
-      <SettingRow label="性能监控" description="显示 CPU、内存占用等性能指标">
-        <UnavailableBadge />
+      <SettingRow label={t('performanceMonitoring')} description={t('performanceMonitoringDescription')}>
+        <SettingsToggle
+          label={t('performanceMonitoring')}
+          checked={general.performanceMonitoring ?? false}
+          onChange={(performanceMonitoring) =>
+            void updateGeneralSettings({ performanceMonitoring })
+          }
+        />
       </SettingRow>
     </SettingsGroup>
   );
+}
+
+function useUiText() {
+  const language = useSettingsConfigStore((state) => state.general?.language);
+  return (key: Parameters<typeof uiText>[1]) => uiText(language, key);
 }
 
 function SelectField({
@@ -243,13 +370,5 @@ function ActionButton({
     >
       {children}
     </button>
-  );
-}
-
-function UnavailableBadge() {
-  return (
-    <span className="rounded-md bg-gray-100 px-2.5 py-1.5 text-[11px] font-medium text-gray-400">
-      暂未开放
-    </span>
   );
 }

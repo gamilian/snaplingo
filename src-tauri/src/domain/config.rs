@@ -6,6 +6,14 @@ pub struct GeneralSettings {
     pub language: String,
     pub theme: String,
     pub start_on_boot: bool,
+    pub proxy_mode: String,
+    pub proxy_url: String,
+    pub request_timeout_ms: u32,
+    pub retry_count: u8,
+    pub log_level: String,
+    pub log_retention_days: u16,
+    pub performance_monitoring: bool,
+    pub experimental_gpu_acceleration: bool,
 }
 
 impl Default for GeneralSettings {
@@ -14,6 +22,14 @@ impl Default for GeneralSettings {
             language: "zh-CN".to_string(),
             theme: "system".to_string(),
             start_on_boot: false,
+            proxy_mode: "system".to_string(),
+            proxy_url: String::new(),
+            request_timeout_ms: 10_000,
+            retry_count: 1,
+            log_level: "info".to_string(),
+            log_retention_days: 7,
+            performance_monitoring: false,
+            experimental_gpu_acceleration: false,
         }
     }
 }
@@ -32,10 +48,12 @@ pub struct ScreenshotSettings {
     pub remember_last_tool: bool,
     pub show_selection_size: bool,
     pub show_magnifier: bool,
+    pub magnifier_zoom: u8,
     pub pin_opacity: u8,
     pub pin_shadow: bool,
     pub annotation_colors: Vec<[u8; 4]>,
     pub selection_border_width: u8,
+    pub selection_border_color: [u8; 4],
     pub selection_mask_color: [u8; 4],
 }
 
@@ -53,6 +71,7 @@ impl Default for ScreenshotSettings {
             remember_last_tool: true,
             show_selection_size: true,
             show_magnifier: false,
+            magnifier_zoom: 12,
             pin_opacity: 100,
             pin_shadow: true,
             annotation_colors: vec![
@@ -64,6 +83,7 @@ impl Default for ScreenshotSettings {
                 [0, 0, 0, 255],
             ],
             selection_border_width: 2,
+            selection_border_color: [91, 127, 255, 242],
             selection_mask_color: [0, 0, 0, 46],
         }
     }
@@ -180,6 +200,11 @@ mod tests {
 
         assert_eq!(snapshot.screenshot.quality, 80);
         assert_eq!(snapshot.screenshot.selection_border_width, 2);
+        assert_eq!(snapshot.screenshot.magnifier_zoom, 12);
+        assert_eq!(
+            snapshot.screenshot.selection_border_color,
+            [91, 127, 255, 242]
+        );
         assert_eq!(snapshot.screenshot.selection_mask_color, [0, 0, 0, 46]);
         assert_eq!(
             snapshot.translation.selection_window_position,

@@ -53,6 +53,9 @@ describe('SettingsScrollPage navigation requests', () => {
       block: 'start',
     });
     expect(onHandled).toHaveBeenCalledOnce();
+    const sectionCard = container.querySelector('main > div > section');
+    expect(sectionCard?.className).toContain('overflow-visible');
+    expect(sectionCard?.className).not.toContain('overflow-hidden');
     act(() => root.unmount());
   });
 });

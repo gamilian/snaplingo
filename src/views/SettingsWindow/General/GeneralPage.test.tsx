@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const settingsConfig = vi.hoisted(() => ({
   state: {
     general: {
-      language: 'en',
+      language: 'zh-CN',
       theme: 'dark',
       startOnBoot: true,
     },
@@ -64,10 +64,10 @@ describe('GeneralPage durable settings', () => {
       (element) => getElementName(element) === 'SelectField',
     );
 
-    expect(selects[0].props.value).toBe('en');
+    expect(selects[0].props.value).toBe('zh-CN');
     expect(selects[1].props.value).toBe('dark');
 
-    selects[0].props.onChange?.('ja');
+    selects[0].props.onChange?.('zh-CN');
     selects[1].props.onChange?.('system');
     findElement(
       interfaceContent,
@@ -75,7 +75,7 @@ describe('GeneralPage durable settings', () => {
     ).props.onChange?.(false);
 
     expect(settingsConfig.state.updateGeneralSettings).toHaveBeenNthCalledWith(1, {
-      language: 'ja',
+      language: 'zh-CN',
     });
     expect(settingsConfig.state.updateGeneralSettings).toHaveBeenNthCalledWith(2, {
       theme: 'system',

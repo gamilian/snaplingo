@@ -17,7 +17,10 @@ import {
   shouldPollCaptureHoverSelection,
   startCaptureHoverSelectionPolling,
 } from './captureHoverPolling';
-import { useCaptureMagnifierPixelSource } from './captureMagnifierRuntime';
+import {
+  shouldRequestCaptureMagnifierPixels,
+  useCaptureMagnifierPixelSource,
+} from './captureMagnifierRuntime';
 import { useCaptureSelectionOverlay } from './captureSelectionOverlayRuntime';
 import { getCaptureWorkspaceDerivedState } from './captureWorkspaceDerived';
 import { ANNOTATION_COLORS, type AnnotationColor } from './annotationStyle';
@@ -153,13 +156,19 @@ export function useCaptureWorkspaceRuntimeView({
     hoverSelectionRef,
     showSelectionSize: screenshotPreferences?.showSelectionSize ?? true,
     selectionBorderWidth: screenshotPreferences?.selectionBorderWidth,
+    selectionBorderColor: screenshotPreferences?.selectionBorderColor,
     selectionMaskColor: screenshotPreferences?.selectionMaskColor,
   });
 
   const isMagnifierEnabled = screenshotPreferences?.showMagnifier ?? false;
+  const isMagnifierRequested = shouldRequestCaptureMagnifierPixels({
+    enabled: isMagnifierEnabled,
+    requested: runtimeRenderState.isMagnifierRequested,
+    status: runtimeRenderState.status,
+  });
   const shouldTrackMagnifierCursor =
-    isMagnifierEnabled && derived.shouldTrackMagnifierCursor;
-  const isMagnifierShown = isMagnifierEnabled && derived.isMagnifierShown;
+    isMagnifierRequested && derived.shouldTrackMagnifierCursor;
+  const isMagnifierShown = isMagnifierRequested && derived.isMagnifierShown;
 
   useEffect(() => {
     if (!runtimeRenderState.session || !derived.selectionBounds) return;
@@ -190,8 +199,10 @@ export function useCaptureWorkspaceRuntimeView({
                 )
               )?.rect ?? null
           : undefined,
-      setCursorPointRef: workflowRuntime.actions.updatePolledCursor,
-      setCursorPoint: () => undefined,
+      setCursorPointRef: (point) => {
+        cursorPointRef.current = point;
+      },
+      setCursorPoint: workflowRuntime.actions.updatePolledCursor,
       scheduleSelectionOverlayPaint: overlay.schedulePaint,
       syncHoverSelection: workflowRuntime.actions.updatePolledHover,
       setTimeout: window.setTimeout,
@@ -259,21 +270,15 @@ export function useCaptureWorkspaceRuntimeView({
     workflowRuntime,
   ]);
 
-  const ensureCaptureSnapshotsHydrated = useCallback(
-    async () => {
-      await workflowRuntime.actions.hydrateSnapshots();
-    },
-    [workflowRuntime],
-  );
-  useCaptureMagnifierPixelSource({
+  const magnifierSourceImage = useCaptureMagnifierPixelSource({
     session: runtimeRenderState.session,
-    hasHydratedPixelSource: runtimeRenderState.hasHydratedPixelSource,
-    isMagnifierRequested: runtimeRenderState.isMagnifierRequested,
+    isMagnifierRequested,
     isMagnifierShown,
     cursorMonitor: derived.cursorMonitor,
     cursorInMonitorPoint: derived.cursorInMonitorPoint,
     setCursorColor: workflowRuntime.actions.updateCursorColor,
-    ensureCaptureSnapshotsHydrated,
+    ensureCaptureMonitorHydrated: (_sessionId, monitorId) =>
+      workflowRuntime.actions.hydrateMagnifierMonitor(monitorId),
   });
 
   const textDraftInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -341,6 +346,8 @@ export function useCaptureWorkspaceRuntimeView({
         cursorInMonitorPoint: derived.cursorInMonitorPoint,
         cursorColor: runtimeRenderState.cursorColor,
         colorSampleFormat: runtimeRenderState.colorSampleFormat,
+        sourceImage: magnifierSourceImage,
+        zoom: screenshotPreferences?.magnifierZoom ?? 12,
       },
     }),
     [
@@ -349,7 +356,9 @@ export function useCaptureWorkspaceRuntimeView({
       overlay.cssSize,
       overlay.pixelRatio,
       isMagnifierShown,
+      magnifierSourceImage,
       runtimeRenderState,
+      screenshotPreferences?.magnifierZoom,
     ],
   );
   const actions = useMemo<CaptureWorkspaceViewActions>(

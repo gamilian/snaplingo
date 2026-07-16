@@ -295,6 +295,10 @@ function createPorts(overrides: Record<string, unknown> = {}) {
       queryFavoriteIndex: vi.fn(),
     },
     clipboard: { writeText: vi.fn() },
+    maintenance: {
+      listAppLogs: vi.fn(),
+      clearAppLogs: vi.fn(),
+    },
     ...overrides,
   };
 }

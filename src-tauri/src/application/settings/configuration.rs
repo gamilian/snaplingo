@@ -141,6 +141,29 @@ impl SettingsConfiguration {
     }
 
     fn normalized_snapshot(&self, mut snapshot: SettingsSnapshot) -> SettingsSnapshot {
+        if snapshot.general.language != "zh-CN" {
+            snapshot.general.language = "zh-CN".to_string();
+        }
+        if !matches!(snapshot.general.theme.as_str(), "system" | "light" | "dark") {
+            snapshot.general.theme = "system".to_string();
+        }
+        if !matches!(
+            snapshot.general.proxy_mode.as_str(),
+            "system" | "none" | "manual"
+        ) {
+            snapshot.general.proxy_mode = "system".to_string();
+        }
+        snapshot.general.proxy_url = snapshot.general.proxy_url.trim().to_string();
+        snapshot.general.request_timeout_ms =
+            snapshot.general.request_timeout_ms.clamp(1_000, 120_000);
+        snapshot.general.retry_count = snapshot.general.retry_count.clamp(0, 5);
+        if !matches!(
+            snapshot.general.log_level.as_str(),
+            "debug" | "info" | "warn" | "error"
+        ) {
+            snapshot.general.log_level = "info".to_string();
+        }
+        snapshot.general.log_retention_days = snapshot.general.log_retention_days.clamp(1, 365);
         snapshot.screenshot.save_path =
             self.normalize_screenshot_save_path(&snapshot.screenshot.save_path);
         if !matches!(snapshot.screenshot.format.as_str(), "png" | "jpg" | "webp") {
@@ -155,6 +178,9 @@ impl SettingsConfiguration {
         snapshot.screenshot.quality = snapshot.screenshot.quality.clamp(50, 100);
         snapshot.screenshot.default_stroke_width =
             snapshot.screenshot.default_stroke_width.clamp(1, 8);
+        snapshot.screenshot.selection_border_width =
+            snapshot.screenshot.selection_border_width.clamp(1, 8);
+        snapshot.screenshot.magnifier_zoom = snapshot.screenshot.magnifier_zoom.clamp(4, 20);
         snapshot.screenshot.default_font_size = snapshot.screenshot.default_font_size.clamp(12, 48);
         snapshot.screenshot.pin_opacity = snapshot.screenshot.pin_opacity.clamp(20, 100);
         snapshot.screenshot.custom_file_name =
@@ -257,13 +283,14 @@ mod settings_configuration_tests {
 
         let updated = configuration
             .update_general(GeneralSettings {
-                language: "en".to_string(),
+                language: "zh-CN".to_string(),
                 theme: "dark".to_string(),
                 start_on_boot: true,
+                ..GeneralSettings::default()
             })
             .unwrap();
 
-        assert_eq!(updated.general.language, "en");
+        assert_eq!(updated.general.language, "zh-CN");
         assert_eq!(
             updated.screenshot,
             ScreenshotSettings {
@@ -273,6 +300,21 @@ mod settings_configuration_tests {
         );
         assert_eq!(updated.translation, TranslationSettings::default());
         assert_eq!(store.load_settings().unwrap(), updated);
+    }
+
+    #[test]
+    fn unsupported_interface_languages_fall_back_to_simplified_chinese() {
+        let store = Arc::new(SqliteConfigStore::new_in_memory());
+        let configuration = SettingsConfiguration::new(store);
+
+        let updated = configuration
+            .update_general(GeneralSettings {
+                language: "en".to_string(),
+                ..GeneralSettings::default()
+            })
+            .unwrap();
+
+        assert_eq!(updated.general.language, "zh-CN");
     }
 
     #[test]
@@ -323,6 +365,8 @@ mod settings_configuration_tests {
                 naming_rule: "invalid".to_string(),
                 custom_file_name: "  ".to_string(),
                 default_stroke_width: 99,
+                selection_border_width: 0,
+                magnifier_zoom: 99,
                 default_font_size: 1,
                 pin_opacity: 1,
                 ..ScreenshotSettings::default()
@@ -334,6 +378,8 @@ mod settings_configuration_tests {
         assert_eq!(updated.screenshot.naming_rule, "timestamp");
         assert_eq!(updated.screenshot.custom_file_name, "SnapLingo");
         assert_eq!(updated.screenshot.default_stroke_width, 8);
+        assert_eq!(updated.screenshot.selection_border_width, 1);
+        assert_eq!(updated.screenshot.magnifier_zoom, 20);
         assert_eq!(updated.screenshot.default_font_size, 12);
         assert_eq!(updated.screenshot.pin_opacity, 20);
     }

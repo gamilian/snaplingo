@@ -252,6 +252,57 @@ describe('capture hover polling', () => {
     expect(events).toEqual([]);
   });
 
+  it('continues polling after a transient adapter failure', async () => {
+    const events: string[] = [];
+
+    await runCaptureHoverSelectionPoll({
+      sessionId: 'capture-1',
+      candidates: [],
+      shouldTrackMagnifierCursor: false,
+      canPoll: () => true,
+      getCursorPosition: async () => {
+        throw new Error('temporary failure');
+      },
+      setCursorPointRef: () => events.push('ref'),
+      setCursorPoint: () => events.push('state'),
+      scheduleSelectionOverlayPaint: () => events.push('paint'),
+      syncHoverSelection: (selection) =>
+        events.push(selection ? 'hover' : 'hover:none'),
+      scheduleNextPoll: () => events.push('next'),
+    });
+
+    expect(events).toEqual(['hover:none', 'next']);
+  });
+
+  it('does not publish or reschedule a failed poll after disposal', async () => {
+    let disposed = false;
+    const events: string[] = [];
+    let rejectPoint: (reason?: unknown) => void = () => undefined;
+    const cursorPromise = new Promise<Point>((_resolve, reject) => {
+      rejectPoint = reject;
+    });
+
+    const pollPromise = runCaptureHoverSelectionPoll({
+      sessionId: 'capture-1',
+      candidates: [],
+      shouldTrackMagnifierCursor: false,
+      canPoll: () => true,
+      isDisposed: () => disposed,
+      getCursorPosition: async () => cursorPromise,
+      setCursorPointRef: () => events.push('ref'),
+      setCursorPoint: () => events.push('state'),
+      scheduleSelectionOverlayPaint: () => events.push('paint'),
+      syncHoverSelection: () => events.push('hover'),
+      scheduleNextPoll: () => events.push('next'),
+    });
+
+    disposed = true;
+    rejectPoint(new Error('disposed failure'));
+    await pollPromise;
+
+    expect(events).toEqual([]);
+  });
+
   it('starts hover polling immediately and clears the active timer on cleanup', () => {
     let nextTimerId = 1;
     const timers: Array<{ id: number; delayMs: number; handler: () => void }> = [];

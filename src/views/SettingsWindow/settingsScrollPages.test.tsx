@@ -15,10 +15,12 @@ const settingsConfig = vi.hoisted(() => ({
       rememberLastTool: true,
       showSelectionSize: true,
       showMagnifier: false,
+      magnifierZoom: 12,
       pinOpacity: 100,
       pinShadow: true,
       annotationColors: [[255, 77, 79, 255]] as [number, number, number, number][],
       selectionBorderWidth: 2,
+      selectionBorderColor: [91, 127, 255, 242] as [number, number, number, number],
       selectionMaskColor: [0, 0, 0, 46] as [number, number, number, number],
     },
     translation: {
@@ -79,11 +81,19 @@ describe('single-scroll settings pages', () => {
     ]);
     const labels = settingRowLabels(sections);
     expect(labels).toContain('边框宽度');
+    expect(labels).toContain('边框颜色');
     expect(labels).toContain('遮罩颜色');
     expect(labels).toContain('遮罩透明度');
+    expect(labels).toContain('放大镜倍率');
     expect(labels).not.toContain('标注颜色');
     expect(labels).not.toContain('默认线条粗细');
     expect(labels).not.toContain('默认字体大小');
+
+    const maskPresetButtons = findElements(
+      sections[2].content,
+      (element) => element.props['aria-label']?.startsWith('遮罩颜色 ') ?? false,
+    );
+    expect(maskPresetButtons).toHaveLength(8);
   });
 
   it('groups translation settings and exposes automatic target language', () => {
@@ -171,16 +181,17 @@ function findElements(
 }
 
 function walk(root: ReactNode, visit: (element: TestElement) => void) {
-  if (isElement(root)) visit(root);
-  for (const child of childNodes(root)) walk(child, visit);
+  for (const node of flattenedNodes(root)) {
+    if (!isElement(node)) continue;
+    visit(node);
+    walk(node.props.children, visit);
+  }
 }
 
-function childNodes(node: ReactNode): ReactNode[] {
-  if (Array.isArray(node)) return node.flatMap(childNodes);
-  if (!isElement(node)) return [];
-  const children = node.props.children;
-  if (children === null || children === undefined) return [];
-  return Array.isArray(children) ? children : [children];
+function flattenedNodes(node: ReactNode): ReactNode[] {
+  if (Array.isArray(node)) return node.flatMap(flattenedNodes);
+  if (node === null || node === undefined || typeof node === 'boolean') return [];
+  return [node];
 }
 
 function isElement(node: ReactNode): node is TestElement {
@@ -194,6 +205,7 @@ function elementName(element: TestElement) {
 }
 
 type TestElement = ReactElement<{
+  'aria-label'?: string;
   actions?: { key: string }[];
   children?: ReactNode;
   label?: string;

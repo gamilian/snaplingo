@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { sampleCanvasColor, type ColorSample } from './colorSampler';
+import { sampleImageColor, type ColorSample } from './colorSampler';
 import {
   shouldAutoShowCaptureMagnifier,
   shouldShowMagnifier,
@@ -15,8 +15,14 @@ import type {
 
 interface CaptureMagnifierHydrationState {
   hasSession: boolean;
-  hasHydratedPixelSource: boolean;
+  hasCursorMonitorPixelSource: boolean;
   isMagnifierRequested: boolean;
+}
+
+interface CaptureMagnifierRequestState {
+  enabled: boolean;
+  requested: boolean;
+  status: 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
 }
 
 interface CaptureMagnifierRuntimeStateOptions {
@@ -38,21 +44,31 @@ export interface CaptureMagnifierRuntimeState {
 
 interface UseCaptureMagnifierPixelSourceOptions {
   session: CaptureSessionView | null;
-  hasHydratedPixelSource: boolean;
   isMagnifierRequested: boolean;
   isMagnifierShown: boolean;
   cursorMonitor: MonitorSnapshotView | null;
   cursorInMonitorPoint: Point | null;
   setCursorColor: (color: ColorSample | null) => void;
-  ensureCaptureSnapshotsHydrated: (sessionId: string) => Promise<unknown>;
+  ensureCaptureMonitorHydrated: (
+    sessionId: string,
+    monitorId: string,
+  ) => Promise<unknown>;
 }
 
 export function shouldHydrateCaptureMagnifierPixels({
-  hasHydratedPixelSource,
+  hasCursorMonitorPixelSource,
   hasSession,
   isMagnifierRequested,
 }: CaptureMagnifierHydrationState) {
-  return hasSession && !hasHydratedPixelSource && isMagnifierRequested;
+  return hasSession && !hasCursorMonitorPixelSource && isMagnifierRequested;
+}
+
+export function shouldRequestCaptureMagnifierPixels({
+  enabled,
+  requested,
+  status,
+}: CaptureMagnifierRequestState) {
+  return requested || (enabled && status === 'selecting');
 }
 
 export function getCaptureMagnifierRuntimeState({
@@ -106,88 +122,97 @@ export function getCaptureMagnifierRuntimeState({
 export function useCaptureMagnifierPixelSource({
   cursorInMonitorPoint,
   cursorMonitor,
-  ensureCaptureSnapshotsHydrated,
-  hasHydratedPixelSource,
+  ensureCaptureMonitorHydrated,
   isMagnifierRequested,
   isMagnifierShown,
   session,
   setCursorColor,
 }: UseCaptureMagnifierPixelSourceOptions) {
-  const sampleCanvasByMonitorRef = useRef<Map<string, HTMLCanvasElement>>(new Map());
-  const [sampleCanvasVersion, setSampleCanvasVersion] = useState(0);
+  const sampleSourceByMonitorRef = useRef<
+    Map<string, { image: HTMLImageElement; canvas: HTMLCanvasElement }>
+  >(new Map());
+  const [sampleSourceVersion, setSampleSourceVersion] = useState(0);
 
   useEffect(() => {
-    sampleCanvasByMonitorRef.current = new Map();
+    sampleSourceByMonitorRef.current = new Map();
     setCursorColor(null);
-    setSampleCanvasVersion((version) => version + 1);
+    setSampleSourceVersion((version) => version + 1);
   }, [session?.id, setCursorColor]);
 
   useEffect(() => {
     if (
+      !session ||
+      !cursorMonitor ||
       !shouldHydrateCaptureMagnifierPixels({
-        hasSession: Boolean(session),
-        hasHydratedPixelSource,
+        hasSession: true,
+        hasCursorMonitorPixelSource: Boolean(cursorMonitor.image_base64),
         isMagnifierRequested,
-      }) ||
-      !session
+      })
     ) {
       return;
     }
 
-    void ensureCaptureSnapshotsHydrated(session.id).catch((err) => {
+    void ensureCaptureMonitorHydrated(session.id, cursorMonitor.id).catch((err) => {
       console.warn('Failed to hydrate capture pixels for magnifier:', err);
     });
   }, [
-    ensureCaptureSnapshotsHydrated,
-    hasHydratedPixelSource,
+    cursorMonitor,
+    ensureCaptureMonitorHydrated,
     isMagnifierRequested,
     session,
   ]);
 
   useEffect(() => {
-    if (!session || !isMagnifierShown) return;
+    if (!isMagnifierShown || !cursorMonitor?.image_base64) return;
+    if (sampleSourceByMonitorRef.current.has(cursorMonitor.id)) return;
 
     let disposed = false;
-    session.monitors.forEach((monitor) => {
-      if (!monitor.image_base64) return;
-      if (sampleCanvasByMonitorRef.current.has(monitor.id)) return;
+    const monitorId = cursorMonitor.id;
+    const image = new Image();
+    image.decoding = 'async';
+    image.onload = () => {
+      if (disposed) return;
 
-      const image = new Image();
-      image.onload = () => {
-        if (disposed) return;
-
-        const canvas = document.createElement('canvas');
-        canvas.width = image.naturalWidth;
-        canvas.height = image.naturalHeight;
-        canvas.getContext('2d')?.drawImage(image, 0, 0);
-        sampleCanvasByMonitorRef.current.set(monitor.id, canvas);
-        setSampleCanvasVersion((version) => version + 1);
-      };
-      image.src = `data:image/png;base64,${monitor.image_base64}`;
-    });
+      const canvas = document.createElement('canvas');
+      canvas.width = 1;
+      canvas.height = 1;
+      sampleSourceByMonitorRef.current.set(monitorId, { image, canvas });
+      setSampleSourceVersion((version) => version + 1);
+    };
+    image.src = `data:image/png;base64,${cursorMonitor.image_base64}`;
 
     return () => {
       disposed = true;
     };
-  }, [isMagnifierShown, session]);
+  }, [cursorMonitor?.id, cursorMonitor?.image_base64, isMagnifierShown]);
 
   useEffect(() => {
-    if (!cursorInMonitorPoint || !cursorMonitor) {
+    if (!isMagnifierShown || !cursorInMonitorPoint || !cursorMonitor) {
       setCursorColor(null);
       return;
     }
 
-    const canvas = sampleCanvasByMonitorRef.current.get(cursorMonitor.id);
-    if (!canvas) {
+    const source = sampleSourceByMonitorRef.current.get(cursorMonitor.id);
+    if (!source) {
       setCursorColor(null);
       return;
     }
 
     setCursorColor(
-      sampleCanvasColor(canvas, cursorInMonitorPoint, {
+      sampleImageColor(source.image, source.canvas, cursorInMonitorPoint, {
         width: cursorMonitor.logical_bounds.width,
         height: cursorMonitor.logical_bounds.height,
       }),
     );
-  }, [cursorInMonitorPoint, cursorMonitor, sampleCanvasVersion, setCursorColor]);
+  }, [
+    cursorInMonitorPoint,
+    cursorMonitor,
+    isMagnifierShown,
+    sampleSourceVersion,
+    setCursorColor,
+  ]);
+
+  return cursorMonitor
+    ? sampleSourceByMonitorRef.current.get(cursorMonitor.id)?.image ?? null
+    : null;
 }

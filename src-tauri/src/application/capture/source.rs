@@ -9,6 +9,17 @@ use crate::error::AppError;
 pub trait CaptureSessionSource: Send + Sync {
     async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError>;
 
+    async fn capture_monitor_snapshot(
+        &self,
+        monitor_id: &str,
+    ) -> Result<MonitorSnapshot, AppError> {
+        self.capture_monitor_snapshots()
+            .await?
+            .into_iter()
+            .find(|snapshot| snapshot.id == monitor_id)
+            .ok_or_else(|| AppError::System(format!("Capture monitor not found: {monitor_id}")))
+    }
+
     async fn capture_monitor_layouts(&self) -> Result<Vec<MonitorLayout>, AppError>;
 
     async fn capture_window_candidates(
@@ -29,7 +40,7 @@ pub trait CaptureSessionSource: Send + Sync {
         &self,
         _point: &LogicalPoint,
     ) -> Result<Option<ControlCandidate>, AppError> {
-        Ok(None)
+        Err(AppError::System("当前平台暂不支持界面元素检测".to_string()))
     }
 
     fn current_cursor_position(
