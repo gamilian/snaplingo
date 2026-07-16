@@ -9,7 +9,7 @@ const screenshotSettings = readFileSync(
   'utf8',
 );
 const captureRuntime = readFileSync(
-  new URL('./capture-workspace/runtime.ts', import.meta.url),
+  new URL('../views/CaptureWorkspace/captureWorkspaceRuntime.ts', import.meta.url),
   'utf8',
 );
 const appShell = readFileSync(
@@ -18,7 +18,7 @@ const appShell = readFileSync(
 );
 
 describe('frontend architecture boundaries', () => {
-  it('keeps screenshot settings and application preferences independent from capture views', () => {
+  it('keeps screenshot settings independent from the capture workspace', () => {
     expect(screenshotSettings).not.toContain('../../CaptureWorkspace/');
     expect(captureRuntime).toContain("from '../../domain/annotationColor'");
   });

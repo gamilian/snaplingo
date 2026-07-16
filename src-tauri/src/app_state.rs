@@ -7,9 +7,9 @@ use crate::application::providers::{
 };
 use crate::application::result_window::ResultWindowRuntime;
 use crate::application::{
-    CaptureOutput, CaptureSessionRuntime, CaptureSessions, Favorites, History, HotkeyRuntime,
-    LibraryIndex, OcrHistoryReplay, PinnedImageRuntime, ScreenshotFavoriteCapture,
-    ScreenshotFavorites, SelectedTextAcquirer, SettingsConfiguration,
+    CaptureCursorMover, CaptureOutput, CaptureSessionRuntime, CaptureSessions, Favorites, History,
+    HotkeyRuntime, LibraryIndex, OcrHistoryReplay, PinnedImageRuntime, ScreenshotFavoriteCapture,
+    ScreenshotFavorites, SelectedTextAcquirer, SettingsApplication, SettingsConfiguration,
 };
 use crate::infrastructure::events::EventBus;
 use crate::infrastructure::storage::SqliteAppLogRepository;
@@ -18,6 +18,7 @@ use crate::Result;
 pub struct SettingsRuntime {
     pub configuration: Arc<SettingsConfiguration>,
     pub hotkeys: Arc<HotkeyRuntime>,
+    pub application: Arc<SettingsApplication>,
 }
 
 pub struct ProviderRuntime {
@@ -34,6 +35,7 @@ pub struct CaptureRuntimeState {
     pub output: Arc<CaptureOutput>,
     pub runtime: Arc<CaptureSessionRuntime>,
     pub pinned_images: Arc<PinnedImageRuntime>,
+    pub cursor: Arc<dyn CaptureCursorMover>,
 }
 
 pub struct HistoryRuntime {

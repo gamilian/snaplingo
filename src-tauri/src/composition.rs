@@ -203,7 +203,7 @@ pub(crate) fn build_app_state(
     let selected_text_acquirer = build_selected_text_acquirer(app.clone());
     let result_window = Arc::new(ResultWindowRuntime::new(
         Arc::new(TauriResultWindowRuntimeHost::new(app.clone())),
-        Arc::new(TauriResultWindowNotifier::new(app)),
+        Arc::new(TauriResultWindowNotifier::new(app.clone())),
     ));
 
     hydrate_provider_credentials_in_background(
@@ -212,10 +212,18 @@ pub(crate) fn build_app_state(
         ocr_coordinator.clone(),
     );
 
+    let settings_application = Arc::new(crate::application::SettingsApplication::new(
+        settings_configuration.clone(),
+        Arc::new(crate::infrastructure::system::start_on_boot::TauriStartOnBoot(app)),
+        history.clone(),
+        logs.repository.clone(),
+    ));
+
     AppState {
         settings: Arc::new(SettingsRuntime {
             configuration: settings_configuration,
             hotkeys: hotkey_runtime,
+            application: settings_application,
         }),
         providers: Arc::new(ProviderRuntime {
             translation: translation_coordinator,
@@ -230,6 +238,9 @@ pub(crate) fn build_app_state(
             output: capture_runtime.output,
             runtime: capture_runtime.runtime,
             pinned_images: capture_runtime.pinned_images,
+            cursor: Arc::new(
+                crate::infrastructure::system::capture_cursor::EnigoCaptureCursorMover,
+            ),
         }),
         history: Arc::new(HistoryRuntime {
             history,

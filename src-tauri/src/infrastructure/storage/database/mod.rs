@@ -7,7 +7,7 @@ mod library_index;
 mod migrations;
 mod screenshot_favorites;
 
-pub use app_logs::{AppLogEntry, SqliteAppLogRepository};
+pub use app_logs::SqliteAppLogRepository;
 pub use config_store::SqliteConfigStore;
 pub use favorite_capacity::SqliteFavoriteCapacityRepository;
 pub use favorites::SqliteFavoriteRepository;

@@ -3,6 +3,10 @@ use async_trait::async_trait;
 use crate::domain::capture::{LogicalRect, MonitorSnapshotView};
 use crate::Result;
 
+pub trait CaptureCursorMover: Send + Sync {
+    fn move_relative(&self, delta_x: i32, delta_y: i32);
+}
+
 #[async_trait]
 pub(crate) trait CaptureSessionRuntimeHost: Send + Sync {
     async fn begin_capture_presentation(&self) -> Result<()>;

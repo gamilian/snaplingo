@@ -21,7 +21,7 @@ const captureView = readFileSync(
   new URL('../../views/CaptureWorkspace/CaptureWorkspaceView.tsx', import.meta.url),
   'utf8',
 );
-const runtime = readFileSync(new URL('./runtime.ts', import.meta.url), 'utf8');
+const runtime = readFileSync(new URL('../../views/CaptureWorkspace/captureWorkspaceRuntime.ts', import.meta.url), 'utf8');
 const keyboard = readFileSync(
   new URL('../../views/CaptureWorkspace/captureWorkspaceKeyboard.ts', import.meta.url),
   'utf8',

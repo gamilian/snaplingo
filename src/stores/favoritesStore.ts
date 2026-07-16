@@ -122,13 +122,24 @@ export const useFavoritesStore = create<FavoritesState>((set) => ({
     });
   },
   hydrateKeys: async (kind) => {
-    const page = await runtime().query({ kind, limit: 1000, offset: 0 });
+    const items: FavoriteItem[] = [];
+    const limit = 1000;
+    let offset = 0;
+    let total = 0;
+    let loaded = 0;
+    do {
+      const page = await runtime().query({ kind, limit, offset });
+      items.push(...page.items);
+      total = page.total;
+      loaded = page.items.length;
+      offset += loaded;
+    } while (offset < total && loaded > 0);
     set((state) => {
       const prefix = `[\"${kind}\"`;
       const keys = new Set(
         [...state.keys].filter((key) => !key.startsWith(prefix)),
       );
-      page.items.forEach((item) => keys.add(itemKey(item)));
+      items.forEach((item) => keys.add(itemKey(item)));
       return { keys };
     });
   },

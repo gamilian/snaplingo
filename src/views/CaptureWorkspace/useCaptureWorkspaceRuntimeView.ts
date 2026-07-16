@@ -9,8 +9,8 @@ import {
 import {
   createCaptureWorkspaceRuntime,
   type CaptureScreenshotPreferences,
-} from '../../application/capture-workspace/runtime';
-import type { CaptureWorkspaceRuntime } from '../../application/capture-workspace/types';
+} from './captureWorkspaceRuntime';
+import type { CaptureWorkspaceRuntime } from './captureWorkspaceRuntimeTypes';
 import type { OcrSettings } from '../../application/settings/ports';
 import { prepareCaptureSurfaceForReveal } from './captureHostRuntime';
 import {

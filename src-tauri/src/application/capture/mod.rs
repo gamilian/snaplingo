@@ -19,6 +19,7 @@ pub(crate) use output::configured_capture_save_dir;
 pub use output::{CaptureOutput, ClipboardCaptureOutput};
 pub use render::CaptureSessionOutput;
 pub use runtime::CaptureSessionRuntime;
+pub use runtime_host::CaptureCursorMover;
 pub(crate) use runtime_host::CaptureSessionRuntimeHost;
 pub use session::CaptureSessions;
 pub use source::CaptureSessionSource;

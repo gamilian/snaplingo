@@ -43,6 +43,25 @@ describe('settings library', () => {
     });
   });
 
+  it('hydrates indexed history by id when concurrent writes shift source offsets', async () => {
+    const expected = translation(2, '2026-07-15T08:00:00Z');
+    const inserted = translation(3, '2026-07-15T10:00:00Z');
+    const history = createHistoryPort({ translations: [inserted, expected] });
+    const index = createIndexPort({
+      history: {
+        total: 1,
+        items: [{ id: 2, kind: 'translation', sourceOffset: 0 }],
+      },
+    });
+    const library = createSettingsLibrary(createPorts({ history, index }));
+
+    const page = await library.queryHistory({
+      filter: 'all', search: '', page: 0, pageSize: 20,
+    });
+
+    expect(page.items.map((item) => item.key)).toEqual(['translation:2']);
+  });
+
   it('forwards a filtered history page without cross-source queries', async () => {
     const history = createHistoryPort({
       translations: [translation(1, '2026-07-15T08:00:00Z')],

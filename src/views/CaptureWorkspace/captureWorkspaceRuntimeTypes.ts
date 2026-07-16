@@ -9,32 +9,32 @@ import type {
 import type {
   HoverSelectionCompletionAction,
   PreviewCaptureCompletionAction,
-} from '../../views/CaptureWorkspace/captureActions';
+} from './captureActions';
 import type {
   AnnotationHistory,
-} from '../../views/CaptureWorkspace/annotationHistory';
+} from './annotationHistory';
 import type {
   AnnotationGestureDraft,
   AnnotationStyle,
   AnnotationTool,
-} from '../../views/CaptureWorkspace/annotationStyle';
+} from './annotationStyle';
 import type {
   CaptureAnnotationMoveGesture,
-} from '../../views/CaptureWorkspace/captureEditorRuntime';
+} from './captureEditorRuntime';
 import type {
   CaptureDraftSelectionMoveGesture,
   CaptureSelectionEditGesture,
-} from '../../views/CaptureWorkspace/captureSelectionRuntime';
+} from './captureSelectionRuntime';
 import type {
   ColorSample,
   ColorSampleFormat,
-} from '../../views/CaptureWorkspace/colorSampler';
-import type { SelectionHandle } from '../../views/CaptureWorkspace/selection';
+} from './colorSampler';
+import type { SelectionHandle } from './selection';
 import type {
   TextAnnotationDraft,
-} from '../../views/CaptureWorkspace/textAnnotationDraft';
-import type { CaptureCandidateDetectionMode } from '../../views/CaptureWorkspace/captureWorkspaceState';
-import type { CaptureWorkspaceCommandsPort } from './ports';
+} from './textAnnotationDraft';
+import type { CaptureCandidateDetectionMode } from './captureWorkspaceState';
+import type { CaptureWorkspaceCommandsPort } from '../../application/capture-workspace/ports';
 
 export type CaptureWorkspaceRuntimeStatus =
   | 'idle'

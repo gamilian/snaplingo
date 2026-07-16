@@ -11,7 +11,9 @@ pub mod screenshot_favorites;
 pub mod selected_text;
 pub mod settings;
 
-pub use capture::{CaptureOutput, CaptureSessionRuntime, CaptureSessionSource, CaptureSessions};
+pub use capture::{
+    CaptureCursorMover, CaptureOutput, CaptureSessionRuntime, CaptureSessionSource, CaptureSessions,
+};
 pub use favorite_capacity::FavoriteCapacity;
 pub use favorites::Favorites;
 pub use history::{History, OcrHistoryReplay};
@@ -24,4 +26,4 @@ pub use selected_text::{
     SelectedTextAcquirer, SelectionContextProvider, SelectionMethod, SelectionScheme,
     SelectionTextMode, SystemSelectionProvider,
 };
-pub use settings::SettingsConfiguration;
+pub use settings::{SettingsApplication, SettingsConfiguration, StartOnBoot};

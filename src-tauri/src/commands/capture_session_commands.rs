@@ -237,10 +237,8 @@ pub async fn current_capture_control_candidate(
 }
 
 #[tauri::command]
-pub fn move_capture_cursor(delta_x: i32, delta_y: i32) {
-    use enigo::{Enigo, MouseControllable};
-
-    Enigo::new().mouse_move_relative(delta_x, delta_y);
+pub fn move_capture_cursor(delta_x: i32, delta_y: i32, state: State<'_, crate::AppState>) {
+    state.capture.cursor.move_relative(delta_x, delta_y);
 }
 
 #[tauri::command]

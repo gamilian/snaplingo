@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { CaptureWorkspacePlatformRuntime } from './platformRuntime';
-import { createCaptureWorkspaceRuntime } from './runtime';
+import type { CaptureWorkspacePlatformRuntime } from '../../application/capture-workspace/platformRuntime';
+import { createCaptureWorkspaceRuntime } from './captureWorkspaceRuntime';
 
 const selection = { x: 20, y: 30, width: 120, height: 80 };
 

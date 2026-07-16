@@ -155,6 +155,17 @@ function forbiddenPlatformImports(files: SourceFile[]) {
     .sort();
 }
 
+function forbiddenApplicationViewImports(files: SourceFile[]) {
+  return moduleImports(files)
+    .filter(
+      ({ path, specifier }) =>
+        path.startsWith('src/application/') &&
+        /(?:^|\/)views(?:\/|$)/.test(specifier),
+    )
+    .map(({ path, specifier }) => `${path} -> ${specifier}`)
+    .sort();
+}
+
 function tauriEventUses(files: SourceFile[]): TauriEventUse[] {
   return files.flatMap((file) => {
     const sourceFile = parseSourceFile(file);
@@ -355,6 +366,10 @@ describe('frontend dependency rules', () => {
 
   test('only the Tauri platform boundary imports Platform or Tauri modules', () => {
     expect(forbiddenPlatformImports(allSourceFiles())).toEqual([]);
+  });
+
+  test('Application modules do not depend on Views', () => {
+    expect(forbiddenApplicationViewImports(productionSourceFiles())).toEqual([]);
   });
 
   test('raw Tauri event strings stay behind the Tauri platform boundary', () => {

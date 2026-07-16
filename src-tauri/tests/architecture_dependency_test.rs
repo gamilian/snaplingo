@@ -255,6 +255,22 @@ fn commands_do_not_publish_durable_state_change_events() {
 }
 
 #[test]
+fn commands_delegate_native_effects_to_application_seams() {
+    let violations = production_command_sources()
+        .into_iter()
+        .filter(|file| {
+            file.source.contains("enigo::")
+                || file.source.contains("tauri_plugin_autostart")
+                || file.source.contains(".logs.repository")
+                || file.source.contains("run_cleanup()")
+        })
+        .map(|file| file.path)
+        .collect::<Vec<_>>();
+
+    assert_eq!(violations, Vec::<String>::new());
+}
+
+#[test]
 fn rejects_forbidden_synthetic_dependencies() {
     let files = [SourceFile {
         path: "src/application/example.rs".to_string(),

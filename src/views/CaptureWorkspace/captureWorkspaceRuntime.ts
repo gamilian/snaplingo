@@ -11,7 +11,7 @@ import {
 } from '../../domain/annotationColor';
 import type {
   HoverSelectionCompletionAction,
-} from '../../views/CaptureWorkspace/captureActions';
+} from './captureActions';
 import {
   canToggleCapturedCursor,
   getCaptureScreenSelectionScopeFromShortcut,
@@ -23,40 +23,40 @@ import {
   isRestoreLastSelectionShortcut,
   isCandidateDetectionModeToggleShortcut,
   isToggleCapturedCursorShortcut,
-} from '../../views/CaptureWorkspace/captureActions';
+} from './captureActions';
 import {
   getCaptureKeyboardKeyUpAction,
   planCaptureKeyboardBlur,
-} from '../../views/CaptureWorkspace/captureKeyboardHostRuntime';
+} from './captureKeyboardHostRuntime';
 import {
   buildCaptureCandidates,
   getBestCandidateAtPoint,
-} from '../../views/CaptureWorkspace/captureCandidates';
+} from './captureCandidates';
 import {
   getPrimaryCaptureCompletionActionForMode,
   planCandidateSelectionCompletion,
   planManualSelectionCompletion,
   type CaptureRuntimeEffect,
-} from '../../views/CaptureWorkspace/captureInteractionRuntime';
+} from './captureInteractionRuntime';
 import {
   recordSuccessfulCaptureSelection,
   restoreCaptureSelectionFromHistory,
   restoreLastSuccessfulCaptureSelection,
   type CaptureSelectionStorage,
-} from '../../views/CaptureWorkspace/captureHostRuntime';
-import { printBase64PngImage } from '../../views/CaptureWorkspace/capturePrint';
+} from './captureHostRuntime';
+import { printBase64PngImage } from './capturePrint';
 import {
   clearAnnotationHistory,
   emptyAnnotationHistory,
   redoAnnotationHistory,
   removeAnnotationFromHistory,
   undoAnnotationHistory,
-} from '../../views/CaptureWorkspace/annotationHistory';
+} from './annotationHistory';
 import {
   type AnnotationSizeDirection,
   type AnnotationStyle,
   type AnnotationTool,
-} from '../../views/CaptureWorkspace/annotationStyle';
+} from './annotationStyle';
 import {
   applyStyleToSelectedAnnotationHistory,
   commitCaptureEditorTextDraft,
@@ -67,13 +67,13 @@ import {
   planCaptureAnnotationSizeAdjustment,
   planCaptureAnnotationToolActivation,
   planCaptureManualSelectionTransition,
-} from '../../views/CaptureWorkspace/captureEditorRuntime';
-import { getCaptureWorkspaceDerivedState } from '../../views/CaptureWorkspace/captureWorkspaceDerived';
+} from './captureEditorRuntime';
+import { getCaptureWorkspaceDerivedState } from './captureWorkspaceDerived';
 import {
   handleCaptureWorkspaceEditorKeyDown,
   type CaptureWorkspaceKeyboardEditorActions,
   type CaptureWorkspaceKeyboardEditorContext,
-} from '../../views/CaptureWorkspace/captureWorkspaceKeyboard';
+} from './captureWorkspaceKeyboard';
 import {
   handleCaptureWorkspaceEditorPointerDown,
   handleCaptureWorkspaceEditorPointerMove,
@@ -84,44 +84,44 @@ import {
   type CaptureWorkspacePointerEditorActions,
   type CaptureWorkspacePointerEditorContext,
   type CaptureWorkspacePointerEvent,
-} from '../../views/CaptureWorkspace/captureWorkspacePointer';
+} from './captureWorkspacePointer';
 import {
   createInitialCaptureWorkspaceState,
   type CaptureWorkspaceState,
-} from '../../views/CaptureWorkspace/captureWorkspaceState';
+} from './captureWorkspaceState';
 import {
   colorSamplesEqual,
   colorSampleToClipboardText,
-} from '../../views/CaptureWorkspace/colorSampler';
-import { updateTextAnnotationDraft } from '../../views/CaptureWorkspace/textAnnotationDraft';
+} from './colorSampler';
+import { updateTextAnnotationDraft } from './textAnnotationDraft';
 import {
   normalizeSelection,
   snapPointToRects,
-} from '../../views/CaptureWorkspace/selection';
-import type { SelectionHandle } from '../../views/CaptureWorkspace/selection';
+} from './selection';
+import type { SelectionHandle } from './selection';
 import {
   planCaptureDraftSelectionCommit,
   planCaptureDraftSelectionKeyboardNudge,
   planCaptureDraftSelectionPointerMove,
   planCaptureDraftSelectionStart,
   planCaptureSelectionCursorKeyboardNudge,
-} from '../../views/CaptureWorkspace/captureSelectionRuntime';
-import { shouldRevealCaptureWindow } from '../../views/CaptureWorkspace/captureWindowVisibility';
+} from './captureSelectionRuntime';
+import { shouldRevealCaptureWindow } from './captureWindowVisibility';
 import {
   getCurrentMonitorBounds,
   getVirtualDesktopBounds,
-} from '../../views/CaptureWorkspace/virtualDesktop';
+} from './virtualDesktop';
 import {
   applyOcrTextPreferences,
   normalizeOcrText,
 } from '../../utils/ocrTextProcessing';
-import type { OcrSettings } from '../settings/ports';
+import type { OcrSettings } from '../../application/settings/ports';
 import type {
   CaptureWorkspaceRuntime,
   CaptureWorkspacePointerInput,
   CaptureWorkspaceKeyInput,
   CaptureWorkspaceRuntimePlatform,
-} from './types';
+} from './captureWorkspaceRuntimeTypes';
 
 const MIN_SELECTION_SIZE = 10;
 

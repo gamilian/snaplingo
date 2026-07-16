@@ -3,7 +3,7 @@ import type { PointerEvent, ReactNode, Ref, WheelEvent } from 'react';
 import type {
   CaptureWorkspacePointerInput,
   CaptureWorkspaceRuntimeActions,
-} from '../../application/capture-workspace/types';
+} from './captureWorkspaceRuntimeTypes';
 import {
   ANNOTATION_COLORS,
   type AnnotationColor,

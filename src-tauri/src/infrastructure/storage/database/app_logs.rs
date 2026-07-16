@@ -1,22 +1,13 @@
 use std::sync::Arc;
 
+use crate::application::settings::{AppLogEntry, AppLogRepository};
 use chrono::{Duration, Utc};
 use rusqlite::params;
-use serde::Serialize;
 
 use crate::domain::SettingsSnapshot;
 use crate::Result;
 
 use super::Database;
-
-#[derive(Debug, Clone, Serialize)]
-pub struct AppLogEntry {
-    pub id: i64,
-    pub timestamp: String,
-    pub level: String,
-    pub target: String,
-    pub message: String,
-}
 
 pub struct SqliteAppLogRepository {
     database: Arc<Database>,
@@ -107,6 +98,15 @@ impl SqliteAppLogRepository {
             _ => 1,
         };
         current >= configured
+    }
+}
+
+impl AppLogRepository for SqliteAppLogRepository {
+    fn list(&self, limit: usize) -> Result<Vec<AppLogEntry>> {
+        SqliteAppLogRepository::list(self, limit)
+    }
+    fn clear(&self) -> Result<()> {
+        SqliteAppLogRepository::clear(self)
     }
 }
 

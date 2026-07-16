@@ -1,3 +1,4 @@
+pub mod capture_cursor;
 pub mod capture_window;
 pub mod ocr;
 pub mod paths;
@@ -7,6 +8,7 @@ pub mod screenshot;
 pub mod screenshot_favorites;
 pub mod selection;
 pub mod shortcut;
+pub mod start_on_boot;
 
 pub use paths::{get_app_data_dir, get_database_path};
 pub use screenshot::get_capture_session_source;

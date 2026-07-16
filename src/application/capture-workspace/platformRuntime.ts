@@ -7,10 +7,10 @@ import type {
   CaptureWorkspaceRequestHandler,
   CaptureWorkspaceUnsubscribe,
 } from './ports';
-import type { CaptureWorkspaceRuntimePlatform } from './types';
 
-export interface CaptureWorkspacePlatformRuntime
-  extends CaptureWorkspaceRuntimePlatform {
+
+export interface CaptureWorkspacePlatformRuntime {
+  commands: CaptureWorkspaceCommandsPort;
   clipboard: {
     copyText(text: string): Promise<void>;
   };

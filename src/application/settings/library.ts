@@ -225,49 +225,75 @@ export function createSettingsLibrary(ports: {
 }
 
 async function queryHistorySource<T>(
-  refs: Array<{ sourceOffset: number }>,
+  refs: Array<{ id: number; sourceOffset: number }>,
   search: string,
   query: (input: {
     search: string;
     limit: number;
     offset: number;
-  }) => Promise<{ items: T[] }>,
+  }) => Promise<{ items: T[]; total: number }>,
 ): Promise<T[]> {
   if (refs.length === 0) return [];
-  const page = await query({
+  const ids = new Set(refs.map((ref) => ref.id));
+  const initial = await query({
     search,
     limit: refs.length,
     offset: refs[0].sourceOffset,
   });
-  return page.items;
+  const matched = initial.items.filter((item) =>
+    ids.has((item as { id: number }).id),
+  );
+  if (matched.length === refs.length) return matched;
+  const page = await query({
+    search,
+    limit: initial.total,
+    offset: 0,
+  });
+  return page.items.filter((item) => ids.has((item as { id: number }).id));
 }
 
 async function queryFavoriteSource(
-  refs: Array<{ sourceOffset: number }>,
+  refs: Array<{ id: number; sourceOffset: number }>,
   search: string,
   port: SettingsFavoritesPort,
 ): Promise<FavoriteItem[]> {
   if (refs.length === 0) return [];
-  const page = await port.queryFavorites({
+  const ids = new Set(refs.map((ref) => ref.id));
+  const initial = await port.queryFavorites({
     search,
     limit: refs.length,
     offset: refs[0].sourceOffset,
   });
-  return page.items;
+  const matched = initial.items.filter((item) => ids.has(item.id));
+  if (matched.length === refs.length) return matched;
+  const page = await port.queryFavorites({
+    search,
+    limit: initial.total,
+    offset: 0,
+  });
+  return page.items.filter((item) => ids.has(item.id));
 }
 
 async function queryScreenshotSource(
-  refs: Array<{ sourceOffset: number }>,
+  refs: Array<{ id: number; sourceOffset: number }>,
   search: string,
   port: SettingsScreenshotFavoritesPort,
 ): Promise<ScreenshotFavoriteItem[]> {
   if (refs.length === 0) return [];
-  const page = await port.queryScreenshotFavorites({
+  const ids = new Set(refs.map((ref) => ref.id));
+  const initial = await port.queryScreenshotFavorites({
     search,
     limit: refs.length,
     offset: refs[0].sourceOffset,
   });
-  return page.items;
+  const matched = initial.items.filter((item) => ids.has(item.id));
+  if (matched.length === refs.length) return matched;
+  const page = await port.queryScreenshotFavorites({
+    search,
+    limit: initial.total,
+    offset: 0,
+  });
+  return page.items.filter((item) => ids.has(item.id));
 }
 
 function orderByIndex<T extends { key: string }>(
