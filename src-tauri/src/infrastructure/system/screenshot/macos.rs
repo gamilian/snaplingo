@@ -494,9 +494,11 @@ fn capture_visible_window_candidates(
 fn capture_control_candidate_at(
     point: &LogicalPoint,
 ) -> Result<Option<ControlCandidate>, AppError> {
-    if !unsafe { AXIsProcessTrusted() } {
+    if !unsafe { AXIsProcessTrusted() }
+        && !crate::infrastructure::system::selection::macos::context::request_accessibility_permission()
+    {
         return Err(AppError::System(
-            "界面元素检测需要 macOS 辅助功能权限。请在“系统设置 > 隐私与安全性 > 辅助功能”中允许 SnapLingo，然后重新截图"
+            "界面元素检测需要 macOS 辅助功能权限。SnapLingo 已通过 macOS 系统授权流程发起请求；请授权后重新截图"
                 .to_string(),
         ));
     }

@@ -6,6 +6,7 @@ pub mod hotkeys;
 pub mod library_index;
 pub mod pinned_image;
 pub mod providers;
+pub mod required_permissions;
 pub mod result_window;
 pub mod screenshot_favorites;
 pub mod selected_text;
@@ -21,6 +22,9 @@ pub use hotkeys::{HotkeyConfiguration, HotkeyRuntime, HotkeyUpdateOutcome};
 pub use library_index::LibraryIndex;
 pub use pinned_image::PinnedImageRuntime;
 pub use providers::Provider;
+pub use required_permissions::{
+    RequiredPermissions, RequiredPermissionsHost, RequiredPermissionsStatus,
+};
 pub use screenshot_favorites::{ScreenshotFavoriteCapture, ScreenshotFavorites};
 pub use selected_text::{
     SelectedTextAcquirer, SelectionContextProvider, SelectionMethod, SelectionScheme,

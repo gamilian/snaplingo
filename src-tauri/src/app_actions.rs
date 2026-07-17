@@ -39,6 +39,17 @@ pub(crate) enum AppAction {
 }
 
 pub(crate) fn dispatch_app_action(app: tauri::AppHandle, action: AppAction) {
+    if action_requires_permissions(action) {
+        let state = app.state::<AppState>();
+        if !state.permissions.status().all_granted() {
+            state.permissions.request_missing();
+            if let Err(err) = settings_window::show_settings_window(&app) {
+                log::error!("Failed to show required permissions window: {}", err);
+            }
+            return;
+        }
+    }
+
     match action {
         AppAction::OpenCapture(mode) => {
             tauri::async_runtime::spawn(commands::open_capture_window_from_shortcut(
@@ -127,6 +138,13 @@ pub(crate) fn dispatch_app_action(app: tauri::AppHandle, action: AppAction) {
     }
 }
 
+fn action_requires_permissions(action: AppAction) -> bool {
+    !matches!(
+        action,
+        AppAction::OpenSettings | AppAction::OpenAbout | AppAction::Quit
+    )
+}
+
 fn dispatch_result_window_open(app: tauri::AppHandle, request: ResultWindowOpenRequest) {
     tauri::async_runtime::spawn(async move {
         let state = app.state::<AppState>();
@@ -157,7 +175,9 @@ mod tests {
         ResultWindowRuntime, ResultWindowWindowPort,
     };
 
-    use super::{open_result_window_request, CaptureLaunchMode};
+    use super::{
+        action_requires_permissions, open_result_window_request, AppAction, CaptureLaunchMode,
+    };
 
     #[test]
     fn capture_launch_modes_keep_existing_ipc_strings() {
@@ -175,6 +195,15 @@ mod tests {
             CaptureLaunchMode::SilentScreenshotOcr.as_str(),
             "silent-screenshot-ocr"
         );
+    }
+
+    #[test]
+    fn blocks_feature_actions_until_required_permissions_are_granted() {
+        assert!(action_requires_permissions(AppAction::OpenCapture(
+            CaptureLaunchMode::Screenshot
+        )));
+        assert!(!action_requires_permissions(AppAction::OpenSettings));
+        assert!(!action_requires_permissions(AppAction::Quit));
     }
 
     struct Window;

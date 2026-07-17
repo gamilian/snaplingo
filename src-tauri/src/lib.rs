@@ -95,6 +95,8 @@ pub fn run() {
                 log::warn!("Failed to synchronize start on boot: {}", error);
             }
             let hotkey_runtime = app_state.settings.hotkeys.clone();
+            let permissions = app_state.permissions.clone();
+            let permissions_granted = permissions.request_missing().all_granted();
             let log_settings = app_state.settings.configuration.clone();
             let scheduled_log_repository = app_state.logs.repository.clone();
 
@@ -111,24 +113,31 @@ pub fn run() {
 
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                while !permissions.status().all_granted() {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                }
                 let registrar = infrastructure::system::TauriHotkeyRegistrar::new(
-                    app_handle,
+                    app_handle.clone(),
                     startup_shortcuts::trigger_hotkey_action,
                 );
                 if let Err(err) = hotkey_runtime.register_startup_hotkeys_with(&registrar) {
                     log::error!("Failed to register startup hotkeys: {}", err);
                 }
+                if let Err(err) =
+                    infrastructure::system::capture_window::prewarm_capture_window(&app_handle)
+                {
+                    log::warn!("Failed to prewarm capture window: {}", err);
+                }
             });
-
-            if let Err(err) =
-                infrastructure::system::capture_window::prewarm_capture_window(app.handle())
-            {
-                log::warn!("Failed to prewarm capture window: {}", err);
-            }
 
             if let Err(err) = app_shell::setup_menu_bar(app) {
                 log::warn!("Failed to setup menu bar: {}", err);
+            }
+
+            if !permissions_granted {
+                if let Err(err) = settings_window::show_settings_window(app.handle()) {
+                    log::error!("Failed to show required permissions window: {}", err);
+                }
             }
 
             Ok(())
@@ -149,6 +158,8 @@ pub fn run() {
             commands::reset_hotkey,
             commands::reset_hotkey_category,
             commands::get_settings_snapshot,
+            commands::get_required_permissions_status,
+            commands::request_required_permissions,
             commands::trigger_screenshot,
             commands::update_general_settings,
             commands::update_screenshot_settings,

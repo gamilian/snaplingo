@@ -14,7 +14,9 @@ impl SelectionMethod for AccessibilitySelectionMethod {
     }
 
     fn availability(&self, _context: &SelectionContext) -> MethodAvailability {
-        if super::context::accessibility_permission_granted(false) {
+        if super::context::accessibility_permission_granted(false)
+            || super::context::request_accessibility_permission()
+        {
             MethodAvailability::Available
         } else {
             MethodAvailability::Unavailable(

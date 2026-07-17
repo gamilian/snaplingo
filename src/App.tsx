@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'react';
+import { createRequiredPermissionsRuntime } from './application/permissions/runtime';
+import { requiredPermissions } from './platform/tauri/permissions';
+import { RequiredPermissionsGate } from './views/RequiredPermissionsGate';
 import { SettingsWindow } from './views/SettingsWindow';
 import ResultWindow from './views/ResultWindow';
 import {
@@ -94,6 +97,8 @@ const settingsRuntime = createSettingsRuntime({
   screenshotFavorites,
   clipboard: { writeText: writeClipboardText },
 });
+const requiredPermissionsRuntime =
+  createRequiredPermissionsRuntime(requiredPermissions);
 const captureWorkspaceRuntime = createCaptureWorkspacePlatformRuntime({
   events: captureWorkspaceEvents,
   window: captureWindow,
@@ -216,7 +221,7 @@ const isSettingsWindow = isSettingsWindowLaunch(
   window.location.search,
 );
 
-function App() {
+function Application() {
   const resultWindowVisible = useAppStore((state) => state.resultWindowVisible);
   const applyTranslationDefaults = useAppStore(
     (state) => state.applyTranslationDefaults,
@@ -444,6 +449,14 @@ function App() {
       {/* 翻译结果窗口（浮动） */}
       {resultWindowVisible && <ResultWindow runtime={resultWindowRuntime} />}
     </>
+  );
+}
+
+function App() {
+  return (
+    <RequiredPermissionsGate runtime={requiredPermissionsRuntime}>
+      <Application />
+    </RequiredPermissionsGate>
   );
 }
 

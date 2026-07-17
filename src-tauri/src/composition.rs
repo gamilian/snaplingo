@@ -220,6 +220,9 @@ pub(crate) fn build_app_state(
     ));
 
     AppState {
+        permissions: Arc::new(crate::application::RequiredPermissions::new(Arc::new(
+            crate::infrastructure::system::required_permissions::SystemRequiredPermissions,
+        ))),
         settings: Arc::new(SettingsRuntime {
             configuration: settings_configuration,
             hotkeys: hotkey_runtime,

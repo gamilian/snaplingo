@@ -1,4 +1,7 @@
 use crate::domain::{FrontmostApp, SelectionContext};
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static ACCESSIBILITY_PROMPT_REQUESTED: AtomicBool = AtomicBool::new(false);
 
 pub fn accessibility_permission_granted(prompt: bool) -> bool {
     use std::ffi::c_void;
@@ -56,10 +59,20 @@ pub fn accessibility_permission_granted(prompt: bool) -> bool {
     }
 }
 
+pub fn request_accessibility_permission() -> bool {
+    if accessibility_permission_granted(false) {
+        return true;
+    }
+    if ACCESSIBILITY_PROMPT_REQUESTED.swap(true, Ordering::AcqRel) {
+        return false;
+    }
+    accessibility_permission_granted(true)
+}
+
 pub fn selection_accessibility_permission_error() -> String {
     format!(
         "{} {}",
-        "划词翻译需要 macOS 辅助功能权限。请在 系统设置 > 隐私与安全性 > 辅助功能 中允许 SnapLingo，然后重新触发或重启应用。",
+        "划词翻译需要 macOS 辅助功能权限。SnapLingo 已通过 macOS 系统授权流程发起请求；如未自动打开，请在 系统设置 > 隐私与安全性 > 辅助功能 中允许 SnapLingo，然后重新触发或重启应用。",
         macos_accessibility_runtime_context(),
     )
 }

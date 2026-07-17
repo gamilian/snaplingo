@@ -3,6 +3,7 @@ pub mod capture_window;
 pub mod ocr;
 pub mod paths;
 pub mod pinned_window;
+pub mod required_permissions;
 pub mod result_window;
 pub mod screenshot;
 pub mod screenshot_favorites;
