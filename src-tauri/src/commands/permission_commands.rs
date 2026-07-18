@@ -12,5 +12,5 @@ pub fn get_required_permissions_status(
 pub fn request_required_permissions(
     state: State<'_, crate::AppState>,
 ) -> RequiredPermissionsStatus {
-    state.permissions.request_missing()
+    state.permissions.request_next_missing()
 }

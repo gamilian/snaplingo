@@ -231,7 +231,9 @@ export function createResultWindowRuntime({
         state.clearTranslationResults();
       }
       if (shouldApplyTranslationPayloadText(payload)) {
-        state.setSourceText(translationPayloadSourceText(payload));
+        state.setSourceText(
+          translationPayloadSourceText(payload, getOcrSettings?.()),
+        );
       }
       if (payload.autoTranslate) {
         state.requestAutoTranslate();
@@ -247,7 +249,7 @@ export function createResultWindowRuntime({
       state.setOcrError(null);
     }
     if (shouldApplyOcrPayloadText(payload)) {
-      state.setOcrText(ocrPayloadDisplayText(payload));
+      state.setOcrText(ocrPayloadDisplayText(payload, getOcrSettings?.()));
       state.setOcrConfidence(payload.confidence ?? null);
       state.setOcrImageBase64(payload.imageBase64 ?? null);
     }
@@ -383,6 +385,7 @@ export function createResultWindowRuntime({
     subscribeToPayloads,
     startFileOcr,
     favoriteOcrResult,
+    speakText: platform.commands.speakText,
     translate,
     retryTranslationProvider,
     close,

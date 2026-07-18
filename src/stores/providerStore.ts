@@ -46,7 +46,7 @@ function runtime() {
 export interface Provider {
   id: string;
   name: string;
-  type: 'ocr' | 'translation' | 'tts';
+  type: 'ocr' | 'translation';
   status: 'active' | 'inactive' | 'unconfigured';
   isBuiltin: boolean;
   description?: string;
@@ -70,12 +70,10 @@ interface ProviderState {
   // Provider 列表
   ocrProviders: Provider[];
   translationProviders: Provider[];
-  ttsProviders: Provider[];
 
   // 激活状态
   activeOcrProvider: string | null;
   activeTranslationProviders: string[];
-  activeTtsProvider: string | null;
 
   // Async Actions (后端驱动)
   loadTranslationProviders: () => Promise<void>;
@@ -94,25 +92,9 @@ interface ProviderState {
   activateOcrProvider: (id: string) => Promise<void>;
   configureOcrProvider: (providerId: string, credentials: Record<string, string>) => Promise<void>;
 
-  // TTS Actions (保留同步)
-  activateTtsProvider: (id: string) => void;
-
   updateProviderConfig: (id: string, providerId: string, config: any) => Promise<void>;
   reorderTranslationProviders: (ids: string[]) => Promise<void>;
 }
-
-// 内置 TTS Providers（本地临时数据）
-const builtinTtsProviders: Provider[] = [
-  {
-    id: 'system-tts',
-    name: '系统语音',
-    type: 'tts',
-    status: 'active',
-    isBuiltin: true,
-    description: '使用系统内置的 TTS 引擎',
-    requiresApiKey: false,
-  },
-];
 
 // 转换后端 ProviderInfo 到前端 Provider
 function convertProviderInfo(info: ProviderInfo): Provider {
@@ -187,11 +169,9 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
       // 初始数据
       ocrProviders: [], // 从后端加载
       translationProviders: [], // 从后端加载
-      ttsProviders: builtinTtsProviders,
 
       activeOcrProvider: null,
       activeTranslationProviders: [],
-      activeTtsProvider: 'system-tts',
 
       // 从后端加载翻译 Providers
       loadTranslationProviders: async () => {
@@ -320,15 +300,6 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
           throw error;
         }
       },
-
-      // TTS Provider 激活（单选）
-      activateTtsProvider: (id) =>
-        set((state) => ({
-          activeTtsProvider: id,
-          ttsProviders: state.ttsProviders.map((p) =>
-            p.id === id ? { ...p, status: 'active' as const } : { ...p, status: 'inactive' as const }
-          ),
-        })),
 
       // 更新 Provider 配置
       updateProviderConfig: async (_id: string, providerId: string, config: any) => {

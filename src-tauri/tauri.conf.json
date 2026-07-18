@@ -31,10 +31,10 @@
       "entitlements": "entitlements.plist",
       "exceptionDomain": null,
       "frameworks": [],
-      "hardenedRuntime": false,
+      "hardenedRuntime": true,
       "providerShortName": null,
       "signingIdentity": "-",
-      "minimumSystemVersion": "10.13"
+      "minimumSystemVersion": "11.0"
     },
     "iOS": {},
     "android": {

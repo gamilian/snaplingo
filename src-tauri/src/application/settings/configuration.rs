@@ -164,6 +164,16 @@ impl SettingsConfiguration {
             snapshot.general.log_level = "info".to_string();
         }
         snapshot.general.log_retention_days = snapshot.general.log_retention_days.clamp(1, 365);
+        snapshot.general.system_tts_voice = snapshot.general.system_tts_voice.trim().to_string();
+        snapshot.general.system_tts_rate = snapshot.general.system_tts_rate.clamp(80, 400);
+        snapshot.general.settings_window_width = snapshot
+            .general
+            .settings_window_width
+            .map(|width| width.clamp(700, 4_000));
+        snapshot.general.settings_window_height = snapshot
+            .general
+            .settings_window_height
+            .map(|height| height.clamp(500, 3_000));
         snapshot.screenshot.save_path =
             self.normalize_screenshot_save_path(&snapshot.screenshot.save_path);
         if !matches!(snapshot.screenshot.format.as_str(), "png" | "jpg" | "webp") {

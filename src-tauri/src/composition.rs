@@ -122,8 +122,8 @@ pub(crate) fn build_app_state(
         hotkey_configuration,
         Arc::new(TauriHotkeyChangeNotifier { app: app.clone() }),
     ));
-    let keychain = Arc::new(Keychain::new());
-    let provider_credential_store: Arc<dyn ProviderCredentialStore> = keychain.clone();
+    let credential_store = Arc::new(Keychain::sqlite(database.clone()));
+    let provider_credential_store: Arc<dyn ProviderCredentialStore> = credential_store.clone();
     let http_client: Arc<dyn HttpClient> = Arc::new(ReqwestHttpClient::with_settings(
         settings_configuration.clone(),
     ));
@@ -207,7 +207,7 @@ pub(crate) fn build_app_state(
     ));
 
     hydrate_provider_credentials_in_background(
-        provider_credential_store,
+        credential_store,
         provider_configuration.clone(),
         ocr_coordinator.clone(),
     );
@@ -224,7 +224,7 @@ pub(crate) fn build_app_state(
             crate::infrastructure::system::required_permissions::SystemRequiredPermissions,
         ))),
         settings: Arc::new(SettingsRuntime {
-            configuration: settings_configuration,
+            configuration: settings_configuration.clone(),
             hotkeys: hotkey_runtime,
             application: settings_application,
         }),
@@ -260,12 +260,16 @@ pub(crate) fn build_app_state(
             acquirer: selected_text_acquirer,
         }),
         logs,
+        tts: Arc::new(crate::application::TtsRuntime::new(
+            Arc::new(crate::infrastructure::system::tts::MacSystemTtsHost::new()),
+            settings_configuration.clone(),
+        )),
         result_window,
     }
 }
 
 fn hydrate_provider_credentials_in_background(
-    credential_store: Arc<dyn ProviderCredentialStore>,
+    credential_store: Arc<Keychain>,
     provider_configuration: Arc<crate::application::providers::ProviderConfiguration>,
     ocr_coordinator: Arc<crate::application::providers::ocr::OcrCoordinator>,
 ) {

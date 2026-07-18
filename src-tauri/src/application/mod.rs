@@ -11,6 +11,7 @@ pub mod result_window;
 pub mod screenshot_favorites;
 pub mod selected_text;
 pub mod settings;
+pub mod tts;
 
 pub use capture::{
     CaptureCursorMover, CaptureOutput, CaptureSessionRuntime, CaptureSessionSource, CaptureSessions,
@@ -31,3 +32,4 @@ pub use selected_text::{
     SelectionTextMode, SystemSelectionProvider,
 };
 pub use settings::{SettingsApplication, SettingsConfiguration, StartOnBoot};
+pub use tts::{SystemTtsHost, SystemTtsVoice, TtsRuntime};

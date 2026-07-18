@@ -24,6 +24,7 @@ interface TranslationCardProps {
   onFavorite?: () => Promise<void>;
   isFavorite?: boolean;
   copyText: (text: string) => Promise<void>;
+  speakText: (text: string, language?: string) => Promise<void>;
 }
 
 const providerColors: Record<string, string> = {
@@ -44,6 +45,7 @@ export default function TranslationCard({
   onFavorite,
   isFavorite = false,
   copyText,
+  speakText,
 }: TranslationCardProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isFavoritePending, setIsFavoritePending] = useState(false);
@@ -105,7 +107,7 @@ export default function TranslationCard({
             tooltipPlacement="bottom"
             onClick={(event) => {
               event.stopPropagation();
-              void speakResultWindowText(displayText, languageCode);
+              speakResultWindowText(speakText, displayText, languageCode);
             }}
           >
             <VolumeIcon className="h-[15px] w-[15px]" />

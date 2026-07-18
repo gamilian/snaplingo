@@ -1485,7 +1485,7 @@ mod provider_configuration_tests {
     }
 
     #[test]
-    fn custom_provider_credentials_are_not_written_to_sqlite() {
+    fn custom_provider_credentials_are_not_written_to_settings_payload() {
         let (config, database) = test_provider_configuration_with_database();
         let secret = "sqlite-secret-sentinel";
 

@@ -912,7 +912,7 @@ function ResultWindowContent({
                           disabled={!ocrText.trim()}
                           className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
                           onClick={() => {
-                            void speakResultWindowText(ocrText);
+                            speakResultWindowText(runtime.speakText, ocrText);
                           }}
                         >
                           <VolumeIcon className="h-4 w-4" />
@@ -1029,7 +1029,7 @@ function ResultWindowContent({
                           disabled={!ocrText.trim()}
                           className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
                           onClick={() => {
-                            void speakResultWindowText(ocrText);
+                            speakResultWindowText(runtime.speakText, ocrText);
                           }}
                         >
                           <VolumeIcon className="h-4 w-4" />
@@ -1178,7 +1178,8 @@ function ResultWindowContent({
                       disabled={!sourceText.trim()}
                       className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
                       onClick={() => {
-                        void speakResultWindowText(
+                        speakResultWindowText(
+                          runtime.speakText,
                           sourceText,
                           detectedSourceLanguage === 'auto'
                             ? undefined
@@ -1268,6 +1269,7 @@ function ResultWindowContent({
                         translationResultFavoriteKey(result),
                       )}
                       copyText={runtime.clipboard.copyText}
+                      speakText={runtime.speakText}
                     />
                   ))}
                 </div>

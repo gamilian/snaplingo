@@ -21,6 +21,12 @@ interface BackendGeneralSettings {
   log_retention_days?: number;
   performance_monitoring?: boolean;
   experimental_gpu_acceleration?: boolean;
+  system_tts_voice?: string;
+  system_tts_rate?: number;
+  settings_window_x?: number;
+  settings_window_y?: number;
+  settings_window_width?: number;
+  settings_window_height?: number;
 }
 
 interface BackendScreenshotSettings {
@@ -98,6 +104,12 @@ interface GeneralSettingsInput {
   logRetentionDays?: number;
   performanceMonitoring?: boolean;
   experimentalGpuAcceleration?: boolean;
+  systemTtsVoice?: string;
+  systemTtsRate?: number;
+  settingsWindowX?: number;
+  settingsWindowY?: number;
+  settingsWindowWidth?: number;
+  settingsWindowHeight?: number;
 }
 
 interface ScreenshotSettingsInput {
@@ -163,6 +175,20 @@ function normalizeSnapshot(snapshot: BackendSettingsSnapshot) {
       performanceMonitoring: snapshot.general.performance_monitoring ?? false,
       experimentalGpuAcceleration:
         snapshot.general.experimental_gpu_acceleration ?? false,
+      systemTtsVoice: snapshot.general.system_tts_voice ?? '',
+      systemTtsRate: snapshot.general.system_tts_rate ?? 180,
+      ...(snapshot.general.settings_window_x !== undefined
+        ? { settingsWindowX: snapshot.general.settings_window_x }
+        : {}),
+      ...(snapshot.general.settings_window_y !== undefined
+        ? { settingsWindowY: snapshot.general.settings_window_y }
+        : {}),
+      ...(snapshot.general.settings_window_width !== undefined
+        ? { settingsWindowWidth: snapshot.general.settings_window_width }
+        : {}),
+      ...(snapshot.general.settings_window_height !== undefined
+        ? { settingsWindowHeight: snapshot.general.settings_window_height }
+        : {}),
     },
     screenshot: {
       savePath: snapshot.screenshot.save_path,
@@ -242,6 +268,20 @@ export async function updateGeneralSettings(input: GeneralSettingsInput) {
         performance_monitoring: input.performanceMonitoring ?? false,
         experimental_gpu_acceleration:
           input.experimentalGpuAcceleration ?? false,
+        system_tts_voice: input.systemTtsVoice ?? '',
+        system_tts_rate: input.systemTtsRate ?? 180,
+        ...(input.settingsWindowX !== undefined
+          ? { settings_window_x: input.settingsWindowX }
+          : {}),
+        ...(input.settingsWindowY !== undefined
+          ? { settings_window_y: input.settingsWindowY }
+          : {}),
+        ...(input.settingsWindowWidth !== undefined
+          ? { settings_window_width: input.settingsWindowWidth }
+          : {}),
+        ...(input.settingsWindowHeight !== undefined
+          ? { settings_window_height: input.settingsWindowHeight }
+          : {}),
       },
     }),
   );

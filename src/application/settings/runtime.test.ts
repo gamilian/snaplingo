@@ -299,6 +299,10 @@ function createPorts(overrides: Record<string, unknown> = {}) {
       listAppLogs: vi.fn(),
       clearAppLogs: vi.fn(),
     },
+    tts: {
+      listVoices: vi.fn(),
+      speak: vi.fn(),
+    },
     ...overrides,
   };
 }

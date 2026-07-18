@@ -1,5 +1,13 @@
 import type { CaptureResultWindowPayload } from './ports';
-import { normalizeOcrText } from '../../utils/ocrTextProcessing';
+import {
+  applyOcrTextPreferences,
+  normalizeOcrText,
+} from '../../utils/ocrTextProcessing';
+
+interface OcrTextPreferences {
+  preserveFormatting: boolean;
+  removeChineseSpaces: boolean;
+}
 
 export function shouldApplyTranslationPayloadText(
   payload: CaptureResultWindowPayload,
@@ -32,10 +40,22 @@ export function shouldStartFileOcrForPayload(payload: CaptureResultWindowPayload
   return payload.mode === 'ocr' && payload.ocrIntent === 'file';
 }
 
-export function ocrPayloadDisplayText(payload: CaptureResultWindowPayload) {
-  return normalizeOcrText(payload.text);
+export function ocrPayloadDisplayText(
+  payload: CaptureResultWindowPayload,
+  preferences?: OcrTextPreferences,
+) {
+  return preferences
+    ? applyOcrTextPreferences(payload.text, preferences)
+    : normalizeOcrText(payload.text);
 }
 
-export function translationPayloadSourceText(payload: CaptureResultWindowPayload) {
-  return payload.autoTranslate ? normalizeOcrText(payload.text) : payload.text;
+export function translationPayloadSourceText(
+  payload: CaptureResultWindowPayload,
+  preferences?: OcrTextPreferences,
+) {
+  if (!payload.autoTranslate) return payload.text;
+  if (payload.origin === 'screenshot' && preferences) {
+    return applyOcrTextPreferences(payload.text, preferences);
+  }
+  return normalizeOcrText(payload.text);
 }

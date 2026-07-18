@@ -1,4 +1,5 @@
 mod backend;
+mod sqlite;
 
 // Re-export KeychainBackend for testing
 #[cfg(test)]
@@ -7,29 +8,17 @@ pub use backend::KeychainBackend;
 #[cfg(not(test))]
 use backend::KeychainBackend;
 
-#[cfg(target_os = "macos")]
-mod macos;
-#[cfg(target_os = "macos")]
-use macos::MacOSKeychain as PlatformKeychainImpl;
-
-#[cfg(target_os = "windows")]
-mod windows;
-#[cfg(target_os = "windows")]
-use windows::WindowsKeychain as PlatformKeychainImpl;
-
-#[cfg(target_os = "linux")]
-mod linux;
-#[cfg(target_os = "linux")]
-use linux::LinuxKeychain as PlatformKeychainImpl;
-
 use crate::application::providers::{CredentialSnapshot, ProviderCredentialStore};
 use crate::error::{AppError, Result};
+use crate::infrastructure::storage::Database;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Check if an error is a "not found" / "no entry" error from keychain
 pub fn is_keychain_not_found(error: &crate::AppError) -> bool {
     match error {
         crate::AppError::Keychain(e) => matches!(e, keyring::Error::NoEntry),
+        crate::AppError::CredentialNotFound(_) => true,
         _ => false,
     }
 }
@@ -40,10 +29,10 @@ pub struct Keychain {
 }
 
 impl Keychain {
-    /// Create a new keychain instance with the platform backend
-    pub fn new() -> Self {
+    /// Persist every provider credential in the application SQLite database.
+    pub fn sqlite(database: Arc<Database>) -> Self {
         Self {
-            backend: Box::new(PlatformKeychainImpl::new()),
+            backend: Box::new(sqlite::SqliteCredentialBackend::new(database)),
         }
     }
 
@@ -266,12 +255,6 @@ impl Keychain {
             }
         }
         Ok(())
-    }
-}
-
-impl Default for Keychain {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

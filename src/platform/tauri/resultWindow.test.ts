@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const storedValues = new Map<string, string>();
+
 const {
   currentMonitor,
   cursorPosition,
@@ -7,6 +9,7 @@ const {
   hide,
   innerSize,
   monitorFromPoint,
+  outerPosition,
   setPosition,
   setSize,
   startDragging,
@@ -16,6 +19,7 @@ const {
   const startDragging = vi.fn();
   const innerSize = vi.fn();
   const setPosition = vi.fn();
+  const outerPosition = vi.fn();
 
   return {
     currentMonitor: vi.fn(),
@@ -24,6 +28,7 @@ const {
       hide,
       innerSize,
       setPosition,
+      outerPosition,
       setSize,
       startDragging,
     })),
@@ -33,6 +38,7 @@ const {
     setPosition,
     setSize,
     startDragging,
+    outerPosition,
   };
 });
 
@@ -59,6 +65,12 @@ import { resultWindow } from './resultWindow';
 
 describe('Tauri result window adapter', () => {
   beforeEach(() => {
+    storedValues.clear();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storedValues.get(key) ?? null,
+      setItem: (key: string, value: string) => storedValues.set(key, value),
+      clear: () => storedValues.clear(),
+    });
     getCurrentWindow.mockClear();
     hide.mockReset().mockResolvedValue(undefined);
     setSize.mockReset().mockResolvedValue(undefined);
@@ -74,6 +86,7 @@ describe('Tauri result window adapter', () => {
     currentMonitor.mockReset().mockResolvedValue(null);
     innerSize.mockReset().mockResolvedValue({ width: 600, height: 400 });
     startDragging.mockReset().mockResolvedValue(undefined);
+    outerPosition.mockReset().mockResolvedValue({ x: 1420, y: 360 });
   });
 
   it('resizes the current result window from portable dimensions', async () => {
@@ -106,5 +119,20 @@ describe('Tauri result window adapter', () => {
     await resultWindow.startDragging();
 
     expect(startDragging).toHaveBeenCalledOnce();
+    expect(localStorage.getItem('snaplingo.result-window.last-position')).toBe(
+      JSON.stringify({ x: 1420, y: 360 }),
+    );
+  });
+
+  it('restores and clamps the last user-dragged position', async () => {
+    localStorage.setItem(
+      'snaplingo.result-window.last-position',
+      JSON.stringify({ x: 2100, y: 800 }),
+    );
+
+    await resultWindow.place('last-position');
+
+    expect(monitorFromPoint).toHaveBeenCalledWith(2100, 800);
+    expect(setPosition).toHaveBeenCalledWith({ x: 1600, y: 600 });
   });
 });

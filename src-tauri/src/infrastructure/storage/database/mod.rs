@@ -18,11 +18,14 @@ pub use screenshot_favorites::SqliteScreenshotFavoriteRepository;
 use std::path::Path;
 use std::sync::Mutex;
 
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+
 use rusqlite::{Connection, Transaction};
 
 use crate::Result;
 
-/// Shared SQLite connection for SnapLingo's non-secret persistent state.
+/// Shared SQLite connection for SnapLingo's persistent state.
 pub struct Database {
     connection: Mutex<Connection>,
 }
@@ -32,9 +35,11 @@ impl Database {
         let path = path.as_ref();
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
+            restrict_directory_permissions(parent)?;
         }
 
         let mut connection = Connection::open(path)?;
+        restrict_file_permissions(path)?;
         configure_connection(&connection)?;
         migrations::migrate(&mut connection)?;
 
@@ -74,6 +79,28 @@ impl Database {
     }
 }
 
+#[cfg(unix)]
+fn restrict_directory_permissions(path: &Path) -> Result<()> {
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn restrict_directory_permissions(_path: &Path) -> Result<()> {
+    Ok(())
+}
+
+#[cfg(unix)]
+fn restrict_file_permissions(path: &Path) -> Result<()> {
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn restrict_file_permissions(_path: &Path) -> Result<()> {
+    Ok(())
+}
+
 fn configure_connection(connection: &Connection) -> Result<()> {
     connection.execute_batch(
         "PRAGMA foreign_keys = ON;
@@ -104,7 +131,7 @@ mod tests {
                 Ok(connection.query_row("PRAGMA user_version", [], |row| row.get::<_, i32>(0))?)
             })
             .unwrap();
-        assert_eq!(version, 4);
+        assert_eq!(version, 5);
 
         drop(database);
         Database::open(&path).unwrap();
@@ -116,10 +143,31 @@ mod tests {
         let dir = tempdir().unwrap();
         let path = dir.path().join("future.db");
         let connection = Connection::open(&path).unwrap();
-        connection.execute("PRAGMA user_version = 5", []).unwrap();
+        connection.execute("PRAGMA user_version = 6", []).unwrap();
         drop(connection);
 
         let error = Database::open(&path).err().expect("newer schema must fail");
         assert!(error.to_string().contains("newer than this version"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn restricts_database_and_parent_directory_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempdir().unwrap();
+        let data_dir = dir.path().join("snaplingo");
+        let path = data_dir.join("snaplingo.db");
+
+        Database::open(&path).unwrap();
+
+        assert_eq!(
+            fs::metadata(data_dir).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        assert_eq!(
+            fs::metadata(path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
     }
 }

@@ -2,7 +2,7 @@ use rusqlite::{Connection, Transaction};
 
 use crate::{AppError, Result};
 
-const CURRENT_SCHEMA_VERSION: i32 = 4;
+const CURRENT_SCHEMA_VERSION: i32 = 5;
 
 pub(super) fn migrate(connection: &mut Connection) -> Result<()> {
     let mut version: i32 = connection.query_row("PRAGMA user_version", [], |row| row.get(0))?;
@@ -22,6 +22,7 @@ pub(super) fn migrate(connection: &mut Connection) -> Result<()> {
             2 => migrate_to_v2(&transaction)?,
             3 => migrate_to_v3(&transaction)?,
             4 => migrate_to_v4(&transaction)?,
+            5 => migrate_to_v5(&transaction)?,
             _ => unreachable!("missing migration for version {}", next_version),
         }
         transaction.pragma_update(None, "user_version", next_version)?;
@@ -29,6 +30,22 @@ pub(super) fn migrate(connection: &mut Connection) -> Result<()> {
         version = next_version;
     }
 
+    Ok(())
+}
+
+fn migrate_to_v5(transaction: &Transaction<'_>) -> Result<()> {
+    transaction.execute_batch(
+        "CREATE TABLE provider_credentials (
+            storage_key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at INTEGER NOT NULL
+        );
+
+        CREATE TABLE credential_store_metadata (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );",
+    )?;
     Ok(())
 }
 

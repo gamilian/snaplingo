@@ -25,6 +25,16 @@ export interface SettingsMaintenancePort {
   clearAppLogs(): Promise<void>;
 }
 
+export interface SystemTtsVoice {
+  name: string;
+  locale: string;
+}
+
+export interface SettingsTtsPort {
+  listVoices(): Promise<SystemTtsVoice[]>;
+  speak(text: string, language?: string): Promise<void>;
+}
+
 export interface GeneralSettings {
   language: string;
   theme: string;
@@ -37,12 +47,22 @@ export interface GeneralSettings {
   logRetentionDays?: number;
   performanceMonitoring?: boolean;
   experimentalGpuAcceleration?: boolean;
+  systemTtsVoice?: string;
+  systemTtsRate?: number;
+  settingsWindowX?: number;
+  settingsWindowY?: number;
+  settingsWindowWidth?: number;
+  settingsWindowHeight?: number;
 }
 
 export type AnnotationColorPreset = [number, number, number, number];
 export type ScreenshotFormat = 'png' | 'jpg' | 'webp';
 export type ScreenshotNamingRule = 'timestamp' | 'date' | 'counter' | 'custom';
-export type ResultWindowPosition = 'center' | 'below-cursor' | 'cursor';
+export type ResultWindowPosition =
+  | 'center'
+  | 'below-cursor'
+  | 'cursor'
+  | 'last-position';
 export type TranslationInputState = 'last' | 'collapsed' | 'expanded';
 export type SelectionTextMode = 'smart' | 'quality' | 'speed';
 

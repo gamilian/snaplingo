@@ -4,20 +4,20 @@
 
 ## 脚本列表
 
-### 🏗️ `build-release.sh` - Release 构建脚本
+### 🧪 `npm run tauri:build:beta` - 小范围测试构建
 
-完整的 release 构建流程，包括清理、构建、打包和验证。
+完整的小范围测试构建流程，包括构建、打包和验证。
 
 **使用方法：**
 ```bash
-./script/build-release.sh
+npm run tauri:build:beta
 ```
 
 **功能：**
 - 🧹 清理旧构建产物（dist/、target/release）
 - 📦 版本检查（package.json 和 Cargo.toml）
 - 🔨 构建前端（TypeScript + Vite）
-- 🦀 构建 Tauri Release
+- 🦀 构建 Tauri release profile
 - ✅ 验证构建产物并显示文件大小
 - ⏱️ 显示构建总耗时
 
@@ -66,6 +66,45 @@
 - **Xcode Command Line Tools**: `xcode-select --install`
 - **create-dmg**: `brew install create-dmg` (用于生成 DMG 安装包)
 
+### macOS 小范围测试版
+
+当前默认采用小范围测试分发。构建命令：
+
+```bash
+npm run tauri:build:beta
+```
+
+macOS 构建会跳过 Tauri 的 Finder AppleScript 布局步骤，避免要求 Terminal、IDE 或构建代理取得“控制 Finder”的自动化权限。签名后处理仍会生成包含 SnapLingo 和 Applications 链接的 DMG。
+
+未配置 Developer ID 时，脚本会使用稳定的本地证书签名，以保证同一台 Mac 重建后系统权限身份保持稳定。该证书不受 Apple Gatekeeper 信任，因此测试者首次安装必须：
+
+1. 将 SnapLingo 拖入“应用程序”。
+2. 尝试打开一次，然后进入“系统设置 > 隐私与安全性”。
+3. 点击“仍要打开”，输入 Mac 登录密码并确认。
+4. SnapLingo 首次启动会先打开应用设置窗口；权限不足时在窗口内显示引导，依次点击“打开屏幕录制设置”和“打开辅助功能设置”完成授权。应用不会在页面显示前主动请求权限。
+
+“仍要打开”及登录密码属于 Gatekeeper 的未知开发者放行流程；后续屏幕录制和辅助功能属于应用能力授权。此构建仅用于已知测试者，不作为公开发布包。
+
+Provider 的 Endpoint、Base URL、API Key 和 Secret Key 统一以未加密形式保存在本机 `snaplingo.db`。正式运行时不会构造或访问系统钥匙串；遗留钥匙串记录会被忽略。Unix 平台的应用数据目录和数据库权限分别限制为 `0700` 和 `0600`。
+
+正式发布构建会启用 hardened runtime。设置 `SNAPLINGO_NOTARIZE=1` 后，构建脚本还会提交 DMG 公证并附加票据。凭据可使用以下任一方式：
+
+```bash
+# 推荐：预先通过 xcrun notarytool store-credentials 创建
+SNAPLINGO_NOTARIZE=1 \
+SNAPLINGO_NOTARY_PROFILE=SnapLingoNotary \
+SNAPLINGO_CODESIGN_IDENTITY="Developer ID Application: Example (TEAMID)" \
+npm run tauri:build
+
+# 或使用环境变量
+SNAPLINGO_NOTARIZE=1 \
+APPLE_ID="release@example.com" \
+APPLE_PASSWORD="app-specific-password" \
+APPLE_TEAM_ID="TEAMID" \
+SNAPLINGO_CODESIGN_IDENTITY="Developer ID Application: Example (TEAMID)" \
+npm run tauri:build
+```
+
 ### Linux 额外要求
 
 请参考 [Tauri Prerequisites](https://tauri.app/v1/guides/getting-started/prerequisites) 安装必要的系统依赖。
@@ -104,7 +143,7 @@ brew install create-dmg
 ### 问题：构建失败，出现 Rust 编译错误
 **解决：**
 1. 确保 Rust 是最新稳定版：`rustup update`
-2. 清理缓存后重试：`cargo clean && ./script/build-release.sh`
+2. 清理缓存后重试：`cargo clean && npm run tauri:build:beta`
 
 ---
 
@@ -123,13 +162,13 @@ brew install create-dmg
 ./script/dev.sh
 ```
 
-### 发布新版本
+### 生成小范围测试包
 ```bash
 # 1. 更新版本号
 # 编辑 package.json 和 src-tauri/Cargo.toml
 
-# 2. 构建 release 版本
-./script/build-release.sh
+# 2. 构建 Beta 测试版本
+npm run tauri:build:beta
 
 # 3. 测试构建产物
 open target/release/bundle/macos/SnapLingo.app  # macOS

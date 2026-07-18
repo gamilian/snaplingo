@@ -8,6 +8,13 @@ import {
 } from '@tauri-apps/api/window';
 import type { ResultWindowPort } from '../../application/result-window/ports';
 
+const LAST_RESULT_WINDOW_POSITION_KEY = 'snaplingo.result-window.last-position';
+
+interface StoredWindowPosition {
+  x: number;
+  y: number;
+}
+
 export const resultWindow: ResultWindowPort = {
   resize(width, height) {
     return getCurrentWindow().setSize(new LogicalSize(width, height));
@@ -15,16 +22,20 @@ export const resultWindow: ResultWindowPort = {
   async place(position) {
     const window = getCurrentWindow();
     const cursor = await cursorPosition();
+    const storedPosition =
+      position === 'last-position' ? readLastResultWindowPosition() : null;
     const monitor =
-      (await monitorFromPoint(cursor.x, cursor.y)) ?? (await currentMonitor());
+      (storedPosition
+        ? await monitorFromPoint(storedPosition.x, storedPosition.y)
+        : await monitorFromPoint(cursor.x, cursor.y)) ?? (await currentMonitor());
     if (!monitor) return;
 
     const size = await window.innerSize();
     const { position: workPosition, size: workSize } = monitor.workArea;
-    let x = cursor.x;
-    let y = cursor.y;
+    let x = storedPosition?.x ?? cursor.x;
+    let y = storedPosition?.y ?? cursor.y;
 
-    if (position === 'center') {
+    if (position === 'center' || (position === 'last-position' && !storedPosition)) {
       x = workPosition.x + (workSize.width - size.width) / 2;
       y = workPosition.y + (workSize.height - size.height) / 2;
     } else if (position === 'below-cursor') {
@@ -45,13 +56,35 @@ export const resultWindow: ResultWindowPort = {
   hide() {
     return getCurrentWindow().hide();
   },
-  startDragging() {
-    return getCurrentWindow().startDragging();
+  async startDragging() {
+    const window = getCurrentWindow();
+    await window.startDragging();
+    writeLastResultWindowPosition(await window.outerPosition());
   },
   setAlwaysOnTop(value) {
     return getCurrentWindow().setAlwaysOnTop(value);
   },
 };
+
+export function readLastResultWindowPosition(): StoredWindowPosition | null {
+  try {
+    const value = JSON.parse(localStorage.getItem(LAST_RESULT_WINDOW_POSITION_KEY) ?? 'null');
+    return isFinitePosition(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLastResultWindowPosition(position: StoredWindowPosition) {
+  if (!isFinitePosition(position)) return;
+  localStorage.setItem(LAST_RESULT_WINDOW_POSITION_KEY, JSON.stringify(position));
+}
+
+function isFinitePosition(value: unknown): value is StoredWindowPosition {
+  if (!value || typeof value !== 'object') return false;
+  const position = value as Partial<StoredWindowPosition>;
+  return Number.isFinite(position.x) && Number.isFinite(position.y);
+}
 
 export function getCurrentWindowLabel() {
   return getCurrentWindow().label;

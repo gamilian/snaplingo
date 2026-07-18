@@ -34,6 +34,7 @@ pub(crate) enum AppAction {
     TogglePinnedImagesVisibility,
     SwitchPinnedImageGroup,
     OpenSettings,
+    OpenHistory,
     OpenAbout,
     Quit,
 }
@@ -42,7 +43,6 @@ pub(crate) fn dispatch_app_action(app: tauri::AppHandle, action: AppAction) {
     if action_requires_permissions(action) {
         let state = app.state::<AppState>();
         if !state.permissions.status().all_granted() {
-            state.permissions.request_missing();
             if let Err(err) = settings_window::show_settings_window(&app) {
                 log::error!("Failed to show required permissions window: {}", err);
             }
@@ -124,6 +124,14 @@ pub(crate) fn dispatch_app_action(app: tauri::AppHandle, action: AppAction) {
                 log::error!("Failed to show settings window: {}", err);
             }
         }
+        AppAction::OpenHistory => {
+            if let Err(err) = settings_window::show_settings_window_at(
+                &app,
+                Some(settings_window::SettingsWindowRoute::History),
+            ) {
+                log::error!("Failed to show History settings: {}", err);
+            }
+        }
         AppAction::OpenAbout => {
             if let Err(err) = settings_window::show_settings_window_at(
                 &app,
@@ -133,6 +141,16 @@ pub(crate) fn dispatch_app_action(app: tauri::AppHandle, action: AppAction) {
             }
         }
         AppAction::Quit => {
+            if let Some(window) = app.get_webview_window(settings_window::SETTINGS_WINDOW_LABEL) {
+                if let Err(err) =
+                    settings_window::remember_settings_webview_window_geometry(&window)
+                {
+                    log::warn!(
+                        "Failed to remember settings window geometry before quit: {}",
+                        err
+                    );
+                }
+            }
             app.exit(0);
         }
     }
@@ -141,7 +159,7 @@ pub(crate) fn dispatch_app_action(app: tauri::AppHandle, action: AppAction) {
 fn action_requires_permissions(action: AppAction) -> bool {
     !matches!(
         action,
-        AppAction::OpenSettings | AppAction::OpenAbout | AppAction::Quit
+        AppAction::OpenSettings | AppAction::OpenHistory | AppAction::OpenAbout | AppAction::Quit
     )
 }
 

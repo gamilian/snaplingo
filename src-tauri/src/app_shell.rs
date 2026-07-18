@@ -11,6 +11,8 @@ const TRANSLATE_SELECTION_ID: &str = "translate-selection";
 const SCREENSHOT_TRANSLATE_ID: &str = "screenshot-translate";
 const SCREENSHOT_OCR_ID: &str = "screenshot-ocr";
 const FILE_OCR_ID: &str = "file-ocr";
+const SHOW_TRANSLATION_ID: &str = "show-translation";
+const HISTORY_ID: &str = "history";
 const SETTINGS_ID: &str = "settings";
 const ABOUT_ID: &str = "about";
 const QUIT_ID: &str = "quit";
@@ -24,6 +26,8 @@ pub(crate) fn menu_action_for_id(id: &str) -> Option<AppAction> {
         )),
         SCREENSHOT_OCR_ID => Some(AppAction::OpenCapture(CaptureLaunchMode::ScreenshotOcr)),
         FILE_OCR_ID => Some(AppAction::RunFileOcr),
+        SHOW_TRANSLATION_ID => Some(AppAction::OpenTranslationWindow),
+        HISTORY_ID => Some(AppAction::OpenHistory),
         SETTINGS_ID => Some(AppAction::OpenSettings),
         ABOUT_ID => Some(AppAction::OpenAbout),
         QUIT_ID => Some(AppAction::Quit),
@@ -37,6 +41,8 @@ pub(crate) fn setup_menu_bar(app: &tauri::App) -> Result<(), String> {
     let screenshot_translate = menu_item(app, SCREENSHOT_TRANSLATE_ID, "Screenshot Translate")?;
     let screenshot_ocr = menu_item(app, SCREENSHOT_OCR_ID, "Screenshot OCR")?;
     let file_ocr = menu_item(app, FILE_OCR_ID, "Upload Image OCR")?;
+    let show_translation = menu_item(app, SHOW_TRANSLATION_ID, "Show Translation Window")?;
+    let history = menu_item(app, HISTORY_ID, "History")?;
     let settings = menu_item(app, SETTINGS_ID, "Settings")?;
     let about = menu_item(app, ABOUT_ID, "About SnapLingo")?;
     let quit = menu_item(app, QUIT_ID, "Quit SnapLingo")?;
@@ -49,6 +55,8 @@ pub(crate) fn setup_menu_bar(app: &tauri::App) -> Result<(), String> {
             &screenshot_translate,
             &screenshot_ocr,
             &file_ocr,
+            &show_translation,
+            &history,
             &settings,
             &about,
             &quit,
@@ -143,6 +151,11 @@ mod tests {
             Some(AppAction::OpenCapture(CaptureLaunchMode::ScreenshotOcr))
         );
         assert_eq!(menu_action_for_id("file-ocr"), Some(AppAction::RunFileOcr));
+        assert_eq!(
+            menu_action_for_id("show-translation"),
+            Some(AppAction::OpenTranslationWindow)
+        );
+        assert_eq!(menu_action_for_id("history"), Some(AppAction::OpenHistory));
         assert_eq!(
             menu_action_for_id("settings"),
             Some(AppAction::OpenSettings)

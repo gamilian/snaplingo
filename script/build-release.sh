@@ -11,7 +11,7 @@ NC='\033[0m' # No Color
 # Start time
 START_TIME=$(date +%s)
 
-echo -e "${GREEN}🏗️  SnapLingo Release Build${NC}"
+echo -e "${GREEN}🧪 SnapLingo Small-Test Beta Build${NC}"
 echo ""
 
 # Check if node_modules exists

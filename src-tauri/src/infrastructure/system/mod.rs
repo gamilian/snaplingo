@@ -10,6 +10,7 @@ pub mod screenshot_favorites;
 pub mod selection;
 pub mod shortcut;
 pub mod start_on_boot;
+pub mod tts;
 
 pub use paths::{get_app_data_dir, get_database_path};
 pub use screenshot::get_capture_session_source;

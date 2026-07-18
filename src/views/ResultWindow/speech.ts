@@ -17,24 +17,16 @@ export function resultWindowSpeechLanguage(languageCode?: string) {
   return RESULT_WINDOW_SPEECH_LANGUAGE_MAP[languageCode] ?? languageCode;
 }
 
-export function speakResultWindowText(text: string, languageCode?: string) {
+export function speakResultWindowText(
+  speak: (text: string, language?: string) => Promise<void>,
+  text: string,
+  languageCode?: string,
+) {
   const normalizedText = text.trim();
-  const speechSynthesisApi = globalThis.speechSynthesis;
-  const SpeechSynthesisUtteranceCtor = globalThis.SpeechSynthesisUtterance;
-
-  if (!normalizedText || !speechSynthesisApi || !SpeechSynthesisUtteranceCtor) {
-    return false;
-  }
-
-  speechSynthesisApi.cancel();
-
-  const utterance = new SpeechSynthesisUtteranceCtor(normalizedText);
+  if (!normalizedText) return false;
   const speechLanguage = resultWindowSpeechLanguage(languageCode);
-
-  if (speechLanguage) {
-    utterance.lang = speechLanguage;
-  }
-
-  speechSynthesisApi.speak(utterance);
+  void speak(normalizedText, speechLanguage || undefined).catch((error) => {
+    console.error('Failed to speak result text:', error);
+  });
   return true;
 }

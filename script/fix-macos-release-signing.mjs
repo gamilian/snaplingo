@@ -1,5 +1,6 @@
 import {
   chmodSync,
+  copyFileSync,
   cpSync,
   existsSync,
   mkdirSync,
@@ -10,7 +11,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { homedir, tmpdir } from "node:os";
 import { randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
@@ -54,6 +55,187 @@ function assertDoesNotInclude(text, unexpected, message) {
   if (text.includes(unexpected)) {
     throw new Error(`${message}\nUnexpected: ${unexpected}\nActual:\n${text}`);
   }
+}
+
+function listMachODependencies(path) {
+  return run("/usr/bin/otool", ["-L", path])
+    .split("\n")
+    .slice(1)
+    .map((line) => line.trim().match(/^(.+?) \(compatibility version/)?.[1])
+    .filter(Boolean);
+}
+
+function isExternalMachODependency(path) {
+  return (
+    path.startsWith("/") &&
+    !path.startsWith("/System/") &&
+    !path.startsWith("/usr/lib/")
+  );
+}
+
+function listMachORpaths(path) {
+  const lines = run("/usr/bin/otool", ["-l", path]).split("\n");
+  const rpaths = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    if (lines[index].trim() !== "cmd LC_RPATH") {
+      continue;
+    }
+
+    const pathLine = lines.slice(index + 1, index + 5)
+      .find((line) => line.trim().startsWith("path "));
+    const rpath = pathLine?.trim().match(/^path (.+) \(offset/)?.[1];
+    if (rpath) {
+      rpaths.push(rpath);
+    }
+  }
+
+  return rpaths;
+}
+
+function resolveMachOPath(sourcePath, path) {
+  if (path.startsWith("@loader_path/")) {
+    return resolve(dirname(sourcePath), path.slice("@loader_path/".length));
+  }
+
+  return path.startsWith("/") ? path : null;
+}
+
+function resolveExternalDependency(sourcePath, dependencyPath) {
+  if (isExternalMachODependency(dependencyPath)) {
+    return dependencyPath;
+  }
+
+  if (dependencyPath.startsWith("@loader_path/")) {
+    const resolvedPath = resolveMachOPath(sourcePath, dependencyPath);
+    return resolvedPath && isExternalMachODependency(resolvedPath) && existsSync(resolvedPath)
+      ? resolvedPath
+      : null;
+  }
+
+  if (!dependencyPath.startsWith("@rpath/")) {
+    return null;
+  }
+
+  const relativePath = dependencyPath.slice("@rpath/".length);
+  const candidates = [
+    resolve(dirname(sourcePath), relativePath),
+    ...listMachORpaths(sourcePath)
+      .map((rpath) => resolveMachOPath(sourcePath, rpath))
+      .filter(Boolean)
+      .map((rpath) => resolve(rpath, relativePath)),
+  ];
+
+  return candidates.find((path) => isExternalMachODependency(path) && existsSync(path)) ?? null;
+}
+
+function bundleExternalMachODependencies(executablePath) {
+  const frameworksPath = resolve(appPath, "Contents/Frameworks");
+  const dependenciesBySource = new Map();
+  const externalByPath = new Map();
+  const sourceByBasename = new Map();
+  const queue = [executablePath];
+
+  while (queue.length > 0) {
+    const sourcePath = queue.shift();
+    if (dependenciesBySource.has(sourcePath)) {
+      continue;
+    }
+
+    const dependencies = listMachODependencies(sourcePath);
+    dependenciesBySource.set(sourcePath, dependencies);
+
+    for (const dependencyPath of dependencies) {
+      const dependencySourcePath = resolveExternalDependency(sourcePath, dependencyPath);
+      if (!dependencySourcePath) {
+        continue;
+      }
+
+      if (!existsSync(dependencySourcePath)) {
+        throw new Error(`[macos-sign] External dependency not found: ${dependencySourcePath}`);
+      }
+
+      const fileName = basename(dependencySourcePath);
+      const existingSource = sourceByBasename.get(fileName);
+      if (existingSource && existingSource !== dependencySourcePath) {
+        throw new Error(
+          `[macos-sign] Cannot bundle two dependencies named ${fileName}: ${existingSource}, ${dependencySourcePath}`,
+        );
+      }
+
+      sourceByBasename.set(fileName, dependencySourcePath);
+      externalByPath.set(dependencySourcePath, join(frameworksPath, fileName));
+      queue.push(dependencySourcePath);
+    }
+  }
+
+  if (externalByPath.size === 0) {
+    return [];
+  }
+
+  mkdirSync(frameworksPath, { recursive: true });
+  for (const [sourcePath, destinationPath] of externalByPath) {
+    copyFileSync(sourcePath, destinationPath);
+    chmodSync(destinationPath, 0o755);
+  }
+
+  for (const [sourcePath, dependencies] of dependenciesBySource) {
+    const destinationPath = externalByPath.get(sourcePath) ?? sourcePath;
+    const dependencyPrefix = sourcePath === executablePath
+      ? "@executable_path/../Frameworks"
+      : "@loader_path";
+
+    for (const dependencyPath of dependencies) {
+      const dependencySourcePath = resolveExternalDependency(sourcePath, dependencyPath);
+      const bundledPath = externalByPath.get(dependencySourcePath);
+      if (!bundledPath) {
+        continue;
+      }
+
+      run("/usr/bin/install_name_tool", [
+        "-change",
+        dependencyPath,
+        `${dependencyPrefix}/${basename(bundledPath)}`,
+        destinationPath,
+      ]);
+    }
+
+    if (sourcePath !== executablePath) {
+      run("/usr/bin/install_name_tool", [
+        "-id",
+        `@rpath/${basename(destinationPath)}`,
+        destinationPath,
+      ]);
+    }
+  }
+
+  const bundledPaths = [...externalByPath.values()];
+  for (const path of [executablePath, ...bundledPaths]) {
+    const dependencies = listMachODependencies(path);
+    const remainingExternal = dependencies.filter(isExternalMachODependency);
+    if (remainingExternal.length > 0) {
+      throw new Error(
+        `[macos-sign] ${path} still references external dependencies: ${remainingExternal.join(", ")}`,
+      );
+    }
+
+    const missingRelative = dependencies.filter((dependencyPath) => {
+      if (!dependencyPath.startsWith("@loader_path/") && !dependencyPath.startsWith("@rpath/")) {
+        return false;
+      }
+
+      const relativePath = dependencyPath.slice(dependencyPath.indexOf("/") + 1);
+      return !existsSync(resolve(dirname(path), relativePath)) &&
+        !existsSync(resolve(frameworksPath, relativePath));
+    });
+    if (missingRelative.length > 0) {
+      throw new Error(
+        `[macos-sign] ${path} has unresolved bundled dependencies: ${missingRelative.join(", ")}`,
+      );
+    }
+  }
+
+  return bundledPaths;
 }
 
 function parseFirstCodesignIdentity(output, preferredName, excludedNames = []) {
@@ -222,6 +404,26 @@ function resolveCodesignIdentity() {
   return ensureLocalCodesignIdentity();
 }
 
+function prepareSigningEntitlements(signing) {
+  if (!existsSync(entitlementsPath) || signing.identity !== localIdentityName) {
+    return { path: existsSync(entitlementsPath) ? entitlementsPath : null, cleanup: () => {} };
+  }
+
+  const temporaryDir = mkdtempSync(join(tmpdir(), "snaplingo-entitlements-"));
+  const temporaryPath = join(temporaryDir, "entitlements.plist");
+  copyFileSync(entitlementsPath, temporaryPath);
+  run("/usr/libexec/PlistBuddy", [
+    "-c",
+    "Add :com.apple.security.cs.disable-library-validation bool true",
+    temporaryPath,
+  ]);
+
+  return {
+    path: temporaryPath,
+    cleanup: () => rmSync(temporaryDir, { recursive: true, force: true }),
+  };
+}
+
 function verifyAppSignature(path) {
   run("/usr/bin/codesign", ["--verify", "--deep", "--strict", "--verbose=4", path]);
 
@@ -241,6 +443,11 @@ function verifyAppSignature(path) {
     "Signature=adhoc",
     "[macos-sign] The app must not remain ad-hoc signed; TCC Screen Recording permission is unstable for ad-hoc builds.",
   );
+  assertIncludes(
+    signatureDetails,
+    "flags=0x10000(runtime)",
+    "[macos-sign] Hardened runtime is required for release signing.",
+  );
 
   const requirementDetails = run("/usr/bin/codesign", ["-d", "-r-", path]);
   assertIncludes(
@@ -253,6 +460,41 @@ function verifyAppSignature(path) {
     "cdhash H",
     "[macos-sign] The designated requirement must not be tied to a per-build cdhash.",
   );
+}
+
+function notarizationArgs(path) {
+  const profile = process.env.SNAPLINGO_NOTARY_PROFILE;
+  if (profile) {
+    return ["notarytool", "submit", path, "--keychain-profile", profile, "--wait"];
+  }
+
+  const appleId = process.env.APPLE_ID;
+  const password = process.env.APPLE_PASSWORD;
+  const teamId = process.env.APPLE_TEAM_ID;
+  if (!appleId || !password || !teamId) {
+    throw new Error(
+      "[macos-sign] SNAPLINGO_NOTARIZE=1 requires SNAPLINGO_NOTARY_PROFILE or APPLE_ID, APPLE_PASSWORD, and APPLE_TEAM_ID.",
+    );
+  }
+
+  return [
+    "notarytool",
+    "submit",
+    path,
+    "--apple-id",
+    appleId,
+    "--password",
+    password,
+    "--team-id",
+    teamId,
+    "--wait",
+  ];
+}
+
+function notarizeAndStaple(path) {
+  run("/usr/bin/xcrun", notarizationArgs(path));
+  run("/usr/bin/xcrun", ["stapler", "staple", path]);
+  run("/usr/bin/xcrun", ["stapler", "validate", path]);
 }
 
 function findDmgPaths() {
@@ -347,12 +589,26 @@ if (bundleIdentifier !== identifier) {
   );
 }
 
+const executableName = run("/usr/bin/plutil", [
+  "-extract",
+  "CFBundleExecutable",
+  "raw",
+  "-o",
+  "-",
+  infoPlistPath,
+]).trim();
+const executablePath = resolve(appPath, "Contents/MacOS", executableName);
+const bundledLibraries = bundleExternalMachODependencies(executablePath);
+
 const signing = resolveCodesignIdentity();
+const signingEntitlements = prepareSigningEntitlements(signing);
 const signArgs = [
   "--force",
   "--deep",
   "--sign",
   signing.identity,
+  "--options",
+  "runtime",
   "--identifier",
   identifier,
 ];
@@ -361,20 +617,34 @@ if (signing.keychain) {
   signArgs.push("--keychain", signing.keychain);
 }
 
-if (existsSync(entitlementsPath)) {
-  signArgs.push("--entitlements", entitlementsPath);
+if (signingEntitlements.path) {
+  signArgs.push("--entitlements", signingEntitlements.path);
 }
 
 signArgs.push(appPath);
 
-run("/usr/bin/codesign", signArgs);
+try {
+  run("/usr/bin/codesign", signArgs);
+} finally {
+  signingEntitlements.cleanup();
+}
 verifyAppSignature(appPath);
 
 for (const dmgPath of findDmgPaths()) {
   recreateDmg(dmgPath);
+  run("/usr/bin/codesign", ["--force", "--sign", signing.identity, dmgPath]);
+  if (process.env.SNAPLINGO_NOTARIZE === "1") {
+    notarizeAndStaple(dmgPath);
+  }
   console.log(`[macos-sign] Recreated and verified ${dmgPath}`);
 }
 
 console.log(`[macos-sign] Signed and verified ${appPath}`);
+console.log(`[macos-sign] Bundled ${bundledLibraries.length} external libraries`);
 console.log(`[macos-sign] Identifier: ${identifier}`);
 console.log(`[macos-sign] Signing identity: ${signing.identity}`);
+if (signing.identity === localIdentityName) {
+  console.warn(
+    "[macos-sign] Distribution: small-test beta; testers must approve the app in macOS Privacy & Security on first launch.",
+  );
+}

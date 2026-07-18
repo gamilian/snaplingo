@@ -34,15 +34,22 @@ impl RequiredPermissions {
         self.host.status()
     }
 
-    pub fn request_missing(&self) -> RequiredPermissionsStatus {
+    pub fn request_next_missing(&self) -> RequiredPermissionsStatus {
         let status = self.host.status();
         if !status.screen_recording {
+            log::info!("[permissions] requesting screen recording");
             self.host.request_screen_recording();
-        }
-        if !status.accessibility {
+        } else if !status.accessibility {
+            log::info!("[permissions] requesting accessibility");
             self.host.request_accessibility();
         }
-        self.host.status()
+        let updated = self.host.status();
+        log::info!(
+            "[permissions] status after request: screen_recording={}, accessibility={}",
+            updated.screen_recording,
+            updated.accessibility,
+        );
+        updated
     }
 }
 
@@ -69,7 +76,7 @@ mod tests {
     }
 
     #[test]
-    fn requests_every_missing_required_permission() {
+    fn requests_screen_recording_before_accessibility() {
         let host = Arc::new(FakeHost {
             status: RequiredPermissionsStatus {
                 screen_recording: false,
@@ -77,10 +84,20 @@ mod tests {
             },
             requests: Mutex::new(Vec::new()),
         });
-        RequiredPermissions::new(host.clone()).request_missing();
-        assert_eq!(
-            *host.requests.lock().unwrap(),
-            vec!["screenRecording", "accessibility"]
-        );
+        RequiredPermissions::new(host.clone()).request_next_missing();
+        assert_eq!(*host.requests.lock().unwrap(), vec!["screenRecording"]);
+    }
+
+    #[test]
+    fn requests_accessibility_after_screen_recording_is_granted() {
+        let host = Arc::new(FakeHost {
+            status: RequiredPermissionsStatus {
+                screen_recording: true,
+                accessibility: false,
+            },
+            requests: Mutex::new(Vec::new()),
+        });
+        RequiredPermissions::new(host.clone()).request_next_missing();
+        assert_eq!(*host.requests.lock().unwrap(), vec!["accessibility"]);
     }
 }

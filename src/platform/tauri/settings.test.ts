@@ -76,6 +76,8 @@ describe('Tauri settings command adapter', () => {
         logRetentionDays: 7,
         performanceMonitoring: false,
         experimentalGpuAcceleration: false,
+        systemTtsVoice: '',
+        systemTtsRate: 180,
       },
       screenshot: {
         savePath: '/captures',
@@ -155,6 +157,8 @@ describe('Tauri settings command adapter', () => {
         log_retention_days: 7,
         performance_monitoring: false,
         experimental_gpu_acceleration: false,
+        system_tts_voice: '',
+        system_tts_rate: 180,
       },
     });
   });

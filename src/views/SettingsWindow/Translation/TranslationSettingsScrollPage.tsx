@@ -23,6 +23,7 @@ const POSITION_OPTIONS = [
   { value: 'center', label: '居中' },
   { value: 'below-cursor', label: '鼠标下方' },
   { value: 'cursor', label: '鼠标位置' },
+  { value: 'last-position', label: '上次停留位置' },
 ];
 
 const INPUT_STATE_OPTIONS = [

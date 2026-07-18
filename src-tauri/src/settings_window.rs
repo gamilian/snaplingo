@@ -7,13 +7,23 @@ const SETTINGS_NAVIGATION_REQUESTED_EVENT: &str = "settings-navigation-requested
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum SettingsWindowRoute {
     About,
+    History,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SettingsNavigationRequest {
     tab: &'static str,
-    section: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    section: Option<&'static str>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct SettingsWindowGeometry {
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
 }
 
 impl SettingsWindowRoute {
@@ -21,7 +31,11 @@ impl SettingsWindowRoute {
         match self {
             Self::About => SettingsNavigationRequest {
                 tab: "general",
-                section: "about",
+                section: Some("about"),
+            },
+            Self::History => SettingsNavigationRequest {
+                tab: "history",
+                section: None,
             },
         }
     }
@@ -41,8 +55,8 @@ pub(crate) fn show_settings_window_at(
 ) -> Result<(), String> {
     let (window, created) = match app.get_webview_window(SETTINGS_WINDOW_LABEL) {
         Some(window) => (window, false),
-        None => (
-            WebviewWindowBuilder::new(
+        None => {
+            let mut builder = WebviewWindowBuilder::new(
                 app,
                 SETTINGS_WINDOW_LABEL,
                 WebviewUrl::App(settings_window_url(route).into()),
@@ -51,11 +65,14 @@ pub(crate) fn show_settings_window_at(
             .inner_size(900.0, 650.0)
             .min_inner_size(700.0, 500.0)
             .resizable(true)
-            .visible(false)
-            .build()
-            .map_err(|e| e.to_string())?,
-            true,
-        ),
+            .visible(false);
+            if let Some(geometry) = saved_settings_window_geometry(app) {
+                builder = builder
+                    .inner_size(geometry.width as f64, geometry.height as f64)
+                    .position(geometry.x as f64, geometry.y as f64);
+            }
+            (builder.build().map_err(|e| e.to_string())?, true)
+        }
     };
 
     window.show().map_err(|e| e.to_string())?;
@@ -75,12 +92,96 @@ fn settings_window_url(route: Option<SettingsWindowRoute>) -> String {
         Some(SettingsWindowRoute::About) => {
             "index.html?window=settings&tab=general&section=about".to_string()
         }
+        Some(SettingsWindowRoute::History) => "index.html?window=settings&tab=history".to_string(),
         None => "index.html?window=settings".to_string(),
     }
 }
 
 pub(crate) fn hide_settings_window(window: &Window) -> Result<(), String> {
     window.hide().map_err(|e| e.to_string())
+}
+
+pub(crate) fn remember_settings_window_geometry(window: &Window) -> Result<(), String> {
+    let scale_factor = window.scale_factor().map_err(|error| error.to_string())?;
+    let position = window.outer_position().map_err(|error| error.to_string())?;
+    let size = window.inner_size().map_err(|error| error.to_string())?;
+    let geometry = logical_settings_window_geometry(
+        position.x,
+        position.y,
+        size.width,
+        size.height,
+        scale_factor,
+    );
+    save_settings_window_geometry(window.app_handle(), window.label(), geometry)
+}
+
+pub(crate) fn remember_settings_webview_window_geometry(
+    window: &tauri::WebviewWindow,
+) -> Result<(), String> {
+    let scale_factor = window.scale_factor().map_err(|error| error.to_string())?;
+    let position = window.outer_position().map_err(|error| error.to_string())?;
+    let size = window.inner_size().map_err(|error| error.to_string())?;
+    let geometry = logical_settings_window_geometry(
+        position.x,
+        position.y,
+        size.width,
+        size.height,
+        scale_factor,
+    );
+    save_settings_window_geometry(window.app_handle(), window.label(), geometry)
+}
+
+fn save_settings_window_geometry(
+    app: &tauri::AppHandle,
+    window_label: &str,
+    geometry: SettingsWindowGeometry,
+) -> Result<(), String> {
+    if window_label != SETTINGS_WINDOW_LABEL {
+        return Ok(());
+    }
+    let state = app.state::<crate::AppState>();
+    let mut general = state
+        .settings
+        .configuration
+        .snapshot()
+        .map_err(|error| error.to_string())?
+        .general;
+    general.settings_window_x = Some(geometry.x);
+    general.settings_window_y = Some(geometry.y);
+    general.settings_window_width = Some(geometry.width);
+    general.settings_window_height = Some(geometry.height);
+    state
+        .settings
+        .configuration
+        .update_general(general)
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+fn logical_settings_window_geometry(
+    physical_x: i32,
+    physical_y: i32,
+    physical_width: u32,
+    physical_height: u32,
+    scale_factor: f64,
+) -> SettingsWindowGeometry {
+    SettingsWindowGeometry {
+        x: (physical_x as f64 / scale_factor).round() as i32,
+        y: (physical_y as f64 / scale_factor).round() as i32,
+        width: (physical_width as f64 / scale_factor).round() as u32,
+        height: (physical_height as f64 / scale_factor).round() as u32,
+    }
+}
+
+fn saved_settings_window_geometry(app: &tauri::AppHandle) -> Option<SettingsWindowGeometry> {
+    let state = app.try_state::<crate::AppState>()?;
+    let general = state.settings.configuration.snapshot().ok()?.general;
+    Some(SettingsWindowGeometry {
+        x: general.settings_window_x?,
+        y: general.settings_window_y?,
+        width: general.settings_window_width?,
+        height: general.settings_window_height?,
+    })
 }
 
 #[cfg(test)]
@@ -97,6 +198,29 @@ mod tests {
         assert_eq!(
             settings_window_url(Some(SettingsWindowRoute::About)),
             "index.html?window=settings&tab=general&section=about"
+        );
+    }
+
+    #[test]
+    fn history_route_is_encoded_for_a_new_settings_window() {
+        assert_eq!(
+            settings_window_url(Some(SettingsWindowRoute::History)),
+            "index.html?window=settings&tab=history"
+        );
+        assert_eq!(SettingsWindowRoute::History.request().tab, "history");
+        assert_eq!(SettingsWindowRoute::History.request().section, None);
+    }
+
+    #[test]
+    fn stores_settings_window_geometry_in_logical_pixels() {
+        assert_eq!(
+            logical_settings_window_geometry(-200, 120, 1800, 1300, 2.0),
+            SettingsWindowGeometry {
+                x: -100,
+                y: 60,
+                width: 900,
+                height: 650,
+            }
         );
     }
 

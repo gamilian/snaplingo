@@ -12,6 +12,7 @@ describe('translation card presentation', () => {
         text="First line\nSecond line\nThird line"
         bodyHeightPx={144}
         copyText={async () => undefined}
+        speakText={async () => undefined}
       />,
     );
 
@@ -35,6 +36,7 @@ describe('translation card presentation', () => {
         text=""
         bodyHeightPx={62}
         copyText={async () => undefined}
+        speakText={async () => undefined}
       />,
     );
 
@@ -54,6 +56,7 @@ describe('translation card presentation', () => {
         detectedLanguage="en"
         bodyHeightPx={80}
         copyText={async () => undefined}
+        speakText={async () => undefined}
       />,
     );
 
@@ -69,6 +72,7 @@ describe('translation card presentation', () => {
         text={'\n\ntranslated result\n'}
         bodyHeightPx={80}
         copyText={async () => undefined}
+        speakText={async () => undefined}
       />,
     );
 
@@ -84,6 +88,7 @@ describe('translation card presentation', () => {
         text="你好"
         onFavorite={async () => undefined}
         copyText={async () => undefined}
+        speakText={async () => undefined}
       />,
     );
 

@@ -8,7 +8,7 @@ The infrastructure layer contains SnapLingo's adapters for persistence, HTTP, an
 infrastructure/
 ├── storage/
 │   ├── database/       # Shared SQLite connection, migrations, config and history repositories
-│   └── keychain/       # Provider credentials
+│   └── keychain/       # SQLite-only Provider credential adapter
 ├── http/               # Reqwest transport adapter
 ├── llm/                # Provider protocol clients
 ├── events/             # In-process domain event bus
@@ -17,7 +17,7 @@ infrastructure/
 
 ## Persistence
 
-All non-secret durable state uses one database in the platform application-data directory:
+All durable state uses one database in the platform application-data directory:
 
 ```text
 snaplingo/
@@ -30,7 +30,7 @@ The current repositories are:
 
 - `SqliteConfigStore`: versioned JSON namespaces for settings, hotkeys, Provider definitions/order, and prompt strategies.
 - `SqliteHistoryRepository`: relational translation/OCR history with one global history ID plus favorites, notes, and tags.
-- `Keychain`: API keys, tokens, and other Provider credentials. Secrets must never be added to SQLite payloads.
+- `Keychain`: Provider credential adapter backed only by SQLite. Production code does not construct or access a platform Keychain backend.
 
 The database is created once in `composition.rs` and shared by the repositories. Tests use `Database::in_memory()` or a temporary database instead of production paths.
 
@@ -41,7 +41,7 @@ The database is created once in `composition.rs` and shared by the repositories.
 - SQLite schema changes require a new ordered migration and a `user_version` increment.
 - A database with a newer schema version is rejected instead of being rebuilt.
 - Images and other large assets belong in the filesystem; SQLite stores only metadata when a durable asset feature is introduced.
-- Provider secrets stay in the system Keychain and use stable Provider IDs.
+- Provider endpoints, Base URLs, API keys, and secret keys are stored unencrypted in SQLite. The application-data directory is restricted to the current user on Unix platforms.
 
 ## Testing
 
@@ -53,7 +53,7 @@ cargo test --manifest-path src-tauri/Cargo.toml --test infrastructure_integratio
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-Repository tests should verify restart persistence, foreign-key behavior, transaction rollback, and that secret values do not appear in SQLite.
+Repository tests should verify restart persistence, foreign-key behavior, credential migration, and transaction rollback.
 
 ## Dependency Direction
 

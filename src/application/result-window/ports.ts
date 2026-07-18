@@ -62,6 +62,7 @@ export interface ResultWindowCommandsPort {
     language?: string;
     providerUsed?: string;
   }): Promise<number>;
+  speakText(text: string, language?: string): Promise<void>;
 }
 
 export interface OcrFileResult extends OcrResult {

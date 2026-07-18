@@ -14,6 +14,12 @@ pub struct GeneralSettings {
     pub log_retention_days: u16,
     pub performance_monitoring: bool,
     pub experimental_gpu_acceleration: bool,
+    pub system_tts_voice: String,
+    pub system_tts_rate: u16,
+    pub settings_window_x: Option<i32>,
+    pub settings_window_y: Option<i32>,
+    pub settings_window_width: Option<u32>,
+    pub settings_window_height: Option<u32>,
 }
 
 impl Default for GeneralSettings {
@@ -30,6 +36,12 @@ impl Default for GeneralSettings {
             log_retention_days: 7,
             performance_monitoring: false,
             experimental_gpu_acceleration: false,
+            system_tts_voice: String::new(),
+            system_tts_rate: 180,
+            settings_window_x: None,
+            settings_window_y: None,
+            settings_window_width: None,
+            settings_window_height: None,
         }
     }
 }

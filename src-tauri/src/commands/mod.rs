@@ -11,6 +11,7 @@ mod result_window_commands;
 mod screenshot_favorite_commands;
 mod settings_commands;
 mod translation_commands;
+mod tts_commands;
 
 pub use capture_session_commands::*;
 pub use clipboard_commands::*;
@@ -25,6 +26,7 @@ pub use result_window_commands::*;
 pub use screenshot_favorite_commands::*;
 pub use settings_commands::*;
 pub use translation_commands::*;
+pub use tts_commands::*;
 
 use tauri::State;
 

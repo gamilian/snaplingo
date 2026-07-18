@@ -198,7 +198,7 @@ export function ProviderConfigDialog({
                   </svg>
                   <div className="text-sm text-blue-800">
                     <p className="font-medium mb-1">安全提示</p>
-                    <p>凭证将加密保存在系统密钥链中，不会上传到任何服务器</p>
+                    <p>凭证仅保存在本机 SnapLingo 数据库中，不会上传到任何服务器</p>
                   </div>
                 </div>
               </div>

@@ -46,18 +46,6 @@ const providerStore = vi.hoisted(() => ({
     loadOcrProviders: vi.fn(),
     activateOcrProvider: vi.fn(),
     configureOcrProvider: vi.fn(),
-    ttsProviders: [
-      {
-        id: 'system-tts',
-        name: 'System TTS',
-        type: 'tts',
-        status: 'unconfigured',
-        isBuiltin: true,
-        requiresApiKey: true,
-      },
-    ],
-    activeTtsProvider: null,
-    activateTtsProvider: vi.fn(),
     updateProviderConfig: vi.fn(),
   },
 }));
@@ -76,11 +64,36 @@ vi.mock('../../../stores/providerStore', () => ({
     selector(providerStore.state),
 }));
 
+const settingsStore = vi.hoisted(() => ({
+  state: {
+    general: {
+      language: 'zh-CN',
+      theme: 'system',
+      startOnBoot: false,
+      systemTtsVoice: '',
+      systemTtsRate: 180,
+    },
+    updateGeneralSettings: vi.fn(),
+  },
+}));
+
+vi.mock('../../../stores/settingsConfigStore', () => ({
+  useSettingsConfigStore: (
+    selector: (state: typeof settingsStore.state) => unknown,
+  ) => selector(settingsStore.state),
+}));
+
+const ttsRuntime = vi.hoisted(() => ({
+  listVoices: vi.fn(async () => []),
+  speak: vi.fn(async () => undefined),
+}));
+
 vi.mock('../runtimeContext', () => ({
   useSettingsRuntime: () => ({
     providers: {
       getOcrCredentialSchema: vi.fn(),
     },
+    tts: ttsRuntime,
   }),
 }));
 
@@ -104,13 +117,10 @@ describe('provider config pages', () => {
     expect(findProviderConfig(view).props.presentation).toBe('inline');
   });
 
-  it('opens TTS provider configuration inline instead of behind a black modal overlay', () => {
-    let view = renderPage(TtsProvidersPage);
-    findProviderCard(view).props.onConfigure?.();
+  it('loads real macOS system voices for TTS configuration', () => {
+    renderPage(TtsProvidersPage);
 
-    view = renderPage(TtsProvidersPage);
-
-    expect(findProviderConfig(view).props.presentation).toBe('inline');
+    expect(ttsRuntime.listVoices).toHaveBeenCalledTimes(1);
   });
 });
 

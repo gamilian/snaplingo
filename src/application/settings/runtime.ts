@@ -26,6 +26,7 @@ import type {
   SettingsScreenshotFavoritesPort,
   SettingsHotkeysPort,
   SettingsMaintenancePort,
+  SettingsTtsPort,
   SettingsProvidersPort,
   SettingsSnapshot,
   SettingsWindowPort,
@@ -48,6 +49,7 @@ export interface SettingsRuntimePorts {
   screenshotFavorites: SettingsScreenshotFavoritesPort;
   clipboard: SettingsClipboardPort;
   maintenance: SettingsMaintenancePort;
+  tts: SettingsTtsPort;
 }
 
 export interface SettingsRuntime {
@@ -118,6 +120,7 @@ export interface SettingsRuntime {
     copyText(text: string): Promise<void>;
   };
   maintenance: SettingsMaintenancePort;
+  tts: SettingsTtsPort;
 }
 
 export function createSettingsRuntime(
@@ -199,5 +202,6 @@ export function createSettingsRuntime(
       copyText: (text) => ports.clipboard.writeText(text),
     },
     maintenance: ports.maintenance,
+    tts: ports.tts,
   };
 }

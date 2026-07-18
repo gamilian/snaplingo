@@ -479,6 +479,7 @@ function createRuntime(options: {
       recordTranslationHistory: vi.fn(async () => undefined),
       favoriteTranslationResult: vi.fn(async () => 1),
       favoriteOcrResult: vi.fn(async () => 1),
+      speakText: vi.fn(async () => undefined),
     },
     clipboard: { copyText: vi.fn() },
     onPayloadReady: vi.fn(async (handler: ResultPayloadReadyHandler) => {

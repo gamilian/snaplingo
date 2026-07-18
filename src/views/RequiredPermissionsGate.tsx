@@ -36,44 +36,60 @@ export function RequiredPermissionsGate({
       }
     };
 
-    void check(true);
+    // Initial mount only checks status. Native permission requests are always
+    // initiated by an explicit action in the in-app guidance.
+    void check(requestVersion > 0);
     return () => {
       disposed = true;
       if (timer !== undefined) window.clearTimeout(timer);
     };
   }, [requestVersion, runtime]);
 
-  if (status && areRequiredPermissionsGranted(status)) return children;
+  const shouldShowGuide = status
+    ? !areRequiredPermissionsGranted(status)
+    : error !== null;
+
+  if (!shouldShowGuide) return children;
 
   return (
-    <main style={styles.page}>
-      <section style={styles.card}>
-        <h1 style={styles.title}>SnapLingo 需要系统权限</h1>
-        <p style={styles.description}>
-          必须完成以下 macOS 授权后才能继续使用。系统授权完成后，本页面会自动进入应用。
-        </p>
-        <PermissionRow
-          label="屏幕录制"
-          granted={status?.screenRecording ?? false}
-          detail="用于截图、OCR 和截图翻译"
-        />
-        <PermissionRow
-          label="辅助功能"
-          granted={status?.accessibility ?? false}
-          detail="用于读取所选文本、全局快捷键和界面元素检测"
-        />
-        {error && <p style={styles.error}>{error}</p>}
-        <button
-          style={styles.button}
-          onClick={() => setRequestVersion((version) => version + 1)}
+    <>
+      {children}
+      <div style={styles.overlay}>
+        <section
+          aria-label="SnapLingo 系统权限引导"
+          aria-modal="true"
+          role="dialog"
+          style={styles.card}
         >
-          重新发起系统授权
-        </button>
-        <p style={styles.hint}>
-          如果系统设置已经打开，请在“隐私与安全性”中允许 SnapLingo；部分权限需要重新启动应用后生效。
-        </p>
-      </section>
-    </main>
+          <h1 style={styles.title}>SnapLingo 需要系统权限</h1>
+          <p style={styles.description}>
+            首次使用前请完成以下 macOS 授权。设置窗口会保持打开，并在授权完成后自动解锁全部功能。
+          </p>
+          <PermissionRow
+            label="屏幕录制"
+            granted={status?.screenRecording ?? false}
+            detail="用于截图、OCR 和截图翻译"
+          />
+          <PermissionRow
+            label="辅助功能"
+            granted={status?.accessibility ?? false}
+            detail="用于读取所选文本、全局快捷键和界面元素检测"
+          />
+          {error && <p style={styles.error}>{error}</p>}
+          <button
+            style={styles.button}
+            onClick={() => setRequestVersion((version) => version + 1)}
+          >
+            {!status?.screenRecording
+              ? '打开屏幕录制设置'
+              : '打开辅助功能设置'}
+          </button>
+          <p style={styles.hint}>
+            点击后会打开对应的 macOS 系统设置页面。允许当前权限并返回 SnapLingo，再继续完成下一项。
+          </p>
+        </section>
+      </div>
+    </>
   );
 }
 
@@ -101,7 +117,17 @@ function PermissionRow({
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, background: '#f3f4f6', color: '#111827' },
+  overlay: {
+    position: 'fixed',
+    inset: 0,
+    zIndex: 10000,
+    display: 'grid',
+    placeItems: 'center',
+    padding: 24,
+    background: 'rgba(15, 23, 42, 0.48)',
+    backdropFilter: 'blur(6px)',
+    color: '#111827',
+  },
   card: { width: 'min(520px, 100%)', padding: 28, borderRadius: 18, background: '#fff', boxShadow: '0 20px 50px rgba(15, 23, 42, 0.12)' },
   title: { margin: '0 0 10px', fontSize: 24 },
   description: { margin: '0 0 22px', color: '#4b5563', lineHeight: 1.6 },

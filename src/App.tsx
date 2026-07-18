@@ -75,6 +75,7 @@ import {
   resultWindow,
 } from './platform/tauri/resultWindow';
 import * as durableSettings from './platform/tauri/settings';
+import { systemTts } from './platform/tauri/tts';
 import { settingsWindow } from './platform/tauri/settingsWindow';
 import {
   recordTranslationHistory,
@@ -89,6 +90,7 @@ const settingsRuntime = createSettingsRuntime({
     listAppLogs: durableSettings.listAppLogs,
     clearAppLogs: durableSettings.clearAppLogs,
   },
+  tts: systemTts,
   providers: settingsProviders,
   hotkeys,
   history,
@@ -145,6 +147,7 @@ const resultWindowPlatformRuntime = createResultWindowPlatformRuntime({
         confidence: input.result.confidence,
       });
     },
+    speakText: systemTts.speak,
   },
 });
 const resultWindowRuntime = createResultWindowRuntime({

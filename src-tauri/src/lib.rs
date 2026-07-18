@@ -32,6 +32,7 @@ use tauri_plugin_log::{Target, TargetKind};
 pub fn run() {
     let database_path = infrastructure::system::get_database_path()
         .expect("Failed to resolve application database path");
+    let is_first_launch = !database_path.exists();
     let database = Arc::new(
         infrastructure::storage::Database::open(&database_path)
             .expect("Failed to initialize database"),
@@ -70,6 +71,9 @@ pub fn run() {
 
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
+                if let Err(err) = settings_window::remember_settings_window_geometry(window) {
+                    log::warn!("Failed to remember settings window geometry: {}", err);
+                }
                 if let Err(err) = settings_window::hide_settings_window(window) {
                     log::warn!("Failed to hide settings window on close request: {}", err);
                 }
@@ -96,7 +100,7 @@ pub fn run() {
             }
             let hotkey_runtime = app_state.settings.hotkeys.clone();
             let permissions = app_state.permissions.clone();
-            let permissions_granted = permissions.request_missing().all_granted();
+            let permissions_granted = permissions.status().all_granted();
             let log_settings = app_state.settings.configuration.clone();
             let scheduled_log_repository = app_state.logs.repository.clone();
 
@@ -134,9 +138,9 @@ pub fn run() {
                 log::warn!("Failed to setup menu bar: {}", err);
             }
 
-            if !permissions_granted {
+            if should_show_settings_on_startup(is_first_launch, permissions_granted) {
                 if let Err(err) = settings_window::show_settings_window(app.handle()) {
-                    log::error!("Failed to show required permissions window: {}", err);
+                    log::error!("Failed to show startup settings window: {}", err);
                 }
             }
 
@@ -169,6 +173,8 @@ pub fn run() {
             commands::update_history_settings,
             commands::list_app_logs,
             commands::clear_app_logs,
+            commands::list_system_tts_voices,
+            commands::speak_text,
             commands::open_capture_window,
             commands::translate_text_v2,
             commands::translate_text_with_provider,
@@ -267,6 +273,10 @@ pub fn run() {
         });
 }
 
+fn should_show_settings_on_startup(is_first_launch: bool, permissions_granted: bool) -> bool {
+    is_first_launch || !permissions_granted
+}
+
 fn next_daily_log_cleanup_at(now: NaiveDateTime) -> NaiveDateTime {
     let today_at_eight = now.date().and_hms_opt(8, 0, 0).expect("08:00 is valid");
     if now < today_at_eight {
@@ -321,5 +331,17 @@ mod log_cleanup_schedule_tests {
                 .and_hms_opt(8, 0, 0)
                 .unwrap()
         );
+    }
+}
+
+#[cfg(test)]
+mod startup_settings_tests {
+    use super::should_show_settings_on_startup;
+
+    #[test]
+    fn shows_settings_on_first_launch_or_when_permissions_are_missing() {
+        assert!(should_show_settings_on_startup(true, true));
+        assert!(should_show_settings_on_startup(false, false));
+        assert!(!should_show_settings_on_startup(false, true));
     }
 }

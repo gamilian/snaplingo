@@ -6,6 +6,7 @@ import {
   shouldApplyTranslationPayloadText,
   shouldClearTranslationResultsForPayload,
   shouldStartFileOcrForPayload,
+  translationPayloadSourceText,
 } from './payload';
 
 describe('result payload application', () => {
@@ -73,6 +74,35 @@ describe('result payload application', () => {
         ocrIntent: 'display-text',
       }),
     ).toBe('Visit https://example.com');
+  });
+
+  it('preserves screenshot OCR line breaks when configured', () => {
+    expect(
+      ocrPayloadDisplayText(
+        {
+          mode: 'ocr',
+          origin: 'ocr',
+          text: 'first line\nsecond line',
+          autoTranslate: false,
+          ocrIntent: 'display-text',
+        },
+        { preserveFormatting: true, removeChineseSpaces: true },
+      ),
+    ).toBe('first line\nsecond line');
+  });
+
+  it('preserves screenshot translation line breaks when configured', () => {
+    expect(
+      translationPayloadSourceText(
+        {
+          mode: 'translation',
+          origin: 'screenshot',
+          text: 'first line\nsecond line',
+          autoTranslate: true,
+        },
+        { preserveFormatting: true, removeChineseSpaces: true },
+      ),
+    ).toBe('first line\nsecond line');
   });
 
   it('clears OCR results for display and uploaded-image OCR work', () => {
