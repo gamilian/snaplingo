@@ -10,7 +10,6 @@ import {
 } from './icons';
 import IconActionButton from './IconActionButton';
 import { resultWindowAdaptiveTextStyle } from './presentation';
-import { speakResultWindowText } from './speech';
 
 interface TranslationCardProps {
   providerId: string;
@@ -107,7 +106,7 @@ export default function TranslationCard({
             tooltipPlacement="bottom"
             onClick={(event) => {
               event.stopPropagation();
-              speakResultWindowText(speakText, displayText, languageCode);
+              void speakText(displayText, languageCode);
             }}
           >
             <VolumeIcon className="h-[15px] w-[15px]" />

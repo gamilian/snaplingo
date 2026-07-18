@@ -27,6 +27,8 @@ interface BackendGeneralSettings {
   settings_window_y?: number;
   settings_window_width?: number;
   settings_window_height?: number;
+  last_result_window_x?: number;
+  last_result_window_y?: number;
 }
 
 interface BackendScreenshotSettings {
@@ -110,6 +112,8 @@ interface GeneralSettingsInput {
   settingsWindowY?: number;
   settingsWindowWidth?: number;
   settingsWindowHeight?: number;
+  lastResultWindowX?: number;
+  lastResultWindowY?: number;
 }
 
 interface ScreenshotSettingsInput {
@@ -188,6 +192,12 @@ function normalizeSnapshot(snapshot: BackendSettingsSnapshot) {
         : {}),
       ...(snapshot.general.settings_window_height !== undefined
         ? { settingsWindowHeight: snapshot.general.settings_window_height }
+        : {}),
+      ...(snapshot.general.last_result_window_x !== undefined
+        ? { lastResultWindowX: snapshot.general.last_result_window_x }
+        : {}),
+      ...(snapshot.general.last_result_window_y !== undefined
+        ? { lastResultWindowY: snapshot.general.last_result_window_y }
         : {}),
     },
     screenshot: {
@@ -282,9 +292,25 @@ export async function updateGeneralSettings(input: GeneralSettingsInput) {
         ...(input.settingsWindowHeight !== undefined
           ? { settings_window_height: input.settingsWindowHeight }
           : {}),
+        ...(input.lastResultWindowX !== undefined
+          ? { last_result_window_x: input.lastResultWindowX }
+          : {}),
+        ...(input.lastResultWindowY !== undefined
+          ? { last_result_window_y: input.lastResultWindowY }
+          : {}),
       },
     }),
   );
+}
+
+export async function updateLastResultWindowPosition(position: {
+  x: number;
+  y: number;
+}) {
+  await invoke<void>('update_last_result_window_position', {
+    x: Math.round(position.x),
+    y: Math.round(position.y),
+  });
 }
 
 export async function listAppLogs(limit: number) {

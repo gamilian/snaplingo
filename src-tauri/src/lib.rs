@@ -166,6 +166,7 @@ pub fn run() {
             commands::request_required_permissions,
             commands::trigger_screenshot,
             commands::update_general_settings,
+            commands::update_last_result_window_position,
             commands::update_screenshot_settings,
             commands::update_annotation_colors,
             commands::update_translation_settings,

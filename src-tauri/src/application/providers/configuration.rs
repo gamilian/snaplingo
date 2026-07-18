@@ -110,7 +110,7 @@ pub(crate) fn add_custom_translation_provider(
             let rollback_err = credential_store
                 .delete_provider_credential(&id)
                 .err()
-                .map(|re| format!(" keychain cleanup failed: {}", re));
+                .map(|re| format!(" credential cleanup failed: {}", re));
             match rollback_err {
                 Some(re) => AppError::Other(format!(
                     "Failed to save config: {}. Rollback also failed:{}",
@@ -129,7 +129,7 @@ pub(crate) fn add_custom_translation_provider(
             rollback_errors.push(format!("config rollback: {}", re));
         }
         if let Err(re) = credential_store.delete_provider_credential(&id) {
-            rollback_errors.push(format!("keychain rollback: {}", re));
+            rollback_errors.push(format!("credential rollback: {}", re));
         }
         if rollback_errors.is_empty() {
             AppError::Other(format!("Failed to register provider: {}", e))
@@ -152,7 +152,7 @@ pub(crate) fn add_custom_translation_provider(
             rollback_errors.push(format!("config rollback: {}", re));
         }
         if let Err(re) = credential_store.delete_provider_credential(&id) {
-            rollback_errors.push(format!("keychain rollback: {}", re));
+            rollback_errors.push(format!("credential rollback: {}", re));
         }
         if rollback_errors.is_empty() {
             AppError::Other(format!("Failed to activate provider: {}", e))
@@ -714,8 +714,8 @@ pub struct ProviderConfiguration {
     translation_coordinator: Arc<TranslationCoordinator>,
     llm_introspection: Arc<crate::application::providers::LlmIntrospection>,
     change_notifier: Option<Arc<dyn crate::application::providers::ProviderChangeNotifier>>,
-    /// Serializes all provider state mutations (config + keychain + coordinator).
-    /// Prevents concurrent add/update/remove from causing config/keychain/coordinator divergence.
+    /// Serializes all provider state mutations (config + credentials + coordinator).
+    /// Prevents concurrent add/update/remove from causing cross-store divergence.
     provider_state_lock: std::sync::Mutex<()>,
 }
 
@@ -956,13 +956,13 @@ impl ProviderConfiguration {
                 rollback_errors.push(format!("config rollback: {}", re));
             }
 
-            // Rollback keychain if we saved a new key
+            // Roll back credentials if we saved a new key.
             if let Some(ref old_key) = old_api_key {
                 if let Err(re) = self
                     .credential_store
                     .save_provider_credential(&provider_id, old_key)
                 {
-                    rollback_errors.push(format!("keychain rollback: {}", re));
+                    rollback_errors.push(format!("credential rollback: {}", re));
                 }
             }
 
@@ -1102,30 +1102,7 @@ impl ProviderConfiguration {
             errors
         };
 
-        // Step 3: Delete simple API key
-        if let Err(e) = self
-            .credential_store
-            .delete_provider_credential(&provider_id)
-        {
-            // Only fail if key exists but deletion failed (idempotent delete)
-            if !self.credential_store.is_not_found(&e) {
-                let rollback_errors = rollback();
-                if rollback_errors.is_empty() {
-                    return Err(AppError::Other(format!(
-                        "Failed to delete credential: {}",
-                        e
-                    )));
-                } else {
-                    return Err(AppError::Other(format!(
-                        "Failed to delete credential: {}. Rollback also failed: {}",
-                        e,
-                        rollback_errors.join(", ")
-                    )));
-                }
-            }
-        }
-
-        // Step 4: Delete structured credentials (using saved field names) with rollback on failure
+        // Step 3: Delete the known credential fields with rollback on failure.
         if !credential_field_names.is_empty() {
             if let Err(e) = self
                 .credential_store
@@ -1250,34 +1227,11 @@ impl ProviderConfiguration {
             .snapshot_provider_credentials(&provider_id, &field_names)
             .map_err(|e| AppError::Other(format!("Failed to snapshot credentials: {}", e)))?;
 
-        // Save simple API key if applicable
-        if cred_map.len() == 1 && cred_map.contains_key("api_key") {
-            let api_key = cred_map.get("api_key").unwrap();
-            if let Err(e) = self
-                .credential_store
-                .save_provider_credential(&provider_id, api_key)
-            {
-                return Err(AppError::Other(format!("Failed to save credential: {}", e)));
-            }
-        }
-
-        // Save structured credentials with transaction support
+        // Persist the complete credential set atomically.
         if let Err(e) = self
             .credential_store
-            .save_provider_credentials_transactional(&provider_id, &cred_map, &snapshot)
+            .save_provider_credentials(&provider_id, &cred_map)
         {
-            // Rollback simple credential if we saved it
-            if cred_map.len() == 1 && cred_map.contains_key("api_key") {
-                if let Some(Some(ref old_key)) = snapshot.api_key {
-                    let _ = self
-                        .credential_store
-                        .save_provider_credential(&provider_id, old_key);
-                } else if snapshot.api_key == Some(None) {
-                    let _ = self
-                        .credential_store
-                        .delete_provider_credential(&provider_id);
-                }
-            }
             return Err(AppError::Other(format!(
                 "Failed to save credentials: {}",
                 e
@@ -1376,49 +1330,14 @@ impl ProviderConfiguration {
 mod provider_configuration_tests {
     use super::*;
     use crate::application::providers::translation::TranslationCoordinator;
-    use crate::application::providers::{HttpClient, HttpResponse, LlmRuntime};
-    use crate::infrastructure::storage::{Database, Keychain, KeychainBackend, SqliteConfigStore};
+    use crate::application::providers::{
+        CredentialSnapshot, HttpClient, HttpResponse, LlmRuntime, ProviderCredentialStore,
+    };
+    use crate::infrastructure::storage::{Database, SqliteConfigStore, SqliteCredentialStore};
     use anyhow::Result;
     use async_trait::async_trait;
     use std::collections::HashMap;
     use std::sync::{Arc, Mutex};
-
-    // Stub keychain for testing
-    struct StubKeychainBackend {
-        store: Mutex<HashMap<String, String>>,
-    }
-
-    impl StubKeychainBackend {
-        fn new() -> Self {
-            Self {
-                store: Mutex::new(HashMap::new()),
-            }
-        }
-    }
-
-    impl KeychainBackend for StubKeychainBackend {
-        fn save(&self, key: &str, value: &str) -> crate::Result<()> {
-            self.store
-                .lock()
-                .unwrap()
-                .insert(key.to_string(), value.to_string());
-            Ok(())
-        }
-
-        fn load(&self, key: &str) -> crate::Result<String> {
-            self.store
-                .lock()
-                .unwrap()
-                .get(key)
-                .cloned()
-                .ok_or_else(|| crate::AppError::Keychain(keyring::Error::NoEntry))
-        }
-
-        fn delete(&self, key: &str) -> crate::Result<()> {
-            self.store.lock().unwrap().remove(key);
-            Ok(())
-        }
-    }
 
     struct MockHttpClient;
 
@@ -1457,8 +1376,8 @@ mod provider_configuration_tests {
     }
 
     fn test_provider_configuration_with_database() -> (ProviderConfiguration, Arc<Database>) {
-        let keychain = Arc::new(Keychain::with_backend(StubKeychainBackend::new()));
         let database = Arc::new(Database::in_memory().unwrap());
+        let credential_store = Arc::new(SqliteCredentialStore::new(database.clone()));
         let config_store = Arc::new(SqliteConfigStore::new(database.clone()));
         let http_client: Arc<dyn HttpClient> = Arc::new(MockHttpClient);
         let llm_runtime = llm_runtime_from_http(http_client.clone());
@@ -1475,7 +1394,7 @@ mod provider_configuration_tests {
         (
             ProviderConfiguration::new(
                 config_store,
-                keychain,
+                credential_store,
                 llm_runtime,
                 coordinator,
                 llm_introspection,
@@ -1699,7 +1618,7 @@ mod provider_configuration_tests {
 
         assert!(result.is_ok());
 
-        // Verify config and keychain are cleaned up
+        // Verify config and credentials are cleaned up.
         let remaining_defs = config
             .config_store
             .load_custom_translation_providers()
@@ -1713,7 +1632,7 @@ mod provider_configuration_tests {
     }
 
     #[test]
-    fn remove_succeeds_when_keychain_missing() {
+    fn remove_succeeds_when_credentials_are_missing() {
         let config = test_provider_configuration();
 
         // Add a custom provider to config but don't save any credentials
@@ -1732,7 +1651,7 @@ mod provider_configuration_tests {
             .config_store
             .save_custom_translation_providers(&vec![def]);
 
-        // Remove should succeed even though keychain entry doesn't exist
+        // Removal is idempotent when the credential entry does not exist.
         let result = config.remove("test-custom-2".to_string());
 
         assert!(result.is_ok());
@@ -1745,67 +1664,94 @@ mod provider_configuration_tests {
         assert!(remaining_defs.is_empty());
     }
 
-    // Failing keychain backend for testing rollback scenarios
     #[derive(Clone)]
-    struct FailingKeychainBackend {
-        store: Arc<Mutex<HashMap<String, String>>>,
-        fail_on_delete_key: Arc<Mutex<Option<String>>>,
+    struct FailingCredentialStore {
+        inner: Arc<SqliteCredentialStore>,
+        fail_delete: Arc<Mutex<bool>>,
     }
 
-    impl FailingKeychainBackend {
-        fn new() -> Self {
+    impl FailingCredentialStore {
+        fn new(database: Arc<Database>) -> Self {
             Self {
-                store: Arc::new(Mutex::new(HashMap::new())),
-                fail_on_delete_key: Arc::new(Mutex::new(None)),
+                inner: Arc::new(SqliteCredentialStore::new(database)),
+                fail_delete: Arc::new(Mutex::new(false)),
             }
         }
 
-        fn fail_on_delete(&self, key: String) {
-            *self.fail_on_delete_key.lock().unwrap() = Some(key);
+        fn fail_on_delete(&self) {
+            *self.fail_delete.lock().unwrap() = true;
         }
     }
 
-    impl KeychainBackend for FailingKeychainBackend {
-        fn save(&self, key: &str, value: &str) -> crate::Result<()> {
-            self.store
-                .lock()
-                .unwrap()
-                .insert(key.to_string(), value.to_string());
-            Ok(())
+    impl ProviderCredentialStore for FailingCredentialStore {
+        fn save_provider_credential(&self, provider_id: &str, api_key: &str) -> crate::Result<()> {
+            self.inner.save_provider_credential(provider_id, api_key)
         }
 
-        fn load(&self, key: &str) -> crate::Result<String> {
-            self.store
-                .lock()
-                .unwrap()
-                .get(key)
-                .cloned()
-                .ok_or_else(|| crate::AppError::Keychain(keyring::Error::NoEntry))
+        fn load_provider_credential(&self, provider_id: &str) -> crate::Result<String> {
+            self.inner.load_provider_credential(provider_id)
         }
 
-        fn delete(&self, key: &str) -> crate::Result<()> {
-            if let Some(ref fail_key) = *self.fail_on_delete_key.lock().unwrap() {
-                if key == fail_key {
-                    return Err(crate::AppError::Other(format!(
-                        "Simulated delete failure for key: {}",
-                        key
-                    )));
-                }
+        fn delete_provider_credential(&self, provider_id: &str) -> crate::Result<()> {
+            self.inner.delete_provider_credential(provider_id)
+        }
+
+        fn save_provider_credentials(
+            &self,
+            provider_id: &str,
+            credentials: &HashMap<String, String>,
+        ) -> crate::Result<()> {
+            self.inner
+                .save_provider_credentials(provider_id, credentials)
+        }
+
+        fn snapshot_provider_credentials(
+            &self,
+            provider_id: &str,
+            field_names: &[String],
+        ) -> crate::Result<CredentialSnapshot> {
+            self.inner
+                .snapshot_provider_credentials(provider_id, field_names)
+        }
+
+        fn restore_provider_credentials(
+            &self,
+            provider_id: &str,
+            snapshot: &CredentialSnapshot,
+        ) -> crate::Result<()> {
+            self.inner
+                .restore_provider_credentials(provider_id, snapshot)
+        }
+
+        fn load_provider_credentials(
+            &self,
+            provider_id: &str,
+            field_names: &[String],
+        ) -> crate::Result<HashMap<String, String>> {
+            self.inner
+                .load_provider_credentials(provider_id, field_names)
+        }
+
+        fn delete_provider_credentials(
+            &self,
+            provider_id: &str,
+            field_names: &[String],
+        ) -> crate::Result<()> {
+            if *self.fail_delete.lock().unwrap() {
+                return Err(crate::AppError::Other(
+                    "Simulated credential delete failure".to_string(),
+                ));
             }
-
-            self.store.lock().unwrap().remove(key);
-            Ok(())
+            self.inner
+                .delete_provider_credentials(provider_id, field_names)
         }
     }
 
     #[test]
     fn remove_rolls_back_all_state_on_structured_credential_delete_failure() {
-        // Setup: create a provider configuration with failing keychain
-        let failing_backend = FailingKeychainBackend::new();
-        let backend_for_config = failing_backend.clone();
-
-        let keychain = Arc::new(Keychain::with_backend(failing_backend));
-        let config_file = Arc::new(SqliteConfigStore::new_temp());
+        let database = Arc::new(Database::in_memory().unwrap());
+        let credential_store = Arc::new(FailingCredentialStore::new(database.clone()));
+        let config_file = Arc::new(SqliteConfigStore::new(database));
         let http_client: Arc<dyn HttpClient> = Arc::new(MockHttpClient);
         let llm_runtime = llm_runtime_from_http(http_client.clone());
         let coordinator = Arc::new(TranslationCoordinator::new(config_file.clone()));
@@ -1815,7 +1761,7 @@ mod provider_configuration_tests {
 
         let config = ProviderConfiguration::new(
             config_file.clone(),
-            keychain.clone(),
+            credential_store.clone(),
             llm_runtime.clone(),
             coordinator.clone(),
             llm_introspection,
@@ -1847,18 +1793,14 @@ mod provider_configuration_tests {
         coordinator.register(provider).unwrap();
         coordinator.activate("test-custom-3").unwrap();
 
-        // Save credentials (simple + structured)
-        keychain
-            .save_provider_credential("test-custom-3", "simple-key")
-            .unwrap();
-        let mut structured = HashMap::new();
-        structured.insert("api_key".to_string(), "struct-key".to_string());
-        keychain
-            .save_provider_credentials("test-custom-3", &structured)
+        credential_store
+            .save_provider_credentials(
+                "test-custom-3",
+                &HashMap::from([("api_key".to_string(), "test-key".to_string())]),
+            )
             .unwrap();
 
-        // Configure keychain to fail on structured credential deletion
-        backend_for_config.fail_on_delete("provider:test-custom-3:credential:api_key".to_string());
+        credential_store.fail_on_delete();
 
         // Attempt to remove - should fail on structured credential deletion
         let result = config.remove("test-custom-3".to_string());
@@ -1879,15 +1821,15 @@ mod provider_configuration_tests {
         assert_eq!(remaining_defs[0].id, "test-custom-3");
 
         // 2. Simple credential should still exist
-        let simple_key = keychain.load_provider_credential("test-custom-3");
+        let simple_key = credential_store.load_provider_credential("test-custom-3");
         assert!(simple_key.is_ok());
-        assert_eq!(simple_key.unwrap(), "simple-key");
+        assert_eq!(simple_key.unwrap(), "test-key");
 
         // 3. Structured credential should still exist
-        let struct_creds = keychain
+        let struct_creds = credential_store
             .load_provider_credentials("test-custom-3", &vec!["api_key".to_string()])
             .unwrap();
-        assert_eq!(struct_creds.get("api_key").unwrap(), "struct-key");
+        assert_eq!(struct_creds.get("api_key").unwrap(), "test-key");
 
         // 4. Provider should still be registered
         assert!(coordinator.get("test-custom-3").is_some());
@@ -1935,7 +1877,7 @@ mod provider_configuration_tests {
         // All adds should succeed (serialized by lock)
         assert_eq!(results.iter().filter(|r| r.is_ok()).count(), 3);
 
-        // Verify invariant: config defs == keychain ids == coordinator ids
+        // Verify the config, credential, and coordinator invariant.
         let custom_defs = config
             .config_store
             .load_custom_translation_providers()
@@ -1947,7 +1889,7 @@ mod provider_configuration_tests {
         for result in &results {
             if let Ok(view) = result {
                 assert!(config_ids.contains(&view.id));
-                // Keychain should have the credential
+                // The credential store should have the credential.
                 assert!(config
                     .credential_store
                     .load_provider_credential(&view.id)

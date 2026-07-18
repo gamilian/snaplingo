@@ -147,14 +147,26 @@ const resultWindowPlatformRuntime = createResultWindowPlatformRuntime({
         confidence: input.result.confidence,
       });
     },
-    speakText: systemTts.speak,
   },
 });
+
+function getLastResultWindowPosition() {
+  const general = useSettingsConfigStore.getState().general;
+  const x = general?.lastResultWindowX;
+  const y = general?.lastResultWindowY;
+  return typeof x === 'number' && typeof y === 'number' ? { x, y } : undefined;
+}
+
 const resultWindowRuntime = createResultWindowRuntime({
   platform: resultWindowPlatformRuntime,
+  speech: systemTts,
   getTranslationSettings: () =>
     useSettingsConfigStore.getState().translation ?? undefined,
   getOcrSettings: () => useSettingsConfigStore.getState().ocr ?? undefined,
+  positionStore: {
+    load: getLastResultWindowPosition,
+    save: durableSettings.updateLastResultWindowPosition,
+  },
   state: {
     setSourceText: (text) => useAppStore.getState().setSourceText(text),
     setResultWindowOrigin: (origin) =>

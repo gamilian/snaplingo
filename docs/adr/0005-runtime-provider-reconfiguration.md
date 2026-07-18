@@ -1,6 +1,6 @@
 # ADR 0005: Runtime Provider Reconfiguration
 
-> The single-`api_key` compatibility-command portion of this ADR is superseded by [ADR 0007](0007-remove-provider-compatibility-command.md). The runtime reconfiguration decision remains accepted.
+> The single-`api_key` compatibility-command portion is superseded by [ADR 0007](0007-remove-provider-compatibility-command.md), and the Keychain storage portion by [ADR 0010](0010-sqlite-provider-credentials.md). The runtime reconfiguration decision remains accepted.
 
 ## Status
 Accepted
@@ -19,7 +19,7 @@ Provider Coordinators own this behavior through their public Interface:
 
 Frontend code configures Translation Provider credentials through the credential-map Adapter (`configureTranslationProviderCredentials(...)`) and backend command (`configure_translation_provider_credentials`).
 
-Credential validation and custom Translation Provider definition handling live in the Provider Configuration Module. Credentials still persist through Keychain, but runtime mutation happens through the registered Provider behind the Coordinator seam.
+Credential validation and custom Translation Provider definition handling live in the Provider Configuration Module. Credentials persist through the `ProviderCredentialStore` port and its SQLite adapter, while runtime mutation happens through the registered Provider behind the Coordinator seam.
 
 ## Consequences
 

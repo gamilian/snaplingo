@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{AppError, Result};
+use crate::Result;
 
 #[derive(Debug, Clone)]
 pub struct CredentialSnapshot {
@@ -8,24 +8,14 @@ pub struct CredentialSnapshot {
     pub structured: HashMap<String, Option<String>>,
 }
 
-impl CredentialSnapshot {
-    pub fn new() -> Self {
-        Self {
-            api_key: None,
-            structured: HashMap::new(),
-        }
-    }
-}
-
 pub trait ProviderCredentialStore: Send + Sync {
     fn save_provider_credential(&self, provider_id: &str, api_key: &str) -> Result<()>;
     fn load_provider_credential(&self, provider_id: &str) -> Result<String>;
     fn delete_provider_credential(&self, provider_id: &str) -> Result<()>;
-    fn save_provider_credentials_transactional(
+    fn save_provider_credentials(
         &self,
         provider_id: &str,
         credentials: &HashMap<String, String>,
-        snapshot: &CredentialSnapshot,
     ) -> Result<()>;
     fn snapshot_provider_credentials(
         &self,
@@ -43,5 +33,4 @@ pub trait ProviderCredentialStore: Send + Sync {
         field_names: &[String],
     ) -> Result<HashMap<String, String>>;
     fn delete_provider_credentials(&self, provider_id: &str, field_names: &[String]) -> Result<()>;
-    fn is_not_found(&self, error: &AppError) -> bool;
 }

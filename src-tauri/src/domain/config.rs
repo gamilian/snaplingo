@@ -20,6 +20,8 @@ pub struct GeneralSettings {
     pub settings_window_y: Option<i32>,
     pub settings_window_width: Option<u32>,
     pub settings_window_height: Option<u32>,
+    pub last_result_window_x: Option<i32>,
+    pub last_result_window_y: Option<i32>,
 }
 
 impl Default for GeneralSettings {
@@ -42,6 +44,8 @@ impl Default for GeneralSettings {
             settings_window_y: None,
             settings_window_width: None,
             settings_window_height: None,
+            last_result_window_x: None,
+            last_result_window_y: None,
         }
     }
 }
@@ -225,5 +229,7 @@ mod tests {
         assert_eq!(snapshot.translation.window_width, 660);
         assert_eq!(snapshot.ocr.window_position, "cursor");
         assert!(!snapshot.ocr.hide_silent_status);
+        assert_eq!(snapshot.general.last_result_window_x, None);
+        assert_eq!(snapshot.general.last_result_window_y, None);
     }
 }

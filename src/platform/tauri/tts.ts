@@ -3,8 +3,9 @@ import type {
   SettingsTtsPort,
   SystemTtsVoice,
 } from '../../application/settings/ports';
+import type { ResultWindowSpeechPort } from '../../application/result-window/ports';
 
-export const systemTts: SettingsTtsPort = {
+export const systemTts: SettingsTtsPort & ResultWindowSpeechPort = {
   listVoices() {
     return invoke<SystemTtsVoice[]>('list_system_tts_voices');
   },

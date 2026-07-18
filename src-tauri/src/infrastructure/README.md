@@ -7,8 +7,7 @@ The infrastructure layer contains SnapLingo's adapters for persistence, HTTP, an
 ```text
 infrastructure/
 ├── storage/
-│   ├── database/       # Shared SQLite connection, migrations, config and history repositories
-│   └── keychain/       # SQLite-only Provider credential adapter
+│   └── database/       # Shared connection, migrations, settings, credentials and repositories
 ├── http/               # Reqwest transport adapter
 ├── llm/                # Provider protocol clients
 ├── events/             # In-process domain event bus
@@ -30,7 +29,7 @@ The current repositories are:
 
 - `SqliteConfigStore`: versioned JSON namespaces for settings, hotkeys, Provider definitions/order, and prompt strategies.
 - `SqliteHistoryRepository`: relational translation/OCR history with one global history ID plus favorites, notes, and tags.
-- `Keychain`: Provider credential adapter backed only by SQLite. Production code does not construct or access a platform Keychain backend.
+- `SqliteCredentialStore`: Provider credential adapter with atomic multi-field writes.
 
 The database is created once in `composition.rs` and shared by the repositories. Tests use `Database::in_memory()` or a temporary database instead of production paths.
 

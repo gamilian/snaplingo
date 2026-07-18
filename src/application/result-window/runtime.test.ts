@@ -434,6 +434,56 @@ describe('result window application runtime', () => {
 
     expect(ocr.platform.placeAt).toHaveBeenCalledWith('below-cursor');
   });
+
+  it('passes the durable last position to the window adapter', async () => {
+    const { runtime, platform } = createRuntime({
+      lastWindowPosition: { x: 420, y: 240 },
+      translationSettings: {
+        defaultSourceLang: 'auto',
+        defaultTargetLang: 'auto',
+        autoTranslate: true,
+        autoCopy: false,
+        preserveLineBreaks: true,
+        incrementalTranslation: false,
+        windowAlwaysOnTop: true,
+        hideOnBlur: false,
+        inputWindowPosition: 'last-position',
+      },
+    });
+
+    await runtime.resizeStandaloneWindow({
+      presentation: 'standalone',
+      visible: true,
+      mode: 'translation',
+      origin: 'input',
+      panelHeightPx: 300,
+    });
+
+    expect(platform.placeAt).toHaveBeenCalledWith('last-position', {
+      x: 420,
+      y: 240,
+    });
+  });
+
+  it('persists the final position returned by a user drag', async () => {
+    const { runtime, saveLastWindowPosition } = createRuntime({
+      draggedWindowPosition: { x: 640, y: 360 },
+    });
+
+    await runtime.beginDrag();
+
+    expect(saveLastWindowPosition).toHaveBeenCalledWith({ x: 640, y: 360 });
+  });
+
+  it('owns speech normalization instead of leaving it in the View', async () => {
+    const { runtime, speech } = createRuntime();
+
+    await runtime.speakText('\n hello \n', 'en');
+    await runtime.speakText('   ');
+
+    expect(speech.speak).toHaveBeenCalledOnce();
+    expect(speech.speak).toHaveBeenCalledWith('hello', 'en-US');
+  });
 });
 
 function createRuntime(options: {
@@ -453,6 +503,8 @@ function createRuntime(options: {
   translationResults?: Record<string, import('../../types').TranslationResult>;
   translationSettings?: import('../settings/ports').TranslationSettings;
   ocrSettings?: import('../settings/ports').OcrSettings;
+  lastWindowPosition?: import('./ports').ResultWindowPhysicalPosition;
+  draggedWindowPosition?: import('./ports').ResultWindowPhysicalPosition;
 } = {}) {
   let payloadReadyHandler: ResultPayloadReadyHandler | null = null;
   const unsubscribe: ResultWindowUnsubscribe = vi.fn();
@@ -479,7 +531,6 @@ function createRuntime(options: {
       recordTranslationHistory: vi.fn(async () => undefined),
       favoriteTranslationResult: vi.fn(async () => 1),
       favoriteOcrResult: vi.fn(async () => 1),
-      speakText: vi.fn(async () => undefined),
     },
     clipboard: { copyText: vi.fn() },
     onPayloadReady: vi.fn(async (handler: ResultPayloadReadyHandler) => {
@@ -491,9 +542,12 @@ function createRuntime(options: {
     dismiss: vi.fn(async () => {
       if (options.dismissError) throw options.dismissError;
     }),
-    beginDrag: vi.fn(async () => undefined),
+    beginDrag: vi.fn(async () =>
+      options.draggedWindowPosition ?? { x: 0, y: 0 }),
     setAlwaysOnTop: vi.fn(async () => undefined),
   };
+  const speech = { speak: vi.fn(async () => undefined) };
+  const saveLastWindowPosition = vi.fn(async () => undefined);
   const state = {
     setSourceText: vi.fn(),
     setResultWindowOrigin: vi.fn(),
@@ -526,14 +580,21 @@ function createRuntime(options: {
   };
   const runtime = createResultWindowRuntime({
     platform,
+    speech,
     state,
     getTranslationSettings: () => options.translationSettings,
     getOcrSettings: () => options.ocrSettings,
+    positionStore: {
+      load: () => options.lastWindowPosition,
+      save: saveLastWindowPosition,
+    },
   });
 
   return {
     runtime,
     platform,
+    speech,
+    saveLastWindowPosition,
     state,
     unsubscribe,
     emitPayloadReady: async (requestId: string) => {

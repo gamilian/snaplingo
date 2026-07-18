@@ -8,22 +8,17 @@ import {
 } from '@tauri-apps/api/window';
 import type { ResultWindowPort } from '../../application/result-window/ports';
 
-const LAST_RESULT_WINDOW_POSITION_KEY = 'snaplingo.result-window.last-position';
-
-interface StoredWindowPosition {
-  x: number;
-  y: number;
-}
-
 export const resultWindow: ResultWindowPort = {
   resize(width, height) {
     return getCurrentWindow().setSize(new LogicalSize(width, height));
   },
-  async place(position) {
+  async place(position, lastPosition) {
     const window = getCurrentWindow();
     const cursor = await cursorPosition();
     const storedPosition =
-      position === 'last-position' ? readLastResultWindowPosition() : null;
+      position === 'last-position' && isFinitePosition(lastPosition)
+        ? lastPosition
+        : null;
     const monitor =
       (storedPosition
         ? await monitorFromPoint(storedPosition.x, storedPosition.y)
@@ -59,30 +54,19 @@ export const resultWindow: ResultWindowPort = {
   async startDragging() {
     const window = getCurrentWindow();
     await window.startDragging();
-    writeLastResultWindowPosition(await window.outerPosition());
+    const position = await window.outerPosition();
+    return { x: position.x, y: position.y };
   },
   setAlwaysOnTop(value) {
     return getCurrentWindow().setAlwaysOnTop(value);
   },
 };
 
-export function readLastResultWindowPosition(): StoredWindowPosition | null {
-  try {
-    const value = JSON.parse(localStorage.getItem(LAST_RESULT_WINDOW_POSITION_KEY) ?? 'null');
-    return isFinitePosition(value) ? value : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeLastResultWindowPosition(position: StoredWindowPosition) {
-  if (!isFinitePosition(position)) return;
-  localStorage.setItem(LAST_RESULT_WINDOW_POSITION_KEY, JSON.stringify(position));
-}
-
-function isFinitePosition(value: unknown): value is StoredWindowPosition {
+function isFinitePosition(
+  value: unknown,
+): value is { x: number; y: number } {
   if (!value || typeof value !== 'object') return false;
-  const position = value as Partial<StoredWindowPosition>;
+  const position = value as Partial<{ x: number; y: number }>;
   return Number.isFinite(position.x) && Number.isFinite(position.y);
 }
 

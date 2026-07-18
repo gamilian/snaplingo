@@ -38,7 +38,7 @@ use crate::application::settings::{SettingsChangeNotifier, SettingsStore};
 use crate::infrastructure::events::EventBus;
 use crate::infrastructure::http::ReqwestHttpClient;
 use crate::infrastructure::storage::{
-    Database, Keychain, SqliteAppLogRepository, SqliteConfigStore,
+    Database, SqliteAppLogRepository, SqliteConfigStore, SqliteCredentialStore,
     SqliteFavoriteCapacityRepository, SqliteLibraryIndexRepository,
 };
 use crate::infrastructure::storage::{FilesystemOcrHistoryAssets, SqliteFavoriteRepository};
@@ -122,7 +122,7 @@ pub(crate) fn build_app_state(
         hotkey_configuration,
         Arc::new(TauriHotkeyChangeNotifier { app: app.clone() }),
     ));
-    let credential_store = Arc::new(Keychain::sqlite(database.clone()));
+    let credential_store = Arc::new(SqliteCredentialStore::new(database.clone()));
     let provider_credential_store: Arc<dyn ProviderCredentialStore> = credential_store.clone();
     let http_client: Arc<dyn HttpClient> = Arc::new(ReqwestHttpClient::with_settings(
         settings_configuration.clone(),
@@ -261,7 +261,7 @@ pub(crate) fn build_app_state(
         }),
         logs,
         tts: Arc::new(crate::application::TtsRuntime::new(
-            Arc::new(crate::infrastructure::system::tts::MacSystemTtsHost::new()),
+            Arc::new(crate::infrastructure::system::tts::SystemTtsHostAdapter::default()),
             settings_configuration.clone(),
         )),
         result_window,
@@ -269,7 +269,7 @@ pub(crate) fn build_app_state(
 }
 
 fn hydrate_provider_credentials_in_background(
-    credential_store: Arc<Keychain>,
+    credential_store: Arc<SqliteCredentialStore>,
     provider_configuration: Arc<crate::application::providers::ProviderConfiguration>,
     ocr_coordinator: Arc<crate::application::providers::ocr::OcrCoordinator>,
 ) {

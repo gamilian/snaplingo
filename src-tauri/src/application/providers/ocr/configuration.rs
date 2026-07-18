@@ -18,45 +18,8 @@ mod tests {
     use crate::application::providers::common::Provider;
     use crate::application::providers::ocr::OcrProvider;
     use crate::domain::ocr::{OcrRequest, OcrResult};
-    use crate::infrastructure::storage::{Keychain, KeychainBackend, SqliteConfigStore};
+    use crate::infrastructure::storage::{Database, SqliteConfigStore, SqliteCredentialStore};
     use async_trait::async_trait;
-    use std::sync::Mutex;
-
-    struct StubKeychainBackend {
-        store: Mutex<HashMap<String, String>>,
-    }
-
-    impl StubKeychainBackend {
-        fn new() -> Self {
-            Self {
-                store: Mutex::new(HashMap::new()),
-            }
-        }
-    }
-
-    impl KeychainBackend for StubKeychainBackend {
-        fn save(&self, key: &str, value: &str) -> crate::Result<()> {
-            self.store
-                .lock()
-                .unwrap()
-                .insert(key.to_string(), value.to_string());
-            Ok(())
-        }
-
-        fn load(&self, key: &str) -> crate::Result<String> {
-            self.store
-                .lock()
-                .unwrap()
-                .get(key)
-                .cloned()
-                .ok_or_else(|| crate::AppError::Keychain(keyring::Error::NoEntry))
-        }
-
-        fn delete(&self, key: &str) -> crate::Result<()> {
-            self.store.lock().unwrap().remove(key);
-            Ok(())
-        }
-    }
 
     struct RejectingOcrProvider;
 
@@ -104,15 +67,17 @@ mod tests {
     fn save_credentials_uses_provider_validation_before_persisting() {
         let coordinator = Arc::new(OcrCoordinator::new(Arc::new(SqliteConfigStore::new_temp())));
         coordinator.register(RejectingOcrProvider).unwrap();
-        let keychain = Arc::new(Keychain::with_backend(StubKeychainBackend::new()));
-        let configuration = OcrProviderConfiguration::new(coordinator, keychain.clone());
+        let credential_store = Arc::new(SqliteCredentialStore::new(Arc::new(
+            Database::in_memory().unwrap(),
+        )));
+        let configuration = OcrProviderConfiguration::new(coordinator, credential_store.clone());
         let credentials = HashMap::from([("api_key".to_string(), "blocked".to_string())]);
 
         let result = configuration.save_credentials("rejecting-ocr", &credentials);
 
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("blocked api key"));
-        assert!(keychain
+        assert!(credential_store
             .load_provider_credentials("rejecting-ocr", &["api_key".to_string()])
             .is_err());
     }
@@ -183,7 +148,7 @@ impl OcrProviderConfiguration {
             .map_err(|e| format!("Failed to snapshot credentials: {}", e))?;
 
         self.credential_store
-            .save_provider_credentials_transactional(provider_id, credentials, &snapshot)?;
+            .save_provider_credentials(provider_id, credentials)?;
 
         if let Err(e) = self
             .coordinator

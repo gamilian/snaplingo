@@ -2,7 +2,7 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   areRequiredPermissionsGranted,
   type RequiredPermissionsRuntime,
-  type RequiredPermissionsStatus,
+  type RequiredPermissionsSnapshot,
 } from '../application/permissions/runtime';
 
 export function RequiredPermissionsGate({
@@ -12,38 +12,10 @@ export function RequiredPermissionsGate({
   children: ReactNode;
   runtime: RequiredPermissionsRuntime;
 }) {
-  const [status, setStatus] = useState<RequiredPermissionsStatus | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [requestVersion, setRequestVersion] = useState(0);
+  const [{ status, error }, setSnapshot] =
+    useState<RequiredPermissionsSnapshot>({ status: null, error: null });
 
-  useEffect(() => {
-    let disposed = false;
-    let timer: number | undefined;
-
-    const check = async (request: boolean) => {
-      try {
-        const next = request ? await runtime.request() : await runtime.status();
-        if (disposed) return;
-        setStatus(next);
-        setError(null);
-        if (!areRequiredPermissionsGranted(next)) {
-          timer = window.setTimeout(() => void check(false), 750);
-        }
-      } catch (cause) {
-        if (disposed) return;
-        setError(cause instanceof Error ? cause.message : String(cause));
-        timer = window.setTimeout(() => void check(false), 1500);
-      }
-    };
-
-    // Initial mount only checks status. Native permission requests are always
-    // initiated by an explicit action in the in-app guidance.
-    void check(requestVersion > 0);
-    return () => {
-      disposed = true;
-      if (timer !== undefined) window.clearTimeout(timer);
-    };
-  }, [requestVersion, runtime]);
+  useEffect(() => runtime.subscribe(setSnapshot), [runtime]);
 
   const shouldShowGuide = status
     ? !areRequiredPermissionsGranted(status)
@@ -78,7 +50,9 @@ export function RequiredPermissionsGate({
           {error && <p style={styles.error}>{error}</p>}
           <button
             style={styles.button}
-            onClick={() => setRequestVersion((version) => version + 1)}
+            onClick={() => {
+              void runtime.requestNext().catch(() => undefined);
+            }}
           >
             {!status?.screenRecording
               ? '打开屏幕录制设置'

@@ -27,6 +27,19 @@ pub fn update_general_settings(
 }
 
 #[tauri::command]
+pub fn update_last_result_window_position(
+    x: i32,
+    y: i32,
+    state: State<'_, crate::AppState>,
+) -> Result<(), String> {
+    state
+        .settings
+        .configuration
+        .update_last_result_window_position(x, y)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 pub fn update_screenshot_settings(
     input: ScreenshotSettings,
     state: State<'_, crate::AppState>,

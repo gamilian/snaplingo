@@ -5,6 +5,7 @@ mod favorites;
 mod history;
 mod library_index;
 mod migrations;
+mod provider_credentials;
 mod screenshot_favorites;
 
 pub use app_logs::SqliteAppLogRepository;
@@ -13,6 +14,7 @@ pub use favorite_capacity::SqliteFavoriteCapacityRepository;
 pub use favorites::SqliteFavoriteRepository;
 pub use history::SqliteHistoryRepository;
 pub use library_index::SqliteLibraryIndexRepository;
+pub use provider_credentials::SqliteCredentialStore;
 pub use screenshot_favorites::SqliteScreenshotFavoriteRepository;
 
 use std::path::Path;
@@ -131,7 +133,7 @@ mod tests {
                 Ok(connection.query_row("PRAGMA user_version", [], |row| row.get::<_, i32>(0))?)
             })
             .unwrap();
-        assert_eq!(version, 5);
+        assert_eq!(version, 6);
 
         drop(database);
         Database::open(&path).unwrap();
@@ -143,7 +145,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let path = dir.path().join("future.db");
         let connection = Connection::open(&path).unwrap();
-        connection.execute("PRAGMA user_version = 6", []).unwrap();
+        connection.execute("PRAGMA user_version = 7", []).unwrap();
         drop(connection);
 
         let error = Database::open(&path).err().expect("newer schema must fail");

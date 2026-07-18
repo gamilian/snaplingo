@@ -364,6 +364,18 @@ describe('frontend dependency rules', () => {
     ).toEqual([]);
   });
 
+  test('Platform adapters do not own browser-persisted application state', () => {
+    const violations = productionSourceFiles()
+      .filter(({ path }) => path.startsWith('src/platform/tauri/'))
+      .filter(
+        ({ source }) =>
+          source.includes('localStorage') || source.includes('sessionStorage'),
+      )
+      .map(({ path }) => path);
+
+    expect(violations).toEqual([]);
+  });
+
   test('only the Tauri platform boundary imports Platform or Tauri modules', () => {
     expect(forbiddenPlatformImports(allSourceFiles())).toEqual([]);
   });

@@ -53,6 +53,8 @@ export interface GeneralSettings {
   settingsWindowY?: number;
   settingsWindowWidth?: number;
   settingsWindowHeight?: number;
+  lastResultWindowX?: number;
+  lastResultWindowY?: number;
 }
 
 export type AnnotationColorPreset = [number, number, number, number];

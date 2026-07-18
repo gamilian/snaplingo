@@ -87,6 +87,15 @@ impl SettingsConfiguration {
         self.save_snapshot(snapshot)
     }
 
+    pub fn update_last_result_window_position(&self, x: i32, y: i32) -> Result<()> {
+        let _guard = self.update_lock.lock().unwrap();
+        let mut snapshot = self.snapshot()?;
+        snapshot.general.last_result_window_x = Some(x);
+        snapshot.general.last_result_window_y = Some(y);
+        self.save_snapshot(snapshot)?;
+        Ok(())
+    }
+
     pub fn update_screenshot(&self, input: ScreenshotSettings) -> Result<SettingsSnapshot> {
         let _guard = self.update_lock.lock().unwrap();
         let mut snapshot = self.snapshot()?;
@@ -310,6 +319,27 @@ mod settings_configuration_tests {
         );
         assert_eq!(updated.translation, TranslationSettings::default());
         assert_eq!(store.load_settings().unwrap(), updated);
+    }
+
+    #[test]
+    fn updating_result_window_position_preserves_the_latest_general_settings() {
+        let store = Arc::new(SqliteConfigStore::new_in_memory());
+        let configuration = SettingsConfiguration::new(store);
+        configuration
+            .update_general(GeneralSettings {
+                theme: "dark".to_string(),
+                ..GeneralSettings::default()
+            })
+            .unwrap();
+
+        configuration
+            .update_last_result_window_position(420, 240)
+            .unwrap();
+
+        let general = configuration.snapshot().unwrap().general;
+        assert_eq!(general.theme, "dark");
+        assert_eq!(general.last_result_window_x, Some(420));
+        assert_eq!(general.last_result_window_y, Some(240));
     }
 
     #[test]

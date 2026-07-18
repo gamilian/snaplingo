@@ -64,9 +64,11 @@ mod tests {
     use crate::infrastructure::storage::SqliteConfigStore;
     use crate::Result;
 
+    type SpeechCall = (String, Option<String>, String, u16);
+
     #[derive(Default)]
     struct Host {
-        calls: Mutex<Vec<(String, Option<String>, String, u16)>>,
+        calls: Mutex<Vec<SpeechCall>>,
     }
 
     #[async_trait]

@@ -60,8 +60,8 @@ SnapLingo 是一个跨平台桌面应用（基于 Tauri 2.0），整合了截图
 - 🚧 Youdao/Tencent/Azure (计划中)
 
 **配置存储**:
-- 敏感信息 (API Keys): 系统级加密存储 (macOS Keychain / Windows Credential Manager / Linux Secret Service)
-- 非敏感配置: `~/.snaplingo/config.json`
+- Provider Endpoint、Base URL、API Key 与其他应用设置：本机 SQLite (`snaplingo.db`)
+- 当前小范围测试版本接受 API Key 在 SQLite 中明文保存
 
 ---
 
@@ -174,8 +174,8 @@ SnapLingo 是一个跨平台桌面应用（基于 Tauri 2.0），整合了截图
 - WorkflowService (编排五种 Capture Mode)
 
 // Infrastructure Layer (基础设施层)
-- ConfigFile (配置文件)
-- Keychain (系统密钥存储)
+- SqliteConfigStore (配置存储)
+- SqliteCredentialStore (Provider 凭据存储)
 - HistoryDatabase (SQLite)
 - HttpClient (reqwest)
 - LLMClient (OpenAI/Anthropic/Gemini)

@@ -9,6 +9,8 @@ import type { ResultWindowPlatformRuntime } from './platformRuntime';
 import type {
   CaptureResultWindowPayload,
   ResultWindowOrigin,
+  ResultWindowPositionStore,
+  ResultWindowSpeechPort,
   ResultWindowUnsubscribe,
 } from './ports';
 import { runOcrFileWorkflow } from './fileOcrWorkflow';
@@ -22,6 +24,7 @@ import {
   shouldStartFileOcrForPayload,
   translationPayloadSourceText,
 } from './payload';
+import { speakResultWindowText } from './speech';
 
 export type ResultWindowPresentation = 'overlay' | 'standalone';
 
@@ -58,9 +61,11 @@ export interface ResultWindowStatePort {
 
 export interface ResultWindowRuntimePorts {
   platform: ResultWindowPlatformRuntime;
+  speech: ResultWindowSpeechPort;
   state: ResultWindowStatePort;
   getTranslationSettings?: () => TranslationSettings | undefined;
   getOcrSettings?: () => OcrSettings | undefined;
+  positionStore: ResultWindowPositionStore;
 }
 
 export interface ResultWindowResizeInput {
@@ -80,9 +85,11 @@ export function resultWindowStandaloneWindowHeight(panelHeightPx: number) {
 
 export function createResultWindowRuntime({
   platform,
+  speech,
   state,
   getTranslationSettings,
   getOcrSettings,
+  positionStore,
 }: ResultWindowRuntimePorts) {
   let needsPlacement = true;
   let lastPlacedPosition: ResultWindowPosition | null = null;
@@ -370,10 +377,27 @@ export function createResultWindowRuntime({
           ? getTranslationSettings?.()?.inputWindowPosition ?? 'center'
           : getTranslationSettings?.()?.selectionWindowPosition ?? 'below-cursor';
     if (needsPlacement || position !== lastPlacedPosition) {
-      await platform.placeAt(position);
+      if (position === 'last-position') {
+        await platform.placeAt(position, positionStore.load());
+      } else {
+        await platform.placeAt(position);
+      }
       needsPlacement = false;
       lastPlacedPosition = position;
     }
+  }
+
+  async function beginDrag() {
+    const position = await platform.beginDrag();
+    try {
+      await positionStore.save(position);
+    } catch (error) {
+      console.error('Failed to save result window position:', error);
+    }
+  }
+
+  async function speakText(text: string, languageCode?: string) {
+    await speakResultWindowText(speech, text, languageCode);
   }
 
   return {
@@ -385,13 +409,13 @@ export function createResultWindowRuntime({
     subscribeToPayloads,
     startFileOcr,
     favoriteOcrResult,
-    speakText: platform.commands.speakText,
+    speakText,
     translate,
     retryTranslationProvider,
     close,
     resizeStandaloneWindow,
     dismiss: platform.dismiss,
-    beginDrag: platform.beginDrag,
+    beginDrag,
     setAlwaysOnTop: platform.setAlwaysOnTop,
   };
 }

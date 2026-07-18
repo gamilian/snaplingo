@@ -179,13 +179,9 @@ SnapLingo 是一款跨平台桌面应用，将截图捕获、OCR 和翻译统一
 
 ### 配置存储
 
-**敏感信息**（API Key）：
-- macOS：Keychain
-- Windows：Credential Manager
-- Linux：Secret Service
-
-**非敏感配置**：
-- 统一配置文件：`~/.snaplingo/config.json`
+**Provider 配置与凭据**：
+- Endpoint、Base URL、API Key 与其他应用设置统一保存在本机 SQLite（`snaplingo.db`）
+- 当前小范围测试版本接受 API Key 在 SQLite 中明文保存
 - 配置不随应用卸载删除
 
 ## 技术架构

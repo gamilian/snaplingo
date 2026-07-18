@@ -24,6 +24,8 @@ React Views
   - `result-window`: translation and file-OCR workflows.
   - `pinned-image`: pinned-image workflow.
   - `settings`: settings-window hydration and update workflow, including Library cross-source filtering, ordering, and pagination.
+  - `permissions`: required-permission polling and explicit request workflow.
+- Result Window and Settings declare separate narrow speech ports. The shared Tauri adapter implements both without becoming part of either workflow.
 - `src/platform/tauri/` owns typed command invocation, event parsing, and Tauri-window effects. It implements the frontend ports.
 - `src/domain/` holds portable frontend data types and vocabulary.
 
@@ -38,6 +40,8 @@ React Views
   - `library_index` owns lightweight cross-source ordering so only final-page History and Favorites records are hydrated.
   - `capture`, `result_window`, and `pinned_image` own window/runtime-host ports.
   - `selected_text` owns its method and context ports.
+  - `required_permissions` owns permission ordering and status policy.
+  - `tts` owns speech normalization against persisted voice and rate settings.
 - `src-tauri/src/infrastructure/` implements OS, Tauri-window, shortcut, storage, network, native OCR, database, and event capabilities.
 - `src-tauri/src/composition.rs` and `composition/*_runtime.rs` construct concrete Infrastructure adapters and inject them into Application runtimes.
 - `app_actions.rs`, `app_shell.rs`, `settings_window.rs`, and `startup_shortcuts.rs` are startup-shell adapters. They map menu or hotkey intent to Application-facing actions; they do not own Application state.
@@ -58,6 +62,8 @@ React Views
 
 ```text
 Provider Configuration -> ProviderConfigStore / ProviderCredentialStore
+Required Permissions   -> RequiredPermissionsHost
+System Speech          -> SystemTtsHost
 Provider execution     -> HttpClient / LlmRuntime / ProviderEventSink
 History                -> HistoryEventSource / HistoryRepository
 Library                -> SettingsHistoryPort / SettingsFavoritesPort / SettingsScreenshotFavoritesPort
@@ -75,6 +81,7 @@ Portable data and policy are kept in Domain or Application. OS-specific code is 
 
 - Screenshot, selection, system OCR, paths, shortcuts, and desktop windows are Infrastructure concerns.
 - Tauri-specific command/event/window APIs are frontend or backend adapter concerns.
+- Result-window coordinates are durable settings; the window adapter only measures and applies physical positions.
 - macOS System OCR is registered only where available; Tesseract remains a portable native-engine adapter.
 - CI verifies the real desktop targets on macOS, Ubuntu, and Windows rather than claiming cross-compilation coverage.
 

@@ -11,6 +11,8 @@ const backendSnapshot = {
     language: 'en',
     theme: 'dark',
     start_on_boot: true,
+    last_result_window_x: 420,
+    last_result_window_y: 240,
   },
   screenshot: {
     save_path: '/captures',
@@ -78,6 +80,8 @@ describe('Tauri settings command adapter', () => {
         experimentalGpuAcceleration: false,
         systemTtsVoice: '',
         systemTtsRate: 180,
+        lastResultWindowX: 420,
+        lastResultWindowY: 240,
       },
       screenshot: {
         savePath: '/captures',
@@ -142,6 +146,8 @@ describe('Tauri settings command adapter', () => {
       language: 'en',
       theme: 'dark',
       startOnBoot: true,
+      lastResultWindowX: 420,
+      lastResultWindowY: 240,
     });
 
     expect(invoke).toHaveBeenCalledWith('update_general_settings', {
@@ -159,7 +165,21 @@ describe('Tauri settings command adapter', () => {
         experimental_gpu_acceleration: false,
         system_tts_voice: '',
         system_tts_rate: 180,
+        last_result_window_x: 420,
+        last_result_window_y: 240,
       },
+    });
+  });
+
+  it('updates result window position through a narrow backend command', async () => {
+    const { updateLastResultWindowPosition } = await import('./settings');
+    invoke.mockResolvedValueOnce(undefined);
+
+    await updateLastResultWindowPosition({ x: 420.4, y: 239.6 });
+
+    expect(invoke).toHaveBeenCalledWith('update_last_result_window_position', {
+      x: 420,
+      y: 240,
     });
   });
 

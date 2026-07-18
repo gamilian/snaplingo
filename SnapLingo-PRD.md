@@ -35,7 +35,7 @@ The application runs as a system tray utility with global hotkeys, requiring no 
 13. As a Windows user, I want Alt-based hotkeys that follow platform conventions, so that shortcuts feel natural
 14. As a Linux user, I want the tool to work on both X11 and Wayland, so that I can use it on modern distributions
 15. As a power user, I want to configure custom OpenAI-compatible API endpoints, so that I can use local LLMs or alternative providers
-16. As a user, I want API keys stored in my system's credential manager, so that they're encrypted and secure
+16. As a user, I want Provider endpoints and API keys stored in the local application database, so that Provider configuration has one predictable persistence path
 17. As a user editing a screenshot, I want to OCR it without saving first, so that I can decide whether to keep it after seeing the text
 18. As a user, I want to edit OCR-recognized text before translation, so that I can fix recognition errors
 19. As a user, I want to switch source and target languages and re-translate, so that I can experiment with different language pairs
@@ -67,9 +67,6 @@ The application runs as a system tray utility with global hotkeys, requiring no 
 45. As a user, I want proxy configuration for API calls, so that I can use the tool behind corporate firewalls
 46. As a developer, I want comprehensive logs with configurable levels, so that I can troubleshoot issues
 47. As a user uninstalling the app, I want a "clear all data" option in settings, so that I can remove API keys before uninstalling
-48. As a macOS user, I want API keys stored in Keychain, so that they're protected by the OS
-49. As a Windows user, I want API keys stored in Credential Manager, so that they're encrypted
-50. As a Linux user, I want API keys stored in Secret Service, so that they're secure
 
 ## Implementation Decisions
 
@@ -82,8 +79,8 @@ The application runs as a system tray utility with global hotkeys, requiring no 
 - **Backend (Rust)**: System integration (screenshot capture, global hotkeys, clipboard), image processing (layer compositing, format conversion), Provider HTTP clients, language detection, configuration management, history persistence, TTS integration.
 
 **Configuration Storage**:
-- Sensitive data (API keys): System credential stores (macOS Keychain, Windows Credential Manager, Linux Secret Service)
-- Non-sensitive config: `~/.snaplingo/config.json`
+- Provider endpoints, credentials, and application settings: local SQLite database (`snaplingo.db`)
+- API keys are stored unencrypted in SQLite for the current beta scope
 - Configuration persists across app reinstalls unless user explicitly clears data
 
 ### Core Concepts (from CONTEXT.md)

@@ -224,11 +224,8 @@ Use component state (not React Router) for tab navigation, as this is a single s
 ### Persistence
 
 Settings stored in:
-- **Local file**: `~/.snaplingo/config.json` for non-sensitive settings
-- **System keychain**: API keys and sensitive data
-  - macOS: Keychain
-  - Windows: Credential Manager
-  - Linux: Secret Service
+- **Local SQLite database** (`snaplingo.db`): application settings, Provider endpoints, and credentials
+- API keys are stored unencrypted for the current beta scope
 
 ### Icons
 

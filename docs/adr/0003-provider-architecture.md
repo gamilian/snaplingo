@@ -1,7 +1,9 @@
 # ADR 0003: Provider Architecture
 
+> The system-Keychain storage portion is superseded by [ADR 0010](0010-sqlite-provider-credentials.md). The Provider module boundaries remain accepted.
+
 ## Status
-Accepted (2026-06-13), amended by ADR 0004 and ADR 0005
+Accepted (2026-06-13), amended by ADR 0004, ADR 0005, and ADR 0010
 
 ## Context
 
@@ -63,7 +65,7 @@ application/providers/
 
 平台差异保留在 Infrastructure modules：
 
-- Keychain：macOS Keychain、Windows Credential Manager、Linux Secret Service
+- credentials：`SqliteCredentialStore` 通过共享应用数据库实现 `ProviderCredentialStore`
 - paths：平台相关的配置和数据路径
 - HTTP：`HttpClient` interface 和 Reqwest adapter
 - system modules：screenshot、hotkey、window、clipboard、TTS adapters
@@ -91,5 +93,6 @@ Application modules 通过 composition 使用这些 infrastructure interface 或
 - ADR 0002: Main Window Structure
 - ADR 0004: Coordinator Consolidation
 - ADR 0005: Runtime Provider Reconfiguration
+- ADR 0010: SQLite Provider Credentials
 - `CONTEXT.md`
 - `ARCHITECTURE.md`

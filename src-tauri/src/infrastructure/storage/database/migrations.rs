@@ -2,7 +2,7 @@ use rusqlite::{Connection, Transaction};
 
 use crate::{AppError, Result};
 
-const CURRENT_SCHEMA_VERSION: i32 = 5;
+const CURRENT_SCHEMA_VERSION: i32 = 6;
 
 pub(super) fn migrate(connection: &mut Connection) -> Result<()> {
     let mut version: i32 = connection.query_row("PRAGMA user_version", [], |row| row.get(0))?;
@@ -23,6 +23,7 @@ pub(super) fn migrate(connection: &mut Connection) -> Result<()> {
             3 => migrate_to_v3(&transaction)?,
             4 => migrate_to_v4(&transaction)?,
             5 => migrate_to_v5(&transaction)?,
+            6 => migrate_to_v6(&transaction)?,
             _ => unreachable!("missing migration for version {}", next_version),
         }
         transaction.pragma_update(None, "user_version", next_version)?;
@@ -39,12 +40,32 @@ fn migrate_to_v5(transaction: &Transaction<'_>) -> Result<()> {
             storage_key TEXT PRIMARY KEY,
             value TEXT NOT NULL,
             updated_at INTEGER NOT NULL
-        );
-
-        CREATE TABLE credential_store_metadata (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL
         );",
+    )?;
+    Ok(())
+}
+
+fn migrate_to_v6(transaction: &Transaction<'_>) -> Result<()> {
+    transaction.execute_batch(
+        "INSERT INTO provider_credentials (storage_key, value, updated_at)
+         SELECT
+            substr(storage_key, 1, length(storage_key) - length(':api_key'))
+                || ':credential:api_key',
+            value,
+            updated_at
+         FROM provider_credentials
+         WHERE storage_key GLOB 'provider:*:api_key'
+           AND storage_key NOT GLOB 'provider:*:credential:*'
+         ON CONFLICT(storage_key) DO UPDATE SET
+            value = excluded.value,
+            updated_at = excluded.updated_at
+         WHERE excluded.updated_at >= provider_credentials.updated_at;
+
+         DELETE FROM provider_credentials
+         WHERE storage_key GLOB 'provider:*:api_key'
+           AND storage_key NOT GLOB 'provider:*:credential:*';
+
+         DROP TABLE IF EXISTS credential_store_metadata;",
     )?;
     Ok(())
 }
@@ -202,5 +223,70 @@ mod tests {
 
         assert_eq!(settings_table, None);
         assert_eq!(version, 0);
+    }
+
+    #[test]
+    fn v6_normalizes_legacy_api_keys_and_removes_unused_metadata() {
+        let mut connection = Connection::open_in_memory().unwrap();
+        connection
+            .execute_batch(
+                "CREATE TABLE provider_credentials (
+                    storage_key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    updated_at INTEGER NOT NULL
+                );
+                CREATE TABLE credential_store_metadata (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
+                INSERT INTO provider_credentials VALUES (
+                    'provider:custom:api_key', 'secret', 42
+                );
+                INSERT INTO provider_credentials VALUES (
+                    'provider:newer:api_key', 'stale', 40
+                );
+                INSERT INTO provider_credentials VALUES (
+                    'provider:newer:credential:api_key', 'fresh', 43
+                );
+                PRAGMA user_version = 5;",
+            )
+            .unwrap();
+
+        super::migrate(&mut connection).unwrap();
+
+        let credential: String = connection
+            .query_row(
+                "SELECT value FROM provider_credentials WHERE storage_key = ?1",
+                ["provider:custom:credential:api_key"],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let old_key_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM provider_credentials WHERE storage_key = ?1",
+                ["provider:custom:api_key"],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let metadata_table: Option<String> = connection
+            .query_row(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'credential_store_metadata'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()
+            .unwrap();
+
+        assert_eq!(credential, "secret");
+        let newer_credential: String = connection
+            .query_row(
+                "SELECT value FROM provider_credentials WHERE storage_key = ?1",
+                ["provider:newer:credential:api_key"],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(newer_credential, "fresh");
+        assert_eq!(old_key_count, 0);
+        assert_eq!(metadata_table, None);
     }
 }

@@ -14,7 +14,7 @@ describe('result window platform runtime', () => {
         resize: vi.fn(async () => undefined),
         place: vi.fn(async () => undefined),
         hide: vi.fn(async () => undefined),
-        startDragging: vi.fn(async () => undefined),
+        startDragging: vi.fn(async () => ({ x: 320, y: 180 })),
         setAlwaysOnTop: vi.fn(async () => undefined),
       },
     };
@@ -27,7 +27,7 @@ describe('result window platform runtime', () => {
     await runtime.resizeTo(640, 480);
     await runtime.placeAt('below-cursor');
     await runtime.dismiss();
-    await runtime.beginDrag();
+    await expect(runtime.beginDrag()).resolves.toEqual({ x: 320, y: 180 });
     await runtime.setAlwaysOnTop(true);
     await runtime.clipboard.copyText('sample');
 

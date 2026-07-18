@@ -9,6 +9,7 @@ SettingsWindow       -> application/settings
 CaptureWorkspace     -> application/capture-workspace
 ResultWindow         -> application/result-window
 PinnedImageWindow    -> application/pinned-image
+Permission Gate      -> application/permissions
 ```
 
 The Settings runtime includes the Library workflow. It combines History, Favorites, and Screenshot Favorites through narrow ports while Views retain only rendering and local interaction state. A backend Library Index returns the final page's ordered source references before the frontend hydrates those records.
@@ -26,6 +27,8 @@ Tauri command -> Application runtime <- Infrastructure adapter
 ```
 
 `application/` owns Capture, Providers, History, Result Window, Pinned Image, Settings, Hotkeys, and Selected Text workflows. Each module declares the port it needs. `infrastructure/` owns the implementations for storage, credentials, HTTP, LLM transport, events, database, clipboard, windows, shortcuts, screenshots, selection, and native OCR.
+
+Required Permissions owns polling and the ordered explicit request workflow. TTS owns persisted voice/rate policy; the native speech process remains an Infrastructure adapter. Provider credentials are implemented directly by `SqliteCredentialStore`, including atomic multi-field writes.
 
 `app_actions.rs` maps shell actions to workflow calls. `startup_shortcuts.rs` maps validated hotkey category/action pairs to `AppAction`; `infrastructure/system/shortcut.rs` implements global shortcut registration. `application/hotkeys` owns parsing, registration state, and pressed/released policy.
 

@@ -14,10 +14,27 @@ export interface ResultWindowEventsPort {
 
 export interface ResultWindowPort {
   resize(width: number, height: number): Promise<void>;
-  place(position: ResultWindowPosition): Promise<void>;
+  place(
+    position: ResultWindowPosition,
+    lastPosition?: ResultWindowPhysicalPosition,
+  ): Promise<void>;
   hide(): Promise<void>;
-  startDragging(): Promise<void>;
+  startDragging(): Promise<ResultWindowPhysicalPosition>;
   setAlwaysOnTop(value: boolean): Promise<void>;
+}
+
+export interface ResultWindowPhysicalPosition {
+  x: number;
+  y: number;
+}
+
+export interface ResultWindowSpeechPort {
+  speak(text: string, language?: string): Promise<void>;
+}
+
+export interface ResultWindowPositionStore {
+  load(): ResultWindowPhysicalPosition | undefined;
+  save(position: ResultWindowPhysicalPosition): Promise<void>;
 }
 
 export type ResultWindowOrigin = 'selection' | 'screenshot' | 'input' | 'ocr';
@@ -62,7 +79,6 @@ export interface ResultWindowCommandsPort {
     language?: string;
     providerUsed?: string;
   }): Promise<number>;
-  speakText(text: string, language?: string): Promise<void>;
 }
 
 export interface OcrFileResult extends OcrResult {

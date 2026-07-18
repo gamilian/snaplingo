@@ -1,3 +1,5 @@
+import type { ResultWindowSpeechPort } from './ports';
+
 const RESULT_WINDOW_SPEECH_LANGUAGE_MAP: Record<string, string> = {
   zh: 'zh-CN',
   'zh-CN': 'zh-CN',
@@ -13,20 +15,26 @@ const RESULT_WINDOW_SPEECH_LANGUAGE_MAP: Record<string, string> = {
 };
 
 export function resultWindowSpeechLanguage(languageCode?: string) {
-  if (!languageCode) return '';
+  if (!languageCode) return undefined;
   return RESULT_WINDOW_SPEECH_LANGUAGE_MAP[languageCode] ?? languageCode;
 }
 
-export function speakResultWindowText(
-  speak: (text: string, language?: string) => Promise<void>,
+export async function speakResultWindowText(
+  speech: ResultWindowSpeechPort,
   text: string,
   languageCode?: string,
 ) {
   const normalizedText = text.trim();
   if (!normalizedText) return false;
-  const speechLanguage = resultWindowSpeechLanguage(languageCode);
-  void speak(normalizedText, speechLanguage || undefined).catch((error) => {
+
+  try {
+    await speech.speak(
+      normalizedText,
+      resultWindowSpeechLanguage(languageCode),
+    );
+    return true;
+  } catch (error) {
     console.error('Failed to speak result text:', error);
-  });
-  return true;
+    return false;
+  }
 }

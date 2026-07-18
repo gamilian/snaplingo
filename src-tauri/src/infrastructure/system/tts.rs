@@ -3,11 +3,17 @@ use async_trait::async_trait;
 use crate::application::{SystemTtsHost, SystemTtsVoice};
 use crate::{AppError, Result};
 
-pub struct MacSystemTtsHost {
+pub struct SystemTtsHostAdapter {
     speech: tokio::sync::Mutex<Option<tokio::process::Child>>,
 }
 
-impl MacSystemTtsHost {
+impl Default for SystemTtsHostAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SystemTtsHostAdapter {
     pub fn new() -> Self {
         Self {
             speech: tokio::sync::Mutex::new(None),
@@ -16,7 +22,7 @@ impl MacSystemTtsHost {
 }
 
 #[async_trait]
-impl SystemTtsHost for MacSystemTtsHost {
+impl SystemTtsHost for SystemTtsHostAdapter {
     async fn list_voices(&self) -> Result<Vec<SystemTtsVoice>> {
         list_system_tts_voices().await
     }

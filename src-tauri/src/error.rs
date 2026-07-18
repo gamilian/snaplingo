@@ -5,7 +5,6 @@ pub enum AppError {
     Io(std::io::Error),
     Json(serde_json::Error),
     Http(reqwest::Error),
-    Keychain(keyring::Error),
     CredentialNotFound(String),
     Database(rusqlite::Error),
     Config(String),
@@ -28,7 +27,6 @@ impl fmt::Display for AppError {
             AppError::Io(e) => write!(f, "IO error: {}", e),
             AppError::Json(e) => write!(f, "JSON error: {}", e),
             AppError::Http(e) => write!(f, "HTTP error: {}", e),
-            AppError::Keychain(e) => write!(f, "Keychain error: {}", e),
             AppError::CredentialNotFound(key) => write!(f, "Credential not found: {}", key),
             AppError::Database(e) => write!(f, "Database error: {}", e),
             AppError::Config(msg) => write!(f, "Configuration error: {}", msg),
@@ -54,7 +52,6 @@ impl std::error::Error for AppError {
             AppError::Io(e) => Some(e),
             AppError::Json(e) => Some(e),
             AppError::Http(e) => Some(e),
-            AppError::Keychain(e) => Some(e),
             AppError::Database(e) => Some(e),
             _ => None,
         }
@@ -76,12 +73,6 @@ impl From<serde_json::Error> for AppError {
 impl From<reqwest::Error> for AppError {
     fn from(err: reqwest::Error) -> Self {
         AppError::Http(err)
-    }
-}
-
-impl From<keyring::Error> for AppError {
-    fn from(err: keyring::Error) -> Self {
-        AppError::Keychain(err)
     }
 }
 
