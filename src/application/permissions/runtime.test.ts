@@ -119,6 +119,29 @@ describe('required permissions runtime', () => {
     expect(scheduler.delays).toEqual([]);
     unsubscribe();
   });
+
+  it('refreshes a previously granted status after permissions are revoked', async () => {
+    const status = vi
+      .fn()
+      .mockResolvedValueOnce({ screenRecording: true, accessibility: true })
+      .mockResolvedValueOnce({ screenRecording: false, accessibility: true });
+    const runtime = createRequiredPermissionsRuntime({
+      status,
+      request: vi.fn(),
+    });
+    const listener = vi.fn();
+    const unsubscribe = runtime.subscribe(listener);
+    await flushPromises();
+
+    await runtime.refresh();
+
+    expect(status).toHaveBeenCalledTimes(2);
+    expect(listener).toHaveBeenLastCalledWith({
+      status: { screenRecording: false, accessibility: true },
+      error: null,
+    });
+    unsubscribe();
+  });
 });
 
 function createScheduler() {

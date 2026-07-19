@@ -51,11 +51,55 @@ export const resultWindow: ResultWindowPort = {
   hide() {
     return getCurrentWindow().hide();
   },
-  async startDragging() {
+  startDragging() {
     const window = getCurrentWindow();
-    await window.startDragging();
-    const position = await window.outerPosition();
-    return { x: position.x, y: position.y };
+    return new Promise((resolve, reject) => {
+      let latestPosition: { x: number; y: number } | undefined;
+      let unlisten: (() => void) | undefined;
+      let settleTimer: ReturnType<typeof setTimeout> | undefined;
+      let idleTimer: ReturnType<typeof setTimeout> | undefined;
+      let finished = false;
+
+      const clearTimers = () => {
+        if (settleTimer !== undefined) clearTimeout(settleTimer);
+        if (idleTimer !== undefined) clearTimeout(idleTimer);
+      };
+
+      const finish = async () => {
+        if (finished) return;
+        finished = true;
+        clearTimers();
+        unlisten?.();
+        try {
+          const position = latestPosition ?? (await window.outerPosition());
+          resolve({ x: position.x, y: position.y });
+        } catch (error) {
+          reject(error);
+        }
+      };
+
+      const scheduleFinish = (position: { x: number; y: number }) => {
+        latestPosition = position;
+        if (idleTimer !== undefined) clearTimeout(idleTimer);
+        if (settleTimer !== undefined) clearTimeout(settleTimer);
+        settleTimer = setTimeout(() => void finish(), 250);
+      };
+
+      void (async () => {
+        try {
+          unlisten = await window.onMoved(({ payload }) => {
+            scheduleFinish({ x: payload.x, y: payload.y });
+          });
+          await window.startDragging();
+          idleTimer = setTimeout(() => void finish(), 1_500);
+        } catch (error) {
+          finished = true;
+          clearTimers();
+          unlisten?.();
+          reject(error);
+        }
+      })();
+    });
   },
   setAlwaysOnTop(value) {
     return getCurrentWindow().setAlwaysOnTop(value);

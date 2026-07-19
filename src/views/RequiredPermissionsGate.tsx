@@ -15,7 +15,17 @@ export function RequiredPermissionsGate({
   const [{ status, error }, setSnapshot] =
     useState<RequiredPermissionsSnapshot>({ status: null, error: null });
 
-  useEffect(() => runtime.subscribe(setSnapshot), [runtime]);
+  useEffect(() => {
+    const unsubscribe = runtime.subscribe(setSnapshot);
+    const refresh = () => {
+      void runtime.refresh().catch(() => undefined);
+    };
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      unsubscribe();
+    };
+  }, [runtime]);
 
   const shouldShowGuide = status
     ? !areRequiredPermissionsGranted(status)

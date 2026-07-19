@@ -51,6 +51,18 @@ describe('RequiredPermissionsGate', () => {
 
     await view.unmount();
   });
+
+  it('refreshes permission status when the window regains focus', async () => {
+    const runtime = createRuntime(granted);
+    const view = await renderGate(runtime);
+
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+    });
+
+    expect(runtime.refresh).toHaveBeenCalledOnce();
+    await view.unmount();
+  });
 });
 
 function createRuntime(
@@ -70,6 +82,7 @@ function createRuntime(
       listener?.({ status: requestedStatus, error: null });
       return requestedStatus;
     }),
+    refresh: vi.fn(async () => initialStatus),
   };
   return runtime;
 }

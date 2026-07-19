@@ -464,31 +464,13 @@ function verifyAppSignature(path) {
 
 function notarizationArgs(path) {
   const profile = process.env.SNAPLINGO_NOTARY_PROFILE;
-  if (profile) {
-    return ["notarytool", "submit", path, "--keychain-profile", profile, "--wait"];
-  }
-
-  const appleId = process.env.APPLE_ID;
-  const password = process.env.APPLE_PASSWORD;
-  const teamId = process.env.APPLE_TEAM_ID;
-  if (!appleId || !password || !teamId) {
+  if (!profile) {
     throw new Error(
-      "[macos-sign] SNAPLINGO_NOTARIZE=1 requires SNAPLINGO_NOTARY_PROFILE or APPLE_ID, APPLE_PASSWORD, and APPLE_TEAM_ID.",
+      "[macos-sign] SNAPLINGO_NOTARIZE=1 requires SNAPLINGO_NOTARY_PROFILE. Create it with xcrun notarytool store-credentials so secrets never enter build process arguments.",
     );
   }
 
-  return [
-    "notarytool",
-    "submit",
-    path,
-    "--apple-id",
-    appleId,
-    "--password",
-    password,
-    "--team-id",
-    teamId,
-    "--wait",
-  ];
+  return ["notarytool", "submit", path, "--keychain-profile", profile, "--wait"];
 }
 
 function notarizeAndStaple(path) {

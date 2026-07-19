@@ -23,6 +23,7 @@ export interface RequiredPermissionsRuntime {
     listener: (snapshot: RequiredPermissionsSnapshot) => void,
   ): () => void;
   requestNext(): Promise<RequiredPermissionsStatus>;
+  refresh(): Promise<RequiredPermissionsStatus>;
 }
 
 const browserScheduler: PermissionsPollingScheduler = {
@@ -76,6 +77,25 @@ export function createRequiredPermissionsRuntime(
     }
   }
 
+  async function refresh() {
+    operationVersion += 1;
+    cancelPoll();
+    const version = operationVersion;
+    try {
+      const status = await port.status();
+      if (version !== operationVersion || listeners.size === 0) return status;
+      publish({ status, error: null });
+      if (areRequiredPermissionsGranted(status)) cancelPoll();
+      else schedulePoll(750);
+      return status;
+    } catch (cause) {
+      if (version !== operationVersion || listeners.size === 0) throw cause;
+      publish({ status: snapshot.status, error: errorMessage(cause) });
+      schedulePoll(1500);
+      throw cause;
+    }
+  }
+
   return {
     subscribe(listener) {
       listeners.add(listener);
@@ -107,6 +127,7 @@ export function createRequiredPermissionsRuntime(
         throw cause;
       }
     },
+    refresh,
   };
 }
 

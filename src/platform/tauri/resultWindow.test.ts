@@ -7,6 +7,7 @@ const {
   hide,
   innerSize,
   monitorFromPoint,
+  onMoved,
   outerPosition,
   setPosition,
   setSize,
@@ -18,6 +19,7 @@ const {
   const innerSize = vi.fn();
   const setPosition = vi.fn();
   const outerPosition = vi.fn();
+  const onMoved = vi.fn();
 
   return {
     currentMonitor: vi.fn(),
@@ -27,6 +29,7 @@ const {
       innerSize,
       setPosition,
       outerPosition,
+      onMoved,
       setSize,
       startDragging,
     })),
@@ -37,6 +40,7 @@ const {
     setSize,
     startDragging,
     outerPosition,
+    onMoved,
   };
 });
 
@@ -79,6 +83,7 @@ describe('Tauri result window adapter', () => {
     innerSize.mockReset().mockResolvedValue({ width: 600, height: 400 });
     startDragging.mockReset().mockResolvedValue(undefined);
     outerPosition.mockReset().mockResolvedValue({ x: 1420, y: 360 });
+    onMoved.mockReset().mockResolvedValue(vi.fn());
   });
 
   it('resizes the current result window from portable dimensions', async () => {
@@ -108,12 +113,20 @@ describe('Tauri result window adapter', () => {
   });
 
   it('starts dragging the current result window', async () => {
+    onMoved.mockImplementation(async (handler: (event: {
+      payload: { x: number; y: number };
+    }) => void) => {
+      handler({ payload: { x: 1600, y: 720 } });
+      return vi.fn();
+    });
+
     await expect(resultWindow.startDragging()).resolves.toEqual({
-      x: 1420,
-      y: 360,
+      x: 1600,
+      y: 720,
     });
 
     expect(startDragging).toHaveBeenCalledOnce();
+    expect(onMoved).toHaveBeenCalledOnce();
   });
 
   it('restores and clamps the durable last user-dragged position', async () => {

@@ -87,20 +87,12 @@ macOS 构建会跳过 Tauri 的 Finder AppleScript 布局步骤，避免要求 T
 
 Provider 的 Endpoint、Base URL、API Key 和 Secret Key 统一以未加密形式保存在本机 `snaplingo.db`。正式运行时不会构造或访问系统钥匙串；遗留钥匙串记录会被忽略。Unix 平台的应用数据目录和数据库权限分别限制为 `0700` 和 `0600`。
 
-正式发布构建会启用 hardened runtime。设置 `SNAPLINGO_NOTARIZE=1` 后，构建脚本还会提交 DMG 公证并附加票据。凭据可使用以下任一方式：
+正式发布构建会启用 hardened runtime。设置 `SNAPLINGO_NOTARIZE=1` 后，构建脚本还会提交 DMG 公证并附加票据。公证必须使用 `notarytool` Keychain profile，避免 Apple ID 密码进入进程参数或构建日志：
 
 ```bash
-# 推荐：预先通过 xcrun notarytool store-credentials 创建
+# 预先通过 xcrun notarytool store-credentials 创建
 SNAPLINGO_NOTARIZE=1 \
 SNAPLINGO_NOTARY_PROFILE=SnapLingoNotary \
-SNAPLINGO_CODESIGN_IDENTITY="Developer ID Application: Example (TEAMID)" \
-npm run tauri:build
-
-# 或使用环境变量
-SNAPLINGO_NOTARIZE=1 \
-APPLE_ID="release@example.com" \
-APPLE_PASSWORD="app-specific-password" \
-APPLE_TEAM_ID="TEAMID" \
 SNAPLINGO_CODESIGN_IDENTITY="Developer ID Application: Example (TEAMID)" \
 npm run tauri:build
 ```
