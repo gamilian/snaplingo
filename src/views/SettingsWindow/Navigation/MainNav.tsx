@@ -142,7 +142,6 @@ export function MainNav({ activeTab, onTabChange, library }: MainNavProps) {
 
         <nav className="min-h-0 flex-1 overflow-y-auto pt-4">
           <NavGroup
-            label={t('settings')}
             items={settingsItems}
             activeTab={activeTab}
             onTabChange={onTabChange}
@@ -295,16 +294,18 @@ function NavGroup({
   activeTab,
   onTabChange,
 }: {
-  label: string;
+  label?: string;
   items: NavItem[];
   activeTab: MainTab;
   onTabChange: (tab: MainTab) => void;
 }) {
   return (
     <div className="mb-4">
-      <div className="px-2 pb-1.5 text-[10px] font-bold tracking-[0.08em] text-gray-400">
-        {label}
-      </div>
+      {label && (
+        <div className="px-2 pb-1.5 text-[10px] font-bold tracking-[0.08em] text-gray-400">
+          {label}
+        </div>
+      )}
       <div className="space-y-0.5">
         {items.map((item) => {
           const active = activeTab === item.key;

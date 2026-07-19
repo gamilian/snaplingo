@@ -73,7 +73,7 @@ export function SettingsScrollPage({
   return (
     <div ref={scrollRef} className="h-full flex-1 overflow-y-auto bg-[#f4f5f7]">
       <main className="mx-auto w-full max-w-[1080px] px-8 pb-16">
-        <header className="sticky top-0 z-20 -mx-0.5 mb-[18px] flex items-center justify-between gap-7 border-b border-gray-200/95 bg-[#f4f5f7]/95 px-0.5 pb-[15px] pt-[22px] backdrop-blur-xl">
+        <header className="sticky top-0 z-20 -mx-[22px] mb-[18px] flex items-center justify-between gap-7 border-b border-gray-200/95 bg-[#f4f5f7]/95 px-[22px] pb-[15px] pt-[22px] backdrop-blur-xl">
           <div className="min-w-0">
             <div className="flex items-center gap-2.5">
               <h1 className="text-[26px] font-bold tracking-[-0.045em] text-gray-950">
@@ -110,27 +110,22 @@ export function SettingsScrollPage({
         </header>
 
         <div className="space-y-4">
-          {sections.map((section, index) => (
+          {sections.map((section) => (
             <section
               key={section.id}
               ref={(node) => {
                 sectionRefs.current[section.id] = node;
               }}
-              className="scroll-mt-[94px] overflow-visible rounded-[11px] border border-gray-200 bg-white shadow-sm"
+              className="-mx-[22px] scroll-mt-[94px] overflow-visible rounded-[11px] border border-gray-200 bg-white shadow-sm"
             >
               <header className="flex items-center justify-between gap-5 rounded-t-[10px] border-b border-gray-100 bg-gray-50/30 px-[22px] py-4">
-                <div className="flex items-start gap-3">
-                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-primary-50 text-[10px] font-extrabold text-primary-600">
-                    {String(index + 1).padStart(2, '0')}
-                  </span>
-                  <div>
-                    <h2 className="text-base font-semibold tracking-[-0.02em] text-gray-900">
-                      {section.label}
-                    </h2>
-                    <p className="mt-1 text-[11px] leading-relaxed text-gray-500">
-                      {section.description}
-                    </p>
-                  </div>
+                <div className="min-w-0">
+                  <h2 className="text-base font-semibold tracking-[-0.02em] text-gray-900">
+                    {section.label}
+                  </h2>
+                  <p className="mt-1 text-[11px] leading-relaxed text-gray-500">
+                    {section.description}
+                  </p>
                 </div>
                 {section.action}
               </header>

@@ -130,7 +130,7 @@ describe('TranslationProvidersPage', () => {
     expect(providerCards[0].props.leadingSlot?.props.className).toContain('group-hover:opacity-100');
   });
 
-  it('places the add custom provider action in the toolbar with the primary color', () => {
+  it('places the add custom provider action below the grouped provider list', () => {
     const view = renderPage();
     const addButton = findElement(
       view,
@@ -140,10 +140,9 @@ describe('TranslationProvidersPage', () => {
     );
 
     expect(addButton.props.className).toContain('inline-flex');
-    expect(addButton.props.className).toContain('absolute');
-    expect(addButton.props.className).toContain('right-0');
-    expect(addButton.props.className).toContain('top-1');
-    expect(addButton.props.className).toContain('bg-primary-600');
+    // The action now sits in normal flow beneath the list, not absolutely pinned.
+    expect(addButton.props.className).not.toContain('absolute');
+    expect(addButton.props.className).toContain('hover:text-primary-600');
     expect(addButton.props.children).toContainEqual(
       expect.objectContaining({ props: expect.objectContaining({ children: '添加自定义服务' }) }),
     );

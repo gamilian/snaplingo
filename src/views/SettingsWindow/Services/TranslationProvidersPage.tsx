@@ -182,18 +182,7 @@ export function TranslationProvidersPage() {
 
   return (
     <div className="max-w-5xl">
-      <button
-        type="button"
-        title="添加自定义服务"
-        aria-label="添加自定义服务"
-        onClick={handleAddCustom}
-        className="absolute right-0 top-1 inline-flex h-10 items-center gap-2 rounded-xl bg-primary-600 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-[#f5f5f7]"
-      >
-        <PlusIcon />
-        <span>添加自定义服务</span>
-      </button>
-
-      <div className="space-y-3">
+      <div className="-mx-[22px] divide-y divide-gray-100 overflow-hidden rounded-[11px] border border-gray-200 bg-white shadow-sm">
         {orderedProviders.map((provider) => {
           const isActive = activeProviders.includes(provider.id);
 
@@ -206,12 +195,12 @@ export function TranslationProvidersPage() {
               onDragLeave={isActive ? handleDragLeave : undefined}
               onDrop={isActive ? (e) => handleDrop(e, provider.id) : undefined}
               onDragEnd={isActive ? handleDragEnd : undefined}
-              className={`group transition-all ${
+              className={`group relative transition-all ${
                 isActive ? 'cursor-grab active:cursor-grabbing' : ''
               } ${
                 draggedId === provider.id ? 'opacity-50' : ''
               } ${
-                dragOverId === provider.id ? 'rounded-[26px] ring-2 ring-emerald-300 ring-offset-2 ring-offset-[#f5f5f7]' : ''
+                dragOverId === provider.id ? 'ring-2 ring-inset ring-primary-300' : ''
               }`}
             >
               <ProviderCard
@@ -241,13 +230,24 @@ export function TranslationProvidersPage() {
           );
         })}
       </div>
+
+      <button
+        type="button"
+        title="添加自定义服务"
+        aria-label="添加自定义服务"
+        onClick={handleAddCustom}
+        className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3.5 text-xs font-semibold text-gray-600 transition-colors hover:border-primary-200 hover:text-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-100"
+      >
+        <PlusIcon />
+        <span>添加自定义服务</span>
+      </button>
     </div>
   );
 }
 
 function PlusIcon() {
   return (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5" />
     </svg>
   );

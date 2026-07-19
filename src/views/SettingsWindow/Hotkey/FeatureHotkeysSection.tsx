@@ -25,7 +25,6 @@ export function FeatureHotkeysSection({
   const defaultSnapshot = useHotkeyConfigStore((state) => state.defaultSnapshot);
   const updateHotkey = useHotkeyConfigStore((state) => state.updateHotkey);
   const resetHotkey = useHotkeyConfigStore((state) => state.resetHotkey);
-  const resetCategory = useHotkeyConfigStore((state) => state.resetCategory);
   const [recordingKey, setRecordingKey] = useState<string | null>(null);
 
   useEffect(() => {
@@ -81,7 +80,49 @@ export function FeatureHotkeysSection({
     return <div className="px-6 py-8 text-sm text-gray-500">正在加载快捷键配置...</div>;
   }
 
+  return (
+    <div className="divide-y divide-gray-100 px-[22px] pb-2">
+      {actions.map((action) => (
+        <HotkeyRow
+          key={action.key}
+          label={action.label}
+          value={hotkeys[action.key] ?? '未设置'}
+          defaultValue={defaults[action.key] ?? '未设置'}
+          isRecording={recordingKey === action.key}
+          onRecord={() =>
+            setRecordingKey((current) =>
+              current === action.key ? null : action.key,
+            )
+          }
+          onClear={() => {
+            void updateHotkey(category, action.key, '未设置').catch((error) =>
+              reportMutationError('清除快捷键', error),
+            );
+          }}
+          onReset={() => {
+            void resetHotkey(category, action.key).catch((error) =>
+              reportMutationError('恢复快捷键', error),
+            );
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+export function HotkeyToolbar({
+  category,
+  actions,
+}: {
+  category: HotkeyCategory;
+  actions: FeatureHotkeyAction[];
+}) {
+  const snapshot = useHotkeyConfigStore((state) => state.snapshot);
+  const resetCategory = useHotkeyConfigStore((state) => state.resetCategory);
+  const hotkeys = snapshot?.[category];
+
   const detectConflicts = () => {
+    if (!hotkeys) return;
     const configured = actions
       .map((action) => hotkeys[action.key])
       .filter((hotkey) => hotkey && hotkey !== '未设置');
@@ -96,55 +137,27 @@ export function FeatureHotkeysSection({
   };
 
   return (
-    <>
-      <div className="divide-y divide-gray-100 px-[22px]">
-        {actions.map((action) => (
-          <HotkeyRow
-            key={action.key}
-            label={action.label}
-            value={hotkeys[action.key] ?? '未设置'}
-            defaultValue={defaults[action.key] ?? '未设置'}
-            isRecording={recordingKey === action.key}
-            onRecord={() =>
-              setRecordingKey((current) =>
-                current === action.key ? null : action.key,
-              )
-            }
-            onClear={() => {
-              void updateHotkey(category, action.key, '未设置').catch((error) =>
-                reportMutationError('清除快捷键', error),
-              );
-            }}
-            onReset={() => {
-              void resetHotkey(category, action.key).catch((error) =>
-                reportMutationError('恢复快捷键', error),
-              );
-            }}
-          />
-        ))}
-      </div>
-      <footer className="flex items-center justify-between border-t border-gray-100 bg-gray-50/60 px-[22px] py-3">
-        <button
-          type="button"
-          onClick={() => {
-            if (confirm('确定要恢复这一组快捷键到默认值吗？')) {
-              void resetCategory(category).catch((error) =>
-                reportMutationError('恢复快捷键组', error),
-              );
-            }
-          }}
-          className="h-8 rounded-lg px-3 text-[11px] font-medium text-gray-500 hover:bg-white hover:text-gray-800"
-        >
-          恢复默认值
-        </button>
-        <button
-          type="button"
-          onClick={detectConflicts}
-          className="h-8 rounded-lg border border-gray-200 bg-white px-3 text-[11px] font-semibold text-gray-600 hover:border-primary-200 hover:text-primary-600"
-        >
-          检测冲突
-        </button>
-      </footer>
-    </>
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => {
+          if (confirm('确定要恢复这一组快捷键到默认值吗？')) {
+            void resetCategory(category).catch((error) =>
+              reportMutationError('恢复快捷键组', error),
+            );
+          }
+        }}
+        className="h-8 rounded-lg px-3 text-[11px] font-medium text-gray-500 hover:bg-white hover:text-gray-800"
+      >
+        恢复默认值
+      </button>
+      <button
+        type="button"
+        onClick={detectConflicts}
+        className="h-8 rounded-lg border border-gray-200 bg-white px-3 text-[11px] font-semibold text-gray-600 hover:border-primary-200 hover:text-primary-600"
+      >
+        检测冲突
+      </button>
+    </div>
   );
 }

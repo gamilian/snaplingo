@@ -3,7 +3,7 @@ import type { AnnotationColorPreset, ScreenshotSettings } from '../../../applica
 import { CustomRange } from '../../../components/common/CustomRange';
 import { CustomSelect } from '../../../components/common/CustomSelect';
 import { useSettingsConfigStore } from '../../../stores/settingsConfigStore';
-import { FeatureHotkeysSection } from '../Hotkey/FeatureHotkeysSection';
+import { FeatureHotkeysSection, HotkeyToolbar } from '../Hotkey/FeatureHotkeysSection';
 import { SettingRow, SettingsGroup, SettingsToggle } from '../SettingsControls';
 import { SettingsScrollPage } from '../SettingsScrollPage';
 import { useSettingsRuntime } from '../runtimeContext';
@@ -342,6 +342,9 @@ export function ScreenshotSettingsPage() {
           id: 'hotkeys',
           label: '快捷键',
           description: '截图与贴图的全局快捷键',
+          action: (
+            <HotkeyToolbar category="screenshot" actions={SCREENSHOT_HOTKEYS} />
+          ),
           content: (
             <FeatureHotkeysSection
               category="screenshot"

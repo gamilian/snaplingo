@@ -1,7 +1,7 @@
 import type { OcrSettings, ResultWindowPosition } from '../../../application/settings/ports';
 import { CustomSelect } from '../../../components/common/CustomSelect';
 import { useSettingsConfigStore } from '../../../stores/settingsConfigStore';
-import { FeatureHotkeysSection } from '../Hotkey/FeatureHotkeysSection';
+import { FeatureHotkeysSection, HotkeyToolbar } from '../Hotkey/FeatureHotkeysSection';
 import { SettingRow, SettingsGroup, SettingsToggle } from '../SettingsControls';
 import { SettingsScrollPage } from '../SettingsScrollPage';
 
@@ -34,6 +34,7 @@ export function OcrSettingsScrollPage() {
           id: 'hotkeys',
           label: '快捷键',
           description: '常用 OCR 入口的全局快捷键',
+          action: <HotkeyToolbar category="ocr" actions={OCR_HOTKEYS} />,
           content: (
             <FeatureHotkeysSection category="ocr" actions={OCR_HOTKEYS} />
           ),

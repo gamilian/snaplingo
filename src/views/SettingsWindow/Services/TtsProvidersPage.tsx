@@ -75,7 +75,7 @@ export function TtsProvidersPage() {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              className="h-9 rounded-lg bg-emerald-500 px-4 text-sm font-medium text-white hover:bg-emerald-600"
+              className="h-9 rounded-lg bg-primary-600 px-4 text-sm font-medium text-white hover:bg-primary-700"
               onClick={() => {
                 setTestStatus('正在朗读');
                 void runtime.tts.speak('SnapLingo 系统语音测试', 'zh-CN').then(

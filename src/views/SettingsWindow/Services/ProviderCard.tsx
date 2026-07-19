@@ -39,10 +39,10 @@ export function ProviderCard({
 
   return (
     <div
-      className={`group/provider min-h-[92px] rounded-2xl border px-5 py-4 transition-all duration-150 ${
+      className={`group/provider relative min-h-[72px] px-5 py-3.5 transition-colors duration-150 ${
         highlighted
-          ? 'border-emerald-300 bg-emerald-50/55 shadow-[0_8px_22px_rgba(16,185,129,0.08)]'
-          : 'border-gray-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/25'
+          ? 'bg-primary-50/60 before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r before:bg-primary-500'
+          : 'hover:bg-gray-50'
       }`}
     >
       <div className="flex h-full items-center gap-4">
@@ -84,7 +84,7 @@ export function ProviderCard({
               className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-colors ${
                 isActive
                   ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  : 'bg-emerald-500 text-white hover:bg-emerald-600'
+                  : 'bg-primary-600 text-white hover:bg-primary-700'
               }`}
             >
               <PlayIcon className="h-4 w-4" />
