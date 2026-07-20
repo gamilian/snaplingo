@@ -75,9 +75,11 @@ pub(crate) fn setup_menu_bar(app: &tauri::App) -> Result<(), String> {
             }
         });
 
-    if let Some(icon) = app.default_window_icon().cloned() {
-        tray = tray.icon(icon).icon_as_template(true);
-    }
+    // Menu bar uses a dedicated monochrome template (alpha-only S glyph); the colored app
+    // icon would render as a solid blob under `icon_as_template`.
+    tray = tray
+        .icon(tauri::include_image!("icons/trayTemplate.png"))
+        .icon_as_template(true);
 
     tray.build(app).map_err(|e| e.to_string())?;
     Ok(())
