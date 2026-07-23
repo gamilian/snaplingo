@@ -1,4 +1,11 @@
-import type { PointerEvent, ReactNode, Ref, WheelEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  type PointerEvent,
+  type ReactNode,
+  type Ref,
+  type WheelEvent,
+} from 'react';
 
 import type {
   CaptureWorkspacePointerInput,
@@ -28,6 +35,7 @@ import {
   rectStyle,
 } from './capturePreviewPresentation';
 import { CaptureSelectionOverlayCanvas } from './captureSelectionOverlayRuntime';
+import { createCapturePointerFrameDispatcher } from './capturePointerFrame';
 import { getCaptureWorkspacePointerPoint } from './captureWorkspacePointer';
 import type { ColorSample, ColorSampleFormat } from './colorSampler';
 import type { CaptureCandidateDetectionMode } from './captureWorkspaceState';
@@ -103,6 +111,7 @@ export type CaptureWorkspaceViewActions = Pick<
   | 'pointerDown'
   | 'pointerMove'
   | 'pointerUp'
+  | 'pointerCancel'
   | 'resizePointerDown'
   | 'resizeAnnotationPointerDown'
   | 'wheel'
@@ -213,6 +222,17 @@ export function CaptureWorkspaceView({
   annotationColorPresets = ANNOTATION_COLORS,
   onUpdateAnnotationColorPresets = ignoreAnnotationColorPresetUpdate,
 }: CaptureWorkspaceViewProps) {
+  const pointerFrame = useMemo(
+    () =>
+      createCapturePointerFrameDispatcher({
+        requestFrame: window.requestAnimationFrame.bind(window),
+        cancelFrame: window.cancelAnimationFrame.bind(window),
+        move: actions.pointerMove,
+      }),
+    [actions.pointerMove],
+  );
+  useEffect(() => () => pointerFrame.cancel(), [pointerFrame]);
+
   if (renderState.status === 'idle') return null;
 
   const completeSelection = (
@@ -227,6 +247,11 @@ export function CaptureWorkspaceView({
   const handleRootPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (!renderState.selectionBounds) return;
 
+    if (renderState.status === 'selecting') {
+      pointerFrame.flush();
+    } else {
+      pointerFrame.cancel();
+    }
     event.currentTarget.setPointerCapture(event.pointerId);
     const handled = actions.pointerDown({
       point: getCaptureWorkspacePointerPoint(
@@ -234,6 +259,10 @@ export function CaptureWorkspaceView({
         renderState.selectionBounds,
       ),
       button: event.button,
+      detail: event.detail,
+      metaKey: event.metaKey,
+      ctrlKey: event.ctrlKey,
+      altKey: event.altKey,
       shiftKey: event.shiftKey,
       source: 'root',
     });
@@ -241,8 +270,30 @@ export function CaptureWorkspaceView({
   };
   const handleRootPointerMove = (event: PointerEvent<HTMLDivElement>) => {
     if (!renderState.selectionBounds) return;
-    actions.pointerMove({
-      point: getCaptureWorkspacePointerPoint(event, renderState.selectionBounds),
+    const coalescedEvents = event.nativeEvent.getCoalescedEvents?.() ?? [];
+    if (renderState.status !== 'selecting') {
+      pointerFrame.cancel();
+      for (const moveEvent of coalescedEvents.length
+        ? coalescedEvents
+        : [event]) {
+        actions.pointerMove({
+          point: getCaptureWorkspacePointerPoint(
+            moveEvent,
+            renderState.selectionBounds,
+          ),
+          button: event.button,
+          shiftKey: event.shiftKey,
+          source: 'root',
+        });
+      }
+      return;
+    }
+    const latestEvent = coalescedEvents[coalescedEvents.length - 1] ?? event;
+    pointerFrame.schedule({
+      point: getCaptureWorkspacePointerPoint(
+        latestEvent,
+        renderState.selectionBounds,
+      ),
       button: event.button,
       shiftKey: event.shiftKey,
       source: 'root',
@@ -250,12 +301,25 @@ export function CaptureWorkspaceView({
   };
   const handleRootPointerUp = (event: PointerEvent<HTMLDivElement>) => {
     if (!renderState.selectionBounds) return;
+    if (renderState.status === 'selecting') {
+      pointerFrame.flush();
+    } else {
+      pointerFrame.cancel();
+    }
     void actions.pointerUp({
       point: getCaptureWorkspacePointerPoint(event, renderState.selectionBounds),
       button: event.button,
+      detail: event.detail,
+      metaKey: event.metaKey,
+      ctrlKey: event.ctrlKey,
+      altKey: event.altKey,
       shiftKey: event.shiftKey,
       source: 'root',
     });
+  };
+  const handleRootPointerCancel = () => {
+    pointerFrame.cancel();
+    actions.pointerCancel();
   };
   const handleRootWheel = (event: WheelEvent<HTMLDivElement>) => {
     if (
@@ -285,6 +349,7 @@ export function CaptureWorkspaceView({
       onPointerDown={handleRootPointerDown}
       onPointerMove={handleRootPointerMove}
       onPointerUp={handleRootPointerUp}
+      onPointerCancel={handleRootPointerCancel}
       onWheel={handleRootWheel}
       onContextMenu={(event) => event.preventDefault()}
     >

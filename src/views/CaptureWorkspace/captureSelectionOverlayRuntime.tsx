@@ -9,11 +9,10 @@ import {
 import { getCaptureSelectionOverlayCanvasClassName } from './capturePresentation';
 import {
   drawCaptureSelectionOverlayFrame,
-  getCaptureSelectionOverlayCursor,
   getCaptureSelectionOverlayFrame,
   type CaptureSelectionOverlayFrame,
 } from './captureSelectionOverlay';
-import type { LogicalRect, Point } from './types';
+import type { LogicalRect } from './types';
 
 type CaptureSelectionOverlayStatus =
   | 'idle'
@@ -36,7 +35,6 @@ interface UseCaptureSelectionOverlayOptions {
   selectionBounds: LogicalRect | null;
   selection: LogicalRect | null;
   viewportBounds: LogicalRect | null;
-  cursorPointRef: RefObject<Point | null>;
   draftSelectionRef: RefObject<LogicalRect | null>;
   hoverSelectionRef: RefObject<LogicalRect | null>;
   showSelectionSize?: boolean;
@@ -92,7 +90,6 @@ export function CaptureSelectionOverlayCanvas({
 }
 
 export function useCaptureSelectionOverlay({
-  cursorPointRef,
   draftSelectionRef,
   hoverSelectionRef,
   showSelectionSize = true,
@@ -124,11 +121,6 @@ export function useCaptureSelectionOverlay({
         context,
         cssSize,
         frame,
-        getCaptureSelectionOverlayCursor({
-          status,
-          selectionBounds,
-          cursorPoint: cursorPointRef.current,
-        }),
         {
           borderWidth: selectionBorderWidth,
           borderColor: selectionBorderColor,
@@ -138,7 +130,6 @@ export function useCaptureSelectionOverlay({
     },
     [
       cssSize,
-      cursorPointRef,
       pixelRatio,
       selectionBorderColor,
       selectionBorderWidth,

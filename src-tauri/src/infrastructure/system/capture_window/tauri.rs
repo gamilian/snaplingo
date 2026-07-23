@@ -3,10 +3,9 @@ use std::{
     time::{Duration, Instant},
 };
 
-use tauri::{
-    utils::config::Color, AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewUrl,
-    WebviewWindowBuilder,
-};
+use tauri::{utils::config::Color, AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+#[cfg(not(target_os = "macos"))]
+use tauri::{LogicalPosition, LogicalSize};
 
 use crate::domain::capture::LogicalRect;
 
@@ -219,12 +218,16 @@ pub fn open_capture_window_for_session(
             window
                 .set_focusable(capture_window_is_focusable())
                 .map_err(|e| e.to_string())?;
+            #[cfg(not(target_os = "macos"))]
             window
                 .set_position(LogicalPosition::new(bounds.x, bounds.y))
                 .map_err(|e| e.to_string())?;
+            #[cfg(not(target_os = "macos"))]
             window
                 .set_size(LogicalSize::new(bounds.width, bounds.height))
                 .map_err(|e| e.to_string())?;
+            #[cfg(target_os = "macos")]
+            super::macos::set_capture_window_frame(&window, bounds)?;
             configure_capture_window_for_current_space(&window)?;
             window
                 .emit(
@@ -240,14 +243,23 @@ pub fn open_capture_window_for_session(
     }
 
     suppress_capture_window_activation(app)?;
+    #[cfg(target_os = "macos")]
+    let initial_bounds = LogicalRect {
+        x: 0.0,
+        y: 0.0,
+        width: 1.0,
+        height: 1.0,
+    };
+    #[cfg(not(target_os = "macos"))]
+    let initial_bounds = bounds.clone();
     let window = WebviewWindowBuilder::new(
         app,
         CAPTURE_WINDOW_LABEL,
         WebviewUrl::App(capture_window_url_with_session(mode, session_id)),
     )
     .title("SnapLingo Capture")
-    .position(bounds.x, bounds.y)
-    .inner_size(bounds.width, bounds.height)
+    .position(initial_bounds.x, initial_bounds.y)
+    .inner_size(initial_bounds.width, initial_bounds.height)
     .decorations(false)
     .always_on_top(true)
     .visible_on_all_workspaces(capture_window_visible_on_all_workspaces())
@@ -261,6 +273,8 @@ pub fn open_capture_window_for_session(
     .shadow(false)
     .build()
     .map_err(|e| e.to_string())?;
+    #[cfg(target_os = "macos")]
+    super::macos::set_capture_window_frame(&window, bounds)?;
     configure_capture_window_for_current_space(&window)?;
     restore_capture_window_activation();
 

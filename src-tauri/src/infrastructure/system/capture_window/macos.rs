@@ -1,12 +1,15 @@
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering};
 
+use objc2::MainThreadMarker;
 use objc2_app_kit::{
-    NSApplicationActivationOptions, NSCursor, NSRunningApplication, NSScreenSaverWindowLevel,
-    NSView, NSWindow, NSWindowAnimationBehavior, NSWindowCollectionBehavior, NSWindowStyleMask,
-    NSWorkspace,
+    NSApplicationActivationOptions, NSCursor, NSRunningApplication, NSScreen,
+    NSScreenSaverWindowLevel, NSView, NSWindow, NSWindowAnimationBehavior,
+    NSWindowCollectionBehavior, NSWindowStyleMask, NSWorkspace,
 };
+use objc2_foundation::{NSPoint, NSRect, NSSize};
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 
+use crate::domain::capture::LogicalRect;
 use crate::infrastructure::system::shortcut;
 
 use super::backend::CAPTURE_WINDOW_LABEL;
@@ -166,6 +169,26 @@ pub(super) fn configure_capture_window_for_current_space(
     Ok(())
 }
 
+pub(super) fn set_capture_window_frame(
+    window: &WebviewWindow,
+    bounds: &LogicalRect,
+) -> Result<(), String> {
+    let ns_window = window.ns_window().map_err(|e| e.to_string())?;
+    if ns_window.is_null() {
+        return Err("Capture window has no native NSWindow".to_string());
+    }
+
+    let ns_window: &NSWindow = unsafe { &*ns_window.cast() };
+    let main_thread = MainThreadMarker::new()
+        .ok_or_else(|| "Capture window frame must be configured on the main thread".to_string())?;
+    let primary_screen_height = NSScreen::screens(main_thread)
+        .firstObject()
+        .map(|screen| screen.frame().size.height)
+        .ok_or_else(|| "Capture window has no primary NSScreen".to_string())?;
+    ns_window.setFrame_display(capture_overlay_frame(bounds, primary_screen_height), false);
+    Ok(())
+}
+
 pub(super) fn reveal_capture_window_for_current_space(
     window: &WebviewWindow,
 ) -> Result<(), String> {
@@ -274,6 +297,17 @@ fn capture_overlay_collection_behavior(
         | NSWindowCollectionBehavior::FullScreenAuxiliary
         | NSWindowCollectionBehavior::Stationary
         | NSWindowCollectionBehavior::IgnoresCycle
+}
+
+fn capture_overlay_frame(bounds: &LogicalRect, primary_screen_height: f64) -> NSRect {
+    capture_overlay_frame_for_desktop_height(bounds, primary_screen_height)
+}
+
+fn capture_overlay_frame_for_desktop_height(bounds: &LogicalRect, desktop_height: f64) -> NSRect {
+    NSRect::new(
+        NSPoint::new(bounds.x, desktop_height - bounds.y - bounds.height),
+        NSSize::new(bounds.width, bounds.height),
+    )
 }
 
 fn capture_overlay_style_mask(base: NSWindowStyleMask) -> NSWindowStyleMask {
@@ -804,6 +838,24 @@ mod tests {
 
         assert!(behavior.contains(NSWindowCollectionBehavior::Stationary));
         assert!(behavior.contains(NSWindowCollectionBehavior::FullScreenAuxiliary));
+    }
+
+    #[test]
+    fn capture_overlay_frame_covers_a_virtual_desktop_with_negative_origins() {
+        let frame = capture_overlay_frame_for_desktop_height(
+            &LogicalRect {
+                x: -1280.0,
+                y: -600.0,
+                width: 2720.0,
+                height: 1500.0,
+            },
+            900.0,
+        );
+
+        assert_eq!(frame.origin.x, -1280.0);
+        assert_eq!(frame.origin.y, 0.0);
+        assert_eq!(frame.size.width, 2720.0);
+        assert_eq!(frame.size.height, 1500.0);
     }
 
     #[test]

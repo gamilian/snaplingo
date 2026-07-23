@@ -16,6 +16,7 @@ import {
   canToggleCapturedCursor,
   getCaptureScreenSelectionScopeFromShortcut,
   getCursorNudgeDeltaFromShortcut,
+  getHoverSelectionCompletionActionFromPointer,
   getHoverSelectionCompletionActionFromShortcut,
   getPreviewCaptureCompletionActionFromShortcut,
   getSelectionHistoryStepFromShortcut,
@@ -274,12 +275,28 @@ export function createCaptureWorkspaceRuntime({
   let revealAttempt: { key: string; promise: Promise<void> } | null = null;
   let perfState: CaptureFrontendPerfState | null = null;
   let hasKeyboardAdjustedDraft = false;
+  let pressedHoverSelection: LogicalRect | null = null;
+  let pressedHoverDetectionMode: RuntimeState['candidateDetectionMode'] | null = null;
+  let controlCandidateRequestRevision = 0;
+  let controlCandidateRefresh: Promise<void> | null = null;
+  let queuedControlCandidateRefresh: {
+    sessionId: string;
+    cursorPoint: Point;
+  } | null = null;
+  const invalidateControlCandidateRefresh = () => {
+    controlCandidateRequestRevision += 1;
+    queuedControlCandidateRefresh = null;
+  };
+  const clearPressedHoverSelection = () => {
+    pressedHoverSelection = null;
+    pressedHoverDetectionMode = null;
+    invalidateControlCandidateRefresh();
+  };
   const cursorPointRef = { current: null as Point | null };
   const keyboardEditCursorPointRef = { current: null as Point | null };
   let previewScheduler: PreviewRenderScheduler | null = null;
   let terminalOutputSequence = 0;
   let terminalOutputOperation: TerminalOutputOperation | null = null;
-  let controlCandidateRequestRevision = 0;
   let cursorMoveRequestRevision = 0;
   const hostConnections = new Set<HostConnection>();
   const nativeSessionCancellations = new Map<string, Promise<void>>();
@@ -437,6 +454,7 @@ export function createCaptureWorkspaceRuntime({
     snapshotHydration = null;
     hydratedSessionId = null;
     hasKeyboardAdjustedDraft = false;
+    clearPressedHoverSelection();
     cursorPointRef.current = null;
     keyboardEditCursorPointRef.current = null;
     for (const connection of [...hostConnections]) {
@@ -465,6 +483,7 @@ export function createCaptureWorkspaceRuntime({
     cursorPointRef.current = null;
     keyboardEditCursorPointRef.current = null;
     hasKeyboardAdjustedDraft = false;
+    clearPressedHoverSelection();
     hydratedSessionId = null;
     snapshotHydration = null;
     host?.resetSession();
@@ -1212,6 +1231,7 @@ export function createCaptureWorkspaceRuntime({
         state.status === 'selecting' &&
         state.session?.id === sessionId &&
         state.candidateDetectionMode === 'control' &&
+        !state.startPoint &&
         arePointsEqual(state.cursorPoint, cursorPoint)
       ) {
         patch({ hoverSelection: candidate?.rect ?? null, error: null });
@@ -1222,6 +1242,7 @@ export function createCaptureWorkspaceRuntime({
         state.status === 'selecting' &&
         state.session?.id === sessionId &&
         state.candidateDetectionMode === 'control' &&
+        !state.startPoint &&
         arePointsEqual(state.cursorPoint, cursorPoint)
       ) {
         patch({
@@ -1231,6 +1252,41 @@ export function createCaptureWorkspaceRuntime({
         });
       }
     }
+  };
+
+  const scheduleControlCandidateRefresh = (
+    sessionId: string,
+    cursorPoint: Point,
+  ) => {
+    queuedControlCandidateRefresh = { sessionId, cursorPoint };
+    if (controlCandidateRefresh) return;
+
+    const drain = async () => {
+      while (queuedControlCandidateRefresh) {
+        const request = queuedControlCandidateRefresh;
+        queuedControlCandidateRefresh = null;
+        if (
+          state.status !== 'selecting' ||
+          state.session?.id !== request.sessionId ||
+          state.candidateDetectionMode !== 'control' ||
+          state.startPoint
+        ) {
+          continue;
+        }
+        await refreshControlCandidate(request.sessionId, request.cursorPoint);
+      }
+    };
+
+    const request = drain().finally(() => {
+      if (controlCandidateRefresh !== request) return;
+      controlCandidateRefresh = null;
+      const queued = queuedControlCandidateRefresh;
+      if (queued) {
+        scheduleControlCandidateRefresh(queued.sessionId, queued.cursorPoint);
+      }
+    });
+    controlCandidateRefresh = request;
+    void request.catch(() => undefined);
   };
 
   const moveCaptureCursor = async (sessionId: string, delta: Point) => {
@@ -1292,6 +1348,7 @@ export function createCaptureWorkspaceRuntime({
 
   const cancelSession = async () => {
     if (disposed) return;
+    clearPressedHoverSelection();
     const actionGeneration = ++generation;
     const sessionId = state.session?.id;
     if (!sessionId) {
@@ -1532,6 +1589,7 @@ export function createCaptureWorkspaceRuntime({
       detachPreviewScheduler();
       terminalOutputOperation = null;
       hasKeyboardAdjustedDraft = false;
+      clearPressedHoverSelection();
       host?.resetInteraction();
       hasRevealed = false;
       revealAttempt = null;
@@ -1635,6 +1693,7 @@ export function createCaptureWorkspaceRuntime({
       detachPreviewScheduler();
       terminalOutputOperation = null;
       hasKeyboardAdjustedDraft = false;
+      clearPressedHoverSelection();
       host?.resetInteraction();
       hasRevealed = false;
       revealAttempt = null;
@@ -1728,6 +1787,7 @@ export function createCaptureWorkspaceRuntime({
       detachPreviewScheduler();
       terminalOutputOperation = null;
       hasKeyboardAdjustedDraft = false;
+      clearPressedHoverSelection();
       snapshotHydration = null;
       hydratedSessionId = null;
       host?.resetInteraction();
@@ -1842,6 +1902,7 @@ export function createCaptureWorkspaceRuntime({
       }
       if (state.status !== 'selecting') return false;
       if (button === 2) {
+        clearPressedHoverSelection();
         if (state.selection) {
           hasKeyboardAdjustedDraft = false;
           patch({ startPoint: null, selection: null, hoverSelection: null });
@@ -1850,7 +1911,27 @@ export function createCaptureWorkspaceRuntime({
         }
         return true;
       }
+      if (button !== 0) return false;
+      clearPressedHoverSelection();
 
+      pressedHoverSelection =
+        button === 0 &&
+        getHoverSelectionCompletionActionFromPointer(
+          {
+            button,
+            detail,
+            metaKey,
+            ctrlKey,
+            altKey,
+            shiftKey,
+          },
+          { mode: state.mode },
+        )
+          ? state.hoverSelection
+          : null;
+      pressedHoverDetectionMode = pressedHoverSelection
+        ? state.candidateDetectionMode
+        : null;
       const draftStart = planCaptureDraftSelectionStart({
         cursorPoint: point,
         anchorPoint: snapPointToRects(
@@ -1904,10 +1985,12 @@ export function createCaptureWorkspaceRuntime({
         return true;
       }
 
+      const sessionId = state.session.id;
+      const candidateDetectionMode = state.candidateDetectionMode;
       patch({
         cursorPoint: point,
         hoverSelection:
-          state.candidateDetectionMode === 'window'
+          candidateDetectionMode === 'window'
             ? getBestCandidateAtPoint(
                 buildCaptureCandidates(
                   state.session.monitors,
@@ -1917,6 +2000,9 @@ export function createCaptureWorkspaceRuntime({
               )?.rect ?? null
             : null,
       });
+      if (candidateDetectionMode === 'control') {
+        scheduleControlCandidateRefresh(sessionId, point);
+      }
       return true;
     },
 
@@ -1933,7 +2019,10 @@ export function createCaptureWorkspaceRuntime({
         );
         return true;
       }
-      if (state.status !== 'selecting' || !state.startPoint) {
+      if (state.status !== 'selecting') return false;
+      if ((pointer.button ?? 0) !== 0) return false;
+      if (!state.startPoint) {
+        clearPressedHoverSelection();
         return false;
       }
       const { point, shiftKey = false } = pointer;
@@ -1952,8 +2041,19 @@ export function createCaptureWorkspaceRuntime({
         snapTargetRects: getEditorDerived().snapTargetRects,
         edgeSnapThreshold: 6,
         constrainSelection: shiftKey,
-        captureCandidates: candidates,
-        activeHoverSelection: state.hoverSelection,
+        captureCandidates:
+          pressedHoverDetectionMode === 'control' && pressedHoverSelection
+            ? [
+                ...candidates,
+                {
+                  id: 'active-control-candidate',
+                  kind: 'control',
+                  rect: pressedHoverSelection,
+                  priority: Number.MAX_SAFE_INTEGER,
+                },
+              ]
+            : candidates,
+        activeHoverSelection: pressedHoverSelection,
         minSelectionSize: MIN_SELECTION_SIZE,
       });
       const manualSelection = normalizeSelection(state.startPoint, releasePoint);
@@ -1961,6 +2061,7 @@ export function createCaptureWorkspaceRuntime({
         manualSelection.width >= MIN_SELECTION_SIZE &&
         manualSelection.height >= MIN_SELECTION_SIZE;
 
+      clearPressedHoverSelection();
       patch({ startPoint: null, cursorPoint: point });
       if (draftCommit.type === 'complete-selection' && isManualSelection) {
         await completeManualSelection(draftCommit.selection);
@@ -1969,6 +2070,37 @@ export function createCaptureWorkspaceRuntime({
       } else {
         patch({ selection: null, hoverSelection: null });
       }
+      return true;
+    },
+
+    pointerCancel() {
+      clearPressedHoverSelection();
+      if (state.status === 'preview') {
+        if (
+          !state.annotationGesture &&
+          !state.draftAnnotation &&
+          !state.annotationMoveGesture &&
+          !state.editGesture
+        ) {
+          return false;
+        }
+        keyboardEditCursorPointRef.current = null;
+        patch({
+          annotationGesture: null,
+          draftAnnotation: null,
+          annotationMoveGesture: null,
+          editGesture: null,
+        });
+        return true;
+      }
+      if (state.status !== 'selecting' || !state.startPoint) return false;
+
+      hasKeyboardAdjustedDraft = false;
+      patch({
+        startPoint: null,
+        selection: null,
+        hoverSelection: null,
+      });
       return true;
     },
 
@@ -2070,26 +2202,6 @@ export function createCaptureWorkspaceRuntime({
     updateCursorColor(cursorColor) {
       if (colorSamplesEqual(state.cursorColor, cursorColor)) return;
       patch({ cursorColor });
-    },
-
-    updatePolledCursor(point) {
-      if (
-        state.status === 'selecting' &&
-        !state.startPoint &&
-        !arePointsEqual(state.cursorPoint, point)
-      ) {
-        patch({ cursorPoint: point });
-      }
-    },
-
-    updatePolledHover(hoverSelection) {
-      if (
-        state.status === 'selecting' &&
-        !state.startPoint &&
-        !areRectsEqual(state.hoverSelection, hoverSelection)
-      ) {
-        patch({ hoverSelection });
-      }
     },
 
     keyDown(input: CaptureWorkspaceKeyInput) {
@@ -2220,7 +2332,7 @@ export function createCaptureWorkspaceRuntime({
         launch(async () => {
           if (!(await moveCaptureCursor(sessionId, cursorNudgeDelta))) return;
           if (candidateDetectionMode === 'control') {
-            await refreshControlCandidate(sessionId, cursorPoint);
+            scheduleControlCandidateRefresh(sessionId, cursorPoint);
           }
         });
         return true;
@@ -2232,7 +2344,7 @@ export function createCaptureWorkspaceRuntime({
       ) {
         const candidateDetectionMode =
           state.candidateDetectionMode === 'window' ? 'control' : 'window';
-        controlCandidateRequestRevision += 1;
+        invalidateControlCandidateRefresh();
         const sessionId = state.session.id;
         const cursorPoint =
           state.cursorPoint ??
@@ -2248,7 +2360,7 @@ export function createCaptureWorkspaceRuntime({
               : null,
         });
         if (candidateDetectionMode === 'control' && cursorPoint) {
-          launch(() => refreshControlCandidate(sessionId, cursorPoint));
+          scheduleControlCandidateRefresh(sessionId, cursorPoint);
         }
         return true;
       }
@@ -2525,18 +2637,6 @@ function errorMessage(error: unknown) {
 
 function arePointsEqual(a: Point | null, b: Point | null) {
   return a === b || (a !== null && b !== null && a.x === b.x && a.y === b.y);
-}
-
-function areRectsEqual(a: LogicalRect | null, b: LogicalRect | null) {
-  return (
-    a === b ||
-    (a !== null &&
-      b !== null &&
-      a.x === b.x &&
-      a.y === b.y &&
-      a.width === b.width &&
-      a.height === b.height)
-  );
 }
 
 function pointerInput(

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   drawCaptureSelectionOverlayFrame,
-  getCaptureSelectionOverlayCursor,
   getCaptureSelectionOverlayFrame,
   type CaptureSelectionOverlayContext,
 } from './captureSelectionOverlay';
@@ -109,54 +108,12 @@ describe('capture selection canvas overlay', () => {
     ).toBeNull();
   });
 
-  it('builds a viewport cursor only while selecting', () => {
-    expect(
-      getCaptureSelectionOverlayCursor({
-        status: 'selecting',
-        selectionBounds: bounds,
-        cursorPoint: { x: -20, y: 90 },
-      }),
-    ).toEqual({ x: 80, y: 40 });
-    expect(
-      getCaptureSelectionOverlayCursor({
-        status: 'preview',
-        selectionBounds: bounds,
-        cursorPoint: { x: -20, y: 90 },
-      }),
-    ).toBeNull();
-  });
-
   it('draws a clear canvas when there is no active frame', () => {
     const context = createRecordingContext();
 
     drawCaptureSelectionOverlayFrame(context, { width: 500, height: 300 }, null);
 
     expect(context.calls).toEqual(['clearRect:0,0,500,300']);
-  });
-
-  it('draws a custom crosshair cursor even without an active frame', () => {
-    const context = createRecordingContext();
-
-    drawCaptureSelectionOverlayFrame(
-      context,
-      { width: 500, height: 300 },
-      null,
-      { x: 80, y: 40 },
-    );
-
-    expect(context.calls).toEqual([
-      'clearRect:0,0,500,300',
-      'fillStyle:rgba(0, 0, 0, 0.82)',
-      'fillRect:70,38.5,7,3',
-      'fillRect:83,38.5,7,3',
-      'fillRect:78.5,30,3,7',
-      'fillRect:78.5,43,3,7',
-      'fillStyle:rgba(255, 255, 255, 0.96)',
-      'fillRect:70,39.5,7,1',
-      'fillRect:83,39.5,7,1',
-      'fillRect:79.5,30,1,7',
-      'fillRect:79.5,43,1,7',
-    ]);
   });
 
   it('draws dim mask, selection border, and size label onto the canvas', () => {
@@ -204,7 +161,6 @@ describe('capture selection canvas overlay', () => {
         rect: { x: 80, y: 40, width: 120, height: 60 },
         label: null,
       },
-      null,
       {
         borderWidth: 4,
         borderColor: [91, 127, 255, 242],

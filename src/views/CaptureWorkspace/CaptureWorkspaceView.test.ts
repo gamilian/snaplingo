@@ -26,6 +26,7 @@ afterEach(() => {
   }
   delete (HTMLElement.prototype as { setPointerCapture?: unknown })
     .setPointerCapture;
+  vi.restoreAllMocks();
 });
 
 describe("CaptureWorkspaceView runtime seam", () => {
@@ -57,6 +58,7 @@ describe("CaptureWorkspaceView runtime seam", () => {
       | "pointerDown"
       | "pointerMove"
       | "pointerUp"
+      | "pointerCancel"
       | "resizePointerDown"
       | "resizeAnnotationPointerDown"
       | "wheel"
@@ -131,8 +133,6 @@ describe("CaptureWorkspaceView runtime seam", () => {
       void renderState.session;
       // @ts-expect-error host lifecycle actions are outside the View contract
       void actions.connectHost();
-      // @ts-expect-error polling actions are outside the View contract
-      actions.updatePolledCursor({ x: 0, y: 0 });
     }
   });
 
@@ -192,12 +192,22 @@ describe("CaptureWorkspaceView runtime seam", () => {
           button: 0,
         }),
       );
+      workspace.dispatchEvent(
+        new PointerEvent("pointercancel", {
+          bubbles: true,
+          pointerId: 7,
+        }),
+      );
     });
 
     expect(pointerCapture).toHaveBeenCalledWith(7);
     expect(actions.pointerDown).toHaveBeenCalledWith({
       point: { x: 145, y: 265 },
       button: 0,
+      detail: 0,
+      metaKey: false,
+      ctrlKey: false,
+      altKey: false,
       shiftKey: false,
       source: "root",
     });
@@ -210,9 +220,14 @@ describe("CaptureWorkspaceView runtime seam", () => {
     expect(actions.pointerUp).toHaveBeenCalledWith({
       point: { x: 165, y: 285 },
       button: 0,
+      detail: 0,
+      metaKey: false,
+      ctrlKey: false,
+      altKey: false,
       shiftKey: false,
       source: "root",
     });
+    expect(actions.pointerCancel).toHaveBeenCalledOnce();
 
     const wheel = new WheelEvent("wheel", {
       bubbles: true,
@@ -394,6 +409,51 @@ describe("CaptureWorkspaceView runtime seam", () => {
       "stroke",
       5,
     );
+  });
+
+  it("dispatches preview pointer movement without waiting for an animation frame", async () => {
+    const actions = createActions();
+    const scheduledFrames: FrameRequestCallback[] = [];
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      scheduledFrames.push(callback);
+      return scheduledFrames.length;
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    mountedRoots.push({ container, root });
+
+    await act(async () => {
+      root.render(
+        createElement(CaptureWorkspaceView, {
+          renderState: createRenderState(),
+          actions,
+        }),
+      );
+    });
+    actions.pointerMove.mockClear();
+    const initialFrameCount = scheduledFrames.length;
+
+    const workspace = container.firstElementChild as HTMLDivElement;
+    await act(async () => {
+      workspace.dispatchEvent(
+        new PointerEvent("pointermove", {
+          bubbles: true,
+          clientX: 55,
+          clientY: 75,
+          pointerId: 7,
+          button: 0,
+        }),
+      );
+    });
+
+    expect(actions.pointerMove).toHaveBeenCalledWith({
+      point: { x: 155, y: 275 },
+      button: 0,
+      shiftKey: false,
+      source: "root",
+    });
+    expect(scheduledFrames).toHaveLength(initialFrameCount);
   });
 
   it("opens the color palette and manages preset colors", async () => {
@@ -736,6 +796,7 @@ function createActions() {
     pointerDown: vi.fn(() => true),
     pointerMove: vi.fn(() => true),
     pointerUp: vi.fn(async () => true),
+    pointerCancel: vi.fn(() => true),
     resizePointerDown: vi.fn(() => true),
     resizeAnnotationPointerDown: vi.fn(() => true),
     wheel: vi.fn(() => true),

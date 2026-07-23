@@ -106,6 +106,7 @@ export interface CaptureWorkspaceRuntimeActions {
   pointerDown(input: Point | CaptureWorkspacePointerInput): boolean;
   pointerMove(input: Point | CaptureWorkspacePointerInput): boolean;
   pointerUp(input: Point | CaptureWorkspacePointerInput): Promise<boolean>;
+  pointerCancel(): boolean;
   resizePointerDown(
     handle: SelectionHandle,
     input: Point | CaptureWorkspacePointerInput,
@@ -132,8 +133,6 @@ export interface CaptureWorkspaceRuntimeActions {
   undoAnnotation(): void;
   redoAnnotation(): void;
   updateCursorColor(color: ColorSample | null): void;
-  updatePolledCursor(point: Point): void;
-  updatePolledHover(selection: LogicalRect | null): void;
   keyDown(event: CaptureWorkspaceKeyInput): boolean;
   hydrateSnapshots(): Promise<void>;
   hydrateMagnifierMonitor(monitorId: string): Promise<void>;

@@ -65,8 +65,13 @@ describe("capture presentation", () => {
     expect(className).not.toContain("transition-opacity");
   });
 
-  it("hides the system cursor while the canvas crosshair is active", () => {
-    expect(getCaptureRootCursorStyle("selecting")).toBe("none");
+  it("uses a system-rendered selection crosshair with a centered hotspot", () => {
+    const selectingCursor = getCaptureRootCursorStyle("selecting");
+
+    expect(selectingCursor).toContain("data:image/svg+xml");
+    expect(selectingCursor).toContain("16 16");
+    expect(decodeURIComponent(selectingCursor)).toContain("#5b7fff");
+    expect(selectingCursor).not.toBe("none");
     expect(getCaptureRootCursorStyle("preview")).toBe("default");
     expect(getCaptureRootCursorStyle("preview", "text")).toBe("text");
     expect(getCaptureRootCursorStyle("preview", "mosaic")).toContain(

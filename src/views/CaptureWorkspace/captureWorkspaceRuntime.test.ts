@@ -928,6 +928,214 @@ describe('capture workspace runtime', () => {
     });
   });
 
+  it('confirms a recommended interface element with a plain primary click', async () => {
+    const recommended = { x: 40, y: 30, width: 180, height: 120 };
+    const platform = createPlatform({
+      session: createSession({
+        id: 'session-candidate-click',
+        captured_cursor: {
+          logical_position: { x: 80, y: 70 },
+          hotspot: { x: 0, y: 0 },
+          image_width: 16,
+          image_height: 16,
+          scale_factor: 2,
+          image_base64: '',
+        },
+      }),
+    });
+    platform.commands.currentCaptureControlCandidate.mockResolvedValue({
+      id: 'control-recommended',
+      kind: 'control',
+      rect: recommended,
+      priority: 10_001,
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot-copy', 'session-candidate-click');
+    runtime.actions.keyDown({ key: 'Tab' });
+    await vi.waitFor(() =>
+      expect(runtime.renderState.hoverSelection).toEqual(recommended),
+    );
+
+    runtime.actions.pointerDown({
+      point: { x: 80, y: 70 },
+      button: 0,
+      detail: 1,
+      source: 'root',
+    });
+    await runtime.actions.pointerUp({
+      point: { x: 80, y: 70 },
+      button: 0,
+      detail: 1,
+      source: 'root',
+    });
+
+    expect(platform.commands.outputCapture).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 'session-candidate-click',
+        rect: recommended,
+      }),
+    );
+    expect(platform.dismiss).toHaveBeenCalledOnce();
+  });
+
+  it('does not confirm a recommended interface element with a modified primary click', async () => {
+    const recommended = { x: 40, y: 30, width: 180, height: 120 };
+    const platform = createPlatform({
+      session: createSession({
+        id: 'session-candidate-modified-click',
+        captured_cursor: {
+          logical_position: { x: 80, y: 70 },
+          hotspot: { x: 0, y: 0 },
+          image_width: 16,
+          image_height: 16,
+          scale_factor: 2,
+          image_base64: '',
+        },
+      }),
+    });
+    platform.commands.currentCaptureControlCandidate.mockResolvedValue({
+      id: 'control-recommended',
+      kind: 'control',
+      rect: recommended,
+      priority: 10_001,
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession(
+      'screenshot-copy',
+      'session-candidate-modified-click',
+    );
+    runtime.actions.keyDown({ key: 'Tab' });
+    await vi.waitFor(() =>
+      expect(runtime.renderState.hoverSelection).toEqual(recommended),
+    );
+
+    expect(
+      runtime.actions.pointerDown({
+        point: { x: 80, y: 70 },
+        button: 0,
+        detail: 1,
+        metaKey: true,
+        source: 'root',
+      }),
+    ).toBe(true);
+    await expect(
+      runtime.actions.pointerUp({
+        point: { x: 80, y: 70 },
+        button: 0,
+        detail: 1,
+        metaKey: true,
+        source: 'root',
+      }),
+    ).resolves.toBe(true);
+
+    expect(platform.commands.outputCapture).not.toHaveBeenCalled();
+    expect(runtime.renderState).toMatchObject({
+      status: 'selecting',
+      startPoint: null,
+      selection: null,
+    });
+  });
+
+  it('does not start or commit a selection with the middle button', async () => {
+    const platform = createPlatform();
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-middle-click');
+
+    expect(
+      runtime.actions.pointerDown({
+        point: { x: 80, y: 70 },
+        button: 1,
+        source: 'root',
+      }),
+    ).toBe(false);
+    await expect(
+      runtime.actions.pointerUp({
+        point: { x: 80, y: 70 },
+        button: 1,
+        source: 'root',
+      }),
+    ).resolves.toBe(false);
+
+    expect(
+      runtime.actions.pointerDown({
+        point: { x: 20, y: 30 },
+        button: 0,
+        source: 'root',
+      }),
+    ).toBe(true);
+    runtime.actions.pointerMove({
+      point: { x: 80, y: 70 },
+      button: 0,
+      source: 'root',
+    });
+    await expect(
+      runtime.actions.pointerUp({
+        point: { x: 80, y: 70 },
+        button: 1,
+        source: 'root',
+      }),
+    ).resolves.toBe(false);
+
+    expect(runtime.renderState).toMatchObject({
+      status: 'selecting',
+      startPoint: { x: 20, y: 30 },
+      selection: { x: 20, y: 30, width: 60, height: 40 },
+    });
+    expect(platform.commands.renderCaptureOutput).not.toHaveBeenCalled();
+    expect(runtime.actions.pointerCancel()).toBe(true);
+  });
+
+  it('cancels a pressed recommendation without confirming it', async () => {
+    const recommended = { x: 40, y: 30, width: 180, height: 120 };
+    const platform = createPlatform({
+      session: createSession({
+        id: 'session-candidate-cancel',
+        candidates: [
+          {
+            id: 'window-recommended',
+            kind: 'window',
+            rect: recommended,
+            priority: 10,
+          },
+        ],
+        captured_cursor: {
+          logical_position: { x: 80, y: 70 },
+          hotspot: { x: 0, y: 0 },
+          image_width: 16,
+          image_height: 16,
+          scale_factor: 2,
+          image_base64: '',
+        },
+      }),
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot-copy', 'session-candidate-cancel');
+
+    runtime.actions.pointerDown({
+      point: { x: 80, y: 70 },
+      button: 0,
+      detail: 1,
+      source: 'root',
+    });
+    expect(runtime.actions.pointerCancel()).toBe(true);
+    expect(
+      await runtime.actions.pointerUp({
+        point: { x: 80, y: 70 },
+        button: 0,
+        detail: 1,
+        source: 'root',
+      }),
+    ).toBe(false);
+
+    expect(runtime.renderState).toMatchObject({
+      status: 'selecting',
+      startPoint: null,
+      selection: null,
+      hoverSelection: null,
+    });
+    expect(platform.commands.outputCapture).not.toHaveBeenCalled();
+  });
+
   it('keeps a canceled loading session idle when its load resolves later', async () => {
     const load = deferred<ReturnType<typeof createSession>>();
     const platform = createPlatform();
@@ -1217,6 +1425,36 @@ describe('capture workspace runtime', () => {
     );
     expect(runtime.renderState.draftAnnotation).toBeNull();
     expect(platform.commands.renderCaptureOutput).not.toHaveBeenCalled();
+  });
+
+  it('cancels an in-progress pen gesture without committing the draft', async () => {
+    const platform = createPlatform({
+      session: createSession({ id: 'session-editor-pen-cancel' }),
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession('screenshot', 'session-editor-pen-cancel');
+    await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.toggleAnnotationTool('pen');
+    runtime.actions.pointerDown({ point: { x: 30, y: 40 }, source: 'preview' });
+    runtime.actions.pointerMove({ point: { x: 70, y: 80 }, source: 'root' });
+
+    expect(runtime.renderState.annotationGesture).not.toBeNull();
+    expect(runtime.renderState.draftAnnotation).not.toBeNull();
+    expect(runtime.actions.pointerCancel()).toBe(true);
+    expect(runtime.renderState).toMatchObject({
+      status: 'preview',
+      selection,
+      annotationGesture: null,
+      draftAnnotation: null,
+      annotationMoveGesture: null,
+      editGesture: null,
+    });
+    expect(runtime.renderState.annotationHistory.annotations).toEqual([]);
+
+    runtime.actions.pointerMove({ point: { x: 90, y: 90 }, source: 'root' });
+    expect(runtime.renderState.annotationHistory.annotations).toEqual([]);
+    expect(runtime.renderState.draftAnnotation).toBeNull();
   });
 
   it('resizes a selected rectangle annotation from its edge handle', async () => {
@@ -1762,6 +2000,51 @@ describe('capture workspace runtime', () => {
     });
   });
 
+  it('cancels preview selection move and resize gestures at their current selection', async () => {
+    const platform = createPlatform({
+      session: createSession({ id: 'session-editor-selection-cancel' }),
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession(
+      'screenshot',
+      'session-editor-selection-cancel',
+    );
+    await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.pointerDown({
+      point: { x: 40, y: 50 },
+      source: 'preview',
+    });
+    runtime.actions.pointerMove({ point: { x: 55, y: 65 }, source: 'root' });
+
+    const movedSelection = { x: 35, y: 45, width: 120, height: 80 };
+    expect(runtime.renderState.editGesture).not.toBeNull();
+    expect(runtime.renderState.selection).toEqual(movedSelection);
+    expect(runtime.actions.pointerCancel()).toBe(true);
+    expect(runtime.renderState.editGesture).toBeNull();
+    expect(runtime.renderState.selection).toEqual(movedSelection);
+    runtime.actions.pointerMove({ point: { x: 80, y: 90 }, source: 'root' });
+    expect(runtime.renderState.selection).toEqual(movedSelection);
+
+    expect(
+      runtime.actions.resizePointerDown('se', {
+        point: { x: 155, y: 125 },
+        source: 'preview',
+      }),
+    ).toBe(true);
+    runtime.actions.pointerMove({ point: { x: 175, y: 140 }, source: 'root' });
+
+    const resizedSelection = { x: 35, y: 45, width: 140, height: 95 };
+    expect(runtime.renderState.editGesture).not.toBeNull();
+    expect(runtime.renderState.selection).toEqual(resizedSelection);
+    expect(runtime.actions.pointerCancel()).toBe(true);
+    expect(runtime.renderState.editGesture).toBeNull();
+    expect(runtime.renderState.selection).toEqual(resizedSelection);
+    runtime.actions.pointerMove({ point: { x: 200, y: 160 }, source: 'root' });
+    expect(runtime.renderState.selection).toEqual(resizedSelection);
+    expect(runtime.renderState.annotationHistory.annotations).toEqual([]);
+  });
+
   it('ignores a blank root click after the selection enters preview editing', async () => {
     const platform = createPlatform({
       session: createSession({ id: 'session-editor-blank-click' }),
@@ -1958,6 +2241,64 @@ describe('capture workspace runtime', () => {
     expect(runtime.renderState.hoverSelection).toEqual(higher);
   });
 
+  it('refreshes interface-element detection from the current pointer move', async () => {
+    const control = { x: 30, y: 40, width: 60, height: 24 };
+    const platform = createPlatform();
+    platform.commands.currentCaptureControlCandidate.mockResolvedValue({
+      id: 'control-pointer-move',
+      kind: 'control',
+      rect: control,
+      priority: 10_001,
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-control-pointer');
+    expect(runtime.actions.keyDown({ key: 'Tab' })).toBe(true);
+
+    runtime.actions.pointerMove({ x: 40, y: 50 });
+
+    await vi.waitFor(() =>
+      expect(platform.commands.currentCaptureControlCandidate).toHaveBeenCalledWith(
+        'session-1',
+        { x: 40, y: 50 },
+      ),
+    );
+    expect(runtime.renderState.hoverSelection).toEqual(control);
+  });
+
+  it('keeps one interface-element query in flight and queues only the latest point across Tab and pointer moves', async () => {
+    const latestControl = { x: 70, y: 80, width: 50, height: 20 };
+    const pendingInitial = deferred<null>();
+    const platform = createPlatform();
+    platform.commands.currentCaptureControlCandidate
+      .mockImplementationOnce(() => pendingInitial.promise)
+      .mockResolvedValue({
+        id: 'control-latest',
+        kind: 'control',
+        rect: latestControl,
+        priority: 10_001,
+      });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-control-coalesce');
+    runtime.actions.pointerMove({ x: 20, y: 20 });
+    expect(runtime.actions.keyDown({ key: 'Tab' })).toBe(true);
+    expect(platform.commands.currentCaptureControlCandidate).toHaveBeenCalledTimes(1);
+
+    runtime.actions.pointerMove({ x: 40, y: 50 });
+    runtime.actions.pointerMove({ x: 60, y: 70 });
+    runtime.actions.pointerMove({ x: 80, y: 90 });
+
+    expect(platform.commands.currentCaptureControlCandidate).toHaveBeenCalledTimes(1);
+    pendingInitial.resolve(null);
+    await vi.waitFor(() =>
+      expect(platform.commands.currentCaptureControlCandidate).toHaveBeenCalledTimes(2),
+    );
+    expect(platform.commands.currentCaptureControlCandidate).toHaveBeenLastCalledWith(
+      'session-1',
+      { x: 80, y: 90 },
+    );
+    expect(runtime.renderState.hoverSelection).toEqual(latestControl);
+  });
+
   it('consumes Tab before the initial cursor position is available', async () => {
     const platform = createPlatform();
     platform.commands.currentCaptureCursorPosition.mockResolvedValue(null);
@@ -1994,13 +2335,14 @@ describe('capture workspace runtime', () => {
 
     expect(runtime.actions.keyDown({ key: 'Tab' })).toBe(true);
     expect(runtime.actions.keyDown({ key: 'd' })).toBe(true);
+
+    expect(platform.commands.currentCaptureControlCandidate).toHaveBeenCalledTimes(1);
+    staleCandidate.reject(new Error('stale failure'));
+    await staleCandidate.promise.catch(() => undefined);
     await vi.waitFor(() =>
       expect(runtime.renderState.hoverSelection).toEqual(control),
     );
 
-    staleCandidate.reject(new Error('stale failure'));
-    await staleCandidate.promise.catch(() => undefined);
-    await Promise.resolve();
     expect(runtime.renderState).toMatchObject({
       status: 'selecting',
       candidateDetectionMode: 'control',
@@ -2069,43 +2411,33 @@ describe('capture workspace runtime', () => {
     });
   });
 
-  it('uses runtime-owned polled hover state for keyboard and native copy', async () => {
+  it('uses pointer-derived hover state for keyboard and native copy', async () => {
     const candidateB = { x: 200, y: 40, width: 80, height: 70 };
     const platform = createPlatform();
-    platform.commands.getCaptureSession.mockImplementation(async (id) => createSession({ id }));
+    platform.commands.getCaptureSession.mockImplementation(async (id) =>
+      createSession({
+        id,
+        candidates: [
+          { id: 'window-b', kind: 'window', rect: candidateB, priority: 10 },
+        ],
+      }),
+    );
     const runtime = createCaptureWorkspaceRuntime({ platform });
     await runtime.actions.startSession('screenshot-copy', 'session-poll-enter');
-    runtime.actions.updatePolledCursor({ x: 220, y: 60 });
-    runtime.actions.updatePolledHover(candidateB);
+    runtime.actions.pointerMove({ x: 220, y: 60 });
     expect(runtime.actions.keyDown({ key: 'Enter' })).toBe(true);
     await vi.waitFor(() => expect(platform.commands.outputCapture).toHaveBeenCalledWith(
       expect.objectContaining({ sessionId: 'session-poll-enter', rect: candidateB }),
     ));
 
     await runtime.actions.startSession('screenshot-copy', 'session-poll-native');
-    runtime.actions.updatePolledCursor({ x: 220, y: 60 });
-    runtime.actions.updatePolledHover(candidateB);
+    runtime.actions.pointerMove({ x: 220, y: 60 });
     await runtime.actions.connectHost();
     const copyCalls = platform.onCopyRequested.mock.calls;
     await copyCalls[copyCalls.length - 1]?.[0]?.();
     expect(platform.commands.outputCapture).toHaveBeenCalledWith(
       expect.objectContaining({ sessionId: 'session-poll-native', rect: candidateB }),
     );
-  });
-
-  it('does not notify subscribers for unchanged polled cursor or hover state', async () => {
-    const platform = createPlatform();
-    const runtime = createCaptureWorkspaceRuntime({ platform });
-    await runtime.actions.startSession('screenshot', 'session-poll-dedupe');
-    const listener = vi.fn();
-    runtime.subscribe(listener);
-
-    runtime.actions.updatePolledCursor({ x: 220, y: 60 });
-    runtime.actions.updatePolledCursor({ x: 220, y: 60 });
-    runtime.actions.updatePolledHover({ x: 200, y: 40, width: 80, height: 70 });
-    runtime.actions.updatePolledHover({ x: 200, y: 40, width: 80, height: 70 });
-
-    expect(listener).toHaveBeenCalledTimes(2);
   });
 
   it('cancels a selecting draft on Escape without delegating to the editor', async () => {
@@ -2784,8 +3116,7 @@ describe('capture workspace runtime', () => {
       isRenderingOutput: true,
     });
 
-    runtime.actions.updatePolledCursor({ x: 60, y: 70 });
-    runtime.actions.updatePolledHover({ x: 40, y: 50, width: 80, height: 60 });
+    runtime.actions.pointerMove({ x: 60, y: 70 });
     expect(runtime.renderState.cursorPoint).toBeNull();
     expect(runtime.renderState.hoverSelection).toBeNull();
 

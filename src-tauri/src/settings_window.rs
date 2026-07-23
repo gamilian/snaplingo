@@ -1,6 +1,9 @@
 use serde::Serialize;
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder, Window};
 
+#[cfg(target_os = "macos")]
+use objc2_app_kit::NSWindow;
+
 pub(crate) const SETTINGS_WINDOW_LABEL: &str = "settings";
 const SETTINGS_NAVIGATION_REQUESTED_EVENT: &str = "settings-navigation-requested";
 
@@ -75,6 +78,7 @@ pub(crate) fn show_settings_window_at(
         }
     };
 
+    configure_settings_window_for_deactivation(&window)?;
     window.show().map_err(|e| e.to_string())?;
     window.set_focus().map_err(|e| e.to_string())?;
     if !created {
@@ -85,6 +89,30 @@ pub(crate) fn show_settings_window_at(
         }
     }
     Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn configure_settings_window_for_deactivation(window: &tauri::WebviewWindow) -> Result<(), String> {
+    let ns_window = window.ns_window().map_err(|error| error.to_string())?;
+    if ns_window.is_null() {
+        return Err("Settings window has no native NSWindow".to_string());
+    }
+
+    let ns_window: &NSWindow = unsafe { &*ns_window.cast() };
+    ns_window.setHidesOnDeactivate(settings_window_hides_on_deactivate());
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn configure_settings_window_for_deactivation(
+    _window: &tauri::WebviewWindow,
+) -> Result<(), String> {
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn settings_window_hides_on_deactivate() -> bool {
+    false
 }
 
 fn settings_window_url(route: Option<SettingsWindowRoute>) -> String {
@@ -229,6 +257,12 @@ mod tests {
         assert!(should_hide_settings_window_instead_of_close(
             SETTINGS_WINDOW_LABEL
         ));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn settings_window_stays_visible_when_application_deactivates() {
+        assert!(!settings_window_hides_on_deactivate());
     }
 
     #[test]

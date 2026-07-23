@@ -57,8 +57,10 @@ describe('capture workspace production runtime wiring', () => {
     expect(captureView).toContain('actions.pointerMove');
     expect(captureView).toContain('actions.pointerUp');
     expect(runtime).toContain('actions.keyDown(event)');
-    expect(runtimeView).toContain('workflowRuntime.actions.updatePolledCursor');
-    expect(runtimeView).toContain('workflowRuntime.actions.updatePolledHover');
+    expect(runtimeView).not.toContain('startCaptureHoverSelectionPolling');
+    expect(runtime).toContain(
+      'scheduleControlCandidateRefresh(sessionId, point)',
+    );
     expect(runtimeView).not.toContain('workspace.syncHoverSelection');
   });
 

@@ -14,10 +14,6 @@ import type { CaptureWorkspaceRuntime } from './captureWorkspaceRuntimeTypes';
 import type { OcrSettings } from '../../application/settings/ports';
 import { prepareCaptureSurfaceForReveal } from './captureHostRuntime';
 import {
-  shouldPollCaptureHoverSelection,
-  startCaptureHoverSelectionPolling,
-} from './captureHoverPolling';
-import {
   shouldRequestCaptureMagnifierPixels,
   useCaptureMagnifierPixelSource,
 } from './captureMagnifierRuntime';
@@ -34,7 +30,6 @@ import { useCaptureWorkspaceRuntime } from './runtimeContext';
 
 const TOOLBAR_GAP = 14;
 const TOOLBAR_SIZE = { width: 700, height: 42 };
-const CAPTURE_HOVER_POLL_INTERVAL_MS = 16;
 
 interface CaptureWorkspaceRuntimeViewOptions {
   initialMode?: CaptureMode;
@@ -133,10 +128,8 @@ export function useCaptureWorkspaceRuntimeView({
       }),
     [runtimeRenderState],
   );
-  const cursorPointRef = useRef(runtimeRenderState.cursorPoint);
   const draftSelectionRef = useRef<LogicalRect | null>(null);
   const hoverSelectionRef = useRef(runtimeRenderState.hoverSelection);
-  cursorPointRef.current = runtimeRenderState.cursorPoint;
   draftSelectionRef.current =
     runtimeRenderState.status === 'selecting' && runtimeRenderState.startPoint
       ? runtimeRenderState.selection
@@ -151,7 +144,6 @@ export function useCaptureWorkspaceRuntimeView({
         ? runtimeRenderState.selection
         : null,
     viewportBounds: derived.viewportBounds,
-    cursorPointRef,
     draftSelectionRef,
     hoverSelectionRef,
     showSelectionSize: screenshotPreferences?.showSelectionSize ?? true,
@@ -166,62 +158,7 @@ export function useCaptureWorkspaceRuntimeView({
     requested: runtimeRenderState.isMagnifierRequested,
     status: runtimeRenderState.status,
   });
-  const shouldTrackMagnifierCursor =
-    isMagnifierRequested && derived.shouldTrackMagnifierCursor;
   const isMagnifierShown = isMagnifierRequested && derived.isMagnifierShown;
-
-  useEffect(() => {
-    if (!runtimeRenderState.session || !derived.selectionBounds) return;
-
-    return startCaptureHoverSelectionPolling({
-      sessionId: runtimeRenderState.session.id,
-      candidates: derived.captureCandidates,
-      shouldTrackMagnifierCursor,
-      intervalMs: CAPTURE_HOVER_POLL_INTERVAL_MS,
-      canPoll: () => {
-        const currentState = workflowRuntime.renderState;
-        return shouldPollCaptureHoverSelection({
-          status: currentState.status,
-          hasSession: currentState.sessionId !== null,
-          hasSelectionBounds: true,
-          hasActiveStartPoint: currentState.startPoint !== null,
-          hasEditGesture: currentState.editGesture !== null,
-        });
-      },
-      getCursorPosition: platformRuntime.commands.currentCaptureCursorPosition,
-      getHoverSelection:
-        runtimeRenderState.candidateDetectionMode === 'control'
-          ? async (point) =>
-              (
-                await platformRuntime.commands.currentCaptureControlCandidate(
-                  runtimeRenderState.session!.id,
-                  point,
-                )
-              )?.rect ?? null
-          : undefined,
-      setCursorPointRef: (point) => {
-        cursorPointRef.current = point;
-      },
-      setCursorPoint: workflowRuntime.actions.updatePolledCursor,
-      scheduleSelectionOverlayPaint: overlay.schedulePaint,
-      syncHoverSelection: workflowRuntime.actions.updatePolledHover,
-      setTimeout: window.setTimeout,
-      clearTimeout: window.clearTimeout,
-    });
-  }, [
-    derived.captureCandidates,
-    derived.selectionBounds,
-    shouldTrackMagnifierCursor,
-    overlay.schedulePaint,
-    platformRuntime.commands.currentCaptureCursorPosition,
-    platformRuntime.commands.currentCaptureControlCandidate,
-    runtimeRenderState.candidateDetectionMode,
-    runtimeRenderState.editGesture,
-    runtimeRenderState.session,
-    runtimeRenderState.startPoint,
-    runtimeRenderState.status,
-    workflowRuntime,
-  ]);
 
   const initialSessionRuntimeRef = useRef<CaptureWorkspaceRuntime | null>(null);
   useEffect(() => {
@@ -366,6 +303,7 @@ export function useCaptureWorkspaceRuntimeView({
       pointerDown: workflowRuntime.actions.pointerDown,
       pointerMove: workflowRuntime.actions.pointerMove,
       pointerUp: workflowRuntime.actions.pointerUp,
+      pointerCancel: workflowRuntime.actions.pointerCancel,
       resizePointerDown: workflowRuntime.actions.resizePointerDown,
       resizeAnnotationPointerDown:
         workflowRuntime.actions.resizeAnnotationPointerDown,

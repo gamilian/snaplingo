@@ -1,5 +1,5 @@
-import type { LogicalRect, Point } from './types';
-import { virtualPointToViewportPoint, virtualRectToViewportRect } from './virtualDesktop';
+import type { LogicalRect } from './types';
+import { virtualRectToViewportRect } from './virtualDesktop';
 
 type CaptureSelectionOverlayStatus = 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
 
@@ -18,12 +18,6 @@ export interface CaptureSelectionOverlayFrameInput {
   draftSelection: LogicalRect | null;
   hoverSelection: LogicalRect | null;
   showSelectionSize?: boolean;
-}
-
-export interface CaptureSelectionOverlayCursorInput {
-  status: CaptureSelectionOverlayStatus;
-  selectionBounds: LogicalRect | null;
-  cursorPoint: Point | null;
 }
 
 export interface CaptureSelectionOverlayContext {
@@ -53,8 +47,6 @@ export interface CaptureSelectionOverlayStyle {
 const LABEL_HEIGHT = 20;
 const LABEL_PADDING_X = 8;
 const LABEL_SELECTION_GAP = 6;
-const CROSSHAIR_ARM_LENGTH = 10;
-const CROSSHAIR_GAP = 3;
 
 export function getCaptureSelectionOverlayFrame({
   status,
@@ -103,21 +95,10 @@ function buildCaptureSelectionOverlayFrame(
   };
 }
 
-export function getCaptureSelectionOverlayCursor({
-  status,
-  selectionBounds,
-  cursorPoint,
-}: CaptureSelectionOverlayCursorInput): Point | null {
-  if (status !== 'selecting' || !selectionBounds || !cursorPoint) return null;
-
-  return virtualPointToViewportPoint(cursorPoint, selectionBounds);
-}
-
 export function drawCaptureSelectionOverlayFrame(
   context: CaptureSelectionOverlayContext,
   size: Size,
   frame: CaptureSelectionOverlayFrame | null,
-  cursor: Point | null = null,
   style: CaptureSelectionOverlayStyle = {},
 ) {
   context.clearRect(0, 0, size.width, size.height);
@@ -126,10 +107,6 @@ export function drawCaptureSelectionOverlayFrame(
     drawDimMask(context, size, frame.rect, style.maskColor);
     drawSelectionRect(context, frame, style.borderWidth, style.borderColor);
     if (frame.label) drawSizeLabel(context, size, frame);
-  }
-
-  if (cursor) {
-    drawCrosshairCursor(context, size, cursor);
   }
 }
 
@@ -227,39 +204,6 @@ function drawSizeLabel(
     snapCanvasTextPosition(labelX + LABEL_PADDING_X),
     snapCanvasTextPosition(labelY + 4),
   );
-}
-
-function drawCrosshairCursor(
-  context: CaptureSelectionOverlayContext,
-  size: Size,
-  cursor: Point,
-) {
-  const x = clamp(Math.round(cursor.x), 0, size.width);
-  const y = clamp(Math.round(cursor.y), 0, size.height);
-
-  context.fillStyle = 'rgba(0, 0, 0, 0.82)';
-  drawCrosshairLayer(context, x, y, 3);
-  context.fillStyle = 'rgba(255, 255, 255, 0.96)';
-  drawCrosshairLayer(context, x, y, 1);
-}
-
-function drawCrosshairLayer(
-  context: CaptureSelectionOverlayContext,
-  x: number,
-  y: number,
-  thickness: number,
-) {
-  const halfThickness = thickness / 2;
-  const left = x - CROSSHAIR_ARM_LENGTH;
-  const right = x + CROSSHAIR_GAP;
-  const top = y - CROSSHAIR_ARM_LENGTH;
-  const bottom = y + CROSSHAIR_GAP;
-  const armLength = CROSSHAIR_ARM_LENGTH - CROSSHAIR_GAP;
-
-  context.fillRect(left, y - halfThickness, armLength, thickness);
-  context.fillRect(right, y - halfThickness, armLength, thickness);
-  context.fillRect(x - halfThickness, top, thickness, armLength);
-  context.fillRect(x - halfThickness, bottom, thickness, armLength);
 }
 
 function clamp(value: number, min: number, max: number) {

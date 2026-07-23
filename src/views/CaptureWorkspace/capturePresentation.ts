@@ -17,7 +17,7 @@ export function getCaptureRootCursorStyle(
   activeAnnotationTool: AnnotationTool | null = null,
   strokeWidth = 2,
 ) {
-  if (status === 'selecting') return 'none';
+  if (status === 'selecting') return SELECTION_CROSSHAIR_CURSOR;
   return getCaptureEditorCursorStyle(activeAnnotationTool, strokeWidth);
 }
 
@@ -34,9 +34,21 @@ export function getCaptureEditorCursorStyle(
   return 'default';
 }
 
-function cursorDataUrl(svg: string, hotspotX: number, hotspotY: number) {
-  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${hotspotX} ${hotspotY}, auto`;
+function cursorDataUrl(
+  svg: string,
+  hotspotX: number,
+  hotspotY: number,
+  fallback = 'auto',
+) {
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${hotspotX} ${hotspotY}, ${fallback}`;
 }
+
+const SELECTION_CROSSHAIR_CURSOR = cursorDataUrl(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M16 1v10M16 21v10M1 16h10M21 16h10" fill="none" stroke="#000" stroke-width="3" stroke-linecap="square"/><path d="M16 1v10M16 21v10M1 16h10M21 16h10" fill="none" stroke="#fff" stroke-width="1.2" stroke-linecap="square"/><circle cx="16" cy="16" r="2.25" fill="#5b7fff" stroke="#000" stroke-width="1"/></svg>',
+  16,
+  16,
+  'crosshair',
+);
 
 function pencilCursor() {
   return cursorDataUrl(
