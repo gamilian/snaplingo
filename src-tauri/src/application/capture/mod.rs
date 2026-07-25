@@ -15,7 +15,7 @@ mod session_test;
 
 pub use image_composer::CaptureImageComposer;
 pub(crate) use image_composer::{ImageAnnotation, PngPlacement};
-pub(crate) use output::configured_capture_save_dir;
+pub(crate) use output::{configured_capture_save_dir, CaptureOutputHost, CaptureOutputSystemPaths};
 pub use output::{CaptureOutput, ClipboardCaptureOutput};
 pub use render::CaptureSessionOutput;
 pub use runtime::CaptureSessionRuntime;

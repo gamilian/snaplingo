@@ -261,6 +261,9 @@ fn commands_delegate_native_effects_to_application_seams() {
         .filter(|file| {
             file.source.contains("enigo::")
                 || file.source.contains("tauri_plugin_autostart")
+                || file
+                    .source
+                    .contains("crate::infrastructure::system::capture_window")
                 || file.source.contains(".logs.repository")
                 || file.source.contains("run_cleanup()")
         })

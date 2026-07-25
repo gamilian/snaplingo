@@ -1,30 +1,7 @@
 use std::process::Command;
-use std::sync::Arc;
 
-use async_trait::async_trait;
-
-use crate::application::capture::CaptureOutput;
-use crate::application::screenshot_favorites::{
-    ScreenshotFavoriteClipboard, ScreenshotFavoriteHost,
-};
+use crate::application::screenshot_favorites::ScreenshotFavoriteHost;
 use crate::{AppError, Result};
-
-pub struct CaptureOutputScreenshotClipboard {
-    output: Arc<CaptureOutput>,
-}
-
-impl CaptureOutputScreenshotClipboard {
-    pub fn new(output: Arc<CaptureOutput>) -> Self {
-        Self { output }
-    }
-}
-
-#[async_trait]
-impl ScreenshotFavoriteClipboard for CaptureOutputScreenshotClipboard {
-    async fn copy_png(&self, png_data: &[u8]) -> Result<()> {
-        self.output.copy_png(png_data).await
-    }
-}
 
 pub struct SystemScreenshotFavoriteHost;
 

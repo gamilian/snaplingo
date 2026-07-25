@@ -167,6 +167,18 @@ impl CaptureSessionRuntime {
         Ok(())
     }
 
+    pub async fn prepare_capture_window_for_reveal(&self) -> Result<()> {
+        self.host.prepare_capture_window_for_reveal().await
+    }
+
+    pub async fn reveal_capture_window(&self) -> Result<()> {
+        self.host.reveal_capture_window().await
+    }
+
+    pub async fn hide_capture_window(&self) -> Result<()> {
+        self.host.hide_capture_window().await
+    }
+
     pub async fn cancel_capture_session(&self, session_id: &CaptureSessionId) -> Result<()> {
         let restore_result = self
             .restore_capture_snapshot_windows_for_session_id(session_id)
@@ -368,6 +380,8 @@ mod tests {
     #[derive(Debug, Clone, PartialEq)]
     enum HostCall {
         BeginPresentation,
+        PrepareCaptureWindowForReveal,
+        RevealCaptureWindow,
         HideCaptureWindow,
         OpenCaptureWindow {
             mode: String,
@@ -428,6 +442,22 @@ mod tests {
         async fn end_capture_presentation(&self) -> crate::Result<()> {
             self.calls.lock().unwrap().push(HostCall::EndPresentation);
             self.end_result.clone().map_err(AppError::from)
+        }
+
+        async fn prepare_capture_window_for_reveal(&self) -> crate::Result<()> {
+            self.calls
+                .lock()
+                .unwrap()
+                .push(HostCall::PrepareCaptureWindowForReveal);
+            Ok(())
+        }
+
+        async fn reveal_capture_window(&self) -> crate::Result<()> {
+            self.calls
+                .lock()
+                .unwrap()
+                .push(HostCall::RevealCaptureWindow);
+            Ok(())
         }
 
         async fn hide_capture_window(&self) -> crate::Result<()> {
@@ -598,6 +628,25 @@ mod tests {
         );
 
         (runtime, sessions)
+    }
+
+    #[tokio::test]
+    async fn capture_window_visibility_uses_runtime_host_seam() {
+        let host = Arc::new(RecordingRuntimeHost::succeeds());
+        let (runtime, _) = make_runtime(host.clone(), vec![make_snapshot()]);
+
+        runtime.prepare_capture_window_for_reveal().await.unwrap();
+        runtime.reveal_capture_window().await.unwrap();
+        runtime.hide_capture_window().await.unwrap();
+
+        assert_eq!(
+            host.calls(),
+            vec![
+                HostCall::PrepareCaptureWindowForReveal,
+                HostCall::RevealCaptureWindow,
+                HostCall::HideCaptureWindow,
+            ]
+        );
     }
 
     #[tokio::test]

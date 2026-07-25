@@ -11,6 +11,8 @@ pub trait CaptureCursorMover: Send + Sync {
 pub(crate) trait CaptureSessionRuntimeHost: Send + Sync {
     async fn begin_capture_presentation(&self) -> Result<()>;
     async fn end_capture_presentation(&self) -> Result<()>;
+    async fn prepare_capture_window_for_reveal(&self) -> Result<()>;
+    async fn reveal_capture_window(&self) -> Result<()>;
     async fn hide_capture_window(&self) -> Result<()>;
     async fn destroy_inactive_capture_window(&self) -> Result<()>;
     async fn open_capture_window_for_session(
@@ -35,6 +37,14 @@ impl CaptureSessionRuntimeHost for UnconfiguredCaptureSessionRuntimeHost {
     }
 
     async fn end_capture_presentation(&self) -> Result<()> {
+        Err("Capture session host is not configured".into())
+    }
+
+    async fn prepare_capture_window_for_reveal(&self) -> Result<()> {
+        Err("Capture session host is not configured".into())
+    }
+
+    async fn reveal_capture_window(&self) -> Result<()> {
         Err("Capture session host is not configured".into())
     }
 
@@ -80,6 +90,14 @@ mod tests {
         }
 
         async fn end_capture_presentation(&self) -> Result<()> {
+            Ok(())
+        }
+
+        async fn prepare_capture_window_for_reveal(&self) -> Result<()> {
+            Ok(())
+        }
+
+        async fn reveal_capture_window(&self) -> Result<()> {
             Ok(())
         }
 

@@ -1,12 +1,32 @@
-use std::borrow::Cow;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
-use arboard::{Clipboard, ImageData};
+use chrono::{DateTime, Local};
 use image::{DynamicImage, ImageEncoder};
 
 use crate::error::{AppError, Result};
 
-pub struct CaptureOutput;
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct CaptureOutputSystemPaths {
+    pub(crate) download_dir: Option<PathBuf>,
+    pub(crate) picture_dir: Option<PathBuf>,
+    pub(crate) home_dir: Option<PathBuf>,
+    pub(crate) temp_dir: PathBuf,
+}
+
+pub(crate) trait CaptureOutputHost: Send + Sync {
+    fn system_paths(&self) -> CaptureOutputSystemPaths;
+    fn now(&self) -> DateTime<Local>;
+    fn path_exists(&self, path: &Path) -> bool;
+    fn write_file(&self, path: &Path, data: &[u8]) -> Result<()>;
+    fn copy_png(&self, data: &[u8]) -> Result<()>;
+    fn read_clipboard_png(&self) -> Result<Vec<u8>>;
+    fn read_clipboard_text(&self) -> Result<String>;
+}
+
+pub struct CaptureOutput {
+    host: Arc<dyn CaptureOutputHost>,
+}
 
 pub enum ClipboardCaptureOutput {
     Png(Vec<u8>),
@@ -14,8 +34,13 @@ pub enum ClipboardCaptureOutput {
 }
 
 impl CaptureOutput {
-    pub fn new() -> Self {
-        Self
+    pub(crate) fn with_host(host: Arc<dyn CaptureOutputHost>) -> Self {
+        Self { host }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn new() -> Self {
+        Self::with_host(Arc::new(TestCaptureOutputHost))
     }
 
     pub fn default_capture_save_path(
@@ -25,20 +50,22 @@ impl CaptureOutput {
         naming_rule: &str,
         custom_file_name: &str,
     ) -> PathBuf {
+        let paths = self.host.system_paths();
         let base_dir = directory
             .map(str::trim)
             .filter(|path| !path.is_empty())
-            .map(configured_capture_save_dir_for_system)
-            .or_else(dirs::download_dir)
-            .or_else(dirs::picture_dir)
-            .or_else(dirs::home_dir)
-            .unwrap_or_else(std::env::temp_dir);
+            .map(|path| configured_capture_save_dir_for_system(path, paths.home_dir.as_deref()))
+            .or(paths.download_dir)
+            .or(paths.picture_dir)
+            .or(paths.home_dir)
+            .unwrap_or(paths.temp_dir);
         configured_capture_save_path(
             &base_dir,
             format,
             naming_rule,
             custom_file_name,
-            chrono::Local::now(),
+            self.host.now(),
+            &|path| self.host.path_exists(path),
         )
     }
 
@@ -49,26 +76,24 @@ impl CaptureOutput {
         naming_rule: &str,
         custom_file_name: &str,
     ) -> PathBuf {
+        let paths = self.host.system_paths();
         let base_dir = directory
             .map(str::trim)
             .filter(|path| !path.is_empty())
-            .map(configured_capture_save_dir_for_system)
-            .unwrap_or_else(default_quick_capture_save_dir);
+            .map(|path| configured_capture_save_dir_for_system(path, paths.home_dir.as_deref()))
+            .unwrap_or_else(|| default_quick_capture_save_dir(&paths));
         configured_capture_save_path(
             &base_dir,
             format,
             naming_rule,
             custom_file_name,
-            chrono::Local::now(),
+            self.host.now(),
+            &|path| self.host.path_exists(path),
         )
     }
 
     pub async fn save_png(&self, data: &[u8], path: &Path) -> Result<PathBuf> {
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-
-        std::fs::write(path, data)?;
+        self.host.write_file(path, data)?;
 
         Ok(path.to_path_buf())
     }
@@ -81,39 +106,20 @@ impl CaptureOutput {
         quality: u8,
     ) -> Result<PathBuf> {
         let encoded = encode_capture_image(png_data, format, quality)?;
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        std::fs::write(path, encoded)?;
+        self.host.write_file(path, &encoded)?;
         Ok(path.to_path_buf())
     }
 
     pub async fn copy_png(&self, data: &[u8]) -> Result<()> {
-        let image = Self::png_to_clipboard_image(data)?;
-        let mut clipboard = Clipboard::new()
-            .map_err(|e| AppError::System(format!("Failed to open clipboard: {}", e)))?;
-        clipboard
-            .set_image(image)
-            .map_err(|e| AppError::System(format!("Failed to copy image to clipboard: {}", e)))
+        self.host.copy_png(data)
     }
 
     pub fn read_clipboard_png(&self) -> Result<Vec<u8>> {
-        let mut clipboard = Clipboard::new()
-            .map_err(|e| AppError::System(format!("Failed to open clipboard: {}", e)))?;
-        let image = clipboard
-            .get_image()
-            .map_err(|e| AppError::System(format!("Failed to read image from clipboard: {}", e)))?;
-
-        Self::clipboard_image_to_png(image)
+        self.host.read_clipboard_png()
     }
 
     pub fn read_clipboard_text(&self) -> Result<String> {
-        let mut clipboard = Clipboard::new()
-            .map_err(|e| AppError::System(format!("Failed to open clipboard: {}", e)))?;
-
-        clipboard
-            .get_text()
-            .map_err(|e| AppError::System(format!("Failed to read text from clipboard: {}", e)))
+        self.host.read_clipboard_text()
     }
 
     pub fn read_clipboard_capture_output(&self) -> Result<ClipboardCaptureOutput> {
@@ -131,34 +137,6 @@ impl CaptureOutput {
             }
         }
     }
-
-    pub fn png_to_clipboard_image(data: &[u8]) -> Result<ImageData<'static>> {
-        let image = image::load_from_memory(data)
-            .map_err(|e| AppError::System(format!("Failed to decode PNG for clipboard: {}", e)))?
-            .to_rgba8();
-        let (width, height) = image.dimensions();
-
-        Ok(ImageData {
-            width: width as usize,
-            height: height as usize,
-            bytes: Cow::Owned(image.into_raw()),
-        })
-    }
-
-    pub fn clipboard_image_to_png(image: ImageData<'_>) -> Result<Vec<u8>> {
-        let mut png = Vec::new();
-        let encoder = image::codecs::png::PngEncoder::new(&mut png);
-        encoder
-            .write_image(
-                &image.bytes,
-                image.width as u32,
-                image.height as u32,
-                image::ExtendedColorType::Rgba8,
-            )
-            .map_err(|e| AppError::System(format!("Failed to encode clipboard image: {}", e)))?;
-
-        Ok(png)
-    }
 }
 
 pub(crate) fn configured_capture_save_path(
@@ -166,7 +144,8 @@ pub(crate) fn configured_capture_save_path(
     format: &str,
     naming_rule: &str,
     custom_file_name: &str,
-    now: chrono::DateTime<chrono::Local>,
+    now: DateTime<Local>,
+    path_exists: &dyn Fn(&Path) -> bool,
 ) -> PathBuf {
     let extension = capture_extension(format);
     let base_name = match naming_rule {
@@ -177,14 +156,14 @@ pub(crate) fn configured_capture_save_path(
     };
 
     if naming_rule == "counter" {
-        return first_available_capture_path(base_dir, &base_name, extension, 1, 3);
+        return first_available_capture_path(base_dir, &base_name, extension, 1, 3, path_exists);
     }
 
     let direct = base_dir.join(format!("{base_name}.{extension}"));
-    if !direct.exists() {
+    if !path_exists(&direct) {
         return direct;
     }
-    first_available_capture_path(base_dir, &base_name, extension, 2, 0)
+    first_available_capture_path(base_dir, &base_name, extension, 2, 0, path_exists)
 }
 
 fn first_available_capture_path(
@@ -193,6 +172,7 @@ fn first_available_capture_path(
     extension: &str,
     start: u32,
     width: usize,
+    path_exists: &dyn Fn(&Path) -> bool,
 ) -> PathBuf {
     for counter in start..u32::MAX {
         let suffix = if width == 0 {
@@ -201,7 +181,7 @@ fn first_available_capture_path(
             format!("{counter:0width$}")
         };
         let path = base_dir.join(format!("{base_name}_{suffix}.{extension}"));
-        if !path.exists() {
+        if !path_exists(&path) {
             return path;
         }
     }
@@ -269,10 +249,12 @@ fn encode_webp(image: &DynamicImage, quality: u8) -> Result<Vec<u8>> {
     )
 }
 
-fn default_quick_capture_save_dir() -> PathBuf {
-    dirs::picture_dir()
-        .or_else(dirs::home_dir)
-        .unwrap_or_else(std::env::temp_dir)
+fn default_quick_capture_save_dir(paths: &CaptureOutputSystemPaths) -> PathBuf {
+    paths
+        .picture_dir
+        .clone()
+        .or_else(|| paths.home_dir.clone())
+        .unwrap_or_else(|| paths.temp_dir.clone())
         .join("SnapLingo")
 }
 
@@ -288,18 +270,69 @@ pub(crate) fn configured_capture_save_dir(configured: &str, home_dir: &Path) -> 
     PathBuf::from(configured)
 }
 
-fn configured_capture_save_dir_for_system(configured: &str) -> PathBuf {
+fn configured_capture_save_dir_for_system(configured: &str, home_dir: Option<&Path>) -> PathBuf {
     if configured == "~" || configured.starts_with("~/") {
-        if let Some(home) = dirs::home_dir() {
-            return configured_capture_save_dir(configured, &home);
+        if let Some(home) = home_dir {
+            return configured_capture_save_dir(configured, home);
         }
     }
 
     PathBuf::from(configured)
 }
 
+#[cfg(test)]
 impl Default for CaptureOutput {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+struct TestCaptureOutputHost;
+
+#[cfg(test)]
+impl CaptureOutputHost for TestCaptureOutputHost {
+    fn system_paths(&self) -> CaptureOutputSystemPaths {
+        let temp_dir = std::env::temp_dir();
+        CaptureOutputSystemPaths {
+            download_dir: Some(temp_dir.join("Downloads")),
+            picture_dir: Some(temp_dir.join("Pictures")),
+            home_dir: Some(temp_dir.join("Home")),
+            temp_dir,
+        }
+    }
+
+    fn now(&self) -> DateTime<Local> {
+        Local::now()
+    }
+
+    fn path_exists(&self, path: &Path) -> bool {
+        path.exists()
+    }
+
+    fn write_file(&self, path: &Path, data: &[u8]) -> Result<()> {
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(path, data)?;
+        Ok(())
+    }
+
+    fn copy_png(&self, _data: &[u8]) -> Result<()> {
+        Err(AppError::System(
+            "Clipboard is unavailable in a test host".into(),
+        ))
+    }
+
+    fn read_clipboard_png(&self) -> Result<Vec<u8>> {
+        Err(AppError::System(
+            "Clipboard image is unavailable in a test host".into(),
+        ))
+    }
+
+    fn read_clipboard_text(&self) -> Result<String> {
+        Err(AppError::System(
+            "Clipboard text is unavailable in a test host".into(),
+        ))
     }
 }

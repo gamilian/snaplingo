@@ -1,17 +1,17 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
+
 use crate::application::screenshot_favorites::{
     ScreenshotFavoriteCapture, ScreenshotFavoriteCaptureRenderer, ScreenshotFavoriteChangeNotifier,
-    ScreenshotFavorites,
+    ScreenshotFavoriteClipboard, ScreenshotFavorites,
 };
 use crate::application::{CaptureSessionRuntime, FavoriteCapacity};
 use crate::domain::capture::{AnnotationCommand, CaptureSessionId, LogicalRect};
 use crate::infrastructure::storage::{
     Database, FilesystemScreenshotFavoriteAssets, SqliteScreenshotFavoriteRepository,
 };
-use crate::infrastructure::system::screenshot_favorites::{
-    CaptureOutputScreenshotClipboard, SystemScreenshotFavoriteHost,
-};
+use crate::infrastructure::system::screenshot_favorites::SystemScreenshotFavoriteHost;
 use crate::{CaptureOutput, Result};
 use tauri::{AppHandle, Emitter};
 
@@ -29,6 +29,17 @@ impl ScreenshotFavoriteChangeNotifier for TauriScreenshotFavoriteChangeNotifier 
 
 struct CaptureRuntimeFavoriteRenderer {
     runtime: Arc<CaptureSessionRuntime>,
+}
+
+struct CaptureOutputScreenshotClipboard {
+    output: Arc<CaptureOutput>,
+}
+
+#[async_trait]
+impl ScreenshotFavoriteClipboard for CaptureOutputScreenshotClipboard {
+    async fn copy_png(&self, png_data: &[u8]) -> Result<()> {
+        self.output.copy_png(png_data).await
+    }
 }
 
 impl ScreenshotFavoriteCaptureRenderer for CaptureRuntimeFavoriteRenderer {
@@ -55,7 +66,9 @@ pub(crate) fn build_screenshot_favorites(
     let favorites = Arc::new(ScreenshotFavorites::with_change_notifier_and_capacity(
         Arc::new(SqliteScreenshotFavoriteRepository::new(database)),
         Arc::new(FilesystemScreenshotFavoriteAssets::new(asset_root)),
-        Arc::new(CaptureOutputScreenshotClipboard::new(capture_output)),
+        Arc::new(CaptureOutputScreenshotClipboard {
+            output: capture_output,
+        }),
         Arc::new(SystemScreenshotFavoriteHost),
         Arc::new(TauriScreenshotFavoriteChangeNotifier { app }),
         capacity,

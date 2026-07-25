@@ -8,7 +8,7 @@ use crate::Result;
 use super::{
     begin_capture_presentation, capture_window_bounds, destroy_inactive_capture_window,
     end_capture_presentation, hide_capture_window, open_capture_window_for_session,
-    restore_capture_snapshot_windows,
+    prepare_capture_window_for_reveal, restore_capture_snapshot_windows, reveal_capture_window,
 };
 
 pub(crate) struct TauriCaptureSessionRuntimeHost {
@@ -33,6 +33,20 @@ impl CaptureSessionRuntimeHost for TauriCaptureSessionRuntimeHost {
     async fn end_capture_presentation(&self) -> Result<()> {
         run_on_main_thread(&self.app, "end capture presentation", |app| {
             end_capture_presentation(&app)
+        })
+        .await
+    }
+
+    async fn prepare_capture_window_for_reveal(&self) -> Result<()> {
+        run_on_main_thread(&self.app, "prepare capture window for reveal", |app| {
+            prepare_capture_window_for_reveal(&app)
+        })
+        .await
+    }
+
+    async fn reveal_capture_window(&self) -> Result<()> {
+        run_on_main_thread(&self.app, "reveal capture window", |app| {
+            reveal_capture_window(&app)
         })
         .await
     }

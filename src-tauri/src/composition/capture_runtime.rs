@@ -5,6 +5,7 @@ use tauri::AppHandle;
 use crate::application::capture::CaptureImageComposer;
 use crate::application::pinned_image::PinnedImageState;
 use crate::application::providers::ocr::OcrCoordinator;
+use crate::infrastructure::system::capture_output::SystemCaptureOutputHost;
 use crate::infrastructure::system::capture_window::TauriCaptureSessionRuntimeHost;
 use crate::infrastructure::system::pinned_window::TauriPinnedImageRuntimeHost;
 use crate::infrastructure::system::screenshot::get_capture_session_source;
@@ -24,7 +25,7 @@ pub(crate) fn build_capture_runtime(
     let capture_session_source = get_capture_session_source();
     let sessions = Arc::new(CaptureSessions::new(capture_session_source));
     let image_composer = Arc::new(CaptureImageComposer::new());
-    let output = Arc::new(CaptureOutput::new());
+    let output = Arc::new(CaptureOutput::with_host(Arc::new(SystemCaptureOutputHost)));
     let runtime = Arc::new(CaptureSessionRuntime::with_host(
         sessions.clone(),
         image_composer.clone(),

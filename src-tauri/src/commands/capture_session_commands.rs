@@ -9,11 +9,6 @@ use crate::domain::capture::{
     LogicalRect, MonitorSnapshotView,
 };
 use crate::domain::ocr::OcrResult;
-use crate::infrastructure::system::capture_window::{
-    hide_capture_window as hide_capture_window_for_app,
-    prepare_capture_window_for_reveal as prepare_capture_window_for_reveal_for_app,
-    reveal_capture_window as reveal_capture_window_for_app,
-};
 
 static CAPTURE_SHORTCUT_OPEN_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 
@@ -59,18 +54,35 @@ pub async fn create_capture_session(
 }
 
 #[tauri::command]
-pub async fn reveal_capture_window(app: AppHandle) -> Result<(), String> {
-    reveal_capture_window_on_main_thread(&app).await
+pub async fn reveal_capture_window(state: State<'_, crate::AppState>) -> Result<(), String> {
+    state
+        .capture
+        .runtime
+        .reveal_capture_window()
+        .await
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
-pub async fn prepare_capture_window_for_reveal(app: AppHandle) -> Result<(), String> {
-    prepare_capture_window_for_reveal_on_main_thread(&app).await
+pub async fn prepare_capture_window_for_reveal(
+    state: State<'_, crate::AppState>,
+) -> Result<(), String> {
+    state
+        .capture
+        .runtime
+        .prepare_capture_window_for_reveal()
+        .await
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
-pub async fn hide_capture_window(app: AppHandle) -> Result<(), String> {
-    hide_capture_window_on_main_thread(&app).await
+pub async fn hide_capture_window(state: State<'_, crate::AppState>) -> Result<(), String> {
+    state
+        .capture
+        .runtime
+        .hide_capture_window()
+        .await
+        .map_err(|error| error.to_string())
 }
 
 fn capture_session_view_base64_bytes(session: &CaptureSessionView) -> usize {
@@ -88,48 +100,6 @@ fn capture_session_view_base64_bytes(session: &CaptureSessionView) -> usize {
 
 fn elapsed_ms(start: Instant) -> f64 {
     start.elapsed().as_secs_f64() * 1000.0
-}
-
-async fn run_on_main_thread<T, F>(
-    app: &AppHandle,
-    operation_name: &'static str,
-    operation: F,
-) -> Result<T, String>
-where
-    T: Send + 'static,
-    F: FnOnce(AppHandle) -> Result<T, String> + Send + 'static,
-{
-    let (sender, receiver) = tokio::sync::oneshot::channel();
-    let app_for_operation = app.clone();
-    app.run_on_main_thread(move || {
-        let _ = sender.send(operation(app_for_operation));
-    })
-    .map_err(|e| format!("Failed to dispatch {operation_name}: {e}"))?;
-
-    receiver
-        .await
-        .map_err(|e| format!("Failed to receive {operation_name} result: {e}"))?
-}
-
-async fn reveal_capture_window_on_main_thread(app: &AppHandle) -> Result<(), String> {
-    run_on_main_thread(app, "reveal capture window", |app| {
-        reveal_capture_window_for_app(&app)
-    })
-    .await
-}
-
-async fn prepare_capture_window_for_reveal_on_main_thread(app: &AppHandle) -> Result<(), String> {
-    run_on_main_thread(app, "prepare capture window for reveal", |app| {
-        prepare_capture_window_for_reveal_for_app(&app)
-    })
-    .await
-}
-
-async fn hide_capture_window_on_main_thread(app: &AppHandle) -> Result<(), String> {
-    run_on_main_thread(app, "hide capture window", |app| {
-        hide_capture_window_for_app(&app)
-    })
-    .await
 }
 
 #[tauri::command]

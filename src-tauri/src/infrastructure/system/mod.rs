@@ -1,4 +1,5 @@
 pub mod capture_cursor;
+pub(crate) mod capture_output;
 pub mod capture_window;
 pub mod ocr;
 pub mod paths;
