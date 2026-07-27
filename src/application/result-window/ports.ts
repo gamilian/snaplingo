@@ -77,7 +77,7 @@ export interface ResultWindowCommandsPort {
     imageData: Uint8Array | number[];
     result: OcrResult;
     language?: string;
-    providerUsed?: string;
+    providerUsed: string;
   }): Promise<number>;
 }
 

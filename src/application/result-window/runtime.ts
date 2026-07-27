@@ -42,6 +42,7 @@ export interface ResultWindowStatePort {
   showOcrWindow(): void;
   hideResultWindow(): void;
   loadActiveTranslationProviderIds(): Promise<string[]>;
+  loadActiveOcrProviderId(): Promise<string | null>;
   getTranslationSession(): {
     sessionId: string | null;
     sourceText: string;
@@ -74,6 +75,20 @@ export interface ResultWindowResizeInput {
   mode: 'translation' | 'ocr';
   origin?: ResultWindowOrigin;
   panelHeightPx: number;
+}
+
+export interface ResultWindowTranslationFavoriteInput {
+  text: string;
+  sourceLang: string;
+  targetLang: string;
+  result: TranslationResult;
+}
+
+export interface ResultWindowTranslationFavoritesInput {
+  text: string;
+  sourceLang: string;
+  targetLang: string;
+  results: TranslationResult[];
 }
 
 const resultWindowStandaloneContainerPaddingPx = 16;
@@ -328,12 +343,49 @@ export function createResultWindowRuntime({
     confidence: number | null,
   ) {
     const recognitionLanguage = getOcrSettings?.()?.recognitionLanguage;
+    const providerUsed = await state.loadActiveOcrProviderId();
     return platform.commands.favoriteOcrResult({
       imageData: imageBase64 ? base64ToBytes(imageBase64) : [],
       result: { text, confidence },
       language:
         recognitionLanguage === 'auto' ? undefined : recognitionLanguage,
+      providerUsed: providerUsed ?? 'manual',
     });
+  }
+
+  function favoriteTranslationResult(
+    input: ResultWindowTranslationFavoriteInput,
+  ) {
+    const { targetLang } = resolveTranslationRequestLanguages(
+      input.text,
+      input.sourceLang,
+      input.targetLang,
+    );
+    return platform.commands.favoriteTranslationResult({
+      text: input.text,
+      sourceLang: input.sourceLang,
+      targetLang,
+      result: input.result,
+    });
+  }
+
+  function favoriteTranslationResults(
+    input: ResultWindowTranslationFavoritesInput,
+  ) {
+    return Promise.all(
+      input.results.map((result) =>
+        favoriteTranslationResult({
+          text: input.text,
+          sourceLang: input.sourceLang,
+          targetLang: input.targetLang,
+          result,
+        }),
+      ),
+    );
+  }
+
+  function copyText(text: string) {
+    return platform.clipboard.copyText(text);
   }
 
   async function close(presentation: ResultWindowPresentation) {
@@ -401,14 +453,15 @@ export function createResultWindowRuntime({
   }
 
   return {
-    commands: platform.commands,
-    clipboard: platform.clipboard,
     loadCurrentPayload,
     loadPayload,
     applyPayload,
     subscribeToPayloads,
     startFileOcr,
+    favoriteTranslationResult,
+    favoriteTranslationResults,
     favoriteOcrResult,
+    copyText,
     speakText,
     translate,
     retryTranslationProvider,

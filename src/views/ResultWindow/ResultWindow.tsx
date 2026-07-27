@@ -461,21 +461,12 @@ function ResultWindowContent({
 
     setTranslationFavoritePending(true);
     try {
-      await Promise.all(
-        completedTranslationResults.map((result) =>
-          runtime.commands.favoriteTranslationResult({
-            text: sourceText,
-            sourceLang,
-            targetLang: resolvedTargetLanguage,
-            result: {
-              provider_id: result.provider_id,
-              translated_text: result.translated_text,
-              detected_language: result.detected_language,
-              confidence: result.confidence,
-            },
-          }),
-        ),
-      );
+      await runtime.favoriteTranslationResults({
+        text: sourceText,
+        sourceLang,
+        targetLang,
+        results: completedTranslationResults,
+      });
       setFavoritedTranslationKeys((current) => {
         const next = new Set(current);
         completedTranslationResults.forEach((result) =>
@@ -491,10 +482,10 @@ function ResultWindowContent({
   }, [
     completedTranslationResults,
     isTranslationFavoritePending,
-    resolvedTargetLanguage,
     runtime,
     sourceLang,
     sourceText,
+    targetLang,
     translationResultFavoriteKey,
   ]);
 
@@ -889,7 +880,7 @@ function ResultWindowContent({
                               aria-label={`复制${token.label}: ${token.value}`}
                               className={resultWindowOcrTokenButtonClassName()}
                               onClick={() => {
-                                void runtime.clipboard.copyText(token.value);
+                                void runtime.copyText(token.value);
                               }}
                             >
                               <span className="shrink-0 text-slate-400">
@@ -947,7 +938,7 @@ function ResultWindowContent({
                           disabled={!ocrText.trim()}
                           className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
                           onClick={() => {
-                            void runtime.clipboard.copyText(ocrText);
+                            void runtime.copyText(ocrText);
                           }}
                         >
                           <CopyIcon className="h-4 w-4" />
@@ -1064,7 +1055,7 @@ function ResultWindowContent({
                           disabled={!ocrText.trim()}
                           className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
                           onClick={() => {
-                            void runtime.clipboard.copyText(ocrText);
+                            void runtime.copyText(ocrText);
                           }}
                         >
                           <CopyIcon className="h-4 w-4" />
@@ -1167,7 +1158,7 @@ function ResultWindowContent({
                       disabled={!sourceText.trim()}
                       className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
                       onClick={() => {
-                        void runtime.clipboard.copyText(sourceText);
+                        void runtime.copyText(sourceText);
                       }}
                     >
                       <CopyIcon className="h-4 w-4" />
@@ -1245,16 +1236,11 @@ function ResultWindowContent({
                         void runtime.retryTranslationProvider(result.provider_id);
                       }}
                       onFavorite={() =>
-                        runtime.commands.favoriteTranslationResult({
+                        runtime.favoriteTranslationResult({
                           text: sourceText,
                           sourceLang,
-                          targetLang: resolvedTargetLanguage,
-                          result: {
-                            provider_id: result.provider_id,
-                            translated_text: result.translated_text,
-                            detected_language: result.detected_language,
-                            confidence: result.confidence,
-                          },
+                          targetLang,
+                          result,
                         }).then(() => {
                           setFavoritedTranslationKeys((current) =>
                             new Set(current).add(
@@ -1266,7 +1252,7 @@ function ResultWindowContent({
                       isFavorite={favoritedTranslationKeys.has(
                         translationResultFavoriteKey(result),
                       )}
-                      copyText={runtime.clipboard.copyText}
+                      copyText={runtime.copyText}
                       speakText={runtime.speakText}
                     />
                   ))}

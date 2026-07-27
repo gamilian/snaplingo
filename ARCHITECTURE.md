@@ -39,7 +39,7 @@ React Views
   - `favorite_capacity` owns the global Favorites maximum and serializes capacity check plus insertion across regular and screenshot Favorites.
   - `favorites::OcrFavoriteApplication` owns Provider fallback, History source recovery, Favorite insertion, and OCR Favorite replay through local seams.
   - `library_index` owns lightweight cross-source ordering so only final-page History and Favorites records are hydrated.
-  - `capture`, `result_window`, and `pinned_image` own window/runtime-host ports.
+  - `capture`, `result_window`, and `pinned_image` own window/runtime-host ports. Result Window also owns translation/OCR favorite orchestration, OCR Provider fallback, and clipboard intents instead of exposing its platform adapters to Views.
   - `selected_text` owns its method and context ports.
   - `required_permissions` owns permission ordering and status policy.
   - `tts` owns speech normalization against persisted voice and rate settings.

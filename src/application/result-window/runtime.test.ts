@@ -138,7 +138,91 @@ describe('result window application runtime', () => {
       imageData: new Uint8Array([1, 2, 3]),
       result: { text: 'recognized', confidence: 0.9 },
       language: 'ja',
+      providerUsed: 'manual',
     });
+  });
+
+  it('owns OCR provider fallback when favoriting a result', async () => {
+    const { runtime, platform, state } = createRuntime({
+      activeOcrProviderId: 'system',
+    });
+
+    await runtime.favoriteOcrResult(null, 'recognized', null);
+
+    expect(state.loadActiveOcrProviderId).toHaveBeenCalledTimes(1);
+    expect(platform.commands.favoriteOcrResult).toHaveBeenCalledWith({
+      imageData: [],
+      result: { text: 'recognized', confidence: null },
+      language: undefined,
+      providerUsed: 'system',
+    });
+  });
+
+  it('owns single and aggregate translation favorite workflows', async () => {
+    const { runtime, platform } = createRuntime();
+    const google = {
+      provider_id: 'google',
+      translated_text: '你好',
+      detected_language: 'en',
+      confidence: null,
+    };
+    const deeplx = {
+      provider_id: 'deeplx',
+      translated_text: '您好',
+      detected_language: 'en',
+      confidence: null,
+    };
+
+    await runtime.favoriteTranslationResult({
+      text: 'hello',
+      sourceLang: 'en',
+      targetLang: 'auto',
+      result: google,
+    });
+    await runtime.favoriteTranslationResults({
+      text: '你好',
+      sourceLang: 'zh-CN',
+      targetLang: 'auto',
+      results: [google, deeplx],
+    });
+
+    expect(platform.commands.favoriteTranslationResult).toHaveBeenNthCalledWith(
+      1,
+      {
+        text: 'hello',
+        sourceLang: 'en',
+        targetLang: 'zh-CN',
+        result: google,
+      },
+    );
+    expect(platform.commands.favoriteTranslationResult).toHaveBeenNthCalledWith(
+      2,
+      {
+        text: '你好',
+        sourceLang: 'zh-CN',
+        targetLang: 'en',
+        result: google,
+      },
+    );
+    expect(platform.commands.favoriteTranslationResult).toHaveBeenNthCalledWith(
+      3,
+      {
+        text: '你好',
+        sourceLang: 'zh-CN',
+        targetLang: 'en',
+        result: deeplx,
+      },
+    );
+  });
+
+  it('exposes result-window intents without leaking platform adapters', async () => {
+    const { runtime, platform } = createRuntime();
+
+    await runtime.copyText('sample');
+
+    expect(platform.clipboard.copyText).toHaveBeenCalledWith('sample');
+    expect(runtime).not.toHaveProperty('commands');
+    expect(runtime).not.toHaveProperty('clipboard');
   });
 
   it('owns provider fan-out and records one aggregate translation history entry', async () => {
@@ -494,6 +578,7 @@ function createRuntime(options: {
   takePayloadError?: unknown;
   dismissError?: unknown;
   activeProviderIds?: string[];
+  activeOcrProviderId?: string | null;
   translationSession?: {
     sessionId: string | null;
     sourceText: string;
@@ -563,6 +648,9 @@ function createRuntime(options: {
     hideResultWindow: vi.fn(),
     loadActiveTranslationProviderIds: vi.fn(
       async () => options.activeProviderIds ?? [],
+    ),
+    loadActiveOcrProviderId: vi.fn(
+      async () => options.activeOcrProviderId ?? null,
     ),
     getTranslationSession: vi.fn(() =>
       options.translationSession ?? {

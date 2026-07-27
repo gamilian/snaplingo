@@ -10,11 +10,10 @@ import { useSettingsConfigStore } from '../../stores/settingsConfigStore';
 import ResultWindow from './ResultWindow';
 
 const runtime = {
-  commands: {
-    favoriteTranslationResult: vi.fn(),
-    favoriteOcrResult: vi.fn(),
-  },
-  clipboard: { copyText: vi.fn() },
+  favoriteTranslationResult: vi.fn(),
+  favoriteTranslationResults: vi.fn(),
+  favoriteOcrResult: vi.fn(),
+  copyText: vi.fn(),
   resizeStandaloneWindow: vi.fn(),
   setAlwaysOnTop: vi.fn(),
   close: vi.fn(),
@@ -81,7 +80,15 @@ describe('result window text actions', () => {
 
     expect(favoriteButtons).toHaveLength(3);
     await act(async () => favoriteButtons[0].click());
-    expect(runtime.commands.favoriteTranslationResult).toHaveBeenCalledTimes(2);
+    expect(runtime.favoriteTranslationResults).toHaveBeenCalledWith({
+      text: 'hello',
+      sourceLang: 'en',
+      targetLang: 'zh-CN',
+      results: expect.arrayContaining([
+        expect.objectContaining({ provider_id: 'google' }),
+        expect.objectContaining({ provider_id: 'deeplx' }),
+      ]),
+    });
     await view.unmount();
   });
 

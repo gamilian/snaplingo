@@ -127,22 +127,14 @@ const resultWindowPlatformRuntime = createResultWindowPlatformRuntime({
         detectedLanguage: input.result.detected_language,
         confidence: input.result.confidence,
       }),
-    favoriteOcrResult: async (input) => {
-      const providers = settingsRuntime.configuration.providers;
-      if (!providers.getState().activeOcrProvider) {
-        await providers.loadOcr();
-      }
-      return favorites.addOcrFavorite({
+    favoriteOcrResult: (input) =>
+      favorites.addOcrFavorite({
         imageData: input.imageData,
         recognizedText: input.result.text,
         language: input.language,
-        providerUsed:
-          input.providerUsed ??
-          providers.getState().activeOcrProvider ??
-          'manual',
+        providerUsed: input.providerUsed,
         confidence: input.result.confidence,
-      });
-    },
+      }),
   },
 });
 
@@ -186,6 +178,13 @@ const resultWindowRuntime = createResultWindowRuntime({
       const providers = settingsRuntime.configuration.providers;
       await providers.loadTranslation();
       return providers.getState().activeTranslationProviders;
+    },
+    loadActiveOcrProviderId: async () => {
+      const providers = settingsRuntime.configuration.providers;
+      if (!providers.getState().activeOcrProvider) {
+        await providers.loadOcr();
+      }
+      return providers.getState().activeOcrProvider;
     },
     getTranslationSession: () => {
       const state = useAppStore.getState();

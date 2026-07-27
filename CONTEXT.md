@@ -54,7 +54,7 @@ A frozen snapshot of the desktop used to produce screenshot output, OCR input, a
 
 ### Result Window and Pinned Image
 
-Application runtimes that own their workflows and request runtime-host effects. Their Tauri window, clipboard, and notification mechanics remain in Infrastructure.
+Application runtimes that own their workflows and request runtime-host effects. Result Window owns its translation/OCR favorite sequencing, OCR Provider fallback, and clipboard intents. Their Tauri window, clipboard, and notification mechanics remain in Infrastructure.
 
 ### Hotkey
 
