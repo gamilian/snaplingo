@@ -1,6 +1,7 @@
 import { listen } from '@tauri-apps/api/event';
 import type { CaptureWorkspaceEventsPort } from '../../application/capture-workspace/ports';
 import type { ResultWindowEventsPort } from '../../application/result-window/ports';
+import type { SettingsConfigurationEventsPort } from '../../application/settings/configuration';
 import { parseSettingsNavigationRequest } from '../../application/settings/navigation';
 import type { SettingsWindowEventsPort } from '../../application/settings/ports';
 import {
@@ -131,7 +132,7 @@ export const settingsWindowEvents: SettingsWindowEventsPort = {
   },
 };
 
-export const persistentStateEvents = {
+export const persistentStateEvents: SettingsConfigurationEventsPort = {
   subscribeSettingsChanged: (handler: () => void | Promise<void>) =>
     subscribeToSignal(SETTINGS_CHANGED_EVENT, handler),
   subscribeHotkeysChanged: (handler: () => void | Promise<void>) =>

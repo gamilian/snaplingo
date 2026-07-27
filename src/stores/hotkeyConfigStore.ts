@@ -1,24 +1,30 @@
 import { create } from 'zustand';
-import type { SettingsRuntime } from '../application/settings/runtime';
+import type {
+  HotkeyConfigurationState,
+  SettingsConfiguration,
+} from '../application/settings/configuration';
 import type {
   HotkeyCategory,
   HotkeySnapshot,
 } from '../application/settings/ports';
 
-type HotkeysRuntime = SettingsRuntime['hotkeys'];
+type HotkeyConfiguration = SettingsConfiguration['hotkeys'];
 
-let hotkeysRuntime: HotkeysRuntime | null = null;
+let configuration: HotkeyConfiguration | null = null;
+let unsubscribe: (() => void) | null = null;
 
-export function initializeHotkeyConfigStore(runtime: HotkeysRuntime) {
-  hotkeysRuntime = runtime;
+export function initializeHotkeyConfigStore(runtime: HotkeyConfiguration) {
+  unsubscribe?.();
+  configuration = runtime;
+  projectHotkeyState(runtime.getState());
+  unsubscribe = runtime.subscribe(projectHotkeyState);
 }
 
 function runtime() {
-  if (!hotkeysRuntime) {
+  if (!configuration) {
     throw new Error('Hotkey config store runtime has not been initialized');
   }
-
-  return hotkeysRuntime;
+  return configuration;
 }
 
 interface HotkeyConfigState {
@@ -36,65 +42,22 @@ interface HotkeyConfigState {
   resetCategory: (category: HotkeyCategory) => Promise<HotkeySnapshot>;
 }
 
-function cloneSnapshot(snapshot: HotkeySnapshot): HotkeySnapshot {
-  return {
-    screenshot: { ...snapshot.screenshot },
-    translation: { ...snapshot.translation },
-    ocr: { ...snapshot.ocr },
-  };
-}
-
-function applySnapshot(
-  set: (partial: Partial<HotkeyConfigState>) => void,
-  snapshot: HotkeySnapshot,
-) {
-  set({
-    hydrated: true,
-    snapshot: cloneSnapshot(snapshot),
-  });
-}
-
-export const useHotkeyConfigStore = create<HotkeyConfigState>((set, get) => ({
+export const useHotkeyConfigStore = create<HotkeyConfigState>(() => ({
   hydrated: false,
   snapshot: null,
   defaultSnapshot: null,
-  hydrate: async () => {
-    const state = get();
-    const existingSnapshot = state.snapshot;
-
-    if (state.hydrated && existingSnapshot) {
-      return cloneSnapshot(existingSnapshot);
-    }
-
-    const [snapshot, defaults] = await Promise.all([
-      runtime().load(),
-      runtime().loadDefaults(),
-    ]);
-    set({
-      hydrated: true,
-      snapshot: cloneSnapshot(snapshot),
-      defaultSnapshot: cloneSnapshot(defaults),
-    });
-    return cloneSnapshot(snapshot);
-  },
-  refresh: async () => {
-    const snapshot = await runtime().load();
-    applySnapshot(set, snapshot);
-    return cloneSnapshot(snapshot);
-  },
-  updateHotkey: async (category, action, hotkey) => {
-    const outcome = await runtime().update({ category, action, hotkey });
-    applySnapshot(set, outcome.snapshot);
-    return cloneSnapshot(outcome.snapshot);
-  },
-  resetHotkey: async (category, action) => {
-    const outcome = await runtime().reset(category, action);
-    applySnapshot(set, outcome.snapshot);
-    return cloneSnapshot(outcome.snapshot);
-  },
-  resetCategory: async (category) => {
-    const snapshot = await runtime().resetCategory(category);
-    applySnapshot(set, snapshot);
-    return cloneSnapshot(snapshot);
-  },
+  hydrate: () => runtime().hydrate(),
+  refresh: () => runtime().refresh(),
+  updateHotkey: (category, action, hotkey) =>
+    runtime().update(category, action, hotkey),
+  resetHotkey: (category, action) => runtime().reset(category, action),
+  resetCategory: (category) => runtime().resetCategory(category),
 }));
+
+function projectHotkeyState(state: HotkeyConfigurationState) {
+  useHotkeyConfigStore.setState({
+    hydrated: state.hydrated,
+    snapshot: state.snapshot,
+    defaultSnapshot: state.defaultSnapshot,
+  });
+}

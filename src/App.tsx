@@ -22,7 +22,6 @@ import { resolveApplicationTheme } from './application/settings/theme';
 import { useAppStore } from './stores/appStore';
 import {
   initializeHotkeyConfigStore,
-  useHotkeyConfigStore,
 } from './stores/hotkeyConfigStore';
 import {
   initializeSettingsConfigStore,
@@ -30,7 +29,6 @@ import {
 } from './stores/settingsConfigStore';
 import {
   initializeProviderStore,
-  useProviderStore,
 } from './stores/providerStore';
 import {
   initializeHistoryStore,
@@ -85,6 +83,7 @@ import {
 const settingsRuntime = createSettingsRuntime({
   window: settingsWindow,
   windowEvents: settingsWindowEvents,
+  configurationEvents: persistentStateEvents,
   durableSettings,
   maintenance: {
     listAppLogs: durableSettings.listAppLogs,
@@ -129,12 +128,9 @@ const resultWindowPlatformRuntime = createResultWindowPlatformRuntime({
         confidence: input.result.confidence,
       }),
     favoriteOcrResult: async (input) => {
-      if (!useProviderStore.getState().activeOcrProvider) {
-        try {
-          await useProviderStore.getState().loadOcrProviders();
-        } catch (error) {
-          console.error('Failed to load OCR provider metadata:', error);
-        }
+      const providers = settingsRuntime.configuration.providers;
+      if (!providers.getState().activeOcrProvider) {
+        await providers.loadOcr();
       }
       return favorites.addOcrFavorite({
         imageData: input.imageData,
@@ -142,7 +138,7 @@ const resultWindowPlatformRuntime = createResultWindowPlatformRuntime({
         language: input.language,
         providerUsed:
           input.providerUsed ??
-          useProviderStore.getState().activeOcrProvider ??
+          providers.getState().activeOcrProvider ??
           'manual',
         confidence: input.result.confidence,
       });
@@ -151,7 +147,8 @@ const resultWindowPlatformRuntime = createResultWindowPlatformRuntime({
 });
 
 function getLastResultWindowPosition() {
-  const general = useSettingsConfigStore.getState().general;
+  const general =
+    settingsRuntime.configuration.settings.getState().snapshot?.general;
   const x = general?.lastResultWindowX;
   const y = general?.lastResultWindowY;
   return typeof x === 'number' && typeof y === 'number' ? { x, y } : undefined;
@@ -161,8 +158,9 @@ const resultWindowRuntime = createResultWindowRuntime({
   platform: resultWindowPlatformRuntime,
   speech: systemTts,
   getTranslationSettings: () =>
-    useSettingsConfigStore.getState().translation ?? undefined,
-  getOcrSettings: () => useSettingsConfigStore.getState().ocr ?? undefined,
+    settingsRuntime.configuration.settings.getState().snapshot?.translation,
+  getOcrSettings: () =>
+    settingsRuntime.configuration.settings.getState().snapshot?.ocr,
   positionStore: {
     load: getLastResultWindowPosition,
     save: durableSettings.updateLastResultWindowPosition,
@@ -185,8 +183,9 @@ const resultWindowRuntime = createResultWindowRuntime({
     showOcrWindow: () => useAppStore.getState().showOcrWindow(),
     hideResultWindow: () => useAppStore.getState().hideResultWindow(),
     loadActiveTranslationProviderIds: async () => {
-      await useProviderStore.getState().loadTranslationProviders();
-      return useProviderStore.getState().activeTranslationProviders;
+      const providers = settingsRuntime.configuration.providers;
+      await providers.loadTranslation();
+      return providers.getState().activeTranslationProviders;
     },
     getTranslationSession: () => {
       const state = useAppStore.getState();
@@ -210,9 +209,9 @@ const resultWindowRuntime = createResultWindowRuntime({
     setTranslating: (value) => useAppStore.getState().setTranslating(value),
   },
 });
-initializeSettingsConfigStore(settingsRuntime.durableSettings);
-initializeHotkeyConfigStore(settingsRuntime.hotkeys);
-initializeProviderStore(settingsRuntime.providers);
+initializeSettingsConfigStore(settingsRuntime.configuration.settings);
+initializeHotkeyConfigStore(settingsRuntime.configuration.hotkeys);
+initializeProviderStore(settingsRuntime.configuration.providers);
 initializeHistoryStore(settingsRuntime.history);
 initializeFavoritesStore(settingsRuntime.favorites);
 initializeScreenshotFavoritesStore(settingsRuntime.screenshotFavorites);
@@ -243,9 +242,7 @@ function Application() {
   const applyTranslationDefaults = useAppStore(
     (state) => state.applyTranslationDefaults,
   );
-  const hydrateSettings = useSettingsConfigStore((state) => state.hydrate);
   const generalSettings = useSettingsConfigStore((state) => state.general);
-  const hydrateHotkeys = useHotkeyConfigStore((state) => state.hydrate);
   const isCaptureWindow =
     currentWindowLabel === CAPTURE_WINDOW_LABEL || captureLaunch !== null;
   const [hasLoadedCaptureResultPayload, setHasLoadedCaptureResultPayload] =
@@ -254,7 +251,8 @@ function Application() {
   useEffect(() => {
     let disposed = false;
 
-    hydrateSettings()
+    settingsRuntime.configuration.settings
+      .hydrate()
       .then((snapshot) => {
         if (!disposed) {
           applyTranslationDefaults(snapshot.translation);
@@ -267,7 +265,7 @@ function Application() {
     return () => {
       disposed = true;
     };
-  }, [applyTranslationDefaults, hydrateSettings]);
+  }, [applyTranslationDefaults]);
 
   useEffect(() => {
     if (!generalSettings) return;
@@ -296,87 +294,21 @@ function Application() {
   useEffect(() => {
     if (!isSettingsWindow) return;
 
-    hydrateHotkeys().catch((err) => {
+    settingsRuntime.configuration.hotkeys.hydrate().catch((err) => {
       console.warn('Failed to hydrate hotkey configuration:', err);
     });
-  }, [hydrateHotkeys, isSettingsWindow]);
+  }, [isSettingsWindow]);
 
   useEffect(() => {
-    let disposed = false;
-    const unlisteners: Array<() => void> = [];
-
-    const track = (subscription: Promise<() => void>, label: string) => {
-      subscription
-        .then((unlisten) => {
-          if (disposed) {
-            unlisten();
-          } else {
-            unlisteners.push(unlisten);
-          }
-        })
-        .catch((err) => {
-          console.warn(`Failed to subscribe to ${label} changes:`, err);
-        });
-    };
-
-    track(
-      persistentStateEvents.subscribeSettingsChanged(async () => {
-        try {
-          const snapshot = await useSettingsConfigStore.getState().refresh();
-          applyTranslationDefaults(snapshot.translation);
-        } catch (err) {
-          console.warn('Failed to refresh durable settings:', err);
-        }
-      }),
-      'settings',
-    );
-
-    track(
-      persistentStateEvents.subscribeProvidersChanged(async () => {
-        const providers = useProviderStore.getState();
-        await Promise.all([
-          providers.loadTranslationProviders(),
-          providers.loadOcrProviders(),
-        ]);
-      }),
-      'provider',
-    );
-
-    if (isSettingsWindow) {
-      track(
-        persistentStateEvents.subscribeHotkeysChanged(async () => {
-          try {
-            await useHotkeyConfigStore.getState().refresh();
-          } catch (err) {
-            console.warn('Failed to refresh hotkey configuration:', err);
-          }
-        }),
-        'hotkey',
-      );
-      track(
-        persistentStateEvents.subscribeHistoryChanged(() => {
-          useHistoryStore.getState().invalidate();
-        }),
-        'history',
-      );
-      track(
-        persistentStateEvents.subscribeFavoritesChanged(() => {
-          useFavoritesStore.getState().invalidate();
-        }),
-        'favorites',
-      );
-      track(
-        persistentStateEvents.subscribeScreenshotFavoritesChanged(() => {
-          useScreenshotFavoritesStore.getState().invalidate();
-        }),
-        'screenshot favorites',
-      );
-    }
-
-    return () => {
-      disposed = true;
-      unlisteners.forEach((unlisten) => unlisten());
-    };
+    return settingsRuntime.configuration.synchronize({
+      settingsWindow: isSettingsWindow,
+      onSettingsChanged: (snapshot) =>
+        applyTranslationDefaults(snapshot.translation),
+      invalidateHistory: () => useHistoryStore.getState().invalidate(),
+      invalidateFavorites: () => useFavoritesStore.getState().invalidate(),
+      invalidateScreenshotFavorites: () =>
+        useScreenshotFavoritesStore.getState().invalidate(),
+    });
   }, [applyTranslationDefaults, isSettingsWindow]);
 
   useEffect(() => {

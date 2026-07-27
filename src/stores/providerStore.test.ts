@@ -1,111 +1,65 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ProviderConfigurationState } from '../application/settings/configuration';
 
-const providersRuntime = vi.hoisted(() => ({
-  configureOcrCredentials: vi.fn(),
-  configureTranslationCredentials: vi.fn(),
-  updateCustomTranslation: vi.fn(),
-  testCustomTranslation: vi.fn(),
-  listOcr: vi.fn(),
-  listTranslation: vi.fn(),
-}));
+describe('providerStore projection', () => {
+  beforeEach(() => vi.resetModules());
 
-describe('providerStore', () => {
-  beforeEach(() => {
-    vi.resetModules();
-    vi.clearAllMocks();
-    providersRuntime.listOcr.mockResolvedValue([]);
-    providersRuntime.listTranslation.mockResolvedValue([]);
-  });
-
-  it('passes DeepLX standard DeepL mode credentials through the credential map command', async () => {
+  it('projects Application state and forwards provider intents', async () => {
+    const provider = {
+      id: 'system-ocr',
+      name: 'System OCR',
+      type: 'ocr' as const,
+      status: 'active' as const,
+      isBuiltin: true,
+      requiresApiKey: false,
+    };
+    let listener!: (state: {
+      ocrProviders: typeof provider[];
+      translationProviders: typeof provider[];
+      activeOcrProvider: string | null;
+      activeTranslationProviders: string[];
+    }) => void;
+    const configuration = {
+      getState: (): ProviderConfigurationState => ({
+        ocrProviders: [],
+        translationProviders: [],
+        activeOcrProvider: null,
+        activeTranslationProviders: [],
+      }),
+      subscribe: vi.fn((next) => {
+        listener = next;
+        return () => undefined;
+      }),
+      loadTranslation: vi.fn(async () => []),
+      loadOcr: vi.fn(async () => []),
+      refresh: vi.fn(async () => undefined),
+      activateTranslation: vi.fn(async () => undefined),
+      deactivateTranslation: vi.fn(async () => undefined),
+      addCustomTranslation: vi.fn(async () => undefined),
+      updateCustomTranslation: vi.fn(async () => undefined),
+      removeTranslation: vi.fn(async () => undefined),
+      testCustomTranslation: vi.fn(async () => undefined),
+      configureTranslation: vi.fn(async () => undefined),
+      reorderTranslation: vi.fn(async () => undefined),
+      activateOcr: vi.fn(async () => undefined),
+      configureOcr: vi.fn(async () => undefined),
+    };
     const { initializeProviderStore, useProviderStore } =
       await import('./providerStore');
-    initializeProviderStore(providersRuntime as never);
+    initializeProviderStore(configuration);
 
-    await useProviderStore.getState().updateProviderConfig('translation', 'deeplx', {
-      mode: 'deepl',
-      api_key: 'secret',
+    listener({
+      ocrProviders: [provider],
+      translationProviders: [],
+      activeOcrProvider: provider.id,
+      activeTranslationProviders: [],
     });
+    await useProviderStore.getState().activateOcrProvider(provider.id);
 
-    expect(providersRuntime.configureTranslationCredentials).toHaveBeenCalledWith('deeplx', {
-      mode: 'deepl',
-      api_key: 'secret',
+    expect(useProviderStore.getState()).toMatchObject({
+      ocrProviders: [provider],
+      activeOcrProvider: provider.id,
     });
-  });
-
-  it('configures OCR providers through the credential map command', async () => {
-    const { initializeProviderStore, useProviderStore } =
-      await import('./providerStore');
-    initializeProviderStore(providersRuntime as never);
-
-    await useProviderStore.getState().configureOcrProvider('baidu-ocr', {
-      api_key: 'key',
-      secret_key: 'secret',
-    });
-
-    expect(providersRuntime.configureOcrCredentials).toHaveBeenCalledWith('baidu-ocr', {
-      api_key: 'key',
-      secret_key: 'secret',
-    });
-  });
-
-  it('updates custom translation providers through the custom provider command', async () => {
-    const { initializeProviderStore, useProviderStore } =
-      await import('./providerStore');
-    initializeProviderStore(providersRuntime as never);
-
-    await useProviderStore.getState().updateCustomTranslationProvider('custom-gpt', {
-      name: 'gpt-5-mini',
-      protocol: 'openai',
-      endpoint: 'https://api.openai.com',
-      model: 'gpt-5-mini',
-      api_key: undefined,
-      reasoning_level: 'minimal',
-    });
-
-    expect(providersRuntime.updateCustomTranslation).toHaveBeenCalledWith('custom-gpt', {
-      name: 'gpt-5-mini',
-      protocol: 'openai',
-      endpoint: 'https://api.openai.com',
-      model: 'gpt-5-mini',
-      apiKey: undefined,
-      reasoningLevel: 'minimal',
-    });
-  });
-
-  it('tests custom translation providers through the provider id command', async () => {
-    const { initializeProviderStore, useProviderStore } =
-      await import('./providerStore');
-    initializeProviderStore(providersRuntime as never);
-
-    await useProviderStore.getState().testCustomTranslationProvider('custom-gpt');
-
-    expect(providersRuntime.testCustomTranslation).toHaveBeenCalledWith('custom-gpt');
-  });
-
-  it('uses the model as display name for stale custom providers named with their generated id', async () => {
-    const { initializeProviderStore, useProviderStore } =
-      await import('./providerStore');
-    initializeProviderStore(providersRuntime as never);
-    providersRuntime.listTranslation.mockResolvedValueOnce([
-      {
-        id: 'custom-llm-1782661440679036000',
-        name: 'custom-llm-1782661440679036000',
-        isActive: true,
-        isConfigured: true,
-        isBuiltin: false,
-        requiresApiKey: true,
-        protocol: 'openai',
-        endpoint: 'https://api.openai.com',
-        model: 'gpt-5-mini',
-        reasoningLevel: null,
-        promptStrategyId: null,
-        promptFallbackStrategyId: null,
-      },
-    ]);
-
-    await useProviderStore.getState().loadTranslationProviders();
-
-    expect(useProviderStore.getState().translationProviders[0].name).toBe('gpt-5-mini');
+    expect(configuration.activateOcr).toHaveBeenCalledWith(provider.id);
   });
 });

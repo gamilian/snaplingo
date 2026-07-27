@@ -1,5 +1,8 @@
 import { create } from 'zustand';
-import type { SettingsRuntime } from '../application/settings/runtime';
+import type {
+  DurableSettingsConfigurationState,
+  SettingsConfiguration,
+} from '../application/settings/configuration';
 import type {
   AnnotationColorPreset,
   GeneralSettings,
@@ -10,26 +13,23 @@ import type {
   TranslationSettings,
 } from '../application/settings/ports';
 
-type DurableSettingsRuntime = SettingsRuntime['durableSettings'];
+type DurableSettingsConfiguration = SettingsConfiguration['settings'];
 
-let durableSettingsRuntime: DurableSettingsRuntime | null = null;
-let nextSnapshotRequest = 0;
-let latestAppliedSnapshotRequest = 0;
-let settingsUpdateQueue: Promise<void> = Promise.resolve();
+let configuration: DurableSettingsConfiguration | null = null;
+let unsubscribe: (() => void) | null = null;
 
-export function initializeSettingsConfigStore(runtime: DurableSettingsRuntime) {
-  durableSettingsRuntime = runtime;
-  nextSnapshotRequest = 0;
-  latestAppliedSnapshotRequest = 0;
-  settingsUpdateQueue = Promise.resolve();
+export function initializeSettingsConfigStore(runtime: DurableSettingsConfiguration) {
+  unsubscribe?.();
+  configuration = runtime;
+  projectSettingsState(runtime.getState());
+  unsubscribe = runtime.subscribe(projectSettingsState);
 }
 
-function settingsRuntime() {
-  if (!durableSettingsRuntime) {
+function runtime() {
+  if (!configuration) {
     throw new Error('Settings config store runtime has not been initialized');
   }
-
-  return durableSettingsRuntime;
+  return configuration;
 }
 
 interface SettingsConfigState {
@@ -57,125 +57,31 @@ interface SettingsConfigState {
   updateHistorySettings: (input: HistorySettings) => Promise<SettingsSnapshot>;
 }
 
-function applySnapshot(
-  set: (partial: Partial<SettingsConfigState>) => void,
-  snapshot: SettingsSnapshot,
-) {
-  set({
-    hydrated: true,
-    general: snapshot.general,
-    screenshot: snapshot.screenshot,
-    translation: snapshot.translation,
-    ocr: snapshot.ocr,
-    history: snapshot.history,
-  });
-}
-
-async function applyLatestSnapshot(
-  set: (partial: Partial<SettingsConfigState>) => void,
-  get: () => SettingsConfigState,
-  request: () => Promise<SettingsSnapshot>,
-) {
-  const requestId = ++nextSnapshotRequest;
-  const snapshot = await request();
-  if (requestId > latestAppliedSnapshotRequest) {
-    latestAppliedSnapshotRequest = requestId;
-    applySnapshot(set, snapshot);
-    return snapshot;
-  }
-  return currentSnapshot(get()) ?? snapshot;
-}
-
-function currentSnapshot(state: SettingsConfigState): SettingsSnapshot | null {
-  if (
-    !state.general ||
-    !state.screenshot ||
-    !state.translation ||
-    !state.ocr ||
-    !state.history
-  ) {
-    return null;
-  }
-
-  return {
-    general: state.general,
-    screenshot: state.screenshot,
-    translation: state.translation,
-    ocr: state.ocr,
-    history: state.history,
-  };
-}
-
-function enqueueSettingsUpdate<T>(request: () => Promise<T>) {
-  const result = settingsUpdateQueue.then(request, request);
-  settingsUpdateQueue = result.then(
-    () => undefined,
-    () => undefined,
-  );
-  return result;
-}
-
-export const useSettingsConfigStore = create<SettingsConfigState>((set, get) => ({
+export const useSettingsConfigStore = create<SettingsConfigState>(() => ({
   hydrated: false,
   general: null,
   screenshot: null,
   translation: null,
   ocr: null,
   history: null,
-  hydrate: async () => {
-    const existingSnapshot = currentSnapshot(get());
-
-    if (get().hydrated && existingSnapshot) {
-      return existingSnapshot;
-    }
-
-    return applyLatestSnapshot(set, get, () => settingsRuntime().load());
-  },
-  refresh: () => applyLatestSnapshot(set, get, () => settingsRuntime().load()),
-  updateGeneralSettings: (input) =>
-    enqueueSettingsUpdate(() => {
-      const general = get().general;
-      if (!general) {
-        throw new Error('General settings have not been loaded');
-      }
-      return applyLatestSnapshot(set, get, () =>
-        settingsRuntime().updateGeneral({ ...general, ...input }),
-      );
-    }),
-  updateScreenshotSettings: (input) =>
-    enqueueSettingsUpdate(() => {
-      const screenshot = get().screenshot;
-      if (!screenshot) {
-        throw new Error('Screenshot settings have not been loaded');
-      }
-      return applyLatestSnapshot(set, get, () =>
-        settingsRuntime().updateScreenshot({ ...screenshot, ...input }),
-      );
-    }),
-  updateAnnotationColors: (colors) =>
-    applyLatestSnapshot(set, get, () =>
-      settingsRuntime().updateAnnotationColors(colors),
-    ),
-  updateTranslationSettings: (input) =>
-    enqueueSettingsUpdate(() => {
-      const translation = get().translation;
-      if (!translation) {
-        throw new Error('Translation settings have not been loaded');
-      }
-      return applyLatestSnapshot(set, get, () =>
-        settingsRuntime().updateTranslation({ ...translation, ...input }),
-      );
-    }),
-  updateOcrSettings: (input) =>
-    enqueueSettingsUpdate(() => {
-      const ocr = get().ocr;
-      if (!ocr) {
-        throw new Error('OCR settings have not been loaded');
-      }
-      return applyLatestSnapshot(set, get, () =>
-        settingsRuntime().updateOcr({ ...ocr, ...input }),
-      );
-    }),
-  updateHistorySettings: (input) =>
-    applyLatestSnapshot(set, get, () => settingsRuntime().updateHistory(input)),
+  hydrate: () => runtime().hydrate(),
+  refresh: () => runtime().refresh(),
+  updateGeneralSettings: (input) => runtime().updateGeneral(input),
+  updateScreenshotSettings: (input) => runtime().updateScreenshot(input),
+  updateAnnotationColors: (colors) => runtime().updateAnnotationColors(colors),
+  updateTranslationSettings: (input) => runtime().updateTranslation(input),
+  updateOcrSettings: (input) => runtime().updateOcr(input),
+  updateHistorySettings: (input) => runtime().updateHistory(input),
 }));
+
+function projectSettingsState(state: DurableSettingsConfigurationState) {
+  const snapshot = state.snapshot;
+  useSettingsConfigStore.setState({
+    hydrated: state.hydrated,
+    general: snapshot?.general ?? null,
+    screenshot: snapshot?.screenshot ?? null,
+    translation: snapshot?.translation ?? null,
+    ocr: snapshot?.ocr ?? null,
+    history: snapshot?.history ?? null,
+  });
+}

@@ -1,22 +1,13 @@
 import type {
-  AnnotationColorPreset,
   DurableSettingsPort,
-  GeneralSettings,
   FavoriteKind,
   FavoritePage,
   FavoriteQuery,
-  HotkeyCategory,
-  HotkeySnapshot,
-  HotkeyUpdateInput,
-  HotkeyUpdateOutcome,
   HistoryKind,
-  HistorySettings,
   HistoryPage,
   HistoryQuery,
   OcrHistoryEntry,
   OcrFavoriteInput,
-  OcrSettings,
-  ScreenshotSettings,
   ScreenshotFavoritePage,
   ScreenshotFavoriteQuery,
   SettingsClipboardPort,
@@ -28,18 +19,22 @@ import type {
   SettingsMaintenancePort,
   SettingsTtsPort,
   SettingsProvidersPort,
-  SettingsSnapshot,
   SettingsWindowPort,
   SettingsWindowEventsPort,
   TranslationHistoryEntry,
   TranslationFavoriteInput,
-  TranslationSettings,
 } from './ports';
 import { createSettingsLibrary, type SettingsLibrary } from './library';
+import {
+  createSettingsConfiguration,
+  type SettingsConfiguration,
+  type SettingsConfigurationEventsPort,
+} from './configuration';
 
 export interface SettingsRuntimePorts {
   window: SettingsWindowPort;
   windowEvents: SettingsWindowEventsPort;
+  configurationEvents: SettingsConfigurationEventsPort;
   durableSettings: DurableSettingsPort;
   providers: SettingsProvidersPort;
   hotkeys: SettingsHotkeysPort;
@@ -54,31 +49,27 @@ export interface SettingsRuntimePorts {
 
 export interface SettingsRuntime {
   library: SettingsLibrary;
+  configuration: SettingsConfiguration;
   window: {
     open(): Promise<void>;
     selectScreenshotDirectory(): Promise<string | null>;
     version(): Promise<string>;
     subscribeNavigationRequested: SettingsWindowEventsPort['subscribeNavigationRequested'];
   };
-  durableSettings: {
-    load(): Promise<SettingsSnapshot>;
-    updateGeneral(input: GeneralSettings): Promise<SettingsSnapshot>;
-    updateScreenshot(input: ScreenshotSettings): Promise<SettingsSnapshot>;
-    updateAnnotationColors(
-      colors: AnnotationColorPreset[],
-    ): Promise<SettingsSnapshot>;
-    updateTranslation(input: TranslationSettings): Promise<SettingsSnapshot>;
-    updateOcr(input: OcrSettings): Promise<SettingsSnapshot>;
-    updateHistory(input: HistorySettings): Promise<SettingsSnapshot>;
-  };
-  providers: SettingsProvidersPort;
-  hotkeys: {
-    load(): Promise<HotkeySnapshot>;
-    loadDefaults(): Promise<HotkeySnapshot>;
-    update(input: HotkeyUpdateInput): Promise<HotkeyUpdateOutcome>;
-    reset(category: HotkeyCategory, action: string): Promise<HotkeyUpdateOutcome>;
-    resetCategory(category: HotkeyCategory): Promise<HotkeySnapshot>;
-  };
+  providers: Pick<
+    SettingsProvidersPort,
+    | 'getTranslationCredentialSchema'
+    | 'getOcrCredentialSchema'
+    | 'listTranslationPromptStrategies'
+    | 'saveTranslationPromptStrategies'
+    | 'listOpenAICompatibleModels'
+    | 'testOpenAICompatible'
+    | 'testOpenAIResponses'
+    | 'listAnthropicModels'
+    | 'testAnthropic'
+    | 'listGeminiModels'
+    | 'testGemini'
+  >;
   history: {
     loadTranslation(
       limit: number,
@@ -127,6 +118,12 @@ export function createSettingsRuntime(
   ports: SettingsRuntimePorts,
 ): SettingsRuntime {
   return {
+    configuration: createSettingsConfiguration({
+      durableSettings: ports.durableSettings,
+      providers: ports.providers,
+      hotkeys: ports.hotkeys,
+      events: ports.configurationEvents,
+    }),
     library: createSettingsLibrary({
       history: ports.history,
       favorites: ports.favorites,
@@ -141,26 +138,26 @@ export function createSettingsRuntime(
       subscribeNavigationRequested: (handler) =>
         ports.windowEvents.subscribeNavigationRequested(handler),
     },
-    durableSettings: {
-      load: () => ports.durableSettings.getSettingsSnapshot(),
-      updateGeneral: (input) =>
-        ports.durableSettings.updateGeneralSettings(input),
-      updateScreenshot: (input) =>
-        ports.durableSettings.updateScreenshotSettings(input),
-      updateAnnotationColors: (colors) =>
-        ports.durableSettings.updateAnnotationColors(colors),
-      updateTranslation: (input) =>
-        ports.durableSettings.updateTranslationSettings(input),
-      updateOcr: (input) => ports.durableSettings.updateOcrSettings(input),
-      updateHistory: (input) => ports.durableSettings.updateHistorySettings(input),
-    },
-    providers: ports.providers,
-    hotkeys: {
-      load: () => ports.hotkeys.getHotkeySnapshot(),
-      loadDefaults: () => ports.hotkeys.getDefaultHotkeySnapshot(),
-      update: (input) => ports.hotkeys.updateHotkey(input),
-      reset: (category, action) => ports.hotkeys.resetHotkey(category, action),
-      resetCategory: (category) => ports.hotkeys.resetHotkeyCategory(category),
+    providers: {
+      getTranslationCredentialSchema: (providerId) =>
+        ports.providers.getTranslationCredentialSchema(providerId),
+      getOcrCredentialSchema: (providerId) =>
+        ports.providers.getOcrCredentialSchema(providerId),
+      listTranslationPromptStrategies: () =>
+        ports.providers.listTranslationPromptStrategies(),
+      saveTranslationPromptStrategies: (config) =>
+        ports.providers.saveTranslationPromptStrategies(config),
+      listOpenAICompatibleModels: (request) =>
+        ports.providers.listOpenAICompatibleModels(request),
+      testOpenAICompatible: (request) =>
+        ports.providers.testOpenAICompatible(request),
+      testOpenAIResponses: (request) =>
+        ports.providers.testOpenAIResponses(request),
+      listAnthropicModels: (request) =>
+        ports.providers.listAnthropicModels(request),
+      testAnthropic: (request) => ports.providers.testAnthropic(request),
+      listGeminiModels: (request) => ports.providers.listGeminiModels(request),
+      testGemini: (request) => ports.providers.testGemini(request),
     },
     history: {
       loadTranslation: (limit, offset) =>

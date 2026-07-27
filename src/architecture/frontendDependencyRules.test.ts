@@ -381,6 +381,40 @@ describe('frontend dependency rules', () => {
     expect(imports.some((specifier) => specifier.startsWith('@tauri-apps/'))).toBe(false);
   });
 
+  test('Settings configuration lifecycle stays behind the Application seam', () => {
+    const productionFiles = productionSourceFiles();
+    const appFile = productionFiles.find(({ path }) => path === 'src/App.tsx');
+    expect(appFile).toBeDefined();
+    expect(appFile!.source).toContain(
+      'configurationEvents: persistentStateEvents',
+    );
+    expect(appFile!.source).not.toContain('persistentStateEvents.subscribe');
+
+    const storePaths = new Set([
+      'src/stores/settingsConfigStore.ts',
+      'src/stores/hotkeyConfigStore.ts',
+      'src/stores/providerStore.ts',
+    ]);
+    const storeFiles = productionFiles.filter(({ path }) => storePaths.has(path));
+    const imports = moduleImports(storeFiles);
+
+    expect(storeFiles).toHaveLength(storePaths.size);
+    expect(
+      storeFiles.map(({ path }) => path).filter((path) =>
+        imports.some(
+          (entry) =>
+            entry.path === path &&
+            entry.specifier === '../application/settings/configuration',
+        ),
+      ),
+    ).toHaveLength(storePaths.size);
+    expect(
+      imports
+        .filter(({ specifier }) => specifier === '../application/settings/runtime')
+        .map(({ path }) => path),
+    ).toEqual([]);
+  });
+
   test('the legacy frontend Tauri seam is deleted', () => {
     expect(
       allSourceFiles()

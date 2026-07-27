@@ -1,143 +1,55 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { HotkeyConfigurationState } from '../application/settings/configuration';
 
-const hotkeysRuntime = vi.hoisted(() => ({
-  load: vi.fn(),
-  loadDefaults: vi.fn(),
-  update: vi.fn(),
-  reset: vi.fn(),
-  resetCategory: vi.fn(),
-}));
-
-const backendSnapshot = {
-  screenshot: {
-    screenshot: '⇧⌘R',
-  },
-  translation: {
-    'selection-translate': '⌥D',
-    'screenshot-translate': '⌥S',
-  },
-  ocr: {
-    'screenshot-ocr': '⇧⌥S',
-  },
+const snapshot = {
+  screenshot: { screenshot: 'Shift+Command+R' },
+  translation: { 'selection-translate': 'Alt+D' },
+  ocr: { 'screenshot-ocr': 'Shift+Alt+S' },
 };
 
-describe('hotkeyConfigStore', () => {
-  beforeEach(() => {
-    vi.resetModules();
-    vi.clearAllMocks();
-    hotkeysRuntime.load.mockResolvedValue(structuredClone(backendSnapshot));
-    hotkeysRuntime.loadDefaults.mockResolvedValue(structuredClone(backendSnapshot));
-  });
+describe('hotkeyConfigStore projection', () => {
+  beforeEach(() => vi.resetModules());
 
-  it('hydrates once from the backend hotkey snapshot', async () => {
+  it('projects Application state and forwards hotkey intents', async () => {
+    let listener!: (state: {
+      hydrated: boolean;
+      snapshot: typeof snapshot | null;
+      defaultSnapshot: typeof snapshot | null;
+    }) => void;
+    const configuration = {
+      getState: (): HotkeyConfigurationState => ({
+        hydrated: false,
+        snapshot: null,
+        defaultSnapshot: null,
+      }),
+      subscribe: vi.fn((next) => {
+        listener = next;
+        return () => undefined;
+      }),
+      hydrate: vi.fn(async () => snapshot),
+      refresh: vi.fn(async () => snapshot),
+      update: vi.fn(async () => snapshot),
+      reset: vi.fn(async () => snapshot),
+      resetCategory: vi.fn(async () => snapshot),
+    };
     const { initializeHotkeyConfigStore, useHotkeyConfigStore } =
       await import('./hotkeyConfigStore');
-    initializeHotkeyConfigStore(hotkeysRuntime);
+    initializeHotkeyConfigStore(configuration);
 
-    await useHotkeyConfigStore.getState().hydrate();
-    await useHotkeyConfigStore.getState().hydrate();
+    listener({ hydrated: true, snapshot, defaultSnapshot: snapshot });
+    await useHotkeyConfigStore
+      .getState()
+      .updateHotkey('translation', 'selection-translate', 'Shift+Alt+D');
 
-    expect(hotkeysRuntime.load).toHaveBeenCalledTimes(1);
-    expect(hotkeysRuntime.loadDefaults).toHaveBeenCalledTimes(1);
     expect(useHotkeyConfigStore.getState()).toMatchObject({
       hydrated: true,
-      snapshot: backendSnapshot,
+      snapshot,
+      defaultSnapshot: snapshot,
     });
-  });
-
-  it('refreshes an already hydrated snapshot from the backend', async () => {
-    const refreshedSnapshot = {
-      ...backendSnapshot,
-      screenshot: { screenshot: 'F12' },
-    };
-    const { initializeHotkeyConfigStore, useHotkeyConfigStore } =
-      await import('./hotkeyConfigStore');
-    initializeHotkeyConfigStore(hotkeysRuntime);
-
-    await useHotkeyConfigStore.getState().hydrate();
-    hotkeysRuntime.load.mockResolvedValueOnce(refreshedSnapshot);
-    const snapshot = await useHotkeyConfigStore.getState().refresh();
-
-    expect(hotkeysRuntime.load).toHaveBeenCalledTimes(2);
-    expect(snapshot).toEqual(refreshedSnapshot);
-    expect(useHotkeyConfigStore.getState().snapshot).toEqual(refreshedSnapshot);
-  });
-
-  it('updates through the backend and applies the returned snapshot', async () => {
-    const { initializeHotkeyConfigStore, useHotkeyConfigStore } =
-      await import('./hotkeyConfigStore');
-    initializeHotkeyConfigStore(hotkeysRuntime);
-    const updatedSnapshot = {
-      ...backendSnapshot,
-      translation: {
-        ...backendSnapshot.translation,
-        'selection-translate': '⇧⌥D',
-      },
-    };
-    hotkeysRuntime.update.mockResolvedValueOnce({
-      snapshot: updatedSnapshot,
-      accelerator: 'Shift+Alt+KeyD',
-    });
-
-    await useHotkeyConfigStore.getState().hydrate();
-    const snapshot = await useHotkeyConfigStore
-      .getState()
-      .updateHotkey('translation', 'selection-translate', '⇧⌥D');
-
-    expect(hotkeysRuntime.update).toHaveBeenCalledWith({
-      category: 'translation',
-      action: 'selection-translate',
-      hotkey: '⇧⌥D',
-    });
-    expect(snapshot).toEqual(updatedSnapshot);
-    expect(useHotkeyConfigStore.getState().snapshot).toEqual(updatedSnapshot);
-  });
-
-  it('resets one hotkey from the backend-provided default snapshot', async () => {
-    const { initializeHotkeyConfigStore, useHotkeyConfigStore } =
-      await import('./hotkeyConfigStore');
-    initializeHotkeyConfigStore(hotkeysRuntime);
-    const changedSnapshot = {
-      ...backendSnapshot,
-      translation: {
-        ...backendSnapshot.translation,
-        'selection-translate': '⇧⌥D',
-      },
-    };
-    hotkeysRuntime.update.mockResolvedValueOnce({
-      snapshot: changedSnapshot,
-      accelerator: 'Shift+Alt+KeyD',
-    });
-    hotkeysRuntime.reset.mockResolvedValueOnce({
-      snapshot: backendSnapshot,
-      accelerator: 'Alt+KeyD',
-    });
-
-    await useHotkeyConfigStore.getState().hydrate();
-    await useHotkeyConfigStore
-      .getState()
-      .updateHotkey('translation', 'selection-translate', '⇧⌥D');
-    await useHotkeyConfigStore
-      .getState()
-      .resetHotkey('translation', 'selection-translate');
-
-    expect(hotkeysRuntime.reset).toHaveBeenCalledWith(
+    expect(configuration.update).toHaveBeenCalledWith(
       'translation',
       'selection-translate',
+      'Shift+Alt+D',
     );
-    expect(useHotkeyConfigStore.getState().snapshot).toEqual(backendSnapshot);
-  });
-
-  it('resets a category through one backend operation', async () => {
-    const { initializeHotkeyConfigStore, useHotkeyConfigStore } =
-      await import('./hotkeyConfigStore');
-    initializeHotkeyConfigStore(hotkeysRuntime);
-    hotkeysRuntime.resetCategory.mockResolvedValueOnce(backendSnapshot);
-
-    await useHotkeyConfigStore.getState().hydrate();
-    await useHotkeyConfigStore.getState().resetCategory('screenshot');
-
-    expect(hotkeysRuntime.resetCategory).toHaveBeenCalledWith('screenshot');
-    expect(useHotkeyConfigStore.getState().snapshot).toEqual(backendSnapshot);
   });
 });

@@ -23,7 +23,7 @@ React Views
   - `capture-workspace`: capture launch/session/effect workflow.
   - `result-window`: translation and file-OCR workflows.
   - `pinned-image`: pinned-image workflow.
-  - `settings`: settings-window hydration and update workflow, including Library cross-source filtering, ordering, and pagination.
+  - `settings`: configuration hydration, serialized updates, Provider/Hotkey reload, cross-window invalidation, and Library cross-source filtering, ordering, and pagination. Zustand stores project this Application-owned state for Views.
   - `permissions`: required-permission polling and explicit request workflow.
 - Result Window and Settings declare separate narrow speech ports. The shared Tauri adapter implements both without becoming part of either workflow.
 - `src/platform/tauri/` owns typed command invocation, event parsing, and Tauri-window effects. It implements the frontend ports.

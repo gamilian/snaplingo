@@ -57,7 +57,7 @@ Application runtimes that own their workflows and request runtime-host effects. 
 
 ### Settings
 
-`application/settings` owns durable setting defaults, normalization, and section updates. The frontend `application/settings` runtime owns hydration and update orchestration. UI navigation state is view-local and not durable settings.
+`application/settings` owns durable setting defaults, normalization, and section updates. Its frontend Settings Configuration module owns hydration, mutation serialization, Provider reload policy, Hotkey snapshots, and cross-window invalidation through narrow ports. Frontend stores only project Application state for Views. UI navigation state is view-local and not durable settings.
 
 ### History
 
