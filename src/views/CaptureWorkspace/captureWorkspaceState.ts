@@ -9,7 +9,10 @@ import {
   type AnnotationStyle,
   type AnnotationTool,
 } from './annotationStyle';
-import type { ColorSample, ColorSampleFormat } from './colorSampler';
+import type {
+  ColorSample,
+  ColorSampleFormat,
+} from '../../application/image-inspection/colorSampler';
 import {
   createCapturePreviewResetState,
   type CaptureAnnotationMoveGesture,

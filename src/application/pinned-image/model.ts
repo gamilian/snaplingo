@@ -39,6 +39,21 @@ export interface PinnedVisualFilter {
   inverted: boolean;
 }
 
+export function createDefaultPinnedTransform(): PinnedTransform {
+  return {
+    rotation: 0,
+    flipX: false,
+    flipY: false,
+  };
+}
+
+export function createDefaultPinnedVisualFilter(): PinnedVisualFilter {
+  return {
+    grayscale: false,
+    inverted: false,
+  };
+}
+
 interface PinnedKeyboardEvent {
   key: string;
   metaKey: boolean;

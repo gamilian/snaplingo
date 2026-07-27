@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSettingsConfigStore } from '../../stores/settingsConfigStore';
 import type { PinnedImageView } from '../../domain/capture';
-import type { PinnedImagePlatformRuntime } from '../../application/pinned-image/platformRuntime';
+import type { PinnedImageRuntime } from '../../application/pinned-image/runtime';
 import {
   PinnedImageRuntimeProvider,
   usePinnedImageRuntime,
@@ -9,7 +9,6 @@ import {
 import {
   getPinnedContextMenuPosition,
   getPinnedDisplaySize,
-  getPinnedDisplaySizeForTransform,
   getPinnedImagePointFromPointer,
   getPinnedKeyboardMoveDelta,
   getPinnedKeyboardOpacityAction,
@@ -30,7 +29,9 @@ import {
   isTogglePinnedThumbnailModeDoubleClick,
   nextPinnedTransform,
   nextPinnedVisualFilter,
-} from './pinControls';
+  createDefaultPinnedTransform,
+  createDefaultPinnedVisualFilter,
+} from '../../application/pinned-image/model';
 import {
   colorSampleToClipboardText,
   isColorSampleCopyShortcut,
@@ -38,19 +39,13 @@ import {
   sampleCanvasColor,
   type ColorSample,
   type ColorSampleFormat,
-} from '../CaptureWorkspace/colorSampler';
+} from '../../application/image-inspection/colorSampler';
 import {
   getMagnifierImageStyle,
   getMagnifierPosition,
-} from '../CaptureWorkspace/magnifier';
+} from '../../application/image-inspection/magnifier';
 import {
-  copyPinnedImage,
-  copyPinnedText,
-  closePinnedImage,
-  destroyPinnedImage,
-  destroyPinnedImageGroup,
   getPinnedHoverToolbarActions,
-  hidePinnedImageGroup,
   isClosePinnedImageShortcut,
   isCopyPinnedImageShortcut,
   isCopyPinnedTextShortcut,
@@ -59,32 +54,13 @@ import {
   isQuickSavePinnedImageShortcut,
   isReplacePinnedImageShortcut,
   isSavePinnedImageShortcut,
-  movePinnedImageToNextGroup,
-  quickSavePinnedImage,
-  replacePinnedImageFromClipboard,
-  savePinnedImage,
-} from './pinActions';
+} from '../../application/pinned-image/input';
 
 const PIN_CONTEXT_MENU_SIZE = { width: 132, height: 332 };
 const PIN_HOVER_TOOLBAR_ACTIONS = getPinnedHoverToolbarActions();
 const PIN_MAGNIFIER_SIZE = { width: 160, height: 112 };
 const PIN_MAGNIFIER_GAP = 14;
 const PIN_MAGNIFIER_ZOOM = 8;
-
-function createDefaultPinnedTransform() {
-  return {
-    rotation: 0,
-    flipX: false,
-    flipY: false,
-  };
-}
-
-function createDefaultPinnedVisualFilter() {
-  return {
-    grayscale: false,
-    inverted: false,
-  };
-}
 
 function readPinnedImageId(search: string) {
   const params = new URLSearchParams(search);
@@ -94,19 +70,18 @@ function readPinnedImageId(search: string) {
 }
 
 interface PinnedImageWindowProps {
-  imageId: string;
-  runtime: PinnedImagePlatformRuntime;
+  runtime: PinnedImageRuntime;
 }
 
-export function PinnedImageWindow({ runtime, imageId }: PinnedImageWindowProps) {
+export function PinnedImageWindow({ runtime }: PinnedImageWindowProps) {
   return (
     <PinnedImageRuntimeProvider runtime={runtime}>
-      <PinnedImageWindowContent imageId={imageId} />
+      <PinnedImageWindowContent />
     </PinnedImageRuntimeProvider>
   );
 }
 
-function PinnedImageWindowContent({ imageId }: { imageId: string }) {
+function PinnedImageWindowContent() {
   const runtime = usePinnedImageRuntime();
   const screenshotSavePath = useSettingsConfigStore(
     (state) => state.screenshot?.savePath,
@@ -171,49 +146,37 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
   }, [image, isThumbnailMode, zoom]);
 
   const hideCurrentPinnedImage = useCallback(async () => {
-    try {
-      await closePinnedImage(imageId, runtime.commands);
-    } catch (err) {
-      console.error('Failed to hide pinned image:', err);
-    }
-  }, [imageId, runtime]);
+    await runtime.close();
+  }, [runtime]);
 
   const destroyCurrentPinnedImage = useCallback(async () => {
-    try {
-      await destroyPinnedImage(
-        imageId,
-        { close: runtime.dismiss },
-        runtime.commands,
-      );
-    } catch (err) {
-      console.error('Failed to destroy pinned image:', err);
-    }
-  }, [imageId, runtime]);
+    await runtime.destroy();
+  }, [runtime]);
 
   const destroyCurrentPinnedImageGroup = useCallback(async () => {
     try {
-      await destroyPinnedImageGroup(imageId, runtime.commands);
+      await runtime.destroyGroup();
       setContextMenuPosition(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [imageId, runtime]);
+  }, [runtime]);
 
   const hideCurrentPinnedImageGroup = useCallback(async () => {
     try {
-      await hidePinnedImageGroup(imageId, runtime.commands);
+      await runtime.hideGroup();
       setContextMenuPosition(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [imageId, runtime]);
+  }, [runtime]);
 
   useEffect(() => {
     let disposed = false;
 
-    runtime.commands.getPinnedImage(imageId)
+    runtime.load()
       .then((nextImage) => {
-        if (!disposed) {
+        if (!disposed && nextImage) {
           setImage(nextImage);
         }
       })
@@ -226,7 +189,7 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
     return () => {
       disposed = true;
     };
-  }, [imageId, runtime]);
+  }, [runtime]);
 
   useEffect(() => {
     sampleCanvasRef.current = null;
@@ -275,9 +238,7 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
     if (!cursorColor) return;
 
     try {
-      await runtime.clipboard.copyText(
-        colorSampleToClipboardText(cursorColor, colorSampleFormat),
-      );
+      await runtime.copyColor(cursorColor, colorSampleFormat);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -318,36 +279,31 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
     async (
       nextZoom: number,
       nextTransform = transform,
-      nextImage = image,
       nextThumbnailMode = isThumbnailMode,
     ) => {
-      if (!nextImage) return;
-
-      const size = getPinnedDisplaySizeForTransform(
-        nextImage,
-        nextZoom,
-        nextTransform,
-        nextThumbnailMode,
-      );
-      await runtime.resizeTo(size.width, size.height);
+      await runtime.resize({
+        zoom: nextZoom,
+        transform: nextTransform,
+        thumbnailMode: nextThumbnailMode,
+      });
     },
-    [image, isThumbnailMode, runtime, transform],
+    [isThumbnailMode, runtime, transform],
   );
 
   const resetPinnedSize = useCallback(() => {
     setZoom(1);
     setIsThumbnailMode(false);
     setContextMenuPosition(null);
-    void resizePinnedWindow(1, transform, image, false);
-  }, [image, resizePinnedWindow, transform]);
+    void resizePinnedWindow(1, transform, false);
+  }, [resizePinnedWindow, transform]);
 
   const resetPinnedSizeAndOpacity = useCallback(() => {
     setZoom(1);
     setOpacity(defaultPinOpacity);
     setIsThumbnailMode(false);
     setContextMenuPosition(null);
-    void resizePinnedWindow(1, transform, image, false);
-  }, [image, resizePinnedWindow, transform]);
+    void resizePinnedWindow(1, transform, false);
+  }, [defaultPinOpacity, resizePinnedWindow, transform]);
 
   const setPinnedOpacityPreset = useCallback((nextOpacity: number) => {
     setOpacity(getPinnedOpacityPreset(nextOpacity));
@@ -356,19 +312,16 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
 
   const copyCurrentPinnedImage = useCallback(async () => {
     try {
-      await copyPinnedImage(imageId, runtime.commands);
+      await runtime.copyImage();
       setContextMenuPosition(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [imageId, runtime]);
+  }, [runtime]);
 
   const copyPinnedSourceText = useCallback(async () => {
     try {
-      await copyPinnedText(
-        runtime.clipboard.copyText,
-        image?.source_text,
-      );
+      await runtime.copySourceText(image?.source_text);
       setContextMenuPosition(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -377,29 +330,25 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
 
   const savePinnedImageAs = useCallback(async () => {
     try {
-      await savePinnedImage(imageId, runtime.commands);
+      await runtime.save();
       setContextMenuPosition(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [imageId, runtime]);
+  }, [runtime]);
 
   const quickSavePinnedImageToDirectory = useCallback(async () => {
     try {
-      await quickSavePinnedImage(
-        imageId,
-        screenshotSavePath,
-        runtime.commands,
-      );
+      await runtime.quickSave(screenshotSavePath);
       setContextMenuPosition(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [imageId, runtime, screenshotSavePath]);
+  }, [runtime, screenshotSavePath]);
 
   const openPreferencesWindow = useCallback(async () => {
     try {
-      await runtime.settings.open();
+      await runtime.openPreferences();
       setContextMenuPosition(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -408,10 +357,7 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
 
   const replacePinnedFromClipboard = useCallback(async () => {
     try {
-      const nextImage = await replacePinnedImageFromClipboard<PinnedImageView>(
-        imageId,
-        runtime.commands,
-      );
+      const nextImage = await runtime.replaceFromClipboard();
       const nextTransform = createDefaultPinnedTransform();
 
       setImage(nextImage);
@@ -419,20 +365,19 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
       setIsThumbnailMode(false);
       setTransform(nextTransform);
       setContextMenuPosition(null);
-      await resizePinnedWindow(1, nextTransform, nextImage, false);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [imageId, resizePinnedWindow, runtime]);
+  }, [runtime]);
 
   const movePinnedToAnotherGroup = useCallback(async () => {
     try {
-      await movePinnedImageToNextGroup(imageId, runtime.commands);
+      await runtime.moveToNextGroup();
       setContextMenuPosition(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [imageId, runtime]);
+  }, [runtime]);
 
   const adjustPinnedZoom = useCallback(
     (wheelDirection: number) => {
@@ -440,21 +385,21 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
       setContextMenuPosition(null);
       setZoom((currentZoom) => {
         const nextZoom = getPinnedZoomFromWheel(currentZoom, wheelDirection);
-        void resizePinnedWindow(nextZoom, transform, image, false);
+        void resizePinnedWindow(nextZoom, transform, false);
         return nextZoom;
       });
     },
-    [image, resizePinnedWindow, transform],
+    [resizePinnedWindow, transform],
   );
 
   const togglePinnedThumbnailMode = useCallback(() => {
     setContextMenuPosition(null);
     setIsThumbnailMode((currentThumbnailMode) => {
       const nextThumbnailMode = !currentThumbnailMode;
-      void resizePinnedWindow(zoom, transform, image, nextThumbnailMode);
+      void resizePinnedWindow(zoom, transform, nextThumbnailMode);
       return nextThumbnailMode;
     });
-  }, [image, resizePinnedWindow, transform, zoom]);
+  }, [resizePinnedWindow, transform, zoom]);
 
   const movePinnedWindowByKeyboard = useCallback(
     async (delta: { x: number; y: number }) => {
@@ -597,7 +542,7 @@ function PinnedImageWindowContent({ imageId }: { imageId: string }) {
             currentTransform,
             transformAction,
           );
-          void resizePinnedWindow(zoom, nextTransform, image, isThumbnailMode);
+          void resizePinnedWindow(zoom, nextTransform, isThumbnailMode);
           return nextTransform;
         });
         return;

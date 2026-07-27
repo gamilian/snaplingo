@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createDefaultPinnedTransform,
+  createDefaultPinnedVisualFilter,
   getPinnedContextMenuPosition,
   getPinnedDisplaySize,
   getPinnedDisplaySizeForTransform,
@@ -23,9 +25,21 @@ import {
   isTogglePinnedThumbnailModeDoubleClick,
   nextPinnedTransform,
   nextPinnedVisualFilter,
-} from './pinControls';
+} from './model';
 
 describe('pinned image controls', () => {
+  it('starts with an untransformed and unfiltered presentation', () => {
+    expect(createDefaultPinnedTransform()).toEqual({
+      rotation: 0,
+      flipX: false,
+      flipY: false,
+    });
+    expect(createDefaultPinnedVisualFilter()).toEqual({
+      grayscale: false,
+      inverted: false,
+    });
+  });
+
   it('zooms pinned images with wheel direction and clamps the range', () => {
     expect(getPinnedZoomFromWheel(1, -1)).toBe(1.1);
     expect(getPinnedZoomFromWheel(1, 1)).toBe(0.9);

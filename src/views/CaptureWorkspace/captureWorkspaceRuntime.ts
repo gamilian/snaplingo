@@ -93,7 +93,7 @@ import {
 import {
   colorSamplesEqual,
   colorSampleToClipboardText,
-} from './colorSampler';
+} from '../../application/image-inspection/colorSampler';
 import { updateTextAnnotationDraft } from './textAnnotationDraft';
 import {
   normalizeSelection,

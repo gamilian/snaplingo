@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { emptyAnnotationHistory } from './annotationHistory';
-import type { ColorSampleFormat } from './colorSampler';
+import type { ColorSampleFormat } from '../../application/image-inspection/colorSampler';
 import {
   createInitialCaptureWorkspaceState,
   type CaptureWorkspaceState,

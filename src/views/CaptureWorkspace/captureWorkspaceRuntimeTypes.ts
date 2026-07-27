@@ -28,7 +28,7 @@ import type {
 import type {
   ColorSample,
   ColorSampleFormat,
-} from './colorSampler';
+} from '../../application/image-inspection/colorSampler';
 import type { SelectionHandle } from './selection';
 import type {
   TextAnnotationDraft,

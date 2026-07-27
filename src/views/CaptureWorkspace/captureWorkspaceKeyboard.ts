@@ -34,7 +34,7 @@ import {
   isColorSampleFormatToggleShortcut,
   type ColorSample,
   type ColorSampleFormat,
-} from './colorSampler';
+} from '../../application/image-inspection/colorSampler';
 import type { CaptureWorkspaceState } from './captureWorkspaceState';
 import type { AnnotationCommand, ArrowKey, LogicalRect, Point } from './types';
 

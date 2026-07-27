@@ -1,4 +1,7 @@
-import type { Point } from './types';
+interface Point {
+  x: number;
+  y: number;
+}
 
 interface Size {
   width: number;

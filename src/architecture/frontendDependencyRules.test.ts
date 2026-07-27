@@ -23,6 +23,12 @@ const TAURI_EVENT_LISTENER_NAMES = new Set([
 ]);
 
 const LEGACY_TAURI_ROOT = ['src', 'tauri'].join('/');
+const VIEW_ROOT_NAMES = new Set([
+  'CaptureWorkspace',
+  'PinnedImageWindow',
+  'ResultWindow',
+  'SettingsWindow',
+]);
 
 function isProductionTypeScript(path: string) {
   return (
@@ -162,6 +168,21 @@ function forbiddenApplicationViewImports(files: SourceFile[]) {
         path.startsWith('src/application/') &&
         /(?:^|\/)views(?:\/|$)/.test(specifier),
     )
+    .map(({ path, specifier }) => `${path} -> ${specifier}`)
+    .sort();
+}
+
+function crossViewRootImports(files: SourceFile[]) {
+  return moduleImports(files)
+    .filter(({ path, specifier }) => {
+      const sourceRoot = path.match(/^src\/views\/([^/]+)\//)?.[1];
+      if (!sourceRoot) return false;
+
+      const targetRoot = specifier
+        .split('/')
+        .find((segment) => VIEW_ROOT_NAMES.has(segment));
+      return targetRoot !== undefined && targetRoot !== sourceRoot;
+    })
     .map(({ path, specifier }) => `${path} -> ${specifier}`)
     .sort();
 }
@@ -333,6 +354,10 @@ describe('frontend dependency rules', () => {
     ).toEqual([]);
   });
 
+  test('View roots share application knowledge without importing each other', () => {
+    expect(crossViewRootImports(viewSourceFilesIncludingTests())).toEqual([]);
+  });
+
   test('App composes Platform adapters into Application runtimes', () => {
     const appFile = productionSourceFiles().find(({ path }) => path === 'src/App.tsx');
     expect(appFile).toBeDefined();
@@ -343,7 +368,7 @@ describe('frontend dependency rules', () => {
       expect.arrayContaining([
         './application/capture-workspace/platformRuntime',
         './application/result-window/platformRuntime',
-        './application/pinned-image/platformRuntime',
+        './application/pinned-image/runtime',
         './application/settings/runtime',
         './views/CaptureWorkspace',
         './views/ResultWindow',
@@ -382,6 +407,16 @@ describe('frontend dependency rules', () => {
 
   test('Application modules do not depend on Views', () => {
     expect(forbiddenApplicationViewImports(productionSourceFiles())).toEqual([]);
+  });
+
+  test('the shallow Pinned Image platform runtime is deleted', () => {
+    expect(
+      allSourceFiles()
+        .map(({ path }) => path)
+        .filter((path) =>
+          path.startsWith('src/application/pinned-image/platformRuntime.'),
+        ),
+    ).toEqual([]);
   });
 
   test('raw Tauri event strings stay behind the Tauri platform boundary', () => {

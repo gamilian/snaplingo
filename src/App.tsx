@@ -16,7 +16,7 @@ import {
 import { createCaptureWorkspacePlatformRuntime } from './application/capture-workspace/platformRuntime';
 import { createResultWindowPlatformRuntime } from './application/result-window/platformRuntime';
 import { createResultWindowRuntime } from './application/result-window/runtime';
-import { createPinnedImagePlatformRuntime } from './application/pinned-image/platformRuntime';
+import { createPinnedImageRuntime } from './application/pinned-image/runtime';
 import { createSettingsRuntime } from './application/settings/runtime';
 import { resolveApplicationTheme } from './application/settings/theme';
 import { useAppStore } from './stores/appStore';
@@ -210,13 +210,6 @@ const resultWindowRuntime = createResultWindowRuntime({
     setTranslating: (value) => useAppStore.getState().setTranslating(value),
   },
 });
-const pinnedImageRuntime = createPinnedImagePlatformRuntime({
-  window: pinnedWindow,
-  commands: pinnedImageCommands,
-  clipboard: { writeText: writeClipboardText },
-  settings: settingsRuntime.window,
-});
-
 initializeSettingsConfigStore(settingsRuntime.durableSettings);
 initializeHotkeyConfigStore(settingsRuntime.hotkeys);
 initializeProviderStore(settingsRuntime.providers);
@@ -227,6 +220,15 @@ initializeScreenshotFavoritesStore(settingsRuntime.screenshotFavorites);
 const currentWindowLabel = getCurrentWindowLabel();
 const captureLaunch = readCaptureLaunch(window.location.search);
 const pinnedImageId = readPinnedImageLaunch(window.location.search);
+const pinnedImageRuntime = pinnedImageId
+  ? createPinnedImageRuntime({
+      imageId: pinnedImageId,
+      window: pinnedWindow,
+      commands: pinnedImageCommands,
+      clipboard: { writeText: writeClipboardText },
+      settings: settingsRuntime.window,
+    })
+  : null;
 const isCaptureResultWindow = isCaptureResultWindowLaunch(
   currentWindowLabel,
   window.location.search,
@@ -444,8 +446,8 @@ function Application() {
     );
   }
 
-  if (pinnedImageId) {
-    return <PinnedImageWindow imageId={pinnedImageId} runtime={pinnedImageRuntime} />;
+  if (pinnedImageRuntime) {
+    return <PinnedImageWindow runtime={pinnedImageRuntime} />;
   }
 
   if (isCaptureResultWindow) {

@@ -3,12 +3,12 @@ import {
   colorSampleToClipboardText,
   type ColorSample,
   type ColorSampleFormat,
-} from './colorSampler';
+} from '../../application/image-inspection/colorSampler';
 import {
   getMagnifierCanvasBlit,
   getMagnifierPosition,
   normalizeMagnifierZoom,
-} from './magnifier';
+} from '../../application/image-inspection/magnifier';
 import type { LogicalRect, Point } from './types';
 
 const MAGNIFIER_GAP = 14;

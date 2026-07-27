@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { sampleImageColor, type ColorSample } from './colorSampler';
+import {
+  sampleImageColor,
+  type ColorSample,
+} from '../../application/image-inspection/colorSampler';
 import {
   shouldAutoShowCaptureMagnifier,
   shouldShowMagnifier,
   shouldTrackCaptureCursorForMagnifier,
-} from './magnifier';
+} from '../../application/image-inspection/magnifier';
 import { getMonitorAtVirtualPoint } from './virtualDesktop';
 import type {
   CaptureSessionView,

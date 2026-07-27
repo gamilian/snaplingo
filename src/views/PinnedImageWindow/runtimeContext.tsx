@@ -1,15 +1,15 @@
 import { createContext, useContext, type ReactNode } from 'react';
-import type { PinnedImagePlatformRuntime } from '../../application/pinned-image/platformRuntime';
+import type { PinnedImageRuntime } from '../../application/pinned-image/runtime';
 
 const PinnedImageRuntimeContext =
-  createContext<PinnedImagePlatformRuntime | null>(null);
+  createContext<PinnedImageRuntime | null>(null);
 
 export function PinnedImageRuntimeProvider({
   children,
   runtime,
 }: {
   children: ReactNode;
-  runtime: PinnedImagePlatformRuntime;
+  runtime: PinnedImageRuntime;
 }) {
   return (
     <PinnedImageRuntimeContext.Provider value={runtime}>

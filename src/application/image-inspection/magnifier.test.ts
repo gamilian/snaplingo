@@ -8,9 +8,8 @@ import {
   shouldShowMagnifier,
   shouldTrackCaptureCursorForMagnifier,
 } from './magnifier';
-import type { LogicalRect, Point } from './types';
 
-const bounds: LogicalRect = { x: 0, y: 0, width: 300, height: 200 };
+const bounds = { x: 0, y: 0, width: 300, height: 200 };
 
 describe('capture magnifier', () => {
   it('normalizes configured zoom to the supported integer range', () => {
@@ -34,7 +33,7 @@ describe('capture magnifier', () => {
   });
 
   it('centers the frozen image background on the cursor point', () => {
-    const cursor: Point = { x: 30, y: 20 };
+    const cursor = { x: 30, y: 20 };
 
     expect(
       getMagnifierImageStyle(

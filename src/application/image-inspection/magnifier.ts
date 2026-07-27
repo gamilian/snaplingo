@@ -1,4 +1,12 @@
-import type { LogicalRect, Point } from './types';
+interface Point {
+  x: number;
+  y: number;
+}
+
+interface LogicalRect extends Point {
+  width: number;
+  height: number;
+}
 
 interface Size {
   width: number;

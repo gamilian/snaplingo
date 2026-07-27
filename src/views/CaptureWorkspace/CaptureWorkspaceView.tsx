@@ -37,7 +37,10 @@ import {
 import { CaptureSelectionOverlayCanvas } from './captureSelectionOverlayRuntime';
 import { createCapturePointerFrameDispatcher } from './capturePointerFrame';
 import { getCaptureWorkspacePointerPoint } from './captureWorkspacePointer';
-import type { ColorSample, ColorSampleFormat } from './colorSampler';
+import type {
+  ColorSample,
+  ColorSampleFormat,
+} from '../../application/image-inspection/colorSampler';
 import type { CaptureCandidateDetectionMode } from './captureWorkspaceState';
 import type { SelectionHandle } from './selection';
 import type { TextAnnotationDraft } from './textAnnotationDraft';
