@@ -4,26 +4,37 @@
 
 ## 脚本列表
 
-### 🧪 `npm run tauri:build:beta` - 小范围测试构建
+### `npm run tauri:build` - 桌面发布构建
 
-完整的小范围测试构建流程，包括构建、打包和验证。
+跨平台发布入口，负责版本检查、Tauri bundle 构建和产物验证。CI 与本地构建调用同一个 implementation。
 
 **使用方法：**
 ```bash
-npm run tauri:build:beta
+npm run tauri:build
 ```
 
 **功能：**
-- 🧹 清理旧构建产物（dist/、target/release）
-- 📦 版本检查（package.json 和 Cargo.toml）
-- 🔨 构建前端（TypeScript + Vite）
-- 🦀 构建 Tauri release profile
-- ✅ 验证构建产物并显示文件大小
-- ⏱️ 显示构建总耗时
+- 要求 `package.json`、`Cargo.toml` 和 `tauri.conf.json` 版本一致
+- 通过 Cargo metadata 发现 workspace target 目录
+- 构建前端和 Tauri release bundle
+- 验证当前平台要求的全部产物及其可运行形态
 
 **输出产物：**
 - macOS: `target/release/bundle/macos/SnapLingo.app` 和 `target/release/bundle/dmg/SnapLingo_*.dmg`
 - Linux: `target/release/bundle/appimage/SnapLingo_*.AppImage` 和 `target/release/bundle/deb/snaplingo_*.deb`
+- Windows: `target/release/bundle/msi/*.msi` 和 `target/release/bundle/nsis/*.exe`
+
+需要清理旧的前端与 release 产物时使用：
+
+```bash
+npm run tauri:build:beta
+```
+
+只验证已有 bundle、不重新构建时使用：
+
+```bash
+npm run release:verify
+```
 
 **构建时间：** 约 2-3 分钟（取决于机器性能）
 
@@ -57,9 +68,9 @@ npm run tauri:build:beta
 
 ### 必须安装的工具
 
-1. **Node.js** (v16+) 和 **npm**
+1. **Node.js** 22 和 **npm**
 2. **Rust** (最新稳定版)
-3. **Tauri CLI**: `npm install -g @tauri-apps/cli`
+3. 项目本地安装的 Tauri CLI（由 `npm ci` 或 `npm install` 提供）
 
 ### macOS 额外要求
 
@@ -129,8 +140,8 @@ cargo --version
 brew install create-dmg
 ```
 
-### 问题：版本号不一致警告
-**说明：** `package.json` 和 `src-tauri/Cargo.toml` 中的版本号不一致，构建仍会继续，但建议同步版本号。
+### 问题：版本号不一致
+**解决：** 同步 `package.json`、`src-tauri/Cargo.toml` 和 `src-tauri/tauri.conf.json` 的版本。发布入口会在构建前失败，避免生成版本不明确的产物。
 
 ### 问题：构建失败，出现 Rust 编译错误
 **解决：**
@@ -141,9 +152,9 @@ brew install create-dmg
 
 ## 平台支持
 
-- ✅ macOS (Apple Silicon & Intel)
-- ✅ Linux (Ubuntu/Debian/Fedora 等)
-- ⚠️ Windows: 脚本需要在 Git Bash、WSL 或 MinGW 环境中运行
+- macOS (Apple Silicon & Intel)
+- Linux (Ubuntu/Debian/Fedora 等)
+- Windows（npm 入口原生支持 PowerShell 和 cmd）
 
 ---
 

@@ -1,13 +1,15 @@
 import { create } from 'zustand';
 import type { TranslationResult } from '../types';
 import type { ResultWindowOrigin } from '../application/result-window/ports';
-
-export type ResultWindowMode = 'translation' | 'ocr';
-export type ProviderTranslationStatus = 'pending' | 'success' | 'error';
-
-export interface ProviderTranslation extends TranslationResult {
-  status: ProviderTranslationStatus;
-}
+import type { SettingsConfiguration } from '../application/settings/configuration';
+import type { ResultWindowStatePort } from '../application/result-window/runtime';
+import type {
+  ProviderTranslation,
+  ResultWindowMode,
+  ResultWindowProjection,
+} from '../application/result-window/projection';
+import { useProviderStore } from './providerStore';
+import { useSettingsConfigStore } from './settingsConfigStore';
 
 interface TranslationDefaults {
   defaultSourceLang: string;
@@ -63,7 +65,7 @@ function hasPendingProviderTranslation(translations: ProviderTranslation[]) {
   return translations.some((translation) => translation.status === 'pending');
 }
 
-interface AppState {
+interface ResultWindowStoreState {
   sourceText: string;
   sourceLang: string;
   targetLang: string;
@@ -89,7 +91,10 @@ interface AppState {
   clearTranslationResults: () => void;
   startTranslationSession: (text: string, providerIds: string[]) => string;
   beginProviderTranslation: (sessionId: string, providerId: string) => void;
-  completeProviderTranslation: (sessionId: string, result: TranslationResult) => void;
+  completeProviderTranslation: (
+    sessionId: string,
+    result: TranslationResult,
+  ) => void;
   failProviderTranslation: (
     sessionId: string,
     providerId: string,
@@ -110,7 +115,7 @@ interface AppState {
   reset: () => void;
 }
 
-export const useAppStore = create<AppState>((set) => ({
+export const useResultWindowStore = create<ResultWindowStoreState>((set) => ({
   sourceText: '',
   sourceLang: 'auto',
   targetLang: 'zh-CN',
@@ -255,3 +260,101 @@ export const useAppStore = create<AppState>((set) => ({
     autoTranslateRequestId: 0,
   }),
 }));
+
+type ProviderConfiguration = SettingsConfiguration['providers'];
+
+export function createResultWindowStatePort(
+  providers: ProviderConfiguration,
+): ResultWindowStatePort {
+  return {
+    setSourceText: (text) => useResultWindowStore.getState().setSourceText(text),
+    setSourceLang: (language) =>
+      useResultWindowStore.getState().setSourceLang(language),
+    setTargetLang: (language) =>
+      useResultWindowStore.getState().setTargetLang(language),
+    setResultWindowOrigin: (origin) =>
+      useResultWindowStore.getState().setResultWindowOrigin(origin),
+    clearTranslationResults: () =>
+      useResultWindowStore.getState().clearTranslationResults(),
+    setOcrText: (text) => useResultWindowStore.getState().setOcrText(text),
+    setOcrConfidence: (confidence) =>
+      useResultWindowStore.getState().setOcrConfidence(confidence),
+    setOcrImageBase64: (imageBase64) =>
+      useResultWindowStore.getState().setOcrImageBase64(imageBase64),
+    setOcrRunning: (value) =>
+      useResultWindowStore.getState().setOcrRunning(value),
+    setOcrError: (message) =>
+      useResultWindowStore.getState().setOcrError(message),
+    requestAutoTranslate: () =>
+      useResultWindowStore.getState().requestAutoTranslate(),
+    showResultWindow: () => useResultWindowStore.getState().showResultWindow(),
+    showOcrWindow: () => useResultWindowStore.getState().showOcrWindow(),
+    hideResultWindow: () => useResultWindowStore.getState().hideResultWindow(),
+    loadActiveTranslationProviderIds: async () => {
+      await providers.loadTranslation();
+      return providers.getState().activeTranslationProviders;
+    },
+    loadActiveOcrProviderId: async () => {
+      if (!providers.getState().activeOcrProvider) {
+        await providers.loadOcr();
+      }
+      return providers.getState().activeOcrProvider;
+    },
+    getTranslationSession: () => {
+      const state = useResultWindowStore.getState();
+      return {
+        sessionId: state.translationSessionId,
+        sourceText: state.sourceText,
+        sourceLang: state.sourceLang,
+        targetLang: state.targetLang,
+      };
+    },
+    startTranslationSession: (text, providerIds) =>
+      useResultWindowStore.getState().startTranslationSession(text, providerIds),
+    beginProviderTranslation: (sessionId, providerId) =>
+      useResultWindowStore
+        .getState()
+        .beginProviderTranslation(sessionId, providerId),
+    completeProviderTranslation: (sessionId, result) =>
+      useResultWindowStore
+        .getState()
+        .completeProviderTranslation(sessionId, result),
+    failProviderTranslation: (sessionId, providerId, message) =>
+      useResultWindowStore
+        .getState()
+        .failProviderTranslation(sessionId, providerId, message),
+    setTranslating: (value) =>
+      useResultWindowStore.getState().setTranslating(value),
+  };
+}
+
+export function useResultWindowProjection(): ResultWindowProjection {
+  const resultWindow = useResultWindowStore();
+  const translationProviders = useProviderStore(
+    (state) => state.translationProviders,
+  );
+  const translationSettings = useSettingsConfigStore(
+    (state) => state.translation,
+  );
+  const ocrSettings = useSettingsConfigStore((state) => state.ocr);
+
+  return {
+    sourceText: resultWindow.sourceText,
+    sourceLang: resultWindow.sourceLang,
+    targetLang: resultWindow.targetLang,
+    providerTranslations: resultWindow.providerTranslations,
+    isTranslating: resultWindow.isTranslating,
+    ocrText: resultWindow.ocrText,
+    ocrConfidence: resultWindow.ocrConfidence,
+    ocrImageBase64: resultWindow.ocrImageBase64,
+    isOcrRunning: resultWindow.isOcrRunning,
+    ocrError: resultWindow.ocrError,
+    resultWindowVisible: resultWindow.resultWindowVisible,
+    resultWindowMode: resultWindow.resultWindowMode,
+    resultWindowOrigin: resultWindow.resultWindowOrigin,
+    autoTranslateRequestId: resultWindow.autoTranslateRequestId,
+    translationProviders,
+    translationSettings,
+    ocrSettings,
+  };
+}

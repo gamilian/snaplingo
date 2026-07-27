@@ -7,16 +7,12 @@ import {
   useState,
   type MouseEvent,
 } from 'react';
-import { useAppStore } from '../../stores/appStore';
-import { useProviderStore } from '../../stores/providerStore';
-import { useSettingsConfigStore } from '../../stores/settingsConfigStore';
+import { useResultWindowProjection } from '../../stores/resultWindowStore';
 import { translationFavoriteKey } from '../../application/favorites/identity';
 import {
-  defaultTargetLanguageForSource,
   getTranslationLanguageDisplayName,
   getTranslationLanguageSelectLabel,
   resolveTranslationRequestLanguages,
-  swapTranslationLanguagePair,
   TRANSLATION_LANGUAGES,
 } from '../../application/translation/languages';
 import TranslationCard from './TranslationCard';
@@ -262,20 +258,10 @@ function ResultWindowContent({
     resultWindowMode,
     resultWindowOrigin,
     autoTranslateRequestId,
-    setSourceText,
-    setSourceLang,
-    setTargetLang,
-    setOcrText,
-    setOcrImageBase64,
-  } = useAppStore();
-  const translationProviders = useProviderStore((state) => state.translationProviders);
-  const loadTranslationProviders = useProviderStore(
-    (state) => state.loadTranslationProviders,
-  );
-  const translationSettings = useSettingsConfigStore(
-    (state) => state.translation,
-  );
-  const ocrSettings = useSettingsConfigStore((state) => state.ocr);
+    translationProviders,
+    translationSettings,
+    ocrSettings,
+  } = useResultWindowProjection();
 
   const lastAutoTranslateRequestId = useRef(0);
   const lastAutomaticTranslationKey = useRef('');
@@ -608,8 +594,8 @@ function ResultWindowContent({
   useEffect(() => {
     if (!resultWindowVisible) return;
 
-    void loadTranslationProviders();
-  }, [loadTranslationProviders, resultWindowVisible]);
+    void runtime.loadTranslationProviders();
+  }, [resultWindowVisible, runtime]);
 
   useLayoutEffect(() => {
     if (!resultWindowVisible) return;
@@ -736,21 +722,6 @@ function ResultWindowContent({
 
   const handleStartDrag = () => {
     void runtime.beginDrag();
-  };
-
-  const handleSourceLanguageChange = (nextSourceLang: string) => {
-    setSourceLang(nextSourceLang);
-    setTargetLang(
-      targetLang === 'auto'
-        ? 'auto'
-        : defaultTargetLanguageForSource(nextSourceLang),
-    );
-  };
-
-  const handleSwapLanguages = () => {
-    const nextLanguagePair = swapTranslationLanguagePair(sourceLang, targetLang);
-    setSourceLang(nextLanguagePair.sourceLang);
-    setTargetLang(nextLanguagePair.targetLang);
   };
 
   const handleTranslate = () => {
@@ -948,8 +919,8 @@ function ResultWindowContent({
                           disabled={!ocrText}
                           className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
                           onClick={() => {
-                            setOcrText('');
-                            setOcrImageBase64(null);
+                            runtime.updateOcrText('');
+                            runtime.clearOcrImage();
                           }}
                         >
                           <ClearTextIcon className="h-4 w-4" />
@@ -1064,7 +1035,7 @@ function ResultWindowContent({
                           title="清空"
                           disabled={!ocrText}
                           className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
-                          onClick={() => setOcrText('')}
+                          onClick={() => runtime.updateOcrText('')}
                         >
                           <ClearTextIcon className="h-4 w-4" />
                         </IconActionButton>
@@ -1106,7 +1077,7 @@ function ResultWindowContent({
                 <textarea
                   ref={sourceTextAreaRef}
                   value={sourceText}
-                  onChange={(e) => setSourceText(e.target.value)}
+                  onChange={(e) => runtime.updateSourceText(e.target.value)}
                   rows={resultWindowTextAreaRows(sourceText, 'source')}
                   placeholder="输入需要翻译的文本..."
                   className={resultWindowTextAreaClassName('source')}
@@ -1190,7 +1161,7 @@ function ResultWindowContent({
                       title="清空"
                       disabled={!sourceText}
                       className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
-                      onClick={() => setSourceText('')}
+                      onClick={() => runtime.updateSourceText('')}
                     >
                       <ClearTextIcon className="h-4 w-4" />
                     </IconActionButton>
@@ -1204,9 +1175,9 @@ function ResultWindowContent({
               <LanguageSwitcher
                 sourceLang={sourceLang}
                 targetLang={targetLang}
-                onSourceChange={handleSourceLanguageChange}
-                onTargetChange={setTargetLang}
-                onSwap={handleSwapLanguages}
+                onSourceChange={runtime.changeSourceLanguage}
+                onTargetChange={runtime.changeTargetLanguage}
+                onSwap={runtime.swapTranslationLanguages}
               />
             </div>
 

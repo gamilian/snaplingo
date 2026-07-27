@@ -16,7 +16,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useAppStore } from '../../stores/appStore';
+import { useResultWindowStore } from '../../stores/resultWindowStore';
 
 const LANGUAGES = [
   { code: 'auto', name: '自动检测' },
@@ -47,7 +47,7 @@ export default function ResultWindowPrototype() {
     setSourceLang,
     setTargetLang,
     hideResultWindow,
-  } = useAppStore();
+  } = useResultWindowStore();
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {

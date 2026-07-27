@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { ProviderTranslationStatus } from '../../stores/appStore';
+import type { ProviderTranslationStatus } from '../../application/result-window/projection';
 import {
   ChevronDownIcon,
   ChevronUpIcon,

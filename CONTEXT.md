@@ -54,7 +54,7 @@ A frozen snapshot of the desktop used to produce screenshot output, OCR input, a
 
 ### Result Window and Pinned Image
 
-Application runtimes that own their workflows and request runtime-host effects. Result Window owns its translation/OCR favorite sequencing, OCR Provider fallback, and clipboard intents. Their Tauri window, clipboard, and notification mechanics remain in Infrastructure.
+Application runtimes that own their workflows and request runtime-host effects. Result Window owns one read-only View-facing state projection, editable text and language intents, translation/OCR favorite sequencing, OCR Provider fallback, and clipboard intents. Their Tauri window, clipboard, and notification mechanics remain in Infrastructure.
 
 ### Hotkey
 
@@ -77,6 +77,10 @@ History and Favorites remain separate backend Application modules with independe
 ### Favorite Capacity
 
 Favorite Capacity is the backend Application module that owns the global maximum across translation, OCR, and screenshot Favorites. All favorite insertion workflows share its atomic in-process gate; its repository port reports the combined persisted count without leaking one favorite storage model into another.
+
+### Release Verification
+
+`script/release-verification.mjs` is the shared release module used by local npm commands and native CI. It requires the package, Cargo, and Tauri versions to match, discovers the Cargo target directory through metadata, invokes the Tauri bundle build, and verifies the expected macOS, Linux, or Windows artifacts.
 
 ## Dependency Direction
 

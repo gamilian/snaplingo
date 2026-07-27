@@ -10,8 +10,9 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "node script/run-tauri-build.mjs && node script/fix-macos-release-signing.mjs",
-    "tauri:build:beta": "npm run tauri:build"
+    "tauri:build": "node script/release-verification.mjs build",
+    "tauri:build:beta": "node script/release-verification.mjs build --clean",
+    "release:verify": "node script/release-verification.mjs verify"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",

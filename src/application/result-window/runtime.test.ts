@@ -225,6 +225,36 @@ describe('result window application runtime', () => {
     expect(runtime).not.toHaveProperty('clipboard');
   });
 
+  it('owns editable projection intents and language pair policy', async () => {
+    const { runtime, state } = createRuntime({
+      activeProviderIds: ['google'],
+      translationSession: {
+        sessionId: 'translation-1',
+        sourceText: 'hello',
+        sourceLang: 'auto',
+        targetLang: 'zh-CN',
+      },
+    });
+
+    runtime.updateSourceText('updated');
+    runtime.changeSourceLanguage('ja');
+    runtime.changeTargetLanguage('en');
+    runtime.swapTranslationLanguages();
+    runtime.updateOcrText('recognized');
+    runtime.clearOcrImage();
+    await runtime.loadTranslationProviders();
+
+    expect(state.setSourceText).toHaveBeenCalledWith('updated');
+    expect(state.setSourceLang).toHaveBeenNthCalledWith(1, 'ja');
+    expect(state.setTargetLang).toHaveBeenNthCalledWith(1, 'zh-CN');
+    expect(state.setTargetLang).toHaveBeenNthCalledWith(2, 'en');
+    expect(state.setSourceLang).toHaveBeenNthCalledWith(2, 'zh-CN');
+    expect(state.setTargetLang).toHaveBeenNthCalledWith(3, 'en');
+    expect(state.setOcrText).toHaveBeenCalledWith('recognized');
+    expect(state.setOcrImageBase64).toHaveBeenCalledWith(null);
+    expect(state.loadActiveTranslationProviderIds).toHaveBeenCalledTimes(1);
+  });
+
   it('owns provider fan-out and records one aggregate translation history entry', async () => {
     const { runtime, platform, state } = createRuntime({
       activeProviderIds: ['google', 'deeplx'],
@@ -635,6 +665,8 @@ function createRuntime(options: {
   const saveLastWindowPosition = vi.fn(async () => undefined);
   const state = {
     setSourceText: vi.fn(),
+    setSourceLang: vi.fn(),
+    setTargetLang: vi.fn(),
     setResultWindowOrigin: vi.fn(),
     clearTranslationResults: vi.fn(),
     setOcrText: vi.fn(),

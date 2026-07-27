@@ -19,7 +19,10 @@ import { createResultWindowRuntime } from './application/result-window/runtime';
 import { createPinnedImageRuntime } from './application/pinned-image/runtime';
 import { createSettingsRuntime } from './application/settings/runtime';
 import { resolveApplicationTheme } from './application/settings/theme';
-import { useAppStore } from './stores/appStore';
+import {
+  createResultWindowStatePort,
+  useResultWindowStore,
+} from './stores/resultWindowStore';
 import {
   initializeHotkeyConfigStore,
 } from './stores/hotkeyConfigStore';
@@ -157,56 +160,9 @@ const resultWindowRuntime = createResultWindowRuntime({
     load: getLastResultWindowPosition,
     save: durableSettings.updateLastResultWindowPosition,
   },
-  state: {
-    setSourceText: (text) => useAppStore.getState().setSourceText(text),
-    setResultWindowOrigin: (origin) =>
-      useAppStore.getState().setResultWindowOrigin(origin),
-    clearTranslationResults: () =>
-      useAppStore.getState().clearTranslationResults(),
-    setOcrText: (text) => useAppStore.getState().setOcrText(text),
-    setOcrConfidence: (confidence) =>
-      useAppStore.getState().setOcrConfidence(confidence),
-    setOcrImageBase64: (imageBase64) =>
-      useAppStore.getState().setOcrImageBase64(imageBase64),
-    setOcrRunning: (value) => useAppStore.getState().setOcrRunning(value),
-    setOcrError: (message) => useAppStore.getState().setOcrError(message),
-    requestAutoTranslate: () => useAppStore.getState().requestAutoTranslate(),
-    showResultWindow: () => useAppStore.getState().showResultWindow(),
-    showOcrWindow: () => useAppStore.getState().showOcrWindow(),
-    hideResultWindow: () => useAppStore.getState().hideResultWindow(),
-    loadActiveTranslationProviderIds: async () => {
-      const providers = settingsRuntime.configuration.providers;
-      await providers.loadTranslation();
-      return providers.getState().activeTranslationProviders;
-    },
-    loadActiveOcrProviderId: async () => {
-      const providers = settingsRuntime.configuration.providers;
-      if (!providers.getState().activeOcrProvider) {
-        await providers.loadOcr();
-      }
-      return providers.getState().activeOcrProvider;
-    },
-    getTranslationSession: () => {
-      const state = useAppStore.getState();
-      return {
-        sessionId: state.translationSessionId,
-        sourceText: state.sourceText,
-        sourceLang: state.sourceLang,
-        targetLang: state.targetLang,
-      };
-    },
-    startTranslationSession: (text, providerIds) =>
-      useAppStore.getState().startTranslationSession(text, providerIds),
-    beginProviderTranslation: (sessionId, providerId) =>
-      useAppStore.getState().beginProviderTranslation(sessionId, providerId),
-    completeProviderTranslation: (sessionId, result) =>
-      useAppStore.getState().completeProviderTranslation(sessionId, result),
-    failProviderTranslation: (sessionId, providerId, message) =>
-      useAppStore
-        .getState()
-        .failProviderTranslation(sessionId, providerId, message),
-    setTranslating: (value) => useAppStore.getState().setTranslating(value),
-  },
+  state: createResultWindowStatePort(
+    settingsRuntime.configuration.providers,
+  ),
 });
 initializeSettingsConfigStore(settingsRuntime.configuration.settings);
 initializeHotkeyConfigStore(settingsRuntime.configuration.hotkeys);
@@ -237,8 +193,10 @@ const isSettingsWindow = isSettingsWindowLaunch(
 );
 
 function Application() {
-  const resultWindowVisible = useAppStore((state) => state.resultWindowVisible);
-  const applyTranslationDefaults = useAppStore(
+  const resultWindowVisible = useResultWindowStore(
+    (state) => state.resultWindowVisible,
+  );
+  const applyTranslationDefaults = useResultWindowStore(
     (state) => state.applyTranslationDefaults,
   );
   const generalSettings = useSettingsConfigStore((state) => state.general);

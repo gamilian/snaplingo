@@ -1,4 +1,4 @@
-import type { ProviderTranslation } from '../../stores/appStore';
+import type { ProviderTranslation } from '../../application/result-window/projection';
 
 export type ResultWindowPresentation = 'overlay' | 'standalone';
 export type ResultWindowTextKind = 'source' | 'ocr' | 'result';

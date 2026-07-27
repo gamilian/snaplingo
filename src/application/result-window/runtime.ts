@@ -4,7 +4,11 @@ import type {
   ResultWindowPosition,
   TranslationSettings,
 } from '../settings/ports';
-import { resolveTranslationRequestLanguages } from '../translation/languages';
+import {
+  defaultTargetLanguageForSource,
+  resolveTranslationRequestLanguages,
+  swapTranslationLanguagePair,
+} from '../translation/languages';
 import type { ResultWindowPlatformRuntime } from './platformRuntime';
 import type {
   CaptureResultWindowPayload,
@@ -30,6 +34,8 @@ export type ResultWindowPresentation = 'overlay' | 'standalone';
 
 export interface ResultWindowStatePort {
   setSourceText(text: string): void;
+  setSourceLang(language: string): void;
+  setTargetLang(language: string): void;
   setResultWindowOrigin(origin: ResultWindowOrigin): void;
   clearTranslationResults(): void;
   setOcrText(text: string): void;
@@ -113,6 +119,26 @@ export function createResultWindowRuntime({
     return getTranslationSettings?.()?.preserveLineBreaks === false
       ? text.replace(/\s+/g, ' ').trim()
       : text;
+  }
+
+  function changeSourceLanguage(language: string) {
+    const { targetLang } = state.getTranslationSession();
+    state.setSourceLang(language);
+    state.setTargetLang(
+      targetLang === 'auto'
+        ? 'auto'
+        : defaultTargetLanguageForSource(language),
+    );
+  }
+
+  function swapTranslationLanguages() {
+    const session = state.getTranslationSession();
+    const next = swapTranslationLanguagePair(
+      session.sourceLang,
+      session.targetLang,
+    );
+    state.setSourceLang(next.sourceLang);
+    state.setTargetLang(next.targetLang);
   }
 
   async function persistTranslationHistory(input: {
@@ -453,6 +479,14 @@ export function createResultWindowRuntime({
   }
 
   return {
+    updateSourceText: state.setSourceText,
+    changeSourceLanguage,
+    changeTargetLanguage: state.setTargetLang,
+    swapTranslationLanguages,
+    updateOcrText: state.setOcrText,
+    clearOcrImage: () => state.setOcrImageBase64(null),
+    loadTranslationProviders: () =>
+      state.loadActiveTranslationProviderIds().then(() => undefined),
     loadCurrentPayload,
     loadPayload,
     applyPayload,

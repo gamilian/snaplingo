@@ -415,6 +415,28 @@ describe('frontend dependency rules', () => {
     ).toEqual([]);
   });
 
+  test('Result Window consumes one state projection and one state adapter', () => {
+    const productionFiles = productionSourceFiles();
+    const appFile = productionFiles.find(({ path }) => path === 'src/App.tsx');
+    const viewFile = productionFiles.find(
+      ({ path }) => path === 'src/views/ResultWindow/ResultWindow.tsx',
+    );
+
+    expect(appFile).toBeDefined();
+    expect(viewFile).toBeDefined();
+    expect(appFile!.source).toContain('state: createResultWindowStatePort(');
+    expect(appFile!.source).not.toContain('useResultWindowStore.getState()');
+    expect(viewFile!.source).toContain('useResultWindowProjection()');
+    expect(viewFile!.source).not.toContain('\n    setSourceText,');
+    expect(viewFile!.source).not.toContain('\n    setSourceLang,');
+    expect(viewFile!.source).not.toContain('\n    setTargetLang,');
+    expect(viewFile!.source).not.toContain('../../stores/providerStore');
+    expect(viewFile!.source).not.toContain('../../stores/settingsConfigStore');
+    expect(
+      allSourceFiles().some(({ path }) => path === 'src/stores/appStore.ts'),
+    ).toBe(false);
+  });
+
   test('the legacy frontend Tauri seam is deleted', () => {
     expect(
       allSourceFiles()

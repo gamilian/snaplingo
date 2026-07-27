@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react-dom/test-utils';
 import { createRoot } from 'react-dom/client';
 import type { ResultWindowRuntime } from '../../application/result-window/runtime';
-import { useAppStore } from '../../stores/appStore';
+import { useResultWindowStore } from '../../stores/resultWindowStore';
 import { useProviderStore } from '../../stores/providerStore';
 import { useSettingsConfigStore } from '../../stores/settingsConfigStore';
 import ResultWindow from './ResultWindow';
@@ -14,6 +14,13 @@ const runtime = {
   favoriteTranslationResults: vi.fn(),
   favoriteOcrResult: vi.fn(),
   copyText: vi.fn(),
+  updateSourceText: vi.fn(),
+  changeSourceLanguage: vi.fn(),
+  changeTargetLanguage: vi.fn(),
+  swapTranslationLanguages: vi.fn(),
+  updateOcrText: vi.fn(),
+  clearOcrImage: vi.fn(),
+  loadTranslationProviders: vi.fn(),
   resizeStandaloneWindow: vi.fn(),
   setAlwaysOnTop: vi.fn(),
   close: vi.fn(),
@@ -39,7 +46,7 @@ async function renderResultWindow() {
 describe('result window text actions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useAppStore.getState().reset();
+    useResultWindowStore.getState().reset();
     useSettingsConfigStore.setState({ translation: null, ocr: null });
     useProviderStore.setState({
       translationProviders: [],
@@ -49,7 +56,7 @@ describe('result window text actions', () => {
   });
 
   it('offers a session favorite action beside the translation source text actions', async () => {
-    useAppStore.setState({
+    useResultWindowStore.setState({
       resultWindowVisible: true,
       resultWindowMode: 'translation',
       sourceText: 'hello',
@@ -93,7 +100,7 @@ describe('result window text actions', () => {
   });
 
   it('offers speak, favorite, and copy actions for OCR text', async () => {
-    useAppStore.setState({
+    useResultWindowStore.setState({
       resultWindowVisible: true,
       resultWindowMode: 'ocr',
       ocrText: 'recognized text',
@@ -108,7 +115,7 @@ describe('result window text actions', () => {
   });
 
   it('delegates translation workflow to the application runtime', async () => {
-    useAppStore.setState({
+    useResultWindowStore.setState({
       resultWindowVisible: true,
       resultWindowMode: 'translation',
       sourceText: 'hello',
@@ -146,7 +153,7 @@ describe('result window text actions', () => {
           hideOnBlur: true,
         },
       });
-      useAppStore.setState({
+      useResultWindowStore.setState({
         resultWindowVisible: true,
         resultWindowMode,
       });

@@ -18,7 +18,7 @@ React Views
 
 ### Frontend
 
-- `src/views/` renders the Settings, Capture Workspace, Result Window, and Pinned Image windows. A view receives an Application runtime through its local runtime context; it does not call Tauri directly.
+- `src/views/` renders the Settings, Capture Workspace, Result Window, and Pinned Image windows. A view receives an Application runtime through its local runtime context; it does not call Tauri directly. Result Window reads its Application state through one projection instead of selecting multiple Stores.
 - `src/application/` owns window workflows and their narrow ports:
   - `capture-workspace`: capture launch/session/effect workflow.
   - `result-window`: translation and file-OCR workflows.
@@ -39,7 +39,7 @@ React Views
   - `favorite_capacity` owns the global Favorites maximum and serializes capacity check plus insertion across regular and screenshot Favorites.
   - `favorites::OcrFavoriteApplication` owns Provider fallback, History source recovery, Favorite insertion, and OCR Favorite replay through local seams.
   - `library_index` owns lightweight cross-source ordering so only final-page History and Favorites records are hydrated.
-  - `capture`, `result_window`, and `pinned_image` own window/runtime-host ports. Result Window also owns translation/OCR favorite orchestration, OCR Provider fallback, and clipboard intents instead of exposing its platform adapters to Views.
+  - `capture`, `result_window`, and `pinned_image` own window/runtime-host ports. Result Window also owns its read-only state projection, editable text and language intents, translation/OCR favorite orchestration, OCR Provider fallback, and clipboard intents instead of exposing Store mutations or platform adapters to Views.
   - `selected_text` owns its method and context ports.
   - `required_permissions` owns permission ordering and status policy.
   - `tts` owns speech normalization against persisted voice and rate settings.
@@ -87,6 +87,7 @@ Portable data and policy are kept in Domain or Application. Infrastructure conta
 - Result-window coordinates are durable settings; the window adapter only measures and applies physical positions.
 - Native System OCR is registered on macOS and Windows where the platform language engine is available; Tesseract remains a portable native-engine adapter.
 - CI verifies the real desktop targets on macOS, Ubuntu, and Windows rather than claiming cross-compilation coverage.
+- `script/release-verification.mjs` owns version consistency, Tauri bundle invocation, Cargo target discovery, and the native artifact contract used by local builds and CI.
 
 ## Enforcement
 
