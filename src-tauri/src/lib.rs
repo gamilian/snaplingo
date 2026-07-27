@@ -120,11 +120,7 @@ pub fn run() {
                 while !permissions.status().all_granted() {
                     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
                 }
-                let registrar = infrastructure::system::TauriHotkeyRegistrar::new(
-                    app_handle.clone(),
-                    startup_shortcuts::trigger_hotkey_action,
-                );
-                if let Err(err) = hotkey_runtime.register_startup_hotkeys_with(&registrar) {
+                if let Err(err) = hotkey_runtime.register_startup_hotkeys() {
                     log::error!("Failed to register startup hotkeys: {}", err);
                 }
                 if let Err(err) =

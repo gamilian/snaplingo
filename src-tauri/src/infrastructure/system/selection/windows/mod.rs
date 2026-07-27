@@ -24,13 +24,6 @@ impl SystemSelectionProvider for PlatformSelectionProvider {
     }
 }
 
-pub fn platform_selection_provider(
-    _app: tauri::AppHandle,
-    _self_bundle_id: Option<String>,
-) -> PlatformSelectionProvider {
-    PlatformSelectionProvider
-}
-
 #[cfg(test)]
 mod selection_provider_tests {
     use super::*;

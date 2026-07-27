@@ -80,7 +80,7 @@ Each port is declared adjacent to its consumer. There is no generic global port 
 
 ## Cross-Platform Strategy
 
-Portable data and policy are kept in Domain or Application. OS-specific code is selected in Infrastructure using platform modules or conditional registration:
+Portable data and policy are kept in Domain or Application. Infrastructure contains OS-specific implementations; Composition selects concrete adapters with target-specific builders:
 
 - Screenshot, selection, system OCR, paths, shortcuts, and desktop windows are Infrastructure concerns.
 - Tauri-specific command/event/window APIs are frontend or backend adapter concerns.

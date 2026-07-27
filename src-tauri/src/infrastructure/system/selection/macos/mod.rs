@@ -57,10 +57,3 @@ impl SystemSelectionProvider for MacSelectionProvider {
         ]
     }
 }
-
-pub fn platform_selection_provider(
-    app: tauri::AppHandle,
-    _self_bundle_id: Option<String>,
-) -> MacSelectionProvider {
-    MacSelectionProvider::new(app, _self_bundle_id)
-}

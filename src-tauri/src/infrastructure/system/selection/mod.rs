@@ -7,13 +7,6 @@ pub mod macos;
 #[cfg(target_os = "windows")]
 pub mod windows;
 
-#[cfg(target_os = "linux")]
-pub use linux::platform_selection_provider;
-#[cfg(target_os = "macos")]
-pub use macos::platform_selection_provider;
-#[cfg(target_os = "windows")]
-pub use windows::platform_selection_provider;
-
 #[cfg(test)]
 mod cross_platform_adapter_tests {
     // Compile platform adapters into the host test binary so their contract

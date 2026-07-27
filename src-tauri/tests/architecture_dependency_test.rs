@@ -320,6 +320,70 @@ fn commands_and_composition_do_not_own_provider_or_ocr_favorite_policy() {
 }
 
 #[test]
+fn composition_is_the_only_platform_adapter_selector() {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let read = |path: &str| fs::read_to_string(manifest_dir.join(path)).unwrap();
+    let mut violations = Vec::new();
+
+    for source in production_command_sources() {
+        if source.source.contains("TauriHotkeyRegistrar") {
+            violations.push(format!("{} constructs TauriHotkeyRegistrar", source.path));
+        }
+    }
+
+    let lib_source = read("src/lib.rs");
+    if lib_source.contains("TauriHotkeyRegistrar") {
+        violations.push("src/lib.rs constructs TauriHotkeyRegistrar".to_string());
+    }
+
+    let screenshot_module = read("src/infrastructure/system/screenshot/mod.rs");
+    if screenshot_module.contains("get_capture_session_source") {
+        violations.push(
+            "src/infrastructure/system/screenshot/mod.rs selects a capture adapter".to_string(),
+        );
+    }
+
+    let selection_module = read("src/infrastructure/system/selection/mod.rs");
+    if selection_module.contains("platform_selection_provider") {
+        violations.push(
+            "src/infrastructure/system/selection/mod.rs selects a selection adapter".to_string(),
+        );
+    }
+    for platform in ["macos", "windows", "linux"] {
+        let path = format!("src/infrastructure/system/selection/{platform}/mod.rs");
+        if read(&path).contains("fn platform_selection_provider") {
+            violations.push(format!("{path} selects a selection adapter"));
+        }
+    }
+
+    let capture_composition = read("src/composition/capture_runtime.rs");
+    for adapter in [
+        "MacOSCaptureSessionSource",
+        "WindowsCaptureSessionSource",
+        "LinuxCaptureSessionSource",
+    ] {
+        assert!(
+            capture_composition.contains(adapter),
+            "capture Composition must select {adapter}"
+        );
+    }
+
+    let selection_composition = read("src/composition/selection_runtime.rs");
+    for adapter in ["MacSelectionProvider", "PlatformSelectionProvider"] {
+        assert!(
+            selection_composition.contains(adapter),
+            "selection Composition must select {adapter}"
+        );
+    }
+    assert!(
+        read("src/composition.rs").contains("TauriHotkeyRegistrar"),
+        "root Composition must select TauriHotkeyRegistrar"
+    );
+
+    assert_eq!(violations, Vec::<String>::new());
+}
+
+#[test]
 fn rejects_forbidden_synthetic_dependencies() {
     let files = [SourceFile {
         path: "src/application/example.rs".to_string(),

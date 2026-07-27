@@ -46,6 +46,7 @@ The only place that chooses concrete adapters and injects them into a runtime.
 
 - Frontend view entry points create an Application runtime with `src/platform/tauri/*` adapters.
 - Backend `src-tauri/src/composition.rs` and its builders create Application runtimes with Infrastructure adapters.
+- Infrastructure may conditionally compile platform implementations, but only Composition selects which concrete adapter satisfies an Application seam.
 
 ### Capture Session
 

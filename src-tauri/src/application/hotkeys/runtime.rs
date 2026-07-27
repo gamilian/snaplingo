@@ -14,6 +14,7 @@ use crate::Result;
 
 pub struct HotkeyRuntime {
     configuration: Arc<HotkeyConfiguration>,
+    registrar: Arc<dyn HotkeyRegistrar>,
     change_notifier: Option<Arc<dyn HotkeyChangeNotifier>>,
     operation_lock: Mutex<()>,
     registrations: Mutex<HashMap<String, String>>,
@@ -51,27 +52,34 @@ struct HotkeyRegistrationChange {
     next_accelerator: Option<String>,
 }
 
-pub(crate) trait HotkeyRegistrar {
+pub(crate) trait HotkeyRegistrar: Send + Sync {
     fn register(&self, registration: HotkeyRegistration) -> Result<()>;
     fn unregister(&self, accelerator: &str) -> Result<()>;
 }
 
 impl HotkeyRuntime {
-    pub fn new(configuration: Arc<HotkeyConfiguration>) -> Self {
+    #[cfg(test)]
+    pub(crate) fn new(
+        configuration: Arc<HotkeyConfiguration>,
+        registrar: Arc<dyn HotkeyRegistrar>,
+    ) -> Self {
         Self {
             configuration,
+            registrar,
             change_notifier: None,
             operation_lock: Mutex::new(()),
             registrations: Mutex::new(HashMap::new()),
         }
     }
 
-    pub fn with_change_notifier(
+    pub(crate) fn with_change_notifier(
         configuration: Arc<HotkeyConfiguration>,
+        registrar: Arc<dyn HotkeyRegistrar>,
         change_notifier: Arc<dyn HotkeyChangeNotifier>,
     ) -> Self {
         Self {
             configuration,
+            registrar,
             change_notifier: Some(change_notifier),
             operation_lock: Mutex::new(()),
             registrations: Mutex::new(HashMap::new()),
@@ -92,12 +100,7 @@ impl HotkeyRuntime {
         crate::domain::hotkey_config::default_hotkey_snapshot()
     }
 
-    pub(crate) fn reset_hotkey_with(
-        &self,
-        registrar: &impl HotkeyRegistrar,
-        category: String,
-        action: String,
-    ) -> Result<HotkeyUpdateOutcome> {
+    pub fn reset_hotkey(&self, category: String, action: String) -> Result<HotkeyUpdateOutcome> {
         validate_hotkey_action(&category, &action)?;
         let hotkey = hotkey_category(&self.default_snapshot(), &category)
             .and_then(|hotkeys| hotkeys.get(&action))
@@ -109,14 +112,10 @@ impl HotkeyRuntime {
                 ))
             })?;
 
-        self.update_hotkey_with(registrar, category, action, hotkey)
+        self.update_hotkey(category, action, hotkey)
     }
 
-    pub(crate) fn reset_category_with(
-        &self,
-        registrar: &impl HotkeyRegistrar,
-        category: String,
-    ) -> Result<HotkeySettingsSnapshot> {
+    pub fn reset_category(&self, category: String) -> Result<HotkeySettingsSnapshot> {
         let _operation_guard = self.operation_lock.lock().map_err(|err| {
             crate::AppError::Other(format!("Shortcut operation lock poisoned: {err}"))
         })?;
@@ -154,8 +153,12 @@ impl HotkeyRuntime {
             let Some(accelerator) = change.previous_accelerator.as_deref() else {
                 continue;
             };
-            if let Err(err) = registrar.unregister(accelerator) {
-                restore_previous_registrations(registrar, &changes, &unregistered_previous);
+            if let Err(err) = self.registrar.unregister(accelerator) {
+                restore_previous_registrations(
+                    self.registrar.as_ref(),
+                    &changes,
+                    &unregistered_previous,
+                );
                 return Err(err);
             }
             unregistered_previous.push(index);
@@ -166,11 +169,14 @@ impl HotkeyRuntime {
             let Some(accelerator) = change.next_accelerator.as_deref() else {
                 continue;
             };
-            if let Err(err) =
-                register_hotkey_action(registrar, &change.category, &change.action, accelerator)
-            {
+            if let Err(err) = register_hotkey_action(
+                self.registrar.as_ref(),
+                &change.category,
+                &change.action,
+                accelerator,
+            ) {
                 rollback_category_registration_changes(
-                    registrar,
+                    self.registrar.as_ref(),
                     &changes,
                     &registered_next,
                     &unregistered_previous,
@@ -184,7 +190,7 @@ impl HotkeyRuntime {
             Ok(snapshot) => snapshot,
             Err(err) => {
                 rollback_category_registration_changes(
-                    registrar,
+                    self.registrar.as_ref(),
                     &changes,
                     &registered_next,
                     &unregistered_previous,
@@ -208,10 +214,7 @@ impl HotkeyRuntime {
         Ok(snapshot)
     }
 
-    pub(crate) fn register_startup_hotkeys_with(
-        &self,
-        registrar: &impl HotkeyRegistrar,
-    ) -> Result<()> {
+    pub fn register_startup_hotkeys(&self) -> Result<()> {
         let _operation_guard = self.operation_lock.lock().map_err(|err| {
             crate::AppError::Other(format!("Shortcut operation lock poisoned: {err}"))
         })?;
@@ -249,7 +252,7 @@ impl HotkeyRuntime {
             }
 
             register_hotkey_action(
-                registrar,
+                self.registrar.as_ref(),
                 default_hotkey.category,
                 default_hotkey.action,
                 &accelerator,
@@ -260,9 +263,8 @@ impl HotkeyRuntime {
         Ok(())
     }
 
-    pub(crate) fn update_hotkey_with(
+    pub fn update_hotkey(
         &self,
-        registrar: &impl HotkeyRegistrar,
         category: String,
         action: String,
         hotkey: String,
@@ -286,13 +288,13 @@ impl HotkeyRuntime {
         }
 
         if let Some(accelerator) = &next_accelerator {
-            register_hotkey_action(registrar, &category, &action, accelerator)?;
+            register_hotkey_action(self.registrar.as_ref(), &category, &action, accelerator)?;
         }
 
         if let Some(accelerator) = &previous_accelerator {
-            if let Err(err) = registrar.unregister(accelerator) {
+            if let Err(err) = self.registrar.unregister(accelerator) {
                 if let Some(next_accelerator) = next_accelerator.as_deref() {
-                    if let Err(rollback_err) = registrar.unregister(next_accelerator) {
+                    if let Err(rollback_err) = self.registrar.unregister(next_accelerator) {
                         log::warn!(
                             "Failed to roll back hotkey registration {} for {}:{} after unregistering {} failed: {}",
                             next_accelerator,
@@ -314,7 +316,7 @@ impl HotkeyRuntime {
             Ok(snapshot) => snapshot,
             Err(err) => {
                 rollback_registration_change(
-                    registrar,
+                    self.registrar.as_ref(),
                     &category,
                     &action,
                     next_accelerator.as_deref(),
@@ -372,7 +374,7 @@ fn resolve_hotkey_accelerator(
 }
 
 fn register_hotkey_action(
-    registrar: &impl HotkeyRegistrar,
+    registrar: &dyn HotkeyRegistrar,
     category: &str,
     action: &str,
     accelerator: &str,
@@ -386,7 +388,7 @@ fn register_hotkey_action(
 }
 
 fn rollback_registration_change(
-    registrar: &impl HotkeyRegistrar,
+    registrar: &dyn HotkeyRegistrar,
     category: &str,
     action: &str,
     next_accelerator: Option<&str>,
@@ -418,7 +420,7 @@ fn rollback_registration_change(
 }
 
 fn rollback_category_registration_changes(
-    registrar: &impl HotkeyRegistrar,
+    registrar: &dyn HotkeyRegistrar,
     changes: &[HotkeyRegistrationChange],
     registered_next: &[usize],
     unregistered_previous: &[usize],
@@ -442,7 +444,7 @@ fn rollback_category_registration_changes(
 }
 
 fn restore_previous_registrations(
-    registrar: &impl HotkeyRegistrar,
+    registrar: &dyn HotkeyRegistrar,
     changes: &[HotkeyRegistrationChange],
     unregistered_previous: &[usize],
 ) {
@@ -582,13 +584,11 @@ mod hotkey_runtime_tests {
 
     #[test]
     fn hotkey_runtime_startup_registers_from_configuration_snapshot() {
-        let (runtime, configuration) = runtime_with_configuration();
+        let (runtime, configuration, registrar) = runtime_with_configuration();
         configuration
             .update_hotkey(TRANSLATION_CATEGORY, SELECTION_TRANSLATE_ACTION, "⇧⌥D")
             .unwrap();
-        let registrar = FakeHotkeyRegistrar::default();
-
-        runtime.register_startup_hotkeys_with(&registrar).unwrap();
+        runtime.register_startup_hotkeys().unwrap();
 
         assert!(registrar.operations().contains(&Operation::Register {
             category: TRANSLATION_CATEGORY.to_string(),
@@ -613,10 +613,10 @@ mod hotkey_runtime_tests {
             .insert(SELECTION_TRANSLATE_ACTION.to_string(), "⌘C".to_string());
         store.save("hotkeys", &snapshot).unwrap();
         let configuration = Arc::new(HotkeyConfiguration::new(store));
-        let runtime = HotkeyRuntime::new(configuration);
-        let registrar = FakeHotkeyRegistrar::default();
+        let registrar = Arc::new(FakeHotkeyRegistrar::default());
+        let runtime = HotkeyRuntime::new(configuration, registrar.clone());
 
-        runtime.register_startup_hotkeys_with(&registrar).unwrap();
+        runtime.register_startup_hotkeys().unwrap();
 
         assert!(!registrar.operations().iter().any(|operation| {
             matches!(
@@ -636,14 +636,12 @@ mod hotkey_runtime_tests {
 
     #[test]
     fn hotkey_runtime_update_to_same_accelerator_is_noop() {
-        let (runtime, _configuration) = runtime_with_configuration();
-        let registrar = FakeHotkeyRegistrar::default();
-        runtime.register_startup_hotkeys_with(&registrar).unwrap();
+        let (runtime, _configuration, registrar) = runtime_with_configuration();
+        runtime.register_startup_hotkeys().unwrap();
         registrar.clear();
 
         let outcome = runtime
-            .update_hotkey_with(
-                &registrar,
+            .update_hotkey(
                 TRANSLATION_CATEGORY.to_string(),
                 SELECTION_TRANSLATE_ACTION.to_string(),
                 "⌥D".to_string(),
@@ -656,14 +654,12 @@ mod hotkey_runtime_tests {
 
     #[test]
     fn hotkey_runtime_update_registers_new_accelerator_before_unregistering_old_one() {
-        let (runtime, _configuration) = runtime_with_configuration();
-        let registrar = FakeHotkeyRegistrar::default();
-        runtime.register_startup_hotkeys_with(&registrar).unwrap();
+        let (runtime, _configuration, registrar) = runtime_with_configuration();
+        runtime.register_startup_hotkeys().unwrap();
         registrar.clear();
 
         runtime
-            .update_hotkey_with(
-                &registrar,
+            .update_hotkey(
                 TRANSLATION_CATEGORY.to_string(),
                 SELECTION_TRANSLATE_ACTION.to_string(),
                 "⇧⌥D".to_string(),
@@ -686,14 +682,12 @@ mod hotkey_runtime_tests {
 
     #[test]
     fn hotkey_runtime_update_to_unset_unregisters_previous_and_persists_unset() {
-        let (runtime, _configuration) = runtime_with_configuration();
-        let registrar = FakeHotkeyRegistrar::default();
-        runtime.register_startup_hotkeys_with(&registrar).unwrap();
+        let (runtime, _configuration, registrar) = runtime_with_configuration();
+        runtime.register_startup_hotkeys().unwrap();
         registrar.clear();
 
         let outcome = runtime
-            .update_hotkey_with(
-                &registrar,
+            .update_hotkey(
                 TRANSLATION_CATEGORY.to_string(),
                 SELECTION_TRANSLATE_ACTION.to_string(),
                 "未设置".to_string(),
@@ -717,12 +711,10 @@ mod hotkey_runtime_tests {
 
     #[test]
     fn hotkey_runtime_reset_uses_domain_default_instead_of_saved_value() {
-        let (runtime, _configuration) = runtime_with_configuration();
-        let registrar = FakeHotkeyRegistrar::default();
-        runtime.register_startup_hotkeys_with(&registrar).unwrap();
+        let (runtime, _configuration, registrar) = runtime_with_configuration();
+        runtime.register_startup_hotkeys().unwrap();
         runtime
-            .update_hotkey_with(
-                &registrar,
+            .update_hotkey(
                 TRANSLATION_CATEGORY.to_string(),
                 SELECTION_TRANSLATE_ACTION.to_string(),
                 "⇧⌥D".to_string(),
@@ -731,8 +723,7 @@ mod hotkey_runtime_tests {
         registrar.clear();
 
         let outcome = runtime
-            .reset_hotkey_with(
-                &registrar,
+            .reset_hotkey(
                 TRANSLATION_CATEGORY.to_string(),
                 SELECTION_TRANSLATE_ACTION.to_string(),
             )
@@ -747,14 +738,12 @@ mod hotkey_runtime_tests {
 
     #[test]
     fn hotkey_runtime_registration_failure_does_not_persist_new_hotkey() {
-        let (runtime, _configuration) = runtime_with_configuration();
-        let registrar = FakeHotkeyRegistrar::default();
-        runtime.register_startup_hotkeys_with(&registrar).unwrap();
+        let (runtime, _configuration, registrar) = runtime_with_configuration();
+        runtime.register_startup_hotkeys().unwrap();
         registrar.clear();
         registrar.fail_register_for("Shift+Alt+KeyD");
 
-        let result = runtime.update_hotkey_with(
-            &registrar,
+        let result = runtime.update_hotkey(
             TRANSLATION_CATEGORY.to_string(),
             SELECTION_TRANSLATE_ACTION.to_string(),
             "⇧⌥D".to_string(),
@@ -776,14 +765,12 @@ mod hotkey_runtime_tests {
 
     #[test]
     fn hotkey_runtime_unregistration_failure_keeps_the_previous_hotkey_active() {
-        let (runtime, _configuration) = runtime_with_configuration();
-        let registrar = FakeHotkeyRegistrar::default();
-        runtime.register_startup_hotkeys_with(&registrar).unwrap();
+        let (runtime, _configuration, registrar) = runtime_with_configuration();
+        runtime.register_startup_hotkeys().unwrap();
         registrar.clear();
         registrar.fail_unregister_for("Alt+KeyD");
 
-        let result = runtime.update_hotkey_with(
-            &registrar,
+        let result = runtime.update_hotkey(
             TRANSLATION_CATEGORY.to_string(),
             SELECTION_TRANSLATE_ACTION.to_string(),
             "⇧⌥D".to_string(),
@@ -804,7 +791,7 @@ mod hotkey_runtime_tests {
 
     #[test]
     fn hotkey_runtime_category_reset_rolls_back_when_a_registration_fails() {
-        let (runtime, configuration) = runtime_with_configuration();
+        let (runtime, configuration, registrar) = runtime_with_configuration();
         configuration
             .update_hotkey(TRANSLATION_CATEGORY, SHOW_TRANSLATION_WINDOW_ACTION, "⇧⌥A")
             .unwrap();
@@ -815,12 +802,11 @@ mod hotkey_runtime_tests {
             .update_hotkey(TRANSLATION_CATEGORY, SELECTION_TRANSLATE_ACTION, "⇧⌥D")
             .unwrap();
         let before = runtime.snapshot().unwrap();
-        let registrar = FakeHotkeyRegistrar::default();
-        runtime.register_startup_hotkeys_with(&registrar).unwrap();
+        runtime.register_startup_hotkeys().unwrap();
         registrar.clear();
         registrar.fail_register_for("Alt+KeyS");
 
-        let result = runtime.reset_category_with(&registrar, TRANSLATION_CATEGORY.to_string());
+        let result = runtime.reset_category(TRANSLATION_CATEGORY.to_string());
 
         assert!(result.is_err());
         assert_eq!(runtime.snapshot().unwrap(), before);
@@ -846,10 +832,10 @@ mod hotkey_runtime_tests {
         configuration
             .update_hotkey(TRANSLATION_CATEGORY, SELECTION_TRANSLATE_ACTION, "⇧⌥D")
             .unwrap();
-        let runtime = HotkeyRuntime::new(configuration);
+        let registrar = Arc::new(FakeHotkeyRegistrar::default());
+        let runtime = HotkeyRuntime::new(configuration, registrar.clone());
         let before = runtime.snapshot().unwrap();
-        let registrar = FakeHotkeyRegistrar::default();
-        runtime.register_startup_hotkeys_with(&registrar).unwrap();
+        runtime.register_startup_hotkeys().unwrap();
         database
             .with_connection(|connection| {
                 connection.execute_batch(
@@ -865,7 +851,7 @@ mod hotkey_runtime_tests {
             .unwrap();
         registrar.clear();
 
-        let result = runtime.reset_category_with(&registrar, TRANSLATION_CATEGORY.to_string());
+        let result = runtime.reset_category(TRANSLATION_CATEGORY.to_string());
 
         assert!(result.is_err());
         assert_eq!(runtime.snapshot().unwrap(), before);
@@ -882,10 +868,9 @@ mod hotkey_runtime_tests {
 
     #[test]
     fn hotkey_runtime_registers_release_timing_actions_via_release_path() {
-        let (runtime, _configuration) = runtime_with_configuration();
-        let registrar = FakeHotkeyRegistrar::default();
+        let (runtime, _configuration, registrar) = runtime_with_configuration();
 
-        runtime.register_startup_hotkeys_with(&registrar).unwrap();
+        runtime.register_startup_hotkeys().unwrap();
 
         assert!(registrar.operations().contains(&Operation::Register {
             category: SCREENSHOT_CATEGORY.to_string(),
@@ -900,13 +885,13 @@ mod hotkey_runtime_tests {
         let config_file = Arc::new(SqliteConfigStore::new_temp());
         let configuration = Arc::new(HotkeyConfiguration::new(config_file));
         let notifier = Arc::new(CountingNotifier(AtomicUsize::new(0)));
-        let runtime = HotkeyRuntime::with_change_notifier(configuration, notifier.clone());
-        let registrar = FakeHotkeyRegistrar::default();
-        runtime.register_startup_hotkeys_with(&registrar).unwrap();
+        let registrar = Arc::new(FakeHotkeyRegistrar::default());
+        let runtime =
+            HotkeyRuntime::with_change_notifier(configuration, registrar, notifier.clone());
+        runtime.register_startup_hotkeys().unwrap();
 
         runtime
-            .update_hotkey_with(
-                &registrar,
+            .update_hotkey(
                 TRANSLATION_CATEGORY.to_string(),
                 SELECTION_TRANSLATE_ACTION.to_string(),
                 "⇧⌥D".to_string(),
@@ -916,10 +901,15 @@ mod hotkey_runtime_tests {
         assert_eq!(notifier.0.load(Ordering::SeqCst), 1);
     }
 
-    fn runtime_with_configuration() -> (HotkeyRuntime, Arc<HotkeyConfiguration>) {
+    fn runtime_with_configuration() -> (
+        HotkeyRuntime,
+        Arc<HotkeyConfiguration>,
+        Arc<FakeHotkeyRegistrar>,
+    ) {
         let config_file = Arc::new(SqliteConfigStore::new_temp());
         let configuration = Arc::new(HotkeyConfiguration::new(config_file));
-        let runtime = HotkeyRuntime::new(configuration.clone());
-        (runtime, configuration)
+        let registrar = Arc::new(FakeHotkeyRegistrar::default());
+        let runtime = HotkeyRuntime::new(configuration.clone(), registrar.clone());
+        (runtime, configuration, registrar)
     }
 }

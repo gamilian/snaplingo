@@ -46,6 +46,7 @@ use crate::infrastructure::storage::{FilesystemOcrHistoryAssets, SqliteFavoriteR
 use crate::infrastructure::system::result_window::{
     TauriResultWindowNotifier, TauriResultWindowRuntimeHost,
 };
+use crate::infrastructure::system::TauriHotkeyRegistrar;
 use crate::{
     FavoriteCapacity, HotkeyConfiguration, HotkeyRuntime, LibraryIndex, SettingsConfiguration,
 };
@@ -121,6 +122,10 @@ pub(crate) fn build_app_state(
     let hotkey_configuration = Arc::new(HotkeyConfiguration::new(hotkey_store));
     let hotkey_runtime = Arc::new(HotkeyRuntime::with_change_notifier(
         hotkey_configuration,
+        Arc::new(TauriHotkeyRegistrar::new(
+            app.clone(),
+            crate::startup_shortcuts::trigger_hotkey_action,
+        )),
         Arc::new(TauriHotkeyChangeNotifier { app: app.clone() }),
     ));
     let credential_store = Arc::new(SqliteCredentialStore::new(database.clone()));
