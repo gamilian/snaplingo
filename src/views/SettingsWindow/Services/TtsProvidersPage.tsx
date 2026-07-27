@@ -11,7 +11,9 @@ export function TtsProvidersPage() {
   const updateGeneralSettings = useSettingsConfigStore(
     (state) => state.updateGeneralSettings,
   );
-  const [voices, setVoices] = useState<Array<{ name: string; locale: string }>>([]);
+  const [voices, setVoices] = useState<
+    Array<{ id: string; name: string; locale: string }>
+  >([]);
   const [testStatus, setTestStatus] = useState<string | null>(null);
 
   useEffect(() => {
@@ -41,15 +43,15 @@ export function TtsProvidersPage() {
 
   return (
     <div className="max-w-3xl space-y-4">
-      <SettingsGroup title="macOS 系统语音">
-        <SettingRow label="语音" description="使用 macOS 已安装的系统声音">
+      <SettingsGroup title="系统语音">
+        <SettingRow label="语音" description="使用当前系统已安装的声音">
           <div className="w-[260px]">
             <CustomSelect
               value={voice}
               options={[
                 { value: '', label: '系统默认' },
                 ...voices.map((item) => ({
-                  value: item.name,
+                  value: item.id,
                   label: `${item.name} · ${item.locale}`,
                 })),
               ]}

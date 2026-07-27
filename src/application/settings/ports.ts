@@ -26,6 +26,7 @@ export interface SettingsMaintenancePort {
 }
 
 export interface SystemTtsVoice {
+  id: string;
   name: string;
   locale: string;
 }

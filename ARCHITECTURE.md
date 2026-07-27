@@ -42,7 +42,7 @@ React Views
   - `capture`, `result_window`, and `pinned_image` own window/runtime-host ports. Result Window also owns its read-only state projection, editable text and language intents, translation/OCR favorite orchestration, OCR Provider fallback, and clipboard intents instead of exposing Store mutations or platform adapters to Views.
   - `selected_text` owns its method and context ports.
   - `required_permissions` owns permission ordering and status policy.
-  - `tts` owns speech normalization against persisted voice and rate settings.
+  - `tts` owns speech normalization, locale-based voice selection, and persisted voice/rate policy. Voice IDs are opaque to Application so native adapters may use platform identifiers independently of display names.
 - `src-tauri/src/infrastructure/` implements OS, Tauri-window, shortcut, storage, network, native OCR, database, and event capabilities.
 - `src-tauri/src/composition.rs` and `composition/*_runtime.rs` construct concrete Infrastructure adapters and inject them into Application runtimes.
 - `app_actions.rs`, `app_shell.rs`, `settings_window.rs`, and `startup_shortcuts.rs` are startup-shell adapters. They map menu or hotkey intent to Application-facing actions; they do not own Application state.
@@ -86,6 +86,7 @@ Portable data and policy are kept in Domain or Application. Infrastructure conta
 - Tauri-specific command/event/window APIs are frontend or backend adapter concerns.
 - Result-window coordinates are durable settings; the window adapter only measures and applies physical positions.
 - Native System OCR is registered on macOS and Windows where the platform language engine is available; Tesseract remains a portable native-engine adapter.
+- System Speech uses a target-specific Infrastructure adapter selected by Composition. macOS currently uses `say`; Windows and Linux adapters can be added without changing Application or Commands.
 - CI verifies the real desktop targets on macOS, Ubuntu, and Windows rather than claiming cross-compilation coverage.
 - `script/release-verification.mjs` owns version consistency, Tauri bundle invocation, Cargo target discovery, and the native artifact contract used by local builds and CI.
 

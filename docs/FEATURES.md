@@ -298,8 +298,8 @@ SnapLingo 是一款跨平台的截图、OCR 与翻译工具，提供三大核心
 **支持的 TTS Provider**：
 - 系统 TTS（内置）
   - macOS: `say` 命令
-  - Windows: SAPI
-  - Linux: `espeak`
+  - Windows: 计划支持系统语音引擎
+  - Linux: 计划支持系统语音引擎
 - Azure TTS（需 API Key，支持多语言自然语音）
 - OpenAI TTS（需 API Key）
 

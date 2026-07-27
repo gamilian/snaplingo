@@ -349,6 +349,12 @@ fn composition_is_the_only_platform_adapter_selector() {
             "src/infrastructure/system/selection/mod.rs selects a selection adapter".to_string(),
         );
     }
+
+    let tts_module = read("src/infrastructure/system/tts/mod.rs");
+    if tts_module.contains("build_system_tts_host") {
+        violations
+            .push("src/infrastructure/system/tts/mod.rs selects a System TTS adapter".to_string());
+    }
     for platform in ["macos", "windows", "linux"] {
         let path = format!("src/infrastructure/system/selection/{platform}/mod.rs");
         if read(&path).contains("fn platform_selection_provider") {
@@ -373,6 +379,13 @@ fn composition_is_the_only_platform_adapter_selector() {
         assert!(
             selection_composition.contains(adapter),
             "selection Composition must select {adapter}"
+        );
+    }
+    let tts_composition = read("src/composition/tts_runtime.rs");
+    for adapter in ["MacOsSystemTtsHost", "UnavailableSystemTtsHost"] {
+        assert!(
+            tts_composition.contains(adapter),
+            "TTS Composition must select {adapter}"
         );
     }
     assert!(

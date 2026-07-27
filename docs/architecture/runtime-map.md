@@ -28,7 +28,7 @@ Tauri command -> Application runtime <- Infrastructure adapter
 
 `application/` owns Capture, Providers, History, Result Window, Pinned Image, Settings, Hotkeys, and Selected Text workflows. Each module declares the port it needs. `infrastructure/` owns the implementations for storage, credentials, HTTP, LLM transport, events, database, clipboard, windows, shortcuts, screenshots, selection, and native OCR.
 
-Required Permissions owns polling and the ordered explicit request workflow. TTS owns persisted voice/rate policy; the native speech process remains an Infrastructure adapter. Provider credentials are implemented directly by `SqliteCredentialStore`, including atomic multi-field writes.
+Required Permissions owns polling and the ordered explicit request workflow. TTS owns text normalization, locale-based voice selection, and persisted voice/rate policy; Composition selects the native speech adapter. Provider credentials are implemented directly by `SqliteCredentialStore`, including atomic multi-field writes.
 
 `app_actions.rs` maps shell actions to workflow calls. `startup_shortcuts.rs` maps validated hotkey category/action pairs to `AppAction`; `infrastructure/system/shortcut.rs` implements global shortcut registration. `application/hotkeys` owns parsing, registration state, and pressed/released policy.
 

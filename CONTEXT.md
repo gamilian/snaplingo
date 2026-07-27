@@ -64,6 +64,10 @@ Application runtimes that own their workflows and request runtime-host effects. 
 
 `application/settings` owns durable setting defaults, normalization, and section updates. Its frontend Settings Configuration module owns hydration, mutation serialization, Provider reload policy, Hotkey snapshots, and cross-window invalidation through narrow ports. Frontend stores only project Application state for Views. UI navigation state is view-local and not durable settings.
 
+### System Speech
+
+The System Speech Application module owns text normalization, persisted voice and rate policy, and locale-based voice selection. A voice exposes an opaque platform ID separately from its display name. Platform adapters own native voice discovery, speech execution, rate conversion, and interruption mechanics; Composition selects the adapter for the current operating system.
+
 ### History
 
 The History module turns Application events into stored records and serves history queries. It depends only on its event-source and repository ports.

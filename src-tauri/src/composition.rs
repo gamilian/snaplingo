@@ -8,6 +8,7 @@ mod history_runtime;
 mod provider_runtime;
 mod screenshot_favorites_runtime;
 mod selection_runtime;
+mod tts_runtime;
 
 use capture_runtime::build_capture_runtime;
 use history_runtime::{build_history, OcrCoordinatorHistoryRecognizer};
@@ -18,6 +19,7 @@ use provider_runtime::{
 };
 use screenshot_favorites_runtime::build_screenshot_favorites;
 use selection_runtime::build_selected_text_acquirer;
+use tts_runtime::build_tts_runtime;
 
 pub(crate) use history_runtime::subscribe_history;
 
@@ -275,10 +277,7 @@ pub(crate) fn build_app_state(
             acquirer: selected_text_acquirer,
         }),
         logs,
-        tts: Arc::new(crate::application::TtsRuntime::new(
-            Arc::new(crate::infrastructure::system::tts::SystemTtsHostAdapter::default()),
-            settings_configuration.clone(),
-        )),
+        tts: build_tts_runtime(settings_configuration.clone()),
         result_window,
     }
 }

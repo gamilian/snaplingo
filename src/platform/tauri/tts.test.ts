@@ -9,8 +9,8 @@ import { systemTts } from './tts';
 describe('Tauri system TTS adapter', () => {
   beforeEach(() => invoke.mockReset());
 
-  it('lists macOS voices and invokes configured speech', async () => {
-    const voices = [{ name: 'Tingting', locale: 'zh_CN' }];
+  it('lists platform voices and invokes configured speech', async () => {
+    const voices = [{ id: 'Tingting', name: 'Tingting', locale: 'zh_CN' }];
     invoke.mockResolvedValueOnce(voices).mockResolvedValueOnce(undefined);
 
     await expect(systemTts.listVoices()).resolves.toEqual(voices);

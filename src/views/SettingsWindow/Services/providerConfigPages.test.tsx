@@ -117,7 +117,7 @@ describe('provider config pages', () => {
     expect(findProviderConfig(view).props.presentation).toBe('inline');
   });
 
-  it('loads real macOS system voices for TTS configuration', () => {
+  it('loads platform system voices for TTS configuration', () => {
     renderPage(TtsProvidersPage);
 
     expect(ttsRuntime.listVoices).toHaveBeenCalledTimes(1);
