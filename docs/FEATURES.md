@@ -169,7 +169,7 @@ SnapLingo 是一款跨平台的截图、OCR 与翻译工具，提供三大核心
 
 **支持的 OCR Provider**：
 - Tesseract（内置，本地）
-- System OCR（macOS，本地）
+- System OCR（macOS/Windows，本地）
 - 百度 OCR（需 API Key）
 
 **未来候选 OCR Provider（未实现）**：
@@ -530,7 +530,7 @@ SnapLingo 是一款跨平台的截图、OCR 与翻译工具，提供三大核心
 
 ┌─────────────────────────────────────┐
 │ [S] System OCR        [未激活 ○]   │
-│ macOS 本地系统 OCR                  │
+│ macOS/Windows 本地系统 OCR           │
 │                    [配置] [激活]    │
 └─────────────────────────────────────┘
 

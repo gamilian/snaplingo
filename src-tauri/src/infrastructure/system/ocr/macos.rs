@@ -18,6 +18,10 @@ impl MacOSVisionOcrEngine {
 }
 
 impl SystemOcrEngine for MacOSVisionOcrEngine {
+    fn is_available(&self) -> bool {
+        true
+    }
+
     fn recognize(&self, request: &OcrRequest) -> Result<OcrResult> {
         recognize_with_vision(request)
     }

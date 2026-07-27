@@ -8,7 +8,7 @@
 
 ### Provider
 
-A pluggable implementation of translation or OCR. A Provider owns its provider-specific request, authentication, response parsing, and credential validation rules. The current built-in implementations include Google Translate, DeepL, Baidu Translation, Tesseract, macOS System OCR, and Baidu OCR.
+A pluggable implementation of translation or OCR. A Provider owns its provider-specific request, authentication, response parsing, and credential validation rules. The current built-in implementations include Google Translate, DeepL, Baidu Translation, Tesseract, macOS and Windows System OCR, and Baidu OCR.
 
 ### Coordinator
 

@@ -82,7 +82,7 @@ Portable data and policy are kept in Domain or Application. OS-specific code is 
 - Screenshot, selection, system OCR, paths, shortcuts, and desktop windows are Infrastructure concerns.
 - Tauri-specific command/event/window APIs are frontend or backend adapter concerns.
 - Result-window coordinates are durable settings; the window adapter only measures and applies physical positions.
-- macOS System OCR is registered only where available; Tesseract remains a portable native-engine adapter.
+- Native System OCR is registered on macOS and Windows where the platform language engine is available; Tesseract remains a portable native-engine adapter.
 - CI verifies the real desktop targets on macOS, Ubuntu, and Windows rather than claiming cross-compilation coverage.
 
 ## Enforcement
