@@ -17,7 +17,7 @@ pub use capture::{
     CaptureCursorMover, CaptureOutput, CaptureSessionRuntime, CaptureSessionSource, CaptureSessions,
 };
 pub use favorite_capacity::FavoriteCapacity;
-pub use favorites::Favorites;
+pub use favorites::{Favorites, OcrFavoriteApplication};
 pub use history::{History, OcrHistoryReplay};
 pub use hotkeys::{HotkeyConfiguration, HotkeyRuntime, HotkeyUpdateOutcome};
 pub use library_index::LibraryIndex;

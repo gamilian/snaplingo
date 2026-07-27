@@ -81,6 +81,47 @@ mod tests {
             .load_provider_credentials("rejecting-ocr", &["api_key".to_string()])
             .is_err());
     }
+
+    #[test]
+    fn baidu_hydration_prefers_structured_credentials() {
+        let credential_store = SqliteCredentialStore::new(Arc::new(Database::in_memory().unwrap()));
+        credential_store
+            .save_provider_credentials(
+                "baidu-ocr",
+                &HashMap::from([
+                    ("api_key".to_string(), "structured-api".to_string()),
+                    ("secret_key".to_string(), "structured-secret".to_string()),
+                ]),
+            )
+            .unwrap();
+        credential_store
+            .save_provider_credential("baidu_ocr_api_key", "legacy-api")
+            .unwrap();
+        credential_store
+            .save_provider_credential("baidu_ocr_secret_key", "legacy-secret")
+            .unwrap();
+
+        let credentials = load_baidu_ocr_credentials(&credential_store).unwrap();
+
+        assert_eq!(credentials["api_key"], "structured-api");
+        assert_eq!(credentials["secret_key"], "structured-secret");
+    }
+
+    #[test]
+    fn baidu_hydration_preserves_legacy_credential_fallback() {
+        let credential_store = SqliteCredentialStore::new(Arc::new(Database::in_memory().unwrap()));
+        credential_store
+            .save_provider_credential("baidu_ocr_api_key", "legacy-api")
+            .unwrap();
+        credential_store
+            .save_provider_credential("baidu_ocr_secret_key", "legacy-secret")
+            .unwrap();
+
+        let credentials = load_baidu_ocr_credentials(&credential_store).unwrap();
+
+        assert_eq!(credentials["api_key"], "legacy-api");
+        assert_eq!(credentials["secret_key"], "legacy-secret");
+    }
 }
 
 impl OcrProviderConfiguration {
@@ -101,6 +142,14 @@ impl OcrProviderConfiguration {
     ) -> Self {
         self.change_notifier = Some(change_notifier);
         self
+    }
+
+    pub(crate) fn hydrate_credentials(&self) -> crate::Result<()> {
+        if let Some(credentials) = load_baidu_ocr_credentials(self.credential_store.as_ref()) {
+            self.coordinator
+                .reconfigure_provider("baidu-ocr", &credentials)?;
+        }
+        Ok(())
     }
 
     pub fn credential_schema(&self, provider_id: &str) -> crate::Result<Vec<CredentialField>> {
@@ -165,4 +214,27 @@ impl OcrProviderConfiguration {
         }
         Ok(())
     }
+}
+
+fn load_baidu_ocr_credentials(
+    credential_store: &dyn ProviderCredentialStore,
+) -> Option<HashMap<String, String>> {
+    credential_store
+        .load_provider_credentials(
+            "baidu-ocr",
+            &["api_key".to_string(), "secret_key".to_string()],
+        )
+        .ok()
+        .or_else(|| {
+            let api_key = credential_store
+                .load_provider_credential("baidu_ocr_api_key")
+                .ok()?;
+            let secret_key = credential_store
+                .load_provider_credential("baidu_ocr_secret_key")
+                .ok()?;
+            Some(HashMap::from([
+                ("api_key".to_string(), api_key),
+                ("secret_key".to_string(), secret_key),
+            ]))
+        })
 }

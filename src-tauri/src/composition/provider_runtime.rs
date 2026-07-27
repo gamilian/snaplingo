@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
@@ -16,8 +15,9 @@ use crate::application::providers::translation::{
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 use crate::application::providers::Provider;
 use crate::application::providers::{
-    HttpClient, LlmIntrospection, LlmRuntime, ProviderConfigStore, ProviderConfiguration,
-    ProviderCredentialStore, ProviderEventSink,
+    HttpClient, LlmIntrospection, LlmRuntime, ProviderAdministration, ProviderConfigStore,
+    ProviderConfiguration, ProviderCredentialStore, ProviderEventSink,
+    TranslationPromptConfiguration,
 };
 #[cfg(all(test, target_os = "macos"))]
 use crate::infrastructure::events::EventBus;
@@ -56,6 +56,24 @@ pub(crate) fn build_provider_configuration(
         )
         .with_change_notifier(change_notifier),
     )
+}
+
+pub(crate) fn build_provider_administration(
+    translation_coordinator: Arc<TranslationCoordinator>,
+    ocr_coordinator: Arc<OcrCoordinator>,
+    provider_configuration: Arc<ProviderConfiguration>,
+    ocr_configuration: Arc<crate::application::providers::ocr::OcrProviderConfiguration>,
+    llm_introspection: Arc<LlmIntrospection>,
+    prompt_strategies: Arc<TranslationPromptConfiguration>,
+) -> Arc<ProviderAdministration> {
+    Arc::new(ProviderAdministration::new(
+        translation_coordinator,
+        ocr_coordinator,
+        provider_configuration,
+        ocr_configuration,
+        llm_introspection,
+        prompt_strategies,
+    ))
 }
 
 pub(crate) fn build_translation_coordinator(
@@ -132,49 +150,8 @@ fn register_system_ocr_provider(
     }
 }
 
-pub(crate) fn hydrate_provider_credentials(
-    provider_configuration: Arc<ProviderConfiguration>,
-    credential_store: Arc<dyn ProviderCredentialStore>,
-    ocr_coordinator: Arc<OcrCoordinator>,
-) {
-    if let Err(e) = provider_configuration.hydrate_credentials() {
-        log::warn!("Failed to hydrate translation provider credentials: {}", e);
-    }
-    hydrate_ocr_provider_credentials(&ocr_coordinator, credential_store.as_ref());
-}
-
-fn hydrate_ocr_provider_credentials(
-    ocr_coordinator: &OcrCoordinator,
-    credential_store: &dyn ProviderCredentialStore,
-) {
-    if let Some(credentials) = load_baidu_ocr_credentials(credential_store) {
-        if let Err(e) = ocr_coordinator.reconfigure_provider("baidu-ocr", &credentials) {
-            log::warn!("Failed to hydrate Baidu OCR credentials: {}", e);
-        }
-    }
-}
-
-fn load_baidu_ocr_credentials(
-    credential_store: &dyn ProviderCredentialStore,
-) -> Option<HashMap<String, String>> {
-    credential_store
-        .load_provider_credentials(
-            "baidu-ocr",
-            &["api_key".to_string(), "secret_key".to_string()],
-        )
-        .ok()
-        .or_else(|| {
-            let api_key = credential_store
-                .load_provider_credential("baidu_ocr_api_key")
-                .ok()?;
-            let secret_key = credential_store
-                .load_provider_credential("baidu_ocr_secret_key")
-                .ok()?;
-            Some(HashMap::from([
-                ("api_key".to_string(), api_key),
-                ("secret_key".to_string(), secret_key),
-            ]))
-        })
+pub(crate) fn hydrate_provider_credentials(administration: Arc<ProviderAdministration>) {
+    administration.hydrate_credentials();
 }
 
 #[cfg(all(test, any(target_os = "macos", target_os = "windows")))]

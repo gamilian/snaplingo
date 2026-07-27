@@ -10,8 +10,14 @@ use crate::domain::ocr::OcrResult;
 use crate::domain::translation::{TranslationRequest, TranslationResult};
 use crate::Result;
 
+mod ocr_application;
+
 #[cfg(test)]
 mod tests;
+
+pub use ocr_application::{
+    OcrFavoriteApplication, OcrFavoriteHistory, OcrFavoriteRecognizer, OcrFavoriteStore,
+};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]

@@ -1,10 +1,8 @@
 use std::sync::Arc;
 
-use crate::application::providers::ocr::{OcrCoordinator, OcrProviderConfiguration};
+use crate::application::providers::ocr::OcrCoordinator;
 use crate::application::providers::translation::TranslationCoordinator;
-use crate::application::providers::{
-    LlmIntrospection, ProviderConfiguration, TranslationPromptConfiguration,
-};
+use crate::application::providers::ProviderAdministration;
 use crate::application::result_window::ResultWindowRuntime;
 use crate::application::{
     CaptureCursorMover, CaptureOutput, CaptureSessionRuntime, CaptureSessions, Favorites, History,
@@ -25,10 +23,7 @@ pub struct SettingsRuntime {
 pub struct ProviderRuntime {
     pub translation: Arc<TranslationCoordinator>,
     pub ocr: Arc<OcrCoordinator>,
-    pub ocr_configuration: Arc<OcrProviderConfiguration>,
-    pub llm_introspection: Arc<LlmIntrospection>,
-    pub configuration: Arc<ProviderConfiguration>,
-    pub prompt_strategies: Arc<TranslationPromptConfiguration>,
+    pub administration: Arc<ProviderAdministration>,
 }
 
 pub struct CaptureRuntimeState {
@@ -52,6 +47,7 @@ pub struct ScreenshotFavoritesRuntime {
 
 pub struct FavoritesRuntime {
     pub favorites: Arc<Favorites>,
+    pub ocr_application: Arc<crate::application::OcrFavoriteApplication>,
 }
 
 pub struct SelectionRuntime {

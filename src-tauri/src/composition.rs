@@ -13,7 +13,8 @@ use capture_runtime::build_capture_runtime;
 use history_runtime::{build_history, OcrCoordinatorHistoryRecognizer};
 use provider_runtime::{
     build_llm_introspection, build_llm_runtime, build_ocr_coordinator,
-    build_provider_configuration, build_translation_coordinator, hydrate_provider_credentials,
+    build_provider_administration, build_provider_configuration, build_translation_coordinator,
+    hydrate_provider_credentials,
 };
 use screenshot_favorites_runtime::build_screenshot_favorites;
 use selection_runtime::build_selected_text_acquirer;
@@ -184,11 +185,24 @@ pub(crate) fn build_app_state(
         OcrProviderConfiguration::new(ocr_coordinator.clone(), provider_credential_store.clone())
             .with_change_notifier(provider_change_notifier),
     );
+    let provider_administration = build_provider_administration(
+        translation_coordinator.clone(),
+        ocr_coordinator.clone(),
+        provider_configuration,
+        ocr_configuration,
+        llm_introspection,
+        prompt_strategies,
+    );
     let ocr_history_replay = Arc::new(crate::application::OcrHistoryReplay::new(
         history.clone(),
         Arc::new(OcrCoordinatorHistoryRecognizer::new(
             ocr_coordinator.clone(),
         )),
+    ));
+    let ocr_favorite_application = Arc::new(crate::application::OcrFavoriteApplication::new(
+        history.clone(),
+        favorites.clone(),
+        ocr_coordinator.clone(),
     ));
 
     let capture_runtime = build_capture_runtime(app.clone(), ocr_coordinator.clone());
@@ -206,11 +220,7 @@ pub(crate) fn build_app_state(
         Arc::new(TauriResultWindowNotifier::new(app.clone())),
     ));
 
-    hydrate_provider_credentials_in_background(
-        credential_store,
-        provider_configuration.clone(),
-        ocr_coordinator.clone(),
-    );
+    hydrate_provider_credentials_in_background(provider_administration.clone());
 
     let settings_application = Arc::new(crate::application::SettingsApplication::new(
         settings_configuration.clone(),
@@ -231,10 +241,7 @@ pub(crate) fn build_app_state(
         providers: Arc::new(ProviderRuntime {
             translation: translation_coordinator,
             ocr: ocr_coordinator,
-            ocr_configuration,
-            llm_introspection,
-            configuration: provider_configuration,
-            prompt_strategies,
+            administration: provider_administration,
         }),
         capture: Arc::new(CaptureRuntimeState {
             sessions: capture_runtime.sessions,
@@ -250,7 +257,10 @@ pub(crate) fn build_app_state(
             ocr_replay: ocr_history_replay,
             events: event_bus,
         }),
-        favorites: Arc::new(FavoritesRuntime { favorites }),
+        favorites: Arc::new(FavoritesRuntime {
+            favorites,
+            ocr_application: ocr_favorite_application,
+        }),
         screenshot_favorites: Arc::new(ScreenshotFavoritesRuntime {
             favorites: screenshot_favorites,
             capture: screenshot_favorite_capture,
@@ -269,11 +279,9 @@ pub(crate) fn build_app_state(
 }
 
 fn hydrate_provider_credentials_in_background(
-    credential_store: Arc<SqliteCredentialStore>,
-    provider_configuration: Arc<crate::application::providers::ProviderConfiguration>,
-    ocr_coordinator: Arc<crate::application::providers::ocr::OcrCoordinator>,
+    administration: Arc<crate::application::providers::ProviderAdministration>,
 ) {
     tauri::async_runtime::spawn_blocking(move || {
-        hydrate_provider_credentials(provider_configuration, credential_store, ocr_coordinator);
+        hydrate_provider_credentials(administration);
     });
 }

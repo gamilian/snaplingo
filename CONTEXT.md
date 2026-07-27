@@ -17,7 +17,11 @@ The Application module that owns Provider registration, active-provider state, p
 - `TranslationCoordinator` supports multiple active Providers and runs them concurrently.
 - `OcrCoordinator` supports one active Provider.
 
-Commands call a Coordinator; they do not select an implementation or persist its state themselves.
+Execution Commands may call a Coordinator. Provider administration Commands call `ProviderAdministration`; Commands do not read Coordinator state, select an implementation, or persist Provider state themselves.
+
+### Workflow Application
+
+An Application module that owns sequencing and fallback policy across narrower modules. `OcrFavoriteApplication` coordinates Provider, History, and Favorites through local seams. `ProviderAdministration` coordinates Provider configuration, introspection, prompt configuration, and Coordinator state. Commands only convert IPC data and call these interfaces.
 
 ### Application Port
 

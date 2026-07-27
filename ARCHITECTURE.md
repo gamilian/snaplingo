@@ -33,10 +33,11 @@ React Views
 
 - `src-tauri/src/commands/` is the IPC adapter seam. A command parses an IPC request, obtains `AppState`, makes one Application call, and converts the result to an IPC response.
 - `src-tauri/src/application/` owns business workflows:
-  - `providers` owns Provider coordination, runtime configuration, credentials, HTTP/LLM vocabulary, and Provider event publication through local ports.
+  - `providers` owns Provider coordination, administration, runtime configuration, credentials, HTTP/LLM vocabulary, and Provider event publication through local ports.
   - `settings` and `hotkeys` own their independent durable-store ports.
   - `history` owns its repository and event-source ports.
   - `favorite_capacity` owns the global Favorites maximum and serializes capacity check plus insertion across regular and screenshot Favorites.
+  - `favorites::OcrFavoriteApplication` owns Provider fallback, History source recovery, Favorite insertion, and OCR Favorite replay through local seams.
   - `library_index` owns lightweight cross-source ordering so only final-page History and Favorites records are hydrated.
   - `capture`, `result_window`, and `pinned_image` own window/runtime-host ports.
   - `selected_text` owns its method and context ports.
@@ -62,6 +63,8 @@ React Views
 
 ```text
 Provider Configuration -> ProviderConfigStore / ProviderCredentialStore
+Provider Administration -> Provider Coordinators / Provider Configuration / LlmIntrospection
+OCR Favorite            -> OcrFavoriteHistory / OcrFavoriteStore / OcrFavoriteRecognizer
 Required Permissions   -> RequiredPermissionsHost
 System Speech          -> SystemTtsHost
 Provider execution     -> HttpClient / LlmRuntime / ProviderEventSink

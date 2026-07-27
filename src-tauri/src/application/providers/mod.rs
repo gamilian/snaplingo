@@ -1,3 +1,4 @@
+mod administration;
 mod change_notifier;
 pub mod common;
 mod config_store;
@@ -11,6 +12,9 @@ pub mod ocr;
 pub mod translation;
 pub mod translation_prompt;
 
+pub use administration::{
+    OcrProviderInfo, ProviderAdministration, ProviderConnectionTestInput, ProviderModelListInput,
+};
 pub use change_notifier::ProviderChangeNotifier;
 pub use common::Provider;
 pub(crate) use config_store::ProviderConfigStore;
@@ -18,7 +22,7 @@ pub use configuration::{
     build_updated_custom_translation_provider_def, create_llm_translation_provider,
     custom_translation_provider_view, validate_required_credentials,
     AddCustomTranslationProviderInput, CustomTranslationProviderDef, CustomTranslationProviderView,
-    ProviderConfiguration, UpdateCustomTranslationProviderInput,
+    ProviderConfiguration, ProviderInfo, UpdateCustomTranslationProviderInput,
 };
 pub(crate) use credential_store::{CredentialSnapshot, ProviderCredentialStore};
 pub use event_sink::ProviderEventSink;

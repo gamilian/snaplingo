@@ -274,6 +274,52 @@ fn commands_delegate_native_effects_to_application_seams() {
 }
 
 #[test]
+fn commands_and_composition_do_not_own_provider_or_ocr_favorite_policy() {
+    let command_sources = production_command_sources();
+    let forbidden_command_policy = [
+        ("src/commands/provider_commands.rs", "LLMProtocol"),
+        ("src/commands/provider_commands.rs", "validate_non_blank"),
+        ("src/commands/provider_commands.rs", ".llm_introspection"),
+        ("src/commands/provider_commands.rs", ".configuration"),
+        ("src/commands/provider_commands.rs", ".prompt_strategies"),
+        ("src/commands/ocr_commands.rs", ".ocr_configuration"),
+        ("src/commands/ocr_commands.rs", ".list_all()"),
+        ("src/commands/ocr_commands.rs", ".get_active()"),
+        ("src/commands/history_commands.rs", ".get_active()"),
+        ("src/commands/history_commands.rs", ".recognize_image("),
+        ("src/commands/history_commands.rs", ".read_ocr_source("),
+    ];
+    let mut violations = Vec::new();
+
+    for (path, policy) in forbidden_command_policy {
+        if command_sources
+            .iter()
+            .find(|source| source.path == path)
+            .is_some_and(|source| source.source.contains(policy))
+        {
+            violations.push(format!("{path} contains {policy}"));
+        }
+    }
+
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let provider_composition =
+        fs::read_to_string(manifest_dir.join("src/composition/provider_runtime.rs")).unwrap();
+    for policy in [
+        "load_baidu_ocr_credentials",
+        "baidu_ocr_api_key",
+        "baidu_ocr_secret_key",
+    ] {
+        if provider_composition.contains(policy) {
+            violations.push(format!(
+                "src/composition/provider_runtime.rs contains {policy}"
+            ));
+        }
+    }
+
+    assert_eq!(violations, Vec::<String>::new());
+}
+
+#[test]
 fn rejects_forbidden_synthetic_dependencies() {
     let files = [SourceFile {
         path: "src/application/example.rs".to_string(),

@@ -1,65 +1,17 @@
 use crate::application::providers::common::CredentialField;
-use crate::application::providers::configuration::{CredentialValue, ProviderInfo};
 use crate::application::providers::{
-    AddCustomTranslationProviderInput, CustomTranslationProviderView,
-    TranslationPromptStrategyConfig, UpdateCustomTranslationProviderInput,
+    AddCustomTranslationProviderInput, ProviderConnectionTestInput, ProviderInfo,
+    ProviderModelListInput, TranslationPromptStrategyConfig, UpdateCustomTranslationProviderInput,
 };
-use crate::infrastructure::llm::LLMProtocol;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tauri::State;
-
-impl From<CustomTranslationProviderView> for ProviderInfo {
-    fn from(view: CustomTranslationProviderView) -> Self {
-        Self {
-            id: view.id,
-            name: view.name,
-            is_configured: true,
-            requires_api_key: true,
-            is_active: true,
-            is_builtin: false,
-            protocol: Some(view.protocol),
-            endpoint: Some(view.endpoint),
-            model: Some(view.model),
-            reasoning_level: view.reasoning_level,
-            prompt_strategy_id: Some(view.prompt_strategy_id),
-            prompt_fallback_strategy_id: Some(view.prompt_fallback_strategy_id),
-        }
-    }
-}
 
 #[tauri::command]
 pub async fn list_translation_providers(
     state: State<'_, crate::AppState>,
 ) -> Result<Vec<ProviderInfo>, String> {
-    let info = state.providers.configuration.list_provider_infos();
-    let active = state.providers.translation.get_active();
-    let active_ids: Vec<_> = active.iter().map(|p| p.read().id().to_string()).collect();
-
-    Ok(order_provider_infos_for_display(info, &active_ids))
-}
-
-fn order_provider_infos_for_display(
-    providers: Vec<ProviderInfo>,
-    active_ids: &[String],
-) -> Vec<ProviderInfo> {
-    let mut by_id: HashMap<_, _> = providers
-        .into_iter()
-        .map(|provider| (provider.id.clone(), provider))
-        .collect();
-
-    let mut ordered = Vec::new();
-    for id in active_ids {
-        if let Some(provider) = by_id.remove(id) {
-            ordered.push(provider);
-        }
-    }
-
-    let mut inactive: Vec<_> = by_id.into_values().collect();
-    inactive.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.id.cmp(&b.id)));
-    ordered.extend(inactive);
-
-    ordered
+    Ok(state.providers.administration.list_translation_providers())
 }
 
 #[tauri::command]
@@ -69,8 +21,8 @@ pub async fn activate_translation_provider(
 ) -> Result<(), String> {
     state
         .providers
-        .configuration
-        .activate_provider(provider_id)
+        .administration
+        .activate_translation_provider(provider_id)
         .map_err(|e| e.to_string())
 }
 
@@ -81,8 +33,8 @@ pub async fn deactivate_translation_provider(
 ) -> Result<(), String> {
     state
         .providers
-        .configuration
-        .deactivate_provider(provider_id)
+        .administration
+        .deactivate_translation_provider(provider_id)
         .map_err(|e| e.to_string())
 }
 
@@ -93,8 +45,8 @@ pub async fn reorder_active_translation_providers(
 ) -> Result<(), String> {
     state
         .providers
-        .configuration
-        .reorder_active_providers(provider_ids)
+        .administration
+        .reorder_active_translation_providers(provider_ids)
         .map_err(|e| e.to_string())
 }
 
@@ -105,8 +57,8 @@ pub async fn get_provider_credential_schema(
 ) -> Result<Vec<CredentialField>, String> {
     state
         .providers
-        .configuration
-        .credential_schema(provider_id)
+        .administration
+        .translation_credential_schema(provider_id)
         .map_err(|e| e.to_string())
 }
 
@@ -116,15 +68,10 @@ pub async fn configure_translation_provider_credentials(
     credentials: HashMap<String, String>,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    let cred_values: Vec<CredentialValue> = credentials
-        .into_iter()
-        .map(|(key, value)| CredentialValue { key, value })
-        .collect();
-
     state
         .providers
-        .configuration
-        .save_credentials(provider_id, cred_values)
+        .administration
+        .configure_translation_provider_credentials(provider_id, credentials)
         .map_err(|e| e.to_string())
 }
 
@@ -186,13 +133,11 @@ pub async fn add_custom_translation_provider(
         prompt_fallback_strategy_id: request.prompt_fallback_strategy_id,
     };
 
-    let view = state
+    state
         .providers
-        .configuration
-        .add(input)
-        .map_err(|e| e.to_string())?;
-
-    Ok(ProviderInfo::from(view))
+        .administration
+        .add_custom_translation_provider(input)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -212,27 +157,21 @@ pub async fn update_custom_translation_provider(
         prompt_fallback_strategy_id: request.prompt_fallback_strategy_id,
     };
 
-    let view = state
+    state
         .providers
-        .configuration
-        .update(provider_id.clone(), input)
-        .map_err(|e| e.to_string())?;
-
-    let mut info = ProviderInfo::from(view);
-    info.is_active = state
-        .providers
-        .translation
-        .get_active()
-        .iter()
-        .any(|provider| provider.read().id() == provider_id);
-    Ok(info)
+        .administration
+        .update_custom_translation_provider(provider_id, input)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn list_translation_prompt_strategies(
     state: State<'_, crate::AppState>,
 ) -> Result<TranslationPromptStrategyConfig, String> {
-    Ok(state.providers.prompt_strategies.list())
+    Ok(state
+        .providers
+        .administration
+        .list_translation_prompt_strategies())
 }
 
 #[tauri::command]
@@ -242,8 +181,8 @@ pub async fn save_translation_prompt_strategies(
 ) -> Result<TranslationPromptStrategyConfig, String> {
     state
         .providers
-        .prompt_strategies
-        .save(config)
+        .administration
+        .save_translation_prompt_strategies(config)
         .map_err(|e| e.to_string())
 }
 
@@ -252,13 +191,10 @@ pub async fn list_openai_compatible_models(
     request: OpenAICompatibleModelsRequest,
     state: State<'_, crate::AppState>,
 ) -> Result<Vec<OpenAICompatibleModelInfo>, String> {
-    let endpoint = validate_non_blank(&request.endpoint, "API address")?;
-    let api_key = validate_non_blank(&request.api_key, "API key")?;
-
     state
         .providers
-        .llm_introspection
-        .list_models(LLMProtocol::OpenAI, endpoint, api_key)
+        .administration
+        .list_openai_compatible_models(model_list_input(request))
         .await
         .map(|models| {
             models
@@ -266,7 +202,7 @@ pub async fn list_openai_compatible_models(
                 .map(|m| OpenAICompatibleModelInfo { id: m.id })
                 .collect()
         })
-        .map_err(|e| format!("Failed to fetch model list: {}", e))
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -274,16 +210,12 @@ pub async fn test_openai_compatible_provider(
     request: TestOpenAICompatibleProviderRequest,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    let endpoint = validate_non_blank(&request.endpoint, "API address")?;
-    let api_key = validate_non_blank(&request.api_key, "API key")?;
-    let model = validate_non_blank(&request.model, "Model")?;
-
     state
         .providers
-        .llm_introspection
-        .test(LLMProtocol::OpenAI, endpoint, model, api_key)
+        .administration
+        .test_openai_compatible_provider(connection_test_input(request))
         .await
-        .map_err(|e| format!("Provider test failed: {}", e))
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -291,16 +223,12 @@ pub async fn test_openai_responses_provider(
     request: TestOpenAICompatibleProviderRequest,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    let endpoint = validate_non_blank(&request.endpoint, "API address")?;
-    let api_key = validate_non_blank(&request.api_key, "API key")?;
-    let model = validate_non_blank(&request.model, "Model")?;
-
     state
         .providers
-        .llm_introspection
-        .test(LLMProtocol::OpenAIResponses, endpoint, model, api_key)
+        .administration
+        .test_openai_responses_provider(connection_test_input(request))
         .await
-        .map_err(|e| format!("Provider test failed: {}", e))
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -308,13 +236,10 @@ pub async fn list_anthropic_models(
     request: OpenAICompatibleModelsRequest,
     state: State<'_, crate::AppState>,
 ) -> Result<Vec<OpenAICompatibleModelInfo>, String> {
-    let endpoint = validate_non_blank(&request.endpoint, "API address")?;
-    let api_key = validate_non_blank(&request.api_key, "API key")?;
-
     state
         .providers
-        .llm_introspection
-        .list_models(LLMProtocol::Anthropic, endpoint, api_key)
+        .administration
+        .list_anthropic_models(model_list_input(request))
         .await
         .map(|models| {
             models
@@ -322,7 +247,7 @@ pub async fn list_anthropic_models(
                 .map(|m| OpenAICompatibleModelInfo { id: m.id })
                 .collect()
         })
-        .map_err(|e| format!("Failed to fetch model list: {}", e))
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -330,16 +255,12 @@ pub async fn test_anthropic_provider(
     request: TestOpenAICompatibleProviderRequest,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    let endpoint = validate_non_blank(&request.endpoint, "API address")?;
-    let api_key = validate_non_blank(&request.api_key, "API key")?;
-    let model = validate_non_blank(&request.model, "Model")?;
-
     state
         .providers
-        .llm_introspection
-        .test(LLMProtocol::Anthropic, endpoint, model, api_key)
+        .administration
+        .test_anthropic_provider(connection_test_input(request))
         .await
-        .map_err(|e| format!("Provider test failed: {}", e))
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -347,13 +268,10 @@ pub async fn list_gemini_models(
     request: OpenAICompatibleModelsRequest,
     state: State<'_, crate::AppState>,
 ) -> Result<Vec<OpenAICompatibleModelInfo>, String> {
-    let endpoint = validate_non_blank(&request.endpoint, "API address")?;
-    let api_key = validate_non_blank(&request.api_key, "API key")?;
-
     state
         .providers
-        .llm_introspection
-        .list_models(LLMProtocol::Gemini, endpoint, api_key)
+        .administration
+        .list_gemini_models(model_list_input(request))
         .await
         .map(|models| {
             models
@@ -361,7 +279,7 @@ pub async fn list_gemini_models(
                 .map(|m| OpenAICompatibleModelInfo { id: m.id })
                 .collect()
         })
-        .map_err(|e| format!("Failed to fetch model list: {}", e))
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -369,16 +287,12 @@ pub async fn test_gemini_provider(
     request: TestOpenAICompatibleProviderRequest,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    let endpoint = validate_non_blank(&request.endpoint, "API address")?;
-    let api_key = validate_non_blank(&request.api_key, "API key")?;
-    let model = validate_non_blank(&request.model, "Model")?;
-
     state
         .providers
-        .llm_introspection
-        .test(LLMProtocol::Gemini, endpoint, model, api_key)
+        .administration
+        .test_gemini_provider(connection_test_input(request))
         .await
-        .map_err(|e| format!("Provider test failed: {}", e))
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -388,8 +302,8 @@ pub async fn test_custom_translation_provider(
 ) -> Result<(), String> {
     state
         .providers
-        .configuration
-        .test_custom_provider(provider_id)
+        .administration
+        .test_custom_translation_provider(provider_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -401,59 +315,24 @@ pub async fn remove_custom_translation_provider(
 ) -> Result<(), String> {
     state
         .providers
-        .configuration
-        .remove(provider_id)
+        .administration
+        .remove_custom_translation_provider(provider_id)
         .map_err(|e| e.to_string())
 }
 
-fn validate_non_blank<'a>(value: &'a str, label: &str) -> Result<&'a str, String> {
-    let value = value.trim();
-    if value.is_empty() {
-        Err(format!("{} cannot be empty", label))
-    } else {
-        Ok(value)
+fn model_list_input(request: OpenAICompatibleModelsRequest) -> ProviderModelListInput {
+    ProviderModelListInput {
+        endpoint: request.endpoint,
+        api_key: request.api_key,
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn provider_info(id: &str, name: &str, is_active: bool) -> ProviderInfo {
-        ProviderInfo {
-            id: id.to_string(),
-            name: name.to_string(),
-            is_configured: true,
-            requires_api_key: false,
-            is_active,
-            is_builtin: false,
-            protocol: None,
-            endpoint: None,
-            model: None,
-            reasoning_level: None,
-            prompt_strategy_id: None,
-            prompt_fallback_strategy_id: None,
-        }
-    }
-
-    #[test]
-    fn provider_list_keeps_active_provider_order_before_inactive_providers() {
-        let providers = vec![
-            provider_info("google-translate", "Google Translate", true),
-            provider_info("custom-gpt", "gpt-5-mini", true),
-            provider_info("deeplx", "DeepLX", false),
-        ];
-        let active_ids = vec!["custom-gpt".to_string(), "google-translate".to_string()];
-
-        let ordered = order_provider_infos_for_display(providers, &active_ids);
-        let ordered_ids: Vec<_> = ordered
-            .iter()
-            .map(|provider| provider.id.as_str())
-            .collect();
-
-        assert_eq!(
-            ordered_ids,
-            vec!["custom-gpt", "google-translate", "deeplx"]
-        );
+fn connection_test_input(
+    request: TestOpenAICompatibleProviderRequest,
+) -> ProviderConnectionTestInput {
+    ProviderConnectionTestInput {
+        endpoint: request.endpoint,
+        api_key: request.api_key,
+        model: request.model,
     }
 }

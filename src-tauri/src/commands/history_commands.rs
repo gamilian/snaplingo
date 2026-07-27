@@ -106,39 +106,11 @@ pub async fn favorite_ocr_result(
     provider_used: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<i64, String> {
-    let provider_used = provider_used.unwrap_or_else(|| {
-        state
-            .providers
-            .ocr
-            .get_active()
-            .map(|provider| provider.read().id().to_string())
-            .unwrap_or_else(|| "manual".to_string())
-    });
-    let image_data = if request.image_data.is_empty() {
-        match source_history_id {
-            Some(id) => state
-                .history
-                .history
-                .read_ocr_source(id)
-                .await
-                .map_err(|error| error.to_string())?,
-            None => Vec::new(),
-        }
-    } else {
-        request.image_data
-    };
     state
         .favorites
-        .favorites
-        .add_ocr(
-            source_history_id,
-            image_data,
-            request.language,
-            provider_used,
-            result,
-        )
+        .ocr_application
+        .favorite(source_history_id, request, result, provider_used)
         .await
-        .map(|record| record.id)
         .map_err(|error| error.to_string())
 }
 
@@ -182,16 +154,10 @@ pub async fn delete_favorite(id: i64, state: State<'_, AppState>) -> Result<(), 
 
 #[tauri::command]
 pub async fn rerun_ocr_favorite(id: i64, state: State<'_, AppState>) -> Result<OcrResult, String> {
-    let image = state
-        .favorites
-        .favorites
-        .read_ocr_source(id)
-        .await
-        .map_err(|error| error.to_string())?;
     state
-        .providers
-        .ocr
-        .recognize_image(image)
+        .favorites
+        .ocr_application
+        .rerun(id)
         .await
         .map_err(|error| error.to_string())
 }
