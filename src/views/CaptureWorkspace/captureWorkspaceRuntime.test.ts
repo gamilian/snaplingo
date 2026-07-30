@@ -1142,6 +1142,56 @@ describe('capture workspace runtime', () => {
     expect(platform.commands.outputCapture).not.toHaveBeenCalled();
   });
 
+  it('enters the preview editor when a candidate is clicked in a preview-flow mode', async () => {
+    const recommended = { x: 40, y: 30, width: 180, height: 120 };
+    const platform = createPlatform({
+      session: createSession({
+        id: 'session-candidate-preview',
+        candidates: [
+          {
+            id: 'window-recommended',
+            kind: 'window',
+            rect: recommended,
+            priority: 10,
+          },
+        ],
+      }),
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-candidate-preview');
+
+    runtime.actions.pointerMove({
+      point: { x: 80, y: 70 },
+      button: 0,
+      source: 'root',
+    });
+    expect(runtime.renderState.hoverSelection).toEqual(recommended);
+    runtime.actions.pointerDown({
+      point: { x: 80, y: 70 },
+      button: 0,
+      detail: 1,
+      source: 'root',
+    });
+    await runtime.actions.pointerUp({
+      point: { x: 80, y: 70 },
+      button: 0,
+      detail: 1,
+      source: 'root',
+    });
+
+    // A clicked candidate in screenshot (preview) mode should open the editor
+    // just like a manual drag, not copy-and-finish.
+    expect(runtime.renderState).toMatchObject({
+      status: 'preview',
+      selection: recommended,
+    });
+    expect(platform.commands.renderCaptureOutput).toHaveBeenCalledWith(
+      expect.objectContaining({ rect: recommended }),
+    );
+    expect(platform.commands.outputCapture).not.toHaveBeenCalled();
+    expect(platform.dismiss).not.toHaveBeenCalled();
+  });
+
   it('keeps a canceled loading session idle when its load resolves later', async () => {
     const load = deferred<ReturnType<typeof createSession>>();
     const platform = createPlatform();

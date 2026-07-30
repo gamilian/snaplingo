@@ -34,7 +34,6 @@ import {
   getBestCandidateAtPoint,
 } from './captureCandidates';
 import {
-  getPrimaryCaptureCompletionActionForMode,
   planCandidateSelectionCompletion,
   planManualSelectionCompletion,
   type CaptureRuntimeEffect,
@@ -1175,11 +1174,16 @@ export function createCaptureWorkspaceRuntime({
 
   const completeCandidateSelection = async (
     rect: LogicalRect,
-    action: HoverSelectionCompletionAction =
-      getPrimaryCaptureCompletionActionForMode(
-        state.mode,
-      ) as HoverSelectionCompletionAction,
+    action?: HoverSelectionCompletionAction,
   ) => {
+    // A plain click/Enter on a smart candidate should follow the same flow as a
+    // manual drag: enter the preview/edit page for screenshot modes, or run the
+    // mode's effects otherwise. Only an explicit action (Cmd+C/S, hover
+    // shortcuts) bypasses preview and completes immediately.
+    if (action === undefined) {
+      await completeManualSelection(rect);
+      return;
+    }
     await runCompletionEffects(
       rect,
       planCandidateSelectionCompletion(action),
