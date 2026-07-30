@@ -44,9 +44,9 @@ function cursorDataUrl(
 }
 
 const SELECTION_CROSSHAIR_CURSOR = cursorDataUrl(
-  '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M16 1v10M16 21v10M1 16h10M21 16h10" fill="none" stroke="#000" stroke-width="3" stroke-linecap="square"/><path d="M16 1v10M16 21v10M1 16h10M21 16h10" fill="none" stroke="#fff" stroke-width="1.2" stroke-linecap="square"/><circle cx="16" cy="16" r="2.25" fill="#5b7fff" stroke="#000" stroke-width="1"/></svg>',
-  16,
-  16,
+  '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path d="M10 3v5M10 12v5M3 10h5M12 10h5" fill="none" stroke="rgba(15,23,42,.55)" stroke-width="2" stroke-linecap="round"/><path d="M10 3v5M10 12v5M3 10h5M12 10h5" fill="none" stroke="rgba(255,255,255,.94)" stroke-width=".75" stroke-linecap="round"/><circle cx="10" cy="10" r="1.15" fill="rgba(255,255,255,.96)" stroke="rgba(15,23,42,.55)" stroke-width=".65"/></svg>',
+  10,
+  10,
   'crosshair',
 );
 

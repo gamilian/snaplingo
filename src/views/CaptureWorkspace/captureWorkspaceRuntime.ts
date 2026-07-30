@@ -1914,6 +1914,10 @@ export function createCaptureWorkspaceRuntime({
       if (button !== 0) return false;
       clearPressedHoverSelection();
 
+      const hoverSelectionAtPress =
+        state.hoverSelection && rectContainsPoint(state.hoverSelection, point)
+          ? state.hoverSelection
+          : null;
       pressedHoverSelection =
         button === 0 &&
         getHoverSelectionCompletionActionFromPointer(
@@ -1927,7 +1931,7 @@ export function createCaptureWorkspaceRuntime({
           },
           { mode: state.mode },
         )
-          ? state.hoverSelection
+          ? hoverSelectionAtPress
           : null;
       pressedHoverDetectionMode = pressedHoverSelection
         ? state.candidateDetectionMode
@@ -1987,6 +1991,10 @@ export function createCaptureWorkspaceRuntime({
 
       const sessionId = state.session.id;
       const candidateDetectionMode = state.candidateDetectionMode;
+      const retainedControlCandidate =
+        state.hoverSelection && rectContainsPoint(state.hoverSelection, point)
+          ? state.hoverSelection
+          : null;
       patch({
         cursorPoint: point,
         hoverSelection:
@@ -1998,7 +2006,7 @@ export function createCaptureWorkspaceRuntime({
                 ),
                 point,
               )?.rect ?? null
-            : null,
+            : retainedControlCandidate,
       });
       if (candidateDetectionMode === 'control') {
         scheduleControlCandidateRefresh(sessionId, point);
@@ -2637,6 +2645,15 @@ function errorMessage(error: unknown) {
 
 function arePointsEqual(a: Point | null, b: Point | null) {
   return a === b || (a !== null && b !== null && a.x === b.x && a.y === b.y);
+}
+
+function rectContainsPoint(rect: LogicalRect, point: Point) {
+  return (
+    point.x >= rect.x &&
+    point.x < rect.x + rect.width &&
+    point.y >= rect.y &&
+    point.y < rect.y + rect.height
+  );
 }
 
 function pointerInput(

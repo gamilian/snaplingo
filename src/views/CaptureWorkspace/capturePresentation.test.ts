@@ -65,12 +65,15 @@ describe("capture presentation", () => {
     expect(className).not.toContain("transition-opacity");
   });
 
-  it("uses a system-rendered selection crosshair with a centered hotspot", () => {
+  it("uses a compact neutral selection crosshair with a centered hotspot", () => {
     const selectingCursor = getCaptureRootCursorStyle("selecting");
+    const decodedCursor = decodeURIComponent(selectingCursor);
 
     expect(selectingCursor).toContain("data:image/svg+xml");
-    expect(selectingCursor).toContain("16 16");
-    expect(decodeURIComponent(selectingCursor)).toContain("#5b7fff");
+    expect(selectingCursor).toContain("10 10");
+    expect(decodedCursor).toContain('width="20" height="20"');
+    expect(decodedCursor).toContain('stroke-width=".75"');
+    expect(decodedCursor).not.toContain("#5b7fff");
     expect(selectingCursor).not.toBe("none");
     expect(getCaptureRootCursorStyle("preview")).toBe("default");
     expect(getCaptureRootCursorStyle("preview", "text")).toBe("text");

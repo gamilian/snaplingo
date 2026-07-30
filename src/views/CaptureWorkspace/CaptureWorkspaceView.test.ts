@@ -326,6 +326,19 @@ describe("CaptureWorkspaceView runtime seam", () => {
       expect.objectContaining({ source: "preview" }),
     );
 
+    const northwestHandle = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Resize selection nw"]',
+    );
+    expect(northwestHandle).not.toBeNull();
+    expect(northwestHandle!.className).toContain("left-0");
+    expect(northwestHandle!.className).toContain("top-0");
+    expect(northwestHandle!.className).toContain("-translate-x-1/2");
+    expect(northwestHandle!.className).toContain("-translate-y-1/2");
+    expect(northwestHandle!.className).toContain("h-4");
+    expect(northwestHandle!.className).toContain("w-4");
+    expect(northwestHandle!.firstElementChild?.className).toContain("h-2");
+    expect(northwestHandle!.firstElementChild?.className).toContain("w-2");
+
     const annotationEastHandle = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Resize annotation e"]',
     );

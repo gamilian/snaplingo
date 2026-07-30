@@ -10,14 +10,14 @@ import type { LogicalRect } from './types';
 const SELECTION_HANDLES: SelectionHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
 const resizeHandleClassNames: Record<SelectionHandle, string> = {
-  nw: '-left-0.5 -top-0.5 cursor-nwse-resize',
-  n: 'left-1/2 -top-0.5 -translate-x-1/2 cursor-ns-resize',
-  ne: '-right-0.5 -top-0.5 cursor-nesw-resize',
-  e: '-right-0.5 top-1/2 -translate-y-1/2 cursor-ew-resize',
-  se: '-bottom-0.5 -right-0.5 cursor-nwse-resize',
-  s: '-bottom-0.5 left-1/2 -translate-x-1/2 cursor-ns-resize',
-  sw: '-bottom-0.5 -left-0.5 cursor-nesw-resize',
-  w: '-left-0.5 top-1/2 -translate-y-1/2 cursor-ew-resize',
+  nw: 'left-0 top-0 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize',
+  n: 'left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize',
+  ne: 'right-0 top-0 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize',
+  e: 'right-0 top-1/2 translate-x-1/2 -translate-y-1/2 cursor-ew-resize',
+  se: 'bottom-0 right-0 translate-x-1/2 translate-y-1/2 cursor-nwse-resize',
+  s: 'bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 cursor-ns-resize',
+  sw: 'bottom-0 left-0 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize',
+  w: 'left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize',
 };
 
 const resizeEdgeClassNames: Record<'n' | 'e' | 's' | 'w', string> = {
@@ -238,10 +238,13 @@ export function CaptureSelectionResizeHandles({
       {SELECTION_HANDLES.map((handle) => (
         <button
           key={handle}
-          className={`pointer-events-auto absolute h-3 w-3 rounded-full border border-[#5b7fff] bg-white shadow-[0_2px_7px_rgba(91,127,255,0.35)] ${resizeHandleClassNames[handle]}`}
+          type="button"
+          className={`pointer-events-auto absolute z-[3] flex h-4 w-4 items-center justify-center border-0 bg-transparent p-0 ${resizeHandleClassNames[handle]}`}
           aria-label={`Resize selection ${handle}`}
           onPointerDown={(event) => onResizeHandlePointerDown(handle, event)}
-        />
+        >
+          <span className="pointer-events-none h-2 w-2 rounded-full border border-[#5b7fff] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.3)]" />
+        </button>
       ))}
     </div>
   );

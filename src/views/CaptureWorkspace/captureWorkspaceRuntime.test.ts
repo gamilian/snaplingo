@@ -928,7 +928,7 @@ describe('capture workspace runtime', () => {
     });
   });
 
-  it('confirms a recommended interface element with a plain primary click', async () => {
+  it('confirms a recommended interface element after flushing the latest pointer move', async () => {
     const recommended = { x: 40, y: 30, width: 180, height: 120 };
     const platform = createPlatform({
       session: createSession({
@@ -956,6 +956,12 @@ describe('capture workspace runtime', () => {
       expect(runtime.renderState.hoverSelection).toEqual(recommended),
     );
 
+    runtime.actions.pointerMove({
+      point: { x: 80, y: 70 },
+      button: 0,
+      source: 'root',
+    });
+    expect(runtime.renderState.hoverSelection).toEqual(recommended);
     runtime.actions.pointerDown({
       point: { x: 80, y: 70 },
       button: 0,
@@ -2263,6 +2269,32 @@ describe('capture workspace runtime', () => {
       ),
     );
     expect(runtime.renderState.hoverSelection).toEqual(control);
+  });
+
+  it('drops a visible interface-element candidate when the pointer leaves it', async () => {
+    const control = { x: 30, y: 40, width: 60, height: 24 };
+    const pendingOutsideCandidate = deferred<null>();
+    const platform = createPlatform();
+    platform.commands.currentCaptureControlCandidate
+      .mockResolvedValueOnce({
+        id: 'control-visible',
+        kind: 'control',
+        rect: control,
+        priority: 10_001,
+      })
+      .mockImplementationOnce(() => pendingOutsideCandidate.promise);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-control-leave');
+    runtime.actions.pointerMove({ x: 40, y: 50 });
+    expect(runtime.actions.keyDown({ key: 'Tab' })).toBe(true);
+    await vi.waitFor(() =>
+      expect(runtime.renderState.hoverSelection).toEqual(control),
+    );
+
+    runtime.actions.pointerMove({ x: 120, y: 90 });
+
+    expect(runtime.renderState.hoverSelection).toBeNull();
+    pendingOutsideCandidate.resolve(null);
   });
 
   it('keeps one interface-element query in flight and queues only the latest point across Tab and pointer moves', async () => {
