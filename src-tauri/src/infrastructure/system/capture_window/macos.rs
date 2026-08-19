@@ -4,7 +4,7 @@ use objc2::MainThreadMarker;
 use objc2_app_kit::{
     NSApplicationActivationOptions, NSCursor, NSRunningApplication, NSScreen,
     NSScreenSaverWindowLevel, NSView, NSWindow, NSWindowAnimationBehavior,
-    NSWindowCollectionBehavior, NSWindowStyleMask, NSWorkspace,
+    NSWindowCollectionBehavior, NSWindowSharingType, NSWindowStyleMask, NSWorkspace,
 };
 use objc2_foundation::{NSPoint, NSRect, NSSize};
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
@@ -47,7 +47,6 @@ pub(super) fn begin_capture_presentation(app: &AppHandle) -> Result<(), String> 
 
     if previous_depth == 0 {
         remember_previous_frontmost_application();
-        hide_settings_window_before_capture_snapshot_if_backgrounded(app);
         if let Some(activation_policy) = capture_presentation_activation_policy() {
             if let Err(err) = app.set_activation_policy(activation_policy) {
                 CAPTURE_PRESENTATION_DEPTH.fetch_sub(1, Ordering::SeqCst);
@@ -158,6 +157,7 @@ pub(super) fn configure_capture_window_for_current_space(
     ns_window.setCollectionBehavior(capture_overlay_collection_behavior(
         ns_window.collectionBehavior(),
     ));
+    ns_window.setSharingType(capture_overlay_sharing_type());
     ns_window.setLevel(NSScreenSaverWindowLevel);
     ns_window.setCanHide(false);
     ns_window.setHidesOnDeactivate(false);
@@ -313,6 +313,10 @@ fn capture_overlay_frame_for_desktop_height(bounds: &LogicalRect, desktop_height
 
 fn capture_overlay_style_mask(base: NSWindowStyleMask) -> NSWindowStyleMask {
     base & !NSWindowStyleMask::NonactivatingPanel
+}
+
+fn capture_overlay_sharing_type() -> NSWindowSharingType {
+    NSWindowSharingType::None
 }
 
 fn capture_presentation_activation_policy() -> Option<tauri::ActivationPolicy> {
@@ -725,35 +729,6 @@ fn emit_capture_redo_requested(app: &AppHandle) {
     }
 }
 
-// The desktop snapshot is a full-display capture (CGDisplayCreateImage via
-// xcap), so any visible SnapLingo window — including the settings window — would
-// be baked into the frozen image the overlay shows. When SnapLingo is not the
-// frontmost app, the settings window is not what the user is looking at, so hide
-// it before the snapshot is taken. It stays hidden after capture ends.
-fn should_hide_settings_window_before_capture_snapshot(
-    current_pid: i32,
-    frontmost_pid: Option<i32>,
-) -> bool {
-    frontmost_pid != Some(current_pid)
-}
-
-fn hide_settings_window_before_capture_snapshot_if_backgrounded(app: &AppHandle) {
-    if !should_hide_settings_window_before_capture_snapshot(
-        current_application_pid(),
-        frontmost_application_pid(),
-    ) {
-        return;
-    }
-
-    if let Some(window) = app.get_webview_window(crate::settings_window::SETTINGS_WINDOW_LABEL) {
-        if window.is_visible().unwrap_or(false) {
-            if let Err(err) = window.hide() {
-                log::warn!("Failed to hide settings window before capture snapshot: {}", err);
-            }
-        }
-    }
-}
-
 fn remember_previous_frontmost_application() {
     let previous_pid = frontmost_application_pid().and_then(|frontmost_pid| {
         previous_frontmost_pid_to_restore(Some(frontmost_pid), current_application_pid())
@@ -947,21 +922,8 @@ mod tests {
     }
 
     #[test]
-    fn hides_settings_window_before_snapshot_only_when_snaplingo_is_backgrounded() {
-        // Another app is frontmost => settings isn't what the user is looking
-        // at, so keep it out of the frozen desktop snapshot.
-        assert!(should_hide_settings_window_before_capture_snapshot(
-            9000,
-            Some(4242),
-        ));
-        // SnapLingo (e.g. the settings window) is frontmost => the user is
-        // looking at it, so leave it in the snapshot.
-        assert!(!should_hide_settings_window_before_capture_snapshot(
-            9000,
-            Some(9000),
-        ));
-        // No known frontmost app => err toward hiding (backgrounded).
-        assert!(should_hide_settings_window_before_capture_snapshot(9000, None));
+    fn capture_overlay_cannot_be_shared_with_screen_capture_clients() {
+        assert_eq!(capture_overlay_sharing_type(), NSWindowSharingType::None);
     }
 
     #[test]

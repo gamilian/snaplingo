@@ -504,11 +504,34 @@ fn scaled_extent(value: f64, scale: f64) -> Result<u32, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::ImageAnnotation;
+    use image::ImageEncoder;
+
+    use super::{CaptureImageComposer, ImageAnnotation, PngPlacement};
     use crate::domain::capture::{
         AnnotationCommand, LogicalPoint, LogicalRect, PhysicalPoint, PhysicalRect,
     };
     use crate::domain::capture::{CapturedCursor, MonitorSnapshot};
+
+    fn solid_png(width: u32, height: u32, rgba: [u8; 4]) -> Vec<u8> {
+        let mut png = Vec::new();
+        image::codecs::png::PngEncoder::new(&mut png)
+            .write_image(
+                &rgba.repeat((width * height) as usize),
+                width,
+                height,
+                image::ExtendedColorType::Rgba8,
+            )
+            .unwrap();
+        png
+    }
+
+    fn png_pixel(png: &[u8], x: u32, y: u32) -> [u8; 4] {
+        image::load_from_memory(png)
+            .unwrap()
+            .to_rgba8()
+            .get_pixel(x, y)
+            .0
+    }
 
     #[test]
     fn capture_image_placements_split_selection_across_monitors() {
@@ -601,6 +624,76 @@ mod tests {
                 height: 2,
             }
         );
+    }
+
+    #[test]
+    fn renders_cross_display_selection_at_the_highest_pixel_density() {
+        let snapshots = vec![
+            MonitorSnapshot {
+                id: "left".to_string(),
+                logical_bounds: LogicalRect {
+                    x: -2.0,
+                    y: 0.0,
+                    width: 2.0,
+                    height: 2.0,
+                },
+                physical_bounds: PhysicalRect {
+                    x: -2,
+                    y: 0,
+                    width: 2,
+                    height: 2,
+                },
+                scale_factor: 1.0,
+                png_data: solid_png(2, 2, [255, 0, 0, 255]),
+            },
+            MonitorSnapshot {
+                id: "retina".to_string(),
+                logical_bounds: LogicalRect {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 2.0,
+                    height: 2.0,
+                },
+                physical_bounds: PhysicalRect {
+                    x: 0,
+                    y: 0,
+                    width: 4,
+                    height: 4,
+                },
+                scale_factor: 2.0,
+                png_data: solid_png(4, 4, [0, 0, 255, 255]),
+            },
+        ];
+        let plan = super::capture_image_composition_plan(
+            &LogicalRect {
+                x: -1.0,
+                y: 0.0,
+                width: 3.0,
+                height: 2.0,
+            },
+            &snapshots,
+        )
+        .unwrap();
+        let placements = plan
+            .placements
+            .iter()
+            .map(|placement| PngPlacement {
+                png_data: &snapshots[placement.snapshot_index].png_data,
+                source_rect: placement.source_rect.clone(),
+                destination_rect: placement.destination_rect.clone(),
+            })
+            .collect::<Vec<_>>();
+
+        let output = CaptureImageComposer::new()
+            .compose_png(plan.width, plan.height, &placements)
+            .unwrap();
+        let image = image::load_from_memory(&output).unwrap();
+
+        assert_eq!((image.width(), image.height()), (6, 4));
+        assert_eq!(png_pixel(&output, 0, 0), [255, 0, 0, 255]);
+        assert_eq!(png_pixel(&output, 1, 3), [255, 0, 0, 255]);
+        assert_eq!(png_pixel(&output, 2, 0), [0, 0, 255, 255]);
+        assert_eq!(png_pixel(&output, 5, 3), [0, 0, 255, 255]);
     }
 
     #[test]
