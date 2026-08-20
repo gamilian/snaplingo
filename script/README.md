@@ -87,14 +87,16 @@ npm run tauri:build:beta
 
 macOS 构建会跳过 Tauri 的 Finder AppleScript 布局步骤，避免要求 Terminal、IDE 或构建代理取得“控制 Finder”的自动化权限。签名后处理仍会生成包含 SnapLingo 和 Applications 链接的 DMG。
 
-未配置 Developer ID 时，脚本会使用稳定的本地证书签名，以保证同一台 Mac 重建后系统权限身份保持稳定。该证书不受 Apple Gatekeeper 信任，因此测试者首次安装必须：
+未显式配置 `SNAPLINGO_CODESIGN_IDENTITY` 时，脚本会创建或复用专用的 `SnapLingo Local Code Signing` 自签名证书；它不会自动改用钥匙串中的其他证书。将这张证书及私钥安全备份并在后续构建中持续复用，同时保持 `com.snaplingo.app` 不变。这样可避免 ad-hoc 签名每次构建都改变身份；TCC 是否跨更新保留仍必须在真实升级路径中测试，Apple 未对此提供保证。
+
+该证书不受 Apple Gatekeeper 信任，因此测试者首次安装必须：
 
 1. 将 SnapLingo 拖入“应用程序”。
 2. 尝试打开一次，然后进入“系统设置 > 隐私与安全性”。
 3. 点击“仍要打开”，输入 Mac 登录密码并确认。
 4. SnapLingo 首次启动会先打开应用设置窗口；权限不足时在窗口内显示引导，依次点击“打开屏幕录制设置”和“打开辅助功能设置”完成授权。应用不会在页面显示前主动请求权限。
 
-“仍要打开”及登录密码属于 Gatekeeper 的未知开发者放行流程；后续屏幕录制和辅助功能属于应用能力授权。此构建仅用于已知测试者，不作为公开发布包。
+“仍要打开”及登录密码属于 Gatekeeper 的未知开发者放行流程；后续屏幕录制和辅助功能属于应用能力授权。此构建仅用于已知测试者，不作为“直接双击即受信任”的公开发布包。不要指导用户关闭 Gatekeeper、运行 `xattr -cr`，或尝试由安装包修改 TCC 数据库。
 
 Provider 的 Endpoint、Base URL、API Key 和 Secret Key 统一以未加密形式保存在本机 `snaplingo.db`。正式运行时不会构造或访问系统钥匙串；遗留钥匙串记录会被忽略。Unix 平台的应用数据目录和数据库权限分别限制为 `0700` 和 `0600`。
 

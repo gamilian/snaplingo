@@ -11,6 +11,24 @@ export function findAttachedDiskImageDevices(infoOutput, imagePath) {
     });
 }
 
+export function retryDiskImageAttach(attach, afterFailure, attempts = 3) {
+  let failure;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return attach();
+    } catch (error) {
+      failure = error;
+      if (attempt === attempts) {
+        break;
+      }
+      afterFailure(attempt, error);
+    }
+  }
+
+  throw failure;
+}
+
 export function createTauriBuildEnvironment(platform, environment) {
   const buildEnvironment = { ...environment };
 

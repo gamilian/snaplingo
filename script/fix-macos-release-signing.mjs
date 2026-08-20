@@ -15,7 +15,10 @@ import { basename, dirname, join, resolve } from "node:path";
 import { homedir, tmpdir } from "node:os";
 import { randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { findAttachedDiskImageDevices } from "./macos-disk-image.mjs";
+import {
+  findAttachedDiskImageDevices,
+  retryDiskImageAttach,
+} from "./macos-disk-image.mjs";
 
 const root = process.cwd();
 const config = JSON.parse(readFileSync(resolve(root, "src-tauri/tauri.conf.json"), "utf8"));
@@ -391,16 +394,6 @@ function resolveCodesignIdentity() {
     return { identity: configuredIdentity, keychain: process.env.SNAPLINGO_CODESIGN_KEYCHAIN };
   }
 
-  const systemIdentity = parseFirstCodesignIdentity(
-    run("/usr/bin/security", ["find-identity", "-v", "-p", "codesigning"]),
-    null,
-    [localIdentityName],
-  );
-
-  if (systemIdentity) {
-    return { identity: systemIdentity };
-  }
-
   return ensureLocalCodesignIdentity();
 }
 
@@ -479,6 +472,16 @@ function notarizeAndStaple(path) {
   run("/usr/bin/xcrun", ["stapler", "validate", path]);
 }
 
+function verifyDmgSignature(path) {
+  run("/usr/bin/codesign", ["--verify", "--strict", "--verbose=4", path]);
+  const signatureDetails = run("/usr/bin/codesign", ["-dv", "--verbose=4", path]);
+  assertDoesNotInclude(
+    signatureDetails,
+    "Signature=adhoc",
+    "[macos-sign] The disk image must not remain ad-hoc signed.",
+  );
+}
+
 function findDmgPaths() {
   const dmgDir = resolve(root, "target/release/bundle/dmg");
   if (!existsSync(dmgDir)) {
@@ -522,7 +525,16 @@ function recreateDmg(dmgPath) {
       dmgPath,
     ]);
 
-    const attachOutput = run("/usr/bin/hdiutil", ["attach", dmgPath, "-nobrowse", "-readonly"]);
+    const attachOutput = retryDiskImageAttach(
+      () => run("/usr/bin/hdiutil", ["attach", dmgPath, "-nobrowse", "-readonly"]),
+      (attempt) => {
+        console.warn(
+          `[macos-sign] Could not mount ${dmgPath} for verification (attempt ${attempt}/3); retrying.`,
+        );
+        detachExistingDmgAttachments(dmgPath);
+        run("/bin/sleep", [String(attempt)]);
+      },
+    );
     const mountPoint = attachOutput
       .split("\n")
       .map((line) => line.split(/\t+/).at(-1)?.trim())
@@ -614,7 +626,13 @@ verifyAppSignature(appPath);
 
 for (const dmgPath of findDmgPaths()) {
   recreateDmg(dmgPath);
-  run("/usr/bin/codesign", ["--force", "--sign", signing.identity, dmgPath]);
+  const dmgSignArgs = ["--force", "--sign", signing.identity];
+  if (signing.keychain) {
+    dmgSignArgs.push("--keychain", signing.keychain);
+  }
+  dmgSignArgs.push(dmgPath);
+  run("/usr/bin/codesign", dmgSignArgs);
+  verifyDmgSignature(dmgPath);
   if (process.env.SNAPLINGO_NOTARIZE === "1") {
     notarizeAndStaple(dmgPath);
   }
