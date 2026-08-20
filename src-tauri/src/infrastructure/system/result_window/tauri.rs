@@ -107,6 +107,7 @@ fn reveal_result_window(window: &WebviewWindow) -> Result<(), String> {
     #[cfg(not(target_os = "macos"))]
     {
         window.show().map_err(|e| e.to_string())?;
+        window.set_focus().map_err(|e| e.to_string())?;
     }
 
     Ok(())

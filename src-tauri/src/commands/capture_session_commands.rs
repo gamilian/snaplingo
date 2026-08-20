@@ -200,7 +200,7 @@ pub async fn current_capture_control_candidate(
 ) -> Result<Option<crate::domain::capture::CaptureCandidateView>, String> {
     state
         .capture
-        .sessions
+        .runtime
         .control_candidate_at(&CaptureSessionId(session_id), &point)
         .await
         .map_err(|e| e.to_string())

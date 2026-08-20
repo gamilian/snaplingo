@@ -25,9 +25,13 @@ tesseract --version
 tesseract 5.x.x
 ```
 
-## Windows 安装
+## Windows
 
-### 使用安装程序
+Windows 版使用系统 OCR，不需要安装 Tesseract。请在 Windows 设置中安装需要识别语言的 OCR 功能包。
+
+如需在其他工具中使用 Tesseract，可按其官方安装说明安装；SnapLingo 的 Windows 发行包不依赖它。
+
+### 在其他工具中使用 Tesseract
 
 1. 下载安装程序：https://github.com/UB-Mannheim/tesseract/wiki
 2. 运行安装程序

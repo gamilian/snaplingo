@@ -147,6 +147,25 @@ pub fn hide_capture_window(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+pub fn set_capture_window_cursor_passthrough(app: &AppHandle, enabled: bool) -> Result<(), String> {
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (app, enabled);
+        return Ok(());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let window = app
+            .get_webview_window(CAPTURE_WINDOW_LABEL)
+            .ok_or_else(|| "Capture window is not open".to_string())?;
+
+        window
+            .set_ignore_cursor_events(enabled)
+            .map_err(|error| error.to_string())
+    }
+}
+
 pub fn destroy_inactive_capture_window(app: &AppHandle) -> Result<(), String> {
     if !should_destroy_capture_window_when_inactive() {
         return Ok(());

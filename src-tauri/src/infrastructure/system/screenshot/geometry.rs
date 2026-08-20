@@ -1,4 +1,6 @@
 #[cfg(any(target_os = "windows", target_os = "linux", test))]
+use crate::domain::capture::LogicalPoint;
+#[cfg(any(target_os = "windows", target_os = "linux", test))]
 use crate::domain::capture::WindowCandidate;
 use crate::domain::capture::{LogicalRect, MonitorLayout, MonitorSnapshot, PhysicalRect};
 
@@ -93,6 +95,27 @@ pub fn window_candidate_from_physical_geometry(
     })
 }
 
+#[cfg(any(target_os = "windows", target_os = "linux", test))]
+pub fn logical_point_from_physical_geometry(
+    x: i32,
+    y: i32,
+    monitors: &[MonitorSnapshot],
+) -> Option<LogicalPoint> {
+    let monitor = monitors.iter().find(|monitor| {
+        let bounds = &monitor.physical_bounds;
+        x >= bounds.x
+            && y >= bounds.y
+            && x < bounds.x.saturating_add_unsigned(bounds.width)
+            && y < bounds.y.saturating_add_unsigned(bounds.height)
+    })?;
+    let scale = monitor.scale_factor.max(1.0);
+
+    Some(LogicalPoint {
+        x: monitor.logical_bounds.x + (x - monitor.physical_bounds.x) as f64 / scale,
+        y: monitor.logical_bounds.y + (y - monitor.physical_bounds.y) as f64 / scale,
+    })
+}
+
 fn normalized_scale_factor(scale_factor: f64) -> f64 {
     if scale_factor > 0.0 {
         scale_factor
@@ -101,7 +124,7 @@ fn normalized_scale_factor(scale_factor: f64) -> f64 {
     }
 }
 
-fn logical_rect_from_physical(
+pub(crate) fn logical_rect_from_physical(
     x: i32,
     y: i32,
     width: u32,
@@ -212,5 +235,37 @@ mod tests {
             &monitors,
         )
         .is_none());
+    }
+
+    #[test]
+    fn cursor_point_uses_the_scale_of_its_monitor() {
+        let monitors = vec![
+            monitor_snapshot_from_physical_geometry(
+                "primary".to_string(),
+                0,
+                0,
+                3840,
+                2160,
+                1.5,
+                vec![],
+            ),
+            monitor_snapshot_from_physical_geometry(
+                "secondary".to_string(),
+                -1920,
+                0,
+                1920,
+                1080,
+                1.0,
+                vec![],
+            ),
+        ];
+
+        assert_eq!(
+            logical_point_from_physical_geometry(-960, 540, &monitors),
+            Some(LogicalPoint {
+                x: -960.0,
+                y: 540.0
+            })
+        );
     }
 }

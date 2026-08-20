@@ -42,11 +42,6 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install leptonica tesseract
 
-      - name: Install Windows OCR dependencies
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: choco install tesseract -y --no-progress
-
       - name: Install frontend dependencies
         run: npm ci
 
@@ -64,3 +59,17 @@ jobs:
 
       - name: Build and verify desktop release
         run: npm run tauri:build
+
+      - name: Smoke test installed Windows application
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem target/release/bundle/nsis -Filter '*.exe' | Select-Object -First 1
+          if (-not $installer) { throw 'NSIS installer was not produced' }
+          Start-Process -FilePath $installer.FullName -ArgumentList '/S' -Wait
+          $app = Get-ChildItem "$env:ProgramFiles\SnapLingo" -Filter '*.exe' -Recurse | Select-Object -First 1
+          if (-not $app) { throw 'Installed SnapLingo executable was not found' }
+          $process = Start-Process -FilePath $app.FullName -PassThru
+          Start-Sleep -Seconds 3
+          if ($process.HasExited) { throw "Installed SnapLingo exited with $($process.ExitCode)" }
+          Stop-Process -Id $process.Id -Force

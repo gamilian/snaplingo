@@ -5,6 +5,7 @@ use crate::application::capture::CaptureSessionRuntimeHost;
 use crate::domain::capture::LogicalRect;
 use crate::Result;
 
+use super::tauri::set_capture_window_cursor_passthrough;
 use super::{
     begin_capture_presentation, capture_window_bounds, destroy_inactive_capture_window,
     end_capture_presentation, hide_capture_window, open_capture_window_for_session,
@@ -55,6 +56,15 @@ impl CaptureSessionRuntimeHost for TauriCaptureSessionRuntimeHost {
         run_on_main_thread(&self.app, "hide capture window", |app| {
             hide_capture_window(&app)
         })
+        .await
+    }
+
+    async fn set_capture_window_cursor_passthrough(&self, enabled: bool) -> Result<()> {
+        run_on_main_thread(
+            &self.app,
+            "set capture window cursor passthrough",
+            move |app| set_capture_window_cursor_passthrough(&app, enabled),
+        )
         .await
     }
 

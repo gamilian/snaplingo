@@ -14,6 +14,9 @@ pub(crate) trait CaptureSessionRuntimeHost: Send + Sync {
     async fn prepare_capture_window_for_reveal(&self) -> Result<()>;
     async fn reveal_capture_window(&self) -> Result<()>;
     async fn hide_capture_window(&self) -> Result<()>;
+    async fn set_capture_window_cursor_passthrough(&self, _enabled: bool) -> Result<()> {
+        Ok(())
+    }
     async fn destroy_inactive_capture_window(&self) -> Result<()>;
     async fn open_capture_window_for_session(
         &self,

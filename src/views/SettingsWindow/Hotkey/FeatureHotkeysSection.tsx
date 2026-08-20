@@ -14,6 +14,10 @@ function reportMutationError(action: string, error: unknown) {
   alert(`${action}失败：${message}`);
 }
 
+function isWindowsPlatform() {
+  return typeof navigator !== 'undefined' && navigator.platform.startsWith('Win');
+}
+
 export function FeatureHotkeysSection({
   category,
   actions,
@@ -38,11 +42,15 @@ export function FeatureHotkeysSection({
         return;
       }
 
-      const modifiers = [];
+      const modifiers: string[] = [];
       if (event.shiftKey) modifiers.push('⇧');
       if (event.altKey) modifiers.push('⌥');
-      if (event.metaKey) modifiers.push('⌘');
-      if (event.ctrlKey) modifiers.push('⌃');
+      if (isWindowsPlatform()) {
+        if (event.ctrlKey) modifiers.push('⌘');
+      } else {
+        if (event.metaKey) modifiers.push('⌘');
+        if (event.ctrlKey) modifiers.push('⌃');
+      }
 
       let mainKey = '';
       if (event.code.startsWith('Key')) mainKey = event.code.slice(3);

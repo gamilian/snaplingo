@@ -14,6 +14,11 @@ export function HotkeyDisplay({ value, onClick, isRecording = false }: HotkeyDis
   const hasOption = value.includes('⌥');
   const hasCommand = value.includes('⌘');
   const hasControl = value.includes('⌃');
+  const isWindows = typeof navigator !== 'undefined' && navigator.platform.startsWith('Win');
+  const hasWindowsControl = hasCommand || hasControl;
+  const primaryModifierClass = (isWindows ? hasWindowsControl : hasCommand)
+    ? 'text-gray-700'
+    : 'text-gray-300';
 
   // 提取字母键（最后一个非修饰键字符）
   const letterKey = value.replace(/[⇧⌥⌘⌃]/g, '').trim();
@@ -40,8 +45,8 @@ export function HotkeyDisplay({ value, onClick, isRecording = false }: HotkeyDis
             {/* 录制中显示所有修饰键（灰色） */}
             <span className="text-base text-gray-300">⇧</span>
             <span className="text-base text-gray-300">⌥</span>
-            <span className="text-base text-gray-300">⌘</span>
-            <span className="text-base text-gray-300">⌃</span>
+            <span className="text-base text-gray-300">{isWindows ? 'Ctrl' : '⌘'}</span>
+            {!isWindows && <span className="text-base text-gray-300">⌃</span>}
             <span className="ml-1 text-[11px] text-gray-400 animate-pulse">按下快捷键...</span>
           </>
         ) : (
@@ -49,8 +54,8 @@ export function HotkeyDisplay({ value, onClick, isRecording = false }: HotkeyDis
             {/* 未设置显示所有修饰键（灰色） */}
             <span className="text-base text-gray-300">⇧</span>
             <span className="text-base text-gray-300">⌥</span>
-            <span className="text-base text-gray-300">⌘</span>
-            <span className="text-base text-gray-300">⌃</span>
+            <span className="text-base text-gray-300">{isWindows ? 'Ctrl' : '⌘'}</span>
+            {!isWindows && <span className="text-base text-gray-300">⌃</span>}
             <span className="ml-1 text-[11px] text-gray-400">未设置</span>
           </>
         )}
@@ -66,11 +71,15 @@ export function HotkeyDisplay({ value, onClick, isRecording = false }: HotkeyDis
       {/* Option */}
       <span className={`text-base ${hasOption ? 'text-gray-700' : 'text-gray-300'}`}>⌥</span>
 
-      {/* Command */}
-      <span className={`text-base ${hasCommand ? 'text-gray-700' : 'text-gray-300'}`}>⌘</span>
+      {/* Primary modifier */}
+      <span className={`text-base ${primaryModifierClass}`}>
+        {isWindows ? 'Ctrl' : '⌘'}
+      </span>
 
       {/* Control */}
-      <span className={`text-base ${hasControl ? 'text-gray-700' : 'text-gray-300'}`}>⌃</span>
+      {!isWindows && (
+        <span className={`text-base ${hasControl ? 'text-gray-700' : 'text-gray-300'}`}>⌃</span>
+      )}
 
       {/* 字母键 */}
       {letterKey && (

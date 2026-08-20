@@ -41,14 +41,23 @@ impl SelectionMethod for ShortcutCopySelectionMethod {
 }
 
 async fn acquire_shortcut_copy_text() -> Result<String, String> {
-    clipboard_transaction::wait_for_clipboard_text_after_action(
+    let original_text = read_clipboard_text().ok();
+    let result = clipboard_transaction::wait_for_clipboard_text_change_after_action(
         || async { press_copy_shortcut() },
         clipboard_change_count,
         read_clipboard_text,
         CLIPBOARD_TIMEOUT,
         CLIPBOARD_POLL_INTERVAL,
     )
-    .await
+    .await;
+
+    if let (Some(text), Ok(change)) = (original_text, result.as_ref()) {
+        if should_restore_temporary_clipboard(change.change_count, clipboard_change_count().ok()) {
+            let _ = write_clipboard_text(text);
+        }
+    }
+
+    result.map(|change| change.text)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -128,6 +137,22 @@ fn read_clipboard_text() -> Result<String, String> {
         .map_err(|e| format!("Failed to read selected text from clipboard: {e}"))
 }
 
+fn write_clipboard_text(text: String) -> Result<(), String> {
+    use arboard::Clipboard;
+
+    let mut clipboard = Clipboard::new().map_err(|e| format!("Failed to open clipboard: {e}"))?;
+    clipboard
+        .set_text(text)
+        .map_err(|e| format!("Failed to restore clipboard text: {e}"))
+}
+
+fn should_restore_temporary_clipboard(
+    observed_change_count: i64,
+    current_change_count: Option<i64>,
+) -> bool {
+    current_change_count == Some(observed_change_count)
+}
+
 #[cfg(target_os = "windows")]
 extern "system" {
     fn GetClipboardSequenceNumber() -> u32;
@@ -138,6 +163,7 @@ mod windows {
     mod shortcut_copy {
         use crate::domain::{MethodAvailability, SelectionContext, SelectionMethodKind};
 
+        use super::super::should_restore_temporary_clipboard;
         use super::super::{
             press_copy_shortcut_with, KeyPress, ShortcutCopySelectionMethod, ShortcutKeySink,
         };
@@ -174,6 +200,13 @@ mod windows {
                     KeyPress::Up(enigo::Key::Control),
                 ]
             );
+        }
+
+        #[test]
+        fn restores_only_when_the_user_has_not_copied_again() {
+            assert!(should_restore_temporary_clipboard(8, Some(8)));
+            assert!(!should_restore_temporary_clipboard(8, Some(9)));
+            assert!(!should_restore_temporary_clipboard(8, None));
         }
 
         #[derive(Default)]

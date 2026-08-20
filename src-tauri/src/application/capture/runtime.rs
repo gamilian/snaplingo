@@ -179,6 +179,21 @@ impl CaptureSessionRuntime {
         self.host.hide_capture_window().await
     }
 
+    pub async fn control_candidate_at(
+        &self,
+        id: &CaptureSessionId,
+        point: &crate::domain::capture::LogicalPoint,
+    ) -> Result<Option<crate::domain::capture::CaptureCandidateView>> {
+        self.host
+            .set_capture_window_cursor_passthrough(true)
+            .await?;
+        let result = self.sessions.control_candidate_at(id, point).await;
+        self.host
+            .set_capture_window_cursor_passthrough(false)
+            .await?;
+        result
+    }
+
     pub async fn cancel_capture_session(&self, session_id: &CaptureSessionId) -> Result<()> {
         let restore_result = self
             .restore_capture_snapshot_windows_for_session_id(session_id)
