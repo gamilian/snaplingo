@@ -138,6 +138,67 @@ describe('result window text actions', () => {
     await view.unmount();
   });
 
+  it('resizes the standalone window after a provider result is collapsed', async () => {
+    const observers: Array<{
+      callback: ResizeObserverCallback;
+      targets: Element[];
+    }> = [];
+    class TestResizeObserver {
+      constructor(callback: ResizeObserverCallback) {
+        observers.push({ callback, targets: [] });
+      }
+
+      observe(target: Element) {
+        const observer = observers[observers.length - 1];
+        observer?.targets.push(target);
+      }
+
+      disconnect() {}
+      unobserve() {}
+    }
+    vi.stubGlobal('ResizeObserver', TestResizeObserver);
+    useResultWindowStore.setState({
+      resultWindowVisible: true,
+      resultWindowMode: 'translation',
+      providerTranslations: [
+        {
+          provider_id: 'google',
+          translated_text: '你好',
+          detected_language: 'en',
+          confidence: null,
+          status: 'success',
+        },
+      ],
+    });
+
+    const view = await renderResultWindow();
+    const resultsList = view.container.querySelector('.space-y-3');
+    const collapseButton = view.container.querySelector<HTMLButtonElement>(
+      '[aria-label="收起"]',
+    );
+    expect(resultsList).not.toBeNull();
+    expect(collapseButton).not.toBeNull();
+
+    const resultsObserver = observers.find(({ targets }) =>
+      targets.includes(resultsList!),
+    );
+    expect(resultsObserver).toBeDefined();
+    Object.defineProperty(resultsList!, 'offsetHeight', {
+      configurable: true,
+      value: 36,
+    });
+    vi.mocked(runtime.resizeStandaloneWindow).mockClear();
+
+    await act(async () => {
+      collapseButton?.click();
+      resultsObserver?.callback([], {} as ResizeObserver);
+    });
+
+    expect(runtime.resizeStandaloneWindow).toHaveBeenCalled();
+    await view.unmount();
+    vi.unstubAllGlobals();
+  });
+
   it.each(['translation', 'ocr'] as const)(
     'hides an unpinned standalone %s result after it loses focus',
     async (resultWindowMode) => {

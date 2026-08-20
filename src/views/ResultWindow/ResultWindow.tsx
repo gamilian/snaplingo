@@ -625,6 +625,20 @@ function ResultWindowContent({
   useLayoutEffect(() => {
     if (!resultWindowVisible) return;
 
+    const resultsList = translationResultsListRef.current;
+    if (!resultsList || typeof ResizeObserver === 'undefined') return;
+
+    const resizeObserver = new ResizeObserver(
+      updateMeasuredTranslationPanelHeight,
+    );
+    resizeObserver.observe(resultsList);
+
+    return () => resizeObserver.disconnect();
+  }, [resultWindowVisible, updateMeasuredTranslationPanelHeight]);
+
+  useLayoutEffect(() => {
+    if (!resultWindowVisible) return;
+
     autosizeResultWindowTextArea(ocrImageTextAreaRef.current, {
       minHeightPx: resultWindowTextAreaMinHeightPx('ocr'),
       textStyle: ocrTextStyle,
