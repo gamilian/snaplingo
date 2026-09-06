@@ -37,14 +37,14 @@ try {
   runStage('Create temporary keychain', '/usr/bin/security', ['create-keychain', '-p', password, keychain]);
   runStage('Configure temporary keychain', '/usr/bin/security', ['set-keychain-settings', '-lut', '21600', keychain]);
   runStage('Unlock temporary keychain', '/usr/bin/security', ['unlock-keychain', '-p', password, keychain]);
-  // The keychain exists only for this ephemeral runner; -A avoids macOS trust
-  // metadata differences that can hide a self-signed identity from codesign.
-  runStage('Import signing identity', '/usr/bin/security', ['import', p12, '-k', keychain, '-P', process.env.MACOS_CERTIFICATE_PASSWORD, '-A']);
+  runStage('Import signing identity', '/usr/bin/security', ['import', p12, '-k', keychain, '-P', process.env.MACOS_CERTIFICATE_PASSWORD, '-T', '/usr/bin/codesign']);
+  runStage('Trust self-signed root in temporary keychain', '/usr/bin/security', ['add-trusted-cert', '-r', 'trustRoot', '-p', 'codeSign', '-k', keychain, cert]);
   runStage('Authorize codesign access', '/usr/bin/security', ['set-key-partition-list', '-S', 'apple-tool:,apple:', '-s', '-k', password, keychain]);
   const keychains = runStage('Read keychain search list', '/usr/bin/security', ['list-keychains', '-d', 'user'])
     .match(/"([^"]+)"/g)?.map(value => value.slice(1, -1)) ?? [];
   runStage('Add temporary keychain to search list', '/usr/bin/security', ['list-keychains', '-d', 'user', '-s', keychain, ...keychains]);
   const identities = runStage('Verify imported signing identity', '/usr/bin/security', ['find-identity', '-v', '-p', 'codesigning', keychain]);
+  console.log(`[macos-sign] Valid imported signing identities: ${(identities.match(/^\s*\d+\)/gm) ?? []).length}`);
   if (!identities.includes(fingerprint)) throw new Error('Imported keychain does not contain the pinned signing identity');
   appendFileSync(process.env.GITHUB_ENV, `SNAPLINGO_CODESIGN_IDENTITY=${fingerprint}\nSNAPLINGO_CODESIGN_KEYCHAIN=${keychain}\nSNAPLINGO_SIGNING_DIRECTORY=${directory}\nSNAPLINGO_CERTIFICATE_SHA1=${fingerprint}\n`);
 } catch (error) {
