@@ -37,7 +37,9 @@ try {
   runStage('Create temporary keychain', '/usr/bin/security', ['create-keychain', '-p', password, keychain]);
   runStage('Configure temporary keychain', '/usr/bin/security', ['set-keychain-settings', '-lut', '21600', keychain]);
   runStage('Unlock temporary keychain', '/usr/bin/security', ['unlock-keychain', '-p', password, keychain]);
-  runStage('Import signing identity', '/usr/bin/security', ['import', p12, '-k', keychain, '-P', process.env.MACOS_CERTIFICATE_PASSWORD, '-T', '/usr/bin/codesign']);
+  // The keychain exists only for this ephemeral runner; -A avoids macOS trust
+  // metadata differences that can hide a self-signed identity from codesign.
+  runStage('Import signing identity', '/usr/bin/security', ['import', p12, '-k', keychain, '-P', process.env.MACOS_CERTIFICATE_PASSWORD, '-A']);
   runStage('Authorize codesign access', '/usr/bin/security', ['set-key-partition-list', '-S', 'apple-tool:,apple:', '-s', '-k', password, keychain]);
   const keychains = runStage('Read keychain search list', '/usr/bin/security', ['list-keychains', '-d', 'user'])
     .match(/"([^"]+)"/g)?.map(value => value.slice(1, -1)) ?? [];
