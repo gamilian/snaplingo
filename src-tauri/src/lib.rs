@@ -100,7 +100,7 @@ pub fn run() {
             }
             let hotkey_runtime = app_state.settings.hotkeys.clone();
             let permissions = app_state.permissions.clone();
-            let permissions_granted = permissions.status().all_granted();
+            let permissions_granted = permissions.status().screen_recording;
             let log_settings = app_state.settings.configuration.clone();
             let scheduled_log_repository = app_state.logs.repository.clone();
 
@@ -117,11 +117,11 @@ pub fn run() {
 
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                while !permissions.status().all_granted() {
-                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-                }
                 if let Err(err) = hotkey_runtime.register_startup_hotkeys() {
                     log::error!("Failed to register startup hotkeys: {}", err);
+                }
+                while !permissions.status().screen_recording {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
                 }
                 if let Err(err) =
                     infrastructure::system::capture_window::prewarm_capture_window(&app_handle)

@@ -1,12 +1,17 @@
 import { spawnSync } from "node:child_process";
 import {
   existsSync,
+  mkdirSync,
+  copyFileSync,
+  writeFileSync,
   readFileSync,
   readdirSync,
   rmSync,
   statSync,
 } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { createHash } from "node:crypto";
+import { verifyMacOSApplication } from "./macos-release-verification.mjs";
+import { dirname, basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptPath = fileURLToPath(import.meta.url);
@@ -45,7 +50,7 @@ export function verifyReleaseArtifacts({
 }
 
 export function releaseArtifactContract(platform, productName, version) {
-  const isCurrentVersion = (name) => !version || name.includes(version);
+  const isCurrentVersion = (name) => !version || name.includes(`_${version}_`);
   switch (platform) {
     case "darwin":
       return [
@@ -158,7 +163,7 @@ function validateNonEmptyFile(path) {
 
 function validateExecutableFile(path) {
   const size = validateNonEmptyFile(path);
-  if ((statSync(path).mode & 0o111) === 0) {
+  if (process.platform !== "win32" && (statSync(path).mode & 0o111) === 0) {
     throw new Error(`Release executable is not executable: ${path}`);
   }
   return size;
@@ -215,6 +220,7 @@ function loadReleaseContext() {
 
   return {
     version,
+    config: tauriConfig,
     productName: tauriConfig.productName ?? packageManifest.name,
     targetDirectory: cargoMetadata.target_directory,
     bundleDirectory: join(cargoMetadata.target_directory, "release", "bundle"),
@@ -226,17 +232,65 @@ function cleanReleaseOutputs(targetDirectory) {
   rmSync(join(targetDirectory, "release"), { recursive: true, force: true });
 }
 
-function buildRelease() {
+function buildRelease(context, args) {
+  // Remove stale bundles without discarding Cargo incremental compilation.
+  rmSync(context.bundleDirectory, { recursive: true, force: true });
   run(
     process.execPath,
-    [join(repositoryRoot, "script", "run-tauri-build.mjs")],
+    [join(repositoryRoot, "script", "run-tauri-build.mjs"), ...args],
     { stdio: "inherit" },
   );
   run(
     process.execPath,
-    [join(repositoryRoot, "script", "fix-macos-release-signing.mjs")],
+    [join(repositoryRoot, "script", "fix-macos-release-signing.mjs"),
+      join(context.bundleDirectory, "macos", `${context.productName}.app`)],
     { stdio: "inherit" },
   );
+}
+
+function verifyNativeMacOSArtifacts(context, artifacts) {
+  const options = { allowAdhoc: process.env.SNAPLINGO_SIGNING_MODE === "adhoc" };
+  const app = artifacts.find(artifact => artifact.kind === "macOS application");
+  const signature = verifyMacOSApplication(app.path, context.config, options);
+  const dmg = artifacts.find(artifact => artifact.kind === "macOS disk image");
+  run("/usr/bin/codesign", ["--verify", "--strict", dmg.path]);
+  run("/usr/bin/hdiutil", ["verify", dmg.path]);
+  const mountOutput = run("/usr/bin/hdiutil", ["attach", dmg.path, "-nobrowse", "-readonly"]);
+  const mount = mountOutput.split("\n").map(line => line.split(/\t+/).at(-1)?.trim())
+    .find(part => part?.startsWith("/Volumes/"));
+  if (!mount) throw new Error("Could not locate mounted release DMG");
+  try {
+    const mounted = verifyMacOSApplication(join(mount, `${context.productName}.app`), context.config, options);
+    if (mounted.requirement !== signature.requirement) throw new Error("DMG signing identity differs from app");
+    if (!existsSync(join(mount, "Applications"))) throw new Error("DMG has no Applications link");
+  } finally {
+    run("/usr/bin/hdiutil", ["detach", mount]);
+  }
+  const assessment = spawnSync("/usr/sbin/spctl", ["--assess", "--type", "execute", "--verbose=4", app.path], { encoding: "utf8" });
+  console.log(`[release] Gatekeeper (self-signed rejection is expected): ${assessment.stderr?.trim()}`);
+}
+
+function collectArtifacts(context, artifacts) {
+  const output = join(repositoryRoot, "release-assets");
+  mkdirSync(output, { recursive: true });
+  const checksums = [];
+  const suffix = process.env.SNAPLINGO_ARTIFACT_SUFFIX ?? "";
+  if (suffix && !/^[a-z0-9-]+$/.test(suffix)) throw new Error("Invalid artifact suffix");
+  for (const artifact of artifacts) {
+    if (statSync(artifact.path).isDirectory()) continue;
+    const name = basename(artifact.path).replace(/(\.[^.]+)$/, `${suffix ? `-${suffix}` : ""}$1`);
+    copyFileSync(artifact.path, join(output, name));
+    const hash = createHash("sha256").update(readFileSync(artifact.path)).digest("hex");
+    checksums.push(`${hash}  ${name}`);
+  }
+  const label = `${process.platform}-${process.arch}${suffix ? `-${suffix}` : ""}`;
+  writeFileSync(join(output, `SHA256SUMS-${label}.txt`), `${checksums.join("\n")}\n`);
+  writeFileSync(join(output, `build-${label}.json`), JSON.stringify({
+    version: context.version, commit: process.env.GITHUB_SHA ?? run("git", ["rev-parse", "HEAD"]).trim(),
+    platform: process.platform, architecture: process.arch,
+    signing: process.platform === "darwin" ? (process.env.SNAPLINGO_SIGNING_MODE ?? "self-signed") : "unsigned",
+    certificateSha1: process.env.SNAPLINGO_CERTIFICATE_SHA1 ?? null,
+  }, null, 2) + "\n");
 }
 
 function formatBytes(bytes) {
@@ -252,7 +306,7 @@ function formatBytes(bytes) {
 
 async function main(args) {
   const command = args[0] ?? "build";
-  if (command !== "build" && command !== "verify") {
+  if (command !== "build" && command !== "verify" && command !== "collect") {
     throw new Error(`Unknown release command: ${command}`);
   }
 
@@ -265,7 +319,7 @@ async function main(args) {
       cleanReleaseOutputs(context.targetDirectory);
       console.log("[release] Removed previous frontend and release outputs");
     }
-    buildRelease();
+    buildRelease(context, args.slice(1).filter(arg => arg !== "--clean" && arg !== "--"));
   }
 
   const artifacts = verifyReleaseArtifacts({
@@ -274,6 +328,10 @@ async function main(args) {
     productName: context.productName,
     version: context.version,
   });
+  if (process.platform === "darwin") {
+    verifyNativeMacOSArtifacts(context, artifacts);
+  }
+  if (command === "collect") collectArtifacts(context, artifacts);
   for (const artifact of artifacts) {
     console.log(
       `[release] ${artifact.kind}: ${artifact.path} (${formatBytes(artifact.size)})`,

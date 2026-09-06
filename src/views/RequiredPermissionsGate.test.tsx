@@ -52,6 +52,20 @@ describe('RequiredPermissionsGate', () => {
     await view.unmount();
   });
 
+  it('lets users continue without granting unrelated permissions', async () => {
+    const runtime = createRuntime(missing);
+    const view = await renderGate(runtime);
+    const skip = [...view.container.querySelectorAll('button')].find(
+      (button) => button.textContent === '稍后设置，继续使用',
+    );
+    expect(skip).toBeDefined();
+    await act(async () => skip?.click());
+    expect(view.container.querySelector('[role="dialog"]')).toBeNull();
+    expect(view.container.textContent).toContain('ready');
+    expect(runtime.requestNext).not.toHaveBeenCalled();
+    await view.unmount();
+  });
+
   it('refreshes permission status when the window regains focus', async () => {
     const runtime = createRuntime(granted);
     const view = await renderGate(runtime);

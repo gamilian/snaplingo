@@ -12,6 +12,10 @@ rust-version = "1.77.2"
 name = "snaplingo_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+default = []
+tesseract-ocr = ["dep:tesseract"]
+
 [build-dependencies]
 tauri-build = { version = "2.6.2", features = [] }
 
@@ -97,10 +101,12 @@ windows = { version = "0.51", features = [
 ] }
 xcap = "0.9"
 
-[target.'cfg(not(target_os = "windows"))'.dependencies]
-tesseract = "0.14"
+[target.'cfg(target_os = "macos")'.dependencies.tesseract]
+version = "0.14"
+optional = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
+tesseract = "0.14"
 xcap = "0.9"
 
 [dev-dependencies]

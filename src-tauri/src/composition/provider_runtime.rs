@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 use crate::application::providers::ocr::impls::SystemOcrProvider;
-#[cfg(not(target_os = "windows"))]
+#[cfg(any(
+    target_os = "linux",
+    all(target_os = "macos", feature = "tesseract-ocr")
+))]
 use crate::application::providers::ocr::impls::TesseractProvider;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 use crate::application::providers::ocr::SystemOcrEngine;
@@ -21,7 +24,10 @@ use crate::application::providers::{
 #[cfg(all(test, target_os = "macos"))]
 use crate::infrastructure::events::EventBus;
 use crate::infrastructure::llm::InfrastructureLlmRuntime;
-#[cfg(not(target_os = "windows"))]
+#[cfg(any(
+    target_os = "linux",
+    all(target_os = "macos", feature = "tesseract-ocr")
+))]
 use crate::infrastructure::system::ocr::get_tesseract_engine;
 #[cfg(target_os = "macos")]
 use crate::infrastructure::system::ocr::MacOSVisionOcrEngine;
@@ -114,7 +120,10 @@ pub(crate) fn build_ocr_coordinator(
 ) -> Arc<OcrCoordinator> {
     let ocr_coordinator = OcrCoordinator::new(config_store);
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(any(
+        target_os = "linux",
+        all(target_os = "macos", feature = "tesseract-ocr")
+    ))]
     {
         let tesseract_provider = TesseractProvider::new(get_tesseract_engine());
         ocr_coordinator.register(tesseract_provider).ok();

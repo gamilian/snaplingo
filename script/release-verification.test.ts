@@ -144,6 +144,15 @@ describe('release artifact contract', () => {
     ).toThrow(/Windows MSI installer was not found/);
   });
 
+  it('does not mistake version 10.2.0 for 0.2.0', () => {
+    const bundleDirectory = temporaryBundleDirectory();
+    writeArtifact(join(bundleDirectory, 'msi', 'SnapLingo_10.2.0_x64_en-US.msi'));
+    writeArtifact(join(bundleDirectory, 'nsis', 'SnapLingo_10.2.0_x64-setup.exe'));
+    expect(() => verifyReleaseArtifacts({
+      platform: 'win32', bundleDirectory, productName: 'SnapLingo', version: '0.2.0',
+    })).toThrow(/Windows MSI installer was not found/);
+  });
+
   it('rejects unsupported release platforms', () => {
     expect(() => releaseArtifactContract('freebsd', 'SnapLingo')).toThrow(
       /Unsupported release platform/,

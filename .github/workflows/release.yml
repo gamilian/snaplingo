@@ -1,0 +1,146 @@
+name: Desktop packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      windows_offline:
+        description: 'Include an additional offline WebView2 Windows installer'
+        type: boolean
+        default: false
+  push:
+    tags: ['v*']
+    branches: ['codex/release-*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-packages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.matrix.outputs.value }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require persistent macOS identity and matching version tag
+        env:
+          CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          FINGERPRINT: ${{ vars.MACOS_CERTIFICATE_SHA1 }}
+        run: |
+          if [ -z "$CERTIFICATE" ] || [ -z "$PASSWORD" ] || [ -z "$FINGERPRINT" ]; then
+            echo 'Configure the persistent macOS certificate first; see docs/RELEASING.md.' >&2
+            exit 1
+          fi
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const version = JSON.parse(fs.readFileSync("package.json")).version;
+            if (process.env.GITHUB_REF_TYPE === "tag" && process.env.GITHUB_REF_NAME !== `v${version}`) {
+              throw new Error("Tag must match package.json, Cargo.toml and tauri.conf.json");
+            }
+          '
+      - id: matrix
+        env:
+          OFFLINE: ${{ inputs.windows_offline || false }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const include = [
+            { os: 'macos-14', label: 'macos-arm64', offline: false },
+            { os: 'macos-15-intel', label: 'macos-x64', offline: false },
+            { os: 'windows-2022', label: 'windows-x64', offline: false },
+          ];
+          if (process.env.OFFLINE === 'true') include.push({ os: 'windows-2022', label: 'windows-x64-offline', offline: true });
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `value=${JSON.stringify({ include })}\n`);
+          NODE
+
+  build:
+    needs: preflight
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.preflight.outputs.matrix) }}
+    env:
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+      - run: npm ci
+      - run: npm test
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+      - run: cargo test --locked --manifest-path src-tauri/Cargo.toml
+      - name: Import persistent macOS certificate
+        if: runner.os == 'macOS'
+        env:
+          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          SNAPLINGO_CERTIFICATE_SHA1: ${{ vars.MACOS_CERTIFICATE_SHA1 }}
+        run: node script/import-macos-certificate.mjs
+      - name: Build and verify installers
+        if: '!matrix.offline'
+        run: npm run tauri:build
+      - name: Build and verify offline Windows installers
+        if: matrix.offline
+        run: npm run tauri:build -- --config src-tauri/tauri.windows-offline.conf.json
+      - name: Smoke test macOS installation
+        if: runner.os == 'macOS'
+        run: node script/smoke-test-macos.mjs
+      - name: Smoke test Windows installation
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./script/smoke-test-windows.ps1
+      - name: Collect verified installers and checksums
+        env:
+          SNAPLINGO_ARTIFACT_SUFFIX: ${{ matrix.offline && 'offline' || '' }}
+        run: node script/release-verification.mjs collect
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SnapLingo-${{ matrix.label }}
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
+      - name: Remove imported macOS keychain
+        if: always() && runner.os == 'macOS'
+        shell: bash
+        run: |
+          if [ -n "${SNAPLINGO_CODESIGN_KEYCHAIN:-}" ]; then
+            security delete-keychain "$SNAPLINGO_CODESIGN_KEYCHAIN"
+            rm -rf "$SNAPLINGO_SIGNING_DIRECTORY"
+          fi
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: SnapLingo-*
+          path: release-assets
+          merge-multiple: true
+      - name: Verify downloaded checksums
+        working-directory: release-assets
+        run: |
+          for checksum in SHA256SUMS-*.txt; do sha256sum --check "$checksum"; done
+      - name: Create draft release for final human acceptance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" release-assets/* --verify-tag --draft \
+            --title "SnapLingo $RELEASE_TAG" --notes-file docs/RELEASE_NOTES_TEMPLATE.md

@@ -59,8 +59,12 @@ npm install
 npm run tauri dev
 
 # Build for production
-npm run tauri build
+npm run tauri:build
 ```
+
+## Desktop releases
+
+Windows packages are built and tested on GitHub Actions. macOS packages use one persistent self-signed identity across Intel and Apple Silicon. See [the zero-cost release and setup guide](docs/RELEASING.md) for downloadable artifacts, release tags, certificate setup, and optional free Windows signing applications.
 
 ## Documentation
 

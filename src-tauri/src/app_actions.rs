@@ -40,15 +40,19 @@ pub(crate) enum AppAction {
 }
 
 pub(crate) fn dispatch_app_action(app: tauri::AppHandle, action: AppAction) {
-    if action_requires_permissions(action) {
-        let state = app.state::<AppState>();
-        if !state.permissions.status().all_granted() {
-            if let Err(err) = settings_window::show_settings_window(&app) {
-                log::error!("Failed to show required permissions window: {}", err);
-            }
-            return;
+    let state = app.state::<AppState>();
+    if !action_permissions_granted(action, state.permissions.status()) {
+        match action {
+            AppAction::OpenCapture(_) => state.permissions.request_screen_recording(),
+            AppAction::TranslateSelection => state.permissions.request_accessibility(),
+            _ => {}
         }
+        if let Err(err) = settings_window::show_settings_window(&app) {
+            log::error!("Failed to show required permissions window: {}", err);
+        }
+        return;
     }
+    drop(state);
 
     match action {
         AppAction::OpenCapture(mode) => {
@@ -156,11 +160,15 @@ pub(crate) fn dispatch_app_action(app: tauri::AppHandle, action: AppAction) {
     }
 }
 
-fn action_requires_permissions(action: AppAction) -> bool {
-    !matches!(
-        action,
-        AppAction::OpenSettings | AppAction::OpenHistory | AppAction::OpenAbout | AppAction::Quit
-    )
+fn action_permissions_granted(
+    action: AppAction,
+    status: crate::application::RequiredPermissionsStatus,
+) -> bool {
+    match action {
+        AppAction::OpenCapture(_) => status.screen_recording,
+        AppAction::TranslateSelection => status.accessibility,
+        _ => true,
+    }
 }
 
 fn dispatch_result_window_open(app: tauri::AppHandle, request: ResultWindowOpenRequest) {
@@ -194,7 +202,7 @@ mod tests {
     };
 
     use super::{
-        action_requires_permissions, open_result_window_request, AppAction, CaptureLaunchMode,
+        action_permissions_granted, open_result_window_request, AppAction, CaptureLaunchMode,
     };
 
     #[test]
@@ -216,12 +224,41 @@ mod tests {
     }
 
     #[test]
-    fn blocks_feature_actions_until_required_permissions_are_granted() {
-        assert!(action_requires_permissions(AppAction::OpenCapture(
-            CaptureLaunchMode::Screenshot
-        )));
-        assert!(!action_requires_permissions(AppAction::OpenSettings));
-        assert!(!action_requires_permissions(AppAction::Quit));
+    fn each_action_requires_only_the_permissions_it_uses() {
+        use crate::application::RequiredPermissionsStatus;
+        let none = RequiredPermissionsStatus {
+            screen_recording: false,
+            accessibility: false,
+        };
+        let screen = RequiredPermissionsStatus {
+            screen_recording: true,
+            ..none
+        };
+        let accessibility = RequiredPermissionsStatus {
+            accessibility: true,
+            ..none
+        };
+        let capture = AppAction::OpenCapture(CaptureLaunchMode::Screenshot);
+        assert!(!action_permissions_granted(capture, none));
+        assert!(action_permissions_granted(capture, screen));
+        assert!(!action_permissions_granted(capture, accessibility));
+        assert!(action_permissions_granted(
+            AppAction::TranslateSelection,
+            accessibility
+        ));
+        assert!(!action_permissions_granted(
+            AppAction::TranslateSelection,
+            screen
+        ));
+        for action in [
+            AppAction::OpenTranslationWindow,
+            AppAction::RunFileOcr,
+            AppAction::PinClipboardImage,
+            AppAction::OpenSettings,
+            AppAction::Quit,
+        ] {
+            assert!(action_permissions_granted(action, none));
+        }
     }
 
     struct Window;

@@ -21,6 +21,7 @@ import {
 } from "./macos-disk-image.mjs";
 
 const root = process.cwd();
+const allowAdhoc = process.env.SNAPLINGO_SIGNING_MODE === "adhoc";
 const config = JSON.parse(readFileSync(resolve(root, "src-tauri/tauri.conf.json"), "utf8"));
 const identifier = config.identifier;
 const productName = config.productName ?? "SnapLingo";
@@ -42,7 +43,7 @@ function run(command, args) {
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
 
   if (result.status !== 0) {
-    throw new Error(`${command} ${args.join(" ")} failed:\n${output}`);
+    throw new Error(`${command} failed:\n${output}`);
   }
 
   return output;
@@ -254,7 +255,8 @@ function parseFirstCodesignIdentity(output, preferredName, excludedNames = []) {
 }
 
 function getOrCreateLocalKeychainPassword() {
-  mkdirSync(localCodesignDir, { recursive: true });
+  mkdirSync(localCodesignDir, { recursive: true, mode: 0o700 });
+  chmodSync(localCodesignDir, 0o700);
 
   if (existsSync(localKeychainPasswordPath)) {
     return readFileSync(localKeychainPasswordPath, "utf8").trim();
@@ -353,6 +355,8 @@ subjectKeyIdentifier = hash
     "-passout",
     `pass:${password}`,
   ]);
+  chmodSync(keyPath, 0o600);
+  chmodSync(p12Path, 0o600);
   run("/usr/bin/security", ["import", p12Path, "-k", localKeychainPath, "-P", password, "-A"]);
   run("/usr/bin/security", [
     "add-trusted-cert",
@@ -387,6 +391,7 @@ subjectKeyIdentifier = hash
 }
 
 function resolveCodesignIdentity() {
+  if (allowAdhoc) return { identity: "-" };
   const configuredIdentity =
     process.env.SNAPLINGO_CODESIGN_IDENTITY ?? process.env.MACOS_CODESIGN_IDENTITY;
 
@@ -394,11 +399,14 @@ function resolveCodesignIdentity() {
     return { identity: configuredIdentity, keychain: process.env.SNAPLINGO_CODESIGN_KEYCHAIN };
   }
 
+  if (process.env.GITHUB_ACTIONS === "true") {
+    throw new Error("Release builds on Actions require the persistent signing certificate. See docs/RELEASING.md.");
+  }
   return ensureLocalCodesignIdentity();
 }
 
 function prepareSigningEntitlements(signing) {
-  if (!existsSync(entitlementsPath) || signing.identity !== localIdentityName) {
+  if (!existsSync(entitlementsPath) || bundledLibraries.length === 0 || allowAdhoc) {
     return { path: existsSync(entitlementsPath) ? entitlementsPath : null, cleanup: () => {} };
   }
 
@@ -431,14 +439,14 @@ function verifyAppSignature(path) {
     "Sealed Resources version=",
     "[macos-sign] The app bundle resources are not sealed.",
   );
-  assertDoesNotInclude(
+  if (!allowAdhoc) assertDoesNotInclude(
     signatureDetails,
     "Signature=adhoc",
     "[macos-sign] The app must not remain ad-hoc signed; TCC Screen Recording permission is unstable for ad-hoc builds.",
   );
   assertIncludes(
     signatureDetails,
-    "flags=0x10000(runtime)",
+    "runtime)",
     "[macos-sign] Hardened runtime is required for release signing.",
   );
 
@@ -448,7 +456,7 @@ function verifyAppSignature(path) {
     `identifier "${identifier}"`,
     "[macos-sign] The designated requirement does not include the stable bundle identifier.",
   );
-  assertDoesNotInclude(
+  if (!allowAdhoc) assertDoesNotInclude(
     requirementDetails,
     "cdhash H",
     "[macos-sign] The designated requirement must not be tied to a per-build cdhash.",
@@ -475,7 +483,7 @@ function notarizeAndStaple(path) {
 function verifyDmgSignature(path) {
   run("/usr/bin/codesign", ["--verify", "--strict", "--verbose=4", path]);
   const signatureDetails = run("/usr/bin/codesign", ["-dv", "--verbose=4", path]);
-  assertDoesNotInclude(
+  if (!allowAdhoc) assertDoesNotInclude(
     signatureDetails,
     "Signature=adhoc",
     "[macos-sign] The disk image must not remain ad-hoc signed.",
@@ -483,13 +491,13 @@ function verifyDmgSignature(path) {
 }
 
 function findDmgPaths() {
-  const dmgDir = resolve(root, "target/release/bundle/dmg");
+  const dmgDir = resolve(dirname(dirname(appPath)), "dmg");
   if (!existsSync(dmgDir)) {
     return [];
   }
 
   return readdirSync(dmgDir)
-    .filter((name) => name.startsWith(`${productName}_`) && name.endsWith(".dmg") && !name.startsWith("rw."))
+    .filter((name) => name.startsWith(`${productName}_${config.version}_`) && name.endsWith(".dmg") && !name.startsWith("rw."))
     .map((name) => resolve(dmgDir, name));
 }
 
@@ -556,6 +564,13 @@ function recreateDmg(dmgPath) {
 
 if (process.platform !== "darwin") {
   console.log("[macos-sign] Skipping macOS signing check on non-macOS host.");
+  process.exit(0);
+}
+
+if (process.argv.includes("--prepare-identity")) {
+  if (process.env.GITHUB_ACTIONS === "true") throw new Error("Create the persistent identity locally, not on Actions");
+  ensureLocalCodesignIdentity();
+  console.log(`[macos-sign] Persistent identity ready in ${localCodesignDir}`);
   process.exit(0);
 }
 
@@ -643,7 +658,7 @@ console.log(`[macos-sign] Signed and verified ${appPath}`);
 console.log(`[macos-sign] Bundled ${bundledLibraries.length} external libraries`);
 console.log(`[macos-sign] Identifier: ${identifier}`);
 console.log(`[macos-sign] Signing identity: ${signing.identity}`);
-if (signing.identity === localIdentityName) {
+if (!allowAdhoc) {
   console.warn(
     "[macos-sign] Distribution: small-test beta; testers must approve the app in macOS Privacy & Security on first launch.",
   );

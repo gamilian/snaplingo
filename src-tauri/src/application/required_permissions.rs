@@ -9,12 +9,6 @@ pub struct RequiredPermissionsStatus {
     pub accessibility: bool,
 }
 
-impl RequiredPermissionsStatus {
-    pub fn all_granted(self) -> bool {
-        self.screen_recording && self.accessibility
-    }
-}
-
 pub trait RequiredPermissionsHost: Send + Sync {
     fn status(&self) -> RequiredPermissionsStatus;
     fn request_screen_recording(&self);
@@ -32,6 +26,14 @@ impl RequiredPermissions {
 
     pub fn status(&self) -> RequiredPermissionsStatus {
         self.host.status()
+    }
+
+    pub fn request_screen_recording(&self) {
+        self.host.request_screen_recording();
+    }
+
+    pub fn request_accessibility(&self) {
+        self.host.request_accessibility();
     }
 
     pub fn request_next_missing(&self) -> RequiredPermissionsStatus {
