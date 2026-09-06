@@ -23,7 +23,7 @@ function run(command, args) {
   if (result.error || result.status !== 0) {
     throw new Error(`${command} failed (exit ${result.status ?? 'timeout'})`);
   }
-  return result.stdout;
+  return `${result.stdout ?? ''}${result.stderr ?? ''}`;
 }
 function runStage(label, command, args) {
   console.log(`[macos-sign] ${label}`);
