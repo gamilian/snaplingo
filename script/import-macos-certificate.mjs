@@ -40,7 +40,6 @@ try {
   // The keychain exists only for this ephemeral runner; -A avoids macOS trust
   // metadata differences that can hide a self-signed identity from codesign.
   runStage('Import signing identity', '/usr/bin/security', ['import', p12, '-k', keychain, '-P', process.env.MACOS_CERTIFICATE_PASSWORD, '-A']);
-  runStage('Trust self-signed identity in temporary keychain', '/usr/bin/security', ['add-trusted-cert', '-d', '-r', 'trustAsRoot', '-p', 'codeSign', '-k', keychain, cert]);
   runStage('Authorize codesign access', '/usr/bin/security', ['set-key-partition-list', '-S', 'apple-tool:,apple:', '-s', '-k', password, keychain]);
   const keychains = runStage('Read keychain search list', '/usr/bin/security', ['list-keychains', '-d', 'user'])
     .match(/"([^"]+)"/g)?.map(value => value.slice(1, -1)) ?? [];
