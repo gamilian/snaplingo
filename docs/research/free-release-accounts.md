@@ -1,6 +1,6 @@
 # macOS / Windows 零付费发布：账号、申请与人工操作
 
-核验日期：**2026-09-06**。范围：SnapLingo 在 GitHub Actions 构建，在 GitHub Releases 直接分发；macOS 使用固定自签名身份，Windows 申请 SignPath Foundation 开源签名。本文只记录流程与资格，不代表任何账号、申请、证书或工作流已配置完成。
+核验日期：**2026-09-06**。范围：SnapLingo 在 GitHub Actions 构建，在 GitHub Releases 直接分发；macOS Actions 使用 ad-hoc 签名，Windows 申请 SignPath Foundation 开源签名。本文只记录流程与资格，不代表任何账号、申请、证书或工作流已配置完成。
 
 本次读取了 GitHub、Apple、SignPath、Microsoft 的官方文档，并在浏览器中只读核验 SignPath 的实际申请表。搜索工具未返回正文，文档改由 HTTPS 直接读取。以下费用条件是核验日的规则；启用发布前仍应检查仓库所有者的实际账单设置。
 
@@ -11,7 +11,7 @@
 | 项目 | 人工准备 | 零付费条件 / 边界 |
 | --- | --- | --- |
 | GitHub 构建和分发 | 已验证邮箱的 GitHub Free 账号；拥有仓库管理权限 | 发布仓库公开，选标准 GitHub-hosted macOS / Windows runner，关闭付费超额使用；无需 GitHub Pro / Team。[G1][G2][G4] |
-| macOS 固定自签名 | 本地生成并备份同一张 Code Signing 证书及私钥 | 无需为自签名注册 Apple 开发者会员；它不是 Developer ID，不能用于 Apple 公证。[A1][A2] |
+| macOS Actions 打包 | 无需证书或私钥；每次构建使用 ad-hoc 签名 | 无需 Apple 开发者会员；不能公证，更新不具有稳定签名身份。[A2] |
 | Windows SignPath | 提交 OSS 申请；获批后配置 SignPath 组织、项目、人员和 CI token | 基金会免费服务有资格要求及审核裁量，不是注册即获证。证书以 SignPath Foundation 名义签发，私钥托管于 HSM。[S1][S2] |
 | 用户安装体验 | 在 Release 中准确写出签名状态与首次打开说明 | macOS 可能需用户手动“仍要打开”；Windows 的 SmartScreen 仍会检查信誉，签名不构成无警告保证。[A3][M1] |
 
@@ -53,25 +53,21 @@
 
 | 名称 | 推荐存储 | 由谁准备 / 内容 |
 | --- | --- | --- |
-| `MACOS_CERTIFICATE_P12` | Repository secret | 维护者导出的固定证书及私钥 `.p12` 的 Base64 内容；按独立发布指南生成 |
-| `MACOS_CERTIFICATE_PASSWORD` | Repository secret | 该 `.p12` 的导出密码 |
-| `MACOS_CERTIFICATE_SHA1` | Repository variable | 同一证书的 SHA-1 指纹，用于选择和核验固定身份；不是私钥。若最终工作流使用 `secrets.MACOS_CERTIFICATE_SHA1`，则按该引用存入 Secrets，勿只配置另一栏 |
 | `SIGNPATH_API_TOKEN` | Repository secret | 获批后建立的 SignPath CI 用户 API token |
 | `SIGNPATH_ORGANIZATION_ID` | Repository variable，建议名称 | 获批的 SignPath organization ID，不是 GitHub organization 名称 |
 | `SIGNPATH_PROJECT_SLUG` | Repository variable，建议名称 | SignPath 项目实际 slug |
 | `SIGNPATH_SIGNING_POLICY_SLUG` | Repository variable，建议名称 | 正式签名 policy 实际 slug；常见名称 `release-signing` 不是保证值 |
 | `SIGNPATH_ARTIFACT_CONFIGURATION_SLUG` | Repository variable，建议名称 | 与实际产物结构一致的 artifact configuration slug；不显式传入时 action 使用项目默认配置 |
 
-Mac 三个名称是本项目计划使用的接口；SignPath 除 API token 外的变量名称是本文建议，创建前以最终工作流为准。不能用猜测的组织 ID、slug 或占位 token 触发正式签名。以上配置值的含义来自 SignPath 集成文档；secrets / variables 的存放方法来自 GitHub 文档。[S7][G7][G8]
+当前工作流不读取 Mac 签名私钥；SignPath 除 API token 外的变量名称是本文建议，创建前以最终工作流为准。不能用猜测的组织 ID、slug 或占位 token 触发正式签名。以上配置值的含义来自 SignPath 集成文档；secrets / variables 的存放方法来自 GitHub 文档。[S7][G7][G8]
 
 `GITHUB_TOKEN` 用工作流提供的令牌即可；本方案不要求为普通 Release 上传或 SignPath 读取工作流另建一个长期 GitHub PAT。SignPath 的 API token 是另一套服务的凭据，不能互相替代。[G9][S7]
 
-## 3. macOS：固定自签名没有会员申请步骤
+## 3. macOS：Actions 使用 ad-hoc 签名
 
-1. 在本地 Mac 的 **钥匙串访问 → 证书助理 → 创建证书**中创建专用的自签名 Code Signing 身份。固定名称、证书及私钥，按独立发布指南导出加密 `.p12` 并备份；普通更新复用同一份。Apple 官方提供该本地自签名功能，这一步不需要加入 Apple Developer Program。[A1]
-2. 按上一节添加 `MACOS_CERTIFICATE_P12`、`MACOS_CERTIFICATE_PASSWORD`、`MACOS_CERTIFICATE_SHA1`，让 Actions 导入同一身份。本文不重复证书生成、Base64 或导出命令；固定身份及保留 `com.snaplingo.app` 是本项目的发布约定，并非 Apple 对更新后 TCC 权限持续有效的保证。[本地应用配置](../../src-tauri/tauri.conf.json)
-3. **不申请 Developer ID，不配置 Apple 公证凭据。**Apple 公证要求 Developer ID；自签名、ad-hoc 或本地开发证书不符合公证要求。因此不要把免费 Apple Account 或免费 Xcode 开发身份当成免费 Developer ID。[A2]
-4. 每次 Release 写清“本版本未经过 Apple 公证”。用户下载并拖入“应用程序”后先尝试打开；若显示无法验证开发者等阻止提示，且用户确认来源可信，可由用户进入 **系统设置 → 隐私与安全性 → 仍要打开 → 打开**。该按钮可能受管理策略限制，官方措辞是用户“可能”可以手动打开，不承诺所有设备都能操作。对于检测到恶意软件、损坏等其他提示，应调查产物，不能一概套用这条说明。[A3]
+1. 当前 GitHub-hosted macOS runner 不导入本地自签名证书；工作流使用 ad-hoc 签名完成构建、DMG 完整性验证和启动检查，因此不需要 Mac 签名 Secrets。
+2. **不申请 Developer ID，不配置 Apple 公证凭据。**Apple 公证要求 Developer ID；自签名、ad-hoc 或本地开发证书不符合公证要求。因此不要把免费 Apple Account 或免费 Xcode 开发身份当成免费 Developer ID。[A2]
+3. 每次 Release 写清“本版本未经过 Apple 公证，且使用 ad-hoc 签名”。用户下载并拖入“应用程序”后先尝试打开；若显示无法验证开发者等阻止提示，且用户确认来源可信，可由用户进入 **系统设置 → 隐私与安全性 → 仍要打开 → 打开**。该按钮可能受管理策略限制，官方措辞是用户“可能”可以手动打开，不承诺所有设备都能操作。对于检测到恶意软件、损坏等其他提示，应调查产物，不能一概套用这条说明。[A3]
 
 发布说明和安装器都不应要求关闭 Gatekeeper、清除 quarantine、修改 TCC 数据库或自动放行。保留系统检查，让用户通过 Apple 提供的单个应用“仍要打开”流程自行决定；签名完整性检查成功也不能宣称通过了 Gatekeeper 或公证。[A2][A3]
 
@@ -192,7 +188,7 @@ SignPath 支持对 MSI 等复合包按配置由内到外签名，但官方格式
 - [ ] GitHub 仓库确实公开，发布 jobs 使用标准 GitHub-hosted macOS / Windows runner。
 - [ ] 检查了仓库所有者的计费账号：无有效付款方式，或已核实零预算及停止付费用量配置；没有待处理的既有费用被误认为已清零。
 - [ ] artifact 保留时间受控，缓存上限未提高到包含额度之外，最终文件使用 Release assets。
-- [ ] Mac 固定自签名证书已由维护者生成、导出及备份，三个配置名称和最终工作流一致。
+- [ ] macOS ad-hoc DMG 已在干净账户中下载、安装、启动并完成权限复测。
 - [ ] Mac 安装说明准确说明未公证与人工“仍要打开”，没有系统安全绕过命令。
 - [ ] 项目许可证已由有权维护者决定，并核对 SignPath 对组件、维护、首发和信誉的条件；本研究文件没有替维护者完成此项。
 - [ ] 已有真实 Windows 下载版本；主页 / 下载页包含准确的申请或签名状态、Code signing policy、人员和隐私说明。
