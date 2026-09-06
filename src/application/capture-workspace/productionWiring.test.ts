@@ -177,7 +177,7 @@ describe('capture workspace production runtime wiring', () => {
       'onUpdateAnnotationColorPresets={updateAnnotationColorPresets}',
     );
     expect(captureViewRoot).not.toContain('viewProps');
-    expect(captureView).toContain('renderState,\n  actions,');
+    expect(captureView).toMatch(/renderState,\r?\n  actions,/);
     expect(runtimeView).toContain('return { renderState, actions };');
     expect(runtimeView).not.toContain('...runtimeRenderState');
     expect(runtimeView).not.toContain('...derived');
