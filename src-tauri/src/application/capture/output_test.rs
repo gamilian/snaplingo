@@ -204,17 +204,17 @@ mod tests {
         assert_eq!(
             configured_capture_save_path(base, "jpg", "timestamp", "", now, &path_exists)
                 .to_string_lossy(),
-            "/tmp/captures/SnapLingo-20260714-133045.jpg"
+            base.join("SnapLingo-20260714-133045.jpg").to_string_lossy()
         );
         assert_eq!(
             configured_capture_save_path(base, "webp", "date", "", now, &path_exists)
                 .to_string_lossy(),
-            "/tmp/captures/SnapLingo-2026-07-14.webp"
+            base.join("SnapLingo-2026-07-14.webp").to_string_lossy()
         );
         assert_eq!(
             configured_capture_save_path(base, "png", "custom", "Work/Notes", now, &path_exists)
                 .to_string_lossy(),
-            "/tmp/captures/Work_Notes.png"
+            base.join("Work_Notes.png").to_string_lossy()
         );
     }
 
