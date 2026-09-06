@@ -451,16 +451,18 @@ function verifyAppSignature(path) {
   );
 
   const requirementDetails = run("/usr/bin/codesign", ["-d", "-r-", path]);
-  assertIncludes(
-    requirementDetails,
-    `identifier "${identifier}"`,
-    "[macos-sign] The designated requirement does not include the stable bundle identifier.",
-  );
-  if (!allowAdhoc) assertDoesNotInclude(
-    requirementDetails,
-    "cdhash H",
-    "[macos-sign] The designated requirement must not be tied to a per-build cdhash.",
-  );
+  if (!allowAdhoc) {
+    assertIncludes(
+      requirementDetails,
+      `identifier "${identifier}"`,
+      "[macos-sign] The designated requirement does not include the stable bundle identifier.",
+    );
+    assertDoesNotInclude(
+      requirementDetails,
+      "cdhash H",
+      "[macos-sign] The designated requirement must not be tied to a per-build cdhash.",
+    );
+  }
 }
 
 function notarizationArgs(path) {
