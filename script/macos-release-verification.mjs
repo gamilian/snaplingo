@@ -28,7 +28,7 @@ export function assertMacOSDeploymentTarget(loadCommands, minimum, label) {
 }
 
 export function designatedRequirement(output) {
-  const requirement = output.match(/^designated =>\s*(.+)$/m)?.[1];
+  const requirement = output.match(/^#?\s*designated =>\s*(.+)$/m)?.[1];
   if (!requirement) throw new Error('Missing designated requirement');
   return requirement.trim();
 }

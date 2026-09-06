@@ -61,6 +61,7 @@ jobs:
       matrix: ${{ fromJSON(needs.preflight.outputs.matrix) }}
     env:
       CARGO_INCREMENTAL: '0'
+      SNAPLINGO_SIGNING_MODE: adhoc
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -71,12 +72,6 @@ jobs:
       - run: npm test
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
       - run: cargo test --locked --manifest-path src-tauri/Cargo.toml
-      - name: Import persistent macOS signing certificate
-        if: runner.os == 'macOS'
-        env:
-          SNAPLINGO_MACOS_SIGNING_CERTIFICATE_P12_BASE64: ${{ secrets.SNAPLINGO_MACOS_SIGNING_CERTIFICATE_P12_BASE64 }}
-          SNAPLINGO_MACOS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.SNAPLINGO_MACOS_SIGNING_CERTIFICATE_PASSWORD }}
-        run: node script/import-macos-release-identity.mjs
       - name: Build and verify installers
         if: '!matrix.offline'
         run: npm run tauri:build

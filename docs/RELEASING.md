@@ -6,15 +6,15 @@
 
 | 平台 | 默认产物 | 构建位置 | 默认签名 |
 | --- | --- | --- | --- |
-| macOS 14+ / Apple Silicon | DMG | Actions `macos-14`，原生 arm64 | 固定自签名 |
-| macOS 14+ / Intel | DMG | Actions `macos-15-intel`，原生 x64 | 固定自签名 |
+| macOS 14+ / Apple Silicon | DMG | Actions `macos-14`，原生 arm64 | ad-hoc 签名 |
+| macOS 14+ / Intel | DMG | Actions `macos-15-intel`，原生 x64 | ad-hoc 签名 |
 | Windows x64 | NSIS EXE、备选 MSI | Actions `windows-2022` | 未签名，可后续申请 SignPath Foundation |
 
 最低系统版本是构建约束，并不代替对应系统真机验收。Windows runner 是服务器环境，不足以证明所有 Windows 桌面配置都兼容；公开发布前至少验收 Windows 11 x64。此流程不要求本地 Mac 构建 Windows 包。
 
 macOS 默认使用 Vision 系统 OCR，不再动态链接 Homebrew 的 Tesseract/Leptonica。Linux 保留 Tesseract。开发者若明确需要 macOS Tesseract，可自行安装 Tesseract 和语言数据，并运行 `npm run tauri:build -- --features tesseract-ocr`；该自定义包不是自包含的官方包。脚本仍校验所有动态库的最低系统版本和架构，不合格就失败。
 
-无需购买 Apple Developer Program、Windows 证书、Azure 签名服务，也无需登记信用卡。Actions 的 macOS 发布包使用项目固定的自签名证书；它不能替代 Apple 公证，也不会通过 Gatekeeper，但固定证书能让 macOS 将后续版本识别为同一屏幕录制授权身份。Windows 免费可信签名需要申请审核；未获批准前按未签名包发布。账号开通、免费额度及 SignPath 完整申请过程见 [免费账号与签名申请](research/free-release-accounts.md)。
+无需购买 Apple Developer Program、Windows 证书、Azure 签名服务，也无需登记信用卡。GitHub-hosted runner 无法可靠地信任本地自签名根证书，因此 Actions 的 macOS 包使用 ad-hoc 签名；它不能替代 Apple 公证，也不能承诺跨更新保留 TCC 授权。Windows 免费可信签名需要申请审核；未获批准前按未签名包发布。账号开通、免费额度及 SignPath 完整申请过程见 [免费账号与签名申请](research/free-release-accounts.md)。
 
 ## 2. GitHub 配置与费用边界
 
@@ -23,13 +23,13 @@ macOS 默认使用 Vision 系统 OCR，不再动态链接 Homebrew 的 Tesseract
 3. 工作流只使用标准托管 runner，并且所有入口 job 都限制 `repository.private == false`。改成私有后会跳过，而不会消耗私有仓库付费资源。
 4. 不启用 larger runner、付费签名服务。不要为 Actions 增加付费预算；在账号 Billing 页面检查 Actions 的预算/超额支出设置，启用到额阻断。不要把免费计算时长理解为任意数量的 artifact 存储都免费。
 5. 普通 CI 不上传大文件；手动/测试分支包只保存 3 天，tag 成功后把安装包保存在 GitHub Release。下载完可主动删除旧运行的 artifacts。不要开启无上限的缓存或长期 artifact 保留。
-6. 版本 tag 保护和分支保护由仓库维护者管理。仓库已保存 `SNAPLINGO_MACOS_SIGNING_CERTIFICATE_P12_BASE64` 和 `SNAPLINGO_MACOS_SIGNING_CERTIFICATE_PASSWORD` 两个 Actions Secret；它们只在 Desktop packages 的 macOS job 中导入临时钥匙串。不得轮换或删除该证书，除非接受用户需要重新授予屏幕录制权限。PR 的 CI 仍使用 ad-hoc 模式，不读取私钥。
+6. 版本 tag 保护和分支保护由仓库维护者管理。Desktop packages 不读取 macOS 私钥；PR 的 CI 也使用相同的 ad-hoc 模式。
 
 ## 3. macOS 零付费构建模式
 
-Desktop packages 以固定自签名证书构建 macOS DMG。证书 P12 与密码保存为 GitHub Actions Secret，每次 macOS job 导入临时钥匙串，工作流校验证书指纹、app 与 DMG 的签名结构、最低系统版本、架构、动态库路径，并从最终 DMG 复制 app 后启动两次。普通 CI 使用 ad-hoc 签名，不读取发布私钥。
+Desktop packages 和 CI 都以 ad-hoc 签名构建 macOS DMG，因此不需要在 GitHub Secrets 中保存或导入 Mac 私钥。工作流仍会校验 app 与 DMG 的签名结构、最低系统版本、架构、动态库路径，并从最终 DMG 复制 app 后启动两次。
 
-固定自签名不能公证，首次启动仍要在“系统设置 → 隐私与安全性 → 仍要打开”手工放行；它不能做到付费 Developer ID 的无警告体验。发布前仍须在干净的 macOS 账户中下载实际 DMG，并重新验证屏幕录制和辅助功能授权。自签名证书保持不变时，TCC 可以将同一 bundle id 的后续版本匹配为同一应用身份；更换证书、改 bundle id 或回退为 ad-hoc 都会要求重新授权。
+ad-hoc 签名每次构建都可能变化，不能替代稳定发行身份，也无法公证。它适合公开的测试版和首发验证；发布前必须在干净的 macOS 账户中下载实际 DMG，按“系统设置 → 隐私与安全性 → 仍要打开”完成首次启动，并重新验证屏幕录制和辅助功能授权。面向非技术公众或需要稳定更新授权时，需要改用 Apple Developer ID 和公证，这不是零付费能力。
 
 ## 4. 工作流使用方式
 
@@ -37,7 +37,7 @@ Desktop packages 以固定自签名证书构建 macOS DMG。证书 P12 与密码
 
 运行前端测试、Rust 格式/测试/check、原生打包验证。Windows 执行 NSIS 安装、启动、同版本重装、卸载检查；macOS 从最终 DMG 复制安装、验证签名、启动两次。Linux 同样执行原生测试与打包。
 
-macOS CI 使用临时 ad-hoc 签名，Desktop packages 使用固定自签名证书。启动检查不等同于 Gatekeeper 信任检查，不会绕过或修改系统信任策略。
+macOS CI 和 Desktop packages 都使用临时 ad-hoc 签名。启动检查不等同于 Gatekeeper 信任检查，不会绕过或修改系统信任策略。
 
 ### Desktop packages：可下载测试包
 
@@ -67,7 +67,7 @@ macOS CI 使用临时 ad-hoc 签名，Desktop packages 使用固定自签名证�
 
 ## 5. 验收边界与必测场景
 
-自动化已经检查：版本、产物非空/可执行、macOS 签名完整性与固定证书指纹/最低系统版本/动态库路径与架构、最终 DMG 内容、Windows 安装退出码和实际安装目录、程序存活、同版本重装。`npm run release:verify` 会重新做 macOS 原生验证，不只是检查文件存在。
+自动化已经检查：版本、产物非空/可执行、macOS ad-hoc 签名完整性/最低系统版本/动态库路径与架构、最终 DMG 内容、Windows 安装退出码和实际安装目录、程序存活、同版本重装。`npm run release:verify` 会重新做 macOS 原生验证，不只是检查文件存在。
 
 自动化**不能证明**真实用户能截图、所有 OCR 语言正常、TCC 跨版本保留，或浏览器下载后的系统信任提示符合预期。公开发布前在干净用户/电脑上完成：
 
@@ -79,10 +79,10 @@ macOS CI 使用临时 ad-hoc 签名，Desktop packages 使用固定自签名证�
 | 使用选中文本/元素检测 | 按需提示辅助功能；浏览器自动化有明确用途说明 |
 | Windows WebView2 缺失 | 在线版在联网环境自动安装；离线版在断网且未安装运行时的测试机安装成功 |
 | Windows OCR 语言缺失 | 有可理解的安装语言提示；补充系统 OCR 语言能力后重新启动验证 |
-| 真实 N→N+1 更新 | 同架构覆盖安装；数据库、API 配置、历史保留；截图/选中文本授权复测，并确认固定证书未变时屏幕录制授权仍被识别 |
+| 真实 N→N+1 更新 | 同架构覆盖安装；数据库、API 配置、历史保留；截图/选中文本授权复测，并接受 ad-hoc 身份变化可能要求重新授权 |
 | 多屏、缩放 | Windows 混合 DPI，macOS Retina/外接屏截图和选区正确 |
 
-自签名包的 `spctl` 拒绝是预期结果；脚本记录结果，不要求用户关闭 Gatekeeper、删除 quarantine 或修改 TCC。
+ad-hoc 包的 `spctl` 拒绝是预期结果；脚本记录结果，不要求用户关闭 Gatekeeper、删除 quarantine 或修改 TCC。
 
 ## 6. 免费 Windows 签名的后续接入
 

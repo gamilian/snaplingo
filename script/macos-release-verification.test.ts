@@ -10,6 +10,11 @@ describe('macOS bundled deployment targets', () => {
       .toBe('identifier "com.snaplingo.app" and certificate leaf = H"260A"');
   });
 
+  it('reads the ad-hoc designated requirement format', () => {
+    expect(designatedRequirement('Executable=/tmp/SnapLingo.app/Contents/MacOS/snaplingo\n# designated => cdhash H"AABB"'))
+      .toBe('cdhash H"AABB"');
+  });
+
   it('rejects a dependency newer than the declared minimum OS', () => {
     expect(() => assertMacOSDeploymentTarget('cmd LC_BUILD_VERSION\n minos 14.0\n sdk 15.0', '11.0', 'libpng'))
       .toThrow(/libpng requires macOS 14.0/);

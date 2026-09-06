@@ -89,7 +89,7 @@ npm run tauri:build:beta
 
 macOS 构建会跳过 Tauri 的 Finder AppleScript 布局步骤，避免要求 Terminal、IDE 或构建代理取得“控制 Finder”的自动化权限。签名后处理仍会生成包含 SnapLingo 和 Applications 链接的 DMG。
 
-GitHub Actions 的 Desktop packages 使用仓库 Secret 中的固定自签名身份；普通 CI 使用 ad-hoc 签名，不读取私钥。Mac 本地若未显式配置 `SNAPLINGO_CODESIGN_IDENTITY`，脚本会创建并使用长期自签名身份。自签名身份不能用于 Apple 公证。
+GitHub Actions 使用 ad-hoc 签名，不读取本地证书或私钥。Mac 本地若显式配置 `SNAPLINGO_CODESIGN_IDENTITY`，脚本可以使用本机的长期自签名身份；该身份只适用于本地测试，不能用于 Apple 公证。
 
 该测试包不受 Apple Gatekeeper 信任，因此测试者首次安装必须：
 

@@ -269,7 +269,7 @@ function verifyNativeMacOSArtifacts(context, artifacts) {
     run("/usr/bin/hdiutil", ["detach", mount]);
   }
   const assessment = spawnSync("/usr/sbin/spctl", ["--assess", "--type", "execute", "--verbose=4", app.path], { encoding: "utf8" });
-  console.log(`[release] Gatekeeper (self-signed rejection is expected): ${assessment.stderr?.trim()}`);
+  console.log(`[release] Gatekeeper (unnotarized beta rejection is expected): ${assessment.stderr?.trim()}`);
 }
 
 function collectArtifacts(context, artifacts) {
