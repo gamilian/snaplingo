@@ -11,7 +11,7 @@ describe('required permissions runtime', () => {
     const status = vi
       .fn()
       .mockResolvedValueOnce({ screenRecording: false, accessibility: false })
-      .mockResolvedValueOnce({ screenRecording: true, accessibility: true });
+      .mockResolvedValueOnce({ screenRecording: true, accessibility: false });
     const request = vi.fn();
     const runtime = createRequiredPermissionsRuntime(
       { status, request },
@@ -35,7 +35,7 @@ describe('required permissions runtime', () => {
 
     expect(status).toHaveBeenCalledTimes(2);
     expect(listener).toHaveBeenLastCalledWith({
-      status: { screenRecording: true, accessibility: true },
+      status: { screenRecording: true, accessibility: false },
       error: null,
     });
 
@@ -58,7 +58,7 @@ describe('required permissions runtime', () => {
     const status = await runtime.requestNext();
 
     expect(request).toHaveBeenCalledOnce();
-    expect(areRequiredPermissionsGranted(status)).toBe(false);
+    expect(areRequiredPermissionsGranted(status)).toBe(true);
   });
 
   it('publishes polling errors and retries at the slower interval', async () => {

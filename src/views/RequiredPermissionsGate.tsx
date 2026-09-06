@@ -46,7 +46,7 @@ export function RequiredPermissionsGate({
         >
           <h1 style={styles.title}>按需启用系统权限</h1>
           <p style={styles.description}>
-            截图需要屏幕录制权限；选中文本和界面元素检测需要辅助功能权限。你也可以稍后设置，先使用文本翻译、文件 OCR 等功能。
+            截图需要屏幕录制权限。选中文本和界面元素检测需要辅助功能权限，但不影响截图、文本翻译或文件 OCR。
           </p>
           <PermissionRow
             label="屏幕录制"
@@ -65,15 +65,13 @@ export function RequiredPermissionsGate({
               void runtime.requestNext().catch(() => undefined);
             }}
           >
-            {!status?.screenRecording
-              ? '打开屏幕录制设置'
-              : '打开辅助功能设置'}
+            打开屏幕录制设置
           </button>
           <button style={styles.button} onClick={() => setDismissed(true)}>
             稍后设置，继续使用
           </button>
           <p style={styles.hint}>
-            点击后会打开对应的 macOS 系统设置页面。允许当前权限并返回 SnapLingo，再继续完成下一项。
+            允许后请完全退出并重新打开 SnapLingo。若系统设置已允许但这里仍显示待授权，请关闭“屏幕录制”中的 SnapLingo 开关，再重新打开应用并允许一次。
           </p>
         </section>
       </div>

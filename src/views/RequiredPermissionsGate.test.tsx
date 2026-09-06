@@ -39,14 +39,15 @@ describe('RequiredPermissionsGate', () => {
     await view.unmount();
   });
 
-  it('offers Accessibility after Screen Recording is granted', async () => {
+  it('does not block screenshot features when only optional Accessibility is missing', async () => {
     const runtime = createRuntime({
       screenRecording: true,
       accessibility: false,
     });
     const view = await renderGate(runtime);
 
-    expect(view.container.textContent).toContain('打开辅助功能设置');
+    expect(view.container.textContent).toContain('ready');
+    expect(view.container.querySelector('[role="dialog"]')).toBeNull();
     expect(runtime.requestNext).not.toHaveBeenCalled();
 
     await view.unmount();

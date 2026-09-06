@@ -134,7 +134,7 @@ export function createRequiredPermissionsRuntime(
 export function areRequiredPermissionsGranted(
   status: RequiredPermissionsStatus,
 ) {
-  return status.screenRecording && status.accessibility;
+  return status.screenRecording;
 }
 
 function errorMessage(cause: unknown) {

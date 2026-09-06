@@ -27,6 +27,12 @@ export function assertMacOSDeploymentTarget(loadCommands, minimum, label) {
   }
 }
 
+export function designatedRequirement(output) {
+  const requirement = output.match(/^designated =>\s*(.+)$/m)?.[1];
+  if (!requirement) throw new Error('Missing designated requirement');
+  return requirement.trim();
+}
+
 function filesIn(directory) {
   if (!existsSync(directory)) return [];
   return readdirSync(directory).flatMap(name => {
@@ -38,7 +44,9 @@ function filesIn(directory) {
 export function verifyMacOSApplication(app, config, { allowAdhoc = false } = {}) {
   run('/usr/bin/codesign', ['--verify', '--deep', '--strict', app]);
   const details = run('/usr/bin/codesign', ['-dv', '--verbose=4', app]);
-  const requirement = run('/usr/bin/codesign', ['-d', '-r-', app]);
+  const requirement = designatedRequirement(
+    run('/usr/bin/codesign', ['-d', '-r-', app]),
+  );
   const plist = JSON.parse(run('/usr/bin/plutil', ['-convert', 'json', '-o', '-', join(app, 'Contents/Info.plist')]));
   for (const [key, value] of Object.entries({
     CFBundleIdentifier: config.identifier,

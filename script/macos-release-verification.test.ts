@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { assertMacOSDeploymentTarget } from './macos-release-verification.mjs';
+import {
+  assertMacOSDeploymentTarget,
+  designatedRequirement,
+} from './macos-release-verification.mjs';
 
 describe('macOS bundled deployment targets', () => {
+  it('compares only the designated requirement, not the app path', () => {
+    expect(designatedRequirement('Executable=/tmp/SnapLingo.app/Contents/MacOS/snaplingo\ndesignated => identifier "com.snaplingo.app" and certificate leaf = H"260A"'))
+      .toBe('identifier "com.snaplingo.app" and certificate leaf = H"260A"');
+  });
+
   it('rejects a dependency newer than the declared minimum OS', () => {
     expect(() => assertMacOSDeploymentTarget('cmd LC_BUILD_VERSION\n minos 14.0\n sdk 15.0', '11.0', 'libpng'))
       .toThrow(/libpng requires macOS 14.0/);
