@@ -39,6 +39,11 @@ try {
   runStage('Unlock temporary keychain', '/usr/bin/security', ['unlock-keychain', '-p', password, keychain]);
   runStage('Import signing identity', '/usr/bin/security', ['import', p12, '-k', keychain, '-P', process.env.MACOS_CERTIFICATE_PASSWORD, '-T', '/usr/bin/codesign']);
   runStage('Authorize codesign access', '/usr/bin/security', ['set-key-partition-list', '-S', 'apple-tool:,apple:', '-s', '-k', password, keychain]);
+  const keychains = runStage('Read keychain search list', '/usr/bin/security', ['list-keychains', '-d', 'user'])
+    .match(/"([^"]+)"/g)?.map(value => value.slice(1, -1)) ?? [];
+  runStage('Add temporary keychain to search list', '/usr/bin/security', ['list-keychains', '-d', 'user', '-s', keychain, ...keychains]);
+  const identities = runStage('Verify imported signing identity', '/usr/bin/security', ['find-identity', '-v', '-p', 'codesigning', keychain]);
+  if (!identities.includes(fingerprint)) throw new Error('Imported keychain does not contain the pinned signing identity');
   appendFileSync(process.env.GITHUB_ENV, `SNAPLINGO_CODESIGN_IDENTITY=${fingerprint}\nSNAPLINGO_CODESIGN_KEYCHAIN=${keychain}\nSNAPLINGO_SIGNING_DIRECTORY=${directory}\nSNAPLINGO_CERTIFICATE_SHA1=${fingerprint}\n`);
 } catch (error) {
   spawnSync('/usr/bin/security', ['delete-keychain', keychain]);
