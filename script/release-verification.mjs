@@ -261,7 +261,9 @@ function verifyNativeMacOSArtifacts(context, artifacts) {
   if (!mount) throw new Error("Could not locate mounted release DMG");
   try {
     const mounted = verifyMacOSApplication(join(mount, `${context.productName}.app`), context.config, options);
-    if (mounted.requirement !== signature.requirement) throw new Error("DMG signing identity differs from app");
+    if (!options.allowAdhoc && mounted.requirement !== signature.requirement) {
+      throw new Error("DMG signing identity differs from app");
+    }
     if (!existsSync(join(mount, "Applications"))) throw new Error("DMG has no Applications link");
   } finally {
     run("/usr/bin/hdiutil", ["detach", mount]);
