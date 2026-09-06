@@ -112,11 +112,6 @@ fn capture_control_candidate_at(
         unsafe { CoCreateInstance(&CUIAutomation, None, CLSCTX_INPROC_SERVER) }.map_err(
             |error| AppError::System(format!("Failed to start Windows UI Automation: {error}")),
         )?;
-    unsafe { automation.SetConnectionTimeout(200) }.map_err(|error| {
-        AppError::System(format!(
-            "Failed to configure Windows UI Automation: {error}"
-        ))
-    })?;
     let element = unsafe { automation.ElementFromPoint(physical_point) }
         .map_err(|error| AppError::System(format!("Failed to find Windows UI element: {error}")))?;
     let process_id = unsafe { element.CurrentProcessId() }.map_err(|error| {
