@@ -13,9 +13,9 @@ pub use config::{
 };
 pub use events::DomainEvent;
 pub use hotkey_config::HotkeySettingsSnapshot;
-pub use ocr::{OcrRequest, OcrResult};
+pub use ocr::{OcrBoundingBox, OcrLine, OcrRequest, OcrResult};
 pub use selection::{
     FrontmostApp, MethodAvailability, SelectedTextSnapshot, SelectionAttempt,
     SelectionAttemptStatus, SelectionContext, SelectionMethodKind, SelectionSource,
 };
-pub use translation::{TranslationRequest, TranslationResult};
+pub use translation::{TranslationError, TranslationRequest, TranslationResult};

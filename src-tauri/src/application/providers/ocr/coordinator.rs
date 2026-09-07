@@ -3,7 +3,7 @@ use crate::application::providers::{
     ProviderChangeNotifier, ProviderConfigStore, ProviderEventSink,
 };
 use crate::domain::events::DomainEvent;
-use crate::domain::ocr::{OcrRequest, OcrResult};
+use crate::domain::ocr::{infer_language_from_text, OcrRequest, OcrResult};
 use crate::Result;
 use chrono::Utc;
 use parking_lot::RwLock;
@@ -202,10 +202,14 @@ impl OcrCoordinator {
         let provider_id = provider_lock.read().id().to_string();
 
         // Call provider's recognize method
-        let result = {
+        let mut result = {
             let provider = provider_lock.read();
             provider.recognize(request).await?
         };
+        result.provider_id = Some(provider_id.clone());
+        if result.detected_language.is_none() {
+            result.detected_language = infer_language_from_text(&result.text);
+        }
 
         // Publish domain event if event sink is attached
         if let Some(event_sink) = &self.event_sink {

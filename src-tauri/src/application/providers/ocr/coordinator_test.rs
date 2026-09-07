@@ -89,6 +89,9 @@ mod tests {
             Ok(OcrResult {
                 text: self.text_to_return.clone(),
                 confidence: Some(0.95),
+                lines: Vec::new(),
+                detected_language: None,
+                provider_id: None,
             })
         }
     }

@@ -67,6 +67,9 @@ mod tests {
             Ok(OcrResult {
                 text: "recorded".to_string(),
                 confidence: Some(1.0),
+                lines: Vec::new(),
+                detected_language: None,
+                provider_id: None,
             })
         }
     }
@@ -415,7 +418,6 @@ mod tests {
     async fn hydrate_monitor_snapshot_returns_only_the_requested_monitor_view() {
         let backend = make_backend();
         let snapshot_calls = backend.capture_monitor_snapshots_calls.clone();
-        let monitor_snapshot_calls = backend.capture_monitor_snapshot_calls.clone();
         let sessions = CaptureSessions::new(Arc::new(backend));
         let view = sessions.create_layout_session().await.unwrap();
 
@@ -424,11 +426,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(*snapshot_calls.lock().unwrap(), 0);
-        assert_eq!(
-            monitor_snapshot_calls.lock().unwrap().as_slice(),
-            &["primary".to_string()]
-        );
+        assert_eq!(*snapshot_calls.lock().unwrap(), 1);
         assert_eq!(monitor.id, "primary");
         assert_eq!(monitor.image_base64, "AQID");
     }
@@ -508,10 +506,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn freeze_session_selection_captures_only_selected_region() {
-        let mut backend = make_backend_with_renderable_png();
-        backend.region_png_data = make_solid_png(2, 3, [40, 50, 60, 255]);
+    async fn freeze_session_selection_hydrates_the_full_session_snapshot() {
+        let backend = make_backend_with_renderable_png();
         let captured_regions = backend.captured_regions.clone();
+        let snapshot_calls = backend.capture_monitor_snapshots_calls.clone();
         let sessions = CaptureSessions::new(Arc::new(backend));
         let view = sessions.create_layout_session().await.unwrap();
 
@@ -528,18 +526,14 @@ mod tests {
             .await
             .unwrap();
 
-        let regions = captured_regions.lock().unwrap();
-        assert_eq!(regions.len(), 1);
-        assert_eq!(regions[0].x, 1);
-        assert_eq!(regions[0].y, 1);
-        assert_eq!(regions[0].width, 2);
-        assert_eq!(regions[0].height, 3);
+        assert!(captured_regions.lock().unwrap().is_empty());
+        assert_eq!(*snapshot_calls.lock().unwrap(), 1);
         assert_eq!(
             frozen_view.monitors[0].image_base64,
             base64::engine::general_purpose::STANDARD.encode(make_solid_png(
-                2,
-                3,
-                [40, 50, 60, 255]
+                4,
+                4,
+                [10, 20, 30, 255]
             ))
         );
         assert!(!sessions
@@ -839,6 +833,36 @@ mod tests {
                 height: 30,
             }
         );
+    }
+
+    #[tokio::test]
+    async fn freezing_a_cross_monitor_selection_hydrates_all_monitors_once() {
+        let backend = make_multi_monitor_backend();
+        let snapshot_calls = backend.capture_monitor_snapshots_calls.clone();
+        let captured_regions = backend.captured_regions.clone();
+        let sessions = CaptureSessions::new(Arc::new(backend));
+        let view = sessions.create_layout_session().await.unwrap();
+
+        let frozen = sessions
+            .freeze_session_selection(
+                &view.id,
+                &LogicalRect {
+                    x: -20.0,
+                    y: 10.0,
+                    width: 40.0,
+                    height: 20.0,
+                },
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(*snapshot_calls.lock().unwrap(), 1);
+        assert!(captured_regions.lock().unwrap().is_empty());
+        assert_eq!(frozen.monitors.len(), 2);
+        assert!(frozen
+            .monitors
+            .iter()
+            .all(|monitor| !monitor.image_base64.is_empty()));
     }
 
     #[tokio::test]

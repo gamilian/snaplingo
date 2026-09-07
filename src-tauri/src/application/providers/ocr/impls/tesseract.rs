@@ -46,10 +46,7 @@ impl OcrProvider for TesseractProvider {
             .engine
             .recognize(&request.image_data, language.as_deref())?;
 
-        Ok(OcrResult {
-            text,
-            confidence: None,
-        })
+        Ok(OcrResult::from_text(text, None))
     }
 }
 

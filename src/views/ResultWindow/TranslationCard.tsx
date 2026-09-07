@@ -100,17 +100,19 @@ export default function TranslationCard({
             </IconActionButton>
           )}
 
-          <IconActionButton
-            title="朗读"
-            className="grid h-6 w-6 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
-            tooltipPlacement="bottom"
-            onClick={(event) => {
-              event.stopPropagation();
-              void speakText(displayText, languageCode);
-            }}
-          >
-            <VolumeIcon className="h-[15px] w-[15px]" />
-          </IconActionButton>
+          {!isError && (
+            <IconActionButton
+              title="朗读"
+              className="grid h-6 w-6 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+              tooltipPlacement="bottom"
+              onClick={(event) => {
+                event.stopPropagation();
+                void speakText(displayText, languageCode);
+              }}
+            >
+              <VolumeIcon className="h-[15px] w-[15px]" />
+            </IconActionButton>
+          )}
 
           {onFavorite && !isPending && !isError && (
             <IconActionButton
@@ -140,17 +142,19 @@ export default function TranslationCard({
             </IconActionButton>
           )}
 
-          <IconActionButton
-            title="复制"
-            className="grid h-6 w-6 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
-            tooltipPlacement="bottom"
-            onClick={(event) => {
-              event.stopPropagation();
-              void copyText(displayText);
-            }}
-          >
-            <CopyIcon className="h-[15px] w-[15px]" />
-          </IconActionButton>
+          {!isError && (
+            <IconActionButton
+              title="复制"
+              className="grid h-6 w-6 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+              tooltipPlacement="bottom"
+              onClick={(event) => {
+                event.stopPropagation();
+                void copyText(displayText);
+              }}
+            >
+              <CopyIcon className="h-[15px] w-[15px]" />
+            </IconActionButton>
+          )}
 
           <IconActionButton
             title={isExpanded ? '收起' : '展开'}

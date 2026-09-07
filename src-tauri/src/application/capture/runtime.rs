@@ -395,6 +395,7 @@ mod tests {
     #[derive(Debug, Clone, PartialEq)]
     enum HostCall {
         BeginPresentation,
+        CaptureSnapshots,
         PrepareCaptureWindowForReveal,
         RevealCaptureWindow,
         HideCaptureWindow,
@@ -539,6 +540,11 @@ mod tests {
         snapshots: Vec<MonitorSnapshot>,
     }
 
+    struct OrderedCaptureSessionSource {
+        calls: Arc<Mutex<Vec<HostCall>>>,
+        snapshots: Vec<MonitorSnapshot>,
+    }
+
     #[async_trait]
     impl CaptureSessionSource for MockCaptureSessionSource {
         async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError> {
@@ -574,6 +580,22 @@ mod tests {
             _monitors: &[MonitorSnapshot],
         ) -> Result<Option<LogicalPoint>, AppError> {
             Ok(None)
+        }
+    }
+
+    #[async_trait]
+    impl CaptureSessionSource for OrderedCaptureSessionSource {
+        async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError> {
+            self.calls.lock().unwrap().push(HostCall::CaptureSnapshots);
+            Ok(self.snapshots.clone())
+        }
+
+        async fn capture_monitor_layouts(&self) -> Result<Vec<MonitorLayout>, AppError> {
+            Ok(Vec::new())
+        }
+
+        async fn capture_region(&self, _region: ScreenRegion) -> Result<Vec<u8>, AppError> {
+            unreachable!("capture sessions must use frozen monitor snapshots")
         }
     }
 
@@ -677,6 +699,39 @@ mod tests {
         assert_eq!(
             host.calls(),
             vec![HostCall::BeginPresentation, HostCall::HideCaptureWindow]
+        );
+    }
+
+    #[tokio::test]
+    async fn create_session_hides_the_overlay_before_freezing_monitor_pixels() {
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let host = Arc::new(RecordingRuntimeHost {
+            calls: calls.clone(),
+            ..RecordingRuntimeHost::succeeds()
+        });
+        let sessions = Arc::new(CaptureSessions::new(Arc::new(
+            OrderedCaptureSessionSource {
+                calls: calls.clone(),
+                snapshots: vec![make_snapshot()],
+            },
+        )));
+        let runtime = CaptureSessionRuntime::with_host(
+            sessions,
+            Arc::new(CaptureImageComposer::new()),
+            Arc::new(CaptureOutput::new()),
+            Arc::new(OcrCoordinator::new(Arc::new(SqliteConfigStore::new_temp()))),
+            host,
+        );
+
+        runtime.create_session_from_visible_desktop().await.unwrap();
+
+        assert_eq!(
+            calls.lock().unwrap().as_slice(),
+            &[
+                HostCall::BeginPresentation,
+                HostCall::HideCaptureWindow,
+                HostCall::CaptureSnapshots,
+            ]
         );
     }
 

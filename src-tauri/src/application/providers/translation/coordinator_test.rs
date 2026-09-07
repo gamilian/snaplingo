@@ -65,6 +65,9 @@ mod tests {
                 translated_text: self.response_text.clone(),
                 detected_language: Some("en".to_string()),
                 confidence: Some(1.0),
+                error: None,
+                request_id: None,
+                duration_ms: None,
             })
         }
     }
@@ -336,8 +339,9 @@ mod tests {
             .translate_with_provider("ghost", &sample_request())
             .await;
 
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err().to_string(), "Provider not found: ghost");
+        let result = result.expect("missing provider returns a structured failure");
+        assert_eq!(result.translated_text, "");
+        assert_eq!(result.error.as_ref().unwrap().code, "provider_not_found");
     }
 
     #[tokio::test]
@@ -394,11 +398,19 @@ mod tests {
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].provider_id, "google");
         assert_eq!(results[0].translated_text, "Hola (Google)");
+        assert!(results[0].request_id.is_some());
+        assert!(results[0].duration_ms.is_some());
         assert_eq!(results[1].provider_id, "custom-gpt");
-        assert!(results[1].translated_text.contains("Translation failed"));
-        assert!(results[1]
-            .translated_text
-            .contains("upstream rejected request"));
+        assert_eq!(results[1].translated_text, "");
+        let error = results[1]
+            .error
+            .as_ref()
+            .expect("structured provider error");
+        assert_eq!(results[1].request_id, results[0].request_id);
+        assert!(results[1].duration_ms.is_some());
+        assert_eq!(error.code, "provider_error");
+        assert!(error.message.contains("upstream rejected request"));
+        assert!(!error.retryable);
     }
 
     #[tokio::test]

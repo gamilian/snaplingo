@@ -60,10 +60,10 @@ mod tests {
         }
 
         fn recognize(&self, request: &OcrRequest) -> Result<OcrResult> {
-            Ok(OcrResult {
-                text: format!("{} bytes", request.image_data.len()),
-                confidence: Some(0.9),
-            })
+            Ok(OcrResult::from_text(
+                format!("{} bytes", request.image_data.len()),
+                Some(0.9),
+            ))
         }
     }
 

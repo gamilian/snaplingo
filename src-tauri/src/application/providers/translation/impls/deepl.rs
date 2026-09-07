@@ -251,12 +251,12 @@ impl TranslationProvider for DeepLProvider {
             }
         }
 
-        Ok(TranslationResult {
-            provider_id: self.id().to_string(),
-            translated_text: deeplx_response.data,
-            detected_language: None,
-            confidence: None,
-        })
+        Ok(TranslationResult::success(
+            self.id(),
+            deeplx_response.data,
+            None,
+            None,
+        ))
     }
 }
 
@@ -303,12 +303,12 @@ impl DeepLProvider {
             .first()
             .ok_or_else(|| AppError::Other("Empty response from DeepL".to_string()))?;
 
-        Ok(TranslationResult {
-            provider_id: self.id().to_string(),
-            translated_text: translation.text.clone(),
-            detected_language: translation.detected_source_language.clone(),
-            confidence: None,
-        })
+        Ok(TranslationResult::success(
+            self.id(),
+            translation.text.clone(),
+            translation.detected_source_language.clone(),
+            None,
+        ))
     }
 }
 

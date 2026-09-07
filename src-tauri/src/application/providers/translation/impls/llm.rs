@@ -82,12 +82,12 @@ impl TranslationProvider for LLMTranslationProvider {
 
         let response = self.llm_client.generate(&llm_request).await?;
 
-        Ok(TranslationResult {
-            provider_id: self.id().to_string(),
-            translated_text: response.text,
-            detected_language: None,
-            confidence: None,
-        })
+        Ok(TranslationResult::success(
+            self.id(),
+            response.text,
+            None,
+            None,
+        ))
     }
 }
 

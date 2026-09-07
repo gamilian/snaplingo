@@ -1,4 +1,4 @@
-import type { TranslationResult } from '../../types';
+import type { TranslationError, TranslationResult } from '../../types';
 import type {
   OcrSettings,
   ResultWindowPosition,
@@ -60,8 +60,7 @@ export interface ResultWindowStatePort {
   completeProviderTranslation(sessionId: string, result: TranslationResult): void;
   failProviderTranslation(
     sessionId: string,
-    providerId: string,
-    message: string,
+    result: TranslationResult,
   ): void;
   setTranslating(value: boolean): void;
 }
@@ -114,6 +113,12 @@ export function createResultWindowRuntime({
 }: ResultWindowRuntimePorts) {
   let needsPlacement = true;
   let lastPlacedPosition: ResultWindowPosition | null = null;
+  let translationGeneration = 0;
+
+  function invalidateTranslationGeneration() {
+    translationGeneration += 1;
+    state.setTranslating(false);
+  }
 
   function translationRequestText(text: string) {
     return getTranslationSettings?.()?.preserveLineBreaks === false
@@ -122,6 +127,7 @@ export function createResultWindowRuntime({
   }
 
   function changeSourceLanguage(language: string) {
+    invalidateTranslationGeneration();
     const { targetLang } = state.getTranslationSession();
     state.setSourceLang(language);
     state.setTargetLang(
@@ -132,6 +138,7 @@ export function createResultWindowRuntime({
   }
 
   function swapTranslationLanguages() {
+    invalidateTranslationGeneration();
     const session = state.getTranslationSession();
     const next = swapTranslationLanguagePair(
       session.sourceLang,
@@ -168,6 +175,8 @@ export function createResultWindowRuntime({
   }) {
     if (!input.text.trim()) return;
 
+    const generation = ++translationGeneration;
+
     const settings = getTranslationSettings?.();
     const requestText = translationRequestText(input.text);
 
@@ -177,6 +186,7 @@ export function createResultWindowRuntime({
       input.targetLang,
     );
     const providerIds = await state.loadActiveTranslationProviderIds();
+    if (generation !== translationGeneration) return;
     const sessionId = state.startTranslationSession(input.text, providerIds);
 
     if (providerIds.length === 0) {
@@ -197,14 +207,20 @@ export function createResultWindowRuntime({
               targetLang: request.targetLang,
             },
           );
+          if (generation !== translationGeneration) return null;
+          if (result.error) {
+            state.failProviderTranslation(sessionId, result);
+            return null;
+          }
           state.completeProviderTranslation(sessionId, result);
           return result;
         } catch (error) {
-          state.failProviderTranslation(
-            sessionId,
-            providerId,
-            errorMessage(error),
-          );
+          if (generation === translationGeneration) {
+            state.failProviderTranslation(
+              sessionId,
+              translationFailure(providerId, error),
+            );
+          }
           return null;
         }
       }),
@@ -213,20 +229,23 @@ export function createResultWindowRuntime({
       (result): result is TranslationResult => result !== null,
     );
 
-    if (completedResults.length > 0) {
-      await persistTranslationHistory({
-        text: input.text,
-        sourceLang: request.sourceLang,
-        targetLang: request.targetLang,
-        results: completedResults,
-        startedAt,
-      });
-      if (settings?.autoCopy) {
-        try {
-          await platform.clipboard.copyText(completedResults[0].translated_text);
-        } catch (error) {
-          console.error('Failed to auto-copy translation result:', error);
-        }
+    if (generation !== translationGeneration || completedResults.length === 0) {
+      return;
+    }
+
+    await persistTranslationHistory({
+      text: input.text,
+      sourceLang: request.sourceLang,
+      targetLang: request.targetLang,
+      results: completedResults,
+      startedAt,
+    });
+    if (generation !== translationGeneration) return;
+    if (settings?.autoCopy) {
+      try {
+        await platform.clipboard.copyText(completedResults[0].translated_text);
+      } catch (error) {
+        console.error('Failed to auto-copy translation result:', error);
       }
     }
   }
@@ -235,13 +254,15 @@ export function createResultWindowRuntime({
     const session = state.getTranslationSession();
     if (!session.sessionId || !session.sourceText.trim()) return;
 
+    const generation = ++translationGeneration;
+    const sessionId = session.sessionId;
+
     const request = resolveTranslationRequestLanguages(
       translationRequestText(session.sourceText),
       session.sourceLang,
       session.targetLang,
     );
-    const startedAt = performance.now();
-    state.beginProviderTranslation(session.sessionId, providerId);
+    state.beginProviderTranslation(sessionId, providerId);
 
     try {
       const result = await platform.commands.translateTextWithProvider(
@@ -252,24 +273,24 @@ export function createResultWindowRuntime({
           targetLang: request.targetLang,
         },
       );
-      state.completeProviderTranslation(session.sessionId, result);
-      await persistTranslationHistory({
-        text: session.sourceText,
-        sourceLang: request.sourceLang,
-        targetLang: request.targetLang,
-        results: [result],
-        startedAt,
-      });
+      if (generation !== translationGeneration) return;
+      if (result.error) {
+        state.failProviderTranslation(sessionId, result);
+        return;
+      }
+      state.completeProviderTranslation(sessionId, result);
     } catch (error) {
-      state.failProviderTranslation(
-        session.sessionId,
-        providerId,
-        errorMessage(error),
-      );
+      if (generation === translationGeneration) {
+            state.failProviderTranslation(
+              sessionId,
+              translationFailure(providerId, error),
+            );
+      }
     }
   }
 
   async function applyPayload(payload: CaptureResultWindowPayload) {
+    invalidateTranslationGeneration();
     state.setResultWindowOrigin(
       payload.origin ?? (payload.mode === 'ocr' ? 'ocr' : 'input'),
     );
@@ -415,6 +436,7 @@ export function createResultWindowRuntime({
   }
 
   async function close(presentation: ResultWindowPresentation) {
+    invalidateTranslationGeneration();
     state.hideResultWindow();
     needsPlacement = true;
     if (presentation === 'standalone') {
@@ -479,9 +501,15 @@ export function createResultWindowRuntime({
   }
 
   return {
-    updateSourceText: state.setSourceText,
+    updateSourceText: (text: string) => {
+      invalidateTranslationGeneration();
+      state.setSourceText(text);
+    },
     changeSourceLanguage,
-    changeTargetLanguage: state.setTargetLang,
+    changeTargetLanguage: (language: string) => {
+      invalidateTranslationGeneration();
+      state.setTargetLang(language);
+    },
     swapTranslationLanguages,
     updateOcrText: state.setOcrText,
     clearOcrImage: () => state.setOcrImageBase64(null),
@@ -517,4 +545,20 @@ function base64ToBytes(base64: string) {
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function translationFailure(providerId: string, error: unknown): TranslationResult {
+  const message = errorMessage(error);
+  const failure: TranslationError = {
+    code: 'request_failed',
+    message,
+    retryable: true,
+  };
+  return {
+    provider_id: providerId,
+    translated_text: '',
+    detected_language: null,
+    confidence: null,
+    error: failure,
+  };
 }

@@ -97,8 +97,7 @@ interface ResultWindowStoreState {
   ) => void;
   failProviderTranslation: (
     sessionId: string,
-    providerId: string,
-    message: string,
+    result: TranslationResult,
   ) => void;
   setTranslating: (value: boolean) => void;
   setOcrText: (text: string) => void;
@@ -143,10 +142,12 @@ export const useResultWindowStore = create<ResultWindowStoreState>((set) => ({
     }),
   setTranslations: (results) =>
     set({
-      translations: results.map(normalizeTranslationResult),
+      translations: results
+        .filter((result) => !result.error)
+        .map(normalizeTranslationResult),
       providerTranslations: results.map((result) => ({
         ...normalizeTranslationResult(result),
-        status: 'success',
+        status: result.error ? 'error' : 'success',
       })),
     }),
   clearTranslationResults: () =>
@@ -201,7 +202,7 @@ export const useResultWindowStore = create<ResultWindowStoreState>((set) => ({
         normalizedResult.provider_id,
         {
           ...normalizedResult,
-          status: 'success',
+          status: normalizedResult.error ? 'error' : 'success',
         },
       );
       return {
@@ -212,18 +213,26 @@ export const useResultWindowStore = create<ResultWindowStoreState>((set) => ({
         isTranslating: hasPendingProviderTranslation(providerTranslations),
       };
     }),
-  failProviderTranslation: (sessionId, providerId, message) =>
+  failProviderTranslation: (sessionId, result) =>
     set((state) => {
       if (state.translationSessionId !== sessionId) return state;
+      const providerId = result.provider_id;
       const providerTranslations = updateProviderTranslation(
         state.providerTranslations,
         providerId,
         {
           provider_id: providerId,
           status: 'error',
-          translated_text: `Translation failed: ${message}`,
+          translated_text: '',
           detected_language: null,
           confidence: null,
+          error: result.error ?? {
+            code: 'request_failed',
+            message: 'Translation request failed',
+            retryable: true,
+          },
+          request_id: result.request_id ?? null,
+          duration_ms: result.duration_ms ?? null,
         },
       );
       return {
@@ -319,10 +328,10 @@ export function createResultWindowStatePort(
       useResultWindowStore
         .getState()
         .completeProviderTranslation(sessionId, result),
-    failProviderTranslation: (sessionId, providerId, message) =>
+    failProviderTranslation: (sessionId, result) =>
       useResultWindowStore
         .getState()
-        .failProviderTranslation(sessionId, providerId, message),
+        .failProviderTranslation(sessionId, result),
     setTranslating: (value) =>
       useResultWindowStore.getState().setTranslating(value),
   };

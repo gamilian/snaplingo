@@ -179,12 +179,12 @@ impl TranslationProvider for BaiduTranslateProvider {
             .first()
             .ok_or_else(|| AppError::Other("Empty translation result from Baidu".to_string()))?;
 
-        Ok(TranslationResult {
-            provider_id: self.id().to_string(),
-            translated_text: translation.dst.clone(),
-            detected_language: None, // Baidu doesn't provide detected language in this endpoint
-            confidence: None,
-        })
+        Ok(TranslationResult::success(
+            self.id(),
+            translation.dst.clone(),
+            None, // Baidu doesn't provide detected language in this endpoint
+            None,
+        ))
     }
 }
 

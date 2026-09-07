@@ -1,7 +1,7 @@
 use std::thread;
 
 use crate::application::providers::ocr::SystemOcrEngine;
-use crate::domain::ocr::{OcrRequest, OcrResult};
+use crate::domain::ocr::OcrRequest;
 use crate::{AppError, Result};
 use windows::core::HSTRING;
 use windows::Globalization::Language;
@@ -84,10 +84,7 @@ fn recognize_with_windows_runtime(
         .map_err(|error| AppError::System(format!("Failed to read Windows OCR result: {error}")))?
         .to_string();
 
-    Ok(OcrResult {
-        text,
-        confidence: None,
-    })
+    Ok(crate::domain::ocr::OcrResult::from_text(text, None))
 }
 
 fn create_ocr_engine(requested_language: Option<&str>) -> Result<OcrEngine> {

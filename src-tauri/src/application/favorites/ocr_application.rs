@@ -215,6 +215,9 @@ mod tests {
         OcrResult {
             text: text.to_string(),
             confidence: Some(0.9),
+            lines: Vec::new(),
+            detected_language: None,
+            provider_id: None,
         }
     }
 

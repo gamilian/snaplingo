@@ -1210,16 +1210,20 @@ function ResultWindowContent({
                         translationProviders,
                       )}
                       status={result.status}
-                      text={result.translated_text}
+                      text={result.error?.message ?? result.translated_text}
                       languageCode={resolvedTargetLanguage}
                       bodyHeightPx={
                         translationLayout.bodyHeightByProviderId[
                           result.provider_id
                         ] ?? 44
                       }
-                      onRetry={() => {
-                        void runtime.retryTranslationProvider(result.provider_id);
-                      }}
+                      onRetry={
+                        result.status !== 'error' || result.error?.retryable
+                          ? () => {
+                              void runtime.retryTranslationProvider(result.provider_id);
+                            }
+                          : undefined
+                      }
                       onFavorite={() =>
                         runtime.favoriteTranslationResult({
                           text: sourceText,

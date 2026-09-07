@@ -251,12 +251,33 @@ impl History {
         &self,
         request: &TranslationRequest,
         results: &[TranslationResult],
-        providers_used: &[String],
+        _providers_used: &[String],
         timestamp: DateTime<Utc>,
         duration_ms: u64,
     ) -> Result<()> {
+        let successful_results = results
+            .iter()
+            .filter(|result| result.error.is_none())
+            .cloned()
+            .collect::<Vec<_>>();
+        if successful_results.is_empty() {
+            if results.is_empty() {
+                self.notify_changed();
+            }
+            return Ok(());
+        }
+        let providers_used = successful_results
+            .iter()
+            .map(|result| result.provider_id.clone())
+            .collect::<Vec<_>>();
         self.repository
-            .insert_translation(request, results, providers_used, timestamp, duration_ms)
+            .insert_translation(
+                request,
+                &successful_results,
+                &providers_used,
+                timestamp,
+                duration_ms,
+            )
             .await?;
         self.notify_changed();
         if let Err(error) = self.run_cleanup().await {

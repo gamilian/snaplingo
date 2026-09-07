@@ -1,12 +1,12 @@
 use crate::application::providers::ocr::SystemOcrEngine;
-use crate::domain::ocr::{OcrRequest, OcrResult};
+use crate::domain::ocr::{OcrBoundingBox, OcrLine, OcrRequest, OcrResult};
 use crate::{AppError, Result};
 use objc2::runtime::AnyObject;
 use objc2::AnyThread;
 use objc2_foundation::{NSArray, NSData, NSDictionary, NSString};
 use objc2_vision::{
-    VNImageOption, VNImageRequestHandler, VNRecognizeTextRequest, VNRequest,
-    VNRequestTextRecognitionLevel,
+    VNDetectedObjectObservation, VNImageOption, VNImageRequestHandler, VNRecognizeTextRequest,
+    VNRequest, VNRequestTextRecognitionLevel,
 };
 
 pub struct MacOSVisionOcrEngine;
@@ -65,6 +65,9 @@ fn recognize_with_vision(request: &OcrRequest) -> Result<OcrResult> {
         return Ok(OcrResult {
             text: String::new(),
             confidence: None,
+            lines: Vec::new(),
+            detected_language: None,
+            provider_id: None,
         });
     };
 
@@ -91,16 +94,51 @@ fn ocr_result_from_observations(
 
         confidence_sum += candidate.confidence();
         confidence_count += 1;
-        lines.push(text);
+        let bounding_box = unsafe {
+            <_ as AsRef<VNDetectedObjectObservation>>::as_ref(&observation).boundingBox()
+        };
+        lines.push(OcrLine {
+            text,
+            confidence: Some(candidate.confidence()),
+            bounding_box: Some(OcrBoundingBox {
+                x: bounding_box.origin.x as f32,
+                y: bounding_box.origin.y as f32,
+                width: bounding_box.size.width as f32,
+                height: bounding_box.size.height as f32,
+            }),
+        });
     }
 
+    lines.sort_by(|left, right| {
+        right
+            .bounding_box
+            .map(|box_| box_.y)
+            .partial_cmp(&left.bounding_box.map(|box_| box_.y))
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| {
+                left.bounding_box
+                    .map(|box_| box_.x)
+                    .partial_cmp(&right.bounding_box.map(|box_| box_.x))
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+    });
+
+    let text = lines
+        .iter()
+        .map(|line| line.text.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+
     OcrResult {
-        text: lines.join("\n"),
+        text,
         confidence: if confidence_count == 0 {
             None
         } else {
             Some(confidence_sum / confidence_count as f32)
         },
+        lines,
+        detected_language: None,
+        provider_id: None,
     }
 }
 

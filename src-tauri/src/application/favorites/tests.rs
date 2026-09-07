@@ -175,6 +175,9 @@ async fn translation_favorite_is_an_independent_snapshot_and_is_deduplicated() {
         translated_text: "你好".to_string(),
         detected_language: Some("en".to_string()),
         confidence: None,
+        error: None,
+        request_id: None,
+        duration_ms: None,
     };
 
     let first = favorites
@@ -214,6 +217,9 @@ async fn capacity_rejects_new_favorites_but_keeps_duplicate_adds_idempotent() {
         translated_text: "你好".to_string(),
         detected_language: Some("en".to_string()),
         confidence: None,
+        error: None,
+        request_id: None,
+        duration_ms: None,
     };
 
     favorites
@@ -237,6 +243,9 @@ async fn capacity_rejects_new_favorites_but_keeps_duplicate_adds_idempotent() {
                 translated_text: "再见".to_string(),
                 detected_language: Some("en".to_string()),
                 confidence: None,
+                error: None,
+                request_id: None,
+                duration_ms: None,
             },
         )
         .await
@@ -263,6 +272,9 @@ async fn ocr_favorite_owns_its_snapshot_and_thumbnail() {
             OcrResult {
                 text: "recognized".to_string(),
                 confidence: Some(0.9),
+                lines: Vec::new(),
+                detected_language: None,
+                provider_id: None,
             },
         )
         .await
@@ -295,6 +307,9 @@ async fn equal_ocr_text_from_different_images_creates_distinct_favorites() {
                 OcrResult {
                     text: "same text".to_string(),
                     confidence: None,
+                    lines: Vec::new(),
+                    detected_language: None,
+                    provider_id: None,
                 },
             )
             .await
@@ -325,6 +340,9 @@ async fn clearing_history_does_not_remove_an_independent_favorite_snapshot() {
         translated_text: "你好".to_string(),
         detected_language: Some("en".to_string()),
         confidence: None,
+        error: None,
+        request_id: None,
+        duration_ms: None,
     };
     history
         .handle(&DomainEvent::TranslationCompleted {

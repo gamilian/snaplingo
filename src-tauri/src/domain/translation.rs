@@ -53,4 +53,57 @@ pub struct TranslationResult {
     pub translated_text: String,
     pub detected_language: Option<String>,
     pub confidence: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<TranslationError>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub duration_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TranslationError {
+    pub code: String,
+    pub message: String,
+    pub retryable: bool,
+}
+
+impl TranslationResult {
+    pub fn success(
+        provider_id: impl Into<String>,
+        translated_text: impl Into<String>,
+        detected_language: Option<String>,
+        confidence: Option<f32>,
+    ) -> Self {
+        Self {
+            provider_id: provider_id.into(),
+            translated_text: translated_text.into(),
+            detected_language,
+            confidence,
+            error: None,
+            request_id: None,
+            duration_ms: None,
+        }
+    }
+
+    pub fn failure(
+        provider_id: impl Into<String>,
+        code: impl Into<String>,
+        message: impl Into<String>,
+        retryable: bool,
+    ) -> Self {
+        Self {
+            provider_id: provider_id.into(),
+            translated_text: String::new(),
+            detected_language: None,
+            confidence: None,
+            error: Some(TranslationError {
+                code: code.into(),
+                message: message.into(),
+                retryable,
+            }),
+            request_id: None,
+            duration_ms: None,
+        }
+    }
 }

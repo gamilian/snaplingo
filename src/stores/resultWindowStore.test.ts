@@ -65,22 +65,39 @@ describe('translation session state', () => {
     ).toBe('new result');
   });
 
-  it('keeps failed provider cards with error text in the result body', () => {
+  it('keeps failed provider cards with structured error state', () => {
     const sessionId = useResultWindowStore
       .getState()
       .startTranslationSession('source text', ['deeplx']);
 
     useResultWindowStore
       .getState()
-      .failProviderTranslation(sessionId, 'deeplx', 'Invalid target_lang.');
+      .failProviderTranslation(sessionId, {
+        provider_id: 'deeplx',
+        translated_text: '',
+        detected_language: null,
+        confidence: null,
+        error: {
+          code: 'invalid_request',
+          message: 'Invalid target_lang.',
+          retryable: false,
+        },
+      });
 
     expect(useResultWindowStore.getState().providerTranslations).toEqual([
       {
         provider_id: 'deeplx',
         status: 'error',
-        translated_text: 'Translation failed: Invalid target_lang.',
+        translated_text: '',
         detected_language: null,
         confidence: null,
+        error: {
+          code: 'invalid_request',
+          message: 'Invalid target_lang.',
+          retryable: false,
+        },
+        request_id: null,
+        duration_ms: null,
       },
     ]);
   });

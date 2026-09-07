@@ -9,7 +9,7 @@ use super::CaptureSessionSource;
 use crate::domain::capture::{
     monitor_snapshot_from_layout, CaptureCandidateView, CaptureSessionId, CaptureSessionView,
     CapturedCursor, CapturedCursorView, ControlCandidate, LogicalPoint, LogicalRect,
-    MonitorSnapshot, MonitorSnapshotView, PhysicalRect, ScreenRegion, WindowCandidate,
+    MonitorSnapshot, MonitorSnapshotView, PhysicalRect, WindowCandidate,
 };
 use crate::error::{AppError, Result};
 
@@ -299,24 +299,14 @@ impl CaptureSessions {
         id: &CaptureSessionId,
         monitor_id: &str,
     ) -> Result<MonitorSnapshotView> {
-        loop {
-            let notified = self.hydration_notify.notified();
-            if let Some(snapshot) = self.cached_monitor_snapshot(id, monitor_id)? {
-                return Ok(snapshot_to_view(&snapshot));
-            }
-
-            if self.try_begin_session_hydration(id)? {
-                let result = self
-                    .capture_and_store_monitor_snapshot(id, monitor_id)
-                    .await;
-                self.finish_session_hydration(id)?;
-                self.hydration_notify.notify_waiters();
-                result?;
-                continue;
-            }
-
-            notified.await;
-        }
+        self.ensure_session_snapshots_hydrated(id).await?;
+        self.cached_monitor_snapshot(id, monitor_id)?
+            .map(|snapshot| snapshot_to_view(&snapshot))
+            .ok_or_else(|| {
+                AppError::System(format!(
+                    "Capture session monitor snapshot is unavailable: {monitor_id}"
+                ))
+            })
     }
 
     async fn ensure_session_snapshots_hydrated(&self, id: &CaptureSessionId) -> Result<()> {
@@ -335,41 +325,6 @@ impl CaptureSessions {
 
             notified.await;
         }
-    }
-
-    async fn capture_and_store_monitor_snapshot(
-        &self,
-        id: &CaptureSessionId,
-        monitor_id: &str,
-    ) -> Result<()> {
-        self.get_session(id)?;
-        let snapshot = self.source.capture_monitor_snapshot(monitor_id).await?;
-        if snapshot.id != monitor_id {
-            return Err(AppError::System(format!(
-                "Capture source returned monitor '{}' for requested monitor '{monitor_id}'",
-                snapshot.id
-            )));
-        }
-
-        let mut sessions = self
-            .sessions
-            .lock()
-            .map_err(|_| AppError::System("Capture session lock poisoned".to_string()))?;
-        let session = sessions
-            .get_mut(id)
-            .ok_or_else(|| AppError::System(format!("Capture session not found: {}", id.0)))?;
-        if !session
-            .layout_snapshots
-            .iter()
-            .any(|layout| layout.id == monitor_id)
-        {
-            return Err(AppError::System(format!(
-                "Capture session monitor not found: {monitor_id}"
-            )));
-        }
-        session.snapshots.retain(|cached| cached.id != monitor_id);
-        session.snapshots.push(snapshot);
-        Ok(())
     }
 
     async fn capture_and_store_session_snapshots(&self, id: &CaptureSessionId) -> Result<()> {
@@ -443,25 +398,10 @@ impl CaptureSessions {
         id: &CaptureSessionId,
         rect: &LogicalRect,
     ) -> Result<CaptureSessionView> {
-        let session = self.get_session(id)?;
-        if session_snapshots_cover_rect(&session, rect) {
-            return Ok(session_to_view(&session));
+        if !session_snapshots_cover_rect(&self.get_session(id)?, rect) {
+            self.ensure_session_snapshots_hydrated(id).await?;
         }
-
-        let snapshots = self
-            .capture_selection_snapshots(&session.layout_snapshots, rect)
-            .await?;
-
-        let mut sessions = self
-            .sessions
-            .lock()
-            .map_err(|_| AppError::System("Capture session lock poisoned".to_string()))?;
-        let session = sessions
-            .get_mut(id)
-            .ok_or_else(|| AppError::System(format!("Capture session not found: {}", id.0)))?;
-        session.snapshots = snapshots;
-
-        Ok(session_to_view(session))
+        self.get_session_view(id)
     }
 
     pub fn session_selection_needs_freeze(
@@ -616,46 +556,6 @@ impl CaptureSessions {
             })?;
 
         logical_rect_to_snapshot_physical(rect, snapshot)
-    }
-
-    async fn capture_selection_snapshots(
-        &self,
-        layout_snapshots: &[MonitorSnapshot],
-        rect: &LogicalRect,
-    ) -> Result<Vec<MonitorSnapshot>> {
-        let mut snapshots = Vec::new();
-
-        for layout in layout_snapshots {
-            let Some(intersection) = logical_rect_intersection(rect, &layout.logical_bounds) else {
-                continue;
-            };
-            let physical_rect = logical_rect_to_snapshot_physical(&intersection, layout)?;
-            let png_data = self
-                .source
-                .capture_region(ScreenRegion {
-                    x: physical_rect.x,
-                    y: physical_rect.y,
-                    width: physical_rect.width,
-                    height: physical_rect.height,
-                })
-                .await?;
-
-            snapshots.push(MonitorSnapshot {
-                id: layout.id.clone(),
-                logical_bounds: intersection,
-                physical_bounds: physical_rect,
-                scale_factor: layout.scale_factor,
-                png_data,
-            });
-        }
-
-        if snapshots.is_empty() {
-            return Err(AppError::System(
-                "Selection does not intersect any captured monitor".to_string(),
-            ));
-        }
-
-        Ok(snapshots)
     }
 }
 

@@ -78,6 +78,23 @@ export type ArrowKey = 'ArrowUp' | 'ArrowRight' | 'ArrowDown' | 'ArrowLeft';
 export interface OcrResult {
   text: string;
   confidence: number | null;
+  lines?: OcrLine[];
+  detected_language?: string | null;
+  provider_id?: string | null;
+}
+
+export interface OcrLine {
+  text: string;
+  confidence: number | null;
+  bounding_box: OcrBoundingBox | null;
+}
+
+export interface OcrBoundingBox {
+  /** Normalized coordinates with an origin at the image's lower-left corner. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 export interface RectangleAnnotationCommand {

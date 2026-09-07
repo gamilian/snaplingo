@@ -6,8 +6,11 @@ use crate::Result;
 use chrono::Utc;
 use parking_lot::RwLock;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
+
+static TRANSLATION_REQUEST_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 /// Coordinator for managing translation providers and operations.
 ///
@@ -325,6 +328,7 @@ impl TranslationCoordinator {
     /// Individual provider failures are logged but don't fail the entire request.
     pub async fn translate(&self, request: &TranslationRequest) -> Result<Vec<TranslationResult>> {
         let start = Instant::now();
+        let request_id = next_translation_request_id();
 
         // Get active providers (lock is released immediately after cloning)
         let active_providers = self.get_active();
@@ -342,8 +346,10 @@ impl TranslationCoordinator {
             let provider_lock = provider_lock.clone();
 
             let task = tokio::spawn(async move {
+                let started_at = Instant::now();
                 let provider = provider_lock.read();
-                provider.translate(&request).await
+                let result = provider.translate(&request).await;
+                (result, started_at.elapsed().as_millis() as u64)
             });
 
             tasks.push((provider_id, task));
@@ -353,26 +359,32 @@ impl TranslationCoordinator {
         let mut results = Vec::new();
         for (provider_id, task) in tasks {
             match task.await {
-                Ok(Ok(result)) => {
+                Ok((Ok(mut result), duration_ms)) => {
+                    result.request_id = Some(request_id.clone());
+                    result.duration_ms = Some(duration_ms);
                     results.push(result);
                 }
-                Ok(Err(e)) => {
+                Ok((Err(e), duration_ms)) => {
                     eprintln!("Translation provider error: {}", e);
-                    results.push(TranslationResult {
+                    let mut result = translation_failure(
                         provider_id,
-                        translated_text: format!("Translation failed: {}", e),
-                        detected_language: None,
-                        confidence: None,
-                    });
+                        "provider_error",
+                        e.to_string(),
+                        duration_ms,
+                    );
+                    result.request_id = Some(request_id.clone());
+                    results.push(result);
                 }
                 Err(e) => {
                     eprintln!("Translation task error: {}", e);
-                    results.push(TranslationResult {
+                    let mut result = translation_failure(
                         provider_id,
-                        translated_text: format!("Translation task failed: {}", e),
-                        detected_language: None,
-                        confidence: None,
-                    });
+                        "provider_task_failed",
+                        e.to_string(),
+                        start.elapsed().as_millis() as u64,
+                    );
+                    result.request_id = Some(request_id.clone());
+                    results.push(result);
                 }
             }
         }
@@ -402,11 +414,36 @@ impl TranslationCoordinator {
         provider_id: &str,
         request: &TranslationRequest,
     ) -> Result<TranslationResult> {
-        let provider_lock = self.get(provider_id).ok_or_else(|| {
-            crate::AppError::Other(format!("Provider not found: {}", provider_id))
-        })?;
+        let request_id = next_translation_request_id();
+        let started_at = Instant::now();
+        let Some(provider_lock) = self.get(provider_id) else {
+            let mut result = translation_failure(
+                provider_id.to_string(),
+                "provider_not_found",
+                format!("Provider not found: {}", provider_id),
+                started_at.elapsed().as_millis() as u64,
+            );
+            result.request_id = Some(request_id);
+            return Ok(result);
+        };
         let provider = provider_lock.read();
-        provider.translate(request).await
+        match provider.translate(request).await {
+            Ok(mut result) => {
+                result.request_id = Some(request_id);
+                result.duration_ms = Some(started_at.elapsed().as_millis() as u64);
+                Ok(result)
+            }
+            Err(error) => {
+                let mut result = translation_failure(
+                    provider_id.to_string(),
+                    "provider_error",
+                    error.to_string(),
+                    started_at.elapsed().as_millis() as u64,
+                );
+                result.request_id = Some(request_id);
+                Ok(result)
+            }
+        }
     }
 
     /// Reconfigures a provider's credentials at runtime.
@@ -458,4 +495,40 @@ fn normalize_legacy_translation_provider_id(id: &str) -> &str {
         "deepl" => "deeplx",
         _ => id,
     }
+}
+
+fn next_translation_request_id() -> String {
+    let sequence = TRANSLATION_REQUEST_SEQUENCE.fetch_add(1, Ordering::Relaxed) + 1;
+    format!("translation-request-{}", sequence)
+}
+
+fn translation_failure(
+    provider_id: impl Into<String>,
+    code: &str,
+    message: String,
+    duration_ms: u64,
+) -> TranslationResult {
+    let retryable = is_retryable_translation_error(&message);
+    let mut result = TranslationResult::failure(provider_id, code, message, retryable);
+    result.duration_ms = Some(duration_ms);
+    result
+}
+
+fn is_retryable_translation_error(message: &str) -> bool {
+    let message = message.to_ascii_lowercase();
+    [
+        "timeout",
+        "timed out",
+        "network",
+        "connect",
+        "connection",
+        "temporarily",
+        "rate limit",
+        "429",
+        "502",
+        "503",
+        "504",
+    ]
+    .iter()
+    .any(|marker| message.contains(marker))
 }

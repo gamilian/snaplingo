@@ -43,6 +43,9 @@ mod tests {
                 translated_text: "Hola mundo".to_string(),
                 detected_language: Some("en".to_string()),
                 confidence: Some(0.95),
+                error: None,
+                request_id: None,
+                duration_ms: None,
             }],
             providers_used: vec!["google".to_string()],
             timestamp: Utc::now(),
@@ -74,12 +77,18 @@ mod tests {
                 translated_text: "你好，世界".to_string(),
                 detected_language: Some("en".to_string()),
                 confidence: None,
+                error: None,
+                request_id: None,
+                duration_ms: None,
             },
             TranslationResult {
                 provider_id: "deeplx".to_string(),
                 translated_text: "你好世界".to_string(),
                 detected_language: Some("en".to_string()),
                 confidence: None,
+                error: None,
+                request_id: None,
+                duration_ms: None,
             },
         ];
 
@@ -106,8 +115,16 @@ mod tests {
                 source_lang: "en".to_string(),
                 target_lang: "zh-CN".to_string(),
             },
-            results: vec![],
-            providers_used: vec![],
+            results: vec![TranslationResult {
+                provider_id: "google".to_string(),
+                translated_text: "可变历史".to_string(),
+                detected_language: None,
+                confidence: None,
+                error: None,
+                request_id: None,
+                duration_ms: None,
+            }],
+            providers_used: vec!["google".to_string()],
             timestamp: Utc::now(),
             duration_ms: 5,
         };
@@ -115,6 +132,38 @@ mod tests {
         history.handle(&event).await;
 
         assert_eq!(notifier.0.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn failed_translation_results_are_not_written_to_history() {
+        let db = create_temp_db();
+        let history = History::new(db.clone());
+        history
+            .record_translation(
+                TranslationRequest {
+                    text: "hello".to_string(),
+                    source_lang: "en".to_string(),
+                    target_lang: "zh-CN".to_string(),
+                },
+                vec![TranslationResult {
+                    provider_id: "google".to_string(),
+                    translated_text: String::new(),
+                    detected_language: None,
+                    confidence: None,
+                    error: Some(crate::domain::translation::TranslationError {
+                        code: "provider_error".to_string(),
+                        message: "upstream unavailable".to_string(),
+                        retryable: true,
+                    }),
+                    request_id: Some("translation-request-1".to_string()),
+                    duration_ms: Some(10),
+                }],
+                10,
+            )
+            .await
+            .unwrap();
+
+        assert!(db.query_translations(10, 0).await.unwrap().is_empty());
     }
 
     #[tokio::test]
@@ -131,6 +180,9 @@ mod tests {
             result: OcrResult {
                 text: "Recognized text".to_string(),
                 confidence: Some(0.92),
+                lines: Vec::new(),
+                detected_language: None,
+                provider_id: None,
             },
             provider_used: "tesseract".to_string(),
             timestamp: Utc::now(),
@@ -165,6 +217,9 @@ mod tests {
                 translated_text: "Tester".to_string(),
                 detected_language: Some("en".to_string()),
                 confidence: Some(0.98),
+                error: None,
+                request_id: None,
+                duration_ms: None,
             }],
             providers_used: vec!["deepl".to_string()],
             timestamp: Utc::now(),
@@ -202,6 +257,9 @@ mod tests {
                 translated_text: "Bórrame".to_string(),
                 detected_language: None,
                 confidence: None,
+                error: None,
+                request_id: None,
+                duration_ms: None,
             }],
             providers_used: vec!["google".to_string()],
             timestamp: Utc::now(),
@@ -233,8 +291,16 @@ mod tests {
                 source_lang: "en".to_string(),
                 target_lang: "zh-CN".to_string(),
             },
-            results: vec![],
-            providers_used: vec![],
+            results: vec![TranslationResult {
+                provider_id: "google".to_string(),
+                translated_text: "可变历史".to_string(),
+                detected_language: None,
+                confidence: None,
+                error: None,
+                request_id: None,
+                duration_ms: None,
+            }],
+            providers_used: vec!["google".to_string()],
             timestamp: Utc::now(),
             duration_ms: 1,
         };
@@ -282,6 +348,9 @@ mod tests {
                 result: OcrResult {
                     text: "ocr".to_string(),
                     confidence: None,
+                    lines: Vec::new(),
+                    detected_language: None,
+                    provider_id: None,
                 },
                 provider_used: "test".to_string(),
                 timestamp: Utc::now(),
@@ -329,6 +398,9 @@ mod tests {
                 result: OcrResult {
                     text: "ocr".to_string(),
                     confidence: None,
+                    lines: Vec::new(),
+                    detected_language: None,
+                    provider_id: None,
                 },
                 provider_used: "test".to_string(),
                 timestamp: Utc::now(),

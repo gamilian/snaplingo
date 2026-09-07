@@ -381,7 +381,103 @@ describe('result window application runtime', () => {
     consoleError.mockRestore();
   });
 
-  it('records a successful provider retry instead of bypassing history', async () => {
+  it('renders structured provider failures without recording them as translations', async () => {
+    const { runtime, platform, state } = createRuntime({
+      activeProviderIds: ['google'],
+      translationResults: {
+        google: {
+          provider_id: 'google',
+          translated_text: '',
+          detected_language: null,
+          confidence: null,
+          error: {
+            code: 'invalid_request',
+            message: 'Invalid target language',
+            retryable: false,
+          },
+        },
+      },
+    });
+
+    await runtime.translate({
+      text: 'hello',
+      sourceLang: 'en',
+      targetLang: 'zh-CN',
+    });
+
+    expect(state.failProviderTranslation).toHaveBeenCalledWith(
+      'translation-1',
+      expect.objectContaining({
+        provider_id: 'google',
+        translated_text: '',
+        error: expect.objectContaining({ code: 'invalid_request' }),
+      }),
+    );
+    expect(state.completeProviderTranslation).not.toHaveBeenCalled();
+    expect(platform.commands.recordTranslationHistory).not.toHaveBeenCalled();
+  });
+
+  it('ignores a late result from an older translation generation', async () => {
+    const first = deferred<import('../../types').TranslationResult>();
+    const second = deferred<import('../../types').TranslationResult>();
+    const { runtime, platform, state } = createRuntime({
+      activeProviderIds: ['google'],
+      translationResults: {
+        google: {
+          provider_id: 'google',
+          translated_text: 'unused',
+          detected_language: 'en',
+          confidence: null,
+        },
+      },
+    });
+    platform.commands.translateTextWithProvider
+      .mockImplementationOnce(async () => first.promise)
+      .mockImplementationOnce(async () => second.promise);
+
+    const firstRun = runtime.translate({
+      text: 'first',
+      sourceLang: 'en',
+      targetLang: 'zh-CN',
+    });
+    await vi.waitFor(() =>
+      expect(platform.commands.translateTextWithProvider).toHaveBeenCalledOnce(),
+    );
+    const secondRun = runtime.translate({
+      text: 'second',
+      sourceLang: 'en',
+      targetLang: 'zh-CN',
+    });
+    await vi.waitFor(() =>
+      expect(platform.commands.translateTextWithProvider).toHaveBeenCalledTimes(2),
+    );
+
+    first.resolve({
+      provider_id: 'google',
+      translated_text: 'old result',
+      detected_language: 'en',
+      confidence: null,
+    });
+    second.resolve({
+      provider_id: 'google',
+      translated_text: 'new result',
+      detected_language: 'en',
+      confidence: null,
+    });
+    await Promise.all([firstRun, secondRun]);
+
+    expect(state.completeProviderTranslation).toHaveBeenCalledTimes(1);
+    expect(state.completeProviderTranslation).toHaveBeenCalledWith(
+      'translation-1',
+      expect.objectContaining({ translated_text: 'new result' }),
+    );
+    expect(platform.commands.recordTranslationHistory).toHaveBeenCalledTimes(1);
+    expect(platform.commands.recordTranslationHistory).toHaveBeenCalledWith(
+      expect.objectContaining({ text: 'second' }),
+    );
+  });
+
+  it('updates a successful provider retry without duplicating history', async () => {
     const { runtime, platform, state } = createRuntime({
       translationSession: {
         sessionId: 'translation-1',
@@ -405,12 +501,7 @@ describe('result window application runtime', () => {
       'translation-1',
       'google',
     );
-    expect(platform.commands.recordTranslationHistory).toHaveBeenCalledWith(
-      expect.objectContaining({
-        text: 'hello',
-        results: [expect.objectContaining({ provider_id: 'google' })],
-      }),
-    );
+    expect(platform.commands.recordTranslationHistory).not.toHaveBeenCalled();
   });
 
   it('closes overlay state locally and standalone state plus native window', async () => {
@@ -721,4 +812,14 @@ function createRuntime(options: {
       await payloadReadyHandler?.(requestId);
     },
   };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
 }

@@ -236,10 +236,9 @@ impl OcrProvider for BaiduOcrProvider {
             .collect::<Vec<_>>()
             .join("\n");
 
-        Ok(OcrResult {
-            text,
-            confidence: None, // Baidu basic OCR doesn't provide confidence scores
-        })
+        Ok(OcrResult::from_text(
+            text, None, // Baidu basic OCR doesn't provide confidence scores
+        ))
     }
 }
 

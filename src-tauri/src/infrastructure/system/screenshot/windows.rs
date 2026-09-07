@@ -21,7 +21,6 @@ use windows::Win32::{
     },
     UI::Accessibility::{CUIAutomation, IUIAutomation},
 };
-use xcap::Monitor;
 
 /// Windows screenshot backend using the cross-platform XCap crate.
 pub struct WindowsCaptureSessionSource;
@@ -102,11 +101,11 @@ impl CaptureSessionSource for WindowsCaptureSessionSource {
 fn capture_control_candidate_at(
     point: &LogicalPoint,
 ) -> Result<Option<ControlCandidate>, AppError> {
-    let scale_factor = windows_primary_scale_factor()?;
-    let physical_point = POINT {
-        x: (point.x * scale_factor).round() as i32,
-        y: (point.y * scale_factor).round() as i32,
-    };
+    let layouts = xcap_common::capture_all_monitor_layouts()?;
+    let (physical_point, scale_factor) = physical_point_for_logical_point(point, &layouts)
+        .ok_or_else(|| {
+            AppError::System("Cannot map logical point to a Windows monitor".to_string())
+        })?;
     let _com = ComApartment::initialize()?;
     let automation: IUIAutomation =
         unsafe { CoCreateInstance(&CUIAutomation, None, CLSCTX_INPROC_SERVER) }.map_err(
@@ -128,12 +127,33 @@ fn capture_control_candidate_at(
         AppError::System(format!("Failed to read Windows UI element bounds: {error}"))
     })?;
 
-    Ok(control_candidate_from_physical_bounds(
-        bounds.left,
-        bounds.top,
-        bounds.right,
-        bounds.bottom,
-        scale_factor,
+    let monitor = layouts.iter().find(|monitor| {
+        let physical = &monitor.physical_bounds;
+        bounds.left >= physical.x
+            && bounds.top >= physical.y
+            && bounds.left < physical.x.saturating_add_unsigned(physical.width)
+            && bounds.top < physical.y.saturating_add_unsigned(physical.height)
+    });
+
+    Ok(monitor.map_or_else(
+        || {
+            control_candidate_from_physical_bounds(
+                bounds.left,
+                bounds.top,
+                bounds.right,
+                bounds.bottom,
+                scale_factor,
+            )
+        },
+        |monitor| {
+            control_candidate_from_physical_bounds_on_monitor(
+                bounds.left,
+                bounds.top,
+                bounds.right,
+                bounds.bottom,
+                monitor,
+            )
+        },
     ))
 }
 
@@ -158,17 +178,6 @@ impl Drop for ComApartment {
     }
 }
 
-fn windows_primary_scale_factor() -> Result<f64, AppError> {
-    Monitor::all()
-        .map_err(|error| {
-            AppError::System(format!("Failed to enumerate Windows monitors: {error}"))
-        })?
-        .into_iter()
-        .find(|monitor| monitor.is_primary().unwrap_or(false))
-        .map(|monitor| monitor.scale_factor().unwrap_or(1.0).max(1.0) as f64)
-        .ok_or_else(|| AppError::System("No primary Windows monitor found".to_string()))
-}
-
 fn control_candidate_from_physical_bounds(
     left: i32,
     top: i32,
@@ -180,12 +189,37 @@ fn control_candidate_from_physical_bounds(
         return None;
     }
     let scale_factor = scale_factor.max(1.0);
-    let bounds = LogicalRect {
+    control_candidate_from_logical_bounds(LogicalRect {
         x: left as f64 / scale_factor,
         y: top as f64 / scale_factor,
         width: (right - left) as f64 / scale_factor,
         height: (bottom - top) as f64 / scale_factor,
-    };
+    })
+}
+
+fn control_candidate_from_physical_bounds_on_monitor(
+    left: i32,
+    top: i32,
+    right: i32,
+    bottom: i32,
+    monitor: &MonitorLayout,
+) -> Option<ControlCandidate> {
+    if right - left < 2 || bottom - top < 2 {
+        return None;
+    }
+    let scale = monitor.scale_factor.max(1.0);
+    control_candidate_from_logical_bounds(LogicalRect {
+        x: monitor.logical_bounds.x + (left - monitor.physical_bounds.x) as f64 / scale,
+        y: monitor.logical_bounds.y + (top - monitor.physical_bounds.y) as f64 / scale,
+        width: (right - left) as f64 / scale,
+        height: (bottom - top) as f64 / scale,
+    })
+}
+
+fn control_candidate_from_logical_bounds(bounds: LogicalRect) -> Option<ControlCandidate> {
+    if bounds.width < 2.0 || bounds.height < 2.0 {
+        return None;
+    }
 
     Some(ControlCandidate {
         id: format!(
@@ -352,43 +386,56 @@ fn delete_icon_info_bitmaps(icon_info: &ICONINFO) {
 }
 
 fn normalize_windows_snapshot_coordinates(monitors: &mut [MonitorSnapshot]) {
-    let scale = monitors
-        .first()
-        .map(|monitor| monitor.scale_factor.max(1.0))
-        .unwrap_or(1.0);
     for monitor in monitors {
         monitor.logical_bounds = logical_rect_from_physical(
             monitor.physical_bounds.x,
             monitor.physical_bounds.y,
             monitor.physical_bounds.width,
             monitor.physical_bounds.height,
-            scale,
+            monitor.scale_factor.max(1.0),
         );
-        monitor.scale_factor = scale;
     }
 }
 
 fn normalize_windows_layout_coordinates(monitors: &mut [MonitorLayout]) {
-    let scale = monitors
-        .first()
-        .map(|monitor| monitor.scale_factor.max(1.0))
-        .unwrap_or(1.0);
     for monitor in monitors {
         monitor.logical_bounds = logical_rect_from_physical(
             monitor.physical_bounds.x,
             monitor.physical_bounds.y,
             monitor.physical_bounds.width,
             monitor.physical_bounds.height,
-            scale,
+            monitor.scale_factor.max(1.0),
         );
-        monitor.scale_factor = scale;
     }
+}
+
+fn physical_point_for_logical_point(
+    point: &LogicalPoint,
+    monitors: &[MonitorLayout],
+) -> Option<(POINT, f64)> {
+    let monitor = monitors.iter().find(|monitor| {
+        let bounds = &monitor.logical_bounds;
+        point.x >= bounds.x
+            && point.y >= bounds.y
+            && point.x < bounds.x + bounds.width
+            && point.y < bounds.y + bounds.height
+    })?;
+    let scale = monitor.scale_factor.max(1.0);
+    Some((
+        POINT {
+            x: (monitor.physical_bounds.x as f64 + (point.x - monitor.logical_bounds.x) * scale)
+                .round() as i32,
+            y: (monitor.physical_bounds.y as f64 + (point.y - monitor.logical_bounds.y) * scale)
+                .round() as i32,
+        },
+        scale,
+    ))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::control_candidate_from_physical_bounds;
-    use crate::domain::capture::LogicalRect;
+    use super::{control_candidate_from_physical_bounds, physical_point_for_logical_point};
+    use crate::domain::capture::{LogicalPoint, LogicalRect, MonitorLayout, PhysicalRect};
 
     #[test]
     fn converts_ui_automation_physical_bounds_to_capture_coordinates() {
@@ -410,5 +457,50 @@ mod tests {
     fn rejects_empty_ui_automation_bounds() {
         assert!(control_candidate_from_physical_bounds(10, 10, 11, 100, 1.0).is_none());
         assert!(control_candidate_from_physical_bounds(10, 10, 100, 11, 1.0).is_none());
+    }
+
+    #[test]
+    fn maps_ui_automation_points_using_the_target_monitor_scale() {
+        let monitors = vec![
+            MonitorLayout {
+                id: "primary".to_string(),
+                logical_bounds: LogicalRect {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 100.0,
+                    height: 100.0,
+                },
+                physical_bounds: PhysicalRect {
+                    x: 0,
+                    y: 0,
+                    width: 200,
+                    height: 200,
+                },
+                scale_factor: 2.0,
+            },
+            MonitorLayout {
+                id: "secondary".to_string(),
+                logical_bounds: LogicalRect {
+                    x: -100.0,
+                    y: 0.0,
+                    width: 100.0,
+                    height: 100.0,
+                },
+                physical_bounds: PhysicalRect {
+                    x: -150,
+                    y: 0,
+                    width: 150,
+                    height: 150,
+                },
+                scale_factor: 1.5,
+            },
+        ];
+
+        let (point, scale) =
+            physical_point_for_logical_point(&LogicalPoint { x: -50.0, y: 20.0 }, &monitors)
+                .unwrap();
+        assert_eq!(point.x, -75);
+        assert_eq!(point.y, 20);
+        assert_eq!(scale, 1.5);
     }
 }
