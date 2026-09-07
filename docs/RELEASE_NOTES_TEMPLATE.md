@@ -1,3 +1,11 @@
+# Release notes template
+
+复制本文件为 `docs/releases/vX.Y.Z.md`，填写版本变化后再发布。该文件只是维护者模板，不会被 Release 工作流直接上传。
+
+## 本版变化
+
+- 在这里填写本版本面向用户的实际变化。
+
 ## 下载与安装
 
 - macOS 14 或更新：Apple Silicon 下载 `aarch64.dmg`；Intel 下载 `x64.dmg`。拖入“应用程序”后启动。
@@ -20,7 +28,3 @@ macOS / Windows 默认使用系统 OCR。Windows 需要安装对应的系统 OCR
 - Windows PowerShell：`Get-FileHash .\下载的文件.exe -Algorithm SHA256`
 
 更新前退出 SnapLingo，覆盖安装同一架构版本。系统隐私授权是否跨版本保留仍需实际检查。正常覆盖安装不应删除 API 配置或历史记录。
-
-## 维护者发布前填写
-
-此 Release 自动创建为草稿。发布前填写本版变更，并按 `docs/RELEASING.md` 完成真实下载、首次授权、OCR 和跨版本升级验收。删除本节后再发布。

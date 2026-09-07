@@ -64,7 +64,7 @@ npm run tauri:build
 
 ## Desktop releases
 
-Windows packages are built and tested on GitHub Actions. macOS packages use one persistent self-signed identity across Intel and Apple Silicon. See [the zero-cost release and setup guide](docs/RELEASING.md) for downloadable artifacts, release tags, certificate setup, and optional free Windows signing applications.
+Windows packages are built and tested on GitHub Actions. macOS packages use ad-hoc signing for the zero-cost beta workflow, so Gatekeeper may require manual approval and screen recording permission may need to be granted again after an update. See [the zero-cost release and setup guide](docs/RELEASING.md) for downloadable artifacts, release tags, and optional free Windows signing applications.
 
 ## Documentation
 

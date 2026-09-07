@@ -27,15 +27,12 @@ jobs:
       matrix: ${{ steps.matrix.outputs.value }}
     steps:
       - uses: actions/checkout@v5
-      - name: Require matching version tag
-        run: |
-          node --input-type=module -e '
-            import fs from "node:fs";
-            const version = JSON.parse(fs.readFileSync("package.json")).version;
-            if (process.env.GITHUB_REF_TYPE === "tag" && process.env.GITHUB_REF_NAME !== `v${version}`) {
-              throw new Error("Tag must match package.json, Cargo.toml and tauri.conf.json");
-            }
-          '
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Require matching release versions and tag
+        run: node script/release-verification.mjs preflight
       - id: matrix
         env:
           OFFLINE: ${{ inputs.windows_offline || false }}
@@ -81,10 +78,14 @@ jobs:
       - name: Smoke test macOS installation
         if: runner.os == 'macOS'
         run: node script/smoke-test-macos.mjs
-      - name: Smoke test Windows installation
+      - name: Smoke test Windows NSIS installation
         if: runner.os == 'Windows'
         shell: pwsh
-        run: ./script/smoke-test-windows.ps1
+        run: ./script/smoke-test-windows.ps1 -InstallerType nsis
+      - name: Smoke test Windows MSI installation
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./script/smoke-test-windows.ps1 -InstallerType msi
       - name: Collect verified installers and checksums
         env:
           SNAPLINGO_ARTIFACT_SUFFIX: ${{ matrix.offline && 'offline' || '' }}
@@ -114,10 +115,33 @@ jobs:
         working-directory: release-assets
         run: |
           for checksum in SHA256SUMS-*.txt; do sha256sum --check "$checksum"; done
+      - name: Require versioned release notes
+        id: notes
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+
+          const tag = process.env.RELEASE_TAG;
+          if (!/^v\d+\.\d+\.\d+$/.test(tag)) {
+            throw new Error(`Unsupported release tag: ${tag}`);
+          }
+          const notesPath = path.join('docs', 'releases', `${tag}.md`);
+          if (!fs.existsSync(notesPath)) {
+            throw new Error(`Missing release notes: ${notesPath}`);
+          }
+          const notes = fs.readFileSync(notesPath, 'utf8');
+          if (/维护者发布前填写|删除本节|TODO|TBD/.test(notes)) {
+            throw new Error(`Release notes contain authoring placeholders: ${notesPath}`);
+          }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `path=${notesPath}\n`);
+          NODE
       - name: Create draft release for final human acceptance
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           gh release create "$RELEASE_TAG" release-assets/* --verify-tag --draft \
-            --title "SnapLingo $RELEASE_TAG" --notes-file docs/RELEASE_NOTES_TEMPLATE.md
+            --title "SnapLingo $RELEASE_TAG" --notes-file "${{ steps.notes.outputs.path }}"

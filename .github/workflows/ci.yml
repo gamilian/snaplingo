@@ -50,7 +50,11 @@ jobs:
       - name: Smoke test macOS installation
         if: runner.os == 'macOS'
         run: node script/smoke-test-macos.mjs
-      - name: Smoke test Windows installation
+      - name: Smoke test Windows NSIS installation
         if: runner.os == 'Windows'
         shell: pwsh
-        run: ./script/smoke-test-windows.ps1
+        run: ./script/smoke-test-windows.ps1 -InstallerType nsis
+      - name: Smoke test Windows MSI installation
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./script/smoke-test-windows.ps1 -InstallerType msi

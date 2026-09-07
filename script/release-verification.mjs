@@ -39,6 +39,17 @@ export function assertUnifiedReleaseVersion(versions) {
   return expected;
 }
 
+export function assertMatchingReleaseTag(version, environment = process.env) {
+  if (
+    environment.GITHUB_REF_TYPE === "tag" &&
+    environment.GITHUB_REF_NAME !== `v${version}`
+  ) {
+    throw new Error(
+      `Release tag ${environment.GITHUB_REF_NAME} must match version v${version}`,
+    );
+  }
+}
+
 export function verifyReleaseArtifacts({
   platform,
   bundleDirectory,
@@ -173,6 +184,27 @@ function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
 }
 
+function readCargoLockPackageVersion(path, packageName) {
+  let currentPackage = null;
+  for (const line of readFileSync(path, "utf8").split("\n")) {
+    if (line === "[[package]]") {
+      currentPackage = {};
+      continue;
+    }
+    const name = line.match(/^name = "([^"]+)"$/)?.[1];
+    if (name) {
+      currentPackage = { ...currentPackage, name };
+      continue;
+    }
+    const version = line.match(/^version = "([^"]+)"$/)?.[1];
+    if (version && currentPackage?.name === packageName) {
+      return version;
+    }
+  }
+
+  throw new Error(`Cargo.lock package ${packageName} was not found`);
+}
+
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     cwd: repositoryRoot,
@@ -201,6 +233,7 @@ function loadReleaseContext() {
       "--no-deps",
       "--format-version",
       "1",
+      "--locked",
       "--manifest-path",
       "src-tauri/Cargo.toml",
     ]),
@@ -212,11 +245,22 @@ function loadReleaseContext() {
     throw new Error(`Cargo package ${packageManifest.name} was not found`);
   }
 
+  const packageLock = readJson(join(repositoryRoot, "package-lock.json"));
+  const packageLockRoot = packageLock.packages?.[""];
+  const cargoLockVersion = readCargoLockPackageVersion(
+    join(repositoryRoot, "Cargo.lock"),
+    packageManifest.name,
+  );
+
   const version = assertUnifiedReleaseVersion({
     "package.json": packageManifest.version,
+    "package-lock.json": packageLock.version,
+    "package-lock.json packages['']": packageLockRoot?.version,
     "Cargo.toml": cargoPackage.version,
+    "Cargo.lock": cargoLockVersion,
     "tauri.conf.json": tauriConfig.version,
   });
+  assertMatchingReleaseTag(version);
 
   return {
     version,
@@ -308,13 +352,23 @@ function formatBytes(bytes) {
 
 async function main(args) {
   const command = args[0] ?? "build";
-  if (command !== "build" && command !== "verify" && command !== "collect") {
+  if (
+    command !== "build" &&
+    command !== "verify" &&
+    command !== "collect" &&
+    command !== "preflight"
+  ) {
     throw new Error(`Unknown release command: ${command}`);
   }
 
   const context = loadReleaseContext();
   console.log(`[release] Version ${context.version}`);
   console.log(`[release] Target directory: ${context.targetDirectory}`);
+
+  if (command === "preflight") {
+    console.log("[release] Version and release tag checks passed");
+    return;
+  }
 
   if (command === "build") {
     if (args.includes("--clean")) {

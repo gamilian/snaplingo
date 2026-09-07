@@ -35,7 +35,7 @@ ad-hoc 签名每次构建都可能变化，不能替代稳定发行身份，也�
 
 ### CI：每次 push / PR
 
-运行前端测试、Rust 格式/测试/check、原生打包验证。Windows 执行 NSIS 安装、启动、同版本重装、卸载检查；macOS 从最终 DMG 复制安装、验证签名、启动两次。Linux 同样执行原生测试与打包。
+运行前端测试、Rust 格式/测试/check、原生打包验证。Windows 分别执行 NSIS 和 MSI 安装、启动、重装、卸载检查；macOS 从最终 DMG 复制安装、验证签名、启动两次。Linux 同样执行原生测试与打包。
 
 macOS CI 和 Desktop packages 都使用临时 ad-hoc 签名。启动检查不等同于 Gatekeeper 信任检查，不会绕过或修改系统信任策略。
 
@@ -52,22 +52,23 @@ macOS CI 和 Desktop packages 都使用临时 ad-hoc 签名。启动检查不等
 ### tag：创建 Release 草稿
 
 1. 同步 `package.json`、`package-lock.json` 的根版本、`src-tauri/Cargo.toml`、`Cargo.lock` 的根包版本、`src-tauri/tauri.conf.json`，提交变更。
-2. 在准备发行的提交上创建匹配版本的 tag，例如版本 `0.2.0`：
+2. 从 `docs/RELEASE_NOTES_TEMPLATE.md` 创建 `docs/releases/v0.2.0.md`，填写本版面向用户的变化、安装说明和已知限制。
+3. 在准备发行的提交上创建匹配版本的 tag，例如版本 `0.2.0`：
 
    ```sh
    git tag v0.2.0
    git push origin v0.2.0
    ```
 
-3. Desktop packages 校验 tag 对应版本，构建所有默认架构，执行安装验证、生成校验值。
-4. 仅所有平台成功后，下载并重新校验 artifacts，再创建 GitHub Release **草稿**，附上安装包、来源文件和安装说明。
-5. 完成下面的交互验收，编辑版本变更说明，再点 Publish release。失败时不要复用同一版本号发布不同内容；草稿重跑前先检查并清理旧草稿，避免混合产物。
+4. Desktop packages 在构建矩阵开始前统一校验所有版本来源和 tag，随后构建所有默认架构，执行安装验证并生成校验值。
+5. 仅所有平台成功后，下载并重新校验 artifacts，再使用对应的版本化 Release notes 创建 GitHub Release **草稿**。
+6. 完成下面的交互验收后点 Publish release。缺少对应版本的 notes 或包含占位内容时，工作流会失败；失败时不要复用同一版本号发布不同内容。
 
 构建用 `Cargo.lock` 和 `npm ci` 固定依赖。普通构建仅清理 bundle，不删除整个 Rust release 缓存；`npm run tauri:build:beta` 才执行完整清理。避免绕过统一入口直接运行 `npm run tauri build`。
 
 ## 5. 验收边界与必测场景
 
-自动化已经检查：版本、产物非空/可执行、macOS ad-hoc 签名完整性/最低系统版本/动态库路径与架构、最终 DMG 内容、Windows 安装退出码和实际安装目录、程序存活、同版本重装。`npm run release:verify` 会重新做 macOS 原生验证，不只是检查文件存在。
+自动化已经检查：版本、产物非空/可执行、macOS ad-hoc 签名完整性/最低系统版本/动态库路径与架构、最终 DMG 内容、Windows NSIS/MSI 安装退出码和实际安装目录、程序存活、卸载与重装后的用户数据保留。`npm run release:verify` 会重新做 macOS 原生验证，不只是检查文件存在。
 
 自动化**不能证明**真实用户能截图、所有 OCR 语言正常、TCC 跨版本保留，或浏览器下载后的系统信任提示符合预期。公开发布前在干净用户/电脑上完成：
 

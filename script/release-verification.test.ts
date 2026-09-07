@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   assertUnifiedReleaseVersion,
+  assertMatchingReleaseTag,
   releaseArtifactContract,
   verifyReleaseArtifacts,
 } from './release-verification.mjs';
@@ -52,6 +53,21 @@ describe('release version contract', () => {
         'tauri.conf.json': '0.2.0',
       }),
     ).toThrow(/Release versions must match/);
+  });
+
+  it('requires a tag to match the unified release version', () => {
+    expect(() => assertMatchingReleaseTag('0.2.0', {
+      GITHUB_REF_TYPE: 'tag',
+      GITHUB_REF_NAME: 'v0.2.0',
+    })).not.toThrow();
+    expect(() => assertMatchingReleaseTag('0.2.0', {
+      GITHUB_REF_TYPE: 'tag',
+      GITHUB_REF_NAME: 'v0.2.1',
+    })).toThrow(/must match version v0.2.0/);
+    expect(() => assertMatchingReleaseTag('0.2.0', {
+      GITHUB_REF_TYPE: 'branch',
+      GITHUB_REF_NAME: 'master',
+    })).not.toThrow();
   });
 });
 
