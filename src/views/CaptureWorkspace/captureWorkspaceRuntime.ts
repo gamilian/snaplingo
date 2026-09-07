@@ -613,7 +613,14 @@ export function createCaptureWorkspaceRuntime({
         : normalizeOcrText(result.text);
 
       if (effect.target === 'translation-window') {
-        await platform.commands.openCaptureTranslationResultWindow(text);
+        if (result.detected_language) {
+          await platform.commands.openCaptureTranslationResultWindow(
+            text,
+            result.detected_language,
+          );
+        } else {
+          await platform.commands.openCaptureTranslationResultWindow(text);
+        }
         return;
       }
 

@@ -66,6 +66,9 @@ export function ProviderCard({
                 未配置
               </span>
             ) : null}
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">
+              {provider.isLocal ? '本地处理' : '发送到服务'}
+            </span>
           </div>
           <p
             className={`mt-1 truncate text-sm ${

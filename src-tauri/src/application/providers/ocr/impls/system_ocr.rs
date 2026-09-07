@@ -37,12 +37,20 @@ impl Provider for SystemOcrProvider {
     fn requires_api_key(&self) -> bool {
         false
     }
+
+    fn is_local(&self) -> bool {
+        true
+    }
 }
 
 #[async_trait]
 impl OcrProvider for SystemOcrProvider {
     async fn recognize(&self, request: &OcrRequest) -> Result<OcrResult> {
         self.engine.recognize(request)
+    }
+
+    async fn recognize_with_recovery(&self, request: &OcrRequest) -> Result<OcrResult> {
+        self.engine.recognize_with_recovery(request)
     }
 }
 

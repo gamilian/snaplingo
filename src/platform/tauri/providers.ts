@@ -18,6 +18,7 @@ interface BackendProviderInfo {
   requires_api_key: boolean;
   is_active: boolean;
   is_builtin: boolean;
+  is_local?: boolean;
   protocol: string | null;
   endpoint: string | null;
   model: string | null;
@@ -32,6 +33,7 @@ interface BackendOcrProviderInfo {
   is_configured: boolean;
   requires_api_key: boolean;
   is_active: boolean;
+  is_local?: boolean;
 }
 
 interface BackendCustomProviderRequest {
@@ -79,6 +81,7 @@ function toProviderInfo(provider: BackendProviderInfo): ProviderInfo {
     requiresApiKey: provider.requires_api_key,
     isActive: provider.is_active,
     isBuiltin: provider.is_builtin,
+    isLocal: provider.is_local ?? false,
     protocol: provider.protocol,
     endpoint: provider.endpoint,
     model: provider.model,
@@ -95,6 +98,7 @@ function toOcrProviderInfo(provider: BackendOcrProviderInfo): OcrProviderInfo {
     isConfigured: provider.is_configured,
     requiresApiKey: provider.requires_api_key,
     isActive: provider.is_active,
+    isLocal: provider.is_local ?? false,
   };
 }
 

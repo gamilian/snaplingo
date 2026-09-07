@@ -57,17 +57,81 @@ describe('OCR file workflow', () => {
     expect(deps.setError).toHaveBeenLastCalledWith(null);
     expect(deps.setRunning).toHaveBeenLastCalledWith(false);
   });
+
+  it('drops a late OCR result after the workflow is invalidated', async () => {
+    let current = true;
+    let resolveRecognition!: (result: {
+      text: string;
+      confidence: number | null;
+      imageDataUrl: string;
+    }) => void;
+    const deps = createDeps({
+      selectedPath: '/tmp/example.png',
+      recognizeImageFile: () =>
+        new Promise((resolve) => {
+          resolveRecognition = resolve;
+        }),
+      isCurrent: () => current,
+    });
+
+    const workflow = runOcrFileWorkflow(deps);
+    await Promise.resolve();
+    current = false;
+    resolveRecognition({
+      text: 'stale result',
+      confidence: 0.9,
+      imageDataUrl: 'stale-image',
+    });
+    await workflow;
+
+    expect(deps.setText).not.toHaveBeenCalled();
+    expect(deps.setImageDataUrl).not.toHaveBeenCalled();
+    expect(deps.setError).toHaveBeenCalledTimes(1);
+    expect(deps.setRunning).toHaveBeenCalledTimes(1);
+    expect(deps.setRunning).toHaveBeenCalledWith(true);
+  });
+
+  it('does not start a stale workflow after file selection resolves', async () => {
+    let current = true;
+    let resolveSelection!: (path: string | null) => void;
+    const deps = createDeps({
+      selectedPath: '/tmp/example.png',
+      selectImageFile: () =>
+        new Promise((resolve) => {
+          resolveSelection = resolve;
+        }),
+      isCurrent: () => current,
+    });
+
+    const selection = runOcrFileWorkflow(deps);
+    current = false;
+    resolveSelection('/tmp/example.png');
+    await selection;
+
+    expect(deps.setRunning).not.toHaveBeenCalled();
+    expect(deps.recognizeImageFile).not.toHaveBeenCalled();
+  });
 });
 
 function createDeps(options: {
   selectedPath: string | null;
+  selectImageFile?: () => Promise<string | null>;
   recognizedText?: string;
   error?: unknown;
   copyError?: unknown;
+  recognizeImageFile?: () => Promise<{
+    text: string;
+    confidence: number | null;
+    imageDataUrl: string;
+  }>;
+  isCurrent?: () => boolean;
 }) {
   return {
-    selectImageFile: vi.fn(async () => options.selectedPath),
+    selectImageFile: vi.fn(
+      options.selectImageFile ?? (async () => options.selectedPath),
+    ),
     recognizeImageFile: vi.fn(async () => {
+      if (options.recognizeImageFile) return options.recognizeImageFile();
       if (options.error) throw options.error;
       return {
         text: options.recognizedText ?? '',
@@ -86,5 +150,6 @@ function createDeps(options: {
           throw options.copyError;
         })
       : undefined,
+    isCurrent: options.isCurrent,
   };
 }

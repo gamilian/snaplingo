@@ -5,6 +5,7 @@ export interface OcrFileWorkflowDeps {
   language?: string;
   transformText: (text: string) => string;
   copyText?: (text: string) => Promise<void>;
+  isCurrent?: () => boolean;
   setText: (text: string) => void;
   setConfidence: (confidence: number | null) => void;
   setImageDataUrl: (imageDataUrl: string) => void;
@@ -15,6 +16,7 @@ export interface OcrFileWorkflowDeps {
 export async function runOcrFileWorkflow(deps: OcrFileWorkflowDeps) {
   const path = await deps.selectImageFile();
   if (!path) return;
+  if (deps.isCurrent && !deps.isCurrent()) return;
 
   deps.setError(null);
   deps.setRunning(true);
@@ -23,11 +25,13 @@ export async function runOcrFileWorkflow(deps: OcrFileWorkflowDeps) {
     const result = deps.language
       ? await deps.recognizeImageFile(path, deps.language)
       : await deps.recognizeImageFile(path);
+    if (deps.isCurrent && !deps.isCurrent()) return;
     const text = deps.transformText(result.text);
     deps.setText(text);
     deps.setConfidence(result.confidence);
     deps.setImageDataUrl(result.imageDataUrl);
     if (deps.copyText) {
+      if (deps.isCurrent && !deps.isCurrent()) return;
       try {
         await deps.copyText(text);
       } catch (error) {
@@ -35,9 +39,13 @@ export async function runOcrFileWorkflow(deps: OcrFileWorkflowDeps) {
       }
     }
   } catch (err) {
-    deps.setError(errorMessage(err));
+    if (deps.isCurrent?.() ?? true) {
+      deps.setError(errorMessage(err));
+    }
   } finally {
-    deps.setRunning(false);
+    if (deps.isCurrent?.() ?? true) {
+      deps.setRunning(false);
+    }
   }
 }
 

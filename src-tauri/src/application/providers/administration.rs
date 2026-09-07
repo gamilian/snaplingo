@@ -21,6 +21,7 @@ pub struct OcrProviderInfo {
     pub is_configured: bool,
     pub requires_api_key: bool,
     pub is_active: bool,
+    pub is_local: bool,
 }
 
 pub struct ProviderModelListInput {
@@ -230,6 +231,7 @@ impl ProviderAdministration {
                     is_configured: provider.is_configured(),
                     requires_api_key: provider.requires_api_key(),
                     is_active: active_id.as_ref() == Some(&id),
+                    is_local: provider.is_local(),
                 }
             })
             .collect()
@@ -305,6 +307,7 @@ fn provider_info_from_custom_view(
         requires_api_key: true,
         is_active,
         is_builtin: false,
+        is_local: false,
         protocol: Some(view.protocol),
         endpoint: Some(view.endpoint),
         model: Some(view.model),
@@ -361,6 +364,7 @@ mod tests {
             requires_api_key: false,
             is_active,
             is_builtin: false,
+            is_local: false,
             protocol: None,
             endpoint: None,
             model: None,

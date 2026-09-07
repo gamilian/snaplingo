@@ -27,4 +27,13 @@ pub trait OcrProvider: Provider {
     /// * The API request fails
     /// * The response cannot be parsed
     async fn recognize(&self, request: &OcrRequest) -> Result<OcrResult>;
+
+    /// Runs an optional provider-local recovery pass for low-quality results.
+    ///
+    /// Remote providers keep the default single-request behavior. Local engines
+    /// may override this to preprocess the image and retry only when the first
+    /// pass is empty or below their quality threshold.
+    async fn recognize_with_recovery(&self, request: &OcrRequest) -> Result<OcrResult> {
+        self.recognize(request).await
+    }
 }

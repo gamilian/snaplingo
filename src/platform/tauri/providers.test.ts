@@ -36,6 +36,7 @@ describe('Tauri providers command adapter', () => {
         requiresApiKey: false,
         isActive: true,
         isBuiltin: true,
+        isLocal: false,
         protocol: null,
         endpoint: null,
         model: null,
@@ -266,6 +267,7 @@ describe('Tauri providers command adapter', () => {
         isConfigured: true,
         requiresApiKey: false,
         isActive: true,
+        isLocal: false,
       },
     ]);
     await settingsProviders.configureOcrCredentials('baidu-ocr', {

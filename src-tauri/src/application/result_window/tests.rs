@@ -199,6 +199,7 @@ fn translation_request(text: &str) -> ResultWindowOpenRequest {
         text: text.to_string(),
         auto_translate: false,
         origin: ResultWindowOrigin::Input,
+        detected_language: None,
     }
 }
 
@@ -211,6 +212,7 @@ fn translation_payload(text: &str, auto_translate: bool) -> ResultWindowPayload 
         ocr_intent: None,
         image_base64: None,
         confidence: None,
+        detected_language: None,
     }
 }
 
@@ -227,6 +229,7 @@ fn ocr_payload(
         ocr_intent: Some(intent),
         image_base64: image_base64.map(str::to_string),
         confidence: None,
+        detected_language: None,
     }
 }
 

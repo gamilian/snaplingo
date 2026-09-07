@@ -18,6 +18,11 @@ pub struct RecognizeImageFileResult {
     pub text: String,
     pub confidence: Option<f32>,
     pub image_data_url: String,
+    pub lines: Vec<crate::domain::ocr::OcrLine>,
+    #[serde(rename = "detected_language")]
+    pub detected_language: Option<String>,
+    #[serde(rename = "provider_id")]
+    pub provider_id: Option<String>,
 }
 
 #[tauri::command]
@@ -66,6 +71,9 @@ pub async fn recognize_image_file(
         text: result.text,
         confidence: result.confidence,
         image_data_url,
+        lines: result.lines,
+        detected_language: result.detected_language,
+        provider_id: result.provider_id,
     })
 }
 
@@ -135,4 +143,26 @@ pub async fn configure_ocr_provider_credentials(
         .administration
         .configure_ocr_provider_credentials(provider_id, credentials)
         .map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::RecognizeImageFileResult;
+
+    #[test]
+    fn file_result_keeps_ocr_metadata_names_consistent_with_ocr_result() {
+        let value = serde_json::to_value(RecognizeImageFileResult {
+            text: "bonjour".into(),
+            confidence: Some(0.9),
+            image_data_url: "data:image/png;base64,aW1hZ2U=".into(),
+            lines: vec![],
+            detected_language: Some("fr".into()),
+            provider_id: Some("system-ocr".into()),
+        })
+        .unwrap();
+
+        assert_eq!(value["imageDataUrl"], "data:image/png;base64,aW1hZ2U=");
+        assert_eq!(value["detected_language"], "fr");
+        assert_eq!(value["provider_id"], "system-ocr");
+    }
 }

@@ -35,6 +35,21 @@ describe('result window application runtime', () => {
     expect(state.showResultWindow).toHaveBeenCalledTimes(1);
   });
 
+  it('uses OCR detected language as the initial source language for screenshot translation', async () => {
+    const { runtime, state } = createRuntime();
+
+    await runtime.applyPayload({
+      mode: 'translation',
+      origin: 'screenshot',
+      text: 'Bonjour',
+      autoTranslate: true,
+      detectedLanguage: 'fr',
+    });
+
+    expect(state.setSourceLang).toHaveBeenCalledWith('fr');
+    expect(state.setSourceText).toHaveBeenCalledWith('Bonjour');
+  });
+
   it('does not take a payload when no current request ID exists', async () => {
     const { runtime, platform, state } = createRuntime({
       currentPayloadRequestId: null,
@@ -113,7 +128,7 @@ describe('result window application runtime', () => {
     expect(state.setOcrImageBase64).toHaveBeenLastCalledWith(
       'data:image/png;base64,aW1hZ2U=',
     );
-    expect(state.setOcrRunning).toHaveBeenNthCalledWith(1, true);
+    expect(state.setOcrRunning).toHaveBeenCalledWith(true);
     expect(state.setOcrRunning).toHaveBeenLastCalledWith(false);
     expect(platform.clipboard.copyText).not.toHaveBeenCalled();
   });

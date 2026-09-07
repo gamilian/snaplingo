@@ -59,18 +59,25 @@ pub(crate) async fn open_capture_ocr_result_window_for_runtime(
 #[tauri::command]
 pub async fn open_capture_translation_result_window(
     text: String,
+    detected_language: Option<String>,
     state: tauri::State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    open_capture_translation_result_window_for_runtime(&state.result_window, text).await
+    open_capture_translation_result_window_for_runtime(
+        &state.result_window,
+        text,
+        detected_language,
+    )
+    .await
 }
 
 pub(crate) async fn open_capture_translation_result_window_for_runtime(
     runtime: &ResultWindowRuntime,
     text: String,
+    detected_language: Option<String>,
 ) -> Result<(), String> {
     open_result_window_request(
         runtime,
-        ResultWindowOpenRequest::screenshot_translation(text),
+        ResultWindowOpenRequest::screenshot_translation(text, detected_language),
     )
     .await
 }
@@ -212,9 +219,13 @@ mod tests {
     async fn commands_delegate_requests_to_the_result_window_runtime() {
         let runtime = runtime();
 
-        super::open_capture_translation_result_window_for_runtime(&runtime, "translated".into())
-            .await
-            .unwrap();
+        super::open_capture_translation_result_window_for_runtime(
+            &runtime,
+            "translated".into(),
+            Some("fr".into()),
+        )
+        .await
+        .unwrap();
 
         let request_id = super::current_capture_result_window_request_id_for_runtime(&runtime)
             .unwrap()
@@ -226,6 +237,7 @@ mod tests {
         assert_eq!(payload.mode, ResultWindowMode::Translation);
         assert_eq!(payload.text, "translated");
         assert!(payload.auto_translate);
+        assert_eq!(payload.detected_language.as_deref(), Some("fr"));
     }
 
     #[tokio::test]

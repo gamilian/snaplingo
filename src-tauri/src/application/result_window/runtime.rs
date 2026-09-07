@@ -100,7 +100,8 @@ impl ResultWindowRuntime {
                 text,
                 auto_translate,
                 origin,
-            } => translation_payload(text, auto_translate, origin),
+                detected_language,
+            } => translation_payload(text, auto_translate, origin, detected_language),
             ResultWindowOpenRequest::Ocr {
                 text,
                 intent,
@@ -114,6 +115,7 @@ impl ResultWindowRuntime {
                 ocr_intent: Some(intent),
                 image_base64,
                 confidence,
+                detected_language: None,
             },
         }
     }
@@ -163,6 +165,7 @@ fn translation_payload(
     text: String,
     auto_translate: bool,
     origin: super::ResultWindowOrigin,
+    detected_language: Option<String>,
 ) -> ResultWindowPayload {
     ResultWindowPayload {
         mode: ResultWindowMode::Translation,
@@ -172,5 +175,6 @@ fn translation_payload(
         ocr_intent: None,
         image_base64: None,
         confidence: None,
+        detected_language,
     }
 }

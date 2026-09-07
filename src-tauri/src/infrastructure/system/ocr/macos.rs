@@ -8,6 +8,7 @@ use objc2_vision::{
     VNDetectedObjectObservation, VNImageOption, VNImageRequestHandler, VNRecognizeTextRequest,
     VNRequest, VNRequestTextRecognitionLevel,
 };
+use std::io::Cursor;
 
 pub struct MacOSVisionOcrEngine;
 
@@ -25,10 +26,40 @@ impl SystemOcrEngine for MacOSVisionOcrEngine {
     fn recognize(&self, request: &OcrRequest) -> Result<OcrResult> {
         recognize_with_vision(request)
     }
+
+    fn recognize_with_recovery(&self, request: &OcrRequest) -> Result<OcrResult> {
+        let initial = recognize_with_vision(request)?;
+        if !should_attempt_recovery(&initial) {
+            return Ok(initial);
+        }
+
+        let enhanced_image = match enhance_image_for_recovery(&request.image_data) {
+            Ok(Some(image)) => image,
+            Ok(None) | Err(_) => return Ok(initial),
+        };
+        let recovered =
+            match recognize_with_vision_data(&enhanced_image, request.language.as_deref()) {
+                Ok(result) => result,
+                Err(_) => return Ok(initial),
+            };
+
+        Ok(if is_better_result(&recovered, &initial) {
+            recovered
+        } else {
+            initial
+        })
+    }
 }
 
 fn recognize_with_vision(request: &OcrRequest) -> Result<OcrResult> {
-    let image_data = NSData::with_bytes(&request.image_data);
+    recognize_with_vision_data(&request.image_data, request.language.as_deref())
+}
+
+fn recognize_with_vision_data(
+    image_data: &[u8],
+    requested_language: Option<&str>,
+) -> Result<OcrResult> {
+    let image_data = NSData::with_bytes(image_data);
     let options = NSDictionary::<VNImageOption, AnyObject>::new();
     let handler = VNImageRequestHandler::initWithData_options(
         VNImageRequestHandler::alloc(),
@@ -41,7 +72,7 @@ fn recognize_with_vision(request: &OcrRequest) -> Result<OcrResult> {
     vision_request.setUsesLanguageCorrection(true);
     vision_request.setAutomaticallyDetectsLanguage(true);
 
-    let language_values: Vec<_> = vision_languages_for_request(request.language.as_deref())
+    let language_values: Vec<_> = vision_languages_for_request(requested_language)
         .iter()
         .map(|language| NSString::from_str(language))
         .collect();
@@ -72,6 +103,66 @@ fn recognize_with_vision(request: &OcrRequest) -> Result<OcrResult> {
     };
 
     Ok(ocr_result_from_observations(&observations))
+}
+
+const OCR_RECOVERY_CONFIDENCE_THRESHOLD: f32 = 0.62;
+
+fn should_attempt_recovery(result: &OcrResult) -> bool {
+    result.text.trim().is_empty()
+        || result
+            .confidence
+            .is_some_and(|confidence| confidence < OCR_RECOVERY_CONFIDENCE_THRESHOLD)
+}
+
+fn is_better_result(candidate: &OcrResult, baseline: &OcrResult) -> bool {
+    let candidate_chars = candidate
+        .text
+        .chars()
+        .filter(|character| !character.is_whitespace())
+        .count();
+    let baseline_chars = baseline
+        .text
+        .chars()
+        .filter(|character| !character.is_whitespace())
+        .count();
+    if candidate_chars == 0 {
+        return false;
+    }
+    if baseline_chars == 0 {
+        return true;
+    }
+
+    candidate.confidence.unwrap_or_default() >= baseline.confidence.unwrap_or_default() + 0.05
+        || candidate_chars >= baseline_chars + 4
+}
+
+fn enhance_image_for_recovery(image_data: &[u8]) -> Result<Option<Vec<u8>>> {
+    let image = match image::load_from_memory(image_data) {
+        Ok(image) => image,
+        Err(_) => return Ok(None),
+    };
+    if image.width() == 0 || image.height() == 0 {
+        return Ok(None);
+    }
+
+    let mut enhanced = image.grayscale().adjust_contrast(35.0);
+    let max_dimension = enhanced.width().max(enhanced.height());
+    if max_dimension < 1600 {
+        let scale = 1600.0 / max_dimension as f32;
+        enhanced = enhanced.resize(
+            (enhanced.width() as f32 * scale).round() as u32,
+            (enhanced.height() as f32 * scale).round() as u32,
+            image::imageops::FilterType::Lanczos3,
+        );
+    }
+
+    let mut encoded = Cursor::new(Vec::new());
+    enhanced
+        .write_to(&mut encoded, image::ImageFormat::Png)
+        .map_err(|error| {
+            AppError::Other(format!("Failed to prepare OCR recovery image: {error}"))
+        })?;
+    Ok(Some(encoded.into_inner()))
 }
 
 fn ocr_result_from_observations(
@@ -179,5 +270,30 @@ mod tests {
             vision_languages_for_request(Some("zh-CN")),
             vec!["zh-Hans".to_string(), "en-US".to_string()]
         );
+    }
+
+    #[test]
+    fn recovery_only_runs_for_empty_or_low_confidence_results() {
+        assert!(should_attempt_recovery(&OcrResult::from_text("", None)));
+        assert!(should_attempt_recovery(&OcrResult::from_text(
+            "text",
+            Some(0.4),
+        )));
+        assert!(!should_attempt_recovery(&OcrResult::from_text(
+            "text",
+            Some(0.9),
+        )));
+    }
+
+    #[test]
+    fn recovery_prefers_more_complete_or_confident_results() {
+        let baseline = OcrResult::from_text("short", Some(0.5));
+        let confident = OcrResult::from_text("short", Some(0.6));
+        let expanded = OcrResult::from_text("a much longer result", Some(0.5));
+        let empty = OcrResult::from_text("", Some(0.99));
+
+        assert!(is_better_result(&confident, &baseline));
+        assert!(is_better_result(&expanded, &baseline));
+        assert!(!is_better_result(&empty, &baseline));
     }
 }

@@ -178,8 +178,14 @@ export async function openCaptureOcrResultWindow(
   });
 }
 
-export async function openCaptureTranslationResultWindow(text: string) {
-  return invoke<void>('open_capture_translation_result_window', { text });
+export async function openCaptureTranslationResultWindow(
+  text: string,
+  detectedLanguage?: string | null,
+) {
+  return invoke<void>('open_capture_translation_result_window', {
+    text,
+    ...(detectedLanguage ? { detectedLanguage } : {}),
+  });
 }
 
 export async function currentCaptureResultWindowRequestId() {

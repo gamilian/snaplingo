@@ -189,6 +189,18 @@ describe('Tauri capture command adapter', () => {
     );
   });
 
+  it('passes OCR detected language when opening screenshot translation', async () => {
+    const { openCaptureTranslationResultWindow } = await import('./capture');
+    invoke.mockResolvedValueOnce(undefined);
+
+    await openCaptureTranslationResultWindow('bonjour', 'fr');
+
+    expect(invoke).toHaveBeenCalledWith(
+      'open_capture_translation_result_window',
+      { text: 'bonjour', detectedLanguage: 'fr' },
+    );
+  });
+
   it('loads the current result window request ID for standalone bootstrap', async () => {
     const { currentCaptureResultWindowRequestId } = await import('./capture');
     invoke.mockResolvedValueOnce('42');

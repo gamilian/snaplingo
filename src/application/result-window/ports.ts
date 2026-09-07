@@ -47,6 +47,7 @@ export interface CaptureResultWindowPayload {
   ocrIntent?: 'display-text' | 'file';
   imageBase64?: string;
   confidence?: number;
+  detectedLanguage?: string | null;
 }
 
 export interface ResultWindowCommandsPort {

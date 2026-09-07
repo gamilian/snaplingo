@@ -161,6 +161,7 @@ export interface ProviderInfo {
   requiresApiKey: boolean;
   isActive: boolean;
   isBuiltin: boolean;
+  isLocal?: boolean;
   protocol: string | null;
   endpoint: string | null;
   model: string | null;
@@ -175,6 +176,7 @@ export interface OcrProviderInfo {
   isConfigured: boolean;
   requiresApiKey: boolean;
   isActive: boolean;
+  isLocal?: boolean;
 }
 
 export interface AddCustomTranslationProviderRequest {

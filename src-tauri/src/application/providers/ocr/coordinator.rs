@@ -204,7 +204,7 @@ impl OcrCoordinator {
         // Call provider's recognize method
         let mut result = {
             let provider = provider_lock.read();
-            provider.recognize(request).await?
+            provider.recognize_with_recovery(request).await?
         };
         result.provider_id = Some(provider_id.clone());
         if result.detected_language.is_none() {

@@ -41,6 +41,8 @@ pub(crate) struct ResultWindowPayload {
     pub(crate) image_base64: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) confidence: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) detected_language: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -49,6 +51,7 @@ pub(crate) enum ResultWindowOpenRequest {
         text: String,
         auto_translate: bool,
         origin: ResultWindowOrigin,
+        detected_language: Option<String>,
     },
     Ocr {
         text: String,
@@ -64,6 +67,7 @@ impl ResultWindowOpenRequest {
             text,
             auto_translate: false,
             origin: ResultWindowOrigin::Input,
+            detected_language: None,
         }
     }
 
@@ -72,14 +76,16 @@ impl ResultWindowOpenRequest {
             text,
             auto_translate: true,
             origin: ResultWindowOrigin::Selection,
+            detected_language: None,
         }
     }
 
-    pub(crate) fn screenshot_translation(text: String) -> Self {
+    pub(crate) fn screenshot_translation(text: String, detected_language: Option<String>) -> Self {
         Self::Translation {
             text,
             auto_translate: true,
             origin: ResultWindowOrigin::Screenshot,
+            detected_language,
         }
     }
 

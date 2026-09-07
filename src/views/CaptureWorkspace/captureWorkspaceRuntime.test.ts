@@ -3065,10 +3065,11 @@ describe('capture workspace runtime', () => {
     {
       mode: 'screenshot-translate' as const,
       expectedText: 'recognized text',
+      detectedLanguage: 'fr',
       assertResult: (platform: ReturnType<typeof createPlatform>) => {
         expect(
           platform.commands.openCaptureTranslationResultWindow,
-        ).toHaveBeenCalledWith('recognized text');
+        ).toHaveBeenCalledWith('recognized text', 'fr');
       },
     },
   ])('executes $mode completion effects before finishing', async ({
@@ -3081,6 +3082,9 @@ describe('capture workspace runtime', () => {
     platform.commands.runCaptureOcr.mockResolvedValue({
       text: ' recognized text ',
       confidence: null,
+      ...(mode === 'screenshot-translate'
+        ? { detected_language: 'fr' }
+        : {}),
     });
     platform.commands.renderCaptureOutput.mockResolvedValue('preview-image');
     const runtime = createCaptureWorkspaceRuntime({

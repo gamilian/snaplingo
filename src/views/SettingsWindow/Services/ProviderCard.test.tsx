@@ -31,7 +31,29 @@ describe('ProviderCard', () => {
       '删除',
     ]);
   });
+
+  it('labels whether provider input stays local or is sent to a service', () => {
+    const provider = {
+      id: 'system-ocr',
+      name: 'System OCR',
+      type: 'ocr' as const,
+      status: 'active' as const,
+      isBuiltin: true,
+      requiresApiKey: false,
+    };
+
+    expect(textContent(ProviderCard({ provider: { ...provider, isLocal: true } })))
+      .toContain('本地处理');
+    expect(textContent(ProviderCard({ provider }))).toContain('发送到服务');
+  });
 });
+
+function textContent(node: ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(textContent).join('');
+  if (!isElement(node)) return '';
+  return textContent(node.props.children);
+}
 
 function findElements(
   root: ReactNode,

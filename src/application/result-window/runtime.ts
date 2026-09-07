@@ -114,10 +114,16 @@ export function createResultWindowRuntime({
   let needsPlacement = true;
   let lastPlacedPosition: ResultWindowPosition | null = null;
   let translationGeneration = 0;
+  let ocrGeneration = 0;
 
   function invalidateTranslationGeneration() {
     translationGeneration += 1;
     state.setTranslating(false);
+  }
+
+  function invalidateOcrGeneration() {
+    ocrGeneration += 1;
+    state.setOcrRunning(false);
   }
 
   function translationRequestText(text: string) {
@@ -291,6 +297,7 @@ export function createResultWindowRuntime({
 
   async function applyPayload(payload: CaptureResultWindowPayload) {
     invalidateTranslationGeneration();
+    invalidateOcrGeneration();
     state.setResultWindowOrigin(
       payload.origin ?? (payload.mode === 'ocr' ? 'ocr' : 'input'),
     );
@@ -303,6 +310,9 @@ export function createResultWindowRuntime({
         state.setSourceText(
           translationPayloadSourceText(payload, getOcrSettings?.()),
         );
+        if (payload.detectedLanguage) {
+          state.setSourceLang(payload.detectedLanguage);
+        }
       }
       if (payload.autoTranslate) {
         state.requestAutoTranslate();
@@ -361,6 +371,7 @@ export function createResultWindowRuntime({
   }
 
   async function startFileOcr() {
+    const generation = ++ocrGeneration;
     const settings = getOcrSettings?.();
     state.showOcrWindow();
     state.setOcrText('');
@@ -376,6 +387,7 @@ export function createResultWindowRuntime({
           : settings?.recognitionLanguage,
       transformText: (text) =>
         settings ? applyOcrTextPreferences(text, settings) : text,
+      isCurrent: () => generation === ocrGeneration,
       setText: state.setOcrText,
       setConfidence: state.setOcrConfidence,
       setImageDataUrl: state.setOcrImageBase64,
@@ -437,6 +449,7 @@ export function createResultWindowRuntime({
 
   async function close(presentation: ResultWindowPresentation) {
     invalidateTranslationGeneration();
+    invalidateOcrGeneration();
     state.hideResultWindow();
     needsPlacement = true;
     if (presentation === 'standalone') {
@@ -511,7 +524,10 @@ export function createResultWindowRuntime({
       state.setTargetLang(language);
     },
     swapTranslationLanguages,
-    updateOcrText: state.setOcrText,
+    updateOcrText: (text: string) => {
+      invalidateOcrGeneration();
+      state.setOcrText(text);
+    },
     clearOcrImage: () => state.setOcrImageBase64(null),
     loadTranslationProviders: () =>
       state.loadActiveTranslationProviderIds().then(() => undefined),

@@ -34,6 +34,10 @@ impl Provider for TesseractProvider {
     fn requires_api_key(&self) -> bool {
         false
     }
+
+    fn is_local(&self) -> bool {
+        true
+    }
 }
 
 #[async_trait]

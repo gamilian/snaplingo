@@ -52,6 +52,10 @@ pub trait Provider: Send + Sync {
     /// This helps the UI determine whether to prompt for credentials.
     fn requires_api_key(&self) -> bool;
 
+    fn is_local(&self) -> bool {
+        false
+    }
+
     /// Returns the credential fields required by this provider.
     ///
     /// Default implementation returns a single "api_key" field for backward compatibility.

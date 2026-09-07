@@ -34,6 +34,7 @@ export interface Provider {
   type: 'ocr' | 'translation';
   status: 'active' | 'inactive' | 'unconfigured';
   isBuiltin: boolean;
+  isLocal?: boolean;
   description?: string;
   requiresApiKey: boolean;
   config?: Record<string, unknown>;
@@ -236,6 +237,7 @@ function toTranslationProvider(info: ProviderInfo): Provider {
     type: 'translation',
     status: providerStatus(info.isConfigured, info.isActive),
     isBuiltin: info.isBuiltin,
+    isLocal: info.isLocal ?? false,
     requiresApiKey: info.requiresApiKey,
     protocol: info.protocol ?? undefined,
     endpoint: info.endpoint ?? undefined,
@@ -253,6 +255,7 @@ function toOcrProvider(info: OcrProviderInfo): Provider {
     type: 'ocr',
     status: providerStatus(info.isConfigured, info.isActive),
     isBuiltin: true,
+    isLocal: info.isLocal ?? false,
     requiresApiKey: info.requiresApiKey,
   };
 }
