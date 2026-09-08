@@ -37,6 +37,15 @@ export interface ResultWindowPositionStore {
   save(position: ResultWindowPhysicalPosition): Promise<void>;
 }
 
+export interface ResultWindowProvidersPort {
+  getState(): {
+    activeTranslationProviders: string[];
+    activeOcrProvider: string | null;
+  };
+  loadTranslation(): Promise<unknown>;
+  loadOcr(): Promise<unknown>;
+}
+
 export type ResultWindowOrigin = 'selection' | 'screenshot' | 'input' | 'ocr';
 
 export interface CaptureResultWindowPayload {

@@ -1,25 +1,25 @@
 import { createContext, useContext, type ReactNode } from 'react';
-import type { CaptureWorkspacePlatformRuntime } from '../../application/capture-workspace/platformRuntime';
+import type { CaptureWorkspacePorts } from '../../application/capture-workspace/ports';
 
-const CaptureWorkspaceRuntimeContext =
-  createContext<CaptureWorkspacePlatformRuntime | null>(null);
+const CaptureWorkspacePortsContext =
+  createContext<CaptureWorkspacePorts | null>(null);
 
-export function CaptureWorkspaceRuntimeProvider({
+export function CaptureWorkspacePortsProvider({
   children,
-  runtime,
+  ports,
 }: {
   children: ReactNode;
-  runtime: CaptureWorkspacePlatformRuntime;
+  ports: CaptureWorkspacePorts;
 }) {
   return (
-    <CaptureWorkspaceRuntimeContext.Provider value={runtime}>
+    <CaptureWorkspacePortsContext.Provider value={ports}>
       {children}
-    </CaptureWorkspaceRuntimeContext.Provider>
+    </CaptureWorkspacePortsContext.Provider>
   );
 }
 
-export function useCaptureWorkspaceRuntime() {
-  const runtime = useContext(CaptureWorkspaceRuntimeContext);
-  if (!runtime) throw new Error('Capture workspace runtime is unavailable');
-  return runtime;
+export function useCaptureWorkspacePorts() {
+  const ports = useContext(CaptureWorkspacePortsContext);
+  if (!ports) throw new Error('Capture workspace ports are unavailable');
+  return ports;
 }

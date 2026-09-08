@@ -1,25 +1,25 @@
 import { useSettingsConfigStore } from '../../stores/settingsConfigStore';
-import type { CaptureWorkspacePlatformRuntime } from '../../application/capture-workspace/platformRuntime';
-import { ANNOTATION_COLORS } from './annotationStyle';
+import type { CaptureWorkspacePorts } from '../../application/capture-workspace/ports';
+import { ANNOTATION_COLORS } from '../../application/capture-workspace/annotationStyle';
 import { CaptureWorkspaceView } from './CaptureWorkspaceView';
 import { useCaptureWorkspaceRuntimeView } from './useCaptureWorkspaceRuntimeView';
 import type { CaptureMode } from './types';
 import {
-  CaptureWorkspaceRuntimeProvider,
+  CaptureWorkspacePortsProvider,
 } from './runtimeContext';
 
 interface CaptureWorkspaceProps {
   initialMode?: CaptureMode;
   initialSessionId?: string;
   onInactive?: () => void | Promise<void>;
-  runtime: CaptureWorkspacePlatformRuntime;
+  ports: CaptureWorkspacePorts;
 }
 
-export default function CaptureWorkspace({ runtime, ...props }: CaptureWorkspaceProps) {
+export default function CaptureWorkspace({ ports, ...props }: CaptureWorkspaceProps) {
   return (
-    <CaptureWorkspaceRuntimeProvider runtime={runtime}>
+    <CaptureWorkspacePortsProvider ports={ports}>
       <CaptureWorkspaceContent {...props} />
-    </CaptureWorkspaceRuntimeProvider>
+    </CaptureWorkspacePortsProvider>
   );
 }
 
@@ -27,7 +27,7 @@ function CaptureWorkspaceContent({
   initialMode,
   initialSessionId,
   onInactive,
-}: Omit<CaptureWorkspaceProps, 'runtime'>) {
+}: Omit<CaptureWorkspaceProps, 'ports'>) {
   const screenshotPreferences = useSettingsConfigStore((state) => state.screenshot);
   const ocrPreferences = useSettingsConfigStore((state) => state.ocr);
   const annotationColorPresets = useSettingsConfigStore(

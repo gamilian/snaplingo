@@ -35,6 +35,8 @@ The dependency direction follows ownership: Views consume Frontend Application i
 
 The frontend and backend architecture suites enforce these ownership boundaries without a migration inventory or allowlist. Production frontend Views and Application modules cannot import Platform/Tauri mechanics. Production backend Application modules cannot import Infrastructure or crate-root startup adapters.
 
+The Result Window runtime owns translation state and scheduling; its Store projects snapshots. The Capture Workspace runtime and portable editing policy reside in Frontend Application, with DOM/Canvas work behind View adapters. Backend Capture owns startup exclusion, frozen coordinate policy, and Pin delivery through an inward port. Guards cover these concrete boundaries, and runtime tests verify the state and effect ordering they protect.
+
 ## Accepted ADR Alignment
 
 - [ADR 0004](../adr/0004-coordinator-consolidation.md) remains accepted. Translation and OCR Provider Coordinators remain deep modules that own activation, persistence, execution, and coordination; they are not split into shallow forwarding modules.

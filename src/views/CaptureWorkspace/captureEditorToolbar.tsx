@@ -1,3 +1,4 @@
+import { annotationColorToCss } from '../../components/common/annotationColorPresentation';
 import { useRef, useState, type MouseEvent, type ReactNode } from "react";
 import IconActionButton from "../../components/common/IconActionButton";
 import {
@@ -5,11 +6,10 @@ import {
   MAX_TEXT_FONT_SIZE,
   MIN_ANNOTATION_STROKE_WIDTH,
   MIN_TEXT_FONT_SIZE,
-  annotationColorToCss,
   type AnnotationColor,
   type AnnotationStyle,
   type AnnotationTool,
-} from "./annotationStyle";
+} from "../../application/capture-workspace/annotationStyle";
 import {
   addAnnotationColorPreset,
   annotationColorFromHex,
@@ -18,7 +18,7 @@ import {
   removeAnnotationColorPreset,
   replaceAnnotationColorPreset,
 } from "./annotationColorPresets";
-import { getSaveCapturePointerAction } from "./captureActions";
+import { getSaveCapturePointerAction } from "../../application/capture-workspace/captureActions";
 import {
   getCaptureEditorCommandButtonClassName,
   getCaptureEditorDividerClassName,

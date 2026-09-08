@@ -1,3 +1,4 @@
+use super::CaptureCoordinatePolicy;
 use crate::domain::capture::{
     CapturedCursor, ControlCandidate, LogicalPoint, MonitorLayout, MonitorSnapshot, ScreenRegion,
     WindowCandidate,
@@ -7,6 +8,10 @@ use crate::error::AppError;
 /// Supplies portable desktop data required to create and hydrate Capture Sessions.
 #[async_trait::async_trait]
 pub trait CaptureSessionSource: Send + Sync {
+    fn coordinate_policy(&self) -> CaptureCoordinatePolicy {
+        CaptureCoordinatePolicy::NativeLogical
+    }
+
     async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError>;
 
     async fn capture_monitor_snapshot(
@@ -39,6 +44,7 @@ pub trait CaptureSessionSource: Send + Sync {
     async fn capture_control_candidate(
         &self,
         _point: &LogicalPoint,
+        _monitors: &[MonitorSnapshot],
     ) -> Result<Option<ControlCandidate>, AppError> {
         Err(AppError::System("当前平台暂不支持界面元素检测".to_string()))
     }

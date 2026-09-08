@@ -1,6 +1,7 @@
+import { annotationColorToCss } from '../../components/common/annotationColorPresentation';
 import { useEffect, useRef, useState } from 'react';
 
-import { annotationColorToCss, arrowHeadPoints } from './annotationStyle';
+import { arrowHeadPoints } from '../../application/capture-workspace/annotationStyle';
 import type { AnnotationCommand, LogicalRect, Point } from './types';
 
 interface CaptureAnnotationCanvasProps {

@@ -4,7 +4,7 @@ import { act, createElement, type RefObject } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
-import { DEFAULT_ANNOTATION_STYLE } from "./annotationStyle";
+import { DEFAULT_ANNOTATION_STYLE } from "../../application/capture-workspace/annotationStyle";
 import {
   CaptureWorkspaceView,
   getCaptureShortcutKeyLabels,

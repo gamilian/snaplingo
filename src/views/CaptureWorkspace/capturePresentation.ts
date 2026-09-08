@@ -1,7 +1,7 @@
 import {
   annotationBrushDiameter,
   type AnnotationTool,
-} from './annotationStyle';
+} from '../../application/capture-workspace/annotationStyle';
 
 type CapturePresentationStatus = 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
 type CaptureEditorCommandButtonVariant = 'default' | 'icon' | 'primary';

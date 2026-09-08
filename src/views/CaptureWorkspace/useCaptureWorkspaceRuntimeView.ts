@@ -1,3 +1,4 @@
+import { shouldRequestCaptureMagnifierPixels } from '../../application/capture-workspace/captureMagnifierState';
 import {
   useCallback,
   useEffect,
@@ -9,24 +10,23 @@ import {
 import {
   createCaptureWorkspaceRuntime,
   type CaptureScreenshotPreferences,
-} from './captureWorkspaceRuntime';
-import type { CaptureWorkspaceRuntime } from './captureWorkspaceRuntimeTypes';
+} from '../../application/capture-workspace/runtime';
+import type { CaptureWorkspaceRuntime } from '../../application/capture-workspace/captureWorkspaceRuntimeTypes';
 import type { OcrSettings } from '../../application/settings/ports';
 import { prepareCaptureSurfaceForReveal } from './captureHostRuntime';
 import {
-  shouldRequestCaptureMagnifierPixels,
   useCaptureMagnifierPixelSource,
 } from './captureMagnifierRuntime';
 import { useCaptureSelectionOverlay } from './captureSelectionOverlayRuntime';
-import { getCaptureWorkspaceDerivedState } from './captureWorkspaceDerived';
-import { ANNOTATION_COLORS, type AnnotationColor } from './annotationStyle';
+import { getCaptureWorkspaceDerivedState } from '../../application/capture-workspace/captureWorkspaceDerived';
+import { ANNOTATION_COLORS, type AnnotationColor } from '../../application/capture-workspace/annotationStyle';
 import type {
   CaptureWorkspaceViewActions,
   CaptureWorkspaceViewRenderState,
 } from './CaptureWorkspaceView';
 import type { CaptureMode, LogicalRect } from './types';
-import { virtualPointToViewportPoint } from './virtualDesktop';
-import { useCaptureWorkspaceRuntime } from './runtimeContext';
+import { virtualPointToViewportPoint } from '../../application/capture-workspace/virtualDesktop';
+import { useCaptureWorkspacePorts } from './runtimeContext';
 
 const TOOLBAR_GAP = 14;
 const TOOLBAR_SIZE = { width: 700, height: 42 };
@@ -59,7 +59,7 @@ export function useCaptureWorkspaceRuntimeView({
   persistScreenshotDefaults,
   ocrPreferences,
 }: CaptureWorkspaceRuntimeViewOptions): CaptureWorkspaceRuntimeView {
-  const platformRuntime = useCaptureWorkspaceRuntime();
+  const platformPorts = useCaptureWorkspacePorts();
   const onInactiveRef = useRef(onInactive);
   const annotationColorPresetsRef = useRef(annotationColorPresets);
   const screenshotPreferencesRef = useRef(screenshotPreferences);
@@ -85,11 +85,11 @@ export function useCaptureWorkspaceRuntimeView({
   const workflowRuntime = useMemo(
     () =>
       createCaptureWorkspaceRuntime({
-        platform: platformRuntime,
+        platform: platformPorts,
         onInactive: () => (
           onInactiveRef.current
             ? onInactiveRef.current()
-            : platformRuntime.dismiss()
+            : platformPorts.window.hide()
         ),
         annotationColorPresets: () =>
           annotationColorPresetsRef.current ?? ANNOTATION_COLORS,
@@ -107,7 +107,7 @@ export function useCaptureWorkspaceRuntimeView({
         },
         keyboard: { target: window },
       }),
-    [platformRuntime, runtimeRevision],
+    [platformPorts, runtimeRevision],
   );
   const [runtimeRenderState, setRuntimeRenderState] = useState(
     () => workflowRuntime.renderState,

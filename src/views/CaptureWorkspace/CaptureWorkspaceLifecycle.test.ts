@@ -4,7 +4,7 @@ import { StrictMode, act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { CaptureWorkspacePlatformRuntime } from '../../application/capture-workspace/platformRuntime';
+import type { CaptureWorkspacePorts } from '../../application/capture-workspace/ports';
 import type { CaptureSessionView } from './types';
 import CaptureWorkspace from './index';
 
@@ -46,7 +46,7 @@ describe('CaptureWorkspace React lifecycle', () => {
     await act(async () => {
       root.render(
         createElement(CaptureWorkspace, {
-          runtime: platform,
+          ports: platform,
           initialMode: 'screenshot',
           initialSessionId: session.id,
         }),
@@ -58,7 +58,7 @@ describe('CaptureWorkspace React lifecycle', () => {
       await sessionRequest.promise;
     });
 
-    expect(platform.reveal).not.toHaveBeenCalled();
+    expect(platform.window.reveal).not.toHaveBeenCalled();
     expect(platform.commands.hydrateCaptureSessionSnapshots).toHaveBeenCalledWith(session.id);
 
     await act(async () => {
@@ -83,13 +83,13 @@ describe('CaptureWorkspace React lifecycle', () => {
     expect(images[1].style.top).toBe('0px');
     expect(images[1].style.width).toBe('400px');
     expect(decode).toHaveBeenCalledTimes(2);
-    expect(platform.reveal).not.toHaveBeenCalled();
+    expect(platform.window.reveal).not.toHaveBeenCalled();
 
     await act(async () => primaryDecoded.resolve());
-    expect(platform.reveal).not.toHaveBeenCalled();
+    expect(platform.window.reveal).not.toHaveBeenCalled();
     await act(async () => secondaryDecoded.resolve());
-    await vi.waitFor(() => expect(platform.reveal).toHaveBeenCalledOnce());
-    expect(platform.prepareForReveal).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(platform.window.reveal).toHaveBeenCalledOnce());
+    expect(platform.window.prepareForReveal).toHaveBeenCalledOnce();
 
     await act(async () => root.unmount());
     container.remove();
@@ -102,7 +102,7 @@ describe('CaptureWorkspace React lifecycle', () => {
     const lateHotkeyRegistration = deferred<() => void>();
     const disposeLateHotkey = vi.fn();
     const hotkeyHandlers: Array<
-      Parameters<CaptureWorkspacePlatformRuntime['onHotkeyTriggered']>[0]
+      Parameters<CaptureWorkspacePorts['events']['subscribeHotkeyTriggered']>[0]
     > = [];
     let getSessionCall = 0;
     let hotkeyRegistrationCall = 0;
@@ -113,7 +113,7 @@ describe('CaptureWorkspace React lifecycle', () => {
         ? oldSessionRequest.promise
         : currentSessionRequest.promise;
     });
-    platform.onHotkeyTriggered.mockImplementation((handler) => {
+    platform.events.subscribeHotkeyTriggered.mockImplementation((handler) => {
       hotkeyHandlers.push(handler);
       hotkeyRegistrationCall += 1;
       return hotkeyRegistrationCall === 1
@@ -132,7 +132,7 @@ describe('CaptureWorkspace React lifecycle', () => {
           StrictMode,
           null,
           createElement(CaptureWorkspace, {
-            runtime: platform,
+            ports: platform,
             initialMode: 'screenshot',
             initialSessionId: 'strict-session',
           }),
@@ -212,19 +212,19 @@ describe('CaptureWorkspace React lifecycle', () => {
 
     await act(async () => {
       root.render(createElement(CaptureWorkspace, {
-        runtime: platform,
+        ports: platform,
         initialMode: 'screenshot',
         initialSessionId: 'failed-image-session',
       }));
     });
-    await vi.waitFor(() => expect(platform.reveal).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(platform.window.reveal).toHaveBeenCalledOnce());
     expect(container.textContent).toContain('Frozen image could not be decoded');
     expect(platform.commands.renderCaptureOutput).not.toHaveBeenCalled();
 
     await act(async () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     });
-    await vi.waitFor(() => expect(platform.dismiss).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(platform.window.hide).toHaveBeenCalledOnce());
 
     await act(async () => root.unmount());
     container.remove();
@@ -249,12 +249,12 @@ describe('CaptureWorkspace React lifecycle', () => {
 
     await act(async () => {
       root.render(createElement(CaptureWorkspace, {
-        runtime: platform,
+        ports: platform,
         initialMode: 'screenshot',
         initialSessionId: 'keyboard-session',
       }));
     });
-    await vi.waitFor(() => expect(platform.reveal).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(platform.window.reveal).toHaveBeenCalledOnce());
     await act(async () => {
       container.firstElementChild?.dispatchEvent(new PointerEvent('pointermove', {
         bubbles: true,
@@ -294,7 +294,7 @@ function createPlatform() {
     commands: {
       createCaptureSession: vi.fn(async () => createSession('created')),
       getCaptureSession: vi.fn<
-        CaptureWorkspacePlatformRuntime['commands']['getCaptureSession']
+        CaptureWorkspacePorts['commands']['getCaptureSession']
       >(async () => createSession('loaded')),
       hydrateCaptureSessionSnapshots: vi.fn(async (sessionId: string) => ({
         ...createSession(sessionId),
@@ -315,7 +315,7 @@ function createPlatform() {
       currentCaptureControlCandidate: vi.fn(async () => null),
       moveCaptureCursor: vi.fn(async () => undefined),
       cancelCaptureSession: vi.fn<
-        CaptureWorkspacePlatformRuntime['commands']['cancelCaptureSession']
+        CaptureWorkspacePorts['commands']['cancelCaptureSession']
       >(async () => undefined),
       restoreCaptureSnapshotWindowsForSession: vi.fn(async () => undefined),
       renderCaptureOutput: vi.fn(async () => 'preview-image'),
@@ -327,29 +327,34 @@ function createPlatform() {
       openCaptureTranslationResultWindow: vi.fn(async () => undefined),
       copyTextToClipboard: vi.fn(async () => undefined),
     },
-    clipboard: { copyText: vi.fn(async () => undefined) },
-    onCancelRequested: vi.fn<
-      CaptureWorkspacePlatformRuntime['onCancelRequested']
+    clipboard: { writeText: vi.fn(async () => undefined) },
+    events: {
+    subscribeCaptureCancel: vi.fn<
+      CaptureWorkspacePorts['events']['subscribeCaptureCancel']
     >(async () => () => undefined),
-    onCopyRequested: vi.fn<
-      CaptureWorkspacePlatformRuntime['onCopyRequested']
+    subscribeCaptureCopy: vi.fn<
+      CaptureWorkspacePorts['events']['subscribeCaptureCopy']
     >(async () => () => undefined),
-    onSaveRequested: vi.fn<
-      CaptureWorkspacePlatformRuntime['onSaveRequested']
+    subscribeCaptureSave: vi.fn<
+      CaptureWorkspacePorts['events']['subscribeCaptureSave']
     >(async () => () => undefined),
-    onUndoRequested: vi.fn<
-      CaptureWorkspacePlatformRuntime['onUndoRequested']
+    subscribeCaptureUndo: vi.fn<
+      CaptureWorkspacePorts['events']['subscribeCaptureUndo']
     >(async () => () => undefined),
-    onRedoRequested: vi.fn<
-      CaptureWorkspacePlatformRuntime['onRedoRequested']
+    subscribeCaptureRedo: vi.fn<
+      CaptureWorkspacePorts['events']['subscribeCaptureRedo']
     >(async () => () => undefined),
-    onHotkeyTriggered: vi.fn<
-      CaptureWorkspacePlatformRuntime['onHotkeyTriggered']
+    subscribeHotkeyTriggered: vi.fn<
+      CaptureWorkspacePorts['events']['subscribeHotkeyTriggered']
     >(async () => () => undefined),
+    },
+    window: {
     prepareForReveal: vi.fn(async () => undefined),
     reveal: vi.fn(async () => undefined),
-    dismiss: vi.fn(async () => undefined),
-  } satisfies CaptureWorkspacePlatformRuntime;
+    hide: vi.fn(async () => undefined),
+    },
+    print: { printImage: vi.fn<CaptureWorkspacePorts['print']['printImage']>(async () => undefined) },
+  } satisfies CaptureWorkspacePorts;
 }
 
 function createSession(id: string): CaptureSessionView {

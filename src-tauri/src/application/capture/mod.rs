@@ -1,3 +1,4 @@
+mod coordinates;
 mod image_composer;
 mod output;
 mod render;
@@ -13,6 +14,7 @@ mod output_test;
 #[cfg(test)]
 mod session_test;
 
+pub use coordinates::{CaptureCoordinatePolicy, CaptureWindowGeometry};
 pub use image_composer::CaptureImageComposer;
 pub(crate) use image_composer::{ImageAnnotation, PngPlacement};
 pub(crate) use output::{configured_capture_save_dir, CaptureOutputHost, CaptureOutputSystemPaths};
@@ -20,6 +22,6 @@ pub use output::{CaptureOutput, ClipboardCaptureOutput};
 pub use render::CaptureSessionOutput;
 pub use runtime::CaptureSessionRuntime;
 pub use runtime_host::CaptureCursorMover;
-pub(crate) use runtime_host::CaptureSessionRuntimeHost;
+pub(crate) use runtime_host::{CapturePinOutput, CaptureSessionRuntimeHost};
 pub use session::CaptureSessions;
 pub use source::CaptureSessionSource;

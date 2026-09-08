@@ -257,14 +257,11 @@ function ResultWindowContent({
     resultWindowVisible,
     resultWindowMode,
     resultWindowOrigin,
-    autoTranslateRequestId,
     translationProviders,
     translationSettings,
     ocrSettings,
   } = useResultWindowProjection();
 
-  const lastAutoTranslateRequestId = useRef(0);
-  const lastAutomaticTranslationKey = useRef('');
   const resultWindowPanelRef = useRef<HTMLDivElement>(null);
   const sourceTextAreaRef = useRef<HTMLTextAreaElement>(null);
   const sourceTextMirrorRef = useRef<HTMLDivElement>(null);
@@ -665,60 +662,6 @@ function ResultWindowContent({
     updateMeasuredTranslationPanelHeight,
   ]);
 
-  useEffect(() => {
-    if (
-      !resultWindowVisible ||
-      autoTranslateRequestId === 0 ||
-      autoTranslateRequestId === lastAutoTranslateRequestId.current ||
-      !sourceText.trim()
-    ) {
-      return;
-    }
-
-    lastAutoTranslateRequestId.current = autoTranslateRequestId;
-    lastAutomaticTranslationKey.current = `${sourceLang}\u0000${targetLang}\u0000${sourceText}`;
-    void runtime.translate({ text: sourceText, sourceLang, targetLang });
-  }, [
-    autoTranslateRequestId,
-    resultWindowVisible,
-    sourceLang,
-    sourceText,
-    targetLang,
-    runtime,
-  ]);
-
-  useEffect(() => {
-    if (
-      !resultWindowVisible ||
-      resultWindowMode !== 'translation' ||
-      !translationSettings?.autoTranslate ||
-      !sourceText.trim() ||
-      isTranslating
-    ) {
-      return;
-    }
-
-    const key = `${sourceLang}\u0000${targetLang}\u0000${sourceText}`;
-    if (key === lastAutomaticTranslationKey.current) return;
-
-    const timeout = window.setTimeout(() => {
-      lastAutomaticTranslationKey.current = key;
-      void runtime.translate({ text: sourceText, sourceLang, targetLang });
-    }, translationSettings.incrementalTranslation ? 150 : 500);
-
-    return () => window.clearTimeout(timeout);
-  }, [
-    isTranslating,
-    resultWindowMode,
-    resultWindowVisible,
-    runtime,
-    sourceLang,
-    sourceText,
-    targetLang,
-    translationSettings?.autoTranslate,
-    translationSettings?.incrementalTranslation,
-  ]);
-
   if (!resultWindowVisible) return null;
 
   const handleOverlayClick = (e: MouseEvent<HTMLDivElement>) => {
@@ -739,7 +682,6 @@ function ResultWindowContent({
   };
 
   const handleTranslate = () => {
-    lastAutomaticTranslationKey.current = `${sourceLang}\u0000${targetLang}\u0000${sourceText}`;
     void runtime.translate({ text: sourceText, sourceLang, targetLang });
   };
 

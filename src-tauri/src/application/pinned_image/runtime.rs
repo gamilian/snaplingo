@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::application::capture::{CaptureImageComposer, CaptureOutput};
+use crate::application::capture::{CaptureImageComposer, CaptureOutput, CapturePinOutput};
 
 use super::{PinnedImageOpenRequest, PinnedImageState};
 use crate::domain::capture::PinnedImageView;
@@ -28,6 +28,13 @@ pub struct PinnedImageRuntime {
     image_composition: Arc<CaptureImageComposer>,
     output: Arc<CaptureOutput>,
     host: Arc<dyn PinnedImageRuntimeHost>,
+}
+
+#[async_trait::async_trait]
+impl CapturePinOutput for PinnedImageRuntime {
+    async fn pin_png(&self, png_data: Vec<u8>) -> Result<()> {
+        self.pin_png_and_open(png_data).await
+    }
 }
 
 impl PinnedImageRuntime {

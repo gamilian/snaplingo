@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { AnnotationColor } from './annotationStyle';
+import type { AnnotationColor } from '../../application/capture-workspace/annotationStyle';
 import {
   addAnnotationColorPreset,
   annotationColorFromHex,

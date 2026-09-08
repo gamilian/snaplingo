@@ -1,15 +1,14 @@
 use async_trait::async_trait;
 use tauri::AppHandle;
 
-use crate::application::capture::CaptureSessionRuntimeHost;
-use crate::domain::capture::LogicalRect;
+use crate::application::capture::{CaptureSessionRuntimeHost, CaptureWindowGeometry};
 use crate::Result;
 
 use super::tauri::set_capture_window_cursor_passthrough;
 use super::{
-    begin_capture_presentation, capture_window_bounds, destroy_inactive_capture_window,
-    end_capture_presentation, hide_capture_window, open_capture_window_for_session,
-    prepare_capture_window_for_reveal, restore_capture_snapshot_windows, reveal_capture_window,
+    begin_capture_presentation, destroy_inactive_capture_window, end_capture_presentation,
+    hide_capture_window, open_capture_window_for_session, prepare_capture_window_for_reveal,
+    restore_capture_snapshot_windows, reveal_capture_window,
 };
 
 pub(crate) struct TauriCaptureSessionRuntimeHost {
@@ -38,16 +37,21 @@ impl CaptureSessionRuntimeHost for TauriCaptureSessionRuntimeHost {
         .await
     }
 
-    async fn prepare_capture_window_for_reveal(&self) -> Result<()> {
-        run_on_main_thread(&self.app, "prepare capture window for reveal", |app| {
-            prepare_capture_window_for_reveal(&app)
+    async fn prepare_capture_window_for_reveal(
+        &self,
+        geometry: Option<&CaptureWindowGeometry>,
+    ) -> Result<()> {
+        let geometry = geometry.cloned();
+        run_on_main_thread(&self.app, "prepare capture window for reveal", move |app| {
+            prepare_capture_window_for_reveal(&app, geometry.as_ref())
         })
         .await
     }
 
-    async fn reveal_capture_window(&self) -> Result<()> {
-        run_on_main_thread(&self.app, "reveal capture window", |app| {
-            reveal_capture_window(&app)
+    async fn reveal_capture_window(&self, geometry: Option<&CaptureWindowGeometry>) -> Result<()> {
+        let geometry = geometry.cloned();
+        run_on_main_thread(&self.app, "reveal capture window", move |app| {
+            reveal_capture_window(&app, geometry.as_ref())
         })
         .await
     }
@@ -79,14 +83,14 @@ impl CaptureSessionRuntimeHost for TauriCaptureSessionRuntimeHost {
         &self,
         mode: &str,
         session_id: &str,
-        bounds: &LogicalRect,
+        geometry: &CaptureWindowGeometry,
     ) -> Result<()> {
         let mode = mode.to_string();
         let session_id = session_id.to_string();
-        let bounds = bounds.clone();
+        let geometry = geometry.clone();
 
         run_on_main_thread(&self.app, "open capture window", move |app| {
-            open_capture_window_for_session(&app, &mode, &session_id, &bounds)
+            open_capture_window_for_session(&app, &mode, &session_id, &geometry)
         })
         .await
     }
@@ -99,13 +103,6 @@ impl CaptureSessionRuntimeHost for TauriCaptureSessionRuntimeHost {
             restore_capture_snapshot_windows(&app, &hidden_window_labels)
         })
         .await
-    }
-
-    fn capture_window_bounds(
-        &self,
-        monitors: &[crate::domain::capture::MonitorSnapshotView],
-    ) -> Option<LogicalRect> {
-        capture_window_bounds(monitors)
     }
 }
 

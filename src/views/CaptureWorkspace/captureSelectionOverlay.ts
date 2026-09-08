@@ -1,5 +1,5 @@
 import type { LogicalRect } from './types';
-import { virtualRectToViewportRect } from './virtualDesktop';
+import { virtualRectToViewportRect } from '../../application/capture-workspace/virtualDesktop';
 
 type CaptureSelectionOverlayStatus = 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
 

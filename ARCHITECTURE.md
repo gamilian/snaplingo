@@ -20,8 +20,8 @@ React Views
 
 - `src/views/` renders the Settings, Capture Workspace, Result Window, and Pinned Image windows. A view receives an Application runtime through its local runtime context; it does not call Tauri directly. Result Window reads its Application state through one projection instead of selecting multiple Stores.
 - `src/application/` owns window workflows and their narrow ports:
-  - `capture-workspace`: capture launch/session/effect workflow.
-  - `result-window`: translation and file-OCR workflows.
+  - `capture-workspace`: the capture runtime, editing state, frozen-image readiness, cancellation, OCR recovery, and output workflow. Views supply DOM decoding, Canvas rendering, input conversion, and printing through local ports.
+  - `result-window`: translation session state, request validity, Provider retry, deduplication, 150/500 ms automatic translation scheduling, and file-OCR/favorite workflows. Zustand subscribes to runtime snapshots and combines them with Settings into the View projection.
   - `pinned-image`: pinned-image workflow.
   - `settings`: configuration hydration, serialized updates, Provider/Hotkey reload, cross-window invalidation, and Library cross-source filtering, ordering, and pagination. Zustand stores project this Application-owned state for Views.
   - `permissions`: required-permission polling and explicit request workflow.
@@ -39,7 +39,7 @@ React Views
   - `favorite_capacity` owns the global Favorites maximum and serializes capacity check plus insertion across regular and screenshot Favorites.
   - `favorites::OcrFavoriteApplication` owns Provider fallback, History source recovery, Favorite insertion, and OCR Favorite replay through local seams.
   - `library_index` owns lightweight cross-source ordering so only final-page History and Favorites records are hydrated.
-  - `capture`, `result_window`, and `pinned_image` own window/runtime-host ports. Result Window also owns its read-only state projection, editable text and language intents, translation/OCR favorite orchestration, OCR Provider fallback, and clipboard intents instead of exposing Store mutations or platform adapters to Views.
+  - `capture`, `result_window`, and `pinned_image` own window/runtime-host ports. Capture owns startup exclusion, failure cleanup, frozen monitor coordinates, and output delivery. Its `CapturePinOutput` port is implemented by the existing Pinned Image runtime and wired by Composition; Commands do not chain the two workflows.
   - `selected_text` owns its method and context ports.
   - `required_permissions` owns permission ordering and status policy.
   - `tts` owns speech normalization, locale-based voice selection, and persisted voice/rate policy. Voice IDs are opaque to Application so native adapters may use platform identifiers independently of display names.
@@ -72,7 +72,8 @@ History                -> HistoryEventSource / HistoryRepository
 Library                -> SettingsHistoryPort / SettingsFavoritesPort / SettingsScreenshotFavoritesPort
 Library Index          -> LibraryIndexRepository
 Favorite Capacity      -> FavoriteCapacityRepository / FavoriteCapacityPolicyProvider
-Capture                -> CaptureSessionSource / CaptureRuntimeHost
+Capture                -> CaptureSessionSource / CaptureSessionRuntimeHost
+Capture Pin output     -> CapturePinOutput (implemented by PinnedImageRuntime)
 Hotkeys                -> HotkeyStore / HotkeyRegistrar
 ```
 
@@ -85,14 +86,17 @@ Portable data and policy are kept in Domain or Application. Infrastructure conta
 - Screenshot, selection, system OCR, paths, shortcuts, and desktop windows are Infrastructure concerns.
 - Tauri-specific command/event/window APIs are frontend or backend adapter concerns.
 - Result-window coordinates are durable settings; the window adapter only measures and applies physical positions.
+- Capture sessions freeze monitor geometry with their pixels. Windows retains one primary-monitor scale for the spanning WebView; macOS and Linux retain their native logical-coordinate rules. Window preparation/reveal, cursor mapping, control detection, and output use the requested session's geometry, including after a refresh.
 - Native System OCR is registered on macOS and Windows where the platform language engine is available; Tesseract remains a portable native-engine adapter.
-- System Speech uses a target-specific Infrastructure adapter selected by Composition. macOS currently uses `say`; Windows and Linux adapters can be added without changing Application or Commands.
+- System Speech uses a target-specific Infrastructure adapter selected by Composition: `MacOsSystemTtsHost` on macOS, `WindowsSystemTtsHost` on Windows, and `UnavailableSystemTtsHost` on Linux, where native speech is not yet implemented.
 - CI verifies the real desktop targets on macOS, Ubuntu, and Windows rather than claiming cross-compilation coverage.
 - `script/release-verification.mjs` owns version consistency, Tauri bundle invocation, Cargo target discovery, and the native artifact contract used by local builds and CI.
 
 ## Enforcement
 
 `src/architecture/frontendDependencyRules.test.ts` rejects production imports of Platform/Tauri from Views and frontend Application modules. `src-tauri/tests/architecture_dependency_test.rs` rejects backend Application imports of Infrastructure and crate-root startup adapters. These tests are intentionally strict and contain no migration inventory or allowlist.
+
+Capture guards also cover the actual frontend runtime's Application location and absence of View/DOM dependencies, backend startup/Pin policy staying out of Commands, and native window/control adapters using frozen session coordinates. Runtime interface tests verify scheduling, stale-result rejection, readiness, cancellation, overlapping startup, failure recovery, and frozen-pixel delivery.
 
 ## Compatibility Policy
 

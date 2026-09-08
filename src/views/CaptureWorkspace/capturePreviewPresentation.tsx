@@ -1,10 +1,10 @@
+import { annotationColorToCss } from '../../components/common/annotationColorPresentation';
 import type { PointerEvent, Ref } from 'react';
 import {
-  annotationColorToCss,
   type AnnotationStyle,
-} from './annotationStyle';
-import type { SelectionHandle } from './selection';
-import type { TextAnnotationDraft } from './textAnnotationDraft';
+} from '../../application/capture-workspace/annotationStyle';
+import type { SelectionHandle } from '../../application/capture-workspace/selection';
+import type { TextAnnotationDraft } from '../../application/capture-workspace/textAnnotationDraft';
 import type { LogicalRect } from './types';
 
 const SELECTION_HANDLES: SelectionHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];

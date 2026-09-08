@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react-dom/test-utils';
 import { createRoot } from 'react-dom/client';
 import type { ResultWindowRuntime } from '../../application/result-window/runtime';
+import { createInitialResultWindowState } from '../../application/result-window/projection';
 import { useResultWindowStore } from '../../stores/resultWindowStore';
 import { useProviderStore } from '../../stores/providerStore';
 import { useSettingsConfigStore } from '../../stores/settingsConfigStore';
@@ -46,7 +47,7 @@ async function renderResultWindow() {
 describe('result window text actions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useResultWindowStore.getState().reset();
+    useResultWindowStore.setState(createInitialResultWindowState(), true);
     useSettingsConfigStore.setState({ translation: null, ocr: null });
     useProviderStore.setState({
       translationProviders: [],

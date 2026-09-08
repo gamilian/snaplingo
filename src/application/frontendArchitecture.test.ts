@@ -9,7 +9,7 @@ const screenshotSettings = readFileSync(
   'utf8',
 );
 const captureRuntime = readFileSync(
-  new URL('../views/CaptureWorkspace/captureWorkspaceRuntime.ts', import.meta.url),
+  new URL('./capture-workspace/runtime.ts', import.meta.url),
   'utf8',
 );
 const appShell = readFileSync(

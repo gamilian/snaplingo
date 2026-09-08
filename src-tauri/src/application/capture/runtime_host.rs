@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::domain::capture::{LogicalRect, MonitorSnapshotView};
+use super::CaptureWindowGeometry;
 use crate::Result;
 
 pub trait CaptureCursorMover: Send + Sync {
@@ -8,11 +8,30 @@ pub trait CaptureCursorMover: Send + Sync {
 }
 
 #[async_trait]
+pub(crate) trait CapturePinOutput: Send + Sync {
+    async fn pin_png(&self, png_data: Vec<u8>) -> Result<()>;
+}
+
+pub(crate) struct UnconfiguredCapturePinOutput;
+
+#[async_trait]
+impl CapturePinOutput for UnconfiguredCapturePinOutput {
+    async fn pin_png(&self, _png_data: Vec<u8>) -> Result<()> {
+        Err("Capture pin output is not configured".into())
+    }
+}
+
+#[async_trait]
 pub(crate) trait CaptureSessionRuntimeHost: Send + Sync {
     async fn begin_capture_presentation(&self) -> Result<()>;
     async fn end_capture_presentation(&self) -> Result<()>;
-    async fn prepare_capture_window_for_reveal(&self) -> Result<()>;
-    async fn reveal_capture_window(&self) -> Result<()>;
+    /// No geometry is supplied when revealing a session-load error.
+    async fn prepare_capture_window_for_reveal(
+        &self,
+        geometry: Option<&CaptureWindowGeometry>,
+    ) -> Result<()>;
+    async fn reveal_capture_window(&self, geometry: Option<&CaptureWindowGeometry>) -> Result<()>;
+    /// Hiding an absent or already hidden overlay succeeds.
     async fn hide_capture_window(&self) -> Result<()>;
     async fn set_capture_window_cursor_passthrough(&self, _enabled: bool) -> Result<()> {
         Ok(())
@@ -22,13 +41,12 @@ pub(crate) trait CaptureSessionRuntimeHost: Send + Sync {
         &self,
         mode: &str,
         session_id: &str,
-        bounds: &LogicalRect,
+        geometry: &CaptureWindowGeometry,
     ) -> Result<()>;
     async fn restore_capture_snapshot_windows(
         &self,
         hidden_window_labels: Vec<String>,
     ) -> Result<()>;
-    fn capture_window_bounds(&self, monitors: &[MonitorSnapshotView]) -> Option<LogicalRect>;
 }
 
 pub(crate) struct UnconfiguredCaptureSessionRuntimeHost;
@@ -43,11 +61,14 @@ impl CaptureSessionRuntimeHost for UnconfiguredCaptureSessionRuntimeHost {
         Err("Capture session host is not configured".into())
     }
 
-    async fn prepare_capture_window_for_reveal(&self) -> Result<()> {
+    async fn prepare_capture_window_for_reveal(
+        &self,
+        _geometry: Option<&CaptureWindowGeometry>,
+    ) -> Result<()> {
         Err("Capture session host is not configured".into())
     }
 
-    async fn reveal_capture_window(&self) -> Result<()> {
+    async fn reveal_capture_window(&self, _geometry: Option<&CaptureWindowGeometry>) -> Result<()> {
         Err("Capture session host is not configured".into())
     }
 
@@ -63,7 +84,7 @@ impl CaptureSessionRuntimeHost for UnconfiguredCaptureSessionRuntimeHost {
         &self,
         _mode: &str,
         _session_id: &str,
-        _bounds: &LogicalRect,
+        _geometry: &CaptureWindowGeometry,
     ) -> Result<()> {
         Err("Capture session host is not configured".into())
     }
@@ -73,10 +94,6 @@ impl CaptureSessionRuntimeHost for UnconfiguredCaptureSessionRuntimeHost {
         _hidden_window_labels: Vec<String>,
     ) -> Result<()> {
         Err("Capture session host is not configured".into())
-    }
-
-    fn capture_window_bounds(&self, _monitors: &[MonitorSnapshotView]) -> Option<LogicalRect> {
-        None
     }
 }
 
@@ -96,11 +113,17 @@ mod tests {
             Ok(())
         }
 
-        async fn prepare_capture_window_for_reveal(&self) -> Result<()> {
+        async fn prepare_capture_window_for_reveal(
+            &self,
+            _geometry: Option<&CaptureWindowGeometry>,
+        ) -> Result<()> {
             Ok(())
         }
 
-        async fn reveal_capture_window(&self) -> Result<()> {
+        async fn reveal_capture_window(
+            &self,
+            _geometry: Option<&CaptureWindowGeometry>,
+        ) -> Result<()> {
             Ok(())
         }
 
@@ -116,7 +139,7 @@ mod tests {
             &self,
             _mode: &str,
             _session_id: &str,
-            _bounds: &LogicalRect,
+            _geometry: &CaptureWindowGeometry,
         ) -> Result<()> {
             Ok(())
         }
@@ -127,15 +150,6 @@ mod tests {
         ) -> Result<()> {
             Ok(())
         }
-
-        fn capture_window_bounds(&self, _monitors: &[MonitorSnapshotView]) -> Option<LogicalRect> {
-            Some(LogicalRect {
-                x: 0.0,
-                y: 0.0,
-                width: 100.0,
-                height: 100.0,
-            })
-        }
     }
 
     #[tokio::test]
@@ -143,6 +157,20 @@ mod tests {
         let host = FakeCaptureSessionRuntimeHost;
         host.begin_capture_presentation().await.unwrap();
 
-        assert!(host.capture_window_bounds(&[]).is_some());
+        host.open_capture_window_for_session(
+            "screenshot",
+            "session",
+            &CaptureWindowGeometry {
+                bounds: crate::domain::capture::LogicalRect {
+                    x: -100.0,
+                    y: 0.0,
+                    width: 200.0,
+                    height: 100.0,
+                },
+                desktop_scale: Some(2.0),
+            },
+        )
+        .await
+        .unwrap();
     }
 }

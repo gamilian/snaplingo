@@ -4,7 +4,10 @@ use std::time::Instant;
 use super::render::{
     output_capture_selection, recognize_capture_selection_text, render_capture_png_base64,
 };
-use super::runtime_host::{CaptureSessionRuntimeHost, UnconfiguredCaptureSessionRuntimeHost};
+use super::runtime_host::{
+    CapturePinOutput, CaptureSessionRuntimeHost, UnconfiguredCapturePinOutput,
+    UnconfiguredCaptureSessionRuntimeHost,
+};
 use super::{CaptureImageComposer, CaptureOutput, CaptureSessionOutput, CaptureSessions};
 use crate::application::providers::ocr::OcrCoordinator;
 use crate::domain::capture::{
@@ -20,6 +23,8 @@ pub struct CaptureSessionRuntime {
     output: Arc<CaptureOutput>,
     ocr: Arc<OcrCoordinator>,
     host: Arc<dyn CaptureSessionRuntimeHost>,
+    pin_output: Arc<dyn CapturePinOutput>,
+    startup: tokio::sync::Mutex<()>,
 }
 
 impl CaptureSessionRuntime {
@@ -35,6 +40,7 @@ impl CaptureSessionRuntime {
             output,
             ocr,
             Arc::new(UnconfiguredCaptureSessionRuntimeHost),
+            Arc::new(UnconfiguredCapturePinOutput),
         )
     }
 
@@ -44,6 +50,7 @@ impl CaptureSessionRuntime {
         output: Arc<CaptureOutput>,
         ocr: Arc<OcrCoordinator>,
         host: Arc<dyn CaptureSessionRuntimeHost>,
+        pin_output: Arc<dyn CapturePinOutput>,
     ) -> Self {
         Self {
             sessions,
@@ -51,10 +58,19 @@ impl CaptureSessionRuntime {
             output,
             ocr,
             host,
+            pin_output,
+            startup: tokio::sync::Mutex::new(()),
         }
     }
 
     pub async fn create_session_from_visible_desktop(&self) -> Result<CaptureSessionView> {
+        let _startup = self.startup.try_lock().map_err(|_| {
+            crate::AppError::System("Capture session startup is already in progress".into())
+        })?;
+        self.create_visible_desktop_session().await
+    }
+
+    async fn create_visible_desktop_session(&self) -> Result<CaptureSessionView> {
         let total_start = Instant::now();
         let begin_start = Instant::now();
         self.host.begin_capture_presentation().await?;
@@ -62,17 +78,15 @@ impl CaptureSessionRuntime {
 
         let hide_overlay_start = Instant::now();
         if let Err(err) = self.host.hide_capture_window().await {
-            if err.to_string() != "Capture window is not open" {
-                let presentation_result = self.host.end_capture_presentation().await;
-                return match presentation_result {
-                    Ok(()) => Err(err),
-                    Err(presentation_err) => Err(format!(
-                        "{}; also failed to end capture presentation: {}",
-                        err, presentation_err
-                    )
-                    .into()),
-                };
-            }
+            let presentation_result = self.host.end_capture_presentation().await;
+            return match presentation_result {
+                Ok(()) => Err(err),
+                Err(presentation_err) => Err(format!(
+                    "{}; also failed to end capture presentation: {}",
+                    err, presentation_err
+                )
+                .into()),
+            };
         }
         let hide_overlay_ms = elapsed_ms(hide_overlay_start);
 
@@ -107,22 +121,26 @@ impl CaptureSessionRuntime {
     }
 
     pub async fn open_capture_window_for_mode(&self, mode: &str) -> Result<()> {
+        let Ok(_startup) = self.startup.try_lock() else {
+            log::info!("Ignoring capture request while a capture window is already opening");
+            return Ok(());
+        };
         let total_start = Instant::now();
         let session_start = Instant::now();
-        let session = self.create_session_from_visible_desktop().await?;
+        let session = self.create_visible_desktop_session().await?;
         let session_ms = elapsed_ms(session_start);
         let monitor_count = session.monitors.len();
         let candidate_count = session.candidates.len();
         let view_base64_bytes = capture_session_view_base64_bytes(&session);
 
         let open_start = Instant::now();
-        let open_result = match self.host.capture_window_bounds(&session.monitors) {
-            Some(bounds) => {
+        let open_result = match self.sessions.window_geometry(&session.id) {
+            Ok(geometry) => {
                 self.host
-                    .open_capture_window_for_session(mode, &session.id.0, &bounds)
+                    .open_capture_window_for_session(mode, &session.id.0, &geometry)
                     .await
             }
-            None => Err("Cannot open capture window without monitor bounds".into()),
+            Err(error) => Err(error),
         };
         let open_ms = elapsed_ms(open_start);
 
@@ -167,12 +185,23 @@ impl CaptureSessionRuntime {
         Ok(())
     }
 
-    pub async fn prepare_capture_window_for_reveal(&self) -> Result<()> {
-        self.host.prepare_capture_window_for_reveal().await
+    pub async fn prepare_capture_window_for_reveal(
+        &self,
+        session_id: Option<&CaptureSessionId>,
+    ) -> Result<()> {
+        let geometry = session_id
+            .map(|id| self.sessions.window_geometry(id))
+            .transpose()?;
+        self.host
+            .prepare_capture_window_for_reveal(geometry.as_ref())
+            .await
     }
 
-    pub async fn reveal_capture_window(&self) -> Result<()> {
-        self.host.reveal_capture_window().await
+    pub async fn reveal_capture_window(&self, session_id: Option<&CaptureSessionId>) -> Result<()> {
+        let geometry = session_id
+            .map(|id| self.sessions.window_geometry(id))
+            .transpose()?;
+        self.host.reveal_capture_window(geometry.as_ref()).await
     }
 
     pub async fn hide_capture_window(&self) -> Result<()> {
@@ -313,10 +342,10 @@ impl CaptureSessionRuntime {
         annotations: &[AnnotationCommand],
         include_cursor: bool,
         action: CaptureOutputAction,
-    ) -> Result<CaptureSessionOutput> {
+    ) -> Result<()> {
         self.ensure_selection_snapshots_ready(session_id, rect)?;
 
-        output_capture_selection(
+        let output = output_capture_selection(
             &self.sessions,
             &self.image_composition,
             &self.output,
@@ -326,7 +355,11 @@ impl CaptureSessionRuntime {
             include_cursor,
             action,
         )
-        .await
+        .await?;
+        match output {
+            CaptureSessionOutput::Completed => Ok(()),
+            CaptureSessionOutput::Pin(png_data) => self.pin_output.pin_png(png_data).await,
+        }
     }
 
     fn ensure_selection_snapshots_ready(
@@ -381,9 +414,10 @@ mod tests {
     use image::ImageEncoder;
 
     use super::super::{
-        CaptureImageComposer, CaptureOutput, CaptureSessionSource, CaptureSessions,
+        CaptureCoordinatePolicy, CaptureImageComposer, CaptureOutput, CaptureSessionSource,
+        CaptureSessions, CaptureWindowGeometry,
     };
-    use super::{CaptureSessionOutput, CaptureSessionRuntime, CaptureSessionRuntimeHost};
+    use super::{CapturePinOutput, CaptureSessionRuntime, CaptureSessionRuntimeHost};
     use crate::application::providers::ocr::OcrCoordinator;
     use crate::domain::capture::{
         CaptureOutputAction, CaptureSessionId, LogicalPoint, LogicalRect, MonitorLayout,
@@ -396,13 +430,13 @@ mod tests {
     enum HostCall {
         BeginPresentation,
         CaptureSnapshots,
-        PrepareCaptureWindowForReveal,
-        RevealCaptureWindow,
+        PrepareCaptureWindowForReveal(Option<CaptureWindowGeometry>),
+        RevealCaptureWindow(Option<CaptureWindowGeometry>),
         HideCaptureWindow,
         OpenCaptureWindow {
             mode: String,
             session_id: String,
-            bounds: LogicalRect,
+            geometry: CaptureWindowGeometry,
         },
         RestoreSnapshotWindows(Vec<String>),
         EndPresentation,
@@ -411,7 +445,8 @@ mod tests {
     struct RecordingRuntimeHost {
         calls: Arc<Mutex<Vec<HostCall>>>,
         hide_result: Result<(), String>,
-        open_result: Result<(), String>,
+        open_result: Mutex<Result<(), String>>,
+        open_barrier: Option<Arc<StartupBarrier>>,
         restore_result: Result<(), String>,
         end_result: Result<(), String>,
         destroy_result: Result<(), String>,
@@ -422,7 +457,8 @@ mod tests {
             Self {
                 calls: Arc::new(Mutex::new(Vec::new())),
                 hide_result: Ok(()),
-                open_result: Ok(()),
+                open_result: Mutex::new(Ok(())),
+                open_barrier: None,
                 restore_result: Ok(()),
                 end_result: Ok(()),
                 destroy_result: Ok(()),
@@ -438,7 +474,7 @@ mod tests {
 
         fn with_open_error(message: &str) -> Self {
             Self {
-                open_result: Err(message.to_string()),
+                open_result: Mutex::new(Err(message.to_string())),
                 ..Self::succeeds()
             }
         }
@@ -460,19 +496,25 @@ mod tests {
             self.end_result.clone().map_err(AppError::from)
         }
 
-        async fn prepare_capture_window_for_reveal(&self) -> crate::Result<()> {
+        async fn prepare_capture_window_for_reveal(
+            &self,
+            geometry: Option<&CaptureWindowGeometry>,
+        ) -> crate::Result<()> {
             self.calls
                 .lock()
                 .unwrap()
-                .push(HostCall::PrepareCaptureWindowForReveal);
+                .push(HostCall::PrepareCaptureWindowForReveal(geometry.cloned()));
             Ok(())
         }
 
-        async fn reveal_capture_window(&self) -> crate::Result<()> {
+        async fn reveal_capture_window(
+            &self,
+            geometry: Option<&CaptureWindowGeometry>,
+        ) -> crate::Result<()> {
             self.calls
                 .lock()
                 .unwrap()
-                .push(HostCall::RevealCaptureWindow);
+                .push(HostCall::RevealCaptureWindow(geometry.cloned()));
             Ok(())
         }
 
@@ -489,7 +531,7 @@ mod tests {
             &self,
             mode: &str,
             session_id: &str,
-            bounds: &LogicalRect,
+            geometry: &CaptureWindowGeometry,
         ) -> crate::Result<()> {
             self.calls
                 .lock()
@@ -497,9 +539,17 @@ mod tests {
                 .push(HostCall::OpenCaptureWindow {
                     mode: mode.to_string(),
                     session_id: session_id.to_string(),
-                    bounds: bounds.clone(),
+                    geometry: geometry.clone(),
                 });
-            self.open_result.clone().map_err(AppError::from)
+            if let Some(barrier) = &self.open_barrier {
+                barrier.entered.notify_one();
+                barrier.release.notified().await;
+            }
+            self.open_result
+                .lock()
+                .unwrap()
+                .clone()
+                .map_err(AppError::from)
         }
 
         async fn restore_capture_snapshot_windows(
@@ -512,48 +562,57 @@ mod tests {
                 .push(HostCall::RestoreSnapshotWindows(hidden_window_labels));
             self.restore_result.clone().map_err(AppError::from)
         }
+    }
 
-        fn capture_window_bounds(
-            &self,
-            monitors: &[crate::domain::capture::MonitorSnapshotView],
-        ) -> Option<LogicalRect> {
-            let first = monitors.first()?.logical_bounds.clone();
-            Some(monitors.iter().skip(1).fold(first, |bounds, monitor| {
-                let monitor_bounds = &monitor.logical_bounds;
-                let min_x = bounds.x.min(monitor_bounds.x);
-                let min_y = bounds.y.min(monitor_bounds.y);
-                let max_x = (bounds.x + bounds.width).max(monitor_bounds.x + monitor_bounds.width);
-                let max_y =
-                    (bounds.y + bounds.height).max(monitor_bounds.y + monitor_bounds.height);
+    #[derive(Default)]
+    struct StartupBarrier {
+        entered: tokio::sync::Notify,
+        release: tokio::sync::Notify,
+    }
 
-                LogicalRect {
-                    x: min_x,
-                    y: min_y,
-                    width: max_x - min_x,
-                    height: max_y - min_y,
-                }
-            }))
+    #[derive(Default)]
+    struct RecordingPinOutput {
+        pngs: Mutex<Vec<Vec<u8>>>,
+        error: Mutex<Option<String>>,
+    }
+
+    #[async_trait]
+    impl CapturePinOutput for RecordingPinOutput {
+        async fn pin_png(&self, png_data: Vec<u8>) -> crate::Result<()> {
+            self.pngs.lock().unwrap().push(png_data);
+            match self.error.lock().unwrap().clone() {
+                Some(error) => Err(AppError::from(error)),
+                None => Ok(()),
+            }
         }
     }
 
     struct MockCaptureSessionSource {
-        snapshots: Vec<MonitorSnapshot>,
+        snapshots: Mutex<Vec<MonitorSnapshot>>,
+        coordinate_policy: CaptureCoordinatePolicy,
     }
 
     struct OrderedCaptureSessionSource {
+        capture_barrier: Option<Arc<StartupBarrier>>,
         calls: Arc<Mutex<Vec<HostCall>>>,
         snapshots: Vec<MonitorSnapshot>,
     }
 
     #[async_trait]
     impl CaptureSessionSource for MockCaptureSessionSource {
+        fn coordinate_policy(&self) -> CaptureCoordinatePolicy {
+            self.coordinate_policy
+        }
+
         async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError> {
-            Ok(self.snapshots.clone())
+            Ok(self.snapshots.lock().unwrap().clone())
         }
 
         async fn capture_monitor_layouts(&self) -> Result<Vec<MonitorLayout>, AppError> {
             Ok(self
                 .snapshots
+                .lock()
+                .unwrap()
                 .iter()
                 .map(|snapshot| MonitorLayout {
                     id: snapshot.id.clone(),
@@ -587,6 +646,10 @@ mod tests {
     impl CaptureSessionSource for OrderedCaptureSessionSource {
         async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError> {
             self.calls.lock().unwrap().push(HostCall::CaptureSnapshots);
+            if let Some(barrier) = &self.capture_barrier {
+                barrier.entered.notify_one();
+                barrier.release.notified().await;
+            }
             Ok(self.snapshots.clone())
         }
 
@@ -652,46 +715,155 @@ mod tests {
     fn make_runtime(
         host: Arc<dyn CaptureSessionRuntimeHost>,
         snapshots: Vec<MonitorSnapshot>,
-    ) -> (CaptureSessionRuntime, Arc<CaptureSessions>) {
+    ) -> (
+        CaptureSessionRuntime,
+        Arc<CaptureSessions>,
+        Arc<RecordingPinOutput>,
+    ) {
         let sessions = Arc::new(CaptureSessions::new(Arc::new(MockCaptureSessionSource {
-            snapshots,
+            snapshots: Mutex::new(snapshots),
+            coordinate_policy: CaptureCoordinatePolicy::NativeLogical,
         })));
+        let pin_output = Arc::new(RecordingPinOutput::default());
         let runtime = CaptureSessionRuntime::with_host(
             sessions.clone(),
             Arc::new(CaptureImageComposer::new()),
             Arc::new(CaptureOutput::new()),
             Arc::new(OcrCoordinator::new(Arc::new(SqliteConfigStore::new_temp()))),
             host,
+            pin_output.clone(),
         );
 
-        (runtime, sessions)
+        (runtime, sessions, pin_output)
     }
 
     #[tokio::test]
     async fn capture_window_visibility_uses_runtime_host_seam() {
         let host = Arc::new(RecordingRuntimeHost::succeeds());
-        let (runtime, _) = make_runtime(host.clone(), vec![make_snapshot()]);
+        let (runtime, sessions, _) = make_runtime(host.clone(), vec![make_snapshot()]);
+        let session = sessions.create_session().await.unwrap();
+        let geometry = sessions.window_geometry(&session.id).unwrap();
 
-        runtime.prepare_capture_window_for_reveal().await.unwrap();
-        runtime.reveal_capture_window().await.unwrap();
+        runtime
+            .prepare_capture_window_for_reveal(Some(&session.id))
+            .await
+            .unwrap();
+        runtime
+            .reveal_capture_window(Some(&session.id))
+            .await
+            .unwrap();
         runtime.hide_capture_window().await.unwrap();
 
         assert_eq!(
             host.calls(),
             vec![
-                HostCall::PrepareCaptureWindowForReveal,
-                HostCall::RevealCaptureWindow,
+                HostCall::PrepareCaptureWindowForReveal(Some(geometry.clone())),
+                HostCall::RevealCaptureWindow(Some(geometry)),
                 HostCall::HideCaptureWindow,
             ]
         );
     }
 
     #[tokio::test]
-    async fn create_session_from_visible_desktop_ignores_missing_capture_window_when_hiding() {
-        let host = Arc::new(RecordingRuntimeHost::with_hide_error(
-            "Capture window is not open",
-        ));
-        let (runtime, _) = make_runtime(host.clone(), vec![make_snapshot()]);
+    async fn session_load_errors_can_be_revealed_without_session_geometry() {
+        let host = Arc::new(RecordingRuntimeHost::succeeds());
+        let (runtime, _, _) = make_runtime(host.clone(), Vec::new());
+
+        runtime
+            .prepare_capture_window_for_reveal(None)
+            .await
+            .unwrap();
+        runtime.reveal_capture_window(None).await.unwrap();
+
+        assert_eq!(
+            host.calls(),
+            vec![
+                HostCall::PrepareCaptureWindowForReveal(None),
+                HostCall::RevealCaptureWindow(None),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn window_reveal_uses_the_requested_frozen_session_after_refresh() {
+        let mut initial = make_snapshot();
+        initial.scale_factor = 2.0;
+        let source = Arc::new(MockCaptureSessionSource {
+            snapshots: Mutex::new(vec![initial]),
+            coordinate_policy: CaptureCoordinatePolicy::PrimaryMonitorScale,
+        });
+        let sessions = Arc::new(CaptureSessions::new(source.clone()));
+        let host = Arc::new(RecordingRuntimeHost::succeeds());
+        let runtime = CaptureSessionRuntime::with_host(
+            sessions.clone(),
+            Arc::new(CaptureImageComposer::new()),
+            Arc::new(CaptureOutput::new()),
+            Arc::new(OcrCoordinator::new(Arc::new(SqliteConfigStore::new_temp()))),
+            host.clone(),
+            Arc::new(RecordingPinOutput::default()),
+        );
+
+        runtime
+            .open_capture_window_for_mode("screenshot")
+            .await
+            .unwrap();
+        let original_id = host
+            .calls()
+            .into_iter()
+            .find_map(|call| match call {
+                HostCall::OpenCaptureWindow { session_id, .. } => {
+                    Some(CaptureSessionId(session_id))
+                }
+                _ => None,
+            })
+            .unwrap();
+        let original_geometry = sessions.window_geometry(&original_id).unwrap();
+        {
+            let mut snapshots = source.snapshots.lock().unwrap();
+            snapshots[0].physical_bounds.x = -300;
+            snapshots[0].physical_bounds.width = 900;
+            snapshots[0].scale_factor = 1.5;
+        }
+        let refreshed = runtime.create_session_from_visible_desktop().await.unwrap();
+        let refreshed_geometry = sessions.window_geometry(&refreshed.id).unwrap();
+        assert_ne!(original_geometry.bounds, refreshed_geometry.bounds);
+        assert_eq!(original_geometry.desktop_scale, Some(2.0));
+        assert_eq!(refreshed_geometry.desktop_scale, Some(1.5));
+        source.snapshots.lock().unwrap()[0].scale_factor = 4.0;
+        host.calls.lock().unwrap().clear();
+
+        runtime
+            .prepare_capture_window_for_reveal(Some(&refreshed.id))
+            .await
+            .unwrap();
+        runtime
+            .reveal_capture_window(Some(&refreshed.id))
+            .await
+            .unwrap();
+        runtime
+            .prepare_capture_window_for_reveal(Some(&original_id))
+            .await
+            .unwrap();
+        runtime
+            .reveal_capture_window(Some(&original_id))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            host.calls(),
+            vec![
+                HostCall::PrepareCaptureWindowForReveal(Some(refreshed_geometry.clone())),
+                HostCall::RevealCaptureWindow(Some(refreshed_geometry)),
+                HostCall::PrepareCaptureWindowForReveal(Some(original_geometry.clone())),
+                HostCall::RevealCaptureWindow(Some(original_geometry)),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn create_session_from_visible_desktop_accepts_an_idempotent_hide() {
+        let host = Arc::new(RecordingRuntimeHost::succeeds());
+        let (runtime, _, _) = make_runtime(host.clone(), vec![make_snapshot()]);
 
         let session = runtime.create_session_from_visible_desktop().await.unwrap();
 
@@ -711,6 +883,7 @@ mod tests {
         });
         let sessions = Arc::new(CaptureSessions::new(Arc::new(
             OrderedCaptureSessionSource {
+                capture_barrier: None,
                 calls: calls.clone(),
                 snapshots: vec![make_snapshot()],
             },
@@ -721,6 +894,7 @@ mod tests {
             Arc::new(CaptureOutput::new()),
             Arc::new(OcrCoordinator::new(Arc::new(SqliteConfigStore::new_temp()))),
             host,
+            Arc::new(RecordingPinOutput::default()),
         );
 
         runtime.create_session_from_visible_desktop().await.unwrap();
@@ -738,7 +912,7 @@ mod tests {
     #[tokio::test]
     async fn create_session_from_visible_desktop_ends_presentation_when_session_creation_fails() {
         let host = Arc::new(RecordingRuntimeHost::succeeds());
-        let (runtime, _) = make_runtime(host.clone(), Vec::new());
+        let (runtime, _, _) = make_runtime(host.clone(), Vec::new());
 
         let err = runtime
             .create_session_from_visible_desktop()
@@ -763,7 +937,7 @@ mod tests {
     #[tokio::test]
     async fn open_capture_window_for_mode_rolls_back_session_when_window_open_fails() {
         let host = Arc::new(RecordingRuntimeHost::with_open_error("open failed"));
-        let (runtime, sessions) = make_runtime(host.clone(), vec![make_snapshot()]);
+        let (runtime, sessions, _) = make_runtime(host.clone(), vec![make_snapshot()]);
 
         let err = runtime
             .open_capture_window_for_mode("screenshot")
@@ -786,11 +960,14 @@ mod tests {
                 HostCall::OpenCaptureWindow {
                     mode: "screenshot".to_string(),
                     session_id: session_id.clone(),
-                    bounds: LogicalRect {
-                        x: -20.0,
-                        y: 10.0,
-                        width: 80.0,
-                        height: 40.0,
+                    geometry: CaptureWindowGeometry {
+                        bounds: LogicalRect {
+                            x: -20.0,
+                            y: 10.0,
+                            width: 80.0,
+                            height: 40.0
+                        },
+                        desktop_scale: None,
                     },
                 },
                 HostCall::RestoreSnapshotWindows(Vec::new()),
@@ -803,7 +980,7 @@ mod tests {
     #[tokio::test]
     async fn render_png_base64_rejects_selection_before_snapshots_are_hydrated() {
         let host = Arc::new(RecordingRuntimeHost::succeeds());
-        let (runtime, sessions) = make_runtime(host, vec![make_snapshot()]);
+        let (runtime, sessions, _) = make_runtime(host, vec![make_snapshot()]);
         let session = sessions.create_layout_session().await.unwrap();
 
         let err = runtime
@@ -828,12 +1005,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn output_selection_pin_returns_rendered_png_through_runtime() {
+    async fn output_selection_delivers_frozen_png_to_pin_output_once() {
         let host = Arc::new(RecordingRuntimeHost::succeeds());
-        let (runtime, sessions) = make_runtime(host, vec![make_renderable_snapshot()]);
+        let (runtime, sessions, pin_output) = make_runtime(host, vec![make_renderable_snapshot()]);
         let session = sessions.create_session().await.unwrap();
 
-        let output = runtime
+        runtime
             .output_selection(
                 &session.id,
                 &LogicalRect {
@@ -849,12 +1026,212 @@ mod tests {
             .await
             .unwrap();
 
-        let CaptureSessionOutput::Pin(png_data) = output else {
-            panic!("expected pin output");
-        };
-        let decoded = image::load_from_memory(&png_data).unwrap().to_rgba8();
+        let pngs = pin_output.pngs.lock().unwrap();
+        assert_eq!(pngs.len(), 1);
+        let expected = runtime
+            .render_png(
+                &session.id,
+                &LogicalRect {
+                    x: 1.0,
+                    y: 1.0,
+                    width: 2.0,
+                    height: 2.0,
+                },
+                &[],
+                false,
+            )
+            .unwrap();
+        assert_eq!(pngs[0], expected);
+        let decoded = image::load_from_memory(&pngs[0]).unwrap().to_rgba8();
 
         assert_eq!((decoded.width(), decoded.height()), (2, 2));
         assert!(decoded.pixels().all(|pixel| pixel.0 == [10, 20, 30, 255]));
+    }
+    #[tokio::test]
+    async fn every_open_entry_ignores_overlap_until_native_open_finishes() {
+        let barrier = Arc::new(StartupBarrier::default());
+        let host = Arc::new(RecordingRuntimeHost {
+            open_barrier: Some(barrier.clone()),
+            ..RecordingRuntimeHost::succeeds()
+        });
+        let (runtime, _, _) = make_runtime(host.clone(), vec![make_snapshot()]);
+        let runtime = Arc::new(runtime);
+        let pending = {
+            let runtime = runtime.clone();
+            tokio::spawn(async move { runtime.open_capture_window_for_mode("screenshot").await })
+        };
+        tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            barrier.entered.notified(),
+        )
+        .await
+        .unwrap();
+        runtime
+            .open_capture_window_for_mode("screenshot-ocr")
+            .await
+            .unwrap();
+        let error = runtime
+            .create_session_from_visible_desktop()
+            .await
+            .unwrap_err();
+        assert!(error.to_string().contains("startup is already in progress"));
+        assert_eq!(
+            host.calls()
+                .iter()
+                .filter(|call| matches!(call, HostCall::BeginPresentation))
+                .count(),
+            1
+        );
+        barrier.release.notify_one();
+        pending.await.unwrap().unwrap();
+        barrier.release.notify_one();
+        runtime
+            .open_capture_window_for_mode("screenshot-ocr")
+            .await
+            .unwrap();
+        assert_eq!(
+            host.calls()
+                .iter()
+                .filter(|call| matches!(call, HostCall::BeginPresentation))
+                .count(),
+            2
+        );
+    }
+
+    #[tokio::test]
+    async fn direct_session_creation_and_window_open_share_startup_exclusion() {
+        let barrier = Arc::new(StartupBarrier::default());
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let host = Arc::new(RecordingRuntimeHost {
+            calls: calls.clone(),
+            ..RecordingRuntimeHost::succeeds()
+        });
+        let sessions = Arc::new(CaptureSessions::new(Arc::new(
+            OrderedCaptureSessionSource {
+                capture_barrier: Some(barrier.clone()),
+                calls: calls.clone(),
+                snapshots: vec![make_snapshot()],
+            },
+        )));
+        let runtime = Arc::new(CaptureSessionRuntime::with_host(
+            sessions,
+            Arc::new(CaptureImageComposer::new()),
+            Arc::new(CaptureOutput::new()),
+            Arc::new(OcrCoordinator::new(Arc::new(SqliteConfigStore::new_temp()))),
+            host,
+            Arc::new(RecordingPinOutput::default()),
+        ));
+        let pending = {
+            let runtime = runtime.clone();
+            tokio::spawn(async move { runtime.create_session_from_visible_desktop().await })
+        };
+        tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            barrier.entered.notified(),
+        )
+        .await
+        .unwrap();
+        assert!(runtime.create_session_from_visible_desktop().await.is_err());
+        runtime
+            .open_capture_window_for_mode("screenshot")
+            .await
+            .unwrap();
+        assert_eq!(
+            calls.lock().unwrap().as_slice(),
+            &[
+                HostCall::BeginPresentation,
+                HostCall::HideCaptureWindow,
+                HostCall::CaptureSnapshots,
+            ]
+        );
+        barrier.release.notify_one();
+        pending.await.unwrap().unwrap();
+        barrier.release.notify_one();
+        runtime.create_session_from_visible_desktop().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn failed_startup_releases_exclusion_and_allows_retry() {
+        let host = Arc::new(RecordingRuntimeHost::with_open_error("open failed"));
+        let (runtime, sessions, _) = make_runtime(host.clone(), vec![make_snapshot()]);
+        assert!(runtime
+            .open_capture_window_for_mode("screenshot")
+            .await
+            .is_err());
+        let first_id = host
+            .calls()
+            .iter()
+            .find_map(|call| match call {
+                HostCall::OpenCaptureWindow { session_id, .. } => Some(session_id.clone()),
+                _ => None,
+            })
+            .unwrap();
+        assert!(!sessions.has_session(&CaptureSessionId(first_id)));
+        *host.open_result.lock().unwrap() = Ok(());
+        runtime
+            .open_capture_window_for_mode("screenshot")
+            .await
+            .unwrap();
+        assert_eq!(
+            host.calls()
+                .iter()
+                .filter(|call| matches!(call, HostCall::BeginPresentation))
+                .count(),
+            2
+        );
+        assert_eq!(
+            host.calls()
+                .iter()
+                .filter(|call| matches!(call, HostCall::EndPresentation))
+                .count(),
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn hide_failures_end_presentation_without_interpreting_adapter_error_text() {
+        let host = Arc::new(RecordingRuntimeHost::with_hide_error(
+            "Capture window is not open",
+        ));
+        let (runtime, _, _) = make_runtime(host.clone(), vec![make_snapshot()]);
+        let error = runtime
+            .create_session_from_visible_desktop()
+            .await
+            .unwrap_err();
+        assert_eq!(error.to_string(), "Capture window is not open");
+        assert_eq!(
+            host.calls(),
+            vec![
+                HostCall::BeginPresentation,
+                HostCall::HideCaptureWindow,
+                HostCall::EndPresentation
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn failed_pin_delivery_is_not_repeated_and_keeps_the_session_available() {
+        let host = Arc::new(RecordingRuntimeHost::succeeds());
+        let (runtime, sessions, pin_output) = make_runtime(host, vec![make_renderable_snapshot()]);
+        let session = sessions.create_session().await.unwrap();
+        *pin_output.error.lock().unwrap() = Some("pin window failed".into());
+        let error = runtime
+            .output_selection(
+                &session.id,
+                &LogicalRect {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 2.0,
+                    height: 2.0,
+                },
+                &[],
+                false,
+                CaptureOutputAction::Pin,
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(error.to_string(), "pin window failed");
+        assert_eq!(pin_output.pngs.lock().unwrap().len(), 1);
+        assert!(sessions.has_session(&session.id));
     }
 }

@@ -1,7 +1,5 @@
-use super::{
-    geometry::{normalize_windows_layout_coordinates, normalize_windows_snapshot_coordinates},
-    xcap_common,
-};
+use super::xcap_common;
+use crate::application::capture::CaptureCoordinatePolicy;
 use crate::application::CaptureSessionSource;
 use crate::domain::capture::{
     CapturedCursor, ControlCandidate, LogicalPoint, LogicalRect, MonitorLayout, MonitorSnapshot,
@@ -36,10 +34,12 @@ impl WindowsCaptureSessionSource {
 
 #[async_trait::async_trait]
 impl CaptureSessionSource for WindowsCaptureSessionSource {
+    fn coordinate_policy(&self) -> CaptureCoordinatePolicy {
+        CaptureCoordinatePolicy::PrimaryMonitorScale
+    }
+
     async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError> {
-        let mut snapshots = xcap_common::capture_all_monitor_snapshots()?;
-        normalize_windows_snapshot_coordinates(&mut snapshots);
-        Ok(snapshots)
+        xcap_common::capture_all_monitor_snapshots()
     }
 
     async fn capture_monitor_snapshot(
@@ -54,9 +54,7 @@ impl CaptureSessionSource for WindowsCaptureSessionSource {
     }
 
     async fn capture_monitor_layouts(&self) -> Result<Vec<MonitorLayout>, AppError> {
-        let mut layouts = xcap_common::capture_all_monitor_layouts()?;
-        normalize_windows_layout_coordinates(&mut layouts);
-        Ok(layouts)
+        xcap_common::capture_all_monitor_layouts()
     }
 
     async fn capture_window_candidates(
@@ -76,9 +74,11 @@ impl CaptureSessionSource for WindowsCaptureSessionSource {
     async fn capture_control_candidate(
         &self,
         point: &LogicalPoint,
+        monitors: &[MonitorSnapshot],
     ) -> Result<Option<ControlCandidate>, AppError> {
         let point = point.clone();
-        tokio::task::spawn_blocking(move || capture_control_candidate_at(&point))
+        let monitors = monitors.to_vec();
+        tokio::task::spawn_blocking(move || capture_control_candidate_at(&point, &monitors))
             .await
             .map_err(|error| AppError::System(format!("Control detection task failed: {error}")))?
     }
@@ -103,9 +103,17 @@ impl CaptureSessionSource for WindowsCaptureSessionSource {
 
 fn capture_control_candidate_at(
     point: &LogicalPoint,
+    monitors: &[MonitorSnapshot],
 ) -> Result<Option<ControlCandidate>, AppError> {
-    let mut layouts = xcap_common::capture_all_monitor_layouts()?;
-    normalize_windows_layout_coordinates(&mut layouts);
+    let layouts = monitors
+        .iter()
+        .map(|monitor| MonitorLayout {
+            id: monitor.id.clone(),
+            logical_bounds: monitor.logical_bounds.clone(),
+            physical_bounds: monitor.physical_bounds.clone(),
+            scale_factor: monitor.scale_factor,
+        })
+        .collect::<Vec<_>>();
     let (physical_point, scale_factor) = physical_point_for_logical_point(point, &layouts)
         .ok_or_else(|| {
             AppError::System("Cannot map logical point to a Windows monitor".to_string())

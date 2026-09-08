@@ -10,7 +10,7 @@ export interface ProviderTranslation extends TranslationResult {
   status: ProviderTranslationStatus;
 }
 
-export interface ResultWindowProjection {
+export interface ResultWindowState {
   readonly sourceText: string;
   readonly sourceLang: string;
   readonly targetLang: string;
@@ -24,7 +24,27 @@ export interface ResultWindowProjection {
   readonly resultWindowVisible: boolean;
   readonly resultWindowMode: ResultWindowMode;
   readonly resultWindowOrigin: ResultWindowOrigin;
-  readonly autoTranslateRequestId: number;
+}
+
+export function createInitialResultWindowState(): ResultWindowState {
+  return {
+    sourceText: '',
+    sourceLang: 'auto',
+    targetLang: 'zh-CN',
+    providerTranslations: [],
+    isTranslating: false,
+    ocrText: '',
+    ocrConfidence: null,
+    ocrImageBase64: null,
+    isOcrRunning: false,
+    ocrError: null,
+    resultWindowVisible: false,
+    resultWindowMode: 'translation',
+    resultWindowOrigin: 'input',
+  };
+}
+
+export interface ResultWindowProjection extends ResultWindowState {
   readonly translationProviders: Provider[];
   readonly translationSettings: TranslationSettings | null;
   readonly ocrSettings: OcrSettings | null;

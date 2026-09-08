@@ -124,44 +124,6 @@ fn normalized_scale_factor(scale_factor: f64) -> f64 {
     }
 }
 
-#[cfg(any(target_os = "windows", test))]
-pub(super) fn normalize_windows_snapshot_coordinates(monitors: &mut [MonitorSnapshot]) {
-    // One spanning WebView has one CSS scale. Per-monitor origin scaling would
-    // introduce gaps or overlaps in the Windows physical desktop layout.
-    let scale = monitors
-        .first()
-        .map(|monitor| monitor.scale_factor.max(1.0))
-        .unwrap_or(1.0);
-    for monitor in monitors {
-        monitor.scale_factor = scale;
-        monitor.logical_bounds = logical_rect_from_physical(
-            monitor.physical_bounds.x,
-            monitor.physical_bounds.y,
-            monitor.physical_bounds.width,
-            monitor.physical_bounds.height,
-            scale,
-        );
-    }
-}
-
-#[cfg(any(target_os = "windows", test))]
-pub(super) fn normalize_windows_layout_coordinates(monitors: &mut [MonitorLayout]) {
-    let scale = monitors
-        .first()
-        .map(|monitor| monitor.scale_factor.max(1.0))
-        .unwrap_or(1.0);
-    for monitor in monitors {
-        monitor.scale_factor = scale;
-        monitor.logical_bounds = logical_rect_from_physical(
-            monitor.physical_bounds.x,
-            monitor.physical_bounds.y,
-            monitor.physical_bounds.width,
-            monitor.physical_bounds.height,
-            scale,
-        );
-    }
-}
-
 pub(crate) fn logical_rect_from_physical(
     x: i32,
     y: i32,
@@ -244,8 +206,13 @@ mod tests {
                 scale_factor: monitor.scale_factor,
             })
             .collect::<Vec<_>>();
-        normalize_windows_snapshot_coordinates(&mut snapshots);
-        normalize_windows_layout_coordinates(&mut layouts);
+        use crate::application::capture::CaptureCoordinatePolicy;
+        CaptureCoordinatePolicy::PrimaryMonitorScale.normalize(&mut snapshots);
+        let mut layout_snapshots = layouts
+            .drain(..)
+            .map(|layout| crate::domain::capture::monitor_snapshot_from_layout(layout, Vec::new()))
+            .collect::<Vec<_>>();
+        CaptureCoordinatePolicy::PrimaryMonitorScale.normalize(&mut layout_snapshots);
 
         assert_eq!(
             snapshots[1].logical_bounds.x,
@@ -260,7 +227,7 @@ mod tests {
             0.0
         );
         assert!(snapshots.iter().all(|monitor| monitor.scale_factor == 2.0));
-        for (snapshot, layout) in snapshots.iter().zip(&layouts) {
+        for (snapshot, layout) in snapshots.iter().zip(&layout_snapshots) {
             assert_eq!(snapshot.logical_bounds, layout.logical_bounds);
             assert_eq!(snapshot.scale_factor, layout.scale_factor);
         }

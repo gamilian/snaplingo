@@ -31,19 +31,21 @@ pub(crate) fn build_capture_runtime(
     let sessions = Arc::new(CaptureSessions::new(capture_session_source));
     let image_composer = Arc::new(CaptureImageComposer::new());
     let output = Arc::new(CaptureOutput::with_host(Arc::new(SystemCaptureOutputHost)));
+    let pinned_image_state = Arc::new(PinnedImageState::new());
+    let pinned_images = Arc::new(PinnedImageRuntime::new(
+        pinned_image_state,
+        image_composer.clone(),
+        output.clone(),
+        Arc::new(TauriPinnedImageRuntimeHost::new(app.clone())),
+    ));
+
     let runtime = Arc::new(CaptureSessionRuntime::with_host(
         sessions.clone(),
         image_composer.clone(),
         output.clone(),
         ocr_coordinator,
-        Arc::new(TauriCaptureSessionRuntimeHost::new(app.clone())),
-    ));
-    let pinned_image_state = Arc::new(PinnedImageState::new());
-    let pinned_images = Arc::new(PinnedImageRuntime::new(
-        pinned_image_state,
-        image_composer,
-        output.clone(),
-        Arc::new(TauriPinnedImageRuntimeHost::new(app)),
+        Arc::new(TauriCaptureSessionRuntimeHost::new(app)),
+        pinned_images.clone(),
     ));
 
     CaptureRuntimeParts {

@@ -274,6 +274,80 @@ fn commands_delegate_native_effects_to_application_seams() {
 }
 
 #[test]
+fn capture_commands_do_not_own_startup_exclusion_or_pin_delivery() {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let commands =
+        fs::read_to_string(manifest_dir.join("src/commands/capture_session_commands.rs")).unwrap();
+    for policy in [
+        "AtomicBool",
+        "compare_exchange",
+        "CaptureSessionOutput",
+        "pin_png_and_open",
+        ".pinned_images",
+    ] {
+        assert!(
+            !commands.contains(policy),
+            "Capture Commands must delegate {policy} to the Application runtime"
+        );
+    }
+
+    let runtime =
+        fs::read_to_string(manifest_dir.join("src/application/capture/runtime.rs")).unwrap();
+    let production = runtime.split("#[cfg(test)]").next().unwrap();
+    assert!(
+        !production.contains("Capture window is not open"),
+        "Capture runtime must rely on idempotent hide behavior, not adapter error text"
+    );
+}
+
+#[test]
+fn capture_window_and_control_adapters_use_frozen_session_coordinates() {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let window =
+        fs::read_to_string(manifest_dir.join("src/infrastructure/system/capture_window/tauri.rs"))
+            .unwrap();
+    for live_read in [".primary_monitor(", ".available_monitors("] {
+        assert!(
+            !window.contains(live_read),
+            "Capture window must use supplied session geometry instead of {live_read}"
+        );
+    }
+
+    struct RejectLiveMonitorEnumeration;
+    impl<'ast> Visit<'ast> for RejectLiveMonitorEnumeration {
+        fn visit_path(&mut self, path: &'ast syn::Path) {
+            for segment in &path.segments {
+                assert!(
+                    segment.ident != "capture_all_monitor_layouts"
+                        && segment.ident != "capture_all_monitor_snapshots",
+                    "Control detection must map through the supplied frozen monitors"
+                );
+            }
+            visit::visit_path(self, path);
+        }
+    }
+    let windows_source =
+        fs::read_to_string(manifest_dir.join("src/infrastructure/system/screenshot/windows.rs"))
+            .unwrap();
+    let syntax = syn::parse_file(&windows_source).unwrap();
+    let control_mapping = syntax
+        .items
+        .iter()
+        .find_map(|item| match item {
+            Item::Fn(function) if function.sig.ident == "capture_control_candidate_at" => {
+                Some(function)
+            }
+            _ => None,
+        })
+        .expect("Windows control mapping must be covered by the frozen-coordinate guard");
+    RejectLiveMonitorEnumeration.visit_item_fn(control_mapping);
+    assert!(
+        !windows_source.contains("normalize_windows_"),
+        "The session's coordinate policy owns Windows monitor normalization"
+    );
+}
+
+#[test]
 fn commands_and_composition_do_not_own_provider_or_ocr_favorite_policy() {
     let command_sources = production_command_sources();
     let forbidden_command_policy = [
@@ -382,7 +456,11 @@ fn composition_is_the_only_platform_adapter_selector() {
         );
     }
     let tts_composition = read("src/composition/tts_runtime.rs");
-    for adapter in ["MacOsSystemTtsHost", "UnavailableSystemTtsHost"] {
+    for adapter in [
+        "MacOsSystemTtsHost",
+        "WindowsSystemTtsHost",
+        "UnavailableSystemTtsHost",
+    ] {
         assert!(
             tts_composition.contains(adapter),
             "TTS Composition must select {adapter}"

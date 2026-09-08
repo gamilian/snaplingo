@@ -9,6 +9,8 @@ use tauri::{LogicalPosition, LogicalSize};
 #[cfg(target_os = "windows")]
 use tauri::{PhysicalPosition, PhysicalSize};
 
+use crate::application::capture::CaptureWindowGeometry;
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 use crate::domain::capture::LogicalRect;
 
 use super::backend::{
@@ -90,7 +92,10 @@ pub fn restore_capture_snapshot_windows(
     Ok(())
 }
 
-pub fn reveal_capture_window(app: &AppHandle) -> Result<(), String> {
+pub fn reveal_capture_window(
+    app: &AppHandle,
+    _geometry: Option<&CaptureWindowGeometry>,
+) -> Result<(), String> {
     let window = app
         .get_webview_window(CAPTURE_WINDOW_LABEL)
         .ok_or_else(|| "Capture window is not open".to_string())?;
@@ -102,7 +107,10 @@ pub fn reveal_capture_window(app: &AppHandle) -> Result<(), String> {
 
     #[cfg(not(target_os = "macos"))]
     {
-        configure_capture_window_for_current_space(&window)?;
+        configure_capture_window_for_current_space(
+            &window,
+            _geometry.and_then(|geometry| geometry.desktop_scale),
+        )?;
         window.show().map_err(|e| e.to_string())?;
         focus_capture_window_for_current_space(&window)?;
         reveal_capture_window_for_current_space(&window)?;
@@ -111,10 +119,16 @@ pub fn reveal_capture_window(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-pub fn prepare_capture_window_for_reveal(app: &AppHandle) -> Result<(), String> {
+pub fn prepare_capture_window_for_reveal(
+    app: &AppHandle,
+    geometry: Option<&CaptureWindowGeometry>,
+) -> Result<(), String> {
     let window = app
         .get_webview_window(CAPTURE_WINDOW_LABEL)
         .ok_or_else(|| "Capture window is not open".to_string())?;
+    if let Some(geometry) = geometry {
+        set_capture_window_frame(&window, geometry)?;
+    }
 
     #[cfg(target_os = "macos")]
     {
@@ -124,7 +138,10 @@ pub fn prepare_capture_window_for_reveal(app: &AppHandle) -> Result<(), String> 
     }
 
     #[cfg(target_os = "windows")]
-    configure_capture_window_for_current_space(&window)?;
+    configure_capture_window_for_current_space(
+        &window,
+        geometry.and_then(|geometry| geometry.desktop_scale),
+    )?;
 
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
@@ -135,9 +152,9 @@ pub fn prepare_capture_window_for_reveal(app: &AppHandle) -> Result<(), String> 
 }
 
 pub fn hide_capture_window(app: &AppHandle) -> Result<(), String> {
-    let window = app
-        .get_webview_window(CAPTURE_WINDOW_LABEL)
-        .ok_or_else(|| "Capture window is not open".to_string())?;
+    let Some(window) = app.get_webview_window(CAPTURE_WINDOW_LABEL) else {
+        return Ok(());
+    };
 
     #[cfg(target_os = "macos")]
     {
@@ -213,7 +230,7 @@ pub fn prewarm_capture_window(app: &AppHandle) -> Result<(), String> {
     .shadow(false)
     .build()
     .map_err(|e| e.to_string())?;
-    configure_capture_window_for_current_space(&window)?;
+    configure_capture_window_for_current_space(&window, None)?;
     restore_capture_window_activation();
 
     Ok(())
@@ -223,7 +240,7 @@ pub fn open_capture_window_for_session(
     app: &AppHandle,
     mode: &str,
     session_id: &str,
-    bounds: &LogicalRect,
+    geometry: &CaptureWindowGeometry,
 ) -> Result<(), String> {
     let mode = normalized_capture_mode(mode);
 
@@ -242,19 +259,8 @@ pub fn open_capture_window_for_session(
             window
                 .set_focusable(capture_window_is_focusable())
                 .map_err(|e| e.to_string())?;
-            #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-            window
-                .set_position(LogicalPosition::new(bounds.x, bounds.y))
-                .map_err(|e| e.to_string())?;
-            #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-            window
-                .set_size(LogicalSize::new(bounds.width, bounds.height))
-                .map_err(|e| e.to_string())?;
-            #[cfg(target_os = "macos")]
-            super::macos::set_capture_window_frame(&window, bounds)?;
-            #[cfg(target_os = "windows")]
-            set_windows_capture_window_frame(&window, bounds)?;
-            configure_capture_window_for_current_space(&window)?;
+            set_capture_window_frame(&window, geometry)?;
+            configure_capture_window_for_current_space(&window, geometry.desktop_scale)?;
             window
                 .emit(
                     "hotkey-triggered",
@@ -277,7 +283,7 @@ pub fn open_capture_window_for_session(
         height: 1.0,
     };
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    let initial_bounds = bounds.clone();
+    let initial_bounds = geometry.bounds.clone();
     let window = WebviewWindowBuilder::new(
         app,
         CAPTURE_WINDOW_LABEL,
@@ -299,11 +305,8 @@ pub fn open_capture_window_for_session(
     .shadow(false)
     .build()
     .map_err(|e| e.to_string())?;
-    #[cfg(target_os = "macos")]
-    super::macos::set_capture_window_frame(&window, bounds)?;
-    #[cfg(target_os = "windows")]
-    set_windows_capture_window_frame(&window, bounds)?;
-    configure_capture_window_for_current_space(&window)?;
+    set_capture_window_frame(&window, geometry)?;
+    configure_capture_window_for_current_space(&window, geometry.desktop_scale)?;
     restore_capture_window_activation();
 
     Ok(())
@@ -323,7 +326,10 @@ fn suppress_capture_window_activation(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-fn configure_capture_window_for_current_space(window: &tauri::WebviewWindow) -> Result<(), String> {
+fn configure_capture_window_for_current_space(
+    window: &tauri::WebviewWindow,
+    _desktop_scale: Option<f64>,
+) -> Result<(), String> {
     window
         .set_focusable(capture_window_is_focusable())
         .map_err(|e| e.to_string())?;
@@ -337,11 +343,12 @@ fn configure_capture_window_for_current_space(window: &tauri::WebviewWindow) -> 
     {
         // WebView2 follows the window's monitor DPI. Keep CSS coordinates in
         // the same primary-display scale as the frozen capture session.
-        let desktop_scale = windows_capture_desktop_scale(window)?;
-        let window_scale = window.scale_factor().map_err(|e| e.to_string())?;
-        window
-            .set_zoom(desktop_scale / window_scale)
-            .map_err(|e| e.to_string())?;
+        if let Some(desktop_scale) = _desktop_scale {
+            let window_scale = window.scale_factor().map_err(|e| e.to_string())?;
+            window
+                .set_zoom(desktop_scale / window_scale)
+                .map_err(|e| e.to_string())?;
+        }
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
@@ -352,21 +359,36 @@ fn configure_capture_window_for_current_space(window: &tauri::WebviewWindow) -> 
     Ok(())
 }
 
-#[cfg(target_os = "windows")]
-fn windows_capture_desktop_scale(window: &tauri::WebviewWindow) -> Result<f64, String> {
-    window
-        .primary_monitor()
-        .map_err(|e| e.to_string())?
-        .map(|monitor| monitor.scale_factor())
-        .ok_or_else(|| "Capture window has no primary monitor".to_string())
+fn set_capture_window_frame(
+    window: &tauri::WebviewWindow,
+    geometry: &CaptureWindowGeometry,
+) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    super::macos::set_capture_window_frame(window, &geometry.bounds)?;
+    #[cfg(target_os = "windows")]
+    set_windows_capture_window_frame(window, geometry)?;
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        let bounds = &geometry.bounds;
+        window
+            .set_position(LogicalPosition::new(bounds.x, bounds.y))
+            .map_err(|e| e.to_string())?;
+        window
+            .set_size(LogicalSize::new(bounds.width, bounds.height))
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 #[cfg(target_os = "windows")]
 fn set_windows_capture_window_frame(
     window: &tauri::WebviewWindow,
-    bounds: &LogicalRect,
+    geometry: &CaptureWindowGeometry,
 ) -> Result<(), String> {
-    let scale = windows_capture_desktop_scale(window)?;
+    let bounds = &geometry.bounds;
+    let scale = geometry
+        .desktop_scale
+        .ok_or_else(|| "Windows capture session has no desktop scale".to_string())?;
     window
         .set_position(PhysicalPosition::new(
             (bounds.x * scale).round() as i32,

@@ -1,4 +1,4 @@
-import type { CaptureWorkspacePointerInput } from './captureWorkspaceRuntimeTypes';
+import type { CaptureWorkspacePointerInput } from '../../application/capture-workspace/captureWorkspaceRuntimeTypes';
 
 interface CapturePointerFrameScheduler {
   requestFrame(callback: FrameRequestCallback): number;

@@ -156,10 +156,10 @@ async fn pin_png_keeps_state_when_window_open_fails() {
         host.clone(),
     );
 
-    let error = runtime
-        .pin_png_and_open(make_test_png(3, 2))
-        .await
-        .unwrap_err();
+    let error =
+        crate::application::capture::CapturePinOutput::pin_png(&runtime, make_test_png(3, 2))
+            .await
+            .unwrap_err();
 
     let image_id = opened_image_id(&host, 0);
     assert!(error.to_string().contains("open failed"));

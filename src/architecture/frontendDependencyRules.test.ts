@@ -304,6 +304,27 @@ function unexpectedTauriEventUses(files: SourceFile[]) {
 }
 
 describe('frontend dependency rules', () => {
+  test('Capture workflow implementation stays in Application and uses DOM adapters', () => {
+    const files = productionSourceFiles();
+    const captureFiles = files.filter(({ path }) =>
+      path.startsWith('src/application/capture-workspace/'),
+    );
+    expect(captureFiles.some(({ path }) => path.endsWith('/runtime.ts'))).toBe(true);
+    expect(moduleImports(captureFiles).filter(({ specifier }) =>
+      specifier.includes('/views/') || specifier.includes('/components/') ||
+      specifier === 'react' || specifier.startsWith('react-dom'),
+    )).toEqual([]);
+    expect(captureFiles.filter(({ source }) =>
+      /\b(?:document|HTMLImageElement|HTMLCanvasElement|KeyboardEvent)\b/.test(source),
+    ).map(({ path }) => path)).toEqual([]);
+    expect(files.some(({ path }) =>
+      path === 'src/views/CaptureWorkspace/captureWorkspaceRuntime.ts' ||
+      path === 'src/application/capture-workspace/platformRuntime.ts',
+    )).toBe(false);
+    const runtime = captureFiles.find(({ path }) => path.endsWith('/runtime.ts'))!;
+    expect(runtime.source).toContain('platform.print.printImage(imageBase64)');
+  });
+
   test('production Views live under canonical roots and consume Application seams only', () => {
     const productionFiles = productionSourceFiles();
     const paths = productionFiles.map(({ path }) => path);
@@ -366,7 +387,7 @@ describe('frontend dependency rules', () => {
 
     expect(imports).toEqual(
       expect.arrayContaining([
-        './application/capture-workspace/platformRuntime',
+        './application/capture-workspace/ports',
         './application/result-window/platformRuntime',
         './application/pinned-image/runtime',
         './application/settings/runtime',
@@ -415,7 +436,7 @@ describe('frontend dependency rules', () => {
     ).toEqual([]);
   });
 
-  test('Result Window consumes one state projection and one state adapter', () => {
+  test('Result Window projects application-owned state and scheduling', () => {
     const productionFiles = productionSourceFiles();
     const appFile = productionFiles.find(({ path }) => path === 'src/App.tsx');
     const viewFile = productionFiles.find(
@@ -424,7 +445,13 @@ describe('frontend dependency rules', () => {
 
     expect(appFile).toBeDefined();
     expect(viewFile).toBeDefined();
-    expect(appFile!.source).toContain('state: createResultWindowStatePort(');
+    expect(appFile!.source).toContain('initializeResultWindowStore(resultWindowRuntime)');
+    expect(viewFile!.source).not.toContain('autoTranslateRequestId');
+    expect(viewFile!.source).not.toContain('incrementalTranslation');
+    const storeFile = productionFiles.find(({ path }) => path === 'src/stores/resultWindowStore.ts');
+    expect(storeFile!.source).toContain('runtime.subscribe(');
+    expect(storeFile!.source).not.toContain('startTranslationSession');
+    expect(storeFile!.source).not.toContain('completeProviderTranslation');
     expect(appFile!.source).not.toContain('useResultWindowStore.getState()');
     expect(viewFile!.source).toContain('useResultWindowProjection()');
     expect(viewFile!.source).not.toContain('\n    setSourceText,');

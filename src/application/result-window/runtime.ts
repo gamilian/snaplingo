@@ -14,6 +14,7 @@ import type {
   CaptureResultWindowPayload,
   ResultWindowOrigin,
   ResultWindowPositionStore,
+  ResultWindowProvidersPort,
   ResultWindowSpeechPort,
   ResultWindowUnsubscribe,
 } from './ports';
@@ -29,49 +30,32 @@ import {
   translationPayloadSourceText,
 } from './payload';
 import { speakResultWindowText } from './speech';
+import {
+  createInitialResultWindowState,
+  type ProviderTranslation,
+  type ResultWindowState,
+} from './projection';
 
 export type ResultWindowPresentation = 'overlay' | 'standalone';
-
-export interface ResultWindowStatePort {
-  setSourceText(text: string): void;
-  setSourceLang(language: string): void;
-  setTargetLang(language: string): void;
-  setResultWindowOrigin(origin: ResultWindowOrigin): void;
-  clearTranslationResults(): void;
-  setOcrText(text: string): void;
-  setOcrConfidence(confidence: number | null): void;
-  setOcrImageBase64(imageBase64: string | null): void;
-  setOcrRunning(value: boolean): void;
-  setOcrError(message: string | null): void;
-  requestAutoTranslate(): void;
-  showResultWindow(): void;
-  showOcrWindow(): void;
-  hideResultWindow(): void;
-  loadActiveTranslationProviderIds(): Promise<string[]>;
-  loadActiveOcrProviderId(): Promise<string | null>;
-  getTranslationSession(): {
-    sessionId: string | null;
-    sourceText: string;
-    sourceLang: string;
-    targetLang: string;
-  };
-  startTranslationSession(text: string, providerIds: string[]): string;
-  beginProviderTranslation(sessionId: string, providerId: string): void;
-  completeProviderTranslation(sessionId: string, result: TranslationResult): void;
-  failProviderTranslation(
-    sessionId: string,
-    result: TranslationResult,
-  ): void;
-  setTranslating(value: boolean): void;
-}
 
 export interface ResultWindowRuntimePorts {
   platform: ResultWindowPlatformRuntime;
   speech: ResultWindowSpeechPort;
-  state: ResultWindowStatePort;
+  providers: ResultWindowProvidersPort;
   getTranslationSettings?: () => TranslationSettings | undefined;
   getOcrSettings?: () => OcrSettings | undefined;
   positionStore: ResultWindowPositionStore;
+}
+
+interface TranslationInput {
+  text: string;
+  sourceLang: string;
+  targetLang: string;
+}
+
+interface TranslationSession {
+  request: TranslationInput;
+  providerRequests: Map<string, object>;
 }
 
 export interface ResultWindowResizeInput {
@@ -106,24 +90,91 @@ export function resultWindowStandaloneWindowHeight(panelHeightPx: number) {
 export function createResultWindowRuntime({
   platform,
   speech,
-  state,
+  providers,
   getTranslationSettings,
   getOcrSettings,
   positionStore,
 }: ResultWindowRuntimePorts) {
   let needsPlacement = true;
   let lastPlacedPosition: ResultWindowPosition | null = null;
-  let translationGeneration = 0;
+  let state = createInitialResultWindowState();
+  const listeners = new Set<(state: ResultWindowState) => void>();
+  let translationSession: TranslationSession | null = null;
+  let automaticTranslationTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastTranslationKey: string | null = null;
   let ocrGeneration = 0;
 
-  function invalidateTranslationGeneration() {
-    translationGeneration += 1;
-    state.setTranslating(false);
+  function updateState(update: Partial<ResultWindowState>) {
+    state = { ...state, ...update };
+    listeners.forEach((listener) => listener(state));
+  }
+
+  function cancelAutomaticTranslation() {
+    if (automaticTranslationTimer !== null) {
+      clearTimeout(automaticTranslationTimer);
+      automaticTranslationTimer = null;
+    }
+  }
+
+  function invalidateTranslationSession() {
+    cancelAutomaticTranslation();
+    translationSession = null;
+    if (state.isTranslating) lastTranslationKey = null;
+    updateState({ isTranslating: false });
   }
 
   function invalidateOcrGeneration() {
     ocrGeneration += 1;
-    state.setOcrRunning(false);
+    updateState({ isOcrRunning: false });
+  }
+
+  function currentTranslationInput(): TranslationInput {
+    return {
+      text: state.sourceText,
+      sourceLang: state.sourceLang,
+      targetLang: state.targetLang,
+    };
+  }
+
+  function translationKey(input: TranslationInput) {
+    return `${input.sourceLang}\u0000${input.targetLang}\u0000${input.text}`;
+  }
+
+  function scheduleAutomaticTranslation(immediate = false) {
+    cancelAutomaticTranslation();
+    const settings = getTranslationSettings?.();
+    if (
+      !state.resultWindowVisible ||
+      state.resultWindowMode !== 'translation' ||
+      !state.sourceText.trim() ||
+      state.isTranslating ||
+      (!immediate && !settings?.autoTranslate)
+    ) {
+      return;
+    }
+
+    const input = currentTranslationInput();
+    if (!immediate && translationKey(input) === lastTranslationKey) return;
+
+    const run = () => {
+      automaticTranslationTimer = null;
+      void translate(input).catch((error) => {
+        console.error('Failed to start automatic translation:', error);
+      });
+    };
+    if (immediate) {
+      run();
+    } else {
+      automaticTranslationTimer = setTimeout(
+        run,
+        settings?.incrementalTranslation ? 150 : 500,
+      );
+    }
+  }
+
+  async function loadTranslationProviders() {
+    await providers.loadTranslation();
+    return providers.getState().activeTranslationProviders;
   }
 
   function translationRequestText(text: string) {
@@ -132,26 +183,37 @@ export function createResultWindowRuntime({
       : text;
   }
 
+  function createTranslationSession(input: TranslationInput): TranslationSession {
+    const text = translationRequestText(input.text);
+    return {
+      request: {
+        text,
+        ...resolveTranslationRequestLanguages(text, input.sourceLang, input.targetLang),
+      },
+      providerRequests: new Map(),
+    };
+  }
+
   function changeSourceLanguage(language: string) {
-    invalidateTranslationGeneration();
-    const { targetLang } = state.getTranslationSession();
-    state.setSourceLang(language);
-    state.setTargetLang(
-      targetLang === 'auto'
+    invalidateTranslationSession();
+    const { targetLang } = state;
+    updateState({
+      sourceLang: language,
+      targetLang: targetLang === 'auto'
         ? 'auto'
         : defaultTargetLanguageForSource(language),
-    );
+    });
+    scheduleAutomaticTranslation();
   }
 
   function swapTranslationLanguages() {
-    invalidateTranslationGeneration();
-    const session = state.getTranslationSession();
+    invalidateTranslationSession();
     const next = swapTranslationLanguagePair(
-      session.sourceLang,
-      session.targetLang,
+      state.sourceLang,
+      state.targetLang,
     );
-    state.setSourceLang(next.sourceLang);
-    state.setTargetLang(next.targetLang);
+    updateState(next);
+    scheduleAutomaticTranslation();
   }
 
   async function persistTranslationHistory(input: {
@@ -174,79 +236,115 @@ export function createResultWindowRuntime({
     }
   }
 
-  async function translate(input: {
-    text: string;
-    sourceLang: string;
-    targetLang: string;
-  }) {
+  function updateProviderTranslation(result: ProviderTranslation) {
+    const providerTranslations = state.providerTranslations.map((entry) =>
+      entry.provider_id === result.provider_id ? result : entry,
+    );
+    updateState({
+      providerTranslations,
+      isTranslating: providerTranslations.some((entry) => entry.status === 'pending'),
+    });
+  }
+
+  async function requestProviderTranslation(
+    session: TranslationSession,
+    providerId: string,
+  ): Promise<TranslationResult | null> {
+    const requestToken = {};
+    session.providerRequests.set(providerId, requestToken);
+    updateProviderTranslation(pendingTranslation(providerId));
+    let result: TranslationResult;
+    try {
+      result = await platform.commands.translateTextWithProvider(
+        providerId,
+        session.request,
+      );
+    } catch (error) {
+      result = translationFailure(providerId, error);
+    }
+    if (
+      translationSession !== session ||
+      session.providerRequests.get(providerId) !== requestToken
+    ) {
+      return null;
+    }
+
+    if (result.error) {
+      updateProviderTranslation({
+        ...result,
+        provider_id: providerId,
+        status: 'error',
+        translated_text: '',
+        detected_language: null,
+        confidence: null,
+        request_id: result.request_id ?? null,
+        duration_ms: result.duration_ms ?? null,
+      });
+      return null;
+    }
+    updateProviderTranslation({
+      ...result,
+      provider_id: providerId,
+      translated_text: result.translated_text.trim(),
+      status: 'success',
+    });
+    return result;
+  }
+
+  async function translate(input: TranslationInput) {
+    cancelAutomaticTranslation();
     if (!input.text.trim()) return;
 
-    const generation = ++translationGeneration;
-
+    lastTranslationKey = translationKey(input);
     const settings = getTranslationSettings?.();
-    const requestText = translationRequestText(input.text);
-
-    const request = resolveTranslationRequestLanguages(
-      requestText,
-      input.sourceLang,
-      input.targetLang,
-    );
-    const providerIds = await state.loadActiveTranslationProviderIds();
-    if (generation !== translationGeneration) return;
-    const sessionId = state.startTranslationSession(input.text, providerIds);
-
-    if (providerIds.length === 0) {
-      state.setTranslating(false);
-      return;
+    const session = createTranslationSession(input);
+    translationSession = session;
+    updateState({
+      sourceText: input.text,
+      sourceLang: input.sourceLang,
+      targetLang: input.targetLang,
+      resultWindowMode: 'translation',
+      providerTranslations: [],
+      isTranslating: true,
+    });
+    let providerIds: string[];
+    try {
+      providerIds = await loadTranslationProviders();
+    } catch (error) {
+      if (translationSession === session) {
+        translationSession = null;
+        lastTranslationKey = null;
+        updateState({ isTranslating: false });
+      }
+      throw error;
     }
+    if (translationSession !== session) return;
+    updateState({
+      providerTranslations: providerIds.map(pendingTranslation),
+      isTranslating: providerIds.length > 0,
+    });
+    if (providerIds.length === 0) return;
 
     const startedAt = performance.now();
     const results = await Promise.all(
-      providerIds.map(async (providerId) => {
-        state.beginProviderTranslation(sessionId, providerId);
-        try {
-          const result = await platform.commands.translateTextWithProvider(
-            providerId,
-            {
-              text: requestText,
-              sourceLang: request.sourceLang,
-              targetLang: request.targetLang,
-            },
-          );
-          if (generation !== translationGeneration) return null;
-          if (result.error) {
-            state.failProviderTranslation(sessionId, result);
-            return null;
-          }
-          state.completeProviderTranslation(sessionId, result);
-          return result;
-        } catch (error) {
-          if (generation === translationGeneration) {
-            state.failProviderTranslation(
-              sessionId,
-              translationFailure(providerId, error),
-            );
-          }
-          return null;
-        }
-      }),
+      providerIds.map((providerId) => requestProviderTranslation(session, providerId)),
     );
     const completedResults = results.filter(
       (result): result is TranslationResult => result !== null,
     );
 
-    if (generation !== translationGeneration || completedResults.length === 0) {
+    if (translationSession !== session || completedResults.length === 0) {
       return;
     }
 
     await persistTranslationHistory({
       text: input.text,
-      sourceLang: request.sourceLang,
-      targetLang: request.targetLang,
+      sourceLang: session.request.sourceLang,
+      targetLang: session.request.targetLang,
       results: completedResults,
       startedAt,
     });
-    if (generation !== translationGeneration) return;
+    if (translationSession !== session) return;
     if (settings?.autoCopy) {
       try {
         await platform.clipboard.copyText(completedResults[0].translated_text);
@@ -257,86 +355,62 @@ export function createResultWindowRuntime({
   }
 
   async function retryTranslationProvider(providerId: string) {
-    const session = state.getTranslationSession();
-    if (!session.sessionId || !session.sourceText.trim()) return;
-
-    const generation = ++translationGeneration;
-    const sessionId = session.sessionId;
-
-    const request = resolveTranslationRequestLanguages(
-      translationRequestText(session.sourceText),
-      session.sourceLang,
-      session.targetLang,
-    );
-    state.beginProviderTranslation(sessionId, providerId);
-
-    try {
-      const result = await platform.commands.translateTextWithProvider(
-        providerId,
-        {
-          text: translationRequestText(session.sourceText),
-          sourceLang: request.sourceLang,
-          targetLang: request.targetLang,
-        },
-      );
-      if (generation !== translationGeneration) return;
-      if (result.error) {
-        state.failProviderTranslation(sessionId, result);
-        return;
-      }
-      state.completeProviderTranslation(sessionId, result);
-    } catch (error) {
-      if (generation === translationGeneration) {
-            state.failProviderTranslation(
-              sessionId,
-              translationFailure(providerId, error),
-            );
-      }
+    const session = translationSession;
+    if (
+      !session ||
+      !state.providerTranslations.some((entry) => entry.provider_id === providerId)
+    ) {
+      return;
     }
+    await requestProviderTranslation(session, providerId);
   }
 
   async function applyPayload(payload: CaptureResultWindowPayload) {
-    invalidateTranslationGeneration();
+    invalidateTranslationSession();
     invalidateOcrGeneration();
-    state.setResultWindowOrigin(
-      payload.origin ?? (payload.mode === 'ocr' ? 'ocr' : 'input'),
-    );
+    updateState({
+      resultWindowOrigin: payload.origin ?? (payload.mode === 'ocr' ? 'ocr' : 'input'),
+    });
     needsPlacement = true;
     if (payload.mode === 'translation') {
       if (shouldClearTranslationResultsForPayload(payload)) {
-        state.clearTranslationResults();
+        lastTranslationKey = null;
+        updateState({ providerTranslations: [] });
       }
       if (shouldApplyTranslationPayloadText(payload)) {
-        state.setSourceText(
-          translationPayloadSourceText(payload, getOcrSettings?.()),
-        );
-        if (payload.detectedLanguage) {
-          state.setSourceLang(payload.detectedLanguage);
-        }
+        updateState({
+          sourceText: translationPayloadSourceText(payload, getOcrSettings?.()),
+          sourceLang: payload.detectedLanguage || state.sourceLang,
+        });
       }
-      if (payload.autoTranslate) {
-        state.requestAutoTranslate();
+      updateState({ resultWindowVisible: true, resultWindowMode: 'translation' });
+      if (state.sourceText.trim() && state.providerTranslations.length > 0) {
+        translationSession = createTranslationSession(currentTranslationInput());
       }
-      state.showResultWindow();
+      scheduleAutomaticTranslation(payload.autoTranslate);
       return;
     }
 
     if (shouldClearOcrResultsForPayload(payload)) {
-      state.setOcrText('');
-      state.setOcrConfidence(null);
-      state.setOcrImageBase64(null);
-      state.setOcrError(null);
+      updateState({
+        ocrText: '',
+        ocrConfidence: null,
+        ocrImageBase64: null,
+        ocrError: null,
+      });
     }
     if (shouldApplyOcrPayloadText(payload)) {
-      state.setOcrText(ocrPayloadDisplayText(payload, getOcrSettings?.()));
-      state.setOcrConfidence(payload.confidence ?? null);
-      state.setOcrImageBase64(payload.imageBase64 ?? null);
+      updateState({
+        ocrText: ocrPayloadDisplayText(payload, getOcrSettings?.()),
+        ocrConfidence: payload.confidence ?? null,
+        ocrImageBase64: payload.imageBase64 ?? null,
+      });
     }
     if (shouldStartFileOcrForPayload(payload)) {
       await startFileOcr();
       return;
     }
-    state.showOcrWindow();
+    updateState({ resultWindowVisible: true, resultWindowMode: 'ocr' });
   }
 
   async function loadPayload(requestId: string) {
@@ -371,13 +445,17 @@ export function createResultWindowRuntime({
   }
 
   async function startFileOcr() {
+    invalidateTranslationSession();
     const generation = ++ocrGeneration;
     const settings = getOcrSettings?.();
-    state.showOcrWindow();
-    state.setOcrText('');
-    state.setOcrConfidence(null);
-    state.setOcrImageBase64(null);
-    state.setOcrError(null);
+    updateState({
+      resultWindowVisible: true,
+      resultWindowMode: 'ocr',
+      ocrText: '',
+      ocrConfidence: null,
+      ocrImageBase64: null,
+      ocrError: null,
+    });
     await runOcrFileWorkflow({
       selectImageFile: platform.commands.selectImageFile,
       recognizeImageFile: platform.commands.recognizeImageFile,
@@ -388,11 +466,11 @@ export function createResultWindowRuntime({
       transformText: (text) =>
         settings ? applyOcrTextPreferences(text, settings) : text,
       isCurrent: () => generation === ocrGeneration,
-      setText: state.setOcrText,
-      setConfidence: state.setOcrConfidence,
-      setImageDataUrl: state.setOcrImageBase64,
-      setRunning: state.setOcrRunning,
-      setError: state.setOcrError,
+      setText: (ocrText) => updateState({ ocrText }),
+      setConfidence: (ocrConfidence) => updateState({ ocrConfidence }),
+      setImageDataUrl: (ocrImageBase64) => updateState({ ocrImageBase64 }),
+      setRunning: (isOcrRunning) => updateState({ isOcrRunning }),
+      setError: (ocrError) => updateState({ ocrError }),
     });
   }
 
@@ -402,7 +480,8 @@ export function createResultWindowRuntime({
     confidence: number | null,
   ) {
     const recognitionLanguage = getOcrSettings?.()?.recognitionLanguage;
-    const providerUsed = await state.loadActiveOcrProviderId();
+    if (!providers.getState().activeOcrProvider) await providers.loadOcr();
+    const providerUsed = providers.getState().activeOcrProvider;
     return platform.commands.favoriteOcrResult({
       imageData: imageBase64 ? base64ToBytes(imageBase64) : [],
       result: { text, confidence },
@@ -448,9 +527,9 @@ export function createResultWindowRuntime({
   }
 
   async function close(presentation: ResultWindowPresentation) {
-    invalidateTranslationGeneration();
+    invalidateTranslationSession();
     invalidateOcrGeneration();
-    state.hideResultWindow();
+    updateState({ resultWindowVisible: false });
     needsPlacement = true;
     if (presentation === 'standalone') {
       try {
@@ -514,23 +593,49 @@ export function createResultWindowRuntime({
   }
 
   return {
+    getState: () => state,
+    subscribe: (listener: (state: ResultWindowState) => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    applyTranslationDefaults: (defaults: Pick<
+      TranslationSettings,
+      'defaultSourceLang' | 'defaultTargetLang'
+    >) => {
+      if (
+        state.sourceLang !== defaults.defaultSourceLang ||
+        state.targetLang !== defaults.defaultTargetLang
+      ) {
+        invalidateTranslationSession();
+        updateState({
+          sourceLang: defaults.defaultSourceLang,
+          targetLang: defaults.defaultTargetLang,
+        });
+      }
+      scheduleAutomaticTranslation();
+    },
     updateSourceText: (text: string) => {
-      invalidateTranslationGeneration();
-      state.setSourceText(text);
+      if (text === state.sourceText) return;
+      invalidateTranslationSession();
+      updateState({ sourceText: text });
+      scheduleAutomaticTranslation();
     },
     changeSourceLanguage,
     changeTargetLanguage: (language: string) => {
-      invalidateTranslationGeneration();
-      state.setTargetLang(language);
+      if (language === state.targetLang) return;
+      invalidateTranslationSession();
+      updateState({ targetLang: language });
+      scheduleAutomaticTranslation();
     },
     swapTranslationLanguages,
     updateOcrText: (text: string) => {
       invalidateOcrGeneration();
-      state.setOcrText(text);
+      updateState({ ocrText: text });
     },
-    clearOcrImage: () => state.setOcrImageBase64(null),
-    loadTranslationProviders: () =>
-      state.loadActiveTranslationProviderIds().then(() => undefined),
+    clearOcrImage: () => updateState({ ocrImageBase64: null }),
+    loadTranslationProviders,
     loadCurrentPayload,
     loadPayload,
     applyPayload,
@@ -552,6 +657,16 @@ export function createResultWindowRuntime({
 }
 
 export type ResultWindowRuntime = ReturnType<typeof createResultWindowRuntime>;
+
+function pendingTranslation(providerId: string): ProviderTranslation {
+  return {
+    provider_id: providerId,
+    status: 'pending',
+    translated_text: '',
+    detected_language: null,
+    confidence: null,
+  };
+}
 
 function base64ToBytes(base64: string) {
   const payload = base64.includes(',') ? base64.split(',').pop() ?? '' : base64;

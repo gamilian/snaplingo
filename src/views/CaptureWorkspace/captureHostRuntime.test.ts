@@ -1,80 +1,64 @@
 import { describe, expect, it, vi } from 'vitest';
-
 import {
   prepareCaptureSurfaceForReveal,
-  recordSuccessfulCaptureSelection,
-  restoreCaptureSelectionFromHistory,
-  restoreLastSuccessfulCaptureSelection,
+  waitForCaptureSurfacePaint,
 } from './captureHostRuntime';
 
-const selection = { x: 20, y: 30, width: 120, height: 80 };
-
-function createStorage() {
-  const values = new Map<string, string>();
-  return {
-    getItem: (key: string) => values.get(key) ?? null,
-    setItem: (key: string, value: string) => values.set(key, value),
-  };
-}
-
-describe('capture host view helpers', () => {
-  it('records successful selections and restores the latest within bounds', () => {
-    const storage = createStorage();
-    const completeSelection = vi.fn();
-    recordSuccessfulCaptureSelection(storage, 'copy', selection);
-
-    restoreLastSuccessfulCaptureSelection({
-      storage,
-      selectionBounds: { x: 0, y: 0, width: 500, height: 300 },
-      minSelectionSize: 10,
-      completeSelection,
+describe('capture surface DOM preparation', () => {
+  it('waits for every image decode before painting and revealing the surface', async () => {
+    let finishDecode!: () => void;
+    const decode = new Promise<void>((resolve) => {
+      finishDecode = resolve;
     });
-
-    expect(completeSelection).toHaveBeenCalledWith(selection);
-  });
-
-  it('does not record unsuccessful completion actions', () => {
-    const storage = createStorage();
-    recordSuccessfulCaptureSelection(storage, 'ocr', selection);
-    const completeSelection = vi.fn();
-
-    restoreLastSuccessfulCaptureSelection({
-      storage,
-      selectionBounds: { x: 0, y: 0, width: 500, height: 300 },
-      minSelectionSize: 10,
-      completeSelection,
-    });
-
-    expect(completeSelection).not.toHaveBeenCalled();
-  });
-
-  it('restores neighboring history entries and prepares the reveal surface', async () => {
-    const storage = createStorage();
-    const previous = { x: 1, y: 2, width: 30, height: 40 };
-    recordSuccessfulCaptureSelection(storage, 'copy', previous);
-    recordSuccessfulCaptureSelection(storage, 'copy', selection);
-    const completeSelection = vi.fn();
-
-    restoreCaptureSelectionFromHistory({
-      storage,
-      currentSelection: selection,
-      step: 'previous',
-      selectionBounds: { x: 0, y: 0, width: 500, height: 300 },
-      minSelectionSize: 10,
-      completeSelection,
-    });
-
-    const frame = { variant: 'preview' as const, rect: selection, label: '120 × 80' };
     const paint = vi.fn();
     const waitForPaint = vi.fn(async () => undefined);
-    await prepareCaptureSurfaceForReveal({
-      frame,
+    const prepare = prepareCaptureSurfaceForReveal({
+      images: [{ decode: async () => undefined }, { decode: () => decode }],
+      frame: null,
       paintSelectionOverlayFrame: paint,
       waitForPaint,
     });
+    await Promise.resolve();
+    expect(paint).not.toHaveBeenCalled();
+    finishDecode();
+    await prepare;
+    expect(paint).toHaveBeenCalledExactlyOnceWith(null);
+    expect(waitForPaint).toHaveBeenCalledOnce();
+  });
 
-    expect(completeSelection).toHaveBeenCalledWith(previous);
-    expect(paint).toHaveBeenCalledWith(frame);
-    expect(waitForPaint).toHaveBeenCalledTimes(1);
+  it('rejects failed image decoding before preparing the reveal', async () => {
+    const paint = vi.fn();
+    await expect(
+      prepareCaptureSurfaceForReveal({
+        images: [{
+          decode: async () => {
+            throw new Error('decode failed');
+          },
+        }],
+        frame: null,
+        paintSelectionOverlayFrame: paint,
+      }),
+    ).rejects.toThrow('decode failed');
+    expect(paint).not.toHaveBeenCalled();
+  });
+
+  it('waits for two animation frames before fading in the capture overlay', async () => {
+    const calls: string[] = [];
+    const pendingFrameCallbacks: FrameRequestCallback[] = [];
+    const requestAnimationFrame = (callback: FrameRequestCallback) => {
+      calls.push('requestAnimationFrame');
+      pendingFrameCallbacks.push(callback);
+      return pendingFrameCallbacks.length;
+    };
+
+    const wait = waitForCaptureSurfacePaint(requestAnimationFrame);
+    expect(calls).toEqual(['requestAnimationFrame']);
+
+    pendingFrameCallbacks.shift()?.(1);
+    await Promise.resolve();
+    expect(calls).toEqual(['requestAnimationFrame', 'requestAnimationFrame']);
+
+    pendingFrameCallbacks.shift()?.(2);
+    await wait;
   });
 });

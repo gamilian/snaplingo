@@ -21,13 +21,13 @@ const captureView = readFileSync(
   new URL('../../views/CaptureWorkspace/CaptureWorkspaceView.tsx', import.meta.url),
   'utf8',
 );
-const runtime = readFileSync(new URL('../../views/CaptureWorkspace/captureWorkspaceRuntime.ts', import.meta.url), 'utf8');
+const runtime = readFileSync(new URL('./runtime.ts', import.meta.url), 'utf8');
 const keyboard = readFileSync(
-  new URL('../../views/CaptureWorkspace/captureWorkspaceKeyboard.ts', import.meta.url),
+  new URL('./captureWorkspaceKeyboard.ts', import.meta.url),
   'utf8',
 );
 const pointer = readFileSync(
-  new URL('../../views/CaptureWorkspace/captureWorkspacePointer.ts', import.meta.url),
+  new URL('./captureWorkspacePointer.ts', import.meta.url),
   'utf8',
 );
 const deletedEditorInput = new URL(
@@ -52,6 +52,12 @@ const viewSources = Object.entries(
   });
 
 describe('capture workspace production runtime wiring', () => {
+  it('constructs the real Application runtime and has no synonymous platform runtime', () => {
+    expect(runtimeView).toContain("from '../../application/capture-workspace/runtime'");
+    expect(() => readFileSync(new URL('./platformRuntime.ts', import.meta.url), 'utf8')).toThrow();
+    expect(runtime).not.toContain('CaptureWorkspaceRuntimePlatform');
+  });
+
   it('routes selecting pointer and keyboard host actions through the application runtime', () => {
     expect(captureView).toContain('actions.pointerDown');
     expect(captureView).toContain('actions.pointerMove');

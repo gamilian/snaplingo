@@ -13,14 +13,15 @@ import {
   CAPTURE_WINDOW_LABEL,
   readCaptureLaunch,
 } from './views/CaptureWorkspace/windowMode';
-import { createCaptureWorkspacePlatformRuntime } from './application/capture-workspace/platformRuntime';
+import type { CaptureWorkspacePorts } from './application/capture-workspace/ports';
+import { printBase64PngImage } from './views/CaptureWorkspace/capturePrint';
 import { createResultWindowPlatformRuntime } from './application/result-window/platformRuntime';
 import { createResultWindowRuntime } from './application/result-window/runtime';
 import { createPinnedImageRuntime } from './application/pinned-image/runtime';
 import { createSettingsRuntime } from './application/settings/runtime';
 import { resolveApplicationTheme } from './application/settings/theme';
 import {
-  createResultWindowStatePort,
+  initializeResultWindowStore,
   useResultWindowStore,
 } from './stores/resultWindowStore';
 import {
@@ -103,12 +104,13 @@ const settingsRuntime = createSettingsRuntime({
 });
 const requiredPermissionsRuntime =
   createRequiredPermissionsRuntime(requiredPermissions);
-const captureWorkspaceRuntime = createCaptureWorkspacePlatformRuntime({
+const captureWorkspacePorts: CaptureWorkspacePorts = {
   events: captureWorkspaceEvents,
   window: captureWindow,
   commands: captureWorkspaceCommands,
   clipboard: { writeText: writeClipboardText },
-});
+  print: { printImage: printBase64PngImage },
+};
 const resultWindowPlatformRuntime = createResultWindowPlatformRuntime({
   events: resultWindowEvents,
   window: resultWindow,
@@ -160,10 +162,9 @@ const resultWindowRuntime = createResultWindowRuntime({
     load: getLastResultWindowPosition,
     save: durableSettings.updateLastResultWindowPosition,
   },
-  state: createResultWindowStatePort(
-    settingsRuntime.configuration.providers,
-  ),
+  providers: settingsRuntime.configuration.providers,
 });
+initializeResultWindowStore(resultWindowRuntime);
 initializeSettingsConfigStore(settingsRuntime.configuration.settings);
 initializeHotkeyConfigStore(settingsRuntime.configuration.hotkeys);
 initializeProviderStore(settingsRuntime.configuration.providers);
@@ -196,9 +197,7 @@ function Application() {
   const resultWindowVisible = useResultWindowStore(
     (state) => state.resultWindowVisible,
   );
-  const applyTranslationDefaults = useResultWindowStore(
-    (state) => state.applyTranslationDefaults,
-  );
+  const { applyTranslationDefaults } = resultWindowRuntime;
   const generalSettings = useSettingsConfigStore((state) => state.general);
   const isCaptureWindow =
     currentWindowLabel === CAPTURE_WINDOW_LABEL || captureLaunch !== null;
@@ -327,10 +326,10 @@ function Application() {
   if (isCaptureWindow) {
     return (
       <CaptureWorkspace
-        runtime={captureWorkspaceRuntime}
+        ports={captureWorkspacePorts}
         initialMode={captureLaunch?.mode}
         initialSessionId={captureLaunch?.sessionId}
-        onInactive={() => captureWorkspaceRuntime.dismiss()}
+        onInactive={() => captureWorkspacePorts.window.hide()}
       />
     );
   }

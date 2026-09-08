@@ -10,8 +10,8 @@ mod tests {
         output_capture_selection, recognize_capture_selection_text, render_capture_png_base64,
     };
     use crate::application::capture::{
-        CaptureImageComposer, CaptureOutput, CaptureSessionOutput, CaptureSessionRuntime,
-        CaptureSessionSource, CaptureSessions,
+        CaptureCoordinatePolicy, CaptureImageComposer, CaptureOutput, CaptureSessionOutput,
+        CaptureSessionRuntime, CaptureSessionSource, CaptureSessions,
     };
     use crate::application::providers::common::Provider;
     use crate::application::providers::ocr::{OcrCoordinator, OcrProvider};
@@ -24,6 +24,8 @@ mod tests {
     use crate::infrastructure::storage::SqliteConfigStore;
 
     struct MockCaptureSessionSource {
+        coordinate_policy: CaptureCoordinatePolicy,
+        observed_coordinates: Arc<Mutex<Vec<Vec<MonitorSnapshot>>>>,
         snapshots: Vec<MonitorSnapshot>,
         snapshots_after_first_capture: Option<Vec<MonitorSnapshot>>,
         monitor_layouts: Vec<MonitorLayout>,
@@ -77,6 +79,9 @@ mod tests {
 
     #[async_trait::async_trait]
     impl CaptureSessionSource for MockCaptureSessionSource {
+        fn coordinate_policy(&self) -> CaptureCoordinatePolicy {
+            self.coordinate_policy
+        }
         async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError> {
             let mut calls = self.capture_monitor_snapshots_calls.lock().unwrap();
             *calls += 1;
@@ -127,14 +132,23 @@ mod tests {
         async fn capture_control_candidate(
             &self,
             _point: &LogicalPoint,
+            monitors: &[MonitorSnapshot],
         ) -> Result<Option<ControlCandidate>, AppError> {
+            self.observed_coordinates
+                .lock()
+                .unwrap()
+                .push(monitors.to_vec());
             Ok(self.control_candidate.clone())
         }
 
         fn current_cursor_position(
             &self,
-            _monitors: &[MonitorSnapshot],
+            monitors: &[MonitorSnapshot],
         ) -> Result<Option<LogicalPoint>, AppError> {
+            self.observed_coordinates
+                .lock()
+                .unwrap()
+                .push(monitors.to_vec());
             Ok(self.current_cursor_position.clone())
         }
 
@@ -167,6 +181,8 @@ mod tests {
             png_data: vec![1, 2, 3],
         }];
         MockCaptureSessionSource {
+            coordinate_policy: CaptureCoordinatePolicy::NativeLogical,
+            observed_coordinates: Arc::new(Mutex::new(Vec::new())),
             monitor_layouts: snapshots.iter().map(monitor_layout_from_snapshot).collect(),
             snapshots,
             snapshots_after_first_capture: None,
@@ -220,6 +236,8 @@ mod tests {
             },
         ];
         MockCaptureSessionSource {
+            coordinate_policy: CaptureCoordinatePolicy::NativeLogical,
+            observed_coordinates: Arc::new(Mutex::new(Vec::new())),
             monitor_layouts: snapshots.iter().map(monitor_layout_from_snapshot).collect(),
             snapshots,
             snapshots_after_first_capture: None,
@@ -1002,6 +1020,107 @@ mod tests {
         assert!(decoded.pixels().all(|pixel| pixel.0 == [10, 20, 30, 255]));
 
         let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn frozen_coordinates_survive_live_layout_changes_for_window_cursor_controls_and_pixels()
+    {
+        let mut backend = make_backend_with_renderable_png();
+        backend.coordinate_policy = CaptureCoordinatePolicy::PrimaryMonitorScale;
+        backend.snapshots[0].scale_factor = 2.0;
+        let mut secondary = backend.snapshots[0].clone();
+        secondary.id = "negative".into();
+        secondary.physical_bounds.x = -4;
+        secondary.physical_bounds.y = -4;
+        secondary.scale_factor = 1.25;
+        secondary.png_data = make_solid_png(4, 4, [90, 80, 70, 255]);
+        backend.snapshots.push(secondary);
+        backend.monitor_layouts = backend
+            .snapshots
+            .iter()
+            .map(monitor_layout_from_snapshot)
+            .collect();
+        let mut changed = backend.snapshots.clone();
+        changed[0].scale_factor = 1.0;
+        changed[0].physical_bounds.x = 20;
+        changed[0].png_data = make_solid_png(4, 4, [0, 0, 0, 255]);
+        backend.snapshots_after_first_capture = Some(changed);
+        let observed = backend.observed_coordinates.clone();
+        let calls = backend.capture_monitor_snapshots_calls.clone();
+        let sessions = CaptureSessions::new(Arc::new(backend));
+        let frozen = sessions
+            .create_session_without_monitor_images()
+            .await
+            .unwrap();
+        let original_geometry = sessions.window_geometry(&frozen.id).unwrap();
+        let layout = sessions.create_layout_session().await.unwrap();
+        assert_eq!(
+            sessions.window_geometry(&layout.id).unwrap(),
+            original_geometry
+        );
+        let changed = sessions.create_session().await.unwrap();
+        assert_eq!(
+            sessions.window_geometry(&changed.id).unwrap().desktop_scale,
+            Some(1.0)
+        );
+        assert_eq!(
+            sessions.window_geometry(&frozen.id).unwrap(),
+            original_geometry
+        );
+        assert_eq!(original_geometry.desktop_scale, Some(2.0));
+        assert_eq!(
+            original_geometry.bounds,
+            LogicalRect {
+                x: -2.0,
+                y: -2.0,
+                width: 4.0,
+                height: 4.0
+            }
+        );
+
+        sessions.current_cursor_position(&frozen.id).unwrap();
+        sessions
+            .control_candidate_at(&frozen.id, &LogicalPoint { x: -1.5, y: -1.5 })
+            .await
+            .unwrap();
+        let coordinates = observed.lock().unwrap();
+        assert_eq!(coordinates.len(), 2);
+        for monitors in coordinates.iter() {
+            assert!(monitors.iter().all(|monitor| monitor.scale_factor == 2.0));
+            assert_eq!(monitors[0].physical_bounds.x, 0);
+            assert_eq!(monitors[1].logical_bounds.x, -2.0);
+        }
+        drop(coordinates);
+
+        let selection = LogicalRect {
+            x: -1.5,
+            y: -1.5,
+            width: 1.0,
+            height: 1.0,
+        };
+        let physical = sessions
+            .logical_rect_to_physical(&frozen.id, &selection)
+            .unwrap();
+        assert_eq!(
+            (physical.x, physical.y, physical.width, physical.height),
+            (-3, -3, 2, 2)
+        );
+        let encoded = render_capture_png_base64(
+            &sessions,
+            &CaptureImageComposer::new(),
+            &frozen.id,
+            &selection,
+            &[],
+            false,
+        )
+        .unwrap();
+        let png = base64::engine::general_purpose::STANDARD
+            .decode(encoded)
+            .unwrap();
+        let image = image::load_from_memory(&png).unwrap().to_rgba8();
+        assert_eq!(image.dimensions(), (2, 2));
+        assert!(image.pixels().all(|pixel| pixel.0 == [90, 80, 70, 255]));
+        assert_eq!(*calls.lock().unwrap(), 2);
     }
 
     #[tokio::test]

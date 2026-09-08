@@ -747,6 +747,7 @@ impl CaptureSessionSource for MacOSCaptureSessionSource {
     async fn capture_control_candidate(
         &self,
         point: &LogicalPoint,
+        _monitors: &[MonitorSnapshot],
     ) -> Result<Option<ControlCandidate>, AppError> {
         capture_control_candidate_at(point)
     }

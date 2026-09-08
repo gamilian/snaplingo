@@ -10,13 +10,13 @@ import {
 import type {
   CaptureWorkspacePointerInput,
   CaptureWorkspaceRuntimeActions,
-} from './captureWorkspaceRuntimeTypes';
+} from '../../application/capture-workspace/captureWorkspaceRuntimeTypes';
 import {
   ANNOTATION_COLORS,
   type AnnotationColor,
   type AnnotationStyle,
   type AnnotationTool,
-} from './annotationStyle';
+} from '../../application/capture-workspace/annotationStyle';
 import { CaptureAnnotationCanvas } from './captureAnnotationCanvas';
 import { CaptureEditorToolbar } from './captureEditorToolbar';
 import { CaptureMagnifierOverlay } from './captureMagnifierOverlay';
@@ -36,15 +36,15 @@ import {
 } from './capturePreviewPresentation';
 import { CaptureSelectionOverlayCanvas } from './captureSelectionOverlayRuntime';
 import { createCapturePointerFrameDispatcher } from './capturePointerFrame';
-import { getCaptureWorkspacePointerPoint } from './captureWorkspacePointer';
-import { getMonitorViewportRect } from './virtualDesktop';
+import { getCaptureWorkspacePointerPoint } from '../../application/capture-workspace/captureWorkspacePointer';
+import { getMonitorViewportRect } from '../../application/capture-workspace/virtualDesktop';
 import type {
   ColorSample,
   ColorSampleFormat,
 } from '../../application/image-inspection/colorSampler';
-import type { CaptureCandidateDetectionMode } from './captureWorkspaceState';
-import type { SelectionHandle } from './selection';
-import type { TextAnnotationDraft } from './textAnnotationDraft';
+import type { CaptureCandidateDetectionMode } from '../../application/capture-workspace/captureWorkspaceState';
+import type { SelectionHandle } from '../../application/capture-workspace/selection';
+import type { TextAnnotationDraft } from '../../application/capture-workspace/textAnnotationDraft';
 import type {
   AnnotationCommand,
   LogicalRect,

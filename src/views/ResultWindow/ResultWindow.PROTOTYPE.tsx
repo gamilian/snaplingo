@@ -17,6 +17,7 @@
 
 import { useState, useEffect } from 'react';
 import { useResultWindowStore } from '../../stores/resultWindowStore';
+import { useResultWindowRuntime } from './runtimeContext';
 
 const LANGUAGES = [
   { code: 'auto', name: '自动检测' },
@@ -43,11 +44,14 @@ export default function ResultWindowPrototype() {
     sourceLang,
     targetLang,
     resultWindowVisible,
-    setSourceText,
-    setSourceLang,
-    setTargetLang,
-    hideResultWindow,
   } = useResultWindowStore();
+  const {
+    updateSourceText: setSourceText,
+    changeSourceLanguage: setSourceLang,
+    changeTargetLanguage: setTargetLang,
+    close,
+  } = useResultWindowRuntime();
+  const hideResultWindow = () => { void close('overlay'); };
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {

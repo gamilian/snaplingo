@@ -1,24 +1,12 @@
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
 use tauri::{AppHandle, Manager, State};
 
-use crate::application::capture::CaptureSessionOutput;
 use crate::domain::capture::{
     AnnotationCommand, CaptureOutputAction, CaptureSessionId, CaptureSessionView, LogicalPoint,
     LogicalRect, MonitorSnapshotView,
 };
 use crate::domain::ocr::OcrResult;
-
-static CAPTURE_SHORTCUT_OPEN_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
-
-struct CaptureShortcutOpenGuard;
-
-impl Drop for CaptureShortcutOpenGuard {
-    fn drop(&mut self) {
-        CAPTURE_SHORTCUT_OPEN_IN_FLIGHT.store(false, Ordering::SeqCst);
-    }
-}
 
 #[tauri::command]
 pub async fn open_capture_window(
@@ -54,23 +42,29 @@ pub async fn create_capture_session(
 }
 
 #[tauri::command]
-pub async fn reveal_capture_window(state: State<'_, crate::AppState>) -> Result<(), String> {
+pub async fn reveal_capture_window(
+    session_id: Option<String>,
+    state: State<'_, crate::AppState>,
+) -> Result<(), String> {
+    let session_id = session_id.map(CaptureSessionId);
     state
         .capture
         .runtime
-        .reveal_capture_window()
+        .reveal_capture_window(session_id.as_ref())
         .await
         .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
 pub async fn prepare_capture_window_for_reveal(
+    session_id: Option<String>,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
+    let session_id = session_id.map(CaptureSessionId);
     state
         .capture
         .runtime
-        .prepare_capture_window_for_reveal()
+        .prepare_capture_window_for_reveal(session_id.as_ref())
         .await
         .map_err(|error| error.to_string())
 }
@@ -313,7 +307,7 @@ pub async fn output_capture(
 ) -> Result<(), String> {
     let session_id = CaptureSessionId(session_id);
 
-    let output = state
+    state
         .capture
         .runtime
         .output_selection(
@@ -324,17 +318,7 @@ pub async fn output_capture(
             action,
         )
         .await
-        .map_err(|e| e.to_string())?;
-
-    match output {
-        CaptureSessionOutput::Completed => Ok(()),
-        CaptureSessionOutput::Pin(png_data) => state
-            .capture
-            .pinned_images
-            .pin_png_and_open(png_data)
-            .await
-            .map_err(|error| error.to_string()),
-    }
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -365,11 +349,6 @@ pub async fn run_capture_ocr(
 }
 
 pub async fn open_capture_window_from_shortcut(app: AppHandle, mode: &'static str) {
-    let Some(_guard) = try_begin_capture_shortcut_open() else {
-        log::info!("Ignoring capture shortcut while a capture window is already opening");
-        return;
-    };
-
     let result = async {
         let state = app.state::<crate::AppState>();
         open_capture_window_for_mode(state.inner(), mode)
@@ -380,27 +359,5 @@ pub async fn open_capture_window_from_shortcut(app: AppHandle, mode: &'static st
 
     if let Err(err) = result {
         log::error!("Failed to open capture window: {}", err);
-    }
-}
-
-fn try_begin_capture_shortcut_open() -> Option<CaptureShortcutOpenGuard> {
-    CAPTURE_SHORTCUT_OPEN_IN_FLIGHT
-        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-        .ok()
-        .map(|_| CaptureShortcutOpenGuard)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::try_begin_capture_shortcut_open;
-
-    #[test]
-    fn capture_shortcut_open_guard_blocks_reentrant_open_until_dropped() {
-        let guard = try_begin_capture_shortcut_open().expect("first open should start");
-
-        assert!(try_begin_capture_shortcut_open().is_none());
-
-        drop(guard);
-        assert!(try_begin_capture_shortcut_open().is_some());
     }
 }

@@ -12,6 +12,18 @@ import type {
 
 export type CaptureWorkspaceUnsubscribe = () => void;
 
+export interface CaptureWorkspacePrintPort {
+  printImage(imageBase64: string): void | Promise<void>;
+}
+
+export interface CaptureWorkspacePorts {
+  commands: CaptureWorkspaceCommandsPort;
+  clipboard: CaptureWorkspaceClipboardPort;
+  events: CaptureWorkspaceEventsPort;
+  window: CaptureWindowPort;
+  print: CaptureWorkspacePrintPort;
+}
+
 export type CaptureWorkspaceRequestHandler = () => void | Promise<void>;
 export type CaptureHotkeyHandler = (
   launch: CaptureLaunch,
@@ -39,8 +51,9 @@ export interface CaptureWorkspaceEventsPort {
 }
 
 export interface CaptureWindowPort {
-  prepareForReveal(): Promise<void>;
-  reveal(): Promise<void>;
+  // A failed session load can still reveal its error without session geometry.
+  prepareForReveal(sessionId: string | null): Promise<void>;
+  reveal(sessionId: string | null): Promise<void>;
   hide(): Promise<void>;
 }
 
