@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   assertUnifiedReleaseVersion,
   assertMatchingReleaseTag,
+  releaseAssetName,
   releaseArtifactContract,
   verifyReleaseArtifacts,
 } from './release-verification.mjs';
@@ -72,6 +73,27 @@ describe('release version contract', () => {
 });
 
 describe('release artifact contract', () => {
+  it('uses consistent, release-friendly names for distributed assets', () => {
+    expect(releaseAssetName({
+      projectName: 'snaplingo',
+      version: '0.2.0',
+      target: 'macos-aarch64',
+      kind: 'macOS disk image',
+    })).toBe('snaplingo-v0.2.0-macos-aarch64.dmg');
+    expect(releaseAssetName({
+      projectName: 'snaplingo',
+      version: '0.2.0',
+      target: 'windows-x86_64-offline',
+      kind: 'Windows NSIS installer',
+    })).toBe('snaplingo-v0.2.0-windows-x86_64-offline-setup.exe');
+    expect(releaseAssetName({
+      projectName: 'snaplingo',
+      version: '0.2.0',
+      target: 'windows-x86_64',
+      kind: 'Windows MSI installer',
+    })).toBe('snaplingo-v0.2.0-windows-x86_64.msi');
+  });
+
   it('verifies macOS application and disk image output', () => {
     const bundleDirectory = temporaryBundleDirectory();
     writeArtifact(

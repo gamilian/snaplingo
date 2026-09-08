@@ -11,7 +11,7 @@ import {
 } from "node:fs";
 import { createHash } from "node:crypto";
 import { verifyMacOSApplication } from "./macos-release-verification.mjs";
-import { dirname, basename, join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptPath = fileURLToPath(import.meta.url);
@@ -58,6 +58,18 @@ export function verifyReleaseArtifacts({
 }) {
   const contract = releaseArtifactContract(platform, productName, version);
   return contract.map((artifact) => verifyArtifact(bundleDirectory, artifact));
+}
+
+export function releaseAssetName({ projectName, version, target, kind }) {
+  const extension = {
+    "macOS disk image": ".dmg",
+    "Linux AppImage": ".AppImage",
+    "Debian package": ".deb",
+    "Windows MSI installer": ".msi",
+    "Windows NSIS installer": "-setup.exe",
+  }[kind];
+  if (!extension) throw new Error(`Unsupported release artifact kind: ${kind}`);
+  return `${projectName}-v${version}-${target}${extension}`;
 }
 
 export function releaseArtifactContract(platform, productName, version) {
@@ -264,6 +276,7 @@ function loadReleaseContext() {
 
   return {
     version,
+    packageName: packageManifest.name,
     config: tauriConfig,
     productName: tauriConfig.productName ?? packageManifest.name,
     targetDirectory: cargoMetadata.target_directory,
@@ -322,21 +335,34 @@ function collectArtifacts(context, artifacts) {
   const checksums = [];
   const suffix = process.env.SNAPLINGO_ARTIFACT_SUFFIX ?? "";
   if (suffix && !/^[a-z0-9-]+$/.test(suffix)) throw new Error("Invalid artifact suffix");
+  const target = process.env.SNAPLINGO_RELEASE_TARGET ?? releaseTarget();
   for (const artifact of artifacts) {
     if (statSync(artifact.path).isDirectory()) continue;
-    const name = basename(artifact.path).replace(/(\.[^.]+)$/, `${suffix ? `-${suffix}` : ""}$1`);
+    const name = releaseAssetName({
+      projectName: context.packageName,
+      version: context.version,
+      target: `${target}${suffix ? `-${suffix}` : ""}`,
+      kind: artifact.kind,
+    });
     copyFileSync(artifact.path, join(output, name));
     const hash = createHash("sha256").update(readFileSync(artifact.path)).digest("hex");
     checksums.push(`${hash}  ${name}`);
   }
-  const label = `${process.platform}-${process.arch}${suffix ? `-${suffix}` : ""}`;
-  writeFileSync(join(output, `SHA256SUMS-${label}.txt`), `${checksums.join("\n")}\n`);
-  writeFileSync(join(output, `build-${label}.json`), JSON.stringify({
+  const label = `${target}${suffix ? `-${suffix}` : ""}`;
+  const assetPrefix = `${context.packageName}-v${context.version}-${label}`;
+  writeFileSync(join(output, `${assetPrefix}.SHA256SUMS.txt`), `${checksums.join("\n")}\n`);
+  writeFileSync(join(output, `${assetPrefix}.build.json`), JSON.stringify({
     version: context.version, commit: process.env.GITHUB_SHA ?? run("git", ["rev-parse", "HEAD"]).trim(),
     platform: process.platform, architecture: process.arch,
     signing: process.platform === "darwin" ? (process.env.SNAPLINGO_SIGNING_MODE ?? "self-signed") : "unsigned",
     certificateSha1: process.env.SNAPLINGO_CERTIFICATE_SHA1 ?? null,
   }, null, 2) + "\n");
+}
+
+function releaseTarget() {
+  const platform = process.platform === "darwin" ? "macos" : process.platform;
+  const architecture = process.arch === "arm64" ? "aarch64" : process.arch === "x64" ? "x86_64" : process.arch;
+  return `${platform}-${architecture}`;
 }
 
 function formatBytes(bytes) {

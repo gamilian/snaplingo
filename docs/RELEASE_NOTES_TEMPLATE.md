@@ -8,8 +8,8 @@
 
 ## 下载与安装
 
-- macOS 14 或更新：Apple Silicon 下载 `aarch64.dmg`；Intel 下载 `x64.dmg`。拖入“应用程序”后启动。
-- Windows x64：优先下载 `x64-setup.exe`（当前用户安装）；MSI 为备选安装器，不必重复安装。
+- macOS 14 或更新：Apple Silicon 下载 `snaplingo-vX.Y.Z-macos-aarch64.dmg`；Intel 下载 `snaplingo-vX.Y.Z-macos-x86_64.dmg`。拖入“应用程序”后启动。
+- Windows x64：优先下载 `snaplingo-vX.Y.Z-windows-x86_64-setup.exe`（当前用户安装）；`snaplingo-vX.Y.Z-windows-x86_64.msi` 为备选安装器，不必重复安装。
 - Windows 缺少 WebView2 时，普通安装器需要联网。带 `offline` 的包内含运行时；该包仅在维护者选择构建时提供。
 
 ## 免费版本的签名说明
@@ -22,7 +22,7 @@ macOS / Windows 默认使用系统 OCR。Windows 需要安装对应的系统 OCR
 
 ## 校验与更新
 
-每个平台附 `SHA256SUMS-*.txt` 和 `build-*.json`，记录版本、源码提交和签名方式。
+Release 附一个 `SHA256SUMS.txt`，以及每个构建目标的 `snaplingo-vX.Y.Z-*.build.json`，记录版本、源码提交和签名方式。
 
 - macOS：`shasum -a 256 下载的文件.dmg`
 - Windows PowerShell：`Get-FileHash .\下载的文件.exe -Algorithm SHA256`

@@ -4,11 +4,11 @@
 
 ## 1. 方案与支持范围
 
-| 平台 | 默认产物 | 构建位置 | 默认签名 |
-| --- | --- | --- | --- |
-| macOS 14+ / Apple Silicon | DMG | Actions `macos-14`，原生 arm64 | ad-hoc 签名 |
-| macOS 14+ / Intel | DMG | Actions `macos-15-intel`，原生 x64 | ad-hoc 签名 |
-| Windows x64 | NSIS EXE、备选 MSI | Actions `windows-2022` | 未签名，可后续申请 SignPath Foundation |
+| 平台 | 默认产物 | Release 文件名 | 构建位置 | 默认签名 |
+| --- | --- | --- | --- | --- |
+| macOS 14+ / Apple Silicon | DMG | `snaplingo-vX.Y.Z-macos-aarch64.dmg` | Actions `macos-14`，原生 arm64 | ad-hoc 签名 |
+| macOS 14+ / Intel | DMG | `snaplingo-vX.Y.Z-macos-x86_64.dmg` | Actions `macos-15-intel`，原生 x64 | ad-hoc 签名 |
+| Windows x64 | NSIS EXE、备选 MSI | `snaplingo-vX.Y.Z-windows-x86_64-setup.exe`、`snaplingo-vX.Y.Z-windows-x86_64.msi` | Actions `windows-2022` | 未签名，可后续申请 SignPath Foundation |
 
 最低系统版本是构建约束，并不代替对应系统真机验收。Windows runner 是服务器环境，不足以证明所有 Windows 桌面配置都兼容；公开发布前至少验收 Windows 11 x64。此流程不要求本地 Mac 构建 Windows 包。
 
@@ -46,7 +46,7 @@ macOS CI 和 Desktop packages 都使用临时 ad-hoc 签名。启动检查不等
 - 默认构建两个 macOS DMG 和 Windows 在线 EXE/MSI。
 - 勾选 `windows_offline`，增加带 WebView2 的离线安装包。离线包明显更大；普通包遇到没有运行时的电脑需要联网。
 - `codex/release-*` 测试分支的 push 也会触发，便于首次搭建时验证工作流。
-- 全部成功后，在运行页 **Artifacts** 下载 `SnapLingo-macos-arm64`、`SnapLingo-macos-x64`、`SnapLingo-windows-x64`；压缩包内有安装包、SHA-256 清单和构建来源 JSON。保留 3 天，下载后可删除 artifact。
+- 全部成功后，在运行页 **Artifacts** 下载 `snaplingo-macos-aarch64`、`snaplingo-macos-x86_64`、`snaplingo-windows-x86_64`；压缩包内有按 `snaplingo-vX.Y.Z-平台-架构[-变体][-安装器]` 命名的安装包、SHA-256 清单和构建来源 JSON。保留 3 天，下载后可删除 artifact。
 - 每个平台独立产物，不要拿 Mac 本地 `.app` 当成 Windows 发布结果。
 
 ### tag：创建 Release 草稿

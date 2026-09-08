@@ -40,11 +40,11 @@ jobs:
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
           const include = [
-            { os: 'macos-14', label: 'macos-arm64', offline: false },
-            { os: 'macos-15-intel', label: 'macos-x64', offline: false },
-            { os: 'windows-2022', label: 'windows-x64', offline: false },
+            { os: 'macos-14', label: 'macos-aarch64', offline: false },
+            { os: 'macos-15-intel', label: 'macos-x86_64', offline: false },
+            { os: 'windows-2022', label: 'windows-x86_64', offline: false },
           ];
-          if (process.env.OFFLINE === 'true') include.push({ os: 'windows-2022', label: 'windows-x64-offline', offline: true });
+          if (process.env.OFFLINE === 'true') include.push({ os: 'windows-2022', label: 'windows-x86_64-offline', offline: true });
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `value=${JSON.stringify({ include })}\n`);
           NODE
 
@@ -88,11 +88,11 @@ jobs:
         run: ./script/smoke-test-windows.ps1 -InstallerType msi
       - name: Collect verified installers and checksums
         env:
-          SNAPLINGO_ARTIFACT_SUFFIX: ${{ matrix.offline && 'offline' || '' }}
+          SNAPLINGO_RELEASE_TARGET: ${{ matrix.label }}
         run: node script/release-verification.mjs collect
       - uses: actions/upload-artifact@v4
         with:
-          name: SnapLingo-${{ matrix.label }}
+          name: snaplingo-${{ matrix.label }}
           path: release-assets/*
           if-no-files-found: error
           retention-days: 3
@@ -108,13 +108,24 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v4
         with:
-          pattern: SnapLingo-*
+          pattern: snaplingo-*
           path: release-assets
           merge-multiple: true
       - name: Verify downloaded checksums
         working-directory: release-assets
         run: |
-          for checksum in SHA256SUMS-*.txt; do sha256sum --check "$checksum"; done
+          for checksum in *.SHA256SUMS.txt; do sha256sum --check "$checksum"; done
+      - name: Create release checksum manifest
+        working-directory: release-assets
+        run: |
+          shopt -s nullglob
+          assets=(snaplingo-v*.dmg snaplingo-v*.msi snaplingo-v*-setup.exe snaplingo-v*.AppImage snaplingo-v*.deb)
+          if [ "${#assets[@]}" -eq 0 ]; then
+            echo "No release assets were downloaded" >&2
+            exit 1
+          fi
+          sha256sum "${assets[@]}" > SHA256SUMS.txt
+          rm -- *.SHA256SUMS.txt
       - name: Require versioned release notes
         id: notes
         env:
