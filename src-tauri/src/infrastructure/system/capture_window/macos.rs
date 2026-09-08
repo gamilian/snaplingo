@@ -187,6 +187,11 @@ pub(super) fn set_capture_window_frame(
         .map(|screen| screen.frame().size.height)
         .ok_or_else(|| "Capture window has no primary NSScreen".to_string())?;
     ns_window.setFrame_display(capture_overlay_frame(bounds, primary_screen_height), false);
+    log::info!(
+        "[capture-input] frame requested={:?} native_frame={:?}",
+        bounds,
+        ns_window.frame(),
+    );
     Ok(())
 }
 
@@ -231,6 +236,14 @@ pub(super) fn reveal_capture_window_for_current_space(
         }
     }
     push_native_crosshair_cursor();
+    log::info!(
+        "[capture-input] revealed key={} active={} ignores_mouse={} native_frame={:?} sharing={:?}",
+        ns_window.isKeyWindow(),
+        NSRunningApplication::currentApplication().isActive(),
+        ns_window.ignoresMouseEvents(),
+        ns_window.frame(),
+        ns_window.sharingType(),
+    );
 
     Ok(())
 }
@@ -316,7 +329,9 @@ fn capture_overlay_style_mask(base: NSWindowStyleMask) -> NSWindowStyleMask {
 }
 
 fn capture_overlay_sharing_type() -> NSWindowSharingType {
-    NSWindowSharingType::None
+    // Remote desktop clients need to capture the selection UI. Our own output
+    // uses snapshots frozen before this window is shown.
+    NSWindowSharingType::ReadOnly
 }
 
 fn capture_presentation_activation_policy() -> Option<tauri::ActivationPolicy> {
@@ -922,8 +937,11 @@ mod tests {
     }
 
     #[test]
-    fn capture_overlay_cannot_be_shared_with_screen_capture_clients() {
-        assert_eq!(capture_overlay_sharing_type(), NSWindowSharingType::None);
+    fn capture_overlay_is_visible_to_remote_screen_capture_clients() {
+        assert_eq!(
+            capture_overlay_sharing_type(),
+            NSWindowSharingType::ReadOnly
+        );
     }
 
     #[test]

@@ -163,6 +163,19 @@ interface CaptureWorkspaceDomPointerEvent {
   stopPropagation(): void;
 }
 
+function captureWorkspacePointer(event: CaptureWorkspaceDomPointerEvent) {
+  try {
+    event.currentTarget.setPointerCapture(event.pointerId);
+  } catch (error) {
+    // The full-screen root still receives mouse events if the WebView rejects
+    // pointer capture. Do not let that prevent starting a selection or edit.
+    if (!(error instanceof DOMException) || error.name !== 'NotFoundError') {
+      throw error;
+    }
+    console.warn('[capture-input] Pointer capture rejected; using surface events');
+  }
+}
+
 export function dispatchCaptureWorkspacePreviewPointerDown({
   event,
   selectionBounds,
@@ -174,7 +187,7 @@ export function dispatchCaptureWorkspacePreviewPointerDown({
 }) {
   if (!selectionBounds) return false;
 
-  event.currentTarget.setPointerCapture(event.pointerId);
+  captureWorkspacePointer(event);
   const handled = pointerDown({
     point: getCaptureWorkspacePointerPoint(event, selectionBounds),
     button: event.button,
@@ -208,7 +221,7 @@ export function dispatchCaptureWorkspaceResizePointerDown({
 }) {
   if (!selectionBounds) return false;
 
-  event.currentTarget.setPointerCapture(event.pointerId);
+  captureWorkspacePointer(event);
   const handled = resizePointerDown(handle, {
     point: getCaptureWorkspacePointerPoint(event, selectionBounds),
     button: event.button,
@@ -259,7 +272,7 @@ export function CaptureWorkspaceView({
     } else {
       pointerFrame.cancel();
     }
-    event.currentTarget.setPointerCapture(event.pointerId);
+    captureWorkspacePointer(event);
     const handled = actions.pointerDown({
       point: getCaptureWorkspacePointerPoint(
         event,

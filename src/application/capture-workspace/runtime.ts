@@ -1828,6 +1828,7 @@ export function createCaptureWorkspaceRuntime({
 
     pointerDown(input) {
       if (!state.session) return false;
+      if (state.status === 'selecting') markPerf('selection_pointer_down');
       const pointer = pointerInput(input);
       const {
         altKey = false,
@@ -2027,6 +2028,7 @@ export function createCaptureWorkspaceRuntime({
 
     async pointerUp(input) {
       if (!state.session) return false;
+      if (state.status === 'selecting') markPerf('selection_pointer_up');
       const pointer = pointerInput(input);
       if (state.status === 'preview') {
         const context = editorContext();

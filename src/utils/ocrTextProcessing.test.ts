@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { transform } from 'esbuild';
 import {
   applyOcrTextPreferences,
   normalizeOcrText,
@@ -67,6 +69,26 @@ describe('applyOcrTextPreferences', () => {
 });
 
 describe('ocrCopyTokens', () => {
+  it('compiles for the Safari 15 engine shipped with macOS 12', async () => {
+    await expect(transform(
+      readFileSync(new URL('./ocrTextProcessing.ts', import.meta.url), 'utf8'),
+      { loader: 'ts', target: 'safari15', logOverride: { 'unsupported-regexp': 'error' } },
+    )).resolves.toBeDefined();
+  });
+
+  it('copies labeled values without including their prefixes or adjacent fields', () => {
+    expect(ocrCopyTokens(
+      'Flight  MU5137 Train G1234 Seat 12A SSID: Cafe_5G OTP: A1B2C3 Password: snap-2026',
+    ).map(({ label, value }) => ({ label, value }))).toEqual([
+      { label: '航班', value: 'MU5137' },
+      { label: '车次', value: 'G1234' },
+      { label: '座位', value: '12A' },
+      { label: '账号', value: 'Cafe_5G' },
+      { label: '验证码', value: 'A1B2C3' },
+      { label: '密码', value: 'snap-2026' },
+    ]);
+  });
+
   it('extracts important copy targets from OCR text in source order', () => {
     expect(
       ocrCopyTokens(

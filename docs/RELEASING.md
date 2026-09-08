@@ -6,11 +6,13 @@
 
 | 平台 | 默认产物 | Release 文件名 | 构建位置 | 默认签名 |
 | --- | --- | --- | --- | --- |
-| macOS 14+ / Apple Silicon | DMG | `snaplingo-vX.Y.Z-macos-aarch64.dmg` | Actions `macos-14`，原生 arm64 | ad-hoc 签名 |
-| macOS 14+ / Intel | DMG | `snaplingo-vX.Y.Z-macos-x86_64.dmg` | Actions `macos-15-intel`，原生 x64 | ad-hoc 签名 |
-| Windows x64 | NSIS EXE、备选 MSI | `snaplingo-vX.Y.Z-windows-x86_64-setup.exe`、`snaplingo-vX.Y.Z-windows-x86_64.msi` | Actions `windows-2022` | 未签名，可后续申请 SignPath Foundation |
+| macOS 12+ / Apple Silicon | DMG | `snaplingo-vX.Y.Z-macos-aarch64.dmg` | Actions `macos-14`，原生 arm64 | ad-hoc 签名 |
+| macOS 12+ / Intel | DMG | `snaplingo-vX.Y.Z-macos-x86_64.dmg` | Actions `macos-15-intel`，原生 x64 | ad-hoc 签名 |
+| Windows 10 / 11 x64 | NSIS EXE、备选 MSI | `snaplingo-vX.Y.Z-windows-x86_64-setup.exe`、`snaplingo-vX.Y.Z-windows-x86_64.msi` | Actions `windows-2022` | 未签名，可后续申请 SignPath Foundation |
 
-最低系统版本是构建约束，并不代替对应系统真机验收。Windows runner 是服务器环境，不足以证明所有 Windows 桌面配置都兼容；公开发布前至少验收 Windows 11 x64。此流程不要求本地 Mac 构建 Windows 包。
+以上是兼容目标；最低系统版本是构建约束，并不代替对应系统真机验收。公开发布前需覆盖 macOS 12、13、14、15 及更新版本，以及 Windows 10 / 11 x64 的安装、首次授权、拖动选区、预览、复制、保存和 OCR。Windows runner 是服务器环境，不足以证明 Windows 桌面配置都兼容。此流程不要求本地 Mac 构建 Windows 包。
+
+macOS 构建最低版本为 12.0，前端以 Safari 15 / Chromium 105 为目标；Windows 使用安装器配置的 Evergreen WebView2。前端构建拒绝目标引擎不支持的正则语法，OCR 字段提取使用捕获组，避免依赖 [Safari 16.4 才支持的正则回溯](https://webkit.org/blog/13966/webkit-features-in-safari-16-4/)。Vision 自动识别语言仅在 macOS 13+ 启用，macOS 12 使用指定的识别语言。不得只改安装包的 Info.plist 来降低最低版本，必须重新编译并通过所有内嵌二进制的 deployment target 校验。
 
 macOS 默认使用 Vision 系统 OCR，不再动态链接 Homebrew 的 Tesseract/Leptonica。Linux 保留 Tesseract。开发者若明确需要 macOS Tesseract，可自行安装 Tesseract 和语言数据，并运行 `npm run tauri:build -- --features tesseract-ocr`；该自定义包不是自包含的官方包。脚本仍校验所有动态库的最低系统版本和架构，不合格就失败。
 
@@ -82,6 +84,7 @@ macOS CI 和 Desktop packages 都使用临时 ad-hoc 签名。启动检查不等
 | Windows OCR 语言缺失 | 有可理解的安装语言提示；补充系统 OCR 语言能力后重新启动验证 |
 | 真实 N→N+1 更新 | 同架构覆盖安装；数据库、API 配置、历史保留；截图/选中文本授权复测，并接受 ad-hoc 身份变化可能要求重新授权 |
 | 多屏、缩放 | Windows 混合 DPI，macOS Retina/外接屏截图和选区正确 |
+| 遮罩与十字光标出现后拖动 | 按下、拖动、松开应形成选区并生成预览；Esc 可退出。若失败，在设置中启用性能监控后复现，检查日志中的 `[capture-input]` 和 `selection_pointer_down` / `selection_pointer_up`，区分原生焦点与前端输入 |
 
 ad-hoc 包的 `spctl` 拒绝是预期结果；脚本记录结果，不要求用户关闭 Gatekeeper、删除 quarantine 或修改 TCC。
 

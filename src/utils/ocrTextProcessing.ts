@@ -87,19 +87,19 @@ const tokenPatterns: Array<{
     kind: 'travel',
     label: '航班',
     priority: 76,
-    pattern: /(?<=(?:航班|Flight)\s*)[A-Z]{2}\d{3,4}\b/gi,
+    pattern: /(?:航班|Flight)\s*([A-Z]{2}\d{3,4})\b/gi,
   },
   {
     kind: 'travel',
     label: '车次',
     priority: 75,
-    pattern: /(?<=(?:车次|Train)\s*)[GDCZTKY]\d{1,4}\b/gi,
+    pattern: /(?:车次|Train)\s*([GDCZTKY]\d{1,4})\b/gi,
   },
   {
     kind: 'travel',
     label: '座位',
     priority: 74,
-    pattern: /(?<=(?:座位|Seat)\s*)\d{1,2}[A-Z]\b/gi,
+    pattern: /(?:座位|Seat)\s*(\d{1,2}[A-Z])\b/gi,
   },
   {
     kind: 'account',
@@ -111,19 +111,19 @@ const tokenPatterns: Array<{
     kind: 'account',
     label: '账号',
     priority: 71,
-    pattern: /(?<=(?:Wi-?Fi|SSID|账号|用户名|User(?:name)?)[:：]\s*)[A-Z0-9_.-]{3,}/gi,
+    pattern: /(?:Wi-?Fi|SSID|账号|用户名|User(?:name)?)[:：]\s*([A-Z0-9_.-]{3,})/gi,
   },
   {
     kind: 'code',
     label: '验证码',
     priority: 70,
-    pattern: /(?<=(?:验证码|校验码|Code|OTP)[:：]?\s*)[A-Z0-9]{4,8}\b/gi,
+    pattern: /(?:验证码|校验码|Code|OTP)[:：]?\s*([A-Z0-9]{4,8})\b/gi,
   },
   {
     kind: 'code',
     label: '密码',
     priority: 69,
-    pattern: /(?<=(?:密码|Password|Passcode)[:：]?\s*)[A-Z0-9_.@#$%&*!-]{4,}\b/gi,
+    pattern: /(?:密码|Password|Passcode)[:：]?\s*([A-Z0-9_.@#$%&*!-]{4,})\b/gi,
   },
   {
     kind: 'code',
@@ -332,11 +332,13 @@ function lineJoinSeparator(previous: string, next: string) {
 }
 
 function matchesForPattern(text: string, pattern: RegExp) {
-  return Array.from(text.matchAll(pattern), (match) => ({
-    value: match[0],
-    start: match.index ?? 0,
-    end: (match.index ?? 0) + match[0].length,
-  }));
+  return Array.from(text.matchAll(pattern), (match) => {
+    // Labeled rules capture the trailing value instead of using lookbehind,
+    // which is unavailable in the Safari 15 WebView on macOS 12.
+    const value = match[1] ?? match[0];
+    const end = (match.index ?? 0) + match[0].length;
+    return { value, start: end - value.length, end };
+  });
 }
 
 function normalizeTokenValue(value: string) {

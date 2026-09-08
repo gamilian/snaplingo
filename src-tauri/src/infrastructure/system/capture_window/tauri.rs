@@ -10,7 +10,7 @@ use tauri::{LogicalPosition, LogicalSize};
 use tauri::{PhysicalPosition, PhysicalSize};
 
 use crate::application::capture::CaptureWindowGeometry;
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(target_os = "windows")]
 use crate::domain::capture::LogicalRect;
 
 use super::backend::{
@@ -275,14 +275,16 @@ pub fn open_capture_window_for_session(
     }
 
     suppress_capture_window_activation(app)?;
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(target_os = "windows")]
     let initial_bounds = LogicalRect {
         x: 0.0,
         y: 0.0,
         width: 1.0,
         height: 1.0,
     };
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    // Tauri queues the builder position on macOS. It must agree with the
+    // native frame so that a late queued move cannot restore the main origin.
+    #[cfg(not(target_os = "windows"))]
     let initial_bounds = geometry.bounds.clone();
     let window = WebviewWindowBuilder::new(
         app,

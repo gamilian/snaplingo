@@ -370,6 +370,11 @@ fn capture_visible_display_snapshot(
     let scale_factor = monitor.scale_factor().unwrap_or(1.0).max(1.0) as f64;
     let id = format!("monitor-{}", display_id);
 
+    log::info!(
+        "[capture-input] snapshot display={} origin=({}, {}) pixels={}x{} scale={} active={} asleep={}",
+        display_id, x, y, width, height, scale_factor, display.is_active(), display.is_asleep(),
+    );
+
     Ok(monitor_snapshot_from_visible_display_capture(
         id,
         x,

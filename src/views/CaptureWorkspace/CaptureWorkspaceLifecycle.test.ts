@@ -18,6 +18,56 @@ Object.defineProperty(window, 'localStorage', {
 afterEach(() => vi.restoreAllMocks());
 
 describe('CaptureWorkspace React lifecycle', () => {
+  it.each(['supported', 'rejected'] as const)('drags a selection into a preview when pointer capture is %s', async (capture) => {
+    vi.spyOn(HTMLImageElement.prototype, 'decode').mockResolvedValue(undefined);
+    const platform = createPlatform();
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+
+    try {
+      await act(async () => {
+        root.render(createElement(CaptureWorkspace, {
+          ports: platform,
+          initialMode: 'screenshot',
+          initialSessionId: 'drag-session',
+        }));
+      });
+      await vi.waitFor(() => expect(platform.window.reveal).toHaveBeenCalledOnce());
+      const surface = container.firstElementChild as HTMLDivElement;
+      surface.setPointerCapture = vi.fn(() => {
+        if (capture === 'rejected') {
+          throw new DOMException('No active pointer', 'NotFoundError');
+        }
+      });
+      for (const [type, x, y] of [
+        ['pointerdown', 40, 50],
+        ['pointermove', 200, 160],
+        ['pointerup', 200, 160],
+      ] as const) {
+        await act(async () => {
+          surface.dispatchEvent(new PointerEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            pointerId: 1,
+            pointerType: 'mouse',
+            button: 0,
+            buttons: type === 'pointerup' ? 0 : 1,
+            clientX: x,
+            clientY: y,
+          }));
+        });
+      }
+      await vi.waitFor(() => expect(platform.commands.renderCaptureOutput).toHaveBeenCalledWith(
+        expect.objectContaining({ rect: { x: 40, y: 50, width: 160, height: 110 } }),
+      ));
+      expect(container.querySelector('img[src="data:image/png;base64,preview-image"]')).not.toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+    }
+  });
+
   it('shows frozen images on every monitor and waits for both images to decode before reveal', async () => {
     const sessionRequest = deferred<ReturnType<typeof createSession>>();
     const pixelsRequest = deferred<ReturnType<typeof createSession>>();

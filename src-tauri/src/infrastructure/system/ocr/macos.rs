@@ -70,7 +70,9 @@ fn recognize_with_vision_data(
     let vision_request = VNRecognizeTextRequest::new();
     vision_request.setRecognitionLevel(VNRequestTextRecognitionLevel::Accurate);
     vision_request.setUsesLanguageCorrection(true);
-    vision_request.setAutomaticallyDetectsLanguage(true);
+    if objc2::available!(macos = 13.0) {
+        vision_request.setAutomaticallyDetectsLanguage(true);
+    }
 
     let language_values: Vec<_> = vision_languages_for_request(requested_language)
         .iter()
