@@ -83,6 +83,9 @@ struct TauriHotkeyChangeNotifier {
 
 impl HotkeyChangeNotifier for TauriHotkeyChangeNotifier {
     fn hotkeys_changed(&self) {
+        if let Err(error) = crate::app_shell::refresh_menu_bar_shortcuts(&self.app) {
+            log::warn!("Failed to refresh menu bar shortcuts: {}", error);
+        }
         if let Err(error) = self.app.emit("hotkeys-changed", ()) {
             log::warn!("Failed to emit hotkeys-changed: {}", error);
         }

@@ -1,9 +1,15 @@
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
+    Manager,
 };
 
 use crate::app_actions::{dispatch_app_action, AppAction, CaptureLaunchMode};
+use crate::application::hotkeys::display_hotkey_to_accelerator;
+use crate::domain::hotkey_config::{hotkey_category, HotkeySettingsSnapshot, DEFAULT_HOTKEYS};
+use crate::startup_shortcuts::hotkey_action_binding;
+
+struct MenuBar(Menu<tauri::Wry>);
 
 const TRAY_ID: &str = "snaplingo";
 const SCREENSHOT_ID: &str = "screenshot";
@@ -64,6 +70,14 @@ pub(crate) fn setup_menu_bar(app: &tauri::App) -> Result<(), String> {
     )
     .map_err(|e| e.to_string())?;
 
+    let hotkeys = app
+        .state::<crate::AppState>()
+        .settings
+        .hotkeys
+        .snapshot()
+        .map_err(|e| e.to_string())?;
+    update_menu_shortcuts(&menu, &hotkeys)?;
+
     let mut tray = TrayIconBuilder::with_id(TRAY_ID)
         .menu(&menu)
         .tooltip("SnapLingo")
@@ -82,7 +96,50 @@ pub(crate) fn setup_menu_bar(app: &tauri::App) -> Result<(), String> {
         .icon_as_template(true);
 
     tray.build(app).map_err(|e| e.to_string())?;
+    app.manage(MenuBar(menu));
     Ok(())
+}
+
+pub(crate) fn refresh_menu_bar_shortcuts(app: &tauri::AppHandle) -> Result<(), String> {
+    let Some(menu) = app.try_state::<MenuBar>() else {
+        return Ok(());
+    };
+    let hotkeys = app
+        .state::<crate::AppState>()
+        .settings
+        .hotkeys
+        .snapshot()
+        .map_err(|e| e.to_string())?;
+    update_menu_shortcuts(&menu.0, &hotkeys)
+}
+
+fn update_menu_shortcuts(
+    menu: &Menu<tauri::Wry>,
+    hotkeys: &HotkeySettingsSnapshot,
+) -> Result<(), String> {
+    for item in menu.items().map_err(|e| e.to_string())? {
+        if let Some(item) = item.as_menuitem() {
+            item.set_accelerator(menu_shortcut(item.id().as_ref(), hotkeys)?)
+                .map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+fn menu_shortcut(id: &str, hotkeys: &HotkeySettingsSnapshot) -> Result<Option<String>, String> {
+    let Some(action) = menu_action_for_id(id) else {
+        return Ok(None);
+    };
+    let hotkey = DEFAULT_HOTKEYS.iter().find(|hotkey| {
+        hotkey_action_binding(hotkey.category, hotkey.action)
+            .is_some_and(|binding| binding.action == action)
+    });
+    let Some(value) =
+        hotkey.and_then(|hotkey| hotkey_category(hotkeys, hotkey.category)?.get(hotkey.action))
+    else {
+        return Ok(None);
+    };
+    display_hotkey_to_accelerator(value).map_err(|e| e.to_string())
 }
 
 fn menu_item(app: &tauri::App, id: &str, text: &str) -> Result<MenuItem<tauri::Wry>, String> {
@@ -112,6 +169,62 @@ pub(crate) fn apply_resting_activation_policy(_app: &tauri::AppHandle) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn menu_shortcuts_match_the_configured_actions() {
+        let hotkeys = crate::domain::hotkey_config::default_hotkey_snapshot();
+        for (id, expected) in [
+            (SCREENSHOT_ID, Some("Shift+CmdOrCtrl+KeyR")),
+            (TRANSLATE_SELECTION_ID, Some("Alt+KeyD")),
+            (SCREENSHOT_TRANSLATE_ID, Some("Alt+KeyS")),
+            (SCREENSHOT_OCR_ID, Some("Shift+Alt+KeyS")),
+            (SHOW_TRANSLATION_ID, Some("Alt+KeyA")),
+            (FILE_OCR_ID, None),
+            (HISTORY_ID, None),
+            (SETTINGS_ID, None),
+            (ABOUT_ID, None),
+            (QUIT_ID, None),
+        ] {
+            assert_eq!(
+                menu_shortcut(id, &hotkeys).unwrap().as_deref(),
+                expected,
+                "{id}"
+            );
+        }
+    }
+
+    #[test]
+    fn menu_shortcuts_follow_custom_clear_and_reset_configuration() {
+        use std::sync::Arc;
+
+        use crate::application::hotkeys::HotkeyConfiguration;
+        use crate::domain::hotkey_config::{FILE_OCR_ACTION, HOTKEY_UNSET, OCR_CATEGORY};
+        use crate::infrastructure::storage::SqliteConfigStore;
+
+        let configuration = HotkeyConfiguration::new(Arc::new(SqliteConfigStore::new_in_memory()));
+        for (value, expected) in [
+            ("⌃⇧F6", Some("Ctrl+Shift+F6")),
+            (HOTKEY_UNSET, None),
+            ("  ", None),
+            ("⌥O", Some("Alt+KeyO")),
+        ] {
+            let hotkeys = configuration
+                .update_hotkey(OCR_CATEGORY, FILE_OCR_ACTION, value)
+                .unwrap();
+            assert_eq!(
+                menu_shortcut(FILE_OCR_ID, &hotkeys).unwrap().as_deref(),
+                expected
+            );
+            assert_eq!(
+                menu_shortcut(SCREENSHOT_OCR_ID, &hotkeys)
+                    .unwrap()
+                    .as_deref(),
+                Some("Shift+Alt+KeyS")
+            );
+        }
+        let hotkeys = configuration.reset_category(OCR_CATEGORY).unwrap();
+        assert_eq!(menu_shortcut(FILE_OCR_ID, &hotkeys).unwrap(), None);
+    }
 
     #[cfg(target_os = "macos")]
     #[test]
