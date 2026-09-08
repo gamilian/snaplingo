@@ -53,16 +53,19 @@ export function restoreLastSuccessfulCaptureSelection({
 }
 
 export async function prepareCaptureSurfaceForReveal({
+  images = [],
   frame,
   paintSelectionOverlayFrame,
   waitForPaint = waitForCaptureSurfacePaint,
 }: {
+  images?: readonly Pick<HTMLImageElement, 'decode'>[];
   frame: CaptureSelectionOverlayFrame | null;
   paintSelectionOverlayFrame: (
     frame: CaptureSelectionOverlayFrame | null,
   ) => void;
   waitForPaint?: typeof waitForCaptureSurfacePaint;
 }) {
+  await Promise.all(images.map((image) => image.decode()));
   paintSelectionOverlayFrame(frame);
   await waitForPaint();
 }

@@ -25,6 +25,7 @@ mod tests {
 
     struct MockCaptureSessionSource {
         snapshots: Vec<MonitorSnapshot>,
+        snapshots_after_first_capture: Option<Vec<MonitorSnapshot>>,
         monitor_layouts: Vec<MonitorLayout>,
         window_candidates: Vec<WindowCandidate>,
         captured_cursor: Option<CapturedCursor>,
@@ -77,8 +78,16 @@ mod tests {
     #[async_trait::async_trait]
     impl CaptureSessionSource for MockCaptureSessionSource {
         async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError> {
-            *self.capture_monitor_snapshots_calls.lock().unwrap() += 1;
-            Ok(self.snapshots.clone())
+            let mut calls = self.capture_monitor_snapshots_calls.lock().unwrap();
+            *calls += 1;
+            Ok(if *calls > 1 {
+                self.snapshots_after_first_capture
+                    .as_ref()
+                    .unwrap_or(&self.snapshots)
+            } else {
+                &self.snapshots
+            }
+            .clone())
         }
 
         async fn capture_monitor_snapshot(
@@ -160,6 +169,7 @@ mod tests {
         MockCaptureSessionSource {
             monitor_layouts: snapshots.iter().map(monitor_layout_from_snapshot).collect(),
             snapshots,
+            snapshots_after_first_capture: None,
             window_candidates: Vec::new(),
             captured_cursor: None,
             current_cursor_position: None,
@@ -212,6 +222,7 @@ mod tests {
         MockCaptureSessionSource {
             monitor_layouts: snapshots.iter().map(monitor_layout_from_snapshot).collect(),
             snapshots,
+            snapshots_after_first_capture: None,
             window_candidates: Vec::new(),
             captured_cursor: None,
             current_cursor_position: None,
@@ -991,6 +1002,66 @@ mod tests {
         assert!(decoded.pixels().all(|pixel| pixel.0 == [10, 20, 30, 255]));
 
         let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn frozen_preview_and_output_keep_visible_pixels_when_desktop_changes() {
+        let mut backend = make_backend_with_renderable_png();
+        let mut underlying = backend.snapshots.clone();
+        underlying[0].png_data = make_solid_png(4, 4, [200, 100, 0, 255]);
+        backend.region_png_data = underlying[0].png_data.clone();
+        backend.snapshots_after_first_capture = Some(underlying);
+        let snapshot_calls = backend.capture_monitor_snapshots_calls.clone();
+        let sessions = CaptureSessions::new(Arc::new(backend));
+        let view = sessions
+            .create_session_without_monitor_images()
+            .await
+            .unwrap();
+        let hydrated = sessions.hydrate_session_snapshots(&view.id).await.unwrap();
+        let visible_png = base64::engine::general_purpose::STANDARD
+            .decode(&hydrated.monitors[0].image_base64)
+            .unwrap();
+
+        let preview = render_capture_png_base64(
+            &sessions,
+            &CaptureImageComposer::new(),
+            &view.id,
+            &LogicalRect {
+                x: 0.0,
+                y: 0.0,
+                width: 4.0,
+                height: 4.0,
+            },
+            &[],
+            false,
+        )
+        .unwrap();
+        assert_eq!(preview, hydrated.monitors[0].image_base64);
+        let output = output_capture_selection(
+            &sessions,
+            &CaptureImageComposer::new(),
+            &CaptureOutput::new(),
+            &view.id,
+            &LogicalRect {
+                x: 0.0,
+                y: 0.0,
+                width: 4.0,
+                height: 4.0,
+            },
+            &[],
+            false,
+            CaptureOutputAction::Pin,
+        )
+        .await
+        .unwrap();
+        let CaptureSessionOutput::Pin(output_png) = output else {
+            panic!("expected pin output");
+        };
+        assert_eq!(
+            image::load_from_memory(&output_png).unwrap().to_rgba8(),
+            image::load_from_memory(&visible_png).unwrap().to_rgba8(),
+        );
+        assert_eq!(*snapshot_calls.lock().unwrap(), 1);
     }
 
     #[tokio::test]

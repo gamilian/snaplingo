@@ -2,9 +2,10 @@
 
 import { StrictMode, act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { CaptureWorkspacePlatformRuntime } from '../../application/capture-workspace/platformRuntime';
+import type { CaptureSessionView } from './types';
 import CaptureWorkspace from './index';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -14,13 +15,30 @@ Object.defineProperty(window, 'localStorage', {
   value: createMemoryStorage(),
 });
 
+afterEach(() => vi.restoreAllMocks());
+
 describe('CaptureWorkspace React lifecycle', () => {
-  it('reveals after session metadata loads before capture images are hydrated', async () => {
+  it('shows frozen images on every monitor and waits for both images to decode before reveal', async () => {
     const sessionRequest = deferred<ReturnType<typeof createSession>>();
+    const pixelsRequest = deferred<ReturnType<typeof createSession>>();
+    const primaryDecoded = deferred<void>();
+    const secondaryDecoded = deferred<void>();
+    const decode = vi.spyOn(HTMLImageElement.prototype, 'decode')
+      .mockImplementationOnce(() => primaryDecoded.promise)
+      .mockImplementationOnce(() => secondaryDecoded.promise);
     const platform = createPlatform();
     platform.commands.getCaptureSession.mockImplementation(
       () => sessionRequest.promise,
     );
+    platform.commands.hydrateCaptureSessionSnapshots.mockReturnValue(pixelsRequest.promise);
+    const session = createSession('frozen-session');
+    session.monitors.push({
+      id: 'monitor-left',
+      logical_bounds: { x: -400, y: -100, width: 400, height: 300 },
+      physical_bounds: { x: -400, y: -100, width: 400, height: 300 },
+      scale_factor: 1,
+      image_base64: '',
+    });
     const container = document.createElement('div');
     document.body.append(container);
     const root = createRoot(container);
@@ -30,16 +48,46 @@ describe('CaptureWorkspace React lifecycle', () => {
         createElement(CaptureWorkspace, {
           runtime: platform,
           initialMode: 'screenshot',
-          initialSessionId: 'metadata-session',
+          initialSessionId: session.id,
         }),
       );
     });
 
     await act(async () => {
-      sessionRequest.resolve(createSession('metadata-session'));
+      sessionRequest.resolve(session);
       await sessionRequest.promise;
     });
 
+    expect(platform.reveal).not.toHaveBeenCalled();
+    expect(platform.commands.hydrateCaptureSessionSnapshots).toHaveBeenCalledWith(session.id);
+
+    await act(async () => {
+      pixelsRequest.resolve({
+        ...session,
+        monitors: session.monitors.map((monitor) => ({
+          ...monitor,
+          image_base64: `frozen-${monitor.id}`,
+        })),
+      });
+      await pixelsRequest.promise;
+    });
+
+    const images = container.querySelectorAll<HTMLImageElement>('[data-capture-monitor]');
+    expect(images).toHaveLength(2);
+    expect(images[0].src).toBe('data:image/png;base64,frozen-monitor-1');
+    expect(images[0].style.left).toBe('400px');
+    expect(images[0].style.top).toBe('100px');
+    expect(images[0].style.width).toBe('500px');
+    expect(images[1].src).toBe('data:image/png;base64,frozen-monitor-left');
+    expect(images[1].style.left).toBe('0px');
+    expect(images[1].style.top).toBe('0px');
+    expect(images[1].style.width).toBe('400px');
+    expect(decode).toHaveBeenCalledTimes(2);
+    expect(platform.reveal).not.toHaveBeenCalled();
+
+    await act(async () => primaryDecoded.resolve());
+    expect(platform.reveal).not.toHaveBeenCalled();
+    await act(async () => secondaryDecoded.resolve());
     await vi.waitFor(() => expect(platform.reveal).toHaveBeenCalledOnce());
     expect(platform.prepareForReveal).toHaveBeenCalledOnce();
 
@@ -48,6 +96,7 @@ describe('CaptureWorkspace React lifecycle', () => {
   });
 
   it('replaces the disposed StrictMode runtime and cleans late work on unmount', async () => {
+    vi.spyOn(HTMLImageElement.prototype, 'decode').mockResolvedValue(undefined);
     const oldSessionRequest = deferred<ReturnType<typeof createSession>>();
     const currentSessionRequest = deferred<ReturnType<typeof createSession>>();
     const lateHotkeyRegistration = deferred<() => void>();
@@ -152,6 +201,85 @@ describe('CaptureWorkspace React lifecycle', () => {
     addEventListener.mockRestore();
     removeEventListener.mockRestore();
   });
+
+  it('shows a frozen-image decode failure and lets Escape close the capture window', async () => {
+    vi.spyOn(HTMLImageElement.prototype, 'decode')
+      .mockRejectedValue(new Error('Frozen image could not be decoded'));
+    const platform = createPlatform();
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(createElement(CaptureWorkspace, {
+        runtime: platform,
+        initialMode: 'screenshot',
+        initialSessionId: 'failed-image-session',
+      }));
+    });
+    await vi.waitFor(() => expect(platform.reveal).toHaveBeenCalledOnce());
+    expect(container.textContent).toContain('Frozen image could not be decoded');
+    expect(platform.commands.renderCaptureOutput).not.toHaveBeenCalled();
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    await vi.waitFor(() => expect(platform.dismiss).toHaveBeenCalledOnce());
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it('handles a real keyboard copy shortcut with its modifier keys', async () => {
+    vi.spyOn(HTMLImageElement.prototype, 'decode').mockResolvedValue(undefined);
+    const platform = createPlatform();
+    const session = createSession('keyboard-session');
+    session.monitors[0].image_base64 = 'frozen-monitor';
+    session.candidates = [{
+      id: 'visible-window',
+      kind: 'window',
+      rect: { x: 20, y: 30, width: 300, height: 200 },
+      priority: 1,
+    }];
+    platform.commands.getCaptureSession.mockResolvedValue(session);
+    platform.commands.hydrateCaptureSessionSnapshots.mockResolvedValue(session);
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(createElement(CaptureWorkspace, {
+        runtime: platform,
+        initialMode: 'screenshot',
+        initialSessionId: 'keyboard-session',
+      }));
+    });
+    await vi.waitFor(() => expect(platform.reveal).toHaveBeenCalledOnce());
+    await act(async () => {
+      container.firstElementChild?.dispatchEvent(new PointerEvent('pointermove', {
+        bubbles: true,
+        clientX: 100,
+        clientY: 100,
+      }));
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    });
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'c',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      }));
+    });
+
+    await vi.waitFor(() => expect(platform.commands.outputCapture).toHaveBeenCalledOnce());
+    expect(platform.commands.outputCapture).toHaveBeenCalledWith(expect.objectContaining({
+      action: { type: 'copy' },
+      rect: { x: 20, y: 30, width: 300, height: 200 },
+    }));
+    await act(async () => root.unmount());
+    container.remove();
+  });
 });
 
 function listenerCalls(
@@ -168,9 +296,13 @@ function createPlatform() {
       getCaptureSession: vi.fn<
         CaptureWorkspacePlatformRuntime['commands']['getCaptureSession']
       >(async () => createSession('loaded')),
-      hydrateCaptureSessionSnapshots: vi.fn(async () =>
-        createSession('hydrated'),
-      ),
+      hydrateCaptureSessionSnapshots: vi.fn(async (sessionId: string) => ({
+        ...createSession(sessionId),
+        monitors: createSession(sessionId).monitors.map((monitor) => ({
+          ...monitor,
+          image_base64: 'frozen-monitor',
+        })),
+      })),
       hydrateCaptureMonitorSnapshot: vi.fn(async (_sessionId, monitorId) => {
         const monitor = createSession('hydrated').monitors.find(
           (candidate) => candidate.id === monitorId,
@@ -220,7 +352,7 @@ function createPlatform() {
   } satisfies CaptureWorkspacePlatformRuntime;
 }
 
-function createSession(id: string) {
+function createSession(id: string): CaptureSessionView {
   return {
     id,
     monitors: [

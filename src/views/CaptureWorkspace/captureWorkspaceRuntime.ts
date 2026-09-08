@@ -1543,7 +1543,7 @@ export function createCaptureWorkspaceRuntime({
 
       if (!revealAttempt || revealAttempt.key !== revealKey) {
         const isCurrent = () =>
-          generation === readinessGeneration && state.session?.id === sessionId;
+          generation === readinessGeneration && (state.session?.id ?? null) === sessionId;
         const promise = (async () => {
           try {
             await platform.prepareForReveal();
@@ -2225,12 +2225,12 @@ export function createCaptureWorkspaceRuntime({
 
     keyDown(input: CaptureWorkspaceKeyInput) {
       const event = {
-        metaKey: false,
-        ctrlKey: false,
-        altKey: false,
-        shiftKey: false,
-        repeat: false,
-        ...input,
+        key: input.key,
+        metaKey: input.metaKey ?? false,
+        ctrlKey: input.ctrlKey ?? false,
+        altKey: input.altKey ?? false,
+        shiftKey: input.shiftKey ?? false,
+        repeat: input.repeat ?? false,
       };
       if (
         (state.status === 'selecting' || state.status === 'preview') &&
@@ -2421,7 +2421,7 @@ export function createCaptureWorkspaceRuntime({
       );
       if (editorHandled) return true;
       if (event.key === 'Escape') {
-        if (state.status !== 'selecting') return false;
+        if (state.status !== 'selecting' && state.status !== 'error') return false;
         launch(cancelSession);
         return true;
       }
@@ -2524,8 +2524,8 @@ export function createCaptureWorkspaceRuntime({
             return;
           }
 
-          patch({ session });
           hydratedSessionId = sessionId;
+          patch({ session });
           markPerf('snapshots_hydrated', sessionId);
         })
         .catch((error) => {
@@ -2536,6 +2536,9 @@ export function createCaptureWorkspaceRuntime({
           ) {
             snapshotHydration = null;
             hydratedSessionId = null;
+            if (generation === actionGeneration && state.session?.id === sessionId) {
+              patch({ status: 'error', error: errorMessage(error) });
+            }
           }
           throw error;
         });

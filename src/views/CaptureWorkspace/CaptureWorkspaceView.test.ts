@@ -48,6 +48,7 @@ describe("CaptureWorkspaceView runtime seam", () => {
       | "error"
       | "viewportBounds"
       | "selectionBounds"
+      | "monitors"
       | "isRenderingOutput"
       | "silentOcrHint"
       | "editor"
@@ -107,7 +108,7 @@ describe("CaptureWorkspaceView runtime seam", () => {
       | "canRedo"
     >();
     expectTypeOf<keyof CaptureWorkspaceViewRenderState["dom"]>().toEqualTypeOf<
-      "textDraftInputRef" | "selectionOverlay"
+      "desktopRef" | "textDraftInputRef" | "selectionOverlay"
     >();
     expectTypeOf<
       keyof CaptureWorkspaceViewRenderState["dom"]["selectionOverlay"]
@@ -759,6 +760,7 @@ function createRenderState(): CaptureWorkspaceViewRenderState {
     error: null,
     viewportBounds: { x: 0, y: 0, width: 800, height: 600 },
     selectionBounds: { x: 100, y: 200, width: 800, height: 600 },
+    monitors: [],
     isRenderingOutput: false,
     silentOcrHint: null,
     editor: {
@@ -783,6 +785,7 @@ function createRenderState(): CaptureWorkspaceViewRenderState {
       canRedo: true,
     },
     dom: {
+      desktopRef: { current: null },
       textDraftInputRef,
       selectionOverlay: {
         canvasRef,

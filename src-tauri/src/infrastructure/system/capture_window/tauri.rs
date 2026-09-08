@@ -4,8 +4,10 @@ use std::{
 };
 
 use tauri::{utils::config::Color, AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use tauri::{LogicalPosition, LogicalSize};
+#[cfg(target_os = "windows")]
+use tauri::{PhysicalPosition, PhysicalSize};
 
 use crate::domain::capture::LogicalRect;
 
@@ -121,7 +123,10 @@ pub fn prepare_capture_window_for_reveal(app: &AppHandle) -> Result<(), String> 
         restore_capture_window_activation();
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    configure_capture_window_for_current_space(&window)?;
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         let _ = window;
     }
@@ -167,7 +172,7 @@ pub fn set_capture_window_cursor_passthrough(app: &AppHandle, enabled: bool) -> 
 }
 
 pub fn destroy_inactive_capture_window(app: &AppHandle) -> Result<(), String> {
-    if !should_destroy_capture_window_when_inactive() {
+    if !should_destroy_capture_window_when_inactive(is_capture_presentation_active()) {
         return Ok(());
     }
 
@@ -237,16 +242,18 @@ pub fn open_capture_window_for_session(
             window
                 .set_focusable(capture_window_is_focusable())
                 .map_err(|e| e.to_string())?;
-            #[cfg(not(target_os = "macos"))]
+            #[cfg(not(any(target_os = "macos", target_os = "windows")))]
             window
                 .set_position(LogicalPosition::new(bounds.x, bounds.y))
                 .map_err(|e| e.to_string())?;
-            #[cfg(not(target_os = "macos"))]
+            #[cfg(not(any(target_os = "macos", target_os = "windows")))]
             window
                 .set_size(LogicalSize::new(bounds.width, bounds.height))
                 .map_err(|e| e.to_string())?;
             #[cfg(target_os = "macos")]
             super::macos::set_capture_window_frame(&window, bounds)?;
+            #[cfg(target_os = "windows")]
+            set_windows_capture_window_frame(&window, bounds)?;
             configure_capture_window_for_current_space(&window)?;
             window
                 .emit(
@@ -262,14 +269,14 @@ pub fn open_capture_window_for_session(
     }
 
     suppress_capture_window_activation(app)?;
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     let initial_bounds = LogicalRect {
         x: 0.0,
         y: 0.0,
         width: 1.0,
         height: 1.0,
     };
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     let initial_bounds = bounds.clone();
     let window = WebviewWindowBuilder::new(
         app,
@@ -294,6 +301,8 @@ pub fn open_capture_window_for_session(
     .map_err(|e| e.to_string())?;
     #[cfg(target_os = "macos")]
     super::macos::set_capture_window_frame(&window, bounds)?;
+    #[cfg(target_os = "windows")]
+    set_windows_capture_window_frame(&window, bounds)?;
     configure_capture_window_for_current_space(&window)?;
     restore_capture_window_activation();
 
@@ -324,12 +333,52 @@ fn configure_capture_window_for_current_space(window: &tauri::WebviewWindow) -> 
         super::macos::configure_capture_window_for_current_space(window)?;
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    {
+        // WebView2 follows the window's monitor DPI. Keep CSS coordinates in
+        // the same primary-display scale as the frozen capture session.
+        let desktop_scale = windows_capture_desktop_scale(window)?;
+        let window_scale = window.scale_factor().map_err(|e| e.to_string())?;
+        window
+            .set_zoom(desktop_scale / window_scale)
+            .map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         let _ = window;
     }
 
     Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn windows_capture_desktop_scale(window: &tauri::WebviewWindow) -> Result<f64, String> {
+    window
+        .primary_monitor()
+        .map_err(|e| e.to_string())?
+        .map(|monitor| monitor.scale_factor())
+        .ok_or_else(|| "Capture window has no primary monitor".to_string())
+}
+
+#[cfg(target_os = "windows")]
+fn set_windows_capture_window_frame(
+    window: &tauri::WebviewWindow,
+    bounds: &LogicalRect,
+) -> Result<(), String> {
+    let scale = windows_capture_desktop_scale(window)?;
+    window
+        .set_position(PhysicalPosition::new(
+            (bounds.x * scale).round() as i32,
+            (bounds.y * scale).round() as i32,
+        ))
+        .map_err(|e| e.to_string())?;
+    window
+        .set_size(PhysicalSize::new(
+            (bounds.width * scale).round() as u32,
+            (bounds.height * scale).round() as u32,
+        ))
+        .map_err(|e| e.to_string())
 }
 
 fn restore_capture_window_activation() {
@@ -378,8 +427,8 @@ fn should_reuse_capture_window_for_session() -> bool {
     !cfg!(target_os = "macos")
 }
 
-fn should_destroy_capture_window_when_inactive() -> bool {
-    !should_reuse_capture_window_for_session()
+fn should_destroy_capture_window_when_inactive(has_active_presentation: bool) -> bool {
+    !has_active_presentation && !should_reuse_capture_window_for_session()
 }
 
 fn discard_capture_window_before_new_session(
@@ -453,7 +502,13 @@ mod tests {
     #[cfg(target_os = "macos")]
     #[test]
     fn macos_capture_window_is_destroyed_when_inactive() {
-        assert!(should_destroy_capture_window_when_inactive());
+        assert!(should_destroy_capture_window_when_inactive(false));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_keeps_the_capture_window_when_another_session_is_still_active() {
+        assert!(!should_destroy_capture_window_when_inactive(true));
     }
 
     #[cfg(target_os = "macos")]

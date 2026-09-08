@@ -342,13 +342,34 @@ fn capture_image_composition_plan(
     let placements = intersections
         .into_iter()
         .map(|(snapshot_index, snapshot, intersection)| {
-            let source_rect = scaled_logical_rect_relative_to(
+            let mut source_rect = scaled_logical_rect_relative_to(
                 &intersection,
                 &snapshot.logical_bounds,
                 snapshot.scale_factor,
             )?;
-            let destination_rect =
+            let mut destination_rect =
                 scaled_logical_rect_relative_to(&intersection, rect, output_scale)?;
+
+            // Fractional display scales can round an intersected edge a pixel past
+            // its image. Both rectangles are already clipped in logical space.
+            source_rect.width = source_rect.width.min(
+                snapshot
+                    .physical_bounds
+                    .width
+                    .saturating_sub(source_rect.x as u32),
+            );
+            source_rect.height = source_rect.height.min(
+                snapshot
+                    .physical_bounds
+                    .height
+                    .saturating_sub(source_rect.y as u32),
+            );
+            destination_rect.width = destination_rect
+                .width
+                .min(output_width.saturating_sub(destination_rect.x as u32));
+            destination_rect.height = destination_rect
+                .height
+                .min(output_height.saturating_sub(destination_rect.y as u32));
 
             Ok(CaptureImagePlacement {
                 snapshot_index,
@@ -694,6 +715,50 @@ mod tests {
         assert_eq!(png_pixel(&output, 1, 3), [255, 0, 0, 255]);
         assert_eq!(png_pixel(&output, 2, 0), [0, 0, 255, 255]);
         assert_eq!(png_pixel(&output, 5, 3), [0, 0, 255, 255]);
+    }
+
+    #[test]
+    fn crops_fractional_scale_monitor_edges_without_exceeding_frozen_pixels() {
+        for scale in [1.25, 1.5, 1.75, 2.0, 2.25] {
+            for x in [-2000.0, 0.0, 2000.0] {
+                let snapshot = MonitorSnapshot {
+                    id: "secondary".to_string(),
+                    logical_bounds: LogicalRect {
+                        x,
+                        y: -100.0,
+                        width: 13.0 / scale,
+                        height: 7.0 / scale,
+                    },
+                    physical_bounds: PhysicalRect {
+                        x: (x * scale) as i32,
+                        y: (-100.0 * scale) as i32,
+                        width: 13,
+                        height: 7,
+                    },
+                    scale_factor: scale,
+                    png_data: solid_png(13, 7, [10, 20, 30, 255]),
+                };
+                let plan = super::capture_image_composition_plan(
+                    &snapshot.logical_bounds,
+                    std::slice::from_ref(&snapshot),
+                )
+                .unwrap();
+                let output = CaptureImageComposer::new()
+                    .compose_png(
+                        plan.width,
+                        plan.height,
+                        &[PngPlacement {
+                            png_data: &snapshot.png_data,
+                            source_rect: plan.placements[0].source_rect.clone(),
+                            destination_rect: plan.placements[0].destination_rect.clone(),
+                        }],
+                    )
+                    .unwrap_or_else(|error| panic!("scale={scale} x={x}: {error}"));
+                let image = image::load_from_memory(&output).unwrap().to_rgba8();
+                assert_eq!(image.dimensions(), (13, 7), "scale={scale} x={x}");
+                assert!(image.pixels().all(|pixel| pixel.0 == [10, 20, 30, 255]));
+            }
+        }
     }
 
     #[test]

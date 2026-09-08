@@ -19,7 +19,7 @@ describe('capture window visibility', () => {
     ).toBe(false);
   });
 
-  it('reveals the capture window once metadata is ready even before image hydration', () => {
+  it('keeps the capture window hidden until the frozen images are hydrated', () => {
     expect(
       shouldRevealCaptureWindow({
         status: 'selecting',
@@ -27,7 +27,7 @@ describe('capture window visibility', () => {
         hasCaptureImagesReady: false,
         hasRevealed: false,
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('reveals the capture window once the frozen screen session is ready', () => {

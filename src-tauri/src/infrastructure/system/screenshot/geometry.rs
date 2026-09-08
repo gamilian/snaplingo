@@ -124,6 +124,44 @@ fn normalized_scale_factor(scale_factor: f64) -> f64 {
     }
 }
 
+#[cfg(any(target_os = "windows", test))]
+pub(super) fn normalize_windows_snapshot_coordinates(monitors: &mut [MonitorSnapshot]) {
+    // One spanning WebView has one CSS scale. Per-monitor origin scaling would
+    // introduce gaps or overlaps in the Windows physical desktop layout.
+    let scale = monitors
+        .first()
+        .map(|monitor| monitor.scale_factor.max(1.0))
+        .unwrap_or(1.0);
+    for monitor in monitors {
+        monitor.scale_factor = scale;
+        monitor.logical_bounds = logical_rect_from_physical(
+            monitor.physical_bounds.x,
+            monitor.physical_bounds.y,
+            monitor.physical_bounds.width,
+            monitor.physical_bounds.height,
+            scale,
+        );
+    }
+}
+
+#[cfg(any(target_os = "windows", test))]
+pub(super) fn normalize_windows_layout_coordinates(monitors: &mut [MonitorLayout]) {
+    let scale = monitors
+        .first()
+        .map(|monitor| monitor.scale_factor.max(1.0))
+        .unwrap_or(1.0);
+    for monitor in monitors {
+        monitor.scale_factor = scale;
+        monitor.logical_bounds = logical_rect_from_physical(
+            monitor.physical_bounds.x,
+            monitor.physical_bounds.y,
+            monitor.physical_bounds.width,
+            monitor.physical_bounds.height,
+            scale,
+        );
+    }
+}
+
 pub(crate) fn logical_rect_from_physical(
     x: i32,
     y: i32,
@@ -156,6 +194,81 @@ fn physical_intersection_area(a: &PhysicalRect, b: &PhysicalRect) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn windows_mixed_dpi_displays_share_one_contiguous_capture_coordinate_space() {
+        let mut snapshots = vec![
+            monitor_snapshot_from_physical_geometry(
+                "primary".into(),
+                0,
+                0,
+                3840,
+                2160,
+                2.0,
+                vec![],
+            ),
+            monitor_snapshot_from_physical_geometry(
+                "right".into(),
+                3840,
+                0,
+                1920,
+                1080,
+                1.0,
+                vec![],
+            ),
+            monitor_snapshot_from_physical_geometry(
+                "left".into(),
+                -2560,
+                0,
+                2560,
+                1440,
+                1.25,
+                vec![],
+            ),
+            monitor_snapshot_from_physical_geometry(
+                "top".into(),
+                0,
+                -1080,
+                1920,
+                1080,
+                1.5,
+                vec![],
+            ),
+        ];
+        let mut layouts = snapshots
+            .iter()
+            .map(|monitor| MonitorLayout {
+                id: monitor.id.clone(),
+                logical_bounds: monitor.logical_bounds.clone(),
+                physical_bounds: monitor.physical_bounds.clone(),
+                scale_factor: monitor.scale_factor,
+            })
+            .collect::<Vec<_>>();
+        normalize_windows_snapshot_coordinates(&mut snapshots);
+        normalize_windows_layout_coordinates(&mut layouts);
+
+        assert_eq!(
+            snapshots[1].logical_bounds.x,
+            snapshots[0].logical_bounds.width
+        );
+        assert_eq!(
+            snapshots[2].logical_bounds.x + snapshots[2].logical_bounds.width,
+            0.0
+        );
+        assert_eq!(
+            snapshots[3].logical_bounds.y + snapshots[3].logical_bounds.height,
+            0.0
+        );
+        assert!(snapshots.iter().all(|monitor| monitor.scale_factor == 2.0));
+        for (snapshot, layout) in snapshots.iter().zip(&layouts) {
+            assert_eq!(snapshot.logical_bounds, layout.logical_bounds);
+            assert_eq!(snapshot.scale_factor, layout.scale_factor);
+        }
+        assert_eq!(
+            logical_point_from_physical_geometry(3880, 100, &snapshots),
+            Some(LogicalPoint { x: 1940.0, y: 50.0 })
+        );
+    }
 
     #[test]
     fn monitor_snapshot_from_physical_geometry_derives_logical_bounds() {

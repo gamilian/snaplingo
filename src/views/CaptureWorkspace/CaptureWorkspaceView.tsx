@@ -37,6 +37,7 @@ import {
 import { CaptureSelectionOverlayCanvas } from './captureSelectionOverlayRuntime';
 import { createCapturePointerFrameDispatcher } from './capturePointerFrame';
 import { getCaptureWorkspacePointerPoint } from './captureWorkspacePointer';
+import { getMonitorViewportRect } from './virtualDesktop';
 import type {
   ColorSample,
   ColorSampleFormat,
@@ -62,6 +63,7 @@ export interface CaptureWorkspaceViewRenderState {
   readonly error: string | null;
   readonly viewportBounds: LogicalRect | null;
   readonly selectionBounds: LogicalRect | null;
+  readonly monitors: readonly MonitorSnapshotView[];
   readonly isRenderingOutput: boolean;
   readonly silentOcrHint: {
     readonly status: 'loading' | 'success';
@@ -89,6 +91,7 @@ export interface CaptureWorkspaceViewRenderState {
     readonly canRedo: boolean;
   };
   readonly dom: {
+    readonly desktopRef: Ref<HTMLDivElement>;
     readonly textDraftInputRef: Ref<HTMLTextAreaElement>;
     readonly selectionOverlay: {
       readonly canvasRef: Ref<HTMLCanvasElement>;
@@ -237,6 +240,7 @@ export function CaptureWorkspaceView({
   useEffect(() => () => pointerFrame.cancel(), [pointerFrame]);
 
   if (renderState.status === 'idle') return null;
+  const selectionBounds = renderState.selectionBounds;
 
   const completeSelection = (
     action: Parameters<CaptureWorkspaceViewActions['completePreviewSelection']>[0],
@@ -356,6 +360,26 @@ export function CaptureWorkspaceView({
       onWheel={handleRootWheel}
       onContextMenu={(event) => event.preventDefault()}
     >
+      <div
+        ref={renderState.dom.desktopRef}
+        className="pointer-events-none absolute inset-0"
+        aria-hidden="true"
+      >
+        {selectionBounds && renderState.monitors.map((monitor) => (
+          monitor.image_base64 ? (
+            <img
+              key={monitor.id}
+              data-capture-monitor={monitor.id}
+              src={`data:image/png;base64,${monitor.image_base64}`}
+              alt=""
+              draggable={false}
+              className="absolute max-w-none select-none"
+              style={rectStyle(getMonitorViewportRect(monitor, selectionBounds))}
+            />
+          ) : null
+        ))}
+      </div>
+
       {shouldShowCaptureLoadingMask(renderState.status) && (
         <div className="absolute inset-0 bg-black" aria-label="Loading capture" />
       )}

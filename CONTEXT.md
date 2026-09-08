@@ -52,6 +52,8 @@ The only place that chooses concrete adapters and injects them into a runtime.
 
 A frozen snapshot of the desktop used to produce screenshot output, OCR input, and capture-window effects. Capture policy is owned by `application/capture`; OS screenshot and window mechanics are Infrastructure adapters.
 
+The selection surface displays the same frozen monitor images used by preview, magnification, OCR, and output. It waits for every image to decode before reveal; selection completion never replaces the session pixels with another desktop capture. Windows uses one primary-display coordinate scale for the spanning WebView, monitor snapshots, and cursor/window geometry.
+
 ### Result Window and Pinned Image
 
 Application runtimes that own their workflows and request runtime-host effects. Result Window owns one read-only View-facing state projection, editable text and language intents, translation/OCR favorite sequencing, OCR Provider fallback, and clipboard intents. Their Tauri window, clipboard, and notification mechanics remain in Infrastructure.

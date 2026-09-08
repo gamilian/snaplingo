@@ -86,7 +86,11 @@ export function useCaptureWorkspaceRuntimeView({
     () =>
       createCaptureWorkspaceRuntime({
         platform: platformRuntime,
-        onInactive: () => onInactiveRef.current?.(),
+        onInactive: () => (
+          onInactiveRef.current
+            ? onInactiveRef.current()
+            : platformRuntime.dismiss()
+        ),
         annotationColorPresets: () =>
           annotationColorPresetsRef.current ?? ANNOTATION_COLORS,
         screenshotPreferences: () => screenshotPreferencesRef.current,
@@ -161,6 +165,7 @@ export function useCaptureWorkspaceRuntimeView({
   const isMagnifierShown = isMagnifierRequested && derived.isMagnifierShown;
 
   const initialSessionRuntimeRef = useRef<CaptureWorkspaceRuntime | null>(null);
+  const desktopRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!initialMode || initialSessionRuntimeRef.current === workflowRuntime) {
       return;
@@ -169,13 +174,21 @@ export function useCaptureWorkspaceRuntimeView({
     void workflowRuntime.actions.startSession(initialMode, initialSessionId);
   }, [initialMode, initialSessionId, workflowRuntime]);
 
+  useEffect(() => {
+    if (!runtimeRenderState.sessionId) return;
+    void workflowRuntime.actions.hydrateSnapshots().catch(() => undefined);
+  }, [runtimeRenderState.sessionId, workflowRuntime]);
+
   const prepareCaptureSurface = useCallback(
     () =>
       prepareCaptureSurfaceForReveal({
+        images: runtimeRenderState.status === 'error'
+          ? []
+          : Array.from(desktopRef.current?.querySelectorAll('img') ?? []),
         frame: overlay.getCurrentFrame(),
         paintSelectionOverlayFrame: overlay.paintFrame,
       }),
-    [overlay.getCurrentFrame, overlay.paintFrame],
+    [overlay.getCurrentFrame, overlay.paintFrame, runtimeRenderState.status],
   );
   hostBridgeRef.current = {
     reset: overlay.reset,
@@ -231,6 +244,7 @@ export function useCaptureWorkspaceRuntimeView({
       error: runtimeRenderState.error,
       viewportBounds: derived.viewportBounds,
       selectionBounds: derived.selectionBounds,
+      monitors: runtimeRenderState.session?.monitors ?? [],
       isRenderingOutput: runtimeRenderState.isRenderingOutput,
       silentOcrHint:
         runtimeRenderState.silentOcrHint && derived.selectionBounds
@@ -268,6 +282,7 @@ export function useCaptureWorkspaceRuntimeView({
         canRedo: derived.canRedoAnnotation,
       },
       dom: {
+        desktopRef,
         textDraftInputRef,
         selectionOverlay: {
           canvasRef: overlay.canvasRef,

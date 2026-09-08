@@ -44,6 +44,50 @@ function createKeyboardTarget() {
 }
 
 describe('capture workspace runtime', () => {
+  it('reveals a session load error even when no session id was adopted', async () => {
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockRejectedValue(new Error('Session load failed'));
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'missing-session');
+
+    await runtime.actions.updateHostReadiness(false);
+
+    expect(runtime.renderState.error).toBe('Session load failed');
+    expect(platform.reveal).toHaveBeenCalledOnce();
+  });
+
+  it('waits for every frozen monitor image before revealing the selection surface', async () => {
+    const platform = createPlatform();
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-1');
+
+    await runtime.actions.updateHostReadiness(false);
+    expect(platform.reveal).not.toHaveBeenCalled();
+
+    await runtime.actions.updateHostReadiness(true);
+    expect(platform.reveal).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the visible frozen frame when a foreground window disappears during selection', async () => {
+    const platform = createPlatform();
+    let frozenFrame = 'visible-foreground-window';
+    platform.commands.renderCaptureOutput.mockImplementation(async () => frozenFrame);
+    Object.assign(platform.commands, {
+      // Guard against restoring the old selection-time recapture path.
+      refreshCaptureSessionSnapshots: async () => {
+        frozenFrame = 'underlying-window-after-focus-change';
+      },
+    });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-1');
+
+    runtime.actions.pointerDown({ x: 20, y: 30 });
+    runtime.actions.pointerMove({ x: 140, y: 110 });
+    await runtime.actions.pointerUp({ x: 140, y: 110 });
+
+    expect(runtime.renderState.previewImageBase64).toBe('visible-foreground-window');
+  });
+
   it('does not notify subscribers for duplicate magnifier color samples', () => {
     const runtime = createCaptureWorkspaceRuntime({ platform: createPlatform() });
     const listener = vi.fn();
@@ -2736,7 +2780,7 @@ describe('capture workspace runtime', () => {
     expect(runtime.renderState.status).toBe('preview');
   });
 
-  it('rolls back failed host hydration so the active session can retry cleanly', async () => {
+  it('surfaces failed hydration and hydrates a restarted session cleanly', async () => {
     const initialSession = createSession({ id: 'session-hydration' });
     const hydratedSession = createSession({
       id: 'session-hydration',
@@ -2754,14 +2798,15 @@ describe('capture workspace runtime', () => {
       'hydrate failed',
     );
     expect(runtime.renderState).toMatchObject({
-      status: 'selecting',
+      status: 'error',
       sessionId: 'session-hydration',
       hasHydratedPixelSource: false,
-      error: null,
+      error: 'hydrate failed',
     });
     expect(platform.commands.cancelCaptureSession).not.toHaveBeenCalled();
     expect(platform.dismiss).not.toHaveBeenCalled();
 
+    await runtime.actions.startSession('screenshot', 'session-hydration');
     await expect(runtime.actions.hydrateSnapshots()).resolves.toBeUndefined();
 
     expect(platform.commands.hydrateCaptureSessionSnapshots).toHaveBeenCalledTimes(

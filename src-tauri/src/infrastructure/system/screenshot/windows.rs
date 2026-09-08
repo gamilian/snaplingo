@@ -1,4 +1,7 @@
-use super::{geometry::logical_rect_from_physical, xcap_common};
+use super::{
+    geometry::{normalize_windows_layout_coordinates, normalize_windows_snapshot_coordinates},
+    xcap_common,
+};
 use crate::application::CaptureSessionSource;
 use crate::domain::capture::{
     CapturedCursor, ControlCandidate, LogicalPoint, LogicalRect, MonitorLayout, MonitorSnapshot,
@@ -101,7 +104,8 @@ impl CaptureSessionSource for WindowsCaptureSessionSource {
 fn capture_control_candidate_at(
     point: &LogicalPoint,
 ) -> Result<Option<ControlCandidate>, AppError> {
-    let layouts = xcap_common::capture_all_monitor_layouts()?;
+    let mut layouts = xcap_common::capture_all_monitor_layouts()?;
+    normalize_windows_layout_coordinates(&mut layouts);
     let (physical_point, scale_factor) = physical_point_for_logical_point(point, &layouts)
         .ok_or_else(|| {
             AppError::System("Cannot map logical point to a Windows monitor".to_string())
@@ -385,30 +389,6 @@ fn delete_icon_info_bitmaps(icon_info: &ICONINFO) {
     }
 }
 
-fn normalize_windows_snapshot_coordinates(monitors: &mut [MonitorSnapshot]) {
-    for monitor in monitors {
-        monitor.logical_bounds = logical_rect_from_physical(
-            monitor.physical_bounds.x,
-            monitor.physical_bounds.y,
-            monitor.physical_bounds.width,
-            monitor.physical_bounds.height,
-            monitor.scale_factor.max(1.0),
-        );
-    }
-}
-
-fn normalize_windows_layout_coordinates(monitors: &mut [MonitorLayout]) {
-    for monitor in monitors {
-        monitor.logical_bounds = logical_rect_from_physical(
-            monitor.physical_bounds.x,
-            monitor.physical_bounds.y,
-            monitor.physical_bounds.width,
-            monitor.physical_bounds.height,
-            monitor.scale_factor.max(1.0),
-        );
-    }
-}
-
 fn physical_point_for_logical_point(
     point: &LogicalPoint,
     monitors: &[MonitorLayout],
@@ -500,7 +480,7 @@ mod tests {
             physical_point_for_logical_point(&LogicalPoint { x: -50.0, y: 20.0 }, &monitors)
                 .unwrap();
         assert_eq!(point.x, -75);
-        assert_eq!(point.y, 20);
+        assert_eq!(point.y, 30);
         assert_eq!(scale, 1.5);
     }
 }
