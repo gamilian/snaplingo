@@ -629,7 +629,7 @@ mod hotkey_runtime_tests {
             matches!(
                 operation,
                 Operation::Register { accelerator, .. }
-                    if accelerator == "Shift+CmdOrCtrl+KeyR"
+                    if accelerator == "F1"
             )
         }));
     }
@@ -875,7 +875,7 @@ mod hotkey_runtime_tests {
         assert!(registrar.operations().contains(&Operation::Register {
             category: SCREENSHOT_CATEGORY.to_string(),
             action: SCREENSHOT_ACTION.to_string(),
-            accelerator: "Shift+CmdOrCtrl+KeyR".to_string(),
+            accelerator: "F1".to_string(),
             timing: HotkeyTriggerTiming::Released,
         }));
     }

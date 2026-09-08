@@ -32,7 +32,7 @@ pub const DEFAULT_HOTKEYS: &[DefaultHotkey] = &[
     DefaultHotkey {
         category: SCREENSHOT_CATEGORY,
         action: SCREENSHOT_ACTION,
-        hotkey: "⇧⌘R",
+        hotkey: "F1",
     },
     DefaultHotkey {
         category: SCREENSHOT_CATEGORY,
@@ -166,7 +166,7 @@ mod hotkey_config_tests {
 
         assert_eq!(
             snapshot.screenshot.get("screenshot"),
-            Some(&"⇧⌘R".to_string())
+            Some(&"F1".to_string())
         );
         assert_eq!(
             snapshot.screenshot.get("screenshot-copy"),

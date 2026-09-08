@@ -14,12 +14,12 @@
 
 ## 坑 1：快捷键显示值不等于后端可注册值
 
-界面展示的是 `⇧⌘R`，但后端全局快捷键插件需要解析器支持的 accelerator。
+普通截图当前默认使用 `F1`，显示值和 accelerator 都是 `F1`。对于 `⇧⌘R` 这样的自定义组合键，后端全局快捷键插件需要先转换为解析器支持的 accelerator。
 
 修复点：
 
-- 后端注册使用物理键格式：`CmdOrCtrl+Shift+KeyR`。
-- 前端设置页和默认配置继续展示用户友好的 `⇧⌘R`。
+- 自定义组合键 `⇧⌘R` 在后端注册时使用物理键格式：`CmdOrCtrl+Shift+KeyR`。
+- 前端设置页展示用户友好的快捷键符号；默认值统一由后端提供。
 - 全局快捷键回调只处理 `ShortcutState::Pressed`，避免按下和抬起各触发一次。
 
 相关文件：
@@ -180,7 +180,7 @@ hdiutil verify target/release/bundle/dmg/SnapLingo_0.1.0_aarch64.dmg
 
 | 症状 | 优先检查 |
 | --- | --- |
-| 按快捷键没反应 | 后端 accelerator 是否为 `CmdOrCtrl+Shift+KeyR`；Release 日志里是否有注册失败 |
+| 按快捷键没反应 | 后端 accelerator 是否匹配当前配置（默认 `F1`）；Release 日志里是否有注册失败 |
 | 快捷键触发两次 | 是否只处理 `ShortcutState::Pressed` |
 | 截图黑屏或白屏 | 是否先捕获屏幕再 reveal overlay；是否误捕获 overlay 自己 |
 | 其它应用或 SnapLingo 主窗口在截图里消失 | 是否在截图前隐藏了 `main`、`pin-*` 或其它窗口 |

@@ -174,7 +174,7 @@ mod tests {
     fn menu_shortcuts_match_the_configured_actions() {
         let hotkeys = crate::domain::hotkey_config::default_hotkey_snapshot();
         for (id, expected) in [
-            (SCREENSHOT_ID, Some("Shift+CmdOrCtrl+KeyR")),
+            (SCREENSHOT_ID, Some("F1")),
             (TRANSLATE_SELECTION_ID, Some("Alt+KeyD")),
             (SCREENSHOT_TRANSLATE_ID, Some("Alt+KeyS")),
             (SCREENSHOT_OCR_ID, Some("Shift+Alt+KeyS")),
