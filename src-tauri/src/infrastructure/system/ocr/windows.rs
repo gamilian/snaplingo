@@ -1,7 +1,7 @@
 use std::thread;
 
 use crate::application::providers::ocr::SystemOcrEngine;
-use crate::domain::ocr::OcrRequest;
+use crate::domain::ocr::{OcrRequest, OcrResult};
 use crate::{AppError, Result};
 use windows::core::HSTRING;
 use windows::Globalization::Language;
