@@ -59,6 +59,7 @@ pub struct LogsRuntime {
 }
 
 pub struct AppState {
+    pub updates: Arc<crate::application::updates::AppUpdates>,
     pub permissions: Arc<RequiredPermissions>,
     pub settings: Arc<SettingsRuntime>,
     pub providers: Arc<ProviderRuntime>,

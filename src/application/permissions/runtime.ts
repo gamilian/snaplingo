@@ -3,9 +3,21 @@ export interface RequiredPermissionsStatus {
   accessibility: boolean;
 }
 
+export type SystemPermission = 'screenRecording' | 'accessibility';
+
+export interface RequiredPermissionsContext {
+  platform: string;
+  appPath: string | null;
+  needsInstallation: boolean;
+  canReset: boolean;
+}
+
 export interface RequiredPermissionsPort {
   status(): Promise<RequiredPermissionsStatus>;
-  request(): Promise<RequiredPermissionsStatus>;
+  context(): Promise<RequiredPermissionsContext>;
+  request(permission: SystemPermission): Promise<RequiredPermissionsStatus>;
+  reset(permission: SystemPermission): Promise<RequiredPermissionsStatus>;
+  restart(): Promise<void>;
 }
 
 export interface RequiredPermissionsSnapshot {
@@ -22,7 +34,10 @@ export interface RequiredPermissionsRuntime {
   subscribe(
     listener: (snapshot: RequiredPermissionsSnapshot) => void,
   ): () => void;
-  requestNext(): Promise<RequiredPermissionsStatus>;
+  context(): Promise<RequiredPermissionsContext>;
+  request(permission: SystemPermission): Promise<RequiredPermissionsStatus>;
+  reset(permission: SystemPermission): Promise<RequiredPermissionsStatus>;
+  restart(): Promise<void>;
   refresh(): Promise<RequiredPermissionsStatus>;
 }
 
@@ -41,6 +56,8 @@ export function createRequiredPermissionsRuntime(
   let snapshot: RequiredPermissionsSnapshot = { status: null, error: null };
   let pollHandle: unknown;
   let operationVersion = 0;
+  let pendingAction: Promise<RequiredPermissionsStatus> | null = null;
+  let pendingRefresh: Promise<RequiredPermissionsStatus> | null = null;
 
   function publish(next: RequiredPermissionsSnapshot) {
     snapshot = next;
@@ -68,7 +85,7 @@ export function createRequiredPermissionsRuntime(
       const status = await port.status();
       if (version !== operationVersion || listeners.size === 0) return;
       publish({ status, error: null });
-      if (areRequiredPermissionsGranted(status)) cancelPoll();
+      if (status.screenRecording && status.accessibility) cancelPoll();
       else schedulePoll(750);
     } catch (cause) {
       if (version !== operationVersion || listeners.size === 0) return;
@@ -77,15 +94,15 @@ export function createRequiredPermissionsRuntime(
     }
   }
 
-  async function refresh() {
+  async function runOperation(operation: () => Promise<RequiredPermissionsStatus>) {
     operationVersion += 1;
     cancelPoll();
     const version = operationVersion;
     try {
-      const status = await port.status();
+      const status = await operation();
       if (version !== operationVersion || listeners.size === 0) return status;
       publish({ status, error: null });
-      if (areRequiredPermissionsGranted(status)) cancelPoll();
+      if (status.screenRecording && status.accessibility) cancelPoll();
       else schedulePoll(750);
       return status;
     } catch (cause) {
@@ -94,6 +111,23 @@ export function createRequiredPermissionsRuntime(
       schedulePoll(1500);
       throw cause;
     }
+  }
+
+  function refresh() {
+    if (pendingAction) return pendingAction;
+    if (pendingRefresh) return pendingRefresh;
+    pendingRefresh = runOperation(() => port.status()).finally(() => {
+      pendingRefresh = null;
+    });
+    return pendingRefresh;
+  }
+
+  function mutate(operation: () => Promise<RequiredPermissionsStatus>) {
+    if (pendingAction) return pendingAction;
+    pendingAction = runOperation(operation).finally(() => {
+      pendingAction = null;
+    });
+    return pendingAction;
   }
 
   return {
@@ -109,24 +143,10 @@ export function createRequiredPermissionsRuntime(
         }
       };
     },
-    async requestNext() {
-      operationVersion += 1;
-      cancelPoll();
-      const version = operationVersion;
-      try {
-        const status = await port.request();
-        if (version !== operationVersion || listeners.size === 0) return status;
-        publish({ status, error: null });
-        if (areRequiredPermissionsGranted(status)) cancelPoll();
-        else schedulePoll(750);
-        return status;
-      } catch (cause) {
-        if (version !== operationVersion || listeners.size === 0) throw cause;
-        publish({ status: snapshot.status, error: errorMessage(cause) });
-        schedulePoll(1500);
-        throw cause;
-      }
-    },
+    context: () => port.context(),
+    request: (permission) => mutate(() => port.request(permission)),
+    reset: (permission) => mutate(() => port.reset(permission)),
+    restart: () => port.restart(),
     refresh,
   };
 }

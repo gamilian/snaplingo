@@ -66,7 +66,7 @@ impl ReqwestHttpClient {
         }))
     }
 
-    fn client_for_request(&self) -> anyhow::Result<(reqwest::Client, u8)> {
+    pub(crate) fn client_for_request(&self) -> anyhow::Result<(reqwest::Client, u8)> {
         let Some(configuration) = self.current_configuration()? else {
             return Ok((self.default_client.clone(), 0));
         };

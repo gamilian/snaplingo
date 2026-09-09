@@ -168,6 +168,14 @@ function createPorts(overrides: Record<string, unknown> = {}) {
       queryFavoriteIndex: vi.fn(),
     },
     clipboard: { writeText: vi.fn() },
+    permissions: {
+      subscribe: vi.fn(), context: vi.fn(), request: vi.fn(), reset: vi.fn(),
+      restart: vi.fn(), refresh: vi.fn(),
+    },
+    updates: {
+      subscribe: vi.fn(), ensureChecked: vi.fn(), check: vi.fn(),
+      downloadAndOpen: vi.fn(), openReleasePage: vi.fn(),
+    },
     maintenance: {
       listAppLogs: vi.fn(),
       clearAppLogs: vi.fn(),

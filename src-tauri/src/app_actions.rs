@@ -1,5 +1,5 @@
 use crate::application::result_window::{ResultWindowOpenRequest, ResultWindowRuntime};
-use crate::application::SelectionTextMode;
+use crate::application::{SelectionTextMode, SystemPermission};
 use crate::{commands, settings_window, AppState};
 use tauri::Manager;
 
@@ -42,12 +42,20 @@ pub(crate) enum AppAction {
 pub(crate) fn dispatch_app_action(app: tauri::AppHandle, action: AppAction) {
     let state = app.state::<AppState>();
     if !action_permissions_granted(action, state.permissions.status()) {
-        match action {
-            AppAction::OpenCapture(_) => state.permissions.request_screen_recording(),
-            AppAction::TranslateSelection => state.permissions.request_accessibility(),
-            _ => {}
+        let permission = match action {
+            AppAction::OpenCapture(_) => Some(SystemPermission::ScreenRecording),
+            AppAction::TranslateSelection => Some(SystemPermission::Accessibility),
+            _ => None,
+        };
+        if let Some(permission) = permission {
+            if let Err(error) = state.permissions.request(permission) {
+                log::warn!("Failed to request permission: {}", error);
+            }
         }
-        if let Err(err) = settings_window::show_settings_window(&app) {
+        if let Err(err) = settings_window::show_settings_window_at(
+            &app,
+            Some(settings_window::SettingsWindowRoute::Permissions),
+        ) {
             log::error!("Failed to show required permissions window: {}", err);
         }
         return;

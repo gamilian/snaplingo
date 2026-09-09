@@ -53,6 +53,7 @@ describe('GeneralPage durable settings', () => {
     }).sections;
     expect(sections.map((section) => section.label)).toEqual([
       '界面与启动',
+      '系统权限',
       '网络',
       '日志与维护',
       '实验性功能',

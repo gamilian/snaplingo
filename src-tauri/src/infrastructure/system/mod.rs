@@ -12,6 +12,7 @@ pub mod selection;
 pub mod shortcut;
 pub mod start_on_boot;
 pub mod tts;
+pub mod updates;
 
 pub use paths::{get_app_data_dir, get_database_path};
 pub(crate) use shortcut::TauriHotkeyRegistrar;

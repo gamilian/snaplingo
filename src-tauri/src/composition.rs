@@ -234,14 +234,27 @@ pub(crate) fn build_app_state(
 
     let settings_application = Arc::new(crate::application::SettingsApplication::new(
         settings_configuration.clone(),
-        Arc::new(crate::infrastructure::system::start_on_boot::TauriStartOnBoot(app)),
+        Arc::new(crate::infrastructure::system::start_on_boot::TauriStartOnBoot(app.clone())),
         history.clone(),
         logs.repository.clone(),
     ));
 
     AppState {
+        updates: Arc::new(crate::application::updates::AppUpdates::new(
+            Arc::new(
+                crate::infrastructure::system::updates::SystemAppUpdateHost::new(
+                    app.clone(),
+                    Arc::new(ReqwestHttpClient::with_settings(
+                        settings_configuration.clone(),
+                    )),
+                ),
+            ),
+            app.package_info().version.to_string(),
+            std::env::consts::OS.into(),
+            crate::infrastructure::system::updates::update_architecture().into(),
+        )),
         permissions: Arc::new(crate::application::RequiredPermissions::new(Arc::new(
-            crate::infrastructure::system::required_permissions::SystemRequiredPermissions,
+            crate::infrastructure::system::required_permissions::SystemRequiredPermissions(app),
         ))),
         settings: Arc::new(SettingsRuntime {
             configuration: settings_configuration.clone(),

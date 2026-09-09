@@ -11,6 +11,7 @@ const SETTINGS_NAVIGATION_REQUESTED_EVENT: &str = "settings-navigation-requested
 pub(crate) enum SettingsWindowRoute {
     About,
     History,
+    Permissions,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -39,6 +40,10 @@ impl SettingsWindowRoute {
             Self::History => SettingsNavigationRequest {
                 tab: "history",
                 section: None,
+            },
+            Self::Permissions => SettingsNavigationRequest {
+                tab: "general",
+                section: Some("permissions"),
             },
         }
     }
@@ -121,6 +126,9 @@ fn settings_window_url(route: Option<SettingsWindowRoute>) -> String {
             "index.html?window=settings&tab=general&section=about".to_string()
         }
         Some(SettingsWindowRoute::History) => "index.html?window=settings&tab=history".to_string(),
+        Some(SettingsWindowRoute::Permissions) => {
+            "index.html?window=settings&tab=general&section=permissions".to_string()
+        }
         None => "index.html?window=settings".to_string(),
     }
 }

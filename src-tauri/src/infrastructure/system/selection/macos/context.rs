@@ -72,7 +72,7 @@ pub fn request_accessibility_permission() -> bool {
 pub fn selection_accessibility_permission_error() -> String {
     format!(
         "{} {}",
-        "划词翻译需要 macOS 辅助功能权限。SnapLingo 已通过 macOS 系统授权流程发起请求；如未自动打开，请在 系统设置 > 隐私与安全性 > 辅助功能 中允许 SnapLingo，然后重新触发或重启应用。",
+        "划词翻译需要 macOS 辅助功能权限。请在“系统设置 > 隐私与安全性 > 辅助功能”中允许 SnapLingo，再次触发。重装后仍不可用时，可在“SnapLingo 设置 > 通用 > 系统权限”修复辅助功能授权。",
         macos_accessibility_runtime_context(),
     )
 }

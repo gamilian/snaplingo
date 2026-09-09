@@ -7,6 +7,8 @@ import { SettingRow, SettingsGroup, SettingsToggle } from '../SettingsControls';
 import { SettingsScrollPage } from '../SettingsScrollPage';
 import { useSettingsRuntime } from '../runtimeContext';
 import { uiText } from '../../../application/settings/uiText';
+import { PermissionControls, useRequiredPermissions } from '../../PermissionControls';
+import { SoftwareUpdateSettings } from './SoftwareUpdateSettings';
 
 export function GeneralPage() {
   const t = useUiText();
@@ -72,6 +74,12 @@ export function GeneralPage() {
           ),
         },
         {
+          id: 'permissions',
+          label: '系统权限',
+          description: '管理截图和选中文本的访问权限',
+          content: <PermissionSettings />,
+        },
+        {
           id: 'network',
           label: t('network'),
           description: t('networkDescription'),
@@ -101,14 +109,24 @@ export function GeneralPage() {
               <SettingRow label={t('openSourceLicense')}>
                 <span className="text-xs font-medium text-gray-700">MIT License</span>
               </SettingRow>
-              <SettingRow label={t('softwareUpdate')}>
-                <ActionButton disabled>{t('unavailable')}</ActionButton>
-              </SettingRow>
+              <SoftwareUpdateSettings />
             </SettingsGroup>
           ),
         },
       ]}
     />
+  );
+}
+
+function PermissionSettings() {
+  const runtime = useSettingsRuntime().permissions;
+  const snapshot = useRequiredPermissions(runtime);
+  return (
+    <SettingsGroup title="权限状态">
+      <div className="py-4">
+        <PermissionControls runtime={runtime} snapshot={snapshot} />
+      </div>
+    </SettingsGroup>
   );
 }
 

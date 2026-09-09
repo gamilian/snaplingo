@@ -12,6 +12,7 @@ pub mod screenshot_favorites;
 pub mod selected_text;
 pub mod settings;
 pub mod tts;
+pub mod updates;
 
 pub use capture::{
     CaptureCursorMover, CaptureOutput, CaptureSessionRuntime, CaptureSessionSource, CaptureSessions,
@@ -24,7 +25,8 @@ pub use library_index::LibraryIndex;
 pub use pinned_image::PinnedImageRuntime;
 pub use providers::Provider;
 pub use required_permissions::{
-    RequiredPermissions, RequiredPermissionsHost, RequiredPermissionsStatus,
+    RequiredPermissions, RequiredPermissionsContext, RequiredPermissionsHost,
+    RequiredPermissionsStatus, SystemPermission,
 };
 pub use screenshot_favorites::{ScreenshotFavoriteCapture, ScreenshotFavorites};
 pub use selected_text::{

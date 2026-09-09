@@ -86,7 +86,13 @@ Favorite Capacity is the backend Application module that owns the global maximum
 
 ### Release Verification
 
-`script/release-verification.mjs` is the shared release module used by local npm commands and native CI. It requires the package, Cargo, and Tauri versions to match, discovers the Cargo target directory through metadata, invokes the Tauri bundle build, and verifies the expected macOS, Linux, or Windows artifacts. macOS verification also mounts the final DMG and checks signing identity, bundled dependencies, architecture, and deployment targets. Official macOS builds use system OCR; Tesseract is opt-in via `tesseract-ocr`. Windows installation smoke tests run on GitHub Actions. `.github/workflows/release.yml` builds persistent-certificate macOS and unsigned Windows installers and creates draft releases for version tags. See `docs/RELEASING.md` for setup and manual acceptance.
+`script/release-verification.mjs` is the shared release module used by local npm commands and native CI. It requires the package, Cargo, and Tauri versions to match, discovers the Cargo target directory through metadata, invokes the Tauri bundle build, and verifies the expected macOS, Linux, or Windows artifacts. macOS verification also mounts the final DMG and checks signing identity, bundled dependencies, architecture, and deployment targets. Official macOS builds use system OCR; Tesseract is opt-in via `tesseract-ocr`. Windows installation smoke tests run on GitHub Actions. `.github/workflows/release.yml` builds ad-hoc macOS and unsigned Windows installers and creates draft releases for version tags. See `docs/RELEASING.md` for setup and manual acceptance.
+
+### Permissions and Software Updates
+
+`application/required_permissions` reads current OS grants and targets explicit requests/repairs to one permission. The system adapter detects temporary macOS installs, scopes TCC resets to this app and one service, and handles user-requested restarts. The first-use guide is confined to the Settings Window; the persistent General permissions section shares its frontend runtime.
+
+`application/updates` selects newer stable GitHub releases and verified installers for the running platform/architecture. Its system adapter downloads to a private temporary directory, checks size and SHA-256, marks the internet origin, and opens the system installer. The frontend runtime checks once per settings session and serializes explicit checks/downloads. This uses the existing free release packages and requires no Apple Developer ID; it does not silently replace the app or guarantee TCC continuity for ad-hoc builds.
 
 ## Dependency Direction
 

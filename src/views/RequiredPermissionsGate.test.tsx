@@ -1,40 +1,70 @@
 // @vitest-environment happy-dom
 
-import { act } from 'react-dom/test-utils';
+import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { describe, expect, it, vi } from 'vitest';
-import type { RequiredPermissionsRuntime } from '../application/permissions/runtime';
+import {
+  createRequiredPermissionsRuntime,
+  type RequiredPermissionsRuntime,
+} from '../application/permissions/runtime';
 import { RequiredPermissionsGate } from './RequiredPermissionsGate';
 
 const granted = { screenRecording: true, accessibility: true };
 const missing = { screenRecording: false, accessibility: false };
+const context = { platform: 'macos', appPath: '/Applications/SnapLingo.app', needsInstallation: false, canReset: true };
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 describe('RequiredPermissionsGate', () => {
+  it('detects an existing grant on return without another request or relaunch', async () => {
+    const status = vi.fn()
+      .mockResolvedValueOnce(missing)
+      .mockResolvedValue(granted);
+    const request = vi.fn();
+    const runtime = createRequiredPermissionsRuntime({
+      status, request, context: vi.fn(async () => context), reset: vi.fn(), restart: vi.fn(),
+    });
+    const view = await renderGate(runtime);
+
+    try {
+      await act(async () => window.dispatchEvent(new Event('focus')));
+
+      expect(status).toHaveBeenCalledTimes(2);
+      expect(request).not.toHaveBeenCalled();
+      expect(view.container.querySelector('[role="dialog"]')).toBeNull();
+      expect(view.container.textContent).toContain('ready');
+    } finally {
+      await view.unmount();
+    }
+  });
+
   it('checks status without requesting permissions again on initial mount', async () => {
     const runtime = createRuntime(granted);
     const view = await renderGate(runtime);
 
     expect(runtime.subscribe).toHaveBeenCalledTimes(1);
-    expect(runtime.requestNext).not.toHaveBeenCalled();
+    expect(runtime.request).not.toHaveBeenCalled();
     expect(view.container.textContent).toContain('ready');
 
     await view.unmount();
   });
 
-  it('opens the next missing permission after the user explicitly continues', async () => {
+  it('opens the selected permission after the user explicitly continues', async () => {
     const runtime = createRuntime(missing, granted);
     const view = await renderGate(runtime);
     const retryButton = [...view.container.querySelectorAll('button')].find(
-      (button) => button.textContent === '打开屏幕录制设置',
+      (button) => button.textContent === '去授权',
     );
 
     expect(view.container.textContent).toContain('ready');
     expect(view.container.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(view.container.textContent).not.toContain('辅助功能');
+    expect(view.container.querySelectorAll('button')).toHaveLength(2);
 
     await act(async () => retryButton?.click());
 
-    expect(runtime.requestNext).toHaveBeenCalledTimes(1);
+    expect(runtime.request).toHaveBeenCalledExactlyOnceWith('screenRecording');
     expect(view.container.textContent).toContain('ready');
+    expect(view.container.querySelector('[role="dialog"]')).toBeNull();
 
     await view.unmount();
   });
@@ -48,7 +78,7 @@ describe('RequiredPermissionsGate', () => {
 
     expect(view.container.textContent).toContain('ready');
     expect(view.container.querySelector('[role="dialog"]')).toBeNull();
-    expect(runtime.requestNext).not.toHaveBeenCalled();
+    expect(runtime.request).not.toHaveBeenCalled();
 
     await view.unmount();
   });
@@ -57,13 +87,13 @@ describe('RequiredPermissionsGate', () => {
     const runtime = createRuntime(missing);
     const view = await renderGate(runtime);
     const skip = [...view.container.querySelectorAll('button')].find(
-      (button) => button.textContent === '稍后设置，继续使用',
+      (button) => button.textContent === '稍后',
     );
     expect(skip).toBeDefined();
     await act(async () => skip?.click());
     expect(view.container.querySelector('[role="dialog"]')).toBeNull();
     expect(view.container.textContent).toContain('ready');
-    expect(runtime.requestNext).not.toHaveBeenCalled();
+    expect(runtime.request).not.toHaveBeenCalled();
     await view.unmount();
   });
 
@@ -76,6 +106,36 @@ describe('RequiredPermissionsGate', () => {
     });
 
     expect(runtime.refresh).toHaveBeenCalledOnce();
+    await view.unmount();
+  });
+
+  it('offers recovery in settings only after an unsuccessful grant attempt', async () => {
+    const runtime = createRuntime(missing);
+    const onOpenSettings = vi.fn();
+    const view = await renderGate(runtime, onOpenSettings);
+    const button = (label: string) => [...view.container.querySelectorAll('button')].find((item) => item.textContent === label);
+    expect(button('授权遇到问题？')).toBeUndefined();
+    await act(async () => button('去授权')?.click());
+    expect(button('授权遇到问题？')).toBeDefined();
+    expect(view.container.textContent).not.toContain(context.appPath);
+    await act(async () => button('授权遇到问题？')?.click());
+    expect(onOpenSettings).toHaveBeenCalledOnce();
+    expect(view.container.querySelector('[role="dialog"]')).toBeNull();
+    expect(runtime.reset).not.toHaveBeenCalled();
+    expect(runtime.restart).not.toHaveBeenCalled();
+    await view.unmount();
+  });
+
+  it('does not request or repair permissions for a temporary disk-image copy', async () => {
+    const runtime = createRuntime(missing);
+    vi.mocked(runtime.context).mockResolvedValue({ ...context, needsInstallation: true, canReset: false });
+    const view = await renderGate(runtime);
+    expect(view.container.textContent).toContain('先安装 SnapLingo');
+    expect(view.container.textContent).toContain('应用程序');
+    expect(view.container.querySelectorAll('button')).toHaveLength(1);
+    expect(view.container.textContent).not.toContain('去授权');
+    expect(runtime.request).not.toHaveBeenCalled();
+    expect(runtime.reset).not.toHaveBeenCalled();
     await view.unmount();
   });
 });
@@ -93,7 +153,10 @@ function createRuntime(
       nextListener({ status: initialStatus, error: null });
       return vi.fn();
     }),
-    requestNext: vi.fn(async () => {
+    context: vi.fn(async () => context),
+    reset: vi.fn(async () => initialStatus),
+    restart: vi.fn(async () => undefined),
+    request: vi.fn(async () => {
       listener?.({ status: requestedStatus, error: null });
       return requestedStatus;
     }),
@@ -102,13 +165,13 @@ function createRuntime(
   return runtime;
 }
 
-async function renderGate(runtime: RequiredPermissionsRuntime) {
+async function renderGate(runtime: RequiredPermissionsRuntime, onOpenSettings = vi.fn()) {
   const container = document.createElement('div');
   const root = createRoot(container);
 
   await act(async () => {
     root.render(
-      <RequiredPermissionsGate runtime={runtime}>
+      <RequiredPermissionsGate runtime={runtime} onOpenSettings={onOpenSettings}>
         <div>ready</div>
       </RequiredPermissionsGate>,
     );

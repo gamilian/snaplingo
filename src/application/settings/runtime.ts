@@ -25,6 +25,8 @@ import type {
   TranslationFavoriteInput,
 } from './ports';
 import { createSettingsLibrary, type SettingsLibrary } from './library';
+import type { RequiredPermissionsRuntime } from '../permissions/runtime';
+import type { AppUpdatesRuntime } from '../updates/runtime';
 import {
   createSettingsConfiguration,
   type SettingsConfiguration,
@@ -32,6 +34,8 @@ import {
 } from './configuration';
 
 export interface SettingsRuntimePorts {
+  permissions: RequiredPermissionsRuntime;
+  updates: AppUpdatesRuntime;
   window: SettingsWindowPort;
   windowEvents: SettingsWindowEventsPort;
   configurationEvents: SettingsConfigurationEventsPort;
@@ -48,6 +52,8 @@ export interface SettingsRuntimePorts {
 }
 
 export interface SettingsRuntime {
+  permissions: RequiredPermissionsRuntime;
+  updates: AppUpdatesRuntime;
   library: SettingsLibrary;
   configuration: SettingsConfiguration;
   window: {
@@ -118,6 +124,8 @@ export function createSettingsRuntime(
   ports: SettingsRuntimePorts,
 ): SettingsRuntime {
   return {
+    permissions: ports.permissions,
+    updates: ports.updates,
     configuration: createSettingsConfiguration({
       durableSettings: ports.durableSettings,
       providers: ports.providers,

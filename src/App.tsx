@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { createRequiredPermissionsRuntime } from './application/permissions/runtime';
 import { requiredPermissions } from './platform/tauri/permissions';
 import { RequiredPermissionsGate } from './views/RequiredPermissionsGate';
+import { createAppUpdatesRuntime } from './application/updates/runtime';
+import { appUpdates } from './platform/tauri/updates';
 import { SettingsWindow } from './views/SettingsWindow';
 import ResultWindow from './views/ResultWindow';
 import {
@@ -31,6 +33,7 @@ import {
   initializeSettingsConfigStore,
   useSettingsConfigStore,
 } from './stores/settingsConfigStore';
+import { useSettingsStore } from './stores/settingsStore';
 import {
   initializeProviderStore,
 } from './stores/providerStore';
@@ -84,7 +87,11 @@ import {
   translateTextWithProvider,
 } from './platform/tauri/translation';
 
+const requiredPermissionsRuntime =
+  createRequiredPermissionsRuntime(requiredPermissions);
 const settingsRuntime = createSettingsRuntime({
+  permissions: requiredPermissionsRuntime,
+  updates: createAppUpdatesRuntime(appUpdates),
   window: settingsWindow,
   windowEvents: settingsWindowEvents,
   configurationEvents: persistentStateEvents,
@@ -102,8 +109,6 @@ const settingsRuntime = createSettingsRuntime({
   screenshotFavorites,
   clipboard: { writeText: writeClipboardText },
 });
-const requiredPermissionsRuntime =
-  createRequiredPermissionsRuntime(requiredPermissions);
 const captureWorkspacePorts: CaptureWorkspacePorts = {
   events: captureWorkspaceEvents,
   window: captureWindow,
@@ -349,7 +354,10 @@ function Application() {
   return (
     <>
       {/* 主设置窗口 */}
-      <SettingsWindow runtime={settingsRuntime} />
+      <RequiredPermissionsGate runtime={requiredPermissionsRuntime}
+        onOpenSettings={() => useSettingsStore.getState().navigate({ tab: 'general', section: 'permissions' })}>
+        <SettingsWindow runtime={settingsRuntime} />
+      </RequiredPermissionsGate>
 
       {/* 翻译结果窗口（浮动） */}
       {resultWindowVisible && <ResultWindow runtime={resultWindowRuntime} />}
@@ -358,11 +366,7 @@ function Application() {
 }
 
 function App() {
-  return (
-    <RequiredPermissionsGate runtime={requiredPermissionsRuntime}>
-      <Application />
-    </RequiredPermissionsGate>
-  );
+  return <Application />;
 }
 
 export default App;

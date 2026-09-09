@@ -83,7 +83,7 @@ fn screen_capture_unavailable_error(
     access: ScreenCaptureAccessStatus,
 ) -> AppError {
     AppError::System(format!(
-        "无法捕获屏幕：{}。屏幕录制权限预检：初始={}，已请求={}，请求后={}。请确认“系统设置 > 隐私与安全性 > 屏幕录制”中授权的是当前运行的 SnapLingo，然后完全退出并重新打开。{}",
+        "无法捕获屏幕：{}。屏幕录制权限预检：初始={}，已请求={}，请求后={}。请在“SnapLingo 设置 > 通用 > 系统权限”重新检测；若重装后旧授权失效，可修复屏幕录制授权。仅在 macOS 提示时重启应用。{}",
         operation,
         access.initially_granted,
         access.request_attempted,

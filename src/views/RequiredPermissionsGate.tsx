@@ -1,104 +1,134 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   areRequiredPermissionsGranted,
+  type RequiredPermissionsContext,
   type RequiredPermissionsRuntime,
-  type RequiredPermissionsSnapshot,
 } from '../application/permissions/runtime';
+import { useRequiredPermissions } from './PermissionControls';
+import { ScreenshotIcon } from './SettingsWindow/Icons';
 
 export function RequiredPermissionsGate({
   children,
   runtime,
+  onOpenSettings,
 }: {
   children: ReactNode;
   runtime: RequiredPermissionsRuntime;
+  onOpenSettings: () => void;
 }) {
   const [dismissed, setDismissed] = useState(false);
-  const [{ status, error }, setSnapshot] =
-    useState<RequiredPermissionsSnapshot>({ status: null, error: null });
-
-  useEffect(() => {
-    const unsubscribe = runtime.subscribe(setSnapshot);
-    const refresh = () => {
-      void runtime.refresh().catch(() => undefined);
-    };
-    window.addEventListener('focus', refresh);
-    return () => {
-      window.removeEventListener('focus', refresh);
-      unsubscribe();
-    };
-  }, [runtime]);
+  const [context, setContext] = useState<RequiredPermissionsContext | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+  const [actionError, setActionError] = useState(false);
+  const actionPending = useRef(false);
+  const dialogRef = useRef<HTMLElement>(null);
+  const snapshot = useRequiredPermissions(runtime);
+  const { status, error } = snapshot;
 
   const shouldShowGuide = status
     ? !areRequiredPermissionsGranted(status)
     : error !== null;
 
-  if (dismissed || !shouldShowGuide) return children;
+  const showGuide = !dismissed && shouldShowGuide;
+  const needsInstallation = context?.needsInstallation === true;
+
+  useEffect(() => {
+    if (!showGuide) return;
+    let disposed = false;
+    runtime.context().then(
+      (value) => { if (!disposed) setContext(value); },
+      () => { if (!disposed) setActionError(true); },
+    );
+    return () => { disposed = true; };
+  }, [runtime, showGuide]);
+
+  async function authorize() {
+    if (actionPending.current) return;
+    actionPending.current = true;
+    setBusy(true);
+    setActionError(false);
+    try {
+      const currentContext = context ?? await runtime.context();
+      setContext(currentContext);
+      if (currentContext.needsInstallation) return;
+      if (!status) {
+        await runtime.refresh();
+      } else {
+        setAttempted(true);
+        await runtime.request('screenRecording');
+      }
+    } catch {
+      setActionError(true);
+    } finally {
+      actionPending.current = false;
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!showGuide) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialogRef.current?.focus();
+    const keepFocusInGuide = (event: FocusEvent) => {
+      if (event.target instanceof Node && !dialogRef.current?.contains(event.target)) dialogRef.current?.focus();
+    };
+    document.addEventListener('focusin', keepFocusInGuide);
+    return () => {
+      document.removeEventListener('focusin', keepFocusInGuide);
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, [showGuide]);
 
   return (
     <>
-      {children}
-      <div style={styles.overlay}>
+      <div style={{ display: 'contents' }} aria-hidden={showGuide || undefined}>{children}</div>
+      {showGuide && <div style={styles.overlay}>
         <section
-          aria-label="SnapLingo 系统权限引导"
+          ref={dialogRef}
+          tabIndex={-1}
+          aria-labelledby="screen-permission-title"
+          aria-describedby="screen-permission-description"
           aria-modal="true"
           role="dialog"
+          className="bg-white text-gray-900 outline-none"
           style={styles.card}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') setDismissed(true);
+            if (event.key !== 'Tab') return;
+            const controls = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled)')]
+              .filter((element) => element.getClientRects().length > 0);
+            const first = controls[0];
+            const last = controls[controls.length - 1];
+            if (event.shiftKey && (document.activeElement === first || document.activeElement === event.currentTarget)) {
+              event.preventDefault();
+              last?.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+              event.preventDefault();
+              first?.focus();
+            }
+          }}
         >
-          <h1 style={styles.title}>按需启用系统权限</h1>
-          <p style={styles.description}>
-            截图需要屏幕录制权限。选中文本和界面元素检测需要辅助功能权限，但不影响截图、文本翻译或文件 OCR。
+          <div aria-hidden="true" className="bg-primary-50 text-primary-600" style={styles.icon}><ScreenshotIcon /></div>
+          <h1 id="screen-permission-title" style={styles.title}>{needsInstallation ? '先安装 SnapLingo' : '开启屏幕录制'}</h1>
+          <p id="screen-permission-description" style={styles.description} className="text-gray-500">
+            {needsInstallation ? '将应用拖入“应用程序”，再打开并授权。' : '用于截图、识别和翻译屏幕内容。'}
           </p>
-          <PermissionRow
-            label="屏幕录制"
-            granted={status?.screenRecording ?? false}
-            detail="用于截图、截图 OCR 和截图翻译"
-          />
-          <PermissionRow
-            label="辅助功能"
-            granted={status?.accessibility ?? false}
-            detail="用于读取所选文本和界面元素检测（可选）"
-          />
-          {error && <p style={styles.error}>{error}</p>}
-          <button
-            style={styles.button}
-            onClick={() => {
-              void runtime.requestNext().catch(() => undefined);
-            }}
-          >
-            打开屏幕录制设置
-          </button>
-          <button style={styles.button} onClick={() => setDismissed(true)}>
-            稍后设置，继续使用
-          </button>
-          <p style={styles.hint}>
-            允许后请完全退出并重新打开 SnapLingo。若系统设置已允许但这里仍显示待授权，请关闭“屏幕录制”中的 SnapLingo 开关，再重新打开应用并允许一次。
-          </p>
+          {(actionError || error) && <p role="alert" className="mb-4 text-xs text-red-600">暂时无法完成操作，请重试。</p>}
+          <div style={styles.actions}>
+            <button type="button" className="border border-gray-200 bg-white text-gray-700 hover:bg-gray-50" style={styles.button} onClick={() => setDismissed(true)}>
+              {needsInstallation ? '知道了' : '稍后'}
+            </button>
+            {!needsInstallation && <button type="button" className="bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50" style={styles.button}
+              disabled={busy || (!context && !actionError)} onClick={() => void authorize()}>
+              {busy ? '请稍候…' : !status || actionError ? '重试' : '去授权'}
+            </button>}
+          </div>
+          {!needsInstallation && (attempted || actionError || error) && <button type="button" className="mt-4 text-xs text-gray-500 hover:text-primary-600"
+            onClick={() => { setDismissed(true); onOpenSettings(); }}>授权遇到问题？</button>}
         </section>
-      </div>
+      </div>}
     </>
-  );
-}
-
-function PermissionRow({
-  label,
-  granted,
-  detail,
-}: {
-  label: string;
-  granted: boolean;
-  detail: string;
-}) {
-  return (
-    <div style={styles.row}>
-      <span style={styles.indicator}>{granted ? '✓' : '!'}</span>
-      <span>
-        <strong>{label}</strong>
-        <small style={styles.detail}>{detail}</small>
-      </span>
-      <span style={granted ? styles.granted : styles.missing}>
-        {granted ? '已授权' : '待授权'}
-      </span>
-    </div>
   );
 }
 
@@ -110,19 +140,13 @@ const styles: Record<string, CSSProperties> = {
     display: 'grid',
     placeItems: 'center',
     padding: 24,
-    background: 'rgba(15, 23, 42, 0.48)',
-    backdropFilter: 'blur(6px)',
-    color: '#111827',
+    background: 'rgba(15, 23, 42, 0.32)',
+    backdropFilter: 'blur(4px)',
   },
-  card: { width: 'min(520px, 100%)', padding: 28, borderRadius: 18, background: '#fff', boxShadow: '0 20px 50px rgba(15, 23, 42, 0.12)' },
-  title: { margin: '0 0 10px', fontSize: 24 },
-  description: { margin: '0 0 22px', color: '#4b5563', lineHeight: 1.6 },
-  row: { display: 'grid', gridTemplateColumns: '32px 1fr auto', gap: 12, alignItems: 'center', padding: '14px 0', borderTop: '1px solid #e5e7eb' },
-  indicator: { display: 'grid', placeItems: 'center', width: 26, height: 26, borderRadius: 13, background: '#e5e7eb', fontWeight: 700 },
-  detail: { display: 'block', marginTop: 3, color: '#6b7280' },
-  granted: { color: '#15803d', fontWeight: 600 },
-  missing: { color: '#b45309', fontWeight: 600 },
-  button: { width: '100%', marginTop: 20, padding: '11px 16px', border: 0, borderRadius: 10, background: '#2563eb', color: '#fff', fontWeight: 600, cursor: 'pointer' },
-  hint: { margin: '14px 0 0', color: '#6b7280', fontSize: 13, lineHeight: 1.5 },
-  error: { color: '#b91c1c', fontSize: 13 },
+  card: { width: 'min(380px, 100%)', maxHeight: 'calc(100vh - 48px)', overflowY: 'auto', padding: 24, borderRadius: 16, textAlign: 'center', boxShadow: '0 20px 50px rgba(15, 23, 42, 0.16)' },
+  icon: { display: 'grid', placeItems: 'center', width: 48, height: 48, margin: '0 auto 16px', borderRadius: 12 },
+  title: { margin: '0 0 8px', fontSize: 17, fontWeight: 600 },
+  description: { margin: '0 0 24px', fontSize: 13, lineHeight: 1.6 },
+  actions: { display: 'flex', gap: 8 },
+  button: { flex: 1, padding: '9px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer' },
 };
