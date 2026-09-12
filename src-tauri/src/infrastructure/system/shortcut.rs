@@ -202,8 +202,23 @@ mod tests {
 
     #[test]
     fn recorded_native_shortcuts_use_the_same_display_format_as_the_recorder() {
-        for display in ["F1", "F2", "F3", "F20", "⌘F1", "⇧⌘R", "⇧⌥S", "⌘2"] {
-            let accelerator = crate::application::hotkeys::display_hotkey_to_accelerator(display)
+        let primary_modifier = if cfg!(target_os = "linux") {
+            "⌃"
+        } else {
+            "⌘"
+        };
+        let displays = [
+            "F1".to_string(),
+            "F2".to_string(),
+            "F3".to_string(),
+            "F20".to_string(),
+            format!("{primary_modifier}F1"),
+            format!("⇧{primary_modifier}R"),
+            "⇧⌥S".to_string(),
+            format!("{primary_modifier}2"),
+        ];
+        for display in displays {
+            let accelerator = crate::application::hotkeys::display_hotkey_to_accelerator(&display)
                 .unwrap()
                 .unwrap();
             let shortcut = accelerator.parse::<Shortcut>().unwrap();

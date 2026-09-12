@@ -640,6 +640,21 @@ fn should_skip_window_candidate(title: &str, app_name: &str) -> bool {
 
 #[async_trait::async_trait]
 impl CaptureSessionSource for MacOSCaptureSessionSource {
+    fn selection_monitor_id(&self) -> Result<Option<String>, AppError> {
+        // With separate display Spaces, macOS clips a spanning NSWindow to one
+        // screen. Keep the selection surface on the screen under the trigger.
+        let mouse = NSEvent::mouseLocation();
+        let desktop_y = CGDisplay::main().bounds().size.height - mouse.y;
+        let monitor = Monitor::from_point(mouse.x.floor() as i32, desktop_y.floor() as i32)
+            .map_err(|error| {
+                AppError::System(format!("Failed to locate capture monitor: {error}"))
+            })?;
+        let display_id = monitor.id().map_err(|error| {
+            AppError::System(format!("Failed to read capture monitor id: {error}"))
+        })?;
+        Ok(Some(format!("monitor-{display_id}")))
+    }
+
     async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError> {
         capture_visible_display_snapshots()
     }

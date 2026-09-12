@@ -54,6 +54,8 @@ A frozen snapshot of the desktop used to produce screenshot output, OCR input, a
 
 The selection surface displays the same frozen monitor images used by preview, magnification, OCR, and output. It waits for every image to decode before reveal; selection completion never replaces the session pixels with another desktop capture. Windows uses one primary-display coordinate scale for the spanning WebView, monitor snapshots, and cursor/window geometry.
 
+On macOS, the session pins the selection window and frontend monitor view to the display under the pointer before capture begins. A spanning NSWindow is clipped to one display when displays have separate Spaces; the session retains all monitor layouts for native cursor coordinates and output.
+
 ### Result Window and Pinned Image
 
 Application runtimes that own their workflows and request runtime-host effects. Result Window owns one read-only View-facing state projection, editable text and language intents, translation/OCR favorite sequencing, OCR Provider fallback, and clipboard intents. Their Tauri window, clipboard, and notification mechanics remain in Infrastructure.

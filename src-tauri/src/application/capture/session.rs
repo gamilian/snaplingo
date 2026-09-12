@@ -19,6 +19,7 @@ static NEXT_SESSION_COUNTER: AtomicU64 = AtomicU64::new(1);
 #[derive(Debug, Clone)]
 pub struct CaptureSession {
     pub id: CaptureSessionId,
+    pub selection_monitor_id: Option<String>,
     pub layout_snapshots: Vec<MonitorSnapshot>,
     pub desktop_scale: Option<f64>,
     pub snapshots: Vec<MonitorSnapshot>,
@@ -26,6 +27,19 @@ pub struct CaptureSession {
     pub captured_cursor: Option<CapturedCursor>,
     pub hidden_window_labels: Vec<String>,
     pub created_at: SystemTime,
+}
+
+impl CaptureSession {
+    fn selection_snapshots<'a>(&self, snapshots: &'a [MonitorSnapshot]) -> &'a [MonitorSnapshot] {
+        match &self.selection_monitor_id {
+            None => snapshots,
+            Some(id) => snapshots
+                .iter()
+                .position(|monitor| &monitor.id == id)
+                .map(|index| &snapshots[index..=index])
+                .unwrap_or(&[]),
+        }
+    }
 }
 
 pub struct CaptureSessionSnapshotCache {
@@ -88,6 +102,7 @@ impl CaptureSessions {
     ) -> Result<CaptureSessionView> {
         let total_start = Instant::now();
 
+        let selection_monitor_id = self.source.selection_monitor_id()?;
         let snapshots_start = Instant::now();
         let mut snapshots = self.source.capture_monitor_snapshots().await?;
         let desktop_scale = self.source.coordinate_policy().normalize(&mut snapshots);
@@ -130,6 +145,7 @@ impl CaptureSessions {
         let id = CaptureSessionId(generate_session_id());
         let session = CaptureSession {
             id: id.clone(),
+            selection_monitor_id,
             desktop_scale,
             layout_snapshots: snapshots.iter().map(snapshot_without_pixels).collect(),
             snapshots,
@@ -221,6 +237,7 @@ impl CaptureSessions {
     ) -> Result<CaptureSessionView> {
         let total_start = Instant::now();
 
+        let selection_monitor_id = self.source.selection_monitor_id()?;
         let layouts_start = Instant::now();
         let layouts = self.source.capture_monitor_layouts().await?;
         let layouts_ms = elapsed_ms(layouts_start);
@@ -259,6 +276,7 @@ impl CaptureSessions {
         let id = CaptureSessionId(generate_session_id());
         let session = CaptureSession {
             id: id.clone(),
+            selection_monitor_id,
             desktop_scale,
             layout_snapshots: layout_snapshots.clone(),
             snapshots: layout_snapshots,
@@ -582,7 +600,11 @@ impl CaptureSessions {
         let session = sessions
             .get(id)
             .ok_or_else(|| AppError::System(format!("Capture session not found: {}", id.0)))?;
-        capture_window_geometry(&session.layout_snapshots, session.desktop_scale).ok_or_else(|| {
+        capture_window_geometry(
+            session.selection_snapshots(&session.layout_snapshots),
+            session.desktop_scale,
+        )
+        .ok_or_else(|| {
             AppError::System("Cannot open capture window without monitor bounds".to_string())
         })
     }
@@ -628,7 +650,11 @@ impl CaptureSessions {
 fn session_to_view(session: &CaptureSession) -> CaptureSessionView {
     CaptureSessionView {
         id: session.id.clone(),
-        monitors: session.snapshots.iter().map(snapshot_to_view).collect(),
+        monitors: session
+            .selection_snapshots(&session.snapshots)
+            .iter()
+            .map(snapshot_to_view)
+            .collect(),
         candidates: session.candidates.clone(),
         captured_cursor: session
             .captured_cursor
@@ -641,7 +667,7 @@ fn session_to_view_without_monitor_images(session: &CaptureSession) -> CaptureSe
     CaptureSessionView {
         id: session.id.clone(),
         monitors: session
-            .layout_snapshots
+            .selection_snapshots(&session.layout_snapshots)
             .iter()
             .map(snapshot_to_view)
             .collect(),
@@ -890,6 +916,7 @@ mod payload_metrics_tests {
     fn capture_session_payload_metrics_counts_snapshot_cursor_and_base64_bytes() {
         let session = CaptureSession {
             id: CaptureSessionId("capture-test".to_string()),
+            selection_monitor_id: None,
             layout_snapshots: Vec::new(),
             desktop_scale: None,
             snapshots: vec![

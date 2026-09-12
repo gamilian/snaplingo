@@ -24,6 +24,7 @@ mod tests {
     use crate::infrastructure::storage::SqliteConfigStore;
 
     struct MockCaptureSessionSource {
+        selection_monitor_id: Arc<Mutex<Option<String>>>,
         coordinate_policy: CaptureCoordinatePolicy,
         observed_coordinates: Arc<Mutex<Vec<Vec<MonitorSnapshot>>>>,
         snapshots: Vec<MonitorSnapshot>,
@@ -79,6 +80,10 @@ mod tests {
 
     #[async_trait::async_trait]
     impl CaptureSessionSource for MockCaptureSessionSource {
+        fn selection_monitor_id(&self) -> Result<Option<String>, AppError> {
+            Ok(self.selection_monitor_id.lock().unwrap().clone())
+        }
+
         fn coordinate_policy(&self) -> CaptureCoordinatePolicy {
             self.coordinate_policy
         }
@@ -181,6 +186,7 @@ mod tests {
             png_data: vec![1, 2, 3],
         }];
         MockCaptureSessionSource {
+            selection_monitor_id: Arc::new(Mutex::new(None)),
             coordinate_policy: CaptureCoordinatePolicy::NativeLogical,
             observed_coordinates: Arc::new(Mutex::new(Vec::new())),
             monitor_layouts: snapshots.iter().map(monitor_layout_from_snapshot).collect(),
@@ -236,6 +242,7 @@ mod tests {
             },
         ];
         MockCaptureSessionSource {
+            selection_monitor_id: Arc::new(Mutex::new(None)),
             coordinate_policy: CaptureCoordinatePolicy::NativeLogical,
             observed_coordinates: Arc::new(Mutex::new(Vec::new())),
             monitor_layouts: snapshots.iter().map(monitor_layout_from_snapshot).collect(),
@@ -251,6 +258,76 @@ mod tests {
             captured_regions: Arc::new(Mutex::new(Vec::new())),
             region_png_data: vec![1, 2, 3],
         }
+    }
+
+    #[tokio::test]
+    async fn selection_window_and_frozen_view_stay_on_the_trigger_monitor() {
+        for monitor_id in ["primary", "left"] {
+            let backend = make_multi_monitor_backend();
+            let expected = backend
+                .snapshots
+                .iter()
+                .find(|s| s.id == monitor_id)
+                .unwrap()
+                .clone();
+            let selection_monitor = backend.selection_monitor_id.clone();
+            *selection_monitor.lock().unwrap() = Some(monitor_id.to_string());
+            let sessions = CaptureSessions::new(Arc::new(backend));
+            let view = sessions
+                .create_session_without_monitor_images()
+                .await
+                .unwrap();
+
+            // Moving the mouse after the trigger must not retarget the window or hydration.
+            *selection_monitor.lock().unwrap() = Some(
+                if monitor_id == "primary" {
+                    "left"
+                } else {
+                    "primary"
+                }
+                .to_string(),
+            );
+            assert_eq!(
+                sessions.window_geometry(&view.id).unwrap().bounds,
+                expected.logical_bounds
+            );
+            assert_eq!(view.monitors.len(), 1);
+            assert_eq!(view.monitors[0].id, monitor_id);
+            let hydrated = sessions.hydrate_session_snapshots(&view.id).await.unwrap();
+            assert_eq!(hydrated.monitors.len(), 1);
+            assert_eq!(hydrated.monitors[0].logical_bounds, expected.logical_bounds);
+            assert_eq!(
+                hydrated.monitors[0].image_base64,
+                base64::engine::general_purpose::STANDARD.encode(&expected.png_data)
+            );
+            assert_eq!(
+                sessions
+                    .get_session(&view.id)
+                    .unwrap()
+                    .layout_snapshots
+                    .len(),
+                2
+            );
+            assert_eq!(
+                sessions.window_geometry(&view.id).unwrap().bounds,
+                expected.logical_bounds
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn layout_session_keeps_the_trigger_monitor_when_pixels_are_hydrated() {
+        let backend = make_multi_monitor_backend();
+        *backend.selection_monitor_id.lock().unwrap() = Some("left".to_string());
+        let expected = backend.snapshots[1].logical_bounds.clone();
+        let sessions = CaptureSessions::new(Arc::new(backend));
+        let view = sessions.create_layout_session().await.unwrap();
+        assert_eq!(view.monitors.len(), 1);
+        assert_eq!(view.monitors[0].id, "left");
+        assert_eq!(sessions.window_geometry(&view.id).unwrap().bounds, expected);
+        let hydrated = sessions.hydrate_session_snapshots(&view.id).await.unwrap();
+        assert_eq!(hydrated.monitors.len(), 1);
+        assert_eq!(hydrated.monitors[0].logical_bounds, expected);
     }
 
     fn make_backend_with_window_candidate() -> MockCaptureSessionSource {
