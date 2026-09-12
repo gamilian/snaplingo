@@ -15,6 +15,66 @@ const context = { platform: 'macos', appPath: '/Applications/SnapLingo.app', nee
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 describe('RequiredPermissionsGate', () => {
+  it('does not treat a failed permission check as a missing grant', async () => {
+    const runtime = createRequiredPermissionsRuntime({
+      status: vi.fn().mockRejectedValue(new Error('status unavailable')),
+      request: vi.fn(), context: vi.fn(async () => context), reset: vi.fn(), restart: vi.fn(),
+    });
+    const view = await renderGate(runtime);
+    try {
+      expect(view.container.querySelector('[role="dialog"]')).toBeNull();
+      expect(view.container.textContent).toContain('ready');
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it('waits for a fresh check when reopened after permission was granted elsewhere', async () => {
+    let finishCheck: (status: typeof granted) => void = () => undefined;
+    const status = vi.fn().mockResolvedValueOnce(missing)
+      .mockImplementation(() => new Promise<typeof granted>((resolve) => { finishCheck = resolve; }));
+    const request = vi.fn();
+    const runtime = createRequiredPermissionsRuntime({
+      status, request, context: vi.fn(async () => context), reset: vi.fn(), restart: vi.fn(),
+    });
+    const previousView = await renderGate(runtime);
+    await previousView.unmount();
+    const view = await renderGate(runtime);
+    try {
+      expect(view.container.querySelector('[role="dialog"]')).toBeNull();
+      await act(async () => finishCheck(granted));
+      expect(view.container.querySelector('[role="dialog"]')).toBeNull();
+      expect(request).not.toHaveBeenCalled();
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it('does not use an earlier missing status after a refresh fails', async () => {
+    const runtime = createRequiredPermissionsRuntime({
+      status: vi.fn().mockResolvedValueOnce(missing).mockRejectedValue(new Error('status unavailable')),
+      request: vi.fn(), context: vi.fn(async () => context), reset: vi.fn(), restart: vi.fn(),
+    });
+    const view = await renderGate(runtime);
+    try {
+      await act(async () => window.dispatchEvent(new Event('focus')));
+      expect(view.container.querySelector('[role="dialog"]')).toBeNull();
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it('explains that the current app lacks permission and how old grants can differ', async () => {
+    const view = await renderGate(createRuntime(missing));
+    try {
+      expect(view.container.textContent).toContain('当前运行的 SnapLingo 尚未获得屏幕录制权限');
+      expect(view.container.textContent).toContain('旧版本');
+      expect(view.container.textContent).toContain('无法判断');
+    } finally {
+      await view.unmount();
+    }
+  });
+
   it('detects an existing grant on return without another request or relaunch', async () => {
     const status = vi.fn()
       .mockResolvedValueOnce(missing)
@@ -44,8 +104,27 @@ describe('RequiredPermissionsGate', () => {
     expect(runtime.subscribe).toHaveBeenCalledTimes(1);
     expect(runtime.request).not.toHaveBeenCalled();
     expect(view.container.textContent).toContain('ready');
+    expect(view.container.querySelector('[role="dialog"]')).toBeNull();
 
     await view.unmount();
+  });
+
+  it('rechecks before authorizing and skips the request when the grant is already effective', async () => {
+    const request = vi.fn();
+    const runtime = createRequiredPermissionsRuntime({
+      status: vi.fn().mockResolvedValueOnce(missing).mockResolvedValue(granted),
+      request, context: vi.fn(async () => context), reset: vi.fn(), restart: vi.fn(),
+    });
+    const view = await renderGate(runtime);
+    try {
+      const button = [...view.container.querySelectorAll('button')].find((item) => item.textContent === '去授权');
+      expect(button).toBeDefined();
+      await act(async () => button?.click());
+      expect(request).not.toHaveBeenCalled();
+      expect(view.container.querySelector('[role="dialog"]')).toBeNull();
+    } finally {
+      await view.unmount();
+    }
   });
 
   it('opens the selected permission after the user explicitly continues', async () => {

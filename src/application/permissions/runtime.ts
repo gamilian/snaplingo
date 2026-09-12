@@ -132,6 +132,8 @@ export function createRequiredPermissionsRuntime(
 
   return {
     subscribe(listener) {
+      // A previous settings session may have ended before the OS grant changed.
+      if (listeners.size === 0) snapshot = { status: null, error: null };
       listeners.add(listener);
       listener(snapshot);
       if (listeners.size === 1) void poll();

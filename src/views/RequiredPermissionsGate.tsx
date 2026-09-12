@@ -4,7 +4,7 @@ import {
   type RequiredPermissionsContext,
   type RequiredPermissionsRuntime,
 } from '../application/permissions/runtime';
-import { useRequiredPermissions } from './PermissionControls';
+import { permissionGrantExplanation, useRequiredPermissions } from './PermissionControls';
 import { ScreenshotIcon } from './SettingsWindow/Icons';
 
 export function RequiredPermissionsGate({
@@ -26,9 +26,8 @@ export function RequiredPermissionsGate({
   const snapshot = useRequiredPermissions(runtime);
   const { status, error } = snapshot;
 
-  const shouldShowGuide = status
-    ? !areRequiredPermissionsGranted(status)
-    : error !== null;
+  const shouldShowGuide = status !== null && error === null
+    && !areRequiredPermissionsGranted(status);
 
   const showGuide = !dismissed && shouldShowGuide;
   const needsInstallation = context?.needsInstallation === true;
@@ -52,9 +51,8 @@ export function RequiredPermissionsGate({
       const currentContext = context ?? await runtime.context();
       setContext(currentContext);
       if (currentContext.needsInstallation) return;
-      if (!status) {
-        await runtime.refresh();
-      } else {
+      const currentStatus = await runtime.refresh();
+      if (!areRequiredPermissionsGranted(currentStatus)) {
         setAttempted(true);
         await runtime.request('screenRecording');
       }
@@ -112,19 +110,22 @@ export function RequiredPermissionsGate({
           <div aria-hidden="true" className="bg-primary-50 text-primary-600" style={styles.icon}><ScreenshotIcon /></div>
           <h1 id="screen-permission-title" style={styles.title}>{needsInstallation ? '先安装 SnapLingo' : '开启屏幕录制'}</h1>
           <p id="screen-permission-description" style={styles.description} className="text-gray-500">
-            {needsInstallation ? '将应用拖入“应用程序”，再打开并授权。' : '用于截图、识别和翻译屏幕内容。'}
+            {needsInstallation
+              ? '当前运行的是临时副本。请将应用拖入“应用程序”后打开，再检测是否需要授权。'
+              : '当前运行的 SnapLingo 尚未获得屏幕录制权限，截图、识别和翻译屏幕内容需要此权限。'}
           </p>
-          {(actionError || error) && <p role="alert" className="mb-4 text-xs text-red-600">暂时无法完成操作，请重试。</p>}
+          {!needsInstallation && <p className="mb-5 text-left text-xs leading-relaxed text-gray-500">{permissionGrantExplanation}</p>}
+          {actionError && <p role="alert" className="mb-4 text-xs text-red-600">暂时无法完成操作，请重试。</p>}
           <div style={styles.actions}>
             <button type="button" className="border border-gray-200 bg-white text-gray-700 hover:bg-gray-50" style={styles.button} onClick={() => setDismissed(true)}>
               {needsInstallation ? '知道了' : '稍后'}
             </button>
             {!needsInstallation && <button type="button" className="bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50" style={styles.button}
               disabled={busy || (!context && !actionError)} onClick={() => void authorize()}>
-              {busy ? '请稍候…' : !status || actionError ? '重试' : '去授权'}
+              {busy ? '请稍候…' : actionError ? '重试' : '去授权'}
             </button>}
           </div>
-          {!needsInstallation && (attempted || actionError || error) && <button type="button" className="mt-4 text-xs text-gray-500 hover:text-primary-600"
+          {!needsInstallation && (attempted || actionError) && <button type="button" className="mt-4 text-xs text-gray-500 hover:text-primary-600"
             onClick={() => { setDismissed(true); onOpenSettings(); }}>授权遇到问题？</button>}
         </section>
       </div>}

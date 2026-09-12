@@ -14,6 +14,55 @@ const context = { platform: 'macos', appPath: '/Applications/SnapLingo.app', nee
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 describe('PermissionControls in settings', () => {
+  it('explains missing grants for the current app and possible old-version grants', async () => {
+    const view = await renderControls();
+    try {
+      expect(view.container.textContent).toContain('当前运行的 SnapLingo 尚未获得屏幕录制权限');
+      expect(view.container.textContent).toContain('旧版本');
+      expect(view.container.textContent).toContain('无法判断');
+      expect(view.container.textContent).not.toContain('当前运行的 SnapLingo 尚未获得辅助功能权限');
+      expect(view.container.querySelector('[aria-label="授权辅助功能"]')).toBeNull();
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it('does not show authorization prompts while status is unknown', async () => {
+    const view = await renderControls({ status: vi.fn(() => new Promise<typeof missing>(() => undefined)) });
+    try {
+      expect(view.container.textContent).toContain('检测中');
+      expect(view.container.textContent).not.toContain('去授权');
+      expect(view.container.textContent).not.toContain('待授权');
+      expect(view.container.textContent).not.toContain('重新授权');
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it('shows a check failure instead of an authorization prompt', async () => {
+    const view = await renderControls({ status: vi.fn().mockRejectedValue(new Error('status unavailable')) });
+    try {
+      expect(view.container.textContent).toContain('检测失败');
+      expect(view.container.textContent).not.toContain('去授权');
+      expect(view.container.textContent).not.toContain('待授权');
+      expect(view.container.textContent).not.toContain('重新授权');
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it('does not offer authorization or resets for permissions already granted', async () => {
+    const view = await renderControls({ status: vi.fn(async () => ({ screenRecording: true, accessibility: true })) });
+    try {
+      expect(view.container.textContent).not.toContain('去授权');
+      expect(view.container.textContent).not.toContain('重新授权');
+      expect(view.container.textContent).not.toContain('旧版本');
+      expect(view.port.reset).not.toHaveBeenCalled();
+    } finally {
+      await view.unmount();
+    }
+  });
+
   it('requires confirmation before resetting only the selected permission', async () => {
     const view = await renderControls();
     try {
