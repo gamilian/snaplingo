@@ -35,7 +35,6 @@ describe('captureSelectionRuntime', () => {
         startPoint: { x: 40, y: 60 },
         selection: null,
         hoverSelection: null,
-        previewImageBase64: null,
         renderingOutput: false,
         status: 'selecting',
         activeAnnotationTool: null,
@@ -65,7 +64,6 @@ describe('captureSelectionRuntime', () => {
     ).toEqual({
       draftSelection: { x: 110, y: 80, width: 50, height: 40 },
       anchorPoint: { x: 110, y: 80 },
-      previewImageBase64: null,
       renderingOutput: false,
     });
   });
@@ -82,7 +80,6 @@ describe('captureSelectionRuntime', () => {
       keyboardDraftCursorPoint: { x: 22, y: 13 },
       cursorPoint: { x: 22, y: 13 },
       selection: { x: 10, y: 10, width: 12, height: 3 },
-      previewImageBase64: null,
       renderingOutput: false,
     });
   });
@@ -307,7 +304,6 @@ describe('captureSelectionRuntime', () => {
     ).toEqual({
       keyboardEditCursorPoint: null,
       selection: { x: 25, y: 45, width: 40, height: 20 },
-      previewImageBase64: null,
       renderingOutput: false,
     });
 
@@ -353,7 +349,6 @@ describe('captureSelectionRuntime', () => {
         startPoint: { x: 15, y: 7 },
         startSelection: { x: 25, y: 27, width: 40, height: 20 },
       },
-      previewImageBase64: null,
       renderingOutput: false,
     });
 
@@ -382,7 +377,6 @@ describe('captureSelectionRuntime', () => {
         startPoint: { x: 64, y: 56 },
         startSelection: { x: 20, y: 30, width: 44, height: 26 },
       },
-      previewImageBase64: null,
       renderingOutput: false,
     });
   });
@@ -411,7 +405,6 @@ describe('captureSelectionRuntime', () => {
       }),
     ).toEqual({
       selection: { x: 20, y: 30, width: 41, height: 20 },
-      previewImageBase64: null,
       previewRender: {
         rect: { x: 20, y: 30, width: 41, height: 20 },
       },
@@ -448,7 +441,6 @@ describe('captureSelectionRuntime', () => {
         startPoint: { x: 10, y: 12 },
         startSelection: selection,
       },
-      previewImageBase64: null,
     });
   });
 
@@ -469,7 +461,6 @@ describe('captureSelectionRuntime', () => {
         startPoint: { x: 60, y: 50 },
         startSelection: selection,
       },
-      previewImageBase64: null,
     });
   });
 });

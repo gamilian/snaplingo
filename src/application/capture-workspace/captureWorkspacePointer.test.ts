@@ -63,7 +63,6 @@ function createActions(
     setCursorPoint: vi.fn(),
     setSelection: vi.fn(),
     scheduleSelectionOverlayPaint: vi.fn(),
-    setPreviewImageBase64: vi.fn(),
     setRenderingOutput: vi.fn(),
     setStatus: vi.fn(),
     setAnnotationGesture: vi.fn(),
@@ -222,7 +221,6 @@ describe('capture workspace editor pointer dispatch', () => {
       width: 120,
       height: 90,
     });
-    expect(actions.setPreviewImageBase64).toHaveBeenCalledWith(null);
   });
 
   it('updates freehand gesture and draft atomically during pointer movement', () => {

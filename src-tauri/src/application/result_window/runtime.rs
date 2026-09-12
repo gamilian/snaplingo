@@ -38,6 +38,18 @@ impl ResultWindowRuntime {
 
     pub(crate) async fn open(&self, request: ResultWindowOpenRequest) -> crate::Result<()> {
         let request_id = self.next_request_id()?;
+        self.open_reserved(request_id, request).await
+    }
+
+    pub(crate) fn reserve_request(&self) -> crate::Result<ResultWindowRequestId> {
+        self.next_request_id()
+    }
+
+    pub(crate) async fn open_reserved(
+        &self,
+        request_id: ResultWindowRequestId,
+        request: ResultWindowOpenRequest,
+    ) -> crate::Result<()> {
         let payload = self.payload_for(request);
 
         if !self.store_if_current(request_id, payload)? {
@@ -149,7 +161,7 @@ impl ResultWindowRuntime {
         Ok(())
     }
 
-    fn is_current(&self, request_id: ResultWindowRequestId) -> crate::Result<bool> {
+    pub(crate) fn is_current(&self, request_id: ResultWindowRequestId) -> crate::Result<bool> {
         let state = self.lock_state()?;
         Ok(state.latest_request_id == request_id.0)
     }

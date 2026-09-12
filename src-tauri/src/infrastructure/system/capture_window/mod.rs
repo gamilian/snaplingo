@@ -12,3 +12,4 @@ pub use tauri::{
     open_capture_window_for_session, prepare_capture_window_for_reveal, prewarm_capture_window,
     restore_capture_snapshot_windows, reveal_capture_window,
 };
+pub(crate) mod image_protocol;

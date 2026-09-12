@@ -147,6 +147,17 @@ mod tests {
     }
 
     #[test]
+    fn accepts_standalone_function_keys() {
+        for number in 1..=20 {
+            let hotkey = format!("F{number}");
+            assert_eq!(
+                display_hotkey_to_accelerator(&hotkey).unwrap(),
+                Some(hotkey)
+            );
+        }
+    }
+
+    #[test]
     fn treats_unset_display_hotkeys_as_unregistered() {
         assert_eq!(display_hotkey_to_accelerator("未设置").unwrap(), None);
         assert_eq!(display_hotkey_to_accelerator("  ").unwrap(), None);

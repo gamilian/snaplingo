@@ -1184,6 +1184,41 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn frozen_png_transport_keeps_pixels_out_of_metadata_and_expires_on_cancel() {
+        let backend = make_backend_with_renderable_png();
+        let expected = backend.snapshots[0].png_data.clone();
+        let captures = backend.capture_monitor_snapshots_calls.clone();
+        let sessions = CaptureSessions::new(Arc::new(backend));
+        let session = sessions
+            .create_session_without_monitor_images()
+            .await
+            .unwrap();
+        let metadata = sessions
+            .hydrate_session_snapshot_metadata(&session.id)
+            .await
+            .unwrap();
+        let monitor_id = &metadata.monitors[0].id;
+        assert!(metadata
+            .monitors
+            .iter()
+            .all(|monitor| monitor.image_base64.is_empty()));
+        assert_eq!(
+            sessions
+                .monitor_snapshot_png(&session.id, monitor_id)
+                .unwrap(),
+            expected
+        );
+        assert_eq!(*captures.lock().unwrap(), 1);
+        assert!(sessions
+            .monitor_snapshot_png(&session.id, "absent-monitor")
+            .is_err());
+        sessions.cancel_session(&session.id).unwrap();
+        assert!(sessions
+            .monitor_snapshot_png(&session.id, monitor_id)
+            .is_err());
+    }
+
+    #[tokio::test]
     async fn render_png_base64_returns_rendered_selection_as_base64() {
         let sessions = CaptureSessions::new(Arc::new(make_backend_with_renderable_png()));
         let view = sessions.create_session().await.unwrap();

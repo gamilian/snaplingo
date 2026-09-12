@@ -1,6 +1,8 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
+use super::ocr_completion::{CaptureOcrStatus, CaptureOcrTarget, PendingCaptureOcr};
 use super::render::{
     output_capture_selection, recognize_capture_selection_text, render_capture_png_base64,
 };
@@ -25,6 +27,9 @@ pub struct CaptureSessionRuntime {
     host: Arc<dyn CaptureSessionRuntimeHost>,
     pin_output: Arc<dyn CapturePinOutput>,
     startup: tokio::sync::Mutex<()>,
+    presentations: tokio::sync::Mutex<HashMap<CaptureSessionId, u64>>,
+    ocr_generation: tokio::sync::watch::Sender<u64>,
+    pending_ocr: tokio::sync::Mutex<Option<PendingCaptureOcr>>,
 }
 
 impl CaptureSessionRuntime {
@@ -60,6 +65,9 @@ impl CaptureSessionRuntime {
             host,
             pin_output,
             startup: tokio::sync::Mutex::new(()),
+            presentations: tokio::sync::Mutex::new(HashMap::new()),
+            ocr_generation: tokio::sync::watch::channel(0).0,
+            pending_ocr: tokio::sync::Mutex::new(None),
         }
     }
 
@@ -71,6 +79,10 @@ impl CaptureSessionRuntime {
     }
 
     async fn create_visible_desktop_session(&self) -> Result<CaptureSessionView> {
+        self.cancel_background_ocr();
+        *self.pending_ocr.lock().await = None;
+        let generation = *self.ocr_generation.borrow();
+        self.host.set_capture_ocr_status(None);
         let total_start = Instant::now();
         let begin_start = Instant::now();
         self.host.begin_capture_presentation().await?;
@@ -104,7 +116,13 @@ impl CaptureSessionRuntime {
         );
 
         match session_result {
-            Ok(session) => Ok(session),
+            Ok(session) => {
+                self.presentations
+                    .lock()
+                    .await
+                    .insert(session.id.clone(), generation);
+                Ok(session)
+            }
             Err(session_err) => {
                 let presentation_result = self.host.end_capture_presentation().await;
 
@@ -161,7 +179,7 @@ impl CaptureSessionRuntime {
                 .restore_capture_snapshot_windows_for_session_id(&session.id)
                 .await;
             let _ = self.sessions.cancel_session(&session.id);
-            let presentation_result = self.host.end_capture_presentation().await;
+            let presentation_result = self.end_session_presentation(&session.id).await;
 
             if let Err(restore_err) = restore_result {
                 return Err(format!(
@@ -193,7 +211,7 @@ impl CaptureSessionRuntime {
             .map(|id| self.sessions.window_geometry(id))
             .transpose()?;
         self.host
-            .prepare_capture_window_for_reveal(geometry.as_ref())
+            .prepare_capture_window_for_reveal(session_id, geometry.as_ref())
             .await
     }
 
@@ -224,11 +242,24 @@ impl CaptureSessionRuntime {
     }
 
     pub async fn cancel_capture_session(&self, session_id: &CaptureSessionId) -> Result<()> {
+        let _startup = self.startup.lock().await;
+        self.cancel_capture_session_inner(session_id).await
+    }
+
+    async fn cancel_capture_session_inner(&self, session_id: &CaptureSessionId) -> Result<()> {
+        let mut pending = self.pending_ocr.lock().await;
+        if pending
+            .as_ref()
+            .is_some_and(|job| &job.session_id == session_id)
+        {
+            *pending = None;
+        }
+        drop(pending);
         let restore_result = self
             .restore_capture_snapshot_windows_for_session_id(session_id)
             .await;
         let cancel_result = self.sessions.cancel_session(session_id);
-        let presentation_result = self.host.end_capture_presentation().await;
+        let presentation_result = self.end_session_presentation(session_id).await;
         let destroy_window_result = self.host.destroy_inactive_capture_window().await;
 
         match (
@@ -252,7 +283,7 @@ impl CaptureSessionRuntime {
         let restore_result = self
             .restore_capture_snapshot_windows_for_session_id(session_id)
             .await;
-        let presentation_result = self.host.end_capture_presentation().await;
+        let presentation_result = self.end_session_presentation(session_id).await;
         let destroy_window_result = self.host.destroy_inactive_capture_window().await;
 
         match (restore_result, presentation_result, destroy_window_result) {
@@ -335,6 +366,158 @@ impl CaptureSessionRuntime {
         .await
     }
 
+    /// Own the selected pixels before the WebView finishes its selection workflow.
+    pub(crate) async fn prepare_capture_ocr(
+        &self,
+        session_id: &CaptureSessionId,
+        rect: &LogicalRect,
+        annotations: &[AnnotationCommand],
+        target: CaptureOcrTarget,
+        settings: crate::domain::OcrSettings,
+    ) -> Result<()> {
+        let _startup = self.startup.lock().await;
+        let generation = *self.ocr_generation.borrow();
+        if self.presentations.lock().await.get(session_id) != Some(&generation) {
+            return Err("Capture OCR session is no longer current".into());
+        }
+        let clipboard_revision = self.host.clipboard_revision();
+        self.ensure_selection_snapshots_ready(session_id, rect)?;
+        let language = (settings.recognition_language != "auto")
+            .then(|| settings.recognition_language.clone());
+        let request = super::render::capture_ocr_request(
+            &self.sessions,
+            &self.image_composition,
+            session_id,
+            rect,
+            language,
+        )?;
+        let preview = if target == CaptureOcrTarget::OcrWindow {
+            Some(self.render_png_base64(session_id, rect, annotations, false)?)
+        } else {
+            None
+        };
+        *self.pending_ocr.lock().await = Some(PendingCaptureOcr {
+            session_id: session_id.clone(),
+            generation,
+            request,
+            preview,
+            target,
+            settings,
+            clipboard_revision,
+        });
+        Ok(())
+    }
+
+    /// Commit the handoff. Destruction of the old WebView cannot cancel this owned job.
+    pub(crate) async fn complete_capture_ocr(
+        self: &Arc<Self>,
+        session_id: &CaptureSessionId,
+    ) -> Result<()> {
+        let _startup = self.startup.lock().await;
+        let mut pending = self.pending_ocr.lock().await;
+        if !pending
+            .as_ref()
+            .is_some_and(|job| &job.session_id == session_id)
+        {
+            return Err("No prepared OCR selection for this session".into());
+        }
+        let job = pending.take().unwrap();
+        drop(pending);
+        if job.generation != *self.ocr_generation.borrow() {
+            return Err("Capture OCR session is no longer current".into());
+        }
+        let result_id = self.host.reserve_capture_ocr_result(job.target)?;
+        let hide_result = self.host.hide_capture_window().await;
+        let cancel_result = self.cancel_capture_session_inner(session_id).await;
+        if let Err(error) = hide_result.and(cancel_result) {
+            self.host
+                .report_capture_ocr_error(job.target, result_id, &error.to_string())
+                .await;
+            return Err(error);
+        }
+        if job.shows_status() {
+            self.host
+                .set_capture_ocr_status(Some(CaptureOcrStatus::Recognizing));
+        }
+        let runtime = Arc::clone(self);
+        let receiver = self.ocr_generation.subscribe();
+        tokio::spawn(async move {
+            runtime.run_capture_ocr_job(job, result_id, receiver).await;
+        });
+        Ok(())
+    }
+
+    pub(crate) fn cancel_background_ocr(&self) {
+        self.ocr_generation
+            .send_modify(|generation| *generation = generation.wrapping_add(1));
+    }
+
+    async fn run_capture_ocr_job(
+        &self,
+        mut job: PendingCaptureOcr,
+        result_id: u64,
+        mut generation: tokio::sync::watch::Receiver<u64>,
+    ) {
+        if *generation.borrow() != job.generation {
+            return;
+        }
+        let result = tokio::select! {
+            biased;
+            _ = generation.changed() => return,
+            result = self.ocr.recognize(&job.request) => result,
+        };
+        // Serialize delivery with a new capture's startup, including native window calls.
+        let startup = self.startup.lock().await;
+        if *self.ocr_generation.borrow() != job.generation {
+            return;
+        }
+        if job.target == CaptureOcrTarget::Clipboard
+            && self.host.clipboard_revision() != job.clipboard_revision
+        {
+            // A newer explicit copy wins over this earlier background OCR request.
+            self.host.set_capture_ocr_status(None);
+            return;
+        }
+        let result = match result {
+            Ok(mut result) if !result.text.trim().is_empty() => {
+                if job.target == CaptureOcrTarget::Clipboard {
+                    result.text =
+                        super::ocr_completion::clipboard_text(&result.text, &job.settings);
+                }
+                self.host
+                    .publish_capture_ocr(job.target, result_id, result, job.preview.take())
+                    .await
+            }
+            Ok(_) => Err("No text was recognized in the selected area".into()),
+            Err(error) => Err(error),
+        };
+        let status = match result {
+            Ok(()) => {
+                (job.target == CaptureOcrTarget::Clipboard).then_some(CaptureOcrStatus::Copied)
+            }
+            Err(error) => {
+                self.host
+                    .report_capture_ocr_error(job.target, result_id, &error.to_string())
+                    .await;
+                Some(CaptureOcrStatus::Failed)
+            }
+        };
+        if job.shows_status() {
+            self.host.set_capture_ocr_status(status);
+        }
+        drop(startup);
+        if status.is_some() && job.shows_status() {
+            tokio::select! {
+                _ = generation.changed() => return,
+                _ = tokio::time::sleep(std::time::Duration::from_millis(1500)) => {}
+            }
+            let _startup = self.startup.lock().await;
+            if *self.ocr_generation.borrow() == job.generation {
+                self.host.set_capture_ocr_status(None);
+            }
+        }
+    }
+
     pub async fn output_selection(
         &self,
         session_id: &CaptureSessionId,
@@ -374,6 +557,15 @@ impl CaptureSessionRuntime {
             return Err("Capture session snapshots are not ready for the selected area".into());
         }
 
+        Ok(())
+    }
+
+    async fn end_session_presentation(&self, session_id: &CaptureSessionId) -> Result<()> {
+        // A late IPC response or a destroyed old window may cancel the same ID again.
+        // Only its owner can decrement the native presentation depth.
+        if self.presentations.lock().await.remove(session_id).is_some() {
+            self.host.end_capture_presentation().await?;
+        }
         Ok(())
     }
 
@@ -450,6 +642,18 @@ mod tests {
         restore_result: Result<(), String>,
         end_result: Result<(), String>,
         destroy_result: Result<(), String>,
+        destroy_calls: std::sync::atomic::AtomicUsize,
+        ocr_results: Mutex<
+            Vec<(
+                super::CaptureOcrTarget,
+                crate::domain::ocr::OcrResult,
+                Option<String>,
+            )>,
+        >,
+        ocr_errors: Mutex<Vec<String>>,
+        ocr_statuses: Mutex<Vec<Option<super::CaptureOcrStatus>>>,
+        ocr_completed: tokio::sync::Notify,
+        clipboard_revision: std::sync::atomic::AtomicU64,
     }
 
     impl RecordingRuntimeHost {
@@ -462,6 +666,12 @@ mod tests {
                 restore_result: Ok(()),
                 end_result: Ok(()),
                 destroy_result: Ok(()),
+                destroy_calls: std::sync::atomic::AtomicUsize::new(0),
+                ocr_results: Mutex::new(Vec::new()),
+                ocr_errors: Mutex::new(Vec::new()),
+                ocr_statuses: Mutex::new(Vec::new()),
+                ocr_completed: tokio::sync::Notify::new(),
+                clipboard_revision: std::sync::atomic::AtomicU64::new(0),
             }
         }
 
@@ -486,6 +696,34 @@ mod tests {
 
     #[async_trait]
     impl CaptureSessionRuntimeHost for RecordingRuntimeHost {
+        fn clipboard_revision(&self) -> u64 {
+            self.clipboard_revision
+                .load(std::sync::atomic::Ordering::Relaxed)
+        }
+        fn set_capture_ocr_status(&self, status: Option<super::CaptureOcrStatus>) {
+            self.ocr_statuses.lock().unwrap().push(status);
+        }
+
+        async fn publish_capture_ocr(
+            &self,
+            target: super::CaptureOcrTarget,
+            _: u64,
+            result: crate::domain::ocr::OcrResult,
+            preview: Option<String>,
+        ) -> crate::Result<()> {
+            self.ocr_results
+                .lock()
+                .unwrap()
+                .push((target, result, preview));
+            self.ocr_completed.notify_one();
+            Ok(())
+        }
+
+        async fn report_capture_ocr_error(&self, _: super::CaptureOcrTarget, _: u64, error: &str) {
+            self.ocr_errors.lock().unwrap().push(error.into());
+            self.ocr_completed.notify_one();
+        }
+
         async fn begin_capture_presentation(&self) -> crate::Result<()> {
             self.calls.lock().unwrap().push(HostCall::BeginPresentation);
             Ok(())
@@ -498,6 +736,7 @@ mod tests {
 
         async fn prepare_capture_window_for_reveal(
             &self,
+            _session_id: Option<&CaptureSessionId>,
             geometry: Option<&CaptureWindowGeometry>,
         ) -> crate::Result<()> {
             self.calls
@@ -524,6 +763,8 @@ mod tests {
         }
 
         async fn destroy_inactive_capture_window(&self) -> crate::Result<()> {
+            self.destroy_calls
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             self.destroy_result.clone().map_err(AppError::from)
         }
 
@@ -871,6 +1112,63 @@ mod tests {
         assert_eq!(
             host.calls(),
             vec![HostCall::BeginPresentation, HostCall::HideCaptureWindow]
+        );
+    }
+
+    #[tokio::test]
+    async fn cancelling_an_old_session_twice_does_not_end_a_new_presentation() {
+        let host = Arc::new(RecordingRuntimeHost::succeeds());
+        let (runtime, sessions, _) = make_runtime(host.clone(), vec![make_snapshot()]);
+        let old = runtime.create_session_from_visible_desktop().await.unwrap();
+        let current = runtime.create_session_from_visible_desktop().await.unwrap();
+
+        runtime.cancel_capture_session(&old.id).await.unwrap();
+        runtime.cancel_capture_session(&old.id).await.unwrap();
+        runtime
+            .cancel_capture_session(&CaptureSessionId("unknown".into()))
+            .await
+            .unwrap();
+
+        assert!(!sessions.has_session(&old.id));
+        assert!(sessions.has_session(&current.id));
+        assert_eq!(
+            host.calls()
+                .iter()
+                .filter(|call| **call == HostCall::EndPresentation)
+                .count(),
+            1
+        );
+
+        runtime.cancel_capture_session(&current.id).await.unwrap();
+        assert_eq!(
+            host.calls()
+                .iter()
+                .filter(|call| **call == HostCall::EndPresentation)
+                .count(),
+            2
+        );
+    }
+
+    #[tokio::test]
+    async fn restoring_then_cancelling_a_session_releases_its_presentation_once() {
+        let host = Arc::new(RecordingRuntimeHost::succeeds());
+        let (runtime, sessions, _) = make_runtime(host.clone(), vec![make_snapshot()]);
+        let session = runtime.create_session_from_visible_desktop().await.unwrap();
+
+        runtime
+            .restore_capture_snapshot_windows_for_session(&session.id)
+            .await
+            .unwrap();
+        assert!(sessions.has_session(&session.id));
+        runtime.cancel_capture_session(&session.id).await.unwrap();
+
+        assert!(!sessions.has_session(&session.id));
+        assert_eq!(
+            host.calls()
+                .iter()
+                .filter(|call| **call == HostCall::EndPresentation)
+                .count(),
+            1
         );
     }
 
@@ -1233,5 +1531,268 @@ mod tests {
         assert_eq!(error.to_string(), "pin window failed");
         assert_eq!(pin_output.pngs.lock().unwrap().len(), 1);
         assert!(sessions.has_session(&session.id));
+    }
+
+    mod ocr_completion_tests {
+        use super::*;
+        use crate::application::capture::{CaptureOcrStatus, CaptureOcrTarget};
+        use crate::application::providers::{common::Provider, ocr::OcrProvider};
+        use crate::domain::{OcrRequest, OcrResult, OcrSettings};
+        use tokio::sync::Notify;
+
+        struct SuspendedOcr {
+            barrier: Arc<StartupBarrier>,
+            request: Arc<Mutex<Option<OcrRequest>>>,
+            stopped: Arc<Notify>,
+            result: Result<&'static str, &'static str>,
+        }
+
+        impl Provider for SuspendedOcr {
+            fn id(&self) -> &str {
+                "suspended"
+            }
+            fn name(&self) -> &str {
+                "Suspended OCR"
+            }
+            fn is_configured(&self) -> bool {
+                true
+            }
+            fn requires_api_key(&self) -> bool {
+                false
+            }
+            fn reconfigure_credentials(
+                &mut self,
+                _: &std::collections::HashMap<String, String>,
+            ) -> crate::Result<()> {
+                Ok(())
+            }
+        }
+
+        struct NotifyOnDrop(Arc<Notify>);
+        impl Drop for NotifyOnDrop {
+            fn drop(&mut self) {
+                self.0.notify_one();
+            }
+        }
+
+        #[async_trait]
+        impl OcrProvider for SuspendedOcr {
+            async fn recognize(&self, request: &OcrRequest) -> crate::Result<OcrResult> {
+                let _stopped = NotifyOnDrop(self.stopped.clone());
+                *self.request.lock().unwrap() = Some(request.clone());
+                self.barrier.entered.notify_one();
+                self.barrier.release.notified().await;
+                self.result
+                    .map(|text| OcrResult::from_text(text, Some(0.9)))
+                    .map_err(Into::into)
+            }
+        }
+
+        struct Fixture {
+            runtime: Arc<CaptureSessionRuntime>,
+            host: Arc<RecordingRuntimeHost>,
+            session_id: CaptureSessionId,
+            barrier: Arc<StartupBarrier>,
+            request: Arc<Mutex<Option<OcrRequest>>>,
+            stopped: Arc<Notify>,
+        }
+
+        async fn prepared(
+            target: CaptureOcrTarget,
+            result: Result<&'static str, &'static str>,
+            hide_status: bool,
+        ) -> Fixture {
+            let host = Arc::new(RecordingRuntimeHost::succeeds());
+            let (runtime, _, _) = make_runtime(host.clone(), vec![make_renderable_snapshot()]);
+            let runtime = Arc::new(runtime);
+            let barrier = Arc::new(StartupBarrier::default());
+            let request = Arc::new(Mutex::new(None));
+            let stopped = Arc::new(Notify::new());
+            runtime
+                .ocr
+                .register(SuspendedOcr {
+                    barrier: barrier.clone(),
+                    request: request.clone(),
+                    stopped: stopped.clone(),
+                    result,
+                })
+                .unwrap();
+            runtime.ocr.activate("suspended").unwrap();
+            let session_id = runtime
+                .create_session_from_visible_desktop()
+                .await
+                .unwrap()
+                .id;
+            runtime
+                .prepare_capture_ocr(
+                    &session_id,
+                    &LogicalRect {
+                        x: 1.0,
+                        y: 1.0,
+                        width: 2.0,
+                        height: 2.0,
+                    },
+                    &[],
+                    target,
+                    OcrSettings {
+                        recognition_language: "ja".into(),
+                        hide_silent_status: hide_status,
+                        ..OcrSettings::default()
+                    },
+                )
+                .await
+                .unwrap();
+            assert!(
+                request.lock().unwrap().is_none(),
+                "preparation must not start recognition"
+            );
+            Fixture {
+                runtime,
+                host,
+                session_id,
+                barrier,
+                request,
+                stopped,
+            }
+        }
+
+        async fn notified(notify: &Notify) {
+            tokio::time::timeout(std::time::Duration::from_secs(2), notify.notified())
+                .await
+                .expect("OCR did not reach the expected stage");
+        }
+
+        #[tokio::test]
+        async fn ocr_job_survives_window_cleanup_and_uses_owned_pixels() {
+            for target in [
+                CaptureOcrTarget::OcrWindow,
+                CaptureOcrTarget::TranslationWindow,
+                CaptureOcrTarget::Clipboard,
+            ] {
+                let f = prepared(target, Ok("你 好\n世 界"), false).await;
+                f.runtime.complete_capture_ocr(&f.session_id).await.unwrap();
+                assert!(!f.runtime.sessions.has_session(&f.session_id));
+                assert_eq!(
+                    f.host
+                        .destroy_calls
+                        .load(std::sync::atomic::Ordering::Relaxed),
+                    1
+                );
+                notified(&f.barrier.entered).await;
+                assert!(f.host.ocr_results.lock().unwrap().is_empty());
+                let request = f.request.lock().unwrap().clone().unwrap();
+                assert_eq!(request.language.as_deref(), Some("ja"));
+                let image = image::load_from_memory(&request.image_data)
+                    .unwrap()
+                    .to_rgba8();
+                assert_eq!(image.dimensions(), (4, 4));
+                assert_eq!(image.get_pixel(0, 0).0, [10, 20, 30, 255]);
+
+                // This models the late Destroyed event from the closed WebView.
+                f.runtime
+                    .cancel_capture_session(&f.session_id)
+                    .await
+                    .unwrap();
+                assert!(f.runtime.complete_capture_ocr(&f.session_id).await.is_err());
+                f.barrier.release.notify_one();
+                notified(&f.host.ocr_completed).await;
+                let results = f.host.ocr_results.lock().unwrap();
+                assert_eq!(results.len(), 1);
+                assert_eq!(results[0].0, target);
+                assert_eq!(
+                    results[0].1.text,
+                    if target == CaptureOcrTarget::Clipboard {
+                        "你好\n世界"
+                    } else {
+                        "你 好\n世 界"
+                    }
+                );
+                assert_eq!(
+                    results[0].2.is_some(),
+                    target == CaptureOcrTarget::OcrWindow
+                );
+            }
+        }
+
+        #[tokio::test]
+        async fn cancellation_before_handoff_drops_prepared_ocr_without_running_it() {
+            let f = prepared(CaptureOcrTarget::Clipboard, Ok("cancelled"), false).await;
+            f.runtime
+                .cancel_capture_session(&f.session_id)
+                .await
+                .unwrap();
+            assert!(f.runtime.complete_capture_ocr(&f.session_id).await.is_err());
+            assert!(f.request.lock().unwrap().is_none());
+            assert!(f.host.ocr_results.lock().unwrap().is_empty());
+        }
+
+        #[tokio::test]
+        async fn new_capture_cancels_in_flight_ocr_and_prevents_late_delivery() {
+            let f = prepared(CaptureOcrTarget::TranslationWindow, Ok("stale"), false).await;
+            f.runtime.complete_capture_ocr(&f.session_id).await.unwrap();
+            notified(&f.barrier.entered).await;
+            let new_session = f
+                .runtime
+                .create_session_from_visible_desktop()
+                .await
+                .unwrap();
+            notified(&f.stopped).await;
+            f.barrier.release.notify_one();
+            assert!(f.host.ocr_results.lock().unwrap().is_empty());
+            assert!(f.host.ocr_errors.lock().unwrap().is_empty());
+            assert!(f.runtime.sessions.has_session(&new_session.id));
+            assert_eq!(f.host.ocr_statuses.lock().unwrap().last(), Some(&None));
+        }
+
+        #[tokio::test]
+        async fn failures_and_empty_results_report_after_the_overlay_has_closed() {
+            for result in [Err("recognition failed"), Ok("  \n ")] {
+                let f = prepared(CaptureOcrTarget::Clipboard, result, false).await;
+                f.runtime.complete_capture_ocr(&f.session_id).await.unwrap();
+                notified(&f.barrier.entered).await;
+                f.barrier.release.notify_one();
+                notified(&f.host.ocr_completed).await;
+                assert!(!f.runtime.sessions.has_session(&f.session_id));
+                assert!(f.host.ocr_results.lock().unwrap().is_empty());
+                assert_eq!(f.host.ocr_errors.lock().unwrap().len(), 1);
+            }
+        }
+
+        #[tokio::test]
+        async fn silent_status_preference_does_not_suppress_copying() {
+            let f = prepared(CaptureOcrTarget::Clipboard, Ok("recognized"), true).await;
+            f.runtime.complete_capture_ocr(&f.session_id).await.unwrap();
+            notified(&f.barrier.entered).await;
+            f.barrier.release.notify_one();
+            notified(&f.host.ocr_completed).await;
+            assert_eq!(f.host.ocr_results.lock().unwrap().len(), 1);
+            assert!(!f
+                .host
+                .ocr_statuses
+                .lock()
+                .unwrap()
+                .contains(&Some(CaptureOcrStatus::Recognizing)));
+            assert!(!f
+                .host
+                .ocr_statuses
+                .lock()
+                .unwrap()
+                .contains(&Some(CaptureOcrStatus::Copied)));
+        }
+
+        #[tokio::test]
+        async fn background_ocr_does_not_overwrite_a_newer_clipboard_copy() {
+            let f = prepared(CaptureOcrTarget::Clipboard, Ok("older OCR text"), false).await;
+            f.runtime.complete_capture_ocr(&f.session_id).await.unwrap();
+            notified(&f.barrier.entered).await;
+            f.host
+                .clipboard_revision
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            f.barrier.release.notify_one();
+            notified(&f.stopped).await;
+            assert!(f.host.ocr_results.lock().unwrap().is_empty());
+            assert!(f.host.ocr_errors.lock().unwrap().is_empty());
+            assert_eq!(f.host.ocr_statuses.lock().unwrap().last(), Some(&None));
+        }
     }
 }

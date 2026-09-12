@@ -120,7 +120,7 @@ function createProjection<T>(initialState: T) {
   };
 }
 
-function createDurableSettingsConfiguration(port: DurableSettingsPort) {
+export function createDurableSettingsConfiguration(port: DurableSettingsPort) {
   const projection = createProjection<DurableSettingsConfigurationState>({
     hydrated: false,
     snapshot: null,
@@ -490,6 +490,10 @@ function createHotkeyConfiguration(port: SettingsHotkeysPort) {
     subscribe: projection.subscribe,
     hydrate,
     refresh: () => applyLatestSnapshot(() => port.getHotkeySnapshot()),
+    beginRecording: (recordingId: string) => port.beginHotkeyRecording(recordingId),
+    endRecording: (recordingId: string) => port.endHotkeyRecording(recordingId),
+    subscribeRecordedHotkey: (handler: (event: { recordingId: string; hotkey: string }) => void) =>
+      port.subscribeRecordedHotkey(handler),
     update(category: HotkeyCategory, action: string, hotkey: string) {
       return enqueueUpdate(() =>
         applyLatestSnapshot(() =>

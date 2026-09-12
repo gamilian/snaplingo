@@ -7,6 +7,15 @@ import {
   ocrCopyTokens,
 } from './ocrTextProcessing';
 
+it('shares clipboard formatting cases with backend OCR completion', () => {
+  const fixtures = JSON.parse(readFileSync(new URL('./ocrTextPreferences.fixtures.json', import.meta.url), 'utf8')) as Array<{
+    text: string; preserveFormatting: boolean; removeChineseSpaces: boolean; expected: string;
+  }>;
+  for (const fixture of fixtures) {
+    expect(applyOcrTextPreferences(fixture.text, fixture), fixture.text).toBe(fixture.expected);
+  }
+});
+
 describe('normalizeOcrText', () => {
   it('joins OCR line breaks inside URLs emails phones and English phrases', () => {
     expect(

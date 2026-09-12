@@ -44,6 +44,19 @@ function createKeyboardTarget() {
 }
 
 describe('capture workspace runtime', () => {
+  it.each(['cancel', 'dispose'] as const)('cleans an unreadable native session on %s', async (exit) => {
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockRejectedValue(new Error('Session load failed'));
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'unreadable-session');
+
+    if (exit === 'cancel') await runtime.actions.cancelSession();
+    else runtime.dispose();
+
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledExactlyOnceWith('unreadable-session');
+    expect(runtime.renderState.status).toBe('idle');
+  });
+
   it('reveals a session load error even when no session id was adopted', async () => {
     const platform = createPlatform();
     platform.commands.getCaptureSession.mockRejectedValue(new Error('Session load failed'));
@@ -58,6 +71,35 @@ describe('capture workspace runtime', () => {
     expect(platform.window.reveal).toHaveBeenCalledWith(null);
   });
 
+  it('cancels the restored session and its unreadable replacement on exit', async () => {
+    const platform = createPlatform();
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-1');
+    platform.commands.getCaptureSession.mockRejectedValue(new Error('Session load failed'));
+    await runtime.actions.startSession('screenshot', 'unreadable-replacement');
+
+    await runtime.actions.cancelSession();
+
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith('session-1');
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith('unreadable-replacement');
+    expect(runtime.renderState.status).toBe('idle');
+  });
+
+  it.each([false, true])('releases native resources when hiding fails (loaded: %s)', async (loaded) => {
+    const platform = createPlatform();
+    if (!loaded) {
+      platform.commands.getCaptureSession.mockRejectedValue(new Error('Session load failed'));
+    }
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-1');
+    platform.window.hide.mockRejectedValueOnce(new Error('Hide failed'));
+
+    await runtime.actions.cancelSession();
+
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledExactlyOnceWith('session-1');
+    expect(runtime.renderState.error).toBe('Hide failed');
+  });
+
   it('waits for every frozen monitor image before revealing the selection surface', async () => {
     const platform = createPlatform();
     const runtime = createCaptureWorkspaceRuntime({ platform });
@@ -70,24 +112,20 @@ describe('capture workspace runtime', () => {
     expect(platform.window.reveal).toHaveBeenCalledOnce();
   });
 
-  it('keeps the visible frozen frame when a foreground window disappears during selection', async () => {
-    const platform = createPlatform();
-    let frozenFrame = 'visible-foreground-window';
-    platform.commands.renderCaptureOutput.mockImplementation(async () => frozenFrame);
-    Object.assign(platform.commands, {
-      // Guard against restoring the old selection-time recapture path.
-      refreshCaptureSessionSnapshots: async () => {
-        frozenFrame = 'underlying-window-after-focus-change';
-      },
-    });
+  it('previews the original frozen monitors without recapturing or encoding', async () => {
+    const session = createSession({ monitors: [createMonitor({ image_base64: 'frozen-foreground' })] });
+    const platform = createPlatform({ session });
+    const recapture = vi.fn();
+    Object.assign(platform.commands, { refreshCaptureSessionSnapshots: recapture });
     const runtime = createCaptureWorkspaceRuntime({ platform });
-    await runtime.actions.startSession('screenshot', 'session-1');
-
+    await runtime.actions.startSession('screenshot', session.id);
     runtime.actions.pointerDown({ x: 20, y: 30 });
     runtime.actions.pointerMove({ x: 140, y: 110 });
     await runtime.actions.pointerUp({ x: 140, y: 110 });
-
-    expect(runtime.renderState.previewImageBase64).toBe('visible-foreground-window');
+    expect(runtime.renderState.session?.monitors).toEqual(session.monitors);
+    expect(runtime.renderState).toMatchObject({ status: 'preview', selection, isRenderingOutput: false });
+    expect(platform.commands.renderCaptureOutput).not.toHaveBeenCalled();
+    expect(recapture).not.toHaveBeenCalled();
   });
 
   it('does not notify subscribers for duplicate magnifier color samples', () => {
@@ -111,70 +149,26 @@ describe('capture workspace runtime', () => {
     expect(listener).toHaveBeenCalledOnce();
   });
 
-  it('disposes acquired and late host registrations exactly once', async () => {
+  it('disposes local keyboard listeners and a late launch subscription exactly once', async () => {
     const platform = createPlatform();
     const keyboardTarget = createKeyboardTarget();
     const disposeHotkey = vi.fn();
-    const disposeCancel = vi.fn();
-    const cancelRegistration = deferred<() => void>();
-    platform.events.subscribeHotkeyTriggered.mockResolvedValue(disposeHotkey);
-    platform.events.subscribeCaptureCancel.mockReturnValue(cancelRegistration.promise);
+    const registration = deferred<() => void>();
+    platform.events.subscribeHotkeyTriggered.mockReturnValue(registration.promise);
     const runtime = createCaptureWorkspaceRuntime({
       platform,
       keyboard: { target: keyboardTarget.target },
     });
-
     const connecting = runtime.actions.connectHost();
-    await vi.waitFor(() =>
-      expect(platform.events.subscribeCaptureCancel).toHaveBeenCalledOnce(),
-    );
     runtime.dispose();
-
     expect(keyboardTarget.listenerCount('keydown')).toBe(0);
     expect(keyboardTarget.listenerCount('keyup')).toBe(0);
     expect(keyboardTarget.listenerCount('blur')).toBe(0);
-    expect(disposeHotkey).toHaveBeenCalledOnce();
-
-    cancelRegistration.resolve(disposeCancel);
+    registration.resolve(disposeHotkey);
     const disconnect = await connecting;
     disconnect();
     disconnect();
-
-    expect(disposeCancel).toHaveBeenCalledOnce();
-    expect(platform.events.subscribeCaptureCopy).not.toHaveBeenCalled();
     expect(disposeHotkey).toHaveBeenCalledOnce();
-  });
-
-  it('disposes a late third host registration without retaining listeners', async () => {
-    const platform = createPlatform();
-    const keyboardTarget = createKeyboardTarget();
-    const disposeHotkey = vi.fn();
-    const disposeCancel = vi.fn();
-    const disposeCopy = vi.fn();
-    const copyRegistration = deferred<() => void>();
-    platform.events.subscribeHotkeyTriggered.mockResolvedValue(disposeHotkey);
-    platform.events.subscribeCaptureCancel.mockResolvedValue(disposeCancel);
-    platform.events.subscribeCaptureCopy.mockReturnValue(copyRegistration.promise);
-    const runtime = createCaptureWorkspaceRuntime({
-      platform,
-      keyboard: { target: keyboardTarget.target },
-    });
-
-    const connecting = runtime.actions.connectHost();
-    await vi.waitFor(() =>
-      expect(platform.events.subscribeCaptureCopy).toHaveBeenCalledOnce(),
-    );
-    runtime.dispose();
-    copyRegistration.resolve(disposeCopy);
-    const disconnect = await connecting;
-    disconnect();
-
-    expect(disposeHotkey).toHaveBeenCalledOnce();
-    expect(disposeCancel).toHaveBeenCalledOnce();
-    expect(disposeCopy).toHaveBeenCalledOnce();
-    expect(keyboardTarget.listenerCount('keydown')).toBe(0);
-    expect(keyboardTarget.listenerCount('keyup')).toBe(0);
-    expect(keyboardTarget.listenerCount('blur')).toBe(0);
   });
 
   it('cancels a session that resolves after disposal without adopting it', async () => {
@@ -255,7 +249,6 @@ describe('capture workspace runtime', () => {
     expect(runtime.renderState).toMatchObject({
       status: 'idle',
       sessionId: null,
-      previewImageBase64: null,
       isRenderingOutput: false,
     });
   });
@@ -378,14 +371,14 @@ describe('capture workspace runtime', () => {
       status: 'preview',
       sessionId: 'replacement-previous',
       selection,
-      previewImageBase64: 'preview-image',
       hasHydratedPixelSource: true,
       error: 'replacement load failed',
     });
     expect(platform.commands.cancelCaptureSession).not.toHaveBeenCalled();
 
     await runtime.actions.startSession('screenshot', 'replacement-success');
-    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledTimes(1);
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledTimes(2);
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith('replacement-failed');
     expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
       'replacement-previous',
     );
@@ -413,7 +406,6 @@ describe('capture workspace runtime', () => {
       status: 'preview',
       sessionId: 'refresh-previous',
       selection,
-      previewImageBase64: 'preview-image',
       error: 'refresh create failed',
     });
     expect(platform.commands.cancelCaptureSession).not.toHaveBeenCalled();
@@ -453,7 +445,8 @@ describe('capture workspace runtime', () => {
     failedReplacement.reject(new Error('stale replacement failed'));
     await stale;
 
-    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledTimes(1);
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledTimes(2);
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith('replacement-stale');
     expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
       'replacement-previous',
     );
@@ -484,18 +477,19 @@ describe('capture workspace runtime', () => {
 
   it('contains an unexpected rejection from work launched by a synchronous shortcut', async () => {
     const platform = createPlatform();
-    platform.commands.renderCaptureOutput.mockRejectedValue(
-      new Error('selection render failed'),
+    platform.commands.outputCapture.mockRejectedValue(
+      new Error('copy failed'),
     );
     const runtime = createCaptureWorkspaceRuntime({ platform });
     await runtime.actions.startSession('screenshot', 'session-key-rejection');
 
-    expect(runtime.actions.keyDown({ key: 'a', metaKey: true })).toBe(true);
+    await runtime.actions.renderSelectionPreview(selection);
+    expect(runtime.actions.keyDown({ key: 'c', metaKey: true })).toBe(true);
 
     await vi.waitFor(() =>
       expect(runtime.renderState).toMatchObject({
         status: 'error',
-        error: 'selection render failed',
+        error: 'copy failed',
       }),
     );
   });
@@ -503,13 +497,7 @@ describe('capture workspace runtime', () => {
   it('owns host subscriptions and cleans every listener up together', async () => {
     const platform = createPlatform();
     const unlistenHotkey = vi.fn();
-    const unlistenCancel = vi.fn();
-    const unlistenCopy = vi.fn();
-    const unlistenSave = vi.fn();
     platform.events.subscribeHotkeyTriggered.mockResolvedValue(unlistenHotkey);
-    platform.events.subscribeCaptureCancel.mockResolvedValue(unlistenCancel);
-    platform.events.subscribeCaptureCopy.mockResolvedValue(unlistenCopy);
-    platform.events.subscribeCaptureSave.mockResolvedValue(unlistenSave);
     const runtime = createCaptureWorkspaceRuntime({ platform });
 
     const disconnect = await runtime.actions.connectHost();
@@ -520,61 +508,27 @@ describe('capture workspace runtime', () => {
       status: 'selecting',
       sessionId: 'session-1',
     });
-    expect(platform.events.subscribeCaptureCancel).toHaveBeenCalledTimes(1);
-    expect(platform.events.subscribeCaptureCopy).toHaveBeenCalledTimes(1);
-    expect(platform.events.subscribeCaptureSave).toHaveBeenCalledTimes(1);
 
     disconnect();
     expect(unlistenHotkey).toHaveBeenCalledTimes(1);
-    expect(unlistenCancel).toHaveBeenCalledTimes(1);
-    expect(unlistenCopy).toHaveBeenCalledTimes(1);
-    expect(unlistenSave).toHaveBeenCalledTimes(1);
   });
 
-  it.each([
-    ['second', 'cancel'],
-    ['third', 'copy'],
-    ['fourth', 'save'],
-  ] as const)('cleans partial subscriptions when the %s registration fails', async (_label, failure) => {
+  it('cleans local keyboard listeners when launch subscription fails', async () => {
     const platform = createPlatform();
     const keyboardTarget = createKeyboardTarget();
-    const unlistenHotkey = vi.fn();
-    const unlistenCancel =
-      failure === 'copy' || failure === 'save'
-        ? vi.fn(() => {
-            throw new Error('cancel dispose failed');
-          })
-        : vi.fn();
-    const unlistenCopy = vi.fn();
-    platform.events.subscribeHotkeyTriggered.mockResolvedValue(unlistenHotkey);
-    if (failure === 'cancel') {
-      platform.events.subscribeCaptureCancel.mockRejectedValue(new Error('cancel listen failed'));
-    } else if (failure === 'copy') {
-      platform.events.subscribeCaptureCancel.mockResolvedValue(unlistenCancel);
-      platform.events.subscribeCaptureCopy.mockRejectedValue(new Error('copy listen failed'));
-    } else {
-      platform.events.subscribeCaptureCancel.mockResolvedValue(unlistenCancel);
-      platform.events.subscribeCaptureCopy.mockResolvedValue(unlistenCopy);
-      platform.events.subscribeCaptureSave.mockRejectedValue(new Error('save listen failed'));
-    }
+    platform.events.subscribeHotkeyTriggered.mockRejectedValue(new Error('listen failed'));
     const runtime = createCaptureWorkspaceRuntime({
       platform,
-      keyboard: {
-        target: keyboardTarget.target,
-      },
+      keyboard: { target: keyboardTarget.target },
     });
-
     await runtime.actions.connectHost();
-
-    expect(unlistenHotkey).toHaveBeenCalledOnce();
-    expect(unlistenCancel).toHaveBeenCalledTimes(failure === 'cancel' ? 0 : 1);
-    expect(unlistenCopy).toHaveBeenCalledTimes(failure === 'save' ? 1 : 0);
+    expect(runtime.renderState.error).toBe('listen failed');
     expect(keyboardTarget.listenerCount('keydown')).toBe(0);
     expect(keyboardTarget.listenerCount('keyup')).toBe(0);
     expect(keyboardTarget.listenerCount('blur')).toBe(0);
   });
 
-  it('handles native preview copy through runtime-owned completion effects', async () => {
+  it('copies committed annotations through the local keyboard', async () => {
     const annotation = {
       type: 'text' as const,
       position: { x: 10, y: 10 },
@@ -600,8 +554,11 @@ describe('capture workspace runtime', () => {
     runtime.actions.updateTextDraftText('SnapLingo');
     await runtime.actions.connectHost();
 
-    const copy = platform.events.subscribeCaptureCopy.mock.calls[0]?.[0];
-    await copy?.();
+    expect(runtime.actions.keyDown({ key: 'c', metaKey: true })).toBe(false);
+    expect(platform.commands.outputCapture).not.toHaveBeenCalled();
+    runtime.actions.commitTextDraft();
+    expect(runtime.actions.keyDown({ key: 'c', metaKey: true })).toBe(true);
+    await vi.waitFor(() => expect(platform.window.hide).toHaveBeenCalledOnce());
 
     expect(platform.commands.outputCapture).toHaveBeenCalledWith({
       sessionId: 'session-native-copy',
@@ -615,7 +572,7 @@ describe('capture workspace runtime', () => {
     );
   });
 
-  it('handles native preview save through runtime-owned completion effects', async () => {
+  it('saves through the local keyboard with the configured output preferences', async () => {
     const platform = createPlatform({
       session: createSession({ id: 'session-native-save' }),
     });
@@ -639,8 +596,8 @@ describe('capture workspace runtime', () => {
     await runtime.actions.renderSelectionPreview(selection);
     await runtime.actions.connectHost();
 
-    const save = platform.events.subscribeCaptureSave.mock.calls[0]?.[0];
-    await save?.();
+    expect(runtime.actions.keyDown({ key: 's', metaKey: true })).toBe(true);
+    await vi.waitFor(() => expect(platform.window.hide).toHaveBeenCalledOnce());
 
     expect(platform.commands.defaultCaptureSavePath).toHaveBeenCalledWith({
       directory: '/custom/captures',
@@ -666,7 +623,7 @@ describe('capture workspace runtime', () => {
     );
   });
 
-  it('handles native undo and redo requests while preview editing is active', async () => {
+  it('handles local undo and redo while preview editing is active', async () => {
     const platform = createPlatform({
       session: createSession({ id: 'session-native-undo' }),
     });
@@ -680,10 +637,10 @@ describe('capture workspace runtime', () => {
     await runtime.actions.pointerUp({ point: { x: 70, y: 80 }, source: 'preview' });
     await runtime.actions.connectHost();
 
-    await platform.events.subscribeCaptureUndo.mock.calls[0]?.[0]?.();
+    runtime.actions.keyDown({ key: 'z', metaKey: true });
     expect(runtime.renderState.annotationHistory.annotations).toEqual([]);
 
-    await platform.events.subscribeCaptureRedo.mock.calls[0]?.[0]?.();
+    runtime.actions.keyDown({ key: 'y', metaKey: true });
     expect(runtime.renderState.annotationHistory.annotations).toHaveLength(1);
   });
 
@@ -959,7 +916,7 @@ describe('capture workspace runtime', () => {
       platform.commands.cancelCaptureSession.mock.calls.filter(
         ([id]) => id === 'session-refresh-stale',
       ),
-    ).toHaveLength(1);
+    ).toHaveLength(2);
   });
 
   it('reports session start failures through runtime state', async () => {
@@ -1259,9 +1216,8 @@ describe('capture workspace runtime', () => {
       status: 'preview',
       selection: recommended,
     });
-    expect(platform.commands.renderCaptureOutput).toHaveBeenCalledWith(
-      expect.objectContaining({ rect: recommended }),
-    );
+    expect(runtime.renderState.selection).toEqual(recommended);
+    expect(platform.commands.renderCaptureOutput).not.toHaveBeenCalled();
     expect(platform.commands.outputCapture).not.toHaveBeenCalled();
     expect(platform.window.hide).not.toHaveBeenCalled();
   });
@@ -1281,22 +1237,7 @@ describe('capture workspace runtime', () => {
     expect(runtime.renderState.sessionId).toBeNull();
   });
 
-  it('does not surface a stale preview failure after cancel', async () => {
-    const preview = deferred<string>();
-    const platform = createPlatform({ session: createSession({ id: 'session-preview-cancel' }) });
-    platform.commands.renderCaptureOutput.mockImplementation(() => preview.promise);
-    const runtime = createCaptureWorkspaceRuntime({ platform });
-    await runtime.actions.startSession('screenshot', 'session-preview-cancel');
-
-    const rendering = runtime.actions.renderSelectionPreview(selection);
-    await runtime.actions.cancelSession();
-    preview.reject(new Error('late preview failure'));
-    await rendering;
-
-    expect(runtime.renderState).toMatchObject({ status: 'idle', error: null });
-  });
-
-  it('does not surface stale output or preview work after reset or cancel', async () => {
+  it('does not surface stale output after resetting preview or cancelling', async () => {
     const preview = deferred<string>();
     const output = deferred<void>();
     const platform = createPlatform();
@@ -1308,7 +1249,7 @@ describe('capture workspace runtime', () => {
     await runtime.actions.startSession('screenshot', 'session-reset-preview');
     const rendering = runtime.actions.renderSelectionPreview(selection);
     runtime.actions.resetPreview();
-    preview.reject(new Error('late reset preview failure'));
+    preview.resolve('unused-preview');
     await rendering;
     expect(runtime.renderState).toMatchObject({ status: 'selecting', error: null });
     expect(platform.commands.cancelCaptureSession).not.toHaveBeenCalled();
@@ -1351,11 +1292,7 @@ describe('capture workspace runtime', () => {
     await vi.waitFor(() => expect(runtime.renderState.status).toBe('preview'));
 
     expect(platform.commands.createCaptureSession).toHaveBeenCalledTimes(1);
-    expect(platform.commands.renderCaptureOutput).toHaveBeenCalledWith({
-      sessionId: 'session-keyboard-host',
-      rect: { x: 0, y: 0, width: 500, height: 300 },
-      annotations: [],
-    });
+    expect(platform.commands.renderCaptureOutput).not.toHaveBeenCalled();
     expect(runtime.renderState.status).toBe('preview');
   });
 
@@ -1382,11 +1319,7 @@ describe('capture workspace runtime', () => {
     ).toBe(true);
     await vi.waitFor(() => expect(runtime.renderState.status).toBe('preview'));
 
-    expect(platform.commands.renderCaptureOutput).toHaveBeenCalledWith({
-      sessionId: 'session-virtual-desktop',
-      rect: { x: 0, y: -100, width: 800, height: 400 },
-      annotations: [],
-    });
+    expect(platform.commands.renderCaptureOutput).not.toHaveBeenCalled();
   });
 
   it('owns preview output and remembered-selection keyboard workflows', async () => {
@@ -1409,11 +1342,7 @@ describe('capture workspace runtime', () => {
     expect(runtime.actions.keyDown({ key: 'c', metaKey: true })).toBe(true);
     await vi.waitFor(() => expect(platform.commands.outputCapture).toHaveBeenCalledTimes(2));
 
-    expect(platform.commands.renderCaptureOutput).toHaveBeenCalledWith({
-      sessionId: 'session-restore',
-      rect: selection,
-      annotations: [],
-    });
+    expect(platform.commands.renderCaptureOutput).not.toHaveBeenCalled();
     expect(platform.commands.outputCapture).toHaveBeenLastCalledWith({
       sessionId: 'session-restore',
       rect: selection,
@@ -1518,11 +1447,7 @@ describe('capture workspace runtime', () => {
         filled: false,
       },
     ]);
-    expect(platform.commands.renderCaptureOutput).toHaveBeenLastCalledWith({
-      sessionId: 'session-editor-draw',
-      rect: selection,
-      annotations: [],
-    });
+    expect(platform.commands.renderCaptureOutput).not.toHaveBeenCalled();
   });
 
   it('commits a pen stroke to canvas-backed history without retaining a draft', async () => {
@@ -1549,7 +1474,6 @@ describe('capture workspace runtime', () => {
       source: 'preview',
     });
 
-    expect(runtime.renderState.previewImageBase64).toBe('preview-image');
     expect(runtime.renderState.annotationHistory.annotations[0]?.type).toBe(
       'freehand',
     );
@@ -1726,139 +1650,28 @@ describe('capture workspace runtime', () => {
     expect(runtime.actions.keyDown({ key: 'y', metaKey: true })).toBe(true);
     expect(platform.commands.renderCaptureOutput).not.toHaveBeenCalled();
     expect(runtime.renderState.annotationHistory.annotations).toHaveLength(1);
-    expect(runtime.renderState.previewImageBase64).toBe('preview-image');
   });
 
-  it('ignores a superseded preview failure and publishes the queued revision', async () => {
-    const supersededPreview = deferred<string>();
-    const platform = createPlatform({
-      session: createSession({ id: 'session-preview-revision' }),
-    });
-    platform.commands.renderCaptureOutput
-      .mockImplementationOnce(() => supersededPreview.promise)
-      .mockResolvedValueOnce('latest-preview');
-    const runtime = createCaptureWorkspaceRuntime({ platform });
-
-    await runtime.actions.startSession(
-      'screenshot',
-      'session-preview-revision',
-    );
-    const first = runtime.actions.renderSelectionPreview(selection, []);
-    await vi.waitFor(() =>
-      expect(platform.commands.renderCaptureOutput).toHaveBeenCalledTimes(1),
-    );
-    const finalAnnotations = [
-      {
-        type: 'rectangle' as const,
-        rect: { x: 4, y: 5, width: 30, height: 20 },
-        color: [255, 77, 79, 255] as [number, number, number, number],
-        stroke_width: 2,
-        filled: false,
-      },
-    ];
-    const latest = runtime.actions.renderSelectionPreview(
-      selection,
-      finalAnnotations,
-    );
-
-    supersededPreview.reject(new Error('superseded failure'));
-    await Promise.all([first, latest]);
-
-    expect(runtime.renderState).toMatchObject({
-      status: 'preview',
-      previewImageBase64: 'latest-preview',
-      isRenderingOutput: false,
-      error: null,
-    });
-    expect(platform.commands.renderCaptureOutput).toHaveBeenLastCalledWith({
-      sessionId: 'session-preview-revision',
-      rect: selection,
-      annotations: finalAnnotations,
-    });
-  });
-
-  it('detaches an unresolved preview scheduler when a replacement session starts', async () => {
-    const oldPreview = deferred<string>();
+  it('updates preview geometry immediately even when the output renderer is unavailable', async () => {
     const platform = createPlatform();
-    platform.commands.getCaptureSession.mockImplementation(async (sessionId) =>
-      createSession({ id: sessionId }),
-    );
-    platform.commands.renderCaptureOutput
-      .mockImplementationOnce(() => oldPreview.promise)
-      .mockResolvedValueOnce('replacement-preview');
+    platform.commands.renderCaptureOutput.mockImplementation(() => new Promise(() => undefined));
     const runtime = createCaptureWorkspaceRuntime({ platform });
-
-    await runtime.actions.startSession('screenshot', 'session-preview-old');
-    const oldRendering = runtime.actions.renderSelectionPreview(selection);
-    await vi.waitFor(() =>
-      expect(platform.commands.renderCaptureOutput).toHaveBeenCalledTimes(1),
-    );
-
-    await runtime.actions.startSession('screenshot', 'session-preview-new');
-    const replacementRendering =
-      runtime.actions.renderSelectionPreview(selection);
-
-    try {
-      await vi.waitFor(() =>
-        expect(platform.commands.renderCaptureOutput).toHaveBeenCalledTimes(2),
-      );
-      await replacementRendering;
-      expect(runtime.renderState).toMatchObject({
-        sessionId: 'session-preview-new',
-        status: 'preview',
-        previewImageBase64: 'replacement-preview',
-        error: null,
-      });
-    } finally {
-      oldPreview.reject(new Error('late old preview failure'));
-      await Promise.all([oldRendering, replacementRendering]);
-    }
-
+    await runtime.actions.startSession('screenshot', 'session-1');
+    const latest = { x: 40, y: 50, width: 220, height: 130 };
+    await runtime.actions.renderSelectionPreview(selection);
+    await runtime.actions.renderSelectionPreview(latest);
     expect(runtime.renderState).toMatchObject({
-      sessionId: 'session-preview-new',
-      status: 'preview',
-      previewImageBase64: 'replacement-preview',
-      error: null,
+      status: 'preview', selection: latest, isRenderingOutput: false, error: null,
     });
+    runtime.actions.toggleAnnotationTool('rectangle');
+    runtime.actions.pointerDown({ point: { x: 50, y: 60 }, source: 'preview' });
+    runtime.actions.pointerMove({ point: { x: 90, y: 100 }, source: 'preview' });
+    await runtime.actions.pointerUp({ point: { x: 90, y: 100 }, source: 'preview' });
+    expect(runtime.renderState.annotationHistory.annotations).toHaveLength(1);
+    expect(platform.commands.renderCaptureOutput).not.toHaveBeenCalled();
   });
 
-  it('detaches an unresolved preview scheduler when preview state resets', async () => {
-    const oldPreview = deferred<string>();
-    const platform = createPlatform({
-      session: createSession({ id: 'session-preview-reset-owner' }),
-    });
-    platform.commands.renderCaptureOutput
-      .mockImplementationOnce(() => oldPreview.promise)
-      .mockResolvedValueOnce('reset-owner-preview');
-    const runtime = createCaptureWorkspaceRuntime({ platform });
-
-    await runtime.actions.startSession(
-      'screenshot',
-      'session-preview-reset-owner',
-    );
-    const oldRendering = runtime.actions.renderSelectionPreview(selection);
-    await vi.waitFor(() =>
-      expect(platform.commands.renderCaptureOutput).toHaveBeenCalledTimes(1),
-    );
-
-    runtime.actions.resetPreview();
-    const resetRendering = runtime.actions.renderSelectionPreview(selection);
-    await vi.waitFor(() =>
-      expect(platform.commands.renderCaptureOutput).toHaveBeenCalledTimes(2),
-    );
-    await resetRendering;
-    expect(runtime.renderState.previewImageBase64).toBe('reset-owner-preview');
-
-    oldPreview.reject(new Error('late reset-owner failure'));
-    await oldRendering;
-    expect(runtime.renderState).toMatchObject({
-      status: 'preview',
-      previewImageBase64: 'reset-owner-preview',
-      error: null,
-    });
-  });
-
-  it('executes copy once with current annotations while a preview is pending', async () => {
+  it('copies current annotations immediately without waiting for preview encoding', async () => {
     const pendingPreview = deferred<string>();
     const platform = createPlatform({
       session: createSession({ id: 'session-copy-pending-preview' }),
@@ -1889,9 +1702,8 @@ describe('capture workspace runtime', () => {
       24,
     );
     const rendering = runtime.actions.renderSelectionPreview(selection);
-    await vi.waitFor(() =>
-      expect(platform.commands.renderCaptureOutput).toHaveBeenCalledTimes(1),
-    );
+    expect(platform.commands.renderCaptureOutput).not.toHaveBeenCalled();
+    expect(runtime.renderState.isRenderingOutput).toBe(false);
 
     await runtime.actions.completePreviewSelection('copy', selection);
 
@@ -2038,7 +1850,6 @@ describe('capture workspace runtime', () => {
       stroke_width: 6,
       filled: true,
     });
-    expect(runtime.renderState.previewImageBase64).toBe('preview-image');
   });
 
   it('restores canvas text immediately when text editing is discarded', async () => {
@@ -2071,7 +1882,6 @@ describe('capture workspace runtime', () => {
     runtime.actions.discardTextDraft();
 
     expect(platform.commands.renderCaptureOutput).not.toHaveBeenCalled();
-    expect(runtime.renderState.previewImageBase64).toBe('preview-image');
     expect(runtime.renderState.textDraft).toBeNull();
     expect(runtime.renderState.annotationHistory.annotations[0]).toMatchObject({
       type: 'text',
@@ -2198,7 +2008,7 @@ describe('capture workspace runtime', () => {
     expect(runtime.renderState.startPoint).toBeNull();
   });
 
-  it('owns delete, erase, clear, and preview failure state', async () => {
+  it('owns delete, erase, clear, and output failure state', async () => {
     const platform = createPlatform({
       session: createSession({ id: 'session-editor-delete' }),
     });
@@ -2252,15 +2062,15 @@ describe('capture workspace runtime', () => {
       expect(runtime.renderState.isRenderingOutput).toBe(false),
     );
 
-    platform.commands.renderCaptureOutput.mockRejectedValueOnce(
-      new Error('editor preview failed'),
+    platform.commands.outputCapture.mockRejectedValueOnce(
+      new Error('editor output failed'),
     );
-    await runtime.actions.renderSelectionPreview(selection);
+    await runtime.actions.completePreviewSelection('copy', selection);
     expect(runtime.renderState).toMatchObject({
       status: 'error',
       selection,
       isRenderingOutput: false,
-      error: 'editor preview failed',
+      error: 'editor output failed',
     });
   });
 
@@ -2544,11 +2354,7 @@ describe('capture workspace runtime', () => {
 
     await runtime.actions.pointerUp({ x: 100, y: 80 });
 
-    expect(platform.commands.renderCaptureOutput).toHaveBeenCalledWith({
-      sessionId: 'session-1',
-      rect: { x: 20, y: 30, width: 81, height: 50 },
-      annotations: [],
-    });
+    expect(platform.commands.renderCaptureOutput).not.toHaveBeenCalled();
   });
 
   it('uses the pointer-up coordinate when the draft was not keyboard-adjusted', async () => {
@@ -2560,14 +2366,10 @@ describe('capture workspace runtime', () => {
 
     await runtime.actions.pointerUp({ x: 120, y: 90 });
 
-    expect(platform.commands.renderCaptureOutput).toHaveBeenCalledWith({
-      sessionId: 'session-1',
-      rect: { x: 20, y: 30, width: 100, height: 60 },
-      annotations: [],
-    });
+    expect(platform.commands.renderCaptureOutput).not.toHaveBeenCalled();
   });
 
-  it('uses pointer-derived hover state for keyboard and native copy', async () => {
+  it('uses pointer-derived hover state for Enter and local copy', async () => {
     const candidateB = { x: 200, y: 40, width: 80, height: 70 };
     const platform = createPlatform();
     platform.commands.getCaptureSession.mockImplementation(async (id) =>
@@ -2589,8 +2391,8 @@ describe('capture workspace runtime', () => {
     await runtime.actions.startSession('screenshot-copy', 'session-poll-native');
     runtime.actions.pointerMove({ x: 220, y: 60 });
     await runtime.actions.connectHost();
-    const copyCalls = platform.events.subscribeCaptureCopy.mock.calls;
-    await copyCalls[copyCalls.length - 1]?.[0]?.();
+    runtime.actions.keyDown({ key: 'c', metaKey: true });
+    await vi.waitFor(() => expect(platform.commands.outputCapture).toHaveBeenCalledTimes(2));
     expect(platform.commands.outputCapture).toHaveBeenCalledWith(
       expect.objectContaining({ sessionId: 'session-poll-native', rect: candidateB }),
     );
@@ -2988,19 +2790,38 @@ describe('capture workspace runtime', () => {
     expect(runtime.renderState).toMatchObject({
       status: 'selecting',
       sessionId: 'session-new',
-      previewImageBase64: null,
       isRenderingOutput: false,
       error: null,
     });
   });
 
-  it('does not open an OCR result for a stale completion', async () => {
-    const ocr = deferred<{ text: string; confidence: null }>();
+  it('hands OCR to the backend without waiting for recognition', async () => {
+    const platform = createPlatform({ session: createSession({ id: 'session-ocr' }) });
+    const recognition = deferred<{ text: string; confidence: null }>();
+    platform.commands.runCaptureOcr.mockImplementation(() => recognition.promise);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession('screenshot-ocr', 'session-ocr');
+    runtime.actions.pointerDown({ x: 20, y: 30 });
+    runtime.actions.pointerMove({ x: 140, y: 110 });
+    const completion = runtime.actions.pointerUp({ x: 140, y: 110 });
+
+    await vi.waitFor(() => expect(platform.commands.completeCaptureOcr).toHaveBeenCalledWith('session-ocr'));
+    await completion;
+    expect(platform.commands.prepareCaptureOcr).toHaveBeenCalledWith({
+      sessionId: 'session-ocr', rect: selection, annotations: [], target: 'ocr-window',
+    });
+    expect(runtime.renderState.status).toBe('idle');
+    expect(platform.commands.runCaptureOcr).not.toHaveBeenCalled();
+  });
+
+  it('does not commit a prepared OCR selection for a stale session', async () => {
+    const ocr = deferred<void>();
     const platform = createPlatform();
     platform.commands.getCaptureSession.mockImplementation(async (sessionId) =>
       createSession({ id: sessionId }),
     );
-    platform.commands.runCaptureOcr.mockImplementation(() => ocr.promise);
+    platform.commands.prepareCaptureOcr.mockImplementation(() => ocr.promise);
     const runtime = createCaptureWorkspaceRuntime({ platform });
 
     await runtime.actions.startSession('screenshot-ocr', 'session-old');
@@ -3008,10 +2829,10 @@ describe('capture workspace runtime', () => {
     runtime.actions.pointerMove({ x: 140, y: 110 });
     const oldCompletion = runtime.actions.pointerUp({ x: 140, y: 110 });
     await runtime.actions.startSession('screenshot', 'session-new');
-    ocr.resolve({ text: 'stale text', confidence: null });
+    ocr.resolve();
     await oldCompletion;
 
-    expect(platform.commands.openCaptureOcrResultWindow).not.toHaveBeenCalled();
+    expect(platform.commands.completeCaptureOcr).not.toHaveBeenCalled();
     expect(platform.commands.renderCaptureOutput).not.toHaveBeenCalled();
     expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
       'session-old',
@@ -3095,225 +2916,129 @@ describe('capture workspace runtime', () => {
     runtime.actions.pointerMove({ x: 140, y: 110 });
     await runtime.actions.pointerUp({ x: 140, y: 110 });
 
-    expect(platform.commands.renderCaptureOutput).toHaveBeenCalledWith({
-      sessionId: 'session-preview',
-      rect: selection,
-      annotations: [],
-    });
+    expect(platform.commands.renderCaptureOutput).not.toHaveBeenCalled();
     expect(platform.window.hide).not.toHaveBeenCalled();
     expect(platform.commands.cancelCaptureSession).not.toHaveBeenCalled();
     expect(runtime.renderState).toMatchObject({
       status: 'preview',
       sessionId: 'session-preview',
       selection,
-      previewImageBase64: 'preview-image',
       isRenderingOutput: false,
       error: null,
     });
   });
 
   it.each([
-    {
-      mode: 'screenshot-ocr' as const,
-      expectedText: 'recognized text',
-      assertResult: (platform: ReturnType<typeof createPlatform>) => {
-        expect(platform.commands.renderCaptureOutput).toHaveBeenCalledWith({
-          sessionId: 'session-ocr',
-          rect: selection,
-          annotations: [],
-        });
-        expect(platform.commands.openCaptureOcrResultWindow).toHaveBeenCalledWith(
-          'recognized text',
-          'preview-image',
-        );
-      },
-    },
-    {
-      mode: 'silent-screenshot-ocr' as const,
-      expectedText: 'recognized text',
-      assertResult: (platform: ReturnType<typeof createPlatform>) => {
-        expect(platform.commands.copyTextToClipboard).toHaveBeenCalledWith(
-          'recognized text',
-        );
-      },
-    },
-    {
-      mode: 'screenshot-translate' as const,
-      expectedText: 'recognized text',
-      detectedLanguage: 'fr',
-      assertResult: (platform: ReturnType<typeof createPlatform>) => {
-        expect(
-          platform.commands.openCaptureTranslationResultWindow,
-        ).toHaveBeenCalledWith('recognized text', 'fr');
-      },
-    },
-  ])('executes $mode completion effects before finishing', async ({
-    assertResult,
-    mode,
-  }) => {
-    const platform = createPlatform({
-      session: createSession({ id: 'session-ocr' }),
-    });
-    platform.commands.runCaptureOcr.mockResolvedValue({
-      text: ' recognized text ',
-      confidence: null,
-      ...(mode === 'screenshot-translate'
-        ? { detected_language: 'fr' }
-        : {}),
-    });
-    platform.commands.renderCaptureOutput.mockResolvedValue('preview-image');
-    const runtime = createCaptureWorkspaceRuntime({
-      platform,
-      delay: async () => undefined,
-    });
+    ['screenshot-ocr', 'ocr-window'],
+    ['silent-screenshot-ocr', 'clipboard'],
+    ['screenshot-translate', 'translation-window'],
+  ] as const)('hands %s to the correct backend target', async (mode, target) => {
+    const platform = createPlatform({ session: createSession({ id: 'session-ocr' }) });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
 
     await runtime.actions.startSession(mode, 'session-ocr');
     runtime.actions.pointerDown({ x: 20, y: 30 });
     runtime.actions.pointerMove({ x: 140, y: 110 });
     await runtime.actions.pointerUp({ x: 140, y: 110 });
 
-    expect(platform.commands.runCaptureOcr).toHaveBeenCalledWith(
-      'session-ocr',
-      selection,
-    );
-    assertResult(platform);
-    expect(platform.window.hide).toHaveBeenCalledTimes(1);
-    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
-      'session-ocr',
-    );
-    expect(runtime.renderState).toMatchObject({
-      status: 'idle',
-      sessionId: null,
-      isRenderingOutput: false,
-      error: null,
+    expect(platform.commands.prepareCaptureOcr).toHaveBeenCalledWith({
+      sessionId: 'session-ocr', rect: selection, annotations: [], target,
     });
+    expect(platform.commands.completeCaptureOcr).toHaveBeenCalledWith('session-ocr');
+    expect(platform.commands.copyTextToClipboard).not.toHaveBeenCalled();
+    expect(platform.commands.runCaptureOcr).not.toHaveBeenCalled();
+    expect(runtime.renderState).toMatchObject({ status: 'idle', sessionId: null, error: null });
   });
 
-  it('shows silent OCR progress at the cursor until copied successfully', async () => {
-    const pause = deferred<void>();
-    const platform = createPlatform({
-      session: createSession({ id: 'session-silent-ocr' }),
-    });
-    platform.commands.runCaptureOcr.mockResolvedValue({
-      text: 'recognized text',
-      confidence: null,
-    });
-    const delay = vi.fn(() => pause.promise);
-    const runtime = createCaptureWorkspaceRuntime({ platform, delay });
-
-    await runtime.actions.startSession('silent-screenshot-ocr', 'session-silent-ocr');
-    runtime.actions.pointerDown({ x: 20, y: 30 });
-    runtime.actions.pointerMove({ x: 140, y: 110 });
-    const completion = runtime.actions.pointerUp({ x: 140, y: 110 });
-
-    expect(runtime.renderState.silentOcrHint).toEqual({
-      status: 'loading',
-      point: { x: 140, y: 110 },
-    });
-    await vi.waitFor(() => expect(delay).toHaveBeenCalledWith(550));
-    expect(runtime.renderState.silentOcrHint).toEqual({
-      status: 'success',
-      point: { x: 140, y: 110 },
-    });
-
-    pause.resolve();
-    await completion;
-  });
-
-  it('suppresses silent OCR status when configured', async () => {
-    const platform = createPlatform({
-      session: createSession({ id: 'session-hidden-silent-ocr' }),
-    });
-    platform.commands.runCaptureOcr.mockResolvedValue({
-      text: 'recognized text',
-      confidence: null,
-    });
-    const delay = vi.fn(async () => undefined);
-    const runtime = createCaptureWorkspaceRuntime({
-      platform,
-      delay,
-      ocrPreferences: () => ({
-        recognitionLanguage: 'auto',
-        preserveFormatting: true,
-        removeChineseSpaces: true,
-        showConfidence: false,
-        hideSilentStatus: true,
-      }),
-    });
-
-    await runtime.actions.startSession(
-      'silent-screenshot-ocr',
-      'session-hidden-silent-ocr',
-    );
-    runtime.actions.pointerDown({ x: 20, y: 30 });
-    runtime.actions.pointerMove({ x: 140, y: 110 });
-    await runtime.actions.pointerUp({ x: 140, y: 110 });
-
-    expect(delay).not.toHaveBeenCalled();
-    expect(runtime.renderState.silentOcrHint).toBeNull();
-  });
-
-  it('does not restore a hover selection while direct OCR completion is pending', async () => {
-    const ocr = deferred<{ text: string; confidence: null }>();
-    const platform = createPlatform({
-      session: createSession({ id: 'session-pending-ocr' }),
-    });
-    platform.commands.runCaptureOcr.mockImplementation(() => ocr.promise);
+  it('releases silent OCR as soon as the selected pixels are handed off', async () => {
+    const prepared = deferred<void>();
+    const platform = createPlatform({ session: createSession({ id: 'session-silent' }) });
+    platform.commands.prepareCaptureOcr.mockImplementation(() => prepared.promise);
     const runtime = createCaptureWorkspaceRuntime({ platform });
 
-    await runtime.actions.startSession(
-      'screenshot-ocr',
-      'session-pending-ocr',
-    );
+    await runtime.actions.startSession('silent-screenshot-ocr', 'session-silent');
     runtime.actions.pointerDown({ x: 20, y: 30 });
     runtime.actions.pointerMove({ x: 140, y: 110 });
     const completion = runtime.actions.pointerUp({ x: 140, y: 110 });
-
-    expect(runtime.renderState).toMatchObject({
-      status: 'loading',
-      cursorPoint: null,
-      hoverSelection: null,
-      selection,
-      isRenderingOutput: true,
+    expect(runtime.renderState.silentOcrHint).toEqual({
+      status: 'loading', point: { x: 140, y: 110 },
     });
+    expect(platform.commands.completeCaptureOcr).not.toHaveBeenCalled();
 
-    runtime.actions.pointerMove({ x: 60, y: 70 });
-    expect(runtime.renderState.cursorPoint).toBeNull();
-    expect(runtime.renderState.hoverSelection).toBeNull();
-
-    ocr.resolve({ text: 'recognized text', confidence: null });
+    prepared.resolve();
     await completion;
+    expect(runtime.renderState.status).toBe('idle');
+    expect(runtime.renderState.silentOcrHint).toBeNull();
+    expect(platform.commands.completeCaptureOcr).toHaveBeenCalledWith('session-silent');
   });
 
-  it('opens the OCR result without copying text for ordinary OCR', async () => {
-    const platform = createPlatform({
-      session: createSession({ id: 'session-ocr' }),
-    });
-    platform.commands.runCaptureOcr.mockResolvedValue({
-      text: 'recognized text',
-      confidence: null,
-    });
+  it('suppresses silent OCR preparation status when configured', async () => {
+    const prepared = deferred<void>();
+    const platform = createPlatform();
+    platform.commands.prepareCaptureOcr.mockImplementation(() => prepared.promise);
     const runtime = createCaptureWorkspaceRuntime({
       platform,
       ocrPreferences: () => ({
-        recognitionLanguage: 'auto',
-        preserveFormatting: true,
-        removeChineseSpaces: true,
-        showConfidence: false,
+        recognitionLanguage: 'auto', preserveFormatting: true,
+        removeChineseSpaces: true, showConfidence: false, hideSilentStatus: true,
       }),
     });
+    await runtime.actions.startSession('silent-screenshot-ocr', 'session-hidden');
+    runtime.actions.pointerDown({ x: 20, y: 30 });
+    runtime.actions.pointerMove({ x: 140, y: 110 });
+    const completion = runtime.actions.pointerUp({ x: 140, y: 110 });
+    expect(runtime.renderState.silentOcrHint).toBeNull();
+    prepared.resolve();
+    await completion;
+  });
 
+  it('does not restore hover feedback while OCR pixels are being prepared', async () => {
+    const prepared = deferred<void>();
+    const platform = createPlatform({ session: createSession({ id: 'session-pending' }) });
+    platform.commands.prepareCaptureOcr.mockImplementation(() => prepared.promise);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot-ocr', 'session-pending');
+    runtime.actions.pointerDown({ x: 20, y: 30 });
+    runtime.actions.pointerMove({ x: 140, y: 110 });
+    const completion = runtime.actions.pointerUp({ x: 140, y: 110 });
+    runtime.actions.pointerMove({ x: 60, y: 70 });
+    expect(runtime.renderState).toMatchObject({
+      status: 'loading', cursorPoint: null, hoverSelection: null,
+      selection, isRenderingOutput: true,
+    });
+    prepared.resolve();
+    await completion;
+  });
+
+  it('preserves the selected OCR language during handoff', async () => {
+    const platform = createPlatform({ session: createSession({ id: 'session-ocr' }) });
+    const runtime = createCaptureWorkspaceRuntime({
+      platform,
+      ocrPreferences: () => ({
+        recognitionLanguage: 'ja', preserveFormatting: true,
+        removeChineseSpaces: true, showConfidence: false,
+      }),
+    });
     await runtime.actions.startSession('screenshot-ocr', 'session-ocr');
     runtime.actions.pointerDown({ x: 20, y: 30 });
     runtime.actions.pointerMove({ x: 140, y: 110 });
     await runtime.actions.pointerUp({ x: 140, y: 110 });
+    expect(platform.commands.prepareCaptureOcr).toHaveBeenCalledWith({
+      sessionId: 'session-ocr', rect: selection, annotations: [],
+      target: 'ocr-window', language: 'ja',
+    });
+  });
 
-    expect(platform.commands.openCaptureOcrResultWindow).toHaveBeenCalledWith(
-      'recognized text',
-      'preview-image',
-    );
-    expect(platform.commands.copyTextToClipboard).not.toHaveBeenCalled();
-    expect(platform.window.hide).toHaveBeenCalledTimes(1);
+  it('keeps preparation errors visible without committing an OCR job', async () => {
+    const platform = createPlatform();
+    platform.commands.prepareCaptureOcr.mockRejectedValue(new Error('pixels unavailable'));
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot-ocr', 'session-error');
+    runtime.actions.pointerDown({ x: 20, y: 30 });
+    runtime.actions.pointerMove({ x: 140, y: 110 });
+    await runtime.actions.pointerUp({ x: 140, y: 110 });
+    expect(runtime.renderState).toMatchObject({ status: 'error', error: 'pixels unavailable' });
+    expect(platform.commands.completeCaptureOcr).not.toHaveBeenCalled();
   });
 
   it('persists font and stroke defaults only through the injected settings seam', () => {
@@ -3411,6 +3136,8 @@ function createPlatform({
         CaptureWorkspacePorts['commands']['outputCapture']
       >(async () => undefined),
       runCaptureOcr: vi.fn(async () => ({ text: '', confidence: null })),
+      prepareCaptureOcr: vi.fn(async (_input: unknown): Promise<void> => undefined),
+      completeCaptureOcr: vi.fn(async (_sessionId: string): Promise<void> => undefined),
       openCaptureOcrResultWindow: vi.fn(async () => undefined),
       openCaptureTranslationResultWindow: vi.fn(async () => undefined),
       copyTextToClipboard: vi.fn(async () => undefined),
@@ -3419,21 +3146,6 @@ function createPlatform({
       writeText: vi.fn(async () => undefined),
     },
     events: {
-    subscribeCaptureCancel: vi.fn<
-      CaptureWorkspacePorts['events']['subscribeCaptureCancel']
-    >(async () => () => undefined),
-    subscribeCaptureCopy: vi.fn<
-      CaptureWorkspacePorts['events']['subscribeCaptureCopy']
-    >(async () => () => undefined),
-    subscribeCaptureSave: vi.fn<
-      CaptureWorkspacePorts['events']['subscribeCaptureSave']
-    >(async () => () => undefined),
-    subscribeCaptureUndo: vi.fn<
-      CaptureWorkspacePorts['events']['subscribeCaptureUndo']
-    >(async () => () => undefined),
-    subscribeCaptureRedo: vi.fn<
-      CaptureWorkspacePorts['events']['subscribeCaptureRedo']
-    >(async () => () => undefined),
     subscribeHotkeyTriggered: vi.fn<
       CaptureWorkspacePorts['events']['subscribeHotkeyTriggered']
     >(async () => () => undefined),

@@ -131,11 +131,7 @@ impl CaptureSessions {
         let session = CaptureSession {
             id: id.clone(),
             desktop_scale,
-            layout_snapshots: snapshots
-                .iter()
-                .cloned()
-                .map(snapshot_without_pixels)
-                .collect(),
+            layout_snapshots: snapshots.iter().map(snapshot_without_pixels).collect(),
             snapshots,
             candidates,
             captured_cursor,
@@ -315,6 +311,39 @@ impl CaptureSessions {
             .ok_or_else(|| {
                 AppError::System(format!(
                     "Capture session monitor snapshot is unavailable: {monitor_id}"
+                ))
+            })
+    }
+
+    pub async fn hydrate_session_snapshot_metadata(
+        &self,
+        id: &CaptureSessionId,
+    ) -> Result<CaptureSessionView> {
+        self.ensure_session_snapshots_hydrated(id).await?;
+        self.get_session_view_without_monitor_images(id)
+    }
+
+    pub async fn hydrate_monitor_snapshot_metadata(
+        &self,
+        id: &CaptureSessionId,
+        monitor_id: &str,
+    ) -> Result<MonitorSnapshotView> {
+        self.hydrate_session_snapshot_metadata(id)
+            .await?
+            .monitors
+            .into_iter()
+            .find(|monitor| monitor.id == monitor_id)
+            .ok_or_else(|| {
+                AppError::System(format!("Capture session monitor not found: {monitor_id}"))
+            })
+    }
+
+    pub fn monitor_snapshot_png(&self, id: &CaptureSessionId, monitor_id: &str) -> Result<Vec<u8>> {
+        self.cached_monitor_snapshot(id, monitor_id)?
+            .map(|snapshot| snapshot.png_data)
+            .ok_or_else(|| {
+                AppError::System(format!(
+                    "Capture monitor pixels are unavailable: {monitor_id}"
                 ))
             })
     }
@@ -518,16 +547,31 @@ impl CaptureSessions {
         &self,
         id: &CaptureSessionId,
     ) -> Result<CaptureSessionView> {
-        let session = self.get_session(id)?;
-
-        Ok(session_to_view_without_monitor_images(&session))
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| AppError::System("Capture session lock poisoned".to_string()))?;
+        let session = sessions
+            .get(id)
+            .ok_or_else(|| AppError::System(format!("Capture session not found: {}", id.0)))?;
+        Ok(session_to_view_without_monitor_images(session))
     }
 
     pub fn current_cursor_position(&self, id: &CaptureSessionId) -> Result<Option<LogicalPoint>> {
-        let session = self.get_session(id)?;
+        let layouts = self.session_layout_snapshots(id)?;
+        self.source.current_cursor_position(&layouts)
+    }
 
-        self.source
-            .current_cursor_position(&session.layout_snapshots)
+    fn session_layout_snapshots(&self, id: &CaptureSessionId) -> Result<Vec<MonitorSnapshot>> {
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| AppError::System("Capture session lock poisoned".to_string()))?;
+        let session = sessions
+            .get(id)
+            .ok_or_else(|| AppError::System(format!("Capture session not found: {}", id.0)))?;
+        // Cursor and element queries need geometry, never the frozen PNG payloads.
+        Ok(session.layout_snapshots.clone())
     }
 
     pub fn window_geometry(&self, id: &CaptureSessionId) -> Result<CaptureWindowGeometry> {
@@ -548,11 +592,11 @@ impl CaptureSessions {
         id: &CaptureSessionId,
         point: &LogicalPoint,
     ) -> Result<Option<CaptureCandidateView>> {
-        let session = self.get_session(id)?;
+        let layouts = self.session_layout_snapshots(id)?;
 
         Ok(self
             .source
-            .capture_control_candidate(point, &session.layout_snapshots)
+            .capture_control_candidate(point, &layouts)
             .await?
             .map(control_candidate_to_view))
     }
@@ -569,9 +613,8 @@ impl CaptureSessions {
         id: &CaptureSessionId,
         rect: &LogicalRect,
     ) -> Result<PhysicalRect> {
-        let session = self.get_session(id)?;
-        let snapshot = session
-            .layout_snapshots
+        let layouts = self.session_layout_snapshots(id)?;
+        let snapshot = layouts
             .iter()
             .find(|snapshot| logical_rects_intersect(rect, &snapshot.logical_bounds))
             .ok_or_else(|| {
@@ -655,9 +698,14 @@ fn captured_cursor_to_view(cursor: &CapturedCursor) -> CapturedCursorView {
     }
 }
 
-fn snapshot_without_pixels(mut snapshot: MonitorSnapshot) -> MonitorSnapshot {
-    snapshot.png_data.clear();
-    snapshot
+fn snapshot_without_pixels(snapshot: &MonitorSnapshot) -> MonitorSnapshot {
+    MonitorSnapshot {
+        id: snapshot.id.clone(),
+        logical_bounds: snapshot.logical_bounds.clone(),
+        physical_bounds: snapshot.physical_bounds.clone(),
+        scale_factor: snapshot.scale_factor,
+        png_data: Vec::new(),
+    }
 }
 
 fn session_snapshots_cover_rect(session: &CaptureSession, rect: &LogicalRect) -> bool {

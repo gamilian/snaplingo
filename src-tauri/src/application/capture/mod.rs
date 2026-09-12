@@ -1,5 +1,6 @@
 mod coordinates;
 mod image_composer;
+mod ocr_completion;
 mod output;
 mod render;
 mod runtime;
@@ -12,11 +13,14 @@ mod image_composer_test;
 #[cfg(test)]
 mod output_test;
 #[cfg(test)]
+mod session_allocations_test;
+#[cfg(test)]
 mod session_test;
 
 pub use coordinates::{CaptureCoordinatePolicy, CaptureWindowGeometry};
 pub use image_composer::CaptureImageComposer;
 pub(crate) use image_composer::{ImageAnnotation, PngPlacement};
+pub(crate) use ocr_completion::{CaptureOcrStatus, CaptureOcrTarget};
 pub(crate) use output::{configured_capture_save_dir, CaptureOutputHost, CaptureOutputSystemPaths};
 pub use output::{CaptureOutput, ClipboardCaptureOutput};
 pub use render::CaptureSessionOutput;

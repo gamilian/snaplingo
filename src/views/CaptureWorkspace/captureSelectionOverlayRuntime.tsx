@@ -1,6 +1,6 @@
 import {
   useCallback,
-  useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   type Ref,
@@ -102,7 +102,6 @@ export function useCaptureSelectionOverlay({
   viewportBounds,
 }: UseCaptureSelectionOverlayOptions) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
   const frameRef = useRef<CaptureSelectionOverlayFrame | null>(null);
   const cssSize = useMemo(
     () => getSelectionOverlayCanvasSize(viewportBounds),
@@ -154,12 +153,9 @@ export function useCaptureSelectionOverlay({
         showSelectionSize,
       });
 
-      if (animationFrameRef.current !== null) return;
-
-      animationFrameRef.current = window.requestAnimationFrame(() => {
-        animationFrameRef.current = null;
-        paintFrame(frameRef.current);
-      });
+      // Pointer input is already coalesced per frame. Paint during this commit
+      // instead of queuing a second frame behind the latest pointer position.
+      paintFrame(frameRef.current);
     },
     [
       draftSelectionRef,
@@ -179,17 +175,11 @@ export function useCaptureSelectionOverlay({
 
   const getCurrentFrame = useCallback(() => frameRef.current, []);
 
-  useEffect(() => {
+  const draftSelection = draftSelectionRef.current;
+  const hoverSelection = hoverSelectionRef.current;
+  useLayoutEffect(() => {
     schedulePaint();
-  }, [schedulePaint, selection, viewportBounds]);
-
-  useEffect(() => {
-    return () => {
-      if (animationFrameRef.current !== null) {
-        window.cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, []);
+  }, [schedulePaint, selection, draftSelection, hoverSelection, viewportBounds]);
 
   return {
     canvasRef,

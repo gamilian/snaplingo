@@ -4,6 +4,7 @@ import {
   shouldTrackCaptureCursorForMagnifier,
 } from '../image-inspection/magnifier';
 import { getMonitorAtVirtualPoint } from './virtualDesktop';
+import { captureMonitorImageSource } from './captureSnapshot';
 import type {
   CaptureSessionView,
   LogicalRect,
@@ -65,7 +66,7 @@ export function getCaptureMagnifierRuntimeState({
   viewportBounds,
 }: CaptureMagnifierRuntimeStateOptions): CaptureMagnifierRuntimeState {
   const hasHydratedPixelSource = Boolean(
-    session?.monitors.some((monitor) => monitor.image_base64),
+    session?.monitors.some((monitor) => captureMonitorImageSource(monitor)),
   );
   const cursorMonitor =
     session && cursorPoint
@@ -78,7 +79,7 @@ export function getCaptureMagnifierRuntimeState({
           y: cursorPoint.y - cursorMonitor.logical_bounds.y,
         }
       : null;
-  const hasMagnifierPixelSource = Boolean(cursorMonitor?.image_base64);
+  const hasMagnifierPixelSource = Boolean(captureMonitorImageSource(cursorMonitor));
   const isMagnifierAutoRequested = shouldAutoShowCaptureMagnifier({
     status,
     hasHydratedPixels: hasMagnifierPixelSource,

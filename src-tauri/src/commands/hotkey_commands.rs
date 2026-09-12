@@ -4,6 +4,30 @@ use crate::domain::HotkeySettingsSnapshot;
 use crate::HotkeyUpdateOutcome;
 
 #[tauri::command]
+pub fn begin_hotkey_recording(
+    window: tauri::WebviewWindow,
+    recording_id: String,
+    recording: State<'_, crate::application::hotkeys::HotkeyRecording>,
+) -> Result<(), String> {
+    if window.label() != crate::settings_window::SETTINGS_WINDOW_LABEL
+        || !window.is_focused().map_err(|error| error.to_string())?
+    {
+        return Err("Hotkey recording requires the focused settings window".to_string());
+    }
+    recording.begin(window.label(), recording_id);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn end_hotkey_recording(
+    window: tauri::WebviewWindow,
+    recording_id: String,
+    recording: State<'_, crate::application::hotkeys::HotkeyRecording>,
+) {
+    recording.end(window.label(), &recording_id);
+}
+
+#[tauri::command]
 pub fn get_hotkey_snapshot(
     state: State<'_, crate::AppState>,
 ) -> Result<HotkeySettingsSnapshot, String> {

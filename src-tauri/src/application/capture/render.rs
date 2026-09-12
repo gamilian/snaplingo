@@ -66,6 +66,23 @@ pub async fn recognize_capture_selection_text(
     rect: &LogicalRect,
     language: Option<String>,
 ) -> crate::error::Result<OcrResult> {
+    let request = capture_ocr_request(
+        capture_sessions,
+        image_composition,
+        session_id,
+        rect,
+        language,
+    )?;
+    ocr.recognize(&request).await
+}
+
+pub(super) fn capture_ocr_request(
+    capture_sessions: &CaptureSessions,
+    image_composition: &CaptureImageComposer,
+    session_id: &CaptureSessionId,
+    rect: &LogicalRect,
+    language: Option<String>,
+) -> crate::error::Result<crate::domain::OcrRequest> {
     let session = capture_sessions.get_session(session_id)?;
     let ocr_rect = expanded_ocr_selection_rect(rect, &session.snapshots);
     let png_data = render_capture_png(
@@ -77,11 +94,10 @@ pub async fn recognize_capture_selection_text(
         false,
     )?;
 
-    ocr.recognize(&crate::domain::OcrRequest {
+    Ok(crate::domain::OcrRequest {
         image_data: png_data,
         language,
     })
-    .await
 }
 
 pub async fn output_capture_selection(

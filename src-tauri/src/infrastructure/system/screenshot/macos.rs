@@ -1,6 +1,7 @@
 use super::geometry::{
     monitor_layout_from_physical_geometry, monitor_snapshot_from_physical_geometry,
 };
+use super::macos_window_list::{visible_windows, VisibleWindow};
 use crate::application::CaptureSessionSource;
 use crate::domain::capture::{
     CapturedCursor, ControlCandidate, LogicalPoint, LogicalRect, MonitorLayout, MonitorSnapshot,
@@ -26,7 +27,7 @@ use objc2_app_kit::{NSCursor, NSEvent};
 use std::io::Cursor;
 use std::ptr;
 use std::time::Instant;
-use xcap::{Monitor, Window};
+use xcap::Monitor;
 
 pub struct MacOSCaptureSessionSource;
 
@@ -447,53 +448,22 @@ fn logical_to_physical_extent(value: u32, scale_factor: f64) -> u32 {
 fn capture_visible_window_candidates(
     monitors: &[MonitorSnapshot],
 ) -> Result<Vec<WindowCandidate>, AppError> {
-    let windows = Window::all()
-        .map_err(|e| AppError::System(format!("Failed to enumerate windows: {}", e)))?;
-
-    let mut candidates = Vec::new();
-    for (index, window) in windows.iter().enumerate() {
-        let Ok(is_minimized) = window.is_minimized() else {
-            continue;
-        };
-        if is_minimized {
-            continue;
-        }
-
-        let title = window.title().unwrap_or_default();
-        let app_name = window.app_name().unwrap_or_default();
-        if should_skip_window_candidate(&title, &app_name) {
-            continue;
-        }
-
-        let Ok(width) = window.width() else {
-            continue;
-        };
-        let Ok(height) = window.height() else {
-            continue;
-        };
-        if width < 2 || height < 2 {
-            continue;
-        }
-
-        let Ok(x) = window.x() else {
-            continue;
-        };
-        let Ok(y) = window.y() else {
-            continue;
-        };
-        let id = window
-            .id()
-            .map(|id| format!("window-{}", id))
-            .unwrap_or_else(|_| format!("window-{}", index));
-
-        if let Some(candidate) = window_candidate_from_logical_geometry(
-            id, title, app_name, x, y, width, height, monitors,
-        ) {
-            candidates.push(candidate);
-        }
-    }
-
-    Ok(candidates)
+    Ok(visible_windows()?
+        .into_iter()
+        .filter(|window| !should_skip_window_candidate(&window.title, &window.app_name))
+        .filter_map(|window| {
+            window_candidate_from_logical_geometry(
+                format!("window-{}", window.id),
+                window.title,
+                window.app_name,
+                window.bounds.x as i32,
+                window.bounds.y as i32,
+                window.bounds.width as u32,
+                window.bounds.height as u32,
+                monitors,
+            )
+        })
+        .collect())
 }
 
 fn capture_control_candidate_at(
@@ -511,10 +481,7 @@ fn capture_control_candidate_at(
     let Some(window) = visible_window_at_point(point)? else {
         return Ok(None);
     };
-    let pid = window
-        .pid()
-        .map_err(|e| AppError::System(format!("Failed to read window process: {}", e)))?;
-    let application = unsafe { AXUIElementCreateApplication(pid as i32) };
+    let application = unsafe { AXUIElementCreateApplication(window.owner_pid) };
     if application.is_null() {
         return Ok(None);
     }
@@ -527,31 +494,14 @@ fn capture_control_candidate_at(
     Ok(result)
 }
 
-fn visible_window_at_point(point: &LogicalPoint) -> Result<Option<Window>, AppError> {
-    let windows = Window::all()
-        .map_err(|e| AppError::System(format!("Failed to enumerate windows: {}", e)))?;
-
-    Ok(windows.into_iter().find(|window| {
-        if window.is_minimized().unwrap_or(true) {
-            return false;
-        }
-        let title = window.title().unwrap_or_default();
-        let app_name = window.app_name().unwrap_or_default();
-        if should_skip_window_candidate(&title, &app_name) {
-            return false;
-        }
-        let Ok(x) = window.x() else { return false };
-        let Ok(y) = window.y() else { return false };
-        let Ok(width) = window.width() else {
-            return false;
-        };
-        let Ok(height) = window.height() else {
-            return false;
-        };
-        point.x >= x as f64
-            && point.x < x as f64 + width as f64
-            && point.y >= y as f64
-            && point.y < y as f64 + height as f64
+fn visible_window_at_point(point: &LogicalPoint) -> Result<Option<VisibleWindow>, AppError> {
+    Ok(visible_windows()?.into_iter().find(|window| {
+        let bounds = &window.bounds;
+        !should_skip_window_candidate(&window.title, &window.app_name)
+            && point.x >= bounds.x
+            && point.x < bounds.x + bounds.width
+            && point.y >= bounds.y
+            && point.y < bounds.y + bounds.height
     }))
 }
 
@@ -791,6 +741,28 @@ impl CaptureSessionSource for MacOSCaptureSessionSource {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[ignore = "manual local WindowServer timing probe"]
+    fn benchmark_capture_window_candidates() {
+        let monitors = capture_visible_display_layouts()
+            .unwrap()
+            .into_iter()
+            .map(|layout| crate::domain::capture::monitor_snapshot_from_layout(layout, Vec::new()))
+            .collect::<Vec<_>>();
+        let mut durations = Vec::new();
+        let mut candidate_count = 0;
+        for _ in 0..11 {
+            let start = Instant::now();
+            candidate_count = capture_visible_window_candidates(&monitors).unwrap().len();
+            durations.push(elapsed_ms(start));
+        }
+        durations.sort_by(f64::total_cmp);
+        eprintln!(
+            "window candidate samples=11 candidates={} median_ms={:.3} min_ms={:.3} max_ms={:.3}",
+            candidate_count, durations[5], durations[0], durations[10],
+        );
+    }
 
     #[test]
     fn builds_captured_cursor_from_appkit_bottom_left_coordinates() {

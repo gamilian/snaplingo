@@ -1,11 +1,20 @@
 import { annotationColorToCss } from '../../components/common/annotationColorPresentation';
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, type RefObject } from 'react';
 
 import { arrowHeadPoints } from '../../application/capture-workspace/annotationStyle';
-import type { AnnotationCommand, LogicalRect, Point } from './types';
+import type {
+  AnnotationCommand,
+  CapturedCursorView,
+  LogicalRect,
+  MonitorSnapshotView,
+  Point,
+} from './types';
 
 interface CaptureAnnotationCanvasProps {
-  imageBase64: string | null;
+  desktopRef: RefObject<HTMLDivElement>;
+  monitors: readonly MonitorSnapshotView[];
+  capturedCursor?: CapturedCursorView | null;
+  selection: LogicalRect;
   annotations: AnnotationCommand[];
   draftAnnotation: AnnotationCommand | null;
   selectionViewportRect: LogicalRect;
@@ -248,97 +257,136 @@ export function drawCaptureAnnotation(
   context.restore();
 }
 
+export function drawFrozenCaptureSelection(
+  context: CanvasRenderingContext2D,
+  selection: LogicalRect,
+  monitors: readonly MonitorSnapshotView[],
+  images: ReadonlyMap<string, HTMLImageElement>,
+  capturedCursor?: CapturedCursorView | null,
+  cursorImage?: HTMLImageElement | null,
+) {
+  context.clearRect(0, 0, selection.width, selection.height);
+  for (const monitor of monitors) {
+    const bounds = monitor.logical_bounds;
+    const image = images.get(monitor.id);
+    if (
+      !image ||
+      bounds.x >= selection.x + selection.width ||
+      bounds.y >= selection.y + selection.height ||
+      bounds.x + bounds.width <= selection.x ||
+      bounds.y + bounds.height <= selection.y
+    ) continue;
+    context.drawImage(
+      image,
+      bounds.x - selection.x,
+      bounds.y - selection.y,
+      bounds.width,
+      bounds.height,
+    );
+  }
+  if (capturedCursor && cursorImage) {
+    context.drawImage(
+      cursorImage,
+      capturedCursor.logical_position.x - capturedCursor.hotspot.x - selection.x,
+      capturedCursor.logical_position.y - capturedCursor.hotspot.y - selection.y,
+      capturedCursor.image_width / Math.max(1, capturedCursor.scale_factor),
+      capturedCursor.image_height / Math.max(1, capturedCursor.scale_factor),
+    );
+  }
+}
+
 export function CaptureAnnotationCanvas({
-  imageBase64,
+  desktopRef,
+  monitors,
+  capturedCursor,
+  selection,
   annotations,
   draftAnnotation,
   selectionViewportRect,
 }: CaptureAnnotationCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const mosaicBufferRef = useRef<HTMLCanvasElement | null>(null);
-  const sourceBufferRef = useRef<HTMLCanvasElement | null>(null);
-  const [image, setImage] = useState<HTMLImageElement | null>(null);
+  const sourceRef = useRef<HTMLCanvasElement | null>(null);
+  const pixelRatio = window.devicePixelRatio || 1;
+  const pixelWidth = Math.max(1, Math.round(selection.width * pixelRatio));
+  const pixelHeight = Math.max(1, Math.round(selection.height * pixelRatio));
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !image) return;
-    const frame = requestAnimationFrame(() => {
-      const pixelRatio = window.devicePixelRatio || 1;
-      const pixelWidth = Math.max(
-        1,
-        Math.round(selectionViewportRect.width * pixelRatio),
-      );
-      const pixelHeight = Math.max(
-        1,
-        Math.round(selectionViewportRect.height * pixelRatio),
-      );
-      if (canvas.width !== pixelWidth) canvas.width = pixelWidth;
-      if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
-      const context = canvas.getContext('2d');
-      if (!context) return;
-      const buffers = {
-        mosaic:
-          mosaicBufferRef.current ??
-          (mosaicBufferRef.current = document.createElement('canvas')),
-        source:
-          sourceBufferRef.current ??
-          (sourceBufferRef.current = document.createElement('canvas')),
-      };
-      if (buffers.source.width !== pixelWidth) buffers.source.width = pixelWidth;
-      if (buffers.source.height !== pixelHeight) buffers.source.height = pixelHeight;
-      const sourceContext = buffers.source.getContext('2d');
-      if (!sourceContext) return;
-      sourceContext.clearRect(0, 0, pixelWidth, pixelHeight);
-      sourceContext.drawImage(image, 0, 0, pixelWidth, pixelHeight);
-      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-      context.clearRect(
-        0,
-        0,
-        selectionViewportRect.width,
-        selectionViewportRect.height,
-      );
-      context.drawImage(
-        image,
-        0,
-        0,
-        selectionViewportRect.width,
-        selectionViewportRect.height,
-      );
-      for (const annotation of annotations) {
-        drawCaptureAnnotation(context, annotation, buffers);
-      }
-      if (draftAnnotation) {
-        drawCaptureAnnotation(context, draftAnnotation, buffers);
-      }
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [annotations, draftAnnotation, image, selectionViewportRect]);
+  useLayoutEffect(() => {
+    const sourceContext = sourceRef.current?.getContext('2d');
+    const desktop = desktopRef.current;
+    if (!sourceContext || !desktop) return;
+    sourceContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    const images = new Map(
+      Array.from(desktop.querySelectorAll<HTMLImageElement>('[data-capture-monitor]'))
+        .map((image) => [image.dataset.captureMonitor!, image]),
+    );
+    drawFrozenCaptureSelection(
+      sourceContext,
+      selection,
+      monitors,
+      images,
+      capturedCursor,
+      desktop.querySelector<HTMLImageElement>('[data-capture-cursor]'),
+    );
+  }, [
+    desktopRef,
+    monitors,
+    capturedCursor,
+    selection,
+    pixelRatio,
+    pixelWidth,
+    pixelHeight,
+  ]);
 
-  useEffect(() => {
-    if (!imageBase64) {
-      setImage(null);
-      return;
-    }
-    const nextImage = new Image();
-    nextImage.onload = () => setImage(nextImage);
-    nextImage.src = `data:image/png;base64,${imageBase64}`;
-    return () => {
-      nextImage.onload = null;
+  useLayoutEffect(() => {
+    const context = canvasRef.current?.getContext('2d');
+    const source = sourceRef.current;
+    if (!context || !source) return;
+    const buffers = {
+      mosaic: mosaicBufferRef.current ??
+        (mosaicBufferRef.current = document.createElement('canvas')),
+      source,
     };
-  }, [imageBase64]);
+    context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    context.clearRect(0, 0, selection.width, selection.height);
+    for (const annotation of annotations) {
+      drawCaptureAnnotation(context, annotation, buffers);
+    }
+    if (draftAnnotation) drawCaptureAnnotation(context, draftAnnotation, buffers);
+  }, [
+    annotations,
+    draftAnnotation,
+    monitors,
+    capturedCursor,
+    selection,
+    pixelRatio,
+    pixelWidth,
+    pixelHeight,
+  ]);
 
-  if (!imageBase64) return null;
-
+  const style = {
+    left: `${selectionViewportRect.x}px`,
+    top: `${selectionViewportRect.y}px`,
+    width: `${selectionViewportRect.width}px`,
+    height: `${selectionViewportRect.height}px`,
+  };
   return (
-    <canvas
-      ref={canvasRef}
-      className="pointer-events-none absolute"
-      style={{
-        left: `${selectionViewportRect.x}px`,
-        top: `${selectionViewportRect.y}px`,
-        width: `${selectionViewportRect.width}px`,
-        height: `${selectionViewportRect.height}px`,
-      }}
-    />
+    <>
+      <canvas
+        ref={sourceRef}
+        data-capture-preview
+        width={pixelWidth}
+        height={pixelHeight}
+        className="pointer-events-none absolute"
+        style={style}
+      />
+      <canvas
+        ref={canvasRef}
+        width={pixelWidth}
+        height={pixelHeight}
+        className="pointer-events-none absolute"
+        style={style}
+      />
+    </>
   );
 }

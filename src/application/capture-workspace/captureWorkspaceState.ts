@@ -60,7 +60,6 @@ export interface CaptureWorkspaceState {
   annotationStyle: AnnotationStyle;
   textFontSize: number;
   annotationHistory: AnnotationHistory;
-  previewImageBase64: string | null;
   isAnnotationToolbarVisible: boolean;
   cursorColor: ColorSample | null;
   colorSampleFormat: ColorSampleFormat;
@@ -93,7 +92,6 @@ export function createInitialCaptureWorkspaceState(): CaptureWorkspaceState {
     annotationStyle: DEFAULT_ANNOTATION_STYLE,
     textFontSize: DEFAULT_TEXT_FONT_SIZE,
     annotationHistory: emptyAnnotationHistory(),
-    previewImageBase64: null,
     isAnnotationToolbarVisible: true,
     cursorColor: null,
     colorSampleFormat: 'hex',
@@ -122,7 +120,6 @@ export function resetCaptureInteractionStatePatch(): Partial<CaptureWorkspaceSta
     textDraft: null,
     textDraftAnnotationIndex: null,
     annotationHistory: emptyAnnotationHistory(),
-    previewImageBase64: null,
     isAnnotationToolbarVisible: true,
     cursorColor: null,
     colorSampleFormat: 'hex',

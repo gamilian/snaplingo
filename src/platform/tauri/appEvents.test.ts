@@ -60,27 +60,6 @@ describe('Tauri app event adapter', () => {
   );
 
   it.each([
-    ['capture cancel', 'capture-cancel-requested', 'subscribeCaptureCancel'],
-    ['capture copy', 'capture-copy-requested', 'subscribeCaptureCopy'],
-    ['capture save', 'capture-save-requested', 'subscribeCaptureSave'],
-    ['capture undo', 'capture-undo-requested', 'subscribeCaptureUndo'],
-    ['capture redo', 'capture-redo-requested', 'subscribeCaptureRedo'],
-  ] as const)('subscribes to %s requests with portable callbacks', async (
-    _workflow,
-    eventName,
-    method,
-  ) => {
-    const handler = vi.fn();
-
-    const unsubscribe = await captureWorkspaceEvents[method](handler);
-    listeners.get(eventName)?.({ payload: undefined });
-    unsubscribe();
-
-    expect(handler).toHaveBeenCalledWith();
-    expect(cleanup).toHaveBeenCalledOnce();
-  });
-
-  it.each([
     ['settings', 'settings-changed', 'subscribeSettingsChanged'],
     ['hotkeys', 'hotkeys-changed', 'subscribeHotkeysChanged'],
     ['providers', 'providers-changed', 'subscribeProvidersChanged'],

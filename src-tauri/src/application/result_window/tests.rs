@@ -250,6 +250,27 @@ fn make_runtime(
 }
 
 #[tokio::test]
+async fn an_ocr_reservation_cannot_replace_a_newer_manual_result() {
+    let (runtime, window, notifier) = make_runtime([], []);
+    let pending_ocr = runtime.reserve_request().unwrap();
+    runtime
+        .open(translation_request("newer manual query"))
+        .await
+        .unwrap();
+    let current = runtime.current_request_id().unwrap().unwrap();
+    runtime
+        .open_reserved(pending_ocr, translation_request("stale OCR"))
+        .await
+        .unwrap();
+    assert_eq!(window.open_calls(), 1);
+    assert_eq!(notifier.notification_ids(), vec![current]);
+    assert_eq!(
+        runtime.take_if_current(current).unwrap().unwrap().text,
+        "newer manual query"
+    );
+}
+
+#[tokio::test]
 async fn open_stores_the_pending_payload_before_opening_and_notifies_afterward() {
     let (runtime, window, notifier) = make_runtime([WindowOpenOutcome::BlocksThenSucceeds], []);
     let opening_runtime = runtime.clone();

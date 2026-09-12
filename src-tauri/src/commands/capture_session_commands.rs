@@ -129,7 +129,7 @@ pub async fn hydrate_capture_session_snapshots(
     state
         .capture
         .sessions
-        .hydrate_session_snapshots(&CaptureSessionId(session_id))
+        .hydrate_session_snapshot_metadata(&CaptureSessionId(session_id))
         .await
         .map_err(|e| e.to_string())
 }
@@ -143,7 +143,7 @@ pub async fn hydrate_capture_monitor_snapshot(
     state
         .capture
         .sessions
-        .hydrate_monitor_snapshot(&CaptureSessionId(session_id), &monitor_id)
+        .hydrate_monitor_snapshot_metadata(&CaptureSessionId(session_id), &monitor_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -319,6 +319,51 @@ pub async fn output_capture(
         )
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn prepare_capture_ocr(
+    session_id: String,
+    rect: LogicalRect,
+    annotations: Vec<AnnotationCommand>,
+    target: crate::application::capture::CaptureOcrTarget,
+    language: Option<String>,
+    state: State<'_, crate::AppState>,
+) -> Result<(), String> {
+    let mut settings = state
+        .settings
+        .configuration
+        .snapshot()
+        .map_err(|error| error.to_string())?
+        .ocr;
+    if let Some(language) = language {
+        settings.recognition_language = language;
+    }
+    state
+        .capture
+        .runtime
+        .prepare_capture_ocr(
+            &CaptureSessionId(session_id),
+            &rect,
+            &annotations,
+            target,
+            settings,
+        )
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn complete_capture_ocr(
+    session_id: String,
+    state: State<'_, crate::AppState>,
+) -> Result<(), String> {
+    state
+        .capture
+        .runtime
+        .complete_capture_ocr(&CaptureSessionId(session_id))
+        .await
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]

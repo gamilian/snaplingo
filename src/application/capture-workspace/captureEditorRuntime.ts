@@ -452,7 +452,6 @@ export interface CapturePreviewResetState {
   selection: null;
   hoverSelection: null;
   editGesture: null;
-  previewImageBase64: null;
   renderingOutput: false;
   activeAnnotationTool: null;
   annotationGesture: null;
@@ -474,7 +473,6 @@ export function createCapturePreviewResetState(): CapturePreviewResetState {
     selection: null,
     hoverSelection: null,
     editGesture: null,
-    previewImageBase64: null,
     renderingOutput: false,
     activeAnnotationTool: null,
     annotationGesture: null,

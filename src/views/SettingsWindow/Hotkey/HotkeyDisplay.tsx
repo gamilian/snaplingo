@@ -37,7 +37,7 @@ export function HotkeyDisplay({ value, onClick, isRecording = false }: HotkeyDis
     }
   `;
 
-  if (isUnset) {
+  if (isUnset || isRecording) {
     return (
       <button onClick={handleClick} className={containerClass}>
         {isRecording ? (

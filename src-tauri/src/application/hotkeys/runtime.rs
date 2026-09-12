@@ -681,6 +681,46 @@ mod hotkey_runtime_tests {
     }
 
     #[test]
+    fn hotkey_runtime_updates_a_combination_to_f1_and_persists_it() {
+        let (runtime, configuration, registrar) = runtime_with_configuration();
+        runtime.register_startup_hotkeys().unwrap();
+        runtime
+            .update_hotkey(
+                SCREENSHOT_CATEGORY.to_string(),
+                SCREENSHOT_ACTION.to_string(),
+                "⇧⌘R".to_string(),
+            )
+            .unwrap();
+        registrar.clear();
+
+        let outcome = runtime
+            .update_hotkey(
+                SCREENSHOT_CATEGORY.to_string(),
+                SCREENSHOT_ACTION.to_string(),
+                "F1".to_string(),
+            )
+            .unwrap();
+
+        assert_eq!(outcome.accelerator.as_deref(), Some("F1"));
+        assert_eq!(
+            configuration.snapshot().unwrap().screenshot[SCREENSHOT_ACTION],
+            "F1"
+        );
+        assert_eq!(
+            registrar.operations(),
+            vec![
+                Operation::Register {
+                    category: SCREENSHOT_CATEGORY.to_string(),
+                    action: SCREENSHOT_ACTION.to_string(),
+                    accelerator: "F1".to_string(),
+                    timing: HotkeyTriggerTiming::Released,
+                },
+                Operation::Unregister("Shift+CmdOrCtrl+KeyR".to_string()),
+            ]
+        );
+    }
+
+    #[test]
     fn hotkey_runtime_update_to_unset_unregisters_previous_and_persists_unset() {
         let (runtime, _configuration, registrar) = runtime_with_configuration();
         runtime.register_startup_hotkeys().unwrap();

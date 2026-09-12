@@ -51,7 +51,6 @@ export interface CaptureWorkspaceRenderState {
   readonly selection: LogicalRect | null;
   readonly hoverSelection: LogicalRect | null;
   readonly candidateDetectionMode: CaptureCandidateDetectionMode;
-  readonly previewImageBase64: string | null;
   readonly editGesture: CaptureSelectionEditGesture | null;
   readonly activeAnnotationTool: AnnotationTool | null;
   readonly annotationGesture: AnnotationGestureDraft | null;
@@ -161,6 +160,7 @@ export interface CaptureWorkspaceKeyInput {
   altKey?: boolean;
   shiftKey?: boolean;
   repeat?: boolean;
+  isComposing?: boolean;
 }
 
 export interface CaptureWorkspaceRuntime {
@@ -170,6 +170,8 @@ export interface CaptureWorkspaceRuntime {
   dispose(): void;
 }
 
-export interface CaptureWorkspaceKeyboardEvent extends Required<CaptureWorkspaceKeyInput> {
+export interface CaptureWorkspaceKeyboardEvent extends Required<Omit<CaptureWorkspaceKeyInput, 'isComposing'>> {
+  readonly isComposing?: boolean;
+  readonly target?: EventTarget | null;
   preventDefault(): void;
 }

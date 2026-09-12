@@ -288,6 +288,11 @@ export interface HotkeyUpdateOutcome {
 }
 
 export interface SettingsHotkeysPort {
+  beginHotkeyRecording(recordingId: string): Promise<void>;
+  endHotkeyRecording(recordingId: string): Promise<void>;
+  subscribeRecordedHotkey(
+    handler: (event: { recordingId: string; hotkey: string }) => void,
+  ): Promise<() => void>;
   getHotkeySnapshot(): Promise<HotkeySnapshot>;
   getDefaultHotkeySnapshot(): Promise<HotkeySnapshot>;
   updateHotkey(input: HotkeyUpdateInput): Promise<HotkeyUpdateOutcome>;

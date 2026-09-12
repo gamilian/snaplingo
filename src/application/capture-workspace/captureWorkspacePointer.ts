@@ -86,7 +86,6 @@ export interface CaptureWorkspacePointerEditorActions {
   setCursorPoint(point: Point): void;
   setSelection(selection: LogicalRect): void;
   scheduleSelectionOverlayPaint(): void;
-  setPreviewImageBase64(imageBase64: string | null): void;
   setRenderingOutput(isRendering: boolean): void;
   setStatus(status: CaptureWorkspaceState['status']): void;
   setAnnotationGesture(
@@ -259,7 +258,6 @@ export function handleCaptureWorkspaceEditorPointerMove(
     });
     refs.keyboardEditCursorPointRef.current = move.keyboardEditCursorPoint;
     actions.setSelection(move.selection);
-    actions.setPreviewImageBase64(move.previewImageBase64);
     actions.setRenderingOutput(move.renderingOutput);
   }
 }
@@ -431,7 +429,6 @@ export function handleCaptureWorkspaceEditorPreviewPointerDown(
   actions.setSelectedAnnotationIndex(moveStart.selectedAnnotationIndex);
   actions.setAnnotationMoveGesture(moveStart.annotationMoveGesture);
   actions.setEditGesture(moveStart.editGesture);
-  actions.setPreviewImageBase64(moveStart.previewImageBase64);
 }
 
 export function handleCaptureWorkspaceEditorResizePointerDown(
@@ -454,7 +451,6 @@ export function handleCaptureWorkspaceEditorResizePointerDown(
   });
   actions.setCursorPoint(start.cursorPoint);
   actions.setEditGesture(start.editGesture);
-  actions.setPreviewImageBase64(start.previewImageBase64);
 }
 
 export function handleCaptureWorkspaceEditorWheel(

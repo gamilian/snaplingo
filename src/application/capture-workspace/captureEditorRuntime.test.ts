@@ -550,7 +550,6 @@ describe('captureEditorRuntime', () => {
       selection: null,
       hoverSelection: null,
       editGesture: null,
-      previewImageBase64: null,
       renderingOutput: false,
       activeAnnotationTool: null,
       annotationGesture: null,

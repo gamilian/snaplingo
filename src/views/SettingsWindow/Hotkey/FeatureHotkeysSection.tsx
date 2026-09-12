@@ -29,18 +29,72 @@ export function FeatureHotkeysSection({
   const defaultSnapshot = useHotkeyConfigStore((state) => state.defaultSnapshot);
   const updateHotkey = useHotkeyConfigStore((state) => state.updateHotkey);
   const resetHotkey = useHotkeyConfigStore((state) => state.resetHotkey);
+  const beginRecording = useHotkeyConfigStore((state) => state.beginRecording);
+  const endRecording = useHotkeyConfigStore((state) => state.endRecording);
+  const subscribeRecordedHotkey = useHotkeyConfigStore((state) => state.subscribeRecordedHotkey);
   const [recordingKey, setRecordingKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (!recordingKey) return;
+    const recordingId = Array.from(
+      crypto.getRandomValues(new Uint32Array(4)),
+      (value) => value.toString(16),
+    ).join('-');
+    let disposed = false;
+    let saving = false;
+    let unsubscribe: (() => void) | undefined;
+    let pendingKey: { code: string; hotkey: string } | null = null;
+    const cancel = () => setRecordingKey((current) => current === recordingKey ? null : current);
+
+    const finish = (hotkey: string) => {
+      if (disposed || saving) return;
+      saving = true;
+      void (async () => {
+        try {
+          await starting;
+          if (disposed) return;
+          await saveHotkeyWithRegistration({
+            category,
+            action: recordingKey,
+            hotkey,
+            updateHotkey,
+            reportError: alert,
+          });
+          await endRecording(recordingId);
+        } catch (error) {
+          if (!disposed) reportMutationError('录制快捷键', error);
+        } finally {
+          if (!disposed) cancel();
+        }
+      })();
+    };
+
+    const starting = (async () => {
+      const unlisten = await subscribeRecordedHotkey((event) => {
+        if (event.recordingId === recordingId) finish(event.hotkey);
+      });
+      if (disposed) {
+        unlisten();
+        return;
+      }
+      unsubscribe = unlisten;
+      await beginRecording(recordingId);
+    })();
+    void starting.catch((error) => {
+      if (!disposed) {
+        reportMutationError('开始录制快捷键', error);
+        cancel();
+      }
+    });
 
     const handleKeyDown = (event: KeyboardEvent) => {
       event.preventDefault();
       event.stopPropagation();
       if (event.key === 'Escape') {
-        setRecordingKey(null);
+        cancel();
         return;
       }
+      if (event.repeat || saving) return;
 
       const modifiers: string[] = [];
       if (event.shiftKey) modifiers.push('⇧');
@@ -56,31 +110,43 @@ export function FeatureHotkeysSection({
       if (event.code.startsWith('Key')) mainKey = event.code.slice(3);
       else if (event.code.startsWith('Digit')) mainKey = event.code.slice(5);
       else if (/^F\d+$/.test(event.code)) mainKey = event.code;
+      else if (/^F\d+$/.test(event.key)) mainKey = event.key;
       if (!mainKey) return;
 
-      void saveHotkeyWithRegistration({
-        category,
-        action: recordingKey,
-        hotkey: modifiers.join('') + mainKey,
-        updateHotkey,
-        reportError: alert,
-      }).then(() => setRecordingKey(null));
+      pendingKey = { code: event.code || event.key, hotkey: modifiers.join('') + mainKey };
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (!pendingKey || (event.code || event.key) !== pendingKey.code) return;
+      event.preventDefault();
+      event.stopPropagation();
+      finish(pendingKey.hotkey);
+      pendingKey = null;
     };
 
     const cancelOnOutsideClick = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      if (!target.closest('button') && !target.closest('.hotkey-display')) {
-        setRecordingKey(null);
+      if (!target.closest('[data-hotkey-recorder]')) {
+        cancel();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('keyup', handleKeyUp, true);
+    window.addEventListener('blur', cancel);
     document.addEventListener('mousedown', cancelOnOutsideClick, true);
     return () => {
+      disposed = true;
       window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('keyup', handleKeyUp, true);
+      window.removeEventListener('blur', cancel);
       document.removeEventListener('mousedown', cancelOnOutsideClick, true);
+      unsubscribe?.();
+      void starting.then(() => endRecording(recordingId), () => undefined).catch((error) => {
+        console.warn('Failed to finish hotkey recording:', error);
+      });
     };
-  }, [category, recordingKey, updateHotkey]);
+  }, [category, recordingKey, updateHotkey, beginRecording, endRecording, subscribeRecordedHotkey]);
 
   const hotkeys = snapshot?.[category];
   const defaults = defaultSnapshot?.[category] ?? hotkeys;
@@ -91,28 +157,32 @@ export function FeatureHotkeysSection({
   return (
     <div className="divide-y divide-gray-100 px-[22px] pb-2">
       {actions.map((action) => (
-        <HotkeyRow
+        <div
           key={action.key}
-          label={action.label}
-          value={hotkeys[action.key] ?? '未设置'}
-          defaultValue={defaults[action.key] ?? '未设置'}
-          isRecording={recordingKey === action.key}
-          onRecord={() =>
-            setRecordingKey((current) =>
-              current === action.key ? null : action.key,
-            )
-          }
-          onClear={() => {
-            void updateHotkey(category, action.key, '未设置').catch((error) =>
-              reportMutationError('清除快捷键', error),
-            );
-          }}
-          onReset={() => {
-            void resetHotkey(category, action.key).catch((error) =>
-              reportMutationError('恢复快捷键', error),
-            );
-          }}
-        />
+          data-hotkey-recorder={recordingKey === action.key ? '' : undefined}
+        >
+          <HotkeyRow
+            label={action.label}
+            value={hotkeys[action.key] ?? '未设置'}
+            defaultValue={defaults[action.key] ?? '未设置'}
+            isRecording={recordingKey === action.key}
+            onRecord={() =>
+              setRecordingKey((current) =>
+                current === action.key ? null : action.key,
+              )
+            }
+            onClear={() => {
+              void updateHotkey(category, action.key, '未设置').catch((error) =>
+                reportMutationError('清除快捷键', error),
+              );
+            }}
+            onReset={() => {
+              void resetHotkey(category, action.key).catch((error) =>
+                reportMutationError('恢复快捷键', error),
+              );
+            }}
+          />
+        </div>
       ))}
     </div>
   );

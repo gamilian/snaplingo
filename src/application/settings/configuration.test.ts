@@ -267,6 +267,9 @@ function createFixture(overrides: { events?: SettingsConfigurationEventsPort } =
   };
   const providers = createProviderPort();
   const hotkeyPort = {
+    beginHotkeyRecording: vi.fn(async (_id: string) => undefined),
+    endHotkeyRecording: vi.fn(async (_id: string) => undefined),
+    subscribeRecordedHotkey: vi.fn(async (_handler: (event: { recordingId: string; hotkey: string }) => void) => () => undefined),
     getHotkeySnapshot: vi.fn(async () => hotkeys),
     getDefaultHotkeySnapshot: vi.fn(async () => hotkeys),
     updateHotkey: vi.fn(async () => ({

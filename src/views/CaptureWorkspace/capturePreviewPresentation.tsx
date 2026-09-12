@@ -48,27 +48,6 @@ export function annotationRectToViewportRect(
   };
 }
 
-interface CapturePreviewImageProps {
-  imageBase64: string | null;
-  selectionViewportRect: LogicalRect;
-}
-
-export function CapturePreviewImage({
-  imageBase64,
-  selectionViewportRect,
-}: CapturePreviewImageProps) {
-  if (!imageBase64) return null;
-
-  return (
-    <img
-      src={`data:image/png;base64,${imageBase64}`}
-      className="absolute object-fill"
-      style={rectStyle(selectionViewportRect)}
-      draggable={false}
-    />
-  );
-}
-
 interface CaptureSelectedAnnotationBoundsOverlayProps {
   selectedAnnotationBounds: LogicalRect | null;
   selectionViewportRect: LogicalRect;

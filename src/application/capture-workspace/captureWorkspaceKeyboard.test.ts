@@ -47,7 +47,6 @@ function createActions(
     setColorSampleFormat: vi.fn(),
     setCursorPoint: vi.fn(),
     setSelection: vi.fn(),
-    setPreviewImageBase64: vi.fn(),
     setRenderingOutput: vi.fn(),
     setEditGesture: vi.fn(),
     setIsAnnotationToolbarVisible: vi.fn(),
@@ -213,7 +212,6 @@ describe('handleCaptureWorkspaceEditorKeyDown', () => {
 
     expect(actions.setAnnotationHistory).toHaveBeenCalledOnce();
     expect(actions.setSelection).not.toHaveBeenCalled();
-    expect(actions.setPreviewImageBase64).not.toHaveBeenCalled();
   });
 
   it('copies the sampled color only while the magnifier is shown', () => {

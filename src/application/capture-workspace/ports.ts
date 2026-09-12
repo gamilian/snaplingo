@@ -24,27 +24,11 @@ export interface CaptureWorkspacePorts {
   print: CaptureWorkspacePrintPort;
 }
 
-export type CaptureWorkspaceRequestHandler = () => void | Promise<void>;
 export type CaptureHotkeyHandler = (
   launch: CaptureLaunch,
 ) => void | Promise<void>;
 
 export interface CaptureWorkspaceEventsPort {
-  subscribeCaptureCancel(
-    handler: CaptureWorkspaceRequestHandler,
-  ): Promise<CaptureWorkspaceUnsubscribe>;
-  subscribeCaptureCopy(
-    handler: CaptureWorkspaceRequestHandler,
-  ): Promise<CaptureWorkspaceUnsubscribe>;
-  subscribeCaptureSave(
-    handler: CaptureWorkspaceRequestHandler,
-  ): Promise<CaptureWorkspaceUnsubscribe>;
-  subscribeCaptureUndo(
-    handler: CaptureWorkspaceRequestHandler,
-  ): Promise<CaptureWorkspaceUnsubscribe>;
-  subscribeCaptureRedo(
-    handler: CaptureWorkspaceRequestHandler,
-  ): Promise<CaptureWorkspaceUnsubscribe>;
   subscribeHotkeyTriggered(
     handler: CaptureHotkeyHandler,
   ): Promise<CaptureWorkspaceUnsubscribe>;
@@ -106,6 +90,8 @@ export interface CaptureWorkspaceCommandsPort {
   defaultCaptureSavePath(options?: CaptureSavePathOptions): Promise<string | null>;
   quickCaptureSavePath(options?: CaptureSavePathOptions): Promise<string>;
   outputCapture(input: OutputCaptureInput): Promise<void>;
+  prepareCaptureOcr(input: PrepareCaptureOcrInput): Promise<void>;
+  completeCaptureOcr(sessionId: string): Promise<void>;
   runCaptureOcr(sessionId: string, rect: LogicalRect, language?: string): Promise<OcrResult>;
   openCaptureOcrResultWindow(text: string, imageBase64?: string, confidence?: number): Promise<void>;
   openCaptureTranslationResultWindow(
@@ -113,6 +99,14 @@ export interface CaptureWorkspaceCommandsPort {
     detectedLanguage?: string | null,
   ): Promise<void>;
   copyTextToClipboard(text: string): Promise<void>;
+}
+
+export interface PrepareCaptureOcrInput {
+  sessionId: string;
+  rect: LogicalRect;
+  annotations: AnnotationCommand[];
+  target: 'ocr-window' | 'translation-window' | 'clipboard';
+  language?: string;
 }
 
 export interface CaptureSavePathOptions {

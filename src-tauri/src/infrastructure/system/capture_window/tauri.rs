@@ -307,11 +307,38 @@ pub fn open_capture_window_for_session(
     .shadow(false)
     .build()
     .map_err(|e| e.to_string())?;
+    bind_capture_window_session(app, session_id);
     set_capture_window_frame(&window, geometry)?;
     configure_capture_window_for_current_space(&window, geometry.desktop_scale)?;
     restore_capture_window_activation();
 
     Ok(())
+}
+
+pub(super) fn bind_capture_window_session(app: &AppHandle, session_id: &str) {
+    let Some(window) = app.get_webview_window(CAPTURE_WINDOW_LABEL) else {
+        return;
+    };
+    let Some(state) = app.try_state::<crate::AppState>() else {
+        return;
+    };
+    let runtime = std::sync::Arc::downgrade(&state.capture.runtime);
+    let session_id = crate::domain::capture::CaptureSessionId(session_id.to_owned());
+    // Bind the ID to this window instance: looking up the label at destruction
+    // time could accidentally cancel a newly opened capture window.
+    window.on_window_event(move |event| {
+        if !matches!(event, tauri::WindowEvent::Destroyed) {
+            return;
+        }
+        if let Some(runtime) = runtime.upgrade() {
+            let session_id = session_id.clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(error) = runtime.cancel_capture_session(&session_id).await {
+                    log::warn!("Failed to clean up destroyed capture session: {}", error);
+                }
+            });
+        }
+    });
 }
 
 fn suppress_capture_window_activation(app: &AppHandle) -> Result<(), String> {

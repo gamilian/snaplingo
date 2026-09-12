@@ -10,13 +10,6 @@ import {
   PinnedImageWindow,
   readPinnedImageLaunch,
 } from './views/PinnedImageWindow';
-import CaptureWorkspace from './views/CaptureWorkspace';
-import {
-  CAPTURE_WINDOW_LABEL,
-  readCaptureLaunch,
-} from './views/CaptureWorkspace/windowMode';
-import type { CaptureWorkspacePorts } from './application/capture-workspace/ports';
-import { printBase64PngImage } from './views/CaptureWorkspace/capturePrint';
 import { createResultWindowPlatformRuntime } from './application/result-window/platformRuntime';
 import { createResultWindowRuntime } from './application/result-window/runtime';
 import { createPinnedImageRuntime } from './application/pinned-image/runtime';
@@ -54,17 +47,14 @@ import {
   isSettingsWindowLaunch,
 } from './appWindowRouting';
 import {
-  captureWorkspaceEvents,
   persistentStateEvents,
   resultWindowEvents,
   settingsWindowEvents,
 } from './platform/tauri/appEvents';
 import {
-  captureWorkspaceCommands,
   currentCaptureResultWindowRequestId,
   takeCaptureResultWindowPayload,
 } from './platform/tauri/capture';
-import { captureWindow } from './platform/tauri/captureWindow';
 import { writeClipboardText } from './platform/tauri/clipboard';
 import * as history from './platform/tauri/history';
 import { libraryIndex } from './platform/tauri/libraryIndex';
@@ -109,13 +99,6 @@ const settingsRuntime = createSettingsRuntime({
   screenshotFavorites,
   clipboard: { writeText: writeClipboardText },
 });
-const captureWorkspacePorts: CaptureWorkspacePorts = {
-  events: captureWorkspaceEvents,
-  window: captureWindow,
-  commands: captureWorkspaceCommands,
-  clipboard: { writeText: writeClipboardText },
-  print: { printImage: printBase64PngImage },
-};
 const resultWindowPlatformRuntime = createResultWindowPlatformRuntime({
   events: resultWindowEvents,
   window: resultWindow,
@@ -178,7 +161,6 @@ initializeFavoritesStore(settingsRuntime.favorites);
 initializeScreenshotFavoritesStore(settingsRuntime.screenshotFavorites);
 
 const currentWindowLabel = getCurrentWindowLabel();
-const captureLaunch = readCaptureLaunch(window.location.search);
 const pinnedImageId = readPinnedImageLaunch(window.location.search);
 const pinnedImageRuntime = pinnedImageId
   ? createPinnedImageRuntime({
@@ -204,8 +186,6 @@ function Application() {
   );
   const { applyTranslationDefaults } = resultWindowRuntime;
   const generalSettings = useSettingsConfigStore((state) => state.general);
-  const isCaptureWindow =
-    currentWindowLabel === CAPTURE_WINDOW_LABEL || captureLaunch !== null;
   const [hasLoadedCaptureResultPayload, setHasLoadedCaptureResultPayload] =
     useState(false);
 
@@ -327,17 +307,6 @@ function Application() {
     isCaptureResultWindow,
     resultWindowVisible,
   ]);
-
-  if (isCaptureWindow) {
-    return (
-      <CaptureWorkspace
-        ports={captureWorkspacePorts}
-        initialMode={captureLaunch?.mode}
-        initialSessionId={captureLaunch?.sessionId}
-        onInactive={() => captureWorkspacePorts.window.hide()}
-      />
-    );
-  }
 
   if (pinnedImageRuntime) {
     return <PinnedImageWindow runtime={pinnedImageRuntime} />;

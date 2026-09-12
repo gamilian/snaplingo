@@ -20,7 +20,7 @@ pub use capture::{
 pub use favorite_capacity::FavoriteCapacity;
 pub use favorites::{Favorites, OcrFavoriteApplication};
 pub use history::{History, OcrHistoryReplay};
-pub use hotkeys::{HotkeyConfiguration, HotkeyRuntime, HotkeyUpdateOutcome};
+pub use hotkeys::{HotkeyConfiguration, HotkeyRecording, HotkeyRuntime, HotkeyUpdateOutcome};
 pub use library_index::LibraryIndex;
 pub use pinned_image::PinnedImageRuntime;
 pub use providers::Provider;

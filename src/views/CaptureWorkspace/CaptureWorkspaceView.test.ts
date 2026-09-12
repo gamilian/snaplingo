@@ -49,6 +49,8 @@ describe("CaptureWorkspaceView runtime seam", () => {
       | "viewportBounds"
       | "selectionBounds"
       | "monitors"
+      | "capturedCursor"
+      | "includeCapturedCursor"
       | "isRenderingOutput"
       | "silentOcrHint"
       | "editor"
@@ -87,7 +89,6 @@ describe("CaptureWorkspaceView runtime seam", () => {
     >().toEqualTypeOf<
       | "selection"
       | "selectionViewportRect"
-      | "previewImageBase64"
       | "annotations"
       | "draftAnnotation"
       | "textDraft"
@@ -766,7 +767,6 @@ function createRenderState(): CaptureWorkspaceViewRenderState {
     editor: {
       selection,
       selectionViewportRect: { x: 20, y: 30, width: 160, height: 90 },
-      previewImageBase64: "preview-image",
       annotations: [],
       draftAnnotation: null,
       textDraft: null,

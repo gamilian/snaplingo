@@ -1,0 +1,11 @@
+[
+  {"text":"你 好 世 界\r\n\r\nOCR text  ","preserveFormatting":true,"removeChineseSpaces":true,"expected":"你好世界\n\nOCR text"},
+  {"text":"https://example.com/\nhelp\n\n第一行\n第二行。","preserveFormatting":false,"removeChineseSpaces":true,"expected":"https://example.com/help 第一行第二行。"},
+  {"text":"第 一 行\n第 二 行","preserveFormatting":false,"removeChineseSpaces":false,"expected":"第 一 行第 二 行"},
+  {"text":" \t first \n  second  ","preserveFormatting":true,"removeChineseSpaces":false,"expected":"first \n  second"},
+  {"text":"hello-\nworld\nitem.","preserveFormatting":false,"removeChineseSpaces":true,"expected":"hello-world item."},
+  {"text":"路径/\n- 项目一\n下一行","preserveFormatting":false,"removeChineseSpaces":true,"expected":"路径/ - 项目一下一行"},
+  {"text":"Email hello@example.com\nPhone 1234567890","preserveFormatting":false,"removeChineseSpaces":true,"expected":"Email hello@example.com Phone 1234567890"},
+  {"text":"カタカナ\nカタカナ\n한국어\n한국어","preserveFormatting":false,"removeChineseSpaces":true,"expected":"カタカナ カタカナ 한국어 한국어"},
+  {"text":"你\t好 世 界","preserveFormatting":true,"removeChineseSpaces":true,"expected":"你好世界"}
+]

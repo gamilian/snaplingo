@@ -1,15 +1,28 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 import type { CaptureMode, CaptureSessionView } from '../../domain/capture';
 
-const { invoke, save } = vi.hoisted(() => ({
+const { invoke, save, convertFileSrc } = vi.hoisted(() => ({
   invoke: vi.fn(),
+  convertFileSrc: vi.fn((path: string, protocol: string) => `${protocol}://localhost${path}`),
   save: vi.fn(),
 }));
 
-vi.mock('@tauri-apps/api/core', () => ({ invoke }));
+vi.mock('@tauri-apps/api/core', () => ({ invoke, convertFileSrc }));
 vi.mock('@tauri-apps/plugin-dialog', () => ({ save }));
 
 describe('Tauri capture command adapter', () => {
+  it('prepares OCR pixels before committing the native handoff', async () => {
+    const { prepareCaptureOcr, completeCaptureOcr } = await import('./capture');
+    const input = {
+      sessionId: 'capture-ocr', rect: { x: 10, y: 20, width: 30, height: 40 },
+      annotations: [], target: 'translation-window' as const, language: 'ja',
+    };
+    await prepareCaptureOcr(input);
+    expect(invoke).toHaveBeenCalledWith('prepare_capture_ocr', input);
+    await completeCaptureOcr(input.sessionId);
+    expect(invoke).toHaveBeenCalledWith('complete_capture_ocr', { sessionId: 'capture-ocr' });
+  });
+
   it('accepts only the domain capture mode vocabulary', async () => {
     const { logCaptureFrontendPerf, openCaptureWindow } = await import('./capture');
 
@@ -91,7 +104,7 @@ describe('Tauri capture command adapter', () => {
     });
   });
 
-  it('hydrates capture session snapshots through the native command', async () => {
+  it('loads frozen monitor URLs without transporting Base64 pixels', async () => {
     const { hydrateCaptureSessionSnapshots } = await import('./capture');
     const hydratedSession: CaptureSessionView = {
       id: 'capture-1',
@@ -101,7 +114,7 @@ describe('Tauri capture command adapter', () => {
           logical_bounds: { x: 0, y: 0, width: 100, height: 80 },
           physical_bounds: { x: 0, y: 0, width: 200, height: 160 },
           scale_factor: 2,
-          image_base64: 'pixels',
+          image_base64: '',
         },
       ],
       candidates: [],
@@ -115,7 +128,9 @@ describe('Tauri capture command adapter', () => {
     expect(invoke).toHaveBeenCalledWith('hydrate_capture_session_snapshots', {
       sessionId: 'capture-1',
     });
-    expect(result.monitors[0].image_base64).toBe('pixels');
+    expect(result.monitors[0].image_base64).toBe('');
+    expect(result.monitors[0].image_url).toBe('capture-image://localhost/capture-1/monitor-1');
+    expect(convertFileSrc).toHaveBeenCalledWith('/capture-1/monitor-1', 'capture-image');
   });
 
   it('hydrates only the monitor needed by the magnifier', async () => {
@@ -125,13 +140,13 @@ describe('Tauri capture command adapter', () => {
       logical_bounds: { x: 0, y: 0, width: 100, height: 80 },
       physical_bounds: { x: 0, y: 0, width: 200, height: 160 },
       scale_factor: 2,
-      image_base64: 'pixels',
+      image_base64: '',
     };
     invoke.mockResolvedValueOnce(monitor);
 
     await expect(
       hydrateCaptureMonitorSnapshot('capture-1', 'monitor-1'),
-    ).resolves.toEqual(monitor);
+    ).resolves.toEqual({ ...monitor, image_url: 'capture-image://localhost/capture-1/monitor-1' });
     expect(invoke).toHaveBeenCalledWith('hydrate_capture_monitor_snapshot', {
       sessionId: 'capture-1',
       monitorId: 'monitor-1',

@@ -33,6 +33,9 @@ interface HotkeyConfigState {
   defaultSnapshot: HotkeySnapshot | null;
   hydrate: () => Promise<HotkeySnapshot>;
   refresh: () => Promise<HotkeySnapshot>;
+  beginRecording: HotkeyConfiguration['beginRecording'];
+  endRecording: HotkeyConfiguration['endRecording'];
+  subscribeRecordedHotkey: HotkeyConfiguration['subscribeRecordedHotkey'];
   updateHotkey: (
     category: HotkeyCategory,
     action: string,
@@ -48,6 +51,9 @@ export const useHotkeyConfigStore = create<HotkeyConfigState>(() => ({
   defaultSnapshot: null,
   hydrate: () => runtime().hydrate(),
   refresh: () => runtime().refresh(),
+  beginRecording: (id) => runtime().beginRecording(id),
+  endRecording: (id) => runtime().endRecording(id),
+  subscribeRecordedHotkey: (handler) => runtime().subscribeRecordedHotkey(handler),
   updateHotkey: (category, action, hotkey) =>
     runtime().update(category, action, hotkey),
   resetHotkey: (category, action) => runtime().reset(category, action),

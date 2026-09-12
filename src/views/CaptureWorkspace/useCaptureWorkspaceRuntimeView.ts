@@ -80,8 +80,7 @@ export function useCaptureWorkspaceRuntimeView({
   persistScreenshotDefaultsRef.current = persistScreenshotDefaults;
   ocrPreferencesRef.current = ocrPreferences;
 
-  const [runtimeRevision, setRuntimeRevision] = useState(0);
-  const disposedRuntimeRef = useRef<CaptureWorkspaceRuntime | null>(null);
+  const runtimeLifetimeRef = useRef<{ runtime: CaptureWorkspaceRuntime } | null>(null);
   const workflowRuntime = useMemo(
     () =>
       createCaptureWorkspaceRuntime({
@@ -105,9 +104,18 @@ export function useCaptureWorkspaceRuntimeView({
           scheduleSelectionOverlayPaint: () =>
             hostBridgeRef.current.scheduleSelectionOverlayPaint(),
         },
-        keyboard: { target: window },
+        keyboard: {
+          target: window,
+          isEditingText: (event) => {
+            const target = event.target;
+            return target instanceof HTMLElement && (
+              target.isContentEditable ||
+              target.closest('input, textarea, select') !== null
+            );
+          },
+        },
       }),
-    [platformPorts, runtimeRevision],
+    [platformPorts],
   );
   const [runtimeRenderState, setRuntimeRenderState] = useState(
     () => workflowRuntime.renderState,
@@ -197,15 +205,25 @@ export function useCaptureWorkspaceRuntimeView({
   };
 
   useEffect(() => {
-    if (disposedRuntimeRef.current === workflowRuntime) {
-      setRuntimeRevision((revision) => revision + 1);
-      return;
-    }
-
-    void workflowRuntime.actions.connectHost().catch(() => undefined);
+    const lifetime = { runtime: workflowRuntime };
+    runtimeLifetimeRef.current = lifetime;
+    let closed = false;
+    let disconnect: (() => void) | undefined;
+    void workflowRuntime.actions.connectHost().then((cleanup) => {
+      if (closed) cleanup();
+      else disconnect = cleanup;
+    });
     return () => {
-      disposedRuntimeRef.current = workflowRuntime;
-      workflowRuntime.dispose();
+      closed = true;
+      disconnect?.();
+      // StrictMode immediately reconnects the same view. Only a real unmount
+      // should cancel the native session shared by those effect setups.
+      queueMicrotask(() => {
+        if (
+          runtimeLifetimeRef.current === lifetime ||
+          runtimeLifetimeRef.current?.runtime !== workflowRuntime
+        ) workflowRuntime.dispose();
+      });
     };
   }, [workflowRuntime]);
 
@@ -221,6 +239,7 @@ export function useCaptureWorkspaceRuntimeView({
   ]);
 
   const magnifierSourceImage = useCaptureMagnifierPixelSource({
+    desktopRef,
     session: runtimeRenderState.session,
     isMagnifierRequested,
     isMagnifierShown,
@@ -245,6 +264,8 @@ export function useCaptureWorkspaceRuntimeView({
       viewportBounds: derived.viewportBounds,
       selectionBounds: derived.selectionBounds,
       monitors: runtimeRenderState.session?.monitors ?? [],
+      capturedCursor: runtimeRenderState.session?.captured_cursor,
+      includeCapturedCursor: runtimeRenderState.includeCapturedCursor,
       isRenderingOutput: runtimeRenderState.isRenderingOutput,
       silentOcrHint:
         runtimeRenderState.silentOcrHint && derived.selectionBounds
@@ -259,7 +280,6 @@ export function useCaptureWorkspaceRuntimeView({
       editor: {
         selection: runtimeRenderState.selection,
         selectionViewportRect: derived.selectionViewportRect,
-        previewImageBase64: runtimeRenderState.previewImageBase64,
         annotations: derived.annotations.filter(
           (_, index) =>
             index !== runtimeRenderState.annotationMoveGesture?.annotationIndex &&

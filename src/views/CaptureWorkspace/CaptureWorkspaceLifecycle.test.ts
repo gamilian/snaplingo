@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CaptureWorkspacePorts } from '../../application/capture-workspace/ports';
 import type { CaptureSessionView } from './types';
 import CaptureWorkspace from './index';
+import * as selectionOverlay from './captureSelectionOverlay';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;
@@ -58,10 +59,11 @@ describe('CaptureWorkspace React lifecycle', () => {
           }));
         });
       }
-      await vi.waitFor(() => expect(platform.commands.renderCaptureOutput).toHaveBeenCalledWith(
-        expect.objectContaining({ rect: { x: 40, y: 50, width: 160, height: 110 } }),
-      ));
-      expect(container.querySelector('img[src="data:image/png;base64,preview-image"]')).not.toBeNull();
+      const preview = container.querySelector<HTMLCanvasElement>('[data-capture-preview]');
+      expect(preview).not.toBeNull();
+      expect(preview?.style.width).toBe('160px');
+      expect(preview?.style.height).toBe('110px');
+      expect(platform.commands.renderCaptureOutput).not.toHaveBeenCalled();
     } finally {
       await act(async () => root.unmount());
       container.remove();
@@ -145,111 +147,91 @@ describe('CaptureWorkspace React lifecycle', () => {
     container.remove();
   });
 
-  it('replaces the disposed StrictMode runtime and cleans late work on unmount', async () => {
+  it('keeps the native session through StrictMode reconnect and cancels once on unmount', async () => {
     vi.spyOn(HTMLImageElement.prototype, 'decode').mockResolvedValue(undefined);
-    const oldSessionRequest = deferred<ReturnType<typeof createSession>>();
-    const currentSessionRequest = deferred<ReturnType<typeof createSession>>();
-    const lateHotkeyRegistration = deferred<() => void>();
-    const disposeLateHotkey = vi.fn();
-    const hotkeyHandlers: Array<
-      Parameters<CaptureWorkspacePorts['events']['subscribeHotkeyTriggered']>[0]
-    > = [];
-    let getSessionCall = 0;
-    let hotkeyRegistrationCall = 0;
+    const request = deferred<ReturnType<typeof createSession>>();
+    const lateRegistration = deferred<() => void>();
+    const disposeLate = vi.fn();
     const platform = createPlatform();
-    platform.commands.getCaptureSession.mockImplementation(() => {
-      getSessionCall += 1;
-      return getSessionCall === 1
-        ? oldSessionRequest.promise
-        : currentSessionRequest.promise;
-    });
-    platform.events.subscribeHotkeyTriggered.mockImplementation((handler) => {
-      hotkeyHandlers.push(handler);
-      hotkeyRegistrationCall += 1;
-      return hotkeyRegistrationCall === 1
-        ? lateHotkeyRegistration.promise
-        : Promise.resolve(vi.fn<() => void>());
-    });
+    platform.commands.getCaptureSession.mockReturnValue(request.promise);
+    platform.events.subscribeHotkeyTriggered.mockReturnValueOnce(lateRegistration.promise);
     const addEventListener = vi.spyOn(window, 'addEventListener');
     const removeEventListener = vi.spyOn(window, 'removeEventListener');
     const container = document.createElement('div');
     document.body.append(container);
     const root = createRoot(container);
-
     await act(async () => {
-      root.render(
-        createElement(
-          StrictMode,
-          null,
-          createElement(CaptureWorkspace, {
-            ports: platform,
-            initialMode: 'screenshot',
-            initialSessionId: 'strict-session',
-          }),
-        ),
-      );
+      root.render(createElement(StrictMode, null, createElement(CaptureWorkspace, {
+        ports: platform,
+        initialMode: 'screenshot',
+        initialSessionId: 'strict-session',
+      })));
     });
-
-    await vi.waitFor(() =>
-      expect(platform.commands.getCaptureSession).toHaveBeenCalledTimes(2),
-    );
+    expect(platform.commands.getCaptureSession).toHaveBeenCalledOnce();
+    expect(platform.commands.cancelCaptureSession).not.toHaveBeenCalled();
     await act(async () => {
-      lateHotkeyRegistration.resolve(disposeLateHotkey);
-      oldSessionRequest.resolve(createSession('strict-old'));
-      currentSessionRequest.resolve(createSession('strict-current'));
-      await Promise.resolve();
+      lateRegistration.resolve(disposeLate);
+      request.resolve(createSession('strict-session'));
     });
-    await vi.waitFor(() =>
-      expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
-        'strict-old',
-      ),
-    );
-    expect(disposeLateHotkey).toHaveBeenCalledOnce();
-
+    await vi.waitFor(() => expect(platform.window.reveal).toHaveBeenCalledOnce());
+    expect(disposeLate).toHaveBeenCalledOnce();
+    expect(platform.commands.cancelCaptureSession).not.toHaveBeenCalled();
     await act(async () => root.unmount());
-    await vi.waitFor(() =>
-      expect(platform.commands.cancelCaptureSession).toHaveBeenCalledWith(
-        'strict-current',
-      ),
-    );
-
-    for (const handler of hotkeyHandlers) {
+    expect(platform.commands.cancelCaptureSession).toHaveBeenCalledExactlyOnceWith('strict-session');
+    for (const [handler] of platform.events.subscribeHotkeyTriggered.mock.calls) {
       await handler({ mode: 'screenshot', sessionId: 'after-unmount' });
     }
-    expect(platform.commands.getCaptureSession).toHaveBeenCalledTimes(2);
-    expect(
-      platform.commands.cancelCaptureSession.mock.calls.filter(
-        ([sessionId]) => sessionId === 'strict-old',
-      ),
-    ).toHaveLength(1);
-    expect(
-      platform.commands.cancelCaptureSession.mock.calls.filter(
-        ([sessionId]) => sessionId === 'strict-current',
-      ),
-    ).toHaveLength(1);
-    expect(listenerCalls(addEventListener, 'keydown')).toBe(
-      listenerCalls(removeEventListener, 'keydown'),
-    );
-    expect(addEventListener.mock.calls).toContainEqual([
-      'keydown',
-      expect.any(Function),
-      true,
-    ]);
-    expect(removeEventListener.mock.calls).toContainEqual([
-      'keydown',
-      expect.any(Function),
-      true,
-    ]);
-    expect(listenerCalls(addEventListener, 'keyup')).toBe(
-      listenerCalls(removeEventListener, 'keyup'),
-    );
-    expect(listenerCalls(addEventListener, 'blur')).toBe(
-      listenerCalls(removeEventListener, 'blur'),
-    );
-
+    expect(platform.commands.getCaptureSession).toHaveBeenCalledOnce();
+    for (const event of ['keydown', 'keyup', 'blur'] as const) {
+      expect(listenerCalls(addEventListener, event)).toBe(listenerCalls(removeEventListener, event));
+    }
     container.remove();
-    addEventListener.mockRestore();
-    removeEventListener.mockRestore();
+  });
+
+  it('paints the latest dragged rectangle in the first animation frame', async () => {
+    const frameQueue = new Map<number, FrameRequestCallback>();
+    let nextFrame = 0;
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frameQueue.set(++nextFrame, callback);
+      return nextFrame;
+    });
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id) => { frameQueue.delete(id); });
+    vi.spyOn(HTMLImageElement.prototype, 'decode').mockResolvedValue(undefined);
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ setTransform: vi.fn() } as never);
+    const paint = vi.spyOn(selectionOverlay, 'drawCaptureSelectionOverlayFrame').mockImplementation(() => undefined);
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    const flushFrame = async () => {
+      const callbacks = [...frameQueue.values()];
+      frameQueue.clear();
+      await act(async () => callbacks.forEach((callback) => callback(performance.now())));
+    };
+    try {
+      await act(async () => root.render(createElement(CaptureWorkspace, {
+        ports: createPlatform(), initialMode: 'screenshot', initialSessionId: 'drag-frame',
+      })));
+      for (let frame = 0; frame < 4; frame++) await flushFrame();
+      const surface = container.firstElementChild as HTMLDivElement;
+      surface.setPointerCapture = vi.fn();
+      await act(async () => { surface.dispatchEvent(new PointerEvent('pointerdown', {
+        bubbles: true, pointerId: 1, button: 0, buttons: 1, clientX: 20, clientY: 30,
+      })); });
+      await flushFrame();
+      paint.mockClear();
+      await act(async () => { surface.dispatchEvent(new PointerEvent('pointermove', {
+        bubbles: true, pointerId: 1, button: 0, buttons: 1, clientX: 140, clientY: 110,
+      })); });
+      await flushFrame();
+      expect(paint).toHaveBeenCalledWith(
+        expect.anything(), expect.anything(),
+        expect.objectContaining({ rect: { x: 20, y: 30, width: 120, height: 80 } }),
+        expect.anything(),
+      );
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+    }
   });
 
   it('shows a frozen-image decode failure and lets Escape close the capture window', async () => {
@@ -278,6 +260,40 @@ describe('CaptureWorkspace React lifecycle', () => {
 
     await act(async () => root.unmount());
     container.remove();
+  });
+
+  it.each(['input', 'textarea', 'contenteditable'] as const)('leaves editing shortcuts to the focused %s', async (kind) => {
+    vi.spyOn(HTMLImageElement.prototype, 'decode').mockResolvedValue(undefined);
+    const platform = createPlatform();
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    try {
+      await act(async () => root.render(createElement(CaptureWorkspace, {
+        ports: platform, initialMode: 'screenshot', initialSessionId: 'editing-session',
+      })));
+      await vi.waitFor(() => expect(platform.window.reveal).toHaveBeenCalledOnce());
+      await act(async () => { window.dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'a', metaKey: true, bubbles: true, cancelable: true,
+      })); });
+      const input = document.createElement(kind === 'contenteditable' ? 'div' : kind);
+      if (kind === 'contenteditable') input.contentEditable = 'true';
+      container.firstElementChild?.append(input);
+      for (const key of ['c', 's', 'z', 'y', 'a']) {
+        const event = new KeyboardEvent('keydown', { key, metaKey: true, bubbles: true, cancelable: true });
+        await act(async () => { input.dispatchEvent(event); });
+        expect(event.defaultPrevented).toBe(false);
+      }
+      const composing = new KeyboardEvent('keydown', { key: 'c', metaKey: true, isComposing: true, cancelable: true });
+      await act(async () => { window.dispatchEvent(composing); });
+      expect(composing.defaultPrevented).toBe(false);
+      expect(platform.commands.outputCapture).not.toHaveBeenCalled();
+      expect(platform.commands.defaultCaptureSavePath).not.toHaveBeenCalled();
+      expect(platform.window.hide).not.toHaveBeenCalled();
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+    }
   });
 
   it('handles a real keyboard copy shortcut with its modifier keys', async () => {
@@ -372,6 +388,8 @@ function createPlatform() {
       defaultCaptureSavePath: vi.fn(async () => '/capture.png'),
       quickCaptureSavePath: vi.fn(async () => '/quick.png'),
       outputCapture: vi.fn(async () => undefined),
+      prepareCaptureOcr: vi.fn(async () => undefined),
+      completeCaptureOcr: vi.fn(async () => undefined),
       runCaptureOcr: vi.fn(async () => ({ text: '', confidence: null })),
       openCaptureOcrResultWindow: vi.fn(async () => undefined),
       openCaptureTranslationResultWindow: vi.fn(async () => undefined),
@@ -379,21 +397,6 @@ function createPlatform() {
     },
     clipboard: { writeText: vi.fn(async () => undefined) },
     events: {
-    subscribeCaptureCancel: vi.fn<
-      CaptureWorkspacePorts['events']['subscribeCaptureCancel']
-    >(async () => () => undefined),
-    subscribeCaptureCopy: vi.fn<
-      CaptureWorkspacePorts['events']['subscribeCaptureCopy']
-    >(async () => () => undefined),
-    subscribeCaptureSave: vi.fn<
-      CaptureWorkspacePorts['events']['subscribeCaptureSave']
-    >(async () => () => undefined),
-    subscribeCaptureUndo: vi.fn<
-      CaptureWorkspacePorts['events']['subscribeCaptureUndo']
-    >(async () => () => undefined),
-    subscribeCaptureRedo: vi.fn<
-      CaptureWorkspacePorts['events']['subscribeCaptureRedo']
-    >(async () => () => undefined),
     subscribeHotkeyTriggered: vi.fn<
       CaptureWorkspacePorts['events']['subscribeHotkeyTriggered']
     >(async () => () => undefined),

@@ -41,6 +41,11 @@ pub fn run() {
     let app_database = database.clone();
     let app_database_path = database_path.clone();
     tauri::Builder::default()
+        .manage(HotkeyRecording::default())
+        .register_uri_scheme_protocol(
+            "capture-image",
+            infrastructure::system::capture_window::image_protocol::respond,
+        )
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
@@ -67,6 +72,20 @@ pub fn run() {
         .on_window_event(|window, event| {
             if !settings_window::should_hide_settings_window_instead_of_close(window.label()) {
                 return;
+            }
+
+            if matches!(
+                event,
+                tauri::WindowEvent::Focused(false)
+                    | tauri::WindowEvent::Destroyed
+                    | tauri::WindowEvent::CloseRequested { .. }
+            ) {
+                if let Some(recording) = window
+                    .app_handle()
+                    .try_state::<application::hotkeys::HotkeyRecording>()
+                {
+                    recording.cancel_for_window(window.label());
+                }
             }
 
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -154,6 +173,8 @@ pub fn run() {
             commands::copy_text_to_clipboard,
             commands::get_hotkey_snapshot,
             commands::get_default_hotkey_snapshot,
+            commands::begin_hotkey_recording,
+            commands::end_hotkey_recording,
             commands::update_hotkey,
             commands::reset_hotkey,
             commands::reset_hotkey_category,
@@ -238,6 +259,8 @@ pub fn run() {
             commands::hide_pinned_image_group,
             commands::destroy_pinned_image_group,
             commands::run_capture_ocr,
+            commands::prepare_capture_ocr,
+            commands::complete_capture_ocr,
             commands::get_translation_history,
             commands::get_ocr_history,
             commands::query_translation_history,

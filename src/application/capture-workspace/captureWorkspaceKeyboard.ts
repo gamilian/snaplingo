@@ -87,7 +87,6 @@ export interface CaptureWorkspaceKeyboardEditorActions {
   ): void;
   setCursorPoint(point: Point): void;
   setSelection(selection: LogicalRect): void;
-  setPreviewImageBase64(imageBase64: string | null): void;
   setRenderingOutput(isRendering: boolean): void;
   setEditGesture(gesture: CaptureSelectionEditGesture): void;
   setIsAnnotationToolbarVisible(updater: StateUpdater<boolean>): void;
@@ -208,7 +207,6 @@ export function handleCaptureWorkspaceEditorKeyDown(
     actions.setCursorPoint(editNudge.cursorPoint);
     actions.setSelection(editNudge.selection);
     actions.setEditGesture(editNudge.editGesture);
-    actions.setPreviewImageBase64(editNudge.previewImageBase64);
     actions.setRenderingOutput(editNudge.renderingOutput);
   } else if (
     !textDraft &&
@@ -308,7 +306,6 @@ export function handleCaptureWorkspaceEditorKeyDown(
         keyboardNudgeStep: KEYBOARD_NUDGE_STEP,
       });
       actions.setSelection(preview.selection);
-      actions.setPreviewImageBase64(preview.previewImageBase64);
       void actions.renderSelectionPreview(preview.previewRender.rect);
     }
   }

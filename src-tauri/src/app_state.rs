@@ -79,6 +79,7 @@ impl AppState {
     /// Gracefully shutdown the application, waiting for pending events to complete
     pub async fn shutdown(&self) -> Result<()> {
         log::info!("Starting graceful shutdown...");
+        self.capture.runtime.cancel_background_ocr();
 
         // Wait for all pending events to complete (max 5 seconds)
         let drained = self

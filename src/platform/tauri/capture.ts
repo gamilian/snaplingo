@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { save } from '@tauri-apps/plugin-dialog';
 import type {
   CaptureMode,
@@ -13,6 +13,7 @@ import type {
   CaptureWorkspaceCommandsPort,
   CaptureSavePathOptions,
   OutputCaptureInput,
+  PrepareCaptureOcrInput,
   RenderCaptureOutputInput,
 } from '../../application/capture-workspace/ports';
 import type { CaptureResultWindowPayload } from '../../application/result-window/ports';
@@ -39,19 +40,31 @@ export async function getCaptureSession(sessionId: string) {
 }
 
 export async function hydrateCaptureSessionSnapshots(sessionId: string) {
-  return invoke<CaptureSessionView>('hydrate_capture_session_snapshots', {
+  const session = await invoke<CaptureSessionView>('hydrate_capture_session_snapshots', {
     sessionId,
   });
+  return {
+    ...session,
+    monitors: session.monitors.map((monitor) => withFrozenImageSource(session.id, monitor)),
+  };
+}
+
+function withFrozenImageSource(sessionId: string, monitor: MonitorSnapshotView): MonitorSnapshotView {
+  return {
+    ...monitor,
+    image_url: convertFileSrc(`/${sessionId}/${monitor.id}`, 'capture-image'),
+  };
 }
 
 export async function hydrateCaptureMonitorSnapshot(
   sessionId: string,
   monitorId: string,
 ) {
-  return invoke<MonitorSnapshotView>('hydrate_capture_monitor_snapshot', {
+  const monitor = await invoke<MonitorSnapshotView>('hydrate_capture_monitor_snapshot', {
     sessionId,
     monitorId,
   });
+  return withFrozenImageSource(sessionId, monitor);
 }
 
 export function logCaptureFrontendPerf(input: {
@@ -154,6 +167,20 @@ export async function runCaptureOcr(sessionId: string, rect: LogicalRect, langua
   });
 }
 
+export async function prepareCaptureOcr(input: PrepareCaptureOcrInput) {
+  return invoke<void>('prepare_capture_ocr', {
+    sessionId: input.sessionId,
+    rect: input.rect,
+    annotations: input.annotations,
+    target: input.target,
+    ...(input.language && input.language !== 'auto' ? { language: input.language } : {}),
+  });
+}
+
+export async function completeCaptureOcr(sessionId: string) {
+  return invoke<void>('complete_capture_ocr', { sessionId });
+}
+
 export async function openResultWindow(text: string) {
   return invoke<void>('open_result_window', { text });
 }
@@ -223,6 +250,8 @@ export const captureWorkspaceCommands: CaptureWorkspaceCommandsPort = {
   quickCaptureSavePath,
   outputCapture,
   runCaptureOcr,
+  prepareCaptureOcr,
+  completeCaptureOcr,
   openCaptureOcrResultWindow,
   openCaptureTranslationResultWindow,
   copyTextToClipboard,

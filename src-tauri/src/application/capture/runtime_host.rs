@@ -1,6 +1,9 @@
 use async_trait::async_trait;
 
+use super::ocr_completion::{CaptureOcrStatus, CaptureOcrTarget};
 use super::CaptureWindowGeometry;
+use crate::domain::capture::CaptureSessionId;
+use crate::domain::ocr::OcrResult;
 use crate::Result;
 
 pub trait CaptureCursorMover: Send + Sync {
@@ -23,11 +26,36 @@ impl CapturePinOutput for UnconfiguredCapturePinOutput {
 
 #[async_trait]
 pub(crate) trait CaptureSessionRuntimeHost: Send + Sync {
+    fn clipboard_revision(&self) -> u64 {
+        0
+    }
+    fn reserve_capture_ocr_result(&self, _target: CaptureOcrTarget) -> Result<u64> {
+        Ok(0)
+    }
+    fn set_capture_ocr_status(&self, _status: Option<CaptureOcrStatus>) {}
+    async fn publish_capture_ocr(
+        &self,
+        _target: CaptureOcrTarget,
+        _result_id: u64,
+        _result: OcrResult,
+        _preview: Option<String>,
+    ) -> Result<()> {
+        Err("Capture OCR output is not configured".into())
+    }
+    async fn report_capture_ocr_error(
+        &self,
+        _target: CaptureOcrTarget,
+        _result_id: u64,
+        error: &str,
+    ) {
+        log::error!("Capture OCR failed: {error}");
+    }
     async fn begin_capture_presentation(&self) -> Result<()>;
     async fn end_capture_presentation(&self) -> Result<()>;
     /// No geometry is supplied when revealing a session-load error.
     async fn prepare_capture_window_for_reveal(
         &self,
+        session_id: Option<&CaptureSessionId>,
         geometry: Option<&CaptureWindowGeometry>,
     ) -> Result<()>;
     async fn reveal_capture_window(&self, geometry: Option<&CaptureWindowGeometry>) -> Result<()>;
@@ -63,6 +91,7 @@ impl CaptureSessionRuntimeHost for UnconfiguredCaptureSessionRuntimeHost {
 
     async fn prepare_capture_window_for_reveal(
         &self,
+        _session_id: Option<&CaptureSessionId>,
         _geometry: Option<&CaptureWindowGeometry>,
     ) -> Result<()> {
         Err("Capture session host is not configured".into())
@@ -115,6 +144,7 @@ mod tests {
 
         async fn prepare_capture_window_for_reveal(
             &self,
+            _session_id: Option<&CaptureSessionId>,
             _geometry: Option<&CaptureWindowGeometry>,
         ) -> Result<()> {
             Ok(())

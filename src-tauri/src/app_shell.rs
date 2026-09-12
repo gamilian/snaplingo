@@ -23,6 +23,28 @@ const SETTINGS_ID: &str = "settings";
 const ABOUT_ID: &str = "about";
 const QUIT_ID: &str = "quit";
 
+pub(crate) fn set_capture_ocr_status(
+    app: &tauri::AppHandle,
+    status: Option<crate::application::capture::CaptureOcrStatus>,
+) {
+    use crate::application::capture::CaptureOcrStatus;
+    let Some(tray) = app.tray_by_id(TRAY_ID) else {
+        return;
+    };
+    let (title, tooltip) = match status {
+        Some(CaptureOcrStatus::Recognizing) => ("OCR…", "SnapLingo — Recognizing text…"),
+        Some(CaptureOcrStatus::Copied) => ("✓", "SnapLingo — Text copied"),
+        Some(CaptureOcrStatus::Failed) => ("!", "SnapLingo — OCR failed"),
+        None => ("", "SnapLingo"),
+    };
+    if let Err(error) = tray
+        .set_title(Some(title))
+        .and_then(|_| tray.set_tooltip(Some(tooltip)))
+    {
+        log::warn!("Failed to update capture OCR status: {error}");
+    }
+}
+
 pub(crate) fn menu_action_for_id(id: &str) -> Option<AppAction> {
     match id {
         SCREENSHOT_ID => Some(AppAction::OpenCapture(CaptureLaunchMode::Screenshot)),

@@ -153,7 +153,7 @@ function forbiddenPlatformImports(files: SourceFile[]) {
       if (path.startsWith('src/platform/tauri/')) return false;
       if (specifier.startsWith('@tauri-apps/')) return true;
       if (/(?:^|\/)platform(?:\/|$)/.test(specifier)) {
-        return path !== 'src/App.tsx';
+        return path !== 'src/App.tsx' && path !== 'src/CaptureApp.tsx';
       }
       return /(?:^|\/)tauri(?:\/|$)/.test(specifier);
     })
@@ -379,23 +379,28 @@ describe('frontend dependency rules', () => {
     expect(crossViewRootImports(viewSourceFilesIncludingTests())).toEqual([]);
   });
 
-  test('App composes Platform adapters into Application runtimes', () => {
-    const appFile = productionSourceFiles().find(({ path }) => path === 'src/App.tsx');
+  test.each([
+    ['src/App.tsx', [
+      './application/result-window/platformRuntime',
+      './application/pinned-image/runtime',
+      './application/settings/runtime',
+      './views/ResultWindow',
+      './views/PinnedImageWindow',
+      './views/SettingsWindow',
+    ]],
+    ['src/CaptureApp.tsx', [
+      './application/capture-workspace/ports',
+      './application/settings/configuration',
+      './views/CaptureWorkspace',
+    ]],
+  ])('%s composes Platform adapters into Application runtimes', (entryPoint, expectedImports) => {
+    const appFile = productionSourceFiles().find(({ path }) => path === entryPoint);
     expect(appFile).toBeDefined();
 
     const imports = moduleImports([appFile!]).map(({ specifier }) => specifier);
 
     expect(imports).toEqual(
-      expect.arrayContaining([
-        './application/capture-workspace/ports',
-        './application/result-window/platformRuntime',
-        './application/pinned-image/runtime',
-        './application/settings/runtime',
-        './views/CaptureWorkspace',
-        './views/ResultWindow',
-        './views/PinnedImageWindow',
-        './views/SettingsWindow',
-      ]),
+      expect.arrayContaining(expectedImports),
     );
     expect(imports.some((specifier) => specifier.startsWith('./platform/tauri/'))).toBe(true);
     expect(imports.some((specifier) => specifier.startsWith('./tauri/'))).toBe(false);

@@ -143,18 +143,6 @@ describe("capture presentation", () => {
     expect(preview).not.toContain("bg-black/15");
   });
 
-  it("throttles annotation canvas painting and reuses its mosaic buffer", () => {
-    const canvas = readFileSync(
-      new URL("./captureAnnotationCanvas.tsx", import.meta.url),
-      "utf8",
-    );
-
-    expect(canvas).toContain("requestAnimationFrame");
-    expect(canvas).toContain("cancelAnimationFrame");
-    expect(canvas).toContain("if (canvas.width !== pixelWidth)");
-    expect(canvas).toContain("mosaicBufferRef.current");
-  });
-
   it("keeps toolbar placement dimensions synchronized with the compact surface", () => {
     const runtimeView = readFileSync(
       new URL("./useCaptureWorkspaceRuntimeView.ts", import.meta.url),

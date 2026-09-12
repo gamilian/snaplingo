@@ -129,6 +129,9 @@ function createPorts(overrides: Record<string, unknown> = {}) {
     },
     providers: createProviderPort(),
     hotkeys: {
+      beginHotkeyRecording: vi.fn(),
+      endHotkeyRecording: vi.fn(),
+      subscribeRecordedHotkey: vi.fn(),
       getHotkeySnapshot: vi.fn(),
       getDefaultHotkeySnapshot: vi.fn(),
       updateHotkey: vi.fn(),

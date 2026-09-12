@@ -4,6 +4,7 @@ import {
   type PointerEvent,
   type ReactNode,
   type Ref,
+  type RefObject,
   type WheelEvent,
 } from 'react';
 
@@ -18,6 +19,7 @@ import {
   type AnnotationTool,
 } from '../../application/capture-workspace/annotationStyle';
 import { CaptureAnnotationCanvas } from './captureAnnotationCanvas';
+import { captureMonitorImageSource } from '../../application/capture-workspace/captureSnapshot';
 import { CaptureEditorToolbar } from './captureEditorToolbar';
 import { CaptureMagnifierOverlay } from './captureMagnifierOverlay';
 import {
@@ -27,7 +29,6 @@ import {
   shouldShowCaptureLoadingMask,
 } from './capturePresentation';
 import {
-  CapturePreviewImage,
   CaptureRenderingOutputBar,
   CaptureSelectedAnnotationBoundsOverlay,
   CaptureSelectionResizeHandles,
@@ -47,6 +48,7 @@ import type { SelectionHandle } from '../../application/capture-workspace/select
 import type { TextAnnotationDraft } from '../../application/capture-workspace/textAnnotationDraft';
 import type {
   AnnotationCommand,
+  CapturedCursorView,
   LogicalRect,
   MonitorSnapshotView,
   Point,
@@ -64,6 +66,8 @@ export interface CaptureWorkspaceViewRenderState {
   readonly viewportBounds: LogicalRect | null;
   readonly selectionBounds: LogicalRect | null;
   readonly monitors: readonly MonitorSnapshotView[];
+  readonly capturedCursor?: CapturedCursorView | null;
+  readonly includeCapturedCursor?: boolean;
   readonly isRenderingOutput: boolean;
   readonly silentOcrHint: {
     readonly status: 'loading' | 'success';
@@ -72,7 +76,6 @@ export interface CaptureWorkspaceViewRenderState {
   readonly editor: {
     readonly selection: LogicalRect | null;
     readonly selectionViewportRect: LogicalRect | null;
-    readonly previewImageBase64: string | null;
     readonly annotations: AnnotationCommand[];
     readonly draftAnnotation: AnnotationCommand | null;
     readonly textDraft: TextAnnotationDraft | null;
@@ -91,7 +94,7 @@ export interface CaptureWorkspaceViewRenderState {
     readonly canRedo: boolean;
   };
   readonly dom: {
-    readonly desktopRef: Ref<HTMLDivElement>;
+    readonly desktopRef: RefObject<HTMLDivElement>;
     readonly textDraftInputRef: Ref<HTMLTextAreaElement>;
     readonly selectionOverlay: {
       readonly canvasRef: Ref<HTMLCanvasElement>;
@@ -379,11 +382,12 @@ export function CaptureWorkspaceView({
         aria-hidden="true"
       >
         {selectionBounds && renderState.monitors.map((monitor) => (
-          monitor.image_base64 ? (
+          captureMonitorImageSource(monitor) ? (
             <img
               key={monitor.id}
               data-capture-monitor={monitor.id}
-              src={`data:image/png;base64,${monitor.image_base64}`}
+              src={captureMonitorImageSource(monitor)!}
+              crossOrigin="anonymous"
               alt=""
               draggable={false}
               className="absolute max-w-none select-none"
@@ -391,6 +395,14 @@ export function CaptureWorkspaceView({
             />
           ) : null
         ))}
+        {renderState.capturedCursor && (
+          <img
+            data-capture-cursor
+            src={`data:image/png;base64,${renderState.capturedCursor.image_base64}`}
+            alt=""
+            className="hidden"
+          />
+        )}
       </div>
 
       {shouldShowCaptureLoadingMask(renderState.status) && (
@@ -436,12 +448,11 @@ export function CaptureWorkspaceView({
         renderState.editor.selection &&
         renderState.editor.selectionViewportRect && (
           <>
-            <CapturePreviewImage
-              imageBase64={renderState.editor.previewImageBase64}
-              selectionViewportRect={renderState.editor.selectionViewportRect}
-            />
             <CaptureAnnotationCanvas
-              imageBase64={renderState.editor.previewImageBase64}
+              desktopRef={renderState.dom.desktopRef}
+              monitors={renderState.monitors}
+              capturedCursor={renderState.includeCapturedCursor ? renderState.capturedCursor : null}
+              selection={renderState.editor.selection}
               annotations={renderState.editor.annotations}
               draftAnnotation={renderState.editor.draftAnnotation}
               selectionViewportRect={renderState.editor.selectionViewportRect}

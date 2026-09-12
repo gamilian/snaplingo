@@ -107,14 +107,11 @@ import {
   planCaptureSelectionCursorKeyboardNudge,
 } from './captureSelectionRuntime';
 import { shouldRevealCaptureWindow } from './captureWindowVisibility';
+import { captureMonitorImageSource } from './captureSnapshot';
 import {
   getCurrentMonitorBounds,
   getVirtualDesktopBounds,
 } from './virtualDesktop';
-import {
-  applyOcrTextPreferences,
-  normalizeOcrText,
-} from '../../utils/ocrTextProcessing';
 import type { OcrSettings } from '../settings/ports';
 import type {
   CaptureWorkspaceRuntime,
@@ -137,23 +134,6 @@ interface MagnifierMonitorHydration extends SnapshotHydration {
   monitorId: string;
 }
 
-interface PreviewRenderRequest {
-  revision: number;
-  generation: number;
-  sessionId: string;
-  rect: LogicalRect;
-  annotations: AnnotationCommand[];
-  includeCursor: boolean;
-}
-
-interface PreviewRenderScheduler {
-  generation: number;
-  sessionId: string;
-  revision: number;
-  queuedPreview: PreviewRenderRequest | null;
-  drain: Promise<void> | null;
-}
-
 interface TerminalOutputOperation {
   id: number;
   generation: number;
@@ -174,6 +154,7 @@ interface CaptureWorkspaceRuntimeHost {
 }
 
 interface CaptureWorkspaceRuntimeKeyboard {
+  isEditingText?(event: CaptureWorkspaceKeyboardEvent): boolean;
   target: {
     addEventListener(
       type: 'keydown',
@@ -241,7 +222,6 @@ export function createCaptureWorkspaceRuntime({
   screenshotPreferences,
   persistScreenshotDefaults,
   ocrPreferences,
-  delay,
   storage,
 }: {
   platform: CaptureWorkspacePorts;
@@ -256,13 +236,8 @@ export function createCaptureWorkspaceRuntime({
     >,
   ) => void;
   ocrPreferences?: () => OcrSettings | undefined;
-  delay?: (milliseconds: number) => Promise<void>;
   storage?: CaptureSelectionStorage;
 }): CaptureWorkspaceRuntime {
-  const wait =
-    delay ??
-    ((milliseconds: number) =>
-      new Promise<void>((resolve) => globalThis.setTimeout(resolve, milliseconds)));
   let state = createInitialState('screenshot', undefined, screenshotPreferences?.());
   let generation = 0;
   let disposed = false;
@@ -293,7 +268,6 @@ export function createCaptureWorkspaceRuntime({
   };
   const cursorPointRef = { current: null as Point | null };
   const keyboardEditCursorPointRef = { current: null as Point | null };
-  let previewScheduler: PreviewRenderScheduler | null = null;
   let terminalOutputSequence = 0;
   let terminalOutputOperation: TerminalOutputOperation | null = null;
   let cursorMoveRequestRevision = 0;
@@ -428,14 +402,6 @@ export function createCaptureWorkspaceRuntime({
     }
   };
 
-  const detachPreviewScheduler = () => {
-    if (previewScheduler) {
-      previewScheduler.queuedPreview = null;
-      previewScheduler.revision += 1;
-      previewScheduler = null;
-    }
-  };
-
   const hasCurrentTerminalOutput = () =>
     terminalOutputOperation?.generation === generation &&
     terminalOutputOperation.sessionId === state.session?.id;
@@ -445,7 +411,6 @@ export function createCaptureWorkspaceRuntime({
     disposed = true;
     generation += 1;
     const activeSessionId = state.session?.id ?? null;
-    detachPreviewScheduler();
     terminalOutputOperation = null;
     revealAttempt = null;
     hasRevealed = false;
@@ -476,7 +441,6 @@ export function createCaptureWorkspaceRuntime({
 
   const resetSession = () => {
     if (disposed) return;
-    detachPreviewScheduler();
     terminalOutputOperation = null;
     state = createInitialState(state.mode, state, screenshotPreferences?.());
     cursorPointRef.current = null;
@@ -497,12 +461,20 @@ export function createCaptureWorkspaceRuntime({
     actionGeneration: number,
     sessionId: string,
     cancelNativeSession: () => Promise<void>,
+    completeOcr = false,
   ) => {
     if (generation !== actionGeneration) {
       if (state.session?.id !== sessionId) await cancelNativeSession();
       return;
     }
 
+    if (completeOcr) {
+      // The backend owns both window cleanup and the OCR job from this point on.
+      await platform.commands.completeCaptureOcr(sessionId);
+      provisionalSessionIds.delete(sessionId);
+      if (generation === actionGeneration) resetSession();
+      return;
+    }
     await (onInactive ? onInactive() : platform.window.hide());
     if (generation !== actionGeneration) {
       if (state.session?.id !== sessionId) await cancelNativeSession();
@@ -521,6 +493,7 @@ export function createCaptureWorkspaceRuntime({
     includeCursor: boolean,
     actionGeneration: number,
     cancelNativeSession: () => Promise<void>,
+    completeOcr: boolean,
   ) => {
     const cancelIfStale = async () => {
       if (
@@ -600,58 +573,13 @@ export function createCaptureWorkspaceRuntime({
         ocrSettings?.recognitionLanguage === 'auto'
           ? undefined
           : ocrSettings?.recognitionLanguage;
-      const result = recognitionLanguage
-        ? await platform.commands.runCaptureOcr(
-            sessionId,
-            rect,
-            recognitionLanguage,
-          )
-        : await platform.commands.runCaptureOcr(sessionId, rect);
-      if (await cancelIfStale()) return;
-      const text = ocrSettings
-        ? applyOcrTextPreferences(result.text, ocrSettings)
-        : normalizeOcrText(result.text);
-
-      if (effect.target === 'translation-window') {
-        if (result.detected_language) {
-          await platform.commands.openCaptureTranslationResultWindow(
-            text,
-            result.detected_language,
-          );
-        } else {
-          await platform.commands.openCaptureTranslationResultWindow(text);
-        }
-        return;
-      }
-
-      if (effect.target === 'ocr-window') {
-        const imageBase64 = await platform.commands.renderCaptureOutput({
-          sessionId,
-          rect,
-          annotations,
-        });
-        if (await cancelIfStale()) return;
-        if (result.confidence === null) {
-          await platform.commands.openCaptureOcrResultWindow(text, imageBase64);
-        } else {
-          await platform.commands.openCaptureOcrResultWindow(
-            text,
-            imageBase64,
-            result.confidence,
-          );
-        }
-        return;
-      }
-
-      await platform.commands.copyTextToClipboard(text);
-      if (!ocrSettings?.hideSilentStatus) {
-        const point = state.silentOcrHint?.point ?? {
-          x: rect.x + rect.width / 2,
-          y: rect.y + rect.height / 2,
-        };
-        patch({ silentOcrHint: { status: 'success', point } });
-        await wait(550);
-      }
+      await platform.commands.prepareCaptureOcr({
+        sessionId,
+        rect,
+        annotations,
+        target: effect.target,
+        ...(recognitionLanguage ? { language: recognitionLanguage } : {}),
+      });
       return;
     }
 
@@ -663,7 +591,12 @@ export function createCaptureWorkspaceRuntime({
     }
 
     if (effect.type === 'finish-session') {
-      await finishSession(actionGeneration, sessionId, cancelNativeSession);
+      await finishSession(
+        actionGeneration,
+        sessionId,
+        cancelNativeSession,
+        completeOcr,
+      );
       return;
     }
 
@@ -693,6 +626,7 @@ export function createCaptureWorkspaceRuntime({
     const cancelNativeSession = createNativeSessionCancellation(session.id);
 
     const preservesPreview = state.status === 'preview';
+    const completeOcr = effects.some((effect) => effect.type === 'run-ocr');
     const isSilentOcr = effects.some(
       (effect) => effect.type === 'run-ocr' && effect.target === 'clipboard',
     );
@@ -723,6 +657,7 @@ export function createCaptureWorkspaceRuntime({
           includeCursor,
           actionGeneration,
           cancelNativeSession,
+          completeOcr,
         );
         if (cancelled) return;
         if (
@@ -752,115 +687,28 @@ export function createCaptureWorkspaceRuntime({
         generation === actionGeneration &&
         state.session?.id === session.id
       ) {
-        patch({ isRenderingOutput: Boolean(previewScheduler?.drain) });
+        patch({ isRenderingOutput: false });
       }
     }
   };
 
   const renderSelectionPreview = async (
     rect: LogicalRect,
-    annotations: AnnotationCommand[] = [],
+    _annotations: AnnotationCommand[] = [],
     includeCursor = false,
-    preservePreviewImage = false,
   ) => {
-    const session = state.session;
-    if (!session) return;
-    let scheduler = previewScheduler;
-    if (
-      !scheduler ||
-      scheduler.generation !== generation ||
-      scheduler.sessionId !== session.id
-    ) {
-      scheduler = {
-        generation,
-        sessionId: session.id,
-        revision: 0,
-        queuedPreview: null,
-        drain: null,
-      };
-      previewScheduler = scheduler;
-    }
-    const request: PreviewRenderRequest = {
-      revision: ++scheduler.revision,
-      generation,
-      sessionId: session.id,
-      rect,
-      annotations,
-      includeCursor,
-    };
-    scheduler.queuedPreview = request;
-
-    const preferences = screenshotPreferences?.();
+    if (!state.session || hasCurrentTerminalOutput()) return;
+    // The view crops the already decoded frozen monitors. Encoding is only
+    // needed for terminal output, so entering or resizing preview never blocks.
     patch({
       status: 'preview',
       selection: rect,
       hoverSelection: null,
-      activeAnnotationTool: rememberedAnnotationTool(preferences, storage),
-      ...(preservePreviewImage ? {} : { previewImageBase64: null }),
-      isRenderingOutput: true,
+      activeAnnotationTool: rememberedAnnotationTool(screenshotPreferences?.(), storage),
+      includeCapturedCursor: includeCursor,
+      isRenderingOutput: false,
       error: null,
     });
-
-    if (!scheduler.drain) {
-      const work = (async () => {
-        while (scheduler.queuedPreview) {
-          const current = scheduler.queuedPreview;
-          scheduler.queuedPreview = null;
-          const cancelNativeSession = createNativeSessionCancellation(
-            current.sessionId,
-          );
-          if (
-            generation !== current.generation ||
-            state.session?.id !== current.sessionId
-          ) {
-            if (state.session?.id !== current.sessionId) {
-              await cancelNativeSession().catch(() => undefined);
-            }
-            continue;
-          }
-
-          try {
-            const previewImageBase64 =
-              await platform.commands.renderCaptureOutput({
-                sessionId: current.sessionId,
-                rect: current.rect,
-                annotations: current.annotations,
-                ...(current.includeCursor ? { includeCursor: true } : {}),
-              });
-            if (
-              generation === current.generation &&
-              state.session?.id === current.sessionId &&
-              scheduler.revision === current.revision
-            ) {
-              patch({ previewImageBase64 });
-            } else if (state.session?.id !== current.sessionId) {
-              await cancelNativeSession().catch(() => undefined);
-            }
-          } catch (error) {
-            if (
-              generation === current.generation &&
-              state.session?.id === current.sessionId &&
-              scheduler.revision === current.revision
-            ) {
-              patch({ status: 'error', error: errorMessage(error) });
-            } else if (state.session?.id !== current.sessionId) {
-              await cancelNativeSession().catch(() => undefined);
-            }
-          }
-        }
-      })();
-      let drain!: Promise<void>;
-      drain = work.finally(() => {
-        if (scheduler.drain === drain) {
-          scheduler.drain = null;
-        }
-        if (previewScheduler === scheduler) {
-          patch({ isRenderingOutput: hasCurrentTerminalOutput() });
-        }
-      });
-      scheduler.drain = drain;
-    }
-    await scheduler.drain;
   };
 
   const getEditorDerived = () =>
@@ -884,7 +732,7 @@ export function createCaptureWorkspaceRuntime({
     _annotations: AnnotationCommand[] = state.annotationHistory.annotations,
     includeCursor =
       state.includeCapturedCursor && canToggleCapturedCursor(state.session),
-  ) => renderSelectionPreview(rect, [], includeCursor, true);
+  ) => renderSelectionPreview(rect, [], includeCursor);
 
   const commitTextDraftToHistory = () => {
     const result = commitCaptureEditorTextDraft({
@@ -1085,7 +933,6 @@ export function createCaptureWorkspaceRuntime({
     setCursorPoint: (cursorPoint) => patch({ cursorPoint }),
     setSelection: (selection) => patch({ selection }),
     scheduleSelectionOverlayPaint: () => host?.scheduleSelectionOverlayPaint?.(),
-    setPreviewImageBase64: (previewImageBase64) => patch({ previewImageBase64 }),
     setRenderingOutput: (isRenderingOutput) => patch({ isRenderingOutput }),
     setStatus: (status) => patch({ status }),
     setAnnotationGesture: (
@@ -1361,29 +1208,29 @@ export function createCaptureWorkspaceRuntime({
     if (disposed) return;
     clearPressedHoverSelection();
     const actionGeneration = ++generation;
-    const sessionId = state.session?.id;
-    if (!sessionId) {
-      try {
-        await (onInactive ? onInactive() : platform.window.hide());
-        if (generation === actionGeneration) resetSession();
-      } catch (error) {
-        if (generation === actionGeneration) {
-          patch({ status: 'error', error: errorMessage(error) });
-        }
-      }
-      return;
-    }
-    const cancelNativeSession = createNativeSessionCancellation(sessionId);
+    const sessionsToCancel = new Set(provisionalSessionIds);
+    if (state.session) sessionsToCancel.add(state.session.id);
+    for (const sessionId of sessionsToCancel) provisionalSessionIds.add(sessionId);
+    let failure: string | null = null;
 
     try {
-      await finishSession(actionGeneration, sessionId, cancelNativeSession);
+      await (onInactive ? onInactive() : platform.window.hide());
+      if (generation === actionGeneration) resetSession();
     } catch (error) {
-      if (generation === actionGeneration) {
-        patch({ status: 'error', error: errorMessage(error) });
-      } else {
-        await cancelNativeSession().catch(() => undefined);
+      failure = errorMessage(error);
+    }
+    // Hiding is independent of native cleanup, including failed replacements.
+    for (const sessionId of sessionsToCancel) {
+      if (generation !== actionGeneration && state.session?.id === sessionId) continue;
+      try {
+        await cancelNativeSessionOnce(sessionId);
+        provisionalSessionIds.delete(sessionId);
+      } catch (error) {
+        failure ??= errorMessage(error);
       }
     }
+    if (generation !== actionGeneration) return;
+    if (failure !== null) patch({ status: 'error', error: failure });
   };
 
   const actions: CaptureWorkspaceRuntime['actions'] = {
@@ -1391,6 +1238,7 @@ export function createCaptureWorkspaceRuntime({
       if (disposed) return () => undefined;
       const connection = createHostConnection();
       const handleKeyDown = (event: CaptureWorkspaceKeyboardEvent) => {
+        if (keyboard?.isEditingText?.(event)) return;
         if (actions.keyDown(event)) {
           event.preventDefault();
         }
@@ -1434,86 +1282,8 @@ export function createCaptureWorkspaceRuntime({
       try {
         connection.retain(
           await platform.events.subscribeHotkeyTriggered((launch) => {
-            if (disposed) return;
+            if (disposed || connection.isClosed) return;
             return actions.startSession(launch.mode, launch.sessionId);
-          }),
-        );
-        if (disposed || connection.isClosed) return connection.disconnect;
-
-        connection.retain(
-          await platform.events.subscribeCaptureCancel(() => {
-            if (disposed) return;
-            return cancelSession();
-          }),
-        );
-        if (disposed || connection.isClosed) return connection.disconnect;
-
-        connection.retain(
-          await platform.events.subscribeCaptureCopy(async () => {
-            if (disposed) return;
-            if (state.status === 'preview' && state.selection) {
-              await runCompletionEffects(
-                state.selection,
-                planCandidateSelectionCompletion('copy'),
-                commitTextDraftToHistory().annotations,
-                state.includeCapturedCursor &&
-                  canToggleCapturedCursor(state.session),
-              );
-              return;
-            }
-
-            if (
-              state.status === 'selecting' &&
-              !state.startPoint &&
-              state.hoverSelection &&
-              !state.textDraft
-            ) {
-              await completeCandidateSelection(state.hoverSelection, 'copy');
-            }
-          }),
-        );
-        if (disposed || connection.isClosed) return connection.disconnect;
-
-        connection.retain(
-          await platform.events.subscribeCaptureSave(async () => {
-            if (disposed) return;
-            if (state.status === 'preview' && state.selection) {
-              await runCompletionEffects(
-                state.selection,
-                planCandidateSelectionCompletion('save'),
-                commitTextDraftToHistory().annotations,
-                state.includeCapturedCursor &&
-                  canToggleCapturedCursor(state.session),
-              );
-              return;
-            }
-
-            if (
-              state.status === 'selecting' &&
-              !state.startPoint &&
-              state.hoverSelection &&
-              !state.textDraft
-            ) {
-              await completeCandidateSelection(state.hoverSelection, 'save');
-            }
-          }),
-        );
-        if (disposed || connection.isClosed) return connection.disconnect;
-
-        connection.retain(
-          await platform.events.subscribeCaptureUndo(() => {
-            if (state.status === 'preview' && !state.textDraft) {
-              undoAnnotation();
-            }
-          }),
-        );
-        if (disposed || connection.isClosed) return connection.disconnect;
-
-        connection.retain(
-          await platform.events.subscribeCaptureRedo(() => {
-            if (state.status === 'preview' && !state.textDraft) {
-              redoAnnotation();
-            }
           }),
         );
       } catch (error) {
@@ -1548,8 +1318,10 @@ export function createCaptureWorkspaceRuntime({
           try {
             await platform.window.prepareForReveal(sessionId);
             if (!isCurrent()) return;
+            markPerf('window_prepared', sessionId);
             await host?.prepareSurface();
             if (!isCurrent()) return;
+            markPerf('surface_decoded', sessionId);
             await platform.window.reveal(sessionId);
             if (!isCurrent()) return;
             hasRevealed = true;
@@ -1582,7 +1354,16 @@ export function createCaptureWorkspaceRuntime({
 
     async startSession(mode, requestedSessionId) {
       if (disposed) return;
+      // The native presentation already exists even if reading its metadata fails.
+      if (requestedSessionId) provisionalSessionIds.add(requestedSessionId);
       const previousSessionId = state.session?.id ?? null;
+      for (const sessionId of provisionalSessionIds) {
+        if (sessionId === previousSessionId || sessionId === requestedSessionId) continue;
+        void cancelNativeSessionOnce(sessionId).then(
+          () => provisionalSessionIds.delete(sessionId),
+          () => undefined,
+        );
+      }
       const previousSnapshot = previousSessionId
         ? captureReplacementSnapshot()
         : null;
@@ -1597,7 +1378,6 @@ export function createCaptureWorkspaceRuntime({
         await cancelNativeSessionOnce(previousSessionId).catch(() => undefined);
       };
       const actionGeneration = ++generation;
-      detachPreviewScheduler();
       terminalOutputOperation = null;
       hasKeyboardAdjustedDraft = false;
       clearPressedHoverSelection();
@@ -1701,7 +1481,6 @@ export function createCaptureWorkspaceRuntime({
         await cancelNativeSessionOnce(previousSessionId).catch(() => undefined);
       };
       const actionGeneration = ++generation;
-      detachPreviewScheduler();
       terminalOutputOperation = null;
       hasKeyboardAdjustedDraft = false;
       clearPressedHoverSelection();
@@ -1795,7 +1574,6 @@ export function createCaptureWorkspaceRuntime({
     resetPreview() {
       if (disposed) return;
       generation += 1;
-      detachPreviewScheduler();
       terminalOutputOperation = null;
       hasKeyboardAdjustedDraft = false;
       clearPressedHoverSelection();
@@ -1820,7 +1598,6 @@ export function createCaptureWorkspaceRuntime({
         status: 'selecting',
         selection: null,
         hoverSelection: null,
-        previewImageBase64: null,
         isRenderingOutput: false,
         error: null,
       });
@@ -1963,7 +1740,6 @@ export function createCaptureWorkspaceRuntime({
         cursorPoint: draftStart.nextState.cursorPoint,
         selection: draftStart.nextState.selection,
         hoverSelection: draftStart.nextState.hoverSelection,
-        previewImageBase64: draftStart.nextState.previewImageBase64,
         isRenderingOutput: draftStart.nextState.renderingOutput,
       });
       return true;
@@ -2226,6 +2002,7 @@ export function createCaptureWorkspaceRuntime({
     },
 
     keyDown(input: CaptureWorkspaceKeyInput) {
+      if (disposed || state.textDraft || input.isComposing) return false;
       const event = {
         key: input.key,
         metaKey: input.metaKey ?? false,
@@ -2316,7 +2093,6 @@ export function createCaptureWorkspaceRuntime({
         patch({
           cursorPoint: draftNudge.cursorPoint,
           selection: draftNudge.selection,
-          previewImageBase64: draftNudge.previewImageBase64,
           isRenderingOutput: draftNudge.renderingOutput,
         });
         const sessionId = state.session.id;
@@ -2442,8 +2218,7 @@ export function createCaptureWorkspaceRuntime({
       if (!sessionId) return;
       const hasPixels = () =>
         Boolean(
-          state.session?.monitors.find((monitor) => monitor.id === monitorId)
-            ?.image_base64,
+          captureMonitorImageSource(state.session?.monitors.find((monitor) => monitor.id === monitorId)),
         );
       if (hasPixels()) return;
 
@@ -2566,7 +2341,6 @@ export function createCaptureWorkspaceRuntime({
         selection: state.selection,
         hoverSelection: state.hoverSelection,
         candidateDetectionMode: state.candidateDetectionMode,
-        previewImageBase64: state.previewImageBase64,
         editGesture: state.editGesture,
         activeAnnotationTool: state.activeAnnotationTool,
         annotationGesture: state.annotationGesture,

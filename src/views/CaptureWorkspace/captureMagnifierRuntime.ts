@@ -1,12 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import {
   sampleImageColor,
   type ColorSample,
 } from '../../application/image-inspection/colorSampler';
 import { shouldHydrateCaptureMagnifierPixels } from '../../application/capture-workspace/captureMagnifierState';
+import { captureMonitorImageSource } from '../../application/capture-workspace/captureSnapshot';
 import type { CaptureSessionView, MonitorSnapshotView, Point } from './types';
 
 interface UseCaptureMagnifierPixelSourceOptions {
+  desktopRef: RefObject<HTMLDivElement>;
   session: CaptureSessionView | null;
   isMagnifierRequested: boolean;
   isMagnifierShown: boolean;
@@ -20,6 +22,7 @@ interface UseCaptureMagnifierPixelSourceOptions {
 }
 
 export function useCaptureMagnifierPixelSource({
+  desktopRef,
   cursorInMonitorPoint,
   cursorMonitor,
   ensureCaptureMonitorHydrated,
@@ -45,7 +48,7 @@ export function useCaptureMagnifierPixelSource({
       !cursorMonitor ||
       !shouldHydrateCaptureMagnifierPixels({
         hasSession: true,
-        hasCursorMonitorPixelSource: Boolean(cursorMonitor.image_base64),
+        hasCursorMonitorPixelSource: Boolean(captureMonitorImageSource(cursorMonitor)),
         isMagnifierRequested,
       })
     ) {
@@ -63,14 +66,17 @@ export function useCaptureMagnifierPixelSource({
   ]);
 
   useEffect(() => {
-    if (!isMagnifierShown || !cursorMonitor?.image_base64) return;
+    const source = captureMonitorImageSource(cursorMonitor);
+    if (!isMagnifierShown || !cursorMonitor || !source) return;
     if (sampleSourceByMonitorRef.current.has(cursorMonitor.id)) return;
 
     let disposed = false;
     const monitorId = cursorMonitor.id;
-    const image = new Image();
-    image.decoding = 'async';
-    image.onload = () => {
+    const image = Array.from(
+      desktopRef.current?.querySelectorAll<HTMLImageElement>('[data-capture-monitor]') ?? [],
+    ).find((image) => image.dataset.captureMonitor === monitorId);
+    if (!image) return;
+    void image.decode().then(() => {
       if (disposed) return;
 
       const canvas = document.createElement('canvas');
@@ -78,13 +84,12 @@ export function useCaptureMagnifierPixelSource({
       canvas.height = 1;
       sampleSourceByMonitorRef.current.set(monitorId, { image, canvas });
       setSampleSourceVersion((version) => version + 1);
-    };
-    image.src = `data:image/png;base64,${cursorMonitor.image_base64}`;
+    }).catch(() => undefined);
 
     return () => {
       disposed = true;
     };
-  }, [cursorMonitor?.id, cursorMonitor?.image_base64, isMagnifierShown]);
+  }, [desktopRef, cursorMonitor?.id, cursorMonitor?.image_base64, cursorMonitor?.image_url, isMagnifierShown]);
 
   useEffect(() => {
     if (!isMagnifierShown || !cursorInMonitorPoint || !cursorMonitor) {

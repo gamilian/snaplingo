@@ -23,6 +23,7 @@ export interface MonitorSnapshotView {
   physical_bounds: PhysicalRect;
   scale_factor: number;
   image_base64: string;
+  image_url?: string;
 }
 
 export interface CapturedCursorView {

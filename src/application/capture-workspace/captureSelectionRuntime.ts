@@ -30,7 +30,6 @@ export interface CaptureDraftSelectionStartState {
   startPoint: Point;
   selection: null;
   hoverSelection: null;
-  previewImageBase64: null;
   renderingOutput: false;
   status: 'selecting';
   activeAnnotationTool: null;
@@ -70,7 +69,6 @@ export function planCaptureDraftSelectionStart({
       startPoint: anchorPoint,
       selection: null,
       hoverSelection: null,
-      previewImageBase64: null,
       renderingOutput: false,
       status: 'selecting',
       activeAnnotationTool: null,
@@ -117,7 +115,6 @@ export function planCaptureDraftSelectionMoveShortcutStart({
 export interface CaptureDraftSelectionMovePlan {
   draftSelection: LogicalRect;
   anchorPoint: Point;
-  previewImageBase64: null;
   renderingOutput: false;
 }
 
@@ -143,7 +140,6 @@ export function planCaptureDraftSelectionMove({
   return {
     draftSelection: result.selection,
     anchorPoint: result.anchorPoint,
-    previewImageBase64: null,
     renderingOutput: false,
   };
 }
@@ -181,7 +177,6 @@ export interface CaptureDraftSelectionKeyboardNudgePlan {
   keyboardDraftCursorPoint: Point;
   cursorPoint: Point;
   selection: LogicalRect;
-  previewImageBase64: null;
   renderingOutput: false;
 }
 
@@ -207,7 +202,6 @@ export function planCaptureDraftSelectionKeyboardNudge({
     keyboardDraftCursorPoint: result.cursorPoint,
     cursorPoint: result.cursorPoint,
     selection: result.selection,
-    previewImageBase64: null,
     renderingOutput: false,
   };
 }
@@ -322,7 +316,6 @@ export type CapturePreviewSelectionMoveStartPlan =
       selectedAnnotationIndex: null;
       annotationMoveGesture: null;
       editGesture: CaptureSelectionEditGesture;
-      previewImageBase64: null;
     };
 
 export function planCapturePreviewSelectionMoveStart({
@@ -351,14 +344,12 @@ export function planCapturePreviewSelectionMoveStart({
       startPoint: point,
       startSelection: selection,
     },
-    previewImageBase64: null,
   };
 }
 
 export interface CaptureSelectionResizeStartPlan {
   cursorPoint: Point;
   editGesture: CaptureSelectionEditGesture;
-  previewImageBase64: null;
 }
 
 export function planCaptureSelectionResizeStart({
@@ -378,7 +369,6 @@ export function planCaptureSelectionResizeStart({
       startPoint: point,
       startSelection: selection,
     },
-    previewImageBase64: null,
   };
 }
 
@@ -387,7 +377,6 @@ export interface CaptureSelectionEditKeyboardNudgePlan {
   cursorPoint: Point;
   selection: LogicalRect;
   editGesture: CaptureSelectionEditGesture;
-  previewImageBase64: null;
   renderingOutput: false;
 }
 
@@ -430,7 +419,6 @@ export function planCaptureSelectionEditKeyboardNudge({
       startPoint: result.cursorPoint,
       startSelection: result.selection,
     },
-    previewImageBase64: null,
     renderingOutput: false,
   };
 }
@@ -481,7 +469,6 @@ export function planCaptureHoverSelectionCycle({
 
 export interface CaptureSelectionArrowPreviewPlan {
   selection: LogicalRect;
-  previewImageBase64: null;
   previewRender: {
     rect: LogicalRect;
   };
@@ -526,7 +513,6 @@ export function planCaptureSelectionArrowPreview({
 
   return {
     selection: nextSelection,
-    previewImageBase64: null,
     previewRender: {
       rect: nextSelection,
     },
@@ -604,7 +590,6 @@ export interface CaptureSelectionEditPlanOptions {
 export interface CaptureSelectionEditMovePlan {
   keyboardEditCursorPoint: null;
   selection: LogicalRect;
-  previewImageBase64: null;
   renderingOutput: false;
 }
 
@@ -614,7 +599,6 @@ export function planCaptureSelectionEditMove(
   return {
     keyboardEditCursorPoint: null,
     selection: applyCaptureSelectionEditGesture(options),
-    previewImageBase64: null,
     renderingOutput: false,
   };
 }
