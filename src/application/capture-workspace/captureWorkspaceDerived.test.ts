@@ -123,4 +123,31 @@ describe('captureWorkspaceDerived', () => {
     expect(derived.isFillModeActive).toBe(true);
     expect(derived.selectedAnnotationBounds).toEqual(annotation.rect);
   });
+
+  it('reuses immutable candidate geometry while the capture session is stable', () => {
+    const session = createSession();
+    const state = {
+      ...createInitialCaptureWorkspaceState(),
+      status: 'selecting' as const,
+      session,
+    };
+
+    const first = getCaptureWorkspaceDerivedState({
+      state,
+      hydratedCaptureSessionId: null,
+      toolbarGap: 14,
+      toolbarSize: { width: 640, height: 42 },
+    });
+    const second = getCaptureWorkspaceDerivedState({
+      state: { ...state, cursorPoint: { x: 20, y: 50 } },
+      hydratedCaptureSessionId: null,
+      toolbarGap: 14,
+      toolbarSize: { width: 640, height: 42 },
+    });
+
+    expect(second.captureCandidates).toBe(first.captureCandidates);
+    expect(second.snapTargetRects).toBe(first.snapTargetRects);
+    expect(second.selectionBounds).toBe(first.selectionBounds);
+    expect(second.viewportBounds).toBe(first.viewportBounds);
+  });
 });

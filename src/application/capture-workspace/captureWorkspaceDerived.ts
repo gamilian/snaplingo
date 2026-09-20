@@ -11,11 +11,63 @@ import {
   virtualRectToViewportRect,
 } from './virtualDesktop';
 import type { CaptureWorkspaceState } from './captureWorkspaceState';
-import type { AnnotationCommand, LogicalRect, Point } from '../../domain/capture';
+import type {
+  AnnotationCommand,
+  CaptureSessionView,
+  LogicalRect,
+  Point,
+} from '../../domain/capture';
 
 interface Size {
   width: number;
   height: number;
+}
+
+interface CachedCaptureCandidates {
+  candidates: CaptureCandidate[];
+  rects: LogicalRect[];
+  selectionBounds: LogicalRect;
+  viewportBounds: LogicalRect;
+}
+
+const captureCandidateCache = new WeakMap<
+  CaptureSessionView,
+  CachedCaptureCandidates
+>();
+
+export function getCaptureCandidatesForSession(
+  session: CaptureSessionView,
+): CaptureCandidate[] {
+  return getCachedCaptureCandidates(session).candidates;
+}
+
+export function getCaptureCandidateRectsForSession(
+  session: CaptureSessionView,
+): LogicalRect[] {
+  return getCachedCaptureCandidates(session).rects;
+}
+
+function getCachedCaptureCandidates(
+  session: CaptureSessionView,
+): CachedCaptureCandidates {
+  const cached = captureCandidateCache.get(session);
+  if (cached) return cached;
+
+  const candidates = buildCaptureCandidates(session.monitors, session.candidates);
+  const selectionBounds = getVirtualDesktopBounds(session.monitors);
+  const next = {
+    candidates,
+    rects: candidates.map((candidate) => candidate.rect),
+    selectionBounds,
+    viewportBounds: {
+      x: 0,
+      y: 0,
+      width: selectionBounds.width,
+      height: selectionBounds.height,
+    },
+  };
+  captureCandidateCache.set(session, next);
+  return next;
 }
 
 export interface CaptureWorkspaceDerivedState
@@ -76,24 +128,16 @@ export function getCaptureWorkspaceDerivedState({
     state.activeAnnotationTool === 'ellipse' ||
     selectedAnnotation?.type === 'rectangle' ||
     selectedAnnotation?.type === 'ellipse';
-  const captureCandidates = state.session
-    ? buildCaptureCandidates(state.session.monitors, state.session.candidates)
-    : [];
+  const cachedCandidates = state.session
+    ? getCachedCaptureCandidates(state.session)
+    : null;
+  const captureCandidates = cachedCandidates?.candidates ?? [];
   const areCaptureImagesReady = state.session
     ? hydratedCaptureSessionId === state.session.id
     : false;
-  const snapTargetRects = captureCandidates.map((candidate) => candidate.rect);
-  const selectionBounds = state.session
-    ? getVirtualDesktopBounds(state.session.monitors)
-    : null;
-  const viewportBounds = selectionBounds
-    ? {
-        x: 0,
-        y: 0,
-        width: selectionBounds.width,
-        height: selectionBounds.height,
-      }
-    : null;
+  const snapTargetRects = cachedCandidates?.rects ?? [];
+  const selectionBounds = cachedCandidates?.selectionBounds ?? null;
+  const viewportBounds = cachedCandidates?.viewportBounds ?? null;
   const selectionViewportRect =
     state.selection && selectionBounds
       ? virtualRectToViewportRect(state.selection, selectionBounds)

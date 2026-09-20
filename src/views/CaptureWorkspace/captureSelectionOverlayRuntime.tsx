@@ -1,4 +1,5 @@
 import {
+  memo,
   useCallback,
   useLayoutEffect,
   useMemo,
@@ -67,7 +68,7 @@ export function getSelectionOverlayCanvasSize(
   };
 }
 
-export function CaptureSelectionOverlayCanvas({
+export const CaptureSelectionOverlayCanvas = memo(function CaptureSelectionOverlayCanvas({
   canvasRef,
   cssSize,
   pixelRatio,
@@ -87,7 +88,7 @@ export function CaptureSelectionOverlayCanvas({
       aria-hidden="true"
     />
   );
-}
+});
 
 export function useCaptureSelectionOverlay({
   draftSelectionRef,

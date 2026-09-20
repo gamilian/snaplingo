@@ -31,7 +31,6 @@ import {
   planCaptureKeyboardBlur,
 } from './captureKeyboardHostRuntime';
 import {
-  buildCaptureCandidates,
   getBestCandidateAtPoint,
 } from './captureCandidates';
 import {
@@ -68,7 +67,11 @@ import {
   planCaptureAnnotationToolActivation,
   planCaptureManualSelectionTransition,
 } from './captureEditorRuntime';
-import { getCaptureWorkspaceDerivedState } from './captureWorkspaceDerived';
+import {
+  getCaptureCandidateRectsForSession,
+  getCaptureCandidatesForSession,
+  getCaptureWorkspaceDerivedState,
+} from './captureWorkspaceDerived';
 import {
   handleCaptureWorkspaceEditorKeyDown,
   type CaptureWorkspaceKeyboardEditorActions,
@@ -1073,10 +1076,7 @@ export function createCaptureWorkspaceRuntime({
   const windowCandidateAt = (point: Point) =>
     state.session
       ? getBestCandidateAtPoint(
-          buildCaptureCandidates(
-            state.session.monitors,
-            state.session.candidates,
-          ),
+          getCaptureCandidatesForSession(state.session),
           point,
         )?.rect ?? null
       : null;
@@ -1458,7 +1458,7 @@ export function createCaptureWorkspaceRuntime({
           cursorPoint,
           hoverSelection: cursorPoint
             ? getBestCandidateAtPoint(
-                buildCaptureCandidates(session.monitors, session.candidates),
+                getCaptureCandidatesForSession(session),
                 cursorPoint,
               )?.rect ?? null
             : null,
@@ -1537,7 +1537,7 @@ export function createCaptureWorkspaceRuntime({
           cursorPoint,
           hoverSelection: cursorPoint
             ? getBestCandidateAtPoint(
-                buildCaptureCandidates(session.monitors, session.candidates),
+                getCaptureCandidatesForSession(session),
                 cursorPoint,
               )?.rect ?? null
             : null,
@@ -1742,7 +1742,7 @@ export function createCaptureWorkspaceRuntime({
         cursorPoint: point,
         anchorPoint: snapPointToRects(
           point,
-          getEditorDerived().snapTargetRects,
+          getCaptureCandidateRectsForSession(state.session),
           6,
         ),
       });
@@ -1778,7 +1778,7 @@ export function createCaptureWorkspaceRuntime({
         const draft = planCaptureDraftSelectionPointerMove({
           anchorPoint: state.startPoint,
           point,
-          snapTargetRects: getEditorDerived().snapTargetRects,
+          snapTargetRects: getCaptureCandidateRectsForSession(state.session),
           edgeSnapThreshold: 6,
           constrainSelection: shiftKey,
         });
@@ -1801,10 +1801,7 @@ export function createCaptureWorkspaceRuntime({
         hoverSelection:
           candidateDetectionMode === 'window'
             ? getBestCandidateAtPoint(
-                buildCaptureCandidates(
-                  state.session.monitors,
-                  state.session.candidates,
-                ),
+                getCaptureCandidatesForSession(state.session),
                 point,
               )?.rect ?? null
             : retainedControlCandidate,
@@ -1841,14 +1838,11 @@ export function createCaptureWorkspaceRuntime({
         : point;
       hasKeyboardAdjustedDraft = false;
 
-      const candidates = buildCaptureCandidates(
-        state.session.monitors,
-        state.session.candidates,
-      );
+      const candidates = getCaptureCandidatesForSession(state.session);
       const draftCommit = planCaptureDraftSelectionCommit({
         anchorPoint: state.startPoint,
         releasePoint,
-        snapTargetRects: getEditorDerived().snapTargetRects,
+        snapTargetRects: getCaptureCandidateRectsForSession(state.session),
         edgeSnapThreshold: 6,
         constrainSelection: shiftKey,
         captureCandidates:
@@ -2130,10 +2124,7 @@ export function createCaptureWorkspaceRuntime({
           hoverSelection:
             candidateDetectionMode === 'window'
               ? getBestCandidateAtPoint(
-                  buildCaptureCandidates(
-                    state.session.monitors,
-                    state.session.candidates,
-                  ),
+                  getCaptureCandidatesForSession(state.session),
                   cursorPoint,
                 )?.rect ?? null
               : null,

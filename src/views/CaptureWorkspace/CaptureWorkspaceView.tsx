@@ -1,4 +1,5 @@
 import {
+  memo,
   useEffect,
   useMemo,
   type PointerEvent,
@@ -166,6 +167,51 @@ interface CaptureWorkspaceDomPointerEvent {
   preventDefault(): void;
   stopPropagation(): void;
 }
+
+interface CaptureDesktopLayerProps {
+  desktopRef: RefObject<HTMLDivElement>;
+  monitors: readonly MonitorSnapshotView[];
+  selectionBounds: LogicalRect;
+  capturedCursor?: CapturedCursorView | null;
+}
+
+const CaptureDesktopLayer = memo(function CaptureDesktopLayer({
+  desktopRef,
+  monitors,
+  selectionBounds,
+  capturedCursor,
+}: CaptureDesktopLayerProps) {
+  return (
+    <div
+      ref={desktopRef}
+      className="pointer-events-none absolute inset-0"
+      aria-hidden="true"
+    >
+      {monitors.map((monitor) =>
+        captureMonitorImageSource(monitor) ? (
+          <img
+            key={monitor.id}
+            data-capture-monitor={monitor.id}
+            src={captureMonitorImageSource(monitor)!}
+            crossOrigin="anonymous"
+            alt=""
+            draggable={false}
+            className="absolute max-w-none select-none"
+            style={rectStyle(getMonitorViewportRect(monitor, selectionBounds))}
+          />
+        ) : null,
+      )}
+      {capturedCursor && (
+        <img
+          data-capture-cursor
+          src={`data:image/png;base64,${capturedCursor.image_base64}`}
+          alt=""
+          className="hidden"
+        />
+      )}
+    </div>
+  );
+});
 
 function captureWorkspacePointer(event: CaptureWorkspaceDomPointerEvent) {
   try {
@@ -378,34 +424,14 @@ export function CaptureWorkspaceView({
       onWheel={handleRootWheel}
       onContextMenu={(event) => event.preventDefault()}
     >
-      <div
-        ref={renderState.dom.desktopRef}
-        className="pointer-events-none absolute inset-0"
-        aria-hidden="true"
-      >
-        {selectionBounds && renderState.monitors.map((monitor) => (
-          captureMonitorImageSource(monitor) ? (
-            <img
-              key={monitor.id}
-              data-capture-monitor={monitor.id}
-              src={captureMonitorImageSource(monitor)!}
-              crossOrigin="anonymous"
-              alt=""
-              draggable={false}
-              className="absolute max-w-none select-none"
-              style={rectStyle(getMonitorViewportRect(monitor, selectionBounds))}
-            />
-          ) : null
-        ))}
-        {renderState.capturedCursor && (
-          <img
-            data-capture-cursor
-            src={`data:image/png;base64,${renderState.capturedCursor.image_base64}`}
-            alt=""
-            className="hidden"
-          />
-        )}
-      </div>
+      {selectionBounds && (
+        <CaptureDesktopLayer
+          desktopRef={renderState.dom.desktopRef}
+          monitors={renderState.monitors}
+          selectionBounds={selectionBounds}
+          capturedCursor={renderState.capturedCursor}
+        />
+      )}
 
       {shouldShowCaptureLoadingMask(renderState.status) && (
         <div className="absolute inset-0 bg-black" aria-label="Loading capture" />
