@@ -222,12 +222,16 @@ describe('CaptureWorkspace React lifecycle', () => {
       await act(async () => { surface.dispatchEvent(new PointerEvent('pointermove', {
         bubbles: true, pointerId: 1, button: 0, buttons: 1, clientX: 140, clientY: 110,
       })); });
-      await flushFrame();
-      expect(paint).toHaveBeenCalledWith(
-        expect.anything(), expect.anything(),
-        expect.objectContaining({ rect: { x: 20, y: 30, width: 120, height: 80 } }),
-        expect.anything(),
-      );
+      await act(async () => {
+        const callbacks = [...frameQueue.values()];
+        frameQueue.clear();
+        callbacks.forEach((callback) => callback(performance.now()));
+        expect(paint).toHaveBeenCalledWith(
+          expect.anything(), expect.anything(),
+          expect.objectContaining({ rect: { x: 20, y: 30, width: 120, height: 80 } }),
+          expect.anything(),
+        );
+      });
     } finally {
       await act(async () => root.unmount());
       container.remove();

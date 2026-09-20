@@ -52,6 +52,10 @@ pub(crate) trait CaptureSessionRuntimeHost: Send + Sync {
     }
     async fn begin_capture_presentation(&self) -> Result<()>;
     async fn end_capture_presentation(&self) -> Result<()>;
+    /// Starts the hidden capture WebView before frozen pixels are ready.
+    async fn prepare_capture_window(&self) -> Result<()> {
+        Ok(())
+    }
     /// No geometry is supplied when revealing a session-load error.
     async fn prepare_capture_window_for_reveal(
         &self,

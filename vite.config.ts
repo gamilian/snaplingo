@@ -8,6 +8,9 @@ export default defineConfig(async ({ mode }) => ({
     logOverride: { "unsupported-regexp": "error" },
   },
   build: {
+    rollupOptions: {
+      input: { main: 'index.html', capture: 'capture.html' },
+    },
     // macOS 12 ships Safari 15; Windows uses the installed WebView2 runtime.
     target: ["safari15", "chrome105"],
     cssTarget: ["safari15", "chrome105"],

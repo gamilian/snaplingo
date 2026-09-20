@@ -32,20 +32,28 @@ export async function openCaptureWindow(mode: CaptureMode) {
 }
 
 export async function createCaptureSession() {
-  return invoke<CaptureSessionView>('create_capture_session');
+  const session = await invoke<CaptureSessionView>('create_capture_session');
+  return withFrozenImageSources(session);
 }
 
 export async function getCaptureSession(sessionId: string) {
-  return invoke<CaptureSessionView>('get_capture_session', { sessionId });
+  const session = await invoke<CaptureSessionView>('get_capture_session', { sessionId });
+  return withFrozenImageSources(session);
 }
 
 export async function hydrateCaptureSessionSnapshots(sessionId: string) {
   const session = await invoke<CaptureSessionView>('hydrate_capture_session_snapshots', {
     sessionId,
   });
+  return withFrozenImageSources(session);
+}
+
+function withFrozenImageSources(session: CaptureSessionView): CaptureSessionView {
   return {
     ...session,
-    monitors: session.monitors.map((monitor) => withFrozenImageSource(session.id, monitor)),
+    monitors: session.monitors.map((monitor) =>
+      withFrozenImageSource(session.id, monitor),
+    ),
   };
 }
 

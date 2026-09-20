@@ -134,18 +134,20 @@ pub fn run() {
                 log::warn!("Failed to apply resting activation policy: {}", err);
             }
 
-            let app_handle = app.handle().clone();
+            let prewarm_app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                if let Err(err) = hotkey_runtime.register_startup_hotkeys() {
-                    log::error!("Failed to register startup hotkeys: {}", err);
-                }
                 while !permissions.status().screen_recording {
                     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
                 }
-                if let Err(err) =
-                    infrastructure::system::capture_window::prewarm_capture_window(&app_handle)
-                {
+                if let Err(err) = infrastructure::system::capture_window::prewarm_capture_window(
+                    &prewarm_app_handle,
+                ) {
                     log::warn!("Failed to prewarm capture window: {}", err);
+                }
+            });
+            tauri::async_runtime::spawn(async move {
+                if let Err(err) = hotkey_runtime.register_startup_hotkeys() {
+                    log::error!("Failed to register startup hotkeys: {}", err);
                 }
             });
 

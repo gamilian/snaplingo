@@ -71,6 +71,7 @@ export interface CaptureWorkspaceKeyboardDerivedState {
 
 export interface CaptureWorkspaceKeyboardEditorActions {
   dismissCaptureLayer(): void;
+  cancelSession(): Promise<void> | void;
   renderSelectionPreview(
     rect: LogicalRect,
     annotations?: AnnotationCommand[],
@@ -170,7 +171,7 @@ export function handleCaptureWorkspaceEditorKeyDown(
 
   if (event.key === 'Escape') {
     event.preventDefault();
-    actions.dismissCaptureLayer();
+    void actions.cancelSession();
   } else if (isClearAnnotationsShortcut(event)) {
     event.preventDefault();
     actions.clearAnnotations();

@@ -394,7 +394,7 @@ export function resultWindowTranslationSubtitle(
 }
 
 export function resultWindowOcrResultStackClassName() {
-  return 'flex min-h-0 flex-col gap-3';
+  return 'flex shrink-0 flex-col gap-3';
 }
 
 export function resultWindowOcrImagePanelClassName() {

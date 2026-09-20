@@ -572,6 +572,7 @@ describe('captureEditorRuntime', () => {
       planCaptureManualSelectionTransition({
         rect,
         completion: { type: 'preview' },
+        activeAnnotationTool: 'rectangle',
       }),
     ).toEqual({
       type: 'preview',
@@ -581,7 +582,7 @@ describe('captureEditorRuntime', () => {
         selection: rect,
         hoverSelection: null,
         editGesture: null,
-        activeAnnotationTool: null,
+        activeAnnotationTool: 'rectangle',
         annotationGesture: null,
         draftAnnotation: null,
         selectedAnnotationIndex: null,

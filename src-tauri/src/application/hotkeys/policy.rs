@@ -1,23 +1,12 @@
-use crate::domain::hotkey_config::{
-    OCR_CATEGORY, SCREENSHOT_ACTION, SCREENSHOT_CATEGORY, SCREENSHOT_COPY_ACTION,
-    SCREENSHOT_OCR_ACTION, SCREENSHOT_TRANSLATE_ACTION, SELECTION_TRANSLATE_ACTION,
-    SILENT_SCREENSHOT_OCR_ACTION, TRANSLATION_CATEGORY,
-};
+use crate::domain::hotkey_config::{SELECTION_TRANSLATE_ACTION, TRANSLATION_CATEGORY};
 use crate::{AppError, Result};
 
 pub(crate) fn should_register_hotkey_on_release(category: &str, action: &str) -> bool {
+    // Selection translation reads the user's selection after the shortcut
+    // modifiers are released; capture actions are one-shot and run on press.
     matches!(
         (category, action),
-        (
-            SCREENSHOT_CATEGORY,
-            SCREENSHOT_ACTION | SCREENSHOT_COPY_ACTION
-        ) | (
-            TRANSLATION_CATEGORY,
-            SCREENSHOT_TRANSLATE_ACTION | SELECTION_TRANSLATE_ACTION
-        ) | (
-            OCR_CATEGORY,
-            SCREENSHOT_OCR_ACTION | SILENT_SCREENSHOT_OCR_ACTION
-        )
+        (TRANSLATION_CATEGORY, SELECTION_TRANSLATE_ACTION)
     )
 }
 
@@ -182,16 +171,22 @@ mod tests {
     }
 
     #[test]
-    fn capture_hotkeys_trigger_after_release() {
+    fn only_selection_translation_triggers_after_release() {
+        for (category, action) in [(TRANSLATION_CATEGORY, SELECTION_TRANSLATE_ACTION)] {
+            assert!(should_register_hotkey_on_release(category, action));
+        }
+    }
+
+    #[test]
+    fn screenshot_actions_trigger_on_press() {
         for (category, action) in [
             (SCREENSHOT_CATEGORY, SCREENSHOT_ACTION),
             (SCREENSHOT_CATEGORY, SCREENSHOT_COPY_ACTION),
             (OCR_CATEGORY, SCREENSHOT_OCR_ACTION),
             (OCR_CATEGORY, SILENT_SCREENSHOT_OCR_ACTION),
             (TRANSLATION_CATEGORY, SCREENSHOT_TRANSLATE_ACTION),
-            (TRANSLATION_CATEGORY, SELECTION_TRANSLATE_ACTION),
         ] {
-            assert!(should_register_hotkey_on_release(category, action));
+            assert!(!should_register_hotkey_on_release(category, action));
         }
     }
 }

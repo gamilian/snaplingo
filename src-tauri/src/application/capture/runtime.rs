@@ -102,14 +102,36 @@ impl CaptureSessionRuntime {
         }
         let hide_overlay_ms = elapsed_ms(hide_overlay_start);
 
-        let session_start = Instant::now();
-        let session_result = self.sessions.create_session_without_monitor_images().await;
-        let session_ms = elapsed_ms(session_start);
+        let prepare_window_start = Instant::now();
+        let session_future = async {
+            let session_start = Instant::now();
+            let result = self.sessions.create_session_without_monitor_images().await;
+            (result, elapsed_ms(session_start))
+        };
+        let (prepare_window_result, (session_result, session_ms)) =
+            tokio::join!(self.host.prepare_capture_window(), session_future,);
+        let prepare_window_ms = elapsed_ms(prepare_window_start);
+
+        if let Err(window_err) = prepare_window_result {
+            if let Ok(session) = &session_result {
+                let _ = self.sessions.cancel_session(&session.id);
+            }
+            let presentation_result = self.host.end_capture_presentation().await;
+            return match presentation_result {
+                Ok(()) => Err(window_err),
+                Err(presentation_err) => Err(format!(
+                    "{}; also failed to end capture presentation: {}",
+                    window_err, presentation_err
+                )
+                .into()),
+            };
+        }
 
         log::info!(
-            "[capture-perf] create_visible_desktop_frozen_session begin_ms={:.1} hide_overlay_ms={:.1} capture_session_ms={:.1} total_ms={:.1} success={}",
+            "[capture-perf] create_visible_desktop_frozen_session begin_ms={:.1} hide_overlay_ms={:.1} prepare_window_ms={:.1} capture_session_ms={:.1} total_ms={:.1} success={}",
             begin_ms,
             hide_overlay_ms,
+            prepare_window_ms,
             session_ms,
             elapsed_ms(total_start),
             session_result.is_ok(),

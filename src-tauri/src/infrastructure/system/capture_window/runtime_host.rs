@@ -12,8 +12,9 @@ use crate::Result;
 use super::tauri::{bind_capture_window_session, set_capture_window_cursor_passthrough};
 use super::{
     begin_capture_presentation, destroy_inactive_capture_window, end_capture_presentation,
-    hide_capture_window, open_capture_window_for_session, prepare_capture_window_for_reveal,
-    restore_capture_snapshot_windows, reveal_capture_window,
+    hide_capture_window, open_capture_window_for_session, prepare_capture_window,
+    prepare_capture_window_for_reveal, restore_capture_snapshot_windows, reveal_capture_window,
+    wait_for_capture_window_ready,
 };
 
 pub(crate) struct TauriCaptureSessionRuntimeHost {
@@ -117,6 +118,15 @@ impl CaptureSessionRuntimeHost for TauriCaptureSessionRuntimeHost {
             end_capture_presentation(&app)
         })
         .await
+    }
+
+    async fn prepare_capture_window(&self) -> Result<()> {
+        run_on_main_thread(&self.app, "prepare capture window", |app| {
+            prepare_capture_window(&app)
+        })
+        .await?;
+        wait_for_capture_window_ready().await;
+        Ok(())
     }
 
     async fn prepare_capture_window_for_reveal(

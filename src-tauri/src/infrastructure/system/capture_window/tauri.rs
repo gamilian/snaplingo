@@ -1,9 +1,13 @@
 use std::{
+    sync::atomic::{AtomicBool, Ordering},
+    sync::{Once, OnceLock},
     thread,
     time::{Duration, Instant},
 };
 
-use tauri::{utils::config::Color, AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{
+    utils::config::Color, AppHandle, Emitter, Listener, Manager, WebviewUrl, WebviewWindowBuilder,
+};
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use tauri::{LogicalPosition, LogicalSize};
 #[cfg(target_os = "windows")]
@@ -18,6 +22,13 @@ use super::backend::{
     capture_window_prewarm_url, capture_window_url_with_session, normalized_capture_mode,
     CAPTURE_WINDOW_LABEL,
 };
+
+static CAPTURE_WINDOW_PREPARED_FOR_SESSION: AtomicBool = AtomicBool::new(false);
+static CAPTURE_WINDOW_WEBVIEW_READY: AtomicBool = AtomicBool::new(false);
+static CAPTURE_WINDOW_READY_NOTIFY: OnceLock<tokio::sync::Notify> = OnceLock::new();
+static CAPTURE_WINDOW_READY_LISTENER: Once = Once::new();
+
+const CAPTURE_WINDOW_READY_EVENT: &str = "capture-window-ready";
 
 pub fn begin_capture_presentation(app: &AppHandle) -> Result<(), String> {
     #[cfg(target_os = "macos")]
@@ -209,6 +220,58 @@ pub fn prewarm_capture_window(app: &AppHandle) -> Result<(), String> {
         return Ok(());
     }
 
+    ensure_capture_window_ready_listener(app);
+    CAPTURE_WINDOW_WEBVIEW_READY.store(false, Ordering::SeqCst);
+    build_hidden_capture_window(app)
+}
+
+/// Creates the hidden capture WebView on the current Space before frozen
+/// pixels are ready. macOS intentionally does this per session so fullscreen
+/// Space targeting remains correct.
+pub fn prepare_capture_window(app: &AppHandle) -> Result<(), String> {
+    ensure_capture_window_ready_listener(app);
+    if should_reuse_capture_window_for_session() {
+        if app.get_webview_window(CAPTURE_WINDOW_LABEL).is_some() {
+            return Ok(());
+        }
+    } else if let Some(window) = app.get_webview_window(CAPTURE_WINDOW_LABEL) {
+        discard_capture_window_before_new_session(app, &window)?;
+    }
+
+    CAPTURE_WINDOW_WEBVIEW_READY.store(false, Ordering::SeqCst);
+    build_hidden_capture_window(app)?;
+    if !should_reuse_capture_window_for_session() {
+        CAPTURE_WINDOW_PREPARED_FOR_SESSION.store(true, Ordering::SeqCst);
+    }
+
+    Ok(())
+}
+
+pub async fn wait_for_capture_window_ready() {
+    if CAPTURE_WINDOW_WEBVIEW_READY.load(Ordering::SeqCst) {
+        return;
+    }
+
+    let notify = CAPTURE_WINDOW_READY_NOTIFY.get_or_init(tokio::sync::Notify::new);
+    let notified = notify.notified();
+    if CAPTURE_WINDOW_WEBVIEW_READY.load(Ordering::SeqCst) {
+        return;
+    }
+
+    let _ = tokio::time::timeout(Duration::from_millis(500), notified).await;
+}
+
+fn ensure_capture_window_ready_listener(app: &AppHandle) {
+    CAPTURE_WINDOW_READY_LISTENER.call_once(|| {
+        let notify = CAPTURE_WINDOW_READY_NOTIFY.get_or_init(tokio::sync::Notify::new);
+        let _ = app.listen(CAPTURE_WINDOW_READY_EVENT, move |_| {
+            CAPTURE_WINDOW_WEBVIEW_READY.store(true, Ordering::SeqCst);
+            notify.notify_waiters();
+        });
+    });
+}
+
+fn build_hidden_capture_window(app: &AppHandle) -> Result<(), String> {
     let window = WebviewWindowBuilder::new(
         app,
         CAPTURE_WINDOW_LABEL,
@@ -245,7 +308,10 @@ pub fn open_capture_window_for_session(
     let mode = normalized_capture_mode(mode);
 
     if let Some(window) = app.get_webview_window(CAPTURE_WINDOW_LABEL) {
-        if !should_reuse_capture_window_for_session() {
+        let prepared_for_session =
+            CAPTURE_WINDOW_PREPARED_FOR_SESSION.swap(false, Ordering::SeqCst);
+        let webview_ready = CAPTURE_WINDOW_WEBVIEW_READY.load(Ordering::SeqCst);
+        if !should_reuse_capture_window_for_session() && (!prepared_for_session || !webview_ready) {
             discard_capture_window_before_new_session(app, &window)?;
         } else {
             if should_reset_capture_window_fullscreen_before_reuse() {
@@ -261,6 +327,7 @@ pub fn open_capture_window_for_session(
                 .map_err(|e| e.to_string())?;
             set_capture_window_frame(&window, geometry)?;
             configure_capture_window_for_current_space(&window, geometry.desktop_scale)?;
+            bind_capture_window_session(app, session_id);
             window
                 .emit(
                     "hotkey-triggered",
@@ -272,6 +339,8 @@ pub fn open_capture_window_for_session(
                 .map_err(|e| e.to_string())?;
             return Ok(());
         }
+    } else {
+        CAPTURE_WINDOW_PREPARED_FOR_SESSION.store(false, Ordering::SeqCst);
     }
 
     suppress_capture_window_activation(app)?;

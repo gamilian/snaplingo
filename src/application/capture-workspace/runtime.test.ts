@@ -670,6 +670,28 @@ describe('capture workspace runtime', () => {
     expect(platform.window.reveal).toHaveBeenCalledWith('session-reveal');
   });
 
+  it('starts surface preparation while the native window is still preparing', async () => {
+    const nativeReady = deferred<undefined>();
+    const surfaceReady = deferred<void>();
+    const platform = createPlatform();
+    platform.window.prepareForReveal.mockReturnValue(nativeReady.promise);
+    const prepareSurface = vi.fn(() => surfaceReady.promise);
+    const runtime = createCaptureWorkspaceRuntime({
+      platform,
+      host: { resetInteraction: vi.fn(), resetSession: vi.fn(), prepareSurface },
+    });
+    await runtime.actions.startSession('screenshot', 'parallel-reveal');
+
+    const reveal = runtime.actions.updateHostReadiness(true);
+    expect(prepareSurface).toHaveBeenCalledOnce();
+    surfaceReady.resolve();
+    await Promise.resolve();
+    expect(platform.window.reveal).not.toHaveBeenCalled();
+    nativeReady.resolve(undefined);
+    await reveal;
+    expect(platform.window.reveal).toHaveBeenCalledOnce();
+  });
+
   it('coalesces concurrent readiness and ignores a stale reveal preparation', async () => {
     const firstPrepare = deferred<void>();
     const platform = createPlatform();
@@ -1447,7 +1469,35 @@ describe('capture workspace runtime', () => {
         filled: false,
       },
     ]);
+    expect(runtime.renderState.activeAnnotationTool).toBe('rectangle');
     expect(platform.commands.renderCaptureOutput).not.toHaveBeenCalled();
+
+    expect(
+      runtime.actions.pointerDown({
+        point: { x: 80, y: 90 },
+        source: 'preview',
+      }),
+    ).toBe(true);
+    expect(
+      runtime.actions.pointerMove({
+        point: { x: 110, y: 120 },
+        source: 'preview',
+      }),
+    ).toBe(true);
+    await expect(
+      runtime.actions.pointerUp({
+        point: { x: 110, y: 120 },
+        source: 'preview',
+      }),
+    ).resolves.toBe(true);
+
+    expect(runtime.renderState.annotationHistory.annotations).toHaveLength(2);
+    expect(
+      runtime.renderState.annotationHistory.annotations.map(
+        (annotation) => annotation.type,
+      ),
+    ).toEqual(['rectangle', 'rectangle']);
+    expect(runtime.renderState.activeAnnotationTool).toBe('rectangle');
   });
 
   it('commits a pen stroke to canvas-backed history without retaining a draft', async () => {
@@ -1606,7 +1656,7 @@ describe('capture workspace runtime', () => {
     runtime.actions.commitTextDraft();
 
     expect(runtime.renderState.textDraft).toBeNull();
-    expect(runtime.renderState.activeAnnotationTool).toBeNull();
+    expect(runtime.renderState.activeAnnotationTool).toBe('text');
     expect(runtime.renderState.annotationHistory.annotations).toEqual([
       {
         type: 'text',
@@ -2658,6 +2708,26 @@ describe('capture workspace runtime', () => {
     });
   });
 
+  it('treats an initial frozen image URL as ready without snapshot hydration', async () => {
+    const session = createSession({
+      id: 'session-initial-pixels',
+      monitors: [
+        createMonitor({
+          image_url: 'capture-image://localhost/session-initial-pixels/monitor-1',
+        }),
+      ],
+    });
+    const platform = createPlatform({ session });
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    await runtime.actions.startSession('screenshot', session.id);
+    expect(runtime.renderState.hasHydratedPixelSource).toBe(true);
+
+    await runtime.actions.hydrateSnapshots();
+
+    expect(platform.commands.hydrateCaptureSessionSnapshots).not.toHaveBeenCalled();
+  });
+
   it('hydrates only the requested monitor for the magnifier and reuses it', async () => {
     const platform = createPlatform({
       session: createSession({ id: 'session-magnifier' }),
@@ -3193,6 +3263,7 @@ function createSession(
 function createMonitor(
   overrides: Partial<{
     image_base64: string;
+    image_url?: string;
   }> = {},
 ) {
   return {

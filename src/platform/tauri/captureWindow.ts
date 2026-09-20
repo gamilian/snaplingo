@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { emit } from '@tauri-apps/api/event';
 import type { CaptureWindowPort } from '../../application/capture-workspace/ports';
 
 export const captureWindow: CaptureWindowPort = {
@@ -12,3 +13,7 @@ export const captureWindow: CaptureWindowPort = {
     return invoke<void>('hide_capture_window');
   },
 };
+
+export function signalCaptureWindowReady() {
+  return emit('capture-window-ready');
+}

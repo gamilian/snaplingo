@@ -149,7 +149,7 @@ interface HostConnection {
 interface CaptureWorkspaceRuntimeHost {
   resetInteraction(): void;
   resetSession(): void;
-  prepareSurface(): void | Promise<void>;
+  prepareSurface(windowPrepared: Promise<void>): void | Promise<void>;
   scheduleSelectionOverlayPaint?(): void;
 }
 
@@ -698,13 +698,17 @@ export function createCaptureWorkspaceRuntime({
     includeCursor = false,
   ) => {
     if (!state.session || hasCurrentTerminalOutput()) return;
+    const activeAnnotationTool =
+      state.status === 'preview'
+        ? state.activeAnnotationTool
+        : rememberedAnnotationTool(screenshotPreferences?.(), storage);
     // The view crops the already decoded frozen monitors. Encoding is only
     // needed for terminal output, so entering or resizing preview never blocks.
     patch({
       status: 'preview',
       selection: rect,
       hoverSelection: null,
-      activeAnnotationTool: rememberedAnnotationTool(screenshotPreferences?.(), storage),
+      activeAnnotationTool,
       includeCapturedCursor: includeCursor,
       isRenderingOutput: false,
       error: null,
@@ -826,7 +830,6 @@ export function createCaptureWorkspaceRuntime({
     const nextHistory = clearAnnotationHistory(state.annotationHistory);
     if (nextHistory === state.annotationHistory) return;
     patch({
-      activeAnnotationTool: null,
       annotationGesture: null,
       draftAnnotation: null,
       selectedAnnotationIndex: null,
@@ -868,9 +871,6 @@ export function createCaptureWorkspaceRuntime({
     patch({
       annotationHistory: result.annotationHistory,
       selectedAnnotationIndex: result.selectedAnnotationIndex,
-      ...(result.selectedAnnotationIndex === null
-        ? {}
-        : { activeAnnotationTool: null }),
       annotationGesture: result.annotationGesture,
       draftAnnotation: result.draftAnnotation,
     });
@@ -924,10 +924,11 @@ export function createCaptureWorkspaceRuntime({
     CaptureWorkspaceKeyboardEditorActions = {
     commitTextDraft() {
       commitTextDraftToHistory();
-      patch({ activeAnnotationTool: null, selectedAnnotationIndex: null });
+      patch({ selectedAnnotationIndex: null });
     },
     commitAnnotationGestureAtPoint,
     dismissCaptureLayer,
+    cancelSession: () => cancelSession(),
     adjustAnnotationSize,
     renderSelectionPreview: renderEditorSelectionPreview,
     setCursorPoint: (cursorPoint) => patch({ cursorPoint }),
@@ -1046,7 +1047,13 @@ export function createCaptureWorkspaceRuntime({
 
   const completeManualSelection = async (rect: LogicalRect) => {
     const completion = planManualSelectionCompletion(state.mode);
-    const transition = planCaptureManualSelectionTransition({ rect, completion });
+    const transition = planCaptureManualSelectionTransition({
+      rect,
+      completion,
+      activeAnnotationTool:
+        state.activeAnnotationTool ??
+        rememberedAnnotationTool(screenshotPreferences?.(), storage),
+    });
     if (transition.clearOverlay) host?.resetInteraction();
     if (transition.type === 'preview') {
       patch({
@@ -1316,10 +1323,10 @@ export function createCaptureWorkspaceRuntime({
           generation === readinessGeneration && (state.session?.id ?? null) === sessionId;
         const promise = (async () => {
           try {
-            await platform.window.prepareForReveal(sessionId);
-            if (!isCurrent()) return;
-            markPerf('window_prepared', sessionId);
-            await host?.prepareSurface();
+            const windowPrepared = platform.window.prepareForReveal(sessionId).then(() => {
+              if (isCurrent()) markPerf('window_prepared', sessionId);
+            });
+            await Promise.all([windowPrepared, host?.prepareSurface(windowPrepared)]);
             if (!isCurrent()) return;
             markPerf('surface_decoded', sessionId);
             await platform.window.reveal(sessionId);
@@ -1428,6 +1435,9 @@ export function createCaptureWorkspaceRuntime({
         }
         if (perfState) perfState.sessionId = session.id;
         markPerf('session_loaded', session.id);
+        hydratedSessionId = hasCaptureSessionPixelSource(session)
+          ? session.id
+          : null;
 
         const cursorPoint =
           session.captured_cursor?.logical_position ??
@@ -1518,6 +1528,9 @@ export function createCaptureWorkspaceRuntime({
         }
         adoptedCreatedSession = true;
         provisionalSessionIds.delete(session.id);
+        hydratedSessionId = hasCaptureSessionPixelSource(session)
+          ? session.id
+          : null;
         patch({
           status: 'selecting',
           session,
@@ -2280,6 +2293,12 @@ export function createCaptureWorkspaceRuntime({
       if (!sessionId) return;
       const actionGeneration = generation;
 
+      if (hasCaptureSessionPixelSource(state.session)) {
+        hydratedSessionId = sessionId;
+        snapshotHydration = null;
+        return;
+      }
+
       if (
         snapshotHydration?.generation === actionGeneration &&
         snapshotHydration.sessionId === sessionId
@@ -2431,6 +2450,16 @@ function isAnnotationTool(value: string): value is AnnotationTool {
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function hasCaptureSessionPixelSource(session: CaptureSessionView | null) {
+  return Boolean(
+    session &&
+      session.monitors.length > 0 &&
+      session.monitors.every((monitor) =>
+        Boolean(captureMonitorImageSource(monitor)),
+      ),
+  );
 }
 
 function arePointsEqual(a: Point | null, b: Point | null) {

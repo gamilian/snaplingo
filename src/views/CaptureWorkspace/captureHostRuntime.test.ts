@@ -42,7 +42,27 @@ describe('capture surface DOM preparation', () => {
     expect(paint).not.toHaveBeenCalled();
   });
 
-  it('waits for two animation frames before fading in the capture overlay', async () => {
+  it('decodes immediately but waits for native geometry before painting', async () => {
+    let finishWindow!: () => void;
+    const windowPrepared = new Promise<void>((resolve) => { finishWindow = resolve; });
+    const decode = vi.fn(async () => undefined);
+    const paint = vi.fn();
+    const prepare = prepareCaptureSurfaceForReveal({
+      images: [{ decode }],
+      windowPrepared,
+      frame: null,
+      paintSelectionOverlayFrame: paint,
+      waitForPaint: async () => undefined,
+    });
+    expect(decode).toHaveBeenCalledOnce();
+    await Promise.resolve();
+    expect(paint).not.toHaveBeenCalled();
+    finishWindow();
+    await prepare;
+    expect(paint).toHaveBeenCalledOnce();
+  });
+
+  it('waits for one animation frame before fading in the capture overlay', async () => {
     const calls: string[] = [];
     const pendingFrameCallbacks: FrameRequestCallback[] = [];
     const requestAnimationFrame = (callback: FrameRequestCallback) => {
@@ -55,10 +75,7 @@ describe('capture surface DOM preparation', () => {
     expect(calls).toEqual(['requestAnimationFrame']);
 
     pendingFrameCallbacks.shift()?.(1);
-    await Promise.resolve();
-    expect(calls).toEqual(['requestAnimationFrame', 'requestAnimationFrame']);
-
-    pendingFrameCallbacks.shift()?.(2);
     await wait;
+    expect(calls).toEqual(['requestAnimationFrame']);
   });
 });

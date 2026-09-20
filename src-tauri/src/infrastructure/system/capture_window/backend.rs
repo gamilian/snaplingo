@@ -21,13 +21,13 @@ pub(super) fn normalized_capture_mode(mode: &str) -> &'static str {
 
 fn capture_window_url(mode: &str) -> PathBuf {
     PathBuf::from(format!(
-        "index.html?window=capture&mode={}",
+        "capture.html?window=capture&mode={}",
         normalized_capture_mode(mode)
     ))
 }
 
 pub(super) fn capture_window_prewarm_url() -> PathBuf {
-    PathBuf::from("index.html?window=capture")
+    PathBuf::from("capture.html?window=capture")
 }
 
 pub(super) fn capture_window_url_with_session(mode: &str, session_id: &str) -> PathBuf {
@@ -69,7 +69,7 @@ mod tests {
     fn capture_window_url_encodes_supported_mode() {
         assert_eq!(
             super::capture_window_url("screenshot-ocr").to_string_lossy(),
-            "index.html?window=capture&mode=screenshot-ocr"
+            "capture.html?window=capture&mode=screenshot-ocr"
         );
     }
 
@@ -77,7 +77,7 @@ mod tests {
     fn capture_window_url_encodes_screenshot_copy_mode() {
         assert_eq!(
             super::capture_window_url("screenshot-copy").to_string_lossy(),
-            "index.html?window=capture&mode=screenshot-copy"
+            "capture.html?window=capture&mode=screenshot-copy"
         );
     }
 
@@ -85,7 +85,7 @@ mod tests {
     fn capture_window_url_encodes_silent_screenshot_ocr_mode() {
         assert_eq!(
             super::capture_window_url("silent-screenshot-ocr").to_string_lossy(),
-            "index.html?window=capture&mode=silent-screenshot-ocr"
+            "capture.html?window=capture&mode=silent-screenshot-ocr"
         );
     }
 
@@ -93,7 +93,7 @@ mod tests {
     fn capture_window_url_falls_back_to_screenshot_for_unknown_mode() {
         assert_eq!(
             super::capture_window_url("unknown").to_string_lossy(),
-            "index.html?window=capture&mode=screenshot"
+            "capture.html?window=capture&mode=screenshot"
         );
     }
 
@@ -101,7 +101,7 @@ mod tests {
     fn capture_window_url_with_session_appends_session_id() {
         assert_eq!(
             super::capture_window_url_with_session("screenshot", "session-1").to_string_lossy(),
-            "index.html?window=capture&mode=screenshot&sessionId=session-1"
+            "capture.html?window=capture&mode=screenshot&sessionId=session-1"
         );
     }
 
@@ -109,7 +109,7 @@ mod tests {
     fn capture_window_prewarm_url_has_no_launch_mode() {
         assert_eq!(
             super::capture_window_prewarm_url().to_string_lossy(),
-            "index.html?window=capture"
+            "capture.html?window=capture"
         );
     }
 

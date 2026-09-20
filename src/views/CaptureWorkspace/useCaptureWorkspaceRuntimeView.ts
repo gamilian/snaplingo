@@ -67,7 +67,7 @@ export function useCaptureWorkspaceRuntimeView({
   const ocrPreferencesRef = useRef(ocrPreferences);
   const hostBridgeRef = useRef<{
     reset(): void;
-    prepareSurface(): Promise<void>;
+    prepareSurface(windowPrepared: Promise<void>): Promise<void>;
     scheduleSelectionOverlayPaint(): void;
   }>({
     reset: () => undefined,
@@ -100,7 +100,7 @@ export function useCaptureWorkspaceRuntimeView({
         host: {
           resetInteraction: () => hostBridgeRef.current.reset(),
           resetSession: () => hostBridgeRef.current.reset(),
-          prepareSurface: () => hostBridgeRef.current.prepareSurface(),
+          prepareSurface: (windowPrepared) => hostBridgeRef.current.prepareSurface(windowPrepared),
           scheduleSelectionOverlayPaint: () =>
             hostBridgeRef.current.scheduleSelectionOverlayPaint(),
         },
@@ -188,8 +188,9 @@ export function useCaptureWorkspaceRuntimeView({
   }, [runtimeRenderState.sessionId, workflowRuntime]);
 
   const prepareCaptureSurface = useCallback(
-    () =>
+    (windowPrepared: Promise<void>) =>
       prepareCaptureSurfaceForReveal({
+        windowPrepared,
         images: runtimeRenderState.status === 'error'
           ? []
           : Array.from(desktopRef.current?.querySelectorAll('img') ?? []),

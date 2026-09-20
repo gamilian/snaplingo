@@ -7,6 +7,7 @@ import {
   type RefObject,
   type WheelEvent,
 } from 'react';
+import { flushSync } from 'react-dom';
 
 import type {
   CaptureWorkspacePointerInput,
@@ -249,7 +250,8 @@ export function CaptureWorkspaceView({
       createCapturePointerFrameDispatcher({
         requestFrame: window.requestAnimationFrame.bind(window),
         cancelFrame: window.cancelAnimationFrame.bind(window),
-        move: actions.pointerMove,
+        // Commit the coalesced position before this frame is painted.
+        move: (input) => flushSync(() => actions.pointerMove(input)),
       }),
     [actions.pointerMove],
   );

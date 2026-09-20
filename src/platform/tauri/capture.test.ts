@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, it, vi } from 'vitest';
+import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 import type { CaptureMode, CaptureSessionView } from '../../domain/capture';
 
 const { invoke, save, convertFileSrc } = vi.hoisted(() => ({
@@ -9,6 +9,15 @@ const { invoke, save, convertFileSrc } = vi.hoisted(() => ({
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke, convertFileSrc }));
 vi.mock('@tauri-apps/plugin-dialog', () => ({ save }));
+
+beforeEach(() => {
+  invoke.mockReset();
+  save.mockReset();
+  convertFileSrc.mockClear();
+  convertFileSrc.mockImplementation(
+    (path: string, protocol: string) => `${protocol}://localhost${path}`,
+  );
+});
 
 describe('Tauri capture command adapter', () => {
   it('prepares OCR pixels before committing the native handoff', async () => {
@@ -131,6 +140,47 @@ describe('Tauri capture command adapter', () => {
     expect(result.monitors[0].image_base64).toBe('');
     expect(result.monitors[0].image_url).toBe('capture-image://localhost/capture-1/monitor-1');
     expect(convertFileSrc).toHaveBeenCalledWith('/capture-1/monitor-1', 'capture-image');
+  });
+
+  it('attaches frozen monitor URLs to initial session metadata', async () => {
+    const { createCaptureSession, getCaptureSession } = await import('./capture');
+    const session: CaptureSessionView = {
+      id: 'capture-2',
+      monitors: [
+        {
+          id: 'monitor-1',
+          logical_bounds: { x: 0, y: 0, width: 100, height: 80 },
+          physical_bounds: { x: 0, y: 0, width: 200, height: 160 },
+          scale_factor: 2,
+          image_base64: '',
+        },
+      ],
+      candidates: [],
+      captured_cursor: null,
+    };
+    invoke.mockResolvedValueOnce(session).mockResolvedValueOnce(session);
+
+    await expect(createCaptureSession()).resolves.toMatchObject({
+      id: 'capture-2',
+      monitors: [
+        expect.objectContaining({
+          image_url: 'capture-image://localhost/capture-2/monitor-1',
+        }),
+      ],
+    });
+    await expect(getCaptureSession('capture-2')).resolves.toMatchObject({
+      id: 'capture-2',
+      monitors: [
+        expect.objectContaining({
+          image_url: 'capture-image://localhost/capture-2/monitor-1',
+        }),
+      ],
+    });
+    expect(invoke).toHaveBeenNthCalledWith(1, 'create_capture_session');
+    expect(invoke).toHaveBeenNthCalledWith(2, 'get_capture_session', {
+      sessionId: 'capture-2',
+    });
+    expect(convertFileSrc).toHaveBeenCalledWith('/capture-2/monitor-1', 'capture-image');
   });
 
   it('hydrates only the monitor needed by the magnifier', async () => {

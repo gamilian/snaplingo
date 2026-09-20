@@ -251,12 +251,21 @@ impl HotkeyRuntime {
                 continue;
             }
 
-            register_hotkey_action(
+            if let Err(error) = register_hotkey_action(
                 self.registrar.as_ref(),
                 default_hotkey.category,
                 default_hotkey.action,
                 &accelerator,
-            )?;
+            ) {
+                log::warn!(
+                    "Skipping unavailable global shortcut for {}:{} ({}): {}",
+                    default_hotkey.category,
+                    default_hotkey.action,
+                    accelerator,
+                    error
+                );
+                continue;
+            }
             self.set_registration(registration_key, Some(accelerator))?;
         }
 
@@ -713,7 +722,7 @@ mod hotkey_runtime_tests {
                     category: SCREENSHOT_CATEGORY.to_string(),
                     action: SCREENSHOT_ACTION.to_string(),
                     accelerator: "F1".to_string(),
-                    timing: HotkeyTriggerTiming::Released,
+                    timing: HotkeyTriggerTiming::Pressed,
                 },
                 Operation::Unregister("Shift+CmdOrCtrl+KeyR".to_string()),
             ]
@@ -860,7 +869,24 @@ mod hotkey_runtime_tests {
             category: TRANSLATION_CATEGORY.to_string(),
             action: SCREENSHOT_TRANSLATE_ACTION.to_string(),
             accelerator: "Shift+Alt+KeyS".to_string(),
-            timing: HotkeyTriggerTiming::Released,
+            timing: HotkeyTriggerTiming::Pressed,
+        }));
+    }
+
+    #[test]
+    fn startup_registration_continues_after_one_shortcut_fails() {
+        let (runtime, _configuration, registrar) = runtime_with_configuration();
+        registrar.fail_register_for("F1");
+
+        runtime.register_startup_hotkeys().unwrap();
+
+        assert!(!registrar.is_registered("F1"));
+        assert!(registrar.is_registered("F3"));
+        assert!(registrar.operations().contains(&Operation::Register {
+            category: SCREENSHOT_CATEGORY.to_string(),
+            action: crate::domain::hotkey_config::PIN_ACTION.to_string(),
+            accelerator: "F3".to_string(),
+            timing: HotkeyTriggerTiming::Pressed,
         }));
     }
 
@@ -907,7 +933,7 @@ mod hotkey_runtime_tests {
     }
 
     #[test]
-    fn hotkey_runtime_registers_release_timing_actions_via_release_path() {
+    fn hotkey_runtime_registers_screenshot_actions_on_press() {
         let (runtime, _configuration, registrar) = runtime_with_configuration();
 
         runtime.register_startup_hotkeys().unwrap();
@@ -916,7 +942,7 @@ mod hotkey_runtime_tests {
             category: SCREENSHOT_CATEGORY.to_string(),
             action: SCREENSHOT_ACTION.to_string(),
             accelerator: "F1".to_string(),
-            timing: HotkeyTriggerTiming::Released,
+            timing: HotkeyTriggerTiming::Pressed,
         }));
     }
 

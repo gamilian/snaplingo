@@ -116,8 +116,33 @@ fn macos_app_bundle_path(executable_path: &std::path::Path) -> Option<std::path:
         .map(std::path::Path::to_path_buf)
 }
 
-/// Convert CGImage to PNG bytes
+/// Encode a captured image with the options used by the output path.
 fn image_to_png(cg_image: CGImage) -> Result<Vec<u8>, AppError> {
+    image_to_png_with_options(
+        cg_image,
+        capture_png_compression_type(),
+        capture_png_filter_type(),
+    )
+}
+
+/// Encode a monitor snapshot for the selection surface.
+///
+/// The browser decodes this image immediately before the capture window is
+/// revealed. Stored PNG blocks keep that critical path CPU-light while the
+/// final selection is re-encoded by the output pipeline.
+fn image_to_preview_png(cg_image: CGImage) -> Result<Vec<u8>, AppError> {
+    image_to_png_with_options(
+        cg_image,
+        preview_png_compression_type(),
+        preview_png_filter_type(),
+    )
+}
+
+fn image_to_png_with_options(
+    cg_image: CGImage,
+    compression: PngCompressionType,
+    filter: PngFilterType,
+) -> Result<Vec<u8>, AppError> {
     let total_start = Instant::now();
     let width = cg_image.width();
     let height = cg_image.height();
@@ -132,11 +157,7 @@ fn image_to_png(cg_image: CGImage) -> Result<Vec<u8>, AppError> {
     let encode_start = Instant::now();
     let mut png_data = Vec::new();
     let mut cursor = Cursor::new(&mut png_data);
-    let encoder = PngEncoder::new_with_quality(
-        &mut cursor,
-        capture_png_compression_type(),
-        capture_png_filter_type(),
-    );
+    let encoder = PngEncoder::new_with_quality(&mut cursor, compression, filter);
 
     encoder
         .write_image(
@@ -213,6 +234,16 @@ fn capture_png_compression_type() -> PngCompressionType {
 }
 
 fn capture_png_filter_type() -> PngFilterType {
+    // Neighboring screen pixels are correlated. Sub keeps the fast encoder from
+    // falling back to near-raw PNG payloads for gradients and desktop backgrounds.
+    PngFilterType::Sub
+}
+
+fn preview_png_compression_type() -> PngCompressionType {
+    PngCompressionType::Uncompressed
+}
+
+fn preview_png_filter_type() -> PngFilterType {
     PngFilterType::NoFilter
 }
 
@@ -361,7 +392,7 @@ fn capture_visible_display_snapshot(
         .ok_or_else(|| screen_capture_unavailable_error("显示器截图返回空图像", access))?;
     let width = image.width() as u32;
     let height = image.height() as u32;
-    let png_data = image_to_png(image)?;
+    let png_data = image_to_preview_png(image)?;
     let x = monitor
         .x()
         .map_err(|e| AppError::System(format!("Failed to read monitor x: {}", e)))?;
@@ -942,7 +973,59 @@ mod tests {
         );
         assert_eq!(
             capture_png_filter_type(),
+            image::codecs::png::FilterType::Sub
+        );
+        assert_eq!(
+            preview_png_compression_type(),
+            image::codecs::png::CompressionType::Uncompressed
+        );
+        assert_eq!(
+            preview_png_filter_type(),
             image::codecs::png::FilterType::NoFilter
+        );
+    }
+
+    #[test]
+    fn capture_png_compresses_desktop_gradients_without_changing_pixels() {
+        use core_graphics::{
+            base::{kCGBitmapByteOrder32Little, kCGImageAlphaPremultipliedFirst},
+            color_space::CGColorSpace,
+            data_provider::CGDataProvider,
+        };
+
+        let (width, height) = (512, 256);
+        let rgba = image::RgbaImage::from_fn(width, height, |x, y| {
+            image::Rgba([(x / 2) as u8, y as u8, ((x + y) / 3) as u8, 255])
+        });
+        let mut bgra = rgba.as_raw().clone();
+        for pixel in bgra.chunks_exact_mut(4) {
+            pixel.swap(0, 2);
+        }
+        let provider = CGDataProvider::from_buffer(std::sync::Arc::new(bgra));
+        let screenshot = CGImage::new(
+            width as usize,
+            height as usize,
+            8,
+            32,
+            width as usize * 4,
+            &CGColorSpace::create_device_rgb(),
+            kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst,
+            &provider,
+            false,
+            0,
+        );
+        let preview_png = image_to_preview_png(screenshot.clone()).unwrap();
+        assert_eq!(
+            image::load_from_memory(&preview_png).unwrap().to_rgba8(),
+            rgba
+        );
+
+        let png = image_to_png(screenshot).unwrap();
+        assert_eq!(image::load_from_memory(&png).unwrap().to_rgba8(), rgba);
+        assert!(
+            png.len() < rgba.as_raw().len() / 2,
+            "desktop gradient PNG expanded to {} bytes",
+            png.len(),
         );
     }
 

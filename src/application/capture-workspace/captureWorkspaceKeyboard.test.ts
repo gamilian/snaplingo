@@ -37,6 +37,7 @@ function createActions(
 ): CaptureWorkspaceKeyboardEditorActions {
   return {
     dismissCaptureLayer: vi.fn(),
+    cancelSession: vi.fn(),
     renderSelectionPreview: vi.fn(),
     setIsMagnifierRequested: vi.fn(),
     clearAnnotations: vi.fn(),
@@ -121,20 +122,23 @@ describe('handleCaptureWorkspaceEditorKeyDown', () => {
     ]);
   });
 
-  it('prevents Escape before dismissing the preview editor layer', () => {
+  it('cancels the capture session immediately on Escape in preview', () => {
     const calls: string[] = [];
     const { actions, context } = createContext({
       state: { status: 'preview' },
       actions: {
-        dismissCaptureLayer: vi.fn(() => calls.push('dismissCaptureLayer')),
+        cancelSession: vi.fn(() => {
+          calls.push('cancelSession');
+        }),
       },
     });
     const event = createKeyboardEvent('Escape', {}, calls);
 
     handleCaptureWorkspaceEditorKeyDown(event, context);
 
-    expect(actions.dismissCaptureLayer).toHaveBeenCalledOnce();
-    expect(calls).toEqual(['preventDefault', 'dismissCaptureLayer']);
+    expect(actions.cancelSession).toHaveBeenCalledOnce();
+    expect(actions.dismissCaptureLayer).not.toHaveBeenCalled();
+    expect(calls).toEqual(['preventDefault', 'cancelSession']);
   });
 
   it('updates annotation history and rerenders a selected annotation nudge', () => {

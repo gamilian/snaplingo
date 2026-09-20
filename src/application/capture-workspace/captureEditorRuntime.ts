@@ -493,7 +493,7 @@ interface CaptureManualSelectionBaseState {
   selection: LogicalRect;
   hoverSelection: null;
   editGesture: null;
-  activeAnnotationTool: null;
+  activeAnnotationTool: AnnotationTool | null;
   annotationGesture: null;
   draftAnnotation: null;
   selectedAnnotationIndex: null;
@@ -539,16 +539,18 @@ export type CaptureManualSelectionTransition =
 export function planCaptureManualSelectionTransition({
   rect,
   completion,
+  activeAnnotationTool = null,
 }: {
   rect: LogicalRect;
   completion: ManualSelectionCompletionPlan;
+  activeAnnotationTool?: AnnotationTool | null;
 }): CaptureManualSelectionTransition {
   const baseState: CaptureManualSelectionBaseState = {
     startPoint: null,
     selection: rect,
     hoverSelection: null,
     editGesture: null,
-    activeAnnotationTool: null,
+    activeAnnotationTool,
     annotationGesture: null,
     draftAnnotation: null,
     selectedAnnotationIndex: null,
