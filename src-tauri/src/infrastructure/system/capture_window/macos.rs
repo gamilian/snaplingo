@@ -211,6 +211,16 @@ pub(super) fn prepare_capture_window_for_reveal(window: &WebviewWindow) -> Resul
     Ok(())
 }
 
+pub(super) fn capture_window_is_on_active_space(window: &WebviewWindow) -> Result<bool, String> {
+    let ns_window = window.ns_window().map_err(|e| e.to_string())?;
+    if ns_window.is_null() {
+        return Err("Capture window has no native NSWindow".to_string());
+    }
+
+    let ns_window: &NSWindow = unsafe { &*ns_window.cast() };
+    Ok(ns_window.isOnActiveSpace())
+}
+
 pub(super) fn hide_capture_window_for_current_space(window: &WebviewWindow) -> Result<(), String> {
     let ns_window = window.ns_window().map_err(|e| e.to_string())?;
     if ns_window.is_null() {

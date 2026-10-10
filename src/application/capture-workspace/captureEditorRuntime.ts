@@ -432,15 +432,10 @@ export function completeCaptureEditorGesture({
   }
 
   const nextHistory = addAnnotationToHistory(annotationHistory, nextAnnotation);
-  const nextSelectedAnnotationIndex =
-    nextAnnotation.type === 'rectangle' ||
-    nextAnnotation.type === 'ellipse'
-      ? nextHistory.annotations.length - 1
-      : null;
 
   return {
     annotationHistory: nextHistory,
-    selectedAnnotationIndex: nextSelectedAnnotationIndex,
+    selectedAnnotationIndex: null,
     annotationGesture: null,
     draftAnnotation: null,
   };

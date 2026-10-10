@@ -1651,6 +1651,7 @@ export function createCaptureWorkspaceRuntime({
           !ctrlKey &&
           !altKey &&
           !shiftKey &&
+          !state.activeAnnotationTool &&
           !state.textDraft &&
           state.selection
         ) {

@@ -1500,6 +1500,62 @@ describe('capture workspace runtime', () => {
     expect(runtime.renderState.activeAnnotationTool).toBe('rectangle');
   });
 
+  it.each([
+    ['rectangle', 'rectangle'],
+    ['ellipse', 'ellipse'],
+    ['arrow', 'arrow'],
+    ['line', 'line'],
+    ['pen', 'freehand'],
+    ['highlight', 'highlight'],
+    ['mosaic', 'mosaic'],
+    ['eraser', 'eraser'],
+  ] as const)('keeps %s active for consecutive overlapping annotations', async (tool, annotationType) => {
+    const platform = createPlatform();
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-1');
+    await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.toggleAnnotationTool(tool);
+
+    for (const detail of [1, 2]) {
+      runtime.actions.pointerDown({ point: { x: 30, y: 40 }, source: 'preview', detail });
+      runtime.actions.pointerMove({ point: { x: 70, y: 80 }, source: 'root' });
+      await runtime.actions.pointerUp({ point: { x: 70, y: 80 }, source: 'root' });
+
+      expect(runtime.renderState.activeAnnotationTool).toBe(tool);
+      expect(runtime.renderState.selectedAnnotationIndex).toBeNull();
+      expect(runtime.renderState.annotationHistory.annotations).toHaveLength(detail);
+    }
+    expect(runtime.renderState.annotationHistory.annotations.map((annotation) => annotation.type))
+      .toEqual([annotationType, annotationType]);
+    expect(platform.commands.outputCapture).not.toHaveBeenCalled();
+
+    runtime.actions.selectMoveTool();
+    expect(runtime.renderState.activeAnnotationTool).toBeNull();
+    runtime.actions.pointerDown({ point: { x: 50, y: 60 }, source: 'preview' });
+    await runtime.actions.pointerUp({ point: { x: 50, y: 60 }, source: 'root' });
+    expect(runtime.renderState.selectedAnnotationIndex).toBe(1);
+  });
+
+  it('keeps the text tool active after committing consecutive drafts', async () => {
+    const platform = createPlatform();
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-1');
+    await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.toggleAnnotationTool('text');
+
+    for (const detail of [1, 2]) {
+      runtime.actions.pointerDown({ point: { x: 50, y: 60 }, source: 'preview', detail });
+      runtime.actions.updateTextDraftText(`text ${detail}`);
+      runtime.actions.commitTextDraft();
+
+      expect(runtime.renderState.activeAnnotationTool).toBe('text');
+      expect(runtime.renderState.selectedAnnotationIndex).toBeNull();
+      expect(runtime.renderState.textDraft).toBeNull();
+      expect(runtime.renderState.annotationHistory.annotations).toHaveLength(detail);
+    }
+    expect(platform.commands.outputCapture).not.toHaveBeenCalled();
+  });
+
   it('commits a pen stroke to canvas-backed history without retaining a draft', async () => {
     const platform = createPlatform({
       session: createSession({ id: 'session-editor-pen' }),

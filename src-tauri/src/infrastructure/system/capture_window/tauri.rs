@@ -225,24 +225,24 @@ pub fn prewarm_capture_window(app: &AppHandle) -> Result<(), String> {
     build_hidden_capture_window(app)
 }
 
-/// Creates the hidden capture WebView on the current Space before frozen
-/// pixels are ready. macOS intentionally does this per session so fullscreen
-/// Space targeting remains correct.
+/// Reuses a hidden capture WebView on the current Space before frozen pixels
+/// are ready, rebuilding it when the native window is no longer usable for
+/// the active Space.
 pub fn prepare_capture_window(app: &AppHandle) -> Result<(), String> {
     ensure_capture_window_ready_listener(app);
-    if should_reuse_capture_window_for_session() {
-        if app.get_webview_window(CAPTURE_WINDOW_LABEL).is_some() {
+    if let Some(window) = app.get_webview_window(CAPTURE_WINDOW_LABEL) {
+        let webview_ready = CAPTURE_WINDOW_WEBVIEW_READY.load(Ordering::SeqCst);
+        let on_active_space = capture_window_is_on_active_space(&window).unwrap_or(false);
+        if should_reuse_existing_capture_window(true, webview_ready, on_active_space) {
+            CAPTURE_WINDOW_PREPARED_FOR_SESSION.store(true, Ordering::SeqCst);
             return Ok(());
         }
-    } else if let Some(window) = app.get_webview_window(CAPTURE_WINDOW_LABEL) {
         discard_capture_window_before_new_session(app, &window)?;
     }
 
     CAPTURE_WINDOW_WEBVIEW_READY.store(false, Ordering::SeqCst);
     build_hidden_capture_window(app)?;
-    if !should_reuse_capture_window_for_session() {
-        CAPTURE_WINDOW_PREPARED_FOR_SESSION.store(true, Ordering::SeqCst);
-    }
+    CAPTURE_WINDOW_PREPARED_FOR_SESSION.store(true, Ordering::SeqCst);
 
     Ok(())
 }
@@ -311,8 +311,14 @@ pub fn open_capture_window_for_session(
         let prepared_for_session =
             CAPTURE_WINDOW_PREPARED_FOR_SESSION.swap(false, Ordering::SeqCst);
         let webview_ready = CAPTURE_WINDOW_WEBVIEW_READY.load(Ordering::SeqCst);
-        if !should_reuse_capture_window_for_session() && (!prepared_for_session || !webview_ready) {
+        let on_active_space = capture_window_is_on_active_space(&window).unwrap_or(false);
+        if !should_reuse_existing_capture_window(
+            prepared_for_session,
+            webview_ready,
+            on_active_space,
+        ) {
             discard_capture_window_before_new_session(app, &window)?;
+            CAPTURE_WINDOW_WEBVIEW_READY.store(false, Ordering::SeqCst);
         } else {
             if should_reset_capture_window_fullscreen_before_reuse() {
                 window.set_fullscreen(false).map_err(|e| e.to_string())?;
@@ -544,11 +550,35 @@ fn should_prewarm_capture_window() -> bool {
 }
 
 fn should_reuse_capture_window_for_session() -> bool {
-    !cfg!(target_os = "macos")
+    true
+}
+
+fn should_reuse_existing_capture_window(
+    prepared_for_session: bool,
+    webview_ready: bool,
+    on_active_space: bool,
+) -> bool {
+    should_reuse_capture_window_for_session()
+        && prepared_for_session
+        && webview_ready
+        && on_active_space
 }
 
 fn should_destroy_capture_window_when_inactive(has_active_presentation: bool) -> bool {
     !has_active_presentation && !should_reuse_capture_window_for_session()
+}
+
+fn capture_window_is_on_active_space(window: &tauri::WebviewWindow) -> Result<bool, String> {
+    #[cfg(target_os = "macos")]
+    {
+        return super::macos::capture_window_is_on_active_space(window);
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = window;
+        Ok(true)
+    }
 }
 
 fn discard_capture_window_before_new_session(
@@ -615,14 +645,27 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn macos_capture_window_is_recreated_between_sessions_to_retarget_fullscreen_space() {
-        assert!(!should_reuse_capture_window_for_session());
+    fn macos_capture_window_reuses_when_ready_on_the_active_space() {
+        assert!(should_reuse_existing_capture_window(true, true, true));
     }
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn macos_capture_window_is_destroyed_when_inactive() {
-        assert!(should_destroy_capture_window_when_inactive(false));
+    fn macos_capture_window_recreates_when_it_is_not_on_the_active_space() {
+        assert!(!should_reuse_existing_capture_window(true, true, false));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_capture_window_recreates_when_preparation_is_stale() {
+        assert!(!should_reuse_existing_capture_window(false, true, true));
+        assert!(!should_reuse_existing_capture_window(true, false, true));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_capture_window_is_kept_when_inactive_for_same_space_reuse() {
+        assert!(!should_destroy_capture_window_when_inactive(false));
     }
 
     #[cfg(target_os = "macos")]
