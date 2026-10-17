@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 export interface SettingsScrollSection {
   id: string;
   label: string;
-  description: string;
+  description?: string;
   content: ReactNode;
   action?: ReactNode;
 }
@@ -17,7 +17,7 @@ export function SettingsScrollPage({
   autoSaveLabel = '自动保存',
 }: {
   title: string;
-  description: string;
+  description?: string;
   sections: SettingsScrollSection[];
   requestedSectionId?: string | null;
   onRequestedSectionHandled?: () => void;
@@ -84,7 +84,9 @@ export function SettingsScrollPage({
                 {autoSaveLabel}
               </span>
             </div>
-            <p className="mt-1 text-label text-muted">{description}</p>
+            {description && (
+              <p className="mt-1 text-label text-muted">{description}</p>
+            )}
           </div>
 
           <nav className="flex max-w-[60%] shrink gap-0.5 overflow-x-auto rounded-md bg-raised p-[3px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -123,9 +125,11 @@ export function SettingsScrollPage({
                   <h2 className="text-card font-semibold tracking-[-0.012em] text-ink">
                     {section.label}
                   </h2>
-                  <p className="mt-0.5 text-hint leading-relaxed text-muted">
-                    {section.description}
-                  </p>
+                  {section.description && (
+                    <p className="mt-0.5 text-hint leading-relaxed text-muted">
+                      {section.description}
+                    </p>
+                  )}
                 </div>
                 {section.action}
               </header>

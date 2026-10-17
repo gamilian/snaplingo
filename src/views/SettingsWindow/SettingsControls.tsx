@@ -4,14 +4,16 @@ export function SettingsGroup({
   title,
   children,
 }: {
-  title: string;
+  title?: string;
   children: ReactNode;
 }) {
   return (
     <section className="border-t border-line first:border-t-0">
-      <div className="border-b border-line bg-sunken px-[22px] py-2 text-cap font-semibold uppercase tracking-[0.075em] text-faint">
-        {title}
-      </div>
+      {title && (
+        <div className="border-b border-line bg-sunken px-[22px] py-2 text-cap font-semibold uppercase tracking-[0.075em] text-faint">
+          {title}
+        </div>
+      )}
       <div className="divide-y divide-line px-[22px]">{children}</div>
     </section>
   );

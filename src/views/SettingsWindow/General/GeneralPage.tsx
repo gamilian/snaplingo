@@ -32,7 +32,7 @@ export function GeneralPage() {
   return (
     <SettingsScrollPage
       title={t('general')}
-      description={t('generalDescription')}
+     
       autoSaveLabel={t('autoSave')}
       requestedSectionId={requestedSection}
       onRequestedSectionHandled={consumeRequestedSection}
@@ -40,10 +40,9 @@ export function GeneralPage() {
         {
           id: 'interface',
           label: t('interfaceAndStartup'),
-          description: t('interfaceAndStartupDescription'),
           content: (
             <SettingsGroup title={t('interface')}>
-              <SettingRow label={t('interfaceLanguage')} description={t('interfaceLanguageDescription')}>
+              <SettingRow label={t('interfaceLanguage')}>
                 <SelectField
                   value={general.language}
                   options={[
@@ -52,7 +51,7 @@ export function GeneralPage() {
                   onChange={(language) => updateGeneral({ language })}
                 />
               </SettingRow>
-              <SettingRow label={t('theme')} description={t('themeDescription')}>
+              <SettingRow label={t('theme')}>
                 <SelectField
                   value={general.theme}
                   options={[
@@ -63,7 +62,7 @@ export function GeneralPage() {
                   onChange={(theme) => updateGeneral({ theme })}
                 />
               </SettingRow>
-              <SettingRow label={t('startOnBoot')} description={t('startOnBootDescription')}>
+              <SettingRow label={t('startOnBoot')}>
                 <SettingsToggle
                   label={t('startOnBoot')}
                   checked={general.startOnBoot}
@@ -76,33 +75,28 @@ export function GeneralPage() {
         {
           id: 'permissions',
           label: '系统权限',
-          description: '管理截图和选中文本的访问权限',
           content: <PermissionSettings />,
         },
         {
           id: 'network',
           label: t('network'),
-          description: t('networkDescription'),
           content: <NetworkSettings />,
         },
         {
           id: 'maintenance',
           label: t('logsAndMaintenance'),
-          description: t('logsAndMaintenanceDescription'),
           content: <MaintenanceSettings />,
         },
         {
           id: 'experimental',
           label: t('experimental'),
-          description: t('experimentalDescription'),
           content: <ExperimentalSettings />,
         },
         {
           id: 'about',
           label: t('about'),
-          description: t('aboutDescription'),
           content: (
-            <SettingsGroup title="SnapLingo">
+            <SettingsGroup>
               <SettingRow label={t('currentVersion')}>
                 <AppVersionValue />
               </SettingRow>
@@ -122,7 +116,7 @@ function PermissionSettings() {
   const runtime = useSettingsRuntime().permissions;
   const snapshot = useRequiredPermissions(runtime);
   return (
-    <SettingsGroup title="权限状态">
+    <SettingsGroup>
       <div className="py-4">
         <PermissionControls runtime={runtime} snapshot={snapshot} />
       </div>
@@ -167,7 +161,7 @@ function NetworkSettings() {
 
   return (
     <SettingsGroup title={t('connection')}>
-      <SettingRow label={t('proxy')} description={t('proxyDescription')}>
+      <SettingRow label={t('proxy')}>
         <SelectField
           value={general.proxyMode ?? 'system'}
           options={[
@@ -179,7 +173,7 @@ function NetworkSettings() {
         />
       </SettingRow>
       {(general.proxyMode ?? 'system') === 'manual' && (
-        <SettingRow label={t('proxyAddress')} description={t('proxyAddressDescription')}>
+        <SettingRow label={t('proxyAddress')}>
           <input
             key={general.proxyUrl ?? ''}
             defaultValue={general.proxyUrl ?? ''}
@@ -189,7 +183,7 @@ function NetworkSettings() {
           />
         </SettingRow>
       )}
-      <SettingRow label={t('requestTimeout')} description={t('requestTimeoutDescription')}>
+      <SettingRow label={t('requestTimeout')}>
         <CustomNumberInput
           value={general.requestTimeoutMs ?? 10_000}
           onChange={(requestTimeoutMs) => updateGeneral({ requestTimeoutMs })}
@@ -200,7 +194,7 @@ function NetworkSettings() {
           className="w-[230px]"
         />
       </SettingRow>
-      <SettingRow label={t('retryCount')} description={t('retryCountDescription')}>
+      <SettingRow label={t('retryCount')}>
         <CustomNumberInput
           value={general.retryCount ?? 1}
           onChange={(retryCount) => updateGeneral({ retryCount })}
@@ -235,7 +229,7 @@ function MaintenanceSettings() {
   return (
     <>
       <SettingsGroup title={t('logs')}>
-        <SettingRow label={t('logLevel')} description={t('logLevelDescription')}>
+        <SettingRow label={t('logLevel')}>
           <SelectField
             value={general.logLevel ?? 'info'}
             options={[
@@ -247,7 +241,7 @@ function MaintenanceSettings() {
             onChange={(logLevel) => void updateGeneralSettings({ logLevel: logLevel as 'debug' | 'info' | 'warn' | 'error' })}
           />
         </SettingRow>
-        <SettingRow label={t('logRetentionDays')} description={t('logRetentionDaysDescription')}>
+        <SettingRow label={t('logRetentionDays')}>
           <CustomNumberInput
             value={general.logRetentionDays ?? 7}
             onChange={(logRetentionDays) =>
@@ -260,7 +254,7 @@ function MaintenanceSettings() {
             className="w-[230px]"
           />
         </SettingRow>
-        <SettingRow label={t('logStorage')} description={t('logStorageDescription')}>
+        <SettingRow label={t('logStorage')}>
           <span className="text-xs font-medium text-muted">
             {t('recentLogs').replace('{count}', String(logs.length))}
           </span>
@@ -301,7 +295,7 @@ function MaintenanceSettings() {
             {t('clearAllHistory')}
           </ActionButton>
         </SettingRow>
-        <SettingRow label={t('appSettings')} description={t('resetSettingsDescription')}>
+        <SettingRow label={t('appSettings')}>
           <ActionButton danger disabled>{t('unavailable')}</ActionButton>
         </SettingRow>
       </SettingsGroup>
@@ -319,7 +313,7 @@ function ExperimentalSettings() {
 
   return (
     <SettingsGroup title={t('performance')}>
-      <SettingRow label={t('gpuComposition')} description={t('gpuCompositionDescription')}>
+      <SettingRow label={t('gpuComposition')}>
         <SettingsToggle
           label={t('gpuComposition')}
           checked={general.experimentalGpuAcceleration ?? false}
@@ -328,7 +322,7 @@ function ExperimentalSettings() {
           }
         />
       </SettingRow>
-      <SettingRow label={t('performanceMonitoring')} description={t('performanceMonitoringDescription')}>
+      <SettingRow label={t('performanceMonitoring')}>
         <SettingsToggle
           label={t('performanceMonitoring')}
           checked={general.performanceMonitoring ?? false}

@@ -54,12 +54,11 @@ export function TranslationSettingsScrollPage() {
   return (
     <SettingsScrollPage
       title="翻译"
-      description="快捷键、语言规则、窗口与翻译行为"
+     
       sections={[
         {
           id: 'hotkeys',
           label: '快捷键',
-          description: '常用翻译入口的全局快捷键',
           action: (
             <HotkeyToolbar category="translation" actions={TRANSLATION_HOTKEYS} />
           ),
@@ -73,10 +72,9 @@ export function TranslationSettingsScrollPage() {
         {
           id: 'language',
           label: '语言与取词',
-          description: '默认语言与划词翻译的取词策略',
           content: (
             <>
-              <SettingsGroup title="默认语言">
+              <SettingsGroup>
                 <SettingRow label="源语言">
                   <SelectField
                     value={translation.defaultSourceLang}
@@ -88,7 +86,7 @@ export function TranslationSettingsScrollPage() {
                 </SettingRow>
                 <SettingRow
                   label="目标语言"
-                  description="自动：源语言为中文时翻译成英语，其他语言翻译成中文"
+                 
                 >
                   <SelectField
                     value={translation.defaultTargetLang}
@@ -102,10 +100,10 @@ export function TranslationSettingsScrollPage() {
                   />
                 </SettingRow>
               </SettingsGroup>
-              <SettingsGroup title="划词翻译">
+              <SettingsGroup>
                 <SettingRow
                   label="取词模式"
-                  description="智能模式会根据应用和文本类型选择取词方式"
+                 
                 >
                   <SelectField
                     value={translation.selectionTextMode ?? 'smart'}
@@ -128,10 +126,9 @@ export function TranslationSettingsScrollPage() {
         {
           id: 'window',
           label: '窗口与输入框',
-          description: '翻译窗口的位置、尺寸与输入框初始状态',
           content: (
             <>
-              <SettingsGroup title="窗口位置">
+              <SettingsGroup>
                 <SettingRow label="划词翻译与截图翻译">
                   <PositionSelect
                     value={translation.selectionWindowPosition ?? 'below-cursor'}
@@ -149,7 +146,7 @@ export function TranslationSettingsScrollPage() {
                   />
                 </SettingRow>
               </SettingsGroup>
-              <SettingsGroup title="窗口尺寸">
+              <SettingsGroup>
                 <SettingRow label="最高屏幕占比">
                   <RangeValue value={`${translation.maxWindowHeightRatio ?? 70}%`}>
                     <CustomRange
@@ -175,7 +172,7 @@ export function TranslationSettingsScrollPage() {
                   </RangeValue>
                 </SettingRow>
               </SettingsGroup>
-              <SettingsGroup title="输入框初始状态">
+              <SettingsGroup>
                 <SettingRow label="划词翻译">
                   <InputStateSelect
                     value={translation.selectionInputState ?? 'last'}
@@ -199,19 +196,18 @@ export function TranslationSettingsScrollPage() {
         {
           id: 'behavior',
           label: '翻译行为',
-          description: '输入、结果与窗口的通用行为',
           content: (
             <>
-              <SettingsGroup title="输入与结果">
+              <SettingsGroup>
                 <ToggleRow
                   label="自动翻译"
-                  description="输入文本后自动开始翻译"
+                 
                   checked={translation.autoTranslate}
                   onChange={(autoTranslate) => updateTranslation({ autoTranslate })}
                 />
                 <ToggleRow
                   label="增量翻译"
-                  description="输入时实时更新翻译结果"
+                 
                   checked={translation.incrementalTranslation}
                   onChange={(incrementalTranslation) =>
                     updateTranslation({ incrementalTranslation })
@@ -230,7 +226,7 @@ export function TranslationSettingsScrollPage() {
                   }
                 />
               </SettingsGroup>
-              <SettingsGroup title="窗口行为">
+              <SettingsGroup>
                 <ToggleRow
                   label="结果窗口置顶"
                   checked={translation.windowAlwaysOnTop}
@@ -302,7 +298,6 @@ function InputStateSelect({
 
 function ToggleRow({
   label,
-  description,
   checked,
   onChange,
 }: {
@@ -312,7 +307,7 @@ function ToggleRow({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <SettingRow label={label} description={description}>
+    <SettingRow label={label}>
       <SettingsToggle label={label} checked={checked} onChange={onChange} />
     </SettingRow>
   );

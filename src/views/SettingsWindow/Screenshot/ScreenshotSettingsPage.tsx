@@ -61,8 +61,8 @@ export function ScreenshotSettingsPage() {
 
   const outputSettings = (
     <>
-      <SettingsGroup title="文件">
-        <SettingRow label="默认保存路径" description="截图文件保存到此文件夹">
+      <SettingsGroup>
+        <SettingRow label="默认保存路径">
           <div className="flex items-center gap-2">
             <input
               type="text"
@@ -104,7 +104,7 @@ export function ScreenshotSettingsPage() {
             />
           </div>
         </SettingRow>
-        <SettingRow label="图片质量" description="仅对 JPG 和 WebP 格式生效">
+        <SettingRow label="图片质量">
           <RangeValue value={`${screenshot.quality}%`}>
             <CustomRange
               value={screenshot.quality}
@@ -146,8 +146,8 @@ export function ScreenshotSettingsPage() {
           </SettingRow>
         )}
       </SettingsGroup>
-      <SettingsGroup title="完成后">
-        <SettingRow label="截图后自动复制" description="截图完成后复制到剪贴板">
+      <SettingsGroup>
+        <SettingRow label="截图后自动复制">
           <SettingsToggle
             label="截图后自动复制"
             checked={screenshot.autoCopy}
@@ -160,8 +160,8 @@ export function ScreenshotSettingsPage() {
 
   const captureInterfaceSettings = (
     <>
-      <SettingsGroup title="选区外观">
-        <SettingRow label="边框宽度" description="截图选区边框的显示宽度">
+      <SettingsGroup>
+        <SettingRow label="边框宽度">
           <RangeValue value={`${screenshot.selectionBorderWidth ?? 2}px`}>
             <CustomRange
               value={screenshot.selectionBorderWidth ?? 2}
@@ -174,7 +174,7 @@ export function ScreenshotSettingsPage() {
             />
           </RangeValue>
         </SettingRow>
-        <SettingRow label="边框颜色" description="截图选区边框使用的颜色">
+        <SettingRow label="边框颜色">
           <div className="flex items-center gap-2.5">
             {BORDER_COLORS.map((color) => {
               const selected = colorsEqual(selectionBorderColor, color);
@@ -214,7 +214,7 @@ export function ScreenshotSettingsPage() {
             </label>
           </div>
         </SettingRow>
-        <SettingRow label="遮罩颜色" description="选区外区域使用的遮罩颜色">
+        <SettingRow label="遮罩颜色">
           <div className="flex max-w-[520px] flex-wrap items-center justify-end gap-2.5">
             {MASK_COLORS.map((color) => {
               const selected = colorsEqual(selectionMaskColor, color);
@@ -254,7 +254,7 @@ export function ScreenshotSettingsPage() {
             </label>
           </div>
         </SettingRow>
-        <SettingRow label="遮罩透明度" description="调整选区外遮罩的透明程度">
+        <SettingRow label="遮罩透明度">
           <RangeValue value={`${maskColorOpacity(selectionMaskColor)}%`}>
             <CustomRange
               value={maskColorOpacity(selectionMaskColor)}
@@ -273,8 +273,8 @@ export function ScreenshotSettingsPage() {
           </RangeValue>
         </SettingRow>
       </SettingsGroup>
-      <SettingsGroup title="选区辅助">
-        <SettingRow label="显示选区尺寸" description="选取时显示宽度和高度">
+      <SettingsGroup>
+        <SettingRow label="显示选区尺寸">
           <SettingsToggle
             label="显示选区尺寸"
             checked={screenshot.showSelectionSize}
@@ -283,7 +283,7 @@ export function ScreenshotSettingsPage() {
         </SettingRow>
         <SettingRow
           label="显示放大镜"
-          description="选区时自动显示；关闭后仍可按住 Alt 临时查看"
+         
         >
           <SettingsToggle
             label="显示放大镜"
@@ -291,7 +291,7 @@ export function ScreenshotSettingsPage() {
             onChange={(showMagnifier) => updateScreenshot({ showMagnifier })}
           />
         </SettingRow>
-        <SettingRow label="放大镜倍率" description="调整选区放大镜显示的像素倍率">
+        <SettingRow label="放大镜倍率">
           <RangeValue value={`${screenshot.magnifierZoom ?? 12}×`}>
             <CustomRange
               value={screenshot.magnifierZoom ?? 12}
@@ -303,8 +303,8 @@ export function ScreenshotSettingsPage() {
           </RangeValue>
         </SettingRow>
       </SettingsGroup>
-      <SettingsGroup title="编辑器与贴图">
-        <SettingRow label="记住上次使用的工具" description="下次截图时恢复上次使用的标注工具">
+      <SettingsGroup>
+        <SettingRow label="记住上次使用的工具">
           <SettingsToggle
             label="记住上次使用的工具"
             checked={screenshot.rememberLastTool}
@@ -336,12 +336,11 @@ export function ScreenshotSettingsPage() {
   return (
     <SettingsScrollPage
       title="截图"
-      description="截图快捷键、文件输出与选区界面"
+     
       sections={[
         {
           id: 'hotkeys',
           label: '快捷键',
-          description: '截图与贴图的全局快捷键',
           action: (
             <HotkeyToolbar category="screenshot" actions={SCREENSHOT_HOTKEYS} />
           ),
@@ -355,13 +354,11 @@ export function ScreenshotSettingsPage() {
         {
           id: 'output',
           label: '保存与输出',
-          description: '保存位置、图片格式和完成后的动作',
           content: outputSettings,
         },
         {
           id: 'capture-interface',
           label: '截图界面',
-          description: '配置选区外观、辅助信息与贴图显示',
           content: captureInterfaceSettings,
         },
       ]}

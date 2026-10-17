@@ -28,12 +28,11 @@ export function OcrSettingsScrollPage() {
   return (
     <SettingsScrollPage
       title="OCR"
-      description="快捷键、识别文本与结果窗口"
+     
       sections={[
         {
           id: 'hotkeys',
           label: '快捷键',
-          description: '常用 OCR 入口的全局快捷键',
           action: <HotkeyToolbar category="ocr" actions={OCR_HOTKEYS} />,
           content: (
             <FeatureHotkeysSection category="ocr" actions={OCR_HOTKEYS} />
@@ -42,9 +41,8 @@ export function OcrSettingsScrollPage() {
         {
           id: 'recognition',
           label: '识别与文本',
-          description: '识别语言与结果文本的处理方式',
           content: (
-            <SettingsGroup title="识别">
+            <SettingsGroup>
               <SettingRow label="识别语言">
                 <div className="w-[230px]">
                   <CustomSelect
@@ -65,7 +63,7 @@ export function OcrSettingsScrollPage() {
               </SettingRow>
               <ToggleRow
                 label="保留文本格式"
-                description="保留换行和段落结构"
+               
                 checked={ocr.preserveFormatting}
                 onChange={(preserveFormatting) =>
                   updateOcr({ preserveFormatting })
@@ -89,10 +87,9 @@ export function OcrSettingsScrollPage() {
         {
           id: 'window',
           label: '窗口与提示',
-          description: 'OCR 结果窗口位置与静默识别提示',
           content: (
             <>
-              <SettingsGroup title="结果窗口">
+              <SettingsGroup>
                 <SettingRow label="OCR 窗口位置">
                   <div className="w-[230px]">
                     <CustomSelect
@@ -112,10 +109,10 @@ export function OcrSettingsScrollPage() {
                   </div>
                 </SettingRow>
               </SettingsGroup>
-              <SettingsGroup title="静默 OCR">
+              <SettingsGroup>
                 <ToggleRow
                   label="隐藏识别状态提示"
-                  description="开启后，后台识别时不再在鼠标位置显示加载和成功提示"
+                 
                   checked={ocr.hideSilentStatus ?? false}
                   onChange={(hideSilentStatus) =>
                     updateOcr({ hideSilentStatus })
@@ -132,7 +129,6 @@ export function OcrSettingsScrollPage() {
 
 function ToggleRow({
   label,
-  description,
   checked,
   onChange,
 }: {
@@ -142,7 +138,7 @@ function ToggleRow({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <SettingRow label={label} description={description}>
+    <SettingRow label={label}>
       <SettingsToggle label={label} checked={checked} onChange={onChange} />
     </SettingRow>
   );
