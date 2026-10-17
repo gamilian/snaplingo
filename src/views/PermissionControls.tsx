@@ -30,7 +30,7 @@ const permissions: { key: SystemPermission; label: string; detail: string }[] = 
   { key: 'accessibility', label: '辅助功能', detail: '选中文本与界面元素检测（可选）' },
 ];
 
-const buttonClass = 'rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-50';
+const buttonClass = 'rounded-lg border border-line bg-surface px-3 py-2 text-xs font-medium text-ink hover:bg-sunken disabled:cursor-default disabled:opacity-50';
 
 export const permissionGrantExplanation = '如果你此前已授权，重装或更新时的应用签名变化可能使旧版本的授权未对当前应用生效。仅凭系统检测无法判断是尚未授权，还是旧授权未生效。若系统中已开启，请先重新检测；仅在 macOS 要求时重启应用，仍不可用再重新授权。';
 
@@ -74,7 +74,7 @@ export function PermissionControls({ runtime, snapshot }: {
   }
 
   if (context && context.platform !== 'macos') {
-    return <p className="py-3 text-xs text-gray-500">当前系统无需单独开启屏幕录制或辅助功能权限。</p>;
+    return <p className="py-3 text-xs text-muted">当前系统无需单独开启屏幕录制或辅助功能权限。</p>;
   }
 
   const actionDisabled = busy || !status || !context || context.needsInstallation;
@@ -82,26 +82,26 @@ export function PermissionControls({ runtime, snapshot }: {
   const repairLabel = permissions.find((permission) => permission.key === repair)?.label;
 
   return (
-    <div className="text-left text-sm text-gray-800" aria-busy={busy}>
+    <div className="text-left text-sm text-ink" aria-busy={busy}>
       {context?.needsInstallation && (
         <p className="mb-3 rounded-lg bg-amber-50 p-3 text-xs leading-relaxed text-amber-800" role="alert">
           当前运行的是临时副本。请将 SnapLingo 拖入“应用程序”后打开，再检测是否需要授权。
         </p>
       )}
       {permissions.map(({ key, label, detail }) => (
-        <div key={key} className="flex items-center justify-between gap-4 border-b border-gray-100 py-3">
+        <div key={key} className="flex items-center justify-between gap-4 border-b border-line py-3">
           <div>
             <p className="font-semibold">{label}</p>
-            <p className="mt-1 text-xs leading-relaxed text-gray-500">{detail}</p>
-            {status?.[key] === false && <p className="mt-1 text-xs leading-relaxed text-gray-500">当前运行的 SnapLingo 尚未获得{label}权限。</p>}
+            <p className="mt-1 text-xs leading-relaxed text-muted">{detail}</p>
+            {status?.[key] === false && <p className="mt-1 text-xs leading-relaxed text-muted">当前运行的 SnapLingo 尚未获得{label}权限。</p>}
           </div>
           <div className="flex shrink-0 items-center gap-3">
-            <span className={`text-xs ${status?.[key] ? 'text-green-700' : 'text-gray-500'}`} aria-live="polite">
+            <span className={`text-xs ${status?.[key] ? 'text-green-700' : 'text-muted'}`} aria-live="polite">
               {error ? '检测失败' : !status ? '检测中…' : status[key] ? '已授权' : '待授权'}
             </span>
             {status?.[key] === false && (
               <button type="button" className={key === 'screenRecording'
-                ? 'rounded-lg bg-primary-600 px-3 py-2 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-50'
+                ? 'rounded-lg bg-accent px-3 py-2 text-xs font-medium text-accent-on hover:bg-accent-hover disabled:opacity-50'
                 : buttonClass} disabled={actionDisabled}
                 aria-label={`授权${label}`} onClick={() => void perform(() => runtime.request(key))}>
                 去授权
@@ -110,11 +110,11 @@ export function PermissionControls({ runtime, snapshot }: {
           </div>
         </div>
       ))}
-      {missingPermissions.length > 0 && <p className="mt-3 text-xs leading-relaxed text-gray-500">{permissionGrantExplanation}</p>}
+      {missingPermissions.length > 0 && <p className="mt-3 text-xs leading-relaxed text-muted">{permissionGrantExplanation}</p>}
       {(actionError || error) && <p role="alert" className="mt-3 text-xs text-red-600">{actionError || '暂时无法确认系统权限，请重新检测。'}</p>}
-      {notice && <p role="status" className="mt-3 text-xs leading-relaxed text-gray-600">{notice}</p>}
-      <details className="mt-4 text-xs leading-relaxed text-gray-500">
-        <summary className="cursor-pointer font-medium text-gray-700">授权遇到问题？</summary>
+      {notice && <p role="status" className="mt-3 text-xs leading-relaxed text-muted">{notice}</p>}
+      <details className="mt-4 text-xs leading-relaxed text-muted">
+        <summary className="cursor-pointer font-medium text-ink">授权遇到问题？</summary>
         <p className="mt-3">这里检测的是当前运行应用的权限。系统设置有变化时，可先重新检测。</p>
         {context?.appPath && <p className="mt-2 break-all">当前应用：{context.appPath}</p>}
         <div className="mt-3 flex flex-wrap gap-2">

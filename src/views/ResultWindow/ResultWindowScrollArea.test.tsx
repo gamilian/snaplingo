@@ -49,7 +49,7 @@ describe('result window scroll area', () => {
     expect(visibleClassName).not.toContain('w-1.5');
 
     expect(thumbClassName).toContain('w-[3px]');
-    expect(thumbClassName).toContain('bg-slate-400/35');
+    expect(thumbClassName).toContain('bg-faint/35');
     expect(thumbClassName).not.toContain('bg-slate-400/80');
   });
 

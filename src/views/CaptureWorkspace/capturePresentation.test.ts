@@ -96,17 +96,17 @@ describe("capture presentation", () => {
   it("uses a light floating toolbar for the editing surface", () => {
     const className = getCaptureEditorToolbarClassName();
 
-    expect(className).toContain("h-[42px]");
-    expect(className).toContain("gap-1");
-    expect(className).toContain("rounded-[12px]");
-    expect(className).toContain("bg-white/95");
-    expect(className).toContain("text-slate-600");
+    expect(className).toContain("h-[40px]");
+    expect(className).toContain("gap-0.5");
+    expect(className).toContain("rounded-[11px]");
+    expect(className).toContain("bg-surface");
+    expect(className).toContain("text-muted");
   });
 
   it("uses compact editor controls for small capture selections", () => {
     expect(getCaptureEditorIconButtonClassName()).toContain("h-7 w-7");
     expect(getCaptureEditorCommandButtonClassName()).toContain("h-7");
-    expect(getCaptureEditorCommandButtonClassName()).toContain("text-[11px]");
+    expect(getCaptureEditorCommandButtonClassName()).toContain("text-hint");
     expect(getCaptureEditorCommandButtonClassName("primary")).toContain("w-7");
   });
 
@@ -150,7 +150,7 @@ describe("capture presentation", () => {
     );
 
     expect(runtimeView).toContain(
-      "const TOOLBAR_SIZE = { width: 700, height: 42 };",
+      "const TOOLBAR_SIZE = { width: 700, height: 40 };",
     );
   });
 
@@ -159,7 +159,7 @@ describe("capture presentation", () => {
       expect.stringContaining("bg-transparent"),
     );
     expect(getCaptureEditorSelectionClassName("preview")).not.toContain(
-      "border-[#5b7fff]",
+      "border-accent",
     );
     expect(getCaptureEditorSelectionClassName("preview")).toEqual(
       expect.stringContaining("cursor-default"),
@@ -168,13 +168,13 @@ describe("capture presentation", () => {
       "cursor-move",
     );
     expect(getCaptureEditorSelectionClassName("preview")).toEqual(
-      expect.stringContaining("rounded-[8px]"),
+      expect.stringContaining("rounded-md"),
     );
     expect(getCaptureEditorIconButtonClassName(true)).toEqual(
-      expect.stringContaining("border-[#5b7fff]"),
+      expect.stringContaining("bg-accent-soft"),
     );
     expect(getCaptureEditorCommandButtonClassName("primary")).toEqual(
-      expect.stringContaining("bg-[#5b7fff]"),
+      expect.stringContaining("bg-accent"),
     );
   });
 });

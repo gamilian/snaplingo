@@ -222,7 +222,7 @@ export function CaptureSelectionResizeHandles({
           aria-label={`Resize selection ${handle}`}
           onPointerDown={(event) => onResizeHandlePointerDown(handle, event)}
         >
-          <span className="pointer-events-none h-2 w-2 rounded-full border border-[#5b7fff] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.3)]" />
+          <span className="pointer-events-none h-2 w-2 rounded-full border border-accent bg-surface shadow-[0_1px_3px_rgba(15,23,42,0.3)]" />
         </button>
       ))}
     </div>

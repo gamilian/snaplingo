@@ -13,50 +13,64 @@ export function SecondaryNav({
 }: SecondaryNavProps) {
   if (orientation === 'horizontal') {
     return (
-      <div className="inline-flex rounded-[22px] border border-gray-200 bg-white/80 p-1.5 shadow-sm backdrop-blur">
-        <nav className="flex gap-1.5">
-          {items.map((item) => (
-            <button
-              key={item.key}
-              onClick={() => onItemChange(item.key)}
-              className={`
-                rounded-2xl px-4 py-2 text-sm font-medium transition-all duration-150
-                ${
-                  activeItem === item.key
-                    ? 'bg-primary-600 text-white shadow-sm'
-                    : 'text-gray-500 hover:bg-primary-50 hover:text-primary-600'
-                }
-              `}
-            >
-              {item.label}
-            </button>
-          ))}
+      <div className="inline-flex max-w-[60%] shrink overflow-x-auto rounded-md bg-raised p-[3px]">
+        <nav className="flex gap-0.5">
+          {items.map((item) => {
+            const active = activeItem === item.key;
+            return (
+              <button
+                key={item.key}
+                type="button"
+                aria-current={active ? 'page' : undefined}
+                onClick={() => onItemChange(item.key)}
+                className={`
+                  h-[25px] shrink-0 whitespace-nowrap rounded-sm px-2.5 text-label font-medium transition-colors
+                  ${
+                    active
+                      ? 'bg-surface text-ink shadow-xs'
+                      : 'text-muted hover:text-ink'
+                  }
+                `}
+              >
+                {item.label}
+              </button>
+            );
+          })}
         </nav>
       </div>
     );
   }
 
   return (
-    <div className="w-[200px] bg-gray-50 border-r border-gray-200 flex flex-col">
-      <nav className="flex-1 p-6 space-y-1">
-        {items.map((item) => (
-          <button
-            key={item.key}
-            onClick={() => onItemChange(item.key)}
-            className={`
-              w-full text-left px-3 py-2 rounded-md text-sm font-medium
-              transition-all duration-150
-              border-l-2
-              ${
-                activeItem === item.key
-                  ? 'bg-white text-gray-900 font-semibold border-primary-500 shadow-xs'
-                  : 'text-gray-600 hover:bg-white hover:text-gray-900 border-transparent hover:border-gray-300'
-              }
-            `}
-          >
-            {item.label}
-          </button>
-        ))}
+    <div className="flex w-[200px] flex-col border-r border-line bg-sunken">
+      <nav className="flex-1 space-y-0.5 p-4">
+        {items.map((item) => {
+          const active = activeItem === item.key;
+          return (
+            <button
+              key={item.key}
+              type="button"
+              aria-current={active ? 'page' : undefined}
+              onClick={() => onItemChange(item.key)}
+              className={`
+                relative w-full rounded-md px-2.5 py-1.5 text-left text-label transition-colors
+                ${
+                  active
+                    ? 'bg-accent-soft font-semibold text-accent-text'
+                    : 'text-muted hover:bg-raised/70 hover:text-ink'
+                }
+              `}
+            >
+              {active && (
+                <span
+                  aria-hidden="true"
+                  className="absolute -left-4 top-1.5 bottom-1.5 w-0.5 rounded-r-sm bg-accent"
+                />
+              )}
+              {item.label}
+            </button>
+          );
+        })}
       </nav>
     </div>
   );

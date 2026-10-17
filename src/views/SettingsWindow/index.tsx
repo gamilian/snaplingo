@@ -50,7 +50,7 @@ function SettingsWindowContent() {
   }, [navigate, runtime]);
 
   return (
-    <div className="flex h-screen bg-[#f5f5f7]">
+    <div className="flex h-screen bg-canvas">
       <MainNav
         activeTab={activeMainTab}
         onTabChange={setActiveMainTab}
@@ -83,20 +83,20 @@ function SettingsSectionContent({ section }: { section: SettingsSection }) {
 
   if (section.key === 'services') {
     return (
-      <div className="h-full flex-1 overflow-y-auto bg-[#f4f5f7]">
+      <div className="h-full flex-1 overflow-y-auto bg-canvas">
         <main className="mx-auto w-full max-w-[1080px] px-8 pb-16">
-          <header className="sticky top-0 z-20 -mx-[22px] mb-[18px] flex items-center justify-between gap-7 border-b border-gray-200/95 bg-[#f4f5f7]/95 px-[22px] pb-[15px] pt-[22px] backdrop-blur-xl">
+          <header className="sticky top-0 z-20 -mx-[22px] mb-[18px] flex items-center justify-between gap-7 border-b border-line/95 bg-canvas/95 px-[22px] pb-[15px] pt-[22px] backdrop-blur-xl">
             <div className="min-w-0">
               <div className="flex items-center gap-2.5">
-                <h1 className="text-[26px] font-bold tracking-[-0.045em] text-gray-950">
+                <h1 className="text-display font-bold tracking-[-0.045em] text-ink">
                   服务
                 </h1>
-                <span className="flex items-center gap-1.5 text-[10px] font-medium text-gray-500">
+                <span className="flex items-center gap-1.5 text-hint font-medium text-muted">
                   <i className="h-1.5 w-1.5 rounded-full bg-green-500 ring-[3px] ring-green-100" />
                   自动保存
                 </span>
               </div>
-              <p className="mt-1 text-[12px] text-gray-500">
+              <p className="mt-1 text-label text-muted">
                 配置 OCR、翻译与语音合成引擎
               </p>
             </div>

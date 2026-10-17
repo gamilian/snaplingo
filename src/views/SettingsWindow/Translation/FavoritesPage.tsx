@@ -36,8 +36,8 @@ export function FavoritesPage() {
   return (
     <div className="max-w-4xl space-y-6">
       <div>
-        <h2 className="mb-2 text-3xl font-bold text-gray-900">收藏夹</h2>
-        <p className="text-gray-600">独立保存的翻译结果</p>
+        <h2 className="mb-2 text-3xl font-bold text-ink">收藏夹</h2>
+        <p className="text-muted">独立保存的翻译结果</p>
       </div>
 
       <div className="flex gap-3">
@@ -48,7 +48,7 @@ export function FavoritesPage() {
             setPage(0);
           }}
           placeholder="搜索收藏的源文或译文"
-          className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-500"
+          className="flex-1 rounded-lg border border-line-strong px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-accent"
         />
         <select
           value={tag}
@@ -56,7 +56,7 @@ export function FavoritesPage() {
             setTag(event.target.value);
             setPage(0);
           }}
-          className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+          className="rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm"
         >
           <option value="">全部标签</option>
           {tags.map((value) => (
@@ -70,15 +70,15 @@ export function FavoritesPage() {
           {favorites.map((item) => {
             const snapshot = item.content.snapshot;
             return (
-              <div key={item.id} className="rounded-lg border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md">
+              <div key={item.id} className="rounded-lg border border-line bg-surface p-4 transition-shadow hover:shadow-md">
                 <div className="mb-2 flex items-start justify-between">
                   <div className="flex items-center space-x-2">
                     <span className="rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">翻译</span>
-                    <span className="text-xs text-gray-500">{snapshot.sourceLang} → {snapshot.targetLang}</span>
-                    <span className="text-xs text-gray-400">{snapshot.result.provider_id}</span>
+                    <span className="text-xs text-muted">{snapshot.sourceLang} → {snapshot.targetLang}</span>
+                    <span className="text-xs text-faint">{snapshot.result.provider_id}</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <span className="text-xs text-gray-400">{formatRelativeTime(new Date(item.createdAt).getTime())}</span>
+                    <span className="text-xs text-faint">{formatRelativeTime(new Date(item.createdAt).getTime())}</span>
                     <IconActionButton
                       onClick={() => void deleteFavorite(item.id)}
                       title="删除收藏"
@@ -89,8 +89,8 @@ export function FavoritesPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm text-gray-800">{snapshot.sourceText}</div>
-                  <div className="border-l-2 border-blue-200 pl-3 text-sm text-gray-600">{snapshot.result.translated_text}</div>
+                  <div className="text-sm text-ink">{snapshot.sourceText}</div>
+                  <div className="border-l-2 border-blue-200 pl-3 text-sm text-muted">{snapshot.result.translated_text}</div>
                   <FavoriteMetadataEditor
                     note={item.note ?? undefined}
                     tags={item.tags}
@@ -103,7 +103,7 @@ export function FavoritesPage() {
           })}
         </div>
       ) : (
-        <div className="py-16 text-center text-gray-400">暂无收藏的翻译结果</div>
+        <div className="py-16 text-center text-faint">暂无收藏的翻译结果</div>
       )}
       <HistoryPagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} />
     </div>

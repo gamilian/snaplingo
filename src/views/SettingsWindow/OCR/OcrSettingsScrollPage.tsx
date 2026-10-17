@@ -18,7 +18,7 @@ export function OcrSettingsScrollPage() {
   );
 
   if (!ocr) {
-    return <div className="p-12 text-sm text-gray-500">设置加载中...</div>;
+    return <div className="p-12 text-sm text-muted">设置加载中...</div>;
   }
 
   const updateOcr = (input: Partial<OcrSettings>) => {

@@ -111,32 +111,32 @@ export function ProviderConfigDialog({
       className={
         presentation === 'inline'
           ? 'w-full'
-          : 'bg-white rounded-xl shadow-2xl w-[500px] max-h-[80vh] overflow-y-auto'
+          : 'bg-surface rounded-xl shadow-2xl w-[500px] max-h-[80vh] overflow-y-auto'
       }
       onClick={(e) => e.stopPropagation()}
     >
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-6 border-b border-line">
           <div className="flex items-center gap-3">
             {presentation === 'inline' && (
               <IconActionButton
                 onClick={handleClose}
                 title="返回供应商列表"
                 tooltipPlacement="bottom"
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-50"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface text-muted transition-colors hover:bg-sunken"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
                 </svg>
               </IconActionButton>
             )}
-            <h3 className="text-xl font-bold text-gray-900">配置 {provider.name}</h3>
+            <h3 className="text-xl font-bold text-ink">配置 {provider.name}</h3>
           </div>
-          <p className="text-sm text-gray-600 mt-1">{provider.description}</p>
+          <p className="text-sm text-muted mt-1">{provider.description}</p>
         </div>
 
         <div className="p-6 space-y-6">
           {loading ? (
-            <div className="text-center py-8 text-gray-500">加载中...</div>
+            <div className="text-center py-8 text-muted">加载中...</div>
           ) : (
             <>
               {provider.id === 'deeplx' ? (
@@ -147,7 +147,7 @@ export function ProviderConfigDialog({
               ) : (
                 fields.map((field) => (
                   <div key={field.name}>
-                    <label className="block font-medium text-gray-700 mb-2">
+                    <label className="block font-medium text-ink mb-2">
                       {field.label} <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -155,7 +155,7 @@ export function ProviderConfigDialog({
                       value={credentials[field.name] || ''}
                       onChange={(e) => updateCredential(field.name, e.target.value)}
                       placeholder={`请输入 ${field.label}`}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="w-full px-4 py-2 border border-line-strong rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                     />
                   </div>
                 ))
@@ -163,20 +163,20 @@ export function ProviderConfigDialog({
 
               {/* Baidu 特殊提示 */}
               {provider.id === 'baidu-translate' && (
-                <p className="text-xs text-gray-500">
-                  获取地址：<a href="https://fanyi-api.baidu.com/" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">https://fanyi-api.baidu.com/</a>
+                <p className="text-xs text-muted">
+                  获取地址：<a href="https://fanyi-api.baidu.com/" target="_blank" rel="noopener noreferrer" className="text-accent-text hover:underline">https://fanyi-api.baidu.com/</a>
                 </p>
               )}
 
               {provider.id === 'baidu-ocr' && (
-                <p className="text-xs text-gray-500">
-                  获取地址：<a href="https://cloud.baidu.com/product/ocr" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">https://cloud.baidu.com/product/ocr</a>
+                <p className="text-xs text-muted">
+                  获取地址：<a href="https://cloud.baidu.com/product/ocr" target="_blank" rel="noopener noreferrer" className="text-accent-text hover:underline">https://cloud.baidu.com/product/ocr</a>
                 </p>
               )}
 
               {provider.id === 'deeplx' && (
-                <p className="text-xs text-gray-500">
-                  项目地址：<a href="https://github.com/OwO-Network/DeepLX" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">https://github.com/OwO-Network/DeepLX</a>
+                <p className="text-xs text-muted">
+                  项目地址：<a href="https://github.com/OwO-Network/DeepLX" target="_blank" rel="noopener noreferrer" className="text-accent-text hover:underline">https://github.com/OwO-Network/DeepLX</a>
                 </p>
               )}
 
@@ -184,7 +184,7 @@ export function ProviderConfigDialog({
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div className="flex items-start space-x-3">
                   <svg
-                    className="w-5 h-5 text-primary-600 flex-shrink-0 mt-0.5"
+                    className="w-5 h-5 text-accent-text flex-shrink-0 mt-0.5"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -206,17 +206,17 @@ export function ProviderConfigDialog({
           )}
         </div>
 
-        <div className="p-6 border-t border-gray-200 flex items-center justify-between">
+        <div className="p-6 border-t border-line flex items-center justify-between">
           <button
             onClick={handleClose}
-            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm text-muted hover:text-ink hover:bg-raised rounded-lg transition-colors"
           >
             取消
           </button>
           <button
             onClick={handleSave}
             disabled={loading || isSaveDisabled(provider, fields, credentials)}
-            className="px-6 py-2 text-sm bg-primary-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+            className="px-6 py-2 text-sm bg-accent hover:bg-accent-hover text-accent-on rounded-lg transition-colors disabled:bg-line-strong disabled:cursor-not-allowed"
           >
             保存配置
           </button>
@@ -246,10 +246,10 @@ function DeepLXCredentialFields({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+      <div className="flex items-center justify-between gap-4 rounded-lg border border-line bg-sunken px-4 py-3">
         <div>
-          <div className="font-medium text-gray-800">标准 DeepL</div>
-          <div className="text-xs text-gray-500">关闭时使用 DeepLX 服务地址</div>
+          <div className="font-medium text-ink">标准 DeepL</div>
+          <div className="text-xs text-muted">关闭时使用 DeepLX 服务地址</div>
         </div>
         <button
           type="button"
@@ -257,11 +257,11 @@ function DeepLXCredentialFields({
           aria-checked={isStandardDeepL}
           onClick={() => onChange('mode', isStandardDeepL ? 'deeplx' : 'deepl')}
           className={`relative h-6 w-11 rounded-full transition-colors ${
-            isStandardDeepL ? 'bg-primary-600' : 'bg-gray-300'
+            isStandardDeepL ? 'bg-accent' : 'bg-line-strong'
           }`}
         >
           <span
-            className={`absolute left-0 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+            className={`absolute left-0 top-0.5 h-5 w-5 rounded-full bg-surface shadow transition-transform ${
               isStandardDeepL ? 'translate-x-5' : 'translate-x-0.5'
             }`}
           />
@@ -270,7 +270,7 @@ function DeepLXCredentialFields({
 
       {isStandardDeepL ? (
         <div>
-          <label className="block font-medium text-gray-700 mb-2">
+          <label className="block font-medium text-ink mb-2">
             DeepL API Key <span className="text-red-500">*</span>
           </label>
           <input
@@ -278,12 +278,12 @@ function DeepLXCredentialFields({
             value={credentials.api_key || ''}
             onChange={(e) => onChange('api_key', e.target.value)}
             placeholder="请输入 DeepL API Key"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="w-full px-4 py-2 border border-line-strong rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           />
         </div>
       ) : (
         <div>
-          <label className="block font-medium text-gray-700 mb-2">
+          <label className="block font-medium text-ink mb-2">
             DeepLX API 地址 <span className="text-red-500">*</span>
           </label>
           <input
@@ -291,7 +291,7 @@ function DeepLXCredentialFields({
             value={credentials.endpoint || ''}
             onChange={(e) => onChange('endpoint', e.target.value)}
             placeholder="例如：https://deeplx.example.com"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="w-full px-4 py-2 border border-line-strong rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           />
         </div>
       )}

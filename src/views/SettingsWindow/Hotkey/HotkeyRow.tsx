@@ -26,10 +26,10 @@ export function HotkeyRow({
   const isModified = defaultValue && value !== defaultValue;
 
   return (
-    <div className="flex min-h-[58px] items-center justify-between py-2.5 transition-colors hover:bg-gray-50">
+    <div className="flex min-h-[58px] items-center justify-between py-2.5 transition-colors hover:bg-sunken">
       <div className="flex-1">
-        <div className="text-[13px] font-semibold text-gray-700">{label}</div>
-        {description && <div className="text-xs text-gray-500 mt-1">{description}</div>}
+        <div className="text-card font-semibold text-ink">{label}</div>
+        {description && <div className="text-xs text-muted mt-1">{description}</div>}
       </div>
       <div className="flex items-center space-x-3">
         <HotkeyDisplay value={value} onClick={onRecord} isRecording={isRecording} />
@@ -43,8 +43,8 @@ export function HotkeyRow({
             className={`
               w-7 h-7 flex items-center justify-center rounded transition-all duration-150
               ${isModified
-                ? 'text-gray-400 hover:text-primary-600 hover:bg-primary-50 cursor-pointer'
-                : 'text-gray-300 cursor-not-allowed'
+                ? 'text-faint hover:text-accent-text hover:bg-accent-soft cursor-pointer'
+                : 'text-faint cursor-not-allowed'
               }
             `}
             title={isModified ? "恢复默认值" : "已是默认值"}
@@ -61,8 +61,8 @@ export function HotkeyRow({
             className={`
               w-7 h-7 flex items-center justify-center rounded transition-all duration-150
               ${hasValue
-                ? 'text-gray-400 hover:text-red-500 hover:bg-red-50 cursor-pointer'
-                : 'text-gray-300 cursor-not-allowed'
+                ? 'text-faint hover:text-red-500 hover:bg-red-50 cursor-pointer'
+                : 'text-faint cursor-not-allowed'
               }
             `}
             title={hasValue ? "清除快捷键" : "未设置快捷键"}

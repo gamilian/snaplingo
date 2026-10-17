@@ -3,7 +3,7 @@ import type { ProviderTranslation } from '../../application/result-window/projec
 export type ResultWindowPresentation = 'overlay' | 'standalone';
 export type ResultWindowTextKind = 'source' | 'ocr' | 'result';
 
-const resultWindowSurfaceRadiusClassName = 'rounded-[14px]';
+const resultWindowSurfaceRadiusClassName = 'rounded-xl';
 const resultWindowSurfaceClipClassName = '[clip-path:inset(0_round_14px)]';
 const translationResultsMaxHeightPx = 560;
 const translationWindowMaxHeightPx = 820;
@@ -88,7 +88,7 @@ export function resultWindowPanelClassName(
   { fitContent = false }: ResultWindowShellOptions = {},
 ) {
   const baseClassName =
-    `relative min-h-0 bg-white ${resultWindowSurfaceRadiusClassName} shadow-xl w-full overflow-hidden ${resultWindowSurfaceClipClassName} flex flex-col`;
+    `relative min-h-0 bg-surface ${resultWindowSurfaceRadiusClassName} shadow-xl w-full overflow-hidden ${resultWindowSurfaceClipClassName} flex flex-col`;
 
   if (presentation === 'standalone') {
     if (fitContent) {
@@ -133,25 +133,25 @@ export function resultWindowHeaderDragHandleClassName(isDraggable: boolean) {
 
 export function resultWindowPinButtonClassName(isPinned: boolean) {
   const pinnedClassName = isPinned
-    ? 'bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700'
-    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800';
+    ? 'bg-accent-soft text-accent-text hover:bg-accent-line'
+    : 'text-muted hover:bg-raised hover:text-ink';
 
-  return `grid h-7 w-7 shrink-0 place-items-center rounded-[7px] transition-colors duration-150 ${pinnedClassName}`;
+  return `grid h-7 w-7 shrink-0 place-items-center rounded-md transition-colors duration-150 ${pinnedClassName}`;
 }
 
 export function resultWindowTextBoxClassName() {
-  return `overflow-hidden ${resultWindowSurfaceRadiusClassName} border border-slate-300 bg-white`;
+  return `overflow-hidden ${resultWindowSurfaceRadiusClassName} border border-line-strong bg-surface`;
 }
 
 export function resultWindowTextAreaClassName(kind: 'source' | 'ocr') {
   const baseClassName =
-    'w-full resize-none overflow-hidden border-0 outline-none placeholder:text-slate-400';
+    'w-full resize-none overflow-hidden border-0 outline-none placeholder:text-faint';
 
   if (kind === 'ocr') {
-    return `${baseClassName} min-h-[72px] px-3 py-3 text-[14px] leading-[1.42] text-slate-800`;
+    return `${baseClassName} min-h-[72px] px-3 py-3 text-card leading-[1.42] text-ink`;
   }
 
-  return `${baseClassName} min-h-[52px] px-3 py-2.5 text-[13px] leading-[1.38] text-slate-900`;
+  return `${baseClassName} min-h-[52px] px-3 py-2.5 text-card leading-[1.38] text-ink`;
 }
 
 export function resultWindowTextAreaRows(
@@ -398,23 +398,23 @@ export function resultWindowOcrResultStackClassName() {
 }
 
 export function resultWindowOcrImagePanelClassName() {
-  return `overflow-hidden ${resultWindowSurfaceRadiusClassName} border border-slate-200 bg-slate-50`;
+  return `overflow-hidden ${resultWindowSurfaceRadiusClassName} border border-line bg-sunken`;
 }
 
 export function resultWindowOcrImageActionButtonClassName() {
-  return 'inline-flex h-8 w-full items-center justify-center gap-2 rounded-[10px] border border-emerald-200 bg-emerald-50 text-[13px] font-bold text-emerald-700 transition-colors duration-150 hover:border-emerald-300 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60';
+  return 'inline-flex h-8 w-full items-center justify-center gap-2 rounded-lg border border-good/40 bg-good-soft text-card font-bold text-good transition-colors duration-150 hover:border-good/60 disabled:cursor-not-allowed disabled:opacity-60';
 }
 
 export function resultWindowOcrFullTextBoxClassName() {
-  return `flex min-h-0 flex-col overflow-hidden ${resultWindowSurfaceRadiusClassName} border border-slate-300 bg-white`;
+  return `flex min-h-0 flex-col overflow-hidden ${resultWindowSurfaceRadiusClassName} border border-line-strong bg-surface`;
 }
 
 export function resultWindowOcrResultTextAreaClassName() {
-  return 'min-h-[72px] w-full resize-none overflow-hidden border-0 px-3 py-3 text-[14px] leading-[1.42] text-slate-800 outline-none placeholder:text-slate-400';
+  return 'min-h-[72px] w-full resize-none overflow-hidden border-0 px-3 py-3 text-card leading-[1.42] text-ink outline-none placeholder:text-faint';
 }
 
 export function resultWindowOcrTokenButtonClassName() {
-  return 'inline-flex max-w-full items-center gap-1 break-all rounded-full border border-slate-200 bg-white px-2.5 py-1 text-left text-[11px] font-semibold leading-tight text-slate-700 shadow-sm transition-colors duration-150 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400';
+  return 'inline-flex max-w-full items-center gap-1 break-all rounded-full border border-line bg-surface px-2.5 py-1 text-left text-hint font-semibold leading-tight text-ink shadow-sm transition-colors duration-150 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400';
 }
 
 function resultWindowTextAreaAutosizeSlackPx(

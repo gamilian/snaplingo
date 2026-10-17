@@ -32,7 +32,7 @@ export function TtsProvidersPage() {
   }, [runtime]);
 
   if (!general) {
-    return <div className="p-12 text-sm text-gray-500">设置加载中...</div>;
+    return <div className="p-12 text-sm text-muted">设置加载中...</div>;
   }
 
   const voice = general.systemTtsVoice ?? '';
@@ -68,7 +68,7 @@ export function TtsProvidersPage() {
               step={10}
               onChange={(systemTtsRate) => updateTts({ systemTtsRate })}
             />
-            <span className="w-12 text-right text-xs font-medium text-gray-600">
+            <span className="w-12 text-right text-xs font-medium text-muted">
               {rate}
             </span>
           </div>
@@ -77,7 +77,7 @@ export function TtsProvidersPage() {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              className="h-9 rounded-lg bg-primary-600 px-4 text-sm font-medium text-white hover:bg-primary-700"
+              className="h-9 rounded-lg bg-accent px-4 text-sm font-medium text-accent-on hover:bg-accent-hover"
               onClick={() => {
                 setTestStatus('正在朗读');
                 void runtime.tts.speak('SnapLingo 系统语音测试', 'zh-CN').then(
@@ -89,7 +89,7 @@ export function TtsProvidersPage() {
             >
               测试朗读
             </button>
-            {testStatus && <span className="text-xs text-gray-500">{testStatus}</span>}
+            {testStatus && <span className="text-xs text-muted">{testStatus}</span>}
           </div>
         </SettingRow>
       </SettingsGroup>

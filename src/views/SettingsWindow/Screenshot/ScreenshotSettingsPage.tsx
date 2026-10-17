@@ -49,7 +49,7 @@ export function ScreenshotSettingsPage() {
     (state) => state.updateScreenshotSettings,
   );
   if (!screenshot) {
-    return <div className="p-12 text-sm text-gray-500">设置加载中...</div>;
+    return <div className="p-12 text-sm text-muted">设置加载中...</div>;
   }
 
   const updateScreenshot = (input: Partial<ScreenshotSettings>) => {
@@ -71,7 +71,7 @@ export function ScreenshotSettingsPage() {
               onBlur={(event) =>
                 updateScreenshot({ savePath: event.currentTarget.value })
               }
-              className="h-9 w-[260px] rounded-lg border border-gray-200 bg-white px-3 text-xs text-gray-700 outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+              className="h-9 w-[260px] rounded-lg border border-line bg-surface px-3 text-xs text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent-line"
               placeholder="~/Pictures/SnapLingo"
             />
             <button
@@ -83,7 +83,7 @@ export function ScreenshotSettingsPage() {
                   }
                 });
               }}
-              className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-600 hover:bg-gray-50"
+              className="h-9 rounded-lg border border-line bg-surface px-3 text-xs font-medium text-muted hover:bg-sunken"
             >
               浏览
             </button>
@@ -141,7 +141,7 @@ export function ScreenshotSettingsPage() {
               onChange={(event) =>
                 updateScreenshot({ customFileName: event.target.value })
               }
-              className="h-9 w-[230px] rounded-lg border border-gray-200 px-3 text-xs outline-none focus:border-primary-400"
+              className="h-9 w-[230px] rounded-lg border border-line px-3 text-xs outline-none focus:border-accent"
             />
           </SettingRow>
         )}
@@ -185,13 +185,13 @@ export function ScreenshotSettingsPage() {
                   aria-label={`边框颜色 ${color.slice(0, 3).join(',')}`}
                   onClick={() => updateScreenshot({ selectionBorderColor: color })}
                   className={`h-8 w-8 rounded-lg border-[3px] border-white shadow-sm ${
-                    selected ? 'ring-2 ring-primary-500' : 'ring-1 ring-gray-200'
+                    selected ? 'ring-2 ring-accent' : 'ring-1 ring-gray-200'
                   }`}
                   style={{ backgroundColor: rgba(color) }}
                 />
               );
             })}
-            <label className="relative ml-1 flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-600 shadow-sm hover:bg-gray-50">
+            <label className="relative ml-1 flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-line bg-surface px-3 text-xs font-medium text-muted shadow-sm hover:bg-sunken">
               <span
                 className="h-4 w-4 rounded-full border border-black/10"
                 style={{ backgroundColor: maskColorHex(selectionBorderColor) }}
@@ -225,13 +225,13 @@ export function ScreenshotSettingsPage() {
                   aria-label={`遮罩颜色 ${color.slice(0, 3).join(',')}`}
                   onClick={() => updateScreenshot({ selectionMaskColor: color })}
                   className={`h-8 w-8 rounded-lg border-[3px] border-white shadow-sm ${
-                    selected ? 'ring-2 ring-primary-500' : 'ring-1 ring-gray-200'
+                    selected ? 'ring-2 ring-accent' : 'ring-1 ring-gray-200'
                   }`}
                   style={{ backgroundColor: rgba(color) }}
                 />
               );
             })}
-            <label className="relative ml-1 flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-600 shadow-sm hover:bg-gray-50">
+            <label className="relative ml-1 flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-line bg-surface px-3 text-xs font-medium text-muted shadow-sm hover:bg-sunken">
               <span
                 className="h-4 w-4 rounded-full border border-black/10"
                 style={{ backgroundColor: maskColorHex(selectionMaskColor) }}
@@ -373,7 +373,7 @@ function RangeValue({ children, value }: { children: ReactNode; value: string })
   return (
     <div className="flex w-[250px] items-center gap-3">
       <div className="min-w-0 flex-1">{children}</div>
-      <span className="min-w-[38px] text-right text-[11px] font-semibold text-primary-600">
+      <span className="min-w-[38px] text-right text-hint font-semibold text-accent-text">
         {value}
       </span>
     </div>

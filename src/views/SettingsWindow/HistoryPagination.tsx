@@ -15,8 +15,8 @@ export function HistoryPagination({
   if (total <= pageSize) return null;
 
   return (
-    <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-      <span className="text-sm text-gray-500">
+    <div className="flex items-center justify-between pt-4 border-t border-line">
+      <span className="text-sm text-muted">
         共 {total} 条，第 {page + 1}/{pageCount} 页
       </span>
       <div className="flex gap-2">
@@ -24,7 +24,7 @@ export function HistoryPagination({
           type="button"
           disabled={page === 0}
           onClick={() => onPageChange(page - 1)}
-          className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50"
+          className="px-3 py-1.5 text-sm rounded-lg border border-line disabled:opacity-40 hover:bg-sunken"
         >
           上一页
         </button>
@@ -32,7 +32,7 @@ export function HistoryPagination({
           type="button"
           disabled={page + 1 >= pageCount}
           onClick={() => onPageChange(page + 1)}
-          className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50"
+          className="px-3 py-1.5 text-sm rounded-lg border border-line disabled:opacity-40 hover:bg-sunken"
         >
           下一页
         </button>

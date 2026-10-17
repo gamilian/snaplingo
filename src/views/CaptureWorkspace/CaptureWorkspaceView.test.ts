@@ -251,7 +251,7 @@ describe("CaptureWorkspaceView runtime seam", () => {
     pointerCapture.mockClear();
     const preview = Array.from(container.querySelectorAll("div")).find(
       (element) =>
-        element.classList.contains("rounded-[8px]") &&
+        element.classList.contains("rounded-md") &&
         element.classList.contains("bg-transparent") &&
         element.style.left === "20px",
     );
@@ -729,7 +729,7 @@ describe("CaptureWorkspaceView runtime seam", () => {
     });
 
     const hints = container.querySelector('[aria-label="选区快捷键提示"]');
-    expect(hints?.className).toContain("bg-slate-900/[0.55]");
+    expect(hints?.className).toContain("bg-[#161920]/[0.55]");
     expect(hints?.textContent).toContain("WASD将鼠标指针移动 1 像素");
     expect(hints?.textContent).toContain("当前：界面元素");
     expect(hints?.textContent).toContain("设置截屏区域为当前屏幕");

@@ -2,128 +2,77 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Design tokens ──────────────────────────────────────────────────────────
+   One palette per theme, expressed as space-separated RGB channels so Tailwind
+   can apply opacity modifiers (`bg-surface/95`). Components never reference a
+   literal colour; they use the semantic names mapped in tailwind.config.js.
+   Dark mode is therefore a variable swap, not a per-class override. */
+
+:root {
+  --canvas: 244 245 247;
+  --surface: 255 255 255;
+  --sunken: 240 241 244;
+  --raised: 234 236 239;
+  --line: 226 229 234;
+  --line-strong: 207 212 220;
+
+  --ink: 23 26 33;
+  --muted: 93 100 114;
+  --faint: 139 147 161;
+
+  --accent: 79 91 213;
+  --accent-hover: 65 76 191;
+  --accent-text: 63 73 191;
+  --accent-soft: 238 240 255;
+  --accent-line: 205 210 248;
+  --accent-on: 255 255 255;
+
+  --good: 18 133 95;
+  --good-soft: 228 246 238;
+  --warn: 161 92 7;
+  --warn-soft: 253 241 220;
+  --danger: 209 59 52;
+  --danger-soft: 253 236 235;
+
+  --shadow-color: 16 20 32;
+
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --canvas: 13 15 20;
+  --surface: 22 25 32;
+  --sunken: 16 19 25;
+  --raised: 30 34 48;
+  --line: 36 41 54;
+  --line-strong: 51 58 75;
+
+  --ink: 232 234 240;
+  --muted: 154 162 180;
+  --faint: 108 116 136;
+
+  --accent: 124 134 238;
+  --accent-hover: 139 148 242;
+  --accent-text: 150 160 245;
+  --accent-soft: 28 33 56;
+  --accent-line: 46 53 86;
+  --accent-on: 13 15 20;
+
+  --good: 63 199 149;
+  --good-soft: 16 41 31;
+  --warn: 224 164 74;
+  --warn-soft: 42 32 16;
+  --danger: 239 106 97;
+  --danger-soft: 44 21 18;
+
+  --shadow-color: 0 0 0;
+
+  color-scheme: dark;
+}
+
 :root[data-experimental-gpu='true'] canvas {
   transform: translateZ(0);
   backface-visibility: hidden;
-}
-
-:root[data-theme-scope='settings'][data-theme='dark'] {
-  --gray-50: #111827;
-  --gray-100: #1f2937;
-  --gray-200: #374151;
-  --gray-300: #4b5563;
-  --gray-400: #9ca3af;
-  --gray-500: #cbd5e1;
-  --gray-600: #d1d5db;
-  --gray-700: #e5e7eb;
-  --gray-800: #f3f4f6;
-  --gray-900: #f9fafb;
-}
-
-:root[data-theme-scope='settings'][data-theme='dark'] body,
-:root[data-theme-scope='settings'][data-theme='dark'] .bg-\[\#f4f5f7\],
-:root[data-theme-scope='settings'][data-theme='dark'] .bg-\[\#f5f5f7\],
-:root[data-theme-scope='settings'][data-theme='dark'] .bg-\[\#f5f6f8\],
-:root[data-theme-scope='settings'][data-theme='dark'] .bg-gray-50,
-:root[data-theme-scope='settings'][data-theme='dark'] [class*='bg-gray-50/'] {
-  background-color: #111827 !important;
-}
-
-:root[data-theme-scope='settings'][data-theme='dark'] .bg-white,
-:root[data-theme-scope='settings'][data-theme='dark'] [class*='bg-white/'] {
-  background-color: #1f2937 !important;
-}
-
-:root[data-theme-scope='settings'][data-theme='dark'] .bg-gray-100,
-:root[data-theme-scope='settings'][data-theme='dark'] [class*='bg-gray-100/'] {
-  background-color: #374151 !important;
-}
-
-:root[data-theme-scope='settings'][data-theme='dark'] .border-gray-100,
-:root[data-theme-scope='settings'][data-theme='dark'] .border-gray-200,
-:root[data-theme-scope='settings'][data-theme='dark'] .border-slate-100,
-:root[data-theme-scope='settings'][data-theme='dark'] .border-slate-200,
-:root[data-theme-scope='settings'][data-theme='dark'] .border-slate-300 {
-  border-color: #4b5563 !important;
-}
-
-:root[data-theme-scope='settings'][data-theme='dark'] .text-gray-950,
-:root[data-theme-scope='settings'][data-theme='dark'] .text-gray-900,
-:root[data-theme-scope='settings'][data-theme='dark'] .text-gray-800,
-:root[data-theme-scope='settings'][data-theme='dark'] .text-gray-700,
-:root[data-theme-scope='settings'][data-theme='dark'] .text-gray-600,
-:root[data-theme-scope='settings'][data-theme='dark'] .text-slate-950,
-:root[data-theme-scope='settings'][data-theme='dark'] .text-slate-900,
-:root[data-theme-scope='settings'][data-theme='dark'] .text-slate-800,
-:root[data-theme-scope='settings'][data-theme='dark'] .text-slate-700,
-:root[data-theme-scope='settings'][data-theme='dark'] .text-slate-600 {
-  color: #f3f4f6 !important;
-}
-
-:root[data-theme-scope='settings'][data-theme='dark'] .text-gray-500,
-:root[data-theme-scope='settings'][data-theme='dark'] .text-gray-400,
-:root[data-theme-scope='settings'][data-theme='dark'] .text-slate-500,
-:root[data-theme-scope='settings'][data-theme='dark'] .text-slate-400 {
-  color: #cbd5e1 !important;
-}
-
-:root {
-  /* 品牌色 - 自定义蓝紫色系 */
-  --primary-50: #f0f4ff;
-  --primary-100: #e0e7ff;
-  --primary-500: #5b7fff;
-  --primary-600: #4a6fe8;
-  --primary-700: #3a5fd1;
-
-  /* 中性色 */
-  --gray-50: #fafbfc;
-  --gray-100: #f4f6f8;
-  --gray-200: #e8ecf0;
-  --gray-300: #dde2e8;
-  --gray-400: #9ca3af;
-  --gray-500: #6b7280;
-  --gray-600: #4b5563;
-  --gray-700: #374151;
-  --gray-800: #1f2937;
-  --gray-900: #111827;
-
-  /* 语义色 */
-  --success: #10b981;
-  --warning: #f59e0b;
-  --danger: #ef4444;
-
-  /* Provider品牌色 */
-  --google: #4285f4;
-  --deeplx: #0f2b46;
-  --baidu: #2932e1;
-  --openai: #10a37f;
-
-  /* 间距系统 */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-6: 24px;
-  --space-8: 32px;
-  --space-12: 48px;
-
-  /* 圆角系统 */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 18px;
-  --radius-2xl: 24px;
-
-  /* 阴影系统 */
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
-  --shadow-xl: 0 12px 40px rgba(0, 0, 0, 0.16);
-
-  /* 过渡 */
-  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 * {
@@ -136,8 +85,8 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Inter", "SF Pro", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: var(--gray-50);
-  color: var(--gray-900);
+  background: rgb(var(--canvas));
+  color: rgb(var(--ink));
 }
 
 :root[data-result-window='true'],
@@ -156,12 +105,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--gray-300);
+  background: rgb(var(--line-strong));
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--gray-400);
+  background: rgb(var(--faint));
 }
 
 .result-window-scrollbar {

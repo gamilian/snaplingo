@@ -53,8 +53,8 @@ export function HistoryPage() {
   return (
     <div className="max-w-4xl space-y-6">
       <div>
-        <h2 className="text-3xl font-bold text-gray-900 mb-2">历史记录</h2>
-        <p className="text-gray-600">查看和管理 OCR 识别历史</p>
+        <h2 className="text-3xl font-bold text-ink mb-2">历史记录</h2>
+        <p className="text-muted">查看和管理 OCR 识别历史</p>
       </div>
 
       {/* 工具栏 */}
@@ -67,7 +67,7 @@ export function HistoryPage() {
             setPage(0);
           }}
           placeholder="搜索识别文本..."
-          className="flex-1 max-w-xs px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className="flex-1 max-w-xs px-4 py-2 border border-line-strong rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent"
         />
       </div>
 
@@ -77,28 +77,28 @@ export function HistoryPage() {
           {history.map((item) => (
             <div
               key={item.id}
-              className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+              className="bg-surface border border-line rounded-lg p-4 hover:shadow-md transition-shadow"
             >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center space-x-2">
                   <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded font-medium">
                     OCR
                   </span>
-                  <span className="text-xs text-gray-500">{item.language}</span>
+                  <span className="text-xs text-muted">{item.language}</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <span className="text-xs text-gray-400">{formatRelativeTime(item.timestamp)}</span>
+                  <span className="text-xs text-faint">{formatRelativeTime(item.timestamp)}</span>
                   <IconActionButton
                     onClick={() => void handleRerun(item.id)}
                     title="重新识别并复制"
-                    className="w-6 h-6 flex items-center justify-center rounded text-gray-400 transition-colors hover:text-blue-500"
+                    className="w-6 h-6 flex items-center justify-center rounded text-faint transition-colors hover:text-blue-500"
                   >
                     ↻
                   </IconActionButton>
                   <IconActionButton
                     onClick={() => handleCopy(item.text)}
                     title="复制文本"
-                    className="w-6 h-6 flex items-center justify-center rounded text-gray-400 transition-colors hover:text-blue-500"
+                    className="w-6 h-6 flex items-center justify-center rounded text-faint transition-colors hover:text-blue-500"
                   >
                     📋
                   </IconActionButton>
@@ -130,7 +130,7 @@ export function HistoryPage() {
                         recognizedText: item.text,
                         language: item.language === 'Unknown' ? null : item.language,
                         providerUsed: item.providerUsed,
-                      })) ? 'text-yellow-500' : 'text-gray-300 hover:text-gray-400'
+                      })) ? 'text-yellow-500' : 'text-faint hover:text-faint'
                     }`}
                   >
                     {favoriteKeys.has(ocrFavoriteKey({
@@ -142,7 +142,7 @@ export function HistoryPage() {
                   <IconActionButton
                     onClick={() => deleteItem(item.id)}
                     title="删除"
-                    className="w-6 h-6 flex items-center justify-center rounded text-gray-300 transition-colors hover:text-red-500"
+                    className="w-6 h-6 flex items-center justify-center rounded text-faint transition-colors hover:text-red-500"
                   >
                     ✕
                   </IconActionButton>
@@ -152,22 +152,22 @@ export function HistoryPage() {
                 <img
                   src={item.imageThumbnail}
                   alt="OCR source"
-                  className="mb-3 max-h-40 w-full rounded-lg bg-gray-50 object-contain"
+                  className="mb-3 max-h-40 w-full rounded-lg bg-sunken object-contain"
                 />
               )}
-              <div className="text-sm text-gray-800 whitespace-pre-wrap">{item.text}</div>
+              <div className="text-sm text-ink whitespace-pre-wrap">{item.text}</div>
             </div>
           ))}
         </div>
       ) : (
-        <div className="text-center py-16 text-gray-400">
+        <div className="text-center py-16 text-faint">
           {search ? '没有匹配的历史记录' : '暂无 OCR 历史记录'}
         </div>
       )}
 
       {/* 底部操作 */}
       {history.length > 0 && (
-        <div className="pt-4 border-t border-gray-200">
+        <div className="pt-4 border-t border-line">
           <button
             onClick={handleClear}
             className="px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"

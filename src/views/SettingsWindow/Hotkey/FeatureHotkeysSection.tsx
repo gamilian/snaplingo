@@ -151,11 +151,11 @@ export function FeatureHotkeysSection({
   const hotkeys = snapshot?.[category];
   const defaults = defaultSnapshot?.[category] ?? hotkeys;
   if (!hotkeys || !defaults) {
-    return <div className="px-6 py-8 text-sm text-gray-500">正在加载快捷键配置...</div>;
+    return <div className="px-6 py-8 text-sm text-muted">正在加载快捷键配置...</div>;
   }
 
   return (
-    <div className="divide-y divide-gray-100 px-[22px] pb-2">
+    <div className="divide-y divide-line px-[22px] pb-2">
       {actions.map((action) => (
         <div
           key={action.key}
@@ -225,14 +225,14 @@ export function HotkeyToolbar({
             );
           }
         }}
-        className="h-8 rounded-lg px-3 text-[11px] font-medium text-gray-500 hover:bg-white hover:text-gray-800"
+        className="h-8 rounded-lg px-3 text-hint font-medium text-muted hover:bg-surface hover:text-ink"
       >
         恢复默认值
       </button>
       <button
         type="button"
         onClick={detectConflicts}
-        className="h-8 rounded-lg border border-gray-200 bg-white px-3 text-[11px] font-semibold text-gray-600 hover:border-primary-200 hover:text-primary-600"
+        className="h-8 rounded-lg border border-line bg-surface px-3 text-hint font-semibold text-muted hover:border-accent-line hover:text-accent-text"
       >
         检测冲突
       </button>

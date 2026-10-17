@@ -117,7 +117,7 @@ export function HistoryLibraryPage() {
           <button
             type="button"
             onClick={() => void clearVisibleKind()}
-            className="text-gray-400 hover:text-red-600"
+            className="text-faint hover:text-red-600"
           >
             清空记录
           </button>
@@ -241,16 +241,16 @@ function TranslationHistoryDetail({
           </SmallActionButton>
         }
       >
-        <p className="whitespace-pre-wrap text-sm leading-7 text-gray-800">
+        <p className="whitespace-pre-wrap text-sm leading-7 text-ink">
           {entry.sourceText}
         </p>
       </DetailCard>
-      <div className="mb-3 flex items-center gap-2 text-xs text-gray-500">
-        <span className="rounded-lg bg-white px-3 py-2 shadow-sm">
+      <div className="mb-3 flex items-center gap-2 text-xs text-muted">
+        <span className="rounded-lg bg-surface px-3 py-2 shadow-sm">
           {entry.sourceLang}
         </span>
         <span>→</span>
-        <span className="rounded-lg bg-white px-3 py-2 shadow-sm">
+        <span className="rounded-lg bg-surface px-3 py-2 shadow-sm">
           {entry.targetLang}
         </span>
       </div>
@@ -286,7 +286,7 @@ function TranslationHistoryDetail({
               </>
             }
           >
-            <p className="whitespace-pre-wrap text-sm leading-7 text-gray-800">
+            <p className="whitespace-pre-wrap text-sm leading-7 text-ink">
               {result.translatedText}
             </p>
           </DetailCard>
@@ -338,7 +338,7 @@ function OcrHistoryDetail({
           <img
             src={entry.thumbnailDataUrl}
             alt="OCR 原图"
-            className="max-h-64 w-full rounded-lg bg-gray-50 object-contain"
+            className="max-h-64 w-full rounded-lg bg-sunken object-contain"
           />
         </DetailCard>
       )}
@@ -356,7 +356,7 @@ function OcrHistoryDetail({
           </>
         }
       >
-        <p className="whitespace-pre-wrap text-sm leading-7 text-gray-800">
+        <p className="whitespace-pre-wrap text-sm leading-7 text-ink">
           {entry.recognizedText}
         </p>
       </DetailCard>

@@ -451,7 +451,7 @@ export function CaptureWorkspaceView({
               ? 'OCR 识别中'
               : 'OCR 已复制'
           }
-          className="pointer-events-none absolute z-[80] flex items-center gap-2 rounded-lg bg-slate-950/90 px-3 py-2 text-xs font-medium text-white shadow-xl"
+          className="pointer-events-none absolute z-[80] flex items-center gap-2 rounded-lg bg-[#0d0f14]/90 px-3 py-2 text-xs font-medium text-white shadow-xl"
           style={{
             left: renderState.silentOcrHint.point.x + 12,
             top: renderState.silentOcrHint.point.y + 12,
@@ -461,7 +461,7 @@ export function CaptureWorkspaceView({
             className={
               renderState.silentOcrHint.status === 'loading'
                 ? 'h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white'
-                : 'grid h-3.5 w-3.5 place-items-center rounded-full bg-emerald-500 text-[10px]'
+                : 'grid h-3.5 w-3.5 place-items-center rounded-full bg-emerald-500 text-hint'
             }
           >
             {renderState.silentOcrHint.status === 'success' ? '✓' : ''}
@@ -626,7 +626,7 @@ function CaptureSelectionShortcutHints({
   return (
     <aside
       aria-label="选区快捷键提示"
-      className="pointer-events-none absolute bottom-5 left-5 w-[330px] overflow-hidden rounded-lg border border-white/25 bg-slate-900/[0.55] text-[11px] text-white/90 shadow-lg backdrop-blur-lg"
+      className="pointer-events-none absolute bottom-5 left-5 w-[330px] overflow-hidden rounded-lg border border-white/25 bg-[#161920]/[0.55] text-hint text-white/90 shadow-lg backdrop-blur-lg"
     >
       <HintRow keys={['W', 'A', 'S', 'D']}>
         将鼠标指针移动 1 像素
@@ -669,7 +669,7 @@ function HintRow({
         {keys.map((key, index) => (
           <kbd
             key={`${key}-${index}`}
-            className="grid min-w-5 place-items-center rounded border border-white/30 bg-white/[0.08] px-1 py-0.5 font-mono text-[10px] font-semibold"
+            className="grid min-w-5 place-items-center rounded border border-white/30 bg-white/[0.08] px-1 py-0.5 font-mono text-hint font-semibold"
           >
             {key}
           </kbd>

@@ -64,11 +64,11 @@ export function CustomNumberInput({
         max={max}
         step={step}
         className={`
-          w-full px-4 py-2.5 pr-12 bg-white border rounded-lg text-sm
+          w-full px-4 py-2.5 pr-12 bg-surface border rounded-lg text-sm
           transition-all duration-200
           ${isFocused
-            ? 'border-primary-500 ring-2 ring-primary-100 shadow-sm'
-            : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
+            ? 'border-accent ring-2 ring-accent-line shadow-sm'
+            : 'border-line hover:border-line-strong hover:shadow-sm'
           }
           focus:outline-none
           [appearance:textfield]
@@ -79,7 +79,7 @@ export function CustomNumberInput({
 
       {/* 后缀文字 */}
       {suffix && (
-        <div className="absolute right-14 top-1/2 -translate-y-1/2 text-sm text-gray-500 pointer-events-none">
+        <div className="absolute right-14 top-1/2 -translate-y-1/2 text-sm text-muted pointer-events-none">
           {suffix}
         </div>
       )}
@@ -94,8 +94,8 @@ export function CustomNumberInput({
             w-6 h-5 flex items-center justify-center rounded-sm
             transition-all duration-150
             ${canIncrement
-              ? 'hover:bg-gray-100 text-gray-500 hover:text-gray-900'
-              : 'text-gray-300 cursor-not-allowed'
+              ? 'hover:bg-raised text-muted hover:text-ink'
+              : 'text-faint cursor-not-allowed'
             }
           `}
           tabIndex={-1}
@@ -113,8 +113,8 @@ export function CustomNumberInput({
             w-6 h-5 flex items-center justify-center rounded-sm
             transition-all duration-150
             ${canDecrement
-              ? 'hover:bg-gray-100 text-gray-500 hover:text-gray-900'
-              : 'text-gray-300 cursor-not-allowed'
+              ? 'hover:bg-raised text-muted hover:text-ink'
+              : 'text-faint cursor-not-allowed'
             }
           `}
           tabIndex={-1}

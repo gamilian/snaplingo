@@ -130,17 +130,17 @@ export function MainNav({ activeTab, onTabChange, library }: MainNavProps) {
 
   return (
     <>
-      <aside className="flex w-[202px] shrink-0 flex-col border-r border-gray-200 bg-gray-50 px-3.5 py-4">
-        <div className="flex h-12 items-center gap-3 border-b border-gray-200 px-2 pb-4">
-          <div className="grid h-9 w-9 place-items-center rounded-[11px] bg-primary-600 text-sm font-extrabold text-white shadow-sm">
+      <aside className="flex w-[202px] shrink-0 flex-col border-r border-line bg-sunken px-2.5 py-3">
+        <div className="flex items-center gap-2.5 px-1.5 pb-3">
+          <div className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-gradient-to-br from-accent to-accent-hover text-label font-bold tracking-[-0.03em] text-accent-on shadow-xs">
             S
           </div>
-          <span className="text-[15px] font-bold tracking-[-0.02em] text-gray-900">
+          <span className="truncate text-card font-bold tracking-[-0.018em] text-ink">
             SnapLingo
           </span>
         </div>
 
-        <nav className="min-h-0 flex-1 overflow-y-auto pt-4">
+        <nav className="min-h-0 flex-1 overflow-y-auto pt-2">
           <NavGroup
             items={settingsItems}
             activeTab={activeTab}
@@ -154,13 +154,13 @@ export function MainNav({ activeTab, onTabChange, library }: MainNavProps) {
           />
         </nav>
 
-        <div className="rounded-[10px] border border-gray-200 bg-white p-3 shadow-sm">
-          <div className="mb-2 flex items-center justify-between gap-2 border-b border-gray-100 pb-2">
-            <span className="text-[11px] font-bold text-gray-700">{t('historyAndFavorites')}</span>
+        <div className="mt-3 rounded-md border border-line bg-surface p-2.5">
+          <div className="mb-2 flex items-center justify-between gap-2 border-b border-line pb-2">
+            <span className="text-hint font-semibold text-ink">{t('historyAndFavorites')}</span>
             <button
               type="button"
               onClick={openCapacity}
-              className="h-6 rounded-md bg-primary-50 px-2 text-[10px] font-semibold text-primary-600 hover:bg-primary-100"
+              className="h-5 rounded-sm bg-accent-soft px-1.5 text-cap font-semibold text-accent-text hover:bg-accent-line"
             >
               {t('configure')}
             </button>
@@ -185,23 +185,23 @@ export function MainNav({ activeTab, onTabChange, library }: MainNavProps) {
 
       {isCapacityOpen && history && (
         <div
-          className="fixed inset-0 z-[100] grid place-items-center bg-gray-950/30 p-6 backdrop-blur-[2px]"
+          className="fixed inset-0 z-[100] grid place-items-center bg-black/30 p-6 backdrop-blur-[2px]"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setCapacityOpen(false);
           }}
         >
-          <section className="w-full max-w-[440px] overflow-hidden rounded-2xl border border-black/10 bg-white shadow-2xl">
-            <header className="flex items-start justify-between gap-4 border-b border-gray-100 px-5 py-4">
+          <section className="w-full max-w-[440px] overflow-hidden rounded-2xl border border-black/10 bg-surface shadow-2xl">
+            <header className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
               <div>
-                <h2 className="text-base font-bold text-gray-900">{t('historyAndFavorites')}</h2>
-                <p className="mt-1 text-xs text-gray-500">
+                <h2 className="text-base font-bold text-ink">{t('historyAndFavorites')}</h2>
+                <p className="mt-1 text-xs text-muted">
                   {t('capacityDescription')}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setCapacityOpen(false)}
-                className="grid h-8 w-8 place-items-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                className="grid h-8 w-8 place-items-center rounded-lg text-faint hover:bg-raised hover:text-ink"
                 aria-label={t('close')}
               >
                 ×
@@ -210,10 +210,10 @@ export function MainNav({ activeTab, onTabChange, library }: MainNavProps) {
             <div className="space-y-5 px-5 py-5">
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-5">
                 <div>
-                  <div className="text-sm font-semibold text-gray-800">
+                  <div className="text-sm font-semibold text-ink">
                     {t('autoCleanupHistory')}
                   </div>
-                  <div className="mt-1 text-[11px] text-gray-500">
+                  <div className="mt-1 text-hint text-muted">
                     {t('autoCleanupHistoryDescription')}
                   </div>
                 </div>
@@ -224,11 +224,11 @@ export function MainNav({ activeTab, onTabChange, library }: MainNavProps) {
                   aria-checked={autoCleanupEnabled}
                   onClick={() => setAutoCleanupEnabled((value) => !value)}
                   className={`relative h-[22px] w-10 rounded-full transition-colors ${
-                    autoCleanupEnabled ? 'bg-primary-600' : 'bg-gray-300'
+                    autoCleanupEnabled ? 'bg-accent' : 'bg-line-strong'
                   }`}
                 >
                   <span
-                    className={`absolute left-0.5 top-0.5 h-[18px] w-[18px] rounded-full bg-white shadow transition-transform ${
+                    className={`absolute left-0.5 top-0.5 h-[18px] w-[18px] rounded-full bg-surface shadow transition-transform ${
                       autoCleanupEnabled ? 'translate-x-[18px]' : ''
                     }`}
                   />
@@ -261,22 +261,22 @@ export function MainNav({ activeTab, onTabChange, library }: MainNavProps) {
                 max={100000}
                 step={100}
               />
-              <p className="rounded-lg bg-gray-50 px-3 py-2.5 text-[11px] leading-relaxed text-gray-500">
+              <p className="rounded-lg bg-sunken px-3 py-2.5 text-hint leading-relaxed text-muted">
                 {t('capacityNotice')}
               </p>
             </div>
-            <footer className="flex justify-end gap-2 border-t border-gray-100 bg-gray-50 px-5 py-3.5">
+            <footer className="flex justify-end gap-2 border-t border-line bg-sunken px-5 py-3.5">
               <button
                 type="button"
                 onClick={() => setCapacityOpen(false)}
-                className="h-9 rounded-lg border border-gray-200 bg-white px-4 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                className="h-9 rounded-lg border border-line bg-surface px-4 text-xs font-medium text-muted hover:bg-sunken"
               >
                 {t('cancel')}
               </button>
               <button
                 type="button"
                 onClick={() => void saveCapacity()}
-                className="h-9 rounded-lg bg-primary-600 px-4 text-xs font-semibold text-white hover:bg-primary-700"
+                className="h-9 rounded-lg bg-accent px-4 text-xs font-semibold text-accent-on hover:bg-accent-hover"
               >
                 {t('saveSettings')}
               </button>
@@ -300,36 +300,41 @@ function NavGroup({
   onTabChange: (tab: MainTab) => void;
 }) {
   return (
-    <div className="mb-4">
+    <div className="mb-3.5">
       {label && (
-        <div className="px-2 pb-1.5 text-[10px] font-bold tracking-[0.08em] text-gray-400">
+        <div className="px-2 pb-1.5 text-cap font-semibold uppercase tracking-[0.075em] text-faint">
           {label}
         </div>
       )}
-      <div className="space-y-0.5">
+      <div className="space-y-px">
         {items.map((item) => {
           const active = activeTab === item.key;
           return (
             <button
               key={item.key}
               type="button"
+              aria-current={active ? 'page' : undefined}
               onClick={() => onTabChange(item.key)}
-              className={`flex h-9 w-full items-center gap-2.5 rounded-lg px-2 text-left text-[13px] transition-colors ${
+              className={`relative flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-left text-label transition-colors ${
                 active
-                  ? 'bg-primary-50 font-semibold text-primary-700'
-                  : 'text-gray-600 hover:bg-white hover:text-gray-900'
+                  ? 'bg-accent-soft font-semibold text-accent-text'
+                  : 'text-muted hover:bg-raised/70 hover:text-ink'
               }`}
             >
+              {active && (
+                <span
+                  aria-hidden="true"
+                  className="absolute -left-2.5 top-1.5 bottom-1.5 w-0.5 rounded-r-sm bg-accent"
+                />
+              )}
               <span
-                className={`grid h-6 w-6 place-items-center rounded-md [&>svg]:h-3.5 [&>svg]:w-3.5 ${
-                  active
-                    ? 'bg-primary-100 text-primary-600'
-                    : 'bg-gray-200/70 text-gray-500'
+                className={`shrink-0 transition-colors [&>svg]:h-4 [&>svg]:w-4 ${
+                  active ? 'text-accent' : 'text-faint'
                 }`}
               >
                 {item.icon}
               </span>
-              <span>{item.label}</span>
+              <span className="truncate">{item.label}</span>
             </button>
           );
         })}
@@ -350,9 +355,9 @@ function CapacitySummary({
   capacity?: number;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-1 text-[10px] text-gray-500">
+    <div className="flex items-center justify-between gap-3 py-1 text-hint text-muted">
       <span>{label}</span>
-      <span className="font-medium tabular-nums text-gray-700">
+      <span className="font-medium tabular-nums text-ink">
         {value === null
           ? '—'
           : `${value.toLocaleString()}${capacity === undefined ? '' : ` / ${capacity.toLocaleString()}`}${suffix ? ` ${suffix}` : ''}`}
@@ -381,8 +386,8 @@ function CapacityField({
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_132px] items-center gap-5">
       <div>
-        <div className="text-sm font-semibold text-gray-800">{label}</div>
-        <div className="mt-1 text-[11px] text-gray-500">{description}</div>
+        <div className="text-sm font-semibold text-ink">{label}</div>
+        <div className="mt-1 text-hint text-muted">{description}</div>
       </div>
       <CustomNumberInput
         value={value}

@@ -53,7 +53,7 @@ describe('hover tooltip', () => {
     expect(markup).toContain('z-[2147483647]');
     expect(markup).toContain('top:64px');
     expect(markup).toContain('bg-white/95');
-    expect(markup).toContain('border-slate-200/90');
+    expect(markup).toContain('border-line/90');
     expect(markup).not.toContain('bg-slate-900/90');
     expect(markup).toContain('>固定窗口<');
   });

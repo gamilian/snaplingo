@@ -74,14 +74,14 @@ describe('result window presentation', () => {
   });
 
   it('styles the Bob-style pin control by pinned state', () => {
-    expect(resultWindowPinButtonClassName(false)).toContain('text-slate-500');
-    expect(resultWindowPinButtonClassName(true)).toContain('bg-blue-50');
-    expect(resultWindowPinButtonClassName(true)).toContain('text-blue-600');
+    expect(resultWindowPinButtonClassName(false)).toContain('text-muted');
+    expect(resultWindowPinButtonClassName(true)).toContain('bg-accent-soft');
+    expect(resultWindowPinButtonClassName(true)).toContain('text-accent-text');
   });
 
   it('uses the compact pro rounded shell for both result window presentations', () => {
-    expect(resultWindowPanelClassName('overlay')).toContain('rounded-[14px]');
-    expect(resultWindowPanelClassName('standalone')).toContain('rounded-[14px]');
+    expect(resultWindowPanelClassName('overlay')).toContain('rounded-xl');
+    expect(resultWindowPanelClassName('standalone')).toContain('rounded-xl');
     expect(resultWindowPanelClassName('overlay')).toContain('max-w-[660px]');
     expect(resultWindowPanelClassName('standalone')).not.toContain('max-w-[660px]');
     expect(resultWindowPanelClassName('overlay')).toContain(
@@ -148,10 +148,10 @@ describe('result window presentation', () => {
   });
 
   it('uses expanding text boxes without individual scrollbars', () => {
-    expect(resultWindowTextBoxClassName()).toContain('rounded-[14px]');
+    expect(resultWindowTextBoxClassName()).toContain('rounded-xl');
     expect(resultWindowTextBoxClassName()).toContain('overflow-hidden');
 
-    expect(resultWindowTextAreaClassName('source')).toContain('text-[13px]');
+    expect(resultWindowTextAreaClassName('source')).toContain('text-card');
     expect(resultWindowTextAreaClassName('source')).toContain('leading-[1.38]');
     expect(resultWindowTextAreaClassName('source')).not.toContain('max-h-');
     expect(resultWindowTextAreaClassName('ocr')).not.toContain('max-h-');
@@ -397,19 +397,19 @@ describe('result window presentation', () => {
     expect(resultWindowOcrResultStackClassName()).not.toContain('grid-cols-');
     expect(resultWindowOcrResultStackClassName()).not.toContain('gap-2.5');
 
-    expect(resultWindowOcrImagePanelClassName()).toContain('rounded-[14px]');
+    expect(resultWindowOcrImagePanelClassName()).toContain('rounded-xl');
     expect(resultWindowOcrImagePanelClassName()).toContain('overflow-hidden');
     expect(resultWindowOcrImagePanelClassName()).not.toContain('min-h-0');
 
     expect(resultWindowOcrImageActionButtonClassName()).toContain('h-8');
-    expect(resultWindowOcrImageActionButtonClassName()).toContain('rounded-[10px]');
+    expect(resultWindowOcrImageActionButtonClassName()).toContain('rounded-lg');
 
     expect(resultWindowOcrFullTextBoxClassName()).not.toContain('flex-1');
-    expect(resultWindowOcrFullTextBoxClassName()).toContain('rounded-[14px]');
+    expect(resultWindowOcrFullTextBoxClassName()).toContain('rounded-xl');
 
     expect(resultWindowOcrResultTextAreaClassName()).not.toContain('overflow-y-auto');
     expect(resultWindowOcrResultTextAreaClassName()).not.toContain('flex-1');
-    expect(resultWindowOcrResultTextAreaClassName()).toContain('text-[14px]');
+    expect(resultWindowOcrResultTextAreaClassName()).toContain('text-card');
     expect(resultWindowOcrResultTextAreaClassName()).toContain('leading-[1.42]');
     expect(resultWindowOcrResultTextAreaClassName()).not.toContain(
       'result-window-scrollbar',

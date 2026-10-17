@@ -39,7 +39,7 @@ export function TranslationSettingsScrollPage() {
   );
 
   if (!translation) {
-    return <div className="p-12 text-sm text-gray-500">设置加载中...</div>;
+    return <div className="p-12 text-sm text-muted">设置加载中...</div>;
   }
 
   const updateTranslation = (input: Partial<TranslationSettings>) => {
@@ -322,7 +322,7 @@ function RangeValue({ children, value }: { children: ReactNode; value: string })
   return (
     <div className="flex w-[270px] items-center gap-3">
       <div className="min-w-0 flex-1">{children}</div>
-      <span className="min-w-[48px] text-right text-[11px] font-semibold text-primary-600">
+      <span className="min-w-[48px] text-right text-hint font-semibold text-accent-text">
         {value}
       </span>
     </div>

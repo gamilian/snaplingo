@@ -81,9 +81,9 @@ export function getCaptureSelectionOverlayCanvasClassName() {
 
 export function getCaptureEditorToolbarClassName() {
   return [
-    'absolute flex h-[42px] items-center gap-1 rounded-[12px] bg-white/95 px-1.5 py-1',
-    'text-[11px] font-semibold text-slate-600 shadow-[0_10px_28px_rgba(15,23,42,0.2)]',
-    'ring-1 ring-slate-200/90 backdrop-blur-xl',
+    'absolute flex h-[40px] items-center gap-0.5 rounded-[11px] bg-surface px-[5px] py-1',
+    'text-hint font-semibold text-muted shadow-[0_10px_30px_rgba(0,0,0,0.34)]',
+    'ring-1 ring-line',
   ].join(' ');
 }
 
@@ -92,7 +92,7 @@ export function getCaptureEditorSelectionClassName(
   activeAnnotationTool: AnnotationTool | null = null,
 ) {
   return [
-    'absolute rounded-[8px] bg-transparent',
+    'absolute rounded-md bg-transparent',
     status === 'preview'
       ? getCaptureEditorCursorClassName(activeAnnotationTool)
       : '',
@@ -116,11 +116,11 @@ export function getCaptureEditorIconButtonClassName(
   widthClassName = 'w-7',
 ) {
   return [
-    `flex h-7 ${widthClassName} shrink-0 items-center justify-center rounded-[8px] border leading-none`,
+    `flex h-7 ${widthClassName} shrink-0 items-center justify-center rounded-sm leading-none`,
     'transition-colors disabled:cursor-not-allowed disabled:opacity-40',
     isActive
-      ? 'border-[#5b7fff] bg-[#eef3ff] text-[#4a6fe8] shadow-[0_0_0_2px_rgba(91,127,255,0.2)]'
-      : 'border-transparent bg-transparent text-slate-600 hover:bg-slate-100',
+      ? 'bg-accent-soft text-accent-text shadow-[inset_0_0_0_1px_rgb(var(--accent-line))]'
+      : 'text-muted hover:bg-raised hover:text-ink',
   ].join(' ');
 }
 
@@ -128,19 +128,19 @@ export function getCaptureEditorCommandButtonClassName(
   variant: CaptureEditorCommandButtonVariant = 'default',
 ) {
   const base =
-    'flex h-7 shrink-0 items-center justify-center rounded-[8px] text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40';
+    'flex h-7 shrink-0 items-center justify-center rounded-sm text-hint font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40';
 
   if (variant === 'primary') {
-    return `${base} w-7 bg-[#5b7fff] text-white shadow-[0_5px_12px_rgba(91,127,255,0.28)] hover:bg-[#4a6fe8]`;
+    return `${base} w-7 bg-accent text-accent-on hover:bg-accent-hover`;
   }
 
   if (variant === 'icon') {
-    return `${base} w-7 border border-slate-200 bg-white text-slate-600 hover:bg-slate-50`;
+    return `${base} w-7 text-muted hover:bg-raised hover:text-ink`;
   }
 
-  return `${base} border border-slate-200 bg-white px-2 text-slate-600 hover:bg-slate-50`;
+  return `${base} px-2 text-muted hover:bg-raised hover:text-ink`;
 }
 
 export function getCaptureEditorDividerClassName() {
-  return 'mx-0.5 h-6 w-px shrink-0 bg-slate-200';
+  return 'mx-1 h-[18px] w-px shrink-0 bg-line';
 }

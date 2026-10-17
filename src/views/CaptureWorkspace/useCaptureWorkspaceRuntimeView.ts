@@ -29,7 +29,7 @@ import { virtualPointToViewportPoint } from '../../application/capture-workspace
 import { useCaptureWorkspacePorts } from './runtimeContext';
 
 const TOOLBAR_GAP = 14;
-const TOOLBAR_SIZE = { width: 700, height: 42 };
+const TOOLBAR_SIZE = { width: 700, height: 40 };
 
 interface CaptureWorkspaceRuntimeViewOptions {
   initialMode?: CaptureMode;

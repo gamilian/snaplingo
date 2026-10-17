@@ -22,14 +22,14 @@ describe('SecondaryNav', () => {
 
     const nav = findElement(root, (element) => element.type === 'nav');
     expect(nav.props.className).toContain('flex');
-    expect(nav.props.className).toContain('gap-1.5');
+    expect(nav.props.className).toContain('gap-0.5');
 
     const activeButton = findElement(
       root,
       (element) => element.type === 'button' && element.props.children === '翻译服务',
     );
-    expect(activeButton.props.className).toContain('bg-primary-600');
-    expect(activeButton.props.className).toContain('text-white');
+    expect(activeButton.props.className).toContain('bg-surface');
+    expect(activeButton.props.className).toContain('text-ink');
   });
 });
 

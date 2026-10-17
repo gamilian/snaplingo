@@ -28,8 +28,8 @@ export default function HoverTooltip({
   } as const;
   const arrowClassName =
     placement === 'bottom'
-      ? '-top-[5px] border-l border-t border-slate-200/90'
-      : '-bottom-[5px] border-b border-r border-slate-200/90';
+      ? '-top-[5px] border-l border-t border-line/90'
+      : '-bottom-[5px] border-b border-r border-line/90';
 
   return createPortal(
     <span
@@ -37,7 +37,7 @@ export default function HoverTooltip({
       style={tooltipStyle}
       className="pointer-events-none fixed z-[2147483647] whitespace-nowrap"
     >
-      <span className="relative block rounded-[10px] border border-slate-200/90 bg-white/95 px-2.5 py-1.5 text-[11px] font-medium leading-none text-slate-700 shadow-[0_12px_30px_rgba(15,23,42,0.14),0_2px_6px_rgba(15,23,42,0.06)] backdrop-blur-md">
+      <span className="relative block rounded-lg border border-line/90 bg-white/95 px-2.5 py-1.5 text-hint font-medium leading-none text-ink shadow-float backdrop-blur-md">
         <span
           aria-hidden="true"
           className={`absolute left-1/2 h-[10px] w-[10px] -translate-x-1/2 rotate-45 bg-white/95 ${arrowClassName}`}

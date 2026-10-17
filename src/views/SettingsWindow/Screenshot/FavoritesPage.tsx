@@ -22,8 +22,8 @@ export function FavoritesPage() {
   return (
     <div className="max-w-5xl space-y-6">
       <div>
-        <h2 className="mb-2 text-3xl font-bold text-gray-900">收藏夹</h2>
-        <p className="text-gray-600">已收藏的截图</p>
+        <h2 className="mb-2 text-3xl font-bold text-ink">收藏夹</h2>
+        <p className="text-muted">已收藏的截图</p>
       </div>
 
       <input
@@ -33,14 +33,14 @@ export function FavoritesPage() {
           setPage(0);
         }}
         placeholder="搜索笔记或标签"
-        className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-primary-400"
+        className="w-full rounded-xl border border-line bg-surface px-4 py-2.5 text-sm outline-none focus:border-accent"
       />
 
       {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</p>}
       {loading && items.length === 0 ? (
-        <div className="py-16 text-center text-gray-400">正在加载收藏…</div>
+        <div className="py-16 text-center text-faint">正在加载收藏…</div>
       ) : items.length === 0 ? (
-        <div className="py-16 text-center text-gray-400">
+        <div className="py-16 text-center text-faint">
           暂无收藏的截图
           <p className="mt-2 text-sm">截图后点击收藏按钮即可添加</p>
         </div>
@@ -49,12 +49,12 @@ export function FavoritesPage() {
           {items.map((item) => (
             <article
               key={item.id}
-              className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm"
+              className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm"
             >
               <button
                 type="button"
                 onClick={() => void revealFavorite(item.id)}
-                className="block aspect-video w-full overflow-hidden bg-gray-100"
+                className="block aspect-video w-full overflow-hidden bg-raised"
                 title="在文件管理器中显示"
               >
                 <img
@@ -64,7 +64,7 @@ export function FavoritesPage() {
                 />
               </button>
               <div className="p-4">
-                <div className="flex items-center justify-between text-xs text-gray-500">
+                <div className="flex items-center justify-between text-xs text-muted">
                   <span>{item.width} × {item.height}</span>
                   <span>{new Date(item.createdAt).toLocaleString()}</span>
                 </div>
@@ -82,14 +82,14 @@ export function FavoritesPage() {
                   <button
                     type="button"
                     onClick={() => void copyFavorite(item.id)}
-                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm hover:bg-gray-50"
+                    className="rounded-lg border border-line px-3 py-1.5 text-sm hover:bg-sunken"
                   >
                     复制
                   </button>
                   <button
                     type="button"
                     onClick={() => void revealFavorite(item.id)}
-                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm hover:bg-gray-50"
+                    className="rounded-lg border border-line px-3 py-1.5 text-sm hover:bg-sunken"
                   >
                     显示文件
                   </button>

@@ -84,39 +84,39 @@ export function HotkeyRecorderDialog({ isOpen, onClose, onSave, currentHotkey, l
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={handleClose}>
       <div
-        className="bg-white rounded-xl shadow-2xl w-96 p-6"
+        className="bg-surface rounded-xl shadow-2xl w-96 p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-xl font-bold text-gray-900 mb-2">录制快捷键</h3>
-        <p className="text-sm text-gray-600 mb-6">{label}</p>
+        <h3 className="text-xl font-bold text-ink mb-2">录制快捷键</h3>
+        <p className="text-sm text-muted mb-6">{label}</p>
 
         <div className="mb-6">
-          <div className="text-sm text-gray-600 mb-2">当前快捷键：</div>
-          <div className="px-4 py-3 bg-gray-50 rounded-lg text-center">
-            <span className="text-lg font-mono text-gray-800">{currentHotkey}</span>
+          <div className="text-sm text-muted mb-2">当前快捷键：</div>
+          <div className="px-4 py-3 bg-sunken rounded-lg text-center">
+            <span className="text-lg font-mono text-ink">{currentHotkey}</span>
           </div>
         </div>
 
         <div className="mb-6">
-          <div className="text-sm text-gray-600 mb-2">新快捷键：</div>
+          <div className="text-sm text-muted mb-2">新快捷键：</div>
           <div
             className={`px-4 py-8 rounded-lg text-center border-2 transition-colors ${
               recording
                 ? 'border-blue-500 bg-blue-50'
-                : 'border-gray-200 bg-gray-50'
+                : 'border-line bg-sunken'
             }`}
           >
             {recording ? (
               <div>
-                <div className="text-sm text-primary-600 mb-2">按下快捷键...</div>
-                <div className="text-2xl font-mono text-gray-800 min-h-[32px]">
+                <div className="text-sm text-accent-text mb-2">按下快捷键...</div>
+                <div className="text-2xl font-mono text-ink min-h-[32px]">
                   {recordedKeys.length > 0 ? recordedKeys.join('') : '等待输入'}
                 </div>
               </div>
             ) : (
               <button
                 onClick={handleStartRecording}
-                className="text-primary-600 hover:text-blue-700 font-medium"
+                className="text-accent-text hover:text-blue-700 font-medium"
               >
                 点击开始录制
               </button>
@@ -127,7 +127,7 @@ export function HotkeyRecorderDialog({ isOpen, onClose, onSave, currentHotkey, l
         <div className="flex items-center justify-between">
           <button
             onClick={handleClose}
-            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm text-muted hover:text-ink hover:bg-raised rounded-lg transition-colors"
           >
             取消
           </button>
@@ -135,7 +135,7 @@ export function HotkeyRecorderDialog({ isOpen, onClose, onSave, currentHotkey, l
             {recording && (
               <button
                 onClick={handleStopRecording}
-                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm text-muted hover:text-ink hover:bg-raised rounded-lg transition-colors"
               >
                 停止录制
               </button>
@@ -143,7 +143,7 @@ export function HotkeyRecorderDialog({ isOpen, onClose, onSave, currentHotkey, l
             <button
               onClick={handleSave}
               disabled={recordedKeys.length === 0}
-              className="px-4 py-2 text-sm bg-primary-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm bg-accent hover:bg-accent-hover text-accent-on rounded-lg transition-colors disabled:bg-line-strong disabled:cursor-not-allowed"
             >
               保存
             </button>

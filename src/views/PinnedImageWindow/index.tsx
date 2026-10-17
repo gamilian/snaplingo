@@ -646,7 +646,7 @@ function PinnedImageWindowContent() {
 
   if (error) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-neutral-950 p-3 text-xs text-red-100">
+      <div className="flex h-screen w-screen items-center justify-center bg-surface p-3 text-xs text-danger">
         {error}
       </div>
     );
@@ -764,7 +764,7 @@ function PinnedImageWindowContent() {
         magnifierImageStyle &&
         cursorColor && (
           <div
-            className="pointer-events-none absolute overflow-hidden rounded border border-white/70 bg-neutral-950 text-[10px] text-white shadow-2xl ring-1 ring-black/50"
+            className="pointer-events-none absolute overflow-hidden rounded-md border border-white/15 bg-[#10131a] text-hint text-white shadow-float"
             style={{
               left: `${magnifierPosition.x}px`,
               top: `${magnifierPosition.y}px`,
@@ -794,7 +794,7 @@ function PinnedImageWindowContent() {
         )}
       {contextMenuPosition && (
         <div
-          className="absolute z-10 w-[132px] rounded bg-neutral-950/95 p-1 text-xs text-white shadow-xl ring-1 ring-white/15"
+          className="absolute z-10 w-[132px] rounded-md bg-surface p-1 text-label text-ink shadow-e3 ring-1 ring-line"
           style={{
             left: `${contextMenuPosition.x}px`,
             top: `${contextMenuPosition.y}px`,
@@ -803,11 +803,11 @@ function PinnedImageWindowContent() {
         >
           <button
             type="button"
-            className="flex h-7 w-full items-center justify-between rounded px-2 text-left hover:bg-white/15"
+            className="flex h-7 w-full items-center justify-between rounded-sm px-2 text-left text-muted hover:bg-raised hover:text-ink"
             onClick={resetPinnedSize}
           >
             <span>Reset size</span>
-            <span className="font-mono text-[10px] text-white/55">
+            <span className="font-mono text-hint text-faint">
               {Math.round(zoom * 100)}%
             </span>
           </button>
@@ -815,61 +815,61 @@ function PinnedImageWindowContent() {
             <button
               key={preset}
               type="button"
-              className="flex h-7 w-full items-center justify-between rounded px-2 text-left hover:bg-white/15"
+              className="flex h-7 w-full items-center justify-between rounded-sm px-2 text-left text-muted hover:bg-raised hover:text-ink"
               onClick={() => setPinnedOpacityPreset(preset)}
             >
               <span>Opacity</span>
-              <span className="font-mono text-[10px] text-white/55">
+              <span className="font-mono text-hint text-faint">
                 {Math.round(preset * 100)}%
               </span>
             </button>
           ))}
-          <div className="my-1 h-px bg-white/10" />
+          <div className="my-1 h-px bg-line" />
           <button
             type="button"
-            className="h-7 w-full rounded px-2 text-left hover:bg-white/15"
+            className="h-7 w-full rounded-sm px-2 text-left text-muted hover:bg-raised hover:text-ink"
             onClick={movePinnedToAnotherGroup}
           >
             Move Group
           </button>
           <button
             type="button"
-            className="h-7 w-full rounded px-2 text-left hover:bg-white/15"
+            className="h-7 w-full rounded-sm px-2 text-left text-muted hover:bg-raised hover:text-ink"
             onClick={hideCurrentPinnedImage}
           >
             Close
           </button>
           <button
             type="button"
-            className="h-7 w-full rounded px-2 text-left hover:bg-white/15"
+            className="h-7 w-full rounded-sm px-2 text-left text-muted hover:bg-raised hover:text-ink"
             onClick={hideCurrentPinnedImageGroup}
           >
             Hide Group
           </button>
           <button
             type="button"
-            className="h-7 w-full rounded px-2 text-left hover:bg-white/15"
+            className="h-7 w-full rounded-sm px-2 text-left text-muted hover:bg-raised hover:text-ink"
             onClick={copyCurrentPinnedImage}
           >
             Copy
           </button>
           <button
             type="button"
-            className="h-7 w-full rounded px-2 text-left hover:bg-white/15"
+            className="h-7 w-full rounded-sm px-2 text-left text-muted hover:bg-raised hover:text-ink"
             onClick={savePinnedImageAs}
           >
             Save As
           </button>
           <button
             type="button"
-            className="h-7 w-full rounded px-2 text-left text-red-100 hover:bg-red-500/20"
+            className="h-7 w-full rounded-sm px-2 text-left text-danger hover:bg-danger-soft"
             onClick={destroyCurrentPinnedImage}
           >
             Destroy
           </button>
           <button
             type="button"
-            className="h-7 w-full rounded px-2 text-left text-red-100 hover:bg-red-500/20"
+            className="h-7 w-full rounded-sm px-2 text-left text-danger hover:bg-danger-soft"
             onClick={destroyCurrentPinnedImageGroup}
           >
             Destroy Group
@@ -877,14 +877,14 @@ function PinnedImageWindowContent() {
         </div>
       )}
       <div
-        className={`absolute right-1 top-1 flex gap-1 rounded bg-black/70 p-1 text-xs text-white shadow transition-opacity ${hoverToolbarVisibilityClassName}`}
+        className={`absolute right-1 top-1 flex gap-0.5 rounded-md bg-surface/95 p-[3px] text-label text-muted shadow-e2 ring-1 ring-line backdrop-blur-md transition-opacity ${hoverToolbarVisibilityClassName}`}
         onPointerDown={(event) => event.stopPropagation()}
       >
         {PIN_HOVER_TOOLBAR_ACTIONS.map((action) => (
           <button
             key={action.id}
             type="button"
-            className="h-6 rounded px-2 leading-6 hover:bg-white/15 focus:bg-white/15"
+            className="h-6 rounded-sm px-2 leading-6 hover:bg-raised hover:text-ink focus:bg-raised focus:text-ink"
             aria-label={action.ariaLabel}
             title={action.title}
             onClick={() => runHoverToolbarAction(action.id)}

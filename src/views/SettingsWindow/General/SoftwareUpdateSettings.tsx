@@ -3,7 +3,7 @@ import type { AppUpdatesSnapshot } from '../../../application/updates/runtime';
 import { SettingRow } from '../SettingsControls';
 import { useSettingsRuntime } from '../runtimeContext';
 
-const buttonClass = 'rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-default disabled:opacity-50';
+const buttonClass = 'rounded-lg border border-line bg-surface px-3 py-2 text-xs font-medium text-ink hover:bg-sunken disabled:cursor-default disabled:opacity-50';
 
 export function SoftwareUpdateSettings() {
   const runtime = useSettingsRuntime().updates;
@@ -43,23 +43,23 @@ export function SoftwareUpdateSettings() {
             {status.downloadSize !== null ? (
               <>
                 <button type="button" disabled={busy}
-                  className="rounded-lg bg-primary-600 px-4 py-2 text-xs font-semibold text-white hover:bg-primary-700 disabled:opacity-50"
+                  className="rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-accent-on hover:bg-accent-hover disabled:opacity-50"
                   onClick={() => void runtime.downloadAndOpen().catch(() => undefined)}>
                   {phase === 'downloading' ? '正在下载并校验…' : downloadedPath ? '再次下载并打开安装包' : '下载并打开安装包'}
                   {phase !== 'downloading' && `（${Math.ceil(status.downloadSize / 1_000_000)} MB）`}
                 </button>
-                <p className="mt-3 text-xs leading-relaxed text-gray-500">
+                <p className="mt-3 text-xs leading-relaxed text-muted">
                   {status.platform === 'macos'
                     ? '安装包打开后，退出 SnapLingo，将新版拖入“应用程序”替换旧版，再打开。设置和历史记录会保留。'
                     : '下载完成后将打开系统安装器，按提示覆盖安装。设置和历史记录会保留。'}
                 </p>
               </>
             ) : (
-              <p className="text-xs text-gray-500">此版本暂未提供可验证的适配安装包，请前往发布页面查看。</p>
+              <p className="text-xs text-muted">此版本暂未提供可验证的适配安装包，请前往发布页面查看。</p>
             )}
-            {downloadedPath && <p className="mt-2 break-all text-xs text-gray-500">安装包位置：{downloadedPath}</p>}
+            {downloadedPath && <p className="mt-2 break-all text-xs text-muted">安装包位置：{downloadedPath}</p>}
             {status.notes && (
-              <details className="mt-4 text-xs text-gray-600">
+              <details className="mt-4 text-xs text-muted">
                 <summary className="cursor-pointer font-medium">{status.latestVersion} 更新说明</summary>
                 <p className="mt-3 whitespace-pre-wrap break-words leading-relaxed">{status.notes}</p>
               </details>

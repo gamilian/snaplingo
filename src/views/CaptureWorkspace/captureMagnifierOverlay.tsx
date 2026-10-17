@@ -95,7 +95,7 @@ export function CaptureMagnifierOverlay({
   return (
     <div
       aria-label="像素放大镜"
-      className="pointer-events-none absolute left-0 top-0 z-[70] will-change-transform overflow-hidden rounded-[6px] border border-white/30 bg-transparent text-white shadow-xl ring-1 ring-black/20"
+      className="pointer-events-none absolute left-0 top-0 z-[70] will-change-transform overflow-hidden rounded-sm border border-white/30 bg-transparent text-white shadow-xl ring-1 ring-black/20"
       style={{
         transform: `translate3d(${position.x}px, ${position.y}px, 0)`,
         width: `${MAGNIFIER_PANEL_SIZE.width}px`,
@@ -112,7 +112,7 @@ export function CaptureMagnifierOverlay({
         <div className="absolute left-0 top-1/2 h-[2px] w-full -translate-y-1/2 bg-blue-400/[0.65]" />
         <div className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 border-2 border-white shadow-[0_0_0_1px_rgba(0,0,0,0.85)]" />
       </div>
-      <div className="bg-slate-900/[0.58] px-4 py-2.5 font-mono text-[12px] leading-5">
+      <div className="bg-[#161920]/[0.58] px-4 py-2.5 font-mono text-label leading-5">
         <div className="text-center font-semibold tracking-wide">
           ({Math.round(screenCursor.x)}, {Math.round(screenCursor.y)})
         </div>
@@ -123,7 +123,7 @@ export function CaptureMagnifierOverlay({
           />
           <span>{colorText}</span>
         </div>
-        <div className="mt-1.5 border-t border-white/15 pt-1.5 text-center text-[11px] leading-[17px] text-white/90">
+        <div className="mt-1.5 border-t border-white/15 pt-1.5 text-center text-hint leading-[17px] text-white/90">
           <div>按 C 复制颜色值</div>
           <div>按 Shift 切换 RGB / HEX</div>
         </div>

@@ -8,11 +8,11 @@ export function SettingsGroup({
   children: ReactNode;
 }) {
   return (
-    <section className="border-t border-gray-200 first:border-t-0">
-      <div className="border-b border-gray-100 bg-gray-50 px-[22px] py-2.5 text-[10px] font-bold tracking-[0.04em] text-gray-500">
+    <section className="border-t border-line first:border-t-0">
+      <div className="border-b border-line bg-sunken px-[22px] py-2 text-cap font-semibold uppercase tracking-[0.075em] text-faint">
         {title}
       </div>
-      <div className="divide-y divide-gray-100 px-[22px]">{children}</div>
+      <div className="divide-y divide-line px-[22px]">{children}</div>
     </section>
   );
 }
@@ -27,11 +27,11 @@ export function SettingRow({
   children: ReactNode;
 }) {
   return (
-    <div className="grid min-h-[70px] grid-cols-[minmax(0,1fr)_minmax(230px,auto)] items-center gap-9">
+    <div className="grid min-h-[54px] grid-cols-[minmax(0,1fr)_minmax(200px,auto)] items-center gap-x-6 gap-y-2 py-2.5">
       <div>
-        <div className="text-[13px] font-semibold text-gray-800">{label}</div>
+        <div className="text-label font-semibold text-ink">{label}</div>
         {description && (
-          <div className="mt-1 text-[11px] leading-relaxed text-gray-500">
+          <div className="mt-0.5 text-hint leading-relaxed text-muted">
             {description}
           </div>
         )}
@@ -57,13 +57,13 @@ export function SettingsToggle({
       aria-label={label}
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className={`relative h-[22px] w-10 rounded-full transition-colors ${
-        checked ? 'bg-primary-600' : 'bg-gray-300'
+      className={`relative h-5 w-9 rounded-full transition-colors ${
+        checked ? 'bg-accent' : 'bg-line-strong'
       }`}
     >
       <span
-        className={`absolute left-0.5 top-0.5 h-[18px] w-[18px] rounded-full bg-white shadow transition-transform ${
-          checked ? 'translate-x-[18px]' : ''
+        className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-surface shadow transition-transform ${
+          checked ? 'translate-x-4' : ''
         }`}
       />
     </button>

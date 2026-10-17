@@ -379,7 +379,7 @@ export function CaptureEditorToolbar({
       <div className={getCaptureEditorDividerClassName()} />
       <div className="relative flex h-7 shrink-0">
         <IconActionButton
-          className="h-7 w-7 shrink-0 rounded-[8px] border border-slate-200 bg-[#5b7fff] shadow-[0_0_0_2px_rgba(91,127,255,0.12)] disabled:cursor-not-allowed disabled:opacity-40"
+          className="h-7 w-7 shrink-0 rounded-sm shadow-[inset_0_0_0_1px_rgba(0,0,0,0.18)] disabled:cursor-not-allowed disabled:opacity-40"
           style={{
             backgroundColor: annotationColorToCss(annotationStyle.color),
           }}
@@ -412,54 +412,59 @@ export function CaptureEditorToolbar({
           />
         )}
       </div>
-      <input
-        className="h-7 w-14 accent-[#5b7fff] disabled:opacity-40"
-        type="range"
-        min={
-          isTextSizingActive ? MIN_TEXT_FONT_SIZE : MIN_ANNOTATION_STROKE_WIDTH
-        }
-        max={
-          isTextSizingActive ? MAX_TEXT_FONT_SIZE : MAX_ANNOTATION_STROKE_WIDTH
-        }
-        step={1}
-        value={sizeValue}
-        disabled={isRenderingOutput}
-        title={
-          isTextSizingActive ? "Text font size" : "Annotation stroke width"
-        }
-        aria-label={
-          isTextSizingActive ? "Text font size" : "Annotation stroke width"
-        }
-        onInput={(event) => {
-          const value = Number(event.currentTarget.value);
-          pendingSizeDefaultRef.current = {
-            kind: isTextSizingActive ? "font" : "stroke",
-            value,
-          };
-          if (textDraftActive) {
-            onTextDraftFontSizeChange(value);
-            return;
+      <div className="flex shrink-0 items-center gap-1.5 pl-1 pr-0.5">
+        <input
+          className="h-7 w-[86px] accent-accent disabled:opacity-40"
+          type="range"
+          min={
+            isTextSizingActive ? MIN_TEXT_FONT_SIZE : MIN_ANNOTATION_STROKE_WIDTH
           }
-
-          if (isTextSizingActive) {
-            onApplyAnnotationStyle(annotationStyle, value);
-            return;
+          max={
+            isTextSizingActive ? MAX_TEXT_FONT_SIZE : MAX_ANNOTATION_STROKE_WIDTH
           }
+          step={1}
+          value={sizeValue}
+          disabled={isRenderingOutput}
+          title={
+            isTextSizingActive ? "Text font size" : "Annotation stroke width"
+          }
+          aria-label={
+            isTextSizingActive ? "Text font size" : "Annotation stroke width"
+          }
+          onInput={(event) => {
+            const value = Number(event.currentTarget.value);
+            pendingSizeDefaultRef.current = {
+              kind: isTextSizingActive ? "font" : "stroke",
+              value,
+            };
+            if (textDraftActive) {
+              onTextDraftFontSizeChange(value);
+              return;
+            }
 
-          onApplyAnnotationStyle(
-            {
-              ...annotationStyle,
-              strokeWidth: value,
-            },
-            textFontSize,
-          );
-        }}
-        onPointerUp={commitSizeDefault}
-        onKeyUp={commitSizeDefault}
-        onBlur={commitSizeDefault}
-      />
+            if (isTextSizingActive) {
+              onApplyAnnotationStyle(annotationStyle, value);
+              return;
+            }
+
+            onApplyAnnotationStyle(
+              {
+                ...annotationStyle,
+                strokeWidth: value,
+              },
+              textFontSize,
+            );
+          }}
+          onPointerUp={commitSizeDefault}
+          onKeyUp={commitSizeDefault}
+          onBlur={commitSizeDefault}
+        />
+        <span className="w-4 text-right font-mono text-hint tabular-nums text-muted">
+          {sizeValue}
+        </span>
+      </div>
       <input
-        className="h-4 w-4 accent-[#5b7fff] disabled:opacity-40"
+        className="h-4 w-4 accent-accent disabled:opacity-40"
         type="checkbox"
         checked={annotationStyle.filled}
         disabled={isRenderingOutput || !isFillModeActive}
@@ -590,17 +595,17 @@ function ColorPickerPopover({
 
   return (
     <div
-      className={`absolute left-1/2 z-20 w-[248px] -translate-x-1/2 rounded-[12px] border border-slate-200 bg-white/95 p-3 text-slate-700 shadow-[0_14px_34px_rgba(15,23,42,0.22)] backdrop-blur-xl ${
+      className={`absolute left-1/2 z-20 w-[248px] -translate-x-1/2 rounded-md border border-line bg-surface p-3 text-ink shadow-float ${
         opensUpward ? "bottom-[calc(100%+3px)]" : "top-[calc(100%+3px)]"
       }`}
       role="dialog"
       aria-label="Annotation colors"
     >
       <div className="mb-2.5 flex items-center justify-between gap-3">
-        <span className="text-[12px] font-semibold text-slate-800">颜色</span>
+        <span className="text-label font-semibold text-ink">颜色</span>
         <button
           type="button"
-          className="flex h-5 w-5 items-center justify-center rounded text-[15px] font-normal text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          className="flex h-5 w-5 items-center justify-center rounded text-title font-normal text-faint hover:bg-raised hover:text-ink"
           aria-label="Close color palette"
           onClick={onClose}
         >
@@ -616,9 +621,9 @@ function ColorPickerPopover({
               <button
                 key={`${hexColor}-${index}`}
                 type="button"
-                className={`h-6 w-6 rounded-[6px] border border-black/10 shadow-sm transition-transform hover:scale-110 focus:outline-none ${
+                className={`h-6 w-6 rounded-sm border border-black/10 shadow-sm transition-transform hover:scale-110 focus:outline-none ${
                   selectedIndex === index
-                    ? "ring-2 ring-[#5b7fff] ring-offset-2"
+                    ? "ring-2 ring-accent ring-offset-2"
                     : ""
                 }`}
                 style={{ backgroundColor: annotationColorToCss(color) }}
@@ -630,7 +635,7 @@ function ColorPickerPopover({
           })}
         </div>
       ) : (
-        <div className="rounded-[8px] border border-dashed border-slate-200 px-3 py-4 text-center text-[11px] font-normal text-slate-400">
+        <div className="rounded-md border border-dashed border-line px-3 py-4 text-center text-hint font-normal text-faint">
           暂无预设颜色
         </div>
       )}
@@ -638,13 +643,13 @@ function ColorPickerPopover({
       <div className="relative mt-3 h-9">
         <button
           type="button"
-          className="flex h-full w-full items-center gap-2 rounded-[8px] border border-slate-200 bg-slate-50 px-2.5 text-left text-[11px] font-semibold text-slate-700 hover:bg-slate-100"
+          className="flex h-full w-full items-center gap-2 rounded-md border border-line bg-sunken px-2.5 text-left text-hint font-semibold text-ink hover:bg-raised"
           aria-label="Open system color palette"
           aria-haspopup="dialog"
           onClick={() => systemPaletteInputRef.current?.click()}
         >
           <span
-            className="h-5 w-5 rounded-full border border-white shadow-sm"
+            className="h-5 w-5 rounded-full border border-surface shadow-sm"
             style={{
               background:
                 "conic-gradient(#ff4d4f, #faad14, #52c41a, #1890ff, #722ed1, #ff4d4f)",
@@ -652,7 +657,7 @@ function ColorPickerPopover({
             aria-hidden="true"
           />
           <span className="flex-1">系统调色板</span>
-          <span className="font-mono text-[10px] text-slate-400">
+          <span className="font-mono text-hint text-faint">
             {draftColor}
           </span>
         </button>
@@ -667,10 +672,10 @@ function ColorPickerPopover({
         />
       </div>
 
-      <div className="mt-2.5 grid grid-cols-3 gap-1.5 border-t border-slate-100 pt-2.5">
+      <div className="mt-2.5 grid grid-cols-3 gap-1.5 border-t border-line pt-2.5">
         <button
           type="button"
-          className="h-7 rounded-[7px] border border-slate-200 bg-white text-[10px] font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
+          className="h-7 rounded-md border border-line bg-surface text-hint font-semibold text-muted hover:bg-sunken disabled:cursor-not-allowed disabled:opacity-35"
           disabled={!canAdd}
           aria-label="Add preset color"
           onClick={onAdd}
@@ -679,7 +684,7 @@ function ColorPickerPopover({
         </button>
         <button
           type="button"
-          className="h-7 rounded-[7px] border border-slate-200 bg-white text-[10px] font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
+          className="h-7 rounded-md border border-line bg-surface text-hint font-semibold text-muted hover:bg-sunken disabled:cursor-not-allowed disabled:opacity-35"
           disabled={!canReplace}
           aria-label="Replace selected preset"
           onClick={onReplace}
@@ -688,7 +693,7 @@ function ColorPickerPopover({
         </button>
         <button
           type="button"
-          className="h-7 rounded-[7px] border border-red-200 bg-white text-[10px] font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-35"
+          className="h-7 rounded-md border border-red-200 bg-surface text-hint font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-35"
           disabled={selectedIndex === null}
           aria-label="Delete selected preset"
           onClick={onDelete}
@@ -697,7 +702,7 @@ function ColorPickerPopover({
         </button>
       </div>
       {error && (
-        <p className="mt-2 text-[10px] text-red-600" role="alert">
+        <p className="mt-2 text-hint text-red-600" role="alert">
           {error}
         </p>
       )}
@@ -1078,7 +1083,7 @@ function ToolPicker({
 }) {
   return (
     <div
-      className="absolute left-0 top-[calc(100%+6px)] z-10 flex min-w-max gap-1 rounded-[9px] border border-slate-200 bg-white/95 p-1 shadow-[0_8px_20px_rgba(15,23,42,0.2)] backdrop-blur-xl"
+      className="absolute left-0 top-[calc(100%+6px)] z-10 flex min-w-max gap-1 rounded-md border border-line bg-surface p-1 shadow-float"
       role="menu"
       aria-label={label}
     >

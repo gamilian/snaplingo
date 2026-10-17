@@ -1,0 +1,1648 @@
+<!doctype html>
+<title>SnapLingo UI Redesign</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+
+<style>
+/* ============================================================================
+   DESIGN PLAN
+   Subject: SnapLingo 0.1.6 — a macOS/Windows menu-bar screenshot + OCR +
+   translation utility. Four windows ship: Settings, Result, Capture editor,
+   Pinned image. This page is the redesign spec for all four plus the token
+   system that carries light and dark.
+
+   Color — a cool slate neutral (hue-biased toward the accent, not a dead
+   grey) under a single blue-violet accent kept from the current product so
+   existing muscle memory and iconography survive.
+     canvas / surface / raised / sunken      background stack, 4 levels
+     border / border-strong                  hairlines and dividers
+     text / muted / faint                    three-step text ramp
+     accent / accent-text / accent-soft      the one hue that means "active"
+     good / warn / danger                    state only, never decoration
+   Type — the app is a system utility, so it uses the system UI face the real
+   build uses (-apple-system / Segoe UI / PingFang), with JetBrains Mono for
+   shortcut glyphs, hex values, and numeric readouts.
+   Layout — a dark neutral studio wall holds each window as a bordered light
+   frame with a caption bar; light and dark sit side by side at every size.
+   ========================================================================= */
+
+/* ── Tokens ─────────────────────────────────────────────────────────────── */
+:root {
+  color-scheme: light;
+
+  --canvas:          #f4f5f7;
+  --surface:         #ffffff;
+  --raised:          #eaecef;
+  --sunken:          #f0f1f4;
+  --border:          #e2e5ea;
+  --border-strong:   #cfd4dc;
+
+  --text:            #171a21;
+  --muted:           #5d6472;
+  --faint:           #8b93a1;
+
+  --accent:          #4f5bd5;
+  --accent-hover:    #414cbf;
+  --accent-text:     #3f49bf;
+  --accent-soft:     #eef0ff;
+  --accent-line:     #cdd2f8;
+  --on-accent:       #ffffff;
+
+  --good:            #12855f;
+  --good-soft:       #e4f6ee;
+  --warn:            #a15c07;
+  --warn-soft:       #fdf1dc;
+  --danger:          #d13b34;
+  --danger-soft:     #fdeceb;
+
+  --shadow-1: 0 1px 2px rgba(16, 20, 32, .06), 0 0 0 1px rgba(16, 20, 32, .04);
+  --shadow-2: 0 4px 12px rgba(16, 20, 32, .08), 0 1px 3px rgba(16, 20, 32, .05);
+  --shadow-3: 0 18px 44px rgba(16, 20, 32, .18), 0 2px 8px rgba(16, 20, 32, .10);
+  --shadow-cast: 0 22px 56px rgba(0, 0, 0, .30);
+
+  --ring: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  --wall: #0e1014;
+  --rail: #e8eaee;
+
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 10px;
+  --r-xl: 14px;
+  --r-pill: 999px;
+
+  --font-ui: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+             "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --t-fast: 120ms cubic-bezier(.4, 0, .2, 1);
+  --t-base: 180ms cubic-bezier(.4, 0, .2, 1);
+}
+
+/* Dark palette. Only tokens change here — no component rules live inside these
+   blocks, so both themes resolve every colour through the same token names.
+   Selector weight is deliberate: the three states are
+     no choice  → light tokens above, dark media block wins on a dark OS
+     light      → #theme-light rule below out-weighs the media block
+     dark       → #theme-dark rule below out-weighs the light base
+   so the switch works in both directions and the OS default still applies. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --canvas:        #0d0f14;
+    --surface:       #161920;
+    --raised:        #1e2230;
+    --sunken:        #101319;
+    --border:        #242936;
+    --border-strong: #333a4b;
+    --text:          #e8eaf0;
+    --muted:         #9aa2b4;
+    --faint:         #6c7488;
+    --accent:        #7c86ee;
+    --accent-hover:  #8b94f2;
+    --accent-text:   #96a0f5;
+    --accent-soft:   #1c2138;
+    --accent-line:   #2e3556;
+    --on-accent:     #0d0f14;
+    --good:          #3fc795;
+    --good-soft:     #10291f;
+    --warn:          #e0a44a;
+    --warn-soft:     #2a2010;
+    --danger:        #ef6a61;
+    --danger-soft:   #2c1512;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, .5), 0 0 0 1px rgba(255, 255, 255, .04);
+    --shadow-2: 0 4px 14px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .05);
+    --shadow-3: 0 20px 48px rgba(0, 0, 0, .65), 0 0 0 1px rgba(255, 255, 255, .07);
+    --shadow-cast: 0 24px 60px rgba(0, 0, 0, .6);
+    --wall: #08090c;
+    --rail: #1c2029;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas:        #0d0f14;
+  --surface:       #161920;
+  --raised:        #1e2230;
+  --sunken:        #101319;
+  --border:        #242936;
+  --border-strong: #333a4b;
+  --text:          #e8eaf0;
+  --muted:         #9aa2b4;
+  --faint:         #6c7488;
+  --accent:        #7c86ee;
+  --accent-hover:  #8b94f2;
+  --accent-text:   #96a0f5;
+  --accent-soft:   #1c2138;
+  --accent-line:   #2e3556;
+  --on-accent:     #0d0f14;
+  --good:          #3fc795;
+  --good-soft:     #10291f;
+  --warn:          #e0a44a;
+  --warn-soft:     #2a2010;
+  --danger:        #ef6a61;
+  --danger-soft:   #2c1512;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .5), 0 0 0 1px rgba(255, 255, 255, .04);
+  --shadow-2: 0 4px 14px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .05);
+  --shadow-3: 0 20px 48px rgba(0, 0, 0, .65), 0 0 0 1px rgba(255, 255, 255, .07);
+  --shadow-cast: 0 24px 60px rgba(0, 0, 0, .6);
+  --wall: #08090c;
+  --rail: #1c2029;
+}
+
+/* ── Page shell ─────────────────────────────────────────────────────────── */
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--wall);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 56px;
+}
+
+.wrap { max-width: 1340px; margin: 0 auto; }
+
+/* ── Masthead ───────────────────────────────────────────────────────────── */
+.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px 32px;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding-block: 40px 22px;
+  border-bottom: 1px solid rgba(255, 255, 255, .09);
+}
+.masthead h1 {
+  margin: 0;
+  font-size: 25px;
+  font-weight: 640;
+  letter-spacing: -.022em;
+  color: #f3f5f8;
+  text-wrap: balance;
+}
+.masthead .lede {
+  margin: 7px 0 0;
+  max-width: 60ch;
+  font-size: 13.5px;
+  color: #99a1b3;
+}
+.version-tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #7f8798;
+  padding: 3px 7px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: var(--r-xs);
+  vertical-align: 3px;
+  margin-left: 10px;
+}
+
+.masthead-side { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+@media (min-width: 760px) { .masthead-side { align-items: flex-end; } }
+
+/* Theme switch — real radios, so it works without JavaScript. */
+.theme-switch { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--r-md); background: rgba(255, 255, 255, .05); }
+.theme-switch input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.theme-switch label {
+  padding: 5px 11px;
+  border-radius: var(--r-sm);
+  font-size: 11.5px;
+  font-weight: 520;
+  color: #868e9e;
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.theme-switch label:hover { color: #c9cfda; }
+.theme-switch input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Theme resolution. Every palette lives under one selector weight — the bare
+   :root block below — and the two dark blocks only ever re-declare tokens.
+   The preview switch writes data-theme on the root element from a script, so
+   there is exactly one place that decides which palette is active:
+     no attribute  → OS decides (via the media query)
+     "light" / "dark" → that palette, whoever set the attribute. */
+:root { color-scheme: light; }
+
+:root[data-theme="dark"] { color-scheme: dark; }
+
+/* Active pill. The switch's own radio state drives it, so the control reflects
+   the viewer's choice even when that choice is "follow the system". */
+.theme-switch:has(#theme-sys:checked)   label[for="theme-sys"],
+.theme-switch:has(#theme-light:checked) label[for="theme-light"],
+.theme-switch:has(#theme-dark:checked)  label[for="theme-dark"] {
+  background: rgba(255, 255, 255, .13);
+  color: #eef1f6;
+}
+
+/* ── Sections ───────────────────────────────────────────────────────────── */
+section.plate { padding-block: 44px 0; }
+
+.plate-head {
+  display: grid;
+  gap: 10px 28px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, .07);
+  margin-bottom: 26px;
+}
+@media (min-width: 720px) {
+  .plate-head { grid-template-columns: 210px minmax(0, 1fr); align-items: baseline; }
+}
+.plate-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 620;
+  letter-spacing: -.012em;
+  color: #eef1f6;
+}
+.plate-head h2 .ord {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: .1em;
+  color: #6a7285;
+  margin-bottom: 7px;
+}
+.plate-head p { margin: 0; max-width: 68ch; font-size: 13px; color: #9aa3b4; }
+.plate-head code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: #c3cbd9;
+  background: rgba(255, 255, 255, .06);
+  padding: 1px 5px;
+  border-radius: var(--r-xs);
+}
+
+/* ── Window frames ──────────────────────────────────────────────────────── */
+.screens { display: grid; gap: 30px; }
+@media (min-width: 1080px) {
+  .screens.pair { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+}
+
+.shot { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+
+.shot-bar {
+  display: flex; align-items: center; gap: 9px;
+  padding-inline: 3px;
+}
+.shot-bar b {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .01em;
+  color: #dfe4ec;
+}
+.shot-bar .meta {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: #767e90;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.frame {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: var(--r-xl);
+  background: var(--canvas);
+  color: var(--text);
+  box-shadow: var(--shadow-cast);
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+}
+.frame.h-660 { height: 660px; }
+.frame.h-460 { height: 460px; }
+.frame.h-400 { height: 400px; }
+.frame.grow { flex: 1; min-height: 0; }
+
+/* ── Shared app primitives ──────────────────────────────────────────────── */
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.icon-btn {
+  display: grid; place-items: center; width: 26px; height: 26px;
+  border: 0; border-radius: var(--r-sm);
+  background: transparent; color: var(--muted);
+  cursor: pointer; transition: background var(--t-fast), color var(--t-fast);
+}
+.icon-btn:hover { background: var(--raised); color: var(--text); }
+.icon-btn.sm { width: 22px; height: 22px; }
+.icon-btn.on { background: var(--accent-soft); color: var(--accent-text); }
+svg.ic { width: 16px; height: 16px; display: block; }
+svg.ic.sm { width: 14px; height: 14px; }
+
+.toggle {
+  position: relative; width: 36px; height: 20px; flex: none;
+  border: 0; border-radius: var(--r-pill);
+  background: var(--border-strong);
+  cursor: pointer; transition: background var(--t-base);
+}
+.toggle::after {
+  content: ""; position: absolute; top: 2px; left: 2px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .3);
+  transition: transform var(--t-base);
+}
+.toggle.on { background: var(--accent); }
+.toggle.on::after { transform: translateX(16px); }
+
+.field {
+  display: flex; align-items: center; gap: 6px;
+  height: 30px; padding-inline: 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: 500 11.5px/1 var(--font-mono);
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+}
+.field:focus-within { border-color: var(--accent); box-shadow: var(--ring); }
+.field .caret { margin-left: auto; color: var(--faint); display: grid; place-items: center; }
+.field input {
+  min-width: 0; width: 100%; border: 0; background: transparent;
+  color: inherit; font: inherit; outline: none;
+}
+.field input::placeholder { color: var(--faint); }
+
+.stepper {
+  display: inline-flex; align-items: center;
+  height: 30px; border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface); overflow: hidden;
+}
+.stepper button {
+  width: 26px; height: 100%; border: 0; background: transparent;
+  color: var(--faint); cursor: pointer; display: grid; place-items: center;
+  font-size: 14px; line-height: 1;
+}
+.stepper button:hover { background: var(--raised); color: var(--text); }
+.stepper .val {
+  min-width: 54px; padding-inline: 9px; text-align: right;
+  font: 500 12px var(--font-mono); font-variant-numeric: tabular-nums;
+  border-inline: 1px solid var(--border);
+  height: 100%; display: flex; align-items: center; justify-content: flex-end;
+}
+.stepper .unit { padding-inline: 8px 9px; font: 500 10.5px var(--font-mono); color: var(--faint); }
+
+.slider { display: flex; align-items: center; gap: 11px; }
+.slider .track {
+  position: relative; width: 112px; height: 4px; border-radius: var(--r-pill);
+  background: var(--raised);
+}
+.slider .fill { position: absolute; inset: 0 32% 0 0; border-radius: var(--r-pill); background: var(--accent); }
+.slider .knob {
+  position: absolute; top: 50%; left: 68%; width: 13px; height: 13px;
+  transform: translate(-50%, -50%); border-radius: 50%;
+  background: var(--surface); border: 1px solid var(--border-strong);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .22);
+}
+.slider .readout { font: 500 11.5px var(--font-mono); color: var(--muted); min-width: 34px; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 30px; padding-inline: 12px;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--text);
+  font: 550 11.5px var(--font-ui); cursor: pointer;
+  transition: background var(--t-fast), border-color var(--t-fast), box-shadow var(--t-fast);
+}
+.btn:hover { background: var(--raised); border-color: var(--border-strong); }
+.btn.primary {
+  background: var(--accent); border-color: var(--accent); color: var(--on-accent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .16);
+}
+.btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--muted); }
+.btn.ghost:hover { background: var(--raised); color: var(--text); }
+.btn.sq { width: 30px; padding: 0; }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 19px; padding-inline: 7px; border-radius: var(--r-xs);
+  font: 600 10px var(--font-ui); letter-spacing: .01em;
+}
+.badge.soft { background: var(--raised); color: var(--muted); }
+.badge.accent { background: var(--accent-soft); color: var(--accent-text); }
+.badge.good { background: var(--good-soft); color: var(--good); }
+.badge.warn { background: var(--warn-soft); color: var(--warn); }
+.badge.danger { background: var(--danger-soft); color: var(--danger); }
+.badge.dot::before {
+  content: ""; width: 5px; height: 5px; border-radius: 50%;
+  background: currentColor;
+}
+
+/* ============================ 1 · SETTINGS ============================== */
+.set { display: flex; height: 100%; min-height: 0; }
+
+.side {
+  width: 202px; flex: none; display: flex; flex-direction: column;
+  padding: 12px 10px 12px;
+  background: var(--sunken);
+  border-right: 1px solid var(--border);
+}
+.brand { display: flex; align-items: center; gap: 9px; padding: 4px 6px 12px; }
+.brand .mark {
+  width: 28px; height: 28px; border-radius: 8px; flex: none;
+  background: linear-gradient(150deg, var(--accent) 0%, var(--accent-hover) 100%);
+  color: #fff; display: grid; place-items: center;
+  font: 700 12.5px var(--font-ui); letter-spacing: -.03em;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .22);
+}
+.brand .name { font-size: 13px; font-weight: 650; letter-spacing: -.018em; }
+.brand .ver { font: 500 9.5px var(--font-mono); color: var(--faint); margin-top: 1px; }
+
+.nav { display: flex; flex-direction: column; gap: 1px; }
+.nav + .nav { margin-top: 14px; }
+.nav-label {
+  padding: 0 8px 6px;
+  font: 650 9.5px var(--font-ui); letter-spacing: .075em;
+  text-transform: uppercase; color: var(--faint);
+}
+.nav-item {
+  position: relative;
+  display: flex; align-items: center; gap: 9px;
+  height: 32px; padding-inline: 9px;
+  border: 0; border-radius: var(--r-sm);
+  background: transparent; color: var(--muted);
+  font: 550 12.5px var(--font-ui); text-align: left;
+  cursor: pointer; transition: background var(--t-fast), color var(--t-fast);
+}
+.nav-item .nic { color: var(--faint); transition: color var(--t-fast); }
+.nav-item:hover { background: color-mix(in srgb, var(--raised) 70%, transparent); color: var(--text); }
+.nav-item:hover .nic { color: var(--muted); }
+.nav-item .count {
+  margin-left: auto; font: 500 10.5px var(--font-mono);
+  color: var(--faint); font-variant-numeric: tabular-nums;
+}
+.nav-item[aria-current] { background: var(--accent-soft); color: var(--accent-text); font-weight: 620; }
+.nav-item[aria-current] .nic { color: var(--accent); }
+.nav-item[aria-current]::before {
+  content: ""; position: absolute; left: -10px; top: 7px; bottom: 7px;
+  width: 2px; border-radius: 0 2px 2px 0; background: var(--accent);
+}
+
+.side-foot { margin-top: auto; padding-top: 12px; }
+.mini-card {
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--surface); padding: 10px 11px;
+}
+.mini-card .hd {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding-bottom: 8px; margin-bottom: 9px;
+  border-bottom: 1px solid var(--border);
+}
+.mini-card .hd span { font: 620 11px var(--font-ui); }
+.mini-card .hd button {
+  height: 20px; padding-inline: 7px; border: 0; border-radius: var(--r-xs);
+  background: var(--accent-soft); color: var(--accent-text);
+  font: 600 10px var(--font-ui); cursor: pointer;
+}
+.meter { display: flex; flex-direction: column; gap: 5px; }
+.meter + .meter { margin-top: 9px; }
+.meter .row {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  font-size: 10.5px; color: var(--muted);
+}
+.meter .row .num { font: 500 10.5px var(--font-mono); color: var(--text); font-variant-numeric: tabular-nums; }
+.meter .bar { height: 3px; border-radius: var(--r-pill); background: var(--raised); overflow: hidden; }
+.meter .bar i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.meter .bar i.warn { background: var(--warn); }
+
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--canvas); }
+.page-head {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; align-items: center; gap: 20px; justify-content: space-between;
+  padding: 16px 26px 13px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--canvas) 88%, transparent);
+  backdrop-filter: blur(14px);
+}
+.page-head h1 { margin: 0; font-size: 19px; font-weight: 680; letter-spacing: -.028em; }
+.page-head .sub { margin: 3px 0 0; font-size: 11.5px; color: var(--muted); }
+.page-head .title-row { display: flex; align-items: center; gap: 9px; }
+.save-flag { display: inline-flex; align-items: center; gap: 5px; font: 550 10px var(--font-ui); color: var(--muted); }
+.save-flag i { width: 5px; height: 5px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 3px var(--good-soft); }
+
+.seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--r-md); background: var(--raised); max-width: 60%; overflow-x: auto; }
+.seg button {
+  height: 25px; padding-inline: 10px; border: 0; border-radius: var(--r-sm);
+  background: transparent; color: var(--muted);
+  font: 550 11.5px var(--font-ui); white-space: nowrap; cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.seg button:hover { color: var(--text); }
+.seg button[aria-current] { background: var(--surface); color: var(--text); box-shadow: var(--shadow-1); }
+
+.scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 26px 26px; display: flex; flex-direction: column; gap: 13px; }
+
+.card {
+  border: 1px solid var(--border); border-radius: var(--r-lg);
+  background: var(--surface); overflow: hidden; box-shadow: var(--shadow-1);
+}
+.card > header {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 18px;
+  padding: 12px 16px 11px;
+  border-bottom: 1px solid var(--border);
+  background: var(--sunken);
+}
+.card > header h3 { margin: 0; font-size: 13px; font-weight: 640; letter-spacing: -.012em; }
+.card > header p { margin: 3px 0 0; font-size: 11px; color: var(--muted); line-height: 1.45; }
+
+.group-label {
+  padding: 8px 16px 7px; border-bottom: 1px solid var(--border);
+  background: var(--sunken);
+  font: 650 9.5px var(--font-ui); letter-spacing: .075em;
+  text-transform: uppercase; color: var(--faint);
+}
+.rows { padding-inline: 16px; }
+.rows > * + * { border-top: 1px solid var(--border); }
+
+.row {
+  display: grid; gap: 8px 24px; align-items: center;
+  min-height: 54px; padding-block: 10px;
+}
+@media (min-width: 520px) {
+  .row { grid-template-columns: minmax(0, 1fr) minmax(0, auto); }
+}
+.row .lbl { font-size: 12.5px; font-weight: 580; color: var(--text); }
+.row .hint { margin-top: 3px; font-size: 10.5px; color: var(--muted); line-height: 1.45; }
+.row .ctl { justify-self: start; display: flex; align-items: center; gap: 7px; }
+@media (min-width: 520px) { .row .ctl { justify-self: end; } }
+.row .ctl.wide { width: 258px; }
+
+.hotkey-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; padding-block: 8px; }
+.hotkey-row .lbl { font-size: 12.5px; font-weight: 580; }
+.hotkey-row .hint { margin-top: 2px; font-size: 10.5px; color: var(--muted); }
+.capture {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 30px; padding-inline: 9px; min-width: 152px; justify-content: center;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface);
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+}
+.capture:hover { border-color: var(--border-strong); }
+.capture.recording { border-color: var(--accent); box-shadow: var(--ring); }
+kbd {
+  display: inline-grid; place-items: center;
+  min-width: 21px; height: 21px; padding-inline: 5px;
+  border: 1px solid var(--border-strong); border-radius: var(--r-xs);
+  background: var(--raised); color: var(--text);
+  font: 550 11px var(--font-mono);
+  box-shadow: 0 1px 0 var(--border-strong);
+}
+kbd.dim { color: var(--faint); box-shadow: none; background: transparent; border-color: var(--border); }
+.capture .key { font: 600 12px var(--font-mono); color: var(--accent-text); margin-left: 3px; }
+.capture .clear { color: var(--faint); display: grid; place-items: center; }
+.capture .clear:hover { color: var(--danger); }
+
+.swatches { display: flex; gap: 6px; }
+.swatch {
+  width: 24px; height: 24px; border-radius: var(--r-sm); cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, .16);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .1);
+}
+.swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent); }
+.swatch.white { border-color: rgba(0, 0, 0, .22); }
+
+/* ============================ 2 · RESULT ================================ */
+.result { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--canvas); }
+.res-bar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 10px 8px 13px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.res-bar .drag { display: flex; align-items: center; gap: 7px; margin-right: auto; min-width: 0; }
+.res-bar .drag .t { font-size: 12px; font-weight: 620; letter-spacing: -.012em; }
+.res-bar .drag .m { font: 500 10.5px var(--font-mono); color: var(--faint); }
+
+.stack { flex: 1; min-height: 0; overflow-y: auto; padding: 11px 12px 12px; display: flex; flex-direction: column; gap: 10px; }
+
+.panel {
+  border: 1px solid var(--border); border-radius: var(--r-lg);
+  background: var(--surface); box-shadow: var(--shadow-1); overflow: hidden;
+}
+.panel > .cap {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 11px; border-bottom: 1px solid var(--border);
+  background: var(--sunken);
+}
+.panel > .cap .k { font: 650 9.5px var(--font-ui); letter-spacing: .075em; text-transform: uppercase; color: var(--faint); }
+.panel > .cap .spacer { margin-left: auto; }
+
+.src-body { padding: 10px 12px 11px; }
+.src-body p { margin: 0; font-size: 13px; line-height: 1.62; color: var(--text); }
+.src-body p em { font-style: normal; background: var(--accent-soft); color: var(--accent-text); border-radius: 3px; padding: 0 2px; }
+.src-foot {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 9px; border-top: 1px solid var(--border);
+  background: var(--sunken);
+}
+
+.langbar { display: flex; align-items: center; gap: 8px; padding: 9px 11px; }
+.langbar .pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 28px; padding-inline: 10px;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface); font: 550 11.5px var(--font-ui); color: var(--text);
+  cursor: pointer;
+}
+.langbar .pill .caret { color: var(--faint); display: grid; place-items: center; }
+.langbar .swap {
+  width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 50%;
+  background: var(--surface); color: var(--muted); display: grid; place-items: center;
+  cursor: pointer; transition: transform var(--t-base), color var(--t-fast);
+}
+.langbar .swap:hover { color: var(--accent); transform: rotate(180deg); }
+.langbar .auto { margin-left: auto; font: 500 10.5px var(--font-mono); color: var(--faint); }
+
+.pcard { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); overflow: hidden; }
+.pcard + .pcard { margin-top: 8px; }
+.pcard .top {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 9px; border-bottom: 1px solid var(--border); background: var(--sunken);
+}
+.pcard .brandline { width: 3px; height: 14px; border-radius: var(--r-pill); flex: none; }
+.pcard .pname { font-size: 11.5px; font-weight: 620; letter-spacing: -.008em; }
+.pcard .acts { margin-left: auto; display: flex; gap: 1px; }
+.pcard .body { padding: 9px 11px 10px; font-size: 13px; line-height: 1.6; color: var(--text); }
+.pcard .body.skel { display: flex; flex-direction: column; gap: 7px; justify-content: center; }
+.skel i {
+  display: block; height: 7px; border-radius: var(--r-pill); background: var(--raised);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+.skel i:nth-child(1) { width: 92%; }
+.skel i:nth-child(2) { width: 74%; animation-delay: .18s; }
+.skel i:nth-child(3) { width: 46%; animation-delay: .36s; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+.pcard.err .body { color: var(--danger); display: flex; align-items: center; gap: 8px; font-size: 11.5px; }
+
+/* ======================= 3 · CAPTURE EDITOR TOOLBAR ==================== */
+.scene {
+  position: relative; flex: 1; min-height: 0; overflow: hidden;
+  background: #1a1d24;
+  display: grid; place-items: center;
+}
+.mock-doc {
+  width: 74%; padding: 18px 20px 20px;
+  background: #fbfbfc; color: #22252c; border-radius: 8px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .5);
+}
+.mock-doc .bar { display: flex; gap: 5px; margin-bottom: 12px; }
+.mock-doc .bar i { width: 7px; height: 7px; border-radius: 50%; background: #d8dade; }
+.mock-doc h4 { margin: 0 0 4px; font-size: 13px; font-weight: 700; letter-spacing: -.02em; }
+.mock-doc .by { font-size: 10px; color: #8d93a1; margin-bottom: 9px; }
+.mock-doc .ln { height: 5px; border-radius: 3px; background: #e6e8ec; margin-bottom: 6px; }
+.mock-doc .ln:nth-child(odd) { width: 96%; }
+.mock-doc .ln:nth-child(even) { width: 78%; }
+
+.scrim { position: absolute; inset: 0; background: rgba(9, 11, 16, .58); }
+.sel-box {
+  position: absolute; left: 12%; top: 16%; width: 62%; height: 56%;
+  border: 1px solid var(--accent);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .55), 0 0 0 9999px rgba(9, 11, 16, .58);
+  border-radius: 2px;
+}
+.sel-size {
+  position: absolute; right: -1px; top: -22px;
+  padding: 2px 6px; border-radius: var(--r-xs);
+  background: var(--accent); color: #fff;
+  font: 550 10px var(--font-mono); white-space: nowrap;
+}
+.handle {
+  position: absolute; width: 8px; height: 8px; border-radius: 2px;
+  background: #fff; border: 1px solid var(--accent);
+}
+.handle.tl { left: -4px; top: -4px; } .handle.tr { right: -4px; top: -4px; }
+.handle.bl { left: -4px; bottom: -4px; } .handle.br { right: -4px; bottom: -4px; }
+
+.toolbar {
+  position: absolute; display: flex; align-items: center; gap: 2px;
+  padding: 4px 5px; border-radius: 11px;
+  background: var(--surface);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .34), 0 0 0 1px var(--border);
+}
+.tool {
+  width: 28px; height: 28px; border: 0; border-radius: var(--r-sm);
+  background: transparent; color: var(--muted);
+  display: grid; place-items: center; cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.tool:hover { background: var(--raised); color: var(--text); }
+.tool[aria-pressed="true"] {
+  background: var(--accent-soft); color: var(--accent-text);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+.tool.sep-b { margin-right: 6px; }
+.tool .caret {
+  position: absolute; right: 2px; bottom: 2px;
+  width: 0; height: 0;
+  border-left: 3px solid transparent; border-bottom: 3px solid currentColor;
+  opacity: .5;
+}
+.tool.wrap { position: relative; }
+.divider { width: 1px; height: 18px; background: var(--border); margin-inline: 5px; flex: none; }
+
+.colorwell {
+  width: 28px; height: 28px; border-radius: var(--r-sm); border: 0; cursor: pointer;
+  background: linear-gradient(135deg, #e53935 0%, #fb8c00 45%, #43a047 72%, #1e88e5 100%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18);
+  position: relative; flex: none;
+}
+.colorwell::after {
+  content: ""; position: absolute; right: 3px; bottom: 3px;
+  width: 7px; height: 7px; border-radius: 2px;
+  background: #e53935; box-shadow: 0 0 0 1px rgba(255, 255, 255, .9);
+}
+.stroke { display: flex; align-items: center; gap: 7px; padding-inline: 4px 6px; }
+.stroke .track { position: relative; width: 78px; height: 3px; border-radius: var(--r-pill); background: var(--raised); }
+.stroke .fill { position: absolute; inset: 0 45% 0 0; background: var(--text); border-radius: var(--r-pill); }
+.stroke .knob {
+  position: absolute; top: 50%; left: 55%; width: 11px; height: 11px;
+  transform: translate(-50%, -50%); border-radius: 50%;
+  background: var(--surface); box-shadow: 0 0 0 1px var(--border-strong), 0 1px 3px rgba(0, 0, 0, .25);
+}
+.stroke .n { font: 500 10.5px var(--font-mono); color: var(--muted); min-width: 13px; text-align: right; }
+.tool.act { width: auto; padding-inline: 10px; gap: 6px; font: 600 11px var(--font-ui); }
+
+.shot-tip {
+  position: absolute; display: flex; flex-direction: column; gap: 3px;
+  font: 500 10.5px var(--font-mono); color: #cdd4e0;
+  background: rgba(12, 15, 21, .82); border: 1px solid rgba(255, 255, 255, .13);
+  padding: 6px 9px; border-radius: var(--r-sm);
+}
+
+/* ============================ 4 · PINNED IMAGE ========================= */
+.pin-stage {
+  position: relative; flex: 1; min-height: 0; overflow: hidden;
+  background:
+    linear-gradient(45deg, #242833 25%, transparent 25%, transparent 75%, #242833 75%) 0 0 / 18px 18px,
+    linear-gradient(45deg, #242833 25%, transparent 25%, transparent 75%, #242833 75%) 9px 9px / 18px 18px,
+    #1c2029;
+  display: grid; place-items: center;
+}
+.pin-img {
+  width: 66%; aspect-ratio: 16 / 10; border-radius: 4px; overflow: hidden;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, .55);
+  background: #fbfbfc; color: #22252c; padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.pin-img .h { display: flex; gap: 5px; }
+.pin-img .h i { width: 6px; height: 6px; border-radius: 50%; background: #d8dade; }
+.pin-img .ln { height: 5px; border-radius: 3px; background: #e6e8ec; }
+.pin-img .ln.w1 { width: 90%; } .pin-img .ln.w2 { width: 68%; } .pin-img .ln.w3 { width: 82%; }
+
+.pin-hover {
+  position: absolute; top: 10px; right: 10px;
+  display: flex; gap: 2px; padding: 3px;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-2);
+  opacity: .94;
+}
+.pin-hover .tool { width: 26px; height: 26px; }
+
+.ctx {
+  position: absolute; width: 172px; padding: 5px;
+  border-radius: var(--r-md); background: var(--surface);
+  box-shadow: var(--shadow-3); display: flex; flex-direction: column; gap: 1px;
+}
+.ctx button {
+  display: flex; align-items: center; gap: 8px;
+  height: 27px; padding-inline: 8px;
+  border: 0; border-radius: var(--r-sm); background: transparent;
+  color: var(--text); font: 500 11.5px var(--font-ui);
+  text-align: left; cursor: pointer; transition: background var(--t-fast);
+}
+.ctx button:hover { background: var(--raised); }
+.ctx button .key { margin-left: auto; font: 500 10px var(--font-mono); color: var(--faint); }
+.ctx button.danger { color: var(--danger); }
+.ctx button.danger:hover { background: var(--danger-soft); }
+.ctx .sep { height: 1px; background: var(--border); margin: 4px 5px; }
+.ctx .grp {
+  padding: 5px 8px 3px;
+  font: 650 9.5px var(--font-ui); letter-spacing: .075em;
+  text-transform: uppercase; color: var(--faint);
+}
+.opdot { margin-left: auto; display: flex; gap: 3px; }
+.opdot i { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--border-strong); }
+.opdot i.on { border-color: var(--accent); background: var(--accent-soft); }
+
+.magnifier {
+  position: absolute; width: 148px; overflow: hidden;
+  border-radius: var(--r-md); background: #10131a;
+  box-shadow: var(--shadow-3), 0 0 0 1px rgba(255, 255, 255, .12);
+}
+.magnifier .lens {
+  position: relative; height: 88px;
+  background:
+    linear-gradient(#2b3140 0 12px, #1d222d 12px 24px, #2b3140 24px 36px, #1d222d 36px 48px, #2b3140 48px 60px, #1d222d 60px 72px, #2b3140 72px 84px),
+    0 0 / 100% 84px;
+  background-size: 100% 12px;
+}
+.magnifier .cross-h, .magnifier .cross-v { position: absolute; background: rgba(255, 255, 255, .5); }
+.magnifier .cross-h { left: 0; right: 0; top: 50%; height: 1px; }
+.magnifier .cross-v { top: 0; bottom: 0; left: 50%; width: 1px; }
+.magnifier .foot {
+  display: flex; align-items: center; gap: 7px; padding: 6px 8px;
+  border-top: 1px solid rgba(255, 255, 255, .1);
+}
+.magnifier .chip {
+  width: 13px; height: 13px; border-radius: 3px; background: #5b7fff;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .35);
+}
+.magnifier .hex { font: 550 11px var(--font-mono); color: #eef1f6; }
+.magnifier .fmt { margin-left: auto; font: 500 9.5px var(--font-mono); color: #7f889b; }
+
+/* ── Token & component reference ───────────────────────────────────────── */
+.ref { padding-block: 44px 0; }
+.ref-grid { display: grid; gap: 26px; }
+@media (min-width: 860px) { .ref-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.ref-card {
+  border: 1px solid rgba(255, 255, 255, .09);
+  border-radius: var(--r-lg);
+  background: rgba(255, 255, 255, .022);
+  padding: 18px 18px 20px;
+}
+.ref-card h3 {
+  margin: 0 0 3px; font-size: 13px; font-weight: 620; color: #eef1f6;
+  letter-spacing: -.01em;
+}
+.ref-card .note { margin: 0 0 15px; font-size: 12px; color: #8b93a4; }
+
+.swatches-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 9px; }
+.sw-cell { display: flex; align-items: center; gap: 9px; }
+.sw-cell .chip {
+  width: 30px; height: 30px; border-radius: var(--r-sm); flex: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16);
+}
+.sw-cell .meta { min-width: 0; }
+.sw-cell .nm { font: 550 11px var(--font-mono); color: #dde2ea; }
+.sw-cell .hx { font: 400 10px var(--font-mono); color: #767e90; text-transform: uppercase; }
+
+.scale-row { display: flex; align-items: baseline; gap: 14px; padding-block: 7px; border-bottom: 1px solid rgba(255, 255, 255, .055); }
+.scale-row:last-child { border-bottom: 0; }
+.scale-row .tag { width: 128px; flex: none; font: 500 10.5px var(--font-mono); color: #7f8798; }
+.scale-row .demo { color: #e5e9f0; min-width: 0; }
+
+/* Live component samples sit on the real surface so both themes read true. */
+.demo-pad { border-radius: var(--r-lg); padding: 18px; background: var(--canvas); border: 1px solid var(--border); }
+.demo-pad .stack-v { display: flex; flex-direction: column; gap: 14px; }
+.demo-pad .stack-h { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.demo-pad .caption { font: 500 10.5px var(--font-mono); color: var(--muted); }
+
+footer.colophon {
+  margin-top: 52px; padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, .09);
+  font-size: 12px; color: #7b8395;
+  display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between;
+}
+footer.colophon code { font-family: var(--font-mono); font-size: 11px; color: #c3cbd9; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div>
+      <h1>SnapLingo 界面重设计<span class="version-tag">v0.1.6</span></h1>
+      <p class="lede">四个窗口的视觉规范与语义色令牌。先定令牌，再定组件，最后才是页面——这样深色模式是换一组变量值，而不是往每个组件上贴覆盖规则。</p>
+    </div>
+    <div class="masthead-side">
+      <div class="theme-switch" role="radiogroup" aria-label="预览主题">
+        <input type="radio" name="theme" id="theme-sys" checked>
+        <label for="theme-sys">跟随系统</label>
+        <input type="radio" name="theme" id="theme-light">
+        <label for="theme-light">浅色</label>
+        <input type="radio" name="theme" id="theme-dark">
+        <label for="theme-dark">深色</label>
+      </div>
+      <span class="shot-bar meta" style="padding:0">切换后所有窗口示例同时更新</span>
+    </div>
+  </header>
+
+  <!-- ═════════════════════ 1 · 设置窗口 ═════════════════════ -->
+  <section class="plate" id="settings">
+    <div class="plate-head">
+      <h2><span class="ord">01 / 04</span>设置窗口</h2>
+      <p>202 × 内容区。侧栏从 <code>gray-50</code> 换成 <code>--sunken</code>，与内容区 <code>--canvas</code> 只差一级明度，去掉那条 <code>gray-200</code> 分割线；激活项用 2px 强调色指示条贴侧栏左沿，而不是给整块上底色。所有分组卡片改为 10px 圆角 + 单像素边框，阴影只留 1px 那层。</p>
+    </div>
+
+    <div class="screens">
+      <div class="shot">
+        <div class="shot-bar"><b>截图 · 快捷键与保存</b><span class="meta">settings · 900 × 660</span></div>
+        <div class="frame h-660">
+          <div class="set">
+            <aside class="side">
+              <div class="brand">
+                <div class="mark">S</div>
+                <div>
+                  <div class="name">SnapLingo</div>
+                  <div class="ver">0.1.6 · arm64</div>
+                </div>
+              </div>
+
+              <nav class="nav" aria-label="设置">
+                <button class="nav-item" type="button"><span class="nic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.2 2.2M16.9 16.9l2.2 2.2M19.1 4.9l-2.2 2.2M7.1 16.9l-2.2 2.2"/></svg></span>通用</button>
+                <button class="nav-item" type="button" aria-current="page"><span class="nic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.7l1.2-2h7.2l1.2 2h1.7A2.5 2.5 0 0 1 21 8.5v8A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5z"/><circle cx="12" cy="12.5" r="3.2"/></svg></span>截图</button>
+                <button class="nav-item" type="button"><span class="nic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h11M9.5 3v2M7 5c0 4-2 7-4 8.5M10.5 9c1 2.6 2.5 4.4 4.5 5.6M19.5 8.5A5.5 5.5 0 0 0 17 13c-2.2 0-4-1.4-5.5-3.5"/><path d="M12.5 21 16 12l3.5 9M14 18.4h4"/></svg></span>翻译</button>
+                <button class="nav-item" type="button"><span class="nic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V6a2 2 0 0 1 2-2h2.5M16.5 4H19a2 2 0 0 1 2 2v2M21 16v2a2 2 0 0 1-2 2h-2.5M7.5 20H6a2 2 0 0 1-2-2v-2"/><path d="M4.5 12.5h11M4.5 16.5h7"/></svg></span>OCR</button>
+                <button class="nav-item" type="button"><span class="nic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3.5" width="18" height="6.5" rx="1.8"/><rect x="3" y="13.5" width="18" height="6.5" rx="1.8"/><path d="M7 6.75h.01M7 16.75h.01"/></svg></span>服务</button>
+              </nav>
+
+              <nav class="nav" aria-label="资料库">
+                <div class="nav-label">资料库</div>
+                <button class="nav-item" type="button"><span class="nic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/></svg></span>收藏夹<span class="count">128</span></button>
+                <button class="nav-item" type="button"><span class="nic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.4v5l3 1.8"/></svg></span>历史记录<span class="count">1.2k</span></button>
+              </nav>
+
+              <div class="side-foot">
+                <div class="mini-card">
+                  <div class="hd">
+                    <span>历史与收藏</span>
+                    <button type="button">设置</button>
+                  </div>
+                  <div class="meter">
+                    <div class="row"><span>历史已用</span><span class="num">1,204 / 5,000</span></div>
+                    <div class="bar"><i style="width:24%"></i></div>
+                  </div>
+                  <div class="meter">
+                    <div class="row"><span>收藏已用</span><span class="num">128 / 1,000</span></div>
+                    <div class="bar"><i style="width:13%"></i></div>
+                  </div>
+                  <div class="meter">
+                    <div class="row"><span>保留天数</span><span class="num">30 天</span></div>
+                    <div class="bar"><i class="warn" style="width:60%"></i></div>
+                  </div>
+                </div>
+              </div>
+            </aside>
+
+            <main class="main">
+              <div class="page-head">
+                <div>
+                  <div class="title-row">
+                    <h1>截图</h1>
+                    <span class="save-flag"><i></i>自动保存</span>
+                  </div>
+                  <p class="sub">快捷键、输出文件与标注默认值</p>
+                </div>
+                <div class="seg">
+                  <button type="button" aria-current="page">快捷键</button>
+                  <button type="button">保存</button>
+                  <button type="button">编辑器</button>
+                  <button type="button">贴图</button>
+                </div>
+              </div>
+
+              <div class="scroll">
+                <section class="card">
+                  <header>
+                    <div>
+                      <h3>功能快捷键</h3>
+                      <p>点击任意一行进入录制，Esc 取消，退格清除</p>
+                    </div>
+                    <span class="badge soft">5 项</span>
+                  </header>
+                  <div class="rows">
+                    <div class="hotkey-row">
+                      <div>
+                        <div class="lbl">截屏</div>
+                        <div class="hint">冻结屏幕并进入选区编辑</div>
+                      </div>
+                      <div class="capture">
+                        <kbd class="dim">⇧</kbd><kbd class="dim">⌥</kbd><kbd class="dim">⌘</kbd><span class="key">1</span>
+                      </div>
+                    </div>
+                    <div class="hotkey-row">
+                      <div>
+                        <div class="lbl">截屏并自动复制</div>
+                        <div class="hint">完成后直接写入剪贴板，不弹出结果窗口</div>
+                      </div>
+                      <div class="capture recording">
+                        <kbd>⇧</kbd><kbd>⌥</kbd><kbd>⌘</kbd><span class="key" style="color:var(--faint)">按下按键…</span>
+                      </div>
+                    </div>
+                    <div class="hotkey-row">
+                      <div>
+                        <div class="lbl">贴图</div>
+                      </div>
+                      <div class="capture">
+                        <kbd>F3</kbd>
+                        <span class="clear"><svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span>
+                      </div>
+                    </div>
+                    <div class="hotkey-row">
+                      <div>
+                        <div class="lbl">隐藏 / 显示所有贴图</div>
+                      </div>
+                      <div class="capture">
+                        <kbd>⇧</kbd><kbd>⌥</kbd><span class="key">P</span>
+                        <span class="clear"><svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span>
+                      </div>
+                    </div>
+                    <div class="hotkey-row">
+                      <div>
+                        <div class="lbl">切换到另一贴图组</div>
+                      </div>
+                      <div class="capture" style="border-style:dashed">
+                        <span style="color:var(--faint);font-size:11px">未设置 · 点击录制</span>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="card">
+                  <header>
+                    <div>
+                      <h3>输出文件</h3>
+                      <p>截图保存位置、格式与命名方式</p>
+                    </div>
+                  </header>
+                  <div class="rows">
+                    <div class="row">
+                      <div>
+                        <div class="lbl">默认保存路径</div>
+                        <div class="hint">截图文件保存到此文件夹</div>
+                      </div>
+                      <div class="ctl">
+                        <label class="field wide" style="width:214px">
+                          <input type="text" value="~/Pictures/SnapLingo" spellcheck="false" aria-label="默认保存路径">
+                        </label>
+                        <button class="btn" type="button">浏览</button>
+                      </div>
+                    </div>
+                    <div class="row">
+                      <div class="lbl">图片格式</div>
+                      <div class="ctl">
+                        <label class="field" style="width:118px">
+                          <span>PNG</span>
+                          <span class="caret"><svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
+                        </label>
+                      </div>
+                    </div>
+                    <div class="row">
+                      <div>
+                        <div class="lbl">图片质量</div>
+                        <div class="hint">仅对 JPG 和 WebP 格式生效</div>
+                      </div>
+                      <div class="ctl">
+                        <div class="slider">
+                          <div class="track"><div class="fill"></div><div class="knob"></div></div>
+                          <span class="readout">92%</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="row">
+                      <div class="lbl">文件命名规则</div>
+                      <div class="ctl">
+                        <label class="field" style="width:138px">
+                          <span>时间戳</span>
+                          <span class="caret"><svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="card">
+                  <header>
+                    <div>
+                      <h3>行为</h3>
+                      <p>截图完成与编辑器打开时的默认动作</p>
+                    </div>
+                  </header>
+                  <div class="rows">
+                    <div class="row">
+                      <div>
+                        <div class="lbl">自动复制到剪贴板</div>
+                        <div class="hint">保存的同时将图片写入剪贴板</div>
+                      </div>
+                      <div class="ctl"><button class="toggle on" type="button" role="switch" aria-checked="true" aria-label="自动复制到剪贴板"></button></div>
+                    </div>
+                    <div class="row">
+                      <div>
+                        <div class="lbl">在主屏显示选区</div>
+                        <div class="hint">多显示器时从当前指针所在屏幕开始</div>
+                      </div>
+                      <div class="ctl"><button class="toggle" type="button" role="switch" aria-checked="false" aria-label="在主屏显示选区"></button></div>
+                    </div>
+                    <div class="row">
+                      <div>
+                        <div class="lbl">外部显示器延迟</div>
+                        <div class="hint">远程或外接屏截取前的等待时间</div>
+                      </div>
+                      <div class="ctl">
+                        <div class="stepper">
+                          <button type="button" aria-label="减少">−</button>
+                          <span class="val">240</span>
+                          <button type="button" aria-label="增加">+</button>
+                          <span class="unit">ms</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="card">
+                  <div class="group-label">系统权限</div>
+                  <div class="rows">
+                    <div class="row">
+                      <div>
+                        <div class="lbl">屏幕录制</div>
+                        <div class="hint">截取屏幕内容所需</div>
+                      </div>
+                      <div class="ctl"><span class="badge good dot">已授权</span></div>
+                    </div>
+                    <div class="row">
+                      <div>
+                        <div class="lbl">辅助功能</div>
+                        <div class="hint">读取划词选区与全局快捷键</div>
+                      </div>
+                      <div class="ctl">
+                        <span class="badge warn dot">未授权</span>
+                        <button class="btn" type="button">前往设置</button>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </main>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════════════════ 2 · 结果窗口 ═════════════════════ -->
+  <section class="plate" id="result">
+    <div class="plate-head">
+      <h2><span class="ord">02 / 04</span>翻译结果窗口</h2>
+      <p>窗口本身是圆角浮层，所以内部不再叠圆角卡片——原文面板去边框，只保留一条 <code>--sunken</code> 底色带；译文按服务方拆成独立小卡，左侧 3px 服务色条从 14px 高缩到 14px 宽并贴到卡片边缘。骨架屏、失败态、折叠态都在这里定死。</p>
+    </div>
+
+    <div class="screens pair">
+      <div class="shot">
+        <div class="shot-bar"><b>翻译中 · 多服务并排</b><span class="meta">result · 640 × 460</span></div>
+        <div class="frame h-460">
+          <div class="result">
+            <div class="res-bar">
+              <div class="drag">
+                <svg class="ic sm" style="color:var(--faint)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h.01M9 12h.01M9 18h.01M15 6h.01M15 12h.01M15 18h.01"/></svg>
+                <span class="t">翻译结果</span>
+                <span class="m">截屏 · 2 个服务</span>
+              </div>
+              <button class="icon-btn" type="button" aria-label="贴图"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7.5 7.5M3 21l7.5-7.5"/></svg></button>
+              <button class="icon-btn on" type="button" aria-label="已收藏"><svg class="ic" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/></svg></button>
+              <button class="icon-btn" type="button" aria-label="历史"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.4v5l3 1.8"/></svg></button>
+              <button class="icon-btn" type="button" aria-label="设置"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 2 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.5-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 9 4.6a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9 2 2 0 1 1 0 4z"/></svg></button>
+              <button class="icon-btn" type="button" aria-label="关闭"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+            </div>
+
+            <div class="stack">
+              <section class="panel">
+                <div class="cap">
+                  <span class="k">原文</span>
+                  <span class="badge soft">OCR · 中文简体</span>
+                  <span class="spacer"></span>
+                  <button class="icon-btn sm" type="button" aria-label="朗读原文"><svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6.5 9H3v6h3.5L11 19z"/><path d="M15.4 9.2a4 4 0 0 1 0 5.6"/></svg></button>
+                  <button class="icon-btn sm" type="button" aria-label="复制原文"><svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/></svg></button>
+                </div>
+                <div class="src-body">
+                  <p>冻结屏幕会让整个桌面进入只读快照，选区确认之前所有窗口都停止重绘。这样拖动时不会因为底层内容刷新而出现撕裂。</p>
+                </div>
+                <div class="src-foot">
+                  <button class="icon-btn sm" type="button" aria-label="清除"><svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6v14a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V6"/></svg></button>
+                  <span class="mono" style="font-size:10.5px;color:var(--faint)">58 字</span>
+                  <span class="spacer"></span>
+                  <span class="badge soft">150 ms 后自动翻译</span>
+                </div>
+              </section>
+
+              <section class="panel">
+                <div class="langbar">
+                  <button class="pill" type="button" aria-label="源语言：自动检测">
+                    自动检测
+                    <span class="caret"><svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
+                  </button>
+                  <button class="swap" type="button" aria-label="交换语言"><svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4 3 8l4 4M3 8h13M17 20l4-4-4-4M21 16H8"/></svg></button>
+                  <button class="pill" type="button" aria-label="目标语言：中文简体">
+                    中文简体
+                    <span class="caret"><svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
+                  </button>
+                  <span class="auto">zh-CN</span>
+                </div>
+              </section>
+
+              <div>
+                <section class="pcard">
+                  <div class="top">
+                    <span class="brandline" style="background:#4285f4"></span>
+                    <span class="pname">Google 翻译</span>
+                    <span class="badge soft">主</span>
+                    <span class="acts">
+                      <button class="icon-btn sm" type="button" aria-label="朗读"><svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6.5 9H3v6h3.5L11 19z"/><path d="M15.4 9.2a4 4 0 0 1 0 5.6"/></svg></button>
+                      <button class="icon-btn sm" type="button" aria-label="复制"><svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/></svg></button>
+                      <button class="icon-btn sm" type="button" aria-label="收起"><svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg></button>
+                    </span>
+                  </div>
+                  <div class="body">Freezing the screen puts the whole desktop into a read-only snapshot; no window repaints until you confirm the selection. That way dragging never tears as content underneath refreshes.</div>
+                </section>
+
+                <section class="pcard">
+                  <div class="top">
+                    <span class="brandline" style="background:#0f2b46"></span>
+                    <span class="pname">DeepL</span>
+                    <span class="badge" style="background:var(--accent-soft);color:var(--accent-text)">翻译中</span>
+                    <span class="acts">
+                      <button class="icon-btn sm" type="button" aria-label="取消"><svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+                    </span>
+                  </div>
+                  <div class="body skel" style="min-height:62px">
+                    <i></i><i></i><i></i>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="shot">
+        <div class="shot-bar"><b>失败重试 · 折叠态</b><span class="meta">result · 640 × 460</span></div>
+        <div class="frame h-460">
+          <div class="result">
+            <div class="res-bar">
+              <div class="drag">
+                <svg class="ic sm" style="color:var(--faint)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h.01M9 12h.01M9 18h.01M15 6h.01M15 12h.01M15 18h.01"/></svg>
+                <span class="t">翻译结果</span>
+                <span class="m">划线取词 · 1 个服务</span>
+              </div>
+              <button class="icon-btn" type="button" aria-label="贴图"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7.5 7.5M3 21l7.5-7.5"/></svg></button>
+              <button class="icon-btn" type="button" aria-label="收藏"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/></svg></button>
+              <button class="icon-btn" type="button" aria-label="历史"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.4v5l3 1.8"/></svg></button>
+              <button class="icon-btn" type="button" aria-label="关闭"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+            </div>
+
+            <div class="stack">
+              <section class="panel">
+                <div class="cap">
+                  <span class="k">原文</span>
+                  <span class="badge soft">划词 · 英文</span>
+                  <span class="spacer"></span>
+                  <span class="mono" style="font-size:10.5px;color:var(--faint)">3 词</span>
+                </div>
+                <div class="src-body">
+                  <p>idempotent</p>
+                </div>
+              </section>
+
+              <section class="panel">
+                <div class="langbar">
+                  <button class="pill" type="button">英语 <span class="caret"><svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span></button>
+                  <button class="swap" type="button" aria-label="交换语言"><svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4 3 8l4 4M3 8h13M17 20l4-4-4-4M21 16H8"/></svg></button>
+                  <button class="pill" type="button">中文简体 <span class="caret"><svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span></button>
+                </div>
+              </section>
+
+              <div>
+                <section class="pcard err">
+                  <div class="top">
+                    <span class="brandline" style="background:#0f2b46"></span>
+                    <span class="pname">DeepL</span>
+                    <span class="badge danger">失败</span>
+                    <span class="acts">
+                      <button class="icon-btn sm" type="button" aria-label="重试" title="重试"><svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.66"/><path d="M20 4v4h-4"/></svg></button>
+                      <button class="icon-btn sm" type="button" aria-label="展开"><svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+                    </span>
+                  </div>
+                  <div class="body">
+                    <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4.5M12 16h.01"/></svg>
+                    请求超时，已重试 2 次
+                  </div>
+                </section>
+
+                <section class="pcard">
+                  <div class="top">
+                    <span class="brandline" style="background:#2932e1"></span>
+                    <span class="pname">百度翻译</span>
+                    <span class="badge good">已折叠</span>
+                    <span class="acts">
+                      <button class="icon-btn sm" type="button" aria-label="复制"><svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/></svg></button>
+                      <button class="icon-btn sm" type="button" aria-label="展开"><svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+                    </span>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════════════════ 3 · 截图编辑器 ═════════════════════ -->
+  <section class="plate" id="capture">
+    <div class="plate-head">
+      <h2><span class="ord">03 / 04</span>截图编辑器工具栏</h2>
+      <p>工具栏现在是 <code>bg-white/95</code> + 14px 圆角 + 大阴影，浮在暗遮罩上偏"卡片"；改成不透明 <code>--surface</code> + 11px 圆角 + 一层外投影，靠 <code>--border</code> 一像素描边定位。工具图标统一 28px 命中区、1.7px 描边，激活态是浅强调底 + 内描边而不是发光。</p>
+    </div>
+
+    <div class="screens">
+      <div class="shot">
+        <div class="shot-bar"><b>选区完成 · 标注工具就绪</b><span class="meta">capture · 全屏遮罩</span></div>
+        <div class="frame h-400">
+          <div class="scene">
+            <div class="mock-doc">
+              <div class="bar"><i></i><i></i><i></i></div>
+              <h4>Freezing the screen puts the desktop into a snapshot</h4>
+              <div class="by">docs / capture-pipeline</div>
+              <div class="ln"></div><div class="ln"></div><div class="ln"></div><div class="ln"></div><div class="ln"></div>
+            </div>
+            <div class="sel-box">
+              <span class="sel-size">1280 × 720 · 2x</span>
+              <span class="handle tl"></span><span class="handle tr"></span>
+              <span class="handle bl"></span><span class="handle br"></span>
+            </div>
+
+            <div class="toolbar" style="left:50%;top:calc(16% - 52px);transform:translateX(-50%);width:max-content">
+              <button class="tool" type="button" aria-pressed="true" aria-label="选择与移动">
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5 19 12l-6 1.4L10.6 20z"/></svg>
+              </button>
+              <button class="tool wrap" type="button" aria-label="形状">
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="6" width="17" height="12" rx="2"/></svg>
+                <span class="caret"></span>
+              </button>
+              <button class="tool wrap" type="button" aria-label="箭头与线条">
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19 18 6M12 6h6v6"/></svg>
+                <span class="caret"></span>
+              </button>
+              <button class="tool" type="button" aria-label="画笔">
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 3.5 20.5 7.5 9 19l-5 1 1-5z"/></svg>
+              </button>
+              <button class="tool" type="button" aria-label="荧光笔">
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4.5 19.5 10 11 18.5H6.5L4 16z"/><path d="M3.5 21h9"/></svg>
+              </button>
+              <button class="tool" type="button" aria-label="文字">
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6.5V5h14v1.5M12 5v14M9 19h6"/></svg>
+              </button>
+              <button class="tool" type="button" aria-label="马赛克">
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 4h5v5H4zM9 9h5v5H9zM14 4h5v5h-5zM4 14h5v5H4zM14 14h5v5h-5z"/></svg>
+              </button>
+              <button class="tool" type="button" aria-label="橡皮擦">
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m8.5 19-4-4a1.6 1.6 0 0 1 0-2.3l7-7a1.6 1.6 0 0 1 2.3 0l4.7 4.7a1.6 1.6 0 0 1 0 2.3L13.8 19z"/><path d="M5 19h14"/></svg>
+              </button>
+              <span class="divider"></span>
+              <button class="tool" type="button" aria-label="撤销" disabled style="opacity:.4">
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
+              </button>
+              <button class="tool" type="button" aria-label="重做">
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg>
+              </button>
+              <span class="divider"></span>
+              <button class="colorwell" type="button" aria-label="标注颜色"></button>
+              <span class="stroke">
+                <span class="track"><span class="fill"></span><span class="knob"></span></span>
+                <span class="n">3</span>
+              </span>
+              <span class="divider"></span>
+              <button class="tool act" type="button" aria-label="保存">
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10M8.5 10.5 12 14l3.5-3.5"/><path d="M5 18h14"/></svg>
+                保存
+              </button>
+              <button class="tool" type="button" aria-label="复制">
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/></svg>
+              </button>
+              <button class="tool" type="button" aria-label="贴图">
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h6v6M9 20H3v-6M21 4l-7 7M3 20l7-7"/></svg>
+              </button>
+              <button class="tool" type="button" aria-label="取消">
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+
+            <div class="shot-tip" style="left:12%;top:calc(16% + 56% + 14px)">
+              <span>拖动调整选区 · 方向键微调</span>
+              <span>Enter 完成 · Esc 取消</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════════════════ 4 · 贴图窗口 ═════════════════════ -->
+  <section class="plate" id="pin">
+    <div class="plate-head">
+      <h2><span class="ord">04 / 04</span>贴图窗口</h2>
+      <p>贴图悬浮在任意内容之上，所以它的浮层必须不透明并且自证边界。<code>bg-neutral-950/95</code> 那套硬编码深色换成主题令牌——浅色系统下菜单是浅的，深色系统下自动反相。悬停工具条与右键菜单共用一套行高与圆角。</p>
+    </div>
+
+    <div class="screens pair">
+      <div class="shot">
+        <div class="shot-bar"><b>悬停工具条</b><span class="meta">pin · grab</span></div>
+        <div class="frame h-400">
+          <div class="pin-stage">
+            <div class="pin-img">
+              <div class="h"><i></i><i></i><i></i></div>
+              <div class="ln w1"></div><div class="ln w2"></div><div class="ln w3"></div><div class="ln w1"></div>
+            </div>
+            <div class="pin-hover">
+              <button class="tool" type="button" aria-label="复制图片"><svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/></svg></button>
+              <button class="tool" type="button" aria-label="另存为"><svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10M8.5 10.5 12 14l3.5-3.5"/><path d="M5 18h14"/></svg></button>
+              <button class="tool" type="button" aria-label="隐藏"><svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="shot">
+        <div class="shot-bar"><b>右键菜单 · 取色放大镜</b><span class="meta">pin · contextmenu</span></div>
+        <div class="frame h-400">
+          <div class="pin-stage">
+            <div class="pin-img" style="width:58%">
+              <div class="h"><i></i><i></i><i></i></div>
+              <div class="ln w1"></div><div class="ln w2"></div><div class="ln w3"></div>
+            </div>
+
+            <div class="magnifier" style="left:20px;bottom:20px">
+              <div class="lens">
+                <span class="cross-h"></span><span class="cross-v"></span>
+              </div>
+              <div class="foot">
+                <span class="chip"></span>
+                <span class="hex">#5B7FFF</span>
+                <span class="fmt">HEX · ⌥C 复制</span>
+              </div>
+            </div>
+
+            <div class="ctx" style="right:16px;top:16px">
+              <div class="grp">尺寸</div>
+              <button type="button">重置大小<span class="key">100%</span></button>
+              <button type="button">缩略图模式<span class="key">⌥T</span></button>
+              <button type="button">旋转<span class="key">⌥R</span></button>
+              <div class="grp">不透明度</div>
+              <button type="button">不透明度<span class="opdot"><i class="on"></i><i></i><i></i></span></button>
+              <div class="sep"></div>
+              <button type="button">复制图片<span class="key">⌘C</span></button>
+              <button type="button">复制源文本<span class="key">⇧⌘C</span></button>
+              <button type="button">另存为…<span class="key">⌘S</span></button>
+              <button type="button">快速保存<span class="key">⌥S</span></button>
+              <div class="sep"></div>
+              <button type="button">移到下一组<span class="key">⌥G</span></button>
+              <button type="button">隐藏<span class="key">Esc</span></button>
+              <button type="button">隐藏整组<span class="key">⇧Esc</span></button>
+              <div class="sep"></div>
+              <button class="danger" type="button">销毁<span class="key">⌘⌫</span></button>
+              <button class="danger" type="button">销毁整组</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════════════════ 5 · 令牌与组件 ═════════════════════ -->
+  <section class="ref" id="tokens">
+    <div class="plate-head">
+      <h2><span class="ord">附 / 实现参考</span>语义令牌与组件</h2>
+      <p>这套令牌是全部改动的地基。<code>tailwind.config.js</code> 里的 <code>colors</code> 直接映射到下面这些 CSS 变量，组件只写 <code>bg-surface</code> <code>text-muted</code> <code>border-line</code>，不再出现 <code>gray-200</code> / <code>#5b7fff</code> 这类具体值。</p>
+    </div>
+
+    <div class="ref-grid">
+      <div class="ref-card">
+        <h3>中性色与边框</h3>
+        <p class="note">灰阶带一点蓝紫偏移（朝向强调色），避免死灰。四个背景层级足以覆盖侧栏、内容区、卡片和输入框。</p>
+        <div class="swatches-grid">
+          <div class="sw-cell"><span class="chip" style="background:var(--canvas)"></span><span class="meta"><span class="nm">canvas</span><br><span class="hx">#f4f5f7</span></span></div>
+          <div class="sw-cell"><span class="chip" style="background:var(--surface)"></span><span class="meta"><span class="nm">surface</span><br><span class="hx">#ffffff</span></span></div>
+          <div class="sw-cell"><span class="chip" style="background:var(--sunken)"></span><span class="meta"><span class="nm">sunken</span><br><span class="hx">#f0f1f4</span></span></div>
+          <div class="sw-cell"><span class="chip" style="background:var(--raised)"></span><span class="meta"><span class="nm">raised</span><br><span class="hx">#eaecef</span></span></div>
+          <div class="sw-cell"><span class="chip" style="background:var(--border)"></span><span class="meta"><span class="nm">border</span><br><span class="hx">#e2e5ea</span></span></div>
+          <div class="sw-cell"><span class="chip" style="background:var(--border-strong)"></span><span class="meta"><span class="nm">border-strong</span><br><span class="hx">#cfd4dc</span></span></div>
+        </div>
+      </div>
+
+      <div class="ref-card">
+        <h3>文字与强调</h3>
+        <p class="note">文字三级足够：正文、说明、占位/单位。强调色只有一种，语义色只表达状态。</p>
+        <div class="swatches-grid">
+          <div class="sw-cell"><span class="chip" style="background:var(--text)"></span><span class="meta"><span class="nm">text</span><br><span class="hx">#171a21</span></span></div>
+          <div class="sw-cell"><span class="chip" style="background:var(--muted)"></span><span class="meta"><span class="nm">muted</span><br><span class="hx">#5d6472</span></span></div>
+          <div class="sw-cell"><span class="chip" style="background:var(--faint)"></span><span class="meta"><span class="nm">faint</span><br><span class="hx">#8b93a1</span></span></div>
+          <div class="sw-cell"><span class="chip" style="background:var(--accent)"></span><span class="meta"><span class="nm">accent</span><br><span class="hx">#4f5bd5</span></span></div>
+          <div class="sw-cell"><span class="chip" style="background:var(--accent-soft)"></span><span class="meta"><span class="nm">accent-soft</span><br><span class="hx">#eef0ff</span></span></div>
+          <div class="sw-cell"><span class="chip" style="background:var(--good)"></span><span class="meta"><span class="nm">good</span><br><span class="hx">#12855f</span></span></div>
+          <div class="sw-cell"><span class="chip" style="background:var(--warn)"></span><span class="meta"><span class="nm">warn</span><br><span class="hx">#a15c07</span></span></div>
+          <div class="sw-cell"><span class="chip" style="background:var(--danger)"></span><span class="meta"><span class="nm">danger</span><br><span class="hx">#d13b34</span></span></div>
+        </div>
+      </div>
+
+      <div class="ref-card" style="grid-column:1/-1">
+        <h3>字号阶</h3>
+        <p class="note">把现在并存的 10 / 11 / 12 / 13 / 15 / 26px 六档收到六档但各归其位，页面标题不再带 <code>-0.045em</code> 这种越界字距。</p>
+        <div class="scale-row"><span class="tag">19 / 680 · 页面标题</span><span class="demo" style="font-size:19px;font-weight:680;letter-spacing:-.028em">截图</span></div>
+        <div class="scale-row"><span class="tag">13 / 640 · 卡片标题</span><span class="demo" style="font-size:13px;font-weight:640;letter-spacing:-.012em">功能快捷键</span></div>
+        <div class="scale-row"><span class="tag">12.5 / 580 · 行标签</span><span class="demo" style="font-size:12.5px;font-weight:580">默认保存路径</span></div>
+        <div class="scale-row"><span class="tag">11.5 / 520 · 控件</span><span class="demo" style="font-size:11.5px;font-weight:520">浏览</span></div>
+        <div class="scale-row"><span class="tag">10.5 / 400 · 说明</span><span class="demo" style="font-size:10.5px;color:var(--muted)">截图文件保存到此文件夹</span></div>
+        <div class="scale-row"><span class="tag">9.5 / 650 · 分组标签</span><span class="demo" style="font-size:9.5px;font-weight:650;letter-spacing:.075em;text-transform:uppercase;color:var(--faint)">系统权限</span></div>
+      </div>
+
+      <div class="ref-card">
+        <h3>组件 · 控件与状态</h3>
+        <p class="note">直接在真实令牌上渲染，所以切主题时这里是同一套样式的两种解析。</p>
+        <div class="demo-pad">
+          <div class="stack-v">
+            <div class="stack-h">
+              <button class="btn primary" type="button">保存并关闭</button>
+              <button class="btn" type="button">浏览</button>
+              <button class="btn ghost" type="button">恢复默认</button>
+              <button class="toggle on" type="button" role="switch" aria-checked="true" aria-label="示例开关"></button>
+              <button class="toggle" type="button" role="switch" aria-checked="false" aria-label="示例开关"></button>
+            </div>
+            <div class="stack-h">
+              <span class="badge good dot">已授权</span>
+              <span class="badge warn dot">未授权</span>
+              <span class="badge danger">失败</span>
+              <span class="badge accent">翻译中</span>
+              <span class="badge soft">已折叠</span>
+            </div>
+            <div class="stack-h">
+              <span class="capture"><kbd>⇧</kbd><kbd>⌥</kbd><kbd>⌘</kbd><span class="key">1</span></span>
+              <span class="capture recording"><kbd>⇧</kbd><kbd>⌥</kbd><kbd>⌘</kbd><span class="key" style="color:var(--faint)">按下按键…</span></span>
+            </div>
+            <div class="stack-h">
+              <label class="field" style="width:150px"><input type="text" value="~/Pictures" spellcheck="false" aria-label="示例路径"></label>
+              <span class="stepper"><button type="button" aria-label="减少">−</button><span class="val">240</span><button type="button" aria-label="增加">+</button><span class="unit">ms</span></span>
+              <span class="swatches">
+                <span class="swatch" style="background:#e53935" aria-pressed="true" role="button" tabindex="0" aria-label="红色"></span>
+                <span class="swatch" style="background:#43a047" role="button" tabindex="0" aria-label="绿色"></span>
+                <span class="swatch" style="background:#1e88e5" role="button" tabindex="0" aria-label="蓝色"></span>
+                <span class="swatch white" style="background:#ffffff" role="button" tabindex="0" aria-label="白色"></span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ref-card">
+        <h3>从现网到这套令牌</h3>
+        <p class="note">映射关系，用来改 <code>tailwind.config.js</code> 和逐个替换 className。</p>
+        <div class="scale-row"><span class="tag">bg-[#f4f5f7]</span><span class="demo mono" style="font-size:11.5px;color:#c3cbd9">bg-canvas</span></div>
+        <div class="scale-row"><span class="tag">bg-white</span><span class="demo mono" style="font-size:11.5px;color:#c3cbd9">bg-surface</span></div>
+        <div class="scale-row"><span class="tag">bg-gray-50 / 100</span><span class="demo mono" style="font-size:11.5px;color:#c3cbd9">bg-sunken / bg-raised</span></div>
+        <div class="scale-row"><span class="tag">border-gray-200</span><span class="demo mono" style="font-size:11.5px;color:#c3cbd9">border-line</span></div>
+        <div class="scale-row"><span class="tag">text-gray-950 / 900</span><span class="demo mono" style="font-size:11.5px;color:#c3cbd9">text-ink</span></div>
+        <div class="scale-row"><span class="tag">text-gray-500</span><span class="demo mono" style="font-size:11.5px;color:#c3cbd9">text-muted</span></div>
+        <div class="scale-row"><span class="tag">primary-600 / #5b7fff</span><span class="demo mono" style="font-size:11.5px;color:#c3cbd9">accent</span></div>
+        <div class="scale-row"><span class="tag">rounded-[11px] / lg</span><span class="demo mono" style="font-size:11.5px;color:#c3cbd9">rounded-lg (10px)</span></div>
+        <div class="scale-row"><span class="tag">shadow-sm</span><span class="demo mono" style="font-size:11.5px;color:#c3cbd9">shadow-e1</span></div>
+      </div>
+    </div>
+
+    <footer class="colophon">
+      <span>SnapLingo 界面重设计 · 设置 · 结果 · 截图编辑器 · 贴图</span>
+      <span><code>designs/ui-redesign/</code> · 令牌见 <code>src/styles/index.css</code> 建议替换项</span>
+    </footer>
+  </section>
+
+</div>
+
+<script>
+/* The preview switch translates the radio choice into one data-theme attribute
+   on the root element. "Follow system" removes the attribute and lets the
+   prefers-color-scheme media query decide, which is exactly what the real app
+   does when theme === 'system'. */
+(function () {
+  var root = document.documentElement;
+  function apply() {
+    var picked = document.querySelector('.theme-switch input:checked');
+    var choice = picked ? picked.id.replace('theme-', '') : 'sys';
+    if (choice === 'sys') root.removeAttribute('data-theme');
+    else root.setAttribute('data-theme', choice === 'dark' ? 'dark' : 'light');
+  }
+  document.querySelectorAll('.theme-switch input').forEach(function (input) {
+    input.addEventListener('change', apply);
+  });
+  apply();
+})();
+</script>

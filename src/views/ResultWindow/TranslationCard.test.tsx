@@ -16,7 +16,7 @@ describe('translation card presentation', () => {
       />,
     );
 
-    expect(markup).toContain('rounded-[14px]');
+    expect(markup).toContain('rounded-xl');
     expect(markup).toContain('px-3');
     expect(markup).not.toContain('px-2.5');
     expect(markup).toContain('py-2');

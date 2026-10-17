@@ -142,7 +142,7 @@ describe('TranslationProvidersPage', () => {
     expect(addButton.props.className).toContain('inline-flex');
     // The action now sits in normal flow beneath the list, not absolutely pinned.
     expect(addButton.props.className).not.toContain('absolute');
-    expect(addButton.props.className).toContain('hover:text-primary-600');
+    expect(addButton.props.className).toContain('hover:text-accent-text');
     expect(addButton.props.children).toContainEqual(
       expect.objectContaining({ props: expect.objectContaining({ children: '添加自定义服务' }) }),
     );

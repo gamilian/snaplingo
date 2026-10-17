@@ -22,7 +22,7 @@ export function GeneralPage() {
   );
 
   if (!general) {
-    return <div className="p-12 text-sm text-gray-500">{t('loading')}</div>;
+    return <div className="p-12 text-sm text-muted">{t('loading')}</div>;
   }
 
   const updateGeneral = (input: Partial<typeof general>) => {
@@ -107,7 +107,7 @@ export function GeneralPage() {
                 <AppVersionValue />
               </SettingRow>
               <SettingRow label={t('openSourceLicense')}>
-                <span className="text-xs font-medium text-gray-700">MIT License</span>
+                <span className="text-xs font-medium text-ink">MIT License</span>
               </SettingRow>
               <SoftwareUpdateSettings />
             </SettingsGroup>
@@ -151,7 +151,7 @@ export function AppVersionValue() {
     };
   }, [language, runtime]);
 
-  return <span className="text-xs font-medium text-gray-700">{version}</span>;
+  return <span className="text-xs font-medium text-ink">{version}</span>;
 }
 
 function NetworkSettings() {
@@ -185,7 +185,7 @@ function NetworkSettings() {
             defaultValue={general.proxyUrl ?? ''}
             onBlur={(event) => updateGeneral({ proxyUrl: event.currentTarget.value })}
             placeholder="http://127.0.0.1:7890"
-            className="h-9 w-[230px] rounded-lg border border-gray-200 bg-white px-3 text-xs text-gray-700 outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+            className="h-9 w-[230px] rounded-lg border border-line bg-surface px-3 text-xs text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent-line"
           />
         </SettingRow>
       )}
@@ -261,7 +261,7 @@ function MaintenanceSettings() {
           />
         </SettingRow>
         <SettingRow label={t('logStorage')} description={t('logStorageDescription')}>
-          <span className="text-xs font-medium text-gray-600">
+          <span className="text-xs font-medium text-muted">
             {t('recentLogs').replace('{count}', String(logs.length))}
           </span>
         </SettingRow>
@@ -280,7 +280,7 @@ function MaintenanceSettings() {
           </div>
         </SettingRow>
         {logs.length > 0 && (
-          <div className="max-h-40 overflow-auto rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 font-mono text-[10px] leading-5 text-gray-500">
+          <div className="max-h-40 overflow-auto rounded-lg border border-line bg-sunken px-3 py-2 font-mono text-hint leading-5 text-muted">
             {logs.map((entry) => (
               <div key={entry.id} className="truncate">
                 [{entry.level}] {entry.message}
@@ -380,10 +380,10 @@ function ActionButton({
       onClick={onClick}
       className={`h-9 min-w-[132px] rounded-lg border px-3 text-xs font-semibold transition-colors ${
         disabled
-          ? 'cursor-not-allowed border-gray-100 bg-gray-50 text-gray-400'
+          ? 'cursor-not-allowed border-line bg-sunken text-faint'
           : danger
           ? 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
-          : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+          : 'border-line bg-surface text-muted hover:bg-sunken'
       }`}
     >
       {children}

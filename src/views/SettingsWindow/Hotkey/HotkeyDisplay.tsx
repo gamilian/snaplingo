@@ -17,8 +17,8 @@ export function HotkeyDisplay({ value, onClick, isRecording = false }: HotkeyDis
   const isWindows = typeof navigator !== 'undefined' && navigator.platform.startsWith('Win');
   const hasWindowsControl = hasCommand || hasControl;
   const primaryModifierClass = (isWindows ? hasWindowsControl : hasCommand)
-    ? 'text-gray-700'
-    : 'text-gray-300';
+    ? 'text-ink'
+    : 'text-faint';
 
   // 提取字母键（最后一个非修饰键字符）
   const letterKey = value.replace(/[⇧⌥⌘⌃]/g, '').trim();
@@ -27,13 +27,13 @@ export function HotkeyDisplay({ value, onClick, isRecording = false }: HotkeyDis
 
   // 统一的容器样式
   const containerClass = `
-    flex h-9 min-w-[156px] items-center justify-center space-x-1 rounded-lg border bg-white px-3
+    flex h-9 min-w-[156px] items-center justify-center space-x-1 rounded-lg border bg-surface px-3
     transition-all duration-200 cursor-pointer
     ${isRecording
-      ? 'border-primary-500 ring-2 ring-primary-100 shadow-sm animate-pulse'
+      ? 'border-accent ring-2 ring-accent-line shadow-sm animate-pulse'
       : isUnset
-        ? 'border-2 border-dashed border-gray-300 hover:border-gray-400'
-        : 'border border-gray-200 hover:border-gray-300 hover:shadow-sm'
+        ? 'border-2 border-dashed border-line-strong hover:border-faint'
+        : 'border border-line hover:border-line-strong hover:shadow-sm'
     }
   `;
 
@@ -43,20 +43,20 @@ export function HotkeyDisplay({ value, onClick, isRecording = false }: HotkeyDis
         {isRecording ? (
           <>
             {/* 录制中显示所有修饰键（灰色） */}
-            <span className="text-base text-gray-300">⇧</span>
-            <span className="text-base text-gray-300">⌥</span>
-            <span className="text-base text-gray-300">{isWindows ? 'Ctrl' : '⌘'}</span>
-            {!isWindows && <span className="text-base text-gray-300">⌃</span>}
-            <span className="ml-1 text-[11px] text-gray-400 animate-pulse">按下快捷键...</span>
+            <span className="text-base text-faint">⇧</span>
+            <span className="text-base text-faint">⌥</span>
+            <span className="text-base text-faint">{isWindows ? 'Ctrl' : '⌘'}</span>
+            {!isWindows && <span className="text-base text-faint">⌃</span>}
+            <span className="ml-1 text-hint text-faint animate-pulse">按下快捷键...</span>
           </>
         ) : (
           <>
             {/* 未设置显示所有修饰键（灰色） */}
-            <span className="text-base text-gray-300">⇧</span>
-            <span className="text-base text-gray-300">⌥</span>
-            <span className="text-base text-gray-300">{isWindows ? 'Ctrl' : '⌘'}</span>
-            {!isWindows && <span className="text-base text-gray-300">⌃</span>}
-            <span className="ml-1 text-[11px] text-gray-400">未设置</span>
+            <span className="text-base text-faint">⇧</span>
+            <span className="text-base text-faint">⌥</span>
+            <span className="text-base text-faint">{isWindows ? 'Ctrl' : '⌘'}</span>
+            {!isWindows && <span className="text-base text-faint">⌃</span>}
+            <span className="ml-1 text-hint text-faint">未设置</span>
           </>
         )}
       </button>
@@ -66,10 +66,10 @@ export function HotkeyDisplay({ value, onClick, isRecording = false }: HotkeyDis
   return (
     <button onClick={handleClick} className={containerClass}>
       {/* Shift */}
-      <span className={`text-base ${hasShift ? 'text-gray-700' : 'text-gray-300'}`}>⇧</span>
+      <span className={`text-base ${hasShift ? 'text-ink' : 'text-faint'}`}>⇧</span>
 
       {/* Option */}
-      <span className={`text-base ${hasOption ? 'text-gray-700' : 'text-gray-300'}`}>⌥</span>
+      <span className={`text-base ${hasOption ? 'text-ink' : 'text-faint'}`}>⌥</span>
 
       {/* Primary modifier */}
       <span className={`text-base ${primaryModifierClass}`}>
@@ -78,13 +78,13 @@ export function HotkeyDisplay({ value, onClick, isRecording = false }: HotkeyDis
 
       {/* Control */}
       {!isWindows && (
-        <span className={`text-base ${hasControl ? 'text-gray-700' : 'text-gray-300'}`}>⌃</span>
+        <span className={`text-base ${hasControl ? 'text-ink' : 'text-faint'}`}>⌃</span>
       )}
 
       {/* 字母键 */}
       {letterKey && (
         <span
-          className="ml-1 text-base font-semibold text-primary-500"
+          className="ml-1 text-base font-semibold text-accent"
           style={{
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji"',
             fontStyle: 'normal',

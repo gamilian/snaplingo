@@ -41,12 +41,12 @@ export function ProviderCard({
     <div
       className={`group/provider relative min-h-[72px] px-5 py-3.5 transition-colors duration-150 ${
         highlighted
-          ? 'bg-primary-50/60 before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r before:bg-primary-500'
-          : 'hover:bg-gray-50'
+          ? 'bg-accent-soft/60 before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r before:bg-accent'
+          : 'hover:bg-sunken'
       }`}
     >
       <div className="flex h-full items-center gap-4">
-        <div className="flex w-5 flex-shrink-0 justify-center text-gray-300">
+        <div className="flex w-5 flex-shrink-0 justify-center text-faint">
           {leadingSlot ?? <DragDots className="opacity-70" />}
         </div>
 
@@ -58,21 +58,21 @@ export function ProviderCard({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h3 className="truncate text-base font-semibold text-gray-900">
+            <h3 className="truncate text-base font-semibold text-ink">
               {provider.name}
             </h3>
             {provider.status === 'unconfigured' ? (
-              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-hint font-medium text-amber-700">
                 未配置
               </span>
             ) : null}
-            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">
+            <span className="rounded-full bg-raised px-2 py-0.5 text-hint font-medium text-muted">
               {provider.isLocal ? '本地处理' : '发送到服务'}
             </span>
           </div>
           <p
             className={`mt-1 truncate text-sm ${
-              provider.endpoint ? 'text-blue-500' : 'text-gray-500'
+              provider.endpoint ? 'text-blue-500' : 'text-muted'
             }`}
           >
             {subtitle}
@@ -86,8 +86,8 @@ export function ProviderCard({
               onClick={handleToggle}
               className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-colors ${
                 isActive
-                  ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  : 'bg-primary-600 text-white hover:bg-primary-700'
+                  ? 'bg-raised text-muted hover:bg-raised'
+                  : 'bg-accent text-accent-on hover:bg-accent-hover'
               }`}
             >
               <PlayIcon className="h-4 w-4" />
@@ -99,7 +99,7 @@ export function ProviderCard({
             <IconActionButton
               title="编辑"
               onClick={onConfigure}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-raised hover:text-ink"
             >
               <EditIcon />
             </IconActionButton>
@@ -109,7 +109,7 @@ export function ProviderCard({
             <IconActionButton
               title="测试联通"
               onClick={onTest}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-raised hover:text-ink"
             >
               <PulseIcon />
             </IconActionButton>
@@ -119,7 +119,7 @@ export function ProviderCard({
             <IconActionButton
               title="删除"
               onClick={onRemove}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-red-50 hover:text-red-600"
             >
               <TrashIcon />
             </IconActionButton>
@@ -197,18 +197,18 @@ function providerIconClass(providerId: string) {
     case 'google-translate':
       return 'border border-blue-100 bg-blue-50 text-blue-500';
     case 'deeplx':
-      return 'border border-slate-200 bg-slate-50 text-slate-600';
+      return 'border border-line bg-sunken text-muted';
     case 'baidu-translate':
     case 'baidu-ocr':
       return 'border border-indigo-100 bg-indigo-50 text-indigo-500';
     case 'system-ocr':
       return 'border border-emerald-100 bg-emerald-50 text-emerald-600';
     case 'tesseract':
-      return 'border border-gray-200 bg-gray-50 text-gray-600';
+      return 'border border-line bg-sunken text-muted';
     case 'system-tts':
       return 'border border-orange-100 bg-orange-50 text-orange-600';
     default:
-      return 'border border-gray-200 bg-gray-50 text-gray-600';
+      return 'border border-line bg-sunken text-muted';
   }
 }
 

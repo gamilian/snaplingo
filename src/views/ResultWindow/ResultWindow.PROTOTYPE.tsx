@@ -109,47 +109,47 @@ function BobStyleVariant({ sourceText, sourceLang, targetLang, setSourceText, se
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[640px] max-h-[85vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+    <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-[640px] max-h-[85vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
       {/* Toolbar */}
-      <div className="h-12 bg-gray-50 border-b border-gray-200 flex items-center justify-between px-4">
+      <div className="h-12 bg-sunken border-b border-line flex items-center justify-between px-4">
         <div className="flex items-center space-x-2">
-          <button className="w-8 h-8 rounded hover:bg-gray-200 flex items-center justify-center transition-colors" title="固定">📌</button>
-          <button className="w-8 h-8 rounded hover:bg-gray-200 flex items-center justify-center transition-colors" title="收藏">⭐</button>
-          <button className="w-8 h-8 rounded hover:bg-gray-200 flex items-center justify-center transition-colors" title="历史">🕐</button>
-          <button className="w-8 h-8 rounded hover:bg-gray-200 flex items-center justify-center transition-colors" title="设置">⚙️</button>
+          <button className="w-8 h-8 rounded hover:bg-raised flex items-center justify-center transition-colors" title="固定">📌</button>
+          <button className="w-8 h-8 rounded hover:bg-raised flex items-center justify-center transition-colors" title="收藏">⭐</button>
+          <button className="w-8 h-8 rounded hover:bg-raised flex items-center justify-center transition-colors" title="历史">🕐</button>
+          <button className="w-8 h-8 rounded hover:bg-raised flex items-center justify-center transition-colors" title="设置">⚙️</button>
         </div>
-        <button onClick={hideResultWindow} className="w-8 h-8 rounded hover:bg-gray-200 flex items-center justify-center transition-colors text-gray-500">✕</button>
+        <button onClick={hideResultWindow} className="w-8 h-8 rounded hover:bg-raised flex items-center justify-center transition-colors text-muted">✕</button>
       </div>
 
       {/* OCR Area */}
-      <div className="bg-gray-50 border-b border-gray-200 p-4">
-        <div className="text-sm font-medium text-gray-700 mb-2">精准识别</div>
+      <div className="bg-sunken border-b border-line p-4">
+        <div className="text-sm font-medium text-ink mb-2">精准识别</div>
         <textarea
           value={sourceText}
           onChange={(e) => setSourceText(e.target.value)}
-          className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full bg-surface border border-line-strong rounded-lg px-3 py-2 text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           rows={3}
           placeholder="输入或粘贴文本..."
         />
         <div className="flex items-center justify-between mt-2">
           <div className="flex items-center space-x-2">
-            <button className="text-gray-500 hover:text-blue-600 text-sm">🔊</button>
-            <button className="text-gray-500 hover:text-blue-600 text-sm">📋</button>
+            <button className="text-muted hover:text-blue-600 text-sm">🔊</button>
+            <button className="text-muted hover:text-blue-600 text-sm">📋</button>
           </div>
-          <span className="text-xs text-gray-500">识别为 {LANGUAGES.find(l => l.code === sourceLang)?.name}</span>
+          <span className="text-xs text-muted">识别为 {LANGUAGES.find(l => l.code === sourceLang)?.name}</span>
         </div>
       </div>
 
       {/* Language Selector */}
-      <div className="bg-white border-b border-gray-200 py-4 px-6">
+      <div className="bg-surface border-b border-line py-4 px-6">
         <div className="flex items-center justify-center space-x-3">
-          <select value={sourceLang} onChange={(e) => setSourceLang(e.target.value)} className="px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+          <select value={sourceLang} onChange={(e) => setSourceLang(e.target.value)} className="px-3 py-2 bg-sunken border border-line-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
             {LANGUAGES.map((lang) => (
               <option key={lang.code} value={lang.code}>{lang.name}</option>
             ))}
           </select>
-          <button className="p-2 rounded hover:bg-gray-100 disabled:opacity-50" disabled={sourceLang === 'auto'}>⇄</button>
-          <select value={targetLang} onChange={(e) => setTargetLang(e.target.value)} className="px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+          <button className="p-2 rounded hover:bg-raised disabled:opacity-50" disabled={sourceLang === 'auto'}>⇄</button>
+          <select value={targetLang} onChange={(e) => setTargetLang(e.target.value)} className="px-3 py-2 bg-sunken border border-line-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
             {LANGUAGES.filter((lang) => lang.code !== 'auto').map((lang) => (
               <option key={lang.code} value={lang.code}>{lang.name}</option>
             ))}
@@ -158,22 +158,22 @@ function BobStyleVariant({ sourceText, sourceLang, targetLang, setSourceText, se
       </div>
 
       {/* Results */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-white">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-surface">
         {MOCK_TRANSLATIONS.map((trans) => (
-          <div key={trans.provider_id} className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
-            <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between cursor-pointer" onClick={() => toggleCard(trans.provider_id)}>
+          <div key={trans.provider_id} className="bg-sunken rounded-lg border border-line overflow-hidden">
+            <div className="bg-surface border-b border-line px-4 py-3 flex items-center justify-between cursor-pointer" onClick={() => toggleCard(trans.provider_id)}>
               <div className="flex items-center space-x-2">
                 <div className="w-6 h-6 bg-blue-500 rounded text-white text-xs font-bold flex items-center justify-center">{trans.icon}</div>
                 <span className="font-medium text-sm">{trans.name}</span>
               </div>
-              <button className="text-gray-400 hover:text-gray-600 transition-transform" style={{ transform: expandedCards.has(trans.provider_id) ? 'rotate(180deg)' : 'rotate(0deg)' }}>∨</button>
+              <button className="text-faint hover:text-muted transition-transform" style={{ transform: expandedCards.has(trans.provider_id) ? 'rotate(180deg)' : 'rotate(0deg)' }}>∨</button>
             </div>
             {expandedCards.has(trans.provider_id) && (
               <div className="p-4">
-                <p className="text-gray-700 text-sm mb-3">{trans.text}</p>
+                <p className="text-ink text-sm mb-3">{trans.text}</p>
                 <div className="flex items-center space-x-2">
-                  <button className="text-gray-500 hover:text-blue-600 text-sm">🔊</button>
-                  <button className="text-gray-500 hover:text-blue-600 text-sm">📋</button>
+                  <button className="text-muted hover:text-blue-600 text-sm">🔊</button>
+                  <button className="text-muted hover:text-blue-600 text-sm">📋</button>
                 </div>
               </div>
             )}
@@ -187,12 +187,12 @@ function BobStyleVariant({ sourceText, sourceLang, targetLang, setSourceText, se
 // VARIATION 2: Split Panel
 function SplitPanelVariant({ sourceText, sourceLang, targetLang, setSourceText, setSourceLang, setTargetLang, hideResultWindow }: any) {
   return (
-    <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[600px] flex overflow-hidden" onClick={(e) => e.stopPropagation()}>
+    <div className="bg-surface rounded-xl shadow-2xl w-full max-w-5xl h-[600px] flex overflow-hidden" onClick={(e) => e.stopPropagation()}>
       {/* Left Panel - Source */}
-      <div className="w-1/2 bg-gradient-to-br from-blue-50 to-purple-50 p-6 flex flex-col border-r border-gray-200">
+      <div className="w-1/2 bg-gradient-to-br from-blue-50 to-purple-50 p-6 flex flex-col border-r border-line">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-gray-800">源文本</h3>
-          <select value={sourceLang} onChange={(e) => setSourceLang(e.target.value)} className="px-2 py-1 bg-white rounded border border-gray-300 text-sm">
+          <h3 className="font-semibold text-ink">源文本</h3>
+          <select value={sourceLang} onChange={(e) => setSourceLang(e.target.value)} className="px-2 py-1 bg-surface rounded border border-line-strong text-sm">
             {LANGUAGES.map((lang) => (
               <option key={lang.code} value={lang.code}>{lang.name}</option>
             ))}
@@ -201,39 +201,39 @@ function SplitPanelVariant({ sourceText, sourceLang, targetLang, setSourceText, 
         <textarea
           value={sourceText}
           onChange={(e) => setSourceText(e.target.value)}
-          className="flex-1 w-full bg-white rounded-lg p-4 border border-gray-300 resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="flex-1 w-full bg-surface rounded-lg p-4 border border-line-strong resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           placeholder="输入要翻译的文本..."
         />
         <div className="mt-4 flex items-center space-x-2">
-          <button className="px-4 py-2 bg-white rounded-lg border border-gray-300 hover:bg-gray-50 text-sm">🔊 朗读</button>
-          <button className="px-4 py-2 bg-white rounded-lg border border-gray-300 hover:bg-gray-50 text-sm">📋 复制</button>
+          <button className="px-4 py-2 bg-surface rounded-lg border border-line-strong hover:bg-sunken text-sm">🔊 朗读</button>
+          <button className="px-4 py-2 bg-surface rounded-lg border border-line-strong hover:bg-sunken text-sm">📋 复制</button>
         </div>
       </div>
 
       {/* Right Panel - Results */}
-      <div className="w-1/2 bg-white p-6 flex flex-col">
+      <div className="w-1/2 bg-surface p-6 flex flex-col">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-gray-800">翻译结果</h3>
+          <h3 className="font-semibold text-ink">翻译结果</h3>
           <div className="flex items-center space-x-2">
-            <select value={targetLang} onChange={(e) => setTargetLang(e.target.value)} className="px-2 py-1 bg-gray-50 rounded border border-gray-300 text-sm">
+            <select value={targetLang} onChange={(e) => setTargetLang(e.target.value)} className="px-2 py-1 bg-sunken rounded border border-line-strong text-sm">
               {LANGUAGES.filter((lang) => lang.code !== 'auto').map((lang) => (
                 <option key={lang.code} value={lang.code}>{lang.name}</option>
               ))}
             </select>
-            <button onClick={hideResultWindow} className="w-8 h-8 rounded hover:bg-gray-100 flex items-center justify-center">✕</button>
+            <button onClick={hideResultWindow} className="w-8 h-8 rounded hover:bg-raised flex items-center justify-center">✕</button>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto space-y-3">
           {MOCK_TRANSLATIONS.map((trans) => (
-            <div key={trans.provider_id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div key={trans.provider_id} className="p-4 bg-sunken rounded-lg border border-line">
               <div className="flex items-center space-x-2 mb-2">
                 <div className="w-5 h-5 bg-gradient-to-br from-blue-500 to-purple-500 rounded text-white text-xs font-bold flex items-center justify-center">{trans.icon}</div>
-                <span className="text-xs font-medium text-gray-600">{trans.name}</span>
+                <span className="text-xs font-medium text-muted">{trans.name}</span>
               </div>
-              <p className="text-gray-800 mb-2">{trans.text}</p>
+              <p className="text-ink mb-2">{trans.text}</p>
               <div className="flex items-center space-x-2">
-                <button className="text-xs text-gray-500 hover:text-blue-600">🔊</button>
-                <button className="text-xs text-gray-500 hover:text-blue-600">📋</button>
+                <button className="text-xs text-muted hover:text-blue-600">🔊</button>
+                <button className="text-xs text-muted hover:text-blue-600">📋</button>
               </div>
             </div>
           ))}
@@ -248,7 +248,7 @@ function MinimalVariant({ sourceText, sourceLang, targetLang, setSourceText, set
   const [selectedProvider, setSelectedProvider] = useState(0);
 
   return (
-    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+    <div className="bg-surface rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
       {/* Minimal Header */}
       <div className="px-8 pt-6 pb-4 flex items-center justify-between">
         <div className="flex items-center space-x-3">
@@ -257,14 +257,14 @@ function MinimalVariant({ sourceText, sourceLang, targetLang, setSourceText, set
               key={trans.provider_id}
               onClick={() => setSelectedProvider(idx)}
               className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
-                selectedProvider === idx ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white scale-110 shadow-lg' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                selectedProvider === idx ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white scale-110 shadow-lg' : 'bg-raised text-muted hover:bg-raised'
               }`}
             >
               {trans.icon}
             </button>
           ))}
         </div>
-        <button onClick={hideResultWindow} className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400">✕</button>
+        <button onClick={hideResultWindow} className="w-10 h-10 rounded-full hover:bg-raised flex items-center justify-center text-faint">✕</button>
       </div>
 
       {/* Content */}
@@ -274,7 +274,7 @@ function MinimalVariant({ sourceText, sourceLang, targetLang, setSourceText, set
           <textarea
             value={sourceText}
             onChange={(e) => setSourceText(e.target.value)}
-            className="w-full bg-gray-50 rounded-2xl px-6 py-4 text-lg resize-none border-2 border-transparent focus:border-blue-500 focus:bg-white transition-all"
+            className="w-full bg-sunken rounded-2xl px-6 py-4 text-lg resize-none border-2 border-transparent focus:border-blue-500 focus:bg-surface transition-all"
             rows={3}
             placeholder="输入文本..."
           />
@@ -282,13 +282,13 @@ function MinimalVariant({ sourceText, sourceLang, targetLang, setSourceText, set
 
         {/* Language Bar */}
         <div className="flex items-center justify-center space-x-4 py-2">
-          <select value={sourceLang} onChange={(e) => setSourceLang(e.target.value)} className="px-4 py-2 bg-gray-50 rounded-full text-sm border-none appearance-none cursor-pointer hover:bg-gray-100">
+          <select value={sourceLang} onChange={(e) => setSourceLang(e.target.value)} className="px-4 py-2 bg-sunken rounded-full text-sm border-none appearance-none cursor-pointer hover:bg-raised">
             {LANGUAGES.map((lang) => (
               <option key={lang.code} value={lang.code}>{lang.name}</option>
             ))}
           </select>
-          <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm">→</div>
-          <select value={targetLang} onChange={(e) => setTargetLang(e.target.value)} className="px-4 py-2 bg-gray-50 rounded-full text-sm border-none appearance-none cursor-pointer hover:bg-gray-100">
+          <div className="w-8 h-8 rounded-full bg-raised flex items-center justify-center text-sm">→</div>
+          <select value={targetLang} onChange={(e) => setTargetLang(e.target.value)} className="px-4 py-2 bg-sunken rounded-full text-sm border-none appearance-none cursor-pointer hover:bg-raised">
             {LANGUAGES.filter((lang) => lang.code !== 'auto').map((lang) => (
               <option key={lang.code} value={lang.code}>{lang.name}</option>
             ))}
@@ -297,13 +297,13 @@ function MinimalVariant({ sourceText, sourceLang, targetLang, setSourceText, set
 
         {/* Result */}
         <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl px-6 py-6">
-          <p className="text-xl text-gray-800 leading-relaxed">{MOCK_TRANSLATIONS[selectedProvider].text}</p>
-          <div className="flex items-center space-x-4 mt-4 pt-4 border-t border-gray-200">
-            <button className="flex items-center space-x-2 px-4 py-2 bg-white rounded-full hover:bg-gray-50 text-sm">
+          <p className="text-xl text-ink leading-relaxed">{MOCK_TRANSLATIONS[selectedProvider].text}</p>
+          <div className="flex items-center space-x-4 mt-4 pt-4 border-t border-line">
+            <button className="flex items-center space-x-2 px-4 py-2 bg-surface rounded-full hover:bg-sunken text-sm">
               <span>🔊</span>
               <span>朗读</span>
             </button>
-            <button className="flex items-center space-x-2 px-4 py-2 bg-white rounded-full hover:bg-gray-50 text-sm">
+            <button className="flex items-center space-x-2 px-4 py-2 bg-surface rounded-full hover:bg-sunken text-sm">
               <span>📋</span>
               <span>复制</span>
             </button>
@@ -329,7 +329,7 @@ function CardStackVariant({ sourceText, sourceLang, targetLang, setSourceText, s
           <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
           <span className="text-white text-sm font-medium">{MOCK_TRANSLATIONS[currentCard].name}</span>
         </div>
-        <button onClick={hideResultWindow} className="w-8 h-8 rounded-full hover:bg-gray-700 flex items-center justify-center text-gray-400">✕</button>
+        <button onClick={hideResultWindow} className="w-8 h-8 rounded-full hover:bg-gray-700 flex items-center justify-center text-faint">✕</button>
       </div>
 
       {/* Source Input */}

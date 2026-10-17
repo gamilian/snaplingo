@@ -38,7 +38,7 @@ export function resultWindowScrollAreaIndicatorClassName(isVisible: boolean) {
 }
 
 export function resultWindowScrollAreaThumbClassName() {
-  return 'absolute right-0 w-[3px] rounded-full bg-slate-400/35';
+  return 'absolute right-0 w-[3px] rounded-full bg-faint/35';
 }
 
 export function resultWindowScrollAreaMetrics({

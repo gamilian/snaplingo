@@ -20,19 +20,19 @@ export function FavoriteMetadataEditor({
   useEffect(() => setTagDraft(tags.join(', ')), [tags]);
 
   return (
-    <div className="mt-3 grid gap-2 rounded-lg bg-gray-50 p-3">
-      <label className="grid gap-1 text-xs text-gray-500">
+    <div className="mt-3 grid gap-2 rounded-lg bg-sunken p-3">
+      <label className="grid gap-1 text-xs text-muted">
         笔记
         <textarea
           value={noteDraft}
           onChange={(event) => setNoteDraft(event.target.value)}
           onBlur={() => void onSaveNote(noteDraft)}
           rows={2}
-          className="resize-none rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none focus:border-primary-400"
+          className="resize-none rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-accent"
           placeholder="添加上下文笔记"
         />
       </label>
-      <label className="grid gap-1 text-xs text-gray-500">
+      <label className="grid gap-1 text-xs text-muted">
         标签（使用逗号分隔）
         <input
           value={tagDraft}
@@ -45,7 +45,7 @@ export function FavoriteMetadataEditor({
                 .filter(Boolean),
             )
           }
-          className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none focus:border-primary-400"
+          className="rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-accent"
           placeholder="工作, 技术"
         />
       </label>

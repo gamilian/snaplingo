@@ -56,10 +56,10 @@ export function CustomRange({
           height: 6px;
           background: linear-gradient(
             to right,
-            #5b7fff 0%,
-            #5b7fff var(--range-progress),
-            #e5e7eb var(--range-progress),
-            #e5e7eb 100%
+            rgb(var(--accent)) 0%,
+            rgb(var(--accent)) var(--range-progress),
+            rgb(var(--line)) var(--range-progress),
+            rgb(var(--line)) 100%
           );
           border-radius: 3px;
           pointer-events: none;
@@ -74,7 +74,7 @@ export function CustomRange({
           height: 18px;
           border-radius: 50%;
           background: white;
-          border: 2px solid #5b7fff;
+          border: 2px solid rgb(var(--accent));
           box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
           cursor: grab;
           position: relative;
@@ -95,13 +95,13 @@ export function CustomRange({
 
         .smooth-range:hover::-webkit-slider-thumb {
           transform: scale(1.2) translateZ(0);
-          box-shadow: 0 4px 10px rgba(91, 127, 255, 0.35);
+          box-shadow: 0 4px 10px rgb(var(--accent) / 0.35);
         }
 
         .smooth-range:active::-webkit-slider-thumb {
           transform: scale(1.3) translateZ(0);
           cursor: grabbing;
-          box-shadow: 0 6px 16px rgba(91, 127, 255, 0.45);
+          box-shadow: 0 6px 16px rgb(var(--accent) / 0.45);
         }
 
         /* Firefox 滑块 */
@@ -110,7 +110,7 @@ export function CustomRange({
           height: 18px;
           border-radius: 50%;
           background: white;
-          border: 2px solid #5b7fff;
+          border: 2px solid rgb(var(--accent));
           box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
           cursor: grab;
 
@@ -122,13 +122,13 @@ export function CustomRange({
 
         .smooth-range:hover::-moz-range-thumb {
           transform: scale(1.2) translateZ(0);
-          box-shadow: 0 4px 10px rgba(91, 127, 255, 0.35);
+          box-shadow: 0 4px 10px rgb(var(--accent) / 0.35);
         }
 
         .smooth-range:active::-moz-range-thumb {
           transform: scale(1.3) translateZ(0);
           cursor: grabbing;
-          box-shadow: 0 6px 16px rgba(91, 127, 255, 0.45);
+          box-shadow: 0 6px 16px rgb(var(--accent) / 0.45);
         }
 
         /* Firefox 轨道 */

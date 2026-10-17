@@ -224,7 +224,7 @@ function FavoriteDetail({
           <img
             src={item.entry.thumbnailDataUrl}
             alt="收藏截图"
-            className="max-h-[360px] w-full rounded-lg bg-gray-50 object-contain"
+            className="max-h-[360px] w-full rounded-lg bg-sunken object-contain"
           />
         </DetailCard>
         {metadata}
@@ -266,7 +266,7 @@ function FavoriteDetail({
             </SmallActionButton>
           }
         >
-          <p className="whitespace-pre-wrap text-sm leading-7 text-gray-800">
+          <p className="whitespace-pre-wrap text-sm leading-7 text-ink">
             {snapshot.sourceText}
           </p>
         </DetailCard>
@@ -281,7 +281,7 @@ function FavoriteDetail({
             </SmallActionButton>
           }
         >
-          <p className="whitespace-pre-wrap text-sm leading-7 text-gray-800">
+          <p className="whitespace-pre-wrap text-sm leading-7 text-ink">
             {snapshot.result.translated_text}
           </p>
         </DetailCard>
@@ -316,7 +316,7 @@ function FavoriteDetail({
           <img
             src={item.entry.thumbnailDataUrl}
             alt="OCR 收藏原图"
-            className="max-h-64 w-full rounded-lg bg-gray-50 object-contain"
+            className="max-h-64 w-full rounded-lg bg-sunken object-contain"
           />
         </DetailCard>
       )}
@@ -335,7 +335,7 @@ function FavoriteDetail({
           </>
         }
       >
-        <p className="whitespace-pre-wrap text-sm leading-7 text-gray-800">
+        <p className="whitespace-pre-wrap text-sm leading-7 text-ink">
           {snapshot.recognizedText}
         </p>
       </DetailCard>

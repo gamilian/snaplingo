@@ -102,7 +102,7 @@ function Header({
   const isDraggable = Boolean(onStartDrag);
 
   return (
-    <div className="flex min-h-12 items-center justify-between gap-3 rounded-t-[14px] border-b border-slate-200 bg-slate-50/90 px-3">
+    <div className="flex min-h-12 items-center justify-between gap-3 border-b border-line bg-surface px-3">
       <IconActionButton
         onClick={onTogglePinned}
         className={resultWindowPinButtonClassName(isPinned)}
@@ -122,13 +122,7 @@ function Header({
           onStartDrag();
         }}
       >
-        <div
-          className={`grid h-7 w-7 shrink-0 place-items-center rounded-[7px] text-white ${
-            isOcr
-              ? 'bg-gradient-to-br from-emerald-600 to-blue-600'
-              : 'bg-gradient-to-br from-blue-600 to-emerald-500'
-          }`}
-        >
+        <div className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-accent-soft text-accent-text">
           {isOcr ? (
             <ScanIcon className="h-4 w-4" />
           ) : (
@@ -136,16 +130,16 @@ function Header({
           )}
         </div>
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-3">
-          <h2 className="text-base font-bold leading-tight text-slate-950">
+          <h2 className="text-base font-bold leading-tight text-ink">
             {isOcr ? 'OCR' : '翻译'}
           </h2>
-          <span className="text-xs font-semibold text-slate-500">{subtitle}</span>
+          <span className="text-xs font-semibold text-muted">{subtitle}</span>
         </div>
       </div>
 
       <IconActionButton
         onClick={onClose}
-        className="grid h-7 w-7 shrink-0 place-items-center rounded-[7px] text-slate-500 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-800"
+        className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted transition-colors duration-150 hover:bg-raised hover:text-ink"
         title="关闭"
         tooltipPlacement="bottom"
       >
@@ -160,7 +154,7 @@ function LanguageSelect({
   value,
   onChange,
   selectedLabel,
-  buttonClassName = 'h-9 rounded-[14px] border-slate-200 py-0 text-[14px] font-semibold shadow-none hover:shadow-none',
+  buttonClassName = 'h-9 rounded-xl border-line py-0 text-card font-semibold shadow-none hover:shadow-none',
 }: {
   options: { value: string; label: string }[];
   value: string;
@@ -176,7 +170,7 @@ function LanguageSelect({
       selectedLabel={selectedLabel}
       align="center"
       buttonClassName={buttonClassName}
-      menuClassName="rounded-[14px]"
+      menuClassName="rounded-xl"
     />
   );
 }
@@ -195,10 +189,10 @@ function LanguageSwitcher({
   onSwap: () => void;
 }) {
   const mergedSelectButtonClassName =
-    'h-9 rounded-none !border-0 !bg-transparent py-0 text-[13px] font-semibold !shadow-none !ring-0 hover:!border-transparent hover:!bg-transparent hover:!shadow-none';
+    'h-9 rounded-none !border-0 !bg-transparent py-0 text-card font-semibold !shadow-none !ring-0 hover:!border-transparent hover:!bg-transparent hover:!shadow-none';
 
   return (
-    <div className="grid h-10 flex-none grid-cols-[minmax(0,1fr)_40px_minmax(0,1fr)] items-center overflow-visible rounded-[14px] border border-slate-200 bg-slate-50/90">
+    <div className="grid h-10 flex-none grid-cols-[minmax(0,1fr)_40px_minmax(0,1fr)] items-center overflow-visible rounded-xl border border-line bg-sunken/90">
       <LanguageSelect
         options={TRANSLATION_LANGUAGES.map((lang) => ({
           value: lang.code,
@@ -211,7 +205,7 @@ function LanguageSwitcher({
       />
       <IconActionButton
         onClick={onSwap}
-        className="grid h-full w-full place-items-center text-slate-600 transition-colors duration-150 hover:bg-white"
+        className="grid h-full w-full place-items-center text-muted transition-colors duration-150 hover:bg-surface"
         title="切换语言"
         tooltipPlacement="bottom"
       >
@@ -745,8 +739,8 @@ function ResultWindowContent({
               <div className={resultWindowOcrResultStackClassName()}>
                 <div className="flex min-h-0 flex-col gap-2">
                   <div className="flex min-h-[18px] items-center justify-between gap-3">
-                    <h3 className="text-[13px] font-bold text-slate-600">原图</h3>
-                    <span className="text-[11px] text-slate-400">source</span>
+                    <h3 className="text-card font-bold text-muted">原图</h3>
+                    <span className="text-hint text-faint">source</span>
                   </div>
                   <div className={resultWindowOcrImagePanelClassName()}>
                     <img
@@ -773,8 +767,8 @@ function ResultWindowContent({
 
                 <div className="flex min-h-0 flex-col gap-3">
                   <div className="flex min-h-[18px] items-center justify-between gap-3">
-                    <h3 className="text-[13px] font-bold text-slate-600">OCR 结果</h3>
-                    <span className="text-[11px] text-slate-400">
+                    <h3 className="text-card font-bold text-muted">OCR 结果</h3>
+                    <span className="text-hint text-faint">
                       {ocrText ? `${ocrText.length} chars` : 'No text'}
                     </span>
                   </div>
@@ -789,12 +783,12 @@ function ResultWindowContent({
                       style={ocrTextStyle}
                     />
                     {ocrTokens.length > 0 && (
-                      <div className="border-t border-slate-100 bg-slate-50/60 px-3 py-2">
+                      <div className="border-t border-line bg-sunken/60 px-3 py-2">
                         <div className="mb-2 flex min-h-[16px] items-center justify-between gap-3">
-                          <span className="text-[11px] font-bold text-slate-500">
+                          <span className="text-hint font-bold text-muted">
                             推荐复制片段
                           </span>
-                          <span className="text-[10px] text-slate-400">
+                          <span className="text-hint text-faint">
                             {ocrTokens.length} 个
                           </span>
                         </div>
@@ -810,7 +804,7 @@ function ResultWindowContent({
                                 void runtime.copyText(token.value);
                               }}
                             >
-                              <span className="shrink-0 text-slate-400">
+                              <span className="shrink-0 text-faint">
                                 {token.label}
                               </span>
                               <span className="min-w-0 break-all">{token.value}</span>
@@ -819,15 +813,15 @@ function ResultWindowContent({
                         </div>
                       </div>
                     )}
-                    <div className="flex min-h-8 items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/80 px-3 py-1.5">
-                      <span className="text-[11px] text-slate-400">
+                    <div className="flex min-h-8 items-center justify-between gap-3 border-t border-line bg-sunken/80 px-3 py-1.5">
+                      <span className="text-hint text-faint">
                         {ocrText.length} chars
                       </span>
                       <div className="flex items-center gap-2">
                         <IconActionButton
                           title="朗读"
                           disabled={!ocrText.trim()}
-                          className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
+                          className="grid h-7 w-7 place-items-center rounded-md border border-line bg-surface text-muted transition-colors duration-150 hover:border-line-strong hover:bg-sunken hover:text-ink disabled:cursor-not-allowed disabled:opacity-45"
                           onClick={() => {
                             void runtime.speakText(ocrText);
                           }}
@@ -848,7 +842,7 @@ function ResultWindowContent({
                             isOcrFavoritePending ||
                             favoritedOcrSignature === ocrFavoriteSignature
                           }
-                          className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="grid h-7 w-7 place-items-center rounded-md border border-line bg-surface text-muted transition-colors duration-150 hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
                           onClick={() => void handleFavoriteOcr()}
                         >
                           <FavoriteIcon
@@ -863,7 +857,7 @@ function ResultWindowContent({
                         <IconActionButton
                           title="复制"
                           disabled={!ocrText.trim()}
-                          className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
+                          className="grid h-7 w-7 place-items-center rounded-md border border-line bg-surface text-muted transition-colors duration-150 hover:border-line-strong hover:bg-sunken hover:text-ink disabled:cursor-not-allowed disabled:opacity-45"
                           onClick={() => {
                             void runtime.copyText(ocrText);
                           }}
@@ -873,7 +867,7 @@ function ResultWindowContent({
                         <IconActionButton
                           title="清空"
                           disabled={!ocrText}
-                          className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
+                          className="grid h-7 w-7 place-items-center rounded-md border border-line bg-surface text-muted transition-colors duration-150 hover:border-line-strong hover:bg-sunken hover:text-ink disabled:cursor-not-allowed disabled:opacity-45"
                           onClick={() => {
                             runtime.updateOcrText('');
                             runtime.clearOcrImage();
@@ -890,23 +884,23 @@ function ResultWindowContent({
               <>
                 <div className="space-y-3">
                   <div className="flex min-h-[18px] items-center justify-between gap-3">
-                    <label className="text-[13px] font-bold text-slate-600">图片</label>
-                    <span className="text-[11px] text-slate-400">PNG/JPG/WebP</span>
+                    <label className="text-card font-bold text-muted">图片</label>
+                    <span className="text-hint text-faint">PNG/JPG/WebP</span>
                   </div>
                   <button
                     type="button"
                     onClick={handleUploadImage}
                     disabled={isOcrRunning}
-                    className="grid min-h-[92px] w-full place-items-center rounded-[14px] border border-dashed border-slate-300 bg-gradient-to-b from-slate-50 to-white px-3 py-3 text-center transition-colors duration-150 hover:border-emerald-300 hover:bg-emerald-50/30 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="grid min-h-[92px] w-full place-items-center rounded-xl border border-dashed border-line-strong bg-gradient-to-b from-slate-50 to-white px-3 py-3 text-center transition-colors duration-150 hover:border-emerald-300 hover:bg-emerald-50/30 disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     <span className="grid justify-items-center gap-3">
-                      <span className="grid h-9 w-9 place-items-center rounded-[7px] bg-emerald-50 text-emerald-700">
+                      <span className="grid h-9 w-9 place-items-center rounded-md bg-emerald-50 text-emerald-700">
                         <UploadIcon className="h-5 w-5" />
                       </span>
-                      <span className="text-[13px] font-semibold text-slate-900">
+                      <span className="text-card font-semibold text-ink">
                         {isOcrRunning ? '识别中...' : '上传图片 OCR'}
                       </span>
-                      <span className="text-[11px] text-slate-500">
+                      <span className="text-hint text-muted">
                         选择一张图片后自动开始识别
                       </span>
                     </span>
@@ -914,15 +908,15 @@ function ResultWindowContent({
                 </div>
 
                 {ocrError && (
-                  <div className="rounded-[14px] border border-red-200 bg-red-50 px-3 py-3 text-sm font-medium text-red-700">
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-sm font-medium text-red-700">
                     {ocrError}
                   </div>
                 )}
 
                 <div className="min-h-0 space-y-3">
                   <div className="flex min-h-[18px] items-center justify-between gap-3">
-                    <h3 className="text-[13px] font-bold text-slate-600">识别文本</h3>
-                    <span className="text-[11px] text-slate-400">
+                    <h3 className="text-card font-bold text-muted">识别文本</h3>
+                    <span className="text-hint text-faint">
                       {ocrText ? `${ocrText.length} chars` : 'No text'}
                     </span>
                   </div>
@@ -936,15 +930,15 @@ function ResultWindowContent({
                       className={resultWindowTextAreaClassName('ocr')}
                       style={ocrTextStyle}
                     />
-                    <div className="flex min-h-8 items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/80 px-3 py-1.5">
-                      <span className="text-[11px] text-slate-400">
+                    <div className="flex min-h-8 items-center justify-between gap-3 border-t border-line bg-sunken/80 px-3 py-1.5">
+                      <span className="text-hint text-faint">
                         {ocrText.length} chars
                       </span>
                       <div className="flex items-center gap-2">
                         <IconActionButton
                           title="朗读"
                           disabled={!ocrText.trim()}
-                          className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
+                          className="grid h-7 w-7 place-items-center rounded-md border border-line bg-surface text-muted transition-colors duration-150 hover:border-line-strong hover:bg-sunken hover:text-ink disabled:cursor-not-allowed disabled:opacity-45"
                           onClick={() => {
                             void runtime.speakText(ocrText);
                           }}
@@ -965,7 +959,7 @@ function ResultWindowContent({
                             isOcrFavoritePending ||
                             favoritedOcrSignature === ocrFavoriteSignature
                           }
-                          className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="grid h-7 w-7 place-items-center rounded-md border border-line bg-surface text-muted transition-colors duration-150 hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
                           onClick={() => void handleFavoriteOcr()}
                         >
                           <FavoriteIcon
@@ -980,7 +974,7 @@ function ResultWindowContent({
                         <IconActionButton
                           title="复制"
                           disabled={!ocrText.trim()}
-                          className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
+                          className="grid h-7 w-7 place-items-center rounded-md border border-line bg-surface text-muted transition-colors duration-150 hover:border-line-strong hover:bg-sunken hover:text-ink disabled:cursor-not-allowed disabled:opacity-45"
                           onClick={() => {
                             void runtime.copyText(ocrText);
                           }}
@@ -990,7 +984,7 @@ function ResultWindowContent({
                         <IconActionButton
                           title="清空"
                           disabled={!ocrText}
-                          className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
+                          className="grid h-7 w-7 place-items-center rounded-md border border-line bg-surface text-muted transition-colors duration-150 hover:border-line-strong hover:bg-sunken hover:text-ink disabled:cursor-not-allowed disabled:opacity-45"
                           onClick={() => runtime.updateOcrText('')}
                         >
                           <ClearTextIcon className="h-4 w-4" />
@@ -1013,7 +1007,7 @@ function ResultWindowContent({
                 <button
                   type="button"
                   onClick={() => updateSourceInputCollapsed(false)}
-                  className="flex h-10 w-full items-center justify-between gap-3 rounded-[12px] border border-slate-200 bg-slate-50/80 px-3 text-left text-xs text-slate-600 hover:bg-slate-50"
+                  className="flex h-10 w-full items-center justify-between gap-3 rounded-lg border border-line bg-sunken/80 px-3 text-left text-xs text-muted hover:bg-sunken"
                 >
                   <span className="min-w-0 truncate">
                     {sourceText.trim() || '输入需要翻译的文本...'}
@@ -1025,7 +1019,7 @@ function ResultWindowContent({
                 <div
                   ref={sourceTextMirrorRef}
                   aria-hidden="true"
-                  className="invisible pointer-events-none absolute inset-x-0 top-0 whitespace-pre-wrap break-words px-3 py-2.5 text-[13px] text-slate-900"
+                  className="invisible pointer-events-none absolute inset-x-0 top-0 whitespace-pre-wrap break-words px-3 py-2.5 text-card text-ink"
                   style={sourceTextStyle}
                 >
                   {resultWindowTextMirrorContent(sourceText)}
@@ -1039,8 +1033,8 @@ function ResultWindowContent({
                   className={resultWindowTextAreaClassName('source')}
                   style={sourceTextAreaStyle}
                 />
-                <div className="flex min-h-8 items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/80 px-3 py-1.5">
-                  <span className="min-w-0 truncate text-[11px] text-slate-400">
+                <div className="flex min-h-8 items-center justify-between gap-3 border-t border-line bg-sunken/80 px-3 py-1.5">
+                  <span className="min-w-0 truncate text-hint text-faint">
                     {sourceText.length} chars · 识别为{' '}
                     <span className="font-semibold text-blue-600">
                       {getTranslationLanguageDisplayName(detectedSourceLanguage)}
@@ -1050,7 +1044,7 @@ function ResultWindowContent({
                     <button
                       type="button"
                       onClick={() => updateSourceInputCollapsed(true)}
-                      className="h-7 rounded-[7px] px-2 text-[11px] font-semibold text-slate-500 hover:bg-white hover:text-slate-700"
+                      className="h-7 rounded-md px-2 text-hint font-semibold text-muted hover:bg-surface hover:text-ink"
                     >
                       折叠
                     </button>
@@ -1068,7 +1062,7 @@ function ResultWindowContent({
                         isTranslationFavoritePending ||
                         areAllTranslationResultsFavorited
                       }
-                      className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="grid h-7 w-7 place-items-center rounded-md border border-line bg-surface text-muted transition-colors duration-150 hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
                       onClick={() => void handleFavoriteTranslation()}
                     >
                       <FavoriteIcon
@@ -1083,7 +1077,7 @@ function ResultWindowContent({
                     <IconActionButton
                       title="复制"
                       disabled={!sourceText.trim()}
-                      className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
+                      className="grid h-7 w-7 place-items-center rounded-md border border-line bg-surface text-muted transition-colors duration-150 hover:border-line-strong hover:bg-sunken hover:text-ink disabled:cursor-not-allowed disabled:opacity-45"
                       onClick={() => {
                         void runtime.copyText(sourceText);
                       }}
@@ -1093,7 +1087,7 @@ function ResultWindowContent({
                     <IconActionButton
                       title="朗读"
                       disabled={!sourceText.trim()}
-                      className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
+                      className="grid h-7 w-7 place-items-center rounded-md border border-line bg-surface text-muted transition-colors duration-150 hover:border-line-strong hover:bg-sunken hover:text-ink disabled:cursor-not-allowed disabled:opacity-45"
                       onClick={() => {
                         void runtime.speakText(
                           sourceText,
@@ -1108,7 +1102,7 @@ function ResultWindowContent({
                     <IconActionButton
                       title="重试"
                       disabled={!sourceText.trim() || isTranslating}
-                      className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
+                      className="grid h-7 w-7 place-items-center rounded-md border border-line bg-surface text-muted transition-colors duration-150 hover:border-line-strong hover:bg-sunken hover:text-ink disabled:cursor-not-allowed disabled:opacity-45"
                       onClick={handleTranslate}
                     >
                       <RetryIcon className="h-4 w-4" />
@@ -1116,7 +1110,7 @@ function ResultWindowContent({
                     <IconActionButton
                       title="清空"
                       disabled={!sourceText}
-                      className="grid h-7 w-7 place-items-center rounded-[7px] border border-slate-200 bg-white text-slate-500 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-45"
+                      className="grid h-7 w-7 place-items-center rounded-md border border-line bg-surface text-muted transition-colors duration-150 hover:border-line-strong hover:bg-sunken hover:text-ink disabled:cursor-not-allowed disabled:opacity-45"
                       onClick={() => runtime.updateSourceText('')}
                     >
                       <ClearTextIcon className="h-4 w-4" />

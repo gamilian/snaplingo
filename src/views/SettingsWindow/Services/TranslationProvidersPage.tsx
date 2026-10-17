@@ -182,7 +182,7 @@ export function TranslationProvidersPage() {
 
   return (
     <div className="max-w-5xl">
-      <div className="-mx-[22px] divide-y divide-gray-100 overflow-hidden rounded-[11px] border border-gray-200 bg-white shadow-sm">
+      <div className="-mx-[22px] divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface shadow-sm">
         {orderedProviders.map((provider) => {
           const isActive = activeProviders.includes(provider.id);
 
@@ -200,7 +200,7 @@ export function TranslationProvidersPage() {
               } ${
                 draggedId === provider.id ? 'opacity-50' : ''
               } ${
-                dragOverId === provider.id ? 'ring-2 ring-inset ring-primary-300' : ''
+                dragOverId === provider.id ? 'ring-2 ring-inset ring-accent-line' : ''
               }`}
             >
               <ProviderCard
@@ -220,7 +220,7 @@ export function TranslationProvidersPage() {
                     {Array.from({ length: 6 }).map((_, index) => (
                       <span
                         key={index}
-                        className="h-1 w-1 rounded-full bg-gray-400"
+                        className="h-1 w-1 rounded-full bg-faint"
                       />
                     ))}
                   </span>
@@ -236,7 +236,7 @@ export function TranslationProvidersPage() {
         title="添加自定义服务"
         aria-label="添加自定义服务"
         onClick={handleAddCustom}
-        className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3.5 text-xs font-semibold text-gray-600 transition-colors hover:border-primary-200 hover:text-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-100"
+        className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-line bg-surface px-3.5 text-xs font-semibold text-muted transition-colors hover:border-accent-line hover:text-accent-text focus:outline-none focus:ring-2 focus:ring-accent-line"
       >
         <PlusIcon />
         <span>添加自定义服务</span>
