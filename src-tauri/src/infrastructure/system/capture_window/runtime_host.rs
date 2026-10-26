@@ -9,12 +9,16 @@ use crate::domain::capture::CaptureSessionId;
 use crate::domain::ocr::OcrResult;
 use crate::Result;
 
-use super::tauri::{bind_capture_window_session, set_capture_window_cursor_passthrough};
+use super::backend::CAPTURE_WINDOW_LABEL;
+use super::tauri::{
+    bind_capture_window_session, open_capture_window_for_session, prepare_capture_window,
+    set_capture_window_cursor_passthrough, wait_for_capture_window_label_release,
+    CaptureWindowUpdate,
+};
 use super::{
     begin_capture_presentation, destroy_inactive_capture_window, end_capture_presentation,
-    hide_capture_window, open_capture_window_for_session, prepare_capture_window,
-    prepare_capture_window_for_reveal, restore_capture_snapshot_windows, reveal_capture_window,
-    wait_for_capture_window_ready,
+    hide_capture_window, prepare_capture_window_for_reveal, restore_capture_snapshot_windows,
+    reveal_capture_window, wait_for_capture_window_ready,
 };
 
 pub(crate) struct TauriCaptureSessionRuntimeHost {
@@ -121,7 +125,7 @@ impl CaptureSessionRuntimeHost for TauriCaptureSessionRuntimeHost {
     }
 
     async fn prepare_capture_window(&self) -> Result<()> {
-        run_on_main_thread(&self.app, "prepare capture window", |app| {
+        run_capture_window_update(&self.app, "prepare capture window", |app| {
             prepare_capture_window(&app)
         })
         .await?;
@@ -186,7 +190,7 @@ impl CaptureSessionRuntimeHost for TauriCaptureSessionRuntimeHost {
         let session_id = session_id.to_string();
         let geometry = geometry.clone();
 
-        run_on_main_thread(&self.app, "open capture window", move |app| {
+        run_capture_window_update(&self.app, "open capture window", move |app| {
             open_capture_window_for_session(&app, &mode, &session_id, &geometry)
         })
         .await
@@ -200,6 +204,31 @@ impl CaptureSessionRuntimeHost for TauriCaptureSessionRuntimeHost {
             restore_capture_snapshot_windows(&app, &hidden_window_labels)
         })
         .await
+    }
+}
+
+async fn run_capture_window_update<F>(
+    app: &AppHandle,
+    operation_name: &'static str,
+    operation: F,
+) -> Result<()>
+where
+    F: Fn(AppHandle) -> std::result::Result<CaptureWindowUpdate, String> + Send + Sync + 'static,
+{
+    let operation = std::sync::Arc::new(operation);
+    loop {
+        let update = operation.clone();
+        match run_on_main_thread(app, operation_name, move |app| update(app)).await? {
+            CaptureWindowUpdate::Ready => return Ok(()),
+            CaptureWindowUpdate::Closing => {
+                // Destruction is queued on the native event loop. Yield here so
+                // the main thread can release the label before we build again.
+                wait_for_capture_window_label_release(|| {
+                    app.get_webview_window(CAPTURE_WINDOW_LABEL).is_some()
+                })
+                .await?;
+            }
+        }
     }
 }
 

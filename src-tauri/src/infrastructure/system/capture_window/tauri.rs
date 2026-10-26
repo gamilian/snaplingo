@@ -1,7 +1,6 @@
 use std::{
     sync::atomic::{AtomicBool, Ordering},
     sync::{Once, OnceLock},
-    thread,
     time::{Duration, Instant},
 };
 
@@ -29,6 +28,11 @@ static CAPTURE_WINDOW_READY_NOTIFY: OnceLock<tokio::sync::Notify> = OnceLock::ne
 static CAPTURE_WINDOW_READY_LISTENER: Once = Once::new();
 
 const CAPTURE_WINDOW_READY_EVENT: &str = "capture-window-ready";
+
+pub(super) enum CaptureWindowUpdate {
+    Ready,
+    Closing,
+}
 
 pub fn begin_capture_presentation(app: &AppHandle) -> Result<(), String> {
     #[cfg(target_os = "macos")]
@@ -228,23 +232,24 @@ pub fn prewarm_capture_window(app: &AppHandle) -> Result<(), String> {
 /// Reuses a hidden capture WebView on the current Space before frozen pixels
 /// are ready, rebuilding it when the native window is no longer usable for
 /// the active Space.
-pub fn prepare_capture_window(app: &AppHandle) -> Result<(), String> {
+pub(super) fn prepare_capture_window(app: &AppHandle) -> Result<CaptureWindowUpdate, String> {
     ensure_capture_window_ready_listener(app);
     if let Some(window) = app.get_webview_window(CAPTURE_WINDOW_LABEL) {
         let webview_ready = CAPTURE_WINDOW_WEBVIEW_READY.load(Ordering::SeqCst);
         let on_active_space = capture_window_is_on_active_space(&window).unwrap_or(false);
         if should_reuse_existing_capture_window(true, webview_ready, on_active_space) {
             CAPTURE_WINDOW_PREPARED_FOR_SESSION.store(true, Ordering::SeqCst);
-            return Ok(());
+            return Ok(CaptureWindowUpdate::Ready);
         }
-        discard_capture_window_before_new_session(app, &window)?;
+        window.destroy().map_err(|error| error.to_string())?;
+        return Ok(CaptureWindowUpdate::Closing);
     }
 
     CAPTURE_WINDOW_WEBVIEW_READY.store(false, Ordering::SeqCst);
     build_hidden_capture_window(app)?;
     CAPTURE_WINDOW_PREPARED_FOR_SESSION.store(true, Ordering::SeqCst);
 
-    Ok(())
+    Ok(CaptureWindowUpdate::Ready)
 }
 
 pub async fn wait_for_capture_window_ready() {
@@ -299,12 +304,12 @@ fn build_hidden_capture_window(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-pub fn open_capture_window_for_session(
+pub(super) fn open_capture_window_for_session(
     app: &AppHandle,
     mode: &str,
     session_id: &str,
     geometry: &CaptureWindowGeometry,
-) -> Result<(), String> {
+) -> Result<CaptureWindowUpdate, String> {
     let mode = normalized_capture_mode(mode);
 
     if let Some(window) = app.get_webview_window(CAPTURE_WINDOW_LABEL) {
@@ -317,8 +322,9 @@ pub fn open_capture_window_for_session(
             webview_ready,
             on_active_space,
         ) {
-            discard_capture_window_before_new_session(app, &window)?;
             CAPTURE_WINDOW_WEBVIEW_READY.store(false, Ordering::SeqCst);
+            window.destroy().map_err(|error| error.to_string())?;
+            return Ok(CaptureWindowUpdate::Closing);
         } else {
             if should_reset_capture_window_fullscreen_before_reuse() {
                 window.set_fullscreen(false).map_err(|e| e.to_string())?;
@@ -343,7 +349,7 @@ pub fn open_capture_window_for_session(
                     }),
                 )
                 .map_err(|e| e.to_string())?;
-            return Ok(());
+            return Ok(CaptureWindowUpdate::Ready);
         }
     } else {
         CAPTURE_WINDOW_PREPARED_FOR_SESSION.store(false, Ordering::SeqCst);
@@ -387,7 +393,7 @@ pub fn open_capture_window_for_session(
     configure_capture_window_for_current_space(&window, geometry.desktop_scale)?;
     restore_capture_window_activation();
 
-    Ok(())
+    Ok(CaptureWindowUpdate::Ready)
 }
 
 pub(super) fn bind_capture_window_session(app: &AppHandle, session_id: &str) {
@@ -581,22 +587,19 @@ fn capture_window_is_on_active_space(window: &tauri::WebviewWindow) -> Result<bo
     }
 }
 
-fn discard_capture_window_before_new_session(
-    app: &AppHandle,
-    window: &tauri::WebviewWindow,
+pub(super) async fn wait_for_capture_window_label_release(
+    is_present: impl Fn() -> bool,
 ) -> Result<(), String> {
-    window.destroy().map_err(|e| e.to_string())?;
-
     let start = Instant::now();
     while start.elapsed() < capture_window_destroy_timeout() {
-        if app.get_webview_window(CAPTURE_WINDOW_LABEL).is_none() {
+        if !is_present() {
             return Ok(());
         }
 
-        thread::sleep(capture_window_destroy_poll_interval());
+        tokio::time::sleep(capture_window_destroy_poll_interval()).await;
     }
 
-    if app.get_webview_window(CAPTURE_WINDOW_LABEL).is_none() {
+    if !is_present() {
         return Ok(());
     }
 
@@ -614,6 +617,28 @@ fn capture_window_destroy_poll_interval() -> Duration {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn closing_capture_window_allows_queued_destruction_to_run() {
+        let is_present = std::sync::Arc::new(AtomicBool::new(true));
+        let queued_window = is_present.clone();
+        let destruction = tokio::spawn(async move {
+            tokio::task::yield_now().await;
+            queued_window.store(false, Ordering::SeqCst);
+        });
+
+        let start = Instant::now();
+        let result =
+            wait_for_capture_window_label_release(|| is_present.load(Ordering::SeqCst)).await;
+        let elapsed = start.elapsed();
+        destruction.await.unwrap();
+
+        assert!(
+            result.is_ok(),
+            "queued destruction was blocked for {elapsed:?}: {result:?}"
+        );
+        assert!(elapsed < Duration::from_millis(250));
+    }
 
     #[test]
     fn capture_window_accepts_first_mouse_on_reveal() {
