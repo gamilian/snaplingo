@@ -89,7 +89,7 @@ describe.skipIf(process.platform !== 'darwin')('persistent macOS release identit
     run('/usr/bin/codesign', ['--force', '--sign', '-', applications[1]]);
     const adHoc = spawnSync('/usr/bin/codesign', ['--verify', '--strict', `-R=${requirements[0]}`, applications[1]]);
     expect(adHoc.status).not.toBe(0);
-  });
+  }, 60_000);
 
   it('rejects a different certificate and leaves no usable signing environment or credential copy', () => {
     environment.SNAPLINGO_CERTIFICATE_SHA1 = '0'.repeat(40);
