@@ -1,0 +1,19 @@
+{
+  "type": "design",
+  "designSystems": [],
+  "primaryDesignSystem": null,
+  "assets": {
+    "SnapLingo 全界面 · 三套方案": {
+      "versions": [
+        {
+          "path": "index.html",
+          "createdAt": "2026-10-25T17:20:23.257Z",
+          "status": "needs-review",
+          "subtitle": "保留原版快捷键行内录制动效"
+        }
+      ]
+    }
+  },
+  "createdAt": "2026-10-25T17:20:23.261Z",
+  "updatedAt": "2026-10-25T23:35:37.495Z"
+}

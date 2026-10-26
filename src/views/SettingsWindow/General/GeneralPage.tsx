@@ -9,6 +9,7 @@ import { useSettingsRuntime } from '../runtimeContext';
 import { uiText } from '../../../application/settings/uiText';
 import { PermissionControls, useRequiredPermissions } from '../../PermissionControls';
 import { SoftwareUpdateSettings } from './SoftwareUpdateSettings';
+import { ThemePicker } from './ThemePicker';
 
 export function GeneralPage() {
   const t = useUiText();
@@ -42,6 +43,10 @@ export function GeneralPage() {
           label: t('interfaceAndStartup'),
           content: (
             <SettingsGroup title={t('interface')}>
+              <ThemePicker
+                value={general.interfaceTheme ?? 'native'}
+                onChange={(interfaceTheme) => updateGeneralSettings({ interfaceTheme })}
+              />
               <SettingRow label={t('interfaceLanguage')}>
                 <SelectField
                   value={general.language}
@@ -51,7 +56,7 @@ export function GeneralPage() {
                   onChange={(language) => updateGeneral({ language })}
                 />
               </SettingRow>
-              <SettingRow label={t('theme')}>
+              <SettingRow label={t('appearanceMode')}>
                 <SelectField
                   value={general.theme}
                   options={[

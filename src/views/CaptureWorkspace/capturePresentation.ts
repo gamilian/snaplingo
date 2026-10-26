@@ -81,7 +81,7 @@ export function getCaptureSelectionOverlayCanvasClassName() {
 
 export function getCaptureEditorToolbarClassName() {
   return [
-    'absolute flex h-[40px] items-center gap-0.5 rounded-[11px] bg-surface px-[5px] py-1',
+    'capture-editor-toolbar absolute flex h-[40px] items-center gap-0.5 rounded-[11px] bg-surface px-[5px] py-1',
     'text-hint font-semibold text-muted shadow-[0_10px_30px_rgba(0,0,0,0.34)]',
     'ring-1 ring-line',
   ].join(' ');

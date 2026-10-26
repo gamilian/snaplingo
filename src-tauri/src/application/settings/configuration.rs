@@ -157,6 +157,12 @@ impl SettingsConfiguration {
             snapshot.general.theme = "system".to_string();
         }
         if !matches!(
+            snapshot.general.interface_theme.as_str(),
+            "native" | "studio" | "paper"
+        ) {
+            snapshot.general.interface_theme = "native".to_string();
+        }
+        if !matches!(
             snapshot.general.proxy_mode.as_str(),
             "system" | "none" | "manual"
         ) {
@@ -319,6 +325,44 @@ mod settings_configuration_tests {
         );
         assert_eq!(updated.translation, TranslationSettings::default());
         assert_eq!(store.load_settings().unwrap(), updated);
+    }
+
+    #[test]
+    fn interface_themes_persist_and_notify_other_windows_without_changing_appearance() {
+        let store = Arc::new(SqliteConfigStore::new_in_memory());
+        let notifier = Arc::new(CountingNotifier(AtomicUsize::new(0)));
+        let configuration =
+            SettingsConfiguration::with_change_notifier(store.clone(), notifier.clone());
+
+        for (index, theme) in ["native", "studio", "paper"].into_iter().enumerate() {
+            configuration
+                .update_general(GeneralSettings {
+                    interface_theme: theme.to_string(),
+                    theme: "dark".to_string(),
+                    ..GeneralSettings::default()
+                })
+                .unwrap();
+
+            let restored = SettingsConfiguration::new(store.clone())
+                .snapshot()
+                .unwrap();
+            assert_eq!(restored.general.interface_theme, theme);
+            assert_eq!(restored.general.theme, "dark");
+            assert_eq!(notifier.0.load(Ordering::SeqCst), index + 1);
+        }
+    }
+
+    #[test]
+    fn unknown_interface_themes_fall_back_to_native() {
+        let configuration =
+            SettingsConfiguration::new(Arc::new(SqliteConfigStore::new_in_memory()));
+        let updated = configuration
+            .update_general(GeneralSettings {
+                interface_theme: "unknown".to_string(),
+                ..GeneralSettings::default()
+            })
+            .unwrap();
+        assert_eq!(updated.general.interface_theme, "native");
     }
 
     #[test]

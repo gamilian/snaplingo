@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { resolveInterfaceTheme, type InterfaceTheme } from '../../application/settings/theme';
 import type {
   AppLogEntry,
   AnnotationColorPreset,
@@ -12,6 +13,7 @@ import type {
 interface BackendGeneralSettings {
   language: string;
   theme: string;
+  interface_theme?: string;
   start_on_boot: boolean;
   proxy_mode?: 'system' | 'none' | 'manual';
   proxy_url?: string;
@@ -97,6 +99,7 @@ interface BackendSettingsSnapshot {
 interface GeneralSettingsInput {
   language: string;
   theme: string;
+  interfaceTheme?: InterfaceTheme;
   startOnBoot: boolean;
   proxyMode?: 'system' | 'none' | 'manual';
   proxyUrl?: string;
@@ -169,6 +172,7 @@ function normalizeSnapshot(snapshot: BackendSettingsSnapshot) {
     general: {
       language: snapshot.general.language,
       theme: snapshot.general.theme,
+      interfaceTheme: resolveInterfaceTheme(snapshot.general.interface_theme),
       startOnBoot: snapshot.general.start_on_boot,
       proxyMode: snapshot.general.proxy_mode ?? 'system',
       proxyUrl: snapshot.general.proxy_url ?? '',
@@ -268,6 +272,7 @@ export async function updateGeneralSettings(input: GeneralSettingsInput) {
       input: {
         language: input.language,
         theme: input.theme,
+        interface_theme: input.interfaceTheme ?? 'native',
         start_on_boot: input.startOnBoot,
         proxy_mode: input.proxyMode ?? 'system',
         proxy_url: input.proxyUrl ?? '',

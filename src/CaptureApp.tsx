@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useApplicationTheme } from './views/useApplicationTheme';
 import { createDurableSettingsConfiguration } from './application/settings/configuration';
 import type { CaptureWorkspacePorts } from './application/capture-workspace/ports';
 import { captureWorkspaceCommands } from './platform/tauri/capture';
@@ -61,18 +62,7 @@ export default function CaptureApp() {
     };
   }, []);
 
-  useEffect(() => {
-    const root = document.documentElement;
-    root.dataset.themeScope = 'application';
-    root.dataset.theme = 'light';
-    root.style.colorScheme = 'light';
-    if (general) {
-      root.lang = general.language;
-      root.dataset.experimentalGpu = String(
-        general.experimentalGpuAcceleration ?? false,
-      );
-    }
-  }, [general]);
+  useApplicationTheme(general);
 
   return (
     <CaptureWorkspace

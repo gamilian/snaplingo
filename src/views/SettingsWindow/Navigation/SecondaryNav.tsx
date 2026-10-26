@@ -13,7 +13,7 @@ export function SecondaryNav({
 }: SecondaryNavProps) {
   if (orientation === 'horizontal') {
     return (
-      <div className="inline-flex max-w-[60%] shrink overflow-x-auto rounded-md bg-raised p-[3px]">
+      <div className="settings-secondary-horizontal inline-flex max-w-[60%] shrink overflow-x-auto rounded-md bg-raised p-[3px]">
         <nav className="flex gap-0.5">
           {items.map((item) => {
             const active = activeItem === item.key;
@@ -42,7 +42,7 @@ export function SecondaryNav({
   }
 
   return (
-    <div className="flex w-[200px] flex-col border-r border-line bg-sunken">
+    <div className="settings-secondary-vertical flex w-[200px] flex-col border-r border-line bg-sunken">
       <nav className="flex-1 space-y-0.5 p-4">
         {items.map((item) => {
           const active = activeItem === item.key;

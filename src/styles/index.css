@@ -1,3 +1,5 @@
+@import './themes.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -9,64 +11,56 @@
    Dark mode is therefore a variable swap, not a per-class override. */
 
 :root {
-  --canvas: 244 245 247;
+  --canvas: 248 249 252;
   --surface: 255 255 255;
-  --sunken: 240 241 244;
-  --raised: 234 236 239;
-  --line: 226 229 234;
-  --line-strong: 207 212 220;
-
-  --ink: 23 26 33;
-  --muted: 93 100 114;
-  --faint: 139 147 161;
-
-  --accent: 79 91 213;
-  --accent-hover: 65 76 191;
-  --accent-text: 63 73 191;
-  --accent-soft: 238 240 255;
-  --accent-line: 205 210 248;
+  --sidebar: 241 244 248;
+  --sunken: 245 247 250;
+  --raised: 237 241 247;
+  --line: 229 233 240;
+  --line-strong: 212 220 231;
+  --ink: 41 53 71;
+  --muted: 109 120 137;
+  --faint: 138 148 163;
+  --accent: 57 117 220;
+  --accent-hover: 41 100 200;
+  --accent-text: 57 117 220;
+  --accent-soft: 234 241 253;
   --accent-on: 255 255 255;
-
-  --good: 18 133 95;
-  --good-soft: 228 246 238;
-  --warn: 161 92 7;
-  --warn-soft: 253 241 220;
-  --danger: 209 59 52;
-  --danger-soft: 253 236 235;
-
-  --shadow-color: 16 20 32;
-
+  --good: 60 135 107;
+  --good-soft: 234 245 239;
+  --warn: 160 117 50;
+  --warn-soft: 251 242 227;
+  --danger: 200 98 97;
+  --accent-line: 196 214 244;
+  --danger-soft: 248 236 236;
+  --shadow-color: 34 48 60;
   color-scheme: light;
 }
 
 :root[data-theme='dark'] {
-  --canvas: 13 15 20;
-  --surface: 22 25 32;
-  --sunken: 16 19 25;
-  --raised: 30 34 48;
-  --line: 36 41 54;
-  --line-strong: 51 58 75;
-
-  --ink: 232 234 240;
-  --muted: 154 162 180;
-  --faint: 108 116 136;
-
-  --accent: 124 134 238;
-  --accent-hover: 139 148 242;
-  --accent-text: 150 160 245;
-  --accent-soft: 28 33 56;
-  --accent-line: 46 53 86;
-  --accent-on: 13 15 20;
-
-  --good: 63 199 149;
-  --good-soft: 16 41 31;
-  --warn: 224 164 74;
-  --warn-soft: 42 32 16;
-  --danger: 239 106 97;
-  --danger-soft: 44 21 18;
-
+  --canvas: 32 39 49;
+  --surface: 41 50 62;
+  --sidebar: 29 37 47;
+  --sunken: 48 59 73;
+  --raised: 58 70 85;
+  --line: 59 70 83;
+  --line-strong: 77 91 107;
+  --ink: 227 233 241;
+  --muted: 160 174 192;
+  --faint: 134 147 165;
+  --accent: 129 171 239;
+  --accent-hover: 153 191 250;
+  --accent-text: 129 171 239;
+  --accent-soft: 48 63 85;
+  --accent-on: 27 44 69;
+  --good: 138 189 164;
+  --good-soft: 44 64 56;
+  --warn: 217 178 129;
+  --warn-soft: 73 63 50;
+  --danger: 225 145 141;
+  --accent-line: 67 86 115;
+  --danger-soft: 63 61 71;
   --shadow-color: 0 0 0;
-
   color-scheme: dark;
 }
 

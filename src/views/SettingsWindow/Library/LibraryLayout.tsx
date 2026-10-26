@@ -42,9 +42,9 @@ export function LibraryLayout<Key extends string>({
   const hasNext = end < total;
 
   return (
-    <div className="grid h-full min-h-0 min-w-0 flex-1 grid-cols-[410px_minmax(0,1fr)] bg-surface">
+    <div className="library-layout grid h-full min-h-0 min-w-0 flex-1 grid-cols-[410px_minmax(0,1fr)] bg-surface">
       <section className="flex min-h-0 min-w-0 flex-col border-r border-line bg-sunken/60">
-        <header className="space-y-3 border-b border-line bg-surface px-4 pb-3 pt-5">
+        <header className="library-heading space-y-3 border-b border-line bg-surface px-4 pb-3 pt-5">
           <div className="flex items-end justify-between gap-3">
             <h1 className="text-xl font-bold tracking-[-0.035em] text-ink">
               {title}
@@ -115,7 +115,7 @@ export function LibraryLayout<Key extends string>({
         </footer>
       </section>
 
-      <section className="min-h-0 min-w-0 overflow-y-auto bg-canvas px-7 py-7">
+      <section className="library-detail min-h-0 min-w-0 overflow-y-auto bg-canvas px-7 py-7">
         {detail}
       </section>
     </div>
@@ -149,7 +149,7 @@ export function LibraryListItem({
     <button
       type="button"
       onClick={onClick}
-      className={`relative block min-h-[72px] w-full border-b border-line px-4 py-2.5 text-left transition-colors ${
+      className={`library-list-item relative block min-h-[72px] w-full border-b border-line px-4 py-2.5 text-left transition-colors ${
         active ? 'bg-accent-soft' : 'bg-transparent hover:bg-raised/80'
       }`}
     >
@@ -191,7 +191,7 @@ export function DetailHeader({
   actions: ReactNode;
 }) {
   return (
-    <header className="mb-5 flex items-start justify-between gap-5">
+    <header className="library-detail-heading mb-5 flex items-start justify-between gap-5">
       <div className="min-w-0">
         <h2 className="truncate text-lg font-bold tracking-[-0.02em] text-ink">
           {title}
@@ -215,7 +215,7 @@ export function DetailCard({
   actions?: ReactNode;
 }) {
   return (
-    <section className="mb-3 rounded-lg border border-line bg-surface p-4 shadow-sm shadow-gray-200/30">
+    <section className="library-detail-card mb-3 rounded-lg border border-line bg-surface p-4 shadow-sm shadow-gray-200/30">
       <div className="mb-3 flex items-center justify-between gap-3 text-hint font-bold tracking-[0.04em] text-faint">
         <span>{label}</span>
         {meta && <span className="font-medium tracking-normal">{meta}</span>}

@@ -88,7 +88,7 @@ export function resultWindowPanelClassName(
   { fitContent = false }: ResultWindowShellOptions = {},
 ) {
   const baseClassName =
-    `relative min-h-0 bg-surface ${resultWindowSurfaceRadiusClassName} shadow-xl w-full overflow-hidden ${resultWindowSurfaceClipClassName} flex flex-col`;
+    `result-panel relative min-h-0 bg-surface ${resultWindowSurfaceRadiusClassName} shadow-xl w-full overflow-hidden ${resultWindowSurfaceClipClassName} flex flex-col`;
 
   if (presentation === 'standalone') {
     if (fitContent) {

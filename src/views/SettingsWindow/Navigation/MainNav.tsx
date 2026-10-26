@@ -130,17 +130,17 @@ export function MainNav({ activeTab, onTabChange, library }: MainNavProps) {
 
   return (
     <>
-      <aside className="flex w-[202px] shrink-0 flex-col border-r border-line bg-sunken px-2.5 py-3">
-        <div className="flex items-center gap-2.5 px-1.5 pb-3">
+      <aside className="settings-main-nav flex w-[202px] shrink-0 flex-col border-r border-line bg-sunken px-2.5 py-3">
+        <div className="settings-brand flex items-center gap-2.5 px-1.5 pb-3">
           <div className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-gradient-to-br from-accent to-accent-hover text-label font-bold tracking-[-0.03em] text-accent-on shadow-xs">
             S
           </div>
-          <span className="truncate text-card font-bold tracking-[-0.018em] text-ink">
+          <span className="settings-brand-name truncate text-card font-bold tracking-[-0.018em] text-ink">
             SnapLingo
           </span>
         </div>
 
-        <nav className="min-h-0 flex-1 overflow-y-auto pt-2">
+        <nav aria-label="主导航" className="settings-main-links min-h-0 flex-1 overflow-y-auto pt-2">
           <NavGroup
             items={settingsItems}
             activeTab={activeTab}
@@ -154,15 +154,18 @@ export function MainNav({ activeTab, onTabChange, library }: MainNavProps) {
           />
         </nav>
 
-        <div className="mt-3 rounded-md border border-line bg-surface p-2.5">
-          <div className="mb-2 flex items-center justify-between gap-2 border-b border-line pb-2">
+        <div className="settings-capacity-panel mt-3 rounded-md border border-line bg-surface p-2.5">
+          <div className="settings-capacity-heading mb-2 flex items-center justify-between gap-2 border-b border-line pb-2">
             <span className="text-hint font-semibold text-ink">{t('historyAndFavorites')}</span>
             <button
               type="button"
               onClick={openCapacity}
-              className="h-5 rounded-sm bg-accent-soft px-1.5 text-cap font-semibold text-accent-text hover:bg-accent-line"
+              aria-label={t('historyAndFavorites')}
+              title={t('historyAndFavorites')}
+              className="settings-capacity-button h-5 rounded-sm bg-accent-soft px-1.5 text-cap font-semibold text-accent-text hover:bg-accent-line"
             >
-              {t('configure')}
+              <svg className="settings-capacity-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5" /></svg>
+              <span>{t('configure')}</span>
             </button>
           </div>
           <CapacitySummary
@@ -300,13 +303,13 @@ function NavGroup({
   onTabChange: (tab: MainTab) => void;
 }) {
   return (
-    <div className="mb-3.5">
+    <div className="settings-nav-group mb-3.5">
       {label && (
-        <div className="px-2 pb-1.5 text-cap font-semibold uppercase tracking-[0.075em] text-faint">
+        <div className="settings-nav-group-label px-2 pb-1.5 text-cap font-semibold uppercase tracking-[0.075em] text-faint">
           {label}
         </div>
       )}
-      <div className="space-y-px">
+      <div className="settings-nav-items space-y-px">
         {items.map((item) => {
           const active = activeTab === item.key;
           return (
@@ -314,8 +317,9 @@ function NavGroup({
               key={item.key}
               type="button"
               aria-current={active ? 'page' : undefined}
+              title={item.label}
               onClick={() => onTabChange(item.key)}
-              className={`relative flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-left text-label transition-colors ${
+              className={`settings-nav-item relative flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-left text-label transition-colors ${
                 active
                   ? 'bg-accent-soft font-semibold text-accent-text'
                   : 'text-muted hover:bg-raised/70 hover:text-ink'
@@ -324,17 +328,17 @@ function NavGroup({
               {active && (
                 <span
                   aria-hidden="true"
-                  className="absolute -left-2.5 top-1.5 bottom-1.5 w-0.5 rounded-r-sm bg-accent"
+                  className="settings-nav-indicator absolute -left-2.5 top-1.5 bottom-1.5 w-0.5 rounded-r-sm bg-accent"
                 />
               )}
               <span
-                className={`shrink-0 transition-colors [&>svg]:h-4 [&>svg]:w-4 ${
+                className={`settings-nav-icon shrink-0 transition-colors [&>svg]:h-4 [&>svg]:w-4 ${
                   active ? 'text-accent' : 'text-faint'
                 }`}
               >
                 {item.icon}
               </span>
-              <span className="truncate">{item.label}</span>
+              <span className="settings-nav-label truncate">{item.label}</span>
             </button>
           );
         })}
@@ -355,7 +359,7 @@ function CapacitySummary({
   capacity?: number;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-1 text-hint text-muted">
+    <div className="settings-capacity-summary flex items-center justify-between gap-3 py-1 text-hint text-muted">
       <span>{label}</span>
       <span className="font-medium tabular-nums text-ink">
         {value === null

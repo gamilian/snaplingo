@@ -39,7 +39,7 @@ export function ProviderCard({
 
   return (
     <div
-      className={`group/provider relative min-h-[72px] px-5 py-3.5 transition-colors duration-150 ${
+      className={`provider-card group/provider relative min-h-[72px] px-5 py-3.5 transition-colors duration-150 ${
         highlighted
           ? 'bg-accent-soft/60 before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r before:bg-accent'
           : 'hover:bg-sunken'

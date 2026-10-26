@@ -60,7 +60,7 @@ export default function TranslationCard({
   }, [providerId, text]);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-line bg-surface">
+    <div className="translation-result-card overflow-hidden rounded-xl border border-line bg-surface">
       <div className="flex min-h-9 items-center justify-between gap-3 border-b border-line bg-sunken/80 px-3 py-2">
         <button
           type="button"
@@ -192,7 +192,7 @@ export default function TranslationCard({
             </div>
           ) : (
             <p
-              className={`whitespace-pre-wrap break-words px-3 py-2 text-card leading-[1.38] ${
+              className={`translation-result-copy whitespace-pre-wrap break-words px-3 py-2 text-card leading-[1.38] ${
                 isError ? 'text-red-700' : 'text-ink'
               }`}
               style={resultWindowAdaptiveTextStyle(displayText, 'result')}

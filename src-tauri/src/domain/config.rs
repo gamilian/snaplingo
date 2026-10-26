@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 pub struct GeneralSettings {
     pub language: String,
     pub theme: String,
+    pub interface_theme: String,
     pub start_on_boot: bool,
     pub proxy_mode: String,
     pub proxy_url: String,
@@ -29,6 +30,7 @@ impl Default for GeneralSettings {
         Self {
             language: "zh-CN".to_string(),
             theme: "system".to_string(),
+            interface_theme: "native".to_string(),
             start_on_boot: false,
             proxy_mode: "system".to_string(),
             proxy_url: String::new(),
@@ -231,5 +233,6 @@ mod tests {
         assert!(!snapshot.ocr.hide_silent_status);
         assert_eq!(snapshot.general.last_result_window_x, None);
         assert_eq!(snapshot.general.last_result_window_y, None);
+        assert_eq!(snapshot.general.interface_theme, "native");
     }
 }

@@ -1,4 +1,5 @@
 import type { SettingsNavigationRequest } from './navigation';
+import type { InterfaceTheme } from './theme';
 
 export interface SettingsWindowPort {
   openSettings(): Promise<void>;
@@ -39,6 +40,7 @@ export interface SettingsTtsPort {
 export interface GeneralSettings {
   language: string;
   theme: string;
+  interfaceTheme?: InterfaceTheme;
   startOnBoot: boolean;
   proxyMode?: 'system' | 'none' | 'manual';
   proxyUrl?: string;

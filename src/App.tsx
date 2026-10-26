@@ -14,7 +14,7 @@ import { createResultWindowPlatformRuntime } from './application/result-window/p
 import { createResultWindowRuntime } from './application/result-window/runtime';
 import { createPinnedImageRuntime } from './application/pinned-image/runtime';
 import { createSettingsRuntime } from './application/settings/runtime';
-import { resolveApplicationTheme } from './application/settings/theme';
+import { useApplicationTheme } from './views/useApplicationTheme';
 import {
   initializeResultWindowStore,
   useResultWindowStore,
@@ -208,29 +208,7 @@ function Application() {
     };
   }, [applyTranslationDefaults]);
 
-  useEffect(() => {
-    if (!generalSettings) return;
-    const root = document.documentElement;
-    root.lang = generalSettings.language;
-    root.dataset.experimentalGpu = String(
-      generalSettings.experimentalGpuAcceleration ?? false,
-    );
-    root.dataset.themeScope = isSettingsWindow ? 'settings' : 'application';
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const applyTheme = () => {
-      const theme = resolveApplicationTheme({
-        configuredTheme: generalSettings.theme,
-        isSettingsWindow,
-        prefersDark: media.matches,
-      });
-      root.dataset.theme = theme;
-      root.style.colorScheme = theme;
-    };
-    applyTheme();
-    if (!isSettingsWindow || generalSettings.theme !== 'system') return;
-    media.addEventListener('change', applyTheme);
-    return () => media.removeEventListener('change', applyTheme);
-  }, [generalSettings, isSettingsWindow]);
+  useApplicationTheme(generalSettings, isSettingsWindow ? 'settings' : 'application');
 
   useEffect(() => {
     if (!isSettingsWindow) return;

@@ -89,7 +89,7 @@ export function RequiredPermissionsGate({
           aria-describedby="screen-permission-description"
           aria-modal="true"
           role="dialog"
-          className="bg-surface text-ink outline-none"
+          className="permission-guide bg-surface text-ink outline-none"
           style={styles.card}
           onKeyDown={(event) => {
             if (event.key === 'Escape') setDismissed(true);

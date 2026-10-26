@@ -1,32 +1,21 @@
 import { describe, expect, it } from 'vitest';
+import { resolveApplicationTheme, resolveInterfaceTheme } from './theme';
 
-import { resolveApplicationTheme } from './theme';
-
-describe('application theme scope', () => {
-  it('applies the configured theme only to the settings window', () => {
-    expect(
-      resolveApplicationTheme({
-        configuredTheme: 'dark',
-        isSettingsWindow: true,
-        prefersDark: false,
-      }),
-    ).toBe('dark');
-    expect(
-      resolveApplicationTheme({
-        configuredTheme: 'dark',
-        isSettingsWindow: false,
-        prefersDark: true,
-      }),
-    ).toBe('light');
+describe('application themes', () => {
+  it.each(['native', 'studio', 'paper'] as const)('preserves the %s interface theme', (theme) => {
+    expect(resolveInterfaceTheme(theme)).toBe(theme);
   });
 
-  it('resolves the system theme for settings', () => {
-    expect(
-      resolveApplicationTheme({
-        configuredTheme: 'system',
-        isSettingsWindow: true,
-        prefersDark: true,
-      }),
-    ).toBe('dark');
+  it.each([undefined, '', 'unknown'])('uses Native for legacy or unknown interface themes: %s', (value) => {
+    expect(resolveInterfaceTheme(value)).toBe('native');
+  });
+
+  it.each([
+    ['light', true, 'light'],
+    ['dark', false, 'dark'],
+    ['system', true, 'dark'],
+    ['system', false, 'light'],
+  ] as const)('resolves %s appearance with system dark=%s for every window', (configuredTheme, prefersDark, expected) => {
+    expect(resolveApplicationTheme({ configuredTheme, prefersDark })).toBe(expected);
   });
 });

@@ -877,7 +877,7 @@ function PinnedImageWindowContent() {
         </div>
       )}
       <div
-        className={`absolute right-1 top-1 flex gap-0.5 rounded-md bg-surface/95 p-[3px] text-label text-muted shadow-e2 ring-1 ring-line backdrop-blur-md transition-opacity ${hoverToolbarVisibilityClassName}`}
+        className={`pin-toolbar absolute right-1 top-1 flex gap-0.5 rounded-md bg-surface/95 p-[3px] text-label text-muted shadow-e2 ring-1 ring-line backdrop-blur-md transition-opacity ${hoverToolbarVisibilityClassName}`}
         onPointerDown={(event) => event.stopPropagation()}
       >
         {PIN_HOVER_TOOLBAR_ACTIONS.map((action) => (

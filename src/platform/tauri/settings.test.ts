@@ -69,6 +69,7 @@ describe('Tauri settings command adapter', () => {
       general: {
         language: 'en',
         theme: 'dark',
+        interfaceTheme: 'native',
         startOnBoot: true,
         proxyMode: 'system',
         proxyUrl: '',
@@ -154,6 +155,7 @@ describe('Tauri settings command adapter', () => {
       input: {
         language: 'en',
         theme: 'dark',
+        interface_theme: 'native',
         start_on_boot: true,
         proxy_mode: 'system',
         proxy_url: '',
@@ -168,6 +170,17 @@ describe('Tauri settings command adapter', () => {
         last_result_window_x: 420,
         last_result_window_y: 240,
       },
+    });
+  });
+
+  it.each(['native', 'studio', 'paper'] as const)('round-trips the %s interface theme through IPC', async (interfaceTheme) => {
+    const { getSettingsSnapshot, updateGeneralSettings } = await import('./settings');
+    const snapshot = { ...backendSnapshot, general: { ...backendSnapshot.general, interface_theme: interfaceTheme } };
+    invoke.mockResolvedValue(snapshot);
+    await expect(getSettingsSnapshot()).resolves.toMatchObject({ general: { interfaceTheme, theme: 'dark' } });
+    await updateGeneralSettings({ language: 'zh-CN', theme: 'dark', interfaceTheme, startOnBoot: false });
+    expect(invoke).toHaveBeenLastCalledWith('update_general_settings', {
+      input: expect.objectContaining({ interface_theme: interfaceTheme, theme: 'dark' }),
     });
   });
 

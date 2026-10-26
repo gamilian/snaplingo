@@ -155,7 +155,7 @@ export function FeatureHotkeysSection({
   }
 
   return (
-    <div className="divide-y divide-line px-[22px] pb-2">
+    <div className="settings-hotkeys divide-y divide-line px-[22px] pb-2">
       {actions.map((action) => (
         <div
           key={action.key}

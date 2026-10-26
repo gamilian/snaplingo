@@ -8,9 +8,9 @@ export function SettingsGroup({
   children: ReactNode;
 }) {
   return (
-    <section className="border-t border-line first:border-t-0">
+    <section className="settings-group border-t border-line first:border-t-0">
       {title && (
-        <div className="border-b border-line bg-sunken px-[22px] py-2 text-cap font-semibold uppercase tracking-[0.075em] text-faint">
+        <div className="settings-group-label border-b border-line bg-sunken px-[22px] py-2 text-cap font-semibold uppercase tracking-[0.075em] text-faint">
           {title}
         </div>
       )}
@@ -29,7 +29,7 @@ export function SettingRow({
   children: ReactNode;
 }) {
   return (
-    <div className="grid min-h-[54px] grid-cols-[minmax(0,1fr)_minmax(200px,auto)] items-center gap-x-6 gap-y-2 py-2.5">
+    <div className="settings-control-row grid min-h-[54px] grid-cols-[minmax(0,1fr)_minmax(200px,auto)] items-center gap-x-6 gap-y-2 py-2.5">
       <div>
         <div className="text-label font-semibold text-ink">{label}</div>
         {description && (

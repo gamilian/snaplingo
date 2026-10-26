@@ -25,6 +25,7 @@ export function SettingsScrollPage({
 }) {
   const [activeSection, setActiveSection] = useState(sections[0]?.id ?? '');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   useEffect(() => {
@@ -32,7 +33,7 @@ export function SettingsScrollPage({
     if (!container || sections.length === 0) return;
 
     const updateActiveSection = () => {
-      const threshold = container.getBoundingClientRect().top + 112;
+      const threshold = (headerRef.current?.getBoundingClientRect().bottom ?? container.getBoundingClientRect().top) + 16;
       let nextSection = sections[0].id;
       for (const section of sections) {
         if (
@@ -47,9 +48,18 @@ export function SettingsScrollPage({
       );
     };
 
+    const syncHeader = () => {
+      container.style.scrollPaddingTop = `${headerRef.current?.offsetHeight ?? 0}px`;
+      updateActiveSection();
+    };
+    const observer = new ResizeObserver(syncHeader);
+    if (headerRef.current) observer.observe(headerRef.current);
     container.addEventListener('scroll', updateActiveSection, { passive: true });
-    updateActiveSection();
-    return () => container.removeEventListener('scroll', updateActiveSection);
+    syncHeader();
+    return () => {
+      observer.disconnect();
+      container.removeEventListener('scroll', updateActiveSection);
+    };
   }, [sections]);
 
   useEffect(() => {
@@ -70,16 +80,37 @@ export function SettingsScrollPage({
     });
   };
 
+  const sectionButtons = sections.map((section, index) => (
+    <button
+      key={section.id}
+      type="button"
+      aria-current={activeSection === section.id ? 'page' : undefined}
+      onClick={() => jumpToSection(section.id)}
+      className={`settings-section-link h-[25px] shrink-0 whitespace-nowrap rounded-sm px-2.5 text-label font-medium transition-colors ${
+        activeSection === section.id ? 'bg-surface text-ink shadow-xs' : 'text-muted hover:text-ink'
+      }`}
+    >
+      <span className="settings-section-number" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+      <span>{section.label}</span>
+    </button>
+  ));
+
   return (
-    <div ref={scrollRef} className="h-full flex-1 overflow-y-auto bg-canvas">
-      <main className="mx-auto w-full max-w-[1080px] px-8 pb-16">
-        <header className="sticky top-0 z-20 -mx-[22px] mb-[18px] flex items-center justify-between gap-7 border-b border-line bg-canvas/90 px-[22px] pb-[15px] pt-[22px] backdrop-blur-xl">
+    <div className="settings-scroll-layout">
+      <aside className="settings-context-nav">
+        <div className="settings-context-title">{title}<span>CONTENTS</span></div>
+        <nav aria-label={`${title}目录`}>{sectionButtons}</nav>
+        <span className="settings-context-status">{autoSaveLabel}</span>
+      </aside>
+    <div ref={scrollRef} className="settings-scroll-area h-full min-w-0 flex-1 overflow-y-auto bg-canvas">
+      <main className="settings-page mx-auto w-full max-w-[1080px] px-8 pb-16">
+        <header ref={headerRef} className="settings-page-header sticky top-0 z-20 -mx-[22px] mb-[18px] flex items-center justify-between gap-7 border-b border-line bg-canvas/90 px-[22px] pb-[15px] pt-[22px] backdrop-blur-xl">
           <div className="min-w-0">
             <div className="flex items-center gap-2.5">
               <h1 className="text-display font-bold tracking-[-0.028em] text-ink">
                 {title}
               </h1>
-              <span className="flex items-center gap-1.5 text-hint font-medium text-muted">
+              <span className="settings-save-status flex items-center gap-1.5 text-hint font-medium text-muted">
                 <i className="h-1.5 w-1.5 rounded-full bg-good ring-[3px] ring-good-soft" />
                 {autoSaveLabel}
               </span>
@@ -89,40 +120,24 @@ export function SettingsScrollPage({
             )}
           </div>
 
-          <nav className="flex max-w-[60%] shrink gap-0.5 overflow-x-auto rounded-md bg-raised p-[3px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {sections.map((section) => {
-              const active = activeSection === section.id;
-              return (
-                <button
-                  key={section.id}
-                  type="button"
-                  aria-current={active ? 'page' : undefined}
-                  onClick={() => jumpToSection(section.id)}
-                  className={`h-[25px] shrink-0 whitespace-nowrap rounded-sm px-2.5 text-label font-medium transition-colors ${
-                    active
-                      ? 'bg-surface text-ink shadow-xs'
-                      : 'text-muted hover:text-ink'
-                  }`}
-                >
-                  {section.label}
-                </button>
-              );
-            })}
+          <nav aria-label={`${title}分组`} className="settings-section-tabs flex max-w-[60%] shrink gap-0.5 overflow-x-auto rounded-md bg-raised p-[3px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {sectionButtons}
           </nav>
         </header>
 
-        <div className="space-y-3">
-          {sections.map((section) => (
+        <div className="settings-card-stack space-y-3">
+          {sections.map((section, index) => (
             <section
               key={section.id}
               ref={(node) => {
                 sectionRefs.current[section.id] = node;
               }}
-              className="-mx-[22px] scroll-mt-[94px] overflow-visible rounded-lg border border-line bg-surface shadow-e1"
+              className="settings-card -mx-[22px] scroll-mt-4 overflow-visible rounded-lg border border-line bg-surface shadow-e1"
             >
-              <header className="flex items-center justify-between gap-5 rounded-t-lg border-b border-line bg-sunken px-[22px] py-3">
+              <header className="settings-card-heading flex items-center justify-between gap-5 rounded-t-lg border-b border-line bg-sunken px-[22px] py-3">
                 <div className="min-w-0">
                   <h2 className="text-card font-semibold tracking-[-0.012em] text-ink">
+                    <span className="settings-section-number" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
                     {section.label}
                   </h2>
                   {section.description && (
@@ -138,6 +153,7 @@ export function SettingsScrollPage({
           ))}
         </div>
       </main>
+    </div>
     </div>
   );
 }
