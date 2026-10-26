@@ -19,7 +19,7 @@ export function TranslationProvidersPage() {
 
   const [configuringProvider, setConfiguringProvider] = useState<string | null>(null);
   const [addingCustomProvider, setAddingCustomProvider] = useState(false);
-  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [drag, setDrag] = useState<{ id: string; pointerId: number } | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   // 加载 providers
@@ -82,36 +82,42 @@ export function TranslationProvidersPage() {
   };
 
   // 拖拽处理
-  const handleDragStart = (e: React.DragEvent, id: string) => {
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', id);
-    setDraggedId(id);
-  };
-
-  const handleDragOver = (e: React.DragEvent, id: string) => {
+  const handleDragStart = (e: React.PointerEvent, id: string) => {
+    if (e.button !== 0) return;
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (draggedId && draggedId !== id) {
-      setDragOverId(id);
-    }
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setDrag({ id, pointerId: e.pointerId });
   };
 
-  const handleDragLeave = () => {
+  const providerAtPointer = (e: React.PointerEvent) => {
+    const row = document.elementFromPoint(e.clientX, e.clientY)
+      ?.closest<HTMLElement>('[data-translation-provider-id]');
+    const id = row?.dataset.translationProviderId;
+    return id && activeProviders.includes(id) ? id : null;
+  };
+
+  const handleDragOver = (e: React.PointerEvent) => {
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    const id = providerAtPointer(e);
+    setDragOverId(id !== drag.id ? id : null);
+  };
+
+  const handleDragEnd = (e: React.PointerEvent) => {
+    if (drag?.pointerId !== e.pointerId) return;
+    setDrag(null);
     setDragOverId(null);
   };
 
-  const handleDrop = async (e: React.DragEvent, targetId: string) => {
-    e.preventDefault();
-    setDragOverId(null);
+  const handleDrop = async (e: React.PointerEvent) => {
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    const draggedId = drag.id;
+    const targetId = providerAtPointer(e);
+    handleDragEnd(e);
 
-    if (!draggedId || draggedId === targetId) {
-      setDraggedId(null);
-      return;
-    }
+    if (!targetId || draggedId === targetId) return;
 
     // 只允许重排 active providers
     if (!activeProviders.includes(draggedId) || !activeProviders.includes(targetId)) {
-      setDraggedId(null);
       return;
     }
 
@@ -128,13 +134,6 @@ export function TranslationProvidersPage() {
     } catch (error) {
       alert(`重新排序失败: ${error}`);
     }
-
-    setDraggedId(null);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedId(null);
-    setDragOverId(null);
   };
 
   const currentProvider = providers.find((p) => p.id === configuringProvider);
@@ -189,16 +188,9 @@ export function TranslationProvidersPage() {
           return (
             <div
               key={provider.id}
-              draggable={isActive}
-              onDragStart={isActive ? (e) => handleDragStart(e, provider.id) : undefined}
-              onDragOver={isActive ? (e) => handleDragOver(e, provider.id) : undefined}
-              onDragLeave={isActive ? handleDragLeave : undefined}
-              onDrop={isActive ? (e) => handleDrop(e, provider.id) : undefined}
-              onDragEnd={isActive ? handleDragEnd : undefined}
+              data-translation-provider-id={provider.id}
               className={`group relative transition-all ${
-                isActive ? 'cursor-grab active:cursor-grabbing' : ''
-              } ${
-                draggedId === provider.id ? 'opacity-50' : ''
+                drag?.id === provider.id ? 'opacity-50' : ''
               } ${
                 dragOverId === provider.id ? 'ring-2 ring-inset ring-accent-line' : ''
               }`}
@@ -212,10 +204,16 @@ export function TranslationProvidersPage() {
                 onRemove={() => handleRemove(provider.id)}
                 highlighted={isActive}
                 leadingSlot={isActive ? (
-                  <span
+                  <button
+                    type="button"
                     aria-label="拖动排序"
                     title="拖动排序"
-                    className="grid grid-cols-2 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                    onPointerDown={(e) => handleDragStart(e, provider.id)}
+                    onPointerMove={handleDragOver}
+                    onPointerUp={handleDrop}
+                    onPointerCancel={handleDragEnd}
+                    onLostPointerCapture={handleDragEnd}
+                    className="grid h-8 w-5 touch-none select-none cursor-grab grid-cols-2 content-center justify-items-center gap-0.5 opacity-0 transition-opacity active:cursor-grabbing group-hover:opacity-100 group-focus-within:opacity-100"
                   >
                     {Array.from({ length: 6 }).map((_, index) => (
                       <span
@@ -223,7 +221,7 @@ export function TranslationProvidersPage() {
                         className="h-1 w-1 rounded-full bg-faint"
                       />
                     ))}
-                  </span>
+                  </button>
                 ) : undefined}
               />
             </div>

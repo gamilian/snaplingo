@@ -28,6 +28,7 @@ const runtime = {
   startFileOcr: vi.fn(),
   translate: vi.fn(),
   retryTranslationProvider: vi.fn(),
+  beginDrag: vi.fn(),
 } as unknown as ResultWindowRuntime;
 
 async function renderResultWindow() {
@@ -114,6 +115,29 @@ describe('result window text actions', () => {
     expect(view.container.querySelector('[aria-label="复制"]')).not.toBeNull();
     await view.unmount();
   });
+
+  it.each(['translation', 'ocr'] as const)(
+    'starts dragging the standalone %s window from a primary header press',
+    async (resultWindowMode) => {
+      useResultWindowStore.setState({
+        resultWindowVisible: true,
+        resultWindowMode,
+      });
+      const view = await renderResultWindow();
+      const handle = view.container.querySelector<HTMLElement>('.cursor-move')!;
+
+      await act(async () => {
+        handle.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 2 }));
+      });
+      expect(runtime.beginDrag).not.toHaveBeenCalled();
+      await act(async () => {
+        handle.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+      });
+      expect(runtime.beginDrag).toHaveBeenCalledOnce();
+
+      await view.unmount();
+    },
+  );
 
   it('delegates translation workflow to the application runtime', async () => {
     useResultWindowStore.setState({

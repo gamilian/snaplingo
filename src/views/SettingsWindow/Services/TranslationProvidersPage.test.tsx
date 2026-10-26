@@ -98,26 +98,6 @@ describe('TranslationProvidersPage', () => {
     providerStore.state.reorderTranslationProviders.mockClear();
   });
 
-  it('writes active provider id to drag data when dragging starts', () => {
-    const view = renderPage();
-    const draggableCards = findElements(
-      view,
-      (element) => element.props.draggable === true,
-    );
-    const dataTransfer = {
-      effectAllowed: '',
-      setData: vi.fn(),
-    };
-
-    draggableCards[0].props.onDragStart({ dataTransfer });
-
-    expect(dataTransfer.effectAllowed).toBe('move');
-    expect(dataTransfer.setData).toHaveBeenCalledWith(
-      'text/plain',
-      'google-translate',
-    );
-  });
-
   it('renders a hover-visible drag handle for active provider rows', () => {
     const view = renderPage();
     const providerCards = findElements(
@@ -146,32 +126,6 @@ describe('TranslationProvidersPage', () => {
     expect(addButton.props.children).toContainEqual(
       expect.objectContaining({ props: expect.objectContaining({ children: '添加自定义服务' }) }),
     );
-  });
-
-  it('reorders active providers when a dragged provider is dropped on another active provider', async () => {
-    let view = renderPage();
-    let draggableCards = findElements(
-      view,
-      (element) => element.props.draggable === true,
-    );
-    const dataTransfer = {
-      effectAllowed: '',
-      setData: vi.fn(),
-    };
-
-    draggableCards[0].props.onDragStart({ dataTransfer });
-
-    view = renderPage();
-    draggableCards = findElements(
-      view,
-      (element) => element.props.draggable === true,
-    );
-    await draggableCards[1].props.onDrop({ preventDefault: vi.fn() });
-
-    expect(providerStore.state.reorderTranslationProviders).toHaveBeenCalledWith([
-      'custom-gpt',
-      'google-translate',
-    ]);
   });
 
   it('opens the full custom provider form when configuring a custom provider', () => {
@@ -328,15 +282,7 @@ type PageElement = ReactElement & {
   props: {
     children?: ReactNode;
     className?: string;
-    draggable?: boolean;
     'aria-label'?: string;
-    onDragStart?: (event: {
-      dataTransfer: {
-        effectAllowed: string;
-        setData: (type: string, value: string) => void;
-      };
-    }) => void;
-    onDrop?: (event: { preventDefault: () => void }) => Promise<void>;
     onClick?: () => unknown;
     onConfigure?: () => unknown;
     onTest?: () => Promise<void>;

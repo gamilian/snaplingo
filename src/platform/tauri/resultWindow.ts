@@ -79,26 +79,32 @@ export const resultWindow: ResultWindowPort = {
       };
 
       const scheduleFinish = (position: { x: number; y: number }) => {
+        if (finished) return;
         latestPosition = position;
         if (idleTimer !== undefined) clearTimeout(idleTimer);
         if (settleTimer !== undefined) clearTimeout(settleTimer);
         settleTimer = setTimeout(() => void finish(), 250);
       };
 
-      void (async () => {
-        try {
-          unlisten = await window.onMoved(({ payload }) => {
-            scheduleFinish({ x: payload.x, y: payload.y });
-          });
-          await window.startDragging();
-          idleTimer = setTimeout(() => void finish(), 1_500);
-        } catch (error) {
-          finished = true;
-          clearTimers();
-          unlisten?.();
-          reject(error);
-        }
-      })();
+      const fail = (error: unknown) => {
+        if (finished) return;
+        finished = true;
+        clearTimers();
+        unlisten?.();
+        reject(error);
+      };
+
+      void window.onMoved(({ payload }) => {
+        scheduleFinish({ x: payload.x, y: payload.y });
+      }).then((removeListener) => {
+        if (finished) removeListener();
+        else unlisten = removeListener;
+      }, fail);
+      // AppKit must receive the drag while the original mouse-down is current.
+      // Waiting for listener registration can replace it with another native event.
+      void window.startDragging().then(() => {
+        if (!finished) idleTimer = setTimeout(() => void finish(), 1_500);
+      }, fail);
     });
   },
   setAlwaysOnTop(value) {

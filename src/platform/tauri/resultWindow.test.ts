@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   currentMonitor,
@@ -67,6 +67,7 @@ import { resultWindow } from './resultWindow';
 
 describe('Tauri result window adapter', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     getCurrentWindow.mockClear();
     hide.mockReset().mockResolvedValue(undefined);
     setSize.mockReset().mockResolvedValue(undefined);
@@ -85,6 +86,8 @@ describe('Tauri result window adapter', () => {
     outerPosition.mockReset().mockResolvedValue({ x: 1420, y: 360 });
     onMoved.mockReset().mockResolvedValue(vi.fn());
   });
+
+  afterEach(() => vi.useRealTimers());
 
   it('resizes the current result window from portable dimensions', async () => {
     await resultWindow.resize(660, 480);
@@ -120,13 +123,75 @@ describe('Tauri result window adapter', () => {
       return vi.fn();
     });
 
-    await expect(resultWindow.startDragging()).resolves.toEqual({
+    const drag = resultWindow.startDragging();
+    await vi.runAllTimersAsync();
+    await expect(drag).resolves.toEqual({
       x: 1600,
       y: 720,
     });
 
     expect(startDragging).toHaveBeenCalledOnce();
     expect(onMoved).toHaveBeenCalledOnce();
+  });
+
+  it('starts the native drag immediately while the move listener is still registering', async () => {
+    let register!: (unlisten: () => void) => void;
+    const unlisten = vi.fn();
+    onMoved.mockReturnValue(new Promise<() => void>((resolve) => {
+      register = resolve;
+    }));
+    const drag = resultWindow.startDragging();
+
+    try {
+      expect(startDragging).toHaveBeenCalledOnce();
+    } finally {
+      register(unlisten);
+      await vi.runAllTimersAsync();
+      await drag;
+    }
+    expect(unlisten).toHaveBeenCalledOnce();
+  });
+
+  it('returns the latest moved position without repositioning the window', async () => {
+    let moved!: (event: { payload: { x: number; y: number } }) => void;
+    const unlisten = vi.fn();
+    onMoved.mockImplementation(async (handler) => {
+      moved = handler;
+      return unlisten;
+    });
+    const drag = resultWindow.startDragging();
+    moved({ payload: { x: 100, y: 200 } });
+    await vi.advanceTimersByTimeAsync(200);
+    moved({ payload: { x: 220, y: 260 } });
+    await vi.runAllTimersAsync();
+
+    await expect(drag).resolves.toEqual({ x: 220, y: 260 });
+    expect(setPosition).not.toHaveBeenCalled();
+    expect(unlisten).toHaveBeenCalledOnce();
+  });
+
+  it('reads the actual position when the user releases without moving', async () => {
+    const drag = resultWindow.startDragging();
+    await vi.runAllTimersAsync();
+
+    await expect(drag).resolves.toEqual({ x: 1420, y: 360 });
+  });
+
+  it('removes a late-registered listener after native dragging fails', async () => {
+    let register!: (unlisten: () => void) => void;
+    const unlisten = vi.fn();
+    onMoved.mockReturnValue(new Promise<() => void>((resolve) => {
+      register = resolve;
+    }));
+    startDragging.mockRejectedValue(new Error('drag failed'));
+
+    await expect(resultWindow.startDragging()).rejects.toThrow('drag failed');
+    register(unlisten);
+    await vi.runAllTimersAsync();
+
+    expect(unlisten).toHaveBeenCalledOnce();
+    expect(outerPosition).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('restores and clamps the durable last user-dragged position', async () => {
