@@ -58,7 +58,7 @@ jobs:
       matrix: ${{ fromJSON(needs.preflight.outputs.matrix) }}
     env:
       CARGO_INCREMENTAL: '0'
-      SNAPLINGO_SIGNING_MODE: adhoc
+      SNAPLINGO_SIGNING_MODE: self-signed
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -69,6 +69,13 @@ jobs:
       - run: npm test
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
       - run: cargo test --locked --manifest-path src-tauri/Cargo.toml
+      - name: Import persistent macOS certificate
+        if: runner.os == 'macOS'
+        env:
+          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          SNAPLINGO_CERTIFICATE_SHA1: ${{ vars.MACOS_CERTIFICATE_SHA1 }}
+        run: node script/import-macos-certificate.mjs
       - name: Build and verify installers
         if: '!matrix.offline'
         run: npm run tauri:build
@@ -97,6 +104,14 @@ jobs:
           if-no-files-found: error
           retention-days: 3
           compression-level: 0
+      - name: Remove imported macOS keychain
+        if: always() && runner.os == 'macOS'
+        shell: bash
+        run: |
+          if [ -n "${SNAPLINGO_CODESIGN_KEYCHAIN:-}" ]; then
+            security delete-keychain "$SNAPLINGO_CODESIGN_KEYCHAIN"
+            rm -rf "$SNAPLINGO_SIGNING_DIRECTORY"
+          fi
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build

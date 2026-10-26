@@ -1,13 +1,13 @@
 # 零付费桌面发布指南
 
-适用仓库：`gamilian/snaplingo`。配置与官方规则核对日期：2026-09-06。
+适用仓库：`gamilian/snaplingo`。发布签名配置更新日期：2026-10-26；费用与账号规则核对日期：2026-09-06。
 
 ## 1. 方案与支持范围
 
 | 平台 | 默认产物 | Release 文件名 | 构建位置 | 默认签名 |
 | --- | --- | --- | --- | --- |
-| macOS 12+ / Apple Silicon | DMG | `snaplingo-vX.Y.Z-macos-aarch64.dmg` | Actions `macos-14`，原生 arm64 | ad-hoc 签名 |
-| macOS 12+ / Intel | DMG | `snaplingo-vX.Y.Z-macos-x86_64.dmg` | Actions `macos-15-intel`，原生 x64 | ad-hoc 签名 |
+| macOS 12+ / Apple Silicon | DMG | `snaplingo-vX.Y.Z-macos-aarch64.dmg` | Actions `macos-14`，原生 arm64 | 固定自签名证书 |
+| macOS 12+ / Intel | DMG | `snaplingo-vX.Y.Z-macos-x86_64.dmg` | Actions `macos-15-intel`，原生 x64 | 与 arm64 同一张证书 |
 | Windows 10 / 11 x64 | NSIS EXE、备选 MSI | `snaplingo-vX.Y.Z-windows-x86_64-setup.exe`、`snaplingo-vX.Y.Z-windows-x86_64.msi` | Actions `windows-2022` | 未签名，可后续申请 SignPath Foundation |
 
 以上是兼容目标；最低系统版本是构建约束，并不代替对应系统真机验收。公开发布前需覆盖 macOS 12、13、14、15 及更新版本，以及 Windows 10 / 11 x64 的安装、首次授权、拖动选区、预览、复制、保存和 OCR。Windows runner 是服务器环境，不足以证明 Windows 桌面配置都兼容。此流程不要求本地 Mac 构建 Windows 包。
@@ -16,7 +16,7 @@ macOS 构建最低版本为 12.0，前端以 Safari 15 / Chromium 105 为目标�
 
 macOS 默认使用 Vision 系统 OCR，不再动态链接 Homebrew 的 Tesseract/Leptonica。Linux 保留 Tesseract。开发者若明确需要 macOS Tesseract，可自行安装 Tesseract 和语言数据，并运行 `npm run tauri:build -- --features tesseract-ocr`；该自定义包不是自包含的官方包。脚本仍校验所有动态库的最低系统版本和架构，不合格就失败。
 
-无需购买 Apple Developer Program、Windows 证书、Azure 签名服务，也无需登记信用卡。GitHub-hosted runner 无法可靠地信任本地自签名根证书，因此 Actions 的 macOS 包使用 ad-hoc 签名；它不能替代 Apple 公证，也不能承诺跨更新保留 TCC 授权。Windows 免费可信签名需要申请审核；未获批准前按未签名包发布。账号开通、免费额度及 SignPath 完整申请过程见 [免费账号与签名申请](research/free-release-accounts.md)。
+无需购买 Apple Developer Program、Windows 证书、Azure 签名服务，也无需登记信用卡。Actions 的 macOS release 使用长期自签名证书保持签名身份稳定，无需把该证书加入 runner 或用户电脑的系统信任。自签名不能替代 Apple 公证，系统首次打开提示仍然存在。Windows 免费可信签名需要申请审核；未获批准前按未签名包发布。账号开通、免费额度及 SignPath 完整申请过程见 [免费账号与签名申请](research/free-release-accounts.md)。
 
 ## 2. GitHub 配置与费用边界
 
@@ -25,13 +25,25 @@ macOS 默认使用 Vision 系统 OCR，不再动态链接 Homebrew 的 Tesseract
 3. 工作流只使用标准托管 runner，并且所有入口 job 都限制 `repository.private == false`。改成私有后会跳过，而不会消耗私有仓库付费资源。
 4. 不启用 larger runner、付费签名服务。不要为 Actions 增加付费预算；在账号 Billing 页面检查 Actions 的预算/超额支出设置，启用到额阻断。不要把免费计算时长理解为任意数量的 artifact 存储都免费。
 5. 普通 CI 不上传大文件；手动/测试分支包只保存 3 天，tag 成功后把安装包保存在 GitHub Release。下载完可主动删除旧运行的 artifacts。不要开启无上限的缓存或长期 artifact 保留。
-6. 版本 tag 保护和分支保护由仓库维护者管理。Desktop packages 不读取 macOS 私钥；PR 的 CI 也使用相同的 ad-hoc 模式。
+6. 版本 tag 保护、分支保护及签名密钥访问权限由仓库维护者管理。Desktop packages 的 macOS 发布步骤使用证书 Secrets；PR 的 CI 继续使用 ad-hoc，不读取发布密钥。
 
-## 3. macOS 零付费构建模式
+## 3. macOS 固定自签名证书
 
-Desktop packages 和 CI 都以 ad-hoc 签名构建 macOS DMG，因此不需要在 GitHub Secrets 中保存或导入 Mac 私钥。工作流仍会校验 app 与 DMG 的签名结构、最低系统版本、架构、动态库路径，并从最终 DMG 复制 app 后启动两次。
+同一张证书和私钥必须用于两个 macOS 架构和所有后续版本。证书名称相同不代表身份相同；不要在每次 Actions 运行时重新生成证书，也不要把已发布版本切回 ad-hoc。
 
-ad-hoc 签名每次构建都可能变化，不能替代稳定发行身份，也无法公证。它适合公开的测试版和首发验证；发布前必须在干净的 macOS 账户中下载实际 DMG，按“系统设置 → 隐私与安全性 → 仍要打开”完成首次启动，并重新验证屏幕录制和辅助功能授权。面向非技术公众或需要稳定更新授权时，需要改用 Apple Developer ID 和公证，这不是零付费能力。
+仓库 **Settings → Secrets and variables → Actions** 需要以下一次性配置。已有配置时复用原值：
+
+| 类型 | 名称 | 内容 |
+| --- | --- | --- |
+| Secret | `MACOS_CERTIFICATE_P12` | 包含证书与私钥的加密 P12 文件，Base64 编码 |
+| Secret | `MACOS_CERTIFICATE_PASSWORD` | 该 P12 的导出密码 |
+| Variable | `MACOS_CERTIFICATE_SHA1` | 同一证书的 40 位 SHA-1 指纹，无冒号 |
+
+本机既有身份保存在 `~/.snaplingo/codesign/`；加密导出为 `SnapLingoLocalCodeSigning.p12`，对应密码在 `keychain-password.txt`。首次配置时可通过 GitHub CLI 的标准输入写入 Secrets，不要把内容写进命令参数或日志。证书和私钥需要加密备份；遗失后重新创建同名证书仍会改变身份。
+
+`script/import-macos-certificate.mjs` 先核对证书指纹，再导入临时钥匙串、配置 `codesign` 访问并加入搜索列表。缺少配置、密码错误或证书不匹配会终止构建，不回退为 ad-hoc。导入时不调用 `security add-trusted-cert`；`security find-identity` 也不使用会排除未受系统信任证书的 `-v`。系统信任与代码签名完整性是不同检查，最终 app 和 DMG 仍须通过签名校验，且 app 的 designated requirement 必须绑定固定证书而不是每次构建的 `cdhash`。
+
+工作流结束时删除临时钥匙串和文件。安装用户不需要导入你的根证书。首次从历史 ad-hoc 版本迁移到固定自签名版本，可能需要重新授予屏幕录制和辅助功能权限一次；之后使用相同证书和 bundle ID 更新可避免因签名身份变化而失去授权，但不能承诺 macOS 永久不再询问权限。首次下载仍可能需要在“系统设置 → 隐私与安全性 → 仍要打开”中放行；获得 Apple 的发行信任和公证仍需要 Developer ID。
 
 ## 4. 工作流使用方式
 
@@ -39,7 +51,7 @@ ad-hoc 签名每次构建都可能变化，不能替代稳定发行身份，也�
 
 运行前端测试、Rust 格式/测试/check、原生打包验证。Windows 分别执行 NSIS 和 MSI 安装、启动、重装、卸载检查；macOS 从最终 DMG 复制安装、验证签名、启动两次。Linux 同样执行原生测试与打包。
 
-macOS CI 和 Desktop packages 都使用临时 ad-hoc 签名。启动检查不等同于 Gatekeeper 信任检查，不会绕过或修改系统信任策略。
+macOS CI 使用临时 ad-hoc 签名；Desktop packages 使用固定自签名身份。启动检查不等同于 Gatekeeper 信任检查，不会绕过或修改系统信任策略。
 
 ### Desktop packages：可下载测试包
 
@@ -70,7 +82,7 @@ macOS CI 和 Desktop packages 都使用临时 ad-hoc 签名。启动检查不等
 
 ## 5. 验收边界与必测场景
 
-自动化已经检查：版本、产物非空/可执行、macOS ad-hoc 签名完整性/最低系统版本/动态库路径与架构、最终 DMG 内容、Windows NSIS/MSI 安装退出码和实际安装目录、程序存活、卸载与重装后的用户数据保留。`npm run release:verify` 会重新做 macOS 原生验证，不只是检查文件存在。
+自动化已经检查：版本、产物非空/可执行、macOS 签名完整性/固定证书指纹/最低系统版本/动态库路径与架构、最终 DMG 内容、Windows NSIS/MSI 安装退出码和实际安装目录、程序存活、卸载与重装后的用户数据保留。macOS 原生回归测试使用临时自签名证书运行实际导入和发布签名脚本，验证两个内容不同的版本具有相同 designated requirement，且切回 ad-hoc 后不再满足旧身份。`npm run release:verify` 会重新做 macOS 原生验证，不只是检查文件存在。
 
 自动化**不能证明**真实用户能截图、所有 OCR 语言正常、TCC 跨版本保留，或浏览器下载后的系统信任提示符合预期。公开发布前在干净用户/电脑上完成：
 
@@ -82,11 +94,11 @@ macOS CI 和 Desktop packages 都使用临时 ad-hoc 签名。启动检查不等
 | 使用选中文本/元素检测 | 按需提示辅助功能；浏览器自动化有明确用途说明 |
 | Windows WebView2 缺失 | 在线版在联网环境自动安装；离线版在断网且未安装运行时的测试机安装成功 |
 | Windows OCR 语言缺失 | 有可理解的安装语言提示；补充系统 OCR 语言能力后重新启动验证 |
-| 真实 N→N+1 更新 | 同架构覆盖安装；数据库、API 配置、历史保留；截图/选中文本授权复测，并接受 ad-hoc 身份变化可能要求重新授权 |
+| 真实 N→N+1 更新 | 同架构、同证书、同 bundle ID 覆盖安装；数据库、API 配置、历史保留；截图/选中文本授权复测；首次从 ad-hoc 迁移可能需要重新授权 |
 | 多屏、缩放 | Windows 混合 DPI，macOS Retina/外接屏截图和选区正确 |
 | 遮罩与十字光标出现后拖动 | 按下、拖动、松开应形成选区并生成预览；Esc 可退出。若失败，在设置中启用性能监控后复现，检查日志中的 `[capture-input]` 和 `selection_pointer_down` / `selection_pointer_up`，区分原生焦点与前端输入 |
 
-ad-hoc 包的 `spctl` 拒绝是预期结果；脚本记录结果，不要求用户关闭 Gatekeeper、删除 quarantine 或修改 TCC。
+未公证自签名包和 CI ad-hoc 包的 `spctl` 拒绝是预期结果；脚本记录结果，不要求用户关闭 Gatekeeper、删除 quarantine 或修改 TCC。
 
 ### 应用内升级与权限恢复
 
@@ -98,7 +110,7 @@ ad-hoc 包的 `spctl` 拒绝是预期结果；脚本记录结果，不要求用�
 - 从 DMG 或 App Translocation 临时位置运行时，先安装到“应用程序”再授权。旧授权已开启但新版仍不可用时，在“授权遇到问题？”中确认重置具体权限。只调用 `tccutil reset ScreenCapture <当前 bundle ID>` 或 `tccutil reset Accessibility <当前 bundle ID>`；不清除其他应用或其他权限，也不在启动/检查更新时自动重置。
 - 修复后仍需用户在系统设置允许当前应用。macOS 要求“退出并重新打开”时可点击“重启 SnapLingo”，无需反复手动寻找并退出进程。ad-hoc 签名仍不能保证跨版本保留授权；应用不会把本地“曾经允许”当作当前系统授权。
 
-额外交互验收：已有旧版授权后覆盖安装；只修复屏幕录制而保留辅助功能；从 DMG 直接启动；拒绝权限后打开翻译/文件 OCR；更新检查断网后重试；下载中重复点击；实际 N→N+1 下载并安装后保留数据库。
+额外交互验收：已有旧版授权后覆盖安装；连续两个固定自签名 release 覆盖安装后授权仍可用；只修复屏幕录制而保留辅助功能；从 DMG 直接启动；拒绝权限后打开翻译/文件 OCR；更新检查断网后重试；下载中重复点击；实际 N→N+1 下载并安装后保留数据库。
 
 ## 6. 免费 Windows 签名的后续接入
 
