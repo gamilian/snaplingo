@@ -56,6 +56,7 @@ interface ProviderState extends ProviderConfigurationState {
     config: unknown,
   ) => Promise<void>;
   reorderTranslationProviders: (ids: string[]) => Promise<void>;
+  reorderInactiveTranslationProviders: (ids: string[]) => Promise<void>;
 }
 
 export const useProviderStore = create<ProviderState>(() => ({
@@ -83,6 +84,7 @@ export const useProviderStore = create<ProviderState>(() => ({
   updateProviderConfig: (_id, providerId, config) =>
     runtime().configureTranslation(providerId, config),
   reorderTranslationProviders: (ids) => runtime().reorderTranslation(ids),
+  reorderInactiveTranslationProviders: (ids) => runtime().reorderInactiveTranslation(ids),
 }));
 
 function projectProviderState(state: ProviderConfigurationState) {

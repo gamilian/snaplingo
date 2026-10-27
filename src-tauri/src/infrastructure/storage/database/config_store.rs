@@ -19,6 +19,7 @@ const SETTINGS_NAMESPACE: &str = "settings";
 const HOTKEYS_NAMESPACE: &str = "hotkeys";
 const CUSTOM_TRANSLATION_PROVIDERS_NAMESPACE: &str = "custom_translation_providers";
 const ACTIVE_TRANSLATION_PROVIDERS_NAMESPACE: &str = "active_translation_providers";
+const INACTIVE_TRANSLATION_PROVIDERS_NAMESPACE: &str = "inactive_translation_providers";
 const ACTIVE_OCR_PROVIDER_NAMESPACE: &str = "active_ocr_provider";
 const TRANSLATION_PROMPT_STRATEGIES_NAMESPACE: &str = "translation_prompt_strategies";
 const PAYLOAD_VERSION: i32 = 1;
@@ -142,6 +143,14 @@ impl ProviderConfigStore for SqliteConfigStore {
 
     fn save_active_translation_providers(&self, provider_ids: &[String]) -> Result<()> {
         self.save_namespace(ACTIVE_TRANSLATION_PROVIDERS_NAMESPACE, &provider_ids)
+    }
+
+    fn load_inactive_translation_providers(&self) -> Result<Vec<String>> {
+        self.load_namespace(INACTIVE_TRANSLATION_PROVIDERS_NAMESPACE)
+    }
+
+    fn save_inactive_translation_providers(&self, provider_ids: &[String]) -> Result<()> {
+        self.save_namespace(INACTIVE_TRANSLATION_PROVIDERS_NAMESPACE, &provider_ids)
     }
 
     fn load_active_ocr_provider(&self) -> Result<String> {

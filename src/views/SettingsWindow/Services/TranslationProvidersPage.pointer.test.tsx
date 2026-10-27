@@ -34,6 +34,7 @@ describe('translation provider pointer sorting', () => {
       activeTranslationProviders: ['first', 'second'],
       loadTranslationProviders: vi.fn(async () => undefined),
       reorderTranslationProviders: reorder,
+      reorderInactiveTranslationProviders: vi.fn(async () => undefined),
     });
     container = document.createElement('div');
     document.body.append(container);

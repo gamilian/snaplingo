@@ -84,7 +84,8 @@ impl ProviderAdministration {
             .iter()
             .map(|provider| provider.read().id().to_string())
             .collect::<Vec<_>>();
-        order_provider_infos_for_display(providers, &active_ids)
+        let inactive_ids = self.translation_configuration.inactive_provider_order();
+        order_provider_infos_for_display(providers, &active_ids, &inactive_ids)
     }
 
     pub fn activate_translation_provider(&self, provider_id: String) -> Result<()> {
@@ -100,6 +101,11 @@ impl ProviderAdministration {
     pub fn reorder_active_translation_providers(&self, provider_ids: Vec<String>) -> Result<()> {
         self.translation_configuration
             .reorder_active_providers(provider_ids)
+    }
+
+    pub fn reorder_inactive_translation_providers(&self, provider_ids: Vec<String>) -> Result<()> {
+        self.translation_configuration
+            .reorder_inactive_providers(provider_ids)
     }
 
     pub fn translation_credential_schema(
@@ -320,6 +326,7 @@ fn provider_info_from_custom_view(
 fn order_provider_infos_for_display(
     providers: Vec<ProviderInfo>,
     active_ids: &[String],
+    inactive_ids: &[String],
 ) -> Vec<ProviderInfo> {
     let mut by_id: HashMap<_, _> = providers
         .into_iter()
@@ -328,6 +335,12 @@ fn order_provider_infos_for_display(
     let mut ordered = Vec::new();
 
     for id in active_ids {
+        if let Some(provider) = by_id.remove(id) {
+            ordered.push(provider);
+        }
+    }
+
+    for id in inactive_ids {
         if let Some(provider) = by_id.remove(id) {
             ordered.push(provider);
         }
@@ -383,7 +396,7 @@ mod tests {
         ];
         let active_ids = vec!["custom-gpt".to_string(), "google-translate".to_string()];
 
-        let ordered = order_provider_infos_for_display(providers, &active_ids);
+        let ordered = order_provider_infos_for_display(providers, &active_ids, &[]);
         let ordered_ids = ordered
             .iter()
             .map(|provider| provider.id.as_str())

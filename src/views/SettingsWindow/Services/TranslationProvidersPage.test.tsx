@@ -64,6 +64,7 @@ const providerStore = vi.hoisted(() => ({
     removeTranslationProvider: vi.fn(),
     testCustomTranslationProvider: vi.fn(),
     reorderTranslationProviders: vi.fn(),
+    reorderInactiveTranslationProviders: vi.fn(),
   },
 }));
 

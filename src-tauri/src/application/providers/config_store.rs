@@ -13,6 +13,9 @@ pub trait ProviderConfigStore: Send + Sync {
     fn load_active_translation_providers(&self) -> Result<Vec<String>>;
     fn save_active_translation_providers(&self, provider_ids: &[String]) -> Result<()>;
 
+    fn load_inactive_translation_providers(&self) -> Result<Vec<String>>;
+    fn save_inactive_translation_providers(&self, provider_ids: &[String]) -> Result<()>;
+
     fn load_active_ocr_provider(&self) -> Result<String>;
     fn save_active_ocr_provider(&self, provider_id: &str) -> Result<()>;
 

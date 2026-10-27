@@ -197,6 +197,11 @@ export const settingsProviders: SettingsProvidersPort = {
       providerIds,
     });
   },
+  reorderInactiveTranslation(providerIds) {
+    return invoke<void>('reorder_inactive_translation_providers', {
+      providerIds,
+    });
+  },
   getTranslationCredentialSchema(providerId) {
     return invoke('get_provider_credential_schema', { providerId });
   },

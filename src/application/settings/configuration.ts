@@ -399,6 +399,17 @@ function createProviderConfiguration(port: SettingsProvidersPort) {
         port.reorderActiveTranslation(reorderedActiveIds),
       );
     },
+    async reorderInactiveTranslation(providerIds: string[]) {
+      const { translationProviders, activeTranslationProviders } = projection.getState();
+      const inactiveIds = translationProviders
+        .map((provider) => provider.id)
+        .filter((id) => !activeTranslationProviders.includes(id));
+      const reorderedInactiveIds = providerIds.filter((id) => inactiveIds.includes(id));
+      if (reorderedInactiveIds.length !== inactiveIds.length) return;
+      await mutateTranslation(() =>
+        port.reorderInactiveTranslation(reorderedInactiveIds),
+      );
+    },
     activateOcr: (providerId: string) =>
       mutateOcr(() => port.activateOcr(providerId)),
     configureOcr(providerId: string, credentials: Record<string, string>) {

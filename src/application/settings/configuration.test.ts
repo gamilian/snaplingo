@@ -316,6 +316,7 @@ function createProviderPort() {
     activateTranslation: vi.fn(async () => undefined),
     deactivateTranslation: vi.fn(async () => undefined),
     reorderActiveTranslation: vi.fn(async () => undefined),
+    reorderInactiveTranslation: vi.fn(async () => undefined),
     getTranslationCredentialSchema: vi.fn(async () => []),
     getOcrCredentialSchema: vi.fn(async () => []),
     configureTranslationCredentials: vi.fn(async () => undefined),

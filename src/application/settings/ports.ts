@@ -234,6 +234,7 @@ export interface SettingsProvidersPort {
   activateTranslation(providerId: string): Promise<void>;
   deactivateTranslation(providerId: string): Promise<void>;
   reorderActiveTranslation(providerIds: string[]): Promise<void>;
+  reorderInactiveTranslation(providerIds: string[]): Promise<void>;
   getTranslationCredentialSchema(
     providerId: string,
   ): Promise<CredentialField[]>;

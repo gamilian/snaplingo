@@ -197,6 +197,7 @@ function createProviderPort() {
     activateTranslation: vi.fn(),
     deactivateTranslation: vi.fn(),
     reorderActiveTranslation: vi.fn(),
+    reorderInactiveTranslation: vi.fn(),
     getTranslationCredentialSchema: vi.fn(),
     getOcrCredentialSchema: vi.fn(),
     configureTranslationCredentials: vi.fn(),

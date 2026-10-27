@@ -51,6 +51,18 @@ pub async fn reorder_active_translation_providers(
 }
 
 #[tauri::command]
+pub async fn reorder_inactive_translation_providers(
+    provider_ids: Vec<String>,
+    state: State<'_, crate::AppState>,
+) -> Result<(), String> {
+    state
+        .providers
+        .administration
+        .reorder_inactive_translation_providers(provider_ids)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn get_provider_credential_schema(
     provider_id: String,
     state: State<'_, crate::AppState>,

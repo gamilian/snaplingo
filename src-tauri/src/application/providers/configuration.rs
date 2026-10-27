@@ -1289,6 +1289,44 @@ impl ProviderConfiguration {
         Ok(())
     }
 
+    /// Reorder inactive translation providers without changing their active state.
+    pub fn reorder_inactive_providers(&self, ordered_ids: Vec<String>) -> crate::Result<()> {
+        let _guard = self.lock_provider_state()?;
+        let active_ids = self
+            .translation_coordinator
+            .get_active()
+            .iter()
+            .map(|provider| provider.read().id().to_string())
+            .collect::<Vec<_>>();
+        let mut expected_ids = self
+            .translation_coordinator
+            .list_all()
+            .iter()
+            .map(|provider| provider.read().id().to_string())
+            .filter(|id| !active_ids.contains(id))
+            .collect::<Vec<_>>();
+        let mut received_ids = ordered_ids.clone();
+        expected_ids.sort();
+        received_ids.sort();
+        if expected_ids != received_ids {
+            return Err(AppError::Other(format!(
+                "Inactive provider reorder validation failed: expected {:?}, got {:?}",
+                expected_ids, received_ids
+            )));
+        }
+
+        self.config_store
+            .save_inactive_translation_providers(&ordered_ids)?;
+        self.notify_changed();
+        Ok(())
+    }
+
+    pub fn inactive_provider_order(&self) -> Vec<String> {
+        self.config_store
+            .load_inactive_translation_providers()
+            .unwrap_or_default()
+    }
+
     /// Test a custom translation provider by ID.
     pub async fn test_custom_provider(&self, provider_id: String) -> crate::Result<()> {
         // Short-lived lock: clone out the values needed for async test

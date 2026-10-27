@@ -16,6 +16,7 @@ export function TranslationProvidersPage() {
   const removeProvider = useProviderStore((state) => state.removeTranslationProvider);
   const testCustomProvider = useProviderStore((state) => state.testCustomTranslationProvider);
   const reorderProviders = useProviderStore((state) => state.reorderTranslationProviders);
+  const reorderInactiveProviders = useProviderStore((state) => state.reorderInactiveTranslationProviders);
 
   const [configuringProvider, setConfiguringProvider] = useState<string | null>(null);
   const [addingCustomProvider, setAddingCustomProvider] = useState(false);
@@ -93,13 +94,18 @@ export function TranslationProvidersPage() {
     const row = document.elementFromPoint(e.clientX, e.clientY)
       ?.closest<HTMLElement>('[data-translation-provider-id]');
     const id = row?.dataset.translationProviderId;
-    return id && activeProviders.includes(id) ? id : null;
+    return id && providers.some((provider) => provider.id === id) ? id : null;
   };
+
+  const canDropOn = (sourceId: string, targetId: string) =>
+    activeProviders.includes(sourceId) === activeProviders.includes(targetId);
 
   const handleDragOver = (e: React.PointerEvent) => {
     if (!drag || drag.pointerId !== e.pointerId) return;
     const id = providerAtPointer(e);
-    setDragOverId(id !== drag.id ? id : null);
+    setDragOverId(
+      id && id !== drag.id && canDropOn(drag.id, id) ? id : null,
+    );
   };
 
   const handleDragEnd = (e: React.PointerEvent) => {
@@ -114,15 +120,21 @@ export function TranslationProvidersPage() {
     const targetId = providerAtPointer(e);
     handleDragEnd(e);
 
-    if (!targetId || draggedId === targetId) return;
-
-    // 只允许重排 active providers
-    if (!activeProviders.includes(draggedId) || !activeProviders.includes(targetId)) {
+    if (
+      !targetId ||
+      draggedId === targetId ||
+      !canDropOn(draggedId, targetId)
+    ) {
       return;
     }
 
     // 计算新顺序
-    const newOrder = [...activeProviders];
+    const isActive = activeProviders.includes(draggedId);
+    const newOrder = isActive
+      ? [...activeProviders]
+      : providers
+          .filter((provider) => !activeProviders.includes(provider.id))
+          .map((provider) => provider.id);
     const draggedIndex = newOrder.indexOf(draggedId);
     const targetIndex = newOrder.indexOf(targetId);
 
@@ -130,7 +142,11 @@ export function TranslationProvidersPage() {
     newOrder.splice(targetIndex, 0, draggedId);
 
     try {
-      await reorderProviders(newOrder);
+      if (isActive) {
+        await reorderProviders(newOrder);
+      } else {
+        await reorderInactiveProviders(newOrder);
+      }
     } catch (error) {
       alert(`重新排序失败: ${error}`);
     }
@@ -174,9 +190,7 @@ export function TranslationProvidersPage() {
     .map((id) => providers.find((p) => p.id === id))
     .filter((p): p is NonNullable<typeof p> => p !== undefined);
 
-  const inactiveProvidersList = providers.filter(
-    (p) => !activeProviders.includes(p.id)
-  );
+  const inactiveProvidersList = providers.filter((p) => !activeProviders.includes(p.id));
   const orderedProviders = [...activeProvidersList, ...inactiveProvidersList];
 
   return (
@@ -203,7 +217,7 @@ export function TranslationProvidersPage() {
                 onTest={!provider.isBuiltin ? () => handleTest(provider.id) : undefined}
                 onRemove={() => handleRemove(provider.id)}
                 highlighted={isActive}
-                leadingSlot={isActive ? (
+                leadingSlot={
                   <button
                     type="button"
                     aria-label="拖动排序"
@@ -222,7 +236,7 @@ export function TranslationProvidersPage() {
                       />
                     ))}
                   </button>
-                ) : undefined}
+                }
               />
             </div>
           );
