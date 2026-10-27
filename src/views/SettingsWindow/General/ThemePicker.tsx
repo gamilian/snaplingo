@@ -32,10 +32,6 @@ export function ThemePicker({
 
   return (
     <div className="theme-picker" aria-busy={pending !== null}>
-      <div className="theme-picker-heading">
-        <h3>界面主题</h3>
-        <span>{pending ? '正在保存…' : '三种风格，同样顺手'}</span>
-      </div>
       <div className="theme-options" role="group" aria-label="界面主题">
         {themes.map((theme) => (
           <button

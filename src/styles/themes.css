@@ -106,9 +106,6 @@
 
 /* Theme selection previews remain recognizable in either appearance mode. */
 .theme-picker { padding: 24px 0; }
-.theme-picker-heading { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-bottom: 17px; }
-.theme-picker-heading h3 { font-size: 13px; font-weight: 600; }
-.theme-picker-heading > span { color: rgb(var(--muted)); font-size: 11px; }
 .theme-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; }
 .theme-option { text-align: left; min-width: 0; padding: 8px; border: 1px solid rgb(var(--line)); border-radius: 10px; background: rgb(var(--surface)); transition: border-color .18s, box-shadow .18s; }
 .theme-option:hover, .theme-option:focus-visible { border-color: rgb(var(--accent)); outline: none; }

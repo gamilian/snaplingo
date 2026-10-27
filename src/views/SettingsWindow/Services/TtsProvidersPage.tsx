@@ -43,7 +43,7 @@ export function TtsProvidersPage() {
 
   return (
     <div className="max-w-3xl space-y-4">
-      <SettingsGroup title="系统语音">
+      <SettingsGroup>
         <SettingRow label="语音" description="使用当前系统已安装的声音">
           <div className="w-[260px]">
             <CustomSelect

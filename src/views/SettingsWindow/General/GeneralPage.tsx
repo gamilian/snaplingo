@@ -42,7 +42,7 @@ export function GeneralPage() {
           id: 'interface',
           label: t('interfaceAndStartup'),
           content: (
-            <SettingsGroup title={t('interface')}>
+            <SettingsGroup>
               <ThemePicker
                 value={general.interfaceTheme ?? 'native'}
                 onChange={(interfaceTheme) => updateGeneralSettings({ interfaceTheme })}
@@ -165,7 +165,7 @@ function NetworkSettings() {
   };
 
   return (
-    <SettingsGroup title={t('connection')}>
+    <SettingsGroup>
       <SettingRow label={t('proxy')}>
         <SelectField
           value={general.proxyMode ?? 'system'}
@@ -233,7 +233,7 @@ function MaintenanceSettings() {
 
   return (
     <>
-      <SettingsGroup title={t('logs')}>
+      <SettingsGroup>
         <SettingRow label={t('logLevel')}>
           <SelectField
             value={general.logLevel ?? 'info'}
@@ -288,7 +288,7 @@ function MaintenanceSettings() {
           </div>
         )}
       </SettingsGroup>
-      <SettingsGroup title={t('dataMaintenance')}>
+      <SettingsGroup>
         <SettingRow label={t('historyRecords')}>
           <ActionButton
             onClick={() => {
@@ -317,7 +317,7 @@ function ExperimentalSettings() {
   if (!general) return null;
 
   return (
-    <SettingsGroup title={t('performance')}>
+    <SettingsGroup>
       <SettingRow label={t('gpuComposition')}>
         <SettingsToggle
           label={t('gpuComposition')}
