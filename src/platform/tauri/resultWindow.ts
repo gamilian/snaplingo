@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import {
   currentMonitor,
   cursorPosition,
@@ -100,9 +101,7 @@ export const resultWindow: ResultWindowPort = {
         if (finished) removeListener();
         else unlisten = removeListener;
       }, fail);
-      // AppKit must receive the drag while the original mouse-down is current.
-      // Waiting for listener registration can replace it with another native event.
-      void window.startDragging().then(() => {
+      void invoke('start_result_window_drag').then(() => {
         if (!finished) idleTimer = setTimeout(() => void finish(), 1_500);
       }, fail);
     });

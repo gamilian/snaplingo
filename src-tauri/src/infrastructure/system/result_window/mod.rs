@@ -1,4 +1,7 @@
 mod backend;
+pub(crate) mod drag;
+#[cfg(target_os = "macos")]
+mod drag_macos;
 mod runtime_host;
 mod tauri;
 

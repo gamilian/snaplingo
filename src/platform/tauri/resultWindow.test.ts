@@ -44,6 +44,10 @@ const {
   };
 });
 
+const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
+
+vi.mock('@tauri-apps/api/core', () => ({ invoke }));
+
 vi.mock('@tauri-apps/api/window', () => ({
   currentMonitor,
   cursorPosition,
@@ -68,6 +72,7 @@ import { resultWindow } from './resultWindow';
 describe('Tauri result window adapter', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    invoke.mockReset().mockResolvedValue(undefined);
     getCurrentWindow.mockClear();
     hide.mockReset().mockResolvedValue(undefined);
     setSize.mockReset().mockResolvedValue(undefined);
@@ -130,7 +135,8 @@ describe('Tauri result window adapter', () => {
       y: 720,
     });
 
-    expect(startDragging).toHaveBeenCalledOnce();
+    expect(invoke).toHaveBeenCalledExactlyOnceWith('start_result_window_drag');
+    expect(startDragging).not.toHaveBeenCalled();
     expect(onMoved).toHaveBeenCalledOnce();
   });
 
@@ -143,7 +149,7 @@ describe('Tauri result window adapter', () => {
     const drag = resultWindow.startDragging();
 
     try {
-      expect(startDragging).toHaveBeenCalledOnce();
+      expect(invoke).toHaveBeenCalledExactlyOnceWith('start_result_window_drag');
     } finally {
       register(unlisten);
       await vi.runAllTimersAsync();
@@ -183,7 +189,7 @@ describe('Tauri result window adapter', () => {
     onMoved.mockReturnValue(new Promise<() => void>((resolve) => {
       register = resolve;
     }));
-    startDragging.mockRejectedValue(new Error('drag failed'));
+    invoke.mockRejectedValue(new Error('drag failed'));
 
     await expect(resultWindow.startDragging()).rejects.toThrow('drag failed');
     register(unlisten);
