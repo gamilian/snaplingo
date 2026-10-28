@@ -157,6 +157,9 @@ export function CaptureEditorToolbar({
   onPin,
   onFavorite,
 }: CaptureEditorToolbarProps) {
+  const primaryModifier = /Mac|iPhone|iPad|iPod/i.test(navigator.platform)
+    ? 'Cmd'
+    : 'Ctrl';
   const [openPicker, setOpenPicker] = useState<
     "shape" | "arrow" | "color" | null
   >(null);
@@ -363,7 +366,7 @@ export function CaptureEditorToolbar({
       <IconActionButton
         className={getCaptureEditorIconButtonClassName(false)}
         disabled={isRenderingOutput || !canUndo}
-        title="Undo (Ctrl/Cmd+Z)"
+        title={`Undo (${primaryModifier}+Z)`}
         tooltipPlacement="bottom"
         aria-label="Undo annotation"
         onClick={onUndo}
@@ -373,7 +376,7 @@ export function CaptureEditorToolbar({
       <IconActionButton
         className={getCaptureEditorIconButtonClassName(false)}
         disabled={isRenderingOutput || !canRedo}
-        title="Redo (Ctrl/Cmd+Y)"
+        title={`Redo (${primaryModifier}+Y)`}
         tooltipPlacement="bottom"
         aria-label="Redo annotation"
         onClick={onRedo}
@@ -523,7 +526,7 @@ export function CaptureEditorToolbar({
         type="button"
         className={getCaptureEditorCommandButtonClassName("icon")}
         disabled={isRenderingOutput}
-        title="Pin capture (Ctrl/Cmd+T)"
+        title={`Pin capture (${primaryModifier}+T)`}
         aria-label="Pin capture"
         onClick={() => void onPin()}
       >
@@ -533,7 +536,7 @@ export function CaptureEditorToolbar({
         type="button"
         className={getCaptureEditorCommandButtonClassName("icon")}
         disabled={isRenderingOutput}
-        title="Save (Ctrl/Cmd+S, Shift-click for quick save)"
+        title={`Save (${primaryModifier}+S, Shift-click for quick save)`}
         aria-label="Save selection"
         onClick={handleSaveClick}
       >
@@ -543,7 +546,7 @@ export function CaptureEditorToolbar({
         type="button"
         className={getCaptureEditorCommandButtonClassName("primary")}
         disabled={isRenderingOutput}
-        title="Copy (Cmd/Ctrl+C)"
+        title={`Copy (${primaryModifier}+C)`}
         aria-label="Copy selection"
         onClick={() => {
           void onCopy();

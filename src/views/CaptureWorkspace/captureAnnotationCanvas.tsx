@@ -10,6 +10,11 @@ import type {
   Point,
 } from './types';
 
+const WINDOWS_CAPTURE_TEXT_FONT_FAMILY =
+  '"Segoe UI Variable Text", "Segoe UI", system-ui, "Microsoft YaHei", sans-serif';
+const APPLE_CAPTURE_TEXT_FONT_FAMILY =
+  '-apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif';
+
 interface CaptureAnnotationCanvasProps {
   desktopRef: RefObject<HTMLDivElement>;
   monitors: readonly MonitorSnapshotView[];
@@ -101,6 +106,25 @@ function brushBounds(points: Point[], diameter: number): LogicalRect | null {
   };
 }
 
+function alignMosaicRectToGrid(
+  rect: LogicalRect,
+  blockSize: number,
+  maxWidth: number,
+  maxHeight: number,
+): LogicalRect {
+  const size = Math.max(1, blockSize);
+  const x = Math.max(0, Math.floor(rect.x / size) * size);
+  const y = Math.max(0, Math.floor(rect.y / size) * size);
+  const right = Math.min(maxWidth, Math.ceil((rect.x + rect.width) / size) * size);
+  const bottom = Math.min(maxHeight, Math.ceil((rect.y + rect.height) / size) * size);
+  return {
+    x,
+    y,
+    width: Math.max(1, right - x),
+    height: Math.max(1, bottom - y),
+  };
+}
+
 function appendBrushPath(
   context: CanvasRenderingContext2D,
   points: Point[],
@@ -139,8 +163,15 @@ function drawPixelatedBrush(
   blockSize: number,
   buffer: HTMLCanvasElement,
 ) {
-  const rect = brushBounds(points, diameter);
-  if (!rect) return;
+  const bounds = brushBounds(points, diameter);
+  if (!bounds) return;
+  const pixelRatio = context.getTransform().a || 1;
+  const rect = alignMosaicRectToGrid(
+    bounds,
+    blockSize,
+    source.width / pixelRatio,
+    source.height / pixelRatio,
+  );
   context.save();
   appendBrushPath(context, points, diameter);
   context.clip();
@@ -245,7 +276,11 @@ export function drawCaptureAnnotation(
     drawPath(context, annotation.points);
   } else if (annotation.type === 'text') {
     context.fillStyle = annotationColorToCss(annotation.color);
-    context.font = `${annotation.font_size}px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif`;
+    const isWindows = typeof navigator !== 'undefined' && /^Win/i.test(navigator.platform);
+    const fontFamily = isWindows
+      ? WINDOWS_CAPTURE_TEXT_FONT_FAMILY
+      : APPLE_CAPTURE_TEXT_FONT_FAMILY;
+    context.font = `${annotation.font_size}px ${fontFamily}`;
     context.textBaseline = 'alphabetic';
     annotation.text.split('\n').forEach((line, index) => {
       context.fillText(
@@ -328,14 +363,27 @@ export function CaptureAnnotationCanvas({
   selectionViewportRect,
 }: CaptureAnnotationCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const draftCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const mosaicBufferRef = useRef<HTMLCanvasElement | null>(null);
   const sourceRef = useRef<HTMLCanvasElement | null>(null);
+  const paintedDraftRef = useRef<{
+    annotation: AnnotationCommand | null;
+    monitors: readonly MonitorSnapshotView[];
+    capturedCursor?: CapturedCursorView | null;
+    pixelRatio: number;
+    pixelWidth: number;
+    pixelHeight: number;
+    selection: LogicalRect;
+  } | null>(null);
   const { pixelRatio, width: pixelWidth, height: pixelHeight } =
     getCaptureAnnotationCanvasBackingSize(
       selection,
       window.devicePixelRatio || 1,
       outputPixelSize,
     );
+  const nonMosaicDraftAnnotation = draftAnnotation?.type === 'mosaic'
+    ? null
+    : draftAnnotation;
 
   useLayoutEffect(() => {
     const sourceContext = sourceRef.current?.getContext('2d');
@@ -366,6 +414,34 @@ export function CaptureAnnotationCanvas({
 
   useLayoutEffect(() => {
     const context = canvasRef.current?.getContext('2d');
+    if (!context) return;
+    context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    context.clearRect(0, 0, selection.width, selection.height);
+    for (const annotation of annotations) {
+      drawCaptureAnnotation(context, annotation, {
+        mosaic: mosaicBufferRef.current ??
+          (mosaicBufferRef.current = document.createElement('canvas')),
+        source: sourceRef.current ?? context.canvas,
+      });
+    }
+    if (nonMosaicDraftAnnotation) {
+      drawCaptureAnnotation(context, nonMosaicDraftAnnotation, {
+        mosaic: mosaicBufferRef.current ??
+          (mosaicBufferRef.current = document.createElement('canvas')),
+        source: sourceRef.current ?? context.canvas,
+      });
+    }
+  }, [
+    annotations,
+    nonMosaicDraftAnnotation,
+    selection,
+    pixelRatio,
+    pixelWidth,
+    pixelHeight,
+  ]);
+
+  useLayoutEffect(() => {
+    const context = draftCanvasRef.current?.getContext('2d');
     const source = sourceRef.current;
     if (!context || !source) return;
     const buffers = {
@@ -373,14 +449,52 @@ export function CaptureAnnotationCanvas({
         (mosaicBufferRef.current = document.createElement('canvas')),
       source,
     };
-    context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-    context.clearRect(0, 0, selection.width, selection.height);
-    for (const annotation of annotations) {
-      drawCaptureAnnotation(context, annotation, buffers);
+    const previous = paintedDraftRef.current;
+    const sameSurface = previous &&
+      previous.monitors === monitors &&
+      previous.capturedCursor === capturedCursor &&
+      previous.pixelRatio === pixelRatio &&
+      previous.pixelWidth === pixelWidth &&
+      previous.pixelHeight === pixelHeight &&
+      previous.selection === selection;
+    const previousMosaic = previous?.annotation?.type === 'mosaic'
+      ? previous.annotation
+      : null;
+    const nextMosaic = draftAnnotation?.type === 'mosaic' ? draftAnnotation : null;
+    const isMosaicExtension = Boolean(
+      sameSurface && previousMosaic && nextMosaic &&
+      previousMosaic.stroke_width === nextMosaic.stroke_width &&
+      previousMosaic.block_size === nextMosaic.block_size &&
+      nextMosaic.points.length >= previousMosaic.points.length &&
+      previousMosaic.points.every((point, index) => {
+        const nextPoint = nextMosaic.points[index];
+        return point.x === nextPoint?.x && point.y === nextPoint?.y;
+      }),
+    );
+
+    if (isMosaicExtension && previousMosaic && nextMosaic) {
+      const addedPoints = nextMosaic.points.slice(
+        Math.max(0, previousMosaic.points.length - 1),
+      );
+      if (addedPoints.length > 1) {
+        drawCaptureAnnotation(context, { ...nextMosaic, points: addedPoints }, buffers);
+      }
+    } else {
+      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      context.clearRect(0, 0, selection.width, selection.height);
+      if (nextMosaic) drawCaptureAnnotation(context, nextMosaic, buffers);
     }
-    if (draftAnnotation) drawCaptureAnnotation(context, draftAnnotation, buffers);
+
+    paintedDraftRef.current = {
+      annotation: draftAnnotation,
+      monitors,
+      capturedCursor,
+      pixelRatio,
+      pixelWidth,
+      pixelHeight,
+      selection,
+    };
   }, [
-    annotations,
     draftAnnotation,
     monitors,
     capturedCursor,
@@ -408,6 +522,15 @@ export function CaptureAnnotationCanvas({
       />
       <canvas
         ref={canvasRef}
+        data-capture-annotations
+        width={pixelWidth}
+        height={pixelHeight}
+        className="pointer-events-none absolute"
+        style={style}
+      />
+      <canvas
+        ref={draftCanvasRef}
+        data-capture-draft
         width={pixelWidth}
         height={pixelHeight}
         className="pointer-events-none absolute"

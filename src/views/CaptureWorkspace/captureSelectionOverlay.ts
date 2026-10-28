@@ -227,7 +227,10 @@ function drawSizeLabel(
   const label = frame.label;
   if (!label) return;
 
-  context.font = '500 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  const isWindows = typeof navigator !== 'undefined' && /^Win/i.test(navigator.platform);
+  context.font = isWindows
+    ? '500 12px "Segoe UI Variable Text", "Segoe UI", system-ui, "Microsoft YaHei", sans-serif'
+    : '500 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   context.textBaseline = 'top';
 
   const labelWidth = Math.ceil(context.measureText(label).width) + LABEL_PADDING_X * 2;

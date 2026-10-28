@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   drawCaptureSelectionOverlayFrame,
   getCaptureSelectionOverlayFrame,
@@ -8,6 +8,8 @@ import {
 import type { LogicalRect } from './types';
 
 const bounds: LogicalRect = { x: -100, y: 50, width: 500, height: 300 };
+
+afterEach(() => vi.unstubAllGlobals());
 
 function createRecordingContext(): CaptureSelectionOverlayContext & {
   calls: string[];
@@ -223,6 +225,25 @@ describe('capture selection canvas overlay', () => {
       'fillStyle:rgba(255, 255, 255, 0.95)',
       'fillText:120 x 60 px,88,18',
     ]);
+  });
+
+  it('uses Windows system fonts for selection labels', () => {
+    vi.stubGlobal('navigator', { platform: 'Win32' });
+    const context = createRecordingContext();
+
+    drawCaptureSelectionOverlayFrame(
+      context,
+      { width: 500, height: 300 },
+      {
+        variant: 'draft',
+        rect: { x: 80, y: 40, width: 120, height: 60 },
+        label: '120 x 60 px',
+      },
+    );
+
+    expect(context.calls).toContain(
+      'font:500 12px "Segoe UI Variable Text", "Segoe UI", system-ui, "Microsoft YaHei", sans-serif',
+    );
   });
 
   it('uses the configured selection mask, border width, and border color', () => {

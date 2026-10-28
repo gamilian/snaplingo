@@ -19,6 +19,9 @@ export function HotkeyDisplay({ value, onClick, isRecording = false }: HotkeyDis
   const primaryModifierClass = (isWindows ? hasWindowsControl : hasCommand)
     ? 'text-ink'
     : 'text-faint';
+  const shiftLabel = isWindows ? 'Shift' : '⇧';
+  const optionLabel = isWindows ? 'Alt' : '⌥';
+  const primaryLabel = isWindows ? 'Ctrl' : '⌘';
 
   // 提取字母键（最后一个非修饰键字符）
   const letterKey = value.replace(/[⇧⌥⌘⌃]/g, '').trim();
@@ -43,18 +46,18 @@ export function HotkeyDisplay({ value, onClick, isRecording = false }: HotkeyDis
         {isRecording ? (
           <>
             {/* 录制中显示所有修饰键（灰色） */}
-            <span className="text-base text-faint">⇧</span>
-            <span className="text-base text-faint">⌥</span>
-            <span className="text-base text-faint">{isWindows ? 'Ctrl' : '⌘'}</span>
+            <span className="text-base text-faint">{shiftLabel}</span>
+            <span className="text-base text-faint">{optionLabel}</span>
+            <span className="text-base text-faint">{primaryLabel}</span>
             {!isWindows && <span className="text-base text-faint">⌃</span>}
             <span className="ml-1 text-hint text-faint animate-pulse">按下快捷键...</span>
           </>
         ) : (
           <>
             {/* 未设置显示所有修饰键（灰色） */}
-            <span className="text-base text-faint">⇧</span>
-            <span className="text-base text-faint">⌥</span>
-            <span className="text-base text-faint">{isWindows ? 'Ctrl' : '⌘'}</span>
+            <span className="text-base text-faint">{shiftLabel}</span>
+            <span className="text-base text-faint">{optionLabel}</span>
+            <span className="text-base text-faint">{primaryLabel}</span>
             {!isWindows && <span className="text-base text-faint">⌃</span>}
             <span className="ml-1 text-hint text-faint">未设置</span>
           </>
@@ -66,14 +69,14 @@ export function HotkeyDisplay({ value, onClick, isRecording = false }: HotkeyDis
   return (
     <button onClick={handleClick} className={containerClass}>
       {/* Shift */}
-      <span className={`text-base ${hasShift ? 'text-ink' : 'text-faint'}`}>⇧</span>
+      <span className={`text-base ${hasShift ? 'text-ink' : 'text-faint'}`}>{shiftLabel}</span>
 
       {/* Option */}
-      <span className={`text-base ${hasOption ? 'text-ink' : 'text-faint'}`}>⌥</span>
+      <span className={`text-base ${hasOption ? 'text-ink' : 'text-faint'}`}>{optionLabel}</span>
 
       {/* Primary modifier */}
       <span className={`text-base ${primaryModifierClass}`}>
-        {isWindows ? 'Ctrl' : '⌘'}
+        {primaryLabel}
       </span>
 
       {/* Control */}
@@ -86,7 +89,7 @@ export function HotkeyDisplay({ value, onClick, isRecording = false }: HotkeyDis
         <span
           className="ml-1 text-base font-semibold text-accent"
           style={{
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji"',
+            fontFamily: '"Segoe UI Variable Text", "Segoe UI", system-ui, "Microsoft YaHei", sans-serif, "Apple Color Emoji", "Segoe UI Emoji"',
             fontStyle: 'normal',
             letterSpacing: '0.02em'
           }}

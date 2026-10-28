@@ -130,7 +130,7 @@ describe("capture presentation", () => {
     expect(toolbar).toMatch(
       /<button(?:(?!<\/button>)[\s\S])*className=\{getCaptureEditorCommandButtonClassName\(\)\}(?:(?!<\/button>)[\s\S])*title="OCR"/,
     );
-    expect(toolbar).toContain('title="Copy (Cmd/Ctrl+C)"');
+    expect(toolbar).toContain('title={`Copy (${primaryModifier}+C)`}');
   });
 
   it("shows the text draft border only while it is hovered or focused", () => {

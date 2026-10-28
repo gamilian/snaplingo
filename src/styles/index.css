@@ -83,6 +83,10 @@ body {
   color: rgb(var(--ink));
 }
 
+:root[data-platform='windows'] body {
+  font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", Arial, sans-serif;
+}
+
 :root[data-result-window='true'],
 :root[data-result-window='true'] body {
   background: transparent;

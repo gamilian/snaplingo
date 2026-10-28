@@ -7,6 +7,8 @@ mod macos;
 mod tesseract;
 #[cfg(target_os = "windows")]
 mod windows;
+#[cfg(any(target_os = "windows", test))]
+mod windows_image;
 
 #[cfg(all(test, target_os = "macos"))]
 pub(crate) use macos::vision_languages_for_request;
