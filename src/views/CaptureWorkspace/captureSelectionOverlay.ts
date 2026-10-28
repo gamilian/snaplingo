@@ -1,4 +1,4 @@
-import type { LogicalRect } from './types';
+import type { LogicalRect, MonitorSnapshotView } from './types';
 import { virtualRectToViewportRect } from '../../application/capture-workspace/virtualDesktop';
 
 type CaptureSelectionOverlayStatus = 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
@@ -17,6 +17,8 @@ export interface CaptureSelectionOverlayFrameInput {
   selection: LogicalRect | null;
   draftSelection: LogicalRect | null;
   hoverSelection: LogicalRect | null;
+  monitors?: readonly MonitorSnapshotView[];
+  outputPixelScale?: number | null;
   showSelectionSize?: boolean;
 }
 
@@ -54,6 +56,8 @@ export function getCaptureSelectionOverlayFrame({
   selection,
   draftSelection,
   hoverSelection,
+  monitors = [],
+  outputPixelScale,
   showSelectionSize = true,
 }: CaptureSelectionOverlayFrameInput): CaptureSelectionOverlayFrame | null {
   if (!selectionBounds) return null;
@@ -63,6 +67,7 @@ export function getCaptureSelectionOverlayFrame({
       'preview',
       selection,
       selectionBounds,
+      getCaptureOutputPixelSize(selection, monitors, outputPixelScale),
       showSelectionSize,
     );
   }
@@ -76,21 +81,64 @@ export function getCaptureSelectionOverlayFrame({
     draftSelection ? 'draft' : 'hover',
     activeSelection,
     selectionBounds,
+    getCaptureOutputPixelSize(activeSelection, monitors, outputPixelScale),
     showSelectionSize,
   );
+}
+
+export function getCaptureOutputPixelScale(
+  selection: LogicalRect,
+  monitors: readonly MonitorSnapshotView[],
+  sessionOutputPixelScale?: number | null,
+) {
+  if (
+    sessionOutputPixelScale !== undefined &&
+    sessionOutputPixelScale !== null &&
+    Number.isFinite(sessionOutputPixelScale) &&
+    sessionOutputPixelScale > 0
+  ) {
+    return sessionOutputPixelScale;
+  }
+
+  return monitors.reduce((scale, monitor) => {
+    const bounds = monitor.logical_bounds;
+    const intersects =
+      selection.x < bounds.x + bounds.width &&
+      selection.x + selection.width > bounds.x &&
+      selection.y < bounds.y + bounds.height &&
+      selection.y + selection.height > bounds.y;
+    return intersects ? Math.max(scale, monitor.scale_factor) : scale;
+  }, 1);
+}
+
+export function getCaptureOutputPixelSize(
+  selection: LogicalRect,
+  monitors: readonly MonitorSnapshotView[],
+  sessionOutputPixelScale?: number | null,
+) {
+  const scale = getCaptureOutputPixelScale(
+    selection,
+    monitors,
+    sessionOutputPixelScale,
+  );
+  return {
+    width: Math.ceil(selection.width * scale),
+    height: Math.ceil(selection.height * scale),
+  };
 }
 
 function buildCaptureSelectionOverlayFrame(
   variant: CaptureSelectionOverlayVariant,
   selection: LogicalRect,
   selectionBounds: LogicalRect,
+  outputPixelSize: { width: number; height: number },
   showSelectionSize: boolean,
 ): CaptureSelectionOverlayFrame {
   return {
     variant,
     rect: virtualRectToViewportRect(selection, selectionBounds),
     label: showSelectionSize
-      ? `${Math.round(selection.width)} x ${Math.round(selection.height)} px`
+      ? `${outputPixelSize.width} x ${outputPixelSize.height} px`
       : null,
   };
 }

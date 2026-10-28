@@ -106,10 +106,12 @@ describe('result window text actions', () => {
       resultWindowVisible: true,
       resultWindowMode: 'ocr',
       ocrText: 'recognized text',
+      ocrDetectedLanguage: 'en-US',
     });
 
     const view = await renderResultWindow();
 
+    expect(view.container.textContent).toContain('识别语言：en-US');
     expect(view.container.querySelector('[aria-label="朗读"]')).not.toBeNull();
     expect(view.container.querySelector('[aria-label="收藏"]')).not.toBeNull();
     expect(view.container.querySelector('[aria-label="复制"]')).not.toBeNull();

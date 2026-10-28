@@ -333,12 +333,17 @@ async fn ocr_open_requests_preserve_each_intent_and_source_image() {
                 intent: ResultWindowOcrIntent::DisplayText,
                 image_base64: Some("source-image".to_string()),
                 confidence: None,
+                detected_language: Some("en-US".to_string()),
             },
-            ocr_payload(
-                "recognized text",
-                ResultWindowOcrIntent::DisplayText,
-                Some("source-image"),
-            ),
+            {
+                let mut payload = ocr_payload(
+                    "recognized text",
+                    ResultWindowOcrIntent::DisplayText,
+                    Some("source-image"),
+                );
+                payload.detected_language = Some("en-US".to_string());
+                payload
+            },
         ),
         (
             ResultWindowOpenRequest::Ocr {
@@ -346,6 +351,7 @@ async fn ocr_open_requests_preserve_each_intent_and_source_image() {
                 intent: ResultWindowOcrIntent::File,
                 image_base64: None,
                 confidence: None,
+                detected_language: None,
             },
             ocr_payload("", ResultWindowOcrIntent::File, None),
         ),

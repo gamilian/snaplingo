@@ -1,5 +1,5 @@
 import { annotationColorToCss } from '../../components/common/annotationColorPresentation';
-import { useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { useRef, useState, type MouseEvent, type ReactNode, type RefObject } from "react";
 import IconActionButton from "../../components/common/IconActionButton";
 import {
   MAX_ANNOTATION_STROKE_WIDTH,
@@ -28,6 +28,7 @@ import {
 import type { Point } from "./types";
 
 interface CaptureEditorToolbarProps {
+  toolbarRef?: RefObject<HTMLDivElement>;
   position: Point;
   width: number;
   activeAnnotationTool: AnnotationTool | null;
@@ -127,6 +128,7 @@ const ARROW_TOOLS: AnnotationToolButton[] = [
 ];
 
 export function CaptureEditorToolbar({
+  toolbarRef,
   position,
   width,
   activeAnnotationTool,
@@ -287,11 +289,13 @@ export function CaptureEditorToolbar({
 
   return (
     <div
+      ref={toolbarRef}
       className={getCaptureEditorToolbarClassName()}
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
         width: `${width}px`,
+        maxWidth: 'calc(100vw - 16px)',
         zIndex: 2,
       }}
       onPointerDown={(event) => {

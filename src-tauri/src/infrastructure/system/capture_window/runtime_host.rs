@@ -38,7 +38,11 @@ impl CaptureSessionRuntimeHost for TauriCaptureSessionRuntimeHost {
         {
             objc2_app_kit::NSPasteboard::generalPasteboard().changeCount() as u64
         }
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(target_os = "windows")]
+        {
+            clipboard_win::seq_num().map_or(0, |revision| revision.get() as u64)
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
         {
             0
         }
@@ -76,7 +80,12 @@ impl CaptureSessionRuntimeHost for TauriCaptureSessionRuntimeHost {
         let request = if target == CaptureOcrTarget::TranslationWindow {
             ResultWindowOpenRequest::screenshot_translation(result.text, result.detected_language)
         } else {
-            ResultWindowOpenRequest::capture_ocr(result.text, preview, result.confidence)
+            ResultWindowOpenRequest::capture_ocr(
+                result.text,
+                preview,
+                result.confidence,
+                result.detected_language,
+            )
         };
         self.app
             .state::<crate::AppState>()

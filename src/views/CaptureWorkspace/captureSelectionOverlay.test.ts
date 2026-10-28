@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   drawCaptureSelectionOverlayFrame,
   getCaptureSelectionOverlayFrame,
+  getCaptureOutputPixelSize,
   type CaptureSelectionOverlayContext,
 } from './captureSelectionOverlay';
 import type { LogicalRect } from './types';
@@ -60,7 +61,7 @@ describe('capture selection canvas overlay', () => {
     ).toEqual({
       variant: 'draft',
       rect: { x: 80, y: 40, width: 120.4, height: 60.6 },
-      label: '120 x 61 px',
+      label: '121 x 61 px',
     });
   });
 
@@ -92,8 +93,82 @@ describe('capture selection canvas overlay', () => {
     ).toEqual({
       variant: 'preview',
       rect: { x: 100, y: 30, width: 50.4, height: 40.6 },
-      label: '50 x 41 px',
+      label: '51 x 41 px',
     });
+  });
+
+  it('reports physical output pixels on a scaled monitor', () => {
+    expect(
+      getCaptureSelectionOverlayFrame({
+        status: 'selecting',
+        selectionBounds: bounds,
+        selection: null,
+        draftSelection: { x: 0, y: 80, width: 50.4, height: 40.6 },
+        hoverSelection: null,
+        monitors: [
+          {
+            id: 'scaled',
+            logical_bounds: { x: 0, y: 50, width: 250, height: 150 },
+            physical_bounds: { x: 0, y: 0, width: 1500, height: 900 },
+            scale_factor: 1.5,
+            image_base64: '',
+          },
+        ],
+      }),
+    ).toMatchObject({
+      label: '76 x 61 px',
+    });
+  });
+
+  it('uses the highest scale among intersected monitors for cross-monitor output', () => {
+    expect(
+      getCaptureSelectionOverlayFrame({
+        status: 'preview',
+        selectionBounds: bounds,
+        selection: { x: 80, y: 80, width: 40, height: 30 },
+        draftSelection: null,
+        hoverSelection: null,
+        monitors: [
+          {
+            id: 'left',
+            logical_bounds: { x: -100, y: 50, width: 200, height: 150 },
+            physical_bounds: { x: -200, y: 0, width: 400, height: 300 },
+            scale_factor: 1,
+            image_base64: '',
+          },
+          {
+            id: 'right',
+            logical_bounds: { x: 100, y: 50, width: 200, height: 150 },
+            physical_bounds: { x: 200, y: 0, width: 600, height: 450 },
+            scale_factor: 2,
+            image_base64: '',
+          },
+          {
+            id: 'unselected',
+            logical_bounds: { x: 300, y: 50, width: 200, height: 150 },
+            physical_bounds: { x: 800, y: 0, width: 1200, height: 900 },
+            scale_factor: 3,
+            image_base64: '',
+          },
+        ],
+      }),
+    ).toMatchObject({
+      label: '80 x 60 px',
+    });
+  });
+
+  it('uses the session-wide output scale even on a lower-density monitor', () => {
+    expect(getCaptureOutputPixelSize(
+      { x: -100, y: 50, width: 100, height: 80 },
+      [{
+        id: 'secondary',
+        logical_bounds: { x: -100, y: 50, width: 100, height: 80 },
+        physical_bounds: { x: -100, y: 50, width: 100, height: 80 },
+        scale_factor: 1,
+        image_base64: '',
+      }],
+      1.5,
+    )).toEqual({ width: 150, height: 120 });
   });
 
   it('does not build a frame outside selecting or preview state', () => {

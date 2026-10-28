@@ -8,6 +8,7 @@ export interface OcrFileWorkflowDeps {
   isCurrent?: () => boolean;
   setText: (text: string) => void;
   setConfidence: (confidence: number | null) => void;
+  setDetectedLanguage: (language: string | null) => void;
   setImageDataUrl: (imageDataUrl: string) => void;
   setRunning: (running: boolean) => void;
   setError: (message: string | null) => void;
@@ -29,6 +30,7 @@ export async function runOcrFileWorkflow(deps: OcrFileWorkflowDeps) {
     const text = deps.transformText(result.text);
     deps.setText(text);
     deps.setConfidence(result.confidence);
+    deps.setDetectedLanguage(result.detected_language ?? null);
     deps.setImageDataUrl(result.imageDataUrl);
     if (deps.copyText) {
       if (deps.isCurrent && !deps.isCurrent()) return;

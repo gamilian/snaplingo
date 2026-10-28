@@ -69,6 +69,7 @@ describe('result window application runtime', () => {
       autoTranslate: false,
       ocrIntent: 'display-text',
       imageBase64: 'image-base64',
+      detectedLanguage: 'en-US',
     };
     const onLoaded = vi.fn();
     const { runtime, platform, emitPayloadReady, unsubscribe } =
@@ -85,6 +86,7 @@ describe('result window application runtime', () => {
     expect(platform.commands.takePayload).toHaveBeenCalledWith('7');
     expect(runtime.getState()).toMatchObject({
       ocrText: 'recognized', ocrImageBase64: 'image-base64',
+      ocrDetectedLanguage: 'en-US',
       resultWindowOrigin: 'ocr', resultWindowMode: 'ocr', resultWindowVisible: true,
     });
     expect(onLoaded).toHaveBeenCalledTimes(1);

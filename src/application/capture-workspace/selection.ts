@@ -375,22 +375,31 @@ export function snapResizedSelectionToRects(
 
 export function getToolbarPosition(
   rect: LogicalRect,
-  bounds: LogicalRect,
+  clientBounds: LogicalRect,
   toolbarSize: Size,
   gap: number,
 ): Point {
-  const boundsRight = bounds.x + bounds.width;
-  const boundsBottom = bounds.y + bounds.height;
-  const preferredX = rect.x;
+  const margin = 8;
   const belowY = rect.y + rect.height + gap;
   const aboveY = rect.y - toolbarSize.height - gap;
-  const hasRoomBelow = belowY + toolbarSize.height <= boundsBottom;
-  const maxX = Math.max(bounds.x, boundsRight - toolbarSize.width);
-  const maxY = Math.max(bounds.y, boundsBottom - toolbarSize.height);
+  const hasRoomBelow = belowY + toolbarSize.height <= clientBounds.height - margin;
+  const maxX = Math.max(margin, clientBounds.width - toolbarSize.width - margin);
+  const maxY = Math.max(margin, clientBounds.height - toolbarSize.height - margin);
 
   return {
-    x: clamp(preferredX, bounds.x, maxX),
-    y: hasRoomBelow ? belowY : clamp(aboveY, bounds.y, maxY),
+    x: clamp(rect.x, margin, maxX),
+    y: hasRoomBelow ? belowY : clamp(aboveY, margin, maxY),
+  };
+}
+
+export function fitToolbarSize(
+  toolbarSize: Size,
+  clientBounds: LogicalRect,
+  margin = 8,
+): Size {
+  return {
+    width: Math.max(0, Math.min(toolbarSize.width, clientBounds.width - margin * 2)),
+    height: Math.max(0, Math.min(toolbarSize.height, clientBounds.height - margin * 2)),
   };
 }
 

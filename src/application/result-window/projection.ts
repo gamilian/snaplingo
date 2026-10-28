@@ -18,6 +18,7 @@ export interface ResultWindowState {
   readonly isTranslating: boolean;
   readonly ocrText: string;
   readonly ocrConfidence: number | null;
+  readonly ocrDetectedLanguage: string | null;
   readonly ocrImageBase64: string | null;
   readonly isOcrRunning: boolean;
   readonly ocrError: string | null;
@@ -35,6 +36,7 @@ export function createInitialResultWindowState(): ResultWindowState {
     isTranslating: false,
     ocrText: '',
     ocrConfidence: null,
+    ocrDetectedLanguage: null,
     ocrImageBase64: null,
     isOcrRunning: false,
     ocrError: null,

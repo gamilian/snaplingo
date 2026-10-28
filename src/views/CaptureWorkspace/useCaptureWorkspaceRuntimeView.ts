@@ -2,6 +2,7 @@ import { shouldRequestCaptureMagnifierPixels } from '../../application/capture-w
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -120,6 +121,36 @@ export function useCaptureWorkspaceRuntimeView({
   const [runtimeRenderState, setRuntimeRenderState] = useState(
     () => workflowRuntime.renderState,
   );
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
+  const [toolbarHeight, setToolbarHeight] = useState(TOOLBAR_SIZE.height);
+  const [toolbarClientBounds, setToolbarClientBounds] = useState(() => ({
+    x: 0,
+    y: 0,
+    width: document.documentElement.clientWidth,
+    height: document.documentElement.clientHeight,
+  }));
+
+  useLayoutEffect(() => {
+    const updateSize = () => {
+      const { clientWidth: width, clientHeight: height } = document.documentElement;
+      setToolbarClientBounds((previous) =>
+        previous.width === width && previous.height === height
+          ? previous
+          : { x: 0, y: 0, width, height },
+      );
+      const toolbarHeight = toolbarRef.current?.getBoundingClientRect().height;
+      if (toolbarHeight) setToolbarHeight(toolbarHeight);
+    };
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(document.documentElement);
+    if (toolbarRef.current) observer.observe(toolbarRef.current);
+    window.addEventListener('resize', updateSize);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateSize);
+    };
+  }, [runtimeRenderState.status, runtimeRenderState.isAnnotationToolbarVisible]);
 
   useEffect(() => {
     setRuntimeRenderState(workflowRuntime.renderState);
@@ -136,9 +167,10 @@ export function useCaptureWorkspaceRuntimeView({
           ? runtimeRenderState.sessionId
           : null,
         toolbarGap: TOOLBAR_GAP,
-        toolbarSize: TOOLBAR_SIZE,
+        toolbarSize: { width: TOOLBAR_SIZE.width, height: toolbarHeight },
+        toolbarClientBounds,
       }),
-    [runtimeRenderState],
+    [runtimeRenderState, toolbarClientBounds, toolbarHeight],
   );
   const draftSelectionRef = useRef<LogicalRect | null>(null);
   const hoverSelectionRef = useRef(runtimeRenderState.hoverSelection);
@@ -151,6 +183,8 @@ export function useCaptureWorkspaceRuntimeView({
   const overlay = useCaptureSelectionOverlay({
     status: runtimeRenderState.status,
     selectionBounds: derived.selectionBounds,
+    monitors: runtimeRenderState.session?.monitors ?? [],
+    outputPixelScale: runtimeRenderState.session?.output_pixel_scale,
     selection:
       runtimeRenderState.status === 'preview'
         ? runtimeRenderState.selection
@@ -265,6 +299,7 @@ export function useCaptureWorkspaceRuntimeView({
       viewportBounds: derived.viewportBounds,
       selectionBounds: derived.selectionBounds,
       monitors: runtimeRenderState.session?.monitors ?? [],
+      outputPixelScale: runtimeRenderState.session?.output_pixel_scale ?? null,
       capturedCursor: runtimeRenderState.session?.captured_cursor,
       includeCapturedCursor: runtimeRenderState.includeCapturedCursor,
       isRenderingOutput: runtimeRenderState.isRenderingOutput,
@@ -294,7 +329,7 @@ export function useCaptureWorkspaceRuntimeView({
       },
       toolbar: {
         position: derived.toolbarPosition,
-        width: TOOLBAR_SIZE.width,
+        width: derived.toolbarSize.width,
         isVisible: runtimeRenderState.isAnnotationToolbarVisible,
         textFontSize: runtimeRenderState.textFontSize,
         isTextSizingActive: derived.isTextSizingActive,
@@ -304,6 +339,7 @@ export function useCaptureWorkspaceRuntimeView({
       },
       dom: {
         desktopRef,
+        toolbarRef,
         textDraftInputRef,
         selectionOverlay: {
           canvasRef: overlay.canvasRef,

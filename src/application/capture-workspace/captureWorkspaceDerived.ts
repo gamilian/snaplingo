@@ -4,7 +4,7 @@ import {
   type CaptureMagnifierRuntimeState,
 } from './captureMagnifierState';
 import { getCaptureSelectedAnnotationBounds } from './captureEditorRuntime';
-import { getToolbarPosition } from './selection';
+import { fitToolbarSize, getToolbarPosition } from './selection';
 import {
   getVirtualDesktopBounds,
   virtualPointToViewportPoint,
@@ -88,6 +88,7 @@ export interface CaptureWorkspaceDerivedState
   cursorViewportPoint: Point | null;
   selectedAnnotationBounds: LogicalRect | null;
   toolbarPosition: Point | null;
+  toolbarSize: Size;
 }
 
 interface CaptureWorkspaceDerivedOptions {
@@ -95,6 +96,7 @@ interface CaptureWorkspaceDerivedOptions {
   hydratedCaptureSessionId: string | null;
   toolbarSize: Size;
   toolbarGap: number;
+  toolbarClientBounds?: LogicalRect;
 }
 
 export function getCaptureWorkspaceDerivedState({
@@ -102,6 +104,7 @@ export function getCaptureWorkspaceDerivedState({
   hydratedCaptureSessionId,
   toolbarGap,
   toolbarSize,
+  toolbarClientBounds,
 }: CaptureWorkspaceDerivedOptions): CaptureWorkspaceDerivedState {
   const annotations = state.annotationHistory.annotations;
   const selectedAnnotation =
@@ -159,9 +162,19 @@ export function getCaptureWorkspaceDerivedState({
     selectedAnnotationIndex: state.selectedAnnotationIndex,
     annotationMoveGesture: state.annotationMoveGesture,
   });
+  const clientBounds = toolbarClientBounds ?? viewportBounds;
+  const fittedToolbarSize = fitToolbarSize(
+    toolbarSize,
+    clientBounds ?? { x: 0, y: 0, width: 0, height: 0 },
+  );
   const toolbarPosition =
-    selectionViewportRect && viewportBounds && state.status === 'preview'
-      ? getToolbarPosition(selectionViewportRect, viewportBounds, toolbarSize, toolbarGap)
+    selectionViewportRect && clientBounds && state.status === 'preview'
+      ? getToolbarPosition(
+          selectionViewportRect,
+          clientBounds,
+          fittedToolbarSize,
+          toolbarGap,
+        )
       : null;
 
   return {
@@ -181,6 +194,7 @@ export function getCaptureWorkspaceDerivedState({
     cursorViewportPoint,
     selectedAnnotationBounds,
     toolbarPosition,
+    toolbarSize: fittedToolbarSize,
     ...magnifier,
   };
 }

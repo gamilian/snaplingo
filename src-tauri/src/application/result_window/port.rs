@@ -58,6 +58,7 @@ pub(crate) enum ResultWindowOpenRequest {
         intent: ResultWindowOcrIntent,
         image_base64: Option<String>,
         confidence: Option<f32>,
+        detected_language: Option<String>,
     },
 }
 
@@ -99,6 +100,7 @@ impl ResultWindowOpenRequest {
             intent: ResultWindowOcrIntent::DisplayText,
             image_base64: None,
             confidence: None,
+            detected_language: None,
         }
     }
 
@@ -106,12 +108,14 @@ impl ResultWindowOpenRequest {
         text: String,
         image_base64: Option<String>,
         confidence: Option<f32>,
+        detected_language: Option<String>,
     ) -> Self {
         Self::Ocr {
             text,
             intent: ResultWindowOcrIntent::DisplayText,
             image_base64,
             confidence,
+            detected_language,
         }
     }
 
@@ -121,6 +125,7 @@ impl ResultWindowOpenRequest {
             intent: ResultWindowOcrIntent::File,
             image_base64: None,
             confidence: None,
+            detected_language: None,
         }
     }
 }

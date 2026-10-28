@@ -51,7 +51,7 @@ pub(crate) async fn open_capture_ocr_result_window_for_runtime(
 ) -> Result<(), String> {
     open_result_window_request(
         runtime,
-        ResultWindowOpenRequest::capture_ocr(text, image_base64, confidence),
+        ResultWindowOpenRequest::capture_ocr(text, image_base64, confidence, None),
     )
     .await
 }

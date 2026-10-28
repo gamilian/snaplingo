@@ -655,6 +655,7 @@ fn session_to_view(session: &CaptureSession) -> CaptureSessionView {
             .iter()
             .map(snapshot_to_view)
             .collect(),
+        output_pixel_scale: session.desktop_scale,
         candidates: session.candidates.clone(),
         captured_cursor: session
             .captured_cursor
@@ -671,6 +672,7 @@ fn session_to_view_without_monitor_images(session: &CaptureSession) -> CaptureSe
             .iter()
             .map(snapshot_to_view)
             .collect(),
+        output_pixel_scale: session.desktop_scale,
         candidates: session.candidates.clone(),
         captured_cursor: session
             .captured_cursor

@@ -14,10 +14,10 @@ pub(crate) enum CaptureOcrTarget {
     Clipboard,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum CaptureOcrStatus {
     Recognizing,
-    Copied,
+    Copied { language: Option<String> },
     Failed,
 }
 

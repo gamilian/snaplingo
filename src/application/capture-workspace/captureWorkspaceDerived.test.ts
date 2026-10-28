@@ -86,6 +86,24 @@ describe('captureWorkspaceDerived', () => {
     expect(derived.toolbarPosition).not.toBeNull();
   });
 
+  it('fits the toolbar to the CSS client area instead of the virtual desktop', () => {
+    const derived = getCaptureWorkspaceDerivedState({
+      state: {
+        ...createInitialCaptureWorkspaceState(),
+        status: 'preview',
+        session: createSession(),
+        selection: { x: 140, y: 180, width: 60, height: 30 },
+      },
+      hydratedCaptureSessionId: null,
+      toolbarGap: 14,
+      toolbarSize: { width: 700, height: 80 },
+      toolbarClientBounds: { x: 0, y: 0, width: 260, height: 220 },
+    });
+
+    expect(derived.toolbarSize).toEqual({ width: 244, height: 80 });
+    expect(derived.toolbarPosition).toEqual({ x: 8, y: 66 });
+  });
+
   it('derives annotation and toolbar state from editor state', () => {
     const session = createSession();
     const annotation = {

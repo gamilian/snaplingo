@@ -395,6 +395,7 @@ export function createResultWindowRuntime({
       updateState({
         ocrText: '',
         ocrConfidence: null,
+        ocrDetectedLanguage: null,
         ocrImageBase64: null,
         ocrError: null,
       });
@@ -403,6 +404,7 @@ export function createResultWindowRuntime({
       updateState({
         ocrText: ocrPayloadDisplayText(payload, getOcrSettings?.()),
         ocrConfidence: payload.confidence ?? null,
+        ocrDetectedLanguage: payload.detectedLanguage ?? null,
         ocrImageBase64: payload.imageBase64 ?? null,
       });
     }
@@ -453,6 +455,7 @@ export function createResultWindowRuntime({
       resultWindowMode: 'ocr',
       ocrText: '',
       ocrConfidence: null,
+      ocrDetectedLanguage: null,
       ocrImageBase64: null,
       ocrError: null,
     });
@@ -468,6 +471,7 @@ export function createResultWindowRuntime({
       isCurrent: () => generation === ocrGeneration,
       setText: (ocrText) => updateState({ ocrText }),
       setConfidence: (ocrConfidence) => updateState({ ocrConfidence }),
+      setDetectedLanguage: (ocrDetectedLanguage) => updateState({ ocrDetectedLanguage }),
       setImageDataUrl: (ocrImageBase64) => updateState({ ocrImageBase64 }),
       setRunning: (isOcrRunning) => updateState({ isOcrRunning }),
       setError: (ocrError) => updateState({ ocrError }),

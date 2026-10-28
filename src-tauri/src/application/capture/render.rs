@@ -152,8 +152,8 @@ pub fn render_capture_png(
 ) -> crate::error::Result<Vec<u8>> {
     let session = capture_sessions.get_session(session_id)?;
 
-    let plan =
-        capture_image_composition_plan(rect, &session.snapshots).map_err(AppError::System)?;
+    let plan = capture_image_composition_plan(rect, &session.snapshots, session.desktop_scale)
+        .map_err(AppError::System)?;
     let mut placements = plan
         .placements
         .iter()
@@ -331,6 +331,7 @@ fn image_annotations_from_commands(
 fn capture_image_composition_plan(
     rect: &LogicalRect,
     snapshots: &[MonitorSnapshot],
+    output_pixel_scale: Option<f64>,
 ) -> Result<CaptureImageCompositionPlan, String> {
     if rect.width <= 0.0 || rect.height <= 0.0 {
         return Err("Selection has no area".to_string());
@@ -349,10 +350,14 @@ fn capture_image_composition_plan(
         return Err("Selection does not intersect any captured monitor".to_string());
     }
 
-    let output_scale = intersections
-        .iter()
-        .map(|(_, snapshot, _)| snapshot.scale_factor)
-        .fold(1.0_f64, f64::max);
+    let output_scale = output_pixel_scale
+        .filter(|scale| scale.is_finite() && *scale > 0.0)
+        .unwrap_or_else(|| {
+            intersections
+                .iter()
+                .map(|(_, snapshot, _)| snapshot.scale_factor)
+                .fold(1.0_f64, f64::max)
+        });
     let output_width = scaled_extent(rect.width, output_scale)?;
     let output_height = scaled_extent(rect.height, output_scale)?;
     let placements = intersections
@@ -617,6 +622,7 @@ mod tests {
                 height: 2.0,
             },
             &snapshots,
+            None,
         )
         .unwrap();
 
@@ -661,6 +667,59 @@ mod tests {
                 height: 2,
             }
         );
+    }
+
+    #[test]
+    fn applies_explicit_session_output_scale_across_mixed_dpi_monitors() {
+        let snapshots = vec![
+            MonitorSnapshot {
+                id: "primary".into(),
+                logical_bounds: LogicalRect {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 100.0,
+                    height: 80.0,
+                },
+                physical_bounds: PhysicalRect {
+                    x: 0,
+                    y: 0,
+                    width: 200,
+                    height: 160,
+                },
+                scale_factor: 2.0,
+                png_data: Vec::new(),
+            },
+            MonitorSnapshot {
+                id: "secondary".into(),
+                logical_bounds: LogicalRect {
+                    x: 100.0,
+                    y: 0.0,
+                    width: 100.0,
+                    height: 80.0,
+                },
+                physical_bounds: PhysicalRect {
+                    x: 200,
+                    y: 0,
+                    width: 100,
+                    height: 80,
+                },
+                scale_factor: 2.0,
+                png_data: Vec::new(),
+            },
+        ];
+        let plan = super::capture_image_composition_plan(
+            &LogicalRect {
+                x: 100.0,
+                y: 0.0,
+                width: 50.0,
+                height: 40.0,
+            },
+            &snapshots,
+            Some(2.0),
+        )
+        .unwrap();
+
+        assert_eq!((plan.width, plan.height), (100, 80));
     }
 
     #[test]
@@ -709,6 +768,7 @@ mod tests {
                 height: 2.0,
             },
             &snapshots,
+            None,
         )
         .unwrap();
         let placements = plan
@@ -757,6 +817,7 @@ mod tests {
                 let plan = super::capture_image_composition_plan(
                     &snapshot.logical_bounds,
                     std::slice::from_ref(&snapshot),
+                    None,
                 )
                 .unwrap();
                 let output = CaptureImageComposer::new()

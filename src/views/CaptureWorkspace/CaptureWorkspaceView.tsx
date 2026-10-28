@@ -41,6 +41,7 @@ import { CaptureSelectionOverlayCanvas } from './captureSelectionOverlayRuntime'
 import { createCapturePointerFrameDispatcher } from './capturePointerFrame';
 import { getCaptureWorkspacePointerPoint } from '../../application/capture-workspace/captureWorkspacePointer';
 import { getMonitorViewportRect } from '../../application/capture-workspace/virtualDesktop';
+import { getCaptureOutputPixelSize } from './captureSelectionOverlay';
 import type {
   ColorSample,
   ColorSampleFormat,
@@ -68,6 +69,7 @@ export interface CaptureWorkspaceViewRenderState {
   readonly viewportBounds: LogicalRect | null;
   readonly selectionBounds: LogicalRect | null;
   readonly monitors: readonly MonitorSnapshotView[];
+  readonly outputPixelScale: number | null;
   readonly capturedCursor?: CapturedCursorView | null;
   readonly includeCapturedCursor?: boolean;
   readonly isRenderingOutput: boolean;
@@ -97,6 +99,7 @@ export interface CaptureWorkspaceViewRenderState {
   };
   readonly dom: {
     readonly desktopRef: RefObject<HTMLDivElement>;
+    readonly toolbarRef?: RefObject<HTMLDivElement>;
     readonly textDraftInputRef: Ref<HTMLTextAreaElement>;
     readonly selectionOverlay: {
       readonly canvasRef: Ref<HTMLCanvasElement>;
@@ -479,6 +482,11 @@ export function CaptureWorkspaceView({
             <CaptureAnnotationCanvas
               desktopRef={renderState.dom.desktopRef}
               monitors={renderState.monitors}
+              outputPixelSize={getCaptureOutputPixelSize(
+                renderState.editor.selection,
+                renderState.monitors,
+                renderState.outputPixelScale,
+              )}
               capturedCursor={renderState.includeCapturedCursor ? renderState.capturedCursor : null}
               selection={renderState.editor.selection}
               annotations={renderState.editor.annotations}
@@ -544,6 +552,7 @@ export function CaptureWorkspaceView({
             />
             {renderState.toolbar.position && renderState.toolbar.isVisible && (
               <CaptureEditorToolbar
+                toolbarRef={renderState.dom.toolbarRef}
                 position={renderState.toolbar.position}
                 width={renderState.toolbar.width}
                 activeAnnotationTool={renderState.editor.activeAnnotationTool}

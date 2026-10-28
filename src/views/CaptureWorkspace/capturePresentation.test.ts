@@ -96,7 +96,8 @@ describe("capture presentation", () => {
   it("uses a light floating toolbar for the editing surface", () => {
     const className = getCaptureEditorToolbarClassName();
 
-    expect(className).toContain("h-[40px]");
+    expect(className).toContain("min-h-[40px]");
+    expect(className).toContain("flex-wrap");
     expect(className).toContain("gap-0.5");
     expect(className).toContain("rounded-[11px]");
     expect(className).toContain("bg-surface");

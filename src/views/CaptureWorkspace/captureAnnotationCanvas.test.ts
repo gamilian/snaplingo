@@ -3,13 +3,24 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { CaptureAnnotationCanvas, drawCaptureAnnotation, drawFrozenCaptureSelection } from './captureAnnotationCanvas';
+import { CaptureAnnotationCanvas, drawCaptureAnnotation, drawFrozenCaptureSelection, getCaptureAnnotationCanvasBackingSize } from './captureAnnotationCanvas';
 import type { AnnotationCommand, MonitorSnapshotView } from './types';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 afterEach(() => vi.restoreAllMocks());
 
 describe('capture annotation canvas', () => {
+  it('keeps local DPR sharpness while guaranteeing the shared output pixel size', () => {
+    const selection = { x: 0, y: 0, width: 100, height: 80 };
+
+    expect(
+      getCaptureAnnotationCanvasBackingSize(selection, 3, { width: 150, height: 120 }),
+    ).toEqual({ pixelRatio: 3, width: 300, height: 240 });
+    expect(
+      getCaptureAnnotationCanvasBackingSize(selection, 1, { width: 150, height: 120 }),
+    ).toEqual({ pixelRatio: 1.5, width: 150, height: 120 });
+  });
+
   it('composes frozen monitors with negative origins and different pixel densities', () => {
     const context = { clearRect: vi.fn(), drawImage: vi.fn() } as unknown as CanvasRenderingContext2D;
     const left = document.createElement('img');
@@ -47,6 +58,7 @@ describe('capture annotation canvas', () => {
     const props = {
       desktopRef: { current: desktop },
       monitors: [{ id: 'monitor', logical_bounds: rect, physical_bounds: rect, scale_factor: 1, image_base64: '' }],
+      outputPixelSize: { width: 100, height: 80 },
       selection: rect, selectionViewportRect: rect, draftAnnotation: null,
     };
     const container = document.createElement('div');

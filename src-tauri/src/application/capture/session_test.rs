@@ -1129,6 +1129,7 @@ mod tests {
             .create_session_without_monitor_images()
             .await
             .unwrap();
+        assert_eq!(frozen.output_pixel_scale, Some(2.0));
         let original_geometry = sessions.window_geometry(&frozen.id).unwrap();
         let layout = sessions.create_layout_session().await.unwrap();
         assert_eq!(

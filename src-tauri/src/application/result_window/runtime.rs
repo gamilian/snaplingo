@@ -119,6 +119,7 @@ impl ResultWindowRuntime {
                 intent,
                 image_base64,
                 confidence,
+                detected_language,
             } => ResultWindowPayload {
                 mode: ResultWindowMode::Ocr,
                 origin: super::ResultWindowOrigin::Ocr,
@@ -127,7 +128,7 @@ impl ResultWindowRuntime {
                 ocr_intent: Some(intent),
                 image_base64,
                 confidence,
-                detected_language: None,
+                detected_language,
             },
         }
     }

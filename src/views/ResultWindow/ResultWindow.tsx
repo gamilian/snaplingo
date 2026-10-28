@@ -245,6 +245,7 @@ function ResultWindowContent({
     isTranslating,
     ocrText,
     ocrConfidence,
+    ocrDetectedLanguage,
     ocrImageBase64,
     isOcrRunning,
     ocrError,
@@ -735,6 +736,11 @@ function ResultWindowContent({
           <ResultWindowScrollArea
             className={resultWindowOcrContentClassName()}
           >
+            {ocrDetectedLanguage && (
+              <div className="mb-2 text-hint text-muted" title="OCR 引擎实际使用的识别语言">
+                识别语言：{ocrDetectedLanguage}
+              </div>
+            )}
             {ocrImageBase64 ? (
               <div className={resultWindowOcrResultStackClassName()}>
                 <div className="flex min-h-0 flex-col gap-2">

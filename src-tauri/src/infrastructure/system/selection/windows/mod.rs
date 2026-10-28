@@ -1,3 +1,4 @@
+mod clipboard;
 mod shortcut_copy;
 
 use crate::domain::{SelectionContext, SelectionMethodKind};

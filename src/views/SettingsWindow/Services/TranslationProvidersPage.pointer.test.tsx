@@ -97,7 +97,7 @@ describe('translation provider pointer sorting', () => {
       await pointer(handle, 'pointerup');
 
       expect(reorder).not.toHaveBeenCalled();
-      expect(container.querySelectorAll('[aria-label="拖动排序"]')).toHaveLength(2);
+      expect(container.querySelectorAll('[aria-label="拖动排序"]')).toHaveLength(3);
     },
   );
 

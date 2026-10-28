@@ -25,6 +25,7 @@ describe('OCR file workflow', () => {
     expect(deps.setRunning).toHaveBeenNthCalledWith(1, true);
     expect(deps.recognizeImageFile).toHaveBeenCalledWith('/tmp/example.png');
     expect(deps.setText).toHaveBeenCalledWith('hello from image');
+    expect(deps.setDetectedLanguage).toHaveBeenCalledWith('en-US');
     expect(deps.setImageDataUrl).toHaveBeenCalledWith(
       'data:image/png;base64,aW1hZ2U=',
     );
@@ -86,6 +87,7 @@ describe('OCR file workflow', () => {
 
     expect(deps.setText).not.toHaveBeenCalled();
     expect(deps.setImageDataUrl).not.toHaveBeenCalled();
+    expect(deps.setDetectedLanguage).not.toHaveBeenCalled();
     expect(deps.setError).toHaveBeenCalledTimes(1);
     expect(deps.setRunning).toHaveBeenCalledTimes(1);
     expect(deps.setRunning).toHaveBeenCalledWith(true);
@@ -136,12 +138,14 @@ function createDeps(options: {
       return {
         text: options.recognizedText ?? '',
         confidence: null,
+        detected_language: 'en-US',
         imageDataUrl: 'data:image/png;base64,aW1hZ2U=',
       };
     }),
     transformText: (text: string) => text.replace(/\s+/g, ' ').trim(),
     setText: vi.fn(),
     setConfidence: vi.fn(),
+    setDetectedLanguage: vi.fn(),
     setImageDataUrl: vi.fn(),
     setRunning: vi.fn(),
     setError: vi.fn(),

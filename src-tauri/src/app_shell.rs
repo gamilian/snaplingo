@@ -32,14 +32,22 @@ pub(crate) fn set_capture_ocr_status(
         return;
     };
     let (title, tooltip) = match status {
-        Some(CaptureOcrStatus::Recognizing) => ("OCR…", "SnapLingo — Recognizing text…"),
-        Some(CaptureOcrStatus::Copied) => ("✓", "SnapLingo — Text copied"),
-        Some(CaptureOcrStatus::Failed) => ("!", "SnapLingo — OCR failed"),
-        None => ("", "SnapLingo"),
+        Some(CaptureOcrStatus::Recognizing) => {
+            ("OCR…", "SnapLingo — Recognizing text…".to_string())
+        }
+        Some(CaptureOcrStatus::Copied { language }) => (
+            "✓",
+            match language {
+                Some(language) => format!("SnapLingo — Text copied · OCR language: {language}"),
+                None => "SnapLingo — Text copied".to_string(),
+            },
+        ),
+        Some(CaptureOcrStatus::Failed) => ("!", "SnapLingo — OCR failed".to_string()),
+        None => ("", "SnapLingo".to_string()),
     };
     if let Err(error) = tray
         .set_title(Some(title))
-        .and_then(|_| tray.set_tooltip(Some(tooltip)))
+        .and_then(|_| tray.set_tooltip(Some(tooltip.as_str())))
     {
         log::warn!("Failed to update capture OCR status: {error}");
     }

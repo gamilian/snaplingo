@@ -500,6 +500,10 @@ impl CaptureSessionRuntime {
             self.host.set_capture_ocr_status(None);
             return;
         }
+        let language = result
+            .as_ref()
+            .ok()
+            .and_then(|result| result.detected_language.clone());
         let result = match result {
             Ok(mut result) if !result.text.trim().is_empty() => {
                 if job.target == CaptureOcrTarget::Clipboard {
@@ -514,9 +518,8 @@ impl CaptureSessionRuntime {
             Err(error) => Err(error),
         };
         let status = match result {
-            Ok(()) => {
-                (job.target == CaptureOcrTarget::Clipboard).then_some(CaptureOcrStatus::Copied)
-            }
+            Ok(()) => (job.target == CaptureOcrTarget::Clipboard)
+                .then_some(CaptureOcrStatus::Copied { language }),
             Err(error) => {
                 self.host
                     .report_capture_ocr_error(job.target, result_id, &error.to_string())
@@ -525,7 +528,7 @@ impl CaptureSessionRuntime {
             }
         };
         if job.shows_status() {
-            self.host.set_capture_ocr_status(status);
+            self.host.set_capture_ocr_status(status.clone());
         }
         drop(startup);
         if status.is_some() && job.shows_status() {
@@ -1799,7 +1802,7 @@ mod tests {
                 .ocr_statuses
                 .lock()
                 .unwrap()
-                .contains(&Some(CaptureOcrStatus::Copied)));
+                .contains(&Some(CaptureOcrStatus::Copied { language: None })));
         }
 
         #[tokio::test]

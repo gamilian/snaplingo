@@ -11,6 +11,7 @@ import { getCaptureSelectionOverlayCanvasClassName } from './capturePresentation
 import {
   drawCaptureSelectionOverlayFrame,
   getCaptureSelectionOverlayFrame,
+  type CaptureSelectionOverlayFrameInput,
   type CaptureSelectionOverlayFrame,
 } from './captureSelectionOverlay';
 import type { LogicalRect } from './types';
@@ -35,6 +36,8 @@ interface UseCaptureSelectionOverlayOptions {
   status: CaptureSelectionOverlayStatus;
   selectionBounds: LogicalRect | null;
   selection: LogicalRect | null;
+  monitors: CaptureSelectionOverlayFrameInput['monitors'];
+  outputPixelScale: number | null | undefined;
   viewportBounds: LogicalRect | null;
   draftSelectionRef: RefObject<LogicalRect | null>;
   hoverSelectionRef: RefObject<LogicalRect | null>;
@@ -99,6 +102,8 @@ export function useCaptureSelectionOverlay({
   selectionMaskColor,
   selection,
   selectionBounds,
+  monitors,
+  outputPixelScale,
   status,
   viewportBounds,
 }: UseCaptureSelectionOverlayOptions) {
@@ -151,6 +156,8 @@ export function useCaptureSelectionOverlay({
         selection: activeSelection,
         draftSelection,
         hoverSelection,
+        monitors,
+        outputPixelScale,
         showSelectionSize,
       });
 
@@ -161,6 +168,8 @@ export function useCaptureSelectionOverlay({
     [
       draftSelectionRef,
       hoverSelectionRef,
+      monitors,
+      outputPixelScale,
       paintFrame,
       selection,
       selectionBounds,

@@ -84,7 +84,14 @@ fn recognize_with_windows_runtime(
         .map_err(|error| AppError::System(format!("Failed to read Windows OCR result: {error}")))?
         .to_string();
 
-    Ok(crate::domain::ocr::OcrResult::from_text(text, None))
+    let detected_language = engine
+        .RecognizerLanguage()
+        .ok()
+        .and_then(|language| language.LanguageTag().ok())
+        .map(|language| language.to_string());
+    let mut result = OcrResult::from_text(text, None);
+    result.detected_language = detected_language;
+    Ok(result)
 }
 
 fn create_ocr_engine(requested_language: Option<&str>) -> Result<OcrEngine> {

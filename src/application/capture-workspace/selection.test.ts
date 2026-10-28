@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   constrainSelectionPoint,
+  fitToolbarSize,
   getToolbarPosition,
   moveSelectionByDelta,
   moveDraftSelectionByDelta,
@@ -410,7 +411,7 @@ describe('selection editing', () => {
         toolbarSize,
         8,
       ),
-    ).toEqual({ x: 180, y: 120 });
+    ).toEqual({ x: 172, y: 120 });
   });
 
   it('keeps an oversized toolbar anchored inside the left capture bound', () => {
@@ -421,7 +422,18 @@ describe('selection editing', () => {
         { width: 680, height: 32 },
         8,
       ),
-    ).toEqual({ x: 0, y: 118 });
+    ).toEqual({ x: 8, y: 118 });
+  });
+
+  it('fits the toolbar to a narrow CSS client area', () => {
+    expect(fitToolbarSize({ width: 700, height: 80 }, { x: 0, y: 0, width: 260, height: 300 })).toEqual({
+      width: 244,
+      height: 80,
+    });
+    expect(fitToolbarSize({ width: 700, height: 80 }, { x: 0, y: 0, width: 30, height: 20 })).toEqual({
+      width: 14,
+      height: 4,
+    });
   });
 
   it('snaps a drawn point to nearby target edges', () => {

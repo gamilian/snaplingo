@@ -41,6 +41,7 @@ describe('providerStore projection', () => {
       testCustomTranslation: vi.fn(async () => undefined),
       configureTranslation: vi.fn(async () => undefined),
       reorderTranslation: vi.fn(async () => undefined),
+      reorderInactiveTranslation: vi.fn(async () => undefined),
       activateOcr: vi.fn(async () => undefined),
       configureOcr: vi.fn(async () => undefined),
     };

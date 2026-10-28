@@ -13,6 +13,7 @@ import type {
 interface CaptureAnnotationCanvasProps {
   desktopRef: RefObject<HTMLDivElement>;
   monitors: readonly MonitorSnapshotView[];
+  outputPixelSize: { width: number; height: number };
   capturedCursor?: CapturedCursorView | null;
   selection: LogicalRect;
   annotations: AnnotationCommand[];
@@ -295,9 +296,31 @@ export function drawFrozenCaptureSelection(
   }
 }
 
+export function getCaptureAnnotationCanvasBackingSize(
+  selection: LogicalRect,
+  localPixelRatio: number,
+  outputPixelSize: { width: number; height: number },
+) {
+  const localScale = Number.isFinite(localPixelRatio)
+    ? Math.max(1, localPixelRatio)
+    : 1;
+  const outputScale = Math.max(
+    outputPixelSize.width / selection.width,
+    outputPixelSize.height / selection.height,
+  );
+  const pixelRatio = Math.max(localScale, outputScale);
+
+  return {
+    pixelRatio,
+    width: Math.max(1, outputPixelSize.width, Math.ceil(selection.width * pixelRatio)),
+    height: Math.max(1, outputPixelSize.height, Math.ceil(selection.height * pixelRatio)),
+  };
+}
+
 export function CaptureAnnotationCanvas({
   desktopRef,
   monitors,
+  outputPixelSize,
   capturedCursor,
   selection,
   annotations,
@@ -307,9 +330,12 @@ export function CaptureAnnotationCanvas({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const mosaicBufferRef = useRef<HTMLCanvasElement | null>(null);
   const sourceRef = useRef<HTMLCanvasElement | null>(null);
-  const pixelRatio = window.devicePixelRatio || 1;
-  const pixelWidth = Math.max(1, Math.round(selection.width * pixelRatio));
-  const pixelHeight = Math.max(1, Math.round(selection.height * pixelRatio));
+  const { pixelRatio, width: pixelWidth, height: pixelHeight } =
+    getCaptureAnnotationCanvasBackingSize(
+      selection,
+      window.devicePixelRatio || 1,
+      outputPixelSize,
+    );
 
   useLayoutEffect(() => {
     const sourceContext = sourceRef.current?.getContext('2d');

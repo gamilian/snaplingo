@@ -38,6 +38,7 @@ export interface CapturedCursorView {
 export interface CaptureSessionView {
   id: string;
   monitors: MonitorSnapshotView[];
+  output_pixel_scale?: number | null;
   candidates: CaptureCandidateView[];
   captured_cursor?: CapturedCursorView | null;
 }

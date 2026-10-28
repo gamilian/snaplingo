@@ -172,6 +172,8 @@ pub struct CaptureCandidateView {
 pub struct CaptureSessionView {
     pub id: CaptureSessionId,
     pub monitors: Vec<MonitorSnapshotView>,
+    #[serde(default)]
+    pub output_pixel_scale: Option<f64>,
     pub candidates: Vec<CaptureCandidateView>,
     pub captured_cursor: Option<CapturedCursorView>,
 }
