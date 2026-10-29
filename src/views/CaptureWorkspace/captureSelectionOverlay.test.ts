@@ -194,6 +194,7 @@ describe('capture selection canvas overlay', () => {
   });
 
   it('draws dim mask, selection border, and size label onto the canvas', () => {
+    vi.stubGlobal('navigator', { platform: 'MacIntel' });
     const context = createRecordingContext();
 
     drawCaptureSelectionOverlayFrame(
