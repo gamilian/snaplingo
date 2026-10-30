@@ -782,8 +782,17 @@ fn rasterize_brush_mask(
             .collect()
     };
     let radius = stroke_width.max(1) as f64 / 2.0;
+    let radius_squared = radius * radius;
 
     for (start, end) in segments {
+        let delta_x = (end.x - start.x) as f64;
+        let delta_y = (end.y - start.y) as f64;
+        let length_squared = delta_x * delta_x + delta_y * delta_y;
+        let inverse_length_squared = if length_squared == 0.0 {
+            0.0
+        } else {
+            1.0 / length_squared
+        };
         let segment_left = (i64::from(start.x.min(end.x)) - radius.ceil() as i64).max(left);
         let segment_top = (i64::from(start.y.min(end.y)) - radius.ceil() as i64).max(top);
         let segment_right = (i64::from(start.x.max(end.x)) + radius.ceil() as i64 + 1).min(right);
@@ -791,7 +800,15 @@ fn rasterize_brush_mask(
 
         for y in segment_top..segment_bottom {
             for x in segment_left..segment_right {
-                if point_within_segment_brush(start, end, x, y, radius) {
+                if point_within_segment_brush(
+                    start,
+                    delta_x,
+                    delta_y,
+                    inverse_length_squared,
+                    radius_squared,
+                    x,
+                    y,
+                ) {
                     let index = (y - top) as usize * width + (x - left) as usize;
                     mask.pixels[index] = true;
                 }
@@ -804,27 +821,23 @@ fn rasterize_brush_mask(
 
 fn point_within_segment_brush(
     start: &PhysicalPoint,
-    end: &PhysicalPoint,
+    delta_x: f64,
+    delta_y: f64,
+    inverse_length_squared: f64,
+    radius_squared: f64,
     x: i64,
     y: i64,
-    radius: f64,
 ) -> bool {
     let point_x = x as f64 + 0.5;
     let point_y = y as f64 + 0.5;
-    let dx = (end.x - start.x) as f64;
-    let dy = (end.y - start.y) as f64;
-    let length_squared = dx * dx + dy * dy;
-    let t = if length_squared == 0.0 {
-        0.0
-    } else {
-        (((point_x - start.x as f64) * dx + (point_y - start.y as f64) * dy) / length_squared)
-            .clamp(0.0, 1.0)
-    };
-    let closest_x = start.x as f64 + t * dx;
-    let closest_y = start.y as f64 + t * dy;
+    let t = (((point_x - start.x as f64) * delta_x + (point_y - start.y as f64) * delta_y)
+        * inverse_length_squared)
+        .clamp(0.0, 1.0);
+    let closest_x = start.x as f64 + t * delta_x;
+    let closest_y = start.y as f64 + t * delta_y;
     let distance_x = point_x - closest_x;
     let distance_y = point_y - closest_y;
-    distance_x * distance_x + distance_y * distance_y <= radius * radius
+    distance_x * distance_x + distance_y * distance_y <= radius_squared
 }
 
 fn draw_text_annotation(
