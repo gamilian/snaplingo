@@ -85,6 +85,70 @@ body {
 
 :root[data-platform='windows'] body {
   font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", Arial, sans-serif;
+  -webkit-font-smoothing: auto;
+}
+
+/* YaHei UI has no semibold face; 600 falls back to a heavy bold in WebView2. */
+:root[data-platform='windows'] .settings-shell .font-semibold,
+:root[data-platform='windows'] .result-panel .font-semibold {
+  font-weight: 500;
+}
+
+:root[data-platform='windows'][data-interface-theme='native'] .settings-page-header h1 {
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+:root[data-platform='windows'] .settings-shell {
+  line-height: 1.5;
+}
+
+:root[data-platform='windows'] .settings-page-header {
+  backdrop-filter: none;
+  background: rgb(var(--canvas));
+}
+
+:root[data-platform='windows'] .settings-brand-name {
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+:root[data-platform='windows'][data-interface-theme='native'] .settings-card {
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgb(var(--shadow-color) / .04);
+}
+
+:root[data-platform='windows'][data-interface-theme='native'] .settings-card-heading {
+  border-radius: 8px 8px 0 0;
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+
+.windows-hotkey-key {
+  font-family: "Segoe UI Variable Text", "Segoe UI", sans-serif;
+  font-style: normal;
+  letter-spacing: .01em;
+}
+:root[data-platform='windows'] .windows-hotkey-key.text-ink { font-size: 11px; font-weight: 500; }
+.windows-hotkey-separator { color: rgb(var(--faint)); font-size: 10px; font-weight: 400; }
+.windows-hotkey-prompt { display: flex; align-items: center; gap: 8px; color: rgb(var(--accent-text)); font-size: 12px; white-space: nowrap; }
+.windows-hotkey-prompt > span { color: rgb(var(--muted)); font-size: 10px; }
+
+.capture-editor-toolbar { animation: capture-toolbar-enter 110ms ease-out; }
+.capture-output-progress { height: 2px; }
+.capture-output-progress > span {
+  display: block;
+  width: 35%;
+  height: 100%;
+  background: white;
+  animation: capture-processing 900ms linear infinite;
+}
+@keyframes capture-toolbar-enter { from { opacity: 0; } to { opacity: 1; } }
+@keyframes capture-processing { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+
+@media (max-width: 800px) {
+  :root[data-platform='windows'] .settings-hotkey-row { flex-wrap: wrap; gap: 8px; }
 }
 
 :root[data-result-window='true'],

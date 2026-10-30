@@ -30,6 +30,22 @@ afterEach(() => {
 });
 
 describe("CaptureWorkspaceView runtime seam", () => {
+  it.each(["loading", "preview"] as const)("shows selection processing feedback during %s", async (status) => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    mountedRoots.push({ container, root });
+    await act(async () => {
+      root.render(createElement(CaptureWorkspaceView, {
+        renderState: { ...createRenderState(), status, isRenderingOutput: true },
+        actions: createActions(),
+      }));
+    });
+    const progress = container.querySelector<HTMLElement>('[role="progressbar"]');
+    expect(progress?.getAttribute('aria-label')).toBe('正在处理选区');
+    expect(progress?.style.width).toBe('160px');
+  });
+
   it("uses platform-specific modifier labels in selection hints", () => {
     expect(getCaptureShortcutKeyLabels("MacIntel")).toEqual({
       primary: "⌘",

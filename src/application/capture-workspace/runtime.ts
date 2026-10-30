@@ -1241,7 +1241,7 @@ export function createCaptureWorkspaceRuntime({
   };
 
   const actions: CaptureWorkspaceRuntime['actions'] = {
-    async connectHost() {
+    async connectHost(onHotkeySubscriptionReady?: () => void | Promise<void>) {
       if (disposed) return () => undefined;
       const connection = createHostConnection();
       const handleKeyDown = (event: CaptureWorkspaceKeyboardEvent) => {
@@ -1293,6 +1293,9 @@ export function createCaptureWorkspaceRuntime({
             return actions.startSession(launch.mode, launch.sessionId);
           }),
         );
+        if (!disposed && !connection.isClosed) {
+          await onHotkeySubscriptionReady?.();
+        }
       } catch (error) {
         connection.disconnect();
         if (!disposed) patch({ status: 'error', error: errorMessage(error) });

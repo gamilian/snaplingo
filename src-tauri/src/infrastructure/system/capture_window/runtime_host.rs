@@ -138,7 +138,7 @@ impl CaptureSessionRuntimeHost for TauriCaptureSessionRuntimeHost {
             prepare_capture_window(&app)
         })
         .await?;
-        wait_for_capture_window_ready().await;
+        wait_for_capture_window_ready().await?;
         Ok(())
     }
 

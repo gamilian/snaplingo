@@ -19,6 +19,39 @@ Object.defineProperty(window, 'localStorage', {
 afterEach(() => vi.restoreAllMocks());
 
 describe('CaptureWorkspace React lifecycle', () => {
+  it('signals native capture readiness after the hotkey listener is active', async () => {
+    const platform = createPlatform();
+    let activeHotkeyListeners = 0;
+    platform.events.subscribeHotkeyTriggered.mockImplementation(async () => {
+      activeHotkeyListeners += 1;
+      return () => {
+        activeHotkeyListeners -= 1;
+      };
+    });
+    platform.window.signalReady.mockImplementation(async () => {
+      expect(activeHotkeyListeners).toBeGreaterThan(0);
+    });
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            StrictMode,
+            null,
+            createElement(CaptureWorkspace, { ports: platform }),
+          ),
+        );
+      });
+      await vi.waitFor(() => expect(platform.window.signalReady).toHaveBeenCalledOnce());
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+    }
+  });
+
   it.each(['supported', 'rejected'] as const)('drags a selection into a preview when pointer capture is %s', async (capture) => {
     vi.spyOn(HTMLImageElement.prototype, 'decode').mockResolvedValue(undefined);
     const platform = createPlatform();
@@ -406,6 +439,7 @@ function createPlatform() {
     >(async () => () => undefined),
     },
     window: {
+    signalReady: vi.fn(async () => undefined),
     prepareForReveal: vi.fn(async () => undefined),
     reveal: vi.fn(async () => undefined),
     hide: vi.fn(async () => undefined),

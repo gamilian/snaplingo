@@ -26,12 +26,12 @@ export function HotkeyRow({
   const isModified = defaultValue && value !== defaultValue;
 
   return (
-    <div className="flex min-h-[58px] items-center justify-between py-2.5 transition-colors hover:bg-sunken">
-      <div className="flex-1">
+    <div className="settings-hotkey-row flex min-h-[58px] items-center justify-between gap-4 py-2.5 transition-colors hover:bg-sunken">
+      <div className="min-w-0 flex-1">
         <div className="text-card font-semibold text-ink">{label}</div>
         {description && <div className="text-xs text-muted mt-1">{description}</div>}
       </div>
-      <div className="flex items-center space-x-3">
+      <div className="flex shrink-0 items-center space-x-3">
         <HotkeyDisplay value={value} onClick={onRecord} isRecording={isRecording} />
 
         {/* 操作按钮组 - 始终显示 */}

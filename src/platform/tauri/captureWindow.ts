@@ -3,6 +3,9 @@ import { emit } from '@tauri-apps/api/event';
 import type { CaptureWindowPort } from '../../application/capture-workspace/ports';
 
 export const captureWindow: CaptureWindowPort = {
+  async signalReady() {
+    await signalCaptureWindowReady();
+  },
   prepareForReveal(sessionId) {
     return invoke<void>('prepare_capture_window_for_reveal', { sessionId });
   },

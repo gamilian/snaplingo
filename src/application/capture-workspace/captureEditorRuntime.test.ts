@@ -611,7 +611,7 @@ describe('captureEditorRuntime', () => {
       }),
     ).toEqual({
       type: 'effects',
-      clearOverlay: true,
+      clearOverlay: false,
       nextState: {
         startPoint: null,
         selection: rect,

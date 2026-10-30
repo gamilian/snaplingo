@@ -28,7 +28,7 @@ const runtime = {
   startFileOcr: vi.fn(),
   translate: vi.fn(),
   retryTranslationProvider: vi.fn(),
-  beginDrag: vi.fn(),
+  beginDrag: vi.fn(async () => undefined),
 } as unknown as ResultWindowRuntime;
 
 async function renderResultWindow() {
@@ -253,6 +253,53 @@ describe('result window text actions', () => {
 
       expect(runtime.close).toHaveBeenCalledWith('standalone');
       now.mockRestore();
+      await view.unmount();
+    },
+  );
+
+  it.each(['translation', 'ocr'] as const)(
+    'keeps an unpinned standalone %s result visible when dragging briefly loses focus',
+    async (resultWindowMode) => {
+      useSettingsConfigStore.setState({
+        translation: {
+          defaultSourceLang: 'auto',
+          defaultTargetLang: 'zh-CN',
+          autoTranslate: true,
+          autoCopy: false,
+          preserveLineBreaks: true,
+          incrementalTranslation: false,
+          windowAlwaysOnTop: true,
+          hideOnBlur: true,
+        },
+      });
+      useResultWindowStore.setState({
+        resultWindowVisible: true,
+        resultWindowMode,
+      });
+      let finishDrag!: () => void;
+      vi.mocked(runtime.beginDrag).mockReturnValue(
+        new Promise<void>((resolve) => {
+          finishDrag = resolve;
+        }),
+      );
+      const now = vi.spyOn(performance, 'now').mockReturnValue(0);
+      const view = await renderResultWindow();
+      const handle = view.container.querySelector<HTMLElement>('.cursor-move')!;
+
+      await act(async () => {
+        handle.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+      });
+      now.mockReturnValue(400);
+      await act(async () => window.dispatchEvent(new Event('blur')));
+
+      expect(runtime.close).not.toHaveBeenCalled();
+
+      await act(async () => finishDrag());
+      await act(async () => window.dispatchEvent(new Event('blur')));
+
+      expect(runtime.close).toHaveBeenCalledWith('standalone');
+      now.mockRestore();
+      vi.mocked(runtime.beginDrag).mockReset().mockResolvedValue(undefined);
       await view.unmount();
     },
   );

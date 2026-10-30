@@ -39,18 +39,21 @@ impl CaptureSessionSource for WindowsCaptureSessionSource {
     }
 
     async fn capture_monitor_snapshots(&self) -> Result<Vec<MonitorSnapshot>, AppError> {
-        xcap_common::capture_all_monitor_snapshots()
+        tokio::task::spawn_blocking(xcap_common::capture_all_monitor_snapshots)
+            .await
+            .map_err(|error| AppError::System(format!("Screenshot task failed: {error}")))?
     }
 
     async fn capture_monitor_snapshot(
         &self,
         monitor_id: &str,
     ) -> Result<MonitorSnapshot, AppError> {
-        self.capture_monitor_snapshots()
-            .await?
-            .into_iter()
-            .find(|snapshot| snapshot.id == monitor_id)
-            .ok_or_else(|| AppError::System(format!("Capture monitor not found: {monitor_id}")))
+        let monitor_id = monitor_id.to_owned();
+        tokio::task::spawn_blocking(move || {
+            xcap_common::capture_monitor_snapshot_by_id(&monitor_id)
+        })
+        .await
+        .map_err(|error| AppError::System(format!("Screenshot task failed: {error}")))?
     }
 
     async fn capture_monitor_layouts(&self) -> Result<Vec<MonitorLayout>, AppError> {

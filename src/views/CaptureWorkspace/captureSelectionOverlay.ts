@@ -62,7 +62,7 @@ export function getCaptureSelectionOverlayFrame({
 }: CaptureSelectionOverlayFrameInput): CaptureSelectionOverlayFrame | null {
   if (!selectionBounds) return null;
 
-  if (status === 'preview' && selection) {
+  if ((status === 'preview' || status === 'loading') && selection) {
     return buildCaptureSelectionOverlayFrame(
       'preview',
       selection,

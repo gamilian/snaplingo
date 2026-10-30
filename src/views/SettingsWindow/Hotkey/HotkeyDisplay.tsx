@@ -40,6 +40,38 @@ export function HotkeyDisplay({ value, onClick, isRecording = false }: HotkeyDis
     }
   `;
 
+  if (isWindows) {
+    const keys = [
+      hasWindowsControl ? 'Ctrl' : null,
+      hasOption ? 'Alt' : null,
+      hasShift ? 'Shift' : null,
+      letterKey || null,
+    ].filter((key): key is string => key !== null);
+
+    return (
+      <button
+        type="button"
+        onClick={handleClick}
+        className={containerClass}
+        aria-label={isRecording ? '请按下快捷键，Esc 取消' : isUnset ? '设置快捷键' : `修改快捷键：${keys.join(' + ')}`}
+        title={isRecording ? '按 Esc 取消录制' : '点击修改快捷键'}
+      >
+        {isRecording ? (
+          <span role="status" className="windows-hotkey-prompt">请按下快捷键<span>Esc 取消</span></span>
+        ) : isUnset ? (
+          <span className="text-hint text-muted">未设置</span>
+        ) : keys.map((key, index) => (
+          <span key={key} className="inline-flex items-center gap-1">
+            {index > 0 && <span aria-hidden="true" className="windows-hotkey-separator">+</span>}
+            <kbd className={`windows-hotkey-key ${index === keys.length - 1 ? 'text-base font-semibold text-accent' : 'text-ink'}`}>
+              {key}
+            </kbd>
+          </span>
+        ))}
+      </button>
+    );
+  }
+
   if (isUnset || isRecording) {
     return (
       <button onClick={handleClick} className={containerClass}>

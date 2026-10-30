@@ -244,9 +244,14 @@ export function useCaptureWorkspaceRuntimeView({
     runtimeLifetimeRef.current = lifetime;
     let closed = false;
     let disconnect: (() => void) | undefined;
-    void workflowRuntime.actions.connectHost().then((cleanup) => {
-      if (closed) cleanup();
-      else disconnect = cleanup;
+    void workflowRuntime.actions.connectHost(() =>
+      closed ? undefined : platformPorts.window.signalReady(),
+    ).then((cleanup) => {
+      if (closed) {
+        cleanup();
+        return;
+      }
+      disconnect = cleanup;
     });
     return () => {
       closed = true;

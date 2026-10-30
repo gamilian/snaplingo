@@ -35,6 +35,7 @@ export interface CaptureWorkspaceEventsPort {
 }
 
 export interface CaptureWindowPort {
+  signalReady(): Promise<void>;
   // A failed session load can still reveal its error without session geometry.
   prepareForReveal(sessionId: string | null): Promise<void>;
   reveal(sessionId: string | null): Promise<void>;

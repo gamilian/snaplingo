@@ -100,6 +100,26 @@ async function releaseKey(key: string, code = key, modifiers: KeyboardEventInit 
 }
 
 describe('FeatureHotkeysSection keyboard recording', () => {
+  it('records Windows Ctrl combinations using the portable primary modifier', async () => {
+    vi.stubGlobal('navigator', { platform: 'Win32' });
+    const recorder = await createRecorder();
+    await recorder.start();
+    await pressKey('r', 'KeyR', { ctrlKey: true, shiftKey: true });
+    await releaseKey('r', 'KeyR', { ctrlKey: true, shiftKey: true });
+    expect(recorder.updateHotkey).toHaveBeenCalledExactlyOnceWith('screenshot', 'screenshot', '⇧⌘R');
+    expect(recorder.container.querySelector('kbd')?.textContent).toBe('Ctrl');
+  });
+
+  it('does not silently save a Windows Win combination as an unmodified key', async () => {
+    vi.stubGlobal('navigator', { platform: 'Win32' });
+    const recorder = await createRecorder();
+    await recorder.start();
+    await pressKey('r', 'KeyR', { metaKey: true });
+    await releaseKey('r', 'KeyR', { metaKey: true });
+    expect(recorder.updateHotkey).not.toHaveBeenCalled();
+    expect(recorder.container.textContent).toContain('请使用 Ctrl、Alt、Shift 或功能键');
+  });
+
   it('records on older WebViews without crypto.randomUUID', async () => {
     const getRandomValues = crypto.getRandomValues.bind(crypto);
     vi.stubGlobal('crypto', { getRandomValues });

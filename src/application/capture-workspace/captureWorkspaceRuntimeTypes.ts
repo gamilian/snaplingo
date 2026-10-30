@@ -78,7 +78,7 @@ export interface CaptureWorkspaceRenderState {
 }
 
 export interface CaptureWorkspaceRuntimeActions {
-  connectHost(): Promise<() => void>;
+  connectHost(onHotkeySubscriptionReady?: () => void | Promise<void>): Promise<() => void>;
   updateHostReadiness(imagesReady: boolean): Promise<void>;
   startSession(mode: CaptureMode, sessionId?: string): Promise<void>;
   refreshSession(): Promise<void>;

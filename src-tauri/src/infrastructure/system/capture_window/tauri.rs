@@ -28,6 +28,7 @@ static CAPTURE_WINDOW_READY_NOTIFY: OnceLock<tokio::sync::Notify> = OnceLock::ne
 static CAPTURE_WINDOW_READY_LISTENER: Once = Once::new();
 
 const CAPTURE_WINDOW_READY_EVENT: &str = "capture-window-ready";
+const CAPTURE_WINDOW_READY_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub(super) enum CaptureWindowUpdate {
     Ready,
@@ -122,10 +123,8 @@ pub fn reveal_capture_window(
 
     #[cfg(not(target_os = "macos"))]
     {
-        configure_capture_window_for_current_space(
-            &window,
-            _geometry.and_then(|geometry| geometry.desktop_scale),
-        )?;
+        // Geometry and scale are set while the hidden window is opened. Avoid
+        // reconfiguring the WebView after its frozen screen images are ready.
         window.show().map_err(|e| e.to_string())?;
         focus_capture_window_for_current_space(&window)?;
         reveal_capture_window_for_current_space(&window)?;
@@ -141,6 +140,7 @@ pub fn prepare_capture_window_for_reveal(
     let window = app
         .get_webview_window(CAPTURE_WINDOW_LABEL)
         .ok_or_else(|| "Capture window is not open".to_string())?;
+
     if let Some(geometry) = geometry {
         set_capture_window_frame(&window, geometry)?;
     }
@@ -151,12 +151,6 @@ pub fn prepare_capture_window_for_reveal(
         super::macos::prepare_capture_window_for_reveal(&window)?;
         restore_capture_window_activation();
     }
-
-    #[cfg(target_os = "windows")]
-    configure_capture_window_for_current_space(
-        &window,
-        geometry.and_then(|geometry| geometry.desktop_scale),
-    )?;
 
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
@@ -252,26 +246,44 @@ pub(super) fn prepare_capture_window(app: &AppHandle) -> Result<CaptureWindowUpd
     Ok(CaptureWindowUpdate::Ready)
 }
 
-pub async fn wait_for_capture_window_ready() {
-    if CAPTURE_WINDOW_WEBVIEW_READY.load(Ordering::SeqCst) {
-        return;
-    }
-
+pub async fn wait_for_capture_window_ready() -> Result<(), String> {
     let notify = CAPTURE_WINDOW_READY_NOTIFY.get_or_init(tokio::sync::Notify::new);
-    let notified = notify.notified();
-    if CAPTURE_WINDOW_WEBVIEW_READY.load(Ordering::SeqCst) {
-        return;
-    }
+    wait_for_capture_window_ready_with(
+        &CAPTURE_WINDOW_WEBVIEW_READY,
+        notify,
+        CAPTURE_WINDOW_READY_TIMEOUT,
+    )
+    .await
+}
 
-    let _ = tokio::time::timeout(Duration::from_millis(500), notified).await;
+async fn wait_for_capture_window_ready_with(
+    webview_ready: &AtomicBool,
+    notify: &tokio::sync::Notify,
+    timeout: Duration,
+) -> Result<(), String> {
+    tokio::time::timeout(timeout, async {
+        loop {
+            let notified = notify.notified();
+            if webview_ready.load(Ordering::SeqCst) {
+                return;
+            }
+            // A permit may belong to a previous hidden WebView. The flag is
+            // authoritative; a notification only asks us to check it again.
+            notified.await;
+        }
+    })
+    .await
+    .map_err(|_| "Timed out waiting for capture WebView event subscription".to_string())?;
+    Ok(())
 }
 
 fn ensure_capture_window_ready_listener(app: &AppHandle) {
     CAPTURE_WINDOW_READY_LISTENER.call_once(|| {
         let notify = CAPTURE_WINDOW_READY_NOTIFY.get_or_init(tokio::sync::Notify::new);
         let _ = app.listen(CAPTURE_WINDOW_READY_EVENT, move |_| {
-            CAPTURE_WINDOW_WEBVIEW_READY.store(true, Ordering::SeqCst);
-            notify.notify_waiters();
+            if !CAPTURE_WINDOW_WEBVIEW_READY.swap(true, Ordering::SeqCst) {
+                notify.notify_one();
+            }
         });
     });
 }
@@ -617,6 +629,38 @@ fn capture_window_destroy_poll_interval() -> Duration {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn capture_window_readiness_signal_is_not_lost_before_waiting() {
+        let webview_ready = AtomicBool::new(false);
+        let notify = tokio::sync::Notify::new();
+        webview_ready.store(true, Ordering::SeqCst);
+        notify.notify_one();
+
+        wait_for_capture_window_ready_with(&webview_ready, &notify, Duration::from_millis(10))
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn capture_window_waiter_observes_a_late_readiness_signal() {
+        let webview_ready = std::sync::Arc::new(AtomicBool::new(false));
+        let notify = std::sync::Arc::new(tokio::sync::Notify::new());
+        // An early signal from a previous WebView can leave a stored permit.
+        notify.notify_one();
+        let signal_ready = webview_ready.clone();
+        let signal_notify = notify.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+            signal_ready.store(true, Ordering::SeqCst);
+            signal_notify.notify_one();
+        });
+
+        wait_for_capture_window_ready_with(&webview_ready, &notify, Duration::from_millis(100))
+            .await
+            .unwrap();
+        assert!(webview_ready.load(Ordering::SeqCst));
+    }
 
     #[tokio::test(flavor = "current_thread")]
     async fn closing_capture_window_allows_queued_destruction_to_run() {

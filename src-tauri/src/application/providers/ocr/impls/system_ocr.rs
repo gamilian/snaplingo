@@ -46,11 +46,19 @@ impl Provider for SystemOcrProvider {
 #[async_trait]
 impl OcrProvider for SystemOcrProvider {
     async fn recognize(&self, request: &OcrRequest) -> Result<OcrResult> {
-        self.engine.recognize(request)
+        let engine = self.engine.clone();
+        let request = request.clone();
+        tokio::task::spawn_blocking(move || engine.recognize(&request))
+            .await
+            .map_err(|error| crate::AppError::System(format!("System OCR task failed: {error}")))?
     }
 
     async fn recognize_with_recovery(&self, request: &OcrRequest) -> Result<OcrResult> {
-        self.engine.recognize_with_recovery(request)
+        let engine = self.engine.clone();
+        let request = request.clone();
+        tokio::task::spawn_blocking(move || engine.recognize_with_recovery(&request))
+            .await
+            .map_err(|error| crate::AppError::System(format!("System OCR task failed: {error}")))?
     }
 }
 
@@ -104,5 +112,47 @@ mod tests {
 
         assert_eq!(result.text, "3 bytes");
         assert_eq!(result.confidence, Some(0.9));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn native_ocr_does_not_block_other_async_work() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::time::{Duration, Instant};
+
+        struct WaitingEngine(Arc<AtomicBool>);
+        impl SystemOcrEngine for WaitingEngine {
+            fn is_available(&self) -> bool {
+                true
+            }
+            fn recognize(&self, _: &OcrRequest) -> Result<OcrResult> {
+                let started = Instant::now();
+                while !self.0.load(Ordering::SeqCst) {
+                    if started.elapsed() > Duration::from_millis(200) {
+                        return Err("OCR blocked the async runtime".into());
+                    }
+                    std::thread::sleep(Duration::from_millis(1));
+                }
+                Ok(OcrResult::from_text("recognized", None))
+            }
+        }
+
+        for recovery in [false, true] {
+            let progressed = Arc::new(AtomicBool::new(false));
+            let provider = SystemOcrProvider::new(Arc::new(WaitingEngine(progressed.clone())));
+            let heartbeat = tokio::spawn(async move {
+                progressed.store(true, Ordering::SeqCst);
+            });
+            let request = OcrRequest {
+                image_data: vec![],
+                language: None,
+            };
+            let result = if recovery {
+                provider.recognize_with_recovery(&request).await
+            } else {
+                provider.recognize(&request).await
+            };
+            heartbeat.await.unwrap();
+            assert_eq!(result.unwrap().text, "recognized");
+        }
     }
 }

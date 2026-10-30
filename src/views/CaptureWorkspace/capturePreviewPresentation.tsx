@@ -178,14 +178,18 @@ export function CaptureRenderingOutputBar({
 
   return (
     <div
-      className="absolute h-1 bg-white/80"
+      role="progressbar"
+      aria-label="正在处理选区"
+      className="capture-output-progress absolute overflow-hidden bg-white/25"
       style={{
         left: `${selectionViewportRect.x}px`,
         top: `${selectionViewportRect.y + selectionViewportRect.height}px`,
         width: `${selectionViewportRect.width}px`,
         zIndex: 2,
       }}
-    />
+    >
+      <span />
+    </div>
   );
 }
 

@@ -71,7 +71,8 @@ describe('capture workspace production runtime wiring', () => {
   });
 
   it('lets the application runtime own host subscriptions and reveal lifecycle', () => {
-    expect(runtimeView).toContain('workflowRuntime.actions.connectHost');
+    expect(runtimeView).toContain('workflowRuntime.actions.connectHost(() =>');
+    expect(runtimeView).toContain('platformPorts.window.signalReady()');
     expect(runtimeView).toContain('workflowRuntime.actions.updateHostReadiness');
     expect(runtimeView).not.toContain('hostSubscriptions');
     expect(runtimeView).not.toContain('hostWindowReveal');

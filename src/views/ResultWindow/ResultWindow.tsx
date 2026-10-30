@@ -258,6 +258,7 @@ function ResultWindowContent({
   } = useResultWindowProjection();
 
   const resultWindowPanelRef = useRef<HTMLDivElement>(null);
+  const isResultWindowDraggingRef = useRef(false);
   const sourceTextAreaRef = useRef<HTMLTextAreaElement>(null);
   const sourceTextMirrorRef = useRef<HTMLDivElement>(null);
   const ocrImageTextAreaRef = useRef<HTMLTextAreaElement>(null);
@@ -487,6 +488,8 @@ function ResultWindowContent({
 
     const visibleStartedAtMs = performance.now();
     const handleBlur = () => {
+      if (isResultWindowDraggingRef.current) return;
+
       if (
         shouldCloseFromWindowBlur(
           presentation,
@@ -673,7 +676,11 @@ function ResultWindowContent({
   };
 
   const handleStartDrag = () => {
-    void runtime.beginDrag();
+    isResultWindowDraggingRef.current = true;
+    const finishDrag = () => {
+      isResultWindowDraggingRef.current = false;
+    };
+    void runtime.beginDrag().then(finishDrag, finishDrag);
   };
 
   const handleTranslate = () => {

@@ -584,12 +584,14 @@ export function CaptureWorkspaceView({
                 onFavorite={() => completeSelection('favorite')}
               />
             )}
-            <CaptureRenderingOutputBar
-              isRenderingOutput={renderState.isRenderingOutput}
-              selectionViewportRect={renderState.editor.selectionViewportRect}
-            />
           </>
         )}
+      {renderState.editor.selectionViewportRect && (
+        <CaptureRenderingOutputBar
+          isRenderingOutput={renderState.isRenderingOutput}
+          selectionViewportRect={renderState.editor.selectionViewportRect}
+        />
+      )}
       <CaptureSelectionOverlayCanvas
         canvasRef={renderState.dom.selectionOverlay.canvasRef}
         cssSize={renderState.dom.selectionOverlay.cssSize}

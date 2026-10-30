@@ -51,6 +51,17 @@ function createRecordingContext(): CaptureSelectionOverlayContext & {
 }
 
 describe('capture selection canvas overlay', () => {
+  it('keeps the selected mask stable while OCR prepares its pixels', () => {
+    const input = {
+      selectionBounds: bounds,
+      selection: { x: -20, y: 90, width: 120, height: 60 },
+      draftSelection: null,
+      hoverSelection: null,
+    };
+    expect(getCaptureSelectionOverlayFrame({ ...input, status: 'loading' }))
+      .toEqual(getCaptureSelectionOverlayFrame({ ...input, status: 'preview' }));
+  });
+
   it('builds a viewport draft frame with the current selection label', () => {
     expect(
       getCaptureSelectionOverlayFrame({

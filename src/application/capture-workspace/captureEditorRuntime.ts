@@ -526,7 +526,7 @@ export type CaptureManualSelectionTransition =
     }
   | {
       type: 'effects';
-      clearOverlay: true;
+      clearOverlay: false;
       nextState: CaptureEffectsManualSelectionState;
       effects: CaptureRuntimeEffect[];
     };
@@ -575,7 +575,7 @@ export function planCaptureManualSelectionTransition({
 
   return {
     type: 'effects',
-    clearOverlay: true,
+    clearOverlay: false,
     nextState: {
       ...baseState,
       isAnnotationToolbarVisible: false,

@@ -1,16 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { invoke } = vi.hoisted(() => ({
+const { emit, invoke } = vi.hoisted(() => ({
+  emit: vi.fn(),
   invoke: vi.fn(),
 }));
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke }));
+vi.mock('@tauri-apps/api/event', () => ({ emit }));
 
 import { captureWindow } from './captureWindow';
 
 describe('Tauri capture window adapter', () => {
   beforeEach(() => {
     invoke.mockReset().mockResolvedValue(undefined);
+    emit.mockReset().mockResolvedValue(undefined);
+  });
+
+  it('signals native readiness after capture event subscription is established', async () => {
+    await captureWindow.signalReady();
+
+    expect(emit).toHaveBeenCalledWith('capture-window-ready');
   });
 
   it('reveals the capture window through the current native workflow', async () => {

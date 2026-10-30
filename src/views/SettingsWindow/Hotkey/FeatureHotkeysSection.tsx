@@ -33,9 +33,11 @@ export function FeatureHotkeysSection({
   const endRecording = useHotkeyConfigStore((state) => state.endRecording);
   const subscribeRecordedHotkey = useHotkeyConfigStore((state) => state.subscribeRecordedHotkey);
   const [recordingKey, setRecordingKey] = useState<string | null>(null);
+  const [recordingHint, setRecordingHint] = useState<string | null>(null);
 
   useEffect(() => {
     if (!recordingKey) return;
+    setRecordingHint(null);
     const recordingId = Array.from(
       crypto.getRandomValues(new Uint32Array(4)),
       (value) => value.toString(16),
@@ -95,6 +97,12 @@ export function FeatureHotkeysSection({
         return;
       }
       if (event.repeat || saving) return;
+      if (isWindowsPlatform() && event.metaKey) {
+        pendingKey = null;
+        setRecordingHint('暂不支持 Win 键，请使用 Ctrl、Alt、Shift 或功能键。');
+        return;
+      }
+      setRecordingHint(null);
 
       const modifiers: string[] = [];
       if (event.shiftKey) modifiers.push('⇧');
@@ -155,36 +163,43 @@ export function FeatureHotkeysSection({
   }
 
   return (
-    <div className="settings-hotkeys divide-y divide-line px-[22px] pb-2">
-      {actions.map((action) => (
-        <div
-          key={action.key}
-          data-hotkey-recorder={recordingKey === action.key ? '' : undefined}
-        >
-          <HotkeyRow
-            label={action.label}
-            value={hotkeys[action.key] ?? '未设置'}
-            defaultValue={defaults[action.key] ?? '未设置'}
-            isRecording={recordingKey === action.key}
-            onRecord={() =>
-              setRecordingKey((current) =>
-                current === action.key ? null : action.key,
-              )
-            }
-            onClear={() => {
-              void updateHotkey(category, action.key, '未设置').catch((error) =>
-                reportMutationError('清除快捷键', error),
-              );
-            }}
-            onReset={() => {
-              void resetHotkey(category, action.key).catch((error) =>
-                reportMutationError('恢复快捷键', error),
-              );
-            }}
-          />
-        </div>
-      ))}
-    </div>
+    <>
+      <div className="settings-hotkeys divide-y divide-line px-[22px] pb-2">
+        {actions.map((action) => (
+          <div
+            key={action.key}
+            data-hotkey-recorder={recordingKey === action.key ? '' : undefined}
+          >
+            <HotkeyRow
+              label={action.label}
+              value={hotkeys[action.key] ?? '未设置'}
+              defaultValue={defaults[action.key] ?? '未设置'}
+              isRecording={recordingKey === action.key}
+              onRecord={() =>
+                setRecordingKey((current) =>
+                  current === action.key ? null : action.key,
+                )
+              }
+              onClear={() => {
+                void updateHotkey(category, action.key, '未设置').catch((error) =>
+                  reportMutationError('清除快捷键', error),
+                );
+              }}
+              onReset={() => {
+                void resetHotkey(category, action.key).catch((error) =>
+                  reportMutationError('恢复快捷键', error),
+                );
+              }}
+            />
+          </div>
+        ))}
+      </div>
+      {isWindowsPlatform() && (
+        <p role="status" className="px-[22px] pb-3 text-hint text-muted">
+          {recordingKey && recordingHint ? recordingHint : '点击组合键重新录制，按 Esc 取消。'}
+        </p>
+      )}
+    </>
   );
 }
 

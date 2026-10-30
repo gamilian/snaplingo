@@ -513,16 +513,33 @@ describe('capture workspace runtime', () => {
     expect(unlistenHotkey).toHaveBeenCalledTimes(1);
   });
 
+  it('signals native capture readiness after hotkey subscription succeeds', async () => {
+    const platform = createPlatform();
+    const registration = deferred<() => void>();
+    const signalReady = vi.fn(async () => undefined);
+    platform.events.subscribeHotkeyTriggered.mockReturnValue(registration.promise);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+
+    const connecting = runtime.actions.connectHost(signalReady);
+    expect(signalReady).not.toHaveBeenCalled();
+    registration.resolve(() => undefined);
+    await connecting;
+
+    expect(signalReady).toHaveBeenCalledOnce();
+  });
+
   it('cleans local keyboard listeners when launch subscription fails', async () => {
     const platform = createPlatform();
     const keyboardTarget = createKeyboardTarget();
+    const signalReady = vi.fn(async () => undefined);
     platform.events.subscribeHotkeyTriggered.mockRejectedValue(new Error('listen failed'));
     const runtime = createCaptureWorkspaceRuntime({
       platform,
       keyboard: { target: keyboardTarget.target },
     });
-    await runtime.actions.connectHost();
+    await runtime.actions.connectHost(signalReady);
     expect(runtime.renderState.error).toBe('listen failed');
+    expect(signalReady).not.toHaveBeenCalled();
     expect(keyboardTarget.listenerCount('keydown')).toBe(0);
     expect(keyboardTarget.listenerCount('keyup')).toBe(0);
     expect(keyboardTarget.listenerCount('blur')).toBe(0);
@@ -3122,8 +3139,12 @@ describe('capture workspace runtime', () => {
     const prepared = deferred<void>();
     const platform = createPlatform({ session: createSession({ id: 'session-pending' }) });
     platform.commands.prepareCaptureOcr.mockImplementation(() => prepared.promise);
-    const runtime = createCaptureWorkspaceRuntime({ platform });
+    const resetInteraction = vi.fn();
+    const runtime = createCaptureWorkspaceRuntime({ platform, host: {
+      resetInteraction, resetSession: vi.fn(), prepareSurface: async () => undefined,
+    } });
     await runtime.actions.startSession('screenshot-ocr', 'session-pending');
+    resetInteraction.mockClear();
     runtime.actions.pointerDown({ x: 20, y: 30 });
     runtime.actions.pointerMove({ x: 140, y: 110 });
     const completion = runtime.actions.pointerUp({ x: 140, y: 110 });
@@ -3132,6 +3153,7 @@ describe('capture workspace runtime', () => {
       status: 'loading', cursorPoint: null, hoverSelection: null,
       selection, isRenderingOutput: true,
     });
+    expect(resetInteraction).not.toHaveBeenCalled();
     prepared.resolve();
     await completion;
   });
@@ -3277,6 +3299,7 @@ function createPlatform({
     >(async () => () => undefined),
     },
     window: {
+    signalReady: vi.fn(async () => undefined),
     prepareForReveal: vi.fn(async () => undefined),
     reveal: vi.fn(async () => undefined),
     hide: vi.fn<CaptureWorkspacePorts['window']['hide']>(async () =>

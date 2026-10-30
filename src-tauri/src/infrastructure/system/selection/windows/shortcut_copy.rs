@@ -7,9 +7,12 @@ use crate::domain::{
     MethodAvailability, SelectionAttempt, SelectionContext, SelectionMethodKind, SelectionSource,
 };
 use crate::infrastructure::system::selection::common::clipboard_transaction;
+use crate::infrastructure::system::selection::common::shortcut_copy::wait_for_shortcut_modifiers_to_clear_with;
 
 const CLIPBOARD_TIMEOUT: Duration = Duration::from_millis(700);
 const CLIPBOARD_POLL_INTERVAL: Duration = Duration::from_millis(15);
+const MODIFIER_RELEASE_TIMEOUT: Duration = Duration::from_millis(1500);
+const MODIFIER_POLL_INTERVAL: Duration = Duration::from_millis(15);
 const EMPTY_SELECTION_ERROR: &str = "Selected text is empty";
 
 pub struct ShortcutCopySelectionMethod;
@@ -41,6 +44,7 @@ impl SelectionMethod for ShortcutCopySelectionMethod {
 }
 
 async fn acquire_shortcut_copy_text() -> Result<String, String> {
+    wait_for_platform_shortcut_modifiers_to_release().await?;
     let original = super::clipboard::snapshot().map_err(|error| {
         log::warn!("Could not preserve Windows clipboard: {error}");
         error
@@ -89,6 +93,45 @@ async fn acquire_shortcut_copy_text() -> Result<String, String> {
     }
 
     result.map(|change| change.text)
+}
+
+#[cfg(target_os = "windows")]
+async fn wait_for_platform_shortcut_modifiers_to_release() -> Result<(), String> {
+    let waited = wait_for_shortcut_modifiers_to_clear_with(
+        shortcut_modifier_keys_pressed,
+        MODIFIER_RELEASE_TIMEOUT,
+        MODIFIER_POLL_INTERVAL,
+    )
+    .await?;
+
+    if waited >= Duration::from_millis(50) {
+        log::info!(
+            "Selection copy waited {}ms for shortcut modifiers to clear",
+            waited.as_millis()
+        );
+    }
+
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn shortcut_modifier_keys_pressed() -> Result<bool, String> {
+    use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
+
+    Ok(any_windows_shortcut_modifier_pressed(|key| unsafe {
+        GetAsyncKeyState(key) < 0
+    }))
+}
+
+#[cfg(not(target_os = "windows"))]
+async fn wait_for_platform_shortcut_modifiers_to_release() -> Result<(), String> {
+    Ok(())
+}
+
+fn any_windows_shortcut_modifier_pressed(mut is_pressed: impl FnMut(i32) -> bool) -> bool {
+    [0x10, 0x11, 0x12, 0x5b, 0x5c]
+        .into_iter()
+        .any(&mut is_pressed)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -198,6 +241,36 @@ mod windows {
                 method.availability(&SelectionContext::default()),
                 MethodAvailability::Available
             );
+        }
+
+        #[test]
+        fn checks_each_windows_shortcut_modifier_key() {
+            let mut checked = Vec::new();
+
+            let pressed = super::super::any_windows_shortcut_modifier_pressed(|key| {
+                checked.push(key);
+                key == 0x12
+            });
+
+            assert!(pressed);
+            assert_eq!(checked, vec![0x10, 0x11, 0x12]);
+        }
+
+        #[tokio::test]
+        async fn waits_until_all_shortcut_modifiers_are_released() {
+            let modifier_states =
+                std::sync::Arc::new(std::sync::Mutex::new(vec![true, true, false]));
+            let read_modifier_states = modifier_states.clone();
+
+            super::super::wait_for_shortcut_modifiers_to_clear_with(
+                move || Ok(read_modifier_states.lock().unwrap().remove(0)),
+                std::time::Duration::from_millis(100),
+                std::time::Duration::ZERO,
+            )
+            .await
+            .unwrap();
+
+            assert!(modifier_states.lock().unwrap().is_empty());
         }
 
         #[test]

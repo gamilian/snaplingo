@@ -157,12 +157,20 @@ fn capture_monitor_snapshot(
     monitor: &Monitor,
     fallback_index: usize,
 ) -> Result<MonitorSnapshot, AppError> {
+    let started = std::time::Instant::now();
     let image = monitor
         .capture_image()
         .map_err(|e| with_platform_hint(format!("Screenshot failed: {}", e)))?;
     let width = image.width();
     let height = image.height();
+    let capture_ms = started.elapsed().as_secs_f64() * 1000.0;
+    let encoding_started = std::time::Instant::now();
     let png_data = rgba_image_to_png(image)?;
+    log::info!(
+        "[capture-perf] monitor_snapshot width={} height={} png_bytes={} capture_ms={:.1} encode_ms={:.1}",
+        width, height, png_data.len(), capture_ms,
+        encoding_started.elapsed().as_secs_f64() * 1000.0,
+    );
     let x = monitor
         .x()
         .map_err(|e| with_platform_hint(format!("Failed to read monitor x: {}", e)))?;

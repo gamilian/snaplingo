@@ -7,10 +7,7 @@ import {
   captureWorkspaceEvents,
   persistentStateEvents,
 } from './platform/tauri/appEvents';
-import {
-  captureWindow,
-  signalCaptureWindowReady,
-} from './platform/tauri/captureWindow';
+import { captureWindow } from './platform/tauri/captureWindow';
 import { writeClipboardText } from './platform/tauri/clipboard';
 import * as durableSettings from './platform/tauri/settings';
 import {
@@ -35,9 +32,6 @@ const ports: CaptureWorkspacePorts = {
 
 export default function CaptureApp() {
   const general = useSettingsConfigStore((state) => state.general);
-  useEffect(() => {
-    void signalCaptureWindowReady();
-  }, []);
 
   useEffect(() => {
     let disposed = false;
