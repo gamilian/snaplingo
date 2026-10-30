@@ -1,6 +1,6 @@
 [package]
 name = "snaplingo"
-version = "0.1.16"
+version = "0.1.17"
 description = "A cross-platform screenshot, OCR, and translation tool"
 authors = ["SnapLingo Contributors"]
 license = ""

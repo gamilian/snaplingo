@@ -116,7 +116,7 @@ async fn wait_for_platform_shortcut_modifiers_to_release() -> Result<(), String>
 
 #[cfg(target_os = "windows")]
 fn shortcut_modifier_keys_pressed() -> Result<bool, String> {
-    use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
+    use ::windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
 
     Ok(any_windows_shortcut_modifier_pressed(|key| unsafe {
         GetAsyncKeyState(key) < 0
