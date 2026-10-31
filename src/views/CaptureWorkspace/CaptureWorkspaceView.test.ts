@@ -363,6 +363,9 @@ describe("CaptureWorkspaceView runtime seam", () => {
     );
     expect(annotationEastHandle).not.toBeNull();
     expect(annotationEastHandle!.className).toContain("cursor-ew-resize");
+    expect(annotationEastHandle!.className).toContain("h-4");
+    expect(annotationEastHandle!.className).toContain("w-4");
+    expect(annotationEastHandle!.firstElementChild?.className).toContain("h-1.5");
     await act(async () => {
       annotationEastHandle!.dispatchEvent(
         new PointerEvent("pointerdown", {
@@ -379,11 +382,36 @@ describe("CaptureWorkspaceView runtime seam", () => {
       "e",
       expect.objectContaining({ source: "preview" }),
     );
-    const annotationEastEdge = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Resize annotation edge e"]',
-    );
-    expect(annotationEastEdge).not.toBeNull();
-    expect(annotationEastEdge!.className).toContain("cursor-ew-resize");
+    for (const handle of ["n", "e", "s", "w"] as const) {
+      const annotationEdge = container.querySelector<HTMLButtonElement>(
+        `button[aria-label="Resize annotation edge ${handle}"]`,
+      );
+      expect(annotationEdge).not.toBeNull();
+      expect(annotationEdge!.className).toContain(
+        handle === "n" || handle === "s" ? "cursor-ns-resize" : "cursor-ew-resize",
+      );
+      actions.pointerDown.mockClear();
+      actions.resizePointerDown.mockClear();
+      actions.resizeAnnotationPointerDown.mockClear();
+      pointerCapture.mockClear();
+      const event = new PointerEvent("pointerdown", {
+        bubbles: true,
+        cancelable: true,
+        clientX: 65,
+        clientY: 55,
+        pointerId: 13,
+        button: 0,
+      });
+      await act(async () => annotationEdge!.dispatchEvent(event));
+      expect(actions.resizeAnnotationPointerDown).toHaveBeenCalledExactlyOnceWith(
+        handle,
+        expect.objectContaining({ source: "preview" }),
+      );
+      expect(pointerCapture).toHaveBeenCalledExactlyOnceWith(13);
+      expect(event.defaultPrevented).toBe(true);
+      expect(actions.pointerDown).not.toHaveBeenCalled();
+      expect(actions.resizePointerDown).not.toHaveBeenCalled();
+    }
 
     const undoButton = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Undo annotation"]',

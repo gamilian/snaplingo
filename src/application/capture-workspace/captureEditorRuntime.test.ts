@@ -521,7 +521,7 @@ describe('captureEditorRuntime', () => {
         annotationStyle: baseStyle,
         constrainGesture: false,
       })?.selectedAnnotationIndex,
-    ).toBeNull();
+    ).toBe(0);
 
     expect(
       completeCaptureEditorGesture({

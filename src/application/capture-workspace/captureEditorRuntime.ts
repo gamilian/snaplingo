@@ -435,7 +435,8 @@ export function completeCaptureEditorGesture({
 
   return {
     annotationHistory: nextHistory,
-    selectedAnnotationIndex: null,
+    selectedAnnotationIndex:
+      nextAnnotation.type === 'rectangle' ? nextHistory.annotations.length - 1 : null,
     annotationGesture: null,
     draftAnnotation: null,
   };

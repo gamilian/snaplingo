@@ -90,10 +90,12 @@ export function CaptureSelectedAnnotationBoundsOverlay({
         <button
           key={handle}
           type="button"
-          className={`pointer-events-auto absolute z-[3] h-1.5 w-1.5 rounded-full border border-white/80 bg-slate-700/55 p-0 shadow-[0_0_0_1px_rgba(0,0,0,0.3)] ${resizeHandleClassNames[handle]}`}
+          className={`pointer-events-auto absolute z-[3] flex h-4 w-4 items-center justify-center border-0 bg-transparent p-0 ${resizeHandleClassNames[handle]}`}
           aria-label={`Resize annotation ${handle}`}
           onPointerDown={(event) => onResizeHandlePointerDown(handle, event)}
-        />
+        >
+          <span className="pointer-events-none h-1.5 w-1.5 rounded-full border border-white/80 bg-slate-700/55 shadow-[0_0_0_1px_rgba(0,0,0,0.3)]" />
+        </button>
       ))}
     </div>
   );

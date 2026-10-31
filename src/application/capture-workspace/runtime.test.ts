@@ -1539,7 +1539,9 @@ describe('capture workspace runtime', () => {
       await runtime.actions.pointerUp({ point: { x: 70, y: 80 }, source: 'root' });
 
       expect(runtime.renderState.activeAnnotationTool).toBe(tool);
-      expect(runtime.renderState.selectedAnnotationIndex).toBeNull();
+      expect(runtime.renderState.selectedAnnotationIndex).toBe(
+        tool === 'rectangle' ? detail - 1 : null,
+      );
       expect(runtime.renderState.annotationHistory.annotations).toHaveLength(detail);
     }
     expect(runtime.renderState.annotationHistory.annotations.map((annotation) => annotation.type))
@@ -1634,7 +1636,16 @@ describe('capture workspace runtime', () => {
     expect(runtime.renderState.draftAnnotation).toBeNull();
   });
 
-  it('resizes a selected rectangle annotation from its edge handle', async () => {
+  it.each([
+    ['n', { x: 50, y: 40 }, { x: 50, y: 30 }, { x: 10, y: 0, width: 40, height: 50 }],
+    ['n', { x: 50, y: 40 }, { x: 50, y: 50 }, { x: 10, y: 20, width: 40, height: 30 }],
+    ['e', { x: 70, y: 60 }, { x: 90, y: 60 }, { x: 10, y: 10, width: 60, height: 40 }],
+    ['e', { x: 70, y: 60 }, { x: 60, y: 60 }, { x: 10, y: 10, width: 30, height: 40 }],
+    ['s', { x: 50, y: 80 }, { x: 50, y: 100 }, { x: 10, y: 10, width: 40, height: 60 }],
+    ['s', { x: 50, y: 80 }, { x: 50, y: 70 }, { x: 10, y: 10, width: 40, height: 30 }],
+    ['w', { x: 30, y: 60 }, { x: 20, y: 60 }, { x: 0, y: 10, width: 50, height: 40 }],
+    ['w', { x: 30, y: 60 }, { x: 40, y: 60 }, { x: 20, y: 10, width: 30, height: 40 }],
+  ] as const)('resizes a freshly drawn rectangle from its %s edge without switching tools', async (handle, start, end, rect) => {
     const platform = createPlatform({
       session: createSession({ id: 'session-editor-resize-annotation' }),
     });
@@ -1649,23 +1660,33 @@ describe('capture workspace runtime', () => {
     runtime.actions.pointerDown({ point: { x: 30, y: 40 }, source: 'preview' });
     runtime.actions.pointerMove({ point: { x: 70, y: 80 }, source: 'root' });
     await runtime.actions.pointerUp({ point: { x: 70, y: 80 }, source: 'root' });
-    runtime.actions.selectMoveTool();
-    runtime.actions.pointerDown({ point: { x: 50, y: 60 }, source: 'preview' });
-    await runtime.actions.pointerUp({ point: { x: 50, y: 60 }, source: 'root' });
+    const originalAnnotation = runtime.renderState.annotationHistory.annotations[0];
+    expect(runtime.renderState.selectedAnnotationIndex).toBe(0);
 
     expect(
-      runtime.actions.resizeAnnotationPointerDown('e', {
-        point: { x: 70, y: 60 },
+      runtime.actions.resizeAnnotationPointerDown(handle, {
+        point: start,
         source: 'preview',
       }),
     ).toBe(true);
-    runtime.actions.pointerMove({ point: { x: 90, y: 60 }, source: 'root' });
-    await runtime.actions.pointerUp({ point: { x: 90, y: 60 }, source: 'root' });
+    runtime.actions.pointerMove({ point: end, source: 'root' });
+    expect(runtime.renderState.draftAnnotation).toEqual({ ...originalAnnotation, rect });
+    await runtime.actions.pointerUp({ point: end, source: 'root' });
 
-    expect(runtime.renderState.annotationHistory.annotations[0]).toMatchObject({
-      type: 'rectangle',
-      rect: { x: 10, y: 10, width: 60, height: 40 },
+    expect(runtime.renderState.annotationHistory.annotations[0]).toEqual({
+      ...originalAnnotation, rect,
     });
+    expect(runtime.renderState.selectedAnnotationIndex).toBe(0);
+    expect(runtime.renderState.selection).toEqual(selection);
+    expect(runtime.renderState.activeAnnotationTool).toBe('rectangle');
+
+    runtime.actions.undoAnnotation();
+    expect(runtime.renderState.annotationHistory.annotations).toEqual([originalAnnotation]);
+    runtime.actions.redoAnnotation();
+    expect(runtime.renderState.annotationHistory.annotations[0]).toEqual({
+      ...originalAnnotation, rect,
+    });
+    expect(platform.commands.renderCaptureOutput).not.toHaveBeenCalled();
   });
 
   it('preserves the captured cursor when delegated editor rerenders omit an override', async () => {
