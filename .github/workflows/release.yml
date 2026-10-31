@@ -40,7 +40,7 @@ jobs:
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
           const include = [
-            { os: 'macos-14', label: 'macos-aarch64', offline: false },
+            { os: 'macos-15', label: 'macos-aarch64', offline: false },
             { os: 'macos-15-intel', label: 'macos-x86_64', offline: false },
             { os: 'windows-2022', label: 'windows-x86_64', offline: false },
           ];
