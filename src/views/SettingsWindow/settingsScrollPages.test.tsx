@@ -88,6 +88,7 @@ describe('single-scroll settings pages', () => {
     expect(labels).not.toContain('标注颜色');
     expect(labels).not.toContain('默认线条粗细');
     expect(labels).not.toContain('默认字体大小');
+    expect(labels).not.toContain('记住上次使用的工具');
 
     const maskPresetButtons = findElements(
       sections[2].content,

@@ -304,13 +304,6 @@ export function ScreenshotSettingsPage() {
         </SettingRow>
       </SettingsGroup>
       <SettingsGroup>
-        <SettingRow label="记住上次使用的工具">
-          <SettingsToggle
-            label="记住上次使用的工具"
-            checked={screenshot.rememberLastTool}
-            onChange={(rememberLastTool) => updateScreenshot({ rememberLastTool })}
-          />
-        </SettingRow>
         <SettingRow label="贴图默认透明度">
           <RangeValue value={`${screenshot.pinOpacity}%`}>
             <CustomRange

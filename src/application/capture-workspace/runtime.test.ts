@@ -1399,6 +1399,7 @@ describe('capture workspace runtime', () => {
 
     await runtime.actions.startSession('screenshot', 'session-reset');
     await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.selectMoveTool();
     expect(
       runtime.actions.pointerDown({
         point: { x: 30, y: 40 },
@@ -1430,6 +1431,7 @@ describe('capture workspace runtime', () => {
 
     await runtime.actions.startSession('screenshot', 'session-copy');
     await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.selectMoveTool();
     expect(
       runtime.actions.pointerDown({
         point: { x: 30, y: 40 },
@@ -1446,6 +1448,76 @@ describe('capture workspace runtime', () => {
         action: { type: 'copy' },
       });
     });
+  });
+
+  it.each([
+    ['manual', false],
+    ['manual', true],
+    ['preview', false],
+    ['preview', true],
+  ] as const)('starts each screenshot with rectangle and retains tools during %s editing (remember: %s)', async (entry, rememberLastTool) => {
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockImplementation(async (sessionId) =>
+      createSession({ id: sessionId }),
+    );
+    const runtime = createCaptureWorkspaceRuntime({
+      platform,
+      screenshotPreferences: () => ({
+        format: 'png',
+        quality: 90,
+        namingRule: 'timestamp',
+        customFileName: 'SnapLingo',
+        autoCopy: false,
+        defaultStrokeWidth: 2,
+        defaultFontSize: 24,
+        rememberLastTool,
+        showSelectionSize: true,
+        showMagnifier: false,
+      }),
+      storage: {
+        getItem: (key) => key === 'snaplingo.capture.lastAnnotationTool' ? 'mosaic' : null,
+        setItem: vi.fn(),
+      },
+    });
+    const enterEditor = async (sessionId: string) => {
+      await runtime.actions.startSession('screenshot', sessionId);
+      if (entry === 'manual') {
+        runtime.actions.pointerDown({ x: 20, y: 30 });
+        runtime.actions.pointerMove({ x: 140, y: 110 });
+        await runtime.actions.pointerUp({ x: 140, y: 110 });
+      } else {
+        await runtime.actions.renderSelectionPreview(selection);
+      }
+    };
+
+    await enterEditor('session-1');
+    expect(runtime.renderState.activeAnnotationTool).toBe('rectangle');
+
+    for (let index = 0; index < 5; index++) {
+      runtime.actions.pointerDown({ point: { x: 30, y: 40 }, source: 'preview' });
+      runtime.actions.pointerMove({ point: { x: 70, y: 80 }, source: 'root' });
+      await runtime.actions.pointerUp({ point: { x: 70, y: 80 }, source: 'root' });
+      expect(runtime.renderState.activeAnnotationTool).toBe('rectangle');
+    }
+    expect(runtime.renderState.annotationHistory.annotations.map((annotation) => annotation.type))
+      .toEqual(Array(5).fill('rectangle'));
+
+    runtime.actions.toggleAnnotationTool('mosaic');
+    for (let index = 0; index < 2; index++) {
+      runtime.actions.toggleAnnotationTool('mosaic');
+      runtime.actions.pointerDown({ point: { x: 30, y: 40 }, source: 'preview' });
+      runtime.actions.pointerMove({ point: { x: 70, y: 80 }, source: 'root' });
+      await runtime.actions.pointerUp({ point: { x: 70, y: 80 }, source: 'root' });
+      await runtime.actions.renderSelectionPreview(selection);
+      expect(runtime.renderState.activeAnnotationTool).toBe('mosaic');
+    }
+    expect(runtime.renderState.annotationHistory.annotations.slice(5).map((annotation) => annotation.type))
+      .toEqual(['mosaic', 'mosaic']);
+
+    await runtime.actions.cancelSession();
+    await enterEditor('session-2');
+    expect(runtime.renderState.activeAnnotationTool).toBe('rectangle');
+    expect(runtime.renderState.annotationHistory.annotations).toEqual([]);
   });
 
   it('owns annotation draw and preview commit transactions', async () => {
@@ -2044,6 +2116,7 @@ describe('capture workspace runtime', () => {
       'session-editor-selection',
     );
     await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.selectMoveTool();
     runtime.actions.pointerDown({
       point: { x: 40, y: 50 },
       source: 'preview',
@@ -2095,6 +2168,7 @@ describe('capture workspace runtime', () => {
       'session-editor-selection-cancel',
     );
     await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.selectMoveTool();
     runtime.actions.pointerDown({
       point: { x: 40, y: 50 },
       source: 'preview',

@@ -704,7 +704,7 @@ export function createCaptureWorkspaceRuntime({
     const activeAnnotationTool =
       state.status === 'preview'
         ? state.activeAnnotationTool
-        : rememberedAnnotationTool(screenshotPreferences?.(), storage);
+        : 'rectangle';
     // The view crops the already decoded frozen monitors. Encoding is only
     // needed for terminal output, so entering or resizing preview never blocks.
     patch({
@@ -915,12 +915,9 @@ export function createCaptureWorkspaceRuntime({
       nextTool,
       selectedAnnotationIndex: state.selectedAnnotationIndex,
       clearSelectedAnnotation: false,
-      toggle: true,
+      toggle: false,
     });
     patch(activation);
-    if (activation.activeAnnotationTool && screenshotPreferences?.()?.rememberLastTool) {
-      storage?.setItem('snaplingo.capture.lastAnnotationTool', activation.activeAnnotationTool);
-    }
   };
 
   const editorActions: CaptureWorkspacePointerEditorActions &
@@ -1054,8 +1051,9 @@ export function createCaptureWorkspaceRuntime({
       rect,
       completion,
       activeAnnotationTool:
-        state.activeAnnotationTool ??
-        rememberedAnnotationTool(screenshotPreferences?.(), storage),
+        completion.type === 'preview' && state.status !== 'preview'
+          ? 'rectangle'
+          : state.activeAnnotationTool,
     });
     if (transition.clearOverlay) host?.resetInteraction();
     if (transition.type === 'preview') {
@@ -2418,29 +2416,6 @@ function captureSavePathOptions(preferences?: CaptureScreenshotPreferences) {
     namingRule: preferences.namingRule,
     customFileName: preferences.customFileName,
   };
-}
-
-function rememberedAnnotationTool(
-  preferences: CaptureScreenshotPreferences | undefined,
-  storage: CaptureSelectionStorage | undefined,
-): AnnotationTool | null {
-  if (!preferences?.rememberLastTool) return null;
-  const tool = storage?.getItem('snaplingo.capture.lastAnnotationTool');
-  return tool && isAnnotationTool(tool) ? tool : null;
-}
-
-function isAnnotationTool(value: string): value is AnnotationTool {
-  return [
-    'rectangle',
-    'ellipse',
-    'arrow',
-    'line',
-    'pen',
-    'highlight',
-    'mosaic',
-    'text',
-    'eraser',
-  ].includes(value);
 }
 
 function errorMessage(error: unknown) {
