@@ -54,40 +54,6 @@ export interface CapturePointerWheelState {
   hasAnnotationEditingContext: boolean;
 }
 
-export type CapturePointerMoveAction =
-  | 'move-annotation-gesture'
-  | 'move-annotation'
-  | 'move-draft-selection'
-  | 'edit-selection'
-  | 'update-draft-selection'
-  | 'ignore';
-
-export type CapturePointerUpAction =
-  | 'commit-annotation-gesture'
-  | 'commit-annotation-move'
-  | 'commit-selection-edit'
-  | 'commit-draft-selection'
-  | 'ignore';
-
-export interface CapturePointerMoveState {
-  status: CapturePointerStatus;
-  hasSelection: boolean;
-  hasActiveStartPoint: boolean;
-  hasEditGesture: boolean;
-  hasAnnotationGesture: boolean;
-  hasAnnotationMoveGesture: boolean;
-  hasDraftSelectionMoveGesture: boolean;
-}
-
-export interface CapturePointerUpState {
-  status: CapturePointerStatus;
-  hasSelection: boolean;
-  hasActiveStartPoint: boolean;
-  hasEditGesture: boolean;
-  hasAnnotationGesture: boolean;
-  hasAnnotationMoveGesture: boolean;
-}
-
 export type CapturePreviewPointerDownPlan =
   | {
       type: 'pin-selection';
@@ -156,57 +122,6 @@ export function planCapturePreviewPointerDown(
   return {
     type: 'start-preview-interaction',
   };
-}
-
-export function shouldSyncHoverSelectionOnPointerMove({
-  hasActiveStartPoint,
-  hasEditGesture,
-  status,
-}: Pick<
-  CapturePointerMoveState,
-  'hasActiveStartPoint' | 'hasEditGesture' | 'status'
->) {
-  return !hasActiveStartPoint && !hasEditGesture && status === 'selecting';
-}
-
-export function getCapturePointerMoveAction({
-  hasActiveStartPoint,
-  hasAnnotationGesture,
-  hasAnnotationMoveGesture,
-  hasDraftSelectionMoveGesture,
-  hasEditGesture,
-  hasSelection,
-  status,
-}: CapturePointerMoveState): CapturePointerMoveAction {
-  if (hasAnnotationGesture && hasSelection) return 'move-annotation-gesture';
-  if (hasAnnotationMoveGesture && hasSelection) return 'move-annotation';
-  if (hasDraftSelectionMoveGesture && status === 'selecting') {
-    return 'move-draft-selection';
-  }
-  if (hasEditGesture) return 'edit-selection';
-  if (hasActiveStartPoint && status === 'selecting') {
-    return 'update-draft-selection';
-  }
-
-  return 'ignore';
-}
-
-export function getCapturePointerUpAction({
-  hasActiveStartPoint,
-  hasAnnotationGesture,
-  hasAnnotationMoveGesture,
-  hasEditGesture,
-  hasSelection,
-  status,
-}: CapturePointerUpState): CapturePointerUpAction {
-  if (hasAnnotationGesture && hasSelection) return 'commit-annotation-gesture';
-  if (hasAnnotationMoveGesture && hasSelection) return 'commit-annotation-move';
-  if (hasEditGesture) return 'commit-selection-edit';
-  if (hasActiveStartPoint && status === 'selecting') {
-    return 'commit-draft-selection';
-  }
-
-  return 'ignore';
 }
 
 export function getCaptureSelectionLocalPoint(

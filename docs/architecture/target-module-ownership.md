@@ -2,7 +2,7 @@
 
 **Status:** Implemented and enforced
 
-This document records the ownership boundaries implemented from the [Architecture Rebuild Design](../archive/superpowers/specs/2026-07-11-architecture-rebuild-design.md). `ARCHITECTURE.md` remains the current-state overview.
+This document records the implemented ownership rules. [ARCHITECTURE.md](../../ARCHITECTURE.md) remains the current-state overview; accepted ADRs below explain the retained decisions.
 
 ## Vocabulary
 

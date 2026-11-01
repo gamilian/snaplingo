@@ -442,48 +442,6 @@ export function completeCaptureEditorGesture({
   };
 }
 
-export interface CapturePreviewResetState {
-  startPoint: null;
-  cursorPoint: null;
-  selection: null;
-  hoverSelection: null;
-  editGesture: null;
-  renderingOutput: false;
-  activeAnnotationTool: null;
-  annotationGesture: null;
-  draftAnnotation: null;
-  selectedAnnotationIndex: null;
-  annotationMoveGesture: null;
-  draftSelectionMoveGesture: null;
-  textDraft: null;
-  textDraftAnnotationIndex: null;
-  annotationHistory: AnnotationHistory;
-  isMagnifierRequested: false;
-  status: 'selecting';
-}
-
-export function createCapturePreviewResetState(): CapturePreviewResetState {
-  return {
-    startPoint: null,
-    cursorPoint: null,
-    selection: null,
-    hoverSelection: null,
-    editGesture: null,
-    renderingOutput: false,
-    activeAnnotationTool: null,
-    annotationGesture: null,
-    draftAnnotation: null,
-    selectedAnnotationIndex: null,
-    annotationMoveGesture: null,
-    draftSelectionMoveGesture: null,
-    textDraft: null,
-    textDraftAnnotationIndex: null,
-    annotationHistory: emptyAnnotationHistory(),
-    isMagnifierRequested: false,
-    status: 'selecting',
-  };
-}
-
 interface CaptureManualSelectionBaseState {
   startPoint: null;
   selection: LogicalRect;

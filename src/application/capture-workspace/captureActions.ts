@@ -1,28 +1,4 @@
-import type {
-  AnnotationCommand,
-  ArrowKey,
-  CaptureMode,
-  CaptureSessionView,
-  LogicalRect,
-  Point,
-} from '../../domain/capture';
-import type {
-  OutputCaptureInput,
-  RenderCaptureOutputInput,
-} from './ports';
-
-export type CaptureImagePrinter = (
-  imageBase64: string,
-) => Promise<void> | void;
-
-export interface CaptureActionClient {
-  defaultCaptureSavePath: () => Promise<string | null>;
-  quickCaptureSavePath: (directory?: string) => Promise<string>;
-  outputCapture: (input: OutputCaptureInput) => Promise<void>;
-  createCaptureSession: () => Promise<CaptureSessionView>;
-  cancelCaptureSession: (sessionId: string) => Promise<void>;
-  renderCaptureOutput: (input: RenderCaptureOutputInput) => Promise<string>;
-}
+import type { ArrowKey, CaptureMode, CaptureSessionView, Point } from '../../domain/capture';
 
 interface CaptureShortcutEvent {
   key: string;
@@ -63,10 +39,6 @@ export type HoverSelectionCompletionAction =
   | 'ocr'
   | 'silent-ocr'
   | 'ocr-translate';
-interface RestoreLastSelectionOptions {
-  status: 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
-  editing?: boolean;
-}
 export type UndoRedoAction = 'undo' | 'redo';
 export type CaptureKeyboardToolbarAction = 'toggle';
 export type CaptureSelectionFlow =
@@ -190,16 +162,6 @@ export function isRestoreLastSelectionShortcut(event: CaptureShortcutEvent) {
   );
 }
 
-export function shouldRestoreLastSelectionFromShortcut(
-  event: CaptureShortcutEvent,
-  options: RestoreLastSelectionOptions,
-) {
-  if (options.editing) return false;
-  if (options.status !== 'selecting' && options.status !== 'preview') return false;
-
-  return isRestoreLastSelectionShortcut(event);
-}
-
 export function isRefreshCaptureShortcut(event: CaptureShortcutEvent) {
   return (
     event.key === 'F5' &&
@@ -269,18 +231,6 @@ export function isDeleteSelectedAnnotationShortcut(
   );
 }
 
-export function isUndoAnnotationGesturePointShortcut(
-  event: CaptureShortcutEvent,
-) {
-  return (
-    (event.key === 'Backspace' || event.key === 'Delete') &&
-    !event.metaKey &&
-    !event.ctrlKey &&
-    !event.altKey &&
-    !event.shiftKey
-  );
-}
-
 export function getSelectionArrowActionFromShortcut(
   event: CaptureShortcutEvent,
   options: SelectionArrowActionOptions = {},
@@ -331,13 +281,6 @@ export function isPlainCaptureCompletionShortcut(event: CaptureShortcutEvent) {
   );
 }
 
-export function shouldCopyHoverSelectionFromShortcut(
-  event: CaptureShortcutEvent,
-  options: HoverSelectionShortcutOptions = {},
-) {
-  return getHoverSelectionCompletionActionFromShortcut(event, options) === 'copy';
-}
-
 export function getHoverSelectionCompletionActionFromShortcut(
   event: CaptureShortcutEvent,
   options: HoverSelectionShortcutOptions = {},
@@ -379,15 +322,6 @@ export function getCaptureKeyboardToolbarAction(
   if (event.key === ' ') return 'toggle';
 
   return null;
-}
-
-export function isMoveDraftSelectionShortcut(event: CaptureShortcutEvent) {
-  return (
-    event.key === ' ' &&
-    !event.metaKey &&
-    !event.ctrlKey &&
-    !event.altKey
-  );
 }
 
 export function isPinCaptureShortcut(event: CaptureShortcutEvent) {
@@ -460,14 +394,6 @@ export function getCaptureScreenSelectionScopeFromShortcut(
   return event.shiftKey ? 'virtual-desktop' : 'current-monitor';
 }
 
-export function isSelectAllCaptureShortcut(event: CaptureShortcutEvent) {
-  return getCaptureScreenSelectionScopeFromShortcut(event) === 'current-monitor';
-}
-
-export function isCopyCaptureDoubleClick(event: CapturePointerEvent) {
-  return isUnmodifiedPrimaryDoubleClick(event);
-}
-
 export function getHoverSelectionCompletionActionFromPointer(
   event: CapturePointerEvent,
   options: HoverSelectionShortcutOptions = {},
@@ -476,21 +402,6 @@ export function getHoverSelectionCompletionActionFromPointer(
   if (!isUnmodifiedPrimaryClick(event)) return null;
 
   return getPrimaryHoverSelectionCompletionActionForMode(options.mode);
-}
-
-export function isFinishAnnotationGestureDoubleClick(event: CapturePointerEvent) {
-  return isUnmodifiedPrimaryDoubleClick(event);
-}
-
-function isUnmodifiedPrimaryDoubleClick(event: CapturePointerEvent) {
-  return (
-    (event.detail ?? 0) >= 2 &&
-    event.button === 0 &&
-    !event.metaKey &&
-    !event.ctrlKey &&
-    !event.altKey &&
-    !event.shiftKey
-  );
 }
 
 function isUnmodifiedPrimaryClick(event: CapturePointerEvent) {
@@ -543,97 +454,4 @@ export function shouldCancelCaptureOnBlur(state: CancelCaptureBlurState) {
   if (state.isRenderingOutput) return false;
 
   return state.status === 'selecting' || state.status === 'preview';
-}
-
-export async function saveCaptureSelection(
-  sessionId: string,
-  rect: LogicalRect,
-  annotations: AnnotationCommand[] = [],
-  includeCursor = false,
-  client: CaptureActionClient,
-) {
-  const path = await client.defaultCaptureSavePath();
-  if (!path) return;
-
-  await client.outputCapture({
-    sessionId,
-    rect,
-    annotations,
-    ...(includeCursor ? { includeCursor } : {}),
-    action: {
-      type: 'save',
-      path,
-      format: 'png',
-      quality: 90,
-      copyAfterSave: false,
-    },
-  });
-}
-
-export async function quickSaveCaptureSelection(
-  sessionId: string,
-  rect: LogicalRect,
-  annotations: AnnotationCommand[] = [],
-  directory: string | undefined,
-  includeCursor = false,
-  client: CaptureActionClient,
-) {
-  const path = await client.quickCaptureSavePath(directory);
-
-  await client.outputCapture({
-    sessionId,
-    rect,
-    annotations,
-    ...(includeCursor ? { includeCursor } : {}),
-    action: {
-      type: 'save',
-      path,
-      format: 'png',
-      quality: 90,
-      copyAfterSave: false,
-    },
-  });
-}
-
-export async function refreshCaptureSession(
-  previousSessionId: string,
-  client: CaptureActionClient,
-) {
-  const session = await client.createCaptureSession();
-  await client.cancelCaptureSession(previousSessionId);
-  return session;
-}
-
-export async function copyCaptureSelection(
-  sessionId: string,
-  rect: LogicalRect,
-  annotations: AnnotationCommand[] = [],
-  includeCursor = false,
-  client: CaptureActionClient,
-) {
-  await client.outputCapture({
-    sessionId,
-    rect,
-    annotations,
-    ...(includeCursor ? { includeCursor } : {}),
-    action: { type: 'copy' },
-  });
-}
-
-export async function printCaptureSelection(
-  sessionId: string,
-  rect: LogicalRect,
-  annotations: AnnotationCommand[],
-  printImage: CaptureImagePrinter,
-  includeCursor = false,
-  client: CaptureActionClient,
-) {
-  const imageBase64 = await client.renderCaptureOutput({
-    sessionId,
-    rect,
-    annotations,
-    ...(includeCursor ? { includeCursor } : {}),
-  });
-
-  await printImage(imageBase64);
 }

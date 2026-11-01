@@ -35,16 +35,6 @@ export function getCaptureModeSelectionFlow(
   return getCaptureSelectionFlowForMode(mode);
 }
 
-export function getPrimaryCaptureCompletionActionForMode(
-  mode: CaptureMode,
-): CaptureCompletionAction {
-  const flow = getCaptureModeSelectionFlow(mode);
-  if (flow === 'ocr' || flow === 'silent-ocr' || flow === 'ocr-translate') {
-    return flow;
-  }
-  return 'copy';
-}
-
 export function planCandidateSelectionCompletion(
   action: CaptureCompletionAction,
 ): CaptureRuntimeEffect[] {

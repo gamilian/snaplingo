@@ -4,7 +4,6 @@ import {
   applyStyleToSelectedAnnotationHistory,
   commitCaptureEditorTextDraft,
   completeCaptureEditorGesture,
-  createCapturePreviewResetState,
   deriveCaptureEditorToolbarState,
   getCaptureEditorDismissAction,
   getCaptureSelectedAnnotationBounds,
@@ -540,28 +539,6 @@ describe('captureEditorRuntime', () => {
       selectedAnnotationIndex: 2,
       annotationGesture: null,
       draftAnnotation: null,
-    });
-  });
-
-  it('builds a preview reset state that clears selection and editor artifacts', () => {
-    expect(createCapturePreviewResetState()).toEqual({
-      startPoint: null,
-      cursorPoint: null,
-      selection: null,
-      hoverSelection: null,
-      editGesture: null,
-      renderingOutput: false,
-      activeAnnotationTool: null,
-      annotationGesture: null,
-      draftAnnotation: null,
-      selectedAnnotationIndex: null,
-      annotationMoveGesture: null,
-      draftSelectionMoveGesture: null,
-      textDraft: null,
-      textDraftAnnotationIndex: null,
-      annotationHistory: emptyAnnotationHistory(),
-      isMagnifierRequested: false,
-      status: 'selecting',
     });
   });
 

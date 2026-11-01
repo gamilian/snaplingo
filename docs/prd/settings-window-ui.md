@@ -1,5 +1,7 @@
 # PRD: Settings Window UI Implementation
 
+**Status:** Implemented historical specification. App-shell and navigation decisions were subsequently amended by [ADR 0006](../adr/0006-menu-bar-app-shell.md), [ADR 0008](../adr/0008-unified-library-navigation.md), and [ADR 0009](../adr/0009-single-scroll-settings-navigation.md). See [Features](../FEATURES.md) for current behavior. Retired prototype code is recoverable from Git history.
+
 ## Problem Statement
 
 SnapLingo 目前缺少一个主设置窗口（Settings Window），用户无法配置应用的核心功能：截图、OCR、翻译、Provider 管理、快捷键设置等。当前的代码仅包含基础的翻译状态管理（Zustand store）和 Result Window 组件，但没有统一的配置界面。
@@ -15,7 +17,7 @@ SnapLingo 目前缺少一个主设置窗口（Settings Window），用户无法�
 
 实现一个功能域独立的主设置窗口（Settings Window），采用 6 个主标签页结构：截图、翻译、OCR、服务、通用、高级。每个功能域拥有完整的二级导航，包含该域的快捷键、设置、历史、收藏。
 
-设计已通过交互式 UI 原型验证（`designs/prototypes/App.PROTOTYPE_UI.tsx`），确认布局合理、交互流畅、图标识别度高。
+设计已通过交互式 UI 原型验证（现已退役），确认布局合理、交互流畅、图标识别度高。
 
 ## User Stories
 
@@ -377,7 +379,7 @@ The following are explicitly out of scope for this PRD:
 
 ### Design Validation
 
-This PRD is based on a fully interactive prototype (`designs/prototypes/App.PROTOTYPE_UI.tsx`) that was validated through browser testing. Key findings:
+This PRD is based on a fully interactive prototype (now retired) that was validated through browser testing. Key findings:
 
 - 6 main tabs is the right number (not too many, not too few)
 - Secondary navigation works well as a left sidebar
@@ -399,15 +401,9 @@ Recommended implementation order:
 8. **P2**: General and Advanced tabs
 9. **P2**: Form validation and error handling
 
-### Code Reuse from Prototype
+### Current implementation reference
 
-The prototype file `designs/prototypes/App.PROTOTYPE_UI.tsx` contains production-ready code for:
-- Icon components (copy as-is)
-- HotkeyDisplay component structure
-- Layout and styling patterns
-- Navigation button styles
-
-Extract and refactor these into proper component files rather than rewriting from scratch.
+The prototype has been retired. Current Settings rendering lives in `src/views/SettingsWindow/`, shared UI in `src/components/common/`, and workflow policy in `src/application/settings/`. The current implementations and their tests supersede the earlier copy-from-prototype instructions.
 
 ### Anthropic Design Philosophy
 

@@ -1,14 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  planCaptureDraftSelectionMoveShortcutStart,
   planCaptureDraftSelectionKeyboardNudge,
   applyCaptureSelectionEditGesture,
-  planCaptureHoverSelectionCycle,
   planCaptureSelectionArrowPreview,
   planCaptureSelectionCursorKeyboardNudge,
   planCaptureDraftSelectionCommit,
-  planCaptureDraftSelectionMove,
   planCaptureDraftSelectionPointerMove,
   planCaptureDraftSelectionStart,
   planCaptureSelectionEditKeyboardNudge,
@@ -47,24 +44,6 @@ describe('captureSelectionRuntime', () => {
         textDraftAnnotationIndex: null,
         annotationHistory: emptyAnnotationHistory(),
       },
-    });
-  });
-
-  it('plans draft selection pointer moves while clamping movement to the capture bounds', () => {
-    expect(
-      planCaptureDraftSelectionMove({
-        gesture: {
-          startPoint: { x: 100, y: 90 },
-          startSelection: { x: 80, y: 70, width: 50, height: 40 },
-          startAnchorPoint: { x: 80, y: 70 },
-        },
-        point: { x: 140, y: 115 },
-        selectionBounds: { x: 0, y: 0, width: 160, height: 120 },
-      }),
-    ).toEqual({
-      draftSelection: { x: 110, y: 80, width: 50, height: 40 },
-      anchorPoint: { x: 110, y: 80 },
-      renderingOutput: false,
     });
   });
 
@@ -176,48 +155,6 @@ describe('captureSelectionRuntime', () => {
       draftSelection: null,
       overlayHoverSelection: null,
       selection: null,
-    });
-  });
-
-  it('plans hover candidate cycling and starting draft-selection move gestures', () => {
-    const captureCandidates = [
-      {
-        id: 'window:1',
-        kind: 'window' as const,
-        rect: { x: 0, y: 0, width: 50, height: 50 },
-        priority: 10,
-      },
-      {
-        id: 'window:2',
-        kind: 'window' as const,
-        rect: { x: 10, y: 10, width: 80, height: 70 },
-        priority: 20,
-      },
-    ];
-
-    expect(
-      planCaptureHoverSelectionCycle({
-        captureCandidates,
-        cursorPoint: { x: 20, y: 20 },
-        hoverSelection: captureCandidates[0].rect,
-        direction: 1,
-      }),
-    ).toEqual({
-      hoverSelection: captureCandidates[1].rect,
-    });
-
-    expect(
-      planCaptureDraftSelectionMoveShortcutStart({
-        cursorPoint: { x: 30, y: 40 },
-        selection: { x: 20, y: 30, width: 40, height: 20 },
-        anchorPoint: { x: 20, y: 30 },
-      }),
-    ).toEqual({
-      draftSelectionMoveGesture: {
-        startPoint: { x: 30, y: 40 },
-        startSelection: { x: 20, y: 30, width: 40, height: 20 },
-        startAnchorPoint: { x: 20, y: 30 },
-      },
     });
   });
 

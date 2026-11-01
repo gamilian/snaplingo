@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   getCaptureSelectionLocalPoint,
-  getCapturePointerMoveAction,
-  getCapturePointerUpAction,
   planCapturePointerWheelSizeAdjustment,
   planCapturePreviewPointerDown,
   planCaptureRootPointerDown,
-  shouldSyncHoverSelectionOnPointerMove,
 } from './capturePointerInteractionRuntime';
 
 const primaryPointer = {
@@ -145,116 +142,6 @@ describe('capturePointerInteractionRuntime', () => {
         { x: 100, y: 50, width: 80, height: 60 },
       ),
     ).toEqual({ x: 80, y: 60 });
-  });
-
-  it('plans pointer move interaction by active capture gesture priority', () => {
-    expect(
-      getCapturePointerMoveAction({
-        status: 'preview',
-        hasSelection: true,
-        hasActiveStartPoint: true,
-        hasEditGesture: true,
-        hasAnnotationGesture: true,
-        hasAnnotationMoveGesture: true,
-        hasDraftSelectionMoveGesture: true,
-      }),
-    ).toBe('move-annotation-gesture');
-
-    expect(
-      getCapturePointerMoveAction({
-        status: 'selecting',
-        hasSelection: false,
-        hasActiveStartPoint: true,
-        hasEditGesture: false,
-        hasAnnotationGesture: false,
-        hasAnnotationMoveGesture: false,
-        hasDraftSelectionMoveGesture: true,
-      }),
-    ).toBe('move-draft-selection');
-
-    expect(
-      getCapturePointerMoveAction({
-        status: 'preview',
-        hasSelection: true,
-        hasActiveStartPoint: true,
-        hasEditGesture: false,
-        hasAnnotationGesture: false,
-        hasAnnotationMoveGesture: false,
-        hasDraftSelectionMoveGesture: false,
-      }),
-    ).toBe('ignore');
-  });
-
-  it('syncs hover selection only when selecting without an active gesture', () => {
-    expect(
-      shouldSyncHoverSelectionOnPointerMove({
-        status: 'selecting',
-        hasActiveStartPoint: false,
-        hasEditGesture: false,
-      }),
-    ).toBe(true);
-
-    expect(
-      shouldSyncHoverSelectionOnPointerMove({
-        status: 'selecting',
-        hasActiveStartPoint: true,
-        hasEditGesture: false,
-      }),
-    ).toBe(false);
-
-    expect(
-      shouldSyncHoverSelectionOnPointerMove({
-        status: 'preview',
-        hasActiveStartPoint: false,
-        hasEditGesture: false,
-      }),
-    ).toBe(false);
-  });
-
-  it('plans pointer up interaction by active capture gesture priority', () => {
-    expect(
-      getCapturePointerUpAction({
-        status: 'preview',
-        hasSelection: true,
-        hasActiveStartPoint: true,
-        hasEditGesture: true,
-        hasAnnotationGesture: true,
-        hasAnnotationMoveGesture: true,
-      }),
-    ).toBe('commit-annotation-gesture');
-
-    expect(
-      getCapturePointerUpAction({
-        status: 'preview',
-        hasSelection: true,
-        hasActiveStartPoint: false,
-        hasEditGesture: true,
-        hasAnnotationGesture: false,
-        hasAnnotationMoveGesture: false,
-      }),
-    ).toBe('commit-selection-edit');
-
-    expect(
-      getCapturePointerUpAction({
-        status: 'selecting',
-        hasSelection: false,
-        hasActiveStartPoint: true,
-        hasEditGesture: false,
-        hasAnnotationGesture: false,
-        hasAnnotationMoveGesture: false,
-      }),
-    ).toBe('commit-draft-selection');
-
-    expect(
-      getCapturePointerUpAction({
-        status: 'preview',
-        hasSelection: false,
-        hasActiveStartPoint: true,
-        hasEditGesture: false,
-        hasAnnotationGesture: false,
-        hasAnnotationMoveGesture: false,
-      }),
-    ).toBe('ignore');
   });
 
   it('plans wheel-driven annotation size adjustment only for editable preview state', () => {

@@ -38,14 +38,6 @@ export function PinIcon(props: IconProps) {
   );
 }
 
-export function CommandIcon(props: IconProps) {
-  return (
-    <BaseIcon {...props}>
-      <path d="M9 9H7a3 3 0 1 1 3-3v12a3 3 0 1 1-3-3h10a3 3 0 1 1-3 3V6a3 3 0 1 1 3 3H9Z" />
-    </BaseIcon>
-  );
-}
-
 export function LanguageIcon(props: IconProps) {
   return (
     <BaseIcon {...props}>

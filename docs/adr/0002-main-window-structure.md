@@ -141,7 +141,7 @@ SnapLingo 的需求：
 ## Prototype Validation (2026-06-13)
 
 ### 验证方法
-构建了完整的交互式 UI 原型（`designs/prototypes/App.PROTOTYPE_UI.tsx`），包含：
+当时构建了完整的交互式 UI 原型（现已退役，源码保留于 Git 历史），包含：
 - 6 个主标签页的完整导航
 - 截图/翻译/OCR 的二级导航和快捷键设置页面
 - 服务 tab 的 Provider 卡片展示

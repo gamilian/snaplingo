@@ -13,11 +13,7 @@ import type {
   ColorSample,
   ColorSampleFormat,
 } from '../image-inspection/colorSampler';
-import {
-  createCapturePreviewResetState,
-  type CaptureAnnotationMoveGesture,
-} from './captureEditorRuntime';
-import type { LoadedCaptureHostSession } from './captureSelectionHistory';
+import { type CaptureAnnotationMoveGesture } from './captureEditorRuntime';
 import type {
   CaptureDraftSelectionMoveGesture,
   CaptureSelectionEditGesture,
@@ -100,53 +96,5 @@ export function createInitialCaptureWorkspaceState(): CaptureWorkspaceState {
     silentOcrHint: null,
     includeCapturedCursor: false,
     error: null,
-  };
-}
-
-export function resetCaptureInteractionStatePatch(): Partial<CaptureWorkspaceState> {
-  return {
-    startPoint: null,
-    cursorPoint: null,
-    selection: null,
-    hoverSelection: null,
-    candidateDetectionMode: 'window',
-    editGesture: null,
-    activeAnnotationTool: null,
-    annotationGesture: null,
-    draftAnnotation: null,
-    selectedAnnotationIndex: null,
-    annotationMoveGesture: null,
-    draftSelectionMoveGesture: null,
-    textDraft: null,
-    textDraftAnnotationIndex: null,
-    annotationHistory: emptyAnnotationHistory(),
-    isAnnotationToolbarVisible: true,
-    cursorColor: null,
-    colorSampleFormat: 'hex',
-    isMagnifierRequested: false,
-    isRenderingOutput: false,
-    silentOcrHint: null,
-    includeCapturedCursor: false,
-    error: null,
-  };
-}
-
-export function loadedCaptureHostSessionPatch(
-  loaded: LoadedCaptureHostSession,
-): Partial<CaptureWorkspaceState> {
-  return {
-    session: loaded.session,
-    status: 'selecting',
-    cursorPoint: loaded.cursorPoint,
-    hoverSelection: loaded.hoverSelection,
-  };
-}
-
-export function previewResetPatch(): Partial<CaptureWorkspaceState> {
-  const { renderingOutput, ...resetState } = createCapturePreviewResetState();
-
-  return {
-    ...resetState,
-    isRenderingOutput: renderingOutput,
   };
 }

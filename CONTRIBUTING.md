@@ -21,7 +21,7 @@ Read [AGENTS.md](AGENTS.md), [ARCHITECTURE.md](ARCHITECTURE.md), [CONTEXT.md](CO
 
 Application modules own workflow policy and declare the ports they consume. Composition selects concrete adapters. Views own rendering and browser mechanics. Provider protocol rules remain with the Provider module. Tests should exercise the same interface as callers and verify observable outcomes.
 
-SQLite schema changes need a new ordered migration. History and Favorites keep independent storage models. Update current documentation when behavior or ownership changes; completed design notes belong in [the archive](docs/archive/README.md).
+SQLite schema changes need a new ordered migration. History and Favorites keep independent storage models. Update current documentation when behavior or ownership changes. Keep lasting requirements and decisions in the product specifications and ADRs; remove temporary implementation plans, progress notes, and review transcripts after completion. Historical product specifications belong in [the archive](docs/archive/README.md).
 
 ## Verification
 

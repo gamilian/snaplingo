@@ -1,4 +1,4 @@
-import { shouldRecordSuccessfulCaptureCompletion } from './captureInteractionModel';
+import { shouldRecordSuccessfulCaptureSelection } from './captureActions';
 import type { CaptureCompletionAction, SelectionHistoryStep } from './captureActions';
 import {
   getSelectionHistoryEntry,
@@ -24,7 +24,7 @@ export function recordSuccessfulCaptureSelection(
   action: CaptureCompletionAction,
   rect: LogicalRect,
 ) {
-  if (!shouldRecordSuccessfulCaptureCompletion(action)) return;
+  if (!shouldRecordSuccessfulCaptureSelection(action)) return;
   saveLastCaptureSelection(storage, rect);
 }
 

@@ -1,14 +1,10 @@
 import type { AnnotationHistory } from './annotationHistory';
 import { emptyAnnotationHistory } from './annotationHistory';
 import type { CaptureCandidate } from './captureCandidates';
-import {
-  getCandidateForPointerReleaseCompletion,
-  getNextCandidateAtPoint,
-} from './captureCandidates';
+import { getCandidateForPointerReleaseCompletion } from './captureCandidates';
 import type { SelectionArrowAction } from './captureActions';
 import {
   constrainSelectionPoint,
-  moveDraftSelectionByDelta,
   moveSelectionByDelta,
   normalizeSelection,
   nudgeDraftSelection,
@@ -88,60 +84,6 @@ export interface CaptureDraftSelectionMoveGesture {
   startPoint: Point;
   startSelection: LogicalRect;
   startAnchorPoint: Point;
-}
-
-export interface CaptureDraftSelectionMoveShortcutStartPlan {
-  draftSelectionMoveGesture: CaptureDraftSelectionMoveGesture;
-}
-
-export function planCaptureDraftSelectionMoveShortcutStart({
-  cursorPoint,
-  selection,
-  anchorPoint,
-}: {
-  cursorPoint: Point;
-  selection: LogicalRect;
-  anchorPoint: Point;
-}): CaptureDraftSelectionMoveShortcutStartPlan {
-  return {
-    draftSelectionMoveGesture: {
-      startPoint: cursorPoint,
-      startSelection: selection,
-      startAnchorPoint: anchorPoint,
-    },
-  };
-}
-
-export interface CaptureDraftSelectionMovePlan {
-  draftSelection: LogicalRect;
-  anchorPoint: Point;
-  renderingOutput: false;
-}
-
-export function planCaptureDraftSelectionMove({
-  gesture,
-  point,
-  selectionBounds,
-}: {
-  gesture: CaptureDraftSelectionMoveGesture;
-  point: Point;
-  selectionBounds: LogicalRect;
-}): CaptureDraftSelectionMovePlan {
-  const result = moveDraftSelectionByDelta(
-    gesture.startSelection,
-    gesture.startAnchorPoint,
-    {
-      x: point.x - gesture.startPoint.x,
-      y: point.y - gesture.startPoint.y,
-    },
-    selectionBounds,
-  );
-
-  return {
-    draftSelection: result.selection,
-    anchorPoint: result.anchorPoint,
-    renderingOutput: false,
-  };
 }
 
 export interface CaptureDraftSelectionPointerMovePlan {
@@ -438,32 +380,6 @@ export function planCaptureSelectionCursorKeyboardNudge({
 }): CaptureSelectionCursorKeyboardNudgePlan {
   return {
     cursorPoint: nudgeVirtualPoint(cursorPoint, delta, selectionBounds),
-  };
-}
-
-export interface CaptureHoverSelectionCyclePlan {
-  hoverSelection: LogicalRect | null;
-}
-
-export function planCaptureHoverSelectionCycle({
-  captureCandidates,
-  cursorPoint,
-  hoverSelection,
-  direction,
-}: {
-  captureCandidates: CaptureCandidate[];
-  cursorPoint: Point;
-  hoverSelection: LogicalRect | null;
-  direction: 1 | -1;
-}): CaptureHoverSelectionCyclePlan {
-  return {
-    hoverSelection:
-      getNextCandidateAtPoint(
-        captureCandidates,
-        cursorPoint,
-        hoverSelection,
-        direction,
-      )?.rect ?? null,
   };
 }
 

@@ -44,8 +44,8 @@ docs/
   architecture/            Current runtime and ownership maps
   prd/                     Product specifications index
   releases/                Versioned release notes
-  archive/                 Historical PRDs and completed architecture work
-designs/                   Visual explorations and archived prototypes
+  archive/                 Historical product requirements
+designs/                   Current visual explorations and previews
 script/                    Development and release verification
 ```
 
