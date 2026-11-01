@@ -27,7 +27,6 @@ const resultWindowOcrTextAreaMinHeightPx = 72;
 const resultWindowTextAreaSlackRatio = 0.75;
 const resultWindowTextAreaMinSlackPx = 10;
 const resultWindowTextAreaMaxSlackPx = 16;
-const resultWindowStandaloneContainerPaddingPx = 16;
 const resultWindowTranslationFixedLineHeight = 1.38;
 const resultWindowInitialBlurGraceMs = 300;
 
@@ -373,10 +372,6 @@ export function resultWindowResultsListClassName() {
 
 export function resultWindowResultsSectionClassName() {
   return 'flex min-h-0 flex-none flex-col';
-}
-
-export function resultWindowStandaloneWindowHeight(panelHeightPx: number) {
-  return panelHeightPx + resultWindowStandaloneContainerPaddingPx;
 }
 
 export function resultWindowTranslationSubtitle(

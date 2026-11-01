@@ -60,27 +60,6 @@ export function restoreSelectionWithinBounds(
   return moveSelectionByDelta(rect, { x: 0, y: 0 }, bounds);
 }
 
-export function moveDraftSelectionByDelta(
-  rect: LogicalRect,
-  anchorPoint: Point,
-  delta: Point,
-  bounds: LogicalRect,
-) {
-  const selection = moveSelectionByDelta(rect, delta, bounds);
-  const appliedDelta = {
-    x: selection.x - rect.x,
-    y: selection.y - rect.y,
-  };
-
-  return {
-    selection,
-    anchorPoint: {
-      x: anchorPoint.x + appliedDelta.x,
-      y: anchorPoint.y + appliedDelta.y,
-    },
-  };
-}
-
 export function nudgeDraftSelection(
   anchorPoint: Point,
   cursorPoint: Point,

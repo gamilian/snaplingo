@@ -18,24 +18,3 @@ export function readCaptureLaunch(search: string): CaptureLaunch | null {
     sessionId: params.get('sessionId') || undefined,
   };
 }
-
-export function parseCaptureLaunchPayload(payload: unknown): CaptureLaunch | null {
-  if (isCaptureMode(payload)) {
-    return { mode: payload };
-  }
-
-  if (!payload || typeof payload !== 'object') {
-    return null;
-  }
-
-  const candidate = payload as { mode?: unknown; sessionId?: unknown };
-  if (!isCaptureMode(candidate.mode)) {
-    return null;
-  }
-
-  return {
-    mode: candidate.mode,
-    sessionId:
-      typeof candidate.sessionId === 'string' ? candidate.sessionId : undefined,
-  };
-}

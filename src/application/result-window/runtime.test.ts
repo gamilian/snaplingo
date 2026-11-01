@@ -1,8 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  createResultWindowRuntime,
-  resultWindowStandaloneWindowHeight,
-} from './runtime';
+import { createResultWindowRuntime } from './runtime';
 import type { ResultWindowState } from './projection';
 import type { TranslationResult } from '../../domain/translation';
 import type { TranslationSettings } from '../settings/ports';
@@ -521,10 +518,7 @@ describe('result window application runtime', () => {
     });
 
     expect(platform.resizeTo).toHaveBeenCalledOnce();
-    expect(platform.resizeTo).toHaveBeenCalledWith(
-      660,
-      resultWindowStandaloneWindowHeight(300),
-    );
+    expect(platform.resizeTo).toHaveBeenCalledWith(660, 316);
   });
 
   it('applies configured width only to translation windows', async () => {
@@ -555,16 +549,8 @@ describe('result window application runtime', () => {
       panelHeightPx: 300,
     });
 
-    expect(platform.resizeTo).toHaveBeenNthCalledWith(
-      1,
-      720,
-      resultWindowStandaloneWindowHeight(300),
-    );
-    expect(platform.resizeTo).toHaveBeenNthCalledWith(
-      2,
-      660,
-      resultWindowStandaloneWindowHeight(300),
-    );
+    expect(platform.resizeTo).toHaveBeenNthCalledWith(1, 720, 316);
+    expect(platform.resizeTo).toHaveBeenNthCalledWith(2, 660, 316);
   });
 
   it('places translation and OCR windows from their configured trigger settings', async () => {

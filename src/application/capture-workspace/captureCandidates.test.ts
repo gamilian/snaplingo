@@ -5,7 +5,6 @@ import {
   getBestCandidateAtPoint,
   getCandidateForPointerCompletion,
   getCandidateForPointerReleaseCompletion,
-  getNextCandidateAtPoint,
   type CaptureCandidate,
 } from './captureCandidates';
 import type { CaptureCandidateView, MonitorSnapshotView } from '../../domain/capture';
@@ -223,47 +222,6 @@ describe('capture candidates', () => {
     expect(getBestCandidateAtPoint(candidates, { x: 120, y: 120 })?.id).toBe(
       'window:editor',
     );
-  });
-
-  it('cycles candidates under a point by priority and area', () => {
-    const candidates: CaptureCandidate[] = [
-      {
-        id: 'monitor:primary',
-        kind: 'monitor',
-        rect: { x: 0, y: 0, width: 1440, height: 900 },
-        priority: 0,
-      },
-      {
-        id: 'window:outer',
-        kind: 'window',
-        rect: { x: 100, y: 100, width: 700, height: 500 },
-        priority: 10,
-      },
-      {
-        id: 'window:inner',
-        kind: 'window',
-        rect: { x: 200, y: 150, width: 200, height: 150 },
-        priority: 10,
-      },
-    ];
-
-    const point = { x: 220, y: 170 };
-
-    expect(getNextCandidateAtPoint(candidates, point, null, 1)?.id).toBe(
-      'window:inner',
-    );
-    expect(
-      getNextCandidateAtPoint(candidates, point, candidates[2].rect, 1)?.id,
-    ).toBe('window:outer');
-    expect(
-      getNextCandidateAtPoint(candidates, point, candidates[1].rect, 1)?.id,
-    ).toBe('monitor:primary');
-    expect(
-      getNextCandidateAtPoint(candidates, point, candidates[0].rect, 1)?.id,
-    ).toBe('window:inner');
-    expect(
-      getNextCandidateAtPoint(candidates, point, candidates[2].rect, -1)?.id,
-    ).toBe('monitor:primary');
   });
 
   it('falls back to the candidate under the pointer when no hover selection is active', () => {

@@ -38,7 +38,7 @@ export function getBestCandidateAtPoint(
   candidates: CaptureCandidate[],
   point: Point,
 ): CaptureCandidate | null {
-  return sortCandidatesAtPoint(candidates, point, false)[0] ?? null;
+  return sortCandidatesAtPoint(candidates, point)[0] ?? null;
 }
 
 export function getCandidateForPointerCompletion(
@@ -70,39 +70,12 @@ export function getCandidateForPointerReleaseCompletion(
   return getCandidateForPointerCompletion(candidates, point, activeRect);
 }
 
-export function getNextCandidateAtPoint(
-  candidates: CaptureCandidate[],
-  point: Point,
-  currentRect: LogicalRect | null,
-  direction: 1 | -1,
-): CaptureCandidate | null {
-  const matches = sortCandidatesAtPoint(candidates, point, true);
-  if (matches.length === 0) return null;
-
-  const currentIndex = currentRect
-    ? matches.findIndex((candidate) => areRectsEqual(candidate.rect, currentRect))
-    : -1;
-  const nextIndex =
-    currentIndex === -1
-      ? direction === 1
-        ? 0
-        : matches.length - 1
-      : (currentIndex + direction + matches.length) % matches.length;
-
-  return matches[nextIndex];
-}
-
 function sortCandidatesAtPoint(
   candidates: CaptureCandidate[],
   point: Point,
-  includeMonitorCandidates: boolean,
 ): CaptureCandidate[] {
   return candidates
-    .filter((candidate) =>
-      includeMonitorCandidates
-        ? true
-        : isAutomaticHoverCandidate(candidate, candidates),
-    )
+    .filter((candidate) => isAutomaticHoverCandidate(candidate, candidates))
     .filter((candidate) => containsPoint(candidate.rect, point))
     .sort((a, b) => {
       if (a.priority !== b.priority) return b.priority - a.priority;

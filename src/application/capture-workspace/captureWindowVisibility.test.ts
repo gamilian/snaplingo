@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   getCaptureWindowRevealPermissions,
-  revealCaptureWindow,
-  revealCaptureWindowForSession,
   shouldRevealCaptureWindow,
 } from './captureWindowVisibility';
 
@@ -60,49 +58,6 @@ describe('capture window visibility', () => {
         hasRevealed: true,
       }),
     ).toBe(false);
-  });
-
-  it('delegates capture window reveal to the native client', async () => {
-    const calls: string[] = [];
-    await revealCaptureWindow({
-      revealCaptureWindow: async () => {
-        calls.push('native_reveal_capture_window');
-      },
-      restoreCaptureSnapshotWindowsForSession: async () => {
-        calls.push('restore');
-      },
-    });
-
-    expect(calls).toEqual(['native_reveal_capture_window']);
-  });
-
-  it('keeps the native capture presentation active after reveal', async () => {
-    const calls: string[] = [];
-    await revealCaptureWindowForSession({
-      sessionId: 'capture-1',
-      prepareSurface: async () => {
-        calls.push('prepare_surface');
-      },
-      client: {
-        prepareCaptureWindowForReveal: async () => {
-          calls.push('native_prepare_capture_window');
-        },
-        revealCaptureWindow: async () => {
-          calls.push('native_reveal_capture_window');
-        },
-        restoreCaptureSnapshotWindowsForSession: async (sessionId) => {
-          calls.push(
-            `restore_capture_snapshot_windows_for_session:${sessionId}`,
-          );
-        },
-      },
-    });
-
-    expect(calls).toEqual([
-      'native_prepare_capture_window',
-      'prepare_surface',
-      'native_reveal_capture_window',
-    ]);
   });
 
   it('declares the Tauri permissions required for delayed capture reveal', () => {

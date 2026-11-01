@@ -72,7 +72,6 @@ pub struct AppState {
     pub selection: Arc<SelectionRuntime>,
     pub logs: Arc<LogsRuntime>,
     pub tts: Arc<TtsRuntime>,
-    #[allow(dead_code)] // Wired in Task 3; commands consume it in the following Task 4.
     pub(crate) result_window: Arc<ResultWindowRuntime>,
 }
 

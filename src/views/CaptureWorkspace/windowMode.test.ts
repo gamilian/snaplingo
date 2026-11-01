@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  parseCaptureLaunchPayload,
-  readCaptureLaunch,
-} from './windowMode';
+import { readCaptureLaunch } from './windowMode';
 
 describe('capture window mode parsing', () => {
   it('treats a capture window without mode as a prewarmed idle window', () => {
@@ -26,17 +23,5 @@ describe('capture window mode parsing', () => {
 
   it('ignores invalid capture launch modes', () => {
     expect(readCaptureLaunch('?window=capture&mode=settings')).toBeNull();
-  });
-
-  it('parses hotkey payloads for prewarmed capture windows', () => {
-    expect(
-      parseCaptureLaunchPayload({
-        mode: 'screenshot-translate',
-        sessionId: 'session-2',
-      }),
-    ).toEqual({
-      mode: 'screenshot-translate',
-      sessionId: 'session-2',
-    });
   });
 });

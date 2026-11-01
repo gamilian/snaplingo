@@ -18,7 +18,6 @@ import {
   resultWindowPinButtonClassName,
   resultWindowResultsSectionClassName,
   resultWindowResultsListClassName,
-  resultWindowStandaloneWindowHeight,
   resultWindowTranslationMeasuredPanelHeight,
   resultWindowTranslationSubtitle,
   resultWindowTextAreaClassName,
@@ -371,10 +370,6 @@ describe('result window presentation', () => {
     );
     expect(trailingNewlineLayout.resultsHeightPx).toBe(cleanLayout.resultsHeightPx);
     expect(trailingNewlineLayout.windowHeightPx).toBe(cleanLayout.windowHeightPx);
-  });
-
-  it('adds standalone container padding to the native window height', () => {
-    expect(resultWindowStandaloneWindowHeight(794)).toBe(810);
   });
 
   it('allocates pending provider body height and bottom breathing room', () => {
