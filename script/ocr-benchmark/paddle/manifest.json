@@ -1,0 +1,388 @@
+{
+  "recorded_at_utc": "2026-11-01T08:09:19.794451+00:00",
+  "root": "/tmp/snaplingo-ocr-benchmark/paddle",
+  "sdk": [
+    {
+      "directory": "/tmp/snaplingo-ocr-benchmark/paddle/paddle_inference_install_dir",
+      "version_txt": "Paddle version: 3.0.0\nGIT COMMIT ID: 6ed5dd3833c32c3b21e14b1fb1a71f5a535a0fcc\nWITH_MKL: OFF\nWITH_ONEDNN: OFF\nWITH_OPENVINO: OFF\nWITH_GPU: OFF\nWITH_ROCM: OFF\nWITH_IPU: OFF\nCXX compiler version: 12.0.5.12050022\n",
+      "runtime_dependencies": "/tmp/snaplingo-ocr-benchmark/paddle/paddle_inference_install_dir/paddle/lib/libpaddle_inference.dylib:\n\t@rpath/libpaddle_inference.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t@rpath/libphi.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t@rpath/libphi_core.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t/System/Library/Frameworks/Accelerate.framework/Versions/A/Accelerate (compatibility version 1.0.0, current version 4.0.0)\n\t@rpath/libcommon.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t/usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 905.6.0)\n\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1292.100.5)\n",
+      "static_library_bytes": null,
+      "all_runtime_dependencies": {
+        "libcommon.dylib": "/tmp/snaplingo-ocr-benchmark/paddle/paddle_inference_install_dir/paddle/lib/libcommon.dylib:\n\t@rpath/libcommon.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t/usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 905.6.0)\n\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1292.100.5)\n",
+        "libpaddle_inference.dylib": "/tmp/snaplingo-ocr-benchmark/paddle/paddle_inference_install_dir/paddle/lib/libpaddle_inference.dylib:\n\t@rpath/libpaddle_inference.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t@rpath/libphi.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t@rpath/libphi_core.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t/System/Library/Frameworks/Accelerate.framework/Versions/A/Accelerate (compatibility version 1.0.0, current version 4.0.0)\n\t@rpath/libcommon.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t/usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 905.6.0)\n\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1292.100.5)\n",
+        "libphi.dylib": "/tmp/snaplingo-ocr-benchmark/paddle/paddle_inference_install_dir/paddle/lib/libphi.dylib:\n\t@rpath/libphi.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t@rpath/libphi_core.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t/System/Library/Frameworks/Accelerate.framework/Versions/A/Accelerate (compatibility version 1.0.0, current version 4.0.0)\n\t@rpath/libcommon.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t/usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 905.6.0)\n\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1292.100.5)\n",
+        "libphi_core.dylib": "/tmp/snaplingo-ocr-benchmark/paddle/paddle_inference_install_dir/paddle/lib/libphi_core.dylib:\n\t@rpath/libphi_core.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t@rpath/libcommon.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t/System/Library/Frameworks/Accelerate.framework/Versions/A/Accelerate (compatibility version 1.0.0, current version 4.0.0)\n\t/usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 905.6.0)\n\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1292.100.5)\n"
+      },
+      "macos_deployment_target": "11.4",
+      "macho_build_versions": {
+        "libcommon.dylib": "/tmp/snaplingo-ocr-benchmark/paddle/paddle_inference_install_dir/paddle/lib/libcommon.dylib:\nLoad command 9\n      cmd LC_BUILD_VERSION\n  cmdsize 32\n platform MACOS\n    minos 11.4\n      sdk 11.3\n   ntools 1\n     tool LD\n  version 650.9\n",
+        "libpaddle_inference.dylib": "/tmp/snaplingo-ocr-benchmark/paddle/paddle_inference_install_dir/paddle/lib/libpaddle_inference.dylib:\nLoad command 9\n      cmd LC_BUILD_VERSION\n  cmdsize 32\n platform MACOS\n    minos 11.4\n      sdk 11.3\n   ntools 1\n     tool LD\n  version 650.9\n",
+        "libphi.dylib": "/tmp/snaplingo-ocr-benchmark/paddle/paddle_inference_install_dir/paddle/lib/libphi.dylib:\nLoad command 7\n      cmd LC_BUILD_VERSION\n  cmdsize 32\n platform MACOS\n    minos 11.4\n      sdk 11.3\n   ntools 1\n     tool LD\n  version 650.9\n",
+        "libphi_core.dylib": "/tmp/snaplingo-ocr-benchmark/paddle/paddle_inference_install_dir/paddle/lib/libphi_core.dylib:\nLoad command 9\n      cmd LC_BUILD_VERSION\n  cmdsize 32\n platform MACOS\n    minos 11.4\n      sdk 11.3\n   ntools 1\n     tool LD\n  version 650.9\n"
+      }
+    },
+    {
+      "directory": "/tmp/snaplingo-ocr-benchmark/paddle/sdk-3.3.1/paddle_inference_install_dir",
+      "version_txt": "Paddle version: 3.3.0.dev20260319\nGIT COMMIT ID: 7688495538f4d6c1893f084dd238a402e8f68ab6\nWITH_MKL: OFF\nWITH_ONEDNN: OFF\nWITH_OPENVINO: OFF\nWITH_GPU: OFF\nWITH_ROCM: OFF\nWITH_IPU: OFF\nCXX compiler version: 14.0.3.14030022\n",
+      "runtime_dependencies": "/tmp/snaplingo-ocr-benchmark/paddle/sdk-3.3.1/paddle_inference_install_dir/paddle/lib/libpaddle_inference.dylib:\n\t@rpath/libpaddle_inference.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t@rpath/libphi.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t@rpath/libphi_core.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t/System/Library/Frameworks/Accelerate.framework/Versions/A/Accelerate (compatibility version 1.0.0, current version 4.0.0)\n\t@rpath/libcommon.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t/usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 1500.65.0)\n\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1319.100.3)\n",
+      "static_library_bytes": null,
+      "all_runtime_dependencies": {
+        "libcommon.dylib": "/tmp/snaplingo-ocr-benchmark/paddle/sdk-3.3.1/paddle_inference_install_dir/paddle/lib/libcommon.dylib:\n\t@rpath/libcommon.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t/usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 1500.65.0)\n\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1319.100.3)\n",
+        "libpaddle_inference.dylib": "/tmp/snaplingo-ocr-benchmark/paddle/sdk-3.3.1/paddle_inference_install_dir/paddle/lib/libpaddle_inference.dylib:\n\t@rpath/libpaddle_inference.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t@rpath/libphi.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t@rpath/libphi_core.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t/System/Library/Frameworks/Accelerate.framework/Versions/A/Accelerate (compatibility version 1.0.0, current version 4.0.0)\n\t@rpath/libcommon.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t/usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 1500.65.0)\n\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1319.100.3)\n",
+        "libphi.dylib": "/tmp/snaplingo-ocr-benchmark/paddle/sdk-3.3.1/paddle_inference_install_dir/paddle/lib/libphi.dylib:\n\t@rpath/libphi.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t@rpath/libphi_core.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t/System/Library/Frameworks/Accelerate.framework/Versions/A/Accelerate (compatibility version 1.0.0, current version 4.0.0)\n\t@rpath/libcommon.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t/usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 1500.65.0)\n\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1319.100.3)\n",
+        "libphi_core.dylib": "/tmp/snaplingo-ocr-benchmark/paddle/sdk-3.3.1/paddle_inference_install_dir/paddle/lib/libphi_core.dylib:\n\t@rpath/libphi_core.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t@rpath/libcommon.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t/System/Library/Frameworks/Accelerate.framework/Versions/A/Accelerate (compatibility version 1.0.0, current version 4.0.0)\n\t/usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 1500.65.0)\n\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1319.100.3)\n"
+      },
+      "macos_deployment_target": "13.6",
+      "macho_build_versions": {
+        "libcommon.dylib": "/tmp/snaplingo-ocr-benchmark/paddle/sdk-3.3.1/paddle_inference_install_dir/paddle/lib/libcommon.dylib:\nLoad command 10\n      cmd LC_BUILD_VERSION\n  cmdsize 32\n platform MACOS\n    minos 13.6\n      sdk 13.3\n   ntools 1\n     tool LD\n  version 857.1\n",
+        "libpaddle_inference.dylib": "/tmp/snaplingo-ocr-benchmark/paddle/sdk-3.3.1/paddle_inference_install_dir/paddle/lib/libpaddle_inference.dylib:\nLoad command 10\n      cmd LC_BUILD_VERSION\n  cmdsize 32\n platform MACOS\n    minos 13.6\n      sdk 13.3\n   ntools 1\n     tool LD\n  version 857.1\n",
+        "libphi.dylib": "/tmp/snaplingo-ocr-benchmark/paddle/sdk-3.3.1/paddle_inference_install_dir/paddle/lib/libphi.dylib:\nLoad command 8\n      cmd LC_BUILD_VERSION\n  cmdsize 32\n platform MACOS\n    minos 13.6\n      sdk 13.3\n   ntools 1\n     tool LD\n  version 857.1\n",
+        "libphi_core.dylib": "/tmp/snaplingo-ocr-benchmark/paddle/sdk-3.3.1/paddle_inference_install_dir/paddle/lib/libphi_core.dylib:\nLoad command 10\n      cmd LC_BUILD_VERSION\n  cmdsize 32\n platform MACOS\n    minos 13.6\n      sdk 13.3\n   ntools 1\n     tool LD\n  version 857.1\n"
+      }
+    }
+  ],
+  "files": [
+    {
+      "file": "models/PP-OCRv5_mobile_det_infer/inference.json",
+      "bytes": 229777,
+      "sha256": "05feef1acb00aa4cd7362b15f7f501fc4f99d7b1fa73c1c871e0c7b1504b0f5c",
+      "pir_base_code": {
+        "magic": "pir",
+        "trainable": true,
+        "version": 1
+      },
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv5_mobile_det_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv5_mobile_det_infer/inference.pdiparams",
+      "bytes": 4692937,
+      "sha256": "afa1820cb16c1fd0dad589d0f8b389139061c1ef6d68019685fd07be997dda5b",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv5_mobile_det_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv5_mobile_det_infer/inference.yml",
+      "bytes": 903,
+      "sha256": "98069072e1b6b37d727fd9d9f11725faa46d6ea0de012f2ed26caea011c37699",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv5_mobile_det_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv5_mobile_det_infer.tar",
+      "bytes": 4935680,
+      "sha256": "50446e5d01ac2a73d5319c89513281f6578414c888c602f9af13f93feefffc58",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv5_mobile_det_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv5_mobile_rec_infer/inference.json",
+      "bytes": 217724,
+      "sha256": "24587345250c7332d0fc6f9a44e794d078cdaeb64c302fef906f325619de2569",
+      "pir_base_code": {
+        "magic": "pir",
+        "trainable": true,
+        "version": 1
+      },
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv5_mobile_rec_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv5_mobile_rec_infer/inference.pdiparams",
+      "bytes": 16458665,
+      "sha256": "2460da90875937c94db97eba74ae3d9e5d4c4c57c42f1f41531c09a26bcc771a",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv5_mobile_rec_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv5_mobile_rec_infer/inference.yml",
+      "bytes": 148345,
+      "sha256": "5dfeb2777f6d0db8177d8128a8acfcf6e6276dc4ac73ea3bf0dc06d6a5e85d8e",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv5_mobile_rec_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv5_mobile_rec_infer.tar",
+      "bytes": 16834560,
+      "sha256": "566b9512b34e34a9f0db54d87b51fa5a0b9ed2cf1ab7e49728cc0b8b5a64f414",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv5_mobile_rec_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv5_server_det_infer/inference.json",
+      "bytes": 402480,
+      "sha256": "af5876933d8806a1b50d895867e0781e135cd92ff37381992828fc8d1b842d28",
+      "pir_base_code": {
+        "magic": "pir",
+        "trainable": true,
+        "version": 1
+      },
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv5_server_det_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv5_server_det_infer/inference.pdiparams",
+      "bytes": 87932887,
+      "sha256": "183146fe9d9910352f68482f623bcbbb9fa7b9e8fa1463b9ad288cef00524d2d",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv5_server_det_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv5_server_det_infer/inference.yml",
+      "bytes": 903,
+      "sha256": "28fb721efc3634fc8aa677e474b9602cb815a91cf569ef357a7a553d7b3ce685",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv5_server_det_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv5_server_det_infer.tar",
+      "bytes": 88340480,
+      "sha256": "22a33e0ba6a21425ea4192da03bf4395c9a0c67902bd924b7328fc859073045d",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv5_server_det_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv5_server_rec_infer/inference.json",
+      "bytes": 325204,
+      "sha256": "8e6e12e5d42531840310977fffb58165bf889fc5061408c5a8afdb6985f47fcb",
+      "pir_base_code": {
+        "magic": "pir",
+        "trainable": true,
+        "version": 1
+      },
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv5_server_rec_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv5_server_rec_infer/inference.pdiparams",
+      "bytes": 84390117,
+      "sha256": "63853f062a5f4089befc16f565a68277618e0da5cb45468b49d11079de0ada77",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv5_server_rec_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv5_server_rec_infer/inference.yml",
+      "bytes": 148345,
+      "sha256": "2c719dba044c4e2228aef8ff92f5f575394d75d24c16de096a33b7cfd902f66d",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv5_server_rec_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv5_server_rec_infer.tar",
+      "bytes": 84869120,
+      "sha256": "d99be2ffd348943ab52876179168be4fb5b14f5f0812f2ae4c76d89ec2ea750a",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv5_server_rec_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv6_medium_det_infer/inference.json",
+      "bytes": 312150,
+      "sha256": "0f1a7ec35da36173529c7a60238b7f7919e3831929c3f700ad90ad4896adecd5",
+      "pir_base_code": {
+        "magic": "pir",
+        "trainable": true,
+        "version": 3
+      },
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_medium_det_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv6_medium_det_infer/inference.pdiparams",
+      "bytes": 61960476,
+      "sha256": "85218d2e3d98f5a21c58b4220627be923a97aee5db3cc71f39536ab31ac53960",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_medium_det_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv6_medium_det_infer/inference.yml",
+      "bytes": 886,
+      "sha256": "7298d5ead546584af2504d03355f881ac7a7bc0eb1e282d3e159277c1d0af871",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_medium_det_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv6_medium_det_infer.tar",
+      "bytes": 62279680,
+      "sha256": "144d0621e059566e5086e228829171591c144c2deb07b2dad4962214fbabfcf7",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_medium_det_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv6_medium_rec_infer/inference.json",
+      "bytes": 221814,
+      "sha256": "0b2e25e990bd072f1bf77d59d67d508bce6c4bd44af6624e0fb27d6da2cd00e8",
+      "pir_base_code": {
+        "magic": "pir",
+        "trainable": true,
+        "version": 3
+      },
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_medium_rec_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv6_medium_rec_infer/inference.pdiparams",
+      "bytes": 76465087,
+      "sha256": "1b01c79a914587933f615569e75de54f2e638ebb5d3f3b3c1b38c24ede8c7319",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_medium_rec_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv6_medium_rec_infer/inference.yml",
+      "bytes": 150580,
+      "sha256": "991b700facf5b50a7de193468207d5f4255b538dde0d312ae3b7c7a9b6873129",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_medium_rec_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv6_medium_rec_infer.tar",
+      "bytes": 76851200,
+      "sha256": "4eecc1c6a4623765042e6fc15446da0da110b7d875b6b72b2d351d2b2dbd4da6",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_medium_rec_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv6_small_det_infer/inference.json",
+      "bytes": 229307,
+      "sha256": "89240f689a4a77aad75ef55a8df0a15c8e1d4980a327d17e58f24bbadde5aeab",
+      "pir_base_code": {
+        "magic": "pir",
+        "trainable": true,
+        "version": 3
+      },
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_small_det_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv6_small_det_infer/inference.pdiparams",
+      "bytes": 9817888,
+      "sha256": "5043d4ccc8d63402ccea8feefcee4db57077431a873e78d2191836a178a492da",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_small_det_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv6_small_det_infer/inference.yml",
+      "bytes": 885,
+      "sha256": "193f435274bf9f0b5f71a929bbfbcf148282df7e633b34e7c373e8f44741b516",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_small_det_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv6_small_det_infer.tar",
+      "bytes": 10055680,
+      "sha256": "bfb7c1e59f0faa6b540ebdca93aea3f4b1f2477805b389fbee117820d68fe9f5",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_small_det_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv6_small_rec_infer/inference.json",
+      "bytes": 208004,
+      "sha256": "f0bf53c853937a917affdd74467472167727f8ab0f0f7bded01c4a16c27e46e6",
+      "pir_base_code": {
+        "magic": "pir",
+        "trainable": true,
+        "version": 3
+      },
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_small_rec_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv6_small_rec_infer/inference.pdiparams",
+      "bytes": 21074618,
+      "sha256": "406e1e689c9a7fbb04178007a3fe10cf852afe7bf8bb3bc6dbb9d532b13bd907",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_small_rec_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv6_small_rec_infer/inference.yml",
+      "bytes": 150579,
+      "sha256": "ab078671bb49f06228eadccd34f1bb501e157f7a047095ffb943ba81512c77d1",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_small_rec_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv6_small_rec_infer.tar",
+      "bytes": 21442560,
+      "sha256": "da460f968ce9f88325ac3a34fa302077d6e9b0dcefb16ba3137cd7796f879d06",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_small_rec_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv6_tiny_det_infer/inference.json",
+      "bytes": 229184,
+      "sha256": "935c18972799dd8f2a2ff424b9f8b2c6adee4b89f3a76f0746210ec33ba9b3d8",
+      "pir_base_code": {
+        "magic": "pir",
+        "trainable": true,
+        "version": 3
+      },
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_tiny_det_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv6_tiny_det_infer/inference.pdiparams",
+      "bytes": 1718055,
+      "sha256": "853f7ed317d4f2f80de646842e5bbc32f9d39c601562cbe466cda42e4bafb1b1",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_tiny_det_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv6_tiny_det_infer/inference.yml",
+      "bytes": 883,
+      "sha256": "3ac018be6f97499a08faa3bbdeb33640968d9307f6736d152902747a9f259593",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_tiny_det_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv6_tiny_det_infer.tar",
+      "bytes": 1955840,
+      "sha256": "33a23c5e18d83208f9eeeccd00ed789af891786ac9255c83aeb2495b3db9ce63",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_tiny_det_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv6_tiny_rec_infer/inference.json",
+      "bytes": 108959,
+      "sha256": "b5b14770c7dcf092781e92f4278a2ae5f95048f08b4b8a04140e88cb2745f147",
+      "pir_base_code": {
+        "magic": "pir",
+        "trainable": true,
+        "version": 3
+      },
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_tiny_rec_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv6_tiny_rec_infer/inference.pdiparams",
+      "bytes": 4420410,
+      "sha256": "bb2f8f54d1e25f28c71b6fa4fe23f5940e159cae27fbee96155c99f822156e57",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_tiny_rec_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv6_tiny_rec_infer/inference.yml",
+      "bytes": 55571,
+      "sha256": "66170210bad538e83fff3c4a3867e547d6bf20b50d64b20347c4b913f3034ea1",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_tiny_rec_infer.tar"
+    },
+    {
+      "file": "models/PP-OCRv6_tiny_rec_infer.tar",
+      "bytes": 4597760,
+      "sha256": "54403af57bc53981d3dce091c6c80dfc5ae30d58495541777126a54bac450604",
+      "source_url": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv6_tiny_rec_infer.tar"
+    },
+    {
+      "file": "paddle_inference-3.0.0-macos-arm64.tgz",
+      "bytes": 132075021,
+      "sha256": "465e26f6ab1e586f3860dcda3ba93ecfb406f69702326347ecc6fe0f2a020050",
+      "source_url": "https://paddle-inference-lib.bj.bcebos.com/3.0.0/cxx_c/MacOS/m1_clang_noavx_accelerate_blas/paddle_inference.tgz"
+    },
+    {
+      "file": "paddle_inference-3.3.1-macos-arm64.tgz",
+      "bytes": 134706706,
+      "sha256": "f0589b1d4909554202581242478192c049b980ad182699b00919faff992e7349",
+      "source_url": "https://paddle-inference-lib.bj.bcebos.com/3.3.1/cxx_c/MacOS/m1_clang_noavx_accelerate_blas/paddle_inference.tgz"
+    },
+    {
+      "file": "paddle_inference_install_dir/paddle/lib/libcommon.dylib",
+      "bytes": 419676,
+      "sha256": "2ddacc515381b1d71b2564d7444d171de3433908fa39bd28562e7f8b1885a900"
+    },
+    {
+      "file": "paddle_inference_install_dir/paddle/lib/libpaddle_inference.dylib",
+      "bytes": 174784118,
+      "sha256": "606354d9cfad5b1843aa4347a1aa6aa8183a371844d1ebddd0f1e144e7a34c59"
+    },
+    {
+      "file": "paddle_inference_install_dir/paddle/lib/libphi.dylib",
+      "bytes": 16713,
+      "sha256": "13d269bec23002420354f9cb3e74bc6933d3211651c2492e8b41882b16fe2e5a"
+    },
+    {
+      "file": "paddle_inference_install_dir/paddle/lib/libphi_core.dylib",
+      "bytes": 74036814,
+      "sha256": "6944b8c8da2739252024faee6ed8864080d53ee4130c5926fd995972e11d010a"
+    },
+    {
+      "file": "sdk-3.3.1/paddle_inference_install_dir/paddle/lib/libcommon.dylib",
+      "bytes": 761068,
+      "sha256": "923f9d20e5b76f85e52b1d59e9cf5d6421091a713583364bffab1ff736b2e7eb"
+    },
+    {
+      "file": "sdk-3.3.1/paddle_inference_install_dir/paddle/lib/libpaddle_inference.dylib",
+      "bytes": 177638310,
+      "sha256": "e96ee5c54627c671d8debbeedf1c12d00a3cb56532aede1ea3aa4afafdae46e0"
+    },
+    {
+      "file": "sdk-3.3.1/paddle_inference_install_dir/paddle/lib/libphi.dylib",
+      "bytes": 16745,
+      "sha256": "c112e7c10a0e373afe90a30fee370bb890cdd6019c22ee6edae5be8877b6b4a6"
+    },
+    {
+      "file": "sdk-3.3.1/paddle_inference_install_dir/paddle/lib/libphi_core.dylib",
+      "bytes": 79477870,
+      "sha256": "4cda5761275e519d8d098f6d175586aaa1d108cf77e0d91ed69c414fb4b2fafe"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+--- a/src/rec.rs
++++ b/src/rec.rs
+@@ -407,6 +407,12 @@
+                 )));
+             }
+ 
++            if shape[0] != chunk.len() {
++                return Err(OcrError::PostprocessError(format!(
++                    "Benchmark batch size mismatch: requested {}, returned {}",
++                    chunk.len(), shape[0]
++                )));
++            }
+             for (i, text_box) in chunk.iter().take(shape[0]).enumerate() {
+                 let sample_output = batch_output.index_axis(Axis(0), i).into_dyn();
+                 let valid_width = region_target_width(text_box, self.options.target_height) as f32;

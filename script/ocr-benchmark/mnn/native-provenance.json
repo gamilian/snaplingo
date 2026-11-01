@@ -1,0 +1,78 @@
+{
+  "ocr_rs_revision": "664a945953e46186b37203fa4902a20d60a32809",
+  "ocr_rs_git_dirty": false,
+  "ocr_rs_version": "2.4.1",
+  "mnn_runtime_version": "0.1.0",
+  "native_version_observed": "3.6.1",
+  "native_archive": {
+    "path": "/tmp/snaplingo-ocr-benchmark/mnn/native-cache/mnn-3.6.1-d407447e-r1-macos-universal.tar.gz",
+    "bytes": 7468034,
+    "sha256": "1bd39996fe07940efb36918b78f349f8e317899a41071f4dcaffb7ce0e124bf3"
+  },
+  "native_archive_url": "https://github.com/zibo-chen/mnn-native-prebuilds/releases/download/mnn-3.6.1-d407447e-r1/mnn-3.6.1-d407447e-r1-macos-universal.tar.gz",
+  "native_libraries": [
+    {
+      "path": "/tmp/snaplingo-ocr-benchmark/mnn/target/release/build/mnn-runtime-sys-3f26b69aef4c6d52/out/prebuilt/mnn-3.6.1-d407447e-r1-macos-universal/lib/libMNN.a",
+      "bytes": 15606408,
+      "sha256": "2ef27ff5476af4d54483f86fbefc05e139601e6eab86d6ce16e4ecb09983d2d5"
+    },
+    {
+      "path": "/tmp/snaplingo-ocr-benchmark/mnn/target/release/build/mnn-runtime-sys-3f26b69aef4c6d52/out/prebuilt/mnn-3.6.1-d407447e-r1-macos-universal/lib/libMNN.dylib",
+      "bytes": 7994992,
+      "sha256": "11853d72358b1a1fc6a5e2edf3a74956a25227f1b0c0313470c6c437d76c4698"
+    }
+  ],
+  "native_prebuilt_manifest": "native-prebuilt-manifest.json",
+  "instrumentation_patch": {
+    "path": "/Users/gamilian/work/code/snaplingo/script/ocr-benchmark/mnn/strict-backend.patch",
+    "bytes": 920,
+    "sha256": "2f6aab262136acd0dcd6b75c29ce9f40e00bb5ef30664e82dadf954ff81418b8"
+  },
+  "upstream_bridge": {
+    "path": "/Users/gamilian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/mnn-runtime-sys-0.1.0/cpp/mnn_runtime_bridge.cpp",
+    "bytes": 20406,
+    "sha256": "8764eaffe70238e98ff4868c03d730f3b6d28a3860b053a3d1e45794aae17d3f"
+  },
+  "instrumented_bridge": {
+    "path": "/tmp/snaplingo-ocr-benchmark/mnn/runtime-sys/cpp/mnn_runtime_bridge.cpp",
+    "bytes": 20861,
+    "sha256": "0383d0581d401871c2a799df093cf6e51fdac6ce60cb507142c47daf313fa6ee"
+  },
+  "crate_archives": [
+    {
+      "path": "/Users/gamilian/.cargo/registry/cache/index.crates.io-1949cf8c6b5b557f/mnn-runtime-0.1.0.crate",
+      "bytes": 28022,
+      "sha256": "4f2710f326ac586e6e9ab7906c94c7ab36f85dcb9f66020d55ebb09843af1c7e"
+    },
+    {
+      "path": "/Users/gamilian/.cargo/registry/cache/index.crates.io-1949cf8c6b5b557f/mnn-runtime-sys-0.1.0.crate",
+      "bytes": 27001,
+      "sha256": "d46c397d53097d9b9aef77a61a285be2099351e91a5d73b4ac2798029eef0038"
+    }
+  ],
+  "harness_binary": {
+    "path": "/tmp/snaplingo-ocr-benchmark/mnn/target/release/snaplingo-mnn-ocr-bench",
+    "bytes": 8507776,
+    "sha256": "84bce21e520f7035c4222e563276437316c70883db0f25c05fbceb738bb8e25f"
+  },
+  "harness_linkage": "MNN static; macOS arm64 binary; system libraries/frameworks only",
+  "linked_system_libraries": [
+    "\t/usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 1800.105.0)",
+    "\t/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation (compatibility version 300.0.0, current version 3208.0.0)",
+    "\t/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation (compatibility version 150.0.0, current version 3208.0.0)",
+    "\t/System/Library/Frameworks/CoreGraphics.framework/Versions/A/CoreGraphics (compatibility version 64.0.0, current version 1889.2.7)",
+    "\t/System/Library/Frameworks/Metal.framework/Versions/A/Metal (compatibility version 1.0.0, current version 367.6.0)",
+    "\t/System/Library/Frameworks/MetalPerformanceShaders.framework/Versions/A/MetalPerformanceShaders (compatibility version 1.0.0, current version 128.2.0)",
+    "\t/usr/lib/libobjc.A.dylib (compatibility version 1.0.0, current version 228.0.0)",
+    "\t/usr/lib/libiconv.2.dylib (compatibility version 7.0.0, current version 7.0.0)",
+    "\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1351.0.0)"
+  ],
+  "build_command": "CARGO_TARGET_DIR=/tmp/snaplingo-ocr-benchmark/mnn/target CARGO_BUILD_JOBS=2 MNN_REQUIRE_PREBUILT=1 MNN_PREBUILT_CACHE_DIR=/tmp/snaplingo-ocr-benchmark/mnn/native-cache cargo build --release --locked --features metal",
+  "build_directory": "/Users/gamilian/work/code/snaplingo/script/ocr-benchmark/mnn",
+  "first_build_seconds": 144,
+  "compiler": "rustc 1.92.0 (ded5c06cf 2025-12-08)",
+  "cargo": "cargo 1.92.0 (344c4567c 2025-10-21)",
+  "model_download_bytes": 120580278,
+  "backend_registration_check": "backend-metal.jsonl; native_registered=true, runtime_available=true",
+  "scope": "Preparation only; OCR benchmarks scheduled by root; no accuracy ranking or Windows measurement"
+}

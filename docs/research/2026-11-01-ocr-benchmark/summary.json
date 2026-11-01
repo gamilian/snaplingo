@@ -1,0 +1,5456 @@
+[
+  {
+    "name": "mnn-v5_fp16-cpu",
+    "group": "matrix",
+    "status": "ok",
+    "model": "v5_fp16",
+    "backend": "cpu",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 552.128958,
+    "p95_total_ms": 3870.4916355000005,
+    "p50_ocr_ms": 548.8750835000001,
+    "peak_rss_mb": 900.54656,
+    "load_ms": 5.8307080000000004,
+    "first_input_ms": 106.73266600000001,
+    "mean_cpu_percent": 348.40860860860863,
+    "exit_code": 0,
+    "wall_seconds": 58.71778154105414,
+    "params": {
+      "threads": 4,
+      "batch": 8,
+      "parallel": true,
+      "config": "OcrEngineConfig { backend: CPU, gpu_memory_mode: Buffer, gpu_tuning_mode: Auto, gpu_cache_dir: None, thread_count: 4, precision_mode: Normal, det_options: DetOptions { max_side_len: 960, box_threshold: 0.5, unclip_ratio: 1.5, score_threshold: 0.3, min_area: 16, box_border: 5, merge_boxes: false, merge_threshold: 10, precision_mode: Fast, multi_scales: [0.5, 1.0, 1.5], block_size: 640, block_overlap: 100, nms_threshold: 0.3 }, rec_options: RecOptions { target_height: 48, min_score: 0.3, punct_min_score: 0.1, batch_size: 8, enable_batch: true }, ori_options: OriOptions { target_height: 224, target_width: 224, min_score: 0.5, resize_shorter: 256, preprocess_mode: Doc, class_angles: [0, 90, 180, 270] }, enable_parallel: true, min_result_confidence: 0.5, ori_min_confidence: 0.3 }"
+    },
+    "environment": {
+      "arch": "aarch64",
+      "backend": "cpu",
+      "metal_feature": true,
+      "mnn_runtime_version": "0.1.0",
+      "mnn_version": "3.6.1",
+      "native_prebuilt_tag": "mnn-3.6.1-d407447e-r1",
+      "native_registered": true,
+      "native_source_revision": "d407447ed56c4121a11ccbd266dc184ca1ead0c2",
+      "ocr_rs_revision": "664a945953e46186b37203fa4902a20d60a32809",
+      "ocr_rs_version": "2.4.1",
+      "os": "macos",
+      "pid": 9832,
+      "rust_feature_available": true,
+      "strict_session_backend_guard": true,
+      "type": "backend"
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/matrix/mnn-v5_fp16-cpu.jsonl",
+    "cases": {
+      "4k": {
+        "name": "mnn-v5_fp16-cpu",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 3629.4411250000003,
+        "p95_total_ms": 4705.77869775,
+        "p50_lines": 129.0
+      },
+      "compact": {
+        "name": "mnn-v5_fp16-cpu",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 289.0164165,
+        "p95_total_ms": 292.675458,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "mnn-v5_fp16-cpu",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 1563.896917,
+        "p95_total_ms": 1811.009656,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "mnn-v5_fp16-cpu",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 818.291125,
+        "p95_total_ms": 862.954511,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "mnn-v5_fp16-cpu",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 93.7326875,
+        "p95_total_ms": 96.0158955,
+        "p50_lines": 4.0
+      },
+      "wide": {
+        "name": "mnn-v5_fp16-cpu",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 139.769271,
+        "p95_total_ms": 153.812937,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "mnn-v5_fp16-metal",
+    "group": "matrix",
+    "status": "ok",
+    "model": "v5_fp16",
+    "backend": "metal",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 671.3356039999999,
+    "p95_total_ms": 4234.78675025,
+    "p50_ocr_ms": 666.8499374999999,
+    "peak_rss_mb": 741.408768,
+    "load_ms": 20.692375,
+    "first_input_ms": 785.949334,
+    "mean_cpu_percent": 25.79502840909091,
+    "exit_code": 0,
+    "wall_seconds": 82.09391958301421,
+    "params": {
+      "threads": 4,
+      "batch": 8,
+      "parallel": true,
+      "config": "OcrEngineConfig { backend: Metal, gpu_memory_mode: Buffer, gpu_tuning_mode: Auto, gpu_cache_dir: None, thread_count: 4, precision_mode: Normal, det_options: DetOptions { max_side_len: 960, box_threshold: 0.5, unclip_ratio: 1.5, score_threshold: 0.3, min_area: 16, box_border: 5, merge_boxes: false, merge_threshold: 10, precision_mode: Fast, multi_scales: [0.5, 1.0, 1.5], block_size: 640, block_overlap: 100, nms_threshold: 0.3 }, rec_options: RecOptions { target_height: 48, min_score: 0.3, punct_min_score: 0.1, batch_size: 8, enable_batch: true }, ori_options: OriOptions { target_height: 224, target_width: 224, min_score: 0.5, resize_shorter: 256, preprocess_mode: Doc, class_angles: [0, 90, 180, 270] }, enable_parallel: true, min_result_confidence: 0.5, ori_min_confidence: 0.3 }"
+    },
+    "environment": {
+      "arch": "aarch64",
+      "backend": "metal",
+      "metal_feature": true,
+      "mnn_runtime_version": "0.1.0",
+      "mnn_version": "3.6.1",
+      "native_prebuilt_tag": "mnn-3.6.1-d407447e-r1",
+      "native_registered": true,
+      "native_source_revision": "d407447ed56c4121a11ccbd266dc184ca1ead0c2",
+      "ocr_rs_revision": "664a945953e46186b37203fa4902a20d60a32809",
+      "ocr_rs_version": "2.4.1",
+      "os": "macos",
+      "pid": 10373,
+      "rust_feature_available": true,
+      "strict_session_backend_guard": true,
+      "type": "backend"
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/matrix/mnn-v5_fp16-metal.jsonl",
+    "cases": {
+      "4k": {
+        "name": "mnn-v5_fp16-metal",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 4230.4442085,
+        "p95_total_ms": 4282.15618775,
+        "p50_lines": 129.0
+      },
+      "compact": {
+        "name": "mnn-v5_fp16-metal",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 349.9355415,
+        "p95_total_ms": 382.6658645,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "mnn-v5_fp16-metal",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 1852.2749585000001,
+        "p95_total_ms": 1932.5790725,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "mnn-v5_fp16-metal",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 971.5819375,
+        "p95_total_ms": 1010.59956275,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "mnn-v5_fp16-metal",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 110.84131250000002,
+        "p95_total_ms": 146.5276455,
+        "p50_lines": 4.0
+      },
+      "wide": {
+        "name": "mnn-v5_fp16-metal",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 95.501875,
+        "p95_total_ms": 103.98770775,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "mnn-v5_fp32-cpu",
+    "group": "matrix",
+    "status": "ok",
+    "model": "v5_fp32",
+    "backend": "cpu",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 555.27125,
+    "p95_total_ms": 3946.0889795,
+    "p50_ocr_ms": 552.1533545,
+    "peak_rss_mb": 939.802624,
+    "load_ms": 9.186041000000001,
+    "first_input_ms": 101.925833,
+    "mean_cpu_percent": 364.66796959826274,
+    "exit_code": 0,
+    "wall_seconds": 53.95634516701102,
+    "params": {
+      "threads": 4,
+      "batch": 8,
+      "parallel": true,
+      "config": "OcrEngineConfig { backend: CPU, gpu_memory_mode: Buffer, gpu_tuning_mode: Auto, gpu_cache_dir: None, thread_count: 4, precision_mode: Normal, det_options: DetOptions { max_side_len: 960, box_threshold: 0.5, unclip_ratio: 1.5, score_threshold: 0.3, min_area: 16, box_border: 5, merge_boxes: false, merge_threshold: 10, precision_mode: Fast, multi_scales: [0.5, 1.0, 1.5], block_size: 640, block_overlap: 100, nms_threshold: 0.3 }, rec_options: RecOptions { target_height: 48, min_score: 0.3, punct_min_score: 0.1, batch_size: 8, enable_batch: true }, ori_options: OriOptions { target_height: 224, target_width: 224, min_score: 0.5, resize_shorter: 256, preprocess_mode: Doc, class_angles: [0, 90, 180, 270] }, enable_parallel: true, min_result_confidence: 0.5, ori_min_confidence: 0.3 }"
+    },
+    "environment": {
+      "arch": "aarch64",
+      "backend": "cpu",
+      "metal_feature": true,
+      "mnn_runtime_version": "0.1.0",
+      "mnn_version": "3.6.1",
+      "native_prebuilt_tag": "mnn-3.6.1-d407447e-r1",
+      "native_registered": true,
+      "native_source_revision": "d407447ed56c4121a11ccbd266dc184ca1ead0c2",
+      "ocr_rs_revision": "664a945953e46186b37203fa4902a20d60a32809",
+      "ocr_rs_version": "2.4.1",
+      "os": "macos",
+      "pid": 11167,
+      "rust_feature_available": true,
+      "strict_session_backend_guard": true,
+      "type": "backend"
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/matrix/mnn-v5_fp32-cpu.jsonl",
+    "cases": {
+      "4k": {
+        "name": "mnn-v5_fp32-cpu",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 3708.308271,
+        "p95_total_ms": 4454.865104,
+        "p50_lines": 129.0
+      },
+      "compact": {
+        "name": "mnn-v5_fp32-cpu",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 286.8218955,
+        "p95_total_ms": 298.81795850000003,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "mnn-v5_fp32-cpu",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 1538.2824584999998,
+        "p95_total_ms": 1552.17349,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "mnn-v5_fp32-cpu",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 816.1453335000001,
+        "p95_total_ms": 853.92738475,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "mnn-v5_fp32-cpu",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 96.00075050000001,
+        "p95_total_ms": 97.79422875,
+        "p50_lines": 4.0
+      },
+      "wide": {
+        "name": "mnn-v5_fp32-cpu",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 155.1119375,
+        "p95_total_ms": 188.483541,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "mnn-v5_fp32-metal",
+    "group": "matrix",
+    "status": "ok",
+    "model": "v5_fp32",
+    "backend": "metal",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 674.253021,
+    "p95_total_ms": 4527.2537815,
+    "p50_ocr_ms": 670.592625,
+    "peak_rss_mb": 781.697024,
+    "load_ms": 22.395249999999997,
+    "first_input_ms": 735.9154169999999,
+    "mean_cpu_percent": 25.933974784339746,
+    "exit_code": 0,
+    "wall_seconds": 88.42362166696694,
+    "params": {
+      "threads": 4,
+      "batch": 8,
+      "parallel": true,
+      "config": "OcrEngineConfig { backend: Metal, gpu_memory_mode: Buffer, gpu_tuning_mode: Auto, gpu_cache_dir: None, thread_count: 4, precision_mode: Normal, det_options: DetOptions { max_side_len: 960, box_threshold: 0.5, unclip_ratio: 1.5, score_threshold: 0.3, min_area: 16, box_border: 5, merge_boxes: false, merge_threshold: 10, precision_mode: Fast, multi_scales: [0.5, 1.0, 1.5], block_size: 640, block_overlap: 100, nms_threshold: 0.3 }, rec_options: RecOptions { target_height: 48, min_score: 0.3, punct_min_score: 0.1, batch_size: 8, enable_batch: true }, ori_options: OriOptions { target_height: 224, target_width: 224, min_score: 0.5, resize_shorter: 256, preprocess_mode: Doc, class_angles: [0, 90, 180, 270] }, enable_parallel: true, min_result_confidence: 0.5, ori_min_confidence: 0.3 }"
+    },
+    "environment": {
+      "arch": "aarch64",
+      "backend": "metal",
+      "metal_feature": true,
+      "mnn_runtime_version": "0.1.0",
+      "mnn_version": "3.6.1",
+      "native_prebuilt_tag": "mnn-3.6.1-d407447e-r1",
+      "native_registered": true,
+      "native_source_revision": "d407447ed56c4121a11ccbd266dc184ca1ead0c2",
+      "ocr_rs_revision": "664a945953e46186b37203fa4902a20d60a32809",
+      "ocr_rs_version": "2.4.1",
+      "os": "macos",
+      "pid": 11684,
+      "rust_feature_available": true,
+      "strict_session_backend_guard": true,
+      "type": "backend"
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/matrix/mnn-v5_fp32-metal.jsonl",
+    "cases": {
+      "4k": {
+        "name": "mnn-v5_fp32-metal",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 4495.294,
+        "p95_total_ms": 4710.33199975,
+        "p50_lines": 129.0
+      },
+      "compact": {
+        "name": "mnn-v5_fp32-metal",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 360.7849375,
+        "p95_total_ms": 366.00814575,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "mnn-v5_fp32-metal",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 1932.5651874999999,
+        "p95_total_ms": 1972.918281,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "mnn-v5_fp32-metal",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 993.0723125,
+        "p95_total_ms": 1003.11166625,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "mnn-v5_fp32-metal",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 115.6154165,
+        "p95_total_ms": 160.46340575,
+        "p50_lines": 4.0
+      },
+      "wide": {
+        "name": "mnn-v5_fp32-metal",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 102.75100049999999,
+        "p95_total_ms": 110.87618725,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "mnn-v6_medium-cpu",
+    "group": "matrix",
+    "status": "ok",
+    "model": "v6_medium",
+    "backend": "cpu",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 2425.9660214999994,
+    "p95_total_ms": 15347.095552499999,
+    "p50_ocr_ms": 2422.8170835,
+    "peak_rss_mb": 1313.128448,
+    "load_ms": 33.46925,
+    "first_input_ms": 432.79025,
+    "mean_cpu_percent": 378.1529677934522,
+    "exit_code": 0,
+    "wall_seconds": 219.60302641696762,
+    "params": {
+      "threads": 4,
+      "batch": 8,
+      "parallel": true,
+      "config": "OcrEngineConfig { backend: CPU, gpu_memory_mode: Buffer, gpu_tuning_mode: Auto, gpu_cache_dir: None, thread_count: 4, precision_mode: Normal, det_options: DetOptions { max_side_len: 960, box_threshold: 0.5, unclip_ratio: 1.5, score_threshold: 0.3, min_area: 16, box_border: 5, merge_boxes: false, merge_threshold: 10, precision_mode: Fast, multi_scales: [0.5, 1.0, 1.5], block_size: 640, block_overlap: 100, nms_threshold: 0.3 }, rec_options: RecOptions { target_height: 48, min_score: 0.3, punct_min_score: 0.1, batch_size: 8, enable_batch: true }, ori_options: OriOptions { target_height: 224, target_width: 224, min_score: 0.5, resize_shorter: 256, preprocess_mode: Doc, class_angles: [0, 90, 180, 270] }, enable_parallel: true, min_result_confidence: 0.5, ori_min_confidence: 0.3 }"
+    },
+    "environment": {
+      "arch": "aarch64",
+      "backend": "cpu",
+      "metal_feature": true,
+      "mnn_runtime_version": "0.1.0",
+      "mnn_version": "3.6.1",
+      "native_prebuilt_tag": "mnn-3.6.1-d407447e-r1",
+      "native_registered": true,
+      "native_source_revision": "d407447ed56c4121a11ccbd266dc184ca1ead0c2",
+      "ocr_rs_revision": "664a945953e46186b37203fa4902a20d60a32809",
+      "ocr_rs_version": "2.4.1",
+      "os": "macos",
+      "pid": 7243,
+      "rust_feature_available": true,
+      "strict_session_backend_guard": true,
+      "type": "backend"
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/matrix/mnn-v6_medium-cpu.jsonl",
+    "cases": {
+      "4k": {
+        "name": "mnn-v6_medium-cpu",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 15216.821625,
+        "p95_total_ms": 16461.3893025,
+        "p50_lines": 129.0
+      },
+      "compact": {
+        "name": "mnn-v6_medium-cpu",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 1273.4340625,
+        "p95_total_ms": 1356.2127715,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "mnn-v6_medium-cpu",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 6583.657541500001,
+        "p95_total_ms": 7562.598072250001,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "mnn-v6_medium-cpu",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 3618.0985204999997,
+        "p95_total_ms": 4298.084177,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "mnn-v6_medium-cpu",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 354.9483745,
+        "p95_total_ms": 373.18279149999995,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "mnn-v6_medium-cpu",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 538.6121875,
+        "p95_total_ms": 588.1979065,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "mnn-v6_medium-metal",
+    "group": "matrix",
+    "status": "sanity_failed",
+    "model": "v6_medium",
+    "backend": "metal",
+    "hot_samples": 36,
+    "zero_output_samples": 18,
+    "error_samples": 0,
+    "p50_total_ms": 96.99689599999999,
+    "p95_total_ms": 357.03753125000003,
+    "p50_ocr_ms": 81.4598535,
+    "peak_rss_mb": 874.397696,
+    "load_ms": 43.46925,
+    "first_input_ms": 3521.671167,
+    "mean_cpu_percent": 6.227497425334707,
+    "exit_code": 0,
+    "wall_seconds": 56.14364495908376,
+    "params": {
+      "threads": 4,
+      "batch": 8,
+      "parallel": true,
+      "config": "OcrEngineConfig { backend: Metal, gpu_memory_mode: Buffer, gpu_tuning_mode: Auto, gpu_cache_dir: None, thread_count: 4, precision_mode: Normal, det_options: DetOptions { max_side_len: 960, box_threshold: 0.5, unclip_ratio: 1.5, score_threshold: 0.3, min_area: 16, box_border: 5, merge_boxes: false, merge_threshold: 10, precision_mode: Fast, multi_scales: [0.5, 1.0, 1.5], block_size: 640, block_overlap: 100, nms_threshold: 0.3 }, rec_options: RecOptions { target_height: 48, min_score: 0.3, punct_min_score: 0.1, batch_size: 8, enable_batch: true }, ori_options: OriOptions { target_height: 224, target_width: 224, min_score: 0.5, resize_shorter: 256, preprocess_mode: Doc, class_angles: [0, 90, 180, 270] }, enable_parallel: true, min_result_confidence: 0.5, ori_min_confidence: 0.3 }"
+    },
+    "environment": {
+      "arch": "aarch64",
+      "backend": "metal",
+      "metal_feature": true,
+      "mnn_runtime_version": "0.1.0",
+      "mnn_version": "3.6.1",
+      "native_prebuilt_tag": "mnn-3.6.1-d407447e-r1",
+      "native_registered": true,
+      "native_source_revision": "d407447ed56c4121a11ccbd266dc184ca1ead0c2",
+      "ocr_rs_revision": "664a945953e46186b37203fa4902a20d60a32809",
+      "ocr_rs_version": "2.4.1",
+      "os": "macos",
+      "pid": 9303,
+      "rust_feature_available": true,
+      "strict_session_backend_guard": true,
+      "type": "backend"
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/matrix/mnn-v6_medium-metal.jsonl",
+    "cases": {
+      "4k": {
+        "name": "mnn-v6_medium-metal",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 112.132125,
+        "p95_total_ms": 113.90471875,
+        "p50_lines": 0.0
+      },
+      "compact": {
+        "name": "mnn-v6_medium-metal",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 353.940271,
+        "p95_total_ms": 359.851562,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "mnn-v6_medium-metal",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 68.092792,
+        "p95_total_ms": 70.48098999999999,
+        "p50_lines": 0.0
+      },
+      "document": {
+        "name": "mnn-v6_medium-metal",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 83.311521,
+        "p95_total_ms": 88.10044775,
+        "p50_lines": 0.0
+      },
+      "small": {
+        "name": "mnn-v6_medium-metal",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 84.7928545,
+        "p95_total_ms": 89.11961450000001,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "mnn-v6_medium-metal",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 113.92360450000001,
+        "p95_total_ms": 122.46311475,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "mnn-v6_small-cpu",
+    "group": "matrix",
+    "status": "ok",
+    "model": "v6_small",
+    "backend": "cpu",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 563.9767085000001,
+    "p95_total_ms": 3516.44726,
+    "p50_ocr_ms": 560.9063544999999,
+    "peak_rss_mb": 781.221888,
+    "load_ms": 6.687333,
+    "first_input_ms": 102.729083,
+    "mean_cpu_percent": 370.88429844097993,
+    "exit_code": 0,
+    "wall_seconds": 52.0734685419593,
+    "params": {
+      "threads": 4,
+      "config": "OcrEngineConfig { backend: CPU, gpu_memory_mode: Buffer, gpu_tuning_mode: Auto, gpu_cache_dir: None, thread_count: 4, precision_mode: Normal, det_options: DetOptions { max_side_len: 960, box_threshold: 0.5, unclip_ratio: 1.5, score_threshold: 0.3, min_area: 16, box_border: 5, merge_boxes: false, merge_threshold: 10, precision_mode: Fast, multi_scales: [0.5, 1.0, 1.5], block_size: 640, block_overlap: 100, nms_threshold: 0.3 }, rec_options: RecOptions { target_height: 48, min_score: 0.3, punct_min_score: 0.1, batch_size: 8, enable_batch: true }, ori_options: OriOptions { target_height: 224, target_width: 224, min_score: 0.5, resize_shorter: 256, preprocess_mode: Doc, class_angles: [0, 90, 180, 270] }, enable_parallel: true, min_result_confidence: 0.5, ori_min_confidence: 0.3 }"
+    },
+    "environment": {
+      "arch": "aarch64",
+      "backend": "cpu",
+      "metal_feature": true,
+      "mnn_runtime_version": "0.1.0",
+      "mnn_version": "3.6.1",
+      "native_prebuilt_tag": "mnn-3.6.1-d407447e-r1",
+      "native_registered": true,
+      "native_source_revision": "d407447ed56c4121a11ccbd266dc184ca1ead0c2",
+      "ocr_rs_revision": "664a945953e46186b37203fa4902a20d60a32809",
+      "ocr_rs_version": "2.4.1",
+      "os": "macos",
+      "pid": 84996,
+      "rust_feature_available": true,
+      "strict_session_backend_guard": true,
+      "type": "backend"
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/matrix/mnn-v6_small-cpu.jsonl",
+    "cases": {
+      "4k": {
+        "name": "mnn-v6_small-cpu",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 3488.7333535,
+        "p95_total_ms": 3685.815011,
+        "p50_lines": 129.0
+      },
+      "compact": {
+        "name": "mnn-v6_small-cpu",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 293.7381245,
+        "p95_total_ms": 302.64445850000004,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "mnn-v6_small-cpu",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 1628.3673334999999,
+        "p95_total_ms": 1671.7623019999999,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "mnn-v6_small-cpu",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 865.7549795,
+        "p95_total_ms": 952.802083,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "mnn-v6_small-cpu",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 88.5558335,
+        "p95_total_ms": 90.646281,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "mnn-v6_small-cpu",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 121.174791,
+        "p95_total_ms": 124.3801665,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "mnn-v6_small-metal",
+    "group": "matrix",
+    "status": "sanity_failed",
+    "model": "v6_small",
+    "backend": "metal",
+    "hot_samples": 36,
+    "zero_output_samples": 12,
+    "error_samples": 0,
+    "p50_total_ms": 72.0790835,
+    "p95_total_ms": 603.013573,
+    "p50_ocr_ms": 51.0873745,
+    "peak_rss_mb": 634.22464,
+    "load_ms": 17.125708,
+    "first_input_ms": 1324.9785000000002,
+    "mean_cpu_percent": 17.30622406639004,
+    "exit_code": 0,
+    "wall_seconds": 27.726077166968025,
+    "params": {
+      "threads": 4,
+      "batch": 8,
+      "parallel": true,
+      "config": "OcrEngineConfig { backend: Metal, gpu_memory_mode: Buffer, gpu_tuning_mode: Auto, gpu_cache_dir: None, thread_count: 4, precision_mode: Normal, det_options: DetOptions { max_side_len: 960, box_threshold: 0.5, unclip_ratio: 1.5, score_threshold: 0.3, min_area: 16, box_border: 5, merge_boxes: false, merge_threshold: 10, precision_mode: Fast, multi_scales: [0.5, 1.0, 1.5], block_size: 640, block_overlap: 100, nms_threshold: 0.3 }, rec_options: RecOptions { target_height: 48, min_score: 0.3, punct_min_score: 0.1, batch_size: 8, enable_batch: true }, ori_options: OriOptions { target_height: 224, target_width: 224, min_score: 0.5, resize_shorter: 256, preprocess_mode: Doc, class_angles: [0, 90, 180, 270] }, enable_parallel: true, min_result_confidence: 0.5, ori_min_confidence: 0.3 }"
+    },
+    "environment": {
+      "arch": "aarch64",
+      "backend": "metal",
+      "metal_feature": true,
+      "mnn_runtime_version": "0.1.0",
+      "mnn_version": "3.6.1",
+      "native_prebuilt_tag": "mnn-3.6.1-d407447e-r1",
+      "native_registered": true,
+      "native_source_revision": "d407447ed56c4121a11ccbd266dc184ca1ead0c2",
+      "ocr_rs_revision": "664a945953e46186b37203fa4902a20d60a32809",
+      "ocr_rs_version": "2.4.1",
+      "os": "macos",
+      "pid": 6944,
+      "rust_feature_available": true,
+      "strict_session_backend_guard": true,
+      "type": "backend"
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/matrix/mnn-v6_small-metal.jsonl",
+    "cases": {
+      "4k": {
+        "name": "mnn-v6_small-metal",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 84.781604,
+        "p95_total_ms": 87.8808855,
+        "p50_lines": 0.0
+      },
+      "compact": {
+        "name": "mnn-v6_small-metal",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 221.54922900000003,
+        "p95_total_ms": 223.25125025,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "mnn-v6_small-metal",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 41.905417,
+        "p95_total_ms": 43.309469,
+        "p50_lines": 0.0
+      },
+      "document": {
+        "name": "mnn-v6_small-metal",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 601.0875000000001,
+        "p95_total_ms": 610.9707287499999,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "mnn-v6_small-metal",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 44.7511665,
+        "p95_total_ms": 46.252145500000005,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "mnn-v6_small-metal",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 56.7698955,
+        "p95_total_ms": 60.6201145,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "mnn-v6_tiny-cpu",
+    "group": "matrix",
+    "status": "ok",
+    "model": "v6_tiny",
+    "backend": "cpu",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 155.7092705,
+    "p95_total_ms": 859.44718775,
+    "p50_ocr_ms": 152.60277050000002,
+    "peak_rss_mb": 462.52032,
+    "load_ms": 2.9315830000000003,
+    "first_input_ms": 31.620250000000002,
+    "mean_cpu_percent": 341.5018779342723,
+    "exit_code": 0,
+    "wall_seconds": 12.978189875022508,
+    "params": {
+      "threads": 4,
+      "config": "OcrEngineConfig { backend: CPU, gpu_memory_mode: Buffer, gpu_tuning_mode: Auto, gpu_cache_dir: None, thread_count: 4, precision_mode: Normal, det_options: DetOptions { max_side_len: 960, box_threshold: 0.5, unclip_ratio: 1.5, score_threshold: 0.3, min_area: 16, box_border: 5, merge_boxes: false, merge_threshold: 10, precision_mode: Fast, multi_scales: [0.5, 1.0, 1.5], block_size: 640, block_overlap: 100, nms_threshold: 0.3 }, rec_options: RecOptions { target_height: 48, min_score: 0.3, punct_min_score: 0.1, batch_size: 8, enable_batch: true }, ori_options: OriOptions { target_height: 224, target_width: 224, min_score: 0.5, resize_shorter: 256, preprocess_mode: Doc, class_angles: [0, 90, 180, 270] }, enable_parallel: true, min_result_confidence: 0.5, ori_min_confidence: 0.3 }"
+    },
+    "environment": {
+      "arch": "aarch64",
+      "backend": "cpu",
+      "metal_feature": true,
+      "mnn_runtime_version": "0.1.0",
+      "mnn_version": "3.6.1",
+      "native_prebuilt_tag": "mnn-3.6.1-d407447e-r1",
+      "native_registered": true,
+      "native_source_revision": "d407447ed56c4121a11ccbd266dc184ca1ead0c2",
+      "ocr_rs_revision": "664a945953e46186b37203fa4902a20d60a32809",
+      "ocr_rs_version": "2.4.1",
+      "os": "macos",
+      "pid": 84730,
+      "rust_feature_available": true,
+      "strict_session_backend_guard": true,
+      "type": "backend"
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/matrix/mnn-v6_tiny-cpu.jsonl",
+    "cases": {
+      "4k": {
+        "name": "mnn-v6_tiny-cpu",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 845.235146,
+        "p95_total_ms": 866.6494685,
+        "p50_lines": 130.0
+      },
+      "compact": {
+        "name": "mnn-v6_tiny-cpu",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 87.797479,
+        "p95_total_ms": 89.70435375,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "mnn-v6_tiny-cpu",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 383.1982495,
+        "p95_total_ms": 393.05807300000004,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "mnn-v6_tiny-cpu",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 234.8131045,
+        "p95_total_ms": 236.856677,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "mnn-v6_tiny-cpu",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 24.378499499999997,
+        "p95_total_ms": 26.297562999999997,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "mnn-v6_tiny-cpu",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 37.84975,
+        "p95_total_ms": 42.09189575,
+        "p50_lines": 5.0
+      }
+    }
+  },
+  {
+    "name": "mnn-v6_tiny-metal",
+    "group": "matrix",
+    "status": "sanity_failed",
+    "model": "v6_tiny",
+    "backend": "metal",
+    "hot_samples": 36,
+    "zero_output_samples": 12,
+    "error_samples": 0,
+    "p50_total_ms": 73.0558755,
+    "p95_total_ms": 438.78289525,
+    "p50_ocr_ms": 44.345541499999996,
+    "peak_rss_mb": 404.19328,
+    "load_ms": 17.712792,
+    "first_input_ms": 373.78333299999997,
+    "mean_cpu_percent": 30.64263959390863,
+    "exit_code": 0,
+    "wall_seconds": 11.633554707979783,
+    "params": {
+      "threads": 4,
+      "config": "OcrEngineConfig { backend: Metal, gpu_memory_mode: Buffer, gpu_tuning_mode: Auto, gpu_cache_dir: None, thread_count: 4, precision_mode: Normal, det_options: DetOptions { max_side_len: 960, box_threshold: 0.5, unclip_ratio: 1.5, score_threshold: 0.3, min_area: 16, box_border: 5, merge_boxes: false, merge_threshold: 10, precision_mode: Fast, multi_scales: [0.5, 1.0, 1.5], block_size: 640, block_overlap: 100, nms_threshold: 0.3 }, rec_options: RecOptions { target_height: 48, min_score: 0.3, punct_min_score: 0.1, batch_size: 8, enable_batch: true }, ori_options: OriOptions { target_height: 224, target_width: 224, min_score: 0.5, resize_shorter: 256, preprocess_mode: Doc, class_angles: [0, 90, 180, 270] }, enable_parallel: true, min_result_confidence: 0.5, ori_min_confidence: 0.3 }"
+    },
+    "environment": {
+      "arch": "aarch64",
+      "backend": "metal",
+      "metal_feature": true,
+      "mnn_runtime_version": "0.1.0",
+      "mnn_version": "3.6.1",
+      "native_prebuilt_tag": "mnn-3.6.1-d407447e-r1",
+      "native_registered": true,
+      "native_source_revision": "d407447ed56c4121a11ccbd266dc184ca1ead0c2",
+      "ocr_rs_revision": "664a945953e46186b37203fa4902a20d60a32809",
+      "ocr_rs_version": "2.4.1",
+      "os": "macos",
+      "pid": 84887,
+      "rust_feature_available": true,
+      "strict_session_backend_guard": true,
+      "type": "backend"
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/matrix/mnn-v6_tiny-metal.jsonl",
+    "cases": {
+      "4k": {
+        "name": "mnn-v6_tiny-metal",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 82.0931875,
+        "p95_total_ms": 83.30903125,
+        "p50_lines": 0.0
+      },
+      "compact": {
+        "name": "mnn-v6_tiny-metal",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 91.36895799999999,
+        "p95_total_ms": 96.50818749999999,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "mnn-v6_tiny-metal",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 238.9974995,
+        "p95_total_ms": 441.259771,
+        "p50_lines": 28.0
+      },
+      "document": {
+        "name": "mnn-v6_tiny-metal",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 143.8520625,
+        "p95_total_ms": 270.56035475,
+        "p50_lines": 15.0
+      },
+      "small": {
+        "name": "mnn-v6_tiny-metal",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 19.9361045,
+        "p95_total_ms": 22.96955225,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "mnn-v6_tiny-metal",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 43.2429795,
+        "p95_total_ms": 64.293542,
+        "p50_lines": 5.0
+      }
+    }
+  },
+  {
+    "name": "ort-v5_mobile-coreml_gpu",
+    "group": "matrix",
+    "status": "memory_limit",
+    "model": "v5_mobile",
+    "backend": "coreml_gpu",
+    "hot_samples": 0,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": null,
+    "p95_total_ms": null,
+    "p50_ocr_ms": null,
+    "peak_rss_mb": 6002.556928,
+    "load_ms": 1964.3635830143467,
+    "first_input_ms": 456.3906250987202,
+    "mean_cpu_percent": 94.50997088791848,
+    "exit_code": -15,
+    "wall_seconds": 79.43604608403984,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 81372,
+      "model": "v5_mobile",
+      "backend": "coreml_gpu",
+      "ort_version": "1.31.1",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 400.8904170477763,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv5_mobile_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv5_mobile_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/matrix/v5_mobile-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV5",
+        "Rec.ocr_version": "OCRVersion.PPOCRV5",
+        "Det.model_type": "ModelType.MOBILE",
+        "Rec.model_type": "ModelType.MOBILE",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 8,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": true,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "CPUAndGPU",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/matrix/coreml-cache/v5_mobile/coreml_gpu"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/matrix/ort-v5_mobile-coreml_gpu.jsonl",
+    "cases": {
+      "4k": {
+        "name": "ort-v5_mobile-coreml_gpu",
+        "category": "4k",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "compact": {
+        "name": "ort-v5_mobile-coreml_gpu",
+        "category": "compact",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "dense": {
+        "name": "ort-v5_mobile-coreml_gpu",
+        "category": "dense",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "document": {
+        "name": "ort-v5_mobile-coreml_gpu",
+        "category": "document",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "small": {
+        "name": "ort-v5_mobile-coreml_gpu",
+        "category": "small",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "wide": {
+        "name": "ort-v5_mobile-coreml_gpu",
+        "category": "wide",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      }
+    }
+  },
+  {
+    "name": "ort-v5_mobile-cpu",
+    "group": "matrix",
+    "status": "ok",
+    "model": "v5_mobile",
+    "backend": "cpu",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 684.9960829713382,
+    "p95_total_ms": 4186.29394780146,
+    "p50_ocr_ms": 677.8658120310865,
+    "peak_rss_mb": 1667.792896,
+    "load_ms": 105.01087491866201,
+    "first_input_ms": 155.09195905178785,
+    "mean_cpu_percent": 335.7181271477663,
+    "exit_code": 0,
+    "wall_seconds": 67.85011704207864,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 80757,
+      "model": "v5_mobile",
+      "backend": "cpu",
+      "ort_version": "1.31.1",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 491.0220829769969,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv5_mobile_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv5_mobile_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/matrix/v5_mobile-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV5",
+        "Rec.ocr_version": "OCRVersion.PPOCRV5",
+        "Det.model_type": "ModelType.MOBILE",
+        "Rec.model_type": "ModelType.MOBILE",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 8,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": false,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "ALL",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/matrix/coreml-cache/v5_mobile/cpu"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/matrix/ort-v5_mobile-cpu.jsonl",
+    "cases": {
+      "4k": {
+        "name": "ort-v5_mobile-cpu",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 4109.3018960091285,
+        "p95_total_ms": 4314.926291699521,
+        "p50_lines": 129.5
+      },
+      "compact": {
+        "name": "ort-v5_mobile-cpu",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 390.63027047086507,
+        "p95_total_ms": 401.26262471312657,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "ort-v5_mobile-cpu",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 1877.288062532898,
+        "p95_total_ms": 1927.9757916228846,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "ort-v5_mobile-cpu",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 974.8860415420495,
+        "p95_total_ms": 977.3230928112753,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "ort-v5_mobile-cpu",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 107.49168647453189,
+        "p95_total_ms": 110.63650081632659,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "ort-v5_mobile-cpu",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 151.64341701893136,
+        "p95_total_ms": 168.35414577508345,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "ort-v5_server-coreml_gpu",
+    "group": "matrix",
+    "status": "process_error",
+    "model": "v5_server",
+    "backend": "coreml_gpu",
+    "hot_samples": 0,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": null,
+    "p95_total_ms": null,
+    "p50_ocr_ms": null,
+    "peak_rss_mb": 338.24768,
+    "load_ms": null,
+    "first_input_ms": null,
+    "mean_cpu_percent": 89.35,
+    "exit_code": 1,
+    "wall_seconds": 1.3722592920530587,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 84709,
+      "model": "v5_server",
+      "backend": "coreml_gpu",
+      "ort_version": "1.31.1",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 466.4661670103669,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv5_server_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv5_server_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/matrix/v5_server-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV5",
+        "Rec.ocr_version": "OCRVersion.PPOCRV5",
+        "Det.model_type": "ModelType.SERVER",
+        "Rec.model_type": "ModelType.SERVER",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 8,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": true,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "CPUAndGPU",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/matrix/coreml-cache/v5_server/coreml_gpu"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/matrix/ort-v5_server-coreml_gpu.jsonl",
+    "cases": {
+      "4k": {
+        "name": "ort-v5_server-coreml_gpu",
+        "category": "4k",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "compact": {
+        "name": "ort-v5_server-coreml_gpu",
+        "category": "compact",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "dense": {
+        "name": "ort-v5_server-coreml_gpu",
+        "category": "dense",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "document": {
+        "name": "ort-v5_server-coreml_gpu",
+        "category": "document",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "small": {
+        "name": "ort-v5_server-coreml_gpu",
+        "category": "small",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "wide": {
+        "name": "ort-v5_server-coreml_gpu",
+        "category": "wide",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      }
+    }
+  },
+  {
+    "name": "ort-v5_server-cpu",
+    "group": "matrix",
+    "status": "ok",
+    "model": "v5_server",
+    "backend": "cpu",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 3479.230978526175,
+    "p95_total_ms": 17783.874667511554,
+    "p50_ocr_ms": 3472.0737079624087,
+    "peak_rss_mb": 2048.16384,
+    "load_ms": 194.91974997799844,
+    "first_input_ms": 569.7512500919402,
+    "mean_cpu_percent": 374.0419738951225,
+    "exit_code": 0,
+    "wall_seconds": 268.8935535000637,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 82118,
+      "model": "v5_server",
+      "backend": "cpu",
+      "ort_version": "1.31.1",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 493.77008399460465,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv5_server_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv5_server_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/matrix/v5_server-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV5",
+        "Rec.ocr_version": "OCRVersion.PPOCRV5",
+        "Det.model_type": "ModelType.SERVER",
+        "Rec.model_type": "ModelType.SERVER",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 8,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": false,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "ALL",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/matrix/coreml-cache/v5_server/cpu"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/matrix/ort-v5_server-cpu.jsonl",
+    "cases": {
+      "4k": {
+        "name": "ort-v5_server-cpu",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 16942.532167071477,
+        "p95_total_ms": 17908.746666042134,
+        "p50_lines": 129.0
+      },
+      "compact": {
+        "name": "ort-v5_server-cpu",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 2069.7116040391847,
+        "p95_total_ms": 2090.9326037508436,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "ort-v5_server-cpu",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 8150.2757495618425,
+        "p95_total_ms": 8373.814259975916,
+        "p50_lines": 58.0
+      },
+      "document": {
+        "name": "ort-v5_server-cpu",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 4949.860145978164,
+        "p95_total_ms": 5048.31903160084,
+        "p50_lines": 28.5
+      },
+      "small": {
+        "name": "ort-v5_server-cpu",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 553.9916665293276,
+        "p95_total_ms": 571.550374297658,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "ort-v5_server-cpu",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 686.470249958802,
+        "p95_total_ms": 759.7230735409539,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "ort-v6_medium-coreml_all",
+    "group": "matrix",
+    "status": "ok",
+    "model": "v6_medium",
+    "backend": "coreml_all",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 765.5303545761853,
+    "p95_total_ms": 5198.44959420152,
+    "p50_ocr_ms": 721.1468545137905,
+    "peak_rss_mb": 3015.999488,
+    "load_ms": 4331.066499929875,
+    "first_input_ms": 806.3944580499083,
+    "mean_cpu_percent": 76.05524904214559,
+    "exit_code": 0,
+    "wall_seconds": 75.39620695798658,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 79997,
+      "model": "v6_medium",
+      "backend": "coreml_all",
+      "ort_version": "1.31.1",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 493.5386669822037,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_medium_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_medium_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/matrix/v6_medium-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV6",
+        "Rec.ocr_version": "OCRVersion.PPOCRV6",
+        "Det.model_type": "ModelType.MEDIUM",
+        "Rec.model_type": "ModelType.MEDIUM",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 8,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": true,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "ALL",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/matrix/coreml-cache/v6_medium/coreml_all"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/matrix/ort-v6_medium-coreml_all.jsonl",
+    "cases": {
+      "4k": {
+        "name": "ort-v6_medium-coreml_all",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 3026.8796249874867,
+        "p95_total_ms": 5230.786718719173,
+        "p50_lines": 72.0
+      },
+      "compact": {
+        "name": "ort-v6_medium-coreml_all",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 670.4389579826966,
+        "p95_total_ms": 723.5415524919517,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "ort-v6_medium-coreml_all",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 2680.2284164587036,
+        "p95_total_ms": 2879.622781445505,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "ort-v6_medium-coreml_all",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 1751.1735625448637,
+        "p95_total_ms": 1834.426687535597,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "ort-v6_medium-coreml_all",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 253.79520800197497,
+        "p95_total_ms": 289.6927187393885,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "ort-v6_medium-coreml_all",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 306.14643747685477,
+        "p95_total_ms": 366.67560430942103,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "ort-v6_medium-coreml_gpu",
+    "group": "matrix",
+    "status": "ok",
+    "model": "v6_medium",
+    "backend": "coreml_gpu",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 792.987437453121,
+    "p95_total_ms": 5534.999436931685,
+    "p50_ocr_ms": 749.331520521082,
+    "peak_rss_mb": 2913.992704,
+    "load_ms": 3926.2518750038,
+    "first_input_ms": 2291.8947909493,
+    "mean_cpu_percent": 68.43084239130435,
+    "exit_code": 0,
+    "wall_seconds": 85.67332079191692,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 79160,
+      "model": "v6_medium",
+      "backend": "coreml_gpu",
+      "ort_version": "1.31.1",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 481.12270806450397,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_medium_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_medium_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/matrix/v6_medium-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV6",
+        "Rec.ocr_version": "OCRVersion.PPOCRV6",
+        "Det.model_type": "ModelType.MEDIUM",
+        "Rec.model_type": "ModelType.MEDIUM",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 8,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": true,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "CPUAndGPU",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/matrix/coreml-cache/v6_medium/coreml_gpu"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/matrix/ort-v6_medium-coreml_gpu.jsonl",
+    "cases": {
+      "4k": {
+        "name": "ort-v6_medium-coreml_gpu",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 3221.9650624901988,
+        "p95_total_ms": 5574.98871840653,
+        "p50_lines": 72.0
+      },
+      "compact": {
+        "name": "ort-v6_medium-coreml_gpu",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 696.223437495064,
+        "p95_total_ms": 748.5760624404065,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "ort-v6_medium-coreml_gpu",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 2759.136604552623,
+        "p95_total_ms": 2953.471561864717,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "ort-v6_medium-coreml_gpu",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 1715.6886250595562,
+        "p95_total_ms": 1881.417968776077,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "ort-v6_medium-coreml_gpu",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 251.56558299204335,
+        "p95_total_ms": 310.2134578221012,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "ort-v6_medium-coreml_gpu",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 307.9562920611352,
+        "p95_total_ms": 372.72717730957083,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "ort-v6_medium-cpu",
+    "group": "matrix",
+    "status": "ok",
+    "model": "v6_medium",
+    "backend": "cpu",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 1769.8907505255193,
+    "p95_total_ms": 13806.554437323939,
+    "p50_ocr_ms": 1707.6404789695516,
+    "peak_rss_mb": 1532.411904,
+    "load_ms": 178.8922919658944,
+    "first_input_ms": 561.9904578197747,
+    "mean_cpu_percent": 362.95889748549325,
+    "exit_code": 0,
+    "wall_seconds": 184.07175420806743,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 77435,
+      "model": "v6_medium",
+      "backend": "cpu",
+      "ort_version": "1.31.1",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 653.9474999299273,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_medium_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_medium_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/matrix/v6_medium-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV6",
+        "Rec.ocr_version": "OCRVersion.PPOCRV6",
+        "Det.model_type": "ModelType.MEDIUM",
+        "Rec.model_type": "ModelType.MEDIUM",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 8,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": false,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "ALL",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/matrix/coreml-cache/v6_medium/cpu"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/matrix/ort-v6_medium-cpu.jsonl",
+    "cases": {
+      "4k": {
+        "name": "ort-v6_medium-cpu",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 7802.0275415619835,
+        "p95_total_ms": 14593.064593267627,
+        "p50_lines": 72.0
+      },
+      "compact": {
+        "name": "ort-v6_medium-cpu",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 1683.0263335141353,
+        "p95_total_ms": 1846.318603551481,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "ort-v6_medium-cpu",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 7226.901415968314,
+        "p95_total_ms": 8123.49659317988,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "ort-v6_medium-cpu",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 4067.257353977766,
+        "p95_total_ms": 4449.241645692382,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "ort-v6_medium-cpu",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 518.3498134720139,
+        "p95_total_ms": 533.9962600846775,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "ort-v6_medium-cpu",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 582.6831249869429,
+        "p95_total_ms": 595.840114634484,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "ort-v6_small-coreml_all",
+    "group": "matrix",
+    "status": "timeout",
+    "model": "v6_small",
+    "backend": "coreml_all",
+    "hot_samples": 32,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 3741.7944169719703,
+    "p95_total_ms": 21292.956354405032,
+    "p50_ocr_ms": 3733.535208448302,
+    "peak_rss_mb": 3428.253696,
+    "load_ms": 2485.7367089716718,
+    "first_input_ms": 1033.3782500820234,
+    "mean_cpu_percent": 96.41322233104799,
+    "exit_code": -15,
+    "wall_seconds": 300.1299586669775,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 74422,
+      "model": "v6_small",
+      "backend": "coreml_all",
+      "ort_version": "1.31.1",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 675.8733750320971,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_small_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_small_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/matrix/v6_small-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV6",
+        "Rec.ocr_version": "OCRVersion.PPOCRV6",
+        "Det.model_type": "ModelType.SMALL",
+        "Rec.model_type": "ModelType.SMALL",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 8,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": true,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "ALL",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/matrix/coreml-cache/v6_small/coreml_all"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/matrix/ort-v6_small-coreml_all.jsonl",
+    "cases": {
+      "4k": {
+        "name": "ort-v6_small-coreml_all",
+        "category": "4k",
+        "samples": 4,
+        "p50_total_ms": 21330.417708551977,
+        "p95_total_ms": 23056.29034638405,
+        "p50_lines": 129.5
+      },
+      "compact": {
+        "name": "ort-v6_small-coreml_all",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 1939.5172290387563,
+        "p95_total_ms": 2483.136313036084,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "ort-v6_small-coreml_all",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 10505.207895475905,
+        "p95_total_ms": 12405.04013496684,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "ort-v6_small-coreml_all",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 5517.063124978449,
+        "p95_total_ms": 5762.417051912053,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "ort-v6_small-coreml_all",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 505.2247499115765,
+        "p95_total_ms": 561.3349381019361,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "ort-v6_small-coreml_all",
+        "category": "wide",
+        "samples": 4,
+        "p50_total_ms": 531.3027495867573,
+        "p95_total_ms": 732.3444785375614,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "ort-v6_small-coreml_gpu",
+    "group": "matrix",
+    "status": "timeout",
+    "model": "v6_small",
+    "backend": "coreml_gpu",
+    "hot_samples": 33,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 4500.996083137579,
+    "p95_total_ms": 20379.872124758545,
+    "p50_ocr_ms": 4488.224083092064,
+    "peak_rss_mb": 3936.321536,
+    "load_ms": 2152.5837499648333,
+    "first_input_ms": 3610.6266248971224,
+    "mean_cpu_percent": 98.08193269041527,
+    "exit_code": -15,
+    "wall_seconds": 300.16883733298164,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 71351,
+      "model": "v6_small",
+      "backend": "coreml_gpu",
+      "ort_version": "1.31.1",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 464.43104196805507,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_small_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_small_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/matrix/v6_small-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV6",
+        "Rec.ocr_version": "OCRVersion.PPOCRV6",
+        "Det.model_type": "ModelType.SMALL",
+        "Rec.model_type": "ModelType.SMALL",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 8,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": true,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "CPUAndGPU",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/matrix/coreml-cache/v6_small/coreml_gpu"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/matrix/ort-v6_small-coreml_gpu.jsonl",
+    "cases": {
+      "4k": {
+        "name": "ort-v6_small-coreml_gpu",
+        "category": "4k",
+        "samples": 5,
+        "p50_total_ms": 19702.097708010115,
+        "p95_total_ms": 22526.958616334014,
+        "p50_lines": 129.0
+      },
+      "compact": {
+        "name": "ort-v6_small-coreml_gpu",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 1669.6688125375658,
+        "p95_total_ms": 1864.847480028402,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "ort-v6_small-coreml_gpu",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 9212.705937447026,
+        "p95_total_ms": 10053.777864464791,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "ort-v6_small-coreml_gpu",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 5053.180084039923,
+        "p95_total_ms": 5292.869583121501,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "ort-v6_small-coreml_gpu",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 470.96639656228945,
+        "p95_total_ms": 554.3164572445676,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "ort-v6_small-coreml_gpu",
+        "category": "wide",
+        "samples": 4,
+        "p50_total_ms": 523.4006665414199,
+        "p95_total_ms": 714.6615599456709,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "ort-v6_small-cpu",
+    "group": "matrix",
+    "status": "ok",
+    "model": "v6_small",
+    "backend": "cpu",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 685.5920409434475,
+    "p95_total_ms": 3852.299114980269,
+    "p50_ocr_ms": 678.4872079733759,
+    "peak_rss_mb": 1348.845568,
+    "load_ms": 74.0659999428317,
+    "first_input_ms": 118.55566699523479,
+    "mean_cpu_percent": 339.38731501057083,
+    "exit_code": 0,
+    "wall_seconds": 58.31851304101292,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 70768,
+      "model": "v6_small",
+      "backend": "cpu",
+      "ort_version": "1.31.1",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 459.275666042231,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_small_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_small_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/matrix/v6_small-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV6",
+        "Rec.ocr_version": "OCRVersion.PPOCRV6",
+        "Det.model_type": "ModelType.SMALL",
+        "Rec.model_type": "ModelType.SMALL",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 8,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": false,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "ALL",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/matrix/coreml-cache/v6_small/cpu"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/matrix/ort-v6_small-cpu.jsonl",
+    "cases": {
+      "4k": {
+        "name": "ort-v6_small-cpu",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 3751.7163130105473,
+        "p95_total_ms": 3871.070989582222,
+        "p50_lines": 129.5
+      },
+      "compact": {
+        "name": "ort-v6_small-cpu",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 385.46206249156967,
+        "p95_total_ms": 399.89232242805883,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "ort-v6_small-cpu",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 1833.5047709406354,
+        "p95_total_ms": 1923.4175625315402,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "ort-v6_small-cpu",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 982.6593960169703,
+        "p95_total_ms": 1018.4304274444003,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "ort-v6_small-cpu",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 111.61218758206815,
+        "p95_total_ms": 113.46971846069209,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "ort-v6_small-cpu",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 123.492187471129,
+        "p95_total_ms": 131.29311476950534,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "ort-v6_tiny-coreml_gpu",
+    "group": "matrix",
+    "status": "ok",
+    "model": "v6_tiny",
+    "backend": "coreml_gpu",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 1037.3131040250883,
+    "p95_total_ms": 5670.5589064222295,
+    "p50_ocr_ms": 1029.6974795055576,
+    "peak_rss_mb": 2397.585408,
+    "load_ms": 1081.9042089860886,
+    "first_input_ms": 155.1852091215551,
+    "mean_cpu_percent": 102.74021592442645,
+    "exit_code": 0,
+    "wall_seconds": 89.67622670903802,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 69815,
+      "model": "v6_tiny",
+      "backend": "coreml_gpu",
+      "ort_version": "1.31.1",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 460.44633397832513,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_tiny_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_tiny_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/matrix/v6_tiny-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV6",
+        "Rec.ocr_version": "OCRVersion.PPOCRV6",
+        "Det.model_type": "ModelType.TINY",
+        "Rec.model_type": "ModelType.TINY",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 8,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": true,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "CPUAndGPU",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/matrix/coreml-cache/v6_tiny/coreml_gpu"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/matrix/ort-v6_tiny-coreml_gpu.jsonl",
+    "cases": {
+      "4k": {
+        "name": "ort-v6_tiny-coreml_gpu",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 5582.522042503115,
+        "p95_total_ms": 5747.285062272567,
+        "p50_lines": 141.0
+      },
+      "compact": {
+        "name": "ort-v6_tiny-coreml_gpu",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 588.9237289666198,
+        "p95_total_ms": 617.7052082202863,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "ort-v6_tiny-coreml_gpu",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 2727.2337914910167,
+        "p95_total_ms": 2883.5191147518344,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "ort-v6_tiny-coreml_gpu",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 1561.3224575063214,
+        "p95_total_ms": 1666.6935522225685,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "ort-v6_tiny-coreml_gpu",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 161.7704380187206,
+        "p95_total_ms": 184.82411425793543,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "ort-v6_tiny-coreml_gpu",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 279.88597902003676,
+        "p95_total_ms": 308.0612192861736,
+        "p50_lines": 5.5
+      }
+    }
+  },
+  {
+    "name": "ort-v6_tiny-cpu",
+    "group": "matrix",
+    "status": "ok",
+    "model": "v6_tiny",
+    "backend": "cpu",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 191.1708335392177,
+    "p95_total_ms": 937.8472184180282,
+    "p50_ocr_ms": 183.94739599898458,
+    "peak_rss_mb": 880.050176,
+    "load_ms": 59.85820898786187,
+    "first_input_ms": 48.56170795392245,
+    "mean_cpu_percent": 278.53899613899614,
+    "exit_code": 0,
+    "wall_seconds": 16.09596441697795,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 69637,
+      "model": "v6_tiny",
+      "backend": "cpu",
+      "ort_version": "1.31.1",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 617.4734169617295,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_tiny_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_tiny_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/matrix/v6_tiny-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV6",
+        "Rec.ocr_version": "OCRVersion.PPOCRV6",
+        "Det.model_type": "ModelType.TINY",
+        "Rec.model_type": "ModelType.TINY",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 8,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": false,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "ALL",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/matrix/coreml-cache/v6_tiny/cpu"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/matrix/ort-v6_tiny-cpu.jsonl",
+    "cases": {
+      "4k": {
+        "name": "ort-v6_tiny-cpu",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 932.622687483672,
+        "p95_total_ms": 960.0532184704207,
+        "p50_lines": 141.0
+      },
+      "compact": {
+        "name": "ort-v6_tiny-cpu",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 112.17227095039561,
+        "p95_total_ms": 113.65657224087045,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "ort-v6_tiny-cpu",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 443.6225629760884,
+        "p95_total_ms": 459.5356247446034,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "ort-v6_tiny-cpu",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 274.7100830893032,
+        "p95_total_ms": 289.38582300907,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "ort-v6_tiny-cpu",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 31.94372943835333,
+        "p95_total_ms": 33.19115692283958,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "ort-v6_tiny-cpu",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 53.88483346905559,
+        "p95_total_ms": 67.85237503936514,
+        "p50_lines": 5.5
+      }
+    }
+  },
+  {
+    "name": "vision-auto",
+    "group": "matrix",
+    "status": "ok",
+    "model": "vision",
+    "backend": "vision_auto",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 245.8065152168274,
+    "p95_total_ms": 1579.5890390872955,
+    "p50_ocr_ms": 245.73850631713867,
+    "peak_rss_mb": 316.522496,
+    "load_ms": null,
+    "first_input_ms": 677.6700019836426,
+    "mean_cpu_percent": 102.53460674157303,
+    "exit_code": 0,
+    "wall_seconds": 26.12419941695407,
+    "params": {},
+    "environment": {
+      "compute_device_claim": "system-selected; no GPU attribution",
+      "backend": "vision_auto",
+      "type": "environment",
+      "pid": 12513,
+      "uses_cpu_only": false
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/matrix/vision-auto.jsonl",
+    "cases": {
+      "4k": {
+        "name": "vision-auto",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 1567.1745538711548,
+        "p95_total_ms": 1649.2482423782349,
+        "p50_lines": 129.0
+      },
+      "compact": {
+        "name": "vision-auto",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 131.2820315361023,
+        "p95_total_ms": 160.2347493171692,
+        "p50_lines": 11.5
+      },
+      "dense": {
+        "name": "vision-auto",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 701.589047908783,
+        "p95_total_ms": 752.5147497653961,
+        "p50_lines": 57.0
+      },
+      "document": {
+        "name": "vision-auto",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 337.81200647354126,
+        "p95_total_ms": 394.901841878891,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "vision-auto",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 69.9658989906311,
+        "p95_total_ms": 73.16195964813232,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "vision-auto",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 86.64000034332275,
+        "p95_total_ms": 94.88499164581299,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "vision-cpu",
+    "group": "matrix",
+    "status": "ok",
+    "model": "vision",
+    "backend": "vision_cpu",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 616.6489720344543,
+    "p95_total_ms": 2213.4446799755096,
+    "p50_ocr_ms": 616.5865063667297,
+    "peak_rss_mb": 483.852288,
+    "load_ms": null,
+    "first_input_ms": 439.66710567474365,
+    "mean_cpu_percent": 114.89093444909345,
+    "exit_code": 0,
+    "wall_seconds": 42.70640866609756,
+    "params": {},
+    "environment": {
+      "compute_device_claim": "CPU requested",
+      "backend": "vision_cpu",
+      "type": "environment",
+      "pid": 12763,
+      "uses_cpu_only": true
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/matrix/vision-cpu.jsonl",
+    "cases": {
+      "4k": {
+        "name": "vision-cpu",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 2195.398986339569,
+        "p95_total_ms": 2318.822681903839,
+        "p50_lines": 131.0
+      },
+      "compact": {
+        "name": "vision-cpu",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 395.3799605369568,
+        "p95_total_ms": 464.29726481437683,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "vision-cpu",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 1144.006907939911,
+        "p95_total_ms": 1679.021269083023,
+        "p50_lines": 54.5
+      },
+      "document": {
+        "name": "vision-cpu",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 818.8045620918274,
+        "p95_total_ms": 897.5096344947815,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "vision-cpu",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 272.0224857330322,
+        "p95_total_ms": 324.1545259952545,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "vision-cpu",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 212.7109169960022,
+        "p95_total_ms": 228.2898724079132,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "mnn-v6_medium-metal-high-p0-b32",
+    "group": "gpu-tuning",
+    "status": "timeout",
+    "model": "v6_medium",
+    "backend": "metal",
+    "hot_samples": 0,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": null,
+    "p95_total_ms": null,
+    "p50_ocr_ms": null,
+    "peak_rss_mb": 1229.799424,
+    "load_ms": 41.621417,
+    "first_input_ms": 4978.021167,
+    "mean_cpu_percent": 0.8522382249902686,
+    "exit_code": -15,
+    "wall_seconds": 300.46667270804755,
+    "params": {
+      "threads": 4,
+      "batch": 32,
+      "parallel": false,
+      "config": "OcrEngineConfig { backend: Metal, gpu_memory_mode: Buffer, gpu_tuning_mode: Auto, gpu_cache_dir: None, thread_count: 4, precision_mode: High, det_options: DetOptions { max_side_len: 960, box_threshold: 0.5, unclip_ratio: 1.5, score_threshold: 0.3, min_area: 16, box_border: 5, merge_boxes: false, merge_threshold: 10, precision_mode: Fast, multi_scales: [0.5, 1.0, 1.5], block_size: 640, block_overlap: 100, nms_threshold: 0.3 }, rec_options: RecOptions { target_height: 48, min_score: 0.3, punct_min_score: 0.1, batch_size: 32, enable_batch: true }, ori_options: OriOptions { target_height: 224, target_width: 224, min_score: 0.5, resize_shorter: 256, preprocess_mode: Doc, class_angles: [0, 90, 180, 270] }, enable_parallel: false, min_result_confidence: 0.5, ori_min_confidence: 0.3 }"
+    },
+    "environment": {
+      "arch": "aarch64",
+      "backend": "metal",
+      "metal_feature": true,
+      "mnn_runtime_version": "0.1.0",
+      "mnn_version": "3.6.1",
+      "native_prebuilt_tag": "mnn-3.6.1-d407447e-r1",
+      "native_registered": true,
+      "native_source_revision": "d407447ed56c4121a11ccbd266dc184ca1ead0c2",
+      "ocr_rs_revision": "664a945953e46186b37203fa4902a20d60a32809",
+      "ocr_rs_version": "2.4.1",
+      "os": "macos",
+      "pid": 2839,
+      "rust_feature_available": true,
+      "strict_session_backend_guard": true,
+      "type": "backend"
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/gpu-tuning/mnn-v6_medium-metal-high-p0-b32.jsonl",
+    "cases": {
+      "4k": {
+        "name": "mnn-v6_medium-metal-high-p0-b32",
+        "category": "4k",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "compact": {
+        "name": "mnn-v6_medium-metal-high-p0-b32",
+        "category": "compact",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "dense": {
+        "name": "mnn-v6_medium-metal-high-p0-b32",
+        "category": "dense",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "document": {
+        "name": "mnn-v6_medium-metal-high-p0-b32",
+        "category": "document",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "small": {
+        "name": "mnn-v6_medium-metal-high-p0-b32",
+        "category": "small",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "wide": {
+        "name": "mnn-v6_medium-metal-high-p0-b32",
+        "category": "wide",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      }
+    }
+  },
+  {
+    "name": "mnn-v6_medium-metal-high-p0-b8",
+    "group": "gpu-tuning",
+    "status": "timeout",
+    "model": "v6_medium",
+    "backend": "metal",
+    "hot_samples": 0,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": null,
+    "p95_total_ms": null,
+    "p50_ocr_ms": null,
+    "peak_rss_mb": 1820.721152,
+    "load_ms": 41.747917,
+    "first_input_ms": 4962.188958000001,
+    "mean_cpu_percent": 1.4388956557044255,
+    "exit_code": -15,
+    "wall_seconds": 300.42690354201477,
+    "params": {
+      "threads": 4,
+      "batch": 8,
+      "parallel": false,
+      "config": "OcrEngineConfig { backend: Metal, gpu_memory_mode: Buffer, gpu_tuning_mode: Auto, gpu_cache_dir: None, thread_count: 4, precision_mode: High, det_options: DetOptions { max_side_len: 960, box_threshold: 0.5, unclip_ratio: 1.5, score_threshold: 0.3, min_area: 16, box_border: 5, merge_boxes: false, merge_threshold: 10, precision_mode: Fast, multi_scales: [0.5, 1.0, 1.5], block_size: 640, block_overlap: 100, nms_threshold: 0.3 }, rec_options: RecOptions { target_height: 48, min_score: 0.3, punct_min_score: 0.1, batch_size: 8, enable_batch: true }, ori_options: OriOptions { target_height: 224, target_width: 224, min_score: 0.5, resize_shorter: 256, preprocess_mode: Doc, class_angles: [0, 90, 180, 270] }, enable_parallel: false, min_result_confidence: 0.5, ori_min_confidence: 0.3 }"
+    },
+    "environment": {
+      "arch": "aarch64",
+      "backend": "metal",
+      "metal_feature": true,
+      "mnn_runtime_version": "0.1.0",
+      "mnn_version": "3.6.1",
+      "native_prebuilt_tag": "mnn-3.6.1-d407447e-r1",
+      "native_registered": true,
+      "native_source_revision": "d407447ed56c4121a11ccbd266dc184ca1ead0c2",
+      "ocr_rs_revision": "664a945953e46186b37203fa4902a20d60a32809",
+      "ocr_rs_version": "2.4.1",
+      "os": "macos",
+      "pid": 99778,
+      "rust_feature_available": true,
+      "strict_session_backend_guard": true,
+      "type": "backend"
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/gpu-tuning/mnn-v6_medium-metal-high-p0-b8.jsonl",
+    "cases": {
+      "4k": {
+        "name": "mnn-v6_medium-metal-high-p0-b8",
+        "category": "4k",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "compact": {
+        "name": "mnn-v6_medium-metal-high-p0-b8",
+        "category": "compact",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "dense": {
+        "name": "mnn-v6_medium-metal-high-p0-b8",
+        "category": "dense",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "document": {
+        "name": "mnn-v6_medium-metal-high-p0-b8",
+        "category": "document",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "small": {
+        "name": "mnn-v6_medium-metal-high-p0-b8",
+        "category": "small",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "wide": {
+        "name": "mnn-v6_medium-metal-high-p0-b8",
+        "category": "wide",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      }
+    }
+  },
+  {
+    "name": "mnn-v6_medium-metal-normal-p0-b8",
+    "group": "gpu-tuning",
+    "status": "sanity_failed",
+    "model": "v6_medium",
+    "backend": "metal",
+    "hot_samples": 36,
+    "zero_output_samples": 18,
+    "error_samples": 0,
+    "p50_total_ms": 109.2615625,
+    "p95_total_ms": 318.457708,
+    "p50_ocr_ms": 89.0293545,
+    "peak_rss_mb": 1189.363712,
+    "load_ms": 61.136375,
+    "first_input_ms": 17740.000417,
+    "mean_cpu_percent": 4.267881040892194,
+    "exit_code": 0,
+    "wall_seconds": 81.73109062493313,
+    "params": {
+      "threads": 4,
+      "batch": 8,
+      "parallel": false,
+      "config": "OcrEngineConfig { backend: Metal, gpu_memory_mode: Buffer, gpu_tuning_mode: Auto, gpu_cache_dir: None, thread_count: 4, precision_mode: Normal, det_options: DetOptions { max_side_len: 960, box_threshold: 0.5, unclip_ratio: 1.5, score_threshold: 0.3, min_area: 16, box_border: 5, merge_boxes: false, merge_threshold: 10, precision_mode: Fast, multi_scales: [0.5, 1.0, 1.5], block_size: 640, block_overlap: 100, nms_threshold: 0.3 }, rec_options: RecOptions { target_height: 48, min_score: 0.3, punct_min_score: 0.1, batch_size: 8, enable_batch: true }, ori_options: OriOptions { target_height: 224, target_width: 224, min_score: 0.5, resize_shorter: 256, preprocess_mode: Doc, class_angles: [0, 90, 180, 270] }, enable_parallel: false, min_result_confidence: 0.5, ori_min_confidence: 0.3 }"
+    },
+    "environment": {
+      "arch": "aarch64",
+      "backend": "metal",
+      "metal_feature": true,
+      "mnn_runtime_version": "0.1.0",
+      "mnn_version": "3.6.1",
+      "native_prebuilt_tag": "mnn-3.6.1-d407447e-r1",
+      "native_registered": true,
+      "native_source_revision": "d407447ed56c4121a11ccbd266dc184ca1ead0c2",
+      "ocr_rs_revision": "664a945953e46186b37203fa4902a20d60a32809",
+      "ocr_rs_version": "2.4.1",
+      "os": "macos",
+      "pid": 99010,
+      "rust_feature_available": true,
+      "strict_session_backend_guard": true,
+      "type": "backend"
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/gpu-tuning/mnn-v6_medium-metal-normal-p0-b8.jsonl",
+    "cases": {
+      "4k": {
+        "name": "mnn-v6_medium-metal-normal-p0-b8",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 117.75633350000001,
+        "p95_total_ms": 121.50002124999999,
+        "p50_lines": 0.0
+      },
+      "compact": {
+        "name": "mnn-v6_medium-metal-normal-p0-b8",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 317.42770800000005,
+        "p95_total_ms": 324.20858350000003,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "mnn-v6_medium-metal-normal-p0-b8",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 78.98706250000001,
+        "p95_total_ms": 82.93997900000001,
+        "p50_lines": 0.0
+      },
+      "document": {
+        "name": "mnn-v6_medium-metal-normal-p0-b8",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 92.20291649999999,
+        "p95_total_ms": 96.92750025000001,
+        "p50_lines": 0.0
+      },
+      "small": {
+        "name": "mnn-v6_medium-metal-normal-p0-b8",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 92.978125,
+        "p95_total_ms": 103.12331275,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "mnn-v6_medium-metal-normal-p0-b8",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 126.27752050000001,
+        "p95_total_ms": 140.9149895,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "mnn-v6_small-metal-high-p0-b32",
+    "group": "gpu-tuning",
+    "status": "timeout",
+    "model": "v6_small",
+    "backend": "metal",
+    "hot_samples": 0,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": null,
+    "p95_total_ms": null,
+    "p50_ocr_ms": null,
+    "peak_rss_mb": 1178.058752,
+    "load_ms": 34.083667,
+    "first_input_ms": 1889.5049999999999,
+    "mean_cpu_percent": 0.7496305418719211,
+    "exit_code": -15,
+    "wall_seconds": 300.0826781250071,
+    "params": {
+      "threads": 4,
+      "batch": 32,
+      "parallel": false,
+      "config": "OcrEngineConfig { backend: Metal, gpu_memory_mode: Buffer, gpu_tuning_mode: Auto, gpu_cache_dir: None, thread_count: 4, precision_mode: High, det_options: DetOptions { max_side_len: 960, box_threshold: 0.5, unclip_ratio: 1.5, score_threshold: 0.3, min_area: 16, box_border: 5, merge_boxes: false, merge_threshold: 10, precision_mode: Fast, multi_scales: [0.5, 1.0, 1.5], block_size: 640, block_overlap: 100, nms_threshold: 0.3 }, rec_options: RecOptions { target_height: 48, min_score: 0.3, punct_min_score: 0.1, batch_size: 32, enable_batch: true }, ori_options: OriOptions { target_height: 224, target_width: 224, min_score: 0.5, resize_shorter: 256, preprocess_mode: Doc, class_angles: [0, 90, 180, 270] }, enable_parallel: false, min_result_confidence: 0.5, ori_min_confidence: 0.3 }"
+    },
+    "environment": {
+      "arch": "aarch64",
+      "backend": "metal",
+      "metal_feature": true,
+      "mnn_runtime_version": "0.1.0",
+      "mnn_version": "3.6.1",
+      "native_prebuilt_tag": "mnn-3.6.1-d407447e-r1",
+      "native_registered": true,
+      "native_source_revision": "d407447ed56c4121a11ccbd266dc184ca1ead0c2",
+      "ocr_rs_revision": "664a945953e46186b37203fa4902a20d60a32809",
+      "ocr_rs_version": "2.4.1",
+      "os": "macos",
+      "pid": 96257,
+      "rust_feature_available": true,
+      "strict_session_backend_guard": true,
+      "type": "backend"
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/gpu-tuning/mnn-v6_small-metal-high-p0-b32.jsonl",
+    "cases": {
+      "4k": {
+        "name": "mnn-v6_small-metal-high-p0-b32",
+        "category": "4k",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "compact": {
+        "name": "mnn-v6_small-metal-high-p0-b32",
+        "category": "compact",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "dense": {
+        "name": "mnn-v6_small-metal-high-p0-b32",
+        "category": "dense",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "document": {
+        "name": "mnn-v6_small-metal-high-p0-b32",
+        "category": "document",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "small": {
+        "name": "mnn-v6_small-metal-high-p0-b32",
+        "category": "small",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "wide": {
+        "name": "mnn-v6_small-metal-high-p0-b32",
+        "category": "wide",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      }
+    }
+  },
+  {
+    "name": "mnn-v6_small-metal-high-p0-b8",
+    "group": "gpu-tuning",
+    "status": "ok",
+    "model": "v6_small",
+    "backend": "metal",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 495.274541,
+    "p95_total_ms": 2407.6515,
+    "p50_ocr_ms": 475.33733350000006,
+    "peak_rss_mb": 2527.461376,
+    "load_ms": 17.615417,
+    "first_input_ms": 1957.585583,
+    "mean_cpu_percent": 10.088079125455492,
+    "exit_code": 0,
+    "wall_seconds": 235.5879317080835,
+    "params": {
+      "threads": 4,
+      "batch": 8,
+      "parallel": false,
+      "config": "OcrEngineConfig { backend: Metal, gpu_memory_mode: Buffer, gpu_tuning_mode: Auto, gpu_cache_dir: None, thread_count: 4, precision_mode: High, det_options: DetOptions { max_side_len: 960, box_threshold: 0.5, unclip_ratio: 1.5, score_threshold: 0.3, min_area: 16, box_border: 5, merge_boxes: false, merge_threshold: 10, precision_mode: Fast, multi_scales: [0.5, 1.0, 1.5], block_size: 640, block_overlap: 100, nms_threshold: 0.3 }, rec_options: RecOptions { target_height: 48, min_score: 0.3, punct_min_score: 0.1, batch_size: 8, enable_batch: true }, ori_options: OriOptions { target_height: 224, target_width: 224, min_score: 0.5, resize_shorter: 256, preprocess_mode: Doc, class_angles: [0, 90, 180, 270] }, enable_parallel: false, min_result_confidence: 0.5, ori_min_confidence: 0.3 }"
+    },
+    "environment": {
+      "arch": "aarch64",
+      "backend": "metal",
+      "metal_feature": true,
+      "mnn_runtime_version": "0.1.0",
+      "mnn_version": "3.6.1",
+      "native_prebuilt_tag": "mnn-3.6.1-d407447e-r1",
+      "native_registered": true,
+      "native_source_revision": "d407447ed56c4121a11ccbd266dc184ca1ead0c2",
+      "ocr_rs_revision": "664a945953e46186b37203fa4902a20d60a32809",
+      "ocr_rs_version": "2.4.1",
+      "os": "macos",
+      "pid": 94009,
+      "rust_feature_available": true,
+      "strict_session_backend_guard": true,
+      "type": "backend"
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/gpu-tuning/mnn-v6_small-metal-high-p0-b8.jsonl",
+    "cases": {
+      "4k": {
+        "name": "mnn-v6_small-metal-high-p0-b8",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 1969.8546665,
+        "p95_total_ms": 2074.7749065,
+        "p50_lines": 129.0
+      },
+      "compact": {
+        "name": "mnn-v6_small-metal-high-p0-b8",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 176.32820850000002,
+        "p95_total_ms": 193.16219725000002,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "mnn-v6_small-metal-high-p0-b8",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 929.2390625,
+        "p95_total_ms": 1041.3916459999998,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "mnn-v6_small-metal-high-p0-b8",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 2139.557729,
+        "p95_total_ms": 2691.98434425,
+        "p50_lines": 29.0
+      },
+      "small": {
+        "name": "mnn-v6_small-metal-high-p0-b8",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 57.5567085,
+        "p95_total_ms": 62.0170625,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "mnn-v6_small-metal-high-p0-b8",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 92.1859165,
+        "p95_total_ms": 120.43540625,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "mnn-v6_small-metal-normal-p0-b8",
+    "group": "gpu-tuning",
+    "status": "sanity_failed",
+    "model": "v6_small",
+    "backend": "metal",
+    "hot_samples": 36,
+    "zero_output_samples": 12,
+    "error_samples": 0,
+    "p50_total_ms": 74.74799999999999,
+    "p95_total_ms": 406.58027025,
+    "p50_ocr_ms": 53.665791999999996,
+    "peak_rss_mb": 1118.978048,
+    "load_ms": 19.164416,
+    "first_input_ms": 1592.300333,
+    "mean_cpu_percent": 12.569114877589454,
+    "exit_code": 0,
+    "wall_seconds": 32.63898137502838,
+    "params": {
+      "threads": 4,
+      "batch": 8,
+      "parallel": false,
+      "config": "OcrEngineConfig { backend: Metal, gpu_memory_mode: Buffer, gpu_tuning_mode: Auto, gpu_cache_dir: None, thread_count: 4, precision_mode: Normal, det_options: DetOptions { max_side_len: 960, box_threshold: 0.5, unclip_ratio: 1.5, score_threshold: 0.3, min_area: 16, box_border: 5, merge_boxes: false, merge_threshold: 10, precision_mode: Fast, multi_scales: [0.5, 1.0, 1.5], block_size: 640, block_overlap: 100, nms_threshold: 0.3 }, rec_options: RecOptions { target_height: 48, min_score: 0.3, punct_min_score: 0.1, batch_size: 8, enable_batch: true }, ori_options: OriOptions { target_height: 224, target_width: 224, min_score: 0.5, resize_shorter: 256, preprocess_mode: Doc, class_angles: [0, 90, 180, 270] }, enable_parallel: false, min_result_confidence: 0.5, ori_min_confidence: 0.3 }"
+    },
+    "environment": {
+      "arch": "aarch64",
+      "backend": "metal",
+      "metal_feature": true,
+      "mnn_runtime_version": "0.1.0",
+      "mnn_version": "3.6.1",
+      "native_prebuilt_tag": "mnn-3.6.1-d407447e-r1",
+      "native_registered": true,
+      "native_source_revision": "d407447ed56c4121a11ccbd266dc184ca1ead0c2",
+      "ocr_rs_revision": "664a945953e46186b37203fa4902a20d60a32809",
+      "ocr_rs_version": "2.4.1",
+      "os": "macos",
+      "pid": 93694,
+      "rust_feature_available": true,
+      "strict_session_backend_guard": true,
+      "type": "backend"
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/gpu-tuning/mnn-v6_small-metal-normal-p0-b8.jsonl",
+    "cases": {
+      "4k": {
+        "name": "mnn-v6_small-metal-normal-p0-b8",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 83.4705415,
+        "p95_total_ms": 88.39817675,
+        "p50_lines": 0.0
+      },
+      "compact": {
+        "name": "mnn-v6_small-metal-normal-p0-b8",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 149.33610449999998,
+        "p95_total_ms": 158.4297185,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "mnn-v6_small-metal-normal-p0-b8",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 44.9148335,
+        "p95_total_ms": 45.866468999999995,
+        "p50_lines": 0.0
+      },
+      "document": {
+        "name": "mnn-v6_small-metal-normal-p0-b8",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 394.09472900000003,
+        "p95_total_ms": 426.44327024999996,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "mnn-v6_small-metal-normal-p0-b8",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 49.656917,
+        "p95_total_ms": 53.516052,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "mnn-v6_small-metal-normal-p0-b8",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 61.758604,
+        "p95_total_ms": 67.05475999999999,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "mnn-v6_tiny-metal-high-p1-b8",
+    "group": "gpu-tuning",
+    "status": "ok",
+    "model": "v6_tiny",
+    "backend": "metal",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 197.80118749999997,
+    "p95_total_ms": 1162.22995825,
+    "p50_ocr_ms": 194.61006249999997,
+    "peak_rss_mb": 954.368,
+    "load_ms": 28.064791,
+    "first_input_ms": 532.973833,
+    "mean_cpu_percent": 35.76779661016949,
+    "exit_code": 0,
+    "wall_seconds": 29.103853457956575,
+    "params": {
+      "threads": 4,
+      "batch": 8,
+      "parallel": true,
+      "config": "OcrEngineConfig { backend: Metal, gpu_memory_mode: Buffer, gpu_tuning_mode: Auto, gpu_cache_dir: None, thread_count: 4, precision_mode: High, det_options: DetOptions { max_side_len: 960, box_threshold: 0.5, unclip_ratio: 1.5, score_threshold: 0.3, min_area: 16, box_border: 5, merge_boxes: false, merge_threshold: 10, precision_mode: Fast, multi_scales: [0.5, 1.0, 1.5], block_size: 640, block_overlap: 100, nms_threshold: 0.3 }, rec_options: RecOptions { target_height: 48, min_score: 0.3, punct_min_score: 0.1, batch_size: 8, enable_batch: true }, ori_options: OriOptions { target_height: 224, target_width: 224, min_score: 0.5, resize_shorter: 256, preprocess_mode: Doc, class_angles: [0, 90, 180, 270] }, enable_parallel: true, min_result_confidence: 0.5, ori_min_confidence: 0.3 }"
+    },
+    "environment": {
+      "arch": "aarch64",
+      "backend": "metal",
+      "metal_feature": true,
+      "mnn_runtime_version": "0.1.0",
+      "mnn_version": "3.6.1",
+      "native_prebuilt_tag": "mnn-3.6.1-d407447e-r1",
+      "native_registered": true,
+      "native_source_revision": "d407447ed56c4121a11ccbd266dc184ca1ead0c2",
+      "ocr_rs_revision": "664a945953e46186b37203fa4902a20d60a32809",
+      "ocr_rs_version": "2.4.1",
+      "os": "macos",
+      "pid": 93392,
+      "rust_feature_available": true,
+      "strict_session_backend_guard": true,
+      "type": "backend"
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/gpu-tuning/mnn-v6_tiny-metal-high-p1-b8.jsonl",
+    "cases": {
+      "4k": {
+        "name": "mnn-v6_tiny-metal-high-p1-b8",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 1157.4668120000001,
+        "p95_total_ms": 1167.1421770000002,
+        "p50_lines": 130.0
+      },
+      "compact": {
+        "name": "mnn-v6_tiny-metal-high-p1-b8",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 106.7285415,
+        "p95_total_ms": 111.71634425,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "mnn-v6_tiny-metal-high-p1-b8",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 500.3901455,
+        "p95_total_ms": 527.42716725,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "mnn-v6_tiny-metal-high-p1-b8",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 292.27447900000004,
+        "p95_total_ms": 312.30838550000004,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "mnn-v6_tiny-metal-high-p1-b8",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 24.6201455,
+        "p95_total_ms": 26.388073,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "mnn-v6_tiny-metal-high-p1-b8",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 58.091646,
+        "p95_total_ms": 61.10709325,
+        "p50_lines": 5.0
+      }
+    }
+  },
+  {
+    "name": "mnn-v6_tiny-metal-high",
+    "group": "gpu-tuning",
+    "status": "incomplete",
+    "model": "v6_tiny",
+    "backend": "metal",
+    "hot_samples": 12,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 1187.8797295,
+    "p95_total_ms": 2644.8017874999996,
+    "p50_ocr_ms": 1183.1035415000001,
+    "peak_rss_mb": 853.85216,
+    "load_ms": 18.522541,
+    "first_input_ms": 985.478333,
+    "mean_cpu_percent": 18.622611464968152,
+    "exit_code": 0,
+    "wall_seconds": 18.32903983304277,
+    "params": {
+      "threads": 4,
+      "batch": 8,
+      "parallel": true,
+      "config": "OcrEngineConfig { backend: Metal, gpu_memory_mode: Buffer, gpu_tuning_mode: Auto, gpu_cache_dir: None, thread_count: 4, precision_mode: High, det_options: DetOptions { max_side_len: 960, box_threshold: 0.5, unclip_ratio: 1.5, score_threshold: 0.3, min_area: 16, box_border: 5, merge_boxes: false, merge_threshold: 10, precision_mode: Fast, multi_scales: [0.5, 1.0, 1.5], block_size: 640, block_overlap: 100, nms_threshold: 0.3 }, rec_options: RecOptions { target_height: 48, min_score: 0.3, punct_min_score: 0.1, batch_size: 8, enable_batch: true }, ori_options: OriOptions { target_height: 224, target_width: 224, min_score: 0.5, resize_shorter: 256, preprocess_mode: Doc, class_angles: [0, 90, 180, 270] }, enable_parallel: true, min_result_confidence: 0.5, ori_min_confidence: 0.3 }"
+    },
+    "environment": {
+      "arch": "aarch64",
+      "backend": "metal",
+      "metal_feature": true,
+      "mnn_runtime_version": "0.1.0",
+      "mnn_version": "3.6.1",
+      "native_prebuilt_tag": "mnn-3.6.1-d407447e-r1",
+      "native_registered": true,
+      "native_source_revision": "d407447ed56c4121a11ccbd266dc184ca1ead0c2",
+      "ocr_rs_revision": "664a945953e46186b37203fa4902a20d60a32809",
+      "ocr_rs_version": "2.4.1",
+      "os": "macos",
+      "pid": 91084,
+      "rust_feature_available": true,
+      "strict_session_backend_guard": true,
+      "type": "backend"
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/gpu-tuning/mnn-v6_tiny-metal-high.jsonl",
+    "cases": {
+      "4k": {
+        "name": "mnn-v6_tiny-metal-high",
+        "category": "4k",
+        "samples": 2,
+        "p50_total_ms": 2385.0049164999996,
+        "p95_total_ms": 2469.4077791499994,
+        "p50_lines": 130.0
+      },
+      "compact": {
+        "name": "mnn-v6_tiny-metal-high",
+        "category": "compact",
+        "samples": 2,
+        "p50_total_ms": 1069.7146875,
+        "p95_total_ms": 1244.68963155,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "mnn-v6_tiny-metal-high",
+        "category": "dense",
+        "samples": 2,
+        "p50_total_ms": 1596.960563,
+        "p95_total_ms": 1807.9590569000002,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "mnn-v6_tiny-metal-high",
+        "category": "document",
+        "samples": 2,
+        "p50_total_ms": 1979.6691460000002,
+        "p95_total_ms": 2760.9060271,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "mnn-v6_tiny-metal-high",
+        "category": "small",
+        "samples": 2,
+        "p50_total_ms": 634.2804165,
+        "p95_total_ms": 950.35854135,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "mnn-v6_tiny-metal-high",
+        "category": "wide",
+        "samples": 2,
+        "p50_total_ms": 458.0832705,
+        "p95_total_ms": 571.35815205,
+        "p50_lines": 5.0
+      }
+    }
+  },
+  {
+    "name": "ort-v6_medium-cpu-b1",
+    "group": "extra",
+    "status": "ok",
+    "model": "v6_medium",
+    "backend": "cpu",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 1731.9820005213842,
+    "p95_total_ms": 17611.238197772764,
+    "p50_ocr_ms": 1725.885896012187,
+    "peak_rss_mb": 1130.364928,
+    "load_ms": 145.97487496212125,
+    "first_input_ms": 496.6286240378395,
+    "mean_cpu_percent": 319.0508395265621,
+    "exit_code": 0,
+    "wall_seconds": 212.6918754170183,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 15487,
+      "model": "v6_medium",
+      "backend": "cpu",
+      "ort_version": "1.31.1",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 492.7456669975072,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_medium_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_medium_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/extra/v6_medium-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV6",
+        "Rec.ocr_version": "OCRVersion.PPOCRV6",
+        "Det.model_type": "ModelType.MEDIUM",
+        "Rec.model_type": "ModelType.MEDIUM",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 1,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": false,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "ALL",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/extra/coreml-cache/v6_medium/cpu"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/extra/ort-v6_medium-cpu-b1.jsonl",
+    "cases": {
+      "4k": {
+        "name": "ort-v6_medium-cpu-b1",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 9666.104145988356,
+        "p95_total_ms": 17621.748166711768,
+        "p50_lines": 72.5
+      },
+      "compact": {
+        "name": "ort-v6_medium-cpu-b1",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 1729.8798756091855,
+        "p95_total_ms": 1789.2741147370543,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "ort-v6_medium-cpu-b1",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 8693.707542028278,
+        "p95_total_ms": 9048.413833515951,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "ort-v6_medium-cpu-b1",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 4862.555395986419,
+        "p95_total_ms": 4890.821031469386,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "ort-v6_medium-cpu-b1",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 479.7792080207728,
+        "p95_total_ms": 495.7711247552652,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "ort-v6_medium-cpu-b1",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 603.5226254607551,
+        "p95_total_ms": 629.67146927258,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "ort-v6_medium-cpu-b4",
+    "group": "extra",
+    "status": "ok",
+    "model": "v6_medium",
+    "backend": "cpu",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 1679.9568545538932,
+    "p95_total_ms": 14011.052343033953,
+    "p50_ocr_ms": 1676.4788750442676,
+    "peak_rss_mb": 1398.636544,
+    "load_ms": 137.7593749202788,
+    "first_input_ms": 531.1821249779314,
+    "mean_cpu_percent": 366.7295424403183,
+    "exit_code": 0,
+    "wall_seconds": 176.15260445897002,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 17559,
+      "model": "v6_medium",
+      "backend": "cpu",
+      "ort_version": "1.31.1",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 512.3231670586392,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_medium_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_medium_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/extra/v6_medium-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV6",
+        "Rec.ocr_version": "OCRVersion.PPOCRV6",
+        "Det.model_type": "ModelType.MEDIUM",
+        "Rec.model_type": "ModelType.MEDIUM",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 4,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": false,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "ALL",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelFormat": "MLProgram",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/extra/coreml-cache/v6_medium/cpu/MLProgram"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/extra/ort-v6_medium-cpu-b4.jsonl",
+    "cases": {
+      "4k": {
+        "name": "ort-v6_medium-cpu-b4",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 7776.263041479979,
+        "p95_total_ms": 14158.63821824314,
+        "p50_lines": 72.5
+      },
+      "compact": {
+        "name": "ort-v6_medium-cpu-b4",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 1679.9568545538932,
+        "p95_total_ms": 1684.6680724120233,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "ort-v6_medium-cpu-b4",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 7182.590812502895,
+        "p95_total_ms": 7546.022635739064,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "ort-v6_medium-cpu-b4",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 4055.961208534427,
+        "p95_total_ms": 4257.26566722733,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "ort-v6_medium-cpu-b4",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 519.9394170194864,
+        "p95_total_ms": 533.5288235219195,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "ort-v6_medium-cpu-b4",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 566.3608955801465,
+        "p95_total_ms": 602.3902089218609,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "ort-v6_small-cpu-b1",
+    "group": "extra",
+    "status": "ok",
+    "model": "v6_small",
+    "backend": "cpu",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 897.6754579343833,
+    "p95_total_ms": 5674.801489221863,
+    "p50_ocr_ms": 889.1066669602878,
+    "peak_rss_mb": 761.315328,
+    "load_ms": 105.55395798292011,
+    "first_input_ms": 157.75891696102917,
+    "mean_cpu_percent": 268.30299572039945,
+    "exit_code": 0,
+    "wall_seconds": 82.7977654999122,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 14137,
+      "model": "v6_small",
+      "backend": "cpu",
+      "ort_version": "1.31.1",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 837.6191249117255,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_small_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_small_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/extra/v6_small-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV6",
+        "Rec.ocr_version": "OCRVersion.PPOCRV6",
+        "Det.model_type": "ModelType.SMALL",
+        "Rec.model_type": "ModelType.SMALL",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 1,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": false,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "ALL",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/extra/coreml-cache/v6_small/cpu"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/extra/ort-v6_small-cpu-b1.jsonl",
+    "cases": {
+      "4k": {
+        "name": "ort-v6_small-cpu-b1",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 5492.652811983135,
+        "p95_total_ms": 6115.336864255369,
+        "p50_lines": 129.5
+      },
+      "compact": {
+        "name": "ort-v6_small-cpu-b1",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 453.0696669826284,
+        "p95_total_ms": 490.6639894761611,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "ort-v6_small-cpu-b1",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 2593.141374993138,
+        "p95_total_ms": 2710.458999266848,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "ort-v6_small-cpu-b1",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 1319.676208018791,
+        "p95_total_ms": 1392.1964065229986,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "ort-v6_small-cpu-b1",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 126.74610450631008,
+        "p95_total_ms": 129.9537401937414,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "ort-v6_small-cpu-b1",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 160.1393119781278,
+        "p95_total_ms": 164.375666732667,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "ort-v6_small-cpu-b4",
+    "group": "extra",
+    "status": "ok",
+    "model": "v6_small",
+    "backend": "cpu",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 684.0389790013433,
+    "p95_total_ms": 3915.094646246871,
+    "p50_ocr_ms": 676.7637500306591,
+    "peak_rss_mb": 1351.59808,
+    "load_ms": 83.81654100958258,
+    "first_input_ms": 124.88566595129669,
+    "mean_cpu_percent": 327.7454368932039,
+    "exit_code": 0,
+    "wall_seconds": 60.33660525002051,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 14925,
+      "model": "v6_small",
+      "backend": "cpu",
+      "ort_version": "1.31.1",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 502.3317920276895,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_small_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_small_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/extra/v6_small-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV6",
+        "Rec.ocr_version": "OCRVersion.PPOCRV6",
+        "Det.model_type": "ModelType.SMALL",
+        "Rec.model_type": "ModelType.SMALL",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 4,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": false,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "ALL",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/extra/coreml-cache/v6_small/cpu"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/extra/ort-v6_small-cpu-b4.jsonl",
+    "cases": {
+      "4k": {
+        "name": "ort-v6_small-cpu-b4",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 3794.9956879601814,
+        "p95_total_ms": 4568.572490243241,
+        "p50_lines": 129.5
+      },
+      "compact": {
+        "name": "ort-v6_small-cpu-b4",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 382.64816749142483,
+        "p95_total_ms": 393.10232282150537,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "ort-v6_small-cpu-b4",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 1841.0645204712637,
+        "p95_total_ms": 1895.391114114318,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "ort-v6_small-cpu-b4",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 993.8718545599841,
+        "p95_total_ms": 1021.6512607876211,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "ort-v6_small-cpu-b4",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 115.24899950018153,
+        "p95_total_ms": 117.78340651653707,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "ort-v6_small-cpu-b4",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 126.6944165690802,
+        "p95_total_ms": 128.0783225374762,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "paddle-v5_mobile-cpu",
+    "group": "extra",
+    "status": "timeout",
+    "model": "v5_mobile",
+    "backend": "paddle_cpp",
+    "hot_samples": 16,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 3259.464479982853,
+    "p95_total_ms": 39123.711489199195,
+    "p50_ocr_ms": 3255.561250494793,
+    "peak_rss_mb": 1420.017664,
+    "load_ms": 467.48129196930677,
+    "first_input_ms": 934.1449589701369,
+    "mean_cpu_percent": 105.07185012618909,
+    "exit_code": -15,
+    "wall_seconds": 300.0727579999948,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 25442,
+      "model": "v5_mobile",
+      "backend": "paddle_cpp",
+      "ort_version": "1.31.1",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 491.59520806279033,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv5_mobile_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv5_mobile_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/extra/v5_mobile-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV5",
+        "Rec.ocr_version": "OCRVersion.PPOCRV5",
+        "Det.model_type": "ModelType.MOBILE",
+        "Rec.model_type": "ModelType.MOBILE",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 8,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": false,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "ALL",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelFormat": "MLProgram",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/extra/coreml-cache/v5_mobile/paddle_cpp/MLProgram"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/extra/paddle-v5_mobile-cpu.jsonl",
+    "cases": {
+      "4k": {
+        "name": "paddle-v5_mobile-cpu",
+        "category": "4k",
+        "samples": 2,
+        "p50_total_ms": 39274.55639548134,
+        "p95_total_ms": 39546.0772267892,
+        "p50_lines": 129.5
+      },
+      "compact": {
+        "name": "paddle-v5_mobile-cpu",
+        "category": "compact",
+        "samples": 4,
+        "p50_total_ms": 3259.464479982853,
+        "p95_total_ms": 3297.9293232841883,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "paddle-v5_mobile-cpu",
+        "category": "dense",
+        "samples": 2,
+        "p50_total_ms": 17685.67777099088,
+        "p95_total_ms": 17842.71984010702,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "paddle-v5_mobile-cpu",
+        "category": "document",
+        "samples": 2,
+        "p50_total_ms": 8816.566436667927,
+        "p95_total_ms": 8851.927942922339,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "paddle-v5_mobile-cpu",
+        "category": "small",
+        "samples": 4,
+        "p50_total_ms": 886.4136040210724,
+        "p95_total_ms": 926.870171300834,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "paddle-v5_mobile-cpu",
+        "category": "wide",
+        "samples": 2,
+        "p50_total_ms": 1248.915166943334,
+        "p95_total_ms": 1257.5613166322,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "paddle-v5_server-cpu",
+    "group": "extra",
+    "status": "timeout",
+    "model": "v5_server",
+    "backend": "paddle_cpp",
+    "hot_samples": 20,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 6431.463562534191,
+    "p95_total_ms": 26392.080043756872,
+    "p50_ocr_ms": 6423.680895532016,
+    "peak_rss_mb": 5419.106304,
+    "load_ms": 543.1463340064511,
+    "first_input_ms": 891.0455419681966,
+    "mean_cpu_percent": 111.5921078146209,
+    "exit_code": -15,
+    "wall_seconds": 300.17057587509044,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 28185,
+      "model": "v5_server",
+      "backend": "paddle_cpp",
+      "ort_version": "1.31.1",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 496.87170900870115,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv5_server_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv5_server_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/extra/v5_server-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV5",
+        "Rec.ocr_version": "OCRVersion.PPOCRV5",
+        "Det.model_type": "ModelType.SERVER",
+        "Rec.model_type": "ModelType.SERVER",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 8,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": false,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "ALL",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelFormat": "MLProgram",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/extra/coreml-cache/v5_server/paddle_cpp/MLProgram"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/extra/paddle-v5_server-cpu.jsonl",
+    "cases": {
+      "4k": {
+        "name": "paddle-v5_server-cpu",
+        "category": "4k",
+        "samples": 2,
+        "p50_total_ms": 27824.31906252168,
+        "p95_total_ms": 29256.558081286494,
+        "p50_lines": 129.0
+      },
+      "compact": {
+        "name": "paddle-v5_server-cpu",
+        "category": "compact",
+        "samples": 4,
+        "p50_total_ms": 3672.5860835285857,
+        "p95_total_ms": 4126.98620185256,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "paddle-v5_server-cpu",
+        "category": "dense",
+        "samples": 4,
+        "p50_total_ms": 14058.917124988511,
+        "p95_total_ms": 15049.588614352979,
+        "p50_lines": 58.0
+      },
+      "document": {
+        "name": "paddle-v5_server-cpu",
+        "category": "document",
+        "samples": 4,
+        "p50_total_ms": 9529.140061989892,
+        "p95_total_ms": 10833.840581180993,
+        "p50_lines": 28.5
+      },
+      "small": {
+        "name": "paddle-v5_server-cpu",
+        "category": "small",
+        "samples": 4,
+        "p50_total_ms": 770.7343960064463,
+        "p95_total_ms": 834.8459393077064,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "paddle-v5_server-cpu",
+        "category": "wide",
+        "samples": 2,
+        "p50_total_ms": 1091.5048540337011,
+        "p95_total_ms": 1205.3912473260425,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "paddle-v6_medium-cpu",
+    "group": "extra",
+    "status": "timeout",
+    "model": "v6_medium",
+    "backend": "paddle_cpp",
+    "hot_samples": 17,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 5008.585248957388,
+    "p95_total_ms": 26964.46313236373,
+    "p50_ocr_ms": 5004.22958296258,
+    "peak_rss_mb": 1762.246656,
+    "load_ms": 562.7327089896426,
+    "first_input_ms": 1291.2298750597984,
+    "mean_cpu_percent": 106.20111808552373,
+    "exit_code": -15,
+    "wall_seconds": 300.08068766701035,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 22611,
+      "model": "v6_medium",
+      "backend": "paddle_cpp",
+      "ort_version": "1.31.1",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 504.2633330449462,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_medium_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_medium_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/extra/v6_medium-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV6",
+        "Rec.ocr_version": "OCRVersion.PPOCRV6",
+        "Det.model_type": "ModelType.MEDIUM",
+        "Rec.model_type": "ModelType.MEDIUM",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 8,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": false,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "ALL",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelFormat": "MLProgram",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/extra/coreml-cache/v6_medium/paddle_cpp/MLProgram"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/extra/paddle-v6_medium-cpu.jsonl",
+    "cases": {
+      "4k": {
+        "name": "paddle-v6_medium-cpu",
+        "category": "4k",
+        "samples": 2,
+        "p50_total_ms": 24485.785832977854,
+        "p95_total_ms": 41665.62873269431,
+        "p50_lines": 72.0
+      },
+      "compact": {
+        "name": "paddle-v6_medium-cpu",
+        "category": "compact",
+        "samples": 4,
+        "p50_total_ms": 4894.282853521872,
+        "p95_total_ms": 5632.324529305333,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "paddle-v6_medium-cpu",
+        "category": "dense",
+        "samples": 2,
+        "p50_total_ms": 21887.38156191539,
+        "p95_total_ms": 22719.49664275162,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "paddle-v6_medium-cpu",
+        "category": "document",
+        "samples": 3,
+        "p50_total_ms": 12873.575543169864,
+        "p95_total_ms": 13205.887154641096,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "paddle-v6_medium-cpu",
+        "category": "small",
+        "samples": 4,
+        "p50_total_ms": 1307.064228982199,
+        "p95_total_ms": 1389.9228667956777,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "paddle-v6_medium-cpu",
+        "category": "wide",
+        "samples": 2,
+        "p50_total_ms": 1705.8864795253612,
+        "p95_total_ms": 1809.7512607288081,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "paddle-v6_small-cpu",
+    "group": "extra",
+    "status": "ok",
+    "model": "v6_small",
+    "backend": "paddle_cpp",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 3356.924437568523,
+    "p95_total_ms": 19678.732833708636,
+    "p50_ocr_ms": 3348.0910420184955,
+    "peak_rss_mb": 2115.125248,
+    "load_ms": 496.76270806230605,
+    "first_input_ms": 510.51529205869883,
+    "mean_cpu_percent": 103.24951333051206,
+    "exit_code": 0,
+    "wall_seconds": 288.32139383303,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 19964,
+      "model": "v6_small",
+      "backend": "paddle_cpp",
+      "ort_version": "1.31.1",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 509.51554195489734,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_small_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_small_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/extra/v6_small-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV6",
+        "Rec.ocr_version": "OCRVersion.PPOCRV6",
+        "Det.model_type": "ModelType.SMALL",
+        "Rec.model_type": "ModelType.SMALL",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 8,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": false,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "ALL",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelFormat": "MLProgram",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/extra/coreml-cache/v6_small/paddle_cpp/MLProgram"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/extra/paddle-v6_small-cpu.jsonl",
+    "cases": {
+      "4k": {
+        "name": "paddle-v6_small-cpu",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 18833.492979989387,
+        "p95_total_ms": 19732.33548901044,
+        "p50_lines": 129.5
+      },
+      "compact": {
+        "name": "paddle-v6_small-cpu",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 1705.0238535157405,
+        "p95_total_ms": 1838.939708773978,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "paddle-v6_small-cpu",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 9336.715915997047,
+        "p95_total_ms": 9591.808573750313,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "paddle-v6_small-cpu",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 4883.721687016077,
+        "p95_total_ms": 5000.399021431804,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "paddle-v6_small-cpu",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 465.2467080159113,
+        "p95_total_ms": 504.7540731029585,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "paddle-v6_small-cpu",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 605.7793339714408,
+        "p95_total_ms": 641.0941456852015,
+        "p50_lines": 4.0
+      }
+    }
+  },
+  {
+    "name": "paddle-v6_tiny-cpu",
+    "group": "extra",
+    "status": "ok",
+    "model": "v6_tiny",
+    "backend": "paddle_cpp",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 1031.8679579650052,
+    "p95_total_ms": 5430.216989974724,
+    "p50_ocr_ms": 1023.4259579447098,
+    "peak_rss_mb": 1150.255104,
+    "load_ms": 684.143083053641,
+    "first_input_ms": 179.42145792767406,
+    "mean_cpu_percent": 101.83881309686221,
+    "exit_code": 0,
+    "wall_seconds": 85.46680416690651,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 19164,
+      "model": "v6_tiny",
+      "backend": "paddle_cpp",
+      "ort_version": "1.31.1",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 498.32270795013756,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_tiny_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_tiny_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/extra/v6_tiny-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV6",
+        "Rec.ocr_version": "OCRVersion.PPOCRV6",
+        "Det.model_type": "ModelType.TINY",
+        "Rec.model_type": "ModelType.TINY",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 8,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": false,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "ALL",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelFormat": "MLProgram",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/extra/coreml-cache/v6_tiny/paddle_cpp/MLProgram"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/extra/paddle-v6_tiny-cpu.jsonl",
+    "cases": {
+      "4k": {
+        "name": "paddle-v6_tiny-cpu",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 5344.060228962917,
+        "p95_total_ms": 5499.4338329997845,
+        "p50_lines": 141.0
+      },
+      "compact": {
+        "name": "paddle-v6_tiny-cpu",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 575.1045834622346,
+        "p95_total_ms": 582.5115101761185,
+        "p50_lines": 10.0
+      },
+      "dense": {
+        "name": "paddle-v6_tiny-cpu",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 2625.4143119440414,
+        "p95_total_ms": 2701.564240240259,
+        "p50_lines": 56.0
+      },
+      "document": {
+        "name": "paddle-v6_tiny-cpu",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 1522.4118960322812,
+        "p95_total_ms": 1589.6901454543695,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "paddle-v6_tiny-cpu",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 141.337520966772,
+        "p95_total_ms": 142.81770848901942,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "paddle-v6_tiny-cpu",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 265.1626674924046,
+        "p95_total_ms": 333.2286973891314,
+        "p50_lines": 5.5
+      }
+    }
+  },
+  {
+    "name": "tesseract-cli",
+    "group": "extra",
+    "status": "ok",
+    "model": "tesseract",
+    "backend": "tesseract_cli",
+    "hot_samples": 36,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 1772.8646665345877,
+    "p95_total_ms": 20388.75519798603,
+    "p50_ocr_ms": 1772.8646665345877,
+    "peak_rss_mb": 250.51136,
+    "load_ms": null,
+    "first_input_ms": 410.62700003385544,
+    "mean_cpu_percent": 98.4438402941949,
+    "exit_code": 0,
+    "wall_seconds": 219.0285338750109,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "backend": "tesseract_cli",
+      "language": "chi_sim+eng",
+      "psm": 3,
+      "timing_scope": "CLI process and model loading included per image"
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/extra/tesseract-cli.jsonl",
+    "cases": {
+      "4k": {
+        "name": "tesseract-cli",
+        "category": "4k",
+        "samples": 6,
+        "p50_total_ms": 15676.22622899944,
+        "p95_total_ms": 20451.59885447356,
+        "p50_lines": 171.0
+      },
+      "compact": {
+        "name": "tesseract-cli",
+        "category": "compact",
+        "samples": 6,
+        "p50_total_ms": 1152.9565415112302,
+        "p95_total_ms": 1478.1681875465438,
+        "p50_lines": 13.0
+      },
+      "dense": {
+        "name": "tesseract-cli",
+        "category": "dense",
+        "samples": 6,
+        "p50_total_ms": 6651.812666445039,
+        "p95_total_ms": 8652.942083455855,
+        "p50_lines": 38.0
+      },
+      "document": {
+        "name": "tesseract-cli",
+        "category": "document",
+        "samples": 6,
+        "p50_total_ms": 2876.3574379845522,
+        "p95_total_ms": 3715.218354249373,
+        "p50_lines": 137.5
+      },
+      "small": {
+        "name": "tesseract-cli",
+        "category": "small",
+        "samples": 6,
+        "p50_total_ms": 393.67854193551466,
+        "p95_total_ms": 478.08910396997817,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "tesseract-cli",
+        "category": "wide",
+        "samples": 6,
+        "p50_total_ms": 576.3723540003411,
+        "p95_total_ms": 697.8298226895276,
+        "p50_lines": 14.0
+      }
+    }
+  },
+  {
+    "name": "ort-v5_server-coreml-neuralnetwork-probe",
+    "group": "compat",
+    "status": "sanity_failed",
+    "model": "v5_server",
+    "backend": "coreml_gpu",
+    "hot_samples": 2,
+    "zero_output_samples": 1,
+    "error_samples": 0,
+    "p50_total_ms": 2094.7257494553924,
+    "p95_total_ms": 2644.496299372986,
+    "p50_ocr_ms": 2088.6328329797834,
+    "peak_rss_mb": 2611.298304,
+    "load_ms": 2212.5470000319183,
+    "first_input_ms": 2705.5819160304964,
+    "mean_cpu_percent": 50.38225806451613,
+    "exit_code": 0,
+    "wall_seconds": 7.303715332993306,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 35231,
+      "model": "v5_server",
+      "backend": "coreml_gpu",
+      "ort_version": "1.31.1",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 423.76862501259893,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv5_server_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv5_server_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/compat/v5_server-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV5",
+        "Rec.ocr_version": "OCRVersion.PPOCRV5",
+        "Det.model_type": "ModelType.SERVER",
+        "Rec.model_type": "ModelType.SERVER",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 8,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": true,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "CPUAndGPU",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelFormat": "NeuralNetwork",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/compat/coreml-cache/v5_server/coreml_gpu/NeuralNetwork"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/compat/ort-v5_server-coreml-neuralnetwork-probe.jsonl",
+    "cases": {
+      "4k": {
+        "name": "ort-v5_server-coreml-neuralnetwork-probe",
+        "category": "4k",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "compact": {
+        "name": "ort-v5_server-coreml-neuralnetwork-probe",
+        "category": "compact",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "dense": {
+        "name": "ort-v5_server-coreml-neuralnetwork-probe",
+        "category": "dense",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "document": {
+        "name": "ort-v5_server-coreml-neuralnetwork-probe",
+        "category": "document",
+        "samples": 1,
+        "p50_total_ms": 1483.8695828802884,
+        "p95_total_ms": 1483.8695828802884,
+        "p50_lines": 3.0
+      },
+      "small": {
+        "name": "ort-v5_server-coreml-neuralnetwork-probe",
+        "category": "small",
+        "samples": 1,
+        "p50_total_ms": 2705.5819160304964,
+        "p95_total_ms": 2705.5819160304964,
+        "p50_lines": 0.0
+      },
+      "wide": {
+        "name": "ort-v5_server-coreml-neuralnetwork-probe",
+        "category": "wide",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      }
+    }
+  },
+  {
+    "name": "ort-v6_medium-coreml-audit",
+    "group": "compat",
+    "status": "incomplete",
+    "model": "v6_medium",
+    "backend": "coreml_gpu",
+    "hot_samples": 2,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 1413.7642705463804,
+    "p95_total_ms": 2210.2152768115047,
+    "p50_ocr_ms": 1405.160375055857,
+    "peak_rss_mb": 2498.920448,
+    "load_ms": 4253.241874976084,
+    "first_input_ms": 528.8187080295756,
+    "mean_cpu_percent": 76.35928571428572,
+    "exit_code": 0,
+    "wall_seconds": 8.286158624920063,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 35106,
+      "model": "v6_medium",
+      "backend": "coreml_gpu",
+      "ort_version": "1.31.1",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 692.0680420007557,
+      "profiling": true,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_medium_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_medium_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/compat/v6_medium-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV6",
+        "Rec.ocr_version": "OCRVersion.PPOCRV6",
+        "Det.model_type": "ModelType.MEDIUM",
+        "Rec.model_type": "ModelType.MEDIUM",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 8,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": true,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "CPUAndGPU",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelFormat": "MLProgram",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/compat/coreml-cache/v6_medium/coreml_gpu/MLProgram"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/compat/ort-v6_medium-coreml-audit.jsonl",
+    "cases": {
+      "4k": {
+        "name": "ort-v6_medium-coreml-audit",
+        "category": "4k",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "compact": {
+        "name": "ort-v6_medium-coreml-audit",
+        "category": "compact",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "dense": {
+        "name": "ort-v6_medium-coreml-audit",
+        "category": "dense",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "document": {
+        "name": "ort-v6_medium-coreml-audit",
+        "category": "document",
+        "samples": 1,
+        "p50_total_ms": 2298.709833063185,
+        "p95_total_ms": 2298.709833063185,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "ort-v6_medium-coreml-audit",
+        "category": "small",
+        "samples": 1,
+        "p50_total_ms": 528.8187080295756,
+        "p95_total_ms": 528.8187080295756,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "ort-v6_medium-coreml-audit",
+        "category": "wide",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      }
+    }
+  },
+  {
+    "name": "ort-v6_small-coreml-neuralnetwork-probe",
+    "group": "compat",
+    "status": "incomplete",
+    "model": "v6_small",
+    "backend": "coreml_gpu",
+    "hot_samples": 2,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 2188.7433959636837,
+    "p95_total_ms": 3916.3775270804763,
+    "p50_ocr_ms": 2183.0291459918953,
+    "peak_rss_mb": 4535.943168,
+    "load_ms": 660.8247080584988,
+    "first_input_ms": 269.1499169450253,
+    "mean_cpu_percent": 99.56796116504854,
+    "exit_code": 0,
+    "wall_seconds": 6.053205625037663,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 35185,
+      "model": "v6_small",
+      "backend": "coreml_gpu",
+      "ort_version": "1.31.1",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 447.94437498785555,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_small_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_small_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/compat/v6_small-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV6",
+        "Rec.ocr_version": "OCRVersion.PPOCRV6",
+        "Det.model_type": "ModelType.SMALL",
+        "Rec.model_type": "ModelType.SMALL",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 8,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": true,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "CPUAndGPU",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelFormat": "NeuralNetwork",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/compat/coreml-cache/v6_small/coreml_gpu/NeuralNetwork"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/compat/ort-v6_small-coreml-neuralnetwork-probe.jsonl",
+    "cases": {
+      "4k": {
+        "name": "ort-v6_small-coreml-neuralnetwork-probe",
+        "category": "4k",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "compact": {
+        "name": "ort-v6_small-coreml-neuralnetwork-probe",
+        "category": "compact",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "dense": {
+        "name": "ort-v6_small-coreml-neuralnetwork-probe",
+        "category": "dense",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "document": {
+        "name": "ort-v6_small-coreml-neuralnetwork-probe",
+        "category": "document",
+        "samples": 1,
+        "p50_total_ms": 4108.336874982342,
+        "p95_total_ms": 4108.336874982342,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "ort-v6_small-coreml-neuralnetwork-probe",
+        "category": "small",
+        "samples": 1,
+        "p50_total_ms": 269.1499169450253,
+        "p95_total_ms": 269.1499169450253,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "ort-v6_small-coreml-neuralnetwork-probe",
+        "category": "wide",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      }
+    }
+  },
+  {
+    "name": "ort123-v5_mobile-cpu-probe",
+    "group": "compat",
+    "status": "incomplete",
+    "model": "v5_mobile",
+    "backend": "cpu",
+    "hot_samples": 2,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 848.5777504974976,
+    "p95_total_ms": 1443.6763134552166,
+    "p50_ocr_ms": 842.2531459946185,
+    "peak_rss_mb": 956.317696,
+    "load_ms": 93.81429199129343,
+    "first_input_ms": 187.357124988921,
+    "mean_cpu_percent": 236.23863636363637,
+    "exit_code": 0,
+    "wall_seconds": 2.570342667051591,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 34997,
+      "model": "v5_mobile",
+      "backend": "cpu",
+      "ort_version": "1.23.2",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 397.216415964067,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv5_mobile_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv5_mobile_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/compat/v5_mobile-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV5",
+        "Rec.ocr_version": "OCRVersion.PPOCRV5",
+        "Det.model_type": "ModelType.MOBILE",
+        "Rec.model_type": "ModelType.MOBILE",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 8,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": false,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "ALL",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelFormat": "MLProgram",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/compat/coreml-cache/v5_mobile/cpu/MLProgram"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/compat/ort123-v5_mobile-cpu-probe.jsonl",
+    "cases": {
+      "4k": {
+        "name": "ort123-v5_mobile-cpu-probe",
+        "category": "4k",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "compact": {
+        "name": "ort123-v5_mobile-cpu-probe",
+        "category": "compact",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "dense": {
+        "name": "ort123-v5_mobile-cpu-probe",
+        "category": "dense",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "document": {
+        "name": "ort123-v5_mobile-cpu-probe",
+        "category": "document",
+        "samples": 1,
+        "p50_total_ms": 1509.7983760060742,
+        "p95_total_ms": 1509.7983760060742,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "ort123-v5_mobile-cpu-probe",
+        "category": "small",
+        "samples": 1,
+        "p50_total_ms": 187.357124988921,
+        "p95_total_ms": 187.357124988921,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "ort123-v5_mobile-cpu-probe",
+        "category": "wide",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      }
+    }
+  },
+  {
+    "name": "ort123-v5_server-cpu-probe",
+    "group": "compat",
+    "status": "incomplete",
+    "model": "v5_server",
+    "backend": "cpu",
+    "hot_samples": 2,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 3550.328478915617,
+    "p95_total_ms": 6120.274709735531,
+    "p50_ocr_ms": 3544.230916479137,
+    "peak_rss_mb": 1312.129024,
+    "load_ms": 218.65562500897795,
+    "first_input_ms": 694.8326668934897,
+    "mean_cpu_percent": 291.16136363636366,
+    "exit_code": 0,
+    "wall_seconds": 8.133389957947657,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 35019,
+      "model": "v5_server",
+      "backend": "cpu",
+      "ort_version": "1.23.2",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 399.083917029202,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv5_server_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv5_server_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/compat/v5_server-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV5",
+        "Rec.ocr_version": "OCRVersion.PPOCRV5",
+        "Det.model_type": "ModelType.SERVER",
+        "Rec.model_type": "ModelType.SERVER",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 8,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": false,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "ALL",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelFormat": "MLProgram",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/compat/coreml-cache/v5_server/cpu/MLProgram"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/compat/ort123-v5_server-cpu-probe.jsonl",
+    "cases": {
+      "4k": {
+        "name": "ort123-v5_server-cpu-probe",
+        "category": "4k",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "compact": {
+        "name": "ort123-v5_server-cpu-probe",
+        "category": "compact",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "dense": {
+        "name": "ort123-v5_server-cpu-probe",
+        "category": "dense",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "document": {
+        "name": "ort123-v5_server-cpu-probe",
+        "category": "document",
+        "samples": 1,
+        "p50_total_ms": 6405.824290937744,
+        "p95_total_ms": 6405.824290937744,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "ort123-v5_server-cpu-probe",
+        "category": "small",
+        "samples": 1,
+        "p50_total_ms": 694.8326668934897,
+        "p95_total_ms": 694.8326668934897,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "ort123-v5_server-cpu-probe",
+        "category": "wide",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      }
+    }
+  },
+  {
+    "name": "ort123-v6_medium-cpu-probe",
+    "group": "compat",
+    "status": "incomplete",
+    "model": "v6_medium",
+    "backend": "cpu",
+    "hot_samples": 2,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 2753.5499585792422,
+    "p95_total_ms": 4735.438346315641,
+    "p50_ocr_ms": 2747.269521059934,
+    "peak_rss_mb": 1013.530624,
+    "load_ms": 140.83941699936986,
+    "first_input_ms": 551.4517499832436,
+    "mean_cpu_percent": 303.4925925925926,
+    "exit_code": 0,
+    "wall_seconds": 6.417113833012991,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 34918,
+      "model": "v6_medium",
+      "backend": "cpu",
+      "ort_version": "1.23.2",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 385.27020800393075,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_medium_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_medium_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/compat/v6_medium-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV6",
+        "Rec.ocr_version": "OCRVersion.PPOCRV6",
+        "Det.model_type": "ModelType.MEDIUM",
+        "Rec.model_type": "ModelType.MEDIUM",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 8,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": false,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "ALL",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelFormat": "MLProgram",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/compat/coreml-cache/v6_medium/cpu/MLProgram"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/compat/ort123-v6_medium-cpu-probe.jsonl",
+    "cases": {
+      "4k": {
+        "name": "ort123-v6_medium-cpu-probe",
+        "category": "4k",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "compact": {
+        "name": "ort123-v6_medium-cpu-probe",
+        "category": "compact",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "dense": {
+        "name": "ort123-v6_medium-cpu-probe",
+        "category": "dense",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "document": {
+        "name": "ort123-v6_medium-cpu-probe",
+        "category": "document",
+        "samples": 1,
+        "p50_total_ms": 4955.648167175241,
+        "p95_total_ms": 4955.648167175241,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "ort123-v6_medium-cpu-probe",
+        "category": "small",
+        "samples": 1,
+        "p50_total_ms": 551.4517499832436,
+        "p95_total_ms": 551.4517499832436,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "ort123-v6_medium-cpu-probe",
+        "category": "wide",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      }
+    }
+  },
+  {
+    "name": "ort123-v6_small-cpu-probe",
+    "group": "compat",
+    "status": "incomplete",
+    "model": "v6_small",
+    "backend": "cpu",
+    "hot_samples": 2,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 595.5622294568457,
+    "p95_total_ms": 1019.8245735431556,
+    "p50_ocr_ms": 589.6172919892706,
+    "peak_rss_mb": 850.853888,
+    "load_ms": 79.78395803365856,
+    "first_input_ms": 124.15962491650134,
+    "mean_cpu_percent": 231.50571428571428,
+    "exit_code": 0,
+    "wall_seconds": 2.036169249913655,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 34897,
+      "model": "v6_small",
+      "backend": "cpu",
+      "ort_version": "1.23.2",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 390.6765409046784,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_small_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_small_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/compat/v6_small-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV6",
+        "Rec.ocr_version": "OCRVersion.PPOCRV6",
+        "Det.model_type": "ModelType.SMALL",
+        "Rec.model_type": "ModelType.SMALL",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 8,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": false,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "ALL",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelFormat": "MLProgram",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/compat/coreml-cache/v6_small/cpu/MLProgram"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/compat/ort123-v6_small-cpu-probe.jsonl",
+    "cases": {
+      "4k": {
+        "name": "ort123-v6_small-cpu-probe",
+        "category": "4k",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "compact": {
+        "name": "ort123-v6_small-cpu-probe",
+        "category": "compact",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "dense": {
+        "name": "ort123-v6_small-cpu-probe",
+        "category": "dense",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "document": {
+        "name": "ort123-v6_small-cpu-probe",
+        "category": "document",
+        "samples": 1,
+        "p50_total_ms": 1066.96483399719,
+        "p95_total_ms": 1066.96483399719,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "ort123-v6_small-cpu-probe",
+        "category": "small",
+        "samples": 1,
+        "p50_total_ms": 124.15962491650134,
+        "p95_total_ms": 124.15962491650134,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "ort123-v6_small-cpu-probe",
+        "category": "wide",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      }
+    }
+  },
+  {
+    "name": "ort123-v6_tiny-cpu-probe",
+    "group": "compat",
+    "status": "incomplete",
+    "model": "v6_tiny",
+    "backend": "cpu",
+    "hot_samples": 2,
+    "zero_output_samples": 0,
+    "error_samples": 0,
+    "p50_total_ms": 187.20035447040573,
+    "p95_total_ms": 320.993323501898,
+    "p50_ocr_ms": 180.99916697246954,
+    "peak_rss_mb": 533.87264,
+    "load_ms": 43.70529192965478,
+    "first_input_ms": 38.541499990969896,
+    "mean_cpu_percent": 4.963523573200993,
+    "exit_code": 0,
+    "wall_seconds": 53.23971012502443,
+    "params": {},
+    "environment": {
+      "type": "environment",
+      "pid": 34396,
+      "model": "v6_tiny",
+      "backend": "cpu",
+      "ort_version": "1.23.2",
+      "available_providers": [
+        "CoreMLExecutionProvider",
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "python_import_ms": 52585.92695905827,
+      "profiling": false,
+      "params": {
+        "Global.use_cls": false,
+        "Global.max_side_len": 4000,
+        "Global.use_preprocess_img": false,
+        "Global.use_vertical_padding": false,
+        "Global.log_level": "warning",
+        "Det.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_tiny_det/inference.onnx",
+        "Rec.model_path": "/tmp/snaplingo-ocr-benchmark/onnx-models/PP-OCRv6_tiny_rec/inference.onnx",
+        "Rec.rec_keys_path": "/tmp/snaplingo-ocr-benchmark/results/compat/v6_tiny-dict.txt",
+        "Det.ocr_version": "OCRVersion.PPOCRV6",
+        "Rec.ocr_version": "OCRVersion.PPOCRV6",
+        "Det.model_type": "ModelType.TINY",
+        "Rec.model_type": "ModelType.TINY",
+        "Det.limit_side_len": 960,
+        "Det.limit_type": "max",
+        "Det.thresh": 0.3,
+        "Det.box_thresh": 0.5,
+        "Det.unclip_ratio": 1.5,
+        "Det.use_dilation": false,
+        "Det.mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "Det.std": [
+          0.229,
+          0.224,
+          0.225
+        ],
+        "Rec.rec_batch_num": 8,
+        "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        "EngineConfig.onnxruntime.enable_cpu_mem_arena": false,
+        "EngineConfig.onnxruntime.use_coreml": false,
+        "EngineConfig.onnxruntime.coreml_ep_cfg.MLComputeUnits": "ALL",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelFormat": "MLProgram",
+        "EngineConfig.onnxruntime.coreml_ep_cfg.ModelCacheDirectory": "/tmp/snaplingo-ocr-benchmark/results/compat/coreml-cache/v6_tiny/cpu/MLProgram"
+      }
+    },
+    "source": "/tmp/snaplingo-ocr-benchmark/results/compat/ort123-v6_tiny-cpu-probe.jsonl",
+    "cases": {
+      "4k": {
+        "name": "ort123-v6_tiny-cpu-probe",
+        "category": "4k",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "compact": {
+        "name": "ort123-v6_tiny-cpu-probe",
+        "category": "compact",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "dense": {
+        "name": "ort123-v6_tiny-cpu-probe",
+        "category": "dense",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      },
+      "document": {
+        "name": "ort123-v6_tiny-cpu-probe",
+        "category": "document",
+        "samples": 1,
+        "p50_total_ms": 335.85920894984156,
+        "p95_total_ms": 335.85920894984156,
+        "p50_lines": 28.0
+      },
+      "small": {
+        "name": "ort123-v6_tiny-cpu-probe",
+        "category": "small",
+        "samples": 1,
+        "p50_total_ms": 38.541499990969896,
+        "p95_total_ms": 38.541499990969896,
+        "p50_lines": 3.0
+      },
+      "wide": {
+        "name": "ort123-v6_tiny-cpu-probe",
+        "category": "wide",
+        "samples": 0,
+        "p50_total_ms": null,
+        "p95_total_ms": null,
+        "p50_lines": null
+      }
+    }
+  }
+]

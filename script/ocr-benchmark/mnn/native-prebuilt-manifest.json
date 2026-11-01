@@ -1,0 +1,329 @@
+{
+  "backends": [
+    "cpu",
+    "metal"
+  ],
+  "builder_dirty": false,
+  "builder_sha": "c3223f3ee34d92e5346269a5cc2d5c4db523b8cc",
+  "builds": [
+    {
+      "arch": "arm64",
+      "backend_options": "verified",
+      "cmake": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_BUILD_WITH_INSTALL_NAME_DIR": "ON",
+        "CMAKE_INSTALL_NAME_DIR": "@rpath",
+        "CMAKE_OSX_ARCHITECTURES": "arm64",
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "11.0",
+        "CMAKE_POSITION_INDEPENDENT_CODE": "ON",
+        "KLEIDIAI_SRC_DIR": "/Users/runner/work/mnn-native-prebuilds/mnn-native-prebuilds/.work/build/macos-universal/dependencies/kleidiai/kleidiai-1.16.0",
+        "MNN_ARM82": "ON",
+        "MNN_BUILD_BENCHMARK": "OFF",
+        "MNN_BUILD_CONVERTER": "OFF",
+        "MNN_BUILD_DEMO": "OFF",
+        "MNN_BUILD_DIFFUSION": "OFF",
+        "MNN_BUILD_LLM": "OFF",
+        "MNN_BUILD_OPENCV": "OFF",
+        "MNN_BUILD_QUANTOOLS": "OFF",
+        "MNN_BUILD_SHARED_LIBS": "OFF",
+        "MNN_BUILD_TEST": "OFF",
+        "MNN_BUILD_TOOLS": "OFF",
+        "MNN_BUILD_TRAIN": "OFF",
+        "MNN_COREML": "OFF",
+        "MNN_CUDA": "OFF",
+        "MNN_INTERNAL": "OFF",
+        "MNN_METAL": "ON",
+        "MNN_OPENCL": "OFF",
+        "MNN_OPENGL": "OFF",
+        "MNN_SEP_BUILD": "OFF",
+        "MNN_USE_SSE": "OFF",
+        "MNN_VULKAN": "OFF"
+      },
+      "compiler": {
+        "CMAKE_CXX_COMPILER": "/Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/c++",
+        "CMAKE_CXX_COMPILER_ID": "AppleClang",
+        "CMAKE_CXX_COMPILER_VERSION": "17.0.0.17000013"
+      },
+      "shared": false
+    },
+    {
+      "arch": "arm64",
+      "backend_options": "verified",
+      "cmake": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_BUILD_WITH_INSTALL_NAME_DIR": "ON",
+        "CMAKE_INSTALL_NAME_DIR": "@rpath",
+        "CMAKE_OSX_ARCHITECTURES": "arm64",
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "11.0",
+        "CMAKE_POSITION_INDEPENDENT_CODE": "ON",
+        "KLEIDIAI_SRC_DIR": "/Users/runner/work/mnn-native-prebuilds/mnn-native-prebuilds/.work/build/macos-universal/dependencies/kleidiai/kleidiai-1.16.0",
+        "MNN_ARM82": "ON",
+        "MNN_BUILD_BENCHMARK": "OFF",
+        "MNN_BUILD_CONVERTER": "OFF",
+        "MNN_BUILD_DEMO": "OFF",
+        "MNN_BUILD_DIFFUSION": "OFF",
+        "MNN_BUILD_LLM": "OFF",
+        "MNN_BUILD_OPENCV": "OFF",
+        "MNN_BUILD_QUANTOOLS": "OFF",
+        "MNN_BUILD_SHARED_LIBS": "ON",
+        "MNN_BUILD_TEST": "OFF",
+        "MNN_BUILD_TOOLS": "OFF",
+        "MNN_BUILD_TRAIN": "OFF",
+        "MNN_COREML": "OFF",
+        "MNN_CUDA": "OFF",
+        "MNN_INTERNAL": "OFF",
+        "MNN_METAL": "ON",
+        "MNN_OPENCL": "OFF",
+        "MNN_OPENGL": "OFF",
+        "MNN_SEP_BUILD": "OFF",
+        "MNN_USE_SSE": "OFF",
+        "MNN_VULKAN": "OFF"
+      },
+      "compiler": {
+        "CMAKE_CXX_COMPILER": "/Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/c++",
+        "CMAKE_CXX_COMPILER_ID": "AppleClang",
+        "CMAKE_CXX_COMPILER_VERSION": "17.0.0.17000013"
+      },
+      "shared": true
+    },
+    {
+      "arch": "x86_64",
+      "backend_options": "verified",
+      "cmake": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_BUILD_WITH_INSTALL_NAME_DIR": "ON",
+        "CMAKE_INSTALL_NAME_DIR": "@rpath",
+        "CMAKE_OSX_ARCHITECTURES": "x86_64",
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "11.0",
+        "CMAKE_POSITION_INDEPENDENT_CODE": "ON",
+        "MNN_BUILD_BENCHMARK": "OFF",
+        "MNN_BUILD_CONVERTER": "OFF",
+        "MNN_BUILD_DEMO": "OFF",
+        "MNN_BUILD_DIFFUSION": "OFF",
+        "MNN_BUILD_LLM": "OFF",
+        "MNN_BUILD_OPENCV": "OFF",
+        "MNN_BUILD_QUANTOOLS": "OFF",
+        "MNN_BUILD_SHARED_LIBS": "OFF",
+        "MNN_BUILD_TEST": "OFF",
+        "MNN_BUILD_TOOLS": "OFF",
+        "MNN_BUILD_TRAIN": "OFF",
+        "MNN_COREML": "OFF",
+        "MNN_CUDA": "OFF",
+        "MNN_INTERNAL": "OFF",
+        "MNN_METAL": "ON",
+        "MNN_OPENCL": "OFF",
+        "MNN_OPENGL": "OFF",
+        "MNN_SEP_BUILD": "OFF",
+        "MNN_USE_SSE": "ON",
+        "MNN_VULKAN": "OFF"
+      },
+      "compiler": {
+        "CMAKE_CXX_COMPILER": "/Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/c++",
+        "CMAKE_CXX_COMPILER_ID": "AppleClang",
+        "CMAKE_CXX_COMPILER_VERSION": "17.0.0.17000013"
+      },
+      "shared": false
+    },
+    {
+      "arch": "x86_64",
+      "backend_options": "verified",
+      "cmake": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_BUILD_WITH_INSTALL_NAME_DIR": "ON",
+        "CMAKE_INSTALL_NAME_DIR": "@rpath",
+        "CMAKE_OSX_ARCHITECTURES": "x86_64",
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "11.0",
+        "CMAKE_POSITION_INDEPENDENT_CODE": "ON",
+        "MNN_BUILD_BENCHMARK": "OFF",
+        "MNN_BUILD_CONVERTER": "OFF",
+        "MNN_BUILD_DEMO": "OFF",
+        "MNN_BUILD_DIFFUSION": "OFF",
+        "MNN_BUILD_LLM": "OFF",
+        "MNN_BUILD_OPENCV": "OFF",
+        "MNN_BUILD_QUANTOOLS": "OFF",
+        "MNN_BUILD_SHARED_LIBS": "ON",
+        "MNN_BUILD_TEST": "OFF",
+        "MNN_BUILD_TOOLS": "OFF",
+        "MNN_BUILD_TRAIN": "OFF",
+        "MNN_COREML": "OFF",
+        "MNN_CUDA": "OFF",
+        "MNN_INTERNAL": "OFF",
+        "MNN_METAL": "ON",
+        "MNN_OPENCL": "OFF",
+        "MNN_OPENGL": "OFF",
+        "MNN_SEP_BUILD": "OFF",
+        "MNN_USE_SSE": "ON",
+        "MNN_VULKAN": "OFF"
+      },
+      "compiler": {
+        "CMAKE_CXX_COMPILER": "/Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/c++",
+        "CMAKE_CXX_COMPILER_ID": "AppleClang",
+        "CMAKE_CXX_COMPILER_VERSION": "17.0.0.17000013"
+      },
+      "shared": true
+    }
+  ],
+  "component": "mnn",
+  "environment": {
+    "cmake": "cmake version 3.31.6",
+    "cuda_compiler": null,
+    "host": "macOS-15.7.9-arm64-arm-64bit",
+    "python": "3.12.10 (v3.12.10:0cc81280367, Apr  8 2025, 08:46:59) [Clang 13.0.0 (clang-1300.0.29.30)]",
+    "runner_image": "20260829.0321.1"
+  },
+  "files": {
+    "LICENSE-MNN.txt": "a830d59c4f98d110e0540d0581efada06192ba6e798434307d1794b07a290302",
+    "include/MNN/AutoTime.hpp": "d5df4db8ac56a5a2634f6632401cef2a2d2aaadfd1b0b13a8c6f04f81335f004",
+    "include/MNN/ErrorCode.hpp": "de7d2290e4e2f024ae51707298c30721a283367eb90a7abac113d27248d56dd0",
+    "include/MNN/HalideRuntime.h": "f1d35170fa3fc1c7433ca1d18ca5d016ad230f26a0ecfba91b9a7ef9a49f7a37",
+    "include/MNN/ImageProcess.hpp": "206f4ff03f84895ffc14d3b0cb498a8c91467b9198196bb42fc41fe707fbb4cb",
+    "include/MNN/Interpreter.hpp": "0c367286c5906572218ddfa6426007ca748cbf5433f6cd7c7c71ae3300b1f986",
+    "include/MNN/MNNDefine.h": "481f2ff7a4dd29ce779384b8f5169c8b1aee8ebd8f0a9ca4c2f8444de45f9b6f",
+    "include/MNN/MNNForwardType.h": "b9c670a78f3ec42c81328429004fdd6c3ff1a172a52373dd09945a678e5ea167",
+    "include/MNN/MNNSharedContext.h": "11233f00bf63d1336925ab5a563255ffb996590b064db9c20dae0a40de970978",
+    "include/MNN/Matrix.h": "4becb851c912f987b895b08c0b10743f107430c8552a34da9bac3c447c692d1e",
+    "include/MNN/Rect.h": "cec3ec954565d2e03bb749ac9513b53dae8b2389208b490d9cfa588b2eca1ea4",
+    "include/MNN/Tensor.hpp": "6f28b4d0338c6760582ed8d5632fa0c3691bdfacc421753b6d86407466a7bf5c",
+    "include/MNN/expr/Executor.hpp": "989545ffee9512229c87bd6f4fae3f617e30870018ff8d649e57f296744abd64",
+    "include/MNN/expr/ExecutorScope.hpp": "a7132e5e98cf1a5db9e5e2f22fbf2d940d484a0e73b6d30b00913c13e113e2ab",
+    "include/MNN/expr/Expr.hpp": "61731668921de87770fc703c4675995c8f92103677432c78768481fa346f072b",
+    "include/MNN/expr/ExprCreator.hpp": "853120410621ffad5fa47bc50732674d009e40aa3b5205bd4426baa1b0835f17",
+    "include/MNN/expr/MathOp.hpp": "893bce404a402d02986ee6e8d7212bc7ffc804d052c6adf0b1cd1e2032491879",
+    "include/MNN/expr/Module.hpp": "259f3a72d89333107acfaef97e4fc92f421afebecb7e0e868d22fc15f595c32d",
+    "include/MNN/expr/NeuralNetWorkOp.hpp": "8319e2a61ce0ce0dcca93298a34f89fde69438aa8804a2d21eed05fa02e55687",
+    "include/MNN/expr/Optimizer.hpp": "88a674fe723ca80c3d5e38979178d47eb156310772ade0fcc291dd2e38a4f03b",
+    "include/MNN/expr/Scope.hpp": "32556d33c702215c3185e373507b71a8087d29363326cb140cf273bedecdaa7c",
+    "include/MNN/plugin/PluginContext.hpp": "2b5185ec107e4b0166d521f79510e7939108fddbe5e0280357ba378c94e45b29",
+    "include/MNN/plugin/PluginKernel.hpp": "5100976ad3228dad2314b833d9f6b58761f24947d3912de544101ef9fd1a2135",
+    "include/MNN/plugin/PluginShapeInference.hpp": "c6a5268384916da6be3015c33db20e1dbd5a2fa1ce4400a44e099879953f13c2",
+    "lib/cmake/MNN/MNNConfig.cmake": "7710002eef663d0c6efd8dd7d338c1c0a02935713496d782584547f332ff94a8",
+    "lib/cmake/MNN/MNNFeatures.cmake": "39706da4efe83a8eec53e49154da84eb0132e010b0773f3841d95b2486a84cbc",
+    "lib/libMNN.a": "2ef27ff5476af4d54483f86fbefc05e139601e6eab86d6ce16e4ecb09983d2d5",
+    "lib/libMNN.dylib": "11853d72358b1a1fc6a5e2edf3a74956a25227f1b0c0313470c6c437d76c4698",
+    "licenses/3rd_party/flatbuffers/LICENSE.txt": "7ec9661a8afafab1eee3523d6f1a193eff76314a5ab10b4ce96aefd87621b0c3",
+    "licenses/3rd_party/half/LICENSE.txt": "1269110471a5506d5cc9c115c57b855206f69a90cc57bbbf27860907067ed946",
+    "licenses/3rd_party/protobuf/LICENSE": "6e5e117324afd944dcf67f36cf329843bc1a92229a8cd9bb573d7a83130fea7d",
+    "licenses/3rd_party/rapidjson/license.txt": "a140e5d46fe734a1c78f1a3c3ef207871dd75648be71fdda8e309b23ab8b1f32",
+    "metadata/patches/0001-cmake-and-windows-arm-compatibility.patch": "21cea0bb3452b73455d1646c39a758f216ede9035f4dd20e619cb1a6a8b9519a",
+    "metadata/patches/0002-remove-release-compiler-pdb-references.patch": "d70b0f5b48663ad4ccb65f29de01b4f2f7f4c895ea7212545febb27a64c76199",
+    "metadata/patches/0003-respect-explicit-cuda-architectures.patch": "626c1457274e9632e79284aead54f0b0388868786f0490cb67875173cee0628f",
+    "metadata/patches/0004-linux-gpu-runtime-sonames.patch": "4081ac43fc3603f90cc38f0c09ce8c7f2c9f3543c983f33c4d666c8da893b175",
+    "metadata/patches/README.md": "df90bf3a5ed078a16a7d71a554f36bc5486252e4d7ce8bf47b49bf62aaa07715",
+    "metadata/source-lock.json": "31cd0b980cff1b62f3ca69197643d3c028446258b19621b4eaba9d44c351dd85"
+  },
+  "package": "mnn-3.6.1-d407447e-r1-macos-universal",
+  "patches": [
+    {
+      "path": "patches/mnn/0001-cmake-and-windows-arm-compatibility.patch",
+      "sha256": "21cea0bb3452b73455d1646c39a758f216ede9035f4dd20e619cb1a6a8b9519a"
+    },
+    {
+      "path": "patches/mnn/0002-remove-release-compiler-pdb-references.patch",
+      "sha256": "d70b0f5b48663ad4ccb65f29de01b4f2f7f4c895ea7212545febb27a64c76199"
+    },
+    {
+      "path": "patches/mnn/0003-respect-explicit-cuda-architectures.patch",
+      "sha256": "626c1457274e9632e79284aead54f0b0388868786f0490cb67875173cee0628f"
+    },
+    {
+      "path": "patches/mnn/0004-linux-gpu-runtime-sonames.patch",
+      "sha256": "4081ac43fc3603f90cc38f0c09ce8c7f2c9f3543c983f33c4d666c8da893b175"
+    }
+  ],
+  "platform": {
+    "abi": "darwin",
+    "archs": [
+      "arm64",
+      "x86_64"
+    ],
+    "cmake": {
+      "CMAKE_BUILD_WITH_INSTALL_NAME_DIR": "ON",
+      "CMAKE_INSTALL_NAME_DIR": "@rpath",
+      "CMAKE_OSX_DEPLOYMENT_TARGET": "11.0"
+    },
+    "minimum_os": "macOS 11.0",
+    "msvc_arch": "",
+    "os": "macos",
+    "profile": "metal",
+    "runner": "macos-15",
+    "runtime": "libc++",
+    "shared": true
+  },
+  "runtime_requirements": {
+    "metal": "System Metal framework and a supported Apple device"
+  },
+  "schema_version": 1,
+  "source": {
+    "dependencies": {
+      "cutlass": {
+        "ref": "319a389f42b776fae5701afcb943fc03be5b5c25",
+        "sha256": "1d1eac5bcbcced5c1a7f3de433143c0ab269f07551865ba9aa0fcb8618e988c4",
+        "url": "https://codeload.github.com/NVIDIA/cutlass/tar.gz/319a389f42b776fae5701afcb943fc03be5b5c25",
+        "version": "2.9.0"
+      },
+      "kleidiai": {
+        "sha256": "57b0a95c559ec6a4b1460bc742af600bfb6cdff8dc39154b376c25347d7b0891",
+        "url": "https://codeload.github.com/ARM-software/kleidiai/tar.gz/refs/tags/v1.16.0",
+        "version": "1.16.0"
+      }
+    },
+    "note": "Official upstream tag 3.6.1, pinned to commit d407447ed56c4121a11ccbd266dc184ca1ead0c2.",
+    "package_version": "3.6.1-d407447e-r1",
+    "patches": [
+      "patches/mnn/0001-cmake-and-windows-arm-compatibility.patch",
+      "patches/mnn/0002-remove-release-compiler-pdb-references.patch",
+      "patches/mnn/0003-respect-explicit-cuda-architectures.patch",
+      "patches/mnn/0004-linux-gpu-runtime-sonames.patch"
+    ],
+    "ref": "d407447ed56c4121a11ccbd266dc184ca1ead0c2",
+    "release_tag": "mnn-3.6.1-d407447e-r1",
+    "repository": "alibaba/MNN",
+    "revision": 1,
+    "schema_version": 1,
+    "upstream_tag": "3.6.1",
+    "version": "3.6.1"
+  },
+  "target": "macos-universal",
+  "validation": [
+    {
+      "arch": "arm64",
+      "backend_inference": {
+        "metal": "not_tested"
+      },
+      "consumer_link": "passed",
+      "cpu_inference": "passed",
+      "gpu_inference": "not_tested",
+      "linkage": "static"
+    },
+    {
+      "arch": "arm64",
+      "backend_inference": {
+        "metal": "not_tested"
+      },
+      "consumer_link": "passed",
+      "cpu_inference": "passed",
+      "gpu_inference": "not_tested",
+      "linkage": "shared"
+    },
+    {
+      "arch": "x86_64",
+      "backend_inference": {
+        "metal": "not_tested"
+      },
+      "consumer_link": "passed",
+      "cpu_inference": "not_run_cross_target",
+      "gpu_inference": "not_tested",
+      "linkage": "static"
+    },
+    {
+      "arch": "x86_64",
+      "backend_inference": {
+        "metal": "not_tested"
+      },
+      "consumer_link": "passed",
+      "cpu_inference": "not_run_cross_target",
+      "gpu_inference": "not_tested",
+      "linkage": "shared"
+    }
+  ]
+}

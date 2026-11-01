@@ -1,0 +1,17 @@
+--- a/cpp/mnn_runtime_bridge.cpp
++++ b/cpp/mnn_runtime_bridge.cpp
+@@ -200,6 +200,14 @@
+ 
+         int backends[2] = {-1, -1};
+         engine->interpreter->getSessionInfo(engine->session, MNN::Interpreter::BACKENDS, backends);
++        if (config->backend != MNN_FORWARD_CPU && config->backend != MNN_FORWARD_AUTO
++            && backends[0] != config->backend) {
++            set_error(nullptr, "Benchmark forbids backend fallback: requested "
++                + std::to_string(config->backend) + ", session primary "
++                + std::to_string(backends[0]));
++            return nullptr;
++        }
++        // Per-operation CPU backup remains MNN's normal mixed execution policy.
+         if (backends[0] == MNN_FORWARD_CPU || backends[0] == MNN_FORWARD_CPU_EXTENSION) {
+             engine->interpreter->getSessionInfo(engine->session, MNN::Interpreter::THREAD_NUMBER, &engine->effective_threads);
+         }

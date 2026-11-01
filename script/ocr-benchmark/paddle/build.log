@@ -1,0 +1,12 @@
+-- The CXX compiler identification is AppleClang 16.0.0.16000026
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done (0.5s)
+-- Generating done (0.0s)
+-- Build files have been written to: /tmp/snaplingo-ocr-benchmark/paddle/build
+[ 50%] Building CXX object CMakeFiles/snaplingo_paddle_bridge.dir/bridge.cpp.o
+[100%] Linking CXX shared library libsnaplingo_paddle_bridge.dylib
+[100%] Built target snaplingo_paddle_bridge

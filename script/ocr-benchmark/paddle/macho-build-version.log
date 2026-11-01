@@ -1,0 +1,90 @@
+/tmp/snaplingo-ocr-benchmark/paddle/sdk-3.3.1/paddle_inference_install_dir/paddle/lib/libcommon.dylib:
+Load command 10
+      cmd LC_BUILD_VERSION
+  cmdsize 32
+ platform MACOS
+    minos 13.6
+      sdk 13.3
+   ntools 1
+     tool LD
+  version 857.1
+/tmp/snaplingo-ocr-benchmark/paddle/sdk-3.3.1/paddle_inference_install_dir/paddle/lib/libpaddle_inference.dylib:
+Load command 10
+      cmd LC_BUILD_VERSION
+  cmdsize 32
+ platform MACOS
+    minos 13.6
+      sdk 13.3
+   ntools 1
+     tool LD
+  version 857.1
+/tmp/snaplingo-ocr-benchmark/paddle/sdk-3.3.1/paddle_inference_install_dir/paddle/lib/libphi.dylib:
+Load command 8
+      cmd LC_BUILD_VERSION
+  cmdsize 32
+ platform MACOS
+    minos 13.6
+      sdk 13.3
+   ntools 1
+     tool LD
+  version 857.1
+/tmp/snaplingo-ocr-benchmark/paddle/sdk-3.3.1/paddle_inference_install_dir/paddle/lib/libphi_core.dylib:
+Load command 10
+      cmd LC_BUILD_VERSION
+  cmdsize 32
+ platform MACOS
+    minos 13.6
+      sdk 13.3
+   ntools 1
+     tool LD
+  version 857.1
+/tmp/snaplingo-ocr-benchmark/paddle/paddle_inference_install_dir/paddle/lib/libcommon.dylib:
+Load command 9
+      cmd LC_BUILD_VERSION
+  cmdsize 32
+ platform MACOS
+    minos 11.4
+      sdk 11.3
+   ntools 1
+     tool LD
+  version 650.9
+/tmp/snaplingo-ocr-benchmark/paddle/paddle_inference_install_dir/paddle/lib/libpaddle_inference.dylib:
+Load command 9
+      cmd LC_BUILD_VERSION
+  cmdsize 32
+ platform MACOS
+    minos 11.4
+      sdk 11.3
+   ntools 1
+     tool LD
+  version 650.9
+/tmp/snaplingo-ocr-benchmark/paddle/paddle_inference_install_dir/paddle/lib/libphi.dylib:
+Load command 7
+      cmd LC_BUILD_VERSION
+  cmdsize 32
+ platform MACOS
+    minos 11.4
+      sdk 11.3
+   ntools 1
+     tool LD
+  version 650.9
+/tmp/snaplingo-ocr-benchmark/paddle/paddle_inference_install_dir/paddle/lib/libphi_core.dylib:
+Load command 9
+      cmd LC_BUILD_VERSION
+  cmdsize 32
+ platform MACOS
+    minos 11.4
+      sdk 11.3
+   ntools 1
+     tool LD
+  version 650.9
+/tmp/snaplingo-ocr-benchmark/paddle/build/libsnaplingo_paddle_bridge.dylib:
+Load command 10
+      cmd LC_BUILD_VERSION
+  cmdsize 32
+ platform MACOS
+    minos 14.0
+      sdk 15.2
+   ntools 1
+     tool LD
+  version 1115.7.3

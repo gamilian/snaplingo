@@ -1,0 +1,218 @@
+{
+  "ocr_rs_revision": "664a945953e46186b37203fa4902a20d60a32809",
+  "schema_revision": "d407447ed56c4121a11ccbd266dc184ca1ead0c2",
+  "files": [
+    {
+      "file": "PP-OCRv5_mobile_det.mnn",
+      "bytes": 4760244,
+      "sha256": "326f846bb5c903282e116ea089e8796b67921586726cca9457730436a79684c3",
+      "source_url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/PP-OCRv5_mobile_det.mnn",
+      "operators": 541,
+      "counts": {
+        "constant_dtype_1": 113,
+        "fp32_convolution": 64
+      },
+      "storage": {
+        "fp32_constant_values": 145,
+        "fp32_convolution_weight_values": 1164320,
+        "fp32_convolution_bias_values": 7561
+      },
+      "weight_storage": "fp32"
+    },
+    {
+      "file": "PP-OCRv5_mobile_det_fp16.mnn",
+      "bytes": 2439100,
+      "sha256": "617b5228b101275594f96ebb6ae7662fd1618bcf8e84b0ffde1cf3b48e754951",
+      "source_url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/PP-OCRv5_mobile_det_fp16.mnn",
+      "operators": 541,
+      "counts": {
+        "constant_dtype_19": 113,
+        "convolution_quant_type_3": 62,
+        "fp32_convolution": 2
+      },
+      "storage": {
+        "fp16_constant_values": 145,
+        "fp32_convolution_weight_values": 2400,
+        "fp32_convolution_bias_values": 7561,
+        "fp16_convolution_weight_values": 1161920
+      },
+      "weight_storage": "mixed_or_unconfirmed"
+    },
+    {
+      "file": "PP-OCRv5_mobile_rec.mnn",
+      "bytes": 16531596,
+      "sha256": "c809800b09263a8d18c678c211e470ffc464cbb33db2e6bde0244766f3feb0db",
+      "source_url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/PP-OCRv5_mobile_rec.mnn",
+      "operators": 721,
+      "counts": {
+        "constant_dtype_1": 117,
+        "fp32_convolution": 47,
+        "constant_dtype_3": 49
+      },
+      "storage": {
+        "fp32_constant_values": 117,
+        "fp32_convolution_weight_values": 4080872,
+        "fp32_convolution_bias_values": 28429
+      },
+      "weight_storage": "fp32"
+    },
+    {
+      "file": "PP-OCRv5_mobile_rec_fp16.mnn",
+      "bytes": 8371960,
+      "sha256": "ff03e4204260325eabe9f4eae0ec8cc6b79b8a97a8e38a5292ba69cf02a689fc",
+      "source_url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/PP-OCRv5_mobile_rec_fp16.mnn",
+      "operators": 721,
+      "counts": {
+        "constant_dtype_19": 117,
+        "convolution_quant_type_3": 47,
+        "constant_dtype_3": 49
+      },
+      "storage": {
+        "fp16_constant_values": 117,
+        "fp32_convolution_weight_values": 0,
+        "fp32_convolution_bias_values": 28429,
+        "fp16_convolution_weight_values": 4080872
+      },
+      "weight_storage": "fp16_weights_fp32_biases"
+    },
+    {
+      "file": "PP-OCRv6_medium_det.mnn",
+      "bytes": 31078716,
+      "sha256": "a174009ef81dd84f29034047cd56e50b73ef624a3a409226418be63ffc46ca60",
+      "source_url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/PP-OCRv6_medium_det.mnn",
+      "operators": 234,
+      "counts": {
+        "convolution_quant_type_3": 124,
+        "constant_dtype_19": 5
+      },
+      "storage": {
+        "fp32_convolution_weight_values": 0,
+        "fp32_convolution_bias_values": 30689,
+        "fp16_convolution_weight_values": 15457856,
+        "fp16_constant_values": 14
+      },
+      "weight_storage": "fp16_weights_fp32_biases"
+    },
+    {
+      "file": "PP-OCRv6_medium_rec.mnn",
+      "bytes": 38382108,
+      "sha256": "11bbedb5af3a33cb7fee505de19223243d85b82c7b507af51e345ea1b4e68e72",
+      "source_url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/PP-OCRv6_medium_rec.mnn",
+      "operators": 363,
+      "counts": {
+        "convolution_quant_type_3": 71,
+        "constant_dtype_19": 3,
+        "constant_dtype_3": 16
+      },
+      "storage": {
+        "fp32_convolution_weight_values": 0,
+        "fp32_convolution_bias_values": 51670,
+        "fp16_convolution_weight_values": 19059840,
+        "fp16_constant_values": 3
+      },
+      "weight_storage": "fp16_weights_fp32_biases"
+    },
+    {
+      "file": "PP-OCRv6_small_det.mnn",
+      "bytes": 4965224,
+      "sha256": "2c6277abbbddb4c77a790f4650cdd7f8ab33512db38fac372ed5471538070619",
+      "source_url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/PP-OCRv6_small_det.mnn",
+      "operators": 213,
+      "counts": {
+        "convolution_quant_type_3": 85,
+        "constant_dtype_19": 6
+      },
+      "storage": {
+        "fp32_convolution_weight_values": 0,
+        "fp32_convolution_bias_values": 11761,
+        "fp16_convolution_weight_values": 2442072,
+        "fp16_constant_values": 15
+      },
+      "weight_storage": "fp16_weights_fp32_biases"
+    },
+    {
+      "file": "PP-OCRv6_small_rec.mnn",
+      "bytes": 10646760,
+      "sha256": "ed59cc294fe2d564bd64f929b5356b70abd0977f99e7e60e3b08cfeef4ef72be",
+      "source_url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/PP-OCRv6_small_rec.mnn",
+      "operators": 350,
+      "counts": {
+        "convolution_quant_type_3": 66,
+        "constant_dtype_19": 3,
+        "constant_dtype_3": 16
+      },
+      "storage": {
+        "fp32_convolution_weight_values": 0,
+        "fp32_convolution_bias_values": 32606,
+        "fp16_convolution_weight_values": 5232744,
+        "fp16_constant_values": 3
+      },
+      "weight_storage": "fp16_weights_fp32_biases"
+    },
+    {
+      "file": "PP-OCRv6_tiny_det.mnn",
+      "bytes": 901896,
+      "sha256": "7fab7b858f136bc93a760bdca66aaf25f0ff10accabb31e6ef853a897fb9cfec",
+      "source_url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/PP-OCRv6_tiny_det.mnn",
+      "operators": 213,
+      "counts": {
+        "convolution_quant_type_3": 85,
+        "constant_dtype_19": 6
+      },
+      "storage": {
+        "fp32_convolution_weight_values": 0,
+        "fp32_convolution_bias_values": 5205,
+        "fp16_convolution_weight_values": 423520,
+        "fp16_constant_values": 15
+      },
+      "weight_storage": "fp16_weights_fp32_biases"
+    },
+    {
+      "file": "PP-OCRv6_tiny_rec.mnn",
+      "bytes": 2251616,
+      "sha256": "0a43c3c979a98b905f5e84913209998f510189419b5a5d4152bbb01ce8d17a93",
+      "source_url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/PP-OCRv6_tiny_rec.mnn",
+      "operators": 131,
+      "counts": {
+        "convolution_quant_type_3": 39,
+        "constant_dtype_19": 2,
+        "constant_dtype_3": 9
+      },
+      "storage": {
+        "fp32_convolution_weight_values": 0,
+        "fp32_convolution_bias_values": 11518,
+        "fp16_convolution_weight_values": 1091800,
+        "fp16_constant_values": 2
+      },
+      "weight_storage": "fp16_weights_fp32_biases"
+    },
+    {
+      "file": "ppocr_keys_v5.txt",
+      "bytes": 74008,
+      "sha256": "f2ed6bb20a850ce4767fa9b4622d9b282985ab7f0ea8f8c11abd790ca6d2ff94",
+      "source_url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/ppocr_keys_v5.txt",
+      "dictionary_lines": 18383
+    },
+    {
+      "file": "ppocr_keys_v6_medium.txt",
+      "bytes": 74947,
+      "sha256": "b5f2bfe2bdd9448429e3e82b51c789775d9b42f2403d082b00662eb77e401c5d",
+      "source_url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/ppocr_keys_v6_medium.txt",
+      "dictionary_lines": 18708
+    },
+    {
+      "file": "ppocr_keys_v6_small.txt",
+      "bytes": 74947,
+      "sha256": "b5f2bfe2bdd9448429e3e82b51c789775d9b42f2403d082b00662eb77e401c5d",
+      "source_url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/ppocr_keys_v6_small.txt",
+      "dictionary_lines": 18708
+    },
+    {
+      "file": "ppocr_keys_v6_tiny.txt",
+      "bytes": 27156,
+      "sha256": "c5cbe34ef40c29c4df07ed012bf96569cb69a2d2a01a07027e9f13cb832bd9cd",
+      "source_url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/ppocr_keys_v6_tiny.txt",
+      "dictionary_lines": 6904
+    }
+  ]
+}

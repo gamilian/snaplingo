@@ -1,0 +1,90 @@
+{
+  "hardware": {
+    "cpu": "Apple M1 Pro",
+    "cpu_logical_cores": 8,
+    "gpu_cores": 14,
+    "memory_bytes": 17179869184,
+    "os": "macOS 14.8.3",
+    "arch": "arm64"
+  },
+  "scope": {
+    "accuracy_scored": false,
+    "windows_executed": false,
+    "intel_mac_executed": false,
+    "workloads": 12,
+    "warmup_passes": 1,
+    "repeats": 3
+  },
+  "native_libraries": [
+    {
+      "path": "/tmp/snaplingo-ocr-benchmark/ort-sdk31/onnxruntime-osx-arm64-1.31.1/lib/libonnxruntime.1.31.1.dylib",
+      "bytes": 44797256,
+      "sha256": "17500d6b1e37e70f43a2c57d94233a1bc29fbcb297be0a5f8c7c13184f3307ba",
+      "build": [
+        "      cmd LC_BUILD_VERSION",
+        "  cmdsize 32",
+        " platform 1",
+        "    minos 14.0",
+        "      sdk 26.2",
+        "   ntools 1",
+        "     tool 3"
+      ]
+    },
+    {
+      "path": "/tmp/snaplingo-ocr-benchmark/ort-sdk123/onnxruntime-osx-universal2-1.23.2/lib/libonnxruntime.1.23.2.dylib",
+      "bytes": 74902752,
+      "sha256": "6fee21a0dbcaa98fe082cb4f7ed07ec5def439df36198f47b61dc205e7d2a1fa",
+      "build": [
+        "      cmd LC_BUILD_VERSION",
+        "  cmdsize 32",
+        " platform 1",
+        "    minos 13.4",
+        "      sdk 14.4",
+        "   ntools 1",
+        "     tool 3",
+        "      cmd LC_BUILD_VERSION",
+        "  cmdsize 32",
+        " platform 1",
+        "    minos 13.4",
+        "      sdk 14.4",
+        "   ntools 1",
+        "     tool 3"
+      ]
+    },
+    {
+      "path": "/tmp/snaplingo-ocr-benchmark/ort-sdk120/onnxruntime-osx-universal2-1.20.1/lib/libonnxruntime.1.20.1.dylib",
+      "bytes": 54114312,
+      "sha256": "b7b762db4fe82fbc681e7c738bc9dfb686f61f7da5d1c903f0bdba1a62641c5c",
+      "build": [
+        "      cmd LC_BUILD_VERSION",
+        "  cmdsize 32",
+        " platform 1",
+        "    minos 13.3",
+        "      sdk 13.3",
+        "   ntools 1",
+        "     tool 3",
+        "      cmd LC_BUILD_VERSION",
+        "  cmdsize 32",
+        " platform 1",
+        "    minos 13.3",
+        "      sdk 13.3",
+        "   ntools 1",
+        "     tool 3"
+      ]
+    },
+    {
+      "path": "/tmp/snaplingo-ocr-benchmark/mnn/target/release/snaplingo-mnn-ocr-bench",
+      "bytes": 8510240,
+      "sha256": "049945c732a66b973fe400e156fffc24394e3726d2ee396a5d286a27a65f82c7",
+      "build": [
+        "      cmd LC_BUILD_VERSION",
+        "  cmdsize 32",
+        " platform 1",
+        "    minos 11.0",
+        "      sdk 15.2",
+        "   ntools 1",
+        "     tool 3"
+      ]
+    }
+  ]
+}

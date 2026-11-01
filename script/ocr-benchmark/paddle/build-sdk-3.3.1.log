@@ -1,0 +1,6 @@
+-- Configuring done (0.1s)
+-- Generating done (0.0s)
+-- Build files have been written to: /tmp/snaplingo-ocr-benchmark/paddle/build
+[ 50%] Building CXX object CMakeFiles/snaplingo_paddle_bridge.dir/bridge.cpp.o
+[100%] Linking CXX shared library libsnaplingo_paddle_bridge.dylib
+[100%] Built target snaplingo_paddle_bridge

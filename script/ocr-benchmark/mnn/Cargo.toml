@@ -1,0 +1,29 @@
+[package]
+name = "snaplingo-mnn-ocr-bench"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Keep this harness independent of the product workspace.
+[workspace]
+
+[features]
+default = []
+metal = ["ocr-rs/metal", "mnn-runtime/metal"]
+
+[dependencies]
+# setup.sh checks out exactly 664a945953e46186b37203fa4902a20d60a32809.
+# A path checkout avoids fetching the upstream repository's complete model set.
+ocr-rs = { path = "/tmp/snaplingo-ocr-benchmark/mnn/source" }
+mnn-runtime = { version = "=0.1.0", default-features = false }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+serde_json = "1"
+sha2 = "0.10"
+
+[patch.crates-io]
+# The only local change rejects a whole-session GPU -> CPU fallback.
+mnn-runtime-sys = { path = "/tmp/snaplingo-ocr-benchmark/mnn/runtime-sys" }
+
+[profile.release]
+debug = 0
+incremental = false

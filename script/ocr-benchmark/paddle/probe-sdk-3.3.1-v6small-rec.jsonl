@@ -1,0 +1,2 @@
+{"stage": "load", "backend": "paddle_cpp_cpu", "version": "version: 3.3.0.dev20260319\ncommit: 7688495\nbranch: HEAD\n", "model": "/tmp/snaplingo-ocr-benchmark/paddle/models/PP-OCRv6_small_rec_infer", "threads": 1, "load_ms": 202.9085}
+{"stage": "run", "index": 0, "input_shape": [1, 3, 48, 320], "output_shape": [1, 40, 18710], "finite": true, "input_copy_ms": 0.081167, "infer_ms": 49.301708, "output_copy_ms": 0.285167}

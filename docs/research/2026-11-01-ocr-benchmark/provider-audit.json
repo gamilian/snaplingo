@@ -1,0 +1,16 @@
+[
+  {
+    "file": "v6_medium-coreml_gpu-profile_2026-11-01_17-57-26_235.json",
+    "node_execution_counts": {
+      "CoreMLExecutionProvider": 10,
+      "CPUExecutionProvider": 12
+    }
+  },
+  {
+    "file": "v6_medium-coreml_gpu-profile_2026-11-01_17-57-28_007.json",
+    "node_execution_counts": {
+      "CoreMLExecutionProvider": 55,
+      "CPUExecutionProvider": 85
+    }
+  }
+]
