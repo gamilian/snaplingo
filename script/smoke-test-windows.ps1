@@ -24,6 +24,10 @@ $script:msiProduct = $null
 
 function Assert-AppStarts([string]$AppPath) {
     if (-not (Test-Path $AppPath)) { throw "Installed executable missing: $AppPath" }
+    $applicationDirectory = Split-Path $AppPath -Parent
+    foreach ($relative in @('vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll', 'msvcp140_1.dll', 'ocr\medium_det.onnx', 'ocr\medium_rec.onnx', 'ocr\keys.txt', 'ocr\runtime\onnxruntime.dll', 'ocr\runtime\DirectML.dll')) {
+        if (-not (Test-Path (Join-Path $applicationDirectory $relative))) { throw "Installed OCR dependency missing: $relative" }
+    }
     $script:smokeProcess = Start-Process -FilePath $AppPath -PassThru
     try {
         Start-Sleep -Seconds 8

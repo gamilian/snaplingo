@@ -4,6 +4,7 @@
   "version": "0.1.22",
   "type": "module",
   "scripts": {
+    "ocr:prepare": "node script/prepare-ocr.mjs",
     "dev": "vite",
     "build": "tsc && vite build",
     "test": "vitest run",

@@ -152,6 +152,7 @@ impl Default for TranslationSettings {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct OcrSettings {
+    pub gpu_acceleration: bool,
     pub recognition_language: String,
     pub preserve_formatting: bool,
     pub remove_chinese_spaces: bool,
@@ -163,6 +164,7 @@ pub struct OcrSettings {
 impl Default for OcrSettings {
     fn default() -> Self {
         Self {
+            gpu_acceleration: true,
             recognition_language: "auto".to_string(),
             preserve_formatting: true,
             remove_chinese_spaces: true,

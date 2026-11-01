@@ -9,6 +9,14 @@ const invoke = vi.fn();
 vi.mock('@tauri-apps/api/core', () => ({ invoke }));
 
 describe('Tauri providers command adapter', () => {
+  it('maps local OCR acceleration status without exposing native engine choices', async () => {
+    const { settingsProviders } = await import('./providers');
+    invoke.mockResolvedValueOnce([{ id: 'paddle-ocr', name: 'PaddleOCR', is_configured: true, requires_api_key: false, is_active: true, is_local: true,
+      acceleration: { gpu_enabled: true, device: 'cpu', fallback_reason: 'GPU 加速不可用，已使用 CPU' } }]);
+    const providers = await settingsProviders.listOcr();
+    expect(providers[0].isLocal).toBe(true);
+    expect(providers[0].acceleration).toEqual({ gpuEnabled: true, device: 'cpu', fallbackReason: 'GPU 加速不可用，已使用 CPU' });
+  });
   it('maps serialized provider metadata into the Settings model', async () => {
     const { settingsProviders } = await import('./providers');
     invoke.mockResolvedValueOnce([

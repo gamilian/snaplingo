@@ -35,6 +35,7 @@ export interface Provider {
   status: 'active' | 'inactive' | 'unconfigured';
   isBuiltin: boolean;
   isLocal?: boolean;
+  acceleration?: OcrProviderInfo['acceleration'];
   description?: string;
   requiresApiKey: boolean;
   config?: Record<string, unknown>;
@@ -257,6 +258,7 @@ function toOcrProvider(info: OcrProviderInfo): Provider {
     isBuiltin: true,
     isLocal: info.isLocal ?? false,
     requiresApiKey: info.requiresApiKey,
+    acceleration: info.acceleration,
   };
 }
 

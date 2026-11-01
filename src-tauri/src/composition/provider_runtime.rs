@@ -9,7 +9,10 @@ use crate::application::providers::ocr::impls::SystemOcrProvider;
 use crate::application::providers::ocr::impls::TesseractProvider;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 use crate::application::providers::ocr::SystemOcrEngine;
-use crate::application::providers::ocr::{impls::BaiduOcrProvider, OcrCoordinator};
+use crate::application::providers::ocr::{
+    impls::{BaiduOcrProvider, PaddleOcrProvider},
+    OcrCoordinator, PaddleOcrEngine,
+};
 use crate::application::providers::translation::{
     BaiduTranslateProvider, DeepLProvider, GoogleTranslateProvider as GoogleTranslateProviderV2,
     TranslationCoordinator,
@@ -117,8 +120,17 @@ pub(crate) fn build_ocr_coordinator(
     http_client: Arc<dyn HttpClient>,
     event_sink: Arc<dyn ProviderEventSink>,
     change_notifier: Arc<dyn crate::application::providers::ProviderChangeNotifier>,
+    paddle_engine: Arc<dyn PaddleOcrEngine>,
+    settings: Arc<crate::SettingsConfiguration>,
 ) -> Arc<OcrCoordinator> {
     let ocr_coordinator = OcrCoordinator::new(config_store);
+    ocr_coordinator
+        .register(PaddleOcrProvider::new(
+            paddle_engine,
+            settings,
+            change_notifier.clone(),
+        ))
+        .ok();
 
     #[cfg(any(
         target_os = "linux",
@@ -226,9 +238,17 @@ mod tests {
             Arc::new(StubHttpClient),
             Arc::new(EventBus::new()),
             Arc::new(TestProviderChangeNotifier),
+            Arc::new(crate::infrastructure::ocr::LocalPaddleOcrEngine::new(
+                None,
+                std::path::PathBuf::new(),
+            )),
+            Arc::new(crate::SettingsConfiguration::new(Arc::new(
+                SqliteConfigStore::new_temp(),
+            ))),
         );
 
         assert!(coordinator.get("system-ocr").is_some());
+        assert!(coordinator.get("paddle-ocr").is_some());
     }
 
     #[test]

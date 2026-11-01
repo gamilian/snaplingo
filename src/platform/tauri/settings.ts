@@ -73,6 +73,7 @@ interface BackendTranslationSettings {
 }
 
 interface BackendOcrSettings {
+  gpu_acceleration?: boolean;
   recognition_language: string;
   preserve_formatting: boolean;
   remove_chinese_spaces: boolean;
@@ -159,6 +160,7 @@ interface TranslationSettingsInput {
 }
 
 interface OcrSettingsInput {
+  gpuAcceleration?: boolean;
   recognitionLanguage: string;
   preserveFormatting: boolean;
   removeChineseSpaces: boolean;
@@ -244,6 +246,7 @@ function normalizeSnapshot(snapshot: BackendSettingsSnapshot) {
       selectionTextMode: snapshot.translation.selection_text_mode ?? 'smart',
     },
     ocr: {
+      gpuAcceleration: snapshot.ocr.gpu_acceleration ?? true,
       recognitionLanguage: snapshot.ocr.recognition_language,
       preserveFormatting: snapshot.ocr.preserve_formatting,
       removeChineseSpaces: snapshot.ocr.remove_chinese_spaces,
@@ -394,6 +397,7 @@ export async function updateOcrSettings(input: OcrSettingsInput) {
     await invoke<BackendSettingsSnapshot>('update_ocr_settings', {
       input: {
         recognition_language: input.recognitionLanguage,
+        gpu_acceleration: input.gpuAcceleration ?? true,
         preserve_formatting: input.preserveFormatting,
         remove_chinese_spaces: input.removeChineseSpaces,
         show_confidence: input.showConfidence,

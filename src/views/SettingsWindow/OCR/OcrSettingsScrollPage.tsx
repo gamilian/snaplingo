@@ -43,6 +43,12 @@ export function OcrSettingsScrollPage() {
           label: '识别与文本',
           content: (
             <SettingsGroup>
+              <ToggleRow
+                label="本地模型 GPU 加速"
+                description="用于 PaddleOCR；设备不支持时自动使用 CPU"
+                checked={ocr.gpuAcceleration ?? true}
+                onChange={(gpuAcceleration) => updateOcr({ gpuAcceleration })}
+              />
               <SettingRow label="识别语言">
                 <div className="w-[230px]">
                   <CustomSelect
@@ -129,6 +135,7 @@ export function OcrSettingsScrollPage() {
 
 function ToggleRow({
   label,
+  description,
   checked,
   onChange,
 }: {
@@ -138,7 +145,7 @@ function ToggleRow({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <SettingRow label={label}>
+    <SettingRow label={label} description={description}>
       <SettingsToggle label={label} checked={checked} onChange={onChange} />
     </SettingRow>
   );

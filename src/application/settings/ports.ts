@@ -111,6 +111,7 @@ export interface TranslationSettings {
 }
 
 export interface OcrSettings {
+  gpuAcceleration?: boolean;
   recognitionLanguage: string;
   preserveFormatting: boolean;
   removeChineseSpaces: boolean;
@@ -179,6 +180,13 @@ export interface OcrProviderInfo {
   requiresApiKey: boolean;
   isActive: boolean;
   isLocal?: boolean;
+  acceleration?: OcrAccelerationStatus;
+}
+
+export interface OcrAccelerationStatus {
+  gpuEnabled: boolean;
+  device: 'cpu' | 'gpu' | null;
+  fallbackReason: string | null;
 }
 
 export interface AddCustomTranslationProviderRequest {

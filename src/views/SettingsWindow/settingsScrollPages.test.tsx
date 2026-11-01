@@ -148,6 +148,14 @@ describe('single-scroll settings pages', () => {
     expect(labels).toContain('隐藏识别状态提示');
     expect(labels).not.toContain('识别后自动复制');
   });
+
+  it('persists the OCR GPU preference through the settings interface', () => {
+    const sections = scrollSections(OcrSettingsScrollPage());
+    const toggle = findElements(sections[1].content, element => element.props.label === '本地模型 GPU 加速')[0];
+    expect(toggle.props.checked).toBe(true);
+    toggle.props.onChange!(false);
+    expect(settingsConfig.state.updateOcrSettings).toHaveBeenCalledWith({ gpuAcceleration: false });
+  });
 });
 
 interface ScrollSection {
@@ -206,6 +214,8 @@ function elementName(element: TestElement) {
 }
 
 type TestElement = ReactElement<{
+  checked?: boolean;
+  onChange?: (checked: boolean) => void;
   'aria-label'?: string;
   actions?: { key: string }[];
   children?: ReactNode;

@@ -70,12 +70,15 @@ export function verifyMacOSApplication(app, config, { allowAdhoc = false } = {})
   const architectures = run('/usr/bin/lipo', ['-archs', executable]).trim().split(/\s+/);
   const hostArch = process.arch === 'arm64' ? 'arm64' : 'x86_64';
   if (!architectures.includes(hostArch)) throw new Error(`Application cannot run on ${hostArch}`);
-  for (const file of [...filesIn(join(app, 'Contents/MacOS')), ...filesIn(join(app, 'Contents/Frameworks'))]) {
+  // This runtime is loaded only on macOS 14+; the main executable retains macOS 12 support via MNN.
+  const ocrRuntime = join(app, 'Contents/Resources/ocr/runtime/libonnxruntime.dylib');
+  for (const file of [...filesIn(join(app, 'Contents/MacOS')), ...filesIn(join(app, 'Contents/Frameworks')), ...(existsSync(ocrRuntime) ? [ocrRuntime] : [])]) {
     if (!run('/usr/bin/file', ['-b', file]).includes('Mach-O')) continue;
-    assertMacOSDeploymentTarget(run('/usr/bin/otool', ['-l', file]), plist.LSMinimumSystemVersion, file);
+    assertMacOSDeploymentTarget(run('/usr/bin/otool', ['-l', file]), file === ocrRuntime ? '14.0' : plist.LSMinimumSystemVersion, file);
+    if (file === ocrRuntime) run('/usr/bin/codesign', ['--verify', '--strict', file]);
     const libraryArchs = run('/usr/bin/lipo', ['-archs', file]).trim().split(/\s+/);
     if (architectures.some(arch => !libraryArchs.includes(arch))) throw new Error(`Architecture mismatch: ${file}`);
-    const dependencies = run('/usr/bin/otool', ['-L', file]).split('\n').slice(1)
+    const dependencies = run('/usr/bin/otool', ['-L', file]).split('\n').slice(file === ocrRuntime ? 2 : 1)
       .map(line => line.trim().match(/^(.+?) \(compatibility version/)?.[1]).filter(Boolean);
     for (const dependency of dependencies) {
       if (dependency.startsWith('/System/') || dependency.startsWith('/usr/lib/')) continue;

@@ -612,6 +612,12 @@ const executablePath = resolve(appPath, "Contents/MacOS", executableName);
 const bundledLibraries = bundleExternalMachODependencies(executablePath);
 
 const signing = resolveCodesignIdentity();
+const ocrRuntimePath = resolve(appPath, "Contents/Resources/ocr/runtime/libonnxruntime.dylib");
+if (existsSync(ocrRuntimePath)) {
+  const librarySignArgs = ["--force", "--sign", signing.identity, "--options", "runtime"];
+  if (signing.keychain) librarySignArgs.push("--keychain", signing.keychain);
+  run("/usr/bin/codesign", [...librarySignArgs, ocrRuntimePath]);
+}
 const signingEntitlements = prepareSigningEntitlements(signing);
 const signArgs = [
   "--force",

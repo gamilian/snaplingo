@@ -122,6 +122,7 @@ describe('Tauri settings command adapter', () => {
         selectionTextMode: 'smart',
       },
       ocr: {
+        gpuAcceleration: true,
         recognitionLanguage: 'auto',
         preserveFormatting: true,
         removeChineseSpaces: true,
@@ -328,6 +329,7 @@ describe('Tauri settings command adapter', () => {
     invoke.mockResolvedValueOnce(backendSnapshot);
 
     await updateOcrSettings({
+      gpuAcceleration: false,
       recognitionLanguage: 'ja',
       preserveFormatting: false,
       removeChineseSpaces: true,
@@ -338,6 +340,7 @@ describe('Tauri settings command adapter', () => {
 
     expect(invoke).toHaveBeenCalledWith('update_ocr_settings', {
       input: {
+        gpu_acceleration: false,
         recognition_language: 'ja',
         preserve_formatting: false,
         remove_chinese_spaces: true,

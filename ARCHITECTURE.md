@@ -71,6 +71,7 @@ Required Permissions   -> RequiredPermissionsHost
 System Speech          -> SystemTtsHost
 Provider execution     -> HttpClient / LlmRuntime / ProviderEventSink
 File OCR               -> ImageFileReader / OcrCoordinator
+Local PaddleOCR        -> PaddleOcrEngine (models, sessions, and platform backends in Infrastructure)
 Selection Translation  -> SettingsConfiguration / SelectedTextAcquirer / ResultWindowRuntime
 Capture OCR Delivery   -> ResultWindowRuntime / CaptureOcrEffects
 History                -> HistoryEventSource / HistoryRepository

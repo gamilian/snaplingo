@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 mod capture_runtime;
 mod history_runtime;
@@ -190,6 +190,22 @@ pub(crate) fn build_app_state(
         http_client.clone(),
         event_bus.clone(),
         provider_change_notifier.clone(),
+        Arc::new(crate::infrastructure::ocr::LocalPaddleOcrEngine::new(
+            if cfg!(debug_assertions) {
+                Some(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/ocr"))
+            } else {
+                app.path()
+                    .resource_dir()
+                    .map(|root| root.join("ocr"))
+                    .map_err(|error| log::warn!("OCR resource directory is unavailable: {error}"))
+                    .ok()
+            },
+            database_path
+                .parent()
+                .unwrap_or_else(|| std::path::Path::new("."))
+                .join("cache/ocr"),
+        )),
+        settings_configuration.clone(),
     );
     let ocr_configuration = Arc::new(
         OcrProviderConfiguration::new(ocr_coordinator.clone(), provider_credential_store.clone())

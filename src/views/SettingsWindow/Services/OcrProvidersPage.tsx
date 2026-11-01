@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useProviderStore } from '../../../stores/providerStore';
+import { useSettingsConfigStore } from '../../../stores/settingsConfigStore';
 import { ProviderCard } from './ProviderCard';
 import { ProviderConfigDialog } from './ProviderConfigDialog';
 import { useSettingsRuntime } from '../runtimeContext';
 
 export function OcrProvidersPage() {
   const runtime = useSettingsRuntime();
+  const gpuAcceleration = useSettingsConfigStore((state) => state.ocr?.gpuAcceleration);
   const providers = useProviderStore((state) => state.ocrProviders);
   const activeProvider = useProviderStore((state) => state.activeOcrProvider);
   const loadProviders = useProviderStore((state) => state.loadOcrProviders);
@@ -16,7 +18,7 @@ export function OcrProvidersPage() {
 
   useEffect(() => {
     loadProviders();
-  }, [loadProviders]);
+  }, [loadProviders, gpuAcceleration]);
 
   const handleActivate = async (id: string) => {
     try {

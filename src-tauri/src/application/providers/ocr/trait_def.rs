@@ -10,6 +10,10 @@ use async_trait::async_trait;
 /// and returns an OcrResult.
 #[async_trait]
 pub trait OcrProvider: Provider {
+    fn acceleration_status(&self) -> Option<super::OcrAccelerationStatus> {
+        None
+    }
+
     /// Recognizes text from image data.
     ///
     /// # Arguments

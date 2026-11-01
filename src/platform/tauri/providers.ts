@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type {
   AddCustomTranslationProviderRequest,
   OcrProviderInfo,
+  OcrAccelerationStatus,
   ProviderInfo,
   ProviderModelsRequest,
   SettingsProvidersPort,
@@ -34,6 +35,11 @@ interface BackendOcrProviderInfo {
   requires_api_key: boolean;
   is_active: boolean;
   is_local?: boolean;
+  acceleration?: {
+    gpu_enabled: boolean;
+    device: OcrAccelerationStatus['device'];
+    fallback_reason: string | null;
+  } | null;
 }
 
 interface BackendCustomProviderRequest {
@@ -99,6 +105,11 @@ function toOcrProviderInfo(provider: BackendOcrProviderInfo): OcrProviderInfo {
     requiresApiKey: provider.requires_api_key,
     isActive: provider.is_active,
     isLocal: provider.is_local ?? false,
+    acceleration: provider.acceleration ? {
+      gpuEnabled: provider.acceleration.gpu_enabled,
+      device: provider.acceleration.device,
+      fallbackReason: provider.acceleration.fallback_reason,
+    } : undefined,
   };
 }
 

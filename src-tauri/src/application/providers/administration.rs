@@ -22,6 +22,7 @@ pub struct OcrProviderInfo {
     pub requires_api_key: bool,
     pub is_active: bool,
     pub is_local: bool,
+    pub acceleration: Option<crate::application::providers::ocr::OcrAccelerationStatus>,
 }
 
 pub struct ProviderModelListInput {
@@ -238,6 +239,7 @@ impl ProviderAdministration {
                     requires_api_key: provider.requires_api_key(),
                     is_active: active_id.as_ref() == Some(&id),
                     is_local: provider.is_local(),
+                    acceleration: provider.acceleration_status(),
                 }
             })
             .collect()
