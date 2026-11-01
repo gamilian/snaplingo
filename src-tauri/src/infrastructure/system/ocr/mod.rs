@@ -1,3 +1,6 @@
+mod image_file;
+pub(crate) use image_file::FilesystemImageReader;
+
 #[cfg(target_os = "macos")]
 mod macos;
 #[cfg(any(

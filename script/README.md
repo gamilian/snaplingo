@@ -2,7 +2,7 @@
 
 这个目录包含用于构建和测试 SnapLingo 应用的脚本。
 
-完整的免费 GitHub Actions 发布、证书设置和验收流程见 [发布指南](../docs/RELEASING.md)。Windows 安装包主要在 Actions 构建。macOS 官方包要求 14+，默认使用系统 OCR，不依赖用户安装 Homebrew/Tesseract。
+完整的免费 GitHub Actions 发布、证书设置和验收流程见 [发布指南](../docs/RELEASING.md)。Windows 安装包主要在 Actions 构建。macOS 官方包目标为 12+，默认使用系统 OCR，不依赖用户安装 Homebrew/Tesseract。
 
 ## 脚本列表
 

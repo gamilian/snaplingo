@@ -149,6 +149,7 @@ impl SqliteHistoryRepository {
         let search = query.search.as_deref().unwrap_or("").trim();
         let tag = query.tag.as_deref().unwrap_or("").trim();
         let pattern = format!("%{search}%");
+        let ids = query.ids.as_ref().map(serde_json::to_string).transpose()?;
         self.database.with_connection(|connection| {
             let total = connection.query_row(
                 "SELECT COUNT(*)
@@ -160,8 +161,9 @@ impl SqliteHistoryRepository {
                        SELECT 1 FROM history_tags ht
                        JOIN tags tag ON tag.id = ht.tag_id
                        WHERE ht.history_id = r.id AND tag.name = ?3
-                   ))",
-                params![search, pattern, tag],
+                   ))
+                   AND (?4 IS NULL OR r.id IN (SELECT value FROM json_each(?4)))",
+                params![search, pattern, tag, ids],
                 |row| row.get::<_, i64>(0),
             )? as usize;
             let mut statement = connection.prepare(
@@ -176,14 +178,16 @@ impl SqliteHistoryRepository {
                        JOIN tags tag ON tag.id = ht.tag_id
                        WHERE ht.history_id = r.id AND tag.name = ?3
                    ))
+                   AND (?4 IS NULL OR r.id IN (SELECT value FROM json_each(?4)))
                  ORDER BY r.timestamp DESC, r.id DESC
-                 LIMIT ?4 OFFSET ?5",
+                 LIMIT ?5 OFFSET ?6",
             )?;
             let rows = statement.query_map(
                 params![
                     search,
                     pattern,
                     tag,
+                    ids,
                     query.limit as i64,
                     query.offset as i64,
                 ],
@@ -203,6 +207,7 @@ impl SqliteHistoryRepository {
         let search = query.search.as_deref().unwrap_or("").trim();
         let tag = query.tag.as_deref().unwrap_or("").trim();
         let pattern = format!("%{search}%");
+        let ids = query.ids.as_ref().map(serde_json::to_string).transpose()?;
         self.database.with_connection(|connection| {
             let total = connection.query_row(
                 "SELECT COUNT(*)
@@ -214,8 +219,9 @@ impl SqliteHistoryRepository {
                        SELECT 1 FROM history_tags ht
                        JOIN tags tag ON tag.id = ht.tag_id
                        WHERE ht.history_id = r.id AND tag.name = ?3
-                   ))",
-                params![search, pattern, tag],
+                   ))
+                   AND (?4 IS NULL OR r.id IN (SELECT value FROM json_each(?4)))",
+                params![search, pattern, tag, ids],
                 |row| row.get::<_, i64>(0),
             )? as usize;
             let mut statement = connection.prepare(
@@ -231,14 +237,16 @@ impl SqliteHistoryRepository {
                        JOIN tags tag ON tag.id = ht.tag_id
                        WHERE ht.history_id = r.id AND tag.name = ?3
                    ))
+                   AND (?4 IS NULL OR r.id IN (SELECT value FROM json_each(?4)))
                  ORDER BY r.timestamp DESC, r.id DESC
-                 LIMIT ?4 OFFSET ?5",
+                 LIMIT ?5 OFFSET ?6",
             )?;
             let rows = statement.query_map(
                 params![
                     search,
                     pattern,
                     tag,
+                    ids,
                     query.limit as i64,
                     query.offset as i64,
                 ],
@@ -636,6 +644,69 @@ mod tests {
             .await
             .unwrap();
         repository.query_translations(1, 0).await.unwrap()[0].id
+    }
+
+    #[tokio::test]
+    async fn stable_ids_survive_newer_history_and_skip_deleted_records() {
+        let repository = SqliteHistoryRepository::new_in_memory().unwrap();
+        let old = insert_translation(&repository).await;
+        let newer = insert_translation(&repository).await;
+        repository
+            .insert_ocr(
+                &crate::domain::ocr::OcrRequest {
+                    image_data: vec![1, 2, 3],
+                    language: None,
+                },
+                &crate::domain::ocr::OcrResult::from_text("recognized", Some(0.9)),
+                "system",
+                Utc::now(),
+                1,
+                None,
+            )
+            .await
+            .unwrap();
+        let ocr_id = repository.query_ocr(1, 0).await.unwrap()[0].id;
+        let ocr_page = repository
+            .query_ocr_page(&HistoryQuery {
+                ids: Some(vec![ocr_id]),
+                limit: 20,
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert_eq!(ocr_page.total, 1);
+        assert_eq!(ocr_page.items[0].id, ocr_id);
+        let page = repository
+            .query_translation_page(&HistoryQuery {
+                ids: Some(vec![old]),
+                limit: 20,
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert_eq!(page.total, 1);
+        assert_eq!(page.items[0].id, old);
+        repository.delete(old).await.unwrap();
+        let page = repository
+            .query_translation_page(&HistoryQuery {
+                ids: Some(vec![old, newer]),
+                limit: 20,
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert_eq!(page.items.len(), 1);
+        assert_eq!(page.items[0].id, newer);
+        assert!(repository
+            .query_translation_page(&HistoryQuery {
+                ids: Some(vec![]),
+                limit: 20,
+                ..Default::default()
+            })
+            .await
+            .unwrap()
+            .items
+            .is_empty());
     }
 
     #[tokio::test]

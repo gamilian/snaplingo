@@ -1743,7 +1743,15 @@ describe('capture workspace runtime', () => {
     ).toBe(true);
     runtime.actions.pointerMove({ point: end, source: 'root' });
     expect(runtime.renderState.draftAnnotation).toEqual({ ...originalAnnotation, rect });
+    let incompleteCommit = false;
+    const unsubscribe = runtime.subscribe(() => {
+      if (!runtime.renderState.annotationMoveGesture && runtime.renderState.draftAnnotation) {
+        incompleteCommit = true;
+      }
+    });
     await runtime.actions.pointerUp({ point: end, source: 'root' });
+    unsubscribe();
+    expect(incompleteCommit).toBe(false);
 
     expect(runtime.renderState.annotationHistory.annotations[0]).toEqual({
       ...originalAnnotation, rect,

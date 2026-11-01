@@ -82,38 +82,31 @@ impl ScreenshotFavoriteRepository for SqliteScreenshotFavoriteRepository {
                 .map(str::trim)
                 .filter(|value| !value.is_empty())
                 .map(|value| format!("%{}%", value.to_lowercase()));
-            let where_clause = if search.is_some() {
-                "WHERE lower(COALESCE(sf.note, '')) LIKE ?1
+            let ids = query.ids.as_ref().map(serde_json::to_string).transpose()?;
+            let where_clause = "WHERE (?1 IS NULL OR lower(COALESCE(sf.note, '')) LIKE ?1
                    OR EXISTS (
                        SELECT 1 FROM screenshot_favorite_tags sft
                        JOIN tags t ON t.id = sft.tag_id
                        WHERE sft.favorite_id = sf.id AND lower(t.name) LIKE ?1
-                   )"
-            } else {
-                ""
-            };
+                   ))
+                   AND (?2 IS NULL OR sf.id IN (SELECT value FROM json_each(?2)))";
             let total_sql = format!("SELECT COUNT(*) FROM screenshot_favorites sf {where_clause}");
-            let total: i64 = if let Some(search) = &search {
-                connection.query_row(&total_sql, [search], |row| row.get(0))?
-            } else {
-                connection.query_row(&total_sql, [], |row| row.get(0))?
-            };
+            let total: i64 =
+                connection.query_row(&total_sql, params![search, ids], |row| row.get(0))?;
             let page_sql = format!(
                 "SELECT sf.id, sf.created_at, sf.asset_path, sf.thumbnail_path,
                         sf.width, sf.height, sf.note
                  FROM screenshot_favorites sf
                  {where_clause}
-                 ORDER BY sf.created_at DESC, sf.id DESC
-                 LIMIT ?{} OFFSET ?{}",
-                if search.is_some() { 2 } else { 1 },
-                if search.is_some() { 3 } else { 2 }
+                 ORDER BY sf.created_at DESC, sf.id DESC LIMIT ?3 OFFSET ?4"
             );
             let mut statement = connection.prepare(&page_sql)?;
-            let mut rows = if let Some(search) = &search {
-                statement.query(params![search, query.limit as i64, query.offset as i64])?
-            } else {
-                statement.query(params![query.limit as i64, query.offset as i64])?
-            };
+            let mut rows = statement.query(params![
+                search,
+                ids,
+                query.limit as i64,
+                query.offset as i64
+            ])?;
             let mut records = Vec::new();
             while let Some(row) = rows.next()? {
                 records.push(Self::read_record(connection, row)?);
@@ -237,6 +230,7 @@ mod tests {
 
         let (records, total) = repository
             .query(&ScreenshotFavoriteQuery {
+                ids: None,
                 search: Some("WORK".into()),
                 limit: 20,
                 offset: 0,
@@ -246,6 +240,48 @@ mod tests {
         assert_eq!(total, 1);
         assert_eq!(records[0].tags, vec!["work"]);
         assert_eq!(records[0].note.as_deref(), Some("project alpha"));
+    }
+
+    #[tokio::test]
+    async fn stable_ids_bound_screenshot_queries_before_asset_hydration() {
+        let database = Arc::new(Database::in_memory().unwrap());
+        let repository = SqliteScreenshotFavoriteRepository::new(database);
+        let input = NewScreenshotFavorite {
+            created_at: Utc::now(),
+            asset_path: "screenshots/one.png".into(),
+            thumbnail_path: "thumbnails/one.png".into(),
+            width: 100,
+            height: 50,
+        };
+        let old = repository.insert(&input).await.unwrap();
+        repository
+            .insert(&NewScreenshotFavorite {
+                asset_path: "screenshots/two.png".into(),
+                thumbnail_path: "thumbnails/two.png".into(),
+                ..input
+            })
+            .await
+            .unwrap();
+        let (records, total) = repository
+            .query(&ScreenshotFavoriteQuery {
+                ids: Some(vec![old.id]),
+                limit: 20,
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert_eq!(total, 1);
+        assert_eq!(records[0].id, old.id);
+        let (records, total) = repository
+            .query(&ScreenshotFavoriteQuery {
+                ids: Some(vec![]),
+                limit: 20,
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert_eq!(total, 0);
+        assert!(records.is_empty());
     }
 
     #[tokio::test]

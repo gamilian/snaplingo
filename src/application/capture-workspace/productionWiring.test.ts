@@ -22,14 +22,7 @@ const captureView = readFileSync(
   'utf8',
 );
 const runtime = readFileSync(new URL('./runtime.ts', import.meta.url), 'utf8');
-const keyboard = readFileSync(
-  new URL('./captureWorkspaceKeyboard.ts', import.meta.url),
-  'utf8',
-);
-const pointer = readFileSync(
-  new URL('./captureWorkspacePointer.ts', import.meta.url),
-  'utf8',
-);
+const editing = readFileSync(new URL('./editing.ts', import.meta.url), 'utf8');
 const deletedEditorInput = new URL(
   '../../views/CaptureWorkspace/useCaptureWorkspaceEditorInput.ts',
   import.meta.url,
@@ -157,9 +150,9 @@ describe('capture workspace production runtime wiring', () => {
     expect(captureView).toContain('actions.commitTextDraft');
     expect(captureView).toContain('actions.resizePointerDown');
     expect(captureView).toContain('actions.wheel');
-    expect(runtime).toContain('handleCaptureWorkspaceEditorKeyDown');
-    expect(runtime).toContain('handleCaptureWorkspaceEditorPreviewPointerDown');
-    expect(runtime).toContain('commitCaptureEditorTextDraft');
+    expect(runtime).toContain('createCaptureEditing');
+    expect(editing).not.toContain('EditorActions');
+    expect(editing).not.toContain('EditorContext');
   });
 
   it('lets runtime terminal exclusion handle copy while editor previews are pending', () => {
@@ -198,17 +191,9 @@ describe('capture workspace production runtime wiring', () => {
   });
 
   it('keeps selecting keyboard workflows out of the editor-only handler', () => {
-    const editorHandler = keyboard.slice(
-      keyboard.indexOf('export function handleCaptureWorkspaceEditorKeyDown'),
-      keyboard.indexOf('function isArrowKey'),
-    );
-    expect(editorHandler).not.toContain(
-      'actions as CaptureWorkspaceKeyboardActions',
-    );
-    expect(editorHandler).not.toContain('handleCaptureWorkspaceKeyDown(');
-    expect(editorHandler).not.toContain('planCaptureDraftSelectionKeyboardNudge');
-    expect(editorHandler).not.toContain('planCaptureSelectionCursorKeyboardNudge');
-    expect(editorHandler).not.toContain('planCaptureHoverSelectionCycle');
+    expect(editing).not.toContain('planCaptureDraftSelectionKeyboardNudge');
+    expect(editing).not.toContain('planCaptureSelectionCursorKeyboardNudge');
+    expect(editing).not.toContain('planCaptureHoverSelectionCycle');
     expect(runtime).toContain('planCaptureDraftSelectionKeyboardNudge');
     expect(runtime).toContain('planCaptureSelectionCursorKeyboardNudge');
     expect(runtime).toContain('isCandidateDetectionModeToggleShortcut');
@@ -216,45 +201,10 @@ describe('capture workspace production runtime wiring', () => {
     expect(runtime).toContain('moveCaptureCursor');
   });
 
-  it('deletes compatibility-only full keyboard and pointer orchestrators', () => {
-    expect(keyboard).not.toContain(
-      'export interface CaptureWorkspaceKeyboardActions',
-    );
-    expect(keyboard).not.toContain(
-      'export function handleCaptureWorkspaceKeyDown',
-    );
-    expect(pointer).not.toContain('as CaptureWorkspacePointerActions');
-    expect(pointer).not.toContain('editorPointerContext');
-    expect(pointer).not.toContain(
-      'export interface CaptureWorkspacePointerActions',
-    );
-    expect(pointer).not.toContain(
-      'export function handleCaptureWorkspacePointerDown',
-    );
-    expect(pointer).not.toContain(
-      'export function handleCaptureWorkspacePointerMove',
-    );
-    expect(pointer).not.toContain(
-      'export function handleCaptureWorkspacePointerUp',
-    );
-    expect(pointer).not.toContain(
-      'export function handleCaptureWorkspacePreviewPointerDown',
-    );
-    expect(pointer).not.toContain(
-      'export function handleCaptureWorkspaceResizePointerDown',
-    );
-    expect(pointer).not.toContain('export function handleCaptureWorkspaceWheel');
-    for (const hostOrSelectingToken of [
-      'resetPreviewSelection',
-      'cancelSession',
-      'completeManualSelection',
-      'pinSelection',
-      'copySelection',
-      'planCaptureDraftSelectionStart',
-      'planCaptureDraftSelectionPointerMove',
-      'planCaptureDraftSelectionCommit',
-    ]) {
-      expect(pointer).not.toContain(hostOrSelectingToken);
-    }
+  it('keeps editing state updates behind one internal seam', () => {
+    expect(runtime).not.toContain('EditorActions');
+    expect(runtime).not.toContain('EditorContext');
+    expect(runtime).not.toContain('setAnnotationGesture');
+    expect(runtime).not.toContain('setAnnotationHistory');
   });
 });

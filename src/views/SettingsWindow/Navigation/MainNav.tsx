@@ -15,7 +15,7 @@ import {
 import type { MainTab } from '../navigationModel';
 import type { SettingsRuntime } from '../../../application/settings/runtime';
 import { CustomNumberInput } from '../../../components/common/CustomNumberInput';
-import { uiText } from '../../../application/settings/uiText';
+import { uiText } from '../uiText';
 
 interface MainNavProps {
   activeTab: MainTab;

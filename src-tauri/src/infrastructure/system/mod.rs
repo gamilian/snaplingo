@@ -1,6 +1,7 @@
 pub mod capture_cursor;
 pub(crate) mod capture_output;
 pub mod capture_window;
+pub(crate) mod clipboard_text;
 pub mod ocr;
 pub mod paths;
 pub mod pinned_window;

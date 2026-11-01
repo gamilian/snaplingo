@@ -325,6 +325,28 @@ describe('frontend dependency rules', () => {
     expect(runtime.source).toContain('platform.print.printImage(imageBase64)');
   });
 
+  test('all Application modules keep browser mechanics behind DOM adapters', () => {
+    const forbidden = new Set(['HTMLImageElement', 'HTMLCanvasElement', 'KeyboardEvent', 'MouseEvent', 'PointerEvent', 'WheelEvent', 'document']);
+    const violations: string[] = [];
+    for (const file of productionSourceFiles().filter(({ path }) => path.startsWith('src/application/'))) {
+      const source = parseSourceFile(file);
+      function visit(node: ts.Node) {
+        if (ts.isIdentifier(node) && forbidden.has(node.text)) {
+          violations.push(`${file.path}: ${node.text}`);
+        }
+        ts.forEachChild(node, visit);
+      }
+      visit(source);
+    }
+    expect([...new Set(violations)]).toEqual([]);
+  });
+
+  test('Domain data does not import workflows or adapters', () => {
+    const violations = moduleImports(productionSourceFiles())
+      .filter(({ path, specifier }) => path.startsWith('src/domain/') && /(?:^|\/)(?:application|platform|views|stores)(?:\/|$)|^@tauri-apps\//.test(specifier));
+    expect(violations).toEqual([]);
+  });
+
   test('production Views live under canonical roots and consume Application seams only', () => {
     const productionFiles = productionSourceFiles();
     const paths = productionFiles.map(({ path }) => path);

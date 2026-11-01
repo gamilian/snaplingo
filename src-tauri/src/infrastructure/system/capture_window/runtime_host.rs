@@ -2,12 +2,13 @@ use async_trait::async_trait;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
+use crate::application::capture::{CaptureOcrDelivery, CaptureOcrEffects};
 use crate::application::capture::{CaptureOcrStatus, CaptureOcrTarget};
 use crate::application::capture::{CaptureSessionRuntimeHost, CaptureWindowGeometry};
-use crate::application::result_window::{ResultWindowOpenRequest, ResultWindowRequestId};
 use crate::domain::capture::CaptureSessionId;
 use crate::domain::ocr::OcrResult;
 use crate::Result;
+use std::sync::Arc;
 
 use super::backend::CAPTURE_WINDOW_LABEL;
 use super::tauri::{
@@ -23,11 +24,33 @@ use super::{
 
 pub(crate) struct TauriCaptureSessionRuntimeHost {
     app: AppHandle,
+    ocr_delivery: Arc<CaptureOcrDelivery>,
 }
 
 impl TauriCaptureSessionRuntimeHost {
-    pub(crate) fn new(app: AppHandle) -> Self {
-        Self { app }
+    pub(crate) fn new(app: AppHandle, ocr_delivery: Arc<CaptureOcrDelivery>) -> Self {
+        Self { app, ocr_delivery }
+    }
+}
+
+pub(crate) struct TauriCaptureOcrEffects(pub(crate) AppHandle);
+
+impl CaptureOcrEffects for TauriCaptureOcrEffects {
+    fn copy_text(&self, text: String) -> Result<()> {
+        let mut clipboard = arboard::Clipboard::new()
+            .map_err(|error| format!("Failed to open clipboard: {error}"))?;
+        clipboard
+            .set_text(text)
+            .map_err(|error| format!("Failed to copy OCR text: {error}").into())
+    }
+
+    fn show_error(&self, error: &str) {
+        self.0
+            .dialog()
+            .message(error)
+            .title("SnapLingo — OCR")
+            .kind(MessageDialogKind::Error)
+            .show(|_| {});
     }
 }
 
@@ -49,14 +72,7 @@ impl CaptureSessionRuntimeHost for TauriCaptureSessionRuntimeHost {
     }
 
     fn reserve_capture_ocr_result(&self, target: CaptureOcrTarget) -> Result<u64> {
-        if target == CaptureOcrTarget::Clipboard {
-            return Ok(0);
-        }
-        self.app
-            .state::<crate::AppState>()
-            .result_window
-            .reserve_request()
-            .map(|id| id.0)
+        self.ocr_delivery.reserve_result(target)
     }
 
     fn set_capture_ocr_status(&self, status: Option<CaptureOcrStatus>) {
@@ -70,27 +86,8 @@ impl CaptureSessionRuntimeHost for TauriCaptureSessionRuntimeHost {
         result: OcrResult,
         preview: Option<String>,
     ) -> Result<()> {
-        if target == CaptureOcrTarget::Clipboard {
-            let mut clipboard = arboard::Clipboard::new()
-                .map_err(|error| format!("Failed to open clipboard: {error}"))?;
-            return clipboard
-                .set_text(result.text)
-                .map_err(|error| format!("Failed to copy OCR text: {error}").into());
-        }
-        let request = if target == CaptureOcrTarget::TranslationWindow {
-            ResultWindowOpenRequest::screenshot_translation(result.text, result.detected_language)
-        } else {
-            ResultWindowOpenRequest::capture_ocr(
-                result.text,
-                preview,
-                result.confidence,
-                result.detected_language,
-            )
-        };
-        self.app
-            .state::<crate::AppState>()
-            .result_window
-            .open_reserved(ResultWindowRequestId(result_id), request)
+        self.ocr_delivery
+            .publish(target, result_id, result, preview)
             .await
     }
 
@@ -100,23 +97,7 @@ impl CaptureSessionRuntimeHost for TauriCaptureSessionRuntimeHost {
         result_id: u64,
         error: &str,
     ) {
-        log::error!("Capture OCR failed: {error}");
-        if target != CaptureOcrTarget::Clipboard
-            && !self
-                .app
-                .state::<crate::AppState>()
-                .result_window
-                .is_current(ResultWindowRequestId(result_id))
-                .unwrap_or(false)
-        {
-            return;
-        }
-        self.app
-            .dialog()
-            .message(error)
-            .title("SnapLingo — OCR")
-            .kind(MessageDialogKind::Error)
-            .show(|_| {});
+        self.ocr_delivery.report_error(target, result_id, error);
     }
 
     async fn begin_capture_presentation(&self) -> Result<()> {

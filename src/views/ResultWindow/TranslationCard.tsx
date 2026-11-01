@@ -8,7 +8,7 @@ import {
   RetryIcon,
   VolumeIcon,
 } from './icons';
-import IconActionButton from './IconActionButton';
+import IconActionButton from '../../components/common/IconActionButton';
 import { resultWindowAdaptiveTextStyle } from './presentation';
 
 interface TranslationCardProps {

@@ -2,11 +2,14 @@ use std::sync::Arc;
 
 use tauri::AppHandle;
 
-use crate::application::capture::{CaptureImageComposer, CaptureSessionSource};
+use crate::application::capture::{CaptureImageComposer, CaptureOcrDelivery, CaptureSessionSource};
 use crate::application::pinned_image::PinnedImageState;
 use crate::application::providers::ocr::OcrCoordinator;
+use crate::application::result_window::ResultWindowRuntime;
 use crate::infrastructure::system::capture_output::SystemCaptureOutputHost;
-use crate::infrastructure::system::capture_window::TauriCaptureSessionRuntimeHost;
+use crate::infrastructure::system::capture_window::{
+    TauriCaptureOcrEffects, TauriCaptureSessionRuntimeHost,
+};
 use crate::infrastructure::system::pinned_window::TauriPinnedImageRuntimeHost;
 #[cfg(target_os = "linux")]
 use crate::infrastructure::system::screenshot::linux::LinuxCaptureSessionSource;
@@ -26,6 +29,7 @@ pub(crate) struct CaptureRuntimeParts {
 pub(crate) fn build_capture_runtime(
     app: AppHandle,
     ocr_coordinator: Arc<OcrCoordinator>,
+    result_window: Arc<ResultWindowRuntime>,
 ) -> CaptureRuntimeParts {
     let capture_session_source = build_capture_session_source();
     let sessions = Arc::new(CaptureSessions::new(capture_session_source));
@@ -44,7 +48,13 @@ pub(crate) fn build_capture_runtime(
         image_composer.clone(),
         output.clone(),
         ocr_coordinator,
-        Arc::new(TauriCaptureSessionRuntimeHost::new(app)),
+        Arc::new(TauriCaptureSessionRuntimeHost::new(
+            app.clone(),
+            Arc::new(CaptureOcrDelivery::new(
+                result_window,
+                Arc::new(TauriCaptureOcrEffects(app)),
+            )),
+        )),
         pinned_images.clone(),
     ));
 

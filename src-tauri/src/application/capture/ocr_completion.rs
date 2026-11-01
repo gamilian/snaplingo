@@ -37,7 +37,7 @@ impl PendingCaptureOcr {
     }
 }
 
-// Keep clipboard output consistent with applyOcrTextPreferences in ocrTextProcessing.ts.
+// Keep clipboard output consistent with applyOcrTextPreferences in application/ocr/textProcessing.ts.
 // Result-window output is still formatted by that existing frontend function.
 pub(super) fn clipboard_text(text: &str, settings: &OcrSettings) -> String {
     static HAN_SPACES: OnceLock<Regex> = OnceLock::new();
@@ -125,7 +125,7 @@ mod tests {
     #[test]
     fn clipboard_formatting_matches_result_window_preferences() {
         let fixtures: Vec<Fixture> = serde_json::from_str(include_str!(
-            "../../../../src/utils/ocrTextPreferences.fixtures.json"
+            "../../../../src/application/ocr/ocrTextPreferences.fixtures.json"
         ))
         .unwrap();
         for fixture in fixtures {

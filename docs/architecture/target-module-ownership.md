@@ -2,14 +2,14 @@
 
 **Status:** Implemented and enforced
 
-This document records the ownership boundaries implemented from the [Architecture Rebuild Design](../superpowers/specs/2026-07-11-architecture-rebuild-design.md). `ARCHITECTURE.md` remains the current-state overview.
+This document records the ownership boundaries implemented from the [Architecture Rebuild Design](../archive/superpowers/specs/2026-07-11-architecture-rebuild-design.md). `ARCHITECTURE.md` remains the current-state overview.
 
 ## Vocabulary
 
 - A **module** is a cohesive body of behavior hidden behind an **interface**.
 - An **interface** is the narrow surface callers use and tests target.
-- **Depth** is the implementation complexity hidden behind an interface.
-- A **seam** is a boundary where an implementation can be substituted.
+- **Depth** is leverage at the interface: how much behavior callers can exercise per fact they must know.
+- A **seam** is a location where an implementation can be substituted.
 - A **port** is an inward-owned interface for a capability supplied across a seam.
 - An **adapter** implements an inward-owned interface using outward platform mechanics.
 - **Leverage** means one interface serves multiple callers or tests.
@@ -35,7 +35,7 @@ The dependency direction follows ownership: Views consume Frontend Application i
 
 The frontend and backend architecture suites enforce these ownership boundaries without a migration inventory or allowlist. Production frontend Views and Application modules cannot import Platform/Tauri mechanics. Production backend Application modules cannot import Infrastructure or crate-root startup adapters.
 
-The Result Window runtime owns translation state and scheduling; its Store projects snapshots. The Capture Workspace runtime and portable editing policy reside in Frontend Application, with DOM/Canvas work behind View adapters. Backend Capture owns startup exclusion, frozen coordinate policy, and Pin delivery through an inward port. Guards cover these concrete boundaries, and runtime tests verify the state and effect ordering they protect.
+The Result Window runtime owns translation state and scheduling; its Store projects snapshots. Capture Session lifecycle and the deepened Capture Editing module reside in Frontend Application, with shared DOM/Canvas sampling behind View adapters. Library owns stable-ID hydration and visible-content favorite membership; Stores retain only the projections and invalidation signals used by current Views. Backend Capture owns startup exclusion, frozen coordinate policy, and Pin delivery through an inward port. Pure clipboard IPC forwards to a native Infrastructure adapter without creating a policy-free Application module. Guards cover Domain independence, Application DOM/native isolation, and these concrete seams, and runtime tests verify the state and effect ordering they protect.
 
 ## Accepted ADR Alignment
 

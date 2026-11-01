@@ -78,6 +78,7 @@ impl FavoriteRepository for SqliteFavoriteRepository {
         let search = query.search.as_deref().unwrap_or("").trim();
         let pattern = format!("%{search}%");
         let tag = query.tag.as_deref().unwrap_or("").trim();
+        let ids = query.ids.as_ref().map(serde_json::to_string).transpose()?;
         self.database.with_connection(|connection| {
             let total = connection.query_row(
                 "SELECT COUNT(*) FROM favorites f
@@ -87,8 +88,9 @@ impl FavoriteRepository for SqliteFavoriteRepository {
                        SELECT 1 FROM favorite_tags ft
                        JOIN tags t ON t.id = ft.tag_id
                        WHERE ft.favorite_id = f.id AND t.name = ?4
-                   ))",
-                params![kind, search, pattern, tag],
+                   ))
+                   AND (?5 IS NULL OR f.id IN (SELECT value FROM json_each(?5)))",
+                params![kind, search, pattern, tag, ids],
                 |row| row.get::<_, i64>(0),
             )? as usize;
             let mut statement = connection.prepare(
@@ -101,7 +103,8 @@ impl FavoriteRepository for SqliteFavoriteRepository {
                        JOIN tags t ON t.id = ft.tag_id
                        WHERE ft.favorite_id = f.id AND t.name = ?4
                    ))
-                 ORDER BY created_at DESC, id DESC LIMIT ?5 OFFSET ?6",
+                   AND (?5 IS NULL OR f.id IN (SELECT value FROM json_each(?5)))
+                 ORDER BY created_at DESC, id DESC LIMIT ?6 OFFSET ?7",
             )?;
             let items = statement
                 .query_map(
@@ -110,6 +113,7 @@ impl FavoriteRepository for SqliteFavoriteRepository {
                         search,
                         pattern,
                         tag,
+                        ids,
                         query.limit as i64,
                         query.offset as i64
                     ],
@@ -117,6 +121,32 @@ impl FavoriteRepository for SqliteFavoriteRepository {
                 )?
                 .collect::<std::result::Result<Vec<_>, _>>()?;
             Ok(FavoritePage { items, total })
+        })
+    }
+
+    async fn matching_keys(&self, keys: &[String]) -> Result<Vec<String>> {
+        let keys = serde_json::to_string(keys)?;
+        self.database.with_connection(|connection| {
+            let mut statement = connection.prepare(
+                "SELECT requested.value FROM json_each(?1) requested
+                 WHERE EXISTS (
+                    SELECT 1 FROM favorites f
+                    WHERE f.kind = json_extract(requested.value, '$[0]') AND (
+                      (f.kind = 'translation'
+                        AND json_extract(f.content_json, '$.snapshot.sourceText') IS json_extract(requested.value, '$[1]')
+                        AND json_extract(f.content_json, '$.snapshot.sourceLang') IS json_extract(requested.value, '$[2]')
+                        AND json_extract(f.content_json, '$.snapshot.targetLang') IS json_extract(requested.value, '$[3]')
+                        AND json_extract(f.content_json, '$.snapshot.result.provider_id') IS json_extract(requested.value, '$[4]')
+                        AND json_extract(f.content_json, '$.snapshot.result.translated_text') IS json_extract(requested.value, '$[5]'))
+                      OR (f.kind = 'ocr'
+                        AND json_extract(f.content_json, '$.snapshot.recognizedText') IS json_extract(requested.value, '$[1]')
+                        AND json_extract(f.content_json, '$.snapshot.language') IS json_extract(requested.value, '$[2]')
+                        AND json_extract(f.content_json, '$.snapshot.providerUsed') IS json_extract(requested.value, '$[3]'))
+                    )
+                 )"
+            )?;
+            let matches = statement.query_map([keys], |row| row.get(0))?.collect::<rusqlite::Result<Vec<String>>>()?;
+            Ok(matches)
         })
     }
 

@@ -15,6 +15,12 @@ const FORBIDDEN_APPLICATION_DEPENDENCIES: &[&str] = &[
     "app_shell",
     "settings_window",
     "startup_shortcuts",
+    "tauri",
+    "arboard",
+    "enigo",
+    "windows",
+    "objc2",
+    "rusqlite",
 ];
 
 #[derive(Clone)]
@@ -165,6 +171,10 @@ fn is_production_rust(path: &Path) -> bool {
 }
 
 fn dependency_inventory(files: &[SourceFile]) -> BTreeSet<String> {
+    dependency_inventory_with_rules(files, FORBIDDEN_APPLICATION_DEPENDENCIES)
+}
+
+fn dependency_inventory_with_rules(files: &[SourceFile], forbidden: &[&str]) -> BTreeSet<String> {
     files
         .iter()
         .flat_map(|file| {
@@ -175,6 +185,10 @@ fn dependency_inventory(files: &[SourceFile]) -> BTreeSet<String> {
             visitor
                 .dependencies
                 .into_iter()
+                .filter(|dependency| {
+                    let dependency = dependency.strip_prefix("crate::").unwrap_or(dependency);
+                    forbidden.contains(&dependency.split("::").next().unwrap_or(""))
+                })
                 .map(|dependency| format!("{} -> {dependency}", file.path))
                 .collect::<Vec<_>>()
         })
@@ -210,14 +224,7 @@ fn expand_use_tree(tree: &UseTree, mut prefix: Vec<String>, output: &mut BTreeSe
 }
 
 fn record_dependency(path: Vec<String>, output: &mut BTreeSet<String>) {
-    let is_forbidden = path.first().map(String::as_str) == Some("crate")
-        && path
-            .get(1)
-            .is_some_and(|module| FORBIDDEN_APPLICATION_DEPENDENCIES.contains(&module.as_str()));
-
-    if is_forbidden {
-        output.insert(path.join("::"));
-    }
+    output.insert(path.join("::"));
 }
 
 fn has_cfg_test(attributes: &[Attribute]) -> bool {
@@ -234,6 +241,36 @@ fn application_production_sources_do_not_import_outward_adapters() {
     assert_eq!(
         dependency_inventory(&production_application_sources()),
         BTreeSet::<String>::new()
+    );
+}
+
+#[test]
+fn domain_sources_remain_independent_of_workflows_and_native_adapters() {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let mut paths = Vec::new();
+    collect_rust_files(&manifest_dir.join("src/domain"), &mut paths);
+    let files = paths
+        .into_iter()
+        .filter(|path| is_production_rust(path))
+        .map(|path| SourceFile {
+            path: path
+                .strip_prefix(&manifest_dir)
+                .unwrap()
+                .to_string_lossy()
+                .replace('\\', "/"),
+            source: fs::read_to_string(path).unwrap(),
+        })
+        .collect::<Vec<_>>();
+    let mut forbidden = FORBIDDEN_APPLICATION_DEPENDENCIES.to_vec();
+    forbidden.extend(["application", "app_state"]);
+    assert!(dependency_inventory_with_rules(&files, &forbidden).is_empty());
+    let example = SourceFile { path: "domain/example.rs".into(), source: "use crate::application::SettingsConfiguration; use tauri::Manager; use serde::Serialize;".into() };
+    assert_eq!(
+        dependency_inventory_with_rules(&[example], &forbidden),
+        BTreeSet::from([
+            "domain/example.rs -> crate::application::SettingsConfiguration".into(),
+            "domain/example.rs -> tauri::Manager".into(),
+        ])
     );
 }
 
@@ -255,11 +292,14 @@ fn commands_do_not_publish_durable_state_change_events() {
 }
 
 #[test]
-fn commands_delegate_native_effects_to_application_seams() {
+fn commands_keep_native_mechanics_out_of_ipc_adapters() {
     let violations = production_command_sources()
         .into_iter()
         .filter(|file| {
             file.source.contains("enigo::")
+                || file.source.contains("arboard::")
+                || file.source.contains("std::fs::read")
+                || file.source.contains("image::guess_format")
                 || file.source.contains("tauri_plugin_autostart")
                 || file
                     .source

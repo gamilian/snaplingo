@@ -1,3 +1,4 @@
+import { sampleCanvasColor } from '../shared/imageSampling';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSettingsConfigStore } from '../../stores/settingsConfigStore';
 import type { PinnedImageView } from '../../domain/capture';
@@ -36,7 +37,6 @@ import {
   colorSampleToClipboardText,
   isColorSampleCopyShortcut,
   isColorSampleFormatToggleShortcut,
-  sampleCanvasColor,
   type ColorSample,
   type ColorSampleFormat,
 } from '../../application/image-inspection/colorSampler';

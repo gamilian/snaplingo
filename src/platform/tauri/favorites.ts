@@ -43,6 +43,10 @@ export function queryFavorites(query: FavoriteQuery) {
   return invoke<FavoritePage>('query_favorites', { query });
 }
 
+export function queryFavoriteKeys(keys: string[]) {
+  return invoke<string[]>('query_favorite_keys', { keys });
+}
+
 export function updateFavoriteMetadata(
   id: number,
   note: string | null,
@@ -68,6 +72,7 @@ export const favorites = {
   addTranslationFavorite,
   addOcrFavorite,
   queryFavorites,
+  queryFavoriteKeys,
   updateFavoriteMetadata,
   deleteFavorite,
   rerunOcrFavorite,

@@ -20,27 +20,29 @@ React Views
 
 - `src/views/` renders the Settings, Capture Workspace, Result Window, and Pinned Image windows. A view receives an Application runtime through its local runtime context; it does not call Tauri directly. Result Window reads its Application state through one projection instead of selecting multiple Stores.
 - `src/application/` owns window workflows and their narrow ports:
-  - `capture-workspace`: the capture runtime, editing state, frozen-image readiness, cancellation, OCR recovery, and output workflow. Views supply DOM decoding, Canvas rendering, input conversion, and printing through local ports.
+  - `capture-workspace`: the Capture Session runtime, frozen-image readiness, cancellation, OCR recovery, and output workflow. Its `editing` module concentrates pointer/keyboard/toolbar state transitions and publishes consistent edit snapshots through one internal state seam. Views supply DOM decoding, Canvas rendering, input conversion, and printing through local ports.
   - `result-window`: translation session state, request validity, Provider retry, deduplication, 150/500 ms automatic translation scheduling, and file-OCR/favorite workflows. Zustand subscribes to runtime snapshots and combines them with Settings into the View projection.
   - `pinned-image`: pinned-image workflow.
-  - `settings`: configuration hydration, serialized updates, Provider/Hotkey reload, cross-window invalidation, and Library cross-source filtering, ordering, and pagination. Zustand stores project this Application-owned state for Views.
+  - `settings`: configuration hydration, serialized updates, Provider/Hotkey reload, cross-window invalidation, and Library cross-source filtering, ordering, and pagination. The Library hydrates final-page records by stable ID and returns favorite membership for visible content identities; Stores do not hydrate complete Favorite lists. Zustand stores project this Application-owned state for Views.
   - `permissions`: required-permission polling and explicit request workflow.
 - Result Window and Settings declare separate narrow speech ports. The shared Tauri adapter implements both without becoming part of either workflow.
 - `src/platform/tauri/` owns typed command invocation, event parsing, and Tauri-window effects. It implements the frontend ports.
-- `src/domain/` holds portable frontend data types and vocabulary.
+- `src/domain/` holds portable frontend data types and vocabulary, including Translation results.
+- `src/views/shared/imageSampling.ts` is the shared browser adapter for Canvas/image pixels; Application owns the pure color and coordinate rules.
+- UI copy lives with the Settings View; OCR text processing lives in `application/ocr`.
 
 ### Backend
 
 - `src-tauri/src/commands/` is the IPC adapter seam. A command parses an IPC request, obtains `AppState`, makes one Application call, and converts the result to an IPC response.
 - `src-tauri/src/application/` owns business workflows:
-  - `providers` owns Provider coordination, administration, runtime configuration, credentials, HTTP/LLM vocabulary, and Provider event publication through local ports.
+  - `providers` owns Provider coordination, administration, runtime configuration, credentials, HTTP/LLM vocabulary, and Provider event publication through local ports. Its File OCR workflow reads through `ImageFileReader` and uses identical bytes for recognition and preview.
   - `settings` and `hotkeys` own their independent durable-store ports.
   - `history` owns its repository and event-source ports.
   - `favorite_capacity` owns the global Favorites maximum and serializes capacity check plus insertion across regular and screenshot Favorites.
   - `favorites::OcrFavoriteApplication` owns Provider fallback, History source recovery, Favorite insertion, and OCR Favorite replay through local seams.
   - `library_index` owns lightweight cross-source ordering so only final-page History and Favorites records are hydrated.
-  - `capture`, `result_window`, and `pinned_image` own window/runtime-host ports. Capture owns startup exclusion, failure cleanup, frozen monitor coordinates, and output delivery. Its `CapturePinOutput` port is implemented by the existing Pinned Image runtime and wired by Composition; Commands do not chain the two workflows.
-  - `selected_text` owns its method and context ports.
+  - `capture`, `result_window`, and `pinned_image` own window/runtime-host ports. Capture owns startup exclusion, failure cleanup, frozen monitor coordinates, and output delivery. Its `CapturePinOutput` port is implemented by the existing Pinned Image runtime and wired by Composition; Commands do not chain the two workflows. `CaptureOcrDelivery` owns OCR target mapping and stale-request policy; Composition injects the existing Result Window runtime and native clipboard/error effects instead of resolving them through global AppState.
+  - `selected_text` owns its method and context ports. `SelectionTranslation` reads current Settings, acquires selected text, and opens Result Window; Hotkey and IPC adapters share this workflow.
   - `required_permissions` owns permission ordering and status policy.
   - `tts` owns speech normalization, locale-based voice selection, and persisted voice/rate policy. Voice IDs are opaque to Application so native adapters may use platform identifiers independently of display names.
 - `src-tauri/src/infrastructure/` implements OS, Tauri-window, shortcut, storage, network, native OCR, database, and event capabilities.
@@ -68,6 +70,9 @@ OCR Favorite            -> OcrFavoriteHistory / OcrFavoriteStore / OcrFavoriteRe
 Required Permissions   -> RequiredPermissionsHost
 System Speech          -> SystemTtsHost
 Provider execution     -> HttpClient / LlmRuntime / ProviderEventSink
+File OCR               -> ImageFileReader / OcrCoordinator
+Selection Translation  -> SettingsConfiguration / SelectedTextAcquirer / ResultWindowRuntime
+Capture OCR Delivery   -> ResultWindowRuntime / CaptureOcrEffects
 History                -> HistoryEventSource / HistoryRepository
 Library                -> SettingsHistoryPort / SettingsFavoritesPort / SettingsScreenshotFavoritesPort
 Library Index          -> LibraryIndexRepository
@@ -76,6 +81,8 @@ Capture                -> CaptureSessionSource / CaptureSessionRuntimeHost
 Capture Pin output     -> CapturePinOutput (implemented by PinnedImageRuntime)
 Hotkeys                -> HotkeyStore / HotkeyRegistrar
 ```
+
+Pure clipboard IPC has no business workflow: its Command forwards to the Infrastructure clipboard adapter. It does not introduce an empty Application module.
 
 Each port is declared adjacent to its consumer. There is no generic global port bucket.
 
@@ -94,9 +101,9 @@ Portable data and policy are kept in Domain or Application. Infrastructure conta
 
 ## Enforcement
 
-`src/architecture/frontendDependencyRules.test.ts` rejects production imports of Platform/Tauri from Views and frontend Application modules. `src-tauri/tests/architecture_dependency_test.rs` rejects backend Application imports of Infrastructure and crate-root startup adapters. These tests are intentionally strict and contain no migration inventory or allowlist.
+`src/architecture/frontendDependencyRules.test.ts` rejects production imports of Platform/Tauri from Views and frontend Application modules. `src-tauri/tests/architecture_dependency_test.rs` rejects backend Application imports of Infrastructure and crate-root startup adapters. They also reject outward Domain dependencies. These tests are intentionally strict and contain no migration inventory or allowlist.
 
-Capture guards also cover the actual frontend runtime's Application location and absence of View/DOM dependencies, backend startup/Pin policy staying out of Commands, and native window/control adapters using frozen session coordinates. Runtime interface tests verify scheduling, stale-result rejection, readiness, cancellation, overlapping startup, failure recovery, and frozen-pixel delivery.
+Capture guards also cover the actual frontend runtime's Application location and absence of View/DOM dependencies across all Application modules, backend startup/Pin policy and file/native mechanics staying out of Commands, and native window/control adapters using frozen session coordinates. Runtime interface tests verify scheduling, stale-result rejection, readiness, cancellation, overlapping startup, failure recovery, and frozen-pixel delivery.
 
 ## Compatibility Policy
 

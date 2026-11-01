@@ -7,8 +7,8 @@ use crate::application::result_window::ResultWindowRuntime;
 use crate::application::{
     CaptureCursorMover, CaptureOutput, CaptureSessionRuntime, CaptureSessions, Favorites, History,
     HotkeyRuntime, LibraryIndex, OcrHistoryReplay, PinnedImageRuntime, RequiredPermissions,
-    ScreenshotFavoriteCapture, ScreenshotFavorites, SelectedTextAcquirer, SettingsApplication,
-    SettingsConfiguration, TtsRuntime,
+    ScreenshotFavoriteCapture, ScreenshotFavorites, SettingsApplication, SettingsConfiguration,
+    TtsRuntime,
 };
 use crate::infrastructure::events::EventBus;
 use crate::infrastructure::storage::SqliteAppLogRepository;
@@ -23,6 +23,7 @@ pub struct SettingsRuntime {
 pub struct ProviderRuntime {
     pub translation: Arc<TranslationCoordinator>,
     pub ocr: Arc<OcrCoordinator>,
+    pub(crate) file_ocr: Arc<crate::application::providers::ocr::FileOcr>,
     pub administration: Arc<ProviderAdministration>,
 }
 
@@ -51,7 +52,7 @@ pub struct FavoritesRuntime {
 }
 
 pub struct SelectionRuntime {
-    pub acquirer: Arc<SelectedTextAcquirer>,
+    pub(crate) translation: Arc<crate::application::selected_text::SelectionTranslation>,
 }
 
 pub struct LogsRuntime {

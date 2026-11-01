@@ -16,8 +16,8 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useResultWindowStore } from '../../stores/resultWindowStore';
-import { useResultWindowRuntime } from './runtimeContext';
+import { useResultWindowStore } from '../../src/stores/resultWindowStore';
+import { useResultWindowRuntime } from '../../src/views/ResultWindow/runtimeContext';
 
 const LANGUAGES = [
   { code: 'auto', name: '自动检测' },

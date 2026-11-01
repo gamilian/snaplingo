@@ -4,7 +4,7 @@ import {
   resultWindowStandaloneWindowHeight,
 } from './runtime';
 import type { ResultWindowState } from './projection';
-import type { TranslationResult } from '../../types';
+import type { TranslationResult } from '../../domain/translation';
 import type { TranslationSettings } from '../settings/ports';
 import type {
   CaptureResultWindowPayload,
@@ -408,8 +408,8 @@ describe('result window application runtime', () => {
   });
 
   it('ignores a late result from an older translation generation', async () => {
-    const first = deferred<import('../../types').TranslationResult>();
-    const second = deferred<import('../../types').TranslationResult>();
+    const first = deferred<import('../../domain/translation').TranslationResult>();
+    const second = deferred<import('../../domain/translation').TranslationResult>();
     const { runtime, platform } = createRuntime({
       activeProviderIds: ['google'],
       translationResults: {
@@ -892,7 +892,7 @@ function createRuntime(options: {
   dismissError?: unknown;
   activeProviderIds?: string[];
   activeOcrProviderId?: string | null;
-  translationResults?: Record<string, import('../../types').TranslationResult>;
+  translationResults?: Record<string, import('../../domain/translation').TranslationResult>;
   translationSettings?: import('../settings/ports').TranslationSettings;
   ocrSettings?: import('../settings/ports').OcrSettings;
   lastWindowPosition?: import('./ports').ResultWindowPhysicalPosition;

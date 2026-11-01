@@ -215,7 +215,13 @@ pub(crate) fn build_app_state(
         ocr_coordinator.clone(),
     ));
 
-    let capture_runtime = build_capture_runtime(app.clone(), ocr_coordinator.clone());
+    let result_window = Arc::new(ResultWindowRuntime::new(
+        Arc::new(TauriResultWindowRuntimeHost::new(app.clone())),
+        Arc::new(TauriResultWindowNotifier::new(app.clone())),
+    ));
+
+    let capture_runtime =
+        build_capture_runtime(app.clone(), ocr_coordinator.clone(), result_window.clone());
     let (screenshot_favorites, screenshot_favorite_capture) = build_screenshot_favorites(
         database.clone(),
         asset_root,
@@ -225,10 +231,6 @@ pub(crate) fn build_app_state(
         app.clone(),
     );
     let selected_text_acquirer = build_selected_text_acquirer(app.clone());
-    let result_window = Arc::new(ResultWindowRuntime::new(
-        Arc::new(TauriResultWindowRuntimeHost::new(app.clone())),
-        Arc::new(TauriResultWindowNotifier::new(app.clone())),
-    ));
 
     hydrate_provider_credentials_in_background(provider_administration.clone());
 
@@ -263,6 +265,10 @@ pub(crate) fn build_app_state(
         }),
         providers: Arc::new(ProviderRuntime {
             translation: translation_coordinator,
+            file_ocr: Arc::new(crate::application::providers::ocr::FileOcr::new(
+                Arc::new(crate::infrastructure::system::ocr::FilesystemImageReader),
+                ocr_coordinator.clone(),
+            )),
             ocr: ocr_coordinator,
             administration: provider_administration,
         }),
@@ -290,7 +296,13 @@ pub(crate) fn build_app_state(
         }),
         library_index,
         selection: Arc::new(SelectionRuntime {
-            acquirer: selected_text_acquirer,
+            translation: Arc::new(
+                crate::application::selected_text::SelectionTranslation::new(
+                    settings_configuration.clone(),
+                    selected_text_acquirer,
+                    result_window.clone(),
+                ),
+            ),
         }),
         logs,
         tts: build_tts_runtime(settings_configuration.clone()),

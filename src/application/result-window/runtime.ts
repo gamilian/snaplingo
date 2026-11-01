@@ -1,4 +1,4 @@
-import type { TranslationError, TranslationResult } from '../../types';
+import type { TranslationError, TranslationResult } from '../../domain/translation';
 import type {
   OcrSettings,
   ResultWindowPosition,
@@ -19,7 +19,7 @@ import type {
   ResultWindowUnsubscribe,
 } from './ports';
 import { runOcrFileWorkflow } from './fileOcrWorkflow';
-import { applyOcrTextPreferences } from '../../utils/ocrTextProcessing';
+import { applyOcrTextPreferences } from '../ocr/textProcessing';
 import {
   ocrPayloadDisplayText,
   shouldApplyOcrPayloadText,

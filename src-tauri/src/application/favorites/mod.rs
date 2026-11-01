@@ -78,6 +78,7 @@ pub struct FavoriteRecord {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct FavoriteQuery {
+    pub ids: Option<Vec<i64>>,
     pub kind: Option<FavoriteKind>,
     pub search: Option<String>,
     pub tag: Option<String>,
@@ -108,6 +109,7 @@ pub trait FavoriteRepository: Send + Sync {
         created_at: DateTime<Utc>,
     ) -> Result<FavoriteRecord>;
     async fn query(&self, query: &FavoriteQuery) -> Result<FavoritePage>;
+    async fn matching_keys(&self, keys: &[String]) -> Result<Vec<String>>;
     async fn find(&self, id: i64) -> Result<Option<FavoriteRecord>>;
     async fn update_metadata(&self, id: i64, note: Option<String>, tags: Vec<String>)
         -> Result<()>;
@@ -263,6 +265,10 @@ impl Favorites {
             .map(|record| self.hydrate(record))
             .collect::<Result<Vec<_>>>()?;
         Ok(page)
+    }
+
+    pub async fn query_keys(&self, keys: Vec<String>) -> Result<Vec<String>> {
+        self.repository.matching_keys(&keys).await
     }
 
     pub async fn update_metadata(

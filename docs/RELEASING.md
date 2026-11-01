@@ -6,7 +6,7 @@
 
 | 平台 | 默认产物 | Release 文件名 | 构建位置 | 默认签名 |
 | --- | --- | --- | --- | --- |
-| macOS 12+ / Apple Silicon | DMG | `snaplingo-vX.Y.Z-macos-aarch64.dmg` | Actions `macos-14`，原生 arm64 | 固定自签名证书 |
+| macOS 12+ / Apple Silicon | DMG | `snaplingo-vX.Y.Z-macos-aarch64.dmg` | Actions `macos-15`，原生 arm64 | 固定自签名证书 |
 | macOS 12+ / Intel | DMG | `snaplingo-vX.Y.Z-macos-x86_64.dmg` | Actions `macos-15-intel`，原生 x64 | 与 arm64 同一张证书 |
 | Windows 10 / 11 x64 | NSIS EXE、备选 MSI | `snaplingo-vX.Y.Z-windows-x86_64-setup.exe`、`snaplingo-vX.Y.Z-windows-x86_64.msi` | Actions `windows-2022` | 未签名，可后续申请 SignPath Foundation |
 

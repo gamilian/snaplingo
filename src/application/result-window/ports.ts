@@ -99,4 +99,4 @@ export interface ResultWindowClipboardPort {
   writeText(text: string): Promise<void>;
 }
 import type { OcrResult } from '../../domain/capture';
-import type { TranslationResult } from '../../types';
+import type { TranslationResult } from '../../domain/translation';

@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import {
-  sampleImageColor,
-  type ColorSample,
-} from '../../application/image-inspection/colorSampler';
+import type { ColorSample } from '../../application/image-inspection/colorSampler';
+import { sampleImageColor } from '../shared/imageSampling';
 import { shouldHydrateCaptureMagnifierPixels } from '../../application/capture-workspace/captureMagnifierState';
 import { captureMonitorImageSource } from '../../application/capture-workspace/captureSnapshot';
 import type { CaptureSessionView, MonitorSnapshotView, Point } from './types';

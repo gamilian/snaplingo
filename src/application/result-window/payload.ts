@@ -2,7 +2,7 @@ import type { CaptureResultWindowPayload } from './ports';
 import {
   applyOcrTextPreferences,
   normalizeOcrText,
-} from '../../utils/ocrTextProcessing';
+} from '../ocr/textProcessing';
 
 interface OcrTextPreferences {
   preserveFormatting: boolean;

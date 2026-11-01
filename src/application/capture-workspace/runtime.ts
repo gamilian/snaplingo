@@ -7,7 +7,6 @@ import type {
   Point,
 } from '../../domain/capture';
 import {
-  ANNOTATION_COLORS,
   type AnnotationColor,
 } from '../../domain/annotationColor';
 import type {
@@ -44,59 +43,20 @@ import {
   restoreLastSuccessfulCaptureSelection,
   type CaptureSelectionStorage,
 } from './captureSelectionHistory';
-import {
-  clearAnnotationHistory,
-  emptyAnnotationHistory,
-  redoAnnotationHistory,
-  removeAnnotationFromHistory,
-  undoAnnotationHistory,
-} from './annotationHistory';
-import {
-  type AnnotationSizeDirection,
-  type AnnotationStyle,
-  type AnnotationTool,
-} from './annotationStyle';
-import {
-  applyStyleToSelectedAnnotationHistory,
-  commitCaptureEditorTextDraft,
-  completeCaptureEditorGesture,
-  getCaptureEditorDismissAction,
-  planCaptureAnnotationColorSelection,
-  planCaptureAnnotationFillToggle,
-  planCaptureAnnotationSizeAdjustment,
-  planCaptureAnnotationToolActivation,
-  planCaptureManualSelectionTransition,
-} from './captureEditorRuntime';
+import { emptyAnnotationHistory } from './annotationHistory';
+import { planCaptureManualSelectionTransition } from './captureEditorRuntime';
+import { createCaptureEditing } from './editing';
 import {
   getCaptureCandidateRectsForSession,
   getCaptureCandidatesForSession,
-  getCaptureWorkspaceDerivedState,
 } from './captureWorkspaceDerived';
-import {
-  handleCaptureWorkspaceEditorKeyDown,
-  type CaptureWorkspaceKeyboardEditorActions,
-  type CaptureWorkspaceKeyboardEditorContext,
-} from './captureWorkspaceKeyboard';
-import {
-  handleCaptureWorkspaceEditorPointerDown,
-  handleCaptureWorkspaceEditorPointerMove,
-  handleCaptureWorkspaceEditorPointerUp,
-  handleCaptureWorkspaceEditorPreviewPointerDown,
-  handleCaptureWorkspaceEditorResizePointerDown,
-  handleCaptureWorkspaceEditorWheel,
-  type CaptureWorkspacePointerEditorActions,
-  type CaptureWorkspacePointerEditorContext,
-  type CaptureWorkspacePointerEvent,
-} from './captureWorkspacePointer';
 import {
   createInitialCaptureWorkspaceState,
   type CaptureWorkspaceState,
 } from './captureWorkspaceState';
 import {
   colorSamplesEqual,
-  colorSampleToClipboardText,
 } from '../image-inspection/colorSampler';
-import { updateTextAnnotationDraft } from './textAnnotationDraft';
 import {
   normalizeSelection,
   snapPointToRects,
@@ -269,8 +229,6 @@ export function createCaptureWorkspaceRuntime({
     pressedHoverDetectionMode = null;
     invalidateControlCandidateRefresh();
   };
-  const cursorPointRef = { current: null as Point | null };
-  const keyboardEditCursorPointRef = { current: null as Point | null };
   let terminalOutputSequence = 0;
   let terminalOutputOperation: TerminalOutputOperation | null = null;
   let cursorMoveRequestRevision = 0;
@@ -341,7 +299,7 @@ export function createCaptureWorkspaceRuntime({
     hasRevealed,
     perfState: perfState ? { ...perfState } : null,
     hasKeyboardAdjustedDraft,
-    keyboardEditCursorPoint: keyboardEditCursorPointRef.current,
+    keyboardEditCursorPoint: editing.captureInteraction(),
   });
 
   const restoreReplacementSnapshot = (
@@ -353,8 +311,7 @@ export function createCaptureWorkspaceRuntime({
       isRenderingOutput: false,
       error: errorMessage(error),
     };
-    cursorPointRef.current = state.cursorPoint;
-    keyboardEditCursorPointRef.current = snapshot.keyboardEditCursorPoint;
+    editing.restoreInteraction(snapshot.keyboardEditCursorPoint);
     hydratedSessionId = snapshot.hydratedSessionId;
     snapshotHydration = null;
     hasRevealed = snapshot.hasRevealed;
@@ -385,7 +342,6 @@ export function createCaptureWorkspaceRuntime({
   const patch = (next: Partial<RuntimeState>) => {
     if (disposed) return;
     state = { ...state, ...next };
-    if ('cursorPoint' in next) cursorPointRef.current = next.cursorPoint ?? null;
     listeners.forEach((listener) => listener());
   };
 
@@ -422,8 +378,7 @@ export function createCaptureWorkspaceRuntime({
     hydratedSessionId = null;
     hasKeyboardAdjustedDraft = false;
     clearPressedHoverSelection();
-    cursorPointRef.current = null;
-    keyboardEditCursorPointRef.current = null;
+    editing.restoreInteraction(null);
     for (const connection of [...hostConnections]) {
       connection.disconnect();
     }
@@ -446,8 +401,7 @@ export function createCaptureWorkspaceRuntime({
     if (disposed) return;
     terminalOutputOperation = null;
     state = createInitialState(state.mode, state, screenshotPreferences?.());
-    cursorPointRef.current = null;
-    keyboardEditCursorPointRef.current = null;
+    editing.restoreInteraction(null);
     hasKeyboardAdjustedDraft = false;
     clearPressedHoverSelection();
     hydratedSessionId = null;
@@ -718,314 +672,15 @@ export function createCaptureWorkspaceRuntime({
     });
   };
 
-  const getEditorDerived = () =>
-    getCaptureWorkspaceDerivedState({
-      state,
-      hydratedCaptureSessionId: hydratedSessionId,
-      toolbarGap: 0,
-      toolbarSize: { width: 0, height: 0 },
-    });
-
-  const hasDismissibleLayer = () =>
-    state.textDraft !== null ||
-    state.annotationGesture !== null ||
-    state.annotationMoveGesture !== null ||
-    state.draftSelectionMoveGesture !== null ||
-    state.selectedAnnotationIndex !== null ||
-    state.activeAnnotationTool !== null;
-
-  const renderEditorSelectionPreview = (
-    rect: LogicalRect,
-    _annotations: AnnotationCommand[] = state.annotationHistory.annotations,
-    includeCursor =
-      state.includeCapturedCursor && canToggleCapturedCursor(state.session),
-  ) => renderSelectionPreview(rect, [], includeCursor);
-
-  const commitTextDraftToHistory = () => {
-    const result = commitCaptureEditorTextDraft({
-      annotationHistory: state.annotationHistory,
-      selectedAnnotationIndex: state.selectedAnnotationIndex,
-      textDraft: state.textDraft,
-      annotationStyle: state.annotationStyle,
-      textDraftAnnotationIndex: state.textDraftAnnotationIndex,
-    });
-    patch({
-      annotationHistory: result.annotationHistory,
-      selectedAnnotationIndex: result.selectedAnnotationIndex,
-      textDraft: result.textDraft,
-      textDraftAnnotationIndex: result.textDraftAnnotationIndex,
-    });
-    return result.annotationHistory;
-  };
-
-  const applySelectedAnnotationStyle = (
-    nextStyle: AnnotationStyle,
-    nextTextFontSize: number,
-  ) => {
-    const derived = getEditorDerived();
-    const previousHistory = state.annotationHistory;
-    const nextHistory = applyStyleToSelectedAnnotationHistory({
-      annotationHistory: previousHistory,
-      annotations: derived.annotations,
-      selectedAnnotationIndex: state.selectedAnnotationIndex,
-      textDraftActive: state.textDraft !== null,
-      nextStyle,
-      nextTextFontSize,
-    });
-    patch({
-      annotationStyle: nextStyle,
-      textFontSize: nextTextFontSize,
-      annotationHistory: nextHistory,
-    });
-  };
-
-  const adjustAnnotationSize = (direction: AnnotationSizeDirection) => {
-    if (state.textDraft) return;
-    const next = planCaptureAnnotationSizeAdjustment({
-      annotationStyle: state.annotationStyle,
-      textFontSize: state.textFontSize,
-      direction,
-      isTextSizingActive: getEditorDerived().isTextSizingActive,
-    });
-    applySelectedAnnotationStyle(next.annotationStyle, next.textFontSize);
-  };
-
-  const selectAnnotationColor = (color: AnnotationColor) => {
-    if (state.textDraft) return;
-    const next = planCaptureAnnotationColorSelection({
-      annotationStyle: state.annotationStyle,
-      textFontSize: state.textFontSize,
-      color,
-    });
-    applySelectedAnnotationStyle(next.annotationStyle, next.textFontSize);
-  };
-
-  const toggleAnnotationFill = () => {
-    if (state.textDraft || !getEditorDerived().isFillModeActive) return;
-    const next = planCaptureAnnotationFillToggle({
-      annotationStyle: state.annotationStyle,
-      textFontSize: state.textFontSize,
-    });
-    applySelectedAnnotationStyle(next.annotationStyle, next.textFontSize);
-  };
-
-  const undoAnnotation = () => {
-    const nextHistory = undoAnnotationHistory(state.annotationHistory);
-    if (nextHistory === state.annotationHistory) return;
-    patch({
-      selectedAnnotationIndex: null,
-      annotationMoveGesture: null,
-      annotationHistory: nextHistory,
-    });
-  };
-
-  const redoAnnotation = () => {
-    const nextHistory = redoAnnotationHistory(state.annotationHistory);
-    if (nextHistory === state.annotationHistory) return;
-    patch({
-      selectedAnnotationIndex: null,
-      annotationMoveGesture: null,
-      annotationHistory: nextHistory,
-    });
-  };
-
-  const clearAnnotations = () => {
-    const nextHistory = clearAnnotationHistory(state.annotationHistory);
-    if (nextHistory === state.annotationHistory) return;
-    patch({
-      annotationGesture: null,
-      draftAnnotation: null,
-      selectedAnnotationIndex: null,
-      annotationMoveGesture: null,
-      textDraft: null,
-      textDraftAnnotationIndex: null,
-      annotationHistory: nextHistory,
-    });
-  };
-
-  const deleteSelectedAnnotation = () => {
-    if (state.selectedAnnotationIndex === null) return;
-    const nextHistory = removeAnnotationFromHistory(
-      state.annotationHistory,
-      state.selectedAnnotationIndex,
-    );
-    if (nextHistory === state.annotationHistory) return;
-    patch({
-      selectedAnnotationIndex: null,
-      annotationMoveGesture: null,
-      annotationHistory: nextHistory,
-    });
-  };
-
-  const commitAnnotationGestureAtPoint = (
-    localPoint: Point,
-    constrainGesture: boolean,
-  ) => {
-    const previousHistory = state.annotationHistory;
-    const result = completeCaptureEditorGesture({
-      annotationHistory: previousHistory,
-      selectedAnnotationIndex: state.selectedAnnotationIndex,
-      annotationGesture: state.annotationGesture,
-      localPoint,
-      annotationStyle: state.annotationStyle,
-      constrainGesture,
-    });
-    if (!result) return false;
-    patch({
-      annotationHistory: result.annotationHistory,
-      selectedAnnotationIndex: result.selectedAnnotationIndex,
-      annotationGesture: result.annotationGesture,
-      draftAnnotation: result.draftAnnotation,
-    });
-    return true;
-  };
-
-  const dismissCaptureLayer = () => {
-    const action = getCaptureEditorDismissAction({
-      hasTextDraft: state.textDraft !== null,
-      hasAnnotationMoveGesture: state.annotationMoveGesture !== null,
-      hasDraftSelectionMoveGesture: state.draftSelectionMoveGesture !== null,
-      hasSelectedAnnotation: state.selectedAnnotationIndex !== null,
-      hasActiveAnnotationTool: state.activeAnnotationTool !== null,
-      hasAnnotationGesture: state.annotationGesture !== null,
-    });
-    if (action === 'clear-text-draft') {
-      patch({ textDraft: null, textDraftAnnotationIndex: null });
-    } else if (action === 'revert-annotation-move') {
-      patch({ annotationMoveGesture: null, draftAnnotation: null });
-    } else if (action === 'clear-draft-selection-move') {
-      patch({ draftSelectionMoveGesture: null });
-    } else if (action === 'clear-selected-annotation') {
-      patch({ selectedAnnotationIndex: null });
-    } else if (action === 'clear-active-annotation-tool') {
-      patch({
-        activeAnnotationTool: null,
-        annotationGesture: null,
-        draftAnnotation: null,
-      });
-    } else {
-      launch(cancelSession);
-    }
-  };
-
-  const toggleAnnotationTool = (nextTool: AnnotationTool) => {
-    commitTextDraftToHistory();
-    const activation = planCaptureAnnotationToolActivation({
-      currentTool: state.activeAnnotationTool,
-      nextTool,
-      selectedAnnotationIndex: state.selectedAnnotationIndex,
-      clearSelectedAnnotation: false,
-      toggle: false,
-    });
-    patch(activation);
-  };
-
-  const editorActions: CaptureWorkspacePointerEditorActions &
-    CaptureWorkspaceKeyboardEditorActions = {
-    commitTextDraft() {
-      commitTextDraftToHistory();
-      patch({ selectedAnnotationIndex: null });
-    },
-    commitAnnotationGestureAtPoint,
-    dismissCaptureLayer,
-    cancelSession: () => cancelSession(),
-    adjustAnnotationSize,
-    renderSelectionPreview: renderEditorSelectionPreview,
-    setCursorPoint: (cursorPoint) => patch({ cursorPoint }),
-    setSelection: (selection) => patch({ selection }),
-    scheduleSelectionOverlayPaint: () => host?.scheduleSelectionOverlayPaint?.(),
-    setRenderingOutput: (isRenderingOutput) => patch({ isRenderingOutput }),
-    setStatus: (status) => patch({ status }),
-    setAnnotationGesture: (
-      annotationGesture,
-      draftAnnotation?: AnnotationCommand | null,
-    ) =>
-      patch(
-        draftAnnotation === undefined
-          ? { annotationGesture }
-          : { annotationGesture, draftAnnotation },
-      ),
-    setDraftAnnotation: (draftAnnotation) => patch({ draftAnnotation }),
-    setSelectedAnnotationIndex: (selectedAnnotationIndex) =>
-      patch({ selectedAnnotationIndex }),
-    setAnnotationMoveGesture: (annotationMoveGesture) =>
-      patch({ annotationMoveGesture }),
-    setTextDraft: (textDraft) => patch({ textDraft }),
-    setTextDraftAnnotationIndex: (textDraftAnnotationIndex) =>
-      patch({ textDraftAnnotationIndex }),
-    setAnnotationHistory: (annotationHistory) => patch({ annotationHistory }),
-    setEditGesture: (editGesture) => patch({ editGesture }),
-    setAnnotationStyle: (annotationStyle) => patch({ annotationStyle }),
-    setTextFontSize: (textFontSize) => patch({ textFontSize }),
-    setIsMagnifierRequested: (isMagnifierRequested) =>
-      patch({ isMagnifierRequested }),
-    clearAnnotations,
-    undoAnnotation,
-    redoAnnotation,
-    deleteSelectedAnnotation,
-    async copyCurrentColor() {
-      if (!state.cursorColor) return;
-      try {
-        await platform.clipboard.writeText(
-          colorSampleToClipboardText(
-            state.cursorColor,
-            state.colorSampleFormat,
-          ),
-        );
-      } catch (error) {
-        patch({ status: 'error', error: errorMessage(error) });
-      }
-    },
-    setColorSampleFormat: (updater) =>
-      patch({ colorSampleFormat: updater(state.colorSampleFormat) }),
-    setIsAnnotationToolbarVisible: (updater) =>
-      patch({
-        isAnnotationToolbarVisible:
-          typeof updater === 'function'
-            ? updater(state.isAnnotationToolbarVisible)
-            : updater,
-      }),
-    toggleAnnotationFill,
-    setActiveAnnotationTool: (activeAnnotationTool) =>
-      patch({ activeAnnotationTool }),
-    selectAnnotationColor,
-    toggleAnnotationTool,
-  };
-
-  const editorContext = (): CaptureWorkspacePointerEditorContext => {
-    const derived = getEditorDerived();
-    return {
-      state,
-      refs: { cursorPointRef, keyboardEditCursorPointRef },
-      derived: {
-        annotations: derived.annotations,
-        selectionBounds: derived.selectionBounds,
-        snapTargetRects: derived.snapTargetRects,
-        hasAnnotationEditingContext: derived.hasAnnotationEditingContext,
-        shouldTrackMagnifierCursor: derived.shouldTrackMagnifierCursor,
-      },
-      actions: editorActions,
-    };
-  };
-
-  const keyboardEditorContext = (): CaptureWorkspaceKeyboardEditorContext => {
-    const derived = getEditorDerived();
-    return {
-      state,
-      refs: { keyboardEditCursorPointRef },
-      annotationColorPresets: annotationColorPresets?.() ?? ANNOTATION_COLORS,
-      derived: {
-        annotations: derived.annotations,
-        selectionBounds: derived.selectionBounds,
-        hasAnnotationEditingContext: derived.hasAnnotationEditingContext,
-        isAnnotationToolbarVisible: state.isAnnotationToolbarVisible,
-        isMagnifierShown: derived.isMagnifierShown,
-        isFillModeActive: derived.isFillModeActive,
-        cursorColor: state.cursorColor,
-      },
-      actions: editorActions,
-    };
-  };
+  const editing = createCaptureEditing({
+    read: () => state,
+    update: patch,
+    hydratedSessionId: () => hydratedSessionId,
+    renderSelectionPreview,
+    cancelSession: () => launch(cancelSession),
+    copyText: platform.clipboard.writeText,
+    annotationColorPresets,
+  });
 
   const completeCandidateSelection = async (
     rect: LogicalRect,
@@ -1577,7 +1232,7 @@ export function createCaptureWorkspaceRuntime({
         annotations ??
         (action === 'ocr'
           ? state.annotationHistory.annotations
-          : commitTextDraftToHistory().annotations);
+          : editing.commitTextDraftToHistory().annotations);
       await runCompletionEffects(
         rect,
         planCandidateSelectionCompletion(action),
@@ -1638,7 +1293,7 @@ export function createCaptureWorkspaceRuntime({
             runCompletionEffects(
               selection,
               planCandidateSelectionCompletion('pin'),
-              commitTextDraftToHistory().annotations,
+              editing.commitTextDraftToHistory().annotations,
               state.includeCapturedCursor,
             ),
           );
@@ -1667,42 +1322,11 @@ export function createCaptureWorkspaceRuntime({
           );
           return true;
         }
-        if (source === 'root' && button === 2) {
-          if (hasDismissibleLayer()) {
-            const context = editorContext();
-            if (!context.derived.selectionBounds) return false;
-            const editorEvent = createEditorPointerEvent(
-              pointer,
-              context.derived.selectionBounds,
-            );
-            handleCaptureWorkspaceEditorPointerDown(editorEvent.event, context);
-            return editorEvent.handled();
-          }
+        if (source === 'root' && button === 2 && !editing.hasDismissibleLayer()) {
           actions.resetPreview();
           return true;
         }
-        if (source === 'root') {
-          const context = editorContext();
-          if (!context.derived.selectionBounds) return false;
-          const editorEvent = createEditorPointerEvent(
-            pointer,
-            context.derived.selectionBounds,
-          );
-          handleCaptureWorkspaceEditorPointerDown(editorEvent.event, context);
-          return editorEvent.handled();
-        } else {
-          const context = editorContext();
-          if (!context.derived.selectionBounds) return false;
-          const editorEvent = createEditorPointerEvent(
-            pointer,
-            context.derived.selectionBounds,
-          );
-          handleCaptureWorkspaceEditorPreviewPointerDown(
-            editorEvent.event,
-            context,
-          );
-          return editorEvent.handled();
-        }
+        return editing.pointerDown(pointer);
       }
       if (state.status !== 'selecting') return false;
       if (button === 2) {
@@ -1764,14 +1388,7 @@ export function createCaptureWorkspaceRuntime({
       if (!state.session) return false;
       const pointer = pointerInput(input);
       if (state.status === 'preview') {
-        const context = editorContext();
-        if (!context.derived.selectionBounds) return false;
-        handleCaptureWorkspaceEditorPointerMove(
-          createEditorPointerEvent(pointer, context.derived.selectionBounds)
-            .event,
-          context,
-        );
-        return true;
+        return editing.pointerMove(pointer);
       }
       if (state.status !== 'selecting') return false;
       const { point, shiftKey = false } = pointer;
@@ -1819,14 +1436,7 @@ export function createCaptureWorkspaceRuntime({
       if (state.status === 'selecting') markPerf('selection_pointer_up');
       const pointer = pointerInput(input);
       if (state.status === 'preview') {
-        const context = editorContext();
-        if (!context.derived.selectionBounds) return false;
-        handleCaptureWorkspaceEditorPointerUp(
-          createEditorPointerEvent(pointer, context.derived.selectionBounds)
-            .event,
-          context,
-        );
-        return true;
+        return editing.pointerUp(pointer);
       }
       if (state.status !== 'selecting') return false;
       if ((pointer.button ?? 0) !== 0) return false;
@@ -1881,24 +1491,7 @@ export function createCaptureWorkspaceRuntime({
 
     pointerCancel() {
       clearPressedHoverSelection();
-      if (state.status === 'preview') {
-        if (
-          !state.annotationGesture &&
-          !state.draftAnnotation &&
-          !state.annotationMoveGesture &&
-          !state.editGesture
-        ) {
-          return false;
-        }
-        keyboardEditCursorPointRef.current = null;
-        patch({
-          annotationGesture: null,
-          draftAnnotation: null,
-          annotationMoveGesture: null,
-          editGesture: null,
-        });
-        return true;
-      }
+      if (state.status === 'preview') return editing.cancelPointer();
       if (state.status !== 'selecting' || !state.startPoint) return false;
 
       hasKeyboardAdjustedDraft = false;
@@ -1910,92 +1503,16 @@ export function createCaptureWorkspaceRuntime({
       return true;
     },
 
-    resizePointerDown(handle: SelectionHandle, input) {
-      const context = editorContext();
-      if (!context.derived.selectionBounds) return false;
-      const editorEvent = createEditorPointerEvent(
-        pointerInput(input),
-        context.derived.selectionBounds,
-      );
-      handleCaptureWorkspaceEditorResizePointerDown(
-        handle,
-        editorEvent.event,
-        context,
-      );
-      return editorEvent.handled();
-    },
-
-    resizeAnnotationPointerDown(handle: SelectionHandle, input) {
-      if (
-        state.status !== 'preview' ||
-        !state.selection ||
-        state.selectedAnnotationIndex === null
-      ) {
-        return false;
-      }
-      const annotation =
-        state.annotationHistory.annotations[state.selectedAnnotationIndex];
-      if (
-        !annotation ||
-        (annotation.type !== 'rectangle' &&
-          annotation.type !== 'ellipse')
-      ) {
-        return false;
-      }
-      const pointer = pointerInput(input);
-      const localPoint = {
-        x: pointer.point.x - state.selection.x,
-        y: pointer.point.y - state.selection.y,
-      };
-      patch({
-        annotationMoveGesture: {
-          annotationIndex: state.selectedAnnotationIndex,
-          startPoint: localPoint,
-          startAnnotation: annotation,
-          resizeHandle: handle,
-        },
-        draftAnnotation: annotation,
-      });
-      return true;
-    },
-
-    wheel(input) {
-      let handled = false;
-      handleCaptureWorkspaceEditorWheel(
-        {
-          deltaY: input.deltaY,
-          metaKey: input.metaKey ?? false,
-          ctrlKey: input.ctrlKey ?? false,
-          altKey: input.altKey ?? false,
-          preventDefault: () => {
-            handled = true;
-          },
-        },
-        editorContext(),
-      );
-      return handled;
-    },
-
-    commitTextDraft: editorActions.commitTextDraft,
-    updateTextDraftText(text) {
-      if (state.textDraft) {
-        patch({ textDraft: updateTextAnnotationDraft(state.textDraft, text) });
-      }
-    },
-    discardTextDraft() {
-      patch({ textDraft: null, textDraftAnnotationIndex: null });
-    },
-    selectMoveTool() {
-      patch({ activeAnnotationTool: null });
-    },
-    toggleAnnotationTool,
-    applySelectedAnnotationStyle,
-    updateTextDraftFontSize(fontSize) {
-      patch({
-        textFontSize: fontSize,
-        textDraft: state.textDraft ? { ...state.textDraft, fontSize } : null,
-      });
-    },
+    resizePointerDown: (handle: SelectionHandle, input) => editing.resizePointerDown(handle, pointerInput(input)),
+    resizeAnnotationPointerDown: (handle: SelectionHandle, input) => editing.resizeAnnotationPointerDown(handle, pointerInput(input)),
+    wheel: editing.wheel,
+    commitTextDraft: editing.commitTextDraft,
+    updateTextDraftText: editing.updateTextDraftText,
+    discardTextDraft: editing.discardTextDraft,
+    selectMoveTool: editing.selectMoveTool,
+    toggleAnnotationTool: editing.toggleAnnotationTool,
+    applySelectedAnnotationStyle: editing.applySelectedAnnotationStyle,
+    updateTextDraftFontSize: editing.updateTextDraftFontSize,
     commitAnnotationSizeDefault(kind, value) {
       persistScreenshotDefaults?.(
         kind === 'font'
@@ -2003,8 +1520,8 @@ export function createCaptureWorkspaceRuntime({
           : { defaultStrokeWidth: value },
       );
     },
-    undoAnnotation,
-    redoAnnotation,
+    undoAnnotation: editing.undoAnnotation,
+    redoAnnotation: editing.redoAnnotation,
     updateCursorColor(cursorColor) {
       if (colorSamplesEqual(state.cursorColor, cursorColor)) return;
       patch({ cursorColor });
@@ -2187,23 +1704,13 @@ export function createCaptureWorkspaceRuntime({
           runCompletionEffects(
             selection,
             planCandidateSelectionCompletion(previewAction),
-            commitTextDraftToHistory().annotations,
+            editing.commitTextDraftToHistory().annotations,
             state.includeCapturedCursor,
           ),
         );
         return true;
       }
-      let editorHandled = false;
-      handleCaptureWorkspaceEditorKeyDown(
-        {
-          ...event,
-          preventDefault: () => {
-            editorHandled = true;
-          },
-        },
-        keyboardEditorContext(),
-      );
-      if (editorHandled) return true;
+      if (editing.keyDown(input)) return true;
       if (event.key === 'Escape') {
         if (state.status !== 'selecting' && state.status !== 'error') return false;
         launch(cancelSession);
@@ -2449,27 +1956,4 @@ function pointerInput(
   input: Point | CaptureWorkspacePointerInput,
 ): CaptureWorkspacePointerInput {
   return 'point' in input ? input : { point: input };
-}
-
-function createEditorPointerEvent(
-  input: CaptureWorkspacePointerInput,
-  selectionBounds: LogicalRect,
-) {
-  let wasHandled = false;
-  const markHandled = () => {
-    wasHandled = true;
-  };
-  const event: CaptureWorkspacePointerEvent = {
-    clientX: input.point.x - selectionBounds.x,
-    clientY: input.point.y - selectionBounds.y,
-    button: input.button ?? 0,
-    detail: input.detail ?? 1,
-    metaKey: input.metaKey ?? false,
-    ctrlKey: input.ctrlKey ?? false,
-    altKey: input.altKey ?? false,
-    shiftKey: input.shiftKey ?? false,
-    preventDefault: markHandled,
-    stopPropagation: markHandled,
-  };
-  return { event, handled: () => wasHandled };
 }

@@ -276,6 +276,7 @@ pub fn run() {
             commands::favorite_translation_result,
             commands::favorite_ocr_result,
             commands::query_favorites,
+            commands::query_favorite_keys,
             commands::update_favorite_metadata,
             commands::delete_favorite,
             commands::rerun_ocr_favorite,

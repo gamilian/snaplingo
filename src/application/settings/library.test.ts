@@ -17,8 +17,8 @@ describe('settings library', () => {
       history: {
         total: 3,
         items: [
-          { id: 2, kind: 'ocr', sourceOffset: 0 },
-          { id: 1, kind: 'translation', sourceOffset: 0 },
+          { id: 2, kind: 'ocr' },
+          { id: 1, kind: 'translation' },
         ],
       },
     });
@@ -38,6 +38,7 @@ describe('settings library', () => {
     ]);
     expect(history.queryTranslationHistory).toHaveBeenCalledWith({
       search: 'snap',
+      ids: [1],
       limit: 1,
       offset: 0,
     });
@@ -50,7 +51,7 @@ describe('settings library', () => {
     const index = createIndexPort({
       history: {
         total: 1,
-        items: [{ id: 2, kind: 'translation', sourceOffset: 0 }],
+        items: [{ id: 2, kind: 'translation' }],
       },
     });
     const library = createSettingsLibrary(createPorts({ history, index }));
@@ -60,6 +61,28 @@ describe('settings library', () => {
     });
 
     expect(page.items.map((item) => item.key)).toEqual(['translation:2']);
+    expect(history.queryTranslationHistory).toHaveBeenCalledExactlyOnceWith({ search: '', ids: [2], limit: 1, offset: 0 });
+  });
+
+  it('skips concurrently deleted indexed records without a full-source fallback', async () => {
+    const history = createHistoryPort({ translations: [translation(2, '2026-07-15T08:00:00Z')] });
+    const index = createIndexPort({ history: { total: 2, items: [{ id: 1, kind: 'translation' }, { id: 2, kind: 'translation' }] } });
+    const library = createSettingsLibrary(createPorts({ history, index }));
+    const page = await library.queryHistory({ filter: 'all', search: '', page: 0, pageSize: 20 });
+    expect(page.items.map((item) => item.key)).toEqual(['translation:2']);
+    expect(history.queryTranslationHistory).toHaveBeenCalledExactlyOnceWith({ search: '', ids: [1, 2], limit: 2, offset: 0 });
+  });
+
+  it('projects membership for visible content without loading Favorite records', async () => {
+    const history = createHistoryPort({ ocr: [ocr(7, '2026-07-15T09:00:00Z')] });
+    const favorites = createFavoritesPort([]);
+    const key = JSON.stringify(['ocr', 'ocr 7', null, 'system']);
+    favorites.queryFavoriteKeys.mockResolvedValueOnce([key]);
+    const library = createSettingsLibrary(createPorts({ history, favorites }));
+    const page = await library.queryHistory({ filter: 'ocr', search: '', page: 0, pageSize: 20 });
+    expect(page.favoriteKeys.has(key)).toBe(true);
+    expect(favorites.queryFavoriteKeys).toHaveBeenCalledExactlyOnceWith([key]);
+    expect(favorites.queryFavorites).not.toHaveBeenCalled();
   });
 
   it('forwards a filtered history page without cross-source queries', async () => {
@@ -94,10 +117,9 @@ describe('settings library', () => {
     const index = createIndexPort({
       favorites: {
         total: 120,
-        items: screenshots.slice(100).map((item, offset) => ({
+        items: screenshots.slice(100).map((item) => ({
           id: item.id,
           kind: 'screenshot' as const,
-          sourceOffset: offset + 100,
         })),
       },
     });
@@ -117,8 +139,9 @@ describe('settings library', () => {
     expect(screenshotFavorites.queryScreenshotFavorites).toHaveBeenCalledTimes(1);
     expect(screenshotFavorites.queryScreenshotFavorites).toHaveBeenCalledWith({
       search: '',
+      ids: Array.from({ length: 20 }, (_, index) => index + 101),
       limit: 20,
-      offset: 100,
+      offset: 0,
     });
   });
 
@@ -134,8 +157,8 @@ describe('settings library', () => {
       favorites: {
         total: 3,
         items: [
-          { id: 2, kind: 'screenshot', sourceOffset: 0 },
-          { id: 1, kind: 'translation', sourceOffset: 0 },
+          { id: 2, kind: 'screenshot' },
+          { id: 1, kind: 'translation' },
         ],
       },
     });
@@ -236,14 +259,15 @@ function createFavoritesPort(items: TranslationFavoriteItem[]) {
   return {
     addTranslationFavorite: vi.fn(),
     addOcrFavorite: vi.fn(),
-    queryFavorites: vi.fn(async ({ limit, offset }) => ({
-      items: items.slice(offset, offset + limit),
+    queryFavorites: vi.fn(async ({ limit, offset, ids }) => ({
+      items: (ids ? items.filter((item) => ids.includes(item.id)) : items).slice(offset, offset + limit),
       total: items.length,
     })),
     updateFavoriteMetadata: vi.fn(),
     deleteFavorite: vi.fn(),
     rerunOcrFavorite: vi.fn(async () => 'rerun'),
     listFavoriteTags: vi.fn(),
+    queryFavoriteKeys: vi.fn(async (): Promise<string[]> => []),
   };
 }
 
@@ -257,12 +281,12 @@ function createHistoryPort({
   return {
     getTranslationHistory: vi.fn(),
     getOcrHistory: vi.fn(),
-    queryTranslationHistory: vi.fn(async ({ limit, offset }) => ({
-      items: translations.slice(offset, offset + limit),
+    queryTranslationHistory: vi.fn(async ({ limit, offset, ids }) => ({
+      items: (ids ? translations.filter((item) => ids.includes(item.id)) : translations).slice(offset, offset + limit),
       total: translations.length,
     })),
-    queryOcrHistory: vi.fn(async ({ limit, offset }) => ({
-      items: ocrEntries.slice(offset, offset + limit),
+    queryOcrHistory: vi.fn(async ({ limit, offset, ids }) => ({
+      items: (ids ? ocrEntries.filter((item) => ids.includes(item.id)) : ocrEntries).slice(offset, offset + limit),
       total: ocrEntries.length,
     })),
     deleteHistory: vi.fn(),
@@ -282,7 +306,6 @@ function createIndexPort({
     items: Array<{
       id: number;
       kind: 'translation' | 'ocr' | 'screenshot';
-      sourceOffset: number;
     }>;
     total: number;
   };
@@ -290,7 +313,6 @@ function createIndexPort({
     items: Array<{
       id: number;
       kind: 'translation' | 'ocr' | 'screenshot';
-      sourceOffset: number;
     }>;
     total: number;
   };
@@ -303,8 +325,8 @@ function createIndexPort({
 
 function createScreenshotFavoritesPort(items: ScreenshotFavoriteItem[]) {
   return {
-    queryScreenshotFavorites: vi.fn(async ({ limit, offset }) => ({
-      items: items.slice(offset, offset + limit),
+    queryScreenshotFavorites: vi.fn(async ({ limit, offset, ids }) => ({
+      items: (ids ? items.filter((item) => ids.includes(item.id)) : items).slice(offset, offset + limit),
       total: items.length,
     })),
     updateScreenshotFavoriteMetadata: vi.fn(),

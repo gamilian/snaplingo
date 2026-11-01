@@ -137,20 +137,12 @@ pub(crate) fn take_capture_result_window_payload_for_runtime(
 pub(crate) async fn open_selection_translation_window_for_state(
     state: &crate::AppState,
 ) -> Result<(), String> {
-    let settings = state
-        .settings
-        .configuration
-        .snapshot()
-        .map_err(|error| error.to_string())?;
-    let snapshot = state
+    state
         .selection
-        .acquirer
-        .acquire_with_mode(crate::application::SelectionTextMode::from_setting(
-            &settings.translation.selection_text_mode,
-        ))
+        .translation
+        .open()
         .await
-        .map_err(|error| error.to_string())?;
-    open_translation_result_window_for_runtime(&state.result_window, snapshot.text).await
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]

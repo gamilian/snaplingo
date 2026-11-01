@@ -5,7 +5,7 @@ import {
   applyOcrTextPreferences,
   normalizeOcrText,
   ocrCopyTokens,
-} from './ocrTextProcessing';
+} from './textProcessing';
 
 it('shares clipboard formatting cases with backend OCR completion', () => {
   const fixtures = JSON.parse(readFileSync(new URL('./ocrTextPreferences.fixtures.json', import.meta.url), 'utf8')) as Array<{
@@ -80,7 +80,7 @@ describe('applyOcrTextPreferences', () => {
 describe('ocrCopyTokens', () => {
   it('compiles for the Safari 15 engine shipped with macOS 12', async () => {
     await expect(transform(
-      readFileSync(new URL('./ocrTextProcessing.ts', import.meta.url), 'utf8'),
+      readFileSync(new URL('./textProcessing.ts', import.meta.url), 'utf8'),
       { loader: 'ts', target: 'safari15', logOverride: { 'unsupported-regexp': 'error' } },
     )).resolves.toBeDefined();
   });

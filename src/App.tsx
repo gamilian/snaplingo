@@ -31,11 +31,9 @@ import {
   initializeProviderStore,
 } from './stores/providerStore';
 import {
-  initializeHistoryStore,
   useHistoryStore,
 } from './stores/historyStore';
 import {
-  initializeScreenshotFavoritesStore,
   useScreenshotFavoritesStore,
 } from './stores/screenshotFavoritesStore';
 import {
@@ -156,9 +154,7 @@ initializeResultWindowStore(resultWindowRuntime);
 initializeSettingsConfigStore(settingsRuntime.configuration.settings);
 initializeHotkeyConfigStore(settingsRuntime.configuration.hotkeys);
 initializeProviderStore(settingsRuntime.configuration.providers);
-initializeHistoryStore(settingsRuntime.history);
 initializeFavoritesStore(settingsRuntime.favorites);
-initializeScreenshotFavoritesStore(settingsRuntime.screenshotFavorites);
 
 const currentWindowLabel = getCurrentWindowLabel();
 const pinnedImageId = readPinnedImageLaunch(window.location.search);

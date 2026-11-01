@@ -40,9 +40,6 @@ impl LibraryIndexRepository for SqliteLibraryIndexRepository {
             let mut statement = connection.prepare(
                 "WITH filtered AS (
                     SELECT r.id, r.kind, r.timestamp,
-                           ROW_NUMBER() OVER (
-                               PARTITION BY r.kind ORDER BY r.timestamp DESC, r.id DESC
-                           ) - 1 AS source_offset,
                            CASE r.kind WHEN 'translation' THEN 0 ELSE 1 END AS source_order
                     FROM history_records r
                     LEFT JOIN translation_history t ON t.history_id = r.id
@@ -51,7 +48,7 @@ impl LibraryIndexRepository for SqliteLibraryIndexRepository {
                        OR (r.kind = 'translation' AND (t.source_text LIKE ?2 OR t.results LIKE ?2))
                        OR (r.kind = 'ocr' AND o.recognized_text LIKE ?2)
                  )
-                 SELECT id, kind, source_offset
+                 SELECT id, kind
                  FROM filtered
                  ORDER BY timestamp DESC, source_order, id DESC
                  LIMIT ?3 OFFSET ?4",
@@ -67,7 +64,6 @@ impl LibraryIndexRepository for SqliteLibraryIndexRepository {
                         Ok(LibraryIndexItem {
                             id: row.get(0)?,
                             kind,
-                            source_offset: row.get::<_, i64>(2)? as usize,
                         })
                     },
                 )?
@@ -102,16 +98,12 @@ impl LibraryIndexRepository for SqliteLibraryIndexRepository {
             let mut statement = connection.prepare(
                 "WITH regular AS (
                     SELECT f.id, f.kind, f.created_at,
-                           ROW_NUMBER() OVER (ORDER BY f.created_at DESC, f.id DESC) - 1
-                               AS source_offset,
                            0 AS source_order
                     FROM favorites f
                     WHERE ?1 = '' OR f.content_json LIKE ?2 OR COALESCE(f.note, '') LIKE ?2
                  ),
                  screenshots AS (
                     SELECT sf.id, 'screenshot' AS kind, sf.created_at,
-                           ROW_NUMBER() OVER (ORDER BY sf.created_at DESC, sf.id DESC) - 1
-                               AS source_offset,
                            1 AS source_order
                     FROM screenshot_favorites sf
                     WHERE ?1 = ''
@@ -127,7 +119,7 @@ impl LibraryIndexRepository for SqliteLibraryIndexRepository {
                     UNION ALL
                     SELECT * FROM screenshots
                  )
-                 SELECT id, kind, source_offset
+                 SELECT id, kind
                  FROM combined
                  ORDER BY created_at DESC, source_order, id DESC
                  LIMIT ?4 OFFSET ?5",
@@ -150,7 +142,6 @@ impl LibraryIndexRepository for SqliteLibraryIndexRepository {
                         Ok(LibraryIndexItem {
                             id: row.get(0)?,
                             kind,
-                            source_offset: row.get::<_, i64>(2)? as usize,
                         })
                     },
                 )?
@@ -214,11 +205,10 @@ mod tests {
         assert_eq!(page.total, 3);
         assert_eq!(page.items.len(), 1);
         assert_eq!(page.items[0].kind, LibraryIndexKind::Translation);
-        assert_eq!(page.items[0].source_offset, 0);
     }
 
     #[tokio::test]
-    async fn history_index_reports_offsets_within_each_source() {
+    async fn history_index_returns_stable_ids_in_global_order() {
         let database = Arc::new(Database::in_memory().unwrap());
         database
             .with_connection(|connection| {
@@ -264,8 +254,6 @@ mod tests {
 
         assert_eq!(page.total, 3);
         assert_eq!(page.items[0].kind, LibraryIndexKind::Ocr);
-        assert_eq!(page.items[0].source_offset, 0);
         assert_eq!(page.items[1].kind, LibraryIndexKind::Translation);
-        assert_eq!(page.items[1].source_offset, 1);
     }
 }

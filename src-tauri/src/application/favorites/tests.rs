@@ -64,6 +64,35 @@ impl FavoriteRepository for FakeRepository {
         })
     }
 
+    async fn matching_keys(&self, keys: &[String]) -> Result<Vec<String>> {
+        let identities = self
+            .records
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(_, record)| match &record.content {
+                FavoriteContent::Translation(s) => serde_json::json!([
+                    "translation",
+                    s.source_text,
+                    s.source_lang,
+                    s.target_lang,
+                    s.result.provider_id,
+                    s.result.translated_text
+                ])
+                .to_string(),
+                FavoriteContent::Ocr(s) => {
+                    serde_json::json!(["ocr", s.recognized_text, s.language, s.provider_used])
+                        .to_string()
+                }
+            })
+            .collect::<Vec<_>>();
+        Ok(keys
+            .iter()
+            .filter(|key| identities.contains(key))
+            .cloned()
+            .collect())
+    }
+
     async fn find(&self, id: i64) -> Result<Option<FavoriteRecord>> {
         Ok(self
             .records
@@ -371,4 +400,111 @@ async fn clearing_history_does_not_remove_an_independent_favorite_snapshot() {
         .unwrap();
     assert_eq!(page.total, 1);
     assert_eq!(page.items[0].source_history_id, Some(history_id));
+}
+
+#[tokio::test]
+async fn library_membership_uses_content_and_never_hydrates_assets() {
+    let database = Arc::new(Database::in_memory().unwrap());
+    let repository = Arc::new(SqliteFavoriteRepository::new(database));
+    let content = FavoriteContent::Ocr(OcrFavoriteSnapshot {
+        image_hash: "different-image".into(),
+        recognized_text: "行一\n\"第二行\"".into(),
+        language: None,
+        provider_used: "system".into(),
+        confidence: Some(0.8),
+        source_asset_path: Some("missing-source.png".into()),
+        thumbnail_asset_path: Some("missing-thumbnail.png".into()),
+    });
+    let record = repository
+        .insert("opaque-fingerprint", None, &content, Utc::now())
+        .await
+        .unwrap();
+    let favorites = Favorites::new(
+        repository,
+        Arc::new(FakeAssets::default()),
+        unlimited_capacity(),
+    );
+    let key = serde_json::json!(["ocr", "行一\n\"第二行\"", null, "system"]).to_string();
+    let other = serde_json::json!(["ocr", "other", null, "system"]).to_string();
+    assert_eq!(
+        favorites
+            .query_keys(vec![key.clone(), other])
+            .await
+            .unwrap(),
+        vec![key]
+    );
+    assert!(favorites
+        .query(FavoriteQuery {
+            ids: Some(vec![record.id]),
+            limit: 20,
+            ..Default::default()
+        })
+        .await
+        .is_err());
+    favorites.delete(record.id).await.unwrap();
+    assert!(favorites
+        .query_keys(vec![serde_json::json!([
+            "ocr",
+            "行一\n\"第二行\"",
+            null,
+            "system"
+        ])
+        .to_string()])
+        .await
+        .unwrap()
+        .is_empty());
+}
+
+#[tokio::test]
+async fn stable_id_query_returns_only_requested_favorites() {
+    let database = Arc::new(Database::in_memory().unwrap());
+    let repository = SqliteFavoriteRepository::new(database);
+    let content = FavoriteContent::Translation(TranslationFavoriteSnapshot {
+        source_text: "hello".into(),
+        source_lang: "en".into(),
+        target_lang: "zh-CN".into(),
+        result: TranslationResult {
+            provider_id: "google".into(),
+            translated_text: "你好".into(),
+            detected_language: None,
+            confidence: None,
+            error: None,
+            request_id: None,
+            duration_ms: None,
+        },
+    });
+    let old = repository
+        .insert("old", None, &content, Utc::now())
+        .await
+        .unwrap();
+    repository
+        .insert("new", None, &content, Utc::now())
+        .await
+        .unwrap();
+    let page = repository
+        .query(&FavoriteQuery {
+            ids: Some(vec![old.id]),
+            limit: 20,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(page.total, 1);
+    assert_eq!(page.items[0].id, old.id);
+    let key =
+        serde_json::json!(["translation", "hello", "en", "zh-CN", "google", "你好"]).to_string();
+    assert_eq!(
+        repository.matching_keys(&[key.clone()]).await.unwrap(),
+        vec![key]
+    );
+    assert!(repository
+        .query(&FavoriteQuery {
+            ids: Some(vec![]),
+            limit: 20,
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .items
+        .is_empty());
 }

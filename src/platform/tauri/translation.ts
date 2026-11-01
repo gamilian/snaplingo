@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { TranslationResult } from '../../types';
+import type { TranslationResult } from '../../domain/translation';
 
 export interface TranslateTextInput {
   text: string;

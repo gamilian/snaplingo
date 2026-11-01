@@ -8,6 +8,9 @@ use crate::domain::{
 use crate::{AppError, Result};
 
 mod method;
+mod translation;
+
+pub(crate) use translation::SelectionTranslation;
 
 pub use method::{SelectionContextProvider, SelectionMethod, SystemSelectionProvider};
 

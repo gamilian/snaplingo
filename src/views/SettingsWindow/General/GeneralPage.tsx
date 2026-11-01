@@ -6,7 +6,7 @@ import { useSettingsStore } from '../../../stores/settingsStore';
 import { SettingRow, SettingsGroup, SettingsToggle } from '../SettingsControls';
 import { SettingsScrollPage } from '../SettingsScrollPage';
 import { useSettingsRuntime } from '../runtimeContext';
-import { uiText } from '../../../application/settings/uiText';
+import { uiText } from '../uiText';
 import { PermissionControls, useRequiredPermissions } from '../../PermissionControls';
 import { SoftwareUpdateSettings } from './SoftwareUpdateSettings';
 import { ThemePicker } from './ThemePicker';
@@ -293,7 +293,7 @@ function MaintenanceSettings() {
           <ActionButton
             onClick={() => {
               if (confirm(t('clearHistoryConfirm'))) {
-                void runtime.history.clear();
+                void runtime.library.clearHistory('all');
               }
             }}
           >

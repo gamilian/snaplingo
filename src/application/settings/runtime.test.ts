@@ -28,57 +28,6 @@ describe('settings runtime', () => {
     );
   });
 
-  it('translates history actions into portable port calls', async () => {
-    const history = {
-      getTranslationHistory: vi.fn(async () => []),
-      getOcrHistory: vi.fn(async () => []),
-      queryTranslationHistory: vi.fn(async () => ({ items: [], total: 0 })),
-      queryOcrHistory: vi.fn(async () => ({ items: [], total: 0 })),
-      deleteHistory: vi.fn(async () => undefined),
-      updateHistoryNote: vi.fn(async () => undefined),
-      replaceHistoryTags: vi.fn(async () => undefined),
-      clearAllHistory: vi.fn(async () => undefined),
-      clearHistory: vi.fn(async () => undefined),
-    };
-    const runtime = createSettingsRuntime(createPorts({ history }));
-
-    await runtime.history.loadTranslation(20, 40);
-    await runtime.history.loadOcr(10, 0);
-    await runtime.history.queryTranslation({
-      search: 'hello',
-      limit: 20,
-      offset: 40,
-    });
-    await runtime.history.queryOcr({
-      search: '',
-      limit: 20,
-      offset: 0,
-    });
-    await runtime.history.deleteEntry(42);
-    await runtime.history.updateNote(42, 'keep this');
-    await runtime.history.replaceTags(42, ['work']);
-    await runtime.history.clear();
-    await runtime.history.clearKind('translation');
-
-    expect(history.getTranslationHistory).toHaveBeenCalledWith(20, 40);
-    expect(history.getOcrHistory).toHaveBeenCalledWith(10, 0);
-    expect(history.queryTranslationHistory).toHaveBeenCalledWith({
-      search: 'hello',
-      limit: 20,
-      offset: 40,
-    });
-    expect(history.queryOcrHistory).toHaveBeenCalledWith({
-      search: '',
-      limit: 20,
-      offset: 0,
-    });
-    expect(history.deleteHistory).toHaveBeenCalledWith(42);
-    expect(history.updateHistoryNote).toHaveBeenCalledWith(42, 'keep this');
-    expect(history.replaceHistoryTags).toHaveBeenCalledWith(42, ['work']);
-    expect(history.clearAllHistory).toHaveBeenCalledTimes(1);
-    expect(history.clearHistory).toHaveBeenCalledWith('translation');
-  });
-
   it('copies Settings text through the clipboard port', async () => {
     const clipboard = { writeText: vi.fn(async () => undefined) };
     const runtime = createSettingsRuntime(createPorts({ clipboard }));
@@ -158,6 +107,7 @@ function createPorts(overrides: Record<string, unknown> = {}) {
       deleteFavorite: vi.fn(),
       rerunOcrFavorite: vi.fn(),
       listFavoriteTags: vi.fn(),
+      queryFavoriteKeys: vi.fn(async () => []),
     },
     screenshotFavorites: {
       queryScreenshotFavorites: vi.fn(),

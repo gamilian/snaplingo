@@ -1,4 +1,4 @@
-import type { TranslationResult } from '../../types';
+import type { TranslationResult } from '../../domain/translation';
 import type { Provider } from '../settings/configuration';
 import type { OcrSettings, TranslationSettings } from '../settings/ports';
 import type { ResultWindowOrigin } from './ports';

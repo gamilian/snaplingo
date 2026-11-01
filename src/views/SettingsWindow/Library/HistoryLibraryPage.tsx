@@ -30,8 +30,8 @@ const filters: LibraryFilter<LibraryHistoryFilter>[] = [
 export function HistoryLibraryPage() {
   const runtime = useSettingsRuntime();
   const revision = useHistoryStore((state) => state.revision);
-  const favoriteKeys = useFavoritesStore((state) => state.keys);
-  const hydrateFavoriteKeys = useFavoritesStore((state) => state.hydrateKeys);
+  const favoriteRevision = useFavoritesStore((state) => state.revision);
+  const [favoriteKeys, setFavoriteKeys] = useState<ReadonlySet<string>>(new Set());
   const addTranslationFavorite = useFavoritesStore((state) => state.addTranslation);
   const addOcrFavorite = useFavoritesStore((state) => state.addOcr);
   const [filter, setFilter] = useState<LibraryHistoryFilter>('all');
@@ -44,13 +44,6 @@ export function HistoryLibraryPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    void Promise.all([
-      hydrateFavoriteKeys('translation'),
-      hydrateFavoriteKeys('ocr'),
-    ]);
-  }, [hydrateFavoriteKeys]);
-
-  useEffect(() => {
     let cancelled = false;
     setLoading(true);
     void runtime.library
@@ -58,6 +51,7 @@ export function HistoryLibraryPage() {
       .then((result) => {
         if (cancelled) return;
         setItems(result.items);
+        setFavoriteKeys(result.favoriteKeys);
         setTotal(result.total);
         setSelectedKey((current) =>
           result.items.some((item) => item.key === current)
@@ -72,7 +66,7 @@ export function HistoryLibraryPage() {
     return () => {
       cancelled = true;
     };
-  }, [filter, page, refresh, revision, runtime, search]);
+  }, [favoriteRevision, filter, page, refresh, revision, runtime, search]);
 
   const selected = useMemo(
     () => items.find((item) => item.key === selectedKey) ?? null,
@@ -206,7 +200,7 @@ function TranslationHistoryDetail({
   onFavorite,
 }: {
   item: Extract<HistoryLibraryItem, { kind: 'translation' }>;
-  favoriteKeys: Set<string>;
+  favoriteKeys: ReadonlySet<string>;
   onCopy: (text: string) => void;
   onDelete: () => void;
   onFavorite: (input: {

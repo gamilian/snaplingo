@@ -5,7 +5,7 @@ import {
   getTranslationLanguageSelectLabel,
   resolveTranslationRequestLanguages,
   swapTranslationLanguagePair,
-} from '../application/translation/languages';
+} from './languages';
 
 describe('translation language resolution', () => {
   it('uses Chinese-first bilingual labels in the selector', () => {

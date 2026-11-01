@@ -56,6 +56,22 @@ The selection surface displays the same frozen monitor images used by preview, m
 
 On macOS, the session pins the selection window and frontend monitor view to the display under the pointer before capture begins. A spanning NSWindow is clipped to one display when displays have separate Spaces; the session retains all monitor layouts for native cursor coordinates and output.
 
+### File OCR
+
+The workflow that reads one image file, uses those same bytes for both OCR input and its preview, and returns recognition metadata. File access is supplied by an adapter; Provider selection and execution remain with the OCR Coordinator.
+
+### Selection Translation
+
+The workflow that reads the current selection-text mode, acquires selected text, and presents it in the Result Window with Selection origin and automatic translation. Hotkey and IPC entry points share the same sequencing; failed acquisition leaves the current result intact.
+
+### Capture OCR Delivery
+
+The handoff of a Capture Session OCR result to the OCR window, translation window, or clipboard. Window handoffs reserve a Result Window request identity; a newer request supersedes older results and errors. Clipboard delivery does not replace a pending Result Window request.
+
+### Capture Editing
+
+The editing state within a Capture Session: selection geometry, annotation gestures, selected annotations, text drafts, styles, and undo/redo history. Pointer, keyboard, and toolbar intents share its state transitions. An edit commit publishes a consistent snapshot; Capture Session loading, cancellation, and output remain separate workflows.
+
 ### Result Window and Pinned Image
 
 Application runtimes that own their workflows and request runtime-host effects. Result Window owns one read-only View-facing state projection, editable text and language intents, translation/OCR favorite sequencing, OCR Provider fallback, and clipboard intents. Their Tauri window, clipboard, and notification mechanics remain in Infrastructure.
@@ -79,6 +95,8 @@ The History module turns Application events into stored records and serves histo
 ### Library
 
 The Library is the Settings Window's unified browsing surface for History and Favorites across screenshot, translation, and OCR content. Its frontend Application module owns cross-source filtering, ordering, pagination, and mutation sequencing; Views own rendering and local interaction state. A backend Library Index port performs lightweight global ordering before the frontend loads only the final page's source records and thumbnails.
+
+Library hydrates the selected records by stable ID rather than source offsets. Its history-page projection includes favorite membership for only the visible content identities, without loading all Favorite records or thumbnails.
 
 History and Favorites remain separate backend Application modules with independent persistence and mutation rules. The read-only Library Index combines ordering metadata without merging their storage models.
 

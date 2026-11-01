@@ -36,6 +36,7 @@ pub struct NewScreenshotFavorite {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ScreenshotFavoriteQuery {
+    pub ids: Option<Vec<i64>>,
     pub search: Option<String>,
     pub limit: usize,
     pub offset: usize,

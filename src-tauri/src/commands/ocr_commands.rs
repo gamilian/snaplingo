@@ -1,7 +1,6 @@
 use crate::application::providers::common::CredentialField;
 use crate::application::providers::OcrProviderInfo;
 use crate::domain::ocr::{OcrRequest, OcrResult};
-use base64::Engine;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tauri::State;
@@ -49,23 +48,14 @@ pub async fn recognize_image_file(
     language: Option<String>,
     state: State<'_, crate::AppState>,
 ) -> Result<RecognizeImageFileResult, String> {
-    let image_data = std::fs::read(path).map_err(|e| e.to_string())?;
-    let image_data_url = format!(
-        "data:{};base64,{}",
-        image_mime_type(&image_data),
-        base64::engine::general_purpose::STANDARD.encode(&image_data)
-    );
-    let ocr_request = OcrRequest {
-        image_data,
-        language,
-    };
-
-    let result = state
+    let output = state
         .providers
-        .ocr
-        .recognize(&ocr_request)
+        .file_ocr
+        .recognize(&path, language)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|error| error.to_string())?;
+    let result = output.result;
+    let image_data_url = output.image_data_url;
 
     Ok(RecognizeImageFileResult {
         text: result.text,
@@ -75,16 +65,6 @@ pub async fn recognize_image_file(
         detected_language: result.detected_language,
         provider_id: result.provider_id,
     })
-}
-
-fn image_mime_type(image_data: &[u8]) -> &'static str {
-    match image::guess_format(image_data) {
-        Ok(image::ImageFormat::Jpeg) => "image/jpeg",
-        Ok(image::ImageFormat::WebP) => "image/webp",
-        Ok(image::ImageFormat::Bmp) => "image/bmp",
-        Ok(image::ImageFormat::Tiff) => "image/tiff",
-        _ => "image/png",
-    }
 }
 
 #[tauri::command]

@@ -128,6 +128,19 @@ pub async fn query_favorites(
 }
 
 #[tauri::command]
+pub async fn query_favorite_keys(
+    keys: Vec<String>,
+    state: State<'_, AppState>,
+) -> Result<Vec<String>, String> {
+    state
+        .favorites
+        .favorites
+        .query_keys(keys)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 pub async fn update_favorite_metadata(
     id: i64,
     note: Option<String>,

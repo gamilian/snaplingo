@@ -345,6 +345,7 @@ export type HistoryEntry =
 export type HistoryKind = 'translation' | 'ocr';
 
 export interface HistoryQuery {
+  ids?: number[];
   search: string;
   tag?: string;
   limit: number;
@@ -357,6 +358,7 @@ export interface HistoryPage<T> {
 }
 
 export interface ScreenshotFavoriteQuery {
+  ids?: number[];
   search: string;
   limit: number;
   offset: number;
@@ -383,7 +385,6 @@ export type LibraryIndexKind = 'translation' | 'ocr' | 'screenshot';
 export interface LibraryIndexItem {
   id: number;
   kind: LibraryIndexKind;
-  sourceOffset: number;
 }
 
 export interface LibraryIndexQuery {
@@ -471,6 +472,7 @@ export interface OcrFavoriteItem {
 export type FavoriteItem = TranslationFavoriteItem | OcrFavoriteItem;
 
 export interface FavoriteQuery {
+  ids?: number[];
   kind?: FavoriteKind;
   search?: string;
   tag?: string;
@@ -487,6 +489,7 @@ export interface SettingsFavoritesPort {
   addTranslationFavorite(input: TranslationFavoriteInput): Promise<number>;
   addOcrFavorite(input: OcrFavoriteInput): Promise<number>;
   queryFavorites(query: FavoriteQuery): Promise<FavoritePage>;
+  queryFavoriteKeys(keys: string[]): Promise<string[]>;
   updateFavoriteMetadata(
     id: number,
     note: string | null,

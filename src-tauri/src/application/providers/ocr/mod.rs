@@ -1,5 +1,6 @@
 mod configuration;
 mod coordinator;
+mod file_input;
 pub mod impls;
 mod system_engine;
 #[cfg(any(
@@ -14,6 +15,7 @@ mod coordinator_test;
 
 pub use configuration::OcrProviderConfiguration;
 pub use coordinator::OcrCoordinator;
+pub(crate) use file_input::{FileOcr, ImageFileReader};
 pub(crate) use system_engine::SystemOcrEngine;
 #[cfg(any(
     target_os = "linux",

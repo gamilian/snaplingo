@@ -1,83 +1,81 @@
 # SnapLingo
 
-A cross-platform screenshot, OCR, and translation tool.
+A cross-platform screenshot, OCR, and translation desktop application built with Tauri 2, React, TypeScript, and Rust.
 
 ## Features
 
-- 📸 **Screenshot Capture** - Snipaste-level editing tools (annotations, shapes, text, blur)
-- 🔍 **OCR** - Extract text from images with multiple engine support
-- 🌐 **Translation** - Multi-provider translation with side-by-side comparison
-- ⌨️ **Global Hotkeys** - Quick access from anywhere
-- 🎯 **Selection Translation** - Translate selected text instantly
-- 🔒 **Privacy-First** - Local OCR options, BYOK (bring your own API key)
+- Screenshot capture and editing: annotations, shapes, text, mosaic, and blur.
+- Local and remote OCR Providers.
+- Multiple Translation Providers with side-by-side results and custom LLM configuration.
+- Global hotkeys, selected-text translation, and pinned images.
+- History and Favorites in one Library browsing surface.
 
-## Tech Stack
+See [Features](docs/FEATURES.md) for current behavior and [Product specifications](docs/prd/README.md) for scope and design references.
 
-- **Framework**: Tauri 2.0
-- **Frontend**: React + TypeScript + TailwindCSS
-- **Backend**: Rust
-- **Build Tool**: Vite
+## Platform support
 
-## Project Structure
+| Target | Implementation and verification | Official release packages |
+| --- | --- | --- |
+| macOS 12+ / Apple Silicon and Intel | Native capture, selection, Vision OCR, and speech; CI builds both architectures. Minimum-version compatibility still requires manual acceptance. | DMG |
+| Windows 10/11 x64 | Native capture, selection, system OCR, and speech; CI verifies NSIS/MSI installation on Windows Server. Desktop acceptance remains part of release verification. | NSIS EXE and MSI |
+| Linux | XCap capture, shortcut-copy selection, and Tesseract OCR; Ubuntu CI tests and builds packages. X11/Wayland environments require manual acceptance. System speech and installer-based updates are not implemented. | Not in the official release matrix |
 
+macOS releases use a persistent self-signed identity. Ordinary CI uses ad-hoc signing. See [Releasing](docs/RELEASING.md) for installation, permissions, signing, and acceptance checks.
+
+## Project structure
+
+```text
+src/
+  domain/                  Portable data and domain vocabulary
+  application/             Workflows, state transitions, and their ports
+  platform/tauri/           Typed IPC, events, and window adapters
+  views/                   Window rendering and browser mechanics
+  components/common/       Shared UI
+  stores/                  Application projections and invalidation signals
+  styles/                  Shared styles and themes
+src-tauri/src/
+  domain/                  Portable Rust domain types
+  application/             Capture, OCR, translation, settings, and Library workflows
+  infrastructure/          OS, Tauri, SQLite, HTTP, and native-library adapters
+  commands/                IPC conversion and Application calls
+  composition/             Concrete adapter selection and runtime assembly
+docs/
+  adr/                     Accepted architectural decisions
+  architecture/            Current runtime and ownership maps
+  prd/                     Product specifications index
+  releases/                Versioned release notes
+  archive/                 Historical PRDs and completed architecture work
+designs/                   Visual explorations and archived prototypes
+script/                    Development and release verification
 ```
-snaplingo/
-├── src/                    # React frontend
-│   ├── components/         # UI components
-│   ├── hooks/             # React hooks
-│   ├── stores/            # Zustand stores
-│   └── tauri/             # Frontend Tauri Adapter seam
-├── src-tauri/             # Rust backend
-│   └── src/               # Tauri commands, application, domain, infrastructure
-├── docs/                  # Documentation
-│   ├── architecture/      # Runtime maps
-│   └── adr/              # Architecture Decision Records
-├── ARCHITECTURE.md        # Current architecture overview
-├── CONTEXT.md            # Domain language and design decisions
-└── SnapLingo-PRD.md      # Product Requirements Document
 
-```
+Frontend tests live beside the behavior they verify. Rust integration tests live in `src-tauri/tests/`. See [Architecture](ARCHITECTURE.md) and [Domain language](CONTEXT.md) for dependency and ownership rules.
 
 ## Development
 
-### Prerequisites
-
-- Node.js 18+
-- Rust 1.70+
-- Platform-specific dependencies:
-  - **macOS**: Xcode Command Line Tools
-  - **Linux**: `libgtk-3-dev`, `libwebkit2gtk-4.0-dev`, `libayatana-appindicator3-dev`
-  - **Windows**: WebView2 Runtime
-
-### Setup
+Use Node.js 22 and a current stable Rust toolchain. Install the native desktop dependencies for your platform as described in [Contributing](CONTRIBUTING.md).
 
 ```bash
-# Install dependencies
-npm install
-
-# Start development server
-npm run tauri dev
-
-# Build for production
-npm run tauri:build
+npm ci
+npm run tauri:dev
 ```
 
-## Desktop releases
+Run frontend verification and the Rust suite:
 
-Windows packages are built and tested on GitHub Actions. macOS packages use ad-hoc signing for the zero-cost beta workflow, so Gatekeeper may require manual approval and screen recording permission may need to be granted again after an update. See [the zero-cost release and setup guide](docs/RELEASING.md) for downloadable artifacts, release tags, and optional free Windows signing applications.
+```bash
+npm test
+npm run build
+cargo fmt --manifest-path src-tauri/Cargo.toml --check
+cargo test --locked --manifest-path src-tauri/Cargo.toml
+cargo check --locked --manifest-path src-tauri/Cargo.toml --all-targets
+```
 
-## Documentation
-
-- **[CONTEXT.md](./CONTEXT.md)** - Core concepts and domain language
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Current architecture overview
-- **[docs/architecture/runtime-map.md](./docs/architecture/runtime-map.md)** - Runtime map
-- **[SnapLingo-PRD.md](./SnapLingo-PRD.md)** - Product requirements and specifications
-- **[docs/adr/](./docs/adr/)** - Architecture decisions
-
-## License
-
-TBD (MIT or Apache 2.0)
+Build and verify native desktop bundles with `npm run tauri:build`. See [Build scripts](script/README.md) and [Releasing](docs/RELEASING.md) for details.
 
 ## Contributing
 
-Contributions welcome! Please read our contributing guide (coming soon).
+Read [Contributing](CONTRIBUTING.md) before opening a pull request. Include the problem, resulting behavior, and relevant verification. Current architecture references are [ARCHITECTURE.md](ARCHITECTURE.md), [CONTEXT.md](CONTEXT.md), and [ADRs](docs/adr/).
+
+## License
+
+[MIT](LICENSE). Bundled third-party assets retain their own license notices, including [Noto Sans](src-tauri/assets/fonts/LICENSE-NotoSans.txt).

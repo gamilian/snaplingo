@@ -13,17 +13,6 @@ import {
 } from "./capturePresentation";
 
 describe("capture presentation", () => {
-  it("keeps the default document canvas transparent before the app mounts", () => {
-    const css = readFileSync(
-      new URL("../../index.css", import.meta.url),
-      "utf8",
-    );
-
-    expect(css).toMatch(
-      /html,\s*body,\s*#root\s*{[^}]*background:\s*transparent/s,
-    );
-  });
-
   it("keeps the capture html shell transparent before React renders", () => {
     const html = readFileSync(
       new URL("../../../index.html", import.meta.url),

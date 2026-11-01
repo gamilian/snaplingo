@@ -39,8 +39,7 @@ import {
 } from './capturePreviewPresentation';
 import { CaptureSelectionOverlayCanvas } from './captureSelectionOverlayRuntime';
 import { createCapturePointerFrameDispatcher } from './capturePointerFrame';
-import { getCaptureWorkspacePointerPoint } from '../../application/capture-workspace/captureWorkspacePointer';
-import { getMonitorViewportRect } from '../../application/capture-workspace/virtualDesktop';
+import { getMonitorViewportRect, viewportPointToVirtualPoint } from '../../application/capture-workspace/virtualDesktop';
 import { getCaptureOutputPixelSize } from './captureSelectionOverlay';
 import type {
   ColorSample,
@@ -242,7 +241,7 @@ export function dispatchCaptureWorkspacePreviewPointerDown({
 
   captureWorkspacePointer(event);
   const handled = pointerDown({
-    point: getCaptureWorkspacePointerPoint(event, selectionBounds),
+    point: viewportPointToVirtualPoint({ x: event.clientX, y: event.clientY }, selectionBounds),
     button: event.button,
     detail: event.detail,
     metaKey: event.metaKey,
@@ -276,7 +275,7 @@ export function dispatchCaptureWorkspaceResizePointerDown({
 
   captureWorkspacePointer(event);
   const handled = resizePointerDown(handle, {
-    point: getCaptureWorkspacePointerPoint(event, selectionBounds),
+    point: viewportPointToVirtualPoint({ x: event.clientX, y: event.clientY }, selectionBounds),
     button: event.button,
     shiftKey: event.shiftKey,
     source: 'preview',
@@ -328,10 +327,7 @@ export function CaptureWorkspaceView({
     }
     captureWorkspacePointer(event);
     const handled = actions.pointerDown({
-      point: getCaptureWorkspacePointerPoint(
-        event,
-        renderState.selectionBounds,
-      ),
+      point: viewportPointToVirtualPoint({ x: event.clientX, y: event.clientY }, renderState.selectionBounds),
       button: event.button,
       detail: event.detail,
       metaKey: event.metaKey,
@@ -351,10 +347,7 @@ export function CaptureWorkspaceView({
         ? coalescedEvents
         : [event]) {
         actions.pointerMove({
-          point: getCaptureWorkspacePointerPoint(
-            moveEvent,
-            renderState.selectionBounds,
-          ),
+          point: viewportPointToVirtualPoint({ x: moveEvent.clientX, y: moveEvent.clientY }, renderState.selectionBounds),
           button: event.button,
           shiftKey: event.shiftKey,
           source: 'root',
@@ -364,10 +357,7 @@ export function CaptureWorkspaceView({
     }
     const latestEvent = coalescedEvents[coalescedEvents.length - 1] ?? event;
     pointerFrame.schedule({
-      point: getCaptureWorkspacePointerPoint(
-        latestEvent,
-        renderState.selectionBounds,
-      ),
+      point: viewportPointToVirtualPoint({ x: latestEvent.clientX, y: latestEvent.clientY }, renderState.selectionBounds),
       button: event.button,
       shiftKey: event.shiftKey,
       source: 'root',
@@ -381,7 +371,7 @@ export function CaptureWorkspaceView({
       pointerFrame.cancel();
     }
     void actions.pointerUp({
-      point: getCaptureWorkspacePointerPoint(event, renderState.selectionBounds),
+      point: viewportPointToVirtualPoint({ x: event.clientX, y: event.clientY }, renderState.selectionBounds),
       button: event.button,
       detail: event.detail,
       metaKey: event.metaKey,

@@ -18,7 +18,6 @@ pub enum LibraryIndexKind {
 pub struct LibraryIndexItem {
     pub id: i64,
     pub kind: LibraryIndexKind,
-    pub source_offset: usize,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]

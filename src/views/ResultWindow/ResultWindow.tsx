@@ -18,9 +18,9 @@ import {
 import TranslationCard from './TranslationCard';
 import { CustomSelect } from '../../components/common/CustomSelect';
 import { getTranslationProviderDisplayName } from './translationProviderDisplayName';
-import IconActionButton from './IconActionButton';
+import IconActionButton from '../../components/common/IconActionButton';
 import ResultWindowScrollArea from './ResultWindowScrollArea';
-import { ocrCopyTokens } from '../../utils/ocrTextProcessing';
+import { ocrCopyTokens } from '../../application/ocr/textProcessing';
 import {
   resultWindowContentClassName,
   resultWindowAdaptiveTextStyle,

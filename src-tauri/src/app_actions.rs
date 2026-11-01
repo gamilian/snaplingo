@@ -1,5 +1,5 @@
 use crate::application::result_window::{ResultWindowOpenRequest, ResultWindowRuntime};
-use crate::application::{SelectionTextMode, SystemPermission};
+use crate::application::SystemPermission;
 use crate::{commands, settings_window, AppState};
 use tauri::Manager;
 
@@ -72,28 +72,7 @@ pub(crate) fn dispatch_app_action(app: tauri::AppHandle, action: AppAction) {
         AppAction::TranslateSelection => {
             tauri::async_runtime::spawn(async move {
                 let state = app.state::<AppState>();
-                let mode = match state.settings.configuration.snapshot() {
-                    Ok(settings) => {
-                        SelectionTextMode::from_setting(&settings.translation.selection_text_mode)
-                    }
-                    Err(err) => {
-                        log::error!("Failed to load selection translation settings: {}", err);
-                        return;
-                    }
-                };
-                let snapshot = match state.selection.acquirer.acquire_with_mode(mode).await {
-                    Ok(snapshot) => snapshot,
-                    Err(err) => {
-                        log::error!("Failed to acquire selected text: {}", err);
-                        return;
-                    }
-                };
-                if let Err(err) = open_result_window_request(
-                    &state.result_window,
-                    ResultWindowOpenRequest::selection_translation(snapshot.text),
-                )
-                .await
-                {
+                if let Err(err) = state.selection.translation.open().await {
                     log::error!("Failed to open selection translation window: {}", err);
                 }
             });

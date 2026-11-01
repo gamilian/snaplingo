@@ -69,6 +69,7 @@ pub enum HistoryEntry {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct HistoryQuery {
+    pub ids: Option<Vec<i64>>,
     pub search: Option<String>,
     pub tag: Option<String>,
     pub limit: usize,

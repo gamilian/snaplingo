@@ -1,3 +1,4 @@
+import { ocrFavoriteKey, translationFavoriteKey } from '../favorites/identity';
 import type {
   FavoriteItem,
   FavoriteKind,
@@ -54,10 +55,14 @@ export interface LibraryPage<Item> {
   total: number;
 }
 
+export interface HistoryLibraryPage extends LibraryPage<HistoryLibraryItem> {
+  favoriteKeys: ReadonlySet<string>;
+}
+
 export interface SettingsLibrary {
   queryHistory(
     request: LibraryPageRequest<LibraryHistoryFilter>,
-  ): Promise<LibraryPage<HistoryLibraryItem>>;
+  ): Promise<HistoryLibraryPage>;
   queryFavorites(
     request: LibraryPageRequest<LibraryFavoritesFilter>,
   ): Promise<LibraryPage<FavoriteLibraryItem>>;
@@ -80,6 +85,35 @@ export function createSettingsLibrary(ports: {
   index: SettingsLibraryIndexPort;
   clipboard: SettingsClipboardPort;
 }): SettingsLibrary {
+  const withFavoriteKeys = async (
+    page: LibraryPage<HistoryLibraryItem>,
+  ): Promise<HistoryLibraryPage> => {
+    const keys = page.items.flatMap((item) =>
+      item.kind === 'ocr'
+        ? [
+            ocrFavoriteKey({
+              recognizedText: item.entry.recognizedText,
+              language: item.entry.language,
+              providerUsed: item.entry.providerUsed,
+            }),
+          ]
+        : item.entry.results.map((result) =>
+            translationFavoriteKey({
+              sourceText: item.entry.sourceText,
+              sourceLang: item.entry.sourceLang,
+              targetLang: item.entry.targetLang,
+              providerId: result.providerId,
+              translatedText: result.translatedText,
+            }),
+          ),
+    );
+    return {
+      ...page,
+      favoriteKeys: new Set(
+        keys.length ? await ports.favorites.queryFavoriteKeys(keys) : [],
+      ),
+    };
+  };
   return {
     async queryHistory(request) {
       const offset = request.page * request.pageSize;
@@ -91,17 +125,17 @@ export function createSettingsLibrary(ports: {
 
       if (request.filter === 'translation') {
         const page = await ports.history.queryTranslationHistory(query);
-        return {
+        return withFavoriteKeys({
           total: page.total,
           items: page.items.map(toTranslationHistoryItem),
-        };
+        });
       }
       if (request.filter === 'ocr') {
         const page = await ports.history.queryOcrHistory(query);
-        return {
+        return withFavoriteKeys({
           total: page.total,
           items: page.items.map(toOcrHistoryItem),
-        };
+        });
       }
 
       const index = await ports.index.queryHistoryIndex({
@@ -114,12 +148,12 @@ export function createSettingsLibrary(ports: {
       );
       const ocrRefs = index.items.filter((item) => item.kind === 'ocr');
       const [translations, ocr] = await Promise.all([
-        queryHistorySource(
+        loadIndexedItems(
           translationRefs,
           request.search,
           ports.history.queryTranslationHistory,
         ),
-        queryHistorySource(
+        loadIndexedItems(
           ocrRefs,
           request.search,
           ports.history.queryOcrHistory,
@@ -129,10 +163,10 @@ export function createSettingsLibrary(ports: {
         ...translations.map(toTranslationHistoryItem),
         ...ocr.map(toOcrHistoryItem),
       ];
-      return {
+      return withFavoriteKeys({
         total: index.total,
         items: orderByIndex(index.items, items),
-      };
+      });
     },
 
     async queryFavorites(request) {
@@ -174,11 +208,15 @@ export function createSettingsLibrary(ports: {
         (item) => item.kind === 'screenshot',
       );
       const [favorites, screenshots] = await Promise.all([
-        queryFavoriteSource(favoriteRefs, request.search, ports.favorites),
-        queryScreenshotSource(
+        loadIndexedItems(
+          favoriteRefs,
+          request.search,
+          ports.favorites.queryFavorites,
+        ),
+        loadIndexedItems(
           screenshotRefs,
           request.search,
-          ports.screenshotFavorites,
+          ports.screenshotFavorites.queryScreenshotFavorites,
         ),
       ]);
       const items = [
@@ -224,76 +262,25 @@ export function createSettingsLibrary(ports: {
   };
 }
 
-async function queryHistorySource<T>(
-  refs: Array<{ id: number; sourceOffset: number }>,
+async function loadIndexedItems<T extends { id: number }>(
+  refs: Array<{ id: number }>,
   search: string,
   query: (input: {
     search: string;
+    ids: number[];
     limit: number;
     offset: number;
   }) => Promise<{ items: T[]; total: number }>,
 ): Promise<T[]> {
-  if (refs.length === 0) return [];
-  const ids = new Set(refs.map((ref) => ref.id));
-  const initial = await query({
-    search,
-    limit: refs.length,
-    offset: refs[0].sourceOffset,
-  });
-  const matched = initial.items.filter((item) =>
-    ids.has((item as { id: number }).id),
-  );
-  if (matched.length === refs.length) return matched;
-  const page = await query({
-    search,
-    limit: initial.total,
-    offset: 0,
-  });
-  return page.items.filter((item) => ids.has((item as { id: number }).id));
-}
-
-async function queryFavoriteSource(
-  refs: Array<{ id: number; sourceOffset: number }>,
-  search: string,
-  port: SettingsFavoritesPort,
-): Promise<FavoriteItem[]> {
-  if (refs.length === 0) return [];
-  const ids = new Set(refs.map((ref) => ref.id));
-  const initial = await port.queryFavorites({
-    search,
-    limit: refs.length,
-    offset: refs[0].sourceOffset,
-  });
-  const matched = initial.items.filter((item) => ids.has(item.id));
-  if (matched.length === refs.length) return matched;
-  const page = await port.queryFavorites({
-    search,
-    limit: initial.total,
-    offset: 0,
-  });
-  return page.items.filter((item) => ids.has(item.id));
-}
-
-async function queryScreenshotSource(
-  refs: Array<{ id: number; sourceOffset: number }>,
-  search: string,
-  port: SettingsScreenshotFavoritesPort,
-): Promise<ScreenshotFavoriteItem[]> {
-  if (refs.length === 0) return [];
-  const ids = new Set(refs.map((ref) => ref.id));
-  const initial = await port.queryScreenshotFavorites({
-    search,
-    limit: refs.length,
-    offset: refs[0].sourceOffset,
-  });
-  const matched = initial.items.filter((item) => ids.has(item.id));
-  if (matched.length === refs.length) return matched;
-  const page = await port.queryScreenshotFavorites({
-    search,
-    limit: initial.total,
-    offset: 0,
-  });
-  return page.items.filter((item) => ids.has(item.id));
+  if (!refs.length) return [];
+  return (
+    await query({
+      search,
+      ids: refs.map((ref) => ref.id),
+      limit: refs.length,
+      offset: 0,
+    })
+  ).items;
 }
 
 function orderByIndex<T extends { key: string }>(
@@ -301,11 +288,9 @@ function orderByIndex<T extends { key: string }>(
   items: T[],
 ): T[] {
   const byKey = new Map(items.map((item) => [item.key, item]));
-  return index.map((entry) => {
-    const key = `${entry.kind}:${entry.id}`;
-    const item = byKey.get(key);
-    if (!item) throw new Error(`Library index item ${key} was not loaded`);
-    return item;
+  return index.flatMap((entry) => {
+    const item = byKey.get(`${entry.kind}:${entry.id}`);
+    return item ? [item] : [];
   });
 }
 
