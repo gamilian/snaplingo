@@ -146,7 +146,7 @@ describe('Windows portable packaging', () => {
           join(extracted, 'SnapLingo_0.2.0/ocr/medium_rec.onnx'),
           'utf8',
         ),
-      ).toBe('medium_rec.onnx');
+      ).toBe('src-tauri/resources/ocr/medium_rec.onnx');
       expect(
         existsSync(join(context.bundleDirectory, 'portable/SnapLingo_0.2.0')),
       ).toBe(false);
