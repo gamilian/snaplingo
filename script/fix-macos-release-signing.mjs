@@ -7,6 +7,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -513,6 +514,10 @@ function detachExistingDmgAttachments(dmgPath) {
 function recreateDmg(dmgPath) {
   const stagingDir = mkdtempSync(join(tmpdir(), "snaplingo-dmg-"));
   const stagedAppPath = join(stagingDir, `${productName}.app`);
+  const stagedDmgPath = join(
+    dirname(dmgPath),
+    `.snaplingo-${randomBytes(8).toString("hex")}.dmg`,
+  );
 
   try {
     cpSync(appPath, stagedAppPath, {
@@ -529,38 +534,41 @@ function recreateDmg(dmgPath) {
       productName,
       "-srcfolder",
       stagingDir,
-      "-ov",
       "-format",
       "UDZO",
-      dmgPath,
+      stagedDmgPath,
     ]);
 
-    const attachOutput = retryDiskImageAttach(
-      () => run("/usr/bin/hdiutil", ["attach", dmgPath, "-nobrowse", "-readonly"]),
-      (attempt) => {
-        console.warn(
-          `[macos-sign] Could not mount ${dmgPath} for verification (attempt ${attempt}/3); retrying.`,
-        );
-        detachExistingDmgAttachments(dmgPath);
-        run("/bin/sleep", [String(attempt)]);
-      },
-    );
-    const mountPoint = attachOutput
-      .split("\n")
-      .map((line) => line.split(/\t+/).at(-1)?.trim())
-      .find((part) => part?.startsWith("/Volumes/"));
-
-    if (!mountPoint) {
-      throw new Error(`[macos-sign] Failed to find mounted volume for ${dmgPath}.`);
-    }
-
     try {
+      const attachOutput = retryDiskImageAttach(
+        () => run("/usr/bin/hdiutil", ["attach", stagedDmgPath, "-nobrowse", "-readonly"]),
+        (attempt) => {
+          console.warn(
+            `[macos-sign] Could not mount ${stagedDmgPath} for verification (attempt ${attempt}/3); retrying.`,
+          );
+          detachExistingDmgAttachments(stagedDmgPath);
+          run("/bin/sleep", [String(attempt)]);
+        },
+      );
+      const mountPoint = attachOutput
+        .split("\n")
+        .map((line) => line.split(/\t+/).at(-1)?.trim())
+        .find((part) => part?.startsWith("/Volumes/"));
+
+      if (!mountPoint) {
+        throw new Error(`[macos-sign] Failed to find mounted volume for ${stagedDmgPath}.`);
+      }
+
       verifyAppSignature(join(mountPoint, `${productName}.app`));
     } finally {
-      run("/usr/bin/hdiutil", ["detach", mountPoint]);
+      detachExistingDmgAttachments(stagedDmgPath);
     }
+
+    detachExistingDmgAttachments(dmgPath);
+    renameSync(stagedDmgPath, dmgPath);
   } finally {
     rmSync(stagingDir, { recursive: true, force: true });
+    rmSync(stagedDmgPath, { force: true });
   }
 }
 
