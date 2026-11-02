@@ -178,6 +178,11 @@ pub fn hide_capture_window(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+pub(crate) fn yield_capture_window_focus() {
+    #[cfg(target_os = "macos")]
+    super::macos::restore_capture_window_activation();
+}
+
 pub fn set_capture_window_cursor_passthrough(app: &AppHandle, enabled: bool) -> Result<(), String> {
     #[cfg(not(target_os = "windows"))]
     {

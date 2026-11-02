@@ -12,6 +12,7 @@ import {
   clearAnnotationHistory,
   redoAnnotationHistory,
   removeAnnotationFromHistory,
+  replaceAnnotationInHistory,
   undoAnnotationHistory,
 } from './annotationHistory';
 import {
@@ -48,6 +49,7 @@ import {
   planCaptureAnnotationMoveCommit,
   planCaptureAnnotationToolStart,
   planCaptureExistingAnnotationPointerDown,
+  deriveCaptureEditorToolbarState,
   planCaptureSelectedAnnotationKeyboardNudge,
 } from './captureEditorRuntime';
 import { getCaptureWorkspaceDerivedState } from './captureWorkspaceDerived';
@@ -70,6 +72,9 @@ import {
   updateTextAnnotationDraft,
 } from './textAnnotationDraft';
 import type { SelectionHandle } from './selection';
+import type { AnnotationHandle } from './annotationGeometry';
+import { hitTestAnnotations } from './annotationGeometry';
+import { annotationShortcutBindings, normalizeEditorShortcutKey } from './annotationShortcuts';
 import type { CaptureWorkspaceState } from './captureWorkspaceState';
 import type {
   CaptureWorkspaceKeyInput,
@@ -83,10 +88,10 @@ import {
   isColorSampleFormatToggleShortcut,
 } from '../image-inspection/colorSampler';
 
-const MIN_SELECTION_SIZE = 10;
+const MIN_SELECTION_SIZE = 2;
 const EDGE_SNAP_THRESHOLD = 6;
 const KEYBOARD_NUDGE_STEP = 1;
-const KEYBOARD_FAST_NUDGE_STEP = 10;
+const KEYBOARD_FAST_NUDGE_STEP = 5;
 const ARROW_KEYS: ArrowKey[] = [
   'ArrowUp',
   'ArrowRight',
@@ -106,6 +111,7 @@ interface EditorPointerInput {
   stopPropagation(): void;
 }
 interface EditorWheelInput {
+  point?: Point;
   deltaY: number;
   metaKey: boolean;
   ctrlKey: boolean;
@@ -121,6 +127,7 @@ export function createCaptureEditing({
   cancelSession,
   copyText,
   annotationColorPresets,
+  annotationToolShortcuts,
 }: {
   read: () => CaptureWorkspaceState;
   update: (next: Partial<CaptureWorkspaceState>) => void;
@@ -133,6 +140,7 @@ export function createCaptureEditing({
   cancelSession: () => void;
   copyText: (text: string) => Promise<void>;
   annotationColorPresets?: () => readonly AnnotationColor[];
+  annotationToolShortcuts?: () => Readonly<Record<string, string>> | undefined;
 }) {
   const patch = update;
   const keyboardCursor = { current: null as Point | null };
@@ -200,14 +208,25 @@ export function createCaptureEditing({
     });
   };
 
-  const adjustAnnotationSize = (direction: AnnotationSizeDirection) => {
-    if (read().textDraft) return;
+  const adjustAnnotationSize = (direction: AnnotationSizeDirection, targetIndex = read().selectedAnnotationIndex, amount = 1) => {
+    const state = read();
+    const annotation = targetIndex === null ? null : state.annotationHistory.annotations[targetIndex];
+    const toolbar = annotation ? deriveCaptureEditorToolbarState(state, annotation) : state;
+    const type = annotation?.type ?? (state.textDraft ? 'text' : state.activeAnnotationTool);
+    if (type === 'spotlight' || type === 'region-highlight') return;
     const next = planCaptureAnnotationSizeAdjustment({
-      annotationStyle: read().annotationStyle,
-      textFontSize: read().textFontSize,
+      annotationStyle: toolbar.annotationStyle,
+      textFontSize: toolbar.textFontSize,
       direction,
-      isTextSizingActive: getEditorDerived().isTextSizingActive,
+      isTextSizingActive: type === 'text',
+      isBlurSizingActive: type === 'blur',
+      amount,
     });
+    if (state.textDraft) {
+      patch({ textFontSize: next.textFontSize, textDraft: { ...state.textDraft, fontSize: next.textFontSize } });
+      return;
+    }
+    if (targetIndex !== state.selectedAnnotationIndex) patch({ selectedAnnotationIndex: targetIndex });
     applySelectedAnnotationStyle(next.annotationStyle, next.textFontSize);
   };
 
@@ -692,6 +711,9 @@ export function createCaptureEditing({
   }
 
   function handleCaptureWorkspaceEditorWheel(event: EditorWheelInput) {
+    const state = read();
+    const hovered = event.point && state.selection && !state.textDraft
+      ? hitTestAnnotations(state.annotationHistory.annotations, { x: event.point.x - state.selection.x, y: event.point.y - state.selection.y }) : null;
     const {
       state: { annotationGesture, annotationMoveGesture, status, textDraft },
       derived: { hasAnnotationEditingContext },
@@ -701,11 +723,11 @@ export function createCaptureEditing({
       hasTextDraft: textDraft !== null,
       hasAnnotationGesture: annotationGesture !== null,
       hasAnnotationMoveGesture: annotationMoveGesture !== null,
-      hasAnnotationEditingContext,
+      hasAnnotationEditingContext: hasAnnotationEditingContext || hovered !== null || textDraft !== null || Boolean(state.selection),
     });
     if (!direction) return;
     event.preventDefault();
-    adjustAnnotationSize(direction);
+    adjustAnnotationSize(direction, event.point ? hovered : state.selectedAnnotationIndex, event.ctrlKey || event.metaKey ? 3 : 1);
   }
 
   function handleCaptureWorkspaceEditorKeyDown(
@@ -821,7 +843,8 @@ export function createCaptureEditing({
       (event.key === '[' ||
         event.key === ']' ||
         (hasAnnotationEditingContext &&
-          (event.key === '1' || event.key === '2')))
+          (event.key === '1' || event.key === '2') &&
+          !annotationShortcutBindings(annotationToolShortcuts?.())[normalizeEditorShortcutKey(event)]))
     ) {
       const direction = annotationSizeDirectionFromShortcut(event, {
         editing: hasAnnotationEditingContext,
@@ -881,6 +904,12 @@ export function createCaptureEditing({
         patch({ annotationHistory: nudge.annotationHistory });
       }
     } else if (!textDraft && !annotationGesture && !annotationMoveGesture) {
+      const tool = annotationToolFromShortcut(event, annotationShortcutBindings(annotationToolShortcuts?.()));
+      if (tool) {
+        event.preventDefault();
+        toggleAnnotationTool(tool);
+        return;
+      }
       const color = annotationColorFromShortcut(
         event,
         annotationColorPresets?.() ?? ANNOTATION_COLORS,
@@ -888,12 +917,6 @@ export function createCaptureEditing({
       if (color) {
         event.preventDefault();
         selectAnnotationColor(color);
-        return;
-      }
-      const tool = annotationToolFromShortcut(event);
-      if (tool) {
-        event.preventDefault();
-        toggleAnnotationTool(tool);
         return;
       }
       const selectionArrowAction = getSelectionArrowActionFromShortcut(event, {
@@ -906,7 +929,7 @@ export function createCaptureEditing({
           selectionBounds: derived.selectionBounds,
           selectionArrowAction,
           minSelectionSize: MIN_SELECTION_SIZE,
-          keyboardNudgeStep: KEYBOARD_NUDGE_STEP,
+          keyboardNudgeStep: event.shiftKey && selectionArrowAction.mode === 'move' ? KEYBOARD_FAST_NUDGE_STEP : KEYBOARD_NUDGE_STEP,
         });
         patch({ selection: preview.selection });
         void renderEditorSelectionPreview(preview.previewRender.rect);
@@ -976,7 +999,7 @@ export function createCaptureEditing({
       return event.handled();
     },
     resizeAnnotationPointerDown(
-      handle: SelectionHandle,
+      handle: AnnotationHandle,
       input: CaptureWorkspacePointerInput,
     ) {
       const state = read();
@@ -990,9 +1013,16 @@ export function createCaptureEditing({
         state.annotationHistory.annotations[state.selectedAnnotationIndex];
       if (
         !annotation ||
-        (annotation.type !== 'rectangle' && annotation.type !== 'ellipse')
+        (!('rect' in annotation) && annotation.type !== 'text' && annotation.type !== 'arrow')
       )
         return false;
+      if (annotation.type === 'arrow' && (handle === 'control1' || handle === 'control2') && (input.detail ?? 0) >= 2) {
+        const straight = { ...annotation };
+        delete straight.control1;
+        delete straight.control2;
+        patch({ annotationHistory: replaceAnnotationInHistory(state.annotationHistory, state.selectedAnnotationIndex, straight) });
+        return true;
+      }
       patch({
         annotationMoveGesture: {
           annotationIndex: state.selectedAnnotationIndex,
@@ -1010,6 +1040,7 @@ export function createCaptureEditing({
     wheel(input: CaptureWorkspaceWheelInput) {
       let handled = false;
       handleCaptureWorkspaceEditorWheel({
+        point: input.point,
         deltaY: input.deltaY,
         metaKey: input.metaKey ?? false,
         ctrlKey: input.ctrlKey ?? false,
@@ -1024,6 +1055,7 @@ export function createCaptureEditing({
       let handled = false;
       handleCaptureWorkspaceEditorKeyDown({
         key: input.key,
+        code: input.code,
         metaKey: input.metaKey ?? false,
         ctrlKey: input.ctrlKey ?? false,
         altKey: input.altKey ?? false,
@@ -1059,6 +1091,7 @@ export function createCaptureEditing({
     },
     undoAnnotation,
     redoAnnotation,
+    clearAnnotations,
   };
 }
 function createEditorPointerInput(input: CaptureWorkspacePointerInput) {

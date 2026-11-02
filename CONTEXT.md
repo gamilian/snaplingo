@@ -72,6 +72,10 @@ The handoff of a Capture Session OCR result to the OCR window, translation windo
 
 The editing state within a Capture Session: selection geometry, annotation gestures, selected annotations, text drafts, styles, and undo/redo history. Pointer, keyboard, and toolbar intents share its state transitions. An edit commit publishes a consistent snapshot; Capture Session loading, cancellation, and output remain separate workflows.
 
+### Scrolling Capture
+
+A sequence of images from one selected viewport while the user scrolls its content. Matching overlapping content produces one long image, retaining fixed headers and footers once. The latest appended segment can be undone without discarding earlier content. A Scrolling Capture is distinct from the frozen desktop image of an ordinary Capture Session. Complete copies and saves a PNG; reaching its configured height limit invokes the same output. A separate transparent Preview observes the task and passes mouse input through. A transparent viewport outline indicates the original capture region and also passes mouse input through.
+
 ### Result Window and Pinned Image
 
 Application runtimes that own their workflows and request runtime-host effects. Result Window owns one read-only View-facing state projection, editable text and language intents, translation/OCR favorite sequencing, OCR Provider fallback, and clipboard intents. Their Tauri window, clipboard, and notification mechanics remain in Infrastructure.

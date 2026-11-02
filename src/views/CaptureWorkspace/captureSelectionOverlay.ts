@@ -1,7 +1,7 @@
 import type { LogicalRect, MonitorSnapshotView } from './types';
 import { virtualRectToViewportRect } from '../../application/capture-workspace/virtualDesktop';
 
-type CaptureSelectionOverlayStatus = 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
+type CaptureSelectionOverlayStatus = 'idle' | 'loading' | 'selecting' | 'preview' | 'scrolling' | 'error';
 
 export type CaptureSelectionOverlayVariant = 'draft' | 'hover' | 'preview';
 
@@ -44,6 +44,7 @@ export interface CaptureSelectionOverlayStyle {
   borderWidth?: number;
   borderColor?: [number, number, number, number];
   maskColor?: [number, number, number, number];
+  uiScale?: number;
 }
 
 const LABEL_HEIGHT = 20;
@@ -154,7 +155,7 @@ export function drawCaptureSelectionOverlayFrame(
   if (frame) {
     drawDimMask(context, size, frame.rect, style.maskColor);
     drawSelectionRect(context, frame, style.borderWidth, style.borderColor);
-    if (frame.label) drawSizeLabel(context, size, frame);
+    if (frame.label) drawSizeLabel(context, size, frame, style.uiScale ?? 1);
   }
 }
 
@@ -222,6 +223,7 @@ function drawSizeLabel(
   context: CaptureSelectionOverlayContext,
   size: Size,
   frame: CaptureSelectionOverlayFrame,
+  uiScale: number,
 ) {
   const { rect } = frame;
   const label = frame.label;
@@ -229,31 +231,32 @@ function drawSizeLabel(
 
   const isWindows = typeof navigator !== 'undefined' && /^Win/i.test(navigator.platform);
   context.font = isWindows
-    ? '500 12px "Segoe UI Variable Text", "Segoe UI", system-ui, "Microsoft YaHei", sans-serif'
-    : '500 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    ? `500 ${12 * uiScale}px "Segoe UI Variable Text", "Segoe UI", system-ui, "Microsoft YaHei", sans-serif`
+    : `500 ${12 * uiScale}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
   context.textBaseline = 'top';
 
-  const labelWidth = Math.ceil(context.measureText(label).width) + LABEL_PADDING_X * 2;
+  const labelHeight = LABEL_HEIGHT * uiScale;
+  const labelWidth = Math.ceil(context.measureText(label).width) + LABEL_PADDING_X * 2 * uiScale;
   const labelX = snapCanvasTextPosition(
     clamp(rect.x, 0, Math.max(0, size.width - labelWidth)),
   );
-  const preferredLabelY = rect.y - LABEL_HEIGHT - LABEL_SELECTION_GAP;
+  const preferredLabelY = rect.y - labelHeight - LABEL_SELECTION_GAP * uiScale;
   const fallbackLabelY = rect.y;
   const labelY = snapCanvasTextPosition(
     clamp(
       preferredLabelY >= 0 ? preferredLabelY : fallbackLabelY,
       0,
-      Math.max(0, size.height - LABEL_HEIGHT),
+      Math.max(0, size.height - labelHeight),
     ),
   );
 
   context.fillStyle = 'rgba(0, 0, 0, 0.82)';
-  context.fillRect(labelX, labelY, labelWidth, LABEL_HEIGHT);
+  context.fillRect(labelX, labelY, labelWidth, labelHeight);
   context.fillStyle = 'rgba(255, 255, 255, 0.95)';
   context.fillText(
     label,
-    snapCanvasTextPosition(labelX + LABEL_PADDING_X),
-    snapCanvasTextPosition(labelY + 4),
+    snapCanvasTextPosition(labelX + LABEL_PADDING_X * uiScale),
+    snapCanvasTextPosition(labelY + 4 * uiScale),
   );
 }
 

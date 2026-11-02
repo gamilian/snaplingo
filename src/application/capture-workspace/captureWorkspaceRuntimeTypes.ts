@@ -39,6 +39,7 @@ export type CaptureWorkspaceRuntimeStatus =
   | 'loading'
   | 'selecting'
   | 'preview'
+  | 'scrolling'
   | 'error';
 
 export interface CaptureWorkspaceRenderState {
@@ -83,6 +84,7 @@ export interface CaptureWorkspaceRuntimeActions {
   startSession(mode: CaptureMode, sessionId?: string): Promise<void>;
   refreshSession(): Promise<void>;
   cancelSession(): Promise<void>;
+  beginScrollingCapture(): Promise<void>;
   renderSelectionPreview(
     rect: LogicalRect,
     annotations?: AnnotationCommand[],
@@ -109,7 +111,7 @@ export interface CaptureWorkspaceRuntimeActions {
     input: Point | CaptureWorkspacePointerInput,
   ): boolean;
   resizeAnnotationPointerDown(
-    handle: SelectionHandle,
+    handle: import('./annotationGeometry').AnnotationHandle,
     input: Point | CaptureWorkspacePointerInput,
   ): boolean;
   wheel(input: CaptureWorkspaceWheelInput): boolean;
@@ -129,6 +131,7 @@ export interface CaptureWorkspaceRuntimeActions {
   ): void;
   undoAnnotation(): void;
   redoAnnotation(): void;
+  clearAnnotations(): void;
   updateCursorColor(color: ColorSample | null): void;
   keyDown(event: CaptureWorkspaceKeyInput): boolean;
   hydrateSnapshots(): Promise<void>;
@@ -143,10 +146,12 @@ export interface CaptureWorkspacePointerInput {
   ctrlKey?: boolean;
   altKey?: boolean;
   shiftKey?: boolean;
+  spaceKey?: boolean;
   source?: 'root' | 'preview';
 }
 
 export interface CaptureWorkspaceWheelInput {
+  point?: Point;
   deltaY: number;
   metaKey?: boolean;
   ctrlKey?: boolean;
@@ -155,6 +160,7 @@ export interface CaptureWorkspaceWheelInput {
 
 export interface CaptureWorkspaceKeyInput {
   key: string;
+  code?: string;
   metaKey?: boolean;
   ctrlKey?: boolean;
   altKey?: boolean;
@@ -170,7 +176,8 @@ export interface CaptureWorkspaceRuntime {
   dispose(): void;
 }
 
-export interface CaptureWorkspaceKeyboardEvent extends Required<Omit<CaptureWorkspaceKeyInput, 'isComposing'>> {
+export interface CaptureWorkspaceKeyboardEvent extends Required<Omit<CaptureWorkspaceKeyInput, 'isComposing' | 'code'>> {
+  readonly code?: string;
   readonly isComposing?: boolean;
   readonly target?: EventTarget | null;
   preventDefault(): void;

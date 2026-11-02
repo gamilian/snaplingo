@@ -42,6 +42,30 @@ pub async fn create_capture_session(
 }
 
 #[tauri::command]
+pub async fn list_annotation_font_families(
+    state: State<'_, crate::AppState>,
+) -> Result<Vec<String>, String> {
+    Ok(state.capture.runtime.annotation_font_families())
+}
+
+#[tauri::command]
+pub fn last_annotation_tool(state: State<'_, crate::AppState>) -> String {
+    state.capture.runtime.last_annotation_tool()
+}
+
+#[tauri::command]
+pub fn remember_annotation_tool(
+    tool: String,
+    state: State<'_, crate::AppState>,
+) -> Result<(), String> {
+    state
+        .capture
+        .runtime
+        .remember_annotation_tool(tool)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 pub async fn reveal_capture_window(
     session_id: Option<String>,
     state: State<'_, crate::AppState>,
@@ -257,6 +281,7 @@ pub async fn render_capture_output(
 #[tauri::command]
 pub fn default_capture_save_path(
     directory: Option<String>,
+    fallback_directory: Option<String>,
     format: Option<String>,
     naming_rule: Option<String>,
     custom_file_name: Option<String>,
@@ -265,8 +290,9 @@ pub fn default_capture_save_path(
     Ok(state
         .capture
         .output
-        .default_capture_save_path(
+        .dialog_capture_save_path(
             directory.as_deref(),
+            fallback_directory.as_deref(),
             format.as_deref().unwrap_or("png"),
             naming_rule.as_deref().unwrap_or("timestamp"),
             custom_file_name.as_deref().unwrap_or("SnapLingo"),

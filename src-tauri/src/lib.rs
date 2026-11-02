@@ -30,17 +30,13 @@ use tauri_plugin_log::{Target, TargetKind};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let database_path = infrastructure::system::get_database_path()
-        .expect("Failed to resolve application database path");
-    let is_first_launch = !database_path.exists();
-    let database = Arc::new(
-        infrastructure::storage::Database::open(&database_path)
-            .expect("Failed to initialize database"),
-    );
-    let log_repository = infrastructure::storage::SqliteAppLogRepository::new(database.clone());
-    let app_database = database.clone();
-    let app_database_path = database_path.clone();
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _, _| {
+            let handle = app.clone();
+            let _ = app.run_on_main_thread(move || {
+                app_actions::dispatch_app_action(handle, app_actions::AppAction::OpenSettings);
+            });
+        }))
         .manage(HotkeyRecording::default())
         .register_uri_scheme_protocol(
             "capture-image",
@@ -54,21 +50,6 @@ pub fn run() {
             None::<Vec<&'static str>>,
         ))
         .plugin(tauri_plugin_screenshots::init())
-        .plugin(
-            tauri_plugin_log::Builder::default()
-                .level(log::LevelFilter::Debug)
-                .clear_targets()
-                .target(Target::new(TargetKind::Dispatch(
-                    fern::Dispatch::new().chain(fern::Output::call(move |record| {
-                        let _ = log_repository.record(
-                            record.level().as_str(),
-                            record.target(),
-                            &record.args().to_string(),
-                        );
-                    })),
-                )))
-                .build(),
-        )
         .on_window_event(|window, event| {
             if !settings_window::should_hide_settings_window_instead_of_close(window.label()) {
                 return;
@@ -99,8 +80,32 @@ pub fn run() {
             }
         })
         .setup(move |app| {
+            let database_path = infrastructure::system::get_database_path()
+                .expect("Failed to resolve application database path");
+            let is_first_launch = !database_path.exists();
+            let database = Arc::new(
+                infrastructure::storage::Database::open(&database_path)
+                    .expect("Failed to initialize database"),
+            );
+            let log_repository =
+                infrastructure::storage::SqliteAppLogRepository::new(database.clone());
+            app.handle().plugin(
+                tauri_plugin_log::Builder::default()
+                    .level(log::LevelFilter::Debug)
+                    .clear_targets()
+                    .target(Target::new(TargetKind::Dispatch(
+                        fern::Dispatch::new().chain(fern::Output::call(move |record| {
+                            let _ = log_repository.record(
+                                record.level().as_str(),
+                                record.target(),
+                                &record.args().to_string(),
+                            );
+                        })),
+                    )))
+                    .build(),
+            )?;
             let app_state =
-                composition::build_app_state(app_database, app_database_path, app.handle().clone());
+                composition::build_app_state(database, database_path, app.handle().clone());
             composition::subscribe_history(&app_state);
             let start_on_boot = app_state
                 .settings
@@ -234,6 +239,16 @@ pub fn run() {
             commands::get_ocr_provider_credential_schema,
             commands::configure_ocr_provider_credentials,
             commands::create_capture_session,
+            commands::list_annotation_font_families,
+            commands::last_annotation_tool,
+            commands::remember_annotation_tool,
+            commands::begin_scrolling_capture,
+            commands::get_scrolling_capture,
+            commands::capture_scrolling_frame,
+            commands::undo_scrolling_capture,
+            commands::finish_scrolling_capture,
+            commands::set_scrolling_capture_preview,
+            commands::cancel_scrolling_capture,
             commands::get_capture_session,
             commands::hydrate_capture_session_snapshots,
             commands::hydrate_capture_monitor_snapshot,
@@ -262,6 +277,7 @@ pub fn run() {
             commands::move_pinned_image_to_next_group,
             commands::hide_pinned_image_group,
             commands::destroy_pinned_image_group,
+            commands::close_all_pinned_images,
             commands::run_capture_ocr,
             commands::prepare_capture_ocr,
             commands::complete_capture_ocr,

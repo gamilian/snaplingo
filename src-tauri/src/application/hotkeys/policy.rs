@@ -25,6 +25,7 @@ pub(crate) fn display_hotkey_to_accelerator(hotkey: &str) -> Result<Option<Strin
             '⌥' => modifiers.push("Alt"),
             '⌘' => modifiers.push("CmdOrCtrl"),
             '⌃' => modifiers.push("Ctrl"),
+            '⊞' => modifiers.push("Super"),
             _ if !ch.is_whitespace() => main_key.push(ch),
             _ => {}
         }
@@ -100,6 +101,10 @@ fn accelerator_key(main_key: &str) -> Result<String> {
             | "F18"
             | "F19"
             | "F20"
+            | "F21"
+            | "F22"
+            | "F23"
+            | "F24"
     ) {
         return Ok(upper);
     }
@@ -137,13 +142,21 @@ mod tests {
 
     #[test]
     fn accepts_standalone_function_keys() {
-        for number in 1..=20 {
+        for number in 1..=24 {
             let hotkey = format!("F{number}");
             assert_eq!(
                 display_hotkey_to_accelerator(&hotkey).unwrap(),
                 Some(hotkey)
             );
         }
+    }
+
+    #[test]
+    fn windows_modifier_is_distinct_from_the_primary_control_modifier() {
+        assert_eq!(
+            display_hotkey_to_accelerator("⊞F4").unwrap(),
+            Some("Super+F4".into())
+        );
     }
 
     #[test]

@@ -51,6 +51,7 @@ function createRuntime(options: {
     movePinnedImageToNextGroup: vi.fn(async () => 2),
     hidePinnedImageGroup: vi.fn(async () => ['pin-1']),
     destroyPinnedImageGroup: vi.fn(async () => ['pin-1']),
+    closeAllPinnedImages: vi.fn(async () => ['pin-1']),
   };
   const clipboard: PinnedImageClipboardPort = {
     writeText: vi.fn(async () => undefined),
@@ -82,6 +83,20 @@ function createRuntime(options: {
 }
 
 describe('pinned image application runtime', () => {
+  it('exports the current display size after zoom and retains it after save cancellation', async () => {
+    const { runtime, commands } = createRuntime({ image: { ...initialImage, width: 1200, height: 800 } });
+    await runtime.load();
+    await runtime.resize({ zoom: 0.5, transform: { rotation: 0, flipX: false, flipY: false }, thumbnailMode: false });
+    await runtime.copyImage();
+    expect(commands.copyPinnedImage).toHaveBeenCalledWith('pin-1', { width: 450, height: 300 });
+    vi.mocked(commands.defaultCaptureSavePath).mockResolvedValueOnce(null);
+    await runtime.save();
+    expect(commands.savePinnedImage).not.toHaveBeenCalled();
+    await runtime.save();
+    expect(commands.savePinnedImage).toHaveBeenCalledWith('pin-1', '/pictures/default.png', { width: 450, height: 300 }, true);
+    await runtime.closeAll();
+    expect(commands.closeAllPinnedImages).toHaveBeenCalledOnce();
+  });
   it('loads the bound image and resizes from portable presentation state', async () => {
     const { runtime, commands, window } = createRuntime();
 
@@ -108,11 +123,14 @@ describe('pinned image application runtime', () => {
       1,
       'pin-1',
       '/pictures/default.png',
+      undefined,
+      true,
     );
     expect(commands.savePinnedImage).toHaveBeenNthCalledWith(
       2,
       'pin-1',
       '/pictures/quick.png',
+      undefined,
     );
   });
 
@@ -234,7 +252,7 @@ describe('pinned image application runtime', () => {
     await runtime.hideGroup();
     await runtime.destroyGroup();
 
-    expect(commands.copyPinnedImage).toHaveBeenCalledWith('pin-1');
+    expect(commands.copyPinnedImage).toHaveBeenCalledWith('pin-1', undefined);
     expect(settings.open).toHaveBeenCalledTimes(1);
     expect(window.moveBy).toHaveBeenCalledWith(2, -3);
     expect(window.startDragging).toHaveBeenCalledTimes(1);

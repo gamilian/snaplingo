@@ -60,3 +60,11 @@ python3 -m http.server 4311 --directory designs --bind 127.0.0.1
 2026-10-26 起，澄明、夜航、松间三套方案已作为正式界面主题接入应用。通用设置中的“界面主题”负责选择三套布局和配色；“外观模式”继续负责浅色、深色和跟随系统。选择会持久化，并通过已有设置变更事件同步到设置窗口、翻译/OCR 浮窗、截图和贴图窗口。
 
 正式组件主题检查入口：<http://localhost:4312/designs/ui-refresh/themes.html>。这是本地验证壳，使用正式设置、资料库、服务卡片、结果卡片和截图工具组件；不会连接真实服务。
+
+## AirSnip 功能补齐的实际组件预览
+
+2026-11-02 的 `airsnip-parity.html` 使用生产 React Views 和现有主题样式，覆盖设置/许可、截图编辑器、贴图菜单、长截图控制条与独立预览。无需后端；原生端口用内存数据，所有操作仅影响预览。
+
+生成：先 `npm run build`，再 `node designs/ui-refresh/build-parity-preview.mjs`。沿用上述 HTTP 服务，打开 <http://127.0.0.1:4311/ui-refresh/airsnip-parity.html>。它是自包含 HTML，不依赖外部字体或网络资源。参考行为来自 AirSnip `f3e0718f486845f42ba0e556a9c95b68a733facb`，实现与样式均为 SnapLingo 原创；未移植 GPL 源码。
+
+已检查 100%/200% 缩放、浅色/深色、三格式与 Unix 毫秒入口、许可搜索/正文、框选/模糊区域、中文文字与字号 −/+、粗体和 Enter 提交、贴图全部关闭和长截图完成反馈。窄预览面板保留原生窗口实际尺寸并允许滚动，避免 200% 浮窗被压窄后裁切。UI 验证截图为 `screenshots/parity-capture-text.jpg` 和 `screenshots/parity-long-200-dark.jpg`。浏览器预览不代替原生窗口穿透或 Windows 实机验收。

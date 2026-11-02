@@ -1,12 +1,13 @@
 {
   "name": "snaplingo",
   "private": true,
-  "version": "0.1.22",
+  "version": "0.1.23",
   "type": "module",
   "scripts": {
     "ocr:prepare": "node script/prepare-ocr.mjs",
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "node script/third-party-notices.mjs --check && tsc && vite build",
+    "licenses:generate": "node script/third-party-notices.mjs",
     "test": "vitest run",
     "preview": "vite preview",
     "tauri": "tauri",

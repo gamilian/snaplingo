@@ -13,6 +13,9 @@ import {
 import { createResultWindowPlatformRuntime } from './application/result-window/platformRuntime';
 import { createResultWindowRuntime } from './application/result-window/runtime';
 import { createPinnedImageRuntime } from './application/pinned-image/runtime';
+import { createScrollingCaptureRuntime } from './application/scrolling-capture/runtime';
+import { scrollingCapturePorts } from './platform/tauri/scrollingCapture';
+import { ScrollingCaptureWindow, ScrollingCapturePreviewWindow, ScrollingCaptureOutlineWindow } from './views/ScrollingCaptureWindow';
 import { createSettingsRuntime } from './application/settings/runtime';
 import { useApplicationTheme } from './views/useApplicationTheme';
 import {
@@ -157,6 +160,11 @@ initializeProviderStore(settingsRuntime.configuration.providers);
 initializeFavoritesStore(settingsRuntime.favorites);
 
 const currentWindowLabel = getCurrentWindowLabel();
+const isScrollingPreview = new URLSearchParams(window.location.search).get('window') === 'scrolling-preview';
+const isScrollingOutline = new URLSearchParams(window.location.search).get('window') === 'scrolling-outline';
+const scrollingCaptureId = ['scrolling', 'scrolling-preview'].includes(new URLSearchParams(window.location.search).get('window') ?? '')
+  ? new URLSearchParams(window.location.search).get('captureId') : null;
+const scrollingCaptureRuntime = scrollingCaptureId ? createScrollingCaptureRuntime(scrollingCaptureId, scrollingCapturePorts, { sampling: !isScrollingPreview }) : null;
 const pinnedImageId = readPinnedImageLaunch(window.location.search);
 const pinnedImageRuntime = pinnedImageId
   ? createPinnedImageRuntime({
@@ -285,6 +293,13 @@ function Application() {
   if (pinnedImageRuntime) {
     return <PinnedImageWindow runtime={pinnedImageRuntime} />;
   }
+  if (isScrollingOutline) return <ScrollingCaptureOutlineWindow
+    scale={Number(new URLSearchParams(window.location.search).get('scale') ?? 1)}
+    desktopScale={Number(new URLSearchParams(window.location.search).get('desktopScale') ?? 0)}
+  />;
+  if (scrollingCaptureRuntime) return isScrollingPreview
+    ? <ScrollingCapturePreviewWindow runtime={scrollingCaptureRuntime} />
+    : <ScrollingCaptureWindow runtime={scrollingCaptureRuntime} />;
 
   if (isCaptureResultWindow) {
     return <ResultWindow presentation="standalone" runtime={resultWindowRuntime} />;

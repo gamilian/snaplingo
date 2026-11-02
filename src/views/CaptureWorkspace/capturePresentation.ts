@@ -3,7 +3,7 @@ import {
   type AnnotationTool,
 } from '../../application/capture-workspace/annotationStyle';
 
-type CapturePresentationStatus = 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
+type CapturePresentationStatus = 'idle' | 'loading' | 'selecting' | 'preview' | 'scrolling' | 'error';
 type CaptureEditorCommandButtonVariant = 'default' | 'icon' | 'primary';
 
 export function getCaptureRootClassName(_status: CapturePresentationStatus) {
@@ -16,20 +16,22 @@ export function getCaptureRootCursorStyle(
   status: CapturePresentationStatus,
   activeAnnotationTool: AnnotationTool | null = null,
   strokeWidth = 2,
+  uiScale = 1,
 ) {
-  if (status === 'selecting') return SELECTION_CROSSHAIR_CURSOR;
-  return getCaptureEditorCursorStyle(activeAnnotationTool, strokeWidth);
+  if (status === 'selecting') return selectionCrosshairCursor(uiScale);
+  return getCaptureEditorCursorStyle(activeAnnotationTool, strokeWidth, uiScale);
 }
 
 export function getCaptureEditorCursorStyle(
   activeAnnotationTool: AnnotationTool | null,
   strokeWidth = 2,
+  uiScale = 1,
 ) {
   if (activeAnnotationTool === 'text') return 'text';
   if (activeAnnotationTool === 'mosaic') return brushCursor('mosaic', strokeWidth);
   if (activeAnnotationTool === 'eraser') return brushCursor('eraser', strokeWidth);
   if (activeAnnotationTool === 'pen' || activeAnnotationTool === 'highlight') {
-    return pencilCursor();
+    return pencilCursor(uiScale);
   }
   return 'default';
 }
@@ -39,22 +41,27 @@ function cursorDataUrl(
   hotspotX: number,
   hotspotY: number,
   fallback = 'auto',
+  uiScale = 1,
 ) {
-  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${hotspotX} ${hotspotY}, ${fallback}`;
+  const scaled = uiScale === 1 ? svg : svg.replace(/<svg\b[^>]*>/, (tag) => tag.replace(/(width|height)="([0-9.]+)"/g, (_, attribute, size) => `${attribute}="${Number(size) * uiScale}"`));
+  return `url("data:image/svg+xml,${encodeURIComponent(scaled)}") ${Math.round(hotspotX * uiScale)} ${Math.round(hotspotY * uiScale)}, ${fallback}`;
 }
 
-const SELECTION_CROSSHAIR_CURSOR = cursorDataUrl(
+function selectionCrosshairCursor(uiScale: number) { return cursorDataUrl(
   '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path d="M10 3v5M10 12v5M3 10h5M12 10h5" fill="none" stroke="rgba(15,23,42,.55)" stroke-width="2" stroke-linecap="round"/><path d="M10 3v5M10 12v5M3 10h5M12 10h5" fill="none" stroke="rgba(255,255,255,.94)" stroke-width=".75" stroke-linecap="round"/><circle cx="10" cy="10" r="1.15" fill="rgba(255,255,255,.96)" stroke="rgba(15,23,42,.55)" stroke-width=".65"/></svg>',
   10,
   10,
   'crosshair',
-);
+  uiScale,
+); }
 
-function pencilCursor() {
+function pencilCursor(uiScale: number) {
   return cursorDataUrl(
     '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path d="m3 14.8 9.8-9.8 3 3L6 17.8H3v-3Z" fill="white" stroke="black" stroke-width="1.2"/><path d="m12.8 5 1.2-1.2a1.6 1.6 0 0 1 2.3 2.3L15 7.3" fill="#f5c98a" stroke="black" stroke-width="1.2"/><path d="m3 18 2.5-.8-1.7-1.7L3 18Z" fill="#222"/></svg>',
     2,
     18,
+    'auto',
+    uiScale,
   );
 }
 

@@ -11,6 +11,7 @@ import {
 } from "node:fs";
 import { createHash } from "node:crypto";
 import { verifyMacOSApplication } from "./macos-release-verification.mjs";
+import { createWindowsPortableArtifact } from "./windows-portable.mjs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -67,6 +68,7 @@ export function releaseAssetName({ projectName, version, target, kind }) {
     "Debian package": ".deb",
     "Windows MSI installer": ".msi",
     "Windows NSIS installer": "-setup.exe",
+    "Windows portable archive": "-portable.zip",
   }[kind];
   if (!extension) throw new Error(`Unsupported release artifact kind: ${kind}`);
   return `${projectName}-v${version}-${target}${extension}`;
@@ -123,6 +125,12 @@ export function releaseArtifactContract(platform, productName, version) {
           directory: "nsis",
           matches: (name) =>
             name.toLowerCase().endsWith(".exe") && isCurrentVersion(name),
+          validate: validateNonEmptyFile,
+        },
+        {
+          kind: "Windows portable archive",
+          directory: "portable",
+          matches: (name) => name.endsWith("-portable.zip") && isCurrentVersion(name),
           validate: validateNonEmptyFile,
         },
       ];
@@ -275,6 +283,7 @@ function loadReleaseContext() {
   assertMatchingReleaseTag(version);
 
   return {
+    repositoryRoot,
     version,
     packageName: packageManifest.name,
     config: tauriConfig,
@@ -336,8 +345,10 @@ function collectArtifacts(context, artifacts) {
   const suffix = process.env.SNAPLINGO_ARTIFACT_SUFFIX ?? "";
   if (suffix && !/^[a-z0-9-]+$/.test(suffix)) throw new Error("Invalid artifact suffix");
   const target = process.env.SNAPLINGO_RELEASE_TARGET ?? releaseTarget();
+  const label = `${target}${suffix ? `-${suffix}` : ""}`;
   for (const artifact of artifacts) {
     if (statSync(artifact.path).isDirectory()) continue;
+    if (artifact.kind === "Windows portable archive" && label.endsWith("-offline")) continue;
     const name = releaseAssetName({
       projectName: context.packageName,
       version: context.version,
@@ -348,7 +359,6 @@ function collectArtifacts(context, artifacts) {
     const hash = createHash("sha256").update(readFileSync(artifact.path)).digest("hex");
     checksums.push(`${hash}  ${name}`);
   }
-  const label = `${target}${suffix ? `-${suffix}` : ""}`;
   const assetPrefix = `${context.packageName}-v${context.version}-${label}`;
   writeFileSync(join(output, `${assetPrefix}.SHA256SUMS.txt`), `${checksums.join("\n")}\n`);
   writeFileSync(join(output, `${assetPrefix}.build.json`), JSON.stringify({
@@ -360,7 +370,7 @@ function collectArtifacts(context, artifacts) {
 }
 
 function releaseTarget() {
-  const platform = process.platform === "darwin" ? "macos" : process.platform;
+  const platform = process.platform === "darwin" ? "macos" : process.platform === "win32" ? "windows" : process.platform;
   const architecture = process.arch === "arm64" ? "aarch64" : process.arch === "x64" ? "x86_64" : process.arch;
   return `${platform}-${architecture}`;
 }
@@ -402,6 +412,7 @@ async function main(args) {
       console.log("[release] Removed previous frontend and release outputs");
     }
     buildRelease(context, args.slice(1).filter(arg => arg !== "--clean" && arg !== "--"));
+    if (process.platform === "win32") createWindowsPortableArtifact(context);
   }
 
   const artifacts = verifyReleaseArtifacts({

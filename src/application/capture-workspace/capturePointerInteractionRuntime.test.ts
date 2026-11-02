@@ -179,7 +179,7 @@ describe('capturePointerInteractionRuntime', () => {
           hasAnnotationEditingContext: true,
         },
       ),
-    ).toBeNull();
+    ).toBe('increase');
 
     expect(
       planCapturePointerWheelSizeAdjustment(
@@ -197,6 +197,6 @@ describe('capturePointerInteractionRuntime', () => {
           hasAnnotationEditingContext: true,
         },
       ),
-    ).toBeNull();
+    ).toBe('increase');
   });
 });

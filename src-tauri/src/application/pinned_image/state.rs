@@ -159,6 +159,38 @@ impl PinnedImageState {
             .ok_or_else(|| AppError::System(format!("Pinned image not found: {}", image_id)))
     }
 
+    pub fn get_pinned_png_at_size(
+        &self,
+        image_id: &str,
+        size: Option<crate::domain::capture::PinnedImageExportSize>,
+    ) -> Result<Vec<u8>> {
+        let png = self.get_pinned_png(image_id)?;
+        let Some(size) = size else {
+            return Ok(png);
+        };
+        if size.width == 0
+            || size.height == 0
+            || u64::from(size.width) * u64::from(size.height) > 50_000_000
+        {
+            return Err(AppError::System("Invalid pinned image export size".into()));
+        }
+        let image =
+            image::load_from_memory(&png).map_err(|error| AppError::System(error.to_string()))?;
+        if image.width() == size.width && image.height() == size.height {
+            return Ok(png);
+        }
+        let image = image.resize_exact(
+            size.width,
+            size.height,
+            image::imageops::FilterType::Lanczos3,
+        );
+        let mut encoded = std::io::Cursor::new(Vec::new());
+        image
+            .write_to(&mut encoded, image::ImageFormat::Png)
+            .map_err(|error| AppError::System(error.to_string()))?;
+        Ok(encoded.into_inner())
+    }
+
     pub async fn save_pinned_png_to_path(
         &self,
         output: &CaptureOutput,
@@ -264,6 +296,20 @@ impl PinnedImageState {
         self.forget_recoverable_pinned_image(image_id);
 
         Ok(())
+    }
+
+    pub fn remove_all_pinned_images(&self) -> Vec<String> {
+        let mut ids: Vec<_> = self
+            .images
+            .lock()
+            .unwrap()
+            .drain()
+            .map(|(id, _)| id)
+            .collect();
+        self.recoverable_closed_image_ids.lock().unwrap().clear();
+        *self.active_group.lock().unwrap() = 0;
+        ids.sort();
+        ids
     }
 
     pub fn close_pinned_image(&self, image_id: &str) -> Result<()> {

@@ -1,18 +1,22 @@
 import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 import type { CaptureMode, CaptureSessionView } from '../../domain/capture';
 
-const { invoke, save, convertFileSrc } = vi.hoisted(() => ({
+const { invoke, save, convertFileSrc, getSettingsSnapshot } = vi.hoisted(() => ({
   invoke: vi.fn(),
   convertFileSrc: vi.fn((path: string, protocol: string) => `${protocol}://localhost${path}`),
   save: vi.fn(),
+  getSettingsSnapshot: vi.fn(),
 }));
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke, convertFileSrc }));
 vi.mock('@tauri-apps/plugin-dialog', () => ({ save }));
+vi.mock('./settings', () => ({ getSettingsSnapshot }));
 
 beforeEach(() => {
   invoke.mockReset();
   save.mockReset();
+  getSettingsSnapshot.mockReset();
+  getSettingsSnapshot.mockResolvedValue({ screenshot: {} });
   convertFileSrc.mockClear();
   convertFileSrc.mockImplementation(
     (path: string, protocol: string) => `${protocol}://localhost${path}`,
@@ -109,8 +113,22 @@ describe('Tauri capture command adapter', () => {
     );
     expect(save).toHaveBeenCalledWith({
       defaultPath: '/Downloads/SnapLingo-1.png',
-      filters: [{ name: 'PNG image', extensions: ['png'] }],
+      filters: [{ name: 'PNG（无损）', extensions: ['png'] }, { name: 'JPEG', extensions: ['jpg', 'jpeg'] }, { name: 'WebP（无损）', extensions: ['webp'] }],
     });
+  });
+
+  it('uses the last saved directory and format while preserving the chosen suffix', async () => {
+    const { selectCaptureSavePath } = await import('./capture');
+    getSettingsSnapshot.mockResolvedValue({ screenshot: { lastSaveDirectory: '/selected', lastSaveFormat: 'webp' } });
+    invoke.mockResolvedValue('/selected/next.webp');
+    save.mockResolvedValue('/selected/changed.JPEG');
+    expect(await selectCaptureSavePath({ directory: '/default', format: 'png' })).toBe('/selected/changed.JPEG');
+    expect(invoke).toHaveBeenCalledWith('default_capture_save_path', expect.objectContaining({ directory: '/selected', format: 'webp' }));
+    expect(save.mock.calls[0][0].filters[0].extensions).toEqual(['webp']);
+    save.mockResolvedValueOnce('/selected/no-suffix');
+    expect(await selectCaptureSavePath()).toBe('/selected/no-suffix.webp');
+    save.mockResolvedValueOnce(null);
+    expect(await selectCaptureSavePath()).toBeNull();
   });
 
   it('loads frozen monitor URLs without transporting Base64 pixels', async () => {

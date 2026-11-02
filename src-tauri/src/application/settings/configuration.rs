@@ -96,11 +96,31 @@ impl SettingsConfiguration {
         Ok(())
     }
 
-    pub fn update_screenshot(&self, input: ScreenshotSettings) -> Result<SettingsSnapshot> {
+    pub fn update_screenshot(&self, mut input: ScreenshotSettings) -> Result<SettingsSnapshot> {
+        Self::normalized_annotation_shortcuts(&input.annotation_tool_shortcuts)?;
+        Self::normalized_pin_border_shortcut(&input.pin_border_shortcut)?;
         let _guard = self.update_lock.lock().unwrap();
         let mut snapshot = self.snapshot()?;
+        input.last_save_directory = snapshot.screenshot.last_save_directory;
+        input.last_save_format = snapshot.screenshot.last_save_format;
         snapshot.screenshot = input;
         self.save_snapshot(snapshot)
+    }
+
+    pub fn record_screenshot_save_choice(
+        &self,
+        path: &std::path::Path,
+        format: &str,
+    ) -> Result<()> {
+        let _guard = self.update_lock.lock().unwrap();
+        let mut snapshot = self.snapshot()?;
+        snapshot.screenshot.last_save_directory = path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+            .map(|parent| parent.to_string_lossy().into_owned());
+        snapshot.screenshot.last_save_format = Some(format.to_string());
+        self.save_snapshot(snapshot)?;
+        Ok(())
     }
 
     pub fn update_annotation_colors(&self, colors: Vec<[u8; 4]>) -> Result<SettingsSnapshot> {
@@ -196,18 +216,42 @@ impl SettingsConfiguration {
         }
         if !matches!(
             snapshot.screenshot.naming_rule.as_str(),
-            "timestamp" | "date" | "counter" | "custom"
+            "timestamp" | "unix-ms" | "date" | "counter" | "custom"
         ) {
             snapshot.screenshot.naming_rule = "timestamp".to_string();
         }
         snapshot.screenshot.quality = snapshot.screenshot.quality.clamp(50, 100);
         snapshot.screenshot.default_stroke_width =
-            snapshot.screenshot.default_stroke_width.clamp(1, 8);
+            snapshot.screenshot.default_stroke_width.clamp(1, 32);
         snapshot.screenshot.selection_border_width =
             snapshot.screenshot.selection_border_width.clamp(1, 8);
         snapshot.screenshot.magnifier_zoom = snapshot.screenshot.magnifier_zoom.clamp(4, 20);
-        snapshot.screenshot.default_font_size = snapshot.screenshot.default_font_size.clamp(12, 48);
-        snapshot.screenshot.pin_opacity = snapshot.screenshot.pin_opacity.clamp(20, 100);
+        snapshot.screenshot.default_font_size = snapshot.screenshot.default_font_size.clamp(10, 96);
+        snapshot.screenshot.pin_opacity = snapshot.screenshot.pin_opacity.clamp(5, 100);
+        snapshot.screenshot.longshot_max_height =
+            snapshot.screenshot.longshot_max_height.clamp(100, 100_000);
+        snapshot.screenshot.pin_border_shortcut =
+            Self::normalized_pin_border_shortcut(&snapshot.screenshot.pin_border_shortcut)
+                .unwrap_or_else(|_| "b".to_string());
+        snapshot.screenshot.last_save_format = snapshot
+            .screenshot
+            .last_save_format
+            .filter(|format| ["png", "jpg", "webp"].contains(&format.as_str()));
+        snapshot.screenshot.last_save_directory = snapshot
+            .screenshot
+            .last_save_directory
+            .filter(|directory| !directory.trim().is_empty());
+        if !["original", "center"].contains(&snapshot.screenshot.pin_position.as_str()) {
+            snapshot.screenshot.pin_position = "original".to_string();
+        }
+        if !["auto", "100", "125", "150", "175", "200"]
+            .contains(&snapshot.screenshot.capture_ui_scale.as_str())
+        {
+            snapshot.screenshot.capture_ui_scale = "auto".to_string();
+        }
+        snapshot.screenshot.annotation_tool_shortcuts =
+            Self::normalized_annotation_shortcuts(&snapshot.screenshot.annotation_tool_shortcuts)
+                .unwrap_or_else(|_| crate::domain::config::default_annotation_tool_shortcuts());
         snapshot.screenshot.custom_file_name =
             snapshot.screenshot.custom_file_name.trim().to_string();
         if snapshot.screenshot.custom_file_name.is_empty() {
@@ -221,6 +265,73 @@ impl SettingsConfiguration {
             snapshot.ocr.recognition_language = "auto".to_string();
         }
         snapshot
+    }
+
+    fn normalized_pin_border_shortcut(value: &str) -> Result<String> {
+        let value = value.trim().to_ascii_lowercase();
+        if value.is_empty() {
+            return Ok(value);
+        }
+        let parts: Vec<_> = value.split('+').collect();
+        let (key, modifiers) = parts.split_last().unwrap();
+        let single = key.len() == 1 && key.as_bytes()[0].is_ascii_alphanumeric();
+        let function = key
+            .strip_prefix('f')
+            .and_then(|value| value.parse::<u8>().ok())
+            .is_some_and(|value| (1..=24).contains(&value) && *key == format!("f{value}"));
+        let mut used = std::collections::HashSet::new();
+        if !(single || function)
+            || modifiers.iter().any(|modifier| {
+                !["ctrl", "meta", "alt", "shift"].contains(modifier) || !used.insert(*modifier)
+            })
+        {
+            return Err(AppError::Config("Invalid pin border shortcut".into()));
+        }
+        let mut normalized: Vec<_> = ["ctrl", "meta", "alt", "shift"]
+            .into_iter()
+            .filter(|modifier| used.contains(modifier))
+            .collect();
+        normalized.push(key);
+        Ok(normalized.join("+"))
+    }
+
+    fn normalized_annotation_shortcuts(
+        input: &std::collections::HashMap<String, String>,
+    ) -> Result<std::collections::HashMap<String, String>> {
+        let mut shortcuts = crate::domain::config::default_annotation_tool_shortcuts();
+        for (tool, key) in input {
+            if !shortcuts.contains_key(tool) {
+                return Err(AppError::Config(format!(
+                    "Unknown annotation tool '{}'",
+                    tool
+                )));
+            }
+            shortcuts.insert(tool.clone(), key.trim().to_ascii_lowercase());
+        }
+        let mut used = std::collections::HashSet::new();
+        for key in shortcuts.values() {
+            if key.is_empty() {
+                continue;
+            }
+            let single = key.len() == 1 && key.as_bytes()[0].is_ascii_alphanumeric();
+            let function = key
+                .strip_prefix('f')
+                .and_then(|value| value.parse::<u8>().ok())
+                .is_some_and(|value| (1..=24).contains(&value) && key == &format!("f{value}"));
+            if !(single || function) || ["c", "f", "r", "f3"].contains(&key.as_str()) {
+                return Err(AppError::Config(format!(
+                    "Invalid or reserved annotation shortcut '{}'",
+                    key
+                )));
+            }
+            if !used.insert(key.clone()) {
+                return Err(AppError::Config(format!(
+                    "Duplicate annotation shortcut '{}'",
+                    key
+                )));
+            }
+        }
+        Ok(shortcuts)
     }
 
     fn normalize_screenshot_save_path(&self, value: &str) -> String {
@@ -453,6 +564,8 @@ mod settings_configuration_tests {
                 magnifier_zoom: 99,
                 default_font_size: 1,
                 pin_opacity: 1,
+                pin_position: "cursor".into(),
+                capture_ui_scale: "900".into(),
                 ..ScreenshotSettings::default()
             })
             .unwrap();
@@ -461,11 +574,84 @@ mod settings_configuration_tests {
         assert_eq!(updated.screenshot.quality, 50);
         assert_eq!(updated.screenshot.naming_rule, "timestamp");
         assert_eq!(updated.screenshot.custom_file_name, "SnapLingo");
-        assert_eq!(updated.screenshot.default_stroke_width, 8);
+        assert_eq!(updated.screenshot.default_stroke_width, 32);
         assert_eq!(updated.screenshot.selection_border_width, 1);
         assert_eq!(updated.screenshot.magnifier_zoom, 20);
-        assert_eq!(updated.screenshot.default_font_size, 12);
-        assert_eq!(updated.screenshot.pin_opacity, 20);
+        assert_eq!(updated.screenshot.default_font_size, 10);
+        assert_eq!(updated.screenshot.pin_opacity, 5);
+        assert_eq!(updated.screenshot.pin_position, "original");
+        assert_eq!(updated.screenshot.capture_ui_scale, "auto");
+    }
+
+    #[test]
+    fn legacy_screenshot_settings_default_new_fields_and_merge_partial_shortcuts() {
+        let legacy: ScreenshotSettings =
+            serde_json::from_str(r#"{"format":"jpg","pin_opacity":75}"#).unwrap();
+        assert!(!legacy.pin_border);
+        assert_eq!(legacy.pin_position, "original");
+        assert_eq!(legacy.capture_ui_scale, "auto");
+        assert_eq!(legacy.annotation_tool_shortcuts["scrolling"], "s");
+        let configuration =
+            SettingsConfiguration::new(Arc::new(SqliteConfigStore::new_in_memory()));
+        let updated = configuration
+            .update_screenshot(ScreenshotSettings {
+                annotation_tool_shortcuts: [
+                    ("arrow".into(), " X ".into()),
+                    ("text".into(), String::new()),
+                ]
+                .into(),
+                pin_border: true,
+                pin_position: "center".into(),
+                capture_ui_scale: "150".into(),
+                ..legacy
+            })
+            .unwrap();
+        assert_eq!(updated.screenshot.annotation_tool_shortcuts["arrow"], "x");
+        assert_eq!(updated.screenshot.annotation_tool_shortcuts["text"], "");
+        assert_eq!(
+            updated.screenshot.annotation_tool_shortcuts["scrolling"],
+            "s"
+        );
+        assert!(updated.screenshot.pin_border);
+        assert_eq!(
+            configuration.snapshot().unwrap().screenshot,
+            updated.screenshot
+        );
+    }
+
+    #[test]
+    fn invalid_editor_shortcuts_do_not_replace_saved_preferences_and_scrolling_can_be_reassigned() {
+        let configuration =
+            SettingsConfiguration::new(Arc::new(SqliteConfigStore::new_in_memory()));
+        let original = configuration.snapshot().unwrap();
+        for (tool, key) in [
+            ("arrow", "O"),
+            ("arrow", "c"),
+            ("arrow", "Ctrl+x"),
+            ("unknown", "x"),
+        ] {
+            let input = ScreenshotSettings {
+                annotation_tool_shortcuts: [(tool.into(), key.into())].into(),
+                ..ScreenshotSettings::default()
+            };
+            assert!(configuration.update_screenshot(input).is_err());
+            assert_eq!(configuration.snapshot().unwrap(), original);
+        }
+        let updated = configuration
+            .update_screenshot(ScreenshotSettings {
+                annotation_tool_shortcuts: [
+                    ("arrow".into(), "s".into()),
+                    ("scrolling".into(), "x".into()),
+                ]
+                .into(),
+                ..ScreenshotSettings::default()
+            })
+            .unwrap();
+        assert_eq!(
+            updated.screenshot.annotation_tool_shortcuts["scrolling"],
+            "x"
+        );
+        assert_eq!(updated.screenshot.annotation_tool_shortcuts["arrow"], "s");
     }
 
     #[test]
@@ -509,5 +695,45 @@ mod settings_configuration_tests {
             .unwrap();
 
         assert_eq!(notifier.0.load(Ordering::SeqCst), 6);
+    }
+    #[test]
+    fn save_choice_survives_a_stale_full_settings_update() {
+        let configuration =
+            SettingsConfiguration::new(Arc::new(SqliteConfigStore::new_in_memory()));
+        let old = configuration.snapshot().unwrap().screenshot;
+        configuration
+            .record_screenshot_save_choice(std::path::Path::new("/chosen/region.webp"), "webp")
+            .unwrap();
+        let updated = configuration
+            .update_screenshot(ScreenshotSettings {
+                naming_rule: "unix-ms".into(),
+                longshot_max_height: 12000,
+                pin_border_shortcut: "Shift+Ctrl+F4".into(),
+                ..old
+            })
+            .unwrap();
+        assert_eq!(
+            updated.screenshot.last_save_directory.as_deref(),
+            Some("/chosen")
+        );
+        assert_eq!(updated.screenshot.last_save_format.as_deref(), Some("webp"));
+        assert_eq!(updated.screenshot.naming_rule, "unix-ms");
+        assert_eq!(updated.screenshot.pin_border_shortcut, "ctrl+shift+f4");
+        assert_eq!(updated.screenshot.longshot_max_height, 12000);
+        let updated = configuration
+            .update_screenshot(ScreenshotSettings {
+                annotation_tool_shortcuts: [
+                    ("arrow".into(), "2".into()),
+                    ("scrolling".into(), "F2".into()),
+                ]
+                .into(),
+                ..updated.screenshot
+            })
+            .unwrap();
+        assert_eq!(updated.screenshot.annotation_tool_shortcuts["arrow"], "2");
+        assert_eq!(
+            updated.screenshot.annotation_tool_shortcuts["scrolling"],
+            "f2"
+        );
     }
 }

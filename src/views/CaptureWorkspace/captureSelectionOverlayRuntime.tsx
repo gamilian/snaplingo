@@ -21,6 +21,7 @@ type CaptureSelectionOverlayStatus =
   | 'loading'
   | 'selecting'
   | 'preview'
+  | 'scrolling'
   | 'error';
 
 interface CaptureSelectionOverlayPixelRatioSource {
@@ -45,6 +46,7 @@ interface UseCaptureSelectionOverlayOptions {
   selectionBorderWidth?: number;
   selectionBorderColor?: [number, number, number, number];
   selectionMaskColor?: [number, number, number, number];
+  uiScale?: number;
 }
 
 interface CaptureSelectionOverlayCanvasProps {
@@ -100,6 +102,7 @@ export function useCaptureSelectionOverlay({
   selectionBorderWidth,
   selectionBorderColor,
   selectionMaskColor,
+  uiScale = 1,
   selection,
   selectionBounds,
   monitors,
@@ -130,6 +133,7 @@ export function useCaptureSelectionOverlay({
           borderWidth: selectionBorderWidth,
           borderColor: selectionBorderColor,
           maskColor: selectionMaskColor,
+          uiScale,
         },
       );
     },
@@ -140,6 +144,7 @@ export function useCaptureSelectionOverlay({
       selectionBorderWidth,
       selectionBounds,
       selectionMaskColor,
+      uiScale,
       status,
     ],
   );

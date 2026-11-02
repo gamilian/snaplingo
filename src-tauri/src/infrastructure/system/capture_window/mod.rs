@@ -6,6 +6,7 @@ mod tauri;
 
 pub use backend::capture_snapshot_hide_settle_delay_ms;
 pub(crate) use runtime_host::{TauriCaptureOcrEffects, TauriCaptureSessionRuntimeHost};
+pub(crate) use tauri::yield_capture_window_focus;
 pub use tauri::{
     begin_capture_presentation, destroy_inactive_capture_window, end_capture_presentation,
     hide_capture_snapshot_windows, hide_capture_window, is_capture_presentation_active,

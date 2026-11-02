@@ -85,7 +85,7 @@ pub(super) fn pinned_window_size(width: u32, height: u32) -> (f64, f64) {
         .min(PIN_WINDOW_MAX_HEIGHT / height)
         .min(1.0);
 
-    ((width * scale).max(80.0), (height * scale).max(60.0))
+    ((width * scale).max(1.0), (height * scale).max(1.0))
 }
 
 #[cfg(test)]

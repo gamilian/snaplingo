@@ -50,6 +50,9 @@ export interface SettingsRuntime {
     open(): Promise<void>;
     selectScreenshotDirectory(): Promise<string | null>;
     version(): Promise<string>;
+    displayBounds(): Promise<import('../../domain/capture').LogicalRect | null>;
+    applyInterfaceScale(scale: number): Promise<void>;
+    openExternal(url: string): Promise<void>;
     subscribeNavigationRequested: SettingsWindowEventsPort['subscribeNavigationRequested'];
   };
   providers: Pick<
@@ -104,6 +107,9 @@ export function createSettingsRuntime(
       open: () => ports.window.openSettings(),
       selectScreenshotDirectory: () => ports.window.selectScreenshotDirectory(),
       version: () => ports.window.getAppVersion(),
+      displayBounds: () => ports.window.displayBounds?.() ?? Promise.resolve(null),
+      applyInterfaceScale: (scale) => ports.window.applyInterfaceScale?.(scale) ?? Promise.resolve(),
+      openExternal: (url) => ports.window.openExternal?.(url) ?? Promise.resolve(),
       subscribeNavigationRequested: (handler) =>
         ports.windowEvents.subscribeNavigationRequested(handler),
     },

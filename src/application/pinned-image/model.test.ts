@@ -43,8 +43,8 @@ describe('pinned image controls', () => {
   it('zooms pinned images with wheel direction and clamps the range', () => {
     expect(getPinnedZoomFromWheel(1, -1)).toBe(1.1);
     expect(getPinnedZoomFromWheel(1, 1)).toBe(0.9);
-    expect(getPinnedZoomFromWheel(3.95, -1)).toBe(4);
-    expect(getPinnedZoomFromWheel(0.3, 1)).toBe(0.25);
+    expect(getPinnedZoomFromWheel(7.95, -1)).toBe(8);
+    expect(getPinnedZoomFromWheel(0.1, 1)).toBe(0.1);
   });
 
   it('maps keyboard shortcuts to pinned zoom actions', () => {
@@ -199,7 +199,7 @@ describe('pinned image controls', () => {
         ctrlKey: false,
         shiftKey: true,
       }),
-    ).toBeNull();
+    ).toEqual({ x: 0, y: -5 });
     expect(
       getPinnedKeyboardMoveDelta({
         key: 'w',
@@ -363,10 +363,10 @@ describe('pinned image controls', () => {
   });
 
   it('adjusts opacity with wheel direction and clamps the range', () => {
-    expect(getPinnedOpacityFromWheel(0.8, -1)).toBe(0.85);
-    expect(getPinnedOpacityFromWheel(0.8, 1)).toBe(0.75);
+    expect(getPinnedOpacityFromWheel(0.8, -1)).toBeCloseTo(228 / 255);
+    expect(getPinnedOpacityFromWheel(0.8, 1)).toBeCloseTo(180 / 255);
     expect(getPinnedOpacityFromWheel(0.98, -1)).toBe(1);
-    expect(getPinnedOpacityFromWheel(0.22, 1)).toBe(0.2);
+    expect(getPinnedOpacityFromWheel(0.05, 1)).toBe(12 / 255);
   });
 
   it('uses Snipaste wheel modifiers for pinned zoom and opacity', () => {
@@ -535,6 +535,8 @@ describe('pinned image controls', () => {
       width: 1800,
       height: 900,
     });
+    expect(getPinnedDisplaySize({ width: 900, height: 450 }, 8)).toEqual({ width: 4096, height: 2048 });
+    expect(getPinnedDisplaySize({ width: 300, height: 200 }, 0.1)).toEqual({ width: 30, height: 20 });
   });
 
   it('swaps pinned display size for quarter-turn rotations', () => {
@@ -604,6 +606,6 @@ describe('pinned image controls', () => {
     expect(getPinnedOpacityPreset(1)).toBe(1);
     expect(getPinnedOpacityPreset(0.75)).toBe(0.75);
     expect(getPinnedOpacityPreset(1.4)).toBe(1);
-    expect(getPinnedOpacityPreset(0.05)).toBe(0.2);
+    expect(getPinnedOpacityPreset(0)).toBe(12 / 255);
   });
 });

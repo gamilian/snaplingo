@@ -172,43 +172,11 @@ describe('capture session actions', () => {
     ).toBeNull();
   });
 
-  it('uses Cmd/Ctrl+Shift+Z for clearing all annotations', () => {
-    expect(
-      isClearAnnotationsShortcut({
-        key: 'z',
-        metaKey: true,
-        ctrlKey: false,
-        altKey: false,
-        shiftKey: true,
-      }),
-    ).toBe(true);
-    expect(
-      isClearAnnotationsShortcut({
-        key: 'Z',
-        metaKey: false,
-        ctrlKey: true,
-        altKey: false,
-        shiftKey: true,
-      }),
-    ).toBe(true);
-    expect(
-      isClearAnnotationsShortcut({
-        key: 'Backspace',
-        metaKey: true,
-        ctrlKey: false,
-        altKey: false,
-        shiftKey: true,
-      }),
-    ).toBe(false);
-    expect(
-      isClearAnnotationsShortcut({
-        key: 'z',
-        metaKey: true,
-        ctrlKey: false,
-        altKey: true,
-        shiftKey: true,
-      }),
-    ).toBe(false);
+  it('clears annotations with Cmd/Ctrl+Alt+Backspace and keeps redo separate', () => {
+    expect(isClearAnnotationsShortcut({ key: 'Backspace', metaKey: true, ctrlKey: false, altKey: true, shiftKey: false })).toBe(true);
+    expect(isClearAnnotationsShortcut({ key: 'Backspace', metaKey: false, ctrlKey: true, altKey: true, shiftKey: false })).toBe(true);
+    expect(isClearAnnotationsShortcut({ key: 'z', metaKey: true, ctrlKey: false, altKey: false, shiftKey: true })).toBe(false);
+    expect(isClearAnnotationsShortcut({ key: 'Backspace', metaKey: true, ctrlKey: false, altKey: false, shiftKey: false })).toBe(false);
   });
 
   it('maps Snipaste undo and redo shortcuts without stealing clear annotations', () => {
@@ -247,7 +215,7 @@ describe('capture session actions', () => {
         altKey: false,
         shiftKey: true,
       }),
-    ).toBeNull();
+    ).toBe('redo');
     expect(
       getUndoRedoActionFromShortcut({
         key: 'y',
@@ -325,7 +293,7 @@ describe('capture session actions', () => {
         altKey: false,
         shiftKey: true,
       }),
-    ).toEqual({ mode: 'shrink', direction: 'ArrowLeft' });
+    ).toEqual({ mode: 'move', direction: 'ArrowLeft' });
     expect(
       getSelectionArrowActionFromShortcut({
         key: 'ArrowDown',
@@ -334,7 +302,7 @@ describe('capture session actions', () => {
         altKey: false,
         shiftKey: true,
       }),
-    ).toBeNull();
+    ).toEqual({ mode: 'shrink', direction: 'ArrowDown' });
     expect(
       getSelectionArrowActionFromShortcut({
         key: 'ArrowDown',
@@ -512,7 +480,7 @@ describe('capture session actions', () => {
     ).toBe('save');
   });
 
-  it('uses Cmd/Ctrl+T for pinning the current selection', () => {
+  it('uses F3 or Cmd/Ctrl+T for pinning the current selection', () => {
     expect(
       isPinCaptureShortcut({
         key: 't',
@@ -548,7 +516,7 @@ describe('capture session actions', () => {
         altKey: false,
         shiftKey: false,
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('maps plain WASD keys to one-pixel cursor movement', () => {
@@ -899,7 +867,7 @@ describe('capture session actions', () => {
         altKey: false,
         shiftKey: false,
       }),
-    ).toBeNull();
+    ).toBe('copy');
     expect(
       getPreviewCaptureCompletionActionFromShortcut({
         key: 's',

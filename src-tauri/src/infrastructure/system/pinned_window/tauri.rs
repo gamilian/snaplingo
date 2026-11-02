@@ -1,5 +1,6 @@
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
+use crate::application::pinned_image::PinnedImagePlacement;
 use crate::domain::capture::PinnedImageView;
 
 use super::backend::{
@@ -28,25 +29,46 @@ pub fn show_or_open_pinned_image_window(
         return Ok(());
     }
 
-    open_pinned_image_window(app, image)
+    open_pinned_image_window(app, image, PinnedImagePlacement::default())
 }
 
-pub fn open_pinned_image_window(app: &AppHandle, image: &PinnedImageView) -> Result<(), String> {
+pub fn open_pinned_image_window(
+    app: &AppHandle,
+    image: &PinnedImageView,
+    placement: PinnedImagePlacement,
+) -> Result<(), String> {
     let label = pinned_window_label(&image.id);
     let (width, height) = pinned_window_size(image.width, image.height);
+    let cascade = app
+        .webview_windows()
+        .keys()
+        .filter(|label| is_pinned_window_label(label))
+        .count();
 
-    WebviewWindowBuilder::new(app, &label, WebviewUrl::App(pinned_window_url(&image.id)))
-        .title("SnapLingo Pin")
-        .inner_size(width, height)
-        .min_inner_size(80.0, 60.0)
-        .decorations(false)
-        .always_on_top(true)
-        .visible_on_all_workspaces(true)
-        .skip_taskbar(true)
-        .focused(true)
-        .shadow(true)
-        .build()
-        .map_err(|e| e.to_string())?;
+    let window =
+        WebviewWindowBuilder::new(app, &label, WebviewUrl::App(pinned_window_url(&image.id)))
+            .title("SnapLingo Pin")
+            .inner_size(width, height)
+            .min_inner_size(1.0, 1.0)
+            .transparent(true)
+            .decorations(false)
+            .always_on_top(true)
+            .visible_on_all_workspaces(true)
+            .skip_taskbar(true)
+            .focused(true)
+            .visible(false)
+            .shadow(true)
+            .build()
+            .map_err(|e| e.to_string())?;
+    if let Some(origin) = placement.origin {
+        crate::infrastructure::system::window_position::set_desktop_position(&window, origin)?;
+    }
+    if placement.centered {
+        crate::infrastructure::system::window_position::center_on_virtual_desktop(
+            &window, cascade,
+        )?;
+    }
+    window.show().map_err(|error| error.to_string())?;
 
     Ok(())
 }

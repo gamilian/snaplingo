@@ -44,6 +44,8 @@ import {
   type CaptureSelectionStorage,
 } from './captureSelectionHistory';
 import { emptyAnnotationHistory } from './annotationHistory';
+import type { AnnotationTool } from './annotationStyle';
+import { isScrollingCaptureShortcut, annotationShortcutBindings, normalizeEditorShortcutKey } from './annotationShortcuts';
 import { planCaptureManualSelectionTransition } from './captureEditorRuntime';
 import { createCaptureEditing } from './editing';
 import {
@@ -83,7 +85,7 @@ import type {
   CaptureWorkspaceKeyboardEvent,
 } from './captureWorkspaceRuntimeTypes';
 
-const MIN_SELECTION_SIZE = 10;
+const MIN_SELECTION_SIZE = 2;
 
 type RuntimeState = CaptureWorkspaceState;
 
@@ -162,7 +164,7 @@ export interface CaptureScreenshotPreferences {
   savePath?: string;
   format: 'png' | 'jpg' | 'webp';
   quality: number;
-  namingRule: 'timestamp' | 'date' | 'counter' | 'custom';
+  namingRule: 'timestamp' | 'unix-ms' | 'date' | 'counter' | 'custom';
   customFileName: string;
   autoCopy: boolean;
   defaultStrokeWidth: number;
@@ -174,6 +176,8 @@ export interface CaptureScreenshotPreferences {
   selectionBorderWidth?: number;
   selectionBorderColor?: [number, number, number, number];
   selectionMaskColor?: [number, number, number, number];
+  captureUiScale?: import('../settings/ports').CaptureUiScale;
+  annotationToolShortcuts?: Record<string, string>;
 }
 
 export function createCaptureWorkspaceRuntime({
@@ -202,6 +206,10 @@ export function createCaptureWorkspaceRuntime({
   storage?: CaptureSelectionStorage;
 }): CaptureWorkspaceRuntime {
   let state = createInitialState('screenshot', undefined, screenshotPreferences?.());
+  let lastAnnotationTool: AnnotationTool = 'rectangle';
+  let toolWrite = Promise.resolve();
+  const initialAnnotationTool = () =>
+    screenshotPreferences?.()?.rememberLastTool ? lastAnnotationTool : 'rectangle';
   let generation = 0;
   let disposed = false;
   let hydratedSessionId: string | null = null;
@@ -210,6 +218,7 @@ export function createCaptureWorkspaceRuntime({
   const listeners = new Set<() => void>();
   let hasRevealed = false;
   let revealAttempt: { key: string; promise: Promise<void> } | null = null;
+  let spacePressed = false;
   let perfState: CaptureFrontendPerfState | null = null;
   let hasKeyboardAdjustedDraft = false;
   let pressedHoverSelection: LogicalRect | null = null;
@@ -341,6 +350,13 @@ export function createCaptureWorkspaceRuntime({
 
   const patch = (next: Partial<RuntimeState>) => {
     if (disposed) return;
+    if (next.activeAnnotationTool && next.activeAnnotationTool !== state.activeAnnotationTool) {
+      lastAnnotationTool = next.activeAnnotationTool;
+      if (screenshotPreferences?.()?.rememberLastTool && platform.commands.rememberAnnotationTool) {
+        const tool = next.activeAnnotationTool;
+        toolWrite = toolWrite.then(() => platform.commands.rememberAnnotationTool!(tool)).catch(() => {});
+      }
+    }
     state = { ...state, ...next };
     listeners.forEach((listener) => listener());
   };
@@ -400,6 +416,7 @@ export function createCaptureWorkspaceRuntime({
   const resetSession = () => {
     if (disposed) return;
     terminalOutputOperation = null;
+    spacePressed = false;
     state = createInitialState(state.mode, state, screenshotPreferences?.());
     editing.restoreInteraction(null);
     hasKeyboardAdjustedDraft = false;
@@ -491,6 +508,7 @@ export function createCaptureWorkspaceRuntime({
                     format: preferences?.format ?? 'png',
                     quality: preferences?.quality ?? 90,
                     copyAfterSave: preferences?.autoCopy ?? false,
+                    rememberChoice: true,
                   } as const)
                 : null;
             })()
@@ -658,7 +676,7 @@ export function createCaptureWorkspaceRuntime({
     const activeAnnotationTool =
       state.status === 'preview'
         ? state.activeAnnotationTool
-        : 'rectangle';
+        : initialAnnotationTool();
     // The view crops the already decoded frozen monitors. Encoding is only
     // needed for terminal output, so entering or resizing preview never blocks.
     patch({
@@ -673,6 +691,7 @@ export function createCaptureWorkspaceRuntime({
   };
 
   const editing = createCaptureEditing({
+    annotationToolShortcuts: () => screenshotPreferences?.()?.annotationToolShortcuts,
     read: () => state,
     update: patch,
     hydratedSessionId: () => hydratedSessionId,
@@ -707,7 +726,7 @@ export function createCaptureWorkspaceRuntime({
       completion,
       activeAnnotationTool:
         completion.type === 'preview' && state.status !== 'preview'
-          ? 'rectangle'
+          ? initialAnnotationTool()
           : state.activeAnnotationTool,
     });
     if (transition.clearOverlay) host?.resetInteraction();
@@ -904,6 +923,7 @@ export function createCaptureWorkspaceRuntime({
         }
       };
       const handleKeyUp = (event: CaptureWorkspaceKeyboardEvent) => {
+        if (event.key === ' ') spacePressed = false;
         const action = getCaptureKeyboardKeyUpAction(event, {
           hasDraftSelectionMoveGesture:
             state.draftSelectionMoveGesture !== null,
@@ -916,6 +936,7 @@ export function createCaptureWorkspaceRuntime({
         }
       };
       const handleBlur = () => {
+        spacePressed = false;
         const plan = planCaptureKeyboardBlur({
           status: state.status,
           isRenderingOutput: state.isRenderingOutput,
@@ -946,6 +967,21 @@ export function createCaptureWorkspaceRuntime({
             return actions.startSession(launch.mode, launch.sessionId);
           }),
         );
+        if (!disposed && !connection.isClosed && platform.events.subscribeScrollingCaptureEnded) {
+          connection.retain(await platform.events.subscribeScrollingCaptureEnded(({ sessionId, completed }) => {
+            if (disposed || connection.isClosed || state.status !== 'scrolling' || state.session?.id !== sessionId) return;
+            if (completed && state.selection && storage) recordSuccessfulCaptureSelection(storage, 'copy', state.selection);
+            generation += 1;
+            resetSession();
+          }));
+        }
+        if (!disposed && !connection.isClosed && platform.events.subscribePinRequested) {
+          connection.retain(await platform.events.subscribePinRequested(({ sessionId }) => {
+            if (disposed || connection.isClosed || state.session?.id !== sessionId || state.isRenderingOutput) return;
+            if (state.status === 'preview' && state.selection) launch(() => actions.completePreviewSelection('pin', state.selection!));
+            else if (state.status === 'selecting' && state.hoverSelection && !state.startPoint) launch(() => completeCandidateSelection(state.hoverSelection!, 'pin'));
+          }));
+        }
         if (!disposed && !connection.isClosed) {
           await onHotkeySubscriptionReady?.();
         }
@@ -1014,6 +1050,19 @@ export function createCaptureWorkspaceRuntime({
         markPerf('images_ready', sessionId);
       }
     },
+    async beginScrollingCapture() {
+      if (disposed || state.status !== 'preview' || state.isRenderingOutput || !state.session || !state.selection) return;
+      const sessionId = state.session.id;
+      const rect = state.selection;
+      const startGeneration = generation;
+      patch({ status: 'scrolling', error: null });
+      try {
+        if (!platform.commands.beginScrollingCapture) throw new Error('长截图功能不可用');
+        await platform.commands.beginScrollingCapture(sessionId, rect);
+      } catch (error) {
+        if (!disposed && startGeneration === generation && state.session?.id === sessionId) patch({ status: 'preview', error: errorMessage(error) });
+      }
+    },
 
     async startSession(mode, requestedSessionId) {
       if (disposed) return;
@@ -1063,9 +1112,14 @@ export function createCaptureWorkspaceRuntime({
       snapshotHydration = null;
 
       try {
-        const session = requestedSessionId
-          ? await platform.commands.getCaptureSession(requestedSessionId)
-          : await platform.commands.createCaptureSession();
+        const [session, rememberedTool] = await Promise.all([
+          requestedSessionId
+            ? platform.commands.getCaptureSession(requestedSessionId)
+            : platform.commands.createCaptureSession(),
+          screenshotPreferences?.()?.rememberLastTool
+            ? toolWrite.then(() => platform.commands.lastAnnotationTool?.()).catch(() => null)
+            : Promise.resolve(null),
+        ]);
         provisionalSessionIds.add(session.id);
         if (generation !== actionGeneration) {
           provisionalSessionIds.delete(session.id);
@@ -1073,6 +1127,7 @@ export function createCaptureWorkspaceRuntime({
           await cancelStalePrevious();
           return;
         }
+        if (rememberedTool) lastAnnotationTool = rememberedTool;
         if (previousSessionId && previousSessionId !== session.id) {
           try {
             await cancelNativeSessionOnce(previousSessionId);
@@ -1287,6 +1342,17 @@ export function createCaptureWorkspaceRuntime({
         source = 'root',
       } = pointer;
       if (state.status === 'preview') {
+        if (source === 'root' && button === 0 && state.selection && !rectContainsPoint(state.selection, point) && !state.isRenderingOutput) {
+          const previousStyle = state.annotationStyle;
+          const previousTool = state.activeAnnotationTool;
+          actions.resetPreview();
+          patch({ annotationStyle: previousStyle, activeAnnotationTool: previousTool });
+          return actions.pointerDown(pointer);
+        }
+        if (button === 0 && (spacePressed || pointer.spaceKey) && state.selection && rectContainsPoint(state.selection, point) && !state.textDraft && !state.annotationGesture && !state.annotationMoveGesture) {
+          patch({ cursorPoint: point, editGesture: { type: 'move', startPoint: point, startSelection: state.selection } });
+          return true;
+        }
         if (source === 'preview' && button === 1 && state.selection) {
           const selection = state.selection;
           launch(() =>
@@ -1504,7 +1570,7 @@ export function createCaptureWorkspaceRuntime({
     },
 
     resizePointerDown: (handle: SelectionHandle, input) => editing.resizePointerDown(handle, pointerInput(input)),
-    resizeAnnotationPointerDown: (handle: SelectionHandle, input) => editing.resizeAnnotationPointerDown(handle, pointerInput(input)),
+    resizeAnnotationPointerDown: (handle: import('./annotationGeometry').AnnotationHandle, input) => editing.resizeAnnotationPointerDown(handle, pointerInput(input)),
     wheel: editing.wheel,
     commitTextDraft: editing.commitTextDraft,
     updateTextDraftText: editing.updateTextDraftText,
@@ -1522,24 +1588,32 @@ export function createCaptureWorkspaceRuntime({
     },
     undoAnnotation: editing.undoAnnotation,
     redoAnnotation: editing.redoAnnotation,
+    clearAnnotations: editing.clearAnnotations,
     updateCursorColor(cursorColor) {
       if (colorSamplesEqual(state.cursorColor, cursorColor)) return;
       patch({ cursorColor });
     },
 
     keyDown(input: CaptureWorkspaceKeyInput) {
-      if (disposed || state.textDraft || input.isComposing) return false;
+      if (disposed || state.textDraft) return false;
+      if (input.isComposing && (!/^(Key[A-Z]|Digit[0-9]|F(?:[1-9]|1[0-9]|2[0-4]))$/.test(input.code ?? '') || input.ctrlKey || input.metaKey || input.altKey)) return false;
       const event = {
         key: input.key,
+        code: input.code,
         metaKey: input.metaKey ?? false,
         ctrlKey: input.ctrlKey ?? false,
         altKey: input.altKey ?? false,
         shiftKey: input.shiftKey ?? false,
         repeat: input.repeat ?? false,
       };
+      if (event.key === ' ' && !event.ctrlKey && !event.metaKey && !event.altKey) spacePressed = true;
+      if (state.status === 'preview' && !state.isRenderingOutput && isScrollingCaptureShortcut(event, screenshotPreferences?.()?.annotationToolShortcuts) && !state.annotationGesture && !state.annotationMoveGesture && !state.editGesture && !state.draftSelectionMoveGesture) {
+        launch(() => actions.beginScrollingCapture());
+        return true;
+      }
       if (
         (state.status === 'selecting' || state.status === 'preview') &&
-        isRefreshCaptureShortcut(event)
+        isRefreshCaptureShortcut(event) && !annotationShortcutBindings(screenshotPreferences?.()?.annotationToolShortcuts)[normalizeEditorShortcutKey(event)]
       ) {
         launch(actions.refreshSession);
         return true;

@@ -1,5 +1,6 @@
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { save } from '@tauri-apps/plugin-dialog';
+import { getSettingsSnapshot } from './settings';
 import type {
   CaptureMode,
   CaptureCandidateView,
@@ -129,6 +130,7 @@ export async function renderCaptureOutput(input: RenderCaptureOutputInput) {
 function captureSavePathArgs(options?: CaptureSavePathOptions) {
   return {
     directory: options?.directory,
+    ...(options?.fallbackDirectory ? { fallbackDirectory: options.fallbackDirectory } : {}),
     format: options?.format,
     namingRule: options?.namingRule,
     customFileName: options?.customFileName,
@@ -140,17 +142,27 @@ export async function defaultCaptureSavePath(options?: CaptureSavePathOptions) {
 }
 
 export async function selectCaptureSavePath(options?: CaptureSavePathOptions) {
-  const format = options?.format ?? 'png';
-  const defaultPath = await defaultCaptureSavePath(options);
-  return save({
-    defaultPath,
-    filters: [
-      {
-        name: format === 'jpg' ? 'JPEG image' : format === 'webp' ? 'WebP image' : 'PNG image',
-        extensions: [format],
-      },
-    ],
+  const preferences = (await getSettingsSnapshot()).screenshot;
+  const format = preferences.lastSaveFormat ?? options?.format ?? preferences.format ?? 'png';
+  const defaultPath = await defaultCaptureSavePath({
+    ...options,
+    directory: preferences.lastSaveDirectory ?? options?.directory ?? preferences.savePath,
+    fallbackDirectory: preferences.lastSaveDirectory ? options?.directory ?? preferences.savePath : undefined,
+    format,
+    namingRule: options?.namingRule ?? preferences.namingRule,
+    customFileName: options?.customFileName ?? preferences.customFileName,
   });
+  const filters = [
+    { name: 'PNG（无损）', extensions: ['png'] },
+    { name: 'JPEG', extensions: ['jpg', 'jpeg'] },
+    { name: 'WebP（无损）', extensions: ['webp'] },
+  ];
+  filters.sort((a, b) => Number(b.extensions.includes(format)) - Number(a.extensions.includes(format)));
+  const path = await save({
+    defaultPath,
+    filters,
+  });
+  return path && !/\.[^/\\]+$/.test(path) ? `${path}.${format}` : path;
 }
 
 export async function quickCaptureSavePath(options?: CaptureSavePathOptions) {
@@ -243,6 +255,10 @@ export async function triggerScreenshot() {
 }
 
 export const captureWorkspaceCommands: CaptureWorkspaceCommandsPort = {
+  beginScrollingCapture: async (sessionId, rect) => { await invoke('begin_scrolling_capture', { sessionId, rect }); },
+  listAnnotationFontFamilies: () => invoke<string[]>('list_annotation_font_families'),
+  lastAnnotationTool: () => invoke('last_annotation_tool'),
+  rememberAnnotationTool: (tool) => invoke('remember_annotation_tool', { tool }),
   createCaptureSession,
   getCaptureSession,
   hydrateCaptureSessionSnapshots,

@@ -30,7 +30,7 @@ interface MagnifierVisibilityState {
 }
 
 interface AutoMagnifierState {
-  status: 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
+  status: 'idle' | 'loading' | 'selecting' | 'preview' | 'scrolling' | 'error';
   hasHydratedPixels: boolean;
 }
 

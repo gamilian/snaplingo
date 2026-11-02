@@ -12,8 +12,8 @@ pub async fn pin_clipboard_image(state: State<'_, crate::AppState>) -> Result<()
 pub async fn pin_clipboard_image_for_state(state: &crate::AppState) -> Result<(), String> {
     state
         .capture
-        .pinned_images
-        .pin_clipboard()
+        .runtime
+        .pin_from_shortcut()
         .await
         .map_err(|error| error.to_string())
 }
@@ -58,12 +58,13 @@ pub fn remove_pinned_image(
 #[tauri::command]
 pub async fn copy_pinned_image(
     image_id: String,
+    size: Option<crate::domain::capture::PinnedImageExportSize>,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     state
         .capture
         .pinned_images
-        .copy(&image_id)
+        .copy_at_size(&image_id, size)
         .await
         .map_err(|error| error.to_string())
 }
@@ -84,12 +85,31 @@ pub fn replace_pinned_image_from_clipboard(
 pub async fn save_pinned_image(
     image_id: String,
     path: String,
+    size: Option<crate::domain::capture::PinnedImageExportSize>,
+    remember_choice: Option<bool>,
     state: State<'_, crate::AppState>,
 ) -> Result<(), String> {
     state
         .capture
         .pinned_images
-        .save(&image_id, Path::new(&path))
+        .save_at_size(
+            &image_id,
+            Path::new(&path),
+            size,
+            remember_choice.unwrap_or(false),
+        )
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn close_all_pinned_images(
+    state: State<'_, crate::AppState>,
+) -> Result<Vec<String>, String> {
+    state
+        .capture
+        .pinned_images
+        .close_all()
         .await
         .map_err(|error| error.to_string())
 }

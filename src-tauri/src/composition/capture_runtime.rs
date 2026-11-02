@@ -30,33 +30,49 @@ pub(crate) fn build_capture_runtime(
     app: AppHandle,
     ocr_coordinator: Arc<OcrCoordinator>,
     result_window: Arc<ResultWindowRuntime>,
+    settings: Arc<crate::application::settings::SettingsConfiguration>,
 ) -> CaptureRuntimeParts {
     let capture_session_source = build_capture_session_source();
+    let scrolling_host = Arc::new(
+        crate::infrastructure::system::scrolling_window::TauriScrollingCaptureHost::new(
+            app.clone(),
+            capture_session_source.clone(),
+        ),
+    );
     let sessions = Arc::new(CaptureSessions::new(capture_session_source));
-    let image_composer = Arc::new(CaptureImageComposer::new());
+    let image_composer = Arc::new(CaptureImageComposer::with_font_provider(Arc::new(
+        crate::infrastructure::system::annotation_fonts::SystemAnnotationFonts::default(),
+    )));
     let output = Arc::new(CaptureOutput::with_host(Arc::new(SystemCaptureOutputHost)));
     let pinned_image_state = Arc::new(PinnedImageState::new());
-    let pinned_images = Arc::new(PinnedImageRuntime::new(
-        pinned_image_state,
-        image_composer.clone(),
-        output.clone(),
-        Arc::new(TauriPinnedImageRuntimeHost::new(app.clone())),
-    ));
+    let pinned_images = Arc::new(
+        PinnedImageRuntime::new(
+            pinned_image_state,
+            image_composer.clone(),
+            output.clone(),
+            Arc::new(TauriPinnedImageRuntimeHost::new(app.clone())),
+        )
+        .with_settings(settings.clone()),
+    );
 
-    let runtime = Arc::new(CaptureSessionRuntime::with_host(
-        sessions.clone(),
-        image_composer.clone(),
-        output.clone(),
-        ocr_coordinator,
-        Arc::new(TauriCaptureSessionRuntimeHost::new(
-            app.clone(),
-            Arc::new(CaptureOcrDelivery::new(
-                result_window,
-                Arc::new(TauriCaptureOcrEffects(app)),
+    let runtime = Arc::new(
+        CaptureSessionRuntime::with_host(
+            sessions.clone(),
+            image_composer.clone(),
+            output.clone(),
+            ocr_coordinator,
+            Arc::new(TauriCaptureSessionRuntimeHost::new(
+                app.clone(),
+                Arc::new(CaptureOcrDelivery::new(
+                    result_window,
+                    Arc::new(TauriCaptureOcrEffects(app)),
+                )),
             )),
-        )),
-        pinned_images.clone(),
-    ));
+            pinned_images.clone(),
+        )
+        .with_scrolling_host(scrolling_host)
+        .with_settings(settings),
+    );
 
     CaptureRuntimeParts {
         sessions,

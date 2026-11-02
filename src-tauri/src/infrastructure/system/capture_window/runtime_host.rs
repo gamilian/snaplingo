@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 use crate::application::capture::{CaptureOcrDelivery, CaptureOcrEffects};
@@ -56,6 +56,24 @@ impl CaptureOcrEffects for TauriCaptureOcrEffects {
 
 #[async_trait]
 impl CaptureSessionRuntimeHost for TauriCaptureSessionRuntimeHost {
+    async fn request_capture_selection_pin(&self, session_id: &CaptureSessionId) -> Result<bool> {
+        let session_id = session_id.0.clone();
+        run_on_main_thread(&self.app, "pin capture selection", move |app| {
+            if let Some(window) = app.get_webview_window(CAPTURE_WINDOW_LABEL) {
+                if window.is_visible().map_err(|error| error.to_string())? {
+                    window
+                        .emit(
+                            "capture-pin-requested",
+                            serde_json::json!({ "sessionId": session_id }),
+                        )
+                        .map_err(|error| error.to_string())?;
+                    return Ok(true);
+                }
+            }
+            Ok(false)
+        })
+        .await
+    }
     fn clipboard_revision(&self) -> u64 {
         #[cfg(target_os = "macos")]
         {

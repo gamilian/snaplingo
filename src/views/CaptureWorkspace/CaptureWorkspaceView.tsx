@@ -46,7 +46,6 @@ import type {
   ColorSampleFormat,
 } from '../../application/image-inspection/colorSampler';
 import type { CaptureCandidateDetectionMode } from '../../application/capture-workspace/captureWorkspaceState';
-import type { SelectionHandle } from '../../application/capture-workspace/selection';
 import type { TextAnnotationDraft } from '../../application/capture-workspace/textAnnotationDraft';
 import type {
   AnnotationCommand,
@@ -62,7 +61,7 @@ interface CaptureSelectionOverlaySize {
 }
 
 export interface CaptureWorkspaceViewRenderState {
-  readonly status: 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
+  readonly status: 'idle' | 'loading' | 'selecting' | 'preview' | 'scrolling' | 'error';
   readonly candidateDetectionMode: CaptureCandidateDetectionMode;
   readonly error: string | null;
   readonly viewportBounds: LogicalRect | null;
@@ -84,6 +83,7 @@ export interface CaptureWorkspaceViewRenderState {
     readonly textDraft: TextAnnotationDraft | null;
     readonly annotationStyle: AnnotationStyle;
     readonly selectedAnnotationBounds: LogicalRect | null;
+    readonly selectedAnnotation?: AnnotationCommand | null;
     readonly activeAnnotationTool: AnnotationTool | null;
   };
   readonly toolbar: {
@@ -95,6 +95,8 @@ export interface CaptureWorkspaceViewRenderState {
     readonly isFillModeActive: boolean;
     readonly canUndo: boolean;
     readonly canRedo: boolean;
+    readonly fontFamilies?: readonly string[];
+    readonly uiScale?: number;
   };
   readonly dom: {
     readonly desktopRef: RefObject<HTMLDivElement>;
@@ -138,7 +140,9 @@ export type CaptureWorkspaceViewActions = Pick<
   | 'commitAnnotationSizeDefault'
   | 'undoAnnotation'
   | 'redoAnnotation'
+  | 'clearAnnotations'
   | 'cancelSession'
+  | 'beginScrollingCapture'
   | 'completePreviewSelection'
 >;
 
@@ -241,7 +245,7 @@ export function dispatchCaptureWorkspacePreviewPointerDown({
 
   captureWorkspacePointer(event);
   const handled = pointerDown({
-    point: viewportPointToVirtualPoint({ x: event.clientX, y: event.clientY }, selectionBounds),
+    point: viewportPointToVirtualPoint({ x: event.clientX ?? 0, y: event.clientY ?? 0 }, selectionBounds),
     button: event.button,
     detail: event.detail,
     metaKey: event.metaKey,
@@ -257,17 +261,17 @@ export function dispatchCaptureWorkspacePreviewPointerDown({
   return handled;
 }
 
-export function dispatchCaptureWorkspaceResizePointerDown({
+export function dispatchCaptureWorkspaceResizePointerDown<T extends string>({
   handle,
   event,
   selectionBounds,
   resizePointerDown,
 }: {
-  handle: SelectionHandle;
+  handle: T;
   event: CaptureWorkspaceDomPointerEvent;
   selectionBounds: LogicalRect | null;
   resizePointerDown(
-    handle: SelectionHandle,
+    handle: T,
     input: CaptureWorkspacePointerInput,
   ): boolean;
 }) {
@@ -275,8 +279,9 @@ export function dispatchCaptureWorkspaceResizePointerDown({
 
   captureWorkspacePointer(event);
   const handled = resizePointerDown(handle, {
-    point: viewportPointToVirtualPoint({ x: event.clientX, y: event.clientY }, selectionBounds),
+    point: viewportPointToVirtualPoint({ x: event.clientX ?? 0, y: event.clientY ?? 0 }, selectionBounds),
     button: event.button,
+    detail: event.detail,
     shiftKey: event.shiftKey,
     source: 'preview',
   });
@@ -327,7 +332,7 @@ export function CaptureWorkspaceView({
     }
     captureWorkspacePointer(event);
     const handled = actions.pointerDown({
-      point: viewportPointToVirtualPoint({ x: event.clientX, y: event.clientY }, renderState.selectionBounds),
+      point: viewportPointToVirtualPoint({ x: event.clientX ?? 0, y: event.clientY ?? 0 }, renderState.selectionBounds),
       button: event.button,
       detail: event.detail,
       metaKey: event.metaKey,
@@ -371,7 +376,7 @@ export function CaptureWorkspaceView({
       pointerFrame.cancel();
     }
     void actions.pointerUp({
-      point: viewportPointToVirtualPoint({ x: event.clientX, y: event.clientY }, renderState.selectionBounds),
+      point: viewportPointToVirtualPoint({ x: event.clientX ?? 0, y: event.clientY ?? 0 }, renderState.selectionBounds),
       button: event.button,
       detail: event.detail,
       metaKey: event.metaKey,
@@ -388,6 +393,7 @@ export function CaptureWorkspaceView({
   const handleRootWheel = (event: WheelEvent<HTMLDivElement>) => {
     if (
       actions.wheel({
+        ...(renderState.selectionBounds ? { point: viewportPointToVirtualPoint({ x: event.clientX ?? 0, y: event.clientY ?? 0 }, renderState.selectionBounds) } : {}),
         deltaY: event.deltaY,
         metaKey: event.metaKey ?? false,
         ctrlKey: event.ctrlKey ?? false,
@@ -408,6 +414,7 @@ export function CaptureWorkspaceView({
           renderState.status,
           renderState.editor.activeAnnotationTool,
           renderState.editor.annotationStyle.strokeWidth,
+          renderState.toolbar.uiScale,
         ),
       }}
       onPointerDown={handleRootPointerDown}
@@ -495,6 +502,11 @@ export function CaptureWorkspaceView({
               />
             )}
             <CaptureSelectedAnnotationBoundsOverlay
+              selectedAnnotation={renderState.editor.selectedAnnotation}
+              uiScale={renderState.toolbar.uiScale}
+              onResetArrowCurve={() => {
+                if (renderState.editor.selection) actions.resizeAnnotationPointerDown('control1', { point: { x: renderState.editor.selection.x, y: renderState.editor.selection.y }, detail: 2 });
+              }}
               selectedAnnotationBounds={
                 renderState.editor.selectedAnnotationBounds
               }
@@ -519,6 +531,7 @@ export function CaptureWorkspaceView({
                   renderState.status,
                   renderState.editor.activeAnnotationTool,
                   renderState.editor.annotationStyle.strokeWidth,
+          renderState.toolbar.uiScale,
                 ),
               }}
               onPointerDown={(event) => {
@@ -530,6 +543,7 @@ export function CaptureWorkspaceView({
               }}
             />
             <CaptureSelectionResizeHandles
+              uiScale={renderState.toolbar.uiScale}
               selectionViewportRect={renderState.editor.selectionViewportRect}
               onResizeHandlePointerDown={(handle, event) => {
                 dispatchCaptureWorkspaceResizePointerDown({
@@ -548,6 +562,9 @@ export function CaptureWorkspaceView({
                 activeAnnotationTool={renderState.editor.activeAnnotationTool}
                 annotationStyle={renderState.editor.annotationStyle}
                 annotationColorPresets={annotationColorPresets}
+                fontFamilies={renderState.toolbar.fontFamilies}
+                selectedAnnotationType={renderState.editor.selectedAnnotation?.type}
+                uiScale={renderState.toolbar.uiScale}
                 textFontSize={renderState.toolbar.textFontSize}
                 textDraftActive={renderState.editor.textDraft !== null}
                 isTextSizingActive={renderState.toolbar.isTextSizingActive}
@@ -565,7 +582,9 @@ export function CaptureWorkspaceView({
                 onCommitSizeDefault={actions.commitAnnotationSizeDefault}
                 onUndo={actions.undoAnnotation}
                 onRedo={actions.redoAnnotation}
+                onClear={actions.clearAnnotations}
                 onCancel={actions.cancelSession}
+                onBeginScrollingCapture={actions.beginScrollingCapture}
                 onRunOcr={() => completeSelection('ocr')}
                 onCopy={() => completeSelection('copy')}
                 onSave={() => completeSelection('save')}

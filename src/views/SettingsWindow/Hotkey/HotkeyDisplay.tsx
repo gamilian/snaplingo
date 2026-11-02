@@ -14,6 +14,7 @@ export function HotkeyDisplay({ value, onClick, isRecording = false }: HotkeyDis
   const hasOption = value.includes('⌥');
   const hasCommand = value.includes('⌘');
   const hasControl = value.includes('⌃');
+  const hasWin = value.includes('⊞');
   const isWindows = typeof navigator !== 'undefined' && navigator.platform.startsWith('Win');
   const hasWindowsControl = hasCommand || hasControl;
   const primaryModifierClass = (isWindows ? hasWindowsControl : hasCommand)
@@ -24,7 +25,7 @@ export function HotkeyDisplay({ value, onClick, isRecording = false }: HotkeyDis
   const primaryLabel = isWindows ? 'Ctrl' : '⌘';
 
   // 提取字母键（最后一个非修饰键字符）
-  const letterKey = value.replace(/[⇧⌥⌘⌃]/g, '').trim();
+  const letterKey = value.replace(/[⇧⌥⌘⌃⊞]/g, '').trim();
 
   const isUnset = value === "未设置";
 
@@ -42,6 +43,7 @@ export function HotkeyDisplay({ value, onClick, isRecording = false }: HotkeyDis
 
   if (isWindows) {
     const keys = [
+      hasWin ? 'Win' : null,
       hasWindowsControl ? 'Ctrl' : null,
       hasOption ? 'Alt' : null,
       hasShift ? 'Shift' : null,

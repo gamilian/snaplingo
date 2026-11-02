@@ -20,16 +20,20 @@ use crate::Result;
 
 /// Coordinates Capture Session operations that span several application modules.
 pub struct CaptureSessionRuntime {
-    sessions: Arc<CaptureSessions>,
-    image_composition: Arc<CaptureImageComposer>,
-    output: Arc<CaptureOutput>,
+    pub(super) sessions: Arc<CaptureSessions>,
+    pub(super) image_composition: Arc<CaptureImageComposer>,
+    pub(super) output: Arc<CaptureOutput>,
+    pub(super) settings: Option<Arc<crate::application::settings::SettingsConfiguration>>,
     ocr: Arc<OcrCoordinator>,
-    host: Arc<dyn CaptureSessionRuntimeHost>,
-    pin_output: Arc<dyn CapturePinOutput>,
-    startup: tokio::sync::Mutex<()>,
-    presentations: tokio::sync::Mutex<HashMap<CaptureSessionId, u64>>,
-    ocr_generation: tokio::sync::watch::Sender<u64>,
+    pub(super) host: Arc<dyn CaptureSessionRuntimeHost>,
+    pub(super) pin_output: Arc<dyn CapturePinOutput>,
+    pub(super) startup: tokio::sync::Mutex<()>,
+    pub(super) scrolling: tokio::sync::Mutex<Option<super::scrolling::ScrollingCaptureTask>>,
+    pub(super) scrolling_host: Arc<dyn super::scrolling::ScrollingCaptureHost>,
+    pub(super) presentations: tokio::sync::Mutex<HashMap<CaptureSessionId, u64>>,
+    pub(super) ocr_generation: tokio::sync::watch::Sender<u64>,
     pending_ocr: tokio::sync::Mutex<Option<PendingCaptureOcr>>,
+    last_annotation_tool: std::sync::Mutex<String>,
 }
 
 impl CaptureSessionRuntime {
@@ -64,18 +68,69 @@ impl CaptureSessionRuntime {
             ocr,
             host,
             pin_output,
+            settings: None,
             startup: tokio::sync::Mutex::new(()),
+            scrolling: tokio::sync::Mutex::new(None),
+            scrolling_host: Arc::new(super::scrolling::UnconfiguredScrollingCaptureHost),
             presentations: tokio::sync::Mutex::new(HashMap::new()),
             ocr_generation: tokio::sync::watch::channel(0).0,
             pending_ocr: tokio::sync::Mutex::new(None),
+            last_annotation_tool: std::sync::Mutex::new("rectangle".into()),
         }
     }
 
     pub async fn create_session_from_visible_desktop(&self) -> Result<CaptureSessionView> {
+        self.cancel_active_scrolling_capture().await?;
         let _startup = self.startup.try_lock().map_err(|_| {
             crate::AppError::System("Capture session startup is already in progress".into())
         })?;
         self.create_visible_desktop_session().await
+    }
+
+    pub(crate) fn with_settings(
+        mut self,
+        settings: Arc<crate::application::settings::SettingsConfiguration>,
+    ) -> Self {
+        self.settings = Some(settings);
+        self
+    }
+
+    pub fn annotation_font_families(&self) -> Vec<String> {
+        self.image_composition.annotation_font_families()
+    }
+
+    pub fn last_annotation_tool(&self) -> String {
+        self.last_annotation_tool.lock().unwrap().clone()
+    }
+
+    pub fn remember_annotation_tool(&self, tool: String) -> Result<()> {
+        if tool == "scrolling"
+            || !crate::domain::config::default_annotation_tool_shortcuts().contains_key(&tool)
+        {
+            return Err("Unknown annotation tool".into());
+        }
+        *self.last_annotation_tool.lock().unwrap() = tool;
+        Ok(())
+    }
+
+    pub async fn pin_from_shortcut(&self) -> Result<()> {
+        let Ok(_startup) = self.startup.try_lock() else {
+            return Ok(());
+        };
+        let generation = *self.ocr_generation.borrow();
+        let active = self
+            .presentations
+            .lock()
+            .await
+            .iter()
+            .find(|(_, value)| **value == generation)
+            .map(|(id, _)| id.clone());
+        if let Some(id) = active {
+            if self.host.request_capture_selection_pin(&id).await? {
+                return Ok(());
+            }
+        }
+        self.pin_output.pin_clipboard_image().await
     }
 
     async fn create_visible_desktop_session(&self) -> Result<CaptureSessionView> {
@@ -161,6 +216,7 @@ impl CaptureSessionRuntime {
     }
 
     pub async fn open_capture_window_for_mode(&self, mode: &str) -> Result<()> {
+        self.cancel_active_scrolling_capture().await?;
         let Ok(_startup) = self.startup.try_lock() else {
             log::info!("Ignoring capture request while a capture window is already opening");
             return Ok(());
@@ -553,6 +609,25 @@ impl CaptureSessionRuntime {
     ) -> Result<()> {
         self.ensure_selection_snapshots_ready(session_id, rect)?;
 
+        let pin_position = if matches!(&action, CaptureOutputAction::Pin) {
+            let session = self.sessions.get_session(session_id)?;
+            Some(match session.desktop_scale {
+                Some(scale) => crate::domain::capture::DesktopPosition::Physical(
+                    crate::domain::capture::PhysicalPoint {
+                        x: (rect.x * scale).round() as i32,
+                        y: (rect.y * scale).round() as i32,
+                    },
+                ),
+                None => crate::domain::capture::DesktopPosition::Logical(
+                    crate::domain::capture::LogicalPoint {
+                        x: rect.x,
+                        y: rect.y,
+                    },
+                ),
+            })
+        } else {
+            None
+        };
         let output = output_capture_selection(
             &self.sessions,
             &self.image_composition,
@@ -562,15 +637,18 @@ impl CaptureSessionRuntime {
             annotations,
             include_cursor,
             action,
+            self.settings.as_deref(),
         )
         .await?;
         match output {
             CaptureSessionOutput::Completed => Ok(()),
-            CaptureSessionOutput::Pin(png_data) => self.pin_output.pin_png(png_data).await,
+            CaptureSessionOutput::Pin(png_data) => {
+                self.pin_output.pin_png(png_data, pin_position).await
+            }
         }
     }
 
-    fn ensure_selection_snapshots_ready(
+    pub(super) fn ensure_selection_snapshots_ready(
         &self,
         session_id: &CaptureSessionId,
         rect: &LogicalRect,
@@ -679,6 +757,8 @@ mod tests {
         ocr_statuses: Mutex<Vec<Option<super::CaptureOcrStatus>>>,
         ocr_completed: tokio::sync::Notify,
         clipboard_revision: std::sync::atomic::AtomicU64,
+        pin_visible: std::sync::atomic::AtomicBool,
+        pin_requests: Mutex<Vec<CaptureSessionId>>,
     }
 
     impl RecordingRuntimeHost {
@@ -697,6 +777,8 @@ mod tests {
                 ocr_statuses: Mutex::new(Vec::new()),
                 ocr_completed: tokio::sync::Notify::new(),
                 clipboard_revision: std::sync::atomic::AtomicU64::new(0),
+                pin_visible: std::sync::atomic::AtomicBool::new(false),
+                pin_requests: Mutex::new(Vec::new()),
             }
         }
 
@@ -721,6 +803,13 @@ mod tests {
 
     #[async_trait]
     impl CaptureSessionRuntimeHost for RecordingRuntimeHost {
+        async fn request_capture_selection_pin(
+            &self,
+            id: &CaptureSessionId,
+        ) -> crate::Result<bool> {
+            self.pin_requests.lock().unwrap().push(id.clone());
+            Ok(self.pin_visible.load(std::sync::atomic::Ordering::SeqCst))
+        }
         fn clipboard_revision(&self) -> u64 {
             self.clipboard_revision
                 .load(std::sync::atomic::Ordering::Relaxed)
@@ -838,14 +927,26 @@ mod tests {
 
     #[derive(Default)]
     struct RecordingPinOutput {
+        clipboard_pins: std::sync::atomic::AtomicUsize,
         pngs: Mutex<Vec<Vec<u8>>>,
+        positions: Mutex<Vec<Option<crate::domain::capture::DesktopPosition>>>,
         error: Mutex<Option<String>>,
     }
 
     #[async_trait]
     impl CapturePinOutput for RecordingPinOutput {
-        async fn pin_png(&self, png_data: Vec<u8>) -> crate::Result<()> {
+        async fn pin_clipboard_image(&self) -> crate::Result<()> {
+            self.clipboard_pins
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(())
+        }
+        async fn pin_png(
+            &self,
+            png_data: Vec<u8>,
+            position: Option<crate::domain::capture::DesktopPosition>,
+        ) -> crate::Result<()> {
             self.pngs.lock().unwrap().push(png_data);
+            self.positions.lock().unwrap().push(position);
             match self.error.lock().unwrap().clone() {
                 Some(error) => Err(AppError::from(error)),
                 None => Ok(()),
@@ -986,9 +1087,21 @@ mod tests {
         Arc<CaptureSessions>,
         Arc<RecordingPinOutput>,
     ) {
+        make_runtime_with_policy(host, snapshots, CaptureCoordinatePolicy::NativeLogical)
+    }
+
+    fn make_runtime_with_policy(
+        host: Arc<dyn CaptureSessionRuntimeHost>,
+        snapshots: Vec<MonitorSnapshot>,
+        coordinate_policy: CaptureCoordinatePolicy,
+    ) -> (
+        CaptureSessionRuntime,
+        Arc<CaptureSessions>,
+        Arc<RecordingPinOutput>,
+    ) {
         let sessions = Arc::new(CaptureSessions::new(Arc::new(MockCaptureSessionSource {
             snapshots: Mutex::new(snapshots),
-            coordinate_policy: CaptureCoordinatePolicy::NativeLogical,
+            coordinate_policy,
         })));
         let pin_output = Arc::new(RecordingPinOutput::default());
         let runtime = CaptureSessionRuntime::with_host(
@@ -1001,6 +1114,599 @@ mod tests {
         );
 
         (runtime, sessions, pin_output)
+    }
+
+    #[tokio::test]
+    async fn annotation_tool_memory_survives_capture_cleanup_and_resets_with_the_runtime() {
+        let (runtime, _, _) = make_runtime(
+            Arc::new(RecordingRuntimeHost::succeeds()),
+            vec![make_snapshot()],
+        );
+        assert_eq!(runtime.last_annotation_tool(), "rectangle");
+        runtime.remember_annotation_tool("blur".into()).unwrap();
+        let session = runtime.create_session_from_visible_desktop().await.unwrap();
+        runtime.cancel_capture_session(&session.id).await.unwrap();
+        assert_eq!(runtime.last_annotation_tool(), "blur");
+        for tool in ["scrolling", "unknown"] {
+            assert!(runtime.remember_annotation_tool(tool.into()).is_err());
+            assert_eq!(runtime.last_annotation_tool(), "blur");
+        }
+        let (restarted, _, _) = make_runtime(
+            Arc::new(RecordingRuntimeHost::succeeds()),
+            vec![make_snapshot()],
+        );
+        assert_eq!(restarted.last_annotation_tool(), "rectangle");
+    }
+
+    mod scrolling_tests {
+        use super::*;
+        use crate::application::capture::{
+            ScrollingCaptureGeometry, ScrollingCaptureHost, ScrollingWindowOptions,
+        };
+        use crate::domain::capture::{
+            DesktopPosition, PhysicalPoint, ScrollingCaptureStatus, ScrollingCaptureView,
+            ScrollingShortcutAction,
+        };
+        use std::collections::VecDeque;
+
+        #[derive(Default)]
+        struct ScrollingHost {
+            frames: Mutex<VecDeque<crate::Result<Vec<MonitorSnapshot>>>>,
+            geometries: Mutex<Vec<ScrollingCaptureGeometry>>,
+            closed: Mutex<Vec<(String, Option<bool>)>>,
+            open_error: Mutex<Option<String>>,
+        }
+
+        #[async_trait]
+        impl ScrollingCaptureHost for ScrollingHost {
+            async fn open(
+                &self,
+                _: &ScrollingCaptureView,
+                geometry: &ScrollingCaptureGeometry,
+            ) -> crate::Result<ScrollingWindowOptions> {
+                self.geometries.lock().unwrap().push(geometry.clone());
+                if let Some(error) = self.open_error.lock().unwrap().as_ref() {
+                    return Err(error.clone().into());
+                }
+                Ok(ScrollingWindowOptions {
+                    shortcuts: vec![ScrollingShortcutAction::Copy],
+                    preview_expanded: true,
+                })
+            }
+            async fn capture_snapshots(
+                &self,
+                _: &str,
+                geometry: &ScrollingCaptureGeometry,
+            ) -> crate::Result<Vec<MonitorSnapshot>> {
+                self.geometries.lock().unwrap().push(geometry.clone());
+                self.frames
+                    .lock()
+                    .unwrap()
+                    .pop_front()
+                    .unwrap_or_else(|| Err("No fresh frame".into()))
+            }
+            async fn close(
+                &self,
+                id: &str,
+                _: &CaptureSessionId,
+                completed: Option<bool>,
+            ) -> crate::Result<()> {
+                self.closed
+                    .lock()
+                    .unwrap()
+                    .push((id.to_string(), completed));
+                Ok(())
+            }
+        }
+
+        struct OutputRecorder {
+            writes: Mutex<Vec<Vec<u8>>>,
+            copies: Mutex<Vec<Vec<u8>>>,
+            fail_copy: bool,
+        }
+        impl crate::application::capture::output::CaptureOutputHost for OutputRecorder {
+            fn system_paths(
+                &self,
+            ) -> crate::application::capture::output::CaptureOutputSystemPaths {
+                crate::application::capture::output::CaptureOutputSystemPaths {
+                    download_dir: None,
+                    picture_dir: None,
+                    home_dir: None,
+                    temp_dir: std::env::temp_dir(),
+                }
+            }
+            fn now(&self) -> chrono::DateTime<chrono::Local> {
+                chrono::Local::now()
+            }
+            fn path_exists(&self, _: &std::path::Path) -> bool {
+                false
+            }
+            fn write_file(&self, _: &std::path::Path, data: &[u8]) -> crate::Result<()> {
+                self.writes.lock().unwrap().push(data.to_vec());
+                Ok(())
+            }
+            fn copy_png(&self, data: &[u8]) -> crate::Result<()> {
+                self.copies.lock().unwrap().push(data.to_vec());
+                if self.fail_copy {
+                    Err("Clipboard busy".into())
+                } else {
+                    Ok(())
+                }
+            }
+            fn read_clipboard_png(&self) -> crate::Result<Vec<u8>> {
+                Err("Unused".into())
+            }
+            fn read_clipboard_text(&self) -> crate::Result<String> {
+                Err("Unused".into())
+            }
+        }
+
+        #[tokio::test]
+        async fn reaching_the_configured_height_copies_and_saves_the_cropped_result() {
+            for fail_copy in [false, true] {
+                let live = Arc::new(ScrollingHost::default());
+                live.frames
+                    .lock()
+                    .unwrap()
+                    .push_back(Ok(vec![snapshot(40)]));
+                let (mut runtime, sessions, _) = make_runtime(
+                    Arc::new(RecordingRuntimeHost::succeeds()),
+                    vec![snapshot(0)],
+                );
+                let settings = Arc::new(crate::application::settings::SettingsConfiguration::new(
+                    Arc::new(crate::infrastructure::storage::SqliteConfigStore::new_in_memory()),
+                ));
+                settings
+                    .update_screenshot(crate::domain::ScreenshotSettings {
+                        longshot_max_height: 125,
+                        ..Default::default()
+                    })
+                    .unwrap();
+                let output = Arc::new(OutputRecorder {
+                    writes: Mutex::new(Vec::new()),
+                    copies: Mutex::new(Vec::new()),
+                    fail_copy,
+                });
+                runtime.output = Arc::new(CaptureOutput::with_host(output.clone()));
+                let runtime = runtime
+                    .with_settings(settings)
+                    .with_scrolling_host(live.clone());
+                let (session_id, view) =
+                    start(&runtime, &sessions, snapshot(0).logical_bounds).await;
+                let result = runtime.capture_scrolling_frame(&view.id).await.unwrap();
+                assert_eq!(result.height, 125);
+                assert_eq!(output.copies.lock().unwrap().len(), 1);
+                assert_eq!(output.writes.lock().unwrap().len(), 1);
+                assert_eq!(
+                    image::load_from_memory(&output.writes.lock().unwrap()[0])
+                        .unwrap()
+                        .height(),
+                    125
+                );
+                if fail_copy {
+                    assert_eq!(result.status, ScrollingCaptureStatus::Error);
+                    assert!(result.hint.unwrap().contains("图片已保存"));
+                    assert!(sessions.has_session(&session_id));
+                    runtime.cancel_scrolling_capture(&view.id).await.unwrap();
+                } else {
+                    assert_eq!(result.status, ScrollingCaptureStatus::Completed);
+                    assert!(!sessions.has_session(&session_id));
+                    assert_eq!(live.closed.lock().unwrap()[0].1, Some(true));
+                }
+            }
+        }
+
+        fn snapshot(start: u32) -> MonitorSnapshot {
+            let frame = image::RgbaImage::from_fn(64, 100, |x, y| {
+                let row = start + y;
+                image::Rgba([
+                    ((row * 13 + x * 7) % 251) as u8,
+                    ((row * 29 + x * 3) % 253) as u8,
+                    ((row * 3 + x * 11) % 249) as u8,
+                    255,
+                ])
+            });
+            let mut png_data = Vec::new();
+            image::codecs::png::PngEncoder::new(&mut png_data)
+                .write_image(frame.as_raw(), 64, 100, image::ExtendedColorType::Rgba8)
+                .unwrap();
+            MonitorSnapshot {
+                id: "primary".into(),
+                logical_bounds: LogicalRect {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 64.0,
+                    height: 100.0,
+                },
+                physical_bounds: PhysicalRect {
+                    x: 0,
+                    y: 0,
+                    width: 64,
+                    height: 100,
+                },
+                scale_factor: 1.0,
+                png_data,
+            }
+        }
+
+        async fn start(
+            runtime: &CaptureSessionRuntime,
+            sessions: &CaptureSessions,
+            viewport: LogicalRect,
+        ) -> (CaptureSessionId, ScrollingCaptureView) {
+            let session = runtime.create_session_from_visible_desktop().await.unwrap();
+            sessions
+                .hydrate_session_snapshots(&session.id)
+                .await
+                .unwrap();
+            let view = runtime
+                .begin_scrolling_capture(session.id.clone(), viewport)
+                .await
+                .unwrap();
+            (session.id, view)
+        }
+
+        #[tokio::test]
+        async fn oversized_viewports_are_rejected_before_decoding_pixels_or_hiding_the_editor() {
+            let host = Arc::new(RecordingRuntimeHost::succeeds());
+            let live = Arc::new(ScrollingHost::default());
+            let mut original = snapshot(0);
+            original.png_data = vec![1, 2, 3];
+            let (runtime, sessions, _) = make_runtime(host.clone(), vec![original]);
+            let runtime = runtime.with_scrolling_host(live.clone());
+            let session = runtime.create_session_from_visible_desktop().await.unwrap();
+            sessions
+                .hydrate_session_snapshots(&session.id)
+                .await
+                .unwrap();
+            for (width, height) in [(9000.0, 9000.0), (64.0, 30_001.0)] {
+                let viewport = LogicalRect {
+                    x: 0.0,
+                    y: 0.0,
+                    width,
+                    height,
+                };
+                let error = runtime
+                    .begin_scrolling_capture(session.id.clone(), viewport)
+                    .await
+                    .unwrap_err();
+                assert!(error.to_string().contains("too large"));
+                assert!(sessions.has_session(&session.id));
+            }
+            assert!(live.geometries.lock().unwrap().is_empty());
+            assert_eq!(host.calls().len(), 2);
+        }
+
+        #[tokio::test]
+        async fn captures_fresh_frames_without_mutating_the_frozen_session_and_includes_the_final_frame(
+        ) {
+            let host = Arc::new(RecordingRuntimeHost::succeeds());
+            let live = Arc::new(ScrollingHost::default());
+            live.frames
+                .lock()
+                .unwrap()
+                .extend([Ok(vec![snapshot(20)]), Ok(vec![snapshot(40)])]);
+            let original = snapshot(0);
+            let (runtime, sessions, pins) = make_runtime(host.clone(), vec![original.clone()]);
+            let runtime = runtime.with_scrolling_host(live.clone());
+            let (session, view) = start(&runtime, &sessions, original.logical_bounds.clone()).await;
+            assert!(view.preview_expanded);
+            assert_eq!(
+                runtime
+                    .capture_scrolling_frame(&view.id)
+                    .await
+                    .unwrap()
+                    .height,
+                120
+            );
+            assert_eq!(
+                sessions.get_session(&session).unwrap().snapshots[0].png_data,
+                original.png_data
+            );
+            runtime
+                .finish_scrolling_capture(
+                    &view.id,
+                    crate::domain::capture::ScrollingCaptureOutputAction::Pin,
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                image::load_from_memory(&pins.pngs.lock().unwrap()[0])
+                    .unwrap()
+                    .height(),
+                140
+            );
+            assert!(!sessions.has_session(&session));
+            runtime.cancel_scrolling_capture(&view.id).await.unwrap();
+            assert_eq!(*live.closed.lock().unwrap(), vec![(view.id, Some(true))]);
+            assert_eq!(
+                host.calls()
+                    .iter()
+                    .filter(|call| **call == HostCall::EndPresentation)
+                    .count(),
+                1
+            );
+        }
+
+        #[tokio::test]
+        async fn a_failed_open_restores_the_original_editor_without_an_end_notification() {
+            let host = Arc::new(RecordingRuntimeHost::succeeds());
+            let live = Arc::new(ScrollingHost::default());
+            *live.open_error.lock().unwrap() = Some("Window failed".into());
+            let original = snapshot(0);
+            let (runtime, sessions, _) = make_runtime(host.clone(), vec![original.clone()]);
+            let runtime = runtime.with_scrolling_host(live.clone());
+            let session = runtime.create_session_from_visible_desktop().await.unwrap();
+            sessions
+                .hydrate_session_snapshots(&session.id)
+                .await
+                .unwrap();
+            assert!(runtime
+                .begin_scrolling_capture(session.id.clone(), original.logical_bounds)
+                .await
+                .is_err());
+            assert!(sessions.has_session(&session.id));
+            assert_eq!(live.closed.lock().unwrap()[0].1, None);
+            assert!(matches!(
+                host.calls().last(),
+                Some(HostCall::RevealCaptureWindow(_))
+            ));
+            *live.open_error.lock().unwrap() = None;
+            assert!(runtime
+                .begin_scrolling_capture(session.id, snapshot(0).logical_bounds)
+                .await
+                .is_ok());
+        }
+
+        #[tokio::test]
+        async fn changed_display_layout_preserves_the_completed_image_for_output() {
+            let live = Arc::new(ScrollingHost::default());
+            let mut changed = snapshot(20);
+            changed.physical_bounds.x = 100;
+            live.frames.lock().unwrap().push_back(Ok(vec![changed]));
+            let (runtime, sessions, pins) = make_runtime(
+                Arc::new(RecordingRuntimeHost::succeeds()),
+                vec![snapshot(0)],
+            );
+            let runtime = runtime.with_scrolling_host(live);
+            let (_, view) = start(&runtime, &sessions, snapshot(0).logical_bounds).await;
+            let failed = runtime.capture_scrolling_frame(&view.id).await.unwrap();
+            assert_eq!(failed.status, ScrollingCaptureStatus::Error);
+            assert_eq!(failed.height, 100);
+            runtime
+                .finish_scrolling_capture(
+                    &view.id,
+                    crate::domain::capture::ScrollingCaptureOutputAction::Pin,
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                image::load_from_memory(&pins.pngs.lock().unwrap()[0])
+                    .unwrap()
+                    .height(),
+                100
+            );
+        }
+
+        #[tokio::test]
+        async fn failed_output_retains_the_capture_and_retry_ends_it_once() {
+            let live = Arc::new(ScrollingHost::default());
+            let (runtime, sessions, pins) = make_runtime(
+                Arc::new(RecordingRuntimeHost::succeeds()),
+                vec![snapshot(0)],
+            );
+            let runtime = runtime.with_scrolling_host(live.clone());
+            let (session, view) = start(&runtime, &sessions, snapshot(0).logical_bounds).await;
+            *pins.error.lock().unwrap() = Some("Pin failed".into());
+            assert!(runtime
+                .finish_scrolling_capture(
+                    &view.id,
+                    crate::domain::capture::ScrollingCaptureOutputAction::Pin
+                )
+                .await
+                .is_err());
+            assert!(sessions.has_session(&session));
+            assert_eq!(
+                runtime
+                    .scrolling_capture_view(&view.id)
+                    .await
+                    .unwrap()
+                    .height,
+                100
+            );
+            assert!(live.closed.lock().unwrap().is_empty());
+            *pins.error.lock().unwrap() = None;
+            runtime
+                .finish_scrolling_capture(
+                    &view.id,
+                    crate::domain::capture::ScrollingCaptureOutputAction::Pin,
+                )
+                .await
+                .unwrap();
+            assert_eq!(live.closed.lock().unwrap().len(), 1);
+        }
+
+        #[tokio::test]
+        async fn a_new_capture_cancels_scrolling_and_stale_ids_do_not_affect_the_replacement() {
+            let host = Arc::new(RecordingRuntimeHost::succeeds());
+            let live = Arc::new(ScrollingHost::default());
+            let (runtime, sessions, _) = make_runtime(host, vec![snapshot(0)]);
+            let runtime = runtime.with_scrolling_host(live.clone());
+            let (old, old_view) = start(&runtime, &sessions, snapshot(0).logical_bounds).await;
+            let (current, view) = start(&runtime, &sessions, snapshot(0).logical_bounds).await;
+            assert!(!sessions.has_session(&old));
+            assert_eq!(live.closed.lock().unwrap()[0].1, Some(false));
+            assert!(runtime.capture_scrolling_frame(&old_view.id).await.is_err());
+            assert!(runtime.undo_scrolling_capture(&old_view.id).await.is_err());
+            runtime
+                .cancel_scrolling_capture(&old_view.id)
+                .await
+                .unwrap();
+            assert!(sessions.has_session(&current));
+            assert_eq!(
+                runtime
+                    .scrolling_capture_view(&view.id)
+                    .await
+                    .unwrap()
+                    .height,
+                100
+            );
+            runtime.cancel_scrolling_capture(&view.id).await.unwrap();
+            runtime.cancel_scrolling_capture(&view.id).await.unwrap();
+            assert_eq!(live.closed.lock().unwrap().len(), 2);
+        }
+
+        #[tokio::test]
+        async fn windows_secondary_display_uses_the_frozen_primary_scale_and_physical_pin_origin() {
+            let live = Arc::new(ScrollingHost::default());
+            let mut primary = snapshot(0);
+            primary.scale_factor = 2.0;
+            let mut secondary = snapshot(0);
+            secondary.id = "left".into();
+            secondary.physical_bounds.x = -64;
+            secondary.scale_factor = 1.25;
+            secondary.logical_bounds.x = -51.2;
+            let mut fresh = secondary.clone();
+            fresh.png_data = snapshot(20).png_data;
+            live.frames.lock().unwrap().push_back(Ok(vec![fresh]));
+            let (runtime, sessions, pins) = make_runtime_with_policy(
+                Arc::new(RecordingRuntimeHost::succeeds()),
+                vec![primary, secondary],
+                CaptureCoordinatePolicy::PrimaryMonitorScale,
+            );
+            let runtime = runtime.with_scrolling_host(live.clone());
+            let viewport = LogicalRect {
+                x: -32.0,
+                y: 0.0,
+                width: 32.0,
+                height: 50.0,
+            };
+            let (_, view) = start(&runtime, &sessions, viewport.clone()).await;
+            runtime
+                .finish_scrolling_capture(
+                    &view.id,
+                    crate::domain::capture::ScrollingCaptureOutputAction::Pin,
+                )
+                .await
+                .unwrap();
+            let geometry = &live.geometries.lock().unwrap()[0];
+            assert_eq!(geometry.desktop_scale, Some(2.0));
+            assert_eq!(geometry.monitors.len(), 1);
+            assert_eq!(geometry.monitors[0].logical_bounds, viewport);
+            assert_eq!(geometry.monitors[0].scale_factor, 2.0);
+            assert_eq!(
+                image::load_from_memory(&pins.pngs.lock().unwrap()[0])
+                    .unwrap()
+                    .height(),
+                120
+            );
+            assert_eq!(
+                pins.positions.lock().unwrap()[0],
+                Some(DesktopPosition::Physical(PhysicalPoint { x: -64, y: 0 }))
+            );
+        }
+
+        #[tokio::test]
+        async fn saves_the_assembled_image_to_the_requested_path() {
+            let live = Arc::new(ScrollingHost::default());
+            live.frames
+                .lock()
+                .unwrap()
+                .push_back(Ok(vec![snapshot(20)]));
+            let (runtime, sessions, _) = make_runtime(
+                Arc::new(RecordingRuntimeHost::succeeds()),
+                vec![snapshot(0)],
+            );
+            let runtime = runtime.with_scrolling_host(live);
+            let (_, view) = start(&runtime, &sessions, snapshot(0).logical_bounds).await;
+            let directory = tempfile::tempdir().unwrap();
+            let file = directory.path().join("scrolling.png");
+            runtime
+                .finish_scrolling_capture(
+                    &view.id,
+                    crate::domain::capture::ScrollingCaptureOutputAction::Save {
+                        path: file.to_string_lossy().into(),
+                        format: "png".into(),
+                        quality: 90,
+                        copy_after_save: false,
+                        remember_choice: false,
+                    },
+                )
+                .await
+                .unwrap();
+            let output = image::open(file).unwrap();
+            assert_eq!((output.width(), output.height()), (64, 120));
+        }
+
+        #[tokio::test]
+        async fn a_region_spanning_displays_composes_fresh_frames_by_monitor_id() {
+            let live = Arc::new(ScrollingHost::default());
+            let mut right = snapshot(0);
+            right.id = "right".into();
+            right.logical_bounds.x = 64.0;
+            right.physical_bounds.x = 64;
+            let mut fresh_right = right.clone();
+            fresh_right.png_data = snapshot(20).png_data;
+            live.frames
+                .lock()
+                .unwrap()
+                .push_back(Ok(vec![fresh_right, snapshot(20)]));
+            let (runtime, sessions, pins) = make_runtime(
+                Arc::new(RecordingRuntimeHost::succeeds()),
+                vec![snapshot(0), right],
+            );
+            let runtime = runtime.with_scrolling_host(live);
+            let (_, view) = start(
+                &runtime,
+                &sessions,
+                LogicalRect {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 128.0,
+                    height: 100.0,
+                },
+            )
+            .await;
+            runtime
+                .finish_scrolling_capture(
+                    &view.id,
+                    crate::domain::capture::ScrollingCaptureOutputAction::Pin,
+                )
+                .await
+                .unwrap();
+            let output = image::load_from_memory(&pins.pngs.lock().unwrap()[0])
+                .unwrap()
+                .to_rgba8();
+            assert_eq!(output.dimensions(), (128, 120));
+            assert_eq!(output.get_pixel(5, 110), output.get_pixel(69, 110));
+        }
+    }
+
+    #[tokio::test]
+    async fn pin_shortcut_routes_to_the_active_capture_before_the_clipboard() {
+        let host = Arc::new(RecordingRuntimeHost::succeeds());
+        host.pin_visible
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        let (runtime, _, pins) = make_runtime(host.clone(), vec![make_snapshot()]);
+        let session = runtime.create_session_from_visible_desktop().await.unwrap();
+        runtime.pin_from_shortcut().await.unwrap();
+        assert_eq!(
+            host.pin_requests.lock().unwrap().as_slice(),
+            &[session.id.clone()]
+        );
+        assert_eq!(
+            pins.clipboard_pins
+                .load(std::sync::atomic::Ordering::SeqCst),
+            0
+        );
+        host.pin_visible
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+        runtime.pin_from_shortcut().await.unwrap();
+        assert_eq!(
+            pins.clipboard_pins
+                .load(std::sync::atomic::Ordering::SeqCst),
+            1
+        );
     }
 
     #[tokio::test]

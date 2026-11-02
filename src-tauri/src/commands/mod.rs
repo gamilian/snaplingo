@@ -1,4 +1,6 @@
 mod capture_session_commands;
+mod scrolling_capture_commands;
+pub use scrolling_capture_commands::*;
 mod clipboard_commands;
 mod history_commands;
 mod hotkey_commands;

@@ -7,6 +7,12 @@ import "./styles/index.css";
 if (/win/i.test(navigator.platform)) {
   document.documentElement.dataset.platform = 'windows';
 }
+if (['scrolling-preview', 'scrolling-outline'].includes(new URLSearchParams(window.location.search).get('window') ?? '')) {
+  document.documentElement.dataset.scrollingPreview = 'true';
+}
+if (new URLSearchParams(window.location.search).get('window') === 'pin') {
+  document.documentElement.dataset.pinnedImage = 'true';
+}
 
 const App = React.lazy(() =>
   new URLSearchParams(window.location.search).get('window') === CAPTURE_WINDOW_LABEL

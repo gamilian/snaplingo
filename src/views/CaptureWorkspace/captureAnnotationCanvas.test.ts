@@ -59,6 +59,27 @@ describe('capture annotation canvas', () => {
     );
   });
 
+  it('uses software blur when a WebView has no Canvas filter support', () => {
+    const source = document.createElement('canvas');
+    source.width = source.height = 200;
+    const buffer = document.createElement('canvas');
+    const bufferContext = {
+      drawImage: vi.fn(), putImageData: vi.fn(),
+      getImageData: vi.fn((_x: number, _y: number, width: number, height: number) => ({ width, height, data: new Uint8ClampedArray(width * height * 4).fill(255) })),
+    };
+    vi.spyOn(buffer, 'getContext').mockReturnValue(bufferContext as never);
+    const context = {
+      canvas: source, getTransform: () => ({ a: 2 }), save: vi.fn(), restore: vi.fn(),
+      beginPath: vi.fn(), rect: vi.fn(), clip: vi.fn(), drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D;
+    drawCaptureAnnotation(context, { type: 'blur', rect: { x: 20, y: 20, width: 20, height: 20 }, radius: 8 }, { source, mosaic: buffer });
+    expect(bufferContext.getImageData).toHaveBeenCalledWith(0, 0, 128, 128);
+    expect(bufferContext.putImageData).toHaveBeenCalledOnce();
+    expect(context.clip).toHaveBeenCalledOnce();
+    expect(context.drawImage).toHaveBeenCalledWith(buffer, 0, 0, 100, 100);
+    expect('filter' in context).toBe(false);
+  });
+
   it('paints annotations at commit without repainting frozen pixels or waiting another frame', async () => {
     const sourceContext = { setTransform: vi.fn(), clearRect: vi.fn(), drawImage: vi.fn() };
     const annotationContext = {

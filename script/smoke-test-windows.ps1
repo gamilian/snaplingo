@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('nsis', 'msi')]
+    [ValidateSet('nsis', 'msi', 'portable')]
     [string]$InstallerType = 'nsis',
     [string]$Installer
 )
@@ -8,8 +8,8 @@ $ErrorActionPreference = 'Stop'
 if ($env:GITHUB_ACTIONS -ne 'true') { throw 'Run this installer smoke test on an ephemeral GitHub Actions runner.' }
 
 if (-not $Installer) {
-    $bundleDirectory = if ($InstallerType -eq 'msi') { 'target/release/bundle/msi' } else { 'target/release/bundle/nsis' }
-    $extension = if ($InstallerType -eq 'msi') { '*.msi' } else { '*.exe' }
+    $bundleDirectory = "target/release/bundle/$InstallerType"
+    $extension = if ($InstallerType -eq 'msi') { '*.msi' } elseif ($InstallerType -eq 'portable') { '*-portable.zip' } else { '*.exe' }
     $installers = @(Get-ChildItem $bundleDirectory -Filter $extension)
     if ($installers.Count -ne 1) { throw "Expected exactly one $InstallerType installer." }
     $Installer = $installers[0].FullName
@@ -88,7 +88,13 @@ function Uninstall-Msi($Product) {
 }
 
 try {
-    if ($InstallerType -eq 'nsis') {
+    if ($InstallerType -eq 'portable') {
+        Expand-Archive -LiteralPath $Installer -DestinationPath $installDirectory -Force
+        $executables = @(Get-ChildItem $installDirectory -Recurse -Filter 'snaplingo.exe')
+        if ($executables.Count -ne 1) { throw 'Expected exactly one portable executable.' }
+        Assert-AppStarts $executables[0].FullName
+        Assert-AppStarts $executables[0].FullName
+    } elseif ($InstallerType -eq 'nsis') {
         foreach ($attempt in 1..2) {
             $install = Start-Process -FilePath $Installer -ArgumentList "/S /D=$installDirectory" -Wait -PassThru
             if ($install.ExitCode -ne 0) { throw "Installer exited with $($install.ExitCode)" }
@@ -126,4 +132,5 @@ try {
         try { Uninstall-Msi $script:msiProduct } catch { Write-Warning "MSI cleanup failed: $_" }
     }
     Remove-Item -Path $marker -Force -ErrorAction SilentlyContinue
+    if ($InstallerType -eq 'portable') { Remove-Item -Path $installDirectory -Recurse -Force -ErrorAction SilentlyContinue }
 }

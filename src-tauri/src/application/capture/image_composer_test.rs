@@ -155,6 +155,7 @@ mod tests {
                     color: [255, 0, 0, 255],
                     stroke_width: 1,
                     filled: false,
+                    corner_radius: 0,
                 }],
             )
             .unwrap();
@@ -198,6 +199,7 @@ mod tests {
                     color: [255, 0, 0, 255],
                     stroke_width: 1,
                     filled: true,
+                    corner_radius: 0,
                 }],
             )
             .unwrap();
@@ -320,6 +322,8 @@ mod tests {
                     end: PhysicalPoint { x: 10, y: 4 },
                     color: [255, 0, 0, 255],
                     stroke_width: 1,
+                    control1: None,
+                    control2: None,
                 }],
             )
             .unwrap();
@@ -613,6 +617,9 @@ mod tests {
                     text: "Snap".to_string(),
                     color: [255, 0, 0, 255],
                     font_size: 18,
+                    font_family: String::new(),
+                    bold: false,
+                    italic: false,
                 }],
             )
             .unwrap();
@@ -650,6 +657,9 @@ mod tests {
                     text: "中文".to_string(),
                     color: [255, 0, 0, 255],
                     font_size: 24,
+                    font_family: String::new(),
+                    bold: false,
+                    italic: false,
                 }],
             )
             .unwrap();
@@ -686,6 +696,9 @@ mod tests {
                     text: "Snap".to_string(),
                     color: [255, 0, 0, 255],
                     font_size: 18,
+                    font_family: String::new(),
+                    bold: false,
+                    italic: false,
                 }],
             )
             .unwrap();

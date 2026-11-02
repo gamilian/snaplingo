@@ -61,3 +61,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: ./script/smoke-test-windows.ps1 -InstallerType msi
+      - name: Smoke test Windows portable archive
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./script/smoke-test-windows.ps1 -InstallerType portable

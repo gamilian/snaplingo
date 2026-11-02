@@ -1,5 +1,6 @@
 use std::f64::consts::PI;
 use std::io::Cursor;
+use std::sync::Arc;
 
 use ab_glyph::{point, Font, FontArc, Glyph, PxScale, ScaleFont};
 
@@ -23,13 +24,14 @@ pub struct PngPlacement<'a> {
     pub destination_rect: PhysicalRect,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ImageAnnotation {
     Rectangle {
         rect: PhysicalRect,
         color: [u8; 4],
         stroke_width: u32,
         filled: bool,
+        corner_radius: u32,
     },
     Ellipse {
         rect: PhysicalRect,
@@ -42,6 +44,8 @@ pub enum ImageAnnotation {
         end: PhysicalPoint,
         color: [u8; 4],
         stroke_width: u32,
+        control1: Option<PhysicalPoint>,
+        control2: Option<PhysicalPoint>,
     },
     Line {
         start: PhysicalPoint,
@@ -73,14 +77,60 @@ pub enum ImageAnnotation {
         text: String,
         color: [u8; 4],
         font_size: u32,
+        font_family: String,
+        bold: bool,
+        italic: bool,
+    },
+    RegionHighlight {
+        rect: PhysicalRect,
+        color: [u8; 4],
+        corner_radius: u32,
+    },
+    Blur {
+        rect: PhysicalRect,
+        radius: f32,
+        corner_radius: u32,
+    },
+    Spotlight {
+        rect: PhysicalRect,
+        corner_radius: u32,
     },
 }
 
-pub struct CaptureImageComposer;
+#[derive(Clone)]
+pub(crate) struct AnnotationFont {
+    pub font: FontArc,
+    pub bold: bool,
+    pub italic: bool,
+}
+
+pub(crate) trait AnnotationFontProvider: Send + Sync {
+    fn families(&self) -> Vec<String>;
+    fn resolve(&self, family: &str, bold: bool, italic: bool) -> Option<AnnotationFont>;
+}
+
+pub struct CaptureImageComposer {
+    font_provider: Option<Arc<dyn AnnotationFontProvider>>,
+}
 
 impl CaptureImageComposer {
     pub fn new() -> Self {
-        Self
+        Self {
+            font_provider: None,
+        }
+    }
+
+    pub(crate) fn with_font_provider(provider: Arc<dyn AnnotationFontProvider>) -> Self {
+        Self {
+            font_provider: Some(provider),
+        }
+    }
+
+    pub fn annotation_font_families(&self) -> Vec<String> {
+        self.font_provider
+            .as_ref()
+            .map(|provider| provider.families())
+            .unwrap_or_default()
     }
 
     pub fn crop_png(&self, png_data: &[u8], rect: &PhysicalRect) -> Result<Vec<u8>> {
@@ -129,6 +179,21 @@ impl CaptureImageComposer {
         placements: &[PngPlacement<'_>],
         annotations: &[ImageAnnotation],
     ) -> Result<Vec<u8>> {
+        let output = self.compose_rgba_with_annotations(width, height, placements, annotations)?;
+        let mut png = Vec::new();
+        image::DynamicImage::ImageRgba8(output)
+            .write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png)
+            .map_err(|error| AppError::System(format!("Failed to encode composed PNG: {error}")))?;
+        Ok(png)
+    }
+
+    pub(crate) fn compose_rgba_with_annotations(
+        &self,
+        width: u32,
+        height: u32,
+        placements: &[PngPlacement<'_>],
+        annotations: &[ImageAnnotation],
+    ) -> Result<image::RgbaImage> {
         if width == 0 || height == 0 {
             return Err(AppError::System(
                 "Cannot compose a zero-sized capture output".to_string(),
@@ -208,15 +273,27 @@ impl CaptureImageComposer {
             );
         }
         let source = output.clone();
+        let spotlights = annotations
+            .iter()
+            .filter_map(|annotation| match annotation {
+                ImageAnnotation::Spotlight {
+                    rect,
+                    corner_radius,
+                } => Some((rect, *corner_radius)),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        super::image_effects::apply_spotlights(&mut output, &source, &spotlights);
         for annotation in annotations {
-            draw_annotation(&mut output, &source, annotation);
+            draw_annotation(
+                &mut output,
+                &source,
+                annotation,
+                self.font_provider.as_deref(),
+            );
         }
 
-        let mut output_png = Vec::new();
-        image::DynamicImage::ImageRgba8(output)
-            .write_to(&mut Cursor::new(&mut output_png), image::ImageFormat::Png)
-            .map_err(|e| AppError::System(format!("Failed to encode composed PNG: {}", e)))?;
-        Ok(output_png)
+        Ok(output)
     }
 
     pub fn render_text_png(&self, text: &str) -> Result<Vec<u8>> {
@@ -252,6 +329,10 @@ impl CaptureImageComposer {
                 line,
                 TEXT_PIN_FOREGROUND,
                 TEXT_PIN_FONT_SIZE as u32,
+                "",
+                false,
+                false,
+                None,
             );
         }
 
@@ -391,6 +472,7 @@ fn draw_annotation(
     output: &mut image::RgbaImage,
     source: &image::RgbaImage,
     annotation: &ImageAnnotation,
+    fonts: Option<&dyn AnnotationFontProvider>,
 ) {
     match annotation {
         ImageAnnotation::Rectangle {
@@ -398,7 +480,21 @@ fn draw_annotation(
             color,
             stroke_width,
             filled,
-        } => draw_rectangle_annotation(output, rect, *color, *stroke_width, *filled),
+            corner_radius,
+        } => {
+            if *corner_radius > 0 {
+                super::image_effects::rounded_rectangle(
+                    output,
+                    rect,
+                    *color,
+                    *stroke_width,
+                    *filled,
+                    *corner_radius,
+                );
+            } else {
+                draw_rectangle_annotation(output, rect, *color, *stroke_width, *filled);
+            }
+        }
         ImageAnnotation::Ellipse {
             rect,
             color,
@@ -410,7 +506,17 @@ fn draw_annotation(
             end,
             color,
             stroke_width,
-        } => draw_arrow_annotation(output, start, end, *color, *stroke_width),
+            control1,
+            control2,
+        } => draw_arrow_annotation(
+            output,
+            start,
+            end,
+            *color,
+            *stroke_width,
+            control1.as_ref(),
+            control2.as_ref(),
+        ),
         ImageAnnotation::Line {
             start,
             end,
@@ -441,7 +547,31 @@ fn draw_annotation(
             text,
             color,
             font_size,
-        } => draw_text_annotation(output, position, text, *color, *font_size),
+            font_family,
+            bold,
+            italic,
+        } => draw_text_annotation(
+            output,
+            position,
+            text,
+            *color,
+            *font_size,
+            font_family,
+            *bold,
+            *italic,
+            fonts,
+        ),
+        ImageAnnotation::RegionHighlight {
+            rect,
+            color,
+            corner_radius,
+        } => super::image_effects::highlight_region(output, rect, *color, *corner_radius),
+        ImageAnnotation::Blur {
+            rect,
+            radius,
+            corner_radius,
+        } => super::image_effects::blur_region(output, rect, *radius, *corner_radius),
+        ImageAnnotation::Spotlight { .. } => {}
     }
 }
 
@@ -572,13 +702,65 @@ fn draw_arrow_annotation(
     end: &PhysicalPoint,
     color: [u8; 4],
     stroke_width: u32,
+    control1: Option<&PhysicalPoint>,
+    control2: Option<&PhysicalPoint>,
 ) {
     let color = image::Rgba(color);
     let stroke_width = stroke_width.max(1);
-    draw_line(output, start.x, start.y, end.x, end.y, color, stroke_width);
+    let default_control = |t: f64| PhysicalPoint {
+        x: (start.x as f64 + (end.x - start.x) as f64 * t).round() as i32,
+        y: (start.y as f64 + (end.y - start.y) as f64 * t).round() as i32,
+    };
+    let c1 = control1
+        .cloned()
+        .unwrap_or_else(|| default_control(1.0 / 3.0));
+    let c2 = control2
+        .cloned()
+        .unwrap_or_else(|| default_control(2.0 / 3.0));
+    if control1.is_some() || control2.is_some() {
+        let length = ((c1.x - start.x) as f64).hypot((c1.y - start.y) as f64)
+            + ((c2.x - c1.x) as f64).hypot((c2.y - c1.y) as f64)
+            + ((end.x - c2.x) as f64).hypot((end.y - c2.y) as f64);
+        let steps = (length / 4.0).ceil().clamp(16.0, 512.0) as u32;
+        let mut previous = start.clone();
+        for i in 1..=steps {
+            let t = i as f64 / steps as f64;
+            let u = 1.0 - t;
+            let next = PhysicalPoint {
+                x: (u.powi(3) * start.x as f64
+                    + 3.0 * u.powi(2) * t * c1.x as f64
+                    + 3.0 * u * t.powi(2) * c2.x as f64
+                    + t.powi(3) * end.x as f64)
+                    .round() as i32,
+                y: (u.powi(3) * start.y as f64
+                    + 3.0 * u.powi(2) * t * c1.y as f64
+                    + 3.0 * u * t.powi(2) * c2.y as f64
+                    + t.powi(3) * end.y as f64)
+                    .round() as i32,
+            };
+            draw_line(
+                output,
+                previous.x,
+                previous.y,
+                next.x,
+                next.y,
+                color,
+                stroke_width,
+            );
+            previous = next;
+        }
+    } else {
+        draw_line(output, start.x, start.y, end.x, end.y, color, stroke_width);
+    }
 
-    let dx = (end.x - start.x) as f64;
-    let dy = (end.y - start.y) as f64;
+    let tangent = control2
+        .filter(|point| point.x != end.x || point.y != end.y)
+        .or_else(|| {
+            control2.and_then(|_| control1.filter(|point| point.x != end.x || point.y != end.y))
+        })
+        .unwrap_or(start);
+    let dx = (end.x - tangent.x) as f64;
+    let dy = (end.y - tangent.y) as f64;
     let length = dx.hypot(dy);
     if length <= f64::EPSILON {
         return;
@@ -587,11 +769,14 @@ fn draw_arrow_annotation(
     let head_length = ((stroke_width as f64) * 6.0).max(6.0).min(length * 0.8);
     let line_angle = dy.atan2(dx);
     let head_angle = 35.0_f64.to_radians();
-    for wing_angle in [line_angle + PI - head_angle, line_angle + PI + head_angle] {
-        let wing_end = PhysicalPoint {
+    let wings = [line_angle + PI - head_angle, line_angle + PI + head_angle].map(|wing_angle| {
+        PhysicalPoint {
             x: (end.x as f64 + wing_angle.cos() * head_length).round() as i32,
             y: (end.y as f64 + wing_angle.sin() * head_length).round() as i32,
-        };
+        }
+    });
+    super::image_effects::arrow_head(output, end, &wings[0], &wings[1], color.0);
+    for wing_end in &wings {
         draw_line(
             output,
             end.x,
@@ -846,18 +1031,32 @@ fn draw_text_annotation(
     text: &str,
     color: [u8; 4],
     font_size: u32,
+    font_family: &str,
+    bold: bool,
+    italic: bool,
+    fonts: Option<&dyn AnnotationFontProvider>,
 ) {
     if text.is_empty() {
         return;
     }
 
-    let Ok(font) = FontArc::try_from_slice(TEXT_FONT_BYTES) else {
-        return;
+    let resolved = fonts.and_then(|provider| provider.resolve(font_family, bold, italic));
+    let fallback_font = FontArc::try_from_slice(TEXT_FONT_BYTES).ok();
+    let (font, synthetic_bold, synthetic_italic) = if let Some(resolved) = resolved {
+        (
+            resolved.font,
+            bold && !resolved.bold,
+            italic && !resolved.italic,
+        )
+    } else {
+        let Some(font) = fallback_font.clone() else {
+            return;
+        };
+        (font, bold, italic)
     };
     let font_size = font_size.max(1) as f32;
     let scale = PxScale::from(font_size);
-    let scaled_font = font.as_scaled(scale);
-    let line_height = scaled_font.height().max(font_size);
+    let line_height = font_size * 1.2;
     let start_x = position.x as f32;
     let mut caret = point(start_x, position.y as f32);
 
@@ -868,11 +1067,17 @@ fn draw_text_annotation(
             continue;
         }
 
-        let glyph_id = font.glyph_id(character);
+        let use_fallback = font.glyph_id(character).0 == 0 && fallback_font.is_some();
+        let glyph_font = if use_fallback {
+            fallback_font.as_ref().unwrap()
+        } else {
+            &font
+        };
+        let glyph_id = glyph_font.glyph_id(character);
         let glyph: Glyph = glyph_id.with_scale_and_position(scale, caret);
-        caret.x += scaled_font.h_advance(glyph_id);
+        caret.x += glyph_font.as_scaled(scale).h_advance(glyph_id);
 
-        if let Some(outlined_glyph) = font.outline_glyph(glyph) {
+        if let Some(outlined_glyph) = glyph_font.outline_glyph(glyph) {
             let bounds = outlined_glyph.px_bounds();
             outlined_glyph.draw(|x, y, coverage| {
                 let alpha = ((color[3] as f32) * coverage).round() as u8;
@@ -880,12 +1085,26 @@ fn draw_text_annotation(
                     return;
                 }
 
-                blend_pixel_if_in_bounds(
-                    output,
-                    bounds.min.x as i32 + x as i32,
-                    bounds.min.y as i32 + y as i32,
-                    image::Rgba([color[0], color[1], color[2], alpha]),
-                );
+                let pixel_y = bounds.min.y as i32 + y as i32;
+                let skew = if synthetic_italic || (use_fallback && italic) {
+                    ((caret.y - pixel_y as f32) * 0.2).round() as i32
+                } else {
+                    0
+                };
+                let pixel_x = bounds.min.x as i32 + x as i32 + skew;
+                let weight = if synthetic_bold || (use_fallback && bold) {
+                    (font_size / 24.0).ceil().max(1.0) as i32
+                } else {
+                    0
+                };
+                for offset in 0..=weight {
+                    blend_pixel_if_in_bounds(
+                        output,
+                        pixel_x + offset,
+                        pixel_y,
+                        image::Rgba([color[0], color[1], color[2], alpha]),
+                    );
+                }
             });
         }
     }
@@ -917,58 +1136,6 @@ fn average_block_color(
         (totals[2] / count) as u8,
         (totals[3] / count) as u8,
     ])
-}
-
-fn draw_alpha_line(
-    output: &mut image::RgbaImage,
-    start_x: i32,
-    start_y: i32,
-    end_x: i32,
-    end_y: i32,
-    color: image::Rgba<u8>,
-    stroke_width: u32,
-) {
-    let mut x = start_x;
-    let mut y = start_y;
-    let dx = (end_x - start_x).abs();
-    let sx = if start_x < end_x { 1 } else { -1 };
-    let dy = -(end_y - start_y).abs();
-    let sy = if start_y < end_y { 1 } else { -1 };
-    let mut err = dx + dy;
-
-    loop {
-        draw_alpha_stroked_point(output, x, y, color, stroke_width);
-        if x == end_x && y == end_y {
-            break;
-        }
-        let e2 = err * 2;
-        if e2 >= dy {
-            err += dy;
-            x += sx;
-        }
-        if e2 <= dx {
-            err += dx;
-            y += sy;
-        }
-    }
-}
-
-fn draw_alpha_stroked_point(
-    output: &mut image::RgbaImage,
-    x: i32,
-    y: i32,
-    color: image::Rgba<u8>,
-    stroke_width: u32,
-) {
-    let stroke_width = stroke_width.max(1) as i32;
-    let min_offset = -(stroke_width / 2);
-    let max_offset = (stroke_width - 1) / 2;
-
-    for offset_y in min_offset..=max_offset {
-        for offset_x in min_offset..=max_offset {
-            blend_pixel_if_in_bounds(output, x + offset_x, y + offset_y, color);
-        }
-    }
 }
 
 fn blend_pixel_if_in_bounds(output: &mut image::RgbaImage, x: i32, y: i32, color: image::Rgba<u8>) {
@@ -1098,5 +1265,57 @@ fn draw_vertical_line(
 impl Default for CaptureImageComposer {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+fn draw_alpha_line(
+    output: &mut image::RgbaImage,
+    start_x: i32,
+    start_y: i32,
+    end_x: i32,
+    end_y: i32,
+    color: image::Rgba<u8>,
+    stroke_width: u32,
+) {
+    let mut x = start_x;
+    let mut y = start_y;
+    let dx = (end_x - start_x).abs();
+    let sx = if start_x < end_x { 1 } else { -1 };
+    let dy = -(end_y - start_y).abs();
+    let sy = if start_y < end_y { 1 } else { -1 };
+    let mut err = dx + dy;
+
+    loop {
+        draw_alpha_stroked_point(output, x, y, color, stroke_width);
+        if x == end_x && y == end_y {
+            break;
+        }
+        let e2 = err * 2;
+        if e2 >= dy {
+            err += dy;
+            x += sx;
+        }
+        if e2 <= dx {
+            err += dx;
+            y += sy;
+        }
+    }
+}
+
+fn draw_alpha_stroked_point(
+    output: &mut image::RgbaImage,
+    x: i32,
+    y: i32,
+    color: image::Rgba<u8>,
+    stroke_width: u32,
+) {
+    let stroke_width = stroke_width.max(1) as i32;
+    let min_offset = -(stroke_width / 2);
+    let max_offset = (stroke_width - 1) / 2;
+
+    for offset_y in min_offset..=max_offset {
+        for offset_x in min_offset..=max_offset {
+            blend_pixel_if_in_bounds(output, x + offset_x, y + offset_y, color);
+        }
     }
 }

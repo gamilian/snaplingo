@@ -306,3 +306,34 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+
+@container (max-width: 900px) {
+  :root[data-interface-theme] .settings-page { padding-left: 22px; padding-right: 22px; }
+  :root[data-interface-theme='paper'] .settings-nav-label { display: none; }
+  :root[data-interface-theme='paper'] .settings-main-nav { gap: 14px; padding-left: 17px; padding-right: 17px; }
+  .theme-option-name small { display: none; }
+}
+
+.third-party-notices {
+  width: min(860px, calc(90vw / var(--settings-interface-scale, 1)));
+  height: min(760px, calc(85vh / var(--settings-interface-scale, 1)));
+  max-width: none;
+  max-height: none;
+  transform: scale(var(--settings-interface-scale, 1));
+}
+.third-party-notices[open] { display: flex; flex-direction: column; }
+
+@container (max-width: 700px) {
+  :root[data-interface-theme] .settings-context-nav { display: none; }
+  :root[data-interface-theme] .settings-section-tabs { display: flex; max-width: 100%; }
+  :root[data-interface-theme] .settings-page-header { flex-wrap: wrap; gap: 14px; }
+  :root[data-interface-theme='native'] .settings-main-nav { width: 65px; padding: 17px 7px; }
+  :root[data-interface-theme='native'] .settings-brand-name,
+  :root[data-interface-theme='native'] .settings-nav-group-label,
+  :root[data-interface-theme='native'] .settings-nav-label,
+  :root[data-interface-theme='native'] .settings-capacity-panel { display: none; }
+  :root[data-interface-theme='native'] .settings-nav-item { justify-content: center; padding: 0; }
+  :root[data-interface-theme] .settings-control-row { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  :root[data-interface-theme] .settings-control-row > div:last-child { justify-self: stretch; }
+  .theme-options { grid-template-columns: minmax(0, 1fr); }
+}

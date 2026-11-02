@@ -1084,7 +1084,9 @@ mod tests {
                 format: "png".to_string(),
                 quality: 90,
                 copy_after_save: false,
+                remember_choice: false,
             },
+            None,
         )
         .await
         .unwrap();
@@ -1248,6 +1250,7 @@ mod tests {
             &[],
             false,
             CaptureOutputAction::Pin,
+            None,
         )
         .await
         .unwrap();
@@ -1377,6 +1380,7 @@ mod tests {
             &[],
             false,
             CaptureOutputAction::Pin,
+            None,
         )
         .await
         .unwrap();

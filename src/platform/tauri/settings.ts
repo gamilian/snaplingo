@@ -39,6 +39,8 @@ interface BackendScreenshotSettings {
   quality: number;
   naming_rule: ScreenshotNamingRule;
   custom_file_name: string;
+  last_save_directory?: string | null;
+  last_save_format?: ScreenshotFormat | null;
   auto_copy: boolean;
   default_stroke_width: number;
   default_font_size: number;
@@ -48,6 +50,12 @@ interface BackendScreenshotSettings {
   magnifier_zoom?: number;
   pin_opacity: number;
   pin_shadow: boolean;
+  pin_border?: boolean;
+  pin_position?: 'original' | 'center';
+  pin_border_shortcut?: string;
+  longshot_max_height?: number;
+  capture_ui_scale?: import('../../application/settings/ports').CaptureUiScale;
+  annotation_tool_shortcuts?: Record<string, string>;
   annotation_colors: AnnotationColorPreset[];
   selection_border_width?: number;
   selection_border_color?: AnnotationColorPreset;
@@ -126,6 +134,8 @@ interface ScreenshotSettingsInput {
   quality: number;
   namingRule: ScreenshotNamingRule;
   customFileName: string;
+  lastSaveDirectory?: string;
+  lastSaveFormat?: ScreenshotFormat;
   autoCopy: boolean;
   defaultStrokeWidth: number;
   defaultFontSize: number;
@@ -135,6 +145,12 @@ interface ScreenshotSettingsInput {
   magnifierZoom?: number;
   pinOpacity: number;
   pinShadow: boolean;
+  pinBorder?: boolean;
+  pinPosition?: 'original' | 'center';
+  pinBorderShortcut?: string;
+  longshotMaxHeight?: number;
+  captureUiScale?: import('../../application/settings/ports').CaptureUiScale;
+  annotationToolShortcuts?: Record<string, string>;
   annotationColors: AnnotationColorPreset[];
   selectionBorderWidth?: number;
   selectionBorderColor?: AnnotationColorPreset;
@@ -212,6 +228,8 @@ function normalizeSnapshot(snapshot: BackendSettingsSnapshot) {
       quality: snapshot.screenshot.quality,
       namingRule: snapshot.screenshot.naming_rule,
       customFileName: snapshot.screenshot.custom_file_name,
+      ...(snapshot.screenshot.last_save_directory ? { lastSaveDirectory: snapshot.screenshot.last_save_directory } : {}),
+      ...(snapshot.screenshot.last_save_format ? { lastSaveFormat: snapshot.screenshot.last_save_format } : {}),
       autoCopy: snapshot.screenshot.auto_copy,
       defaultStrokeWidth: snapshot.screenshot.default_stroke_width,
       defaultFontSize: snapshot.screenshot.default_font_size,
@@ -221,6 +239,12 @@ function normalizeSnapshot(snapshot: BackendSettingsSnapshot) {
       magnifierZoom: snapshot.screenshot.magnifier_zoom ?? 12,
       pinOpacity: snapshot.screenshot.pin_opacity,
       pinShadow: snapshot.screenshot.pin_shadow,
+      pinBorder: snapshot.screenshot.pin_border ?? false,
+      pinPosition: snapshot.screenshot.pin_position ?? 'original',
+      pinBorderShortcut: snapshot.screenshot.pin_border_shortcut ?? 'b',
+      longshotMaxHeight: snapshot.screenshot.longshot_max_height ?? 30_000,
+      captureUiScale: snapshot.screenshot.capture_ui_scale ?? 'auto',
+      annotationToolShortcuts: snapshot.screenshot.annotation_tool_shortcuts ?? {},
       annotationColors: snapshot.screenshot.annotation_colors,
       selectionBorderWidth: snapshot.screenshot.selection_border_width ?? 2,
       selectionBorderColor:
@@ -347,6 +371,12 @@ export async function updateScreenshotSettings(input: ScreenshotSettingsInput) {
         magnifier_zoom: input.magnifierZoom ?? 12,
         pin_opacity: input.pinOpacity,
         pin_shadow: input.pinShadow,
+        pin_border: input.pinBorder ?? false,
+        pin_position: input.pinPosition ?? 'original',
+        pin_border_shortcut: input.pinBorderShortcut ?? 'b',
+        longshot_max_height: input.longshotMaxHeight ?? 30_000,
+        capture_ui_scale: input.captureUiScale ?? 'auto',
+        annotation_tool_shortcuts: input.annotationToolShortcuts ?? {},
         annotation_colors: input.annotationColors,
         selection_border_width: input.selectionBorderWidth ?? 2,
         selection_border_color:
