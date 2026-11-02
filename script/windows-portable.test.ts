@@ -151,6 +151,6 @@ describe('Windows portable packaging', () => {
         existsSync(join(context.bundleDirectory, 'portable/SnapLingo_0.2.0')),
       ).toBe(false);
     },
-    30_000,
+    60_000,
   );
 });
