@@ -568,7 +568,7 @@ describe('annotation style', () => {
     ).toBeNull();
   });
 
-  it('maps unmodified mouse wheel movement to annotation size directions only in editing mode', () => {
+  it('maps mouse wheel movement including Ctrl to annotation size directions only in editing mode', () => {
     expect(
       annotationSizeDirectionFromWheel(
         {
@@ -612,7 +612,7 @@ describe('annotation style', () => {
         },
         { editing: true },
       ),
-    ).toBeNull();
+    ).toBe('increase');
     expect(
       annotationSizeDirectionFromWheel(
         {
@@ -629,11 +629,11 @@ describe('annotation style', () => {
   it('steps annotation stroke width and text font size within toolbar bounds', () => {
     expect(nextAnnotationStrokeWidth(4, 'increase')).toBe(5);
     expect(nextAnnotationStrokeWidth(1, 'decrease')).toBe(1);
-    expect(nextAnnotationStrokeWidth(8, 'increase')).toBe(8);
+    expect(nextAnnotationStrokeWidth(32, 'increase')).toBe(32);
 
     expect(nextTextFontSize(24, 'increase')).toBe(25);
-    expect(nextTextFontSize(12, 'decrease')).toBe(12);
-    expect(nextTextFontSize(48, 'increase')).toBe(48);
+    expect(nextTextFontSize(10, 'decrease')).toBe(10);
+    expect(nextTextFontSize(96, 'increase')).toBe(96);
   });
 
   it('updates committed annotations with the selected style', () => {

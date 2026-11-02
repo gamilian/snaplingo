@@ -12,20 +12,34 @@ pub trait CaptureCursorMover: Send + Sync {
 
 #[async_trait]
 pub(crate) trait CapturePinOutput: Send + Sync {
-    async fn pin_png(&self, png_data: Vec<u8>) -> Result<()>;
+    async fn pin_clipboard_image(&self) -> Result<()> {
+        Err("Clipboard pin output is not configured".into())
+    }
+    async fn pin_png(
+        &self,
+        png_data: Vec<u8>,
+        position: Option<crate::domain::capture::DesktopPosition>,
+    ) -> Result<()>;
 }
 
 pub(crate) struct UnconfiguredCapturePinOutput;
 
 #[async_trait]
 impl CapturePinOutput for UnconfiguredCapturePinOutput {
-    async fn pin_png(&self, _png_data: Vec<u8>) -> Result<()> {
+    async fn pin_png(
+        &self,
+        _png_data: Vec<u8>,
+        _position: Option<crate::domain::capture::DesktopPosition>,
+    ) -> Result<()> {
         Err("Capture pin output is not configured".into())
     }
 }
 
 #[async_trait]
 pub(crate) trait CaptureSessionRuntimeHost: Send + Sync {
+    async fn request_capture_selection_pin(&self, _session_id: &CaptureSessionId) -> Result<bool> {
+        Ok(false)
+    }
     fn clipboard_revision(&self) -> u64 {
         0
     }

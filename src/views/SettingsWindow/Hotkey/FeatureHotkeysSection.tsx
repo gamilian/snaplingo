@@ -97,11 +97,6 @@ export function FeatureHotkeysSection({
         return;
       }
       if (event.repeat || saving) return;
-      if (isWindowsPlatform() && event.metaKey) {
-        pendingKey = null;
-        setRecordingHint('暂不支持 Win 键，请使用 Ctrl、Alt、Shift 或功能键。');
-        return;
-      }
       setRecordingHint(null);
 
       const modifiers: string[] = [];
@@ -109,6 +104,7 @@ export function FeatureHotkeysSection({
       if (event.altKey) modifiers.push('⌥');
       if (isWindowsPlatform()) {
         if (event.ctrlKey) modifiers.push('⌘');
+        if (event.metaKey) modifiers.push('⊞');
       } else {
         if (event.metaKey) modifiers.push('⌘');
         if (event.ctrlKey) modifiers.push('⌃');

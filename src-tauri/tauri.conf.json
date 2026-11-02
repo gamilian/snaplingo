@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "SnapLingo",
-  "version": "0.1.22",
+  "version": "0.1.23",
   "identifier": "com.snaplingo.app",
   "build": {
     "frontendDist": "../dist",
@@ -18,7 +18,10 @@
     }
   },
   "bundle": {
-    "resources": { "resources/ocr/": "ocr/", "resources/windows-crt/": "./" },
+    "resources": {
+      "resources/ocr/": "ocr/",
+      "resources/windows-crt/": "./"
+    },
     "active": true,
     "targets": "all",
     "icon": [

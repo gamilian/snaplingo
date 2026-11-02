@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import { AnnotationShortcutSettings } from './AnnotationShortcutSettings';
+import { PinBorderShortcutSettings } from './PinBorderShortcutSettings';
 import type { AnnotationColorPreset, ScreenshotSettings } from '../../../application/settings/ports';
 import { CustomRange } from '../../../components/common/CustomRange';
 import { CustomSelect } from '../../../components/common/CustomSelect';
@@ -89,14 +91,14 @@ export function ScreenshotSettingsPage() {
             </button>
           </div>
         </SettingRow>
-        <SettingRow label="图片格式">
+        <SettingRow label="图片格式" description="快捷保存使用此格式；另存为记住上次目录和格式。">
           <div className="w-[230px]">
             <CustomSelect
               value={screenshot.format}
               options={[
-                { value: 'png', label: 'PNG' },
+                { value: 'png', label: 'PNG（无损）' },
                 { value: 'jpg', label: 'JPG' },
-                { value: 'webp', label: 'WebP' },
+                { value: 'webp', label: 'WebP（无损）' },
               ]}
               onChange={(format) =>
                 updateScreenshot({ format: format as ScreenshotSettings['format'] })
@@ -104,7 +106,7 @@ export function ScreenshotSettingsPage() {
             />
           </div>
         </SettingRow>
-        <SettingRow label="图片质量">
+        {screenshot.format === 'jpg' && <SettingRow label="JPEG 图片质量">
           <RangeValue value={`${screenshot.quality}%`}>
             <CustomRange
               value={screenshot.quality}
@@ -114,13 +116,14 @@ export function ScreenshotSettingsPage() {
               onChange={(quality) => updateScreenshot({ quality })}
             />
           </RangeValue>
-        </SettingRow>
+        </SettingRow>}
         <SettingRow label="文件命名规则">
           <div className="w-[230px]">
             <CustomSelect
               value={screenshot.namingRule}
               options={[
-                { value: 'timestamp', label: '时间戳' },
+                { value: 'timestamp', label: '日期与时间' },
+                { value: 'unix-ms', label: 'Unix 毫秒时间戳' },
                 { value: 'date', label: '日期' },
                 { value: 'counter', label: '计数器' },
                 { value: 'custom', label: '自定义' },
@@ -153,6 +156,14 @@ export function ScreenshotSettingsPage() {
             checked={screenshot.autoCopy}
             onChange={(autoCopy) => updateScreenshot({ autoCopy })}
           />
+        </SettingRow>
+        <SettingRow label="长截图最大高度" description="单位：像素。到达上限后自动复制并保存 PNG；同时受总像素上限保护。">
+          <div className="flex items-center gap-2">
+            <input type="number" aria-label="长截图最大高度" min={100} max={100000} step={1000} key={screenshot.longshotMaxHeight ?? 30000} defaultValue={screenshot.longshotMaxHeight ?? 30000}
+              onBlur={(event) => { const value = Number(event.currentTarget.value); if (Number.isFinite(value) && value >= 100) updateScreenshot({ longshotMaxHeight: Math.min(100000, Math.round(value)) }); }}
+              className="h-9 w-[140px] rounded-lg border border-line bg-surface px-3 text-xs text-ink outline-none focus:border-accent" />
+            <span className="text-xs text-muted">px</span>
+          </div>
         </SettingRow>
       </SettingsGroup>
     </>
@@ -274,6 +285,13 @@ export function ScreenshotSettingsPage() {
         </SettingRow>
       </SettingsGroup>
       <SettingsGroup>
+        <SettingRow label="记住上次标注工具" description="本次运行内沿用上次工具；关闭后每次从矩形开始。">
+          <SettingsToggle
+            label="记住上次标注工具"
+            checked={screenshot.rememberLastTool}
+            onChange={(rememberLastTool) => updateScreenshot({ rememberLastTool })}
+          />
+        </SettingRow>
         <SettingRow label="显示选区尺寸">
           <SettingsToggle
             label="显示选区尺寸"
@@ -308,7 +326,7 @@ export function ScreenshotSettingsPage() {
           <RangeValue value={`${screenshot.pinOpacity}%`}>
             <CustomRange
               value={screenshot.pinOpacity}
-              min={20}
+              min={5}
               max={100}
               step={1}
               onChange={(pinOpacity) => updateScreenshot({ pinOpacity })}
@@ -321,6 +339,23 @@ export function ScreenshotSettingsPage() {
             checked={screenshot.pinShadow}
             onChange={(pinShadow) => updateScreenshot({ pinShadow })}
           />
+        </SettingRow>
+        <SettingRow label="贴图初始位置">
+          <div className="w-[230px]"><CustomSelect
+            value={screenshot.pinPosition ?? 'original'}
+            options={[{ value: 'original', label: '截图原位置' }, { value: 'center', label: '桌面中央（级联）' }]}
+            onChange={(position) => updateScreenshot({ pinPosition: position as 'original' | 'center' })}
+          /></div>
+        </SettingRow>
+        <SettingRow label="显示贴图边框">
+          <SettingsToggle label="显示贴图边框" checked={screenshot.pinBorder ?? false} onChange={(pinBorder) => updateScreenshot({ pinBorder })} />
+        </SettingRow>
+        <SettingRow label="界面缩放" description="应用于设置、截图工具、长截图控件与光标。">
+          <div className="w-[230px]"><CustomSelect
+            value={screenshot.captureUiScale ?? 'auto'}
+            options={[{ value: 'auto', label: '自动（跟随显示器）' }, ...['100', '125', '150', '175', '200'].map((value) => ({ value, label: `${value}%` }))]}
+            onChange={(scale) => updateScreenshot({ captureUiScale: scale as ScreenshotSettings['captureUiScale'] })}
+          /></div>
         </SettingRow>
       </SettingsGroup>
     </>
@@ -338,10 +373,14 @@ export function ScreenshotSettingsPage() {
             <HotkeyToolbar category="screenshot" actions={SCREENSHOT_HOTKEYS} />
           ),
           content: (
+            <>
             <FeatureHotkeysSection
               category="screenshot"
               actions={SCREENSHOT_HOTKEYS}
             />
+            <AnnotationShortcutSettings value={screenshot.annotationToolShortcuts} onUpdate={(annotationToolShortcuts) => updateScreenshotSettings({ annotationToolShortcuts })} />
+            <SettingsGroup><PinBorderShortcutSettings value={screenshot.pinBorderShortcut} onUpdate={(pinBorderShortcut) => updateScreenshotSettings({ pinBorderShortcut })} /></SettingsGroup>
+            </>
           ),
         },
         {

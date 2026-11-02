@@ -5,6 +5,7 @@ type CaptureKeyboardHostStatus =
   | 'loading'
   | 'selecting'
   | 'preview'
+  | 'scrolling'
   | 'error';
 
 interface CaptureKeyboardKeyEvent {

@@ -21,12 +21,12 @@ interface CaptureMagnifierHydrationState {
 interface CaptureMagnifierRequestState {
   enabled: boolean;
   requested: boolean;
-  status: 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
+  status: 'idle' | 'loading' | 'selecting' | 'preview' | 'scrolling' | 'error';
 }
 
 interface CaptureMagnifierRuntimeStateOptions {
   session: CaptureSessionView | null;
-  status: 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
+  status: 'idle' | 'loading' | 'selecting' | 'preview' | 'scrolling' | 'error';
   cursorPoint: Point | null;
   cursorViewportPoint: Point | null;
   viewportBounds: LogicalRect | null;

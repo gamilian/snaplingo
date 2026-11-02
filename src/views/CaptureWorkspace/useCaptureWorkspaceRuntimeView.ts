@@ -19,6 +19,7 @@ import {
   useCaptureMagnifierPixelSource,
 } from './captureMagnifierRuntime';
 import { useCaptureSelectionOverlay } from './captureSelectionOverlayRuntime';
+import { captureInterfaceScale } from '../../application/capture-workspace/interfaceScale';
 import { getCaptureWorkspaceDerivedState } from '../../application/capture-workspace/captureWorkspaceDerived';
 import { ANNOTATION_COLORS, type AnnotationColor } from '../../application/capture-workspace/annotationStyle';
 import type {
@@ -61,6 +62,8 @@ export function useCaptureWorkspaceRuntimeView({
   ocrPreferences,
 }: CaptureWorkspaceRuntimeViewOptions): CaptureWorkspaceRuntimeView {
   const platformPorts = useCaptureWorkspacePorts();
+  const [fontFamilies, setFontFamilies] = useState<string[]>([]);
+  const fontFamiliesRequestRef = useRef<Promise<string[]> | null>(null);
   const onInactiveRef = useRef(onInactive);
   const annotationColorPresetsRef = useRef(annotationColorPresets);
   const screenshotPreferencesRef = useRef(screenshotPreferences);
@@ -122,6 +125,10 @@ export function useCaptureWorkspaceRuntimeView({
     () => workflowRuntime.renderState,
   );
   const toolbarRef = useRef<HTMLDivElement | null>(null);
+  const scaleAnchor = runtimeRenderState.selection ?? runtimeRenderState.cursorPoint;
+  const scaleMonitor = runtimeRenderState.session?.monitors.find((monitor) => scaleAnchor && scaleAnchor.x >= monitor.logical_bounds.x && scaleAnchor.y >= monitor.logical_bounds.y && scaleAnchor.x < monitor.logical_bounds.x + monitor.logical_bounds.width && scaleAnchor.y < monitor.logical_bounds.y + monitor.logical_bounds.height)
+    ?? runtimeRenderState.session?.monitors[0];
+  const uiScale = captureInterfaceScale(screenshotPreferences?.captureUiScale, scaleMonitor?.logical_bounds);
   const [toolbarHeight, setToolbarHeight] = useState(TOOLBAR_SIZE.height);
   const [toolbarClientBounds, setToolbarClientBounds] = useState(() => ({
     x: 0,
@@ -150,7 +157,7 @@ export function useCaptureWorkspaceRuntimeView({
       observer.disconnect();
       window.removeEventListener('resize', updateSize);
     };
-  }, [runtimeRenderState.status, runtimeRenderState.isAnnotationToolbarVisible]);
+  }, [runtimeRenderState.status, runtimeRenderState.isAnnotationToolbarVisible, uiScale]);
 
   useEffect(() => {
     setRuntimeRenderState(workflowRuntime.renderState);
@@ -172,6 +179,18 @@ export function useCaptureWorkspaceRuntimeView({
       }),
     [runtimeRenderState, toolbarClientBounds, toolbarHeight],
   );
+  useEffect(() => {
+    if (!derived.isTextSizingActive || !platformPorts.commands.listAnnotationFontFamilies) return;
+    let active = true;
+    fontFamiliesRequestRef.current ??= platformPorts.commands.listAnnotationFontFamilies();
+    void fontFamiliesRequestRef.current.then((families) => {
+      if (active) setFontFamilies(families);
+    }).catch((error) => {
+      fontFamiliesRequestRef.current = null;
+      console.warn('Failed to load annotation fonts:', error);
+    });
+    return () => { active = false; };
+  }, [derived.isTextSizingActive, platformPorts.commands]);
   const draftSelectionRef = useRef<LogicalRect | null>(null);
   const hoverSelectionRef = useRef(runtimeRenderState.hoverSelection);
   draftSelectionRef.current =
@@ -196,6 +215,7 @@ export function useCaptureWorkspaceRuntimeView({
     selectionBorderWidth: screenshotPreferences?.selectionBorderWidth,
     selectionBorderColor: screenshotPreferences?.selectionBorderColor,
     selectionMaskColor: screenshotPreferences?.selectionMaskColor,
+    uiScale,
   });
 
   const isMagnifierEnabled = screenshotPreferences?.showMagnifier ?? false;
@@ -330,9 +350,12 @@ export function useCaptureWorkspaceRuntimeView({
         textDraft: runtimeRenderState.textDraft,
         annotationStyle: runtimeRenderState.annotationStyle,
         selectedAnnotationBounds: derived.selectedAnnotationBounds,
+        selectedAnnotation: derived.selectedAnnotation,
         activeAnnotationTool: runtimeRenderState.activeAnnotationTool,
       },
       toolbar: {
+        fontFamilies,
+        uiScale,
         position: derived.toolbarPosition,
         width: derived.toolbarSize.width,
         isVisible: runtimeRenderState.isAnnotationToolbarVisible,
@@ -373,11 +396,14 @@ export function useCaptureWorkspaceRuntimeView({
       magnifierSourceImage,
       runtimeRenderState,
       screenshotPreferences?.magnifierZoom,
+      fontFamilies,
+      uiScale,
     ],
   );
   const actions = useMemo<CaptureWorkspaceViewActions>(
     () => ({
       pointerDown: workflowRuntime.actions.pointerDown,
+      beginScrollingCapture: workflowRuntime.actions.beginScrollingCapture,
       pointerMove: workflowRuntime.actions.pointerMove,
       pointerUp: workflowRuntime.actions.pointerUp,
       pointerCancel: workflowRuntime.actions.pointerCancel,
@@ -397,6 +423,7 @@ export function useCaptureWorkspaceRuntimeView({
         workflowRuntime.actions.commitAnnotationSizeDefault,
       undoAnnotation: workflowRuntime.actions.undoAnnotation,
       redoAnnotation: workflowRuntime.actions.redoAnnotation,
+      clearAnnotations: workflowRuntime.actions.clearAnnotations,
       cancelSession: workflowRuntime.actions.cancelSession,
       completePreviewSelection:
         workflowRuntime.actions.completePreviewSelection,

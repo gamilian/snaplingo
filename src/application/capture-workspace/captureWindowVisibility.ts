@@ -3,6 +3,7 @@ type CaptureWindowVisibilityStatus =
   | 'loading'
   | 'selecting'
   | 'preview'
+  | 'scrolling'
   | 'error';
 
 interface CaptureWindowRevealState {

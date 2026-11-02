@@ -83,6 +83,13 @@ body {
   color: rgb(var(--ink));
 }
 
+:root[data-scrolling-preview='true'],
+:root[data-scrolling-preview='true'] body,
+:root[data-pinned-image='true'],
+:root[data-pinned-image='true'] body {
+  background: transparent;
+}
+
 :root[data-platform='windows'] body {
   font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", Arial, sans-serif;
   -webkit-font-smoothing: auto;

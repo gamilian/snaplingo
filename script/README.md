@@ -20,11 +20,12 @@ npm run tauri:build
 - 通过 Cargo metadata 发现 workspace target 目录
 - 构建前端和 Tauri release bundle
 - 验证当前平台要求的全部产物及其可运行形态
+- Windows 同时生成便携 ZIP，检查并保留 OCR 模型、运行库、CRT 和许可证
 
 **输出产物：**
 - macOS: `target/release/bundle/macos/SnapLingo.app` 和 `target/release/bundle/dmg/SnapLingo_*.dmg`
 - Linux: `target/release/bundle/appimage/SnapLingo_*.AppImage` 和 `target/release/bundle/deb/snaplingo_*.deb`
-- Windows: `target/release/bundle/msi/*.msi` 和 `target/release/bundle/nsis/*.exe`
+- Windows: `target/release/bundle/msi/*.msi`、`target/release/bundle/nsis/*.exe` 和 `target/release/bundle/portable/*-portable.zip`；便携版需要已安装 WebView2，见 [使用说明](../docs/WINDOWS_PORTABLE.md)
 
 需要清理旧的前端与 release 产物时使用：
 
@@ -190,3 +191,7 @@ open target/release/bundle/macos/SnapLingo.app  # macOS
 ## 贡献
 
 如果你发现脚本有问题或想要改进，请提交 Issue 或 Pull Request。
+
+## 第三方组件许可清单
+
+`npm run licenses:generate` 从锁定的 Rust/npm 依赖和随包字体/OCR 许可生成 `src/domain/thirdPartyNotices.json`。修改依赖或 OCR 资源清单后重新生成并提交；`npm run build` 检查它是否与锁文件一致。关于页可搜索和阅读声明，Windows ZIP 随附相同清单。

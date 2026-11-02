@@ -3,6 +3,7 @@ import {
   type AnnotationColor,
 } from '../../domain/annotationColor';
 import { normalizeSelection } from './selection';
+import { annotationShortcutBindings, normalizeEditorShortcutKey } from './annotationShortcuts';
 import type { AnnotationCommand, Point, TextAnnotationCommand } from '../../domain/capture';
 
 export { ANNOTATION_COLORS };
@@ -15,6 +16,9 @@ export type AnnotationTool =
   | 'line'
   | 'pen'
   | 'highlight'
+  | 'region-highlight'
+  | 'blur'
+  | 'spotlight'
   | 'mosaic'
   | 'text'
   | 'eraser';
@@ -24,6 +28,11 @@ export interface AnnotationStyle {
   color: AnnotationColor;
   strokeWidth: number;
   filled: boolean;
+  cornerRadius?: number;
+  blurRadius?: number;
+  fontFamily?: string;
+  bold?: boolean;
+  italic?: boolean;
 }
 
 export interface AnnotationGestureDraft {
@@ -34,6 +43,7 @@ export interface AnnotationGestureDraft {
 
 interface AnnotationToolShortcutEvent {
   key: string;
+  code?: string;
   metaKey: boolean;
   ctrlKey: boolean;
   altKey: boolean;
@@ -56,9 +66,14 @@ export type AnnotationSizeDirection = 'decrease' | 'increase';
 export const ANNOTATION_STROKE_WIDTHS = [2, 4, 6, 8];
 export const DEFAULT_TEXT_FONT_SIZE = 24;
 export const MIN_ANNOTATION_STROKE_WIDTH = 1;
-export const MAX_ANNOTATION_STROKE_WIDTH = 8;
-export const MIN_TEXT_FONT_SIZE = 12;
-export const MAX_TEXT_FONT_SIZE = 48;
+export const MAX_ANNOTATION_STROKE_WIDTH = 32;
+export const MIN_TEXT_FONT_SIZE = 10;
+export const MAX_TEXT_FONT_SIZE = 96;
+export const MIN_TEXT_RESIZE_FONT_SIZE = 8;
+export const MAX_TEXT_RESIZE_FONT_SIZE = 160;
+export const MIN_BLUR_RADIUS = 4;
+export const MAX_BLUR_RADIUS = 64;
+export const DEFAULT_BLUR_RADIUS = 16;
 
 export const DEFAULT_ANNOTATION_STYLE: AnnotationStyle = {
   color: ANNOTATION_COLORS[0],
@@ -69,23 +84,15 @@ export const DEFAULT_ANNOTATION_STYLE: AnnotationStyle = {
 const MIN_ANNOTATION_SIZE = 4;
 const HIGHLIGHT_ALPHA = 96;
 
-const ANNOTATION_TOOL_SHORTCUTS: Record<string, AnnotationTool> = {
-  o: 'ellipse',
-  a: 'arrow',
-  l: 'line',
-  p: 'pen',
-  h: 'highlight',
-  m: 'mosaic',
-  t: 'text',
-  e: 'eraser',
-};
+export const DEFAULT_ANNOTATION_TOOL_SHORTCUTS = annotationShortcutBindings();
 
 export function annotationToolFromShortcut(
   event: AnnotationToolShortcutEvent,
+  shortcuts: Readonly<Record<string, AnnotationTool>> = DEFAULT_ANNOTATION_TOOL_SHORTCUTS,
 ): AnnotationTool | null {
   if (event.metaKey || event.ctrlKey || event.altKey) return null;
 
-  return ANNOTATION_TOOL_SHORTCUTS[event.key.toLowerCase()] ?? null;
+  return shortcuts[normalizeEditorShortcutKey(event)] ?? null;
 }
 
 export function nextAnnotationToolFromCycleShortcut(
@@ -150,8 +157,6 @@ export function annotationSizeDirectionFromWheel(
 ): AnnotationSizeDirection | null {
   if (
     !options.editing ||
-    event.metaKey ||
-    event.ctrlKey ||
     event.altKey ||
     event.deltaY === 0
   ) {
@@ -166,28 +171,36 @@ function stepBoundedValue(
   direction: AnnotationSizeDirection,
   min: number,
   max: number,
+  amount = 1,
 ) {
-  const step = direction === 'increase' ? 1 : -1;
+  const step = direction === 'increase' ? amount : -amount;
   return Math.min(Math.max(value + step, min), max);
 }
 
 export function nextAnnotationStrokeWidth(
   value: number,
   direction: AnnotationSizeDirection,
+  amount = 1,
 ) {
   return stepBoundedValue(
     value,
     direction,
     MIN_ANNOTATION_STROKE_WIDTH,
     MAX_ANNOTATION_STROKE_WIDTH,
+    amount,
   );
 }
 
 export function nextTextFontSize(
   value: number,
   direction: AnnotationSizeDirection,
+  amount = 1,
 ) {
-  return stepBoundedValue(value, direction, MIN_TEXT_FONT_SIZE, MAX_TEXT_FONT_SIZE);
+  return stepBoundedValue(value, direction, MIN_TEXT_FONT_SIZE, MAX_TEXT_FONT_SIZE, amount);
+}
+
+export function nextBlurRadius(value: number, direction: AnnotationSizeDirection, amount = 1) {
+  return stepBoundedValue(value, direction, MIN_BLUR_RADIUS, MAX_BLUR_RADIUS, amount);
 }
 
 function constrainToSquare(startPoint: Point, currentPoint: Point): Point {
@@ -226,7 +239,10 @@ export function constrainAnnotationGesturePoint(
 ): Point {
   if (
     tool === 'rectangle' ||
-    tool === 'ellipse'
+    tool === 'ellipse' ||
+    tool === 'region-highlight' ||
+    tool === 'blur' ||
+    tool === 'spotlight'
   ) {
     return constrainToSquare(startPoint, currentPoint);
   }
@@ -305,6 +321,7 @@ export function annotationFromGesture(
       color: style.color,
       stroke_width: style.strokeWidth,
       filled: style.filled,
+      ...(style.cornerRadius !== undefined ? { corner_radius: style.cornerRadius } : {}),
     };
   }
 
@@ -316,6 +333,20 @@ export function annotationFromGesture(
       stroke_width: style.strokeWidth,
       filled: style.filled,
     };
+  }
+
+  if (tool === 'region-highlight' || tool === 'blur' || tool === 'spotlight') {
+    const region = {
+      rect: normalizeSelection(startPoint, currentPoint),
+      corner_radius: style.cornerRadius ?? 0,
+    };
+    if (tool === 'region-highlight') {
+      return { type: tool, ...region, color: style.color };
+    }
+    if (tool === 'blur') {
+      return { type: tool, ...region, radius: style.blurRadius ?? DEFAULT_BLUR_RADIUS };
+    }
+    return { type: tool, ...region };
   }
 
   if (tool === 'pen') {
@@ -421,6 +452,9 @@ export function annotationFromText(
     text,
     color: style.color,
     font_size: fontSize,
+    ...(style.fontFamily ? { font_family: style.fontFamily } : {}),
+    ...(style.bold !== undefined ? { bold: style.bold } : {}),
+    ...(style.italic !== undefined ? { italic: style.italic } : {}),
   };
 }
 
@@ -429,6 +463,14 @@ export function applyAnnotationStyle(
   style: AnnotationStyle,
   fontSize = DEFAULT_TEXT_FONT_SIZE,
 ): AnnotationCommand {
+  if (annotation.type === 'blur' || annotation.type === 'spotlight' || annotation.type === 'region-highlight') {
+    return {
+      ...annotation,
+      corner_radius: style.cornerRadius ?? annotation.corner_radius ?? 0,
+      ...(annotation.type === 'blur' ? { radius: style.blurRadius ?? annotation.radius } : {}),
+      ...(annotation.type === 'region-highlight' ? { color: style.color } : {}),
+    } as AnnotationCommand;
+  }
   if (annotation.type === 'mosaic') {
     return {
       ...annotation,
@@ -449,6 +491,9 @@ export function applyAnnotationStyle(
       ...annotation,
       color: style.color,
       font_size: fontSize,
+      ...(style.fontFamily ? { font_family: style.fontFamily } : {}),
+      ...(style.bold !== undefined ? { bold: style.bold } : {}),
+      ...(style.italic !== undefined ? { italic: style.italic } : {}),
     };
   }
 
@@ -466,6 +511,9 @@ export function applyAnnotationStyle(
       color: style.color,
       stroke_width: style.strokeWidth,
       filled: style.filled,
+      ...(annotation.type === 'rectangle' && style.cornerRadius !== undefined
+        ? { corner_radius: style.cornerRadius }
+        : {}),
     };
   }
 
@@ -496,7 +544,10 @@ export function isCommittedAnnotation(annotation: AnnotationCommand) {
 
   if (
     annotation.type === 'rectangle' ||
-    annotation.type === 'ellipse'
+    annotation.type === 'ellipse' ||
+    annotation.type === 'region-highlight' ||
+    annotation.type === 'blur' ||
+    annotation.type === 'spotlight'
   ) {
     return (
       annotation.rect.width >= MIN_ANNOTATION_SIZE &&

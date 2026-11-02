@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSettingsConfigStore } from '../../stores/settingsConfigStore';
 import type { PinnedImageView } from '../../domain/capture';
 import type { PinnedImageRuntime } from '../../application/pinned-image/runtime';
+import { isPinBorderShortcut } from '../../application/pinned-image/borderShortcut';
 import {
   PinnedImageRuntimeProvider,
   usePinnedImageRuntime,
@@ -56,7 +57,7 @@ import {
   isSavePinnedImageShortcut,
 } from '../../application/pinned-image/input';
 
-const PIN_CONTEXT_MENU_SIZE = { width: 132, height: 332 };
+const PIN_CONTEXT_MENU_SIZE = { width: 184, height: 428 };
 const PIN_HOVER_TOOLBAR_ACTIONS = getPinnedHoverToolbarActions();
 const PIN_MAGNIFIER_SIZE = { width: 160, height: 112 };
 const PIN_MAGNIFIER_GAP = 14;
@@ -93,6 +94,9 @@ function PinnedImageWindowContent() {
   const pinShadow = useSettingsConfigStore(
     (state) => state.screenshot?.pinShadow ?? true,
   );
+  const pinBorder = useSettingsConfigStore((state) => state.screenshot?.pinBorder ?? false);
+  const pinBorderShortcut = useSettingsConfigStore((state) => state.screenshot?.pinBorderShortcut ?? 'b');
+  const updateScreenshotSettings = useSettingsConfigStore((state) => state.updateScreenshotSettings);
   const [image, setImage] = useState<PinnedImageView | null>(null);
   const [zoom, setZoom] = useState(1);
   const [opacity, setOpacity] = useState(defaultPinOpacity);
@@ -137,6 +141,20 @@ function PinnedImageWindowContent() {
   const [isHoverToolbarForcedVisible, setIsHoverToolbarForcedVisible] =
     useState(false);
   const [error, setError] = useState<string | null>(null);
+  const togglePinBorder = useCallback(() => {
+    void updateScreenshotSettings({ pinBorder: !pinBorder }).catch((error) => setError(String(error)));
+  }, [pinBorder, updateScreenshotSettings]);
+  useEffect(() => {
+    const handleBorderKey = (event: KeyboardEvent) => {
+      if (isPinBorderShortcut(event, pinBorderShortcut)) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        togglePinBorder();
+      }
+    };
+    window.addEventListener('keydown', handleBorderKey);
+    return () => window.removeEventListener('keydown', handleBorderKey);
+  }, [togglePinBorder, pinBorderShortcut]);
   const imageFrameSize = useMemo(() => {
     if (!image) return null;
 
@@ -160,6 +178,10 @@ function PinnedImageWindowContent() {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
+  }, [runtime]);
+
+  const closeAllPinnedImages = useCallback(async () => {
+    try { await runtime.closeAll(); } catch (err) { setError(String(err)); }
   }, [runtime]);
 
   const hideCurrentPinnedImageGroup = useCallback(async () => {
@@ -757,6 +779,7 @@ function PinnedImageWindowContent() {
               void startPinnedWindowDrag();
             }}
           />
+          {pinBorder && <div aria-hidden="true" className="pointer-events-none absolute inset-0 border border-blue-500" />}
         </div>
       )}
       {isMagnifierShown &&
@@ -794,10 +817,11 @@ function PinnedImageWindowContent() {
         )}
       {contextMenuPosition && (
         <div
-          className="absolute z-10 w-[132px] rounded-md bg-surface p-1 text-label text-ink shadow-e3 ring-1 ring-line"
+          className="absolute z-10 w-[184px] max-w-full overflow-y-auto rounded-lg bg-surface p-1 text-label text-ink shadow-e3 ring-1 ring-line"
           style={{
             left: `${contextMenuPosition.x}px`,
             top: `${contextMenuPosition.y}px`,
+            maxHeight: `calc(100% - ${contextMenuPosition.y + 4}px)`,
           }}
           onPointerDown={(event) => event.stopPropagation()}
         >
@@ -806,7 +830,7 @@ function PinnedImageWindowContent() {
             className="flex h-7 w-full items-center justify-between rounded-sm px-2 text-left text-muted hover:bg-raised hover:text-ink"
             onClick={resetPinnedSize}
           >
-            <span>Reset size</span>
+            <span>重置大小</span>
             <span className="font-mono text-hint text-faint">
               {Math.round(zoom * 100)}%
             </span>
@@ -818,7 +842,7 @@ function PinnedImageWindowContent() {
               className="flex h-7 w-full items-center justify-between rounded-sm px-2 text-left text-muted hover:bg-raised hover:text-ink"
               onClick={() => setPinnedOpacityPreset(preset)}
             >
-              <span>Opacity</span>
+              <span>透明度</span>
               <span className="font-mono text-hint text-faint">
                 {Math.round(preset * 100)}%
               </span>
@@ -830,49 +854,58 @@ function PinnedImageWindowContent() {
             className="h-7 w-full rounded-sm px-2 text-left text-muted hover:bg-raised hover:text-ink"
             onClick={movePinnedToAnotherGroup}
           >
-            Move Group
+            移到另一组
+          </button>
+          <button type="button" className="h-7 w-full rounded-sm px-2 text-left text-muted hover:bg-raised hover:text-ink" onClick={togglePinBorder} title={pinBorderShortcut.toUpperCase() || undefined}>
+            {pinBorder ? '隐藏边框' : '显示边框'}
           </button>
           <button
             type="button"
             className="h-7 w-full rounded-sm px-2 text-left text-muted hover:bg-raised hover:text-ink"
             onClick={hideCurrentPinnedImage}
           >
-            Close
+            收起贴图
           </button>
           <button
             type="button"
             className="h-7 w-full rounded-sm px-2 text-left text-muted hover:bg-raised hover:text-ink"
             onClick={hideCurrentPinnedImageGroup}
           >
-            Hide Group
+            隐藏当前组
           </button>
           <button
             type="button"
             className="h-7 w-full rounded-sm px-2 text-left text-muted hover:bg-raised hover:text-ink"
             onClick={copyCurrentPinnedImage}
           >
-            Copy
+            复制
           </button>
           <button
             type="button"
             className="h-7 w-full rounded-sm px-2 text-left text-muted hover:bg-raised hover:text-ink"
             onClick={savePinnedImageAs}
           >
-            Save As
+            另存为
+          </button>
+          <button type="button" className="h-7 w-full rounded-sm px-2 text-left text-muted hover:bg-raised hover:text-ink" onClick={quickSavePinnedImageToDirectory} title="保存当前尺寸 PNG 到默认目录">
+            快速保存 PNG
           </button>
           <button
             type="button"
             className="h-7 w-full rounded-sm px-2 text-left text-danger hover:bg-danger-soft"
             onClick={destroyCurrentPinnedImage}
           >
-            Destroy
+            关闭当前贴图
           </button>
           <button
             type="button"
             className="h-7 w-full rounded-sm px-2 text-left text-danger hover:bg-danger-soft"
             onClick={destroyCurrentPinnedImageGroup}
           >
-            Destroy Group
+            关闭当前组
+          </button>
+          <button type="button" className="h-7 w-full rounded-sm px-2 text-left text-danger hover:bg-danger-soft" onClick={closeAllPinnedImages}>
+            关闭全部贴图
           </button>
         </div>
       )}

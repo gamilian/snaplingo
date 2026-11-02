@@ -92,6 +92,10 @@ describe('release artifact contract', () => {
       target: 'windows-x86_64',
       kind: 'Windows MSI installer',
     })).toBe('snaplingo-v0.2.0-windows-x86_64.msi');
+    expect(releaseAssetName({
+      projectName: 'snaplingo', version: '0.2.0', target: 'windows-x86_64',
+      kind: 'Windows portable archive',
+    })).toBe('snaplingo-v0.2.0-windows-x86_64-portable.zip');
   });
 
   it('verifies macOS application and disk image output', () => {
@@ -138,10 +142,11 @@ describe('release artifact contract', () => {
     ).toHaveLength(2);
   });
 
-  it('verifies Windows MSI and NSIS output', () => {
+  it('verifies Windows MSI, NSIS, and portable output', () => {
     const bundleDirectory = temporaryBundleDirectory();
     writeArtifact(join(bundleDirectory, 'msi', 'SnapLingo_0.2.0_x64_en-US.msi'));
     writeArtifact(join(bundleDirectory, 'nsis', 'SnapLingo_0.2.0_x64-setup.exe'));
+    writeArtifact(join(bundleDirectory, 'portable', 'SnapLingo_0.2.0_x64-portable.zip'));
 
     expect(
       verifyReleaseArtifacts({
@@ -150,7 +155,17 @@ describe('release artifact contract', () => {
         productName: 'SnapLingo',
         version: '0.2.0',
       }),
-    ).toHaveLength(2);
+    ).toHaveLength(3);
+  });
+
+  it('requires the portable archive from the current version', () => {
+    const bundleDirectory = temporaryBundleDirectory();
+    writeArtifact(join(bundleDirectory, 'msi', 'SnapLingo_0.2.0_x64_en-US.msi'));
+    writeArtifact(join(bundleDirectory, 'nsis', 'SnapLingo_0.2.0_x64-setup.exe'));
+    writeArtifact(join(bundleDirectory, 'portable', 'SnapLingo_0.1.0_x64-portable.zip'));
+    expect(() => verifyReleaseArtifacts({
+      platform: 'win32', bundleDirectory, productName: 'SnapLingo', version: '0.2.0',
+    })).toThrow(/Windows portable archive was not found/);
   });
 
   it('fails when a required platform artifact is missing', () => {

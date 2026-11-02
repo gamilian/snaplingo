@@ -6,6 +6,10 @@ import {
   MAX_TEXT_FONT_SIZE,
   MIN_ANNOTATION_STROKE_WIDTH,
   MIN_TEXT_FONT_SIZE,
+  DEFAULT_BLUR_RADIUS,
+  MIN_BLUR_RADIUS,
+  MAX_BLUR_RADIUS,
+  nextTextFontSize,
   type AnnotationColor,
   type AnnotationStyle,
   type AnnotationTool,
@@ -34,6 +38,9 @@ interface CaptureEditorToolbarProps {
   activeAnnotationTool: AnnotationTool | null;
   annotationStyle: AnnotationStyle;
   annotationColorPresets: readonly AnnotationColor[];
+  fontFamilies?: readonly string[];
+  selectedAnnotationType?: string;
+  uiScale?: number;
   textFontSize: number;
   textDraftActive: boolean;
   isTextSizingActive: boolean;
@@ -54,7 +61,9 @@ interface CaptureEditorToolbarProps {
   onCommitSizeDefault: (kind: "stroke" | "font", value: number) => void;
   onUndo: () => void;
   onRedo: () => void;
+  onClear: () => void;
   onCancel: () => void | Promise<void>;
+  onBeginScrollingCapture: () => void | Promise<void>;
   onRunOcr: () => void | Promise<void>;
   onCopy: () => void | Promise<void>;
   onSave: () => void | Promise<void>;
@@ -95,6 +104,10 @@ const ANNOTATION_TOOL_BUTTONS: AnnotationToolButton[] = [
     ariaLabel: "Erase annotation",
     icon: <EraserIcon />,
   },
+  { tool: "highlight", title: "Highlighter", ariaLabel: "Draw highlight annotation", icon: <EffectIcon kind="highlight" /> },
+  { tool: "region-highlight", title: "Region highlight", ariaLabel: "Highlight an area", icon: <EffectIcon kind="region-highlight" /> },
+  { tool: "blur", title: "Blur", ariaLabel: "Blur an area", icon: <EffectIcon kind="blur" /> },
+  { tool: "spotlight", title: "Spotlight", ariaLabel: "Spotlight an area", icon: <EffectIcon kind="spotlight" /> },
 ];
 
 const SHAPE_TOOLS: AnnotationToolButton[] = [
@@ -134,6 +147,9 @@ export function CaptureEditorToolbar({
   activeAnnotationTool,
   annotationStyle,
   annotationColorPresets,
+  fontFamilies = [],
+  selectedAnnotationType,
+  uiScale = 1,
   textFontSize,
   textDraftActive,
   isTextSizingActive,
@@ -149,7 +165,9 @@ export function CaptureEditorToolbar({
   onCommitSizeDefault,
   onUndo,
   onRedo,
+  onClear,
   onCancel,
+  onBeginScrollingCapture,
   onRunOcr,
   onCopy,
   onSave,
@@ -178,9 +196,11 @@ export function CaptureEditorToolbar({
     kind: "stroke" | "font";
     value: number;
   } | null>(null);
-  const sizeValue = isTextSizingActive
-    ? textFontSize
-    : annotationStyle.strokeWidth;
+  const roundableTypes = ['rectangle', 'region-highlight', 'blur', 'spotlight'];
+  const hasCornerControl = roundableTypes.includes(activeAnnotationTool ?? '') || roundableTypes.includes(selectedAnnotationType ?? '');
+  const hasBlurControl = activeAnnotationTool === 'blur' || selectedAnnotationType === 'blur';
+  const sizeValue = isTextSizingActive ? textFontSize : hasBlurControl ? annotationStyle.blurRadius ?? DEFAULT_BLUR_RADIUS : annotationStyle.strokeWidth;
+  const sizeLabel = isTextSizingActive ? 'Text font size' : hasBlurControl ? 'Annotation blur radius' : 'Annotation stroke width';
 
   const handleSaveClick = (event: MouseEvent<HTMLButtonElement>) => {
     const action = getSaveCapturePointerAction(event);
@@ -293,18 +313,21 @@ export function CaptureEditorToolbar({
   return (
     <div
       ref={toolbarRef}
+      data-capture-toolbar="true"
       className={getCaptureEditorToolbarClassName()}
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
-        width: `${width}px`,
+        width: `${width / uiScale}px`,
+        transform: `scale(${uiScale})`,
+        transformOrigin: 'top left',
         maxWidth: 'calc(100vw - 16px)',
         zIndex: 2,
       }}
       onPointerDown={(event) => {
         event.stopPropagation();
         const target = event.target as HTMLElement;
-        if (textDraftActive && target.tagName !== "INPUT") {
+        if (textDraftActive && target.tagName !== "INPUT" && target.tagName !== "SELECT") {
           event.preventDefault();
         }
       }}
@@ -424,22 +447,26 @@ export function CaptureEditorToolbar({
           className="h-7 w-[86px] accent-accent disabled:opacity-40"
           type="range"
           min={
-            isTextSizingActive ? MIN_TEXT_FONT_SIZE : MIN_ANNOTATION_STROKE_WIDTH
+            isTextSizingActive ? Math.min(MIN_TEXT_FONT_SIZE, textFontSize) : hasBlurControl ? MIN_BLUR_RADIUS : MIN_ANNOTATION_STROKE_WIDTH
           }
           max={
-            isTextSizingActive ? MAX_TEXT_FONT_SIZE : MAX_ANNOTATION_STROKE_WIDTH
+            isTextSizingActive ? Math.max(MAX_TEXT_FONT_SIZE, textFontSize) : hasBlurControl ? MAX_BLUR_RADIUS : MAX_ANNOTATION_STROKE_WIDTH
           }
           step={1}
           value={sizeValue}
           disabled={isRenderingOutput}
           title={
-            isTextSizingActive ? "Text font size" : "Annotation stroke width"
+            sizeLabel
           }
           aria-label={
-            isTextSizingActive ? "Text font size" : "Annotation stroke width"
+            sizeLabel
           }
           onInput={(event) => {
             const value = Number(event.currentTarget.value);
+            if (hasBlurControl && !isTextSizingActive) {
+              onApplyAnnotationStyle({ ...annotationStyle, blurRadius: value }, textFontSize);
+              return;
+            }
             pendingSizeDefaultRef.current = {
               kind: isTextSizingActive ? "font" : "stroke",
               value,
@@ -466,7 +493,7 @@ export function CaptureEditorToolbar({
           onKeyUp={commitSizeDefault}
           onBlur={commitSizeDefault}
         />
-        <span className="w-4 text-right font-mono text-hint tabular-nums text-muted">
+        <span className="w-7 text-right font-mono text-hint tabular-nums text-muted" title={sizeLabel}>
           {sizeValue}
         </span>
       </div>
@@ -500,6 +527,37 @@ export function CaptureEditorToolbar({
       >
         ESC
       </button>
+      {(isTextSizingActive || hasCornerControl) && (
+        <div
+          className="absolute left-0 flex w-full flex-wrap items-center gap-2 rounded-md border border-line bg-surface px-3 py-2 text-xs text-ink shadow-lg"
+          style={position.y + 120 * uiScale > window.innerHeight ? { bottom: 'calc(100% + 8px)' } : { top: 'calc(100% + 8px)' }}
+          role="group"
+          aria-label="Annotation properties"
+        >
+          {isTextSizingActive && <>
+            <select
+              className="h-7 max-w-[220px] rounded border border-line bg-surface px-2 text-xs"
+              aria-label="Annotation font family"
+              value={annotationStyle.fontFamily ?? ''}
+              onChange={(event) => onApplyAnnotationStyle({ ...annotationStyle, fontFamily: event.currentTarget.value }, textFontSize)}
+            >
+              <option value="">默认字体</option>
+              {fontFamilies.map((family) => <option key={family} value={family}>{family}</option>)}
+            </select>
+            <button type="button" className={`h-7 w-7 rounded border border-line font-bold hover:bg-raised ${annotationStyle.bold ? 'bg-accent-soft text-accent-text' : ''}`} aria-label="Bold annotation text" aria-pressed={annotationStyle.bold ?? false} onClick={() => onApplyAnnotationStyle({ ...annotationStyle, bold: !annotationStyle.bold }, textFontSize)}>B</button>
+            <button type="button" className={`h-7 w-7 rounded border border-line italic hover:bg-raised ${annotationStyle.italic ? 'bg-accent-soft text-accent-text' : ''}`} aria-label="Italic annotation text" aria-pressed={annotationStyle.italic ?? false} onClick={() => onApplyAnnotationStyle({ ...annotationStyle, italic: !annotationStyle.italic }, textFontSize)}>I</button>
+            <div className="flex items-center gap-1">
+              <button type="button" className="h-7 w-7 rounded border border-line hover:bg-raised" aria-label="Decrease text font size" onClick={() => { const size = nextTextFontSize(textFontSize, 'decrease', 2); onApplyAnnotationStyle(annotationStyle, size); if (textDraftActive) onTextDraftFontSizeChange(size); }}>−</button>
+              <span className="min-w-7 text-center tabular-nums">{textFontSize}</span>
+              <button type="button" className="h-7 w-7 rounded border border-line hover:bg-raised" aria-label="Increase text font size" onClick={() => { const size = nextTextFontSize(textFontSize, 'increase', 2); onApplyAnnotationStyle(annotationStyle, size); if (textDraftActive) onTextDraftFontSizeChange(size); }}>+</button>
+            </div>
+          </>}
+          {hasCornerControl && <label className="flex items-center gap-2">圆角
+            <input type="range" min={0} max={100} step={1} value={annotationStyle.cornerRadius ?? 0} aria-label="Annotation corner radius" onInput={(event) => onApplyAnnotationStyle({ ...annotationStyle, cornerRadius: Number(event.currentTarget.value) }, textFontSize)} />
+            <span>{annotationStyle.cornerRadius ?? 0}</span>
+          </label>}
+        </div>
+      )}
       <button
         type="button"
         className={getCaptureEditorCommandButtonClassName()}
@@ -512,6 +570,8 @@ export function CaptureEditorToolbar({
       >
         OCR
       </button>
+      <button type="button" className={getCaptureEditorCommandButtonClassName()} disabled={isRenderingOutput} title="长截图" aria-label="Start scrolling capture" onClick={() => { void onBeginScrollingCapture(); }}>长截图</button>
+      <button type="button" className={getCaptureEditorCommandButtonClassName()} disabled={isRenderingOutput || !canUndo} title="清空标注（Ctrl/Cmd+Alt+Backspace）" aria-label="Clear annotations" onClick={onClear}>清空</button>
       <button
         type="button"
         className={getCaptureEditorCommandButtonClassName("icon")}
@@ -526,7 +586,7 @@ export function CaptureEditorToolbar({
         type="button"
         className={getCaptureEditorCommandButtonClassName("icon")}
         disabled={isRenderingOutput}
-        title={`Pin capture (${primaryModifier}+T)`}
+        title={`贴图（F3 / ${primaryModifier}+T）`}
         aria-label="Pin capture"
         onClick={() => void onPin()}
       >
@@ -1110,4 +1170,13 @@ function ToolPicker({
       ))}
     </div>
   );
+}
+
+function EffectIcon({ kind }: { kind: 'highlight' | 'region-highlight' | 'blur' | 'spotlight' }) {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+    {kind === 'highlight' ? <><path d="m6 14 8-8 4 4-8 8-4-4Z" /><path d="m4 20 3-4 3 3-4 3" /></> : <rect x="4" y="5" width="16" height="14" rx="3" />}
+    {kind === 'region-highlight' && <path d="M7 10h10M7 14h10" strokeWidth="3" opacity="0.6" />}
+    {kind === 'blur' && <path d="M7 8h10M7 12h10M7 16h10M9 7v10M15 7v10" opacity="0.5" />}
+    {kind === 'spotlight' && <><circle cx="12" cy="12" r="4" /><path d="M4 5h16v14H4z" fill="currentColor" opacity="0.25" /></>}
+  </svg>;
 }

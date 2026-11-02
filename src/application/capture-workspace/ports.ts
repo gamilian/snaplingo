@@ -9,6 +9,7 @@ import type {
   OcrResult,
   Point,
 } from '../../domain/capture';
+import type { AnnotationTool } from './annotationStyle';
 
 export type CaptureWorkspaceUnsubscribe = () => void;
 
@@ -29,6 +30,8 @@ export type CaptureHotkeyHandler = (
 ) => void | Promise<void>;
 
 export interface CaptureWorkspaceEventsPort {
+  subscribePinRequested?(handler: (event: { sessionId: string }) => void): Promise<CaptureWorkspaceUnsubscribe>;
+  subscribeScrollingCaptureEnded?(handler: (event: { sessionId: string; completed: boolean }) => void): Promise<CaptureWorkspaceUnsubscribe>;
   subscribeHotkeyTriggered(
     handler: CaptureHotkeyHandler,
   ): Promise<CaptureWorkspaceUnsubscribe>;
@@ -50,6 +53,7 @@ export type CaptureOutputAction =
       format: 'png' | 'jpg' | 'webp';
       quality: number;
       copyAfterSave: boolean;
+      rememberChoice?: boolean;
     }
   | { type: 'pin' }
   | { type: 'favorite' };
@@ -66,6 +70,10 @@ export interface OutputCaptureInput extends RenderCaptureOutputInput {
 }
 
 export interface CaptureWorkspaceCommandsPort {
+  beginScrollingCapture?(sessionId: string, rect: LogicalRect): Promise<void>;
+  listAnnotationFontFamilies?(): Promise<string[]>;
+  lastAnnotationTool?(): Promise<AnnotationTool | null>;
+  rememberAnnotationTool?(tool: AnnotationTool): Promise<void>;
   createCaptureSession(): Promise<CaptureSessionView>;
   getCaptureSession(sessionId: string): Promise<CaptureSessionView>;
   hydrateCaptureSessionSnapshots(sessionId: string): Promise<CaptureSessionView>;
@@ -112,8 +120,9 @@ export interface PrepareCaptureOcrInput {
 
 export interface CaptureSavePathOptions {
   directory?: string;
+  fallbackDirectory?: string;
   format?: 'png' | 'jpg' | 'webp';
-  namingRule?: 'timestamp' | 'date' | 'counter' | 'custom';
+  namingRule?: 'timestamp' | 'unix-ms' | 'date' | 'counter' | 'custom';
   customFileName?: string;
 }
 

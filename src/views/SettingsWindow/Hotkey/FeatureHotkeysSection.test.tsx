@@ -110,14 +110,14 @@ describe('FeatureHotkeysSection keyboard recording', () => {
     expect(recorder.container.querySelector('kbd')?.textContent).toBe('Ctrl');
   });
 
-  it('does not silently save a Windows Win combination as an unmodified key', async () => {
+  it('records a Windows Win combination as a distinct modifier', async () => {
     vi.stubGlobal('navigator', { platform: 'Win32' });
     const recorder = await createRecorder();
     await recorder.start();
     await pressKey('r', 'KeyR', { metaKey: true });
     await releaseKey('r', 'KeyR', { metaKey: true });
-    expect(recorder.updateHotkey).not.toHaveBeenCalled();
-    expect(recorder.container.textContent).toContain('请使用 Ctrl、Alt、Shift 或功能键');
+    expect(recorder.updateHotkey).toHaveBeenCalledExactlyOnceWith('screenshot', 'screenshot', '⊞R');
+    expect(recorder.container.querySelector('kbd')?.textContent).toBe('Win');
   });
 
   it('records on older WebViews without crypto.randomUUID', async () => {

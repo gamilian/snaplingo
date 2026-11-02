@@ -1,9 +1,10 @@
-const MIN_ZOOM = 0.25;
-const MAX_ZOOM = 4;
+const MIN_ZOOM = 0.1;
+const MAX_ZOOM = 8;
 const ZOOM_STEP = 0.1;
-const MIN_OPACITY = 0.2;
+const MIN_OPACITY = 12 / 255;
 const MAX_OPACITY = 1;
-const OPACITY_STEP = 0.05;
+const OPACITY_STEP = 24 / 255;
+const MAX_EDGE = 4096;
 const MAX_INITIAL_WIDTH = 900;
 const MAX_INITIAL_HEIGHT = 700;
 const MAX_THUMBNAIL_WIDTH = 220;
@@ -153,7 +154,7 @@ export function getPinnedKeyboardVisualFilterAction(
 export function getPinnedKeyboardMoveDelta(
   event: PinnedKeyboardEvent,
 ): PinnedPoint | null {
-  if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return null;
+  if (event.metaKey || event.ctrlKey || event.altKey) return null;
 
   const deltaByKey: Record<string, PinnedPoint> = {
     ArrowUp: { x: 0, y: -1 },
@@ -162,7 +163,9 @@ export function getPinnedKeyboardMoveDelta(
     ArrowLeft: { x: -1, y: 0 },
   };
 
-  return deltaByKey[event.key] ?? null;
+  const delta = deltaByKey[event.key];
+  const step = event.shiftKey ? 5 : 1;
+  return delta ? { x: delta.x * step, y: delta.y * step } : null;
 }
 
 export function isPinnedMagnifierShortcut(event: PinnedKeyboardEvent) {
@@ -248,11 +251,11 @@ export function getPinnedOpacityFromWheel(
   const nextOpacity =
     currentOpacity + (wheelDirection < 0 ? OPACITY_STEP : -OPACITY_STEP);
 
-  return roundToTwoDecimals(clamp(nextOpacity, MIN_OPACITY, MAX_OPACITY));
+  return clamp(Math.round(nextOpacity * 255) / 255, MIN_OPACITY, MAX_OPACITY);
 }
 
 export function getPinnedOpacityPreset(opacity: number) {
-  return roundToTwoDecimals(clamp(opacity, MIN_OPACITY, MAX_OPACITY));
+  return clamp(opacity, MIN_OPACITY, MAX_OPACITY);
 }
 
 export function getPinnedWheelAction(
@@ -306,10 +309,11 @@ export function getPinnedDisplaySize(originalSize: PinnedSize, zoom: number) {
     MAX_INITIAL_HEIGHT / originalHeight,
     1,
   );
+  const displayScale = Math.min(initialScale * clamp(zoom, MIN_ZOOM, MAX_ZOOM), MAX_EDGE / originalWidth, MAX_EDGE / originalHeight);
 
   return {
-    width: Math.max(MIN_WIDTH, Math.round(originalWidth * initialScale * zoom)),
-    height: Math.max(MIN_HEIGHT, Math.round(originalHeight * initialScale * zoom)),
+    width: Math.max(1, Math.round(originalWidth * displayScale)),
+    height: Math.max(1, Math.round(originalHeight * displayScale)),
   };
 }
 

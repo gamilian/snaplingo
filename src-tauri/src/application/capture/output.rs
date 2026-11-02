@@ -92,6 +92,31 @@ impl CaptureOutput {
         )
     }
 
+    pub fn dialog_capture_save_path(
+        &self,
+        directory: Option<&str>,
+        fallback_directory: Option<&str>,
+        format: &str,
+        naming_rule: &str,
+        custom_file_name: &str,
+    ) -> PathBuf {
+        let directory = if let Some(fallback) = fallback_directory {
+            directory
+                .filter(|directory| {
+                    let paths = self.host.system_paths();
+                    self.host
+                        .path_exists(&configured_capture_save_dir_for_system(
+                            directory,
+                            paths.home_dir.as_deref(),
+                        ))
+                })
+                .or(Some(fallback))
+        } else {
+            directory
+        };
+        self.default_capture_save_path(directory, format, naming_rule, custom_file_name)
+    }
+
     pub async fn save_png(&self, data: &[u8], path: &Path) -> Result<PathBuf> {
         self.host.write_file(path, data)?;
 
@@ -105,9 +130,10 @@ impl CaptureOutput {
         format: &str,
         quality: u8,
     ) -> Result<PathBuf> {
+        let (path, format) = capture_save_path_and_format(path, format)?;
         let encoded = encode_capture_image(png_data, format, quality)?;
-        self.host.write_file(path, &encoded)?;
-        Ok(path.to_path_buf())
+        self.host.write_file(&path, &encoded)?;
+        Ok(path)
     }
 
     pub async fn copy_png(&self, data: &[u8]) -> Result<()> {
@@ -150,6 +176,7 @@ pub(crate) fn configured_capture_save_path(
     let extension = capture_extension(format);
     let base_name = match naming_rule {
         "date" => format!("SnapLingo-{}", now.format("%Y-%m-%d")),
+        "unix-ms" => now.timestamp_millis().to_string(),
         "counter" => "Screenshot".to_string(),
         "custom" => sanitize_file_name(custom_file_name),
         _ => format!("SnapLingo-{}", now.format("%Y%m%d-%H%M%S")),
@@ -188,6 +215,29 @@ fn first_available_capture_path(
     base_dir.join(format!("{base_name}.{extension}"))
 }
 
+pub(crate) fn capture_save_path_and_format(
+    path: &Path,
+    fallback_format: &str,
+) -> Result<(PathBuf, &'static str)> {
+    match path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(str::to_ascii_lowercase)
+        .as_deref()
+    {
+        Some("png") => Ok((path.to_path_buf(), "png")),
+        Some("jpg" | "jpeg") => Ok((path.to_path_buf(), "jpg")),
+        Some("webp") => Ok((path.to_path_buf(), "webp")),
+        None | Some("") => {
+            let format = capture_extension(fallback_format);
+            Ok((path.with_extension(format), format))
+        }
+        Some(extension) => Err(AppError::System(format!(
+            "Unsupported image extension: .{extension}. Use PNG, JPEG or WebP."
+        ))),
+    }
+}
+
 fn capture_extension(format: &str) -> &'static str {
     match format {
         "jpg" | "jpeg" => "jpg",
@@ -221,7 +271,7 @@ fn encode_capture_image(png_data: &[u8], format: &str, quality: u8) -> Result<Ve
         .map_err(|error| AppError::System(format!("Failed to decode capture image: {error}")))?;
     match format {
         "jpg" | "jpeg" => encode_jpeg(&image, quality),
-        "webp" => encode_webp(&image, quality),
+        "webp" => encode_webp(&image),
         _ => Ok(png_data.to_vec()),
     }
 }
@@ -240,11 +290,11 @@ fn encode_jpeg(image: &DynamicImage, quality: u8) -> Result<Vec<u8>> {
     Ok(encoded)
 }
 
-fn encode_webp(image: &DynamicImage, quality: u8) -> Result<Vec<u8>> {
+fn encode_webp(image: &DynamicImage) -> Result<Vec<u8>> {
     let rgba = image.to_rgba8();
     Ok(
         webp::Encoder::from_rgba(rgba.as_raw(), rgba.width(), rgba.height())
-            .encode(quality.clamp(1, 100) as f32)
+            .encode_lossless()
             .to_vec(),
     )
 }

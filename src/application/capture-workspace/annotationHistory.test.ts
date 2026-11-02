@@ -26,6 +26,14 @@ const arrow: AnnotationCommand = {
 };
 
 describe('annotation history', () => {
+  it('retains the most recent one hundred undo steps', () => {
+    let history = { annotations: [], undoneAnnotations: [], undoSnapshots: [], redoSnapshots: [] } as import('./annotationHistory').AnnotationHistory;
+    for (let i = 0; i < 110; i++) history = addAnnotationToHistory(history, rectangle);
+    expect(history.undoSnapshots).toHaveLength(100);
+    for (let i = 0; i < 100; i++) history = undoAnnotationHistory(history);
+    expect(history.annotations).toHaveLength(10);
+    expect(undoAnnotationHistory(history)).toBe(history);
+  });
   it('adds annotations and clears redo history', () => {
     const history = addAnnotationToHistory(
       { annotations: [rectangle], undoneAnnotations: [arrow] },

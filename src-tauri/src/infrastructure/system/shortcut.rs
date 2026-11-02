@@ -148,7 +148,11 @@ fn shortcut_display_hotkey(shortcut: &Shortcut) -> String {
         display.push('⌥');
     }
     if shortcut.mods.intersects(Modifiers::SUPER | Modifiers::META) {
-        display.push('⌘');
+        display.push(if cfg!(target_os = "windows") {
+            '⊞'
+        } else {
+            '⌘'
+        });
     }
     if shortcut.mods.contains(Modifiers::CONTROL) {
         display.push(if cfg!(target_os = "windows") {

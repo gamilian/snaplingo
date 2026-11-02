@@ -188,6 +188,63 @@ pub struct PinnedImageView {
     pub source_text: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum DesktopPosition {
+    Logical(LogicalPoint),
+    Physical(PhysicalPoint),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ScrollingCaptureStatus {
+    Capturing,
+    Limit,
+    Error,
+    Completed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ScrollingShortcutAction {
+    Copy,
+    Complete,
+    Undo,
+    Cancel,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScrollingCaptureView {
+    pub id: String,
+    pub revision: u64,
+    pub width: u32,
+    pub height: u32,
+    pub can_undo: bool,
+    pub preview_base64: String,
+    pub status: ScrollingCaptureStatus,
+    pub hint: Option<String>,
+    pub shortcut_actions: Vec<ScrollingShortcutAction>,
+    pub preview_expanded: bool,
+    pub preview_available: bool,
+    pub ui_scale: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum ScrollingCaptureOutputAction {
+    Complete,
+    Copy,
+    Save {
+        path: String,
+        format: String,
+        quality: u8,
+        #[serde(rename = "copyAfterSave")]
+        copy_after_save: bool,
+        #[serde(default, rename = "rememberChoice")]
+        remember_choice: bool,
+    },
+    Pin,
+}
+
 /// Output action requested for a capture session selection.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -199,8 +256,16 @@ pub enum CaptureOutputAction {
         quality: u8,
         #[serde(rename = "copyAfterSave")]
         copy_after_save: bool,
+        #[serde(default, rename = "rememberChoice")]
+        remember_choice: bool,
     },
     Pin,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct PinnedImageExportSize {
+    pub width: u32,
+    pub height: u32,
 }
 
 /// Vector annotation command in selection-local logical pixels.
@@ -213,6 +278,8 @@ pub enum AnnotationCommand {
         stroke_width: u32,
         #[serde(default)]
         filled: bool,
+        #[serde(default)]
+        corner_radius: f64,
     },
     Ellipse {
         rect: LogicalRect,
@@ -226,6 +293,10 @@ pub enum AnnotationCommand {
         end: LogicalPoint,
         color: [u8; 4],
         stroke_width: u32,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        control1: Option<LogicalPoint>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        control2: Option<LogicalPoint>,
     },
     Line {
         start: LogicalPoint,
@@ -257,6 +328,30 @@ pub enum AnnotationCommand {
         text: String,
         color: [u8; 4],
         font_size: u32,
+        #[serde(default)]
+        font_family: String,
+        #[serde(default)]
+        bold: bool,
+        #[serde(default)]
+        italic: bool,
+    },
+    #[serde(rename = "region-highlight")]
+    RegionHighlight {
+        rect: LogicalRect,
+        color: [u8; 4],
+        #[serde(default)]
+        corner_radius: f64,
+    },
+    Blur {
+        rect: LogicalRect,
+        radius: f64,
+        #[serde(default)]
+        corner_radius: f64,
+    },
+    Spotlight {
+        rect: LogicalRect,
+        #[serde(default)]
+        corner_radius: f64,
     },
 }
 
@@ -315,6 +410,7 @@ mod tests {
             format: "png".to_string(),
             quality: 90,
             copy_after_save: false,
+            remember_choice: false,
         };
 
         let serialized = serde_json::to_value(&action).unwrap();
@@ -338,6 +434,7 @@ mod tests {
             color: [255, 0, 0, 255],
             stroke_width: 2,
             filled: true,
+            corner_radius: 0.0,
         };
 
         let serialized = serde_json::to_value(&annotation).unwrap();
@@ -354,6 +451,8 @@ mod tests {
             end: LogicalPoint { x: 3.0, y: 4.0 },
             color: [255, 0, 0, 255],
             stroke_width: 2,
+            control1: None,
+            control2: None,
         };
 
         let serialized = serde_json::to_value(&annotation).unwrap();
@@ -468,6 +567,9 @@ mod tests {
             text: "Snap text".to_string(),
             color: [255, 0, 0, 255],
             font_size: 18,
+            font_family: String::new(),
+            bold: false,
+            italic: false,
         };
 
         let serialized = serde_json::to_value(&annotation).unwrap();

@@ -15,6 +15,8 @@ import {
   isPointStrokeAnnotationTool,
   nextAnnotationStrokeWidth,
   nextTextFontSize,
+  nextBlurRadius,
+  DEFAULT_BLUR_RADIUS,
 } from './annotationStyle';
 import type { AnnotationHistory } from './annotationHistory';
 import {
@@ -32,9 +34,9 @@ import {
   getAnnotationKeyboardNudgeDelta,
   hitTestAnnotations,
   moveAnnotationByDelta,
-  resizeRectAnnotation,
+  resizeAnnotationByHandle,
+  type AnnotationHandle,
 } from './annotationGeometry';
-import type { SelectionHandle } from './selection';
 import type { AnnotationCommand, LogicalRect, Point } from '../../domain/capture';
 import {
   commitTextAnnotationDraft,
@@ -51,6 +53,17 @@ export function deriveCaptureEditorToolbarState(
   currentState: CaptureEditorToolbarState,
   annotation: AnnotationCommand,
 ): CaptureEditorToolbarState {
+  if (annotation.type === 'blur' || annotation.type === 'spotlight' || annotation.type === 'region-highlight') {
+    return {
+      ...currentState,
+      annotationStyle: {
+        ...currentState.annotationStyle,
+        cornerRadius: annotation.corner_radius ?? 0,
+        ...(annotation.type === 'blur' ? { blurRadius: annotation.radius } : {}),
+        ...(annotation.type === 'region-highlight' ? { color: annotation.color } : {}),
+      },
+    };
+  }
   if (annotation.type === 'mosaic') {
     return {
       ...currentState,
@@ -77,6 +90,9 @@ export function deriveCaptureEditorToolbarState(
       annotationStyle: {
         ...currentState.annotationStyle,
         color: annotation.color,
+        fontFamily: annotation.font_family ?? '',
+        bold: annotation.bold ?? false,
+        italic: annotation.italic ?? false,
       },
     };
   }
@@ -84,12 +100,14 @@ export function deriveCaptureEditorToolbarState(
   return {
     textFontSize: currentState.textFontSize,
     annotationStyle: {
+      ...currentState.annotationStyle,
       color: annotation.color,
       strokeWidth: annotation.stroke_width,
       filled:
         annotation.type === 'rectangle' || annotation.type === 'ellipse'
           ? annotation.filled
           : false,
+      ...(annotation.type === 'rectangle' ? { cornerRadius: annotation.corner_radius ?? 0 } : {}),
     },
   };
 }
@@ -290,14 +308,25 @@ export function planCaptureAnnotationSizeAdjustment({
   textFontSize,
   direction,
   isTextSizingActive,
+  isBlurSizingActive = false,
+  amount = 1,
 }: CaptureEditorToolbarState & {
   direction: AnnotationSizeDirection;
   isTextSizingActive: boolean;
+  isBlurSizingActive?: boolean;
+  amount?: number;
 }): CaptureEditorToolbarState {
   if (isTextSizingActive) {
     return {
       annotationStyle,
-      textFontSize: nextTextFontSize(textFontSize, direction),
+      textFontSize: nextTextFontSize(textFontSize, direction, amount),
+    };
+  }
+
+  if (isBlurSizingActive) {
+    return {
+      annotationStyle: { ...annotationStyle, blurRadius: nextBlurRadius(annotationStyle.blurRadius ?? DEFAULT_BLUR_RADIUS, direction, amount) },
+      textFontSize,
     };
   }
 
@@ -307,6 +336,7 @@ export function planCaptureAnnotationSizeAdjustment({
       strokeWidth: nextAnnotationStrokeWidth(
         annotationStyle.strokeWidth,
         direction,
+        amount,
       ),
     },
     textFontSize,
@@ -627,7 +657,7 @@ export interface CaptureAnnotationMoveGesture {
   annotationIndex: number;
   startPoint: Point;
   startAnnotation: AnnotationCommand;
-  resizeHandle?: SelectionHandle;
+  resizeHandle?: AnnotationHandle;
 }
 
 export type CaptureExistingAnnotationPointerDownPlan =
@@ -707,7 +737,7 @@ export function planCaptureAnnotationMove({
   startPoint: Point;
   localPoint: Point;
   constrainMove: boolean;
-  resizeHandle?: SelectionHandle;
+  resizeHandle?: AnnotationHandle;
   selectionBounds?: LogicalRect;
 }): CaptureAnnotationMovePlan {
   const delta = {
@@ -716,7 +746,7 @@ export function planCaptureAnnotationMove({
   };
   if (resizeHandle && selectionBounds) {
     return {
-      draftAnnotation: resizeRectAnnotation(
+      draftAnnotation: resizeAnnotationByHandle(
         startAnnotation,
         resizeHandle,
         delta,
@@ -756,7 +786,7 @@ export function planCaptureAnnotationMoveCommit({
   startPoint: Point;
   localPoint: Point;
   constrainMove: boolean;
-  resizeHandle?: SelectionHandle;
+  resizeHandle?: AnnotationHandle;
   selectionBounds?: LogicalRect;
 }): CaptureAnnotationMoveCommitPlan {
   const annotationMove = planCaptureAnnotationMove({

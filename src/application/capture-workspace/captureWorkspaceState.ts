@@ -32,6 +32,7 @@ export type CaptureSessionStatus =
   | 'loading'
   | 'selecting'
   | 'preview'
+  | 'scrolling'
   | 'error';
 export type CaptureCandidateDetectionMode = 'window' | 'control';
 

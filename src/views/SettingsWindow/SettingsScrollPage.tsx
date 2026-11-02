@@ -33,7 +33,8 @@ export function SettingsScrollPage({
     if (!container || sections.length === 0) return;
 
     const updateActiveSection = () => {
-      const threshold = (headerRef.current?.getBoundingClientRect().bottom ?? container.getBoundingClientRect().top) + 16;
+      const scale = container.clientHeight ? container.getBoundingClientRect().height / container.clientHeight : 1;
+      const threshold = (headerRef.current?.getBoundingClientRect().bottom ?? container.getBoundingClientRect().top) + 24 * scale;
       let nextSection = sections[0].id;
       for (const section of sections) {
         if (

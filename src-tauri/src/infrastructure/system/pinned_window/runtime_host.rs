@@ -1,6 +1,6 @@
 use tauri::AppHandle;
 
-use crate::application::pinned_image::PinnedImageRuntimeHost;
+use crate::application::pinned_image::{PinnedImagePlacement, PinnedImageRuntimeHost};
 use crate::domain::capture::PinnedImageView;
 use crate::Result;
 
@@ -22,9 +22,9 @@ impl TauriPinnedImageRuntimeHost {
 
 #[async_trait::async_trait]
 impl PinnedImageRuntimeHost for TauriPinnedImageRuntimeHost {
-    async fn open(&self, image: PinnedImageView) -> Result<()> {
+    async fn open(&self, image: PinnedImageView, placement: PinnedImagePlacement) -> Result<()> {
         run_on_main_thread(&self.app, "open pinned image window", move |app| {
-            open_pinned_image_window(&app, &image)
+            open_pinned_image_window(&app, &image, placement)
         })
         .await
     }

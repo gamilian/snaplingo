@@ -75,14 +75,14 @@ export type CancelCapturePointerAction =
   | 'cancel-session';
 
 interface CancelCapturePointerState {
-  status: 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
+  status: 'idle' | 'loading' | 'selecting' | 'preview' | 'scrolling' | 'error';
   hasSelection: boolean;
   hasTextDraft?: boolean;
   hasAnnotationGesture?: boolean;
   hasDismissibleLayer: boolean;
 }
 interface CancelCaptureBlurState {
-  status: 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
+  status: 'idle' | 'loading' | 'selecting' | 'preview' | 'scrolling' | 'error';
   isRenderingOutput?: boolean;
 }
 
@@ -199,10 +199,10 @@ export function getSelectionHistoryStepFromShortcut(
 
 export function isClearAnnotationsShortcut(event: CaptureShortcutEvent) {
   return (
-    event.key.toLowerCase() === 'z' &&
+    event.key === 'Backspace' &&
     (event.metaKey || event.ctrlKey) &&
-    !event.altKey &&
-    !!event.shiftKey
+    !!event.altKey &&
+    !event.shiftKey
   );
 }
 
@@ -213,7 +213,7 @@ export function getUndoRedoActionFromShortcut(
     return null;
   }
 
-  if (event.key.toLowerCase() === 'z') return event.shiftKey ? null : 'undo';
+  if (event.key.toLowerCase() === 'z') return event.shiftKey ? 'redo' : 'undo';
   if (event.key.toLowerCase() === 'y' && !event.shiftKey) return 'redo';
 
   return null;
@@ -252,10 +252,10 @@ export function getSelectionArrowActionFromShortcut(
   if (hasPrimaryModifier && !event.shiftKey) {
     return { mode: 'expand', direction: event.key };
   }
-  if (event.shiftKey && !hasPrimaryModifier) {
+  if (event.shiftKey && hasPrimaryModifier) {
     return { mode: 'shrink', direction: event.key };
   }
-  if (!hasPrimaryModifier && !event.shiftKey) {
+  if (!hasPrimaryModifier) {
     return { mode: 'move', direction: event.key };
   }
 
@@ -302,6 +302,7 @@ export function getHoverSelectionCompletionActionFromShortcut(
 export function getPreviewCaptureCompletionActionFromShortcut(
   event: CaptureShortcutEvent,
 ): PreviewCaptureShortcutCompletionAction | null {
+  if (isPlainCaptureCompletionShortcut(event)) return 'copy';
   if (isCopyCaptureKeyboardShortcut(event)) return 'copy';
   if (isQuickSaveCaptureShortcut(event)) return 'quick-save';
   if (isSaveCaptureShortcut(event)) return 'save';
@@ -325,6 +326,7 @@ export function getCaptureKeyboardToolbarAction(
 }
 
 export function isPinCaptureShortcut(event: CaptureShortcutEvent) {
+  if (event.key === 'F3' && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) return true;
   return (
     event.key.toLowerCase() === 't' &&
     (event.metaKey || event.ctrlKey) &&

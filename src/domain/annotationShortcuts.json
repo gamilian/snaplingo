@@ -1,0 +1,15 @@
+{
+  "rectangle": "b",
+  "ellipse": "o",
+  "arrow": "a",
+  "line": "l",
+  "pen": "p",
+  "highlight": "h",
+  "region-highlight": "q",
+  "blur": "u",
+  "spotlight": "g",
+  "mosaic": "m",
+  "text": "t",
+  "eraser": "e",
+  "scrolling": "s"
+}

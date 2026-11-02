@@ -105,6 +105,7 @@ export interface RectangleAnnotationCommand {
   color: [number, number, number, number];
   stroke_width: number;
   filled: boolean;
+  corner_radius?: number;
 }
 
 export interface EllipseAnnotationCommand {
@@ -121,6 +122,8 @@ export interface ArrowAnnotationCommand {
   end: Point;
   color: [number, number, number, number];
   stroke_width: number;
+  control1?: Point;
+  control2?: Point;
 }
 
 export interface LineAnnotationCommand {
@@ -164,6 +167,29 @@ export interface TextAnnotationCommand {
   text: string;
   color: [number, number, number, number];
   font_size: number;
+  font_family?: string;
+  bold?: boolean;
+  italic?: boolean;
+}
+
+export interface RegionHighlightAnnotationCommand {
+  type: 'region-highlight';
+  rect: LogicalRect;
+  color: [number, number, number, number];
+  corner_radius?: number;
+}
+
+export interface BlurAnnotationCommand {
+  type: 'blur';
+  rect: LogicalRect;
+  radius: number;
+  corner_radius?: number;
+}
+
+export interface SpotlightAnnotationCommand {
+  type: 'spotlight';
+  rect: LogicalRect;
+  corner_radius?: number;
 }
 
 export type AnnotationCommand =
@@ -175,4 +201,7 @@ export type AnnotationCommand =
   | HighlightAnnotationCommand
   | MosaicAnnotationCommand
   | EraserAnnotationCommand
-  | TextAnnotationCommand;
+  | TextAnnotationCommand
+  | RegionHighlightAnnotationCommand
+  | BlurAnnotationCommand
+  | SpotlightAnnotationCommand;

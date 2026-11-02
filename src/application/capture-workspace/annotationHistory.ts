@@ -1,4 +1,5 @@
 import type { AnnotationCommand } from '../../domain/capture';
+const MAX_UNDO_STEPS = 100;
 
 export interface AnnotationHistory {
   annotations: AnnotationCommand[];
@@ -23,7 +24,7 @@ function snapshotHistory(
   return {
     annotations,
     undoneAnnotations: [],
-    undoSnapshots: [...(history.undoSnapshots ?? []), history.annotations],
+    undoSnapshots: [...(history.undoSnapshots ?? []), history.annotations].slice(-MAX_UNDO_STEPS),
     redoSnapshots: [],
   };
 }
@@ -136,7 +137,7 @@ export function redoAnnotationHistory(
     return {
       annotations: nextAnnotations,
       undoneAnnotations: [],
-      undoSnapshots: [...(history.undoSnapshots ?? []), history.annotations],
+      undoSnapshots: [...(history.undoSnapshots ?? []), history.annotations].slice(-MAX_UNDO_STEPS),
       redoSnapshots,
     };
   }

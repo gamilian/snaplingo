@@ -129,6 +129,19 @@ mod tests {
     }
 
     #[test]
+    fn missing_remembered_save_directory_falls_back_to_the_configured_directory() {
+        let output = CaptureOutput::with_host(Arc::new(RecordingCaptureOutputHost::new()));
+        let path = output.dialog_capture_save_path(
+            Some("/removed"),
+            Some("/configured"),
+            "png",
+            "custom",
+            "region",
+        );
+        assert_eq!(path, PathBuf::from("/configured/region.png"));
+    }
+
+    #[test]
     fn configured_tilde_directory_uses_host_home_directory() {
         let output = CaptureOutput::with_host(Arc::new(RecordingCaptureOutputHost::new()));
 
@@ -223,5 +236,66 @@ mod tests {
         let dir = configured_capture_save_dir("~/Pictures/SnapLingo", Path::new("/Users/alice"));
 
         assert_eq!(dir, PathBuf::from("/Users/alice/Pictures/SnapLingo"));
+    }
+
+    #[tokio::test]
+    async fn filename_extension_selects_the_codec_and_webp_preserves_every_pixel() {
+        let host = Arc::new(RecordingCaptureOutputHost::new());
+        let output = CaptureOutput::with_host(host.clone());
+        let pixels = image::RgbaImage::from_fn(20, 10, |x, y| {
+            image::Rgba([(x * 11) as u8, (y * 23) as u8, ((x + y) * 7) as u8, 180])
+        });
+        let mut png = Vec::new();
+        image::codecs::png::PngEncoder::new(&mut png)
+            .write_image(pixels.as_raw(), 20, 10, image::ExtendedColorType::Rgba8)
+            .unwrap();
+        output
+            .save_image(&png, Path::new("image.webp"), "jpg", 50)
+            .await
+            .unwrap();
+        let writes = host.writes();
+        assert_eq!(
+            image::guess_format(&writes[0].1).unwrap(),
+            image::ImageFormat::WebP
+        );
+        assert_eq!(
+            image::load_from_memory(&writes[0].1).unwrap().to_rgba8(),
+            pixels
+        );
+        output
+            .save_image(&png, Path::new("image.JPEG"), "png", 90)
+            .await
+            .unwrap();
+        assert_eq!(
+            image::guess_format(&host.writes()[1].1).unwrap(),
+            image::ImageFormat::Jpeg
+        );
+        let saved = output
+            .save_image(&png, Path::new("no-extension"), "png", 90)
+            .await
+            .unwrap();
+        assert_eq!(saved, PathBuf::from("no-extension.png"));
+        assert!(output
+            .save_image(&png, Path::new("image.txt"), "png", 90)
+            .await
+            .is_err());
+        assert_eq!(host.writes().len(), 3);
+    }
+
+    #[test]
+    fn unix_millisecond_names_contain_only_the_timestamp_before_the_extension() {
+        let now = Local.with_ymd_and_hms(2026, 7, 14, 13, 30, 45).unwrap();
+        let path = configured_capture_save_path(
+            Path::new("captures"),
+            "webp",
+            "unix-ms",
+            "ignored",
+            now,
+            &|_| false,
+        );
+        assert_eq!(
+            path.file_name().unwrap().to_string_lossy(),
+            format!("{}.webp", now.timestamp_millis())
+        );
     }
 }

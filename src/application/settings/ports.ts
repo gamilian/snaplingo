@@ -5,6 +5,9 @@ export interface SettingsWindowPort {
   openSettings(): Promise<void>;
   selectScreenshotDirectory(): Promise<string | null>;
   getAppVersion(): Promise<string>;
+  displayBounds?(): Promise<import('../../domain/capture').LogicalRect | null>;
+  applyInterfaceScale?(scale: number): Promise<void>;
+  openExternal?(url: string): Promise<void>;
 }
 
 export interface SettingsWindowEventsPort {
@@ -62,7 +65,8 @@ export interface GeneralSettings {
 
 export type AnnotationColorPreset = [number, number, number, number];
 export type ScreenshotFormat = 'png' | 'jpg' | 'webp';
-export type ScreenshotNamingRule = 'timestamp' | 'date' | 'counter' | 'custom';
+export type ScreenshotNamingRule = 'timestamp' | 'unix-ms' | 'date' | 'counter' | 'custom';
+export type CaptureUiScale = 'auto' | '100' | '125' | '150' | '175' | '200';
 export type ResultWindowPosition =
   | 'center'
   | 'below-cursor'
@@ -77,6 +81,8 @@ export interface ScreenshotSettings {
   quality: number;
   namingRule: ScreenshotNamingRule;
   customFileName: string;
+  lastSaveDirectory?: string;
+  lastSaveFormat?: ScreenshotFormat;
   autoCopy: boolean;
   defaultStrokeWidth: number;
   defaultFontSize: number;
@@ -86,6 +92,12 @@ export interface ScreenshotSettings {
   magnifierZoom?: number;
   pinOpacity: number;
   pinShadow: boolean;
+  pinBorder?: boolean;
+  pinPosition?: 'original' | 'center';
+  pinBorderShortcut?: string;
+  longshotMaxHeight?: number;
+  captureUiScale?: CaptureUiScale;
+  annotationToolShortcuts?: Record<string, string>;
   annotationColors: AnnotationColorPreset[];
   selectionBorderWidth?: number;
   selectionBorderColor?: AnnotationColorPreset;

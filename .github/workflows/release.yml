@@ -96,6 +96,10 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: ./script/smoke-test-windows.ps1 -InstallerType msi
+      - name: Smoke test Windows portable archive
+        if: runner.os == 'Windows' && !matrix.offline
+        shell: pwsh
+        run: ./script/smoke-test-windows.ps1 -InstallerType portable
       - name: Collect verified installers and checksums
         env:
           SNAPLINGO_RELEASE_TARGET: ${{ matrix.label }}
@@ -137,7 +141,7 @@ jobs:
         working-directory: release-assets
         run: |
           shopt -s nullglob
-          assets=(snaplingo-v*.dmg snaplingo-v*.msi snaplingo-v*-setup.exe snaplingo-v*.AppImage snaplingo-v*.deb)
+          assets=(snaplingo-v*.dmg snaplingo-v*.msi snaplingo-v*-setup.exe snaplingo-v*-portable.zip snaplingo-v*.AppImage snaplingo-v*.deb)
           if [ "${#assets[@]}" -eq 0 ]; then
             echo "No release assets were downloaded" >&2
             exit 1

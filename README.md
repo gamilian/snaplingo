@@ -4,10 +4,11 @@ A cross-platform screenshot, OCR, and translation desktop application built with
 
 ## Features
 
-- Screenshot capture and editing: annotations, shapes, text, mosaic, and blur.
+- Screenshot capture and editing: curved arrows, rounded shapes, resizable text with system fonts, mosaic, blur, region highlights, and spotlights.
+- Manual scrolling screenshots with live preview, segment undo, copy/save/pin output, and bounded image sizes.
 - Local and remote OCR Providers.
 - Multiple Translation Providers with side-by-side results and custom LLM configuration.
-- Global hotkeys, selected-text translation, and pinned images.
+- Global hotkeys, configurable editor shortcuts and UI scale, selected-text translation, and pinned images with border and placement settings.
 - History and Favorites in one Library browsing surface.
 
 See [Features](docs/FEATURES.md) for current behavior and [Product specifications](docs/prd/README.md) for scope and design references.
@@ -17,10 +18,12 @@ See [Features](docs/FEATURES.md) for current behavior and [Product specification
 | Target | Implementation and verification | Official release packages |
 | --- | --- | --- |
 | macOS 12+ / Apple Silicon and Intel | Native capture, selection, Vision OCR, and speech; CI builds both architectures. Minimum-version compatibility still requires manual acceptance. | DMG |
-| Windows 10/11 x64 | Native capture, selection, system OCR, and speech; CI verifies NSIS/MSI installation on Windows Server. Desktop acceptance remains part of release verification. | NSIS EXE and MSI |
+| Windows 10/11 x64 | Native capture, selection, system OCR, and speech; CI verifies NSIS/MSI installation and portable startup on Windows Server. Desktop acceptance remains part of release verification. | NSIS EXE, MSI, and portable ZIP |
 | Linux | XCap capture, shortcut-copy selection, and Tesseract OCR; Ubuntu CI tests and builds packages. X11/Wayland environments require manual acceptance. System speech and installer-based updates are not implemented. | Not in the official release matrix |
 
 macOS releases use a persistent self-signed identity. Ordinary CI uses ad-hoc signing. See [Releasing](docs/RELEASING.md) for installation, permissions, signing, and acceptance checks.
+
+For scrolling capture, select a region in the screenshot editor and press **S** (configurable), then scroll the original page. **Complete / Enter** copies and saves a PNG; the configurable height limit automatically completes capture. The separate transparent preview passes mouse and wheel input through. Windows portable packages require an installed WebView2 Runtime; see [Windows portable](docs/WINDOWS_PORTABLE.md).
 
 ## Project structure
 

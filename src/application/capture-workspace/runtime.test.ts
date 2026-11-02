@@ -40,10 +40,201 @@ function createKeyboardTarget() {
     listenerCount(type: string) {
       return listeners.get(type)?.size ?? 0;
     },
+    dispatchBlur() {
+      listeners.get('blur')?.forEach(listener => listener({} as KeyboardEvent));
+    },
   };
 }
 
+describe('scrolling capture integration', () => {
+  it('starts once from the preview and retains the frozen session while the editor loses focus', async () => {
+    const platform = createPlatform();
+    const keyboard = createKeyboardTarget();
+    const runtime = createCaptureWorkspaceRuntime({ platform, keyboard: { target: keyboard.target } });
+    await runtime.actions.connectHost();
+    await runtime.actions.startSession('screenshot', 'session-1');
+    await runtime.actions.renderSelectionPreview(selection);
+    expect(runtime.actions.keyDown({ key: 's' })).toBe(true);
+    expect(runtime.renderState.status).toBe('scrolling');
+    await runtime.actions.beginScrollingCapture();
+    keyboard.dispatchBlur();
+    await runtime.actions.updateHostReadiness(true);
+    expect(platform.commands.beginScrollingCapture).toHaveBeenCalledExactlyOnceWith('session-1', selection);
+    expect(platform.commands.cancelCaptureSession).not.toHaveBeenCalled();
+    expect(platform.window.reveal).not.toHaveBeenCalled();
+    expect(runtime.renderState.session?.id).toBe('session-1');
+    runtime.dispose();
+  });
+
+  it('restores the editable preview after scrolling startup fails', async () => {
+    const platform = createPlatform();
+    platform.commands.beginScrollingCapture.mockRejectedValueOnce(new Error('Window failed'));
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-1');
+    await runtime.actions.renderSelectionPreview(selection);
+    await runtime.actions.beginScrollingCapture();
+    expect(runtime.renderState).toMatchObject({ status: 'preview', selection, error: 'Window failed', session: { id: 'session-1' } });
+    runtime.dispose();
+  });
+
+  it('clears only the matching ended session and remembers a successful capture region', async () => {
+    const platform = createPlatform();
+    let ended!: (event: { sessionId: string; completed: boolean }) => void;
+    platform.events.subscribeScrollingCaptureEnded.mockImplementation(async handler => { ended = handler; return () => undefined; });
+    const storage = { getItem: vi.fn(() => null), setItem: vi.fn() };
+    const runtime = createCaptureWorkspaceRuntime({ platform, storage });
+    await runtime.actions.connectHost();
+    await runtime.actions.startSession('screenshot', 'session-1');
+    await runtime.actions.renderSelectionPreview(selection);
+    await runtime.actions.beginScrollingCapture();
+    ended({ sessionId: 'old-capture', completed: true });
+    expect(runtime.renderState.status).toBe('scrolling');
+    expect(storage.setItem).not.toHaveBeenCalled();
+    ended({ sessionId: 'session-1', completed: true });
+    expect(runtime.renderState).toMatchObject({ status: 'idle', session: null });
+    expect(storage.setItem).toHaveBeenCalledWith('snaplingo:last-capture-selection', JSON.stringify(selection));
+    expect(storage.setItem).toHaveBeenCalledWith('snaplingo:capture-selection-history', JSON.stringify([selection]));
+    runtime.dispose();
+  });
+
+  it('ignores a late scrolling-start failure after another capture was adopted', async () => {
+    const platform = createPlatform();
+    const pending = deferred<void>();
+    platform.commands.beginScrollingCapture.mockReturnValueOnce(pending.promise);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-1');
+    await runtime.actions.renderSelectionPreview(selection);
+    const starting = runtime.actions.beginScrollingCapture();
+    platform.commands.getCaptureSession.mockResolvedValueOnce(createSession({ id: 'session-2' }));
+    await runtime.actions.startSession('screenshot', 'session-2');
+    pending.reject(new Error('Old start failed'));
+    await starting;
+    expect(runtime.renderState).toMatchObject({ status: 'selecting', error: null, session: { id: 'session-2' } });
+    runtime.dispose();
+  });
+
+  it('uses the configured scrolling key and leaves the old key available to annotation tools', async () => {
+    const platform = createPlatform();
+    const runtime = createCaptureWorkspaceRuntime({ platform, screenshotPreferences: () => ({
+      format: 'png', quality: 90, namingRule: 'timestamp', customFileName: 'SnapLingo', autoCopy: false,
+      defaultStrokeWidth: 2, defaultFontSize: 24, rememberLastTool: false, showSelectionSize: true, showMagnifier: true,
+      annotationToolShortcuts: { scrolling: 'x', arrow: 's' },
+    }) });
+    await runtime.actions.startSession('screenshot', 'session-1');
+    await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.keyDown({ key: 's' });
+    expect(runtime.renderState.activeAnnotationTool).toBe('arrow');
+    expect(platform.commands.beginScrollingCapture).not.toHaveBeenCalled();
+    expect(runtime.actions.keyDown({ key: 'x' })).toBe(true);
+    expect(platform.commands.beginScrollingCapture).toHaveBeenCalledOnce();
+    runtime.dispose();
+  });
+
+  it('does not start scrolling while ordinary screenshot output is pending', async () => {
+    const platform = createPlatform();
+    const pending = deferred<void>();
+    platform.commands.outputCapture.mockReturnValueOnce(pending.promise);
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-1');
+    await runtime.actions.renderSelectionPreview(selection);
+    const copying = runtime.actions.completePreviewSelection('copy', selection);
+    await vi.waitFor(() => expect(platform.commands.outputCapture).toHaveBeenCalledOnce());
+    await runtime.actions.beginScrollingCapture();
+    runtime.actions.keyDown({ key: 's' });
+    expect(platform.commands.beginScrollingCapture).not.toHaveBeenCalled();
+    pending.resolve();
+    await copying;
+    runtime.dispose();
+  });
+});
+
 describe('capture workspace runtime', () => {
+  it('moves the selection with Space held even while an annotation tool is active', async () => {
+    const platform = createPlatform();
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-1');
+    await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.toggleAnnotationTool('rectangle');
+    runtime.actions.pointerDown({ point: { x: 40, y: 50 }, source: 'preview', spaceKey: true });
+    runtime.actions.pointerMove({ point: { x: 55, y: 65 } });
+    await runtime.actions.pointerUp({ point: { x: 55, y: 65 } });
+    expect(runtime.renderState.selection).toEqual({ ...selection, x: 35, y: 45 });
+    expect(runtime.renderState.annotationHistory.annotations).toHaveLength(0);
+    expect(runtime.renderState.activeAnnotationTool).toBe('rectangle');
+    runtime.dispose();
+  });
+  it('moves an unselected region by five pixels with Shift arrows and completes it with Enter', async () => {
+    const platform = createPlatform();
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-1');
+    await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.keyDown({ key: 'ArrowRight', shiftKey: true });
+    expect(runtime.renderState.selection).toEqual({ ...selection, x: 25 });
+    expect(runtime.actions.keyDown({ key: 'Enter' })).toBe(true);
+    await vi.waitFor(() => expect(platform.commands.outputCapture).toHaveBeenCalledWith(expect.objectContaining({ action: { type: 'copy' }, rect: { ...selection, x: 25 } })));
+    runtime.dispose();
+  });
+  it('changes hovered blur strength with Ctrl wheel and changes defaults on empty space', async () => {
+    const platform = createPlatform();
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-1');
+    await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.toggleAnnotationTool('blur');
+    runtime.actions.pointerDown({ point: { x: 35, y: 45 }, source: 'preview' });
+    runtime.actions.pointerMove({ point: { x: 65, y: 75 } });
+    await runtime.actions.pointerUp({ point: { x: 65, y: 75 } });
+    runtime.actions.toggleAnnotationTool('rectangle');
+    expect(runtime.renderState.selectedAnnotationIndex).toBeNull();
+    expect(runtime.actions.wheel({ point: { x: 40, y: 50 }, deltaY: -120, ctrlKey: true })).toBe(true);
+    expect(runtime.renderState.annotationHistory.annotations[0]).toMatchObject({ type: 'blur', radius: 19 });
+    expect(runtime.renderState.annotationStyle.strokeWidth).toBe(2);
+    runtime.actions.undoAnnotation();
+    expect(runtime.renderState.annotationHistory.annotations[0]).toMatchObject({ radius: 16 });
+    runtime.actions.toggleAnnotationTool('blur');
+    runtime.actions.wheel({ point: { x: 130, y: 100 }, deltaY: -120 });
+    expect(runtime.renderState.annotationStyle.blurRadius).toBe(20);
+    expect(runtime.renderState.annotationHistory.annotations[0]).toMatchObject({ radius: 16 });
+    runtime.actions.toggleAnnotationTool('text');
+    runtime.actions.pointerDown({ point: { x: 80, y: 70 }, source: 'preview' });
+    runtime.actions.wheel({ deltaY: -120, ctrlKey: true });
+    expect(runtime.renderState.textDraft?.fontSize).toBe(27);
+    runtime.dispose();
+  });
+
+  it('prioritizes configured digit tools over size keys and handles physical keys under an input method', async () => {
+    const platform = createPlatform();
+    const runtime = createCaptureWorkspaceRuntime({ platform, screenshotPreferences: () => ({
+      format: 'png', quality: 90, namingRule: 'timestamp', customFileName: 'SnapLingo', autoCopy: false,
+      defaultStrokeWidth: 2, defaultFontSize: 24, rememberLastTool: false, showSelectionSize: true, showMagnifier: false,
+      annotationToolShortcuts: { arrow: '2', blur: 'f2', scrolling: 'f4' },
+    }) });
+    await runtime.actions.startSession('screenshot', 'session-1');
+    await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.toggleAnnotationTool('rectangle');
+    expect(runtime.actions.keyDown({ key: 'Process', code: 'Digit2', isComposing: true })).toBe(true);
+    expect(runtime.renderState.activeAnnotationTool).toBe('arrow');
+    expect(runtime.renderState.annotationStyle.strokeWidth).toBe(2);
+    runtime.actions.keyDown({ key: 'F2', code: 'F2' });
+    expect(runtime.renderState.activeAnnotationTool).toBe('blur');
+    runtime.actions.keyDown({ key: 'F4', code: 'F4' });
+    expect(platform.commands.beginScrollingCapture).toHaveBeenCalledOnce();
+    runtime.dispose();
+  });
+
+  it('pins the current selection on F3 and ignores stale native pin events', async () => {
+    const base = createPlatform();
+    let pin!: (event: { sessionId: string }) => void;
+    const platform = { ...base, events: { ...base.events, subscribePinRequested: vi.fn(async (handler: typeof pin) => { pin = handler; return () => {}; }) } };
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.connectHost();
+    await runtime.actions.startSession('screenshot', 'session-1');
+    await runtime.actions.renderSelectionPreview(selection);
+    pin({ sessionId: 'old' });
+    expect(platform.commands.outputCapture).not.toHaveBeenCalled();
+    expect(runtime.actions.keyDown({ key: 'F3' })).toBe(true);
+    await vi.waitFor(() => expect(platform.commands.outputCapture).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'session-1', action: { type: 'pin' } })));
+    runtime.dispose();
+  });
   it.each(['cancel', 'dispose'] as const)('cleans an unreadable native session on %s', async (exit) => {
     const platform = createPlatform();
     platform.commands.getCaptureSession.mockRejectedValue(new Error('Session load failed'));
@@ -632,6 +823,7 @@ describe('capture workspace runtime', () => {
         format: 'webp',
         quality: 73,
         copyAfterSave: true,
+        rememberChoice: true,
       },
     });
     expect(platform.window.hide).toHaveBeenCalledTimes(1);
@@ -1455,7 +1647,7 @@ describe('capture workspace runtime', () => {
     ['manual', true],
     ['preview', false],
     ['preview', true],
-  ] as const)('starts each screenshot with rectangle and retains tools during %s editing (remember: %s)', async (entry, rememberLastTool) => {
+  ] as const)('honors tool memory across %s captures (remember: %s)', async (entry, rememberLastTool) => {
     const platform = createPlatform();
     platform.commands.getCaptureSession.mockImplementation(async (sessionId) =>
       createSession({ id: sessionId }),
@@ -1516,8 +1708,58 @@ describe('capture workspace runtime', () => {
 
     await runtime.actions.cancelSession();
     await enterEditor('session-2');
-    expect(runtime.renderState.activeAnnotationTool).toBe('rectangle');
+    expect(runtime.renderState.activeAnnotationTool).toBe(rememberLastTool ? 'mosaic' : 'rectangle');
     expect(runtime.renderState.annotationHistory.annotations).toEqual([]);
+  });
+
+  it('restores the last tool when the native capture window is recreated and waits for pending tool writes', async () => {
+    const platform = createPlatform();
+    let remembered: import('./annotationStyle').AnnotationTool = 'rectangle';
+    const write = deferred<void>();
+    const rememberAnnotationTool = vi.fn(async (tool: typeof remembered) => {
+      if (tool === 'blur') await write.promise;
+      remembered = tool;
+    });
+    const nativePlatform = {
+      ...platform,
+      commands: {
+        ...platform.commands,
+        lastAnnotationTool: async () => remembered,
+        rememberAnnotationTool,
+      },
+    };
+    const preferences = {
+      format: 'png' as const, quality: 90, namingRule: 'timestamp' as const,
+      customFileName: 'SnapLingo', autoCopy: false, defaultStrokeWidth: 2,
+      defaultFontSize: 24, rememberLastTool: true, showSelectionSize: true,
+      showMagnifier: false,
+    };
+    const create = () => createCaptureWorkspaceRuntime({ platform: nativePlatform, screenshotPreferences: () => preferences });
+    const runtime = create();
+    await runtime.actions.startSession('screenshot', 'session-1');
+    await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.toggleAnnotationTool('blur');
+    runtime.actions.selectMoveTool();
+    await runtime.actions.cancelSession();
+    const starting = runtime.actions.startSession('screenshot', 'session-2');
+    await vi.waitFor(() => expect(rememberAnnotationTool).toHaveBeenCalledWith('blur'));
+    expect(runtime.renderState.status).toBe('loading');
+    write.resolve();
+    await starting;
+    await runtime.actions.renderSelectionPreview(selection);
+    expect(runtime.renderState.activeAnnotationTool).toBe('blur');
+    runtime.dispose();
+
+    const recreated = create();
+    await recreated.actions.startSession('screenshot', 'session-3');
+    await recreated.actions.renderSelectionPreview(selection);
+    expect(recreated.renderState.activeAnnotationTool).toBe('blur');
+    preferences.rememberLastTool = false;
+    await recreated.actions.cancelSession();
+    await recreated.actions.startSession('screenshot', 'session-4');
+    await recreated.actions.renderSelectionPreview(selection);
+    expect(recreated.renderState.activeAnnotationTool).toBe('rectangle');
+    recreated.dispose();
   });
 
   it('owns annotation draw and preview commit transactions', async () => {
@@ -2211,7 +2453,7 @@ describe('capture workspace runtime', () => {
     expect(runtime.renderState.annotationHistory.annotations).toEqual([]);
   });
 
-  it('ignores a blank root click after the selection enters preview editing', async () => {
+  it('starts a fresh selection when clicking away from the current region', async () => {
     const platform = createPlatform({
       session: createSession({ id: 'session-editor-blank-click' }),
     });
@@ -2228,10 +2470,10 @@ describe('capture workspace runtime', () => {
         point: { x: 5, y: 5 },
         source: 'root',
       }),
-    ).toBe(false);
-    expect(runtime.renderState.status).toBe('preview');
-    expect(runtime.renderState.selection).toEqual(selection);
-    expect(runtime.renderState.startPoint).toBeNull();
+    ).toBe(true);
+    expect(runtime.renderState.status).toBe('selecting');
+    expect(runtime.renderState.selection).toBeNull();
+    expect(runtime.renderState.startPoint).toEqual({ x: 0, y: 0 });
   });
 
   it('owns delete, erase, clear, and output failure state', async () => {
@@ -2281,7 +2523,7 @@ describe('capture workspace runtime', () => {
       expect(runtime.renderState.isRenderingOutput).toBe(false),
     );
     expect(
-      runtime.actions.keyDown({ key: 'z', metaKey: true, shiftKey: true }),
+      runtime.actions.keyDown({ key: 'Backspace', metaKey: true, altKey: true }),
     ).toBe(true);
     expect(runtime.renderState.annotationHistory.annotations).toEqual([]);
     await vi.waitFor(() =>
@@ -3350,6 +3592,7 @@ function createPlatform({
 } = {}) {
   return {
     commands: {
+      beginScrollingCapture: vi.fn<NonNullable<CaptureWorkspacePorts['commands']['beginScrollingCapture']>>(async () => undefined),
       createCaptureSession: vi.fn(async () => session),
       getCaptureSession: vi.fn<
         CaptureWorkspacePorts['commands']['getCaptureSession']
@@ -3397,6 +3640,7 @@ function createPlatform({
       writeText: vi.fn(async () => undefined),
     },
     events: {
+    subscribeScrollingCaptureEnded: vi.fn<NonNullable<CaptureWorkspacePorts['events']['subscribeScrollingCaptureEnded']>>(async () => () => undefined),
     subscribeHotkeyTriggered: vi.fn<
       CaptureWorkspacePorts['events']['subscribeHotkeyTriggered']
     >(async () => () => undefined),

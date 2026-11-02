@@ -14,9 +14,9 @@ use crate::error::AppError;
 const OCR_SELECTION_PADDING_LOGICAL_PX: f64 = 2.0;
 
 #[derive(Debug, PartialEq)]
-struct CaptureImageCompositionPlan {
-    width: u32,
-    height: u32,
+pub(super) struct CaptureImageCompositionPlan {
+    pub(super) width: u32,
+    pub(super) height: u32,
     placements: Vec<CaptureImagePlacement>,
 }
 
@@ -109,6 +109,7 @@ pub async fn output_capture_selection(
     annotations: &[AnnotationCommand],
     include_cursor: bool,
     action: CaptureOutputAction,
+    settings: Option<&crate::application::settings::SettingsConfiguration>,
 ) -> crate::error::Result<CaptureSessionOutput> {
     let png_data = render_capture_png(
         capture_sessions,
@@ -125,10 +126,19 @@ pub async fn output_capture_selection(
             format,
             quality,
             copy_after_save,
+            remember_choice,
         } => {
-            output
+            let saved = output
                 .save_image(&png_data, Path::new(&path), &format, quality)
                 .await?;
+            if remember_choice {
+                if let Some(settings) = settings {
+                    let (_, format) = super::output::capture_save_path_and_format(&saved, &format)?;
+                    if let Err(error) = settings.record_screenshot_save_choice(&saved, format) {
+                        log::warn!("Image saved, but could not remember the save choice: {error}");
+                    }
+                }
+            }
             if copy_after_save {
                 output.copy_png(&png_data).await?;
             }
@@ -151,39 +161,60 @@ pub fn render_capture_png(
     include_cursor: bool,
 ) -> crate::error::Result<Vec<u8>> {
     let session = capture_sessions.get_session(session_id)?;
+    let image = compose_snapshot_image(
+        image_composition,
+        &session.snapshots,
+        session.desktop_scale,
+        rect,
+        annotations,
+        if include_cursor {
+            session.captured_cursor.as_ref()
+        } else {
+            None
+        },
+    )?;
+    let mut png = Vec::new();
+    image::DynamicImage::ImageRgba8(image)
+        .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+        .map_err(|error| AppError::System(format!("Failed to encode capture PNG: {error}")))?;
+    Ok(png)
+}
 
-    let plan = capture_image_composition_plan(rect, &session.snapshots, session.desktop_scale)
-        .map_err(AppError::System)?;
+pub(super) fn compose_snapshot_image(
+    image_composition: &CaptureImageComposer,
+    snapshots: &[MonitorSnapshot],
+    desktop_scale: Option<f64>,
+    rect: &LogicalRect,
+    annotations: &[AnnotationCommand],
+    captured_cursor: Option<&CapturedCursor>,
+) -> crate::Result<image::RgbaImage> {
+    let plan =
+        capture_image_composition_plan(rect, snapshots, desktop_scale).map_err(AppError::System)?;
     let mut placements = plan
         .placements
         .iter()
         .map(|placement| PngPlacement {
-            png_data: session.snapshots[placement.snapshot_index]
-                .png_data
-                .as_slice(),
+            png_data: snapshots[placement.snapshot_index].png_data.as_slice(),
             source_rect: placement.source_rect.clone(),
             destination_rect: placement.destination_rect.clone(),
         })
         .collect::<Vec<_>>();
-    if include_cursor {
-        if let Some(cursor) = session.captured_cursor.as_ref() {
-            if let Some(placement) =
-                captured_cursor_placement_for_selection(cursor, rect, plan.width)
-                    .map_err(AppError::System)?
-            {
-                placements.push(PngPlacement {
-                    png_data: cursor.png_data.as_slice(),
-                    source_rect: placement.source_rect,
-                    destination_rect: placement.destination_rect,
-                });
-            }
+    if let Some(cursor) = captured_cursor {
+        if let Some(placement) = captured_cursor_placement_for_selection(cursor, rect, plan.width)
+            .map_err(AppError::System)?
+        {
+            placements.push(PngPlacement {
+                png_data: cursor.png_data.as_slice(),
+                source_rect: placement.source_rect,
+                destination_rect: placement.destination_rect,
+            });
         }
     }
 
     let image_annotations =
         image_annotations_from_commands(annotations, rect, plan.width).map_err(AppError::System)?;
 
-    image_composition.compose_png_with_annotations(
+    image_composition.compose_rgba_with_annotations(
         plan.width,
         plan.height,
         &placements,
@@ -216,11 +247,13 @@ fn image_annotations_from_commands(
                 color,
                 stroke_width,
                 filled,
+                corner_radius,
             } => Ok(ImageAnnotation::Rectangle {
                 rect: scaled_logical_rect_relative_to(rect, &annotation_origin, output_scale)?,
                 color: *color,
                 stroke_width: ((*stroke_width).max(1) as f64 * output_scale).ceil() as u32,
                 filled: *filled,
+                corner_radius: (*corner_radius * output_scale).round().max(0.0) as u32,
             }),
             AnnotationCommand::Ellipse {
                 rect,
@@ -238,11 +271,25 @@ fn image_annotations_from_commands(
                 end,
                 color,
                 stroke_width,
+                control1,
+                control2,
             } => Ok(ImageAnnotation::Arrow {
                 start: scaled_logical_point_relative_to(start, &annotation_origin, output_scale)?,
                 end: scaled_logical_point_relative_to(end, &annotation_origin, output_scale)?,
                 color: *color,
                 stroke_width: ((*stroke_width).max(1) as f64 * output_scale).ceil() as u32,
+                control1: control1
+                    .as_ref()
+                    .map(|point| {
+                        scaled_logical_point_relative_to(point, &annotation_origin, output_scale)
+                    })
+                    .transpose()?,
+                control2: control2
+                    .as_ref()
+                    .map(|point| {
+                        scaled_logical_point_relative_to(point, &annotation_origin, output_scale)
+                    })
+                    .transpose()?,
             }),
             AnnotationCommand::Line {
                 start,
@@ -314,6 +361,9 @@ fn image_annotations_from_commands(
                 text,
                 color,
                 font_size,
+                font_family,
+                bold,
+                italic,
             } => Ok(ImageAnnotation::Text {
                 position: scaled_logical_point_relative_to(
                     position,
@@ -323,12 +373,40 @@ fn image_annotations_from_commands(
                 text: text.clone(),
                 color: *color,
                 font_size: ((*font_size).max(1) as f64 * output_scale).ceil() as u32,
+                font_family: font_family.clone(),
+                bold: *bold,
+                italic: *italic,
+            }),
+            AnnotationCommand::RegionHighlight {
+                rect,
+                color,
+                corner_radius,
+            } => Ok(ImageAnnotation::RegionHighlight {
+                rect: scaled_logical_rect_relative_to(rect, &annotation_origin, output_scale)?,
+                color: *color,
+                corner_radius: (*corner_radius * output_scale).round().max(0.0) as u32,
+            }),
+            AnnotationCommand::Blur {
+                rect,
+                radius,
+                corner_radius,
+            } => Ok(ImageAnnotation::Blur {
+                rect: scaled_logical_rect_relative_to(rect, &annotation_origin, output_scale)?,
+                radius: (*radius * output_scale) as f32,
+                corner_radius: (*corner_radius * output_scale).round().max(0.0) as u32,
+            }),
+            AnnotationCommand::Spotlight {
+                rect,
+                corner_radius,
+            } => Ok(ImageAnnotation::Spotlight {
+                rect: scaled_logical_rect_relative_to(rect, &annotation_origin, output_scale)?,
+                corner_radius: (*corner_radius * output_scale).round().max(0.0) as u32,
             }),
         })
         .collect()
 }
 
-fn capture_image_composition_plan(
+pub(super) fn capture_image_composition_plan(
     rect: &LogicalRect,
     snapshots: &[MonitorSnapshot],
     output_pixel_scale: Option<f64>,
@@ -940,12 +1018,15 @@ mod tests {
                     color: [255, 77, 79, 255],
                     stroke_width: 2,
                     filled: true,
+                    corner_radius: 0.0,
                 },
                 AnnotationCommand::Arrow {
                     start: LogicalPoint { x: 2.0, y: 3.0 },
                     end: LogicalPoint { x: 5.0, y: 7.0 },
                     color: [255, 77, 79, 255],
                     stroke_width: 2,
+                    control1: None,
+                    control2: None,
                 },
                 AnnotationCommand::Line {
                     start: LogicalPoint { x: 3.0, y: 4.0 },
@@ -993,6 +1074,9 @@ mod tests {
                     text: "Snap".to_string(),
                     color: [255, 255, 255, 255],
                     font_size: 12,
+                    font_family: String::new(),
+                    bold: false,
+                    italic: false,
                 },
             ],
             &LogicalRect {
@@ -1018,6 +1102,7 @@ mod tests {
                 color: [255, 77, 79, 255],
                 stroke_width: 4,
                 filled: true,
+                corner_radius: 0,
             }
         );
         assert_eq!(
@@ -1027,6 +1112,8 @@ mod tests {
                 end: PhysicalPoint { x: 10, y: 14 },
                 color: [255, 77, 79, 255],
                 stroke_width: 4,
+                control1: None,
+                control2: None,
             }
         );
         assert_eq!(
@@ -1083,6 +1170,9 @@ mod tests {
                 text: "Snap".to_string(),
                 color: [255, 255, 255, 255],
                 font_size: 24,
+                font_family: String::new(),
+                bold: false,
+                italic: false,
             }
         );
     }

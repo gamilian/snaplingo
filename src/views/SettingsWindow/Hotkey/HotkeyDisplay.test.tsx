@@ -24,6 +24,7 @@ describe('HotkeyDisplay', () => {
 
   it.each([
     ['F1', ['F1']],
+    ['⊞F4', ['Win', 'F4']],
     ['⌘F1', ['Ctrl', 'F1']],
     ['⇧F3', ['Shift', 'F3']],
     ['⌃⌘F3', ['Ctrl', 'F3']],

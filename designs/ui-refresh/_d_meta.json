@@ -12,8 +12,22 @@
           "subtitle": "保留原版快捷键行内录制动效"
         }
       ]
+    },
+    "SnapLingo 功能补齐 · 实际组件预览": {
+      "versions": [
+        {
+          "path": "airsnip-parity.html",
+          "createdAt": "2026-11-02T04:14:31.092Z",
+          "status": "needs-review",
+          "subtitle": "截图、长图、贴图与设置；100%–200% 缩放与主题验证",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          }
+        }
+      ]
     }
   },
   "createdAt": "2026-10-25T17:20:23.261Z",
-  "updatedAt": "2026-10-25T23:35:37.495Z"
+  "updatedAt": "2026-11-02T04:14:31.095Z"
 }

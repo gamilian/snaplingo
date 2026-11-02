@@ -55,6 +55,9 @@ describe('captureEditorRuntime', () => {
         color: [40, 167, 69, 255],
         strokeWidth: 4,
         filled: true,
+        fontFamily: '',
+        bold: false,
+        italic: false,
       },
       textFontSize: 32,
     });
@@ -862,6 +865,9 @@ describe('captureEditorRuntime', () => {
         annotationStyle: {
           ...baseStyle,
           color: [40, 167, 69, 255],
+          fontFamily: '',
+          bold: false,
+          italic: false,
         },
         textFontSize: 32,
       },
@@ -898,7 +904,7 @@ describe('captureEditorRuntime', () => {
         startAnnotation: annotations[0],
       },
       toolbarState: {
-        annotationStyle: baseStyle,
+        annotationStyle: { ...baseStyle, cornerRadius: 0 },
         textFontSize: 20,
       },
     });

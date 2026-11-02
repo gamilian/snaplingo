@@ -6,6 +6,8 @@ import {
 import type { SelectionHandle } from '../../application/capture-workspace/selection';
 import type { TextAnnotationDraft } from '../../application/capture-workspace/textAnnotationDraft';
 import type { LogicalRect } from './types';
+import type { AnnotationCommand } from '../../domain/capture';
+import { annotationSpecialHandles, type AnnotationHandle } from '../../application/capture-workspace/annotationGeometry';
 
 const SELECTION_HANDLES: SelectionHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
@@ -50,15 +52,21 @@ export function annotationRectToViewportRect(
 
 interface CaptureSelectedAnnotationBoundsOverlayProps {
   selectedAnnotationBounds: LogicalRect | null;
+  selectedAnnotation?: AnnotationCommand | null;
+  onResetArrowCurve?: () => void;
+  uiScale?: number;
   selectionViewportRect: LogicalRect;
   onResizeHandlePointerDown: (
-    handle: SelectionHandle,
+    handle: AnnotationHandle,
     event: PointerEvent<HTMLButtonElement>,
   ) => void;
 }
 
 export function CaptureSelectedAnnotationBoundsOverlay({
   selectedAnnotationBounds,
+  selectedAnnotation,
+  onResetArrowCurve,
+  uiScale = 1,
   selectionViewportRect,
   onResizeHandlePointerDown,
 }: CaptureSelectedAnnotationBoundsOverlayProps) {
@@ -77,7 +85,7 @@ export function CaptureSelectedAnnotationBoundsOverlay({
         zIndex: 4,
       }}
     >
-      {(['n', 'e', 's', 'w'] as const).map((handle) => (
+      {selectedAnnotation?.type !== 'arrow' && (['n', 'e', 's', 'w'] as const).map((handle) => (
         <button
           key={`edge-${handle}`}
           type="button"
@@ -86,16 +94,29 @@ export function CaptureSelectedAnnotationBoundsOverlay({
           onPointerDown={(event) => onResizeHandlePointerDown(handle, event)}
         />
       ))}
-      {SELECTION_HANDLES.map((handle) => (
+      {selectedAnnotation?.type !== 'arrow' && SELECTION_HANDLES.map((handle) => (
         <button
           key={handle}
           type="button"
           className={`pointer-events-auto absolute z-[3] flex h-4 w-4 items-center justify-center border-0 bg-transparent p-0 ${resizeHandleClassNames[handle]}`}
           aria-label={`Resize annotation ${handle}`}
+          style={{ width: 16 * uiScale, height: 16 * uiScale }}
           onPointerDown={(event) => onResizeHandlePointerDown(handle, event)}
         >
-          <span className="pointer-events-none h-1.5 w-1.5 rounded-full border border-white/80 bg-slate-700/55 shadow-[0_0_0_1px_rgba(0,0,0,0.3)]" />
+          <span className="pointer-events-none h-1.5 w-1.5 rounded-full border border-white/80 bg-slate-700/55 shadow-[0_0_0_1px_rgba(0,0,0,0.3)]" style={{ width: 6 * uiScale, height: 6 * uiScale }} />
         </button>
+      ))}
+      {selectedAnnotation && annotationSpecialHandles(selectedAnnotation).map(({ handle, point }) => (
+        <button
+          key={handle}
+          type="button"
+          className="pointer-events-auto absolute z-[4] h-3 w-3 -translate-x-1/2 -translate-y-1/2 cursor-move rounded-full border border-white bg-sky-500 shadow"
+          style={{ left: point.x - selectedAnnotationBounds.x, top: point.y - selectedAnnotationBounds.y, width: 12 * uiScale, height: 12 * uiScale }}
+          aria-label={`Edit annotation ${handle}`}
+          title={handle === 'radius' ? '拖动调整圆角' : handle.startsWith('control') ? '拖动调整曲线，双击恢复直线' : '拖动调整箭头端点'}
+          onPointerDown={(event) => onResizeHandlePointerDown(handle, event)}
+          onDoubleClick={handle === 'control1' || handle === 'control2' ? (event) => { event.stopPropagation(); onResetArrowCurve?.(); } : undefined}
+        />
       ))}
     </div>
   );
@@ -143,23 +164,37 @@ export function CaptureTextDraftEditor({
         minHeight: `${Math.ceil(textDraft.fontSize * 1.35 * lines.length)}px`,
         color: annotationColorToCss(annotationStyle.color),
         fontSize: `${textDraft.fontSize}px`,
+        fontFamily: annotationStyle.fontFamily || undefined,
+        fontWeight: annotationStyle.bold ? 'bold' : 'normal',
+        fontStyle: annotationStyle.italic ? 'italic' : 'normal',
         lineHeight: 1.2,
         zIndex: 2,
       }}
       value={textDraft.text}
-      onBlur={onCommit}
+      onBlur={(event) => {
+        if (event.relatedTarget instanceof Element && event.relatedTarget.closest('[data-capture-toolbar]')) return;
+        onCommit();
+      }}
       onChange={(event) => onTextChange(event.currentTarget.value)}
       onKeyDown={(event) => {
         event.stopPropagation();
         if (event.key === 'Escape') {
           event.preventDefault();
           onDiscard();
+        } else if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === 'z') {
+          event.preventDefault();
+          onDiscard();
         } else if (
           event.key === 'Enter' &&
-          (event.metaKey || event.ctrlKey)
+          !event.nativeEvent.isComposing
         ) {
           event.preventDefault();
-          event.currentTarget.blur();
+          if (event.metaKey || event.ctrlKey || event.shiftKey) {
+            event.currentTarget.setRangeText('\n', event.currentTarget.selectionStart, event.currentTarget.selectionEnd, 'end');
+            onTextChange(event.currentTarget.value);
+          } else {
+            event.currentTarget.blur();
+          }
         }
       }}
       onPointerDown={(event) => event.stopPropagation()}
@@ -197,6 +232,7 @@ export function CaptureRenderingOutputBar({
 
 interface CaptureSelectionResizeHandlesProps {
   selectionViewportRect: LogicalRect;
+  uiScale?: number;
   onResizeHandlePointerDown: (
     handle: SelectionHandle,
     event: PointerEvent<HTMLButtonElement>,
@@ -205,6 +241,7 @@ interface CaptureSelectionResizeHandlesProps {
 
 export function CaptureSelectionResizeHandles({
   selectionViewportRect,
+  uiScale = 1,
   onResizeHandlePointerDown,
 }: CaptureSelectionResizeHandlesProps) {
   return (
@@ -226,9 +263,10 @@ export function CaptureSelectionResizeHandles({
           type="button"
           className={`pointer-events-auto absolute z-[3] flex h-4 w-4 items-center justify-center border-0 bg-transparent p-0 ${resizeHandleClassNames[handle]}`}
           aria-label={`Resize selection ${handle}`}
+          style={{ width: 16 * uiScale, height: 16 * uiScale }}
           onPointerDown={(event) => onResizeHandlePointerDown(handle, event)}
         >
-          <span className="pointer-events-none h-2 w-2 rounded-full border border-accent bg-surface shadow-[0_1px_3px_rgba(15,23,42,0.3)]" />
+          <span className="pointer-events-none h-2 w-2 rounded-full border border-accent bg-surface shadow-[0_1px_3px_rgba(15,23,42,0.3)]" style={{ width: 8 * uiScale, height: 8 * uiScale }} />
         </button>
       ))}
     </div>

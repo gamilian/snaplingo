@@ -7,6 +7,8 @@ import {
 import {
   createDefaultPinnedTransform,
   getPinnedDisplaySizeForTransform,
+  getPinnedDisplaySize,
+  getPinnedThumbnailDisplaySize,
   type PinnedTransform,
 } from './model';
 import type {
@@ -44,6 +46,7 @@ export function createPinnedImageRuntime({
   window,
 }: PinnedImageRuntimePorts) {
   let currentImage: PinnedImageView | null = null;
+  let currentPresentation = defaultPresentation;
   let imageGeneration = 0;
   let mutationTail = Promise.resolve();
 
@@ -78,6 +81,13 @@ export function createPinnedImageRuntime({
     return window.resize(size.width, size.height);
   }
 
+  function exportSize() {
+    if (!currentImage) return undefined;
+    return currentPresentation.thumbnailMode
+      ? getPinnedThumbnailDisplaySize(currentImage)
+      : getPinnedDisplaySize(currentImage, currentPresentation.zoom);
+  }
+
   async function runBestEffortWindowEffect(
     operationName: string,
     operation: () => Promise<void>,
@@ -93,6 +103,7 @@ export function createPinnedImageRuntime({
     load,
 
     async resize(presentation: PinnedImagePresentation) {
+      currentPresentation = presentation;
       const image = currentImage;
       if (!image) return;
       await runBestEffortWindowEffect('resize pinned image window', () =>
@@ -115,7 +126,7 @@ export function createPinnedImageRuntime({
     },
 
     copyImage() {
-      return commands.copyPinnedImage(imageId);
+      return commands.copyPinnedImage(imageId, exportSize());
     },
 
     async copySourceText(sourceText?: string | null) {
@@ -130,12 +141,12 @@ export function createPinnedImageRuntime({
 
     async save() {
       const path = await commands.defaultCaptureSavePath();
-      await commands.savePinnedImage(imageId, path);
+      if (path) await commands.savePinnedImage(imageId, path, exportSize(), true);
     },
 
     async quickSave(directory?: string) {
       const path = await commands.quickCaptureSavePath(directory);
-      await commands.savePinnedImage(imageId, path);
+      await commands.savePinnedImage(imageId, path, exportSize());
     },
 
     openPreferences() {
@@ -147,6 +158,7 @@ export function createPinnedImageRuntime({
         const generation = ++imageGeneration;
         const image = await commands.replacePinnedImageFromClipboard(imageId);
         if (generation === imageGeneration) currentImage = image;
+        currentPresentation = defaultPresentation;
         await runBestEffortWindowEffect('resize replaced pinned image window', () =>
           resizeImage(image, defaultPresentation),
         );
@@ -169,6 +181,14 @@ export function createPinnedImageRuntime({
     destroyGroup() {
       return enqueueMutation(async () => {
         await commands.destroyPinnedImageGroup(imageId);
+        currentImage = null;
+        imageGeneration += 1;
+      });
+    },
+
+    closeAll() {
+      return enqueueMutation(async () => {
+        await commands.closeAllPinnedImages();
         currentImage = null;
         imageGeneration += 1;
       });

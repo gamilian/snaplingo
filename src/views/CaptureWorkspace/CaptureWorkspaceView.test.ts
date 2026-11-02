@@ -92,7 +92,9 @@ describe("CaptureWorkspaceView runtime seam", () => {
       | "commitAnnotationSizeDefault"
       | "undoAnnotation"
       | "redoAnnotation"
+      | "clearAnnotations"
       | "cancelSession"
+      | "beginScrollingCapture"
       | "completePreviewSelection";
 
     expectTypeOf<
@@ -111,6 +113,7 @@ describe("CaptureWorkspaceView runtime seam", () => {
       | "textDraft"
       | "annotationStyle"
       | "selectedAnnotationBounds"
+      | "selectedAnnotation"
       | "activeAnnotationTool"
     >();
     expectTypeOf<
@@ -124,6 +127,8 @@ describe("CaptureWorkspaceView runtime seam", () => {
       | "isFillModeActive"
       | "canUndo"
       | "canRedo"
+      | "fontFamilies"
+      | "uiScale"
     >();
     expectTypeOf<keyof CaptureWorkspaceViewRenderState["dom"]>().toEqualTypeOf<
       "desktopRef" | "toolbarRef" | "textDraftInputRef" | "selectionOverlay"
@@ -258,6 +263,7 @@ describe("CaptureWorkspaceView runtime seam", () => {
     });
     expect(actions.wheel).toHaveBeenCalledWith({
       deltaY: 80,
+      point: { x: 100, y: 200 },
       metaKey: false,
       ctrlKey: false,
       altKey: false,
@@ -872,7 +878,9 @@ function createActions() {
     commitAnnotationSizeDefault: vi.fn(),
     undoAnnotation: vi.fn(),
     redoAnnotation: vi.fn(),
+    clearAnnotations: vi.fn(),
     cancelSession: vi.fn(async () => undefined),
+    beginScrollingCapture: vi.fn(async () => undefined),
     completePreviewSelection: vi.fn(async () => undefined),
   } satisfies CaptureWorkspaceViewActions;
 }

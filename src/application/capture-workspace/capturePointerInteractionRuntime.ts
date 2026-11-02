@@ -8,7 +8,7 @@ import {
 } from './captureActions';
 import type { LogicalRect, Point } from '../../domain/capture';
 
-type CapturePointerStatus = 'idle' | 'loading' | 'selecting' | 'preview' | 'error';
+type CapturePointerStatus = 'idle' | 'loading' | 'selecting' | 'preview' | 'scrolling' | 'error';
 
 interface CapturePointerEvent {
   button: number;
@@ -140,7 +140,6 @@ export function planCapturePointerWheelSizeAdjustment(
 ): AnnotationSizeDirection | null {
   if (
     state.status !== 'preview' ||
-    state.hasTextDraft ||
     state.hasAnnotationGesture ||
     state.hasAnnotationMoveGesture
   ) {

@@ -92,6 +92,8 @@ export const resultWindowEvents: ResultWindowEventsPort = {
 };
 
 export const captureWorkspaceEvents: CaptureWorkspaceEventsPort = {
+  subscribePinRequested: (handler) => listen<{ sessionId: string }>('capture-pin-requested', (event) => handler(event.payload)),
+  subscribeScrollingCaptureEnded: (handler) => listen<{ sessionId: string; completed: boolean }>('scrolling-capture-ended', (event) => handler(event.payload)),
   async subscribeHotkeyTriggered(handler) {
     const unlisten = await listen<unknown>(HOTKEY_TRIGGERED_EVENT, (event) => {
       const launch = parseCaptureLaunch(event.payload);

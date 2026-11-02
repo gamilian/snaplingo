@@ -8,7 +8,9 @@
 | --- | --- | --- | --- | --- |
 | macOS 12+ / Apple Silicon | DMG | `snaplingo-vX.Y.Z-macos-aarch64.dmg` | Actions `macos-15`，原生 arm64 | 固定自签名证书 |
 | macOS 12+ / Intel | DMG | `snaplingo-vX.Y.Z-macos-x86_64.dmg` | Actions `macos-15-intel`，原生 x64 | 与 arm64 同一张证书 |
-| Windows 10 / 11 x64 | NSIS EXE、备选 MSI | `snaplingo-vX.Y.Z-windows-x86_64-setup.exe`、`snaplingo-vX.Y.Z-windows-x86_64.msi` | Actions `windows-2022` | 未签名，可后续申请 SignPath Foundation |
+| Windows 10 / 11 x64 | NSIS EXE、备选 MSI、便携 ZIP | `snaplingo-vX.Y.Z-windows-x86_64-setup.exe`、`snaplingo-vX.Y.Z-windows-x86_64.msi`、`snaplingo-vX.Y.Z-windows-x86_64-portable.zip` | Actions `windows-2022` | 未签名，可后续申请 SignPath Foundation |
+
+Windows 便携 ZIP 包含可执行文件、OCR 模型、ONNX Runtime、DirectML、Visual C++ 运行库及许可声明；解压后运行 EXE，无需安装 SnapLingo。WebView2 仍是系统依赖，ZIP 不打包此运行时，用户数据与安装版共用。详细用法见 [Windows 便携版](WINDOWS_PORTABLE.md)。离线 WebView2 安装包仍单独构建，不重复发布便携 ZIP。
 
 以上是兼容目标；最低系统版本是构建约束，并不代替对应系统真机验收。公开发布前需覆盖 macOS 12、13、14、15 及更新版本，以及 Windows 10 / 11 x64 的安装、首次授权、拖动选区、预览、复制、保存和 OCR。Windows runner 是服务器环境，不足以证明 Windows 桌面配置都兼容。此流程不要求本地 Mac 构建 Windows 包。
 
@@ -57,7 +59,7 @@ macOS CI 使用临时 ad-hoc 签名；Desktop packages 使用固定自签名身�
 
 工作流合入默认分支后，在 **Actions → Desktop packages → Run workflow** 选择分支。
 
-- 默认构建两个 macOS DMG 和 Windows 在线 EXE/MSI。
+- 默认构建两个 macOS DMG 和 Windows 在线 EXE/MSI、便携 ZIP。
 - 勾选 `windows_offline`，增加带 WebView2 的离线安装包。离线包明显更大；普通包遇到没有运行时的电脑需要联网。
 - `codex/release-*` 测试分支的 push 也会触发，便于首次搭建时验证工作流。
 - 全部成功后，在运行页 **Artifacts** 下载 `snaplingo-macos-aarch64`、`snaplingo-macos-x86_64`、`snaplingo-windows-x86_64`；压缩包内有按 `snaplingo-vX.Y.Z-平台-架构[-变体][-安装器]` 命名的安装包、SHA-256 清单和构建来源 JSON。保留 3 天，下载后可删除 artifact。
@@ -78,7 +80,7 @@ macOS CI 使用临时 ad-hoc 签名；Desktop packages 使用固定自签名身�
 5. 仅所有平台成功后，下载并重新校验 artifacts，再使用对应的版本化 Release notes 创建 GitHub Release **草稿**。
 6. 完成下面的交互验收后点 Publish release。缺少对应版本的 notes 或包含占位内容时，工作流会失败；失败时不要复用同一版本号发布不同内容。
 
-构建用 `Cargo.lock` 和 `npm ci` 固定依赖。普通构建仅清理 bundle，不删除整个 Rust release 缓存；`npm run tauri:build:beta` 才执行完整清理。避免绕过统一入口直接运行 `npm run tauri build`。
+构建用 `Cargo.lock` 和 `npm ci` 固定依赖。依赖变更后运行 `npm run licenses:generate` 更新关于页与便携包的许可清单；构建会校验清单是否过期。普通构建仅清理 bundle，不删除整个 Rust release 缓存；`npm run tauri:build:beta` 才执行完整清理。避免绕过统一入口直接运行 `npm run tauri build`。
 
 ## 5. 验收边界与必测场景
 
@@ -96,11 +98,15 @@ macOS CI 使用临时 ad-hoc 签名；Desktop packages 使用固定自签名身�
 | Windows OCR 语言缺失 | 有可理解的安装语言提示；补充系统 OCR 语言能力后重新启动验证 |
 | 真实 N→N+1 更新 | 同架构、同证书、同 bundle ID 覆盖安装；数据库、API 配置、历史保留；截图/选中文本授权复测；首次从 ad-hoc 迁移可能需要重新授权 |
 | 多屏、缩放 | Windows 混合 DPI，macOS Retina/外接屏截图和选区正确 |
+| 滚动长截图 | 原页面可持续滚动；固定页眉/页脚、反向滚动、撤销、尺寸上限及失败后输出正常；控制窗口不出现在成图中；完成/取消恢复原应用 |
+| 新标注与贴图设置 | 模糊、聚光灯、区域高亮、圆角、曲线箭头及字体预览与导出一致；改键生效；贴图原位置/居中、边框以及 UI 缩放正常 |
 | 遮罩与十字光标出现后拖动 | 按下、拖动、松开应形成选区并生成预览；Esc 可退出。若失败，在设置中启用性能监控后复现，检查日志中的 `[capture-input]` 和 `selection_pointer_down` / `selection_pointer_up`，区分原生焦点与前端输入 |
 
 未公证自签名包和 CI ad-hoc 包的 `spctl` 拒绝是预期结果；脚本记录结果，不要求用户关闭 Gatekeeper、删除 quarantine 或修改 TCC。
 
 ### 应用内升级与权限恢复
+
+Windows 便携 ZIP 在生成前检查必需的 OCR 和 DLL 资源；CI 和 Desktop packages 会解压最终 ZIP 并验证资源、启动程序两次。ZIP 与安装器一起进入 Release 校验清单。便携版的应用内更新仍打开标准安装包，保持便携使用方式时应退出程序后手动解压新 ZIP。
 
 - **设置 → 通用 → 关于** 在本次设置会话中自动检查一次 GitHub 最新正式版，也可点击“检查更新”重试。只比较正式版本号，不提示降级；每次发行必须提升版本号，替换同一 tag 下的安装包不会触发升级。
 - 根据 macOS / Windows 和架构选择仓库的标准安装包；Intel 版在 Rosetta 下运行时优先下载 Apple Silicon 版。点击“下载并打开安装包”后，程序校验 GitHub 发布元数据中的 SHA-256 和大小，失败即删除临时文件，不打开安装包。未提供匹配文件或有效校验值时保留发布页入口。

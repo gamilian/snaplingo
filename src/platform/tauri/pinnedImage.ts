@@ -2,24 +2,24 @@ import { invoke } from '@tauri-apps/api/core';
 import type { PinnedImageView } from '../../domain/capture';
 import type { PinnedImageCommandsPort } from '../../application/pinned-image/ports';
 import {
-  defaultCaptureSavePath,
+  selectCaptureSavePath,
   quickCaptureSavePath,
 } from './capture';
 
 async function defaultPinnedCaptureSavePath() {
-  return defaultCaptureSavePath();
+  return selectCaptureSavePath();
 }
 
 async function quickPinnedCaptureSavePath(directory?: string) {
-  return quickCaptureSavePath({ directory });
+  return quickCaptureSavePath({ directory, format: 'png', namingRule: 'timestamp' });
 }
 
 export async function getPinnedImage(imageId: string) {
   return invoke<PinnedImageView>('get_pinned_image', { imageId });
 }
 
-export async function copyPinnedImage(imageId: string) {
-  return invoke<void>('copy_pinned_image', { imageId });
+export async function copyPinnedImage(imageId: string, size?: import('../../application/pinned-image/ports').PinnedImageExportSize) {
+  return invoke<void>('copy_pinned_image', { imageId, ...(size ? { size } : {}) });
 }
 
 export async function replacePinnedImageFromClipboard(imageId: string) {
@@ -28,8 +28,8 @@ export async function replacePinnedImageFromClipboard(imageId: string) {
   });
 }
 
-export async function savePinnedImage(imageId: string, path: string) {
-  return invoke<void>('save_pinned_image', { imageId, path });
+export async function savePinnedImage(imageId: string, path: string, size?: import('../../application/pinned-image/ports').PinnedImageExportSize, rememberChoice?: boolean) {
+  return invoke<void>('save_pinned_image', { imageId, path, ...(size ? { size } : {}), ...(rememberChoice ? { rememberChoice } : {}) });
 }
 
 export async function closePinnedImage(imageId: string) {
@@ -60,6 +60,10 @@ export async function destroyPinnedImageGroup(imageId: string) {
   return invoke<string[]>('destroy_pinned_image_group', { imageId });
 }
 
+export async function closeAllPinnedImages() {
+  return invoke<string[]>('close_all_pinned_images');
+}
+
 export const pinnedImageCommands: PinnedImageCommandsPort = {
   getPinnedImage,
   defaultCaptureSavePath: defaultPinnedCaptureSavePath,
@@ -72,4 +76,5 @@ export const pinnedImageCommands: PinnedImageCommandsPort = {
   movePinnedImageToNextGroup,
   hidePinnedImageGroup,
   destroyPinnedImageGroup,
+  closeAllPinnedImages,
 };

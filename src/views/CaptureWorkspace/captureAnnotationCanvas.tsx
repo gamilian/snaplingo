@@ -2,6 +2,8 @@ import { annotationColorToCss } from '../../components/common/annotationColorPre
 import { useLayoutEffect, useRef, type RefObject } from 'react';
 
 import { arrowHeadPoints } from '../../application/capture-workspace/annotationStyle';
+import { arrowControlPoints } from '../../application/capture-workspace/annotationGeometry';
+import { blurRgbaPixels } from '../../application/image-inspection/blur';
 import type {
   AnnotationCommand,
   CapturedCursorView,
@@ -191,6 +193,41 @@ function eraseBrush(
   context.restore();
 }
 
+function roundedRegionPath(context: CanvasRenderingContext2D, rect: LogicalRect, radius = 0) {
+  const r = Math.max(0, Math.min(radius, rect.width / 2, rect.height / 2));
+  const { x, y, width: w, height: h } = rect;
+  context.beginPath();
+  if (!r) {
+    context.rect(x, y, w, h);
+    return;
+  }
+  context.moveTo(x + r, y);
+  context.lineTo(x + w - r, y);
+  context.quadraticCurveTo(x + w, y, x + w, y + r);
+  context.lineTo(x + w, y + h - r);
+  context.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  context.lineTo(x + r, y + h);
+  context.quadraticCurveTo(x, y + h, x, y + h - r);
+  context.lineTo(x, y + r);
+  context.quadraticCurveTo(x, y, x + r, y);
+  context.closePath();
+}
+
+export function drawCaptureSpotlights(context: CanvasRenderingContext2D, annotations: readonly AnnotationCommand[], selection: LogicalRect) {
+  const spotlights = annotations.filter((annotation) => annotation.type === 'spotlight');
+  if (!spotlights.length) return;
+  context.save();
+  context.fillStyle = 'rgba(0,0,0,0.47)';
+  context.fillRect(0, 0, selection.width, selection.height);
+  context.fillStyle = '#000';
+  context.globalCompositeOperation = 'destination-out';
+  for (const annotation of spotlights) {
+    roundedRegionPath(context, annotation.rect, annotation.corner_radius);
+    context.fill();
+  }
+  context.restore();
+}
+
 export function drawCaptureAnnotation(
   context: CanvasRenderingContext2D,
   annotation: AnnotationCommand,
@@ -199,6 +236,47 @@ export function drawCaptureAnnotation(
     source: HTMLCanvasElement;
   },
 ) {
+  if (annotation.type === 'spotlight') return;
+  if (annotation.type === 'blur' || annotation.type === 'region-highlight') {
+    const source = buffers?.source ?? context.canvas;
+    const buffer = buffers?.mosaic ?? document.createElement('canvas');
+    buffer.width = source.width;
+    buffer.height = source.height;
+    const bufferContext = buffer.getContext('2d');
+    if (!bufferContext) return;
+    const pixelRatio = context.getTransform().a || 1;
+    bufferContext.drawImage(source, 0, 0);
+    bufferContext.drawImage(context.canvas, 0, 0);
+    const supportsFilter = 'filter' in context;
+    if (annotation.type === 'blur' && !supportsFilter) {
+      const sigma = annotation.radius * pixelRatio;
+      const padding = Math.ceil(sigma * 3);
+      const left = Math.max(0, Math.floor(annotation.rect.x * pixelRatio) - padding);
+      const top = Math.max(0, Math.floor(annotation.rect.y * pixelRatio) - padding);
+      const right = Math.min(buffer.width, Math.ceil((annotation.rect.x + annotation.rect.width) * pixelRatio) + padding);
+      const bottom = Math.min(buffer.height, Math.ceil((annotation.rect.y + annotation.rect.height) * pixelRatio) + padding);
+      if (right > left && bottom > top) {
+        const pixels = bufferContext.getImageData(left, top, right - left, bottom - top);
+        pixels.data.set(blurRgbaPixels(pixels.data, pixels.width, pixels.height, sigma));
+        bufferContext.putImageData(pixels, left, top);
+      }
+    }
+    if (annotation.type !== 'blur') {
+      bufferContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      bufferContext.globalCompositeOperation = 'multiply';
+      bufferContext.fillStyle = annotationColorToCss(annotation.color);
+      bufferContext.globalAlpha = 0.588;
+      roundedRegionPath(bufferContext, annotation.rect, annotation.corner_radius);
+      bufferContext.fill();
+    }
+    context.save();
+    roundedRegionPath(context, annotation.rect, annotation.corner_radius);
+    context.clip();
+    if (annotation.type === 'blur' && supportsFilter) context.filter = `blur(${annotation.radius * pixelRatio}px)`;
+    context.drawImage(buffer, 0, 0, buffer.width / pixelRatio, buffer.height / pixelRatio);
+    context.restore();
+    return;
+  }
   if (annotation.type === 'mosaic') {
     drawPixelatedBrush(
       context,
@@ -222,12 +300,7 @@ export function drawCaptureAnnotation(
     context.fillStyle = annotationColorToCss(annotation.color);
     context.beginPath();
     if (annotation.type === 'rectangle') {
-      context.rect(
-        annotation.rect.x,
-        annotation.rect.y,
-        annotation.rect.width,
-        annotation.rect.height,
-      );
+      roundedRegionPath(context, annotation.rect, annotation.corner_radius);
     } else {
       context.ellipse(
         annotation.rect.x + annotation.rect.width / 2,
@@ -245,10 +318,21 @@ export function drawCaptureAnnotation(
     context.lineCap = 'round';
     context.lineWidth = annotation.stroke_width;
     context.strokeStyle = annotationColorToCss(annotation.color);
-    drawPath(context, [annotation.start, annotation.end]);
     if (annotation.type === 'arrow') {
+      const [c1, c2] = arrowControlPoints(annotation);
+      context.beginPath();
+      context.moveTo(annotation.start.x, annotation.start.y);
+      context.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, annotation.end.x, annotation.end.y);
+      context.stroke();
+    } else {
+      drawPath(context, [annotation.start, annotation.end]);
+    }
+    if (annotation.type === 'arrow') {
+      const tangent = annotation.control2
+        ? [annotation.control2, annotation.control1, annotation.start].find((point) => point && (point.x !== annotation.end.x || point.y !== annotation.end.y)) ?? annotation.start
+        : annotation.start;
       const arrowPoints = arrowHeadPoints(
-        annotation.start,
+        tangent,
         annotation.end,
         annotation.stroke_width,
       );
@@ -266,8 +350,7 @@ export function drawCaptureAnnotation(
       }
     }
   } else if (
-    annotation.type === 'freehand' ||
-    annotation.type === 'highlight'
+    annotation.type === 'freehand' || annotation.type === 'highlight'
   ) {
     context.lineCap = 'round';
     context.lineJoin = 'round';
@@ -277,10 +360,10 @@ export function drawCaptureAnnotation(
   } else if (annotation.type === 'text') {
     context.fillStyle = annotationColorToCss(annotation.color);
     const isWindows = typeof navigator !== 'undefined' && /^Win/i.test(navigator.platform);
-    const fontFamily = isWindows
+    const fontFamily = annotation.font_family ? JSON.stringify(annotation.font_family) : isWindows
       ? WINDOWS_CAPTURE_TEXT_FONT_FAMILY
       : APPLE_CAPTURE_TEXT_FONT_FAMILY;
-    context.font = `${annotation.font_size}px ${fontFamily}`;
+    context.font = `${annotation.italic ? 'italic ' : ''}${annotation.bold ? 'bold ' : ''}${annotation.font_size}px ${fontFamily}`;
     context.textBaseline = 'alphabetic';
     annotation.text.split('\n').forEach((line, index) => {
       context.fillText(
@@ -417,6 +500,7 @@ export function CaptureAnnotationCanvas({
     if (!context) return;
     context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
     context.clearRect(0, 0, selection.width, selection.height);
+    drawCaptureSpotlights(context, nonMosaicDraftAnnotation ? [...annotations, nonMosaicDraftAnnotation] : annotations, selection);
     for (const annotation of annotations) {
       drawCaptureAnnotation(context, annotation, {
         mosaic: mosaicBufferRef.current ??

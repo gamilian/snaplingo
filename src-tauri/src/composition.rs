@@ -236,8 +236,12 @@ pub(crate) fn build_app_state(
         Arc::new(TauriResultWindowNotifier::new(app.clone())),
     ));
 
-    let capture_runtime =
-        build_capture_runtime(app.clone(), ocr_coordinator.clone(), result_window.clone());
+    let capture_runtime = build_capture_runtime(
+        app.clone(),
+        ocr_coordinator.clone(),
+        result_window.clone(),
+        settings_configuration.clone(),
+    );
     let (screenshot_favorites, screenshot_favorite_capture) = build_screenshot_favorites(
         database.clone(),
         asset_root,

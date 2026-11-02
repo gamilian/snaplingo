@@ -1,4 +1,10 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+pub fn default_annotation_tool_shortcuts() -> HashMap<String, String> {
+    serde_json::from_str(include_str!("../../../src/domain/annotationShortcuts.json"))
+        .expect("bundled annotation shortcuts are valid")
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
@@ -60,6 +66,8 @@ pub struct ScreenshotSettings {
     pub quality: u8,
     pub naming_rule: String,
     pub custom_file_name: String,
+    pub last_save_directory: Option<String>,
+    pub last_save_format: Option<String>,
     pub auto_copy: bool,
     pub default_stroke_width: u8,
     pub default_font_size: u8,
@@ -69,6 +77,12 @@ pub struct ScreenshotSettings {
     pub magnifier_zoom: u8,
     pub pin_opacity: u8,
     pub pin_shadow: bool,
+    pub pin_border: bool,
+    pub pin_position: String,
+    pub pin_border_shortcut: String,
+    pub longshot_max_height: u32,
+    pub capture_ui_scale: String,
+    pub annotation_tool_shortcuts: HashMap<String, String>,
     pub annotation_colors: Vec<[u8; 4]>,
     pub selection_border_width: u8,
     pub selection_border_color: [u8; 4],
@@ -83,6 +97,8 @@ impl Default for ScreenshotSettings {
             quality: 90,
             naming_rule: "timestamp".to_string(),
             custom_file_name: "SnapLingo".to_string(),
+            last_save_directory: None,
+            last_save_format: None,
             auto_copy: false,
             default_stroke_width: 2,
             default_font_size: 24,
@@ -92,6 +108,12 @@ impl Default for ScreenshotSettings {
             magnifier_zoom: 12,
             pin_opacity: 100,
             pin_shadow: true,
+            pin_border: false,
+            pin_position: "original".to_string(),
+            pin_border_shortcut: "b".to_string(),
+            longshot_max_height: 30_000,
+            capture_ui_scale: "auto".to_string(),
+            annotation_tool_shortcuts: default_annotation_tool_shortcuts(),
             annotation_colors: vec![
                 [255, 77, 79, 255],
                 [40, 167, 69, 255],

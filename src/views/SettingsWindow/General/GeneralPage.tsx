@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { CustomNumberInput } from '../../../components/common/CustomNumberInput';
 import { CustomSelect } from '../../../components/common/CustomSelect';
 import { useSettingsConfigStore } from '../../../stores/settingsConfigStore';
@@ -10,6 +10,7 @@ import { uiText } from '../uiText';
 import { PermissionControls, useRequiredPermissions } from '../../PermissionControls';
 import { SoftwareUpdateSettings } from './SoftwareUpdateSettings';
 import { ThemePicker } from './ThemePicker';
+const ThirdPartyNotices = lazy(() => import('./ThirdPartyNotices'));
 
 export function GeneralPage() {
   const t = useUiText();
@@ -108,6 +109,7 @@ export function GeneralPage() {
               <SettingRow label={t('openSourceLicense')}>
                 <span className="text-xs font-medium text-ink">MIT License</span>
               </SettingRow>
+              <AboutLinks />
               <SoftwareUpdateSettings />
             </SettingsGroup>
           ),
@@ -115,6 +117,16 @@ export function GeneralPage() {
       ]}
     />
   );
+}
+
+function AboutLinks() {
+  const runtime = useSettingsRuntime();
+  const [showNotices, setShowNotices] = useState(false);
+  return <>
+    <SettingRow label="项目主页"><ActionButton onClick={() => void runtime.window.openExternal('https://github.com/gamilian/snaplingo')}>GitHub</ActionButton></SettingRow>
+    <SettingRow label="第三方组件"><ActionButton onClick={() => setShowNotices(true)}>查看许可声明</ActionButton></SettingRow>
+    {showNotices && <Suspense fallback={<p className="py-3 text-xs text-muted">正在加载许可声明…</p>}><ThirdPartyNotices onClose={() => setShowNotices(false)} /></Suspense>}
+  </>;
 }
 
 function PermissionSettings() {
