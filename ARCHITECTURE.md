@@ -18,6 +18,8 @@ React Views
 
 ### Frontend
 
+On macOS, Pinned Image and the scrolling-capture controls, viewport outline, and preview use Rust/AppKit views. Their actions call the existing backend Application runtimes directly. The frontend runtimes below still supply these surfaces on Windows and Linux; Settings, Capture Workspace, and Result Window use the frontend on all platforms.
+
 - `src/views/` renders the Settings, Capture Workspace, Result Window, and Pinned Image windows. A view receives an Application runtime through its local runtime context; it does not call Tauri directly. Result Window reads its Application state through one projection instead of selecting multiple Stores.
 - `src/application/` owns window workflows and their narrow ports:
   - `capture-workspace`: the Capture Session runtime, frozen-image readiness, cancellation, OCR recovery, and output workflow. Its `editing` module concentrates pointer/keyboard/toolbar state transitions and publishes consistent edit snapshots through one internal state seam. Views supply DOM decoding, Canvas rendering, input conversion, and printing through local ports.
@@ -48,6 +50,7 @@ React Views
   - `tts` owns speech normalization, locale-based voice selection, and persisted voice/rate policy. Voice IDs are opaque to Application so native adapters may use platform identifiers independently of display names.
 - `src-tauri/src/infrastructure/` implements OS, Tauri-window, shortcut, storage, network, native OCR, database, and event capabilities.
 - Scrolling Capture remains in `application/capture`: it reuses the frozen layout while its host supplies fresh pixels and manages the compact control window, transparent input-pass-through preview and viewport outline, and temporary keys. The preview consumes revisioned updates without starting a second sampler. A pure stitcher owns overlap matching, segment undo, image limits, and thumbnails. Completion copies and saves PNG, including at the configurable image limit. System annotation fonts are supplied through the composer's font-provider port. The Capture runtime also retains the last annotation tool for this process, surviving native capture window recreation without persisting it to the database.
+- The macOS scrolling host owns its single 250 ms sampler, starts it after session adoption, pauses during output or errors, and stops it on close. Native controls update only changed properties and previews decode only changed PNGs. Native pinned views preserve their presentation and compressed PNG while hidden, release decoded/filter/inspection buffers, and restore those buffers when shown. Pin actions reuse Pinned Image, Settings, and Capture Output workflows.
 - `src-tauri/src/composition.rs` and `composition/*_runtime.rs` construct concrete Infrastructure adapters and inject them into Application runtimes.
 - `app_actions.rs`, `app_shell.rs`, `settings_window.rs`, and `startup_shortcuts.rs` are startup-shell adapters. They map menu or hotkey intent to Application-facing actions; they do not own Application state.
 

@@ -3,6 +3,10 @@ pub mod capture_cursor;
 pub(crate) mod capture_output;
 pub mod capture_window;
 pub(crate) mod clipboard_text;
+#[cfg(target_os = "macos")]
+mod image_save_dialog;
+#[cfg(all(test, target_os = "macos"))]
+pub(crate) mod native_view_snapshot;
 pub mod ocr;
 pub mod paths;
 pub mod pinned_window;
@@ -10,6 +14,12 @@ pub mod required_permissions;
 pub mod result_window;
 pub mod screenshot;
 pub mod screenshot_favorites;
+#[cfg(target_os = "macos")]
+mod scrolling_controls_macos;
+#[cfg(target_os = "macos")]
+mod scrolling_native_macos;
+#[cfg(target_os = "macos")]
+mod scrolling_overlays_macos;
 pub(crate) mod scrolling_window;
 pub mod selection;
 pub mod shortcut;

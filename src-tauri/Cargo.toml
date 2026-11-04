@@ -91,7 +91,7 @@ accessibility-sys = "0.2"
 core-foundation = "0.9"
 core-graphics = "0.23"
 objc2 = "0.6.4"
-objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "libc", "NSApplication", "NSCursor", "NSEvent", "NSGraphicsContext", "NSImage", "NSPasteboard", "NSRunningApplication", "NSView", "NSWindow", "NSWorkspace"] }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "libc", "NSApplication", "NSAffineTransform", "NSBezierPath", "NSBitmapImageRep", "NSBox", "NSButton", "NSColor", "NSControl", "NSCursor", "NSEvent", "NSFont", "NSGraphics", "NSGraphicsContext", "NSImage", "NSImageView", "NSMenu", "NSMenuItem", "NSPanel", "NSPasteboard", "NSRunningApplication", "NSTextField", "NSTrackingArea", "NSView", "NSWindow", "NSWorkspace"] }
 objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSData", "NSGeometry", "NSProcessInfo", "objc2-core-foundation"] }
 objc2-vision = { version = "0.3.2", default-features = false, features = ["std", "VNObservation", "VNRecognizeTextRequest", "VNRequest", "VNRequestHandler", "VNTypes", "objc2-core-foundation"] }
 xcap = "0.9"
@@ -131,4 +131,20 @@ syn = { version = "2", default-features = false, features = ["full", "parsing", 
 
 [[test]]
 name = "result_window_drag"
+harness = false
+
+[[test]]
+name = "scrolling_overlays_native"
+harness = false
+
+[[test]]
+name = "scrolling_controls_native"
+harness = false
+
+[[test]]
+name = "pinned_window_native"
+harness = false
+
+[[test]]
+name = "native_ui_workflows"
 harness = false

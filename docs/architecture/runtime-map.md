@@ -2,6 +2,8 @@
 
 ## Frontend Runtime
 
+macOS Pinned Image and scrolling-capture surfaces render through Rust/AppKit adapters and call backend workflows directly. Their frontend counterparts below remain the Windows/Linux implementations.
+
 Each window starts in `src/views/`. Its view-local runtime context supplies one of the frontend Application runtimes:
 
 ```text

@@ -1,0 +1,788 @@
+[
+  {
+    "renderer": "native",
+    "pins": 1,
+    "repetition": 1,
+    "peak_physical_bytes": 23972032,
+    "mean_physical_bytes": 23935168,
+    "mean_cpu_percent": 0.005272218474859614,
+    "peak_cpu_percent": 0.019421231646012487,
+    "helper_count": 0,
+    "processes": {
+      "31285": "/Users/gamilian/work/code/snaplingo/target/release/deps/native_ui_workflows-c360399695c2878d"
+    },
+    "samples": [
+      {
+        "physical_bytes": 23972032,
+        "main_physical_bytes": 23972032,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 23972032,
+        "main_physical_bytes": 23972032,
+        "cpu_percent": 0.012724835658935103,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 23972032,
+        "main_physical_bytes": 23972032,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 23972032,
+        "main_physical_bytes": 23972032,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 23972032,
+        "main_physical_bytes": 23972032,
+        "cpu_percent": 0.019421231646012487,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 23873728,
+        "main_physical_bytes": 23873728,
+        "cpu_percent": 0.010031680493929322,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 23873728,
+        "main_physical_bytes": 23873728,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 23873728,
+        "main_physical_bytes": 23873728,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      }
+    ]
+  },
+  {
+    "renderer": "webview",
+    "pins": 1,
+    "repetition": 1,
+    "peak_physical_bytes": 94298432,
+    "mean_physical_bytes": 93864256,
+    "mean_cpu_percent": 0.13853131924333162,
+    "peak_cpu_percent": 0.7403826051647714,
+    "helper_count": 3,
+    "processes": {
+      "31446": "/Users/gamilian/work/code/snaplingo/target/release/deps/native_ui_workflows-c360399695c2878d",
+      "31469": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+      "31473": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+      "31477": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU"
+    },
+    "samples": [
+      {
+        "physical_bytes": 94298432,
+        "main_physical_bytes": 21105088,
+        "cpu_percent": 0.07483642241628546,
+        "helper_count": 3
+      },
+      {
+        "physical_bytes": 94069056,
+        "main_physical_bytes": 20908480,
+        "cpu_percent": 0.7403826051647714,
+        "helper_count": 3
+      },
+      {
+        "physical_bytes": 93905216,
+        "main_physical_bytes": 20859328,
+        "cpu_percent": 0.11494548262852555,
+        "helper_count": 3
+      },
+      {
+        "physical_bytes": 93757760,
+        "main_physical_bytes": 20859328,
+        "cpu_percent": 0.10126087340291585,
+        "helper_count": 3
+      },
+      {
+        "physical_bytes": 93757760,
+        "main_physical_bytes": 20859328,
+        "cpu_percent": 0.0395484714458463,
+        "helper_count": 3
+      },
+      {
+        "physical_bytes": 93708608,
+        "main_physical_bytes": 20859328,
+        "cpu_percent": 0.018685133608344784,
+        "helper_count": 3
+      },
+      {
+        "physical_bytes": 93708608,
+        "main_physical_bytes": 20859328,
+        "cpu_percent": 0.0,
+        "helper_count": 3
+      },
+      {
+        "physical_bytes": 93708608,
+        "main_physical_bytes": 20859328,
+        "cpu_percent": 0.0185915652799636,
+        "helper_count": 3
+      }
+    ]
+  },
+  {
+    "renderer": "native",
+    "pins": 5,
+    "repetition": 1,
+    "peak_physical_bytes": 67356864,
+    "mean_physical_bytes": 67301560,
+    "mean_cpu_percent": 0.00837605526573558,
+    "peak_cpu_percent": 0.04821113596706355,
+    "helper_count": 0,
+    "processes": {
+      "31639": "/Users/gamilian/work/code/snaplingo/target/release/deps/native_ui_workflows-c360399695c2878d"
+    },
+    "samples": [
+      {
+        "physical_bytes": 67307648,
+        "main_physical_bytes": 67307648,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 67356864,
+        "main_physical_bytes": 67356864,
+        "cpu_percent": 0.04821113596706355,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 67356864,
+        "main_physical_bytes": 67356864,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 67356864,
+        "main_physical_bytes": 67356864,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 67258560,
+        "main_physical_bytes": 67258560,
+        "cpu_percent": 0.009097696824152521,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 67258560,
+        "main_physical_bytes": 67258560,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 67258560,
+        "main_physical_bytes": 67258560,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 67258560,
+        "main_physical_bytes": 67258560,
+        "cpu_percent": 0.009699609334668567,
+        "helper_count": 0
+      }
+    ]
+  },
+  {
+    "renderer": "webview",
+    "pins": 5,
+    "repetition": 1,
+    "peak_physical_bytes": 314083264,
+    "mean_physical_bytes": 313208768,
+    "mean_cpu_percent": 0.1598339974292776,
+    "peak_cpu_percent": 0.5113939716770478,
+    "helper_count": 7,
+    "processes": {
+      "31801": "/Users/gamilian/work/code/snaplingo/target/release/deps/native_ui_workflows-c360399695c2878d",
+      "31808": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+      "31809": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+      "31810": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+      "31811": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+      "31812": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+      "31813": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+      "31814": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU"
+    },
+    "samples": [
+      {
+        "physical_bytes": 314050496,
+        "main_physical_bytes": 25430528,
+        "cpu_percent": 0.3519814799433247,
+        "helper_count": 7
+      },
+      {
+        "physical_bytes": 314083264,
+        "main_physical_bytes": 25348608,
+        "cpu_percent": 0.5113939716770478,
+        "helper_count": 7
+      },
+      {
+        "physical_bytes": 313558976,
+        "main_physical_bytes": 25250304,
+        "cpu_percent": 0.21357320699891277,
+        "helper_count": 7
+      },
+      {
+        "physical_bytes": 313034688,
+        "main_physical_bytes": 25250304,
+        "cpu_percent": 0.11809353490689367,
+        "helper_count": 7
+      },
+      {
+        "physical_bytes": 313034688,
+        "main_physical_bytes": 25250304,
+        "cpu_percent": 0.007193638030041336,
+        "helper_count": 7
+      },
+      {
+        "physical_bytes": 312690624,
+        "main_physical_bytes": 25201152,
+        "cpu_percent": 0.045464127628104485,
+        "helper_count": 7
+      },
+      {
+        "physical_bytes": 312608704,
+        "main_physical_bytes": 25201152,
+        "cpu_percent": 0.02173918493115542,
+        "helper_count": 7
+      },
+      {
+        "physical_bytes": 312608704,
+        "main_physical_bytes": 25201152,
+        "cpu_percent": 0.009232835318740569,
+        "helper_count": 7
+      }
+    ]
+  },
+  {
+    "renderer": "native",
+    "pins": 1,
+    "repetition": 2,
+    "peak_physical_bytes": 23824448,
+    "mean_physical_bytes": 23750720,
+    "mean_cpu_percent": 0.006454174748447183,
+    "peak_cpu_percent": 0.024064957662707914,
+    "helper_count": 0,
+    "processes": {
+      "31970": "/Users/gamilian/work/code/snaplingo/target/release/deps/native_ui_workflows-c360399695c2878d"
+    },
+    "samples": [
+      {
+        "physical_bytes": 23824448,
+        "main_physical_bytes": 23824448,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 23824448,
+        "main_physical_bytes": 23824448,
+        "cpu_percent": 0.024064957662707914,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 23726144,
+        "main_physical_bytes": 23726144,
+        "cpu_percent": 0.009733808606787329,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 23726144,
+        "main_physical_bytes": 23726144,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 23726144,
+        "main_physical_bytes": 23726144,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 23726144,
+        "main_physical_bytes": 23726144,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 23726144,
+        "main_physical_bytes": 23726144,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 23726144,
+        "main_physical_bytes": 23726144,
+        "cpu_percent": 0.01783463171808222,
+        "helper_count": 0
+      }
+    ]
+  },
+  {
+    "renderer": "webview",
+    "pins": 1,
+    "repetition": 2,
+    "peak_physical_bytes": 94347776,
+    "mean_physical_bytes": 93981184,
+    "mean_cpu_percent": 0.08384305426578038,
+    "peak_cpu_percent": 0.3393303197629287,
+    "helper_count": 3,
+    "processes": {
+      "32125": "/Users/gamilian/work/code/snaplingo/target/release/deps/native_ui_workflows-c360399695c2878d",
+      "32131": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+      "32132": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+      "32133": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU"
+    },
+    "samples": [
+      {
+        "physical_bytes": 94347776,
+        "main_physical_bytes": 20548032,
+        "cpu_percent": 0.09163212092052167,
+        "helper_count": 3
+      },
+      {
+        "physical_bytes": 94200320,
+        "main_physical_bytes": 20416960,
+        "cpu_percent": 0.3393303197629287,
+        "helper_count": 3
+      },
+      {
+        "physical_bytes": 94052864,
+        "main_physical_bytes": 20367808,
+        "cpu_percent": 0.10724903895828383,
+        "helper_count": 3
+      },
+      {
+        "physical_bytes": 93921792,
+        "main_physical_bytes": 20367808,
+        "cpu_percent": 0.047310685378090765,
+        "helper_count": 3
+      },
+      {
+        "physical_bytes": 93905408,
+        "main_physical_bytes": 20351424,
+        "cpu_percent": 0.01738068143334409,
+        "helper_count": 3
+      },
+      {
+        "physical_bytes": 93807104,
+        "main_physical_bytes": 20351424,
+        "cpu_percent": 0.03404482360716159,
+        "helper_count": 3
+      },
+      {
+        "physical_bytes": 93807104,
+        "main_physical_bytes": 20351424,
+        "cpu_percent": 0.005765652870888431,
+        "helper_count": 3
+      },
+      {
+        "physical_bytes": 93807104,
+        "main_physical_bytes": 20351424,
+        "cpu_percent": 0.028031111195024015,
+        "helper_count": 3
+      }
+    ]
+  },
+  {
+    "renderer": "native",
+    "pins": 5,
+    "repetition": 2,
+    "peak_physical_bytes": 67848448,
+    "mean_physical_bytes": 67782912,
+    "mean_cpu_percent": 0.012999667869284547,
+    "peak_cpu_percent": 0.07070915158142438,
+    "helper_count": 0,
+    "processes": {
+      "32288": "/Users/gamilian/work/code/snaplingo/target/release/deps/native_ui_workflows-c360399695c2878d"
+    },
+    "samples": [
+      {
+        "physical_bytes": 67815680,
+        "main_physical_bytes": 67815680,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 67848448,
+        "main_physical_bytes": 67848448,
+        "cpu_percent": 0.07070915158142438,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 67848448,
+        "main_physical_bytes": 67848448,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 67750144,
+        "main_physical_bytes": 67750144,
+        "cpu_percent": 0.015919281161989474,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 67750144,
+        "main_physical_bytes": 67750144,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 67750144,
+        "main_physical_bytes": 67750144,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 67750144,
+        "main_physical_bytes": 67750144,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 67750144,
+        "main_physical_bytes": 67750144,
+        "cpu_percent": 0.017368910210862523,
+        "helper_count": 0
+      }
+    ]
+  },
+  {
+    "renderer": "webview",
+    "pins": 5,
+    "repetition": 2,
+    "peak_physical_bytes": 324306816,
+    "mean_physical_bytes": 318762880,
+    "mean_cpu_percent": 0.14568233341909526,
+    "peak_cpu_percent": 0.365715559002889,
+    "helper_count": 7,
+    "processes": {
+      "32447": "/Users/gamilian/work/code/snaplingo/target/release/deps/native_ui_workflows-c360399695c2878d",
+      "32452": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+      "32453": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+      "32454": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+      "32455": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+      "32456": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+      "32457": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+      "32458": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU"
+    },
+    "samples": [
+      {
+        "physical_bytes": 316065664,
+        "main_physical_bytes": 27691584,
+        "cpu_percent": 0.3260931023734157,
+        "helper_count": 7
+      },
+      {
+        "physical_bytes": 315885440,
+        "main_physical_bytes": 27478592,
+        "cpu_percent": 0.365715559002889,
+        "helper_count": 7
+      },
+      {
+        "physical_bytes": 315393920,
+        "main_physical_bytes": 27429440,
+        "cpu_percent": 0.16879051543445392,
+        "helper_count": 7
+      },
+      {
+        "physical_bytes": 314918784,
+        "main_physical_bytes": 27429440,
+        "cpu_percent": 0.2275130824334058,
+        "helper_count": 7
+      },
+      {
+        "physical_bytes": 314918784,
+        "main_physical_bytes": 27429440,
+        "cpu_percent": 0.008355359465513678,
+        "helper_count": 7
+      },
+      {
+        "physical_bytes": 324306816,
+        "main_physical_bytes": 34720320,
+        "cpu_percent": 0.05467370364590918,
+        "helper_count": 7
+      },
+      {
+        "physical_bytes": 324306816,
+        "main_physical_bytes": 34720320,
+        "cpu_percent": 0.0,
+        "helper_count": 7
+      },
+      {
+        "physical_bytes": 324306816,
+        "main_physical_bytes": 34720320,
+        "cpu_percent": 0.014317344997174755,
+        "helper_count": 7
+      }
+    ]
+  },
+  {
+    "renderer": "native",
+    "pins": 1,
+    "repetition": 3,
+    "peak_physical_bytes": 23808256,
+    "mean_physical_bytes": 23734528,
+    "mean_cpu_percent": 0.010773060637742332,
+    "peak_cpu_percent": 0.04410347907783788,
+    "helper_count": 0,
+    "processes": {
+      "32615": "/Users/gamilian/work/code/snaplingo/target/release/deps/native_ui_workflows-c360399695c2878d"
+    },
+    "samples": [
+      {
+        "physical_bytes": 23808256,
+        "main_physical_bytes": 23808256,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 23808256,
+        "main_physical_bytes": 23808256,
+        "cpu_percent": 0.04410347907783788,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 23709952,
+        "main_physical_bytes": 23709952,
+        "cpu_percent": 0.019612949791571258,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 23709952,
+        "main_physical_bytes": 23709952,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 23709952,
+        "main_physical_bytes": 23709952,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 23709952,
+        "main_physical_bytes": 23709952,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 23709952,
+        "main_physical_bytes": 23709952,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 23709952,
+        "main_physical_bytes": 23709952,
+        "cpu_percent": 0.02246805623252951,
+        "helper_count": 0
+      }
+    ]
+  },
+  {
+    "renderer": "webview",
+    "pins": 1,
+    "repetition": 3,
+    "peak_physical_bytes": 96133760,
+    "mean_physical_bytes": 95634048,
+    "mean_cpu_percent": 0.09859129918134717,
+    "peak_cpu_percent": 0.48441428009955284,
+    "helper_count": 3,
+    "processes": {
+      "32774": "/Users/gamilian/work/code/snaplingo/target/release/deps/native_ui_workflows-c360399695c2878d",
+      "32780": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+      "32781": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+      "32782": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU"
+    },
+    "samples": [
+      {
+        "physical_bytes": 96133760,
+        "main_physical_bytes": 23005696,
+        "cpu_percent": 0.09865398428550848,
+        "helper_count": 3
+      },
+      {
+        "physical_bytes": 95904384,
+        "main_physical_bytes": 22809088,
+        "cpu_percent": 0.48441428009955284,
+        "helper_count": 3
+      },
+      {
+        "physical_bytes": 95691392,
+        "main_physical_bytes": 22776320,
+        "cpu_percent": 0.08561357280951615,
+        "helper_count": 3
+      },
+      {
+        "physical_bytes": 95593088,
+        "main_physical_bytes": 22776320,
+        "cpu_percent": 0.029573968037368063,
+        "helper_count": 3
+      },
+      {
+        "physical_bytes": 95593088,
+        "main_physical_bytes": 22776320,
+        "cpu_percent": 0.01149575580650083,
+        "helper_count": 3
+      },
+      {
+        "physical_bytes": 95462016,
+        "main_physical_bytes": 22776320,
+        "cpu_percent": 0.04303300958725518,
+        "helper_count": 3
+      },
+      {
+        "physical_bytes": 95462016,
+        "main_physical_bytes": 22776320,
+        "cpu_percent": 0.0057810408311895125,
+        "helper_count": 3
+      },
+      {
+        "physical_bytes": 95232640,
+        "main_physical_bytes": 22776320,
+        "cpu_percent": 0.030164781993886305,
+        "helper_count": 3
+      }
+    ]
+  },
+  {
+    "renderer": "native",
+    "pins": 5,
+    "repetition": 3,
+    "peak_physical_bytes": 67340544,
+    "mean_physical_bytes": 67297528,
+    "mean_cpu_percent": 0.012036946119387156,
+    "peak_cpu_percent": 0.05717229141726668,
+    "helper_count": 0,
+    "processes": {
+      "32935": "/Users/gamilian/work/code/snaplingo/target/release/deps/native_ui_workflows-c360399695c2878d"
+    },
+    "samples": [
+      {
+        "physical_bytes": 67291328,
+        "main_physical_bytes": 67291328,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 67340544,
+        "main_physical_bytes": 67340544,
+        "cpu_percent": 0.05717229141726668,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 67291392,
+        "main_physical_bytes": 67291392,
+        "cpu_percent": 0.018931445327582324,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 67291392,
+        "main_physical_bytes": 67291392,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 67291392,
+        "main_physical_bytes": 67291392,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 67291392,
+        "main_physical_bytes": 67291392,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 67291392,
+        "main_physical_bytes": 67291392,
+        "cpu_percent": 0.0,
+        "helper_count": 0
+      },
+      {
+        "physical_bytes": 67291392,
+        "main_physical_bytes": 67291392,
+        "cpu_percent": 0.020191832210248246,
+        "helper_count": 0
+      }
+    ]
+  },
+  {
+    "renderer": "webview",
+    "pins": 5,
+    "repetition": 3,
+    "peak_physical_bytes": 316524800,
+    "mean_physical_bytes": 314937576,
+    "mean_cpu_percent": 0.16041383043107763,
+    "peak_cpu_percent": 0.5121074244020882,
+    "helper_count": 7,
+    "processes": {
+      "33093": "/Users/gamilian/work/code/snaplingo/target/release/deps/native_ui_workflows-c360399695c2878d",
+      "33098": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+      "33099": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+      "33100": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+      "33101": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+      "33102": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+      "33103": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+      "33104": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU"
+    },
+    "samples": [
+      {
+        "physical_bytes": 314067200,
+        "main_physical_bytes": 29067904,
+        "cpu_percent": 0.5121074244020882,
+        "helper_count": 7
+      },
+      {
+        "physical_bytes": 313968896,
+        "main_physical_bytes": 28887680,
+        "cpu_percent": 0.45194200497775167,
+        "helper_count": 7
+      },
+      {
+        "physical_bytes": 313084160,
+        "main_physical_bytes": 28838528,
+        "cpu_percent": 0.17660798898492996,
+        "helper_count": 7
+      },
+      {
+        "physical_bytes": 312903936,
+        "main_physical_bytes": 28838528,
+        "cpu_percent": 0.043795412425842936,
+        "helper_count": 7
+      },
+      {
+        "physical_bytes": 316524800,
+        "main_physical_bytes": 31165056,
+        "cpu_percent": 0.006297206823347182,
+        "helper_count": 7
+      },
+      {
+        "physical_bytes": 316328128,
+        "main_physical_bytes": 31165056,
+        "cpu_percent": 0.05567847692201403,
+        "helper_count": 7
+      },
+      {
+        "physical_bytes": 316311744,
+        "main_physical_bytes": 31165056,
+        "cpu_percent": 0.015312676017760582,
+        "helper_count": 7
+      },
+      {
+        "physical_bytes": 316311744,
+        "main_physical_bytes": 31165056,
+        "cpu_percent": 0.021569452894886473,
+        "helper_count": 7
+      }
+    ]
+  }
+]

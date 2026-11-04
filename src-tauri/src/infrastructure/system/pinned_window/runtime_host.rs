@@ -1,4 +1,6 @@
 use tauri::AppHandle;
+#[cfg(target_os = "macos")]
+use tauri::Listener;
 
 use crate::application::pinned_image::{PinnedImagePlacement, PinnedImageRuntimeHost};
 use crate::domain::capture::PinnedImageView;
@@ -12,11 +14,26 @@ use super::{
 
 pub(crate) struct TauriPinnedImageRuntimeHost {
     app: AppHandle,
+    #[cfg(target_os = "macos")]
+    settings_listener: tauri::EventId,
 }
 
 impl TauriPinnedImageRuntimeHost {
     pub(crate) fn new(app: AppHandle) -> Self {
-        Self { app }
+        #[cfg(target_os = "macos")]
+        let settings_listener = super::macos::listen_settings(&app);
+        Self {
+            app,
+            #[cfg(target_os = "macos")]
+            settings_listener,
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+impl Drop for TauriPinnedImageRuntimeHost {
+    fn drop(&mut self) {
+        self.app.unlisten(self.settings_listener);
     }
 }
 
@@ -76,7 +93,7 @@ impl PinnedImageRuntimeHost for TauriPinnedImageRuntimeHost {
     }
 }
 
-async fn run_on_main_thread<T, F>(
+pub(super) async fn run_on_main_thread<T, F>(
     app: &AppHandle,
     operation_name: &'static str,
     operation: F,

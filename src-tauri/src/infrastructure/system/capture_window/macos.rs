@@ -320,17 +320,21 @@ fn capture_window_activation_suppression_policy_for_state(
 }
 
 fn has_visible_non_capture_window_on_active_space(app: &AppHandle) -> bool {
-    app.webview_windows()
-        .into_iter()
-        .filter(|(label, _)| label.as_str() != CAPTURE_WINDOW_LABEL)
-        .any(|(_, window)| window_is_visible_on_active_space(&window))
+    super::super::pinned_window::has_visible_native_window_on_active_space()
+        || app
+            .webview_windows()
+            .into_iter()
+            .filter(|(label, _)| label.as_str() != CAPTURE_WINDOW_LABEL)
+            .any(|(_, window)| window_is_visible_on_active_space(&window))
 }
 
 fn has_key_non_capture_window(app: &AppHandle) -> bool {
-    app.webview_windows()
-        .into_iter()
-        .filter(|(label, _)| label.as_str() != CAPTURE_WINDOW_LABEL)
-        .any(|(_, window)| window_is_key(&window))
+    super::super::pinned_window::has_key_native_window()
+        || app
+            .webview_windows()
+            .into_iter()
+            .filter(|(label, _)| label.as_str() != CAPTURE_WINDOW_LABEL)
+            .any(|(_, window)| window_is_key(&window))
 }
 
 fn window_is_key(window: &WebviewWindow) -> bool {
