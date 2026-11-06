@@ -84,6 +84,11 @@ export function loadCaptureSelectionHistory(storage: SelectionStorage) {
   }
 }
 
+export function storeCaptureSelectionHistory(storage: SelectionStorage, history: LogicalRect[]) {
+  storage.setItem(CAPTURE_SELECTION_HISTORY_KEY, JSON.stringify(history));
+  if (history[0]) storage.setItem(LAST_CAPTURE_SELECTION_KEY, JSON.stringify(history[0]));
+}
+
 export function getSelectionHistoryEntry(
   history: LogicalRect[],
   current: LogicalRect | null,

@@ -1,5 +1,5 @@
 import { listen } from '@tauri-apps/api/event';
-import type { CaptureWorkspaceEventsPort } from '../../application/capture-workspace/ports';
+import type { CaptureEditorToolbarEvent, CaptureWorkspaceEventsPort } from '../../application/capture-workspace/ports';
 import type { ResultWindowEventsPort } from '../../application/result-window/ports';
 import type { SettingsConfigurationEventsPort } from '../../application/settings/configuration';
 import { parseSettingsNavigationRequest } from '../../application/settings/navigation';
@@ -92,6 +92,7 @@ export const resultWindowEvents: ResultWindowEventsPort = {
 };
 
 export const captureWorkspaceEvents: CaptureWorkspaceEventsPort = {
+  subscribeEditorToolbarAction: (handler) => listen<CaptureEditorToolbarEvent>('capture-editor-toolbar-action', (event) => handler(event.payload)),
   subscribePinRequested: (handler) => listen<{ sessionId: string }>('capture-pin-requested', (event) => handler(event.payload)),
   subscribeScrollingCaptureEnded: (handler) => listen<{ sessionId: string; completed: boolean }>('scrolling-capture-ended', (event) => handler(event.payload)),
   async subscribeHotkeyTriggered(handler) {

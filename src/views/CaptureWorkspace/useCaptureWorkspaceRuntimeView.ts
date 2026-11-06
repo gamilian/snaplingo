@@ -38,6 +38,7 @@ interface CaptureWorkspaceRuntimeViewOptions {
   initialSessionId?: string;
   onInactive?: () => void | Promise<void>;
   annotationColorPresets?: readonly AnnotationColor[];
+  persistAnnotationColors?: (colors: AnnotationColor[]) => void | Promise<unknown>;
   screenshotPreferences?: CaptureScreenshotPreferences;
   persistScreenshotDefaults?: (
     input: Partial<
@@ -57,6 +58,7 @@ export function useCaptureWorkspaceRuntimeView({
   initialSessionId,
   onInactive,
   annotationColorPresets,
+  persistAnnotationColors,
   screenshotPreferences,
   persistScreenshotDefaults,
   ocrPreferences,
@@ -64,8 +66,13 @@ export function useCaptureWorkspaceRuntimeView({
   const platformPorts = useCaptureWorkspacePorts();
   const [fontFamilies, setFontFamilies] = useState<string[]>([]);
   const fontFamiliesRequestRef = useRef<Promise<string[]> | null>(null);
+  const [nativeToolbar, setNativeToolbar] = useState(false);
+  const toolbarOwnerRef = useRef<string | null>(null);
+  const toolbarRequestRef = useRef(0);
+  const toolbarWriteRef = useRef(Promise.resolve());
   const onInactiveRef = useRef(onInactive);
   const annotationColorPresetsRef = useRef(annotationColorPresets);
+  const persistAnnotationColorsRef = useRef(persistAnnotationColors);
   const screenshotPreferencesRef = useRef(screenshotPreferences);
   const persistScreenshotDefaultsRef = useRef(persistScreenshotDefaults);
   const ocrPreferencesRef = useRef(ocrPreferences);
@@ -80,6 +87,7 @@ export function useCaptureWorkspaceRuntimeView({
   });
   onInactiveRef.current = onInactive;
   annotationColorPresetsRef.current = annotationColorPresets;
+  persistAnnotationColorsRef.current = persistAnnotationColors;
   screenshotPreferencesRef.current = screenshotPreferences;
   persistScreenshotDefaultsRef.current = persistScreenshotDefaults;
   ocrPreferencesRef.current = ocrPreferences;
@@ -96,6 +104,7 @@ export function useCaptureWorkspaceRuntimeView({
         ),
         annotationColorPresets: () =>
           annotationColorPresetsRef.current ?? ANNOTATION_COLORS,
+        persistAnnotationColors: (colors) => persistAnnotationColorsRef.current?.(colors),
         screenshotPreferences: () => screenshotPreferencesRef.current,
         persistScreenshotDefaults: (input) =>
           persistScreenshotDefaultsRef.current?.(input),
@@ -157,7 +166,7 @@ export function useCaptureWorkspaceRuntimeView({
       observer.disconnect();
       window.removeEventListener('resize', updateSize);
     };
-  }, [runtimeRenderState.status, runtimeRenderState.isAnnotationToolbarVisible, uiScale]);
+  }, [runtimeRenderState.status, runtimeRenderState.isAnnotationToolbarVisible, uiScale, nativeToolbar]);
 
   useEffect(() => {
     setRuntimeRenderState(workflowRuntime.renderState);
@@ -179,6 +188,81 @@ export function useCaptureWorkspaceRuntimeView({
       }),
     [runtimeRenderState, toolbarClientBounds, toolbarHeight],
   );
+  const toolbarDark = document.documentElement.dataset.theme === 'dark';
+  const selectedType = derived.selectedAnnotation?.type;
+  const roundEnabled = ['rectangle', 'region-highlight', 'blur', 'spotlight']
+    .some(type => type === runtimeRenderState.activeAnnotationTool || type === selectedType);
+  const blurMode = runtimeRenderState.activeAnnotationTool === 'blur' || selectedType === 'blur';
+  const styling = useMemo(() => ({
+    style: runtimeRenderState.annotationStyle,
+    fontSize: runtimeRenderState.textFontSize,
+    textMode: derived.isTextSizingActive,
+    fillEnabled: derived.isFillModeActive,
+    roundEnabled, blurMode,
+    colorPresets: annotationColorPresets ?? ANNOTATION_COLORS,
+    fontFamilies,
+    error: runtimeRenderState.error,
+  }), [runtimeRenderState.annotationStyle, runtimeRenderState.textFontSize,
+    runtimeRenderState.error, derived.isTextSizingActive, derived.isFillModeActive,
+    roundEnabled, blurMode, annotationColorPresets, fontFamilies]);
+  const nativeToolbarHeight = (64 + 36 * (
+    ((derived.toolbarSize.width - 8 * uiScale) / uiScale < 560 ? 2 : 1) +
+    (styling.textMode ? 1 : 0) + (styling.roundEnabled ? 1 : 0) +
+    (styling.error ? 1 : 0)
+  )) * uiScale;
+  useEffect(() => {
+    const update = platformPorts.commands.updateCaptureEditorToolbar;
+    if (!update) return;
+    const request = ++toolbarRequestRef.current;
+    const id = runtimeRenderState.sessionId;
+    const position = derived.toolbarPosition;
+    const presentation = id && position && runtimeRenderState.status === 'preview' &&
+      runtimeRenderState.isAnnotationToolbarVisible ? {
+        frame: { x: position.x + 4 * uiScale, y: position.y + 4 * uiScale,
+          width: derived.toolbarSize.width - 8 * uiScale, height: nativeToolbarHeight },
+        uiScale,
+        dark: toolbarDark,
+        visible: true,
+        activeTool: runtimeRenderState.activeAnnotationTool,
+        canUndo: derived.canUndoAnnotation,
+        canRedo: derived.canRedoAnnotation,
+        busy: runtimeRenderState.isRenderingOutput,
+        styling,
+      } : null;
+    // Serialize writes and skip superseded frames, including session replacement.
+    toolbarWriteRef.current = toolbarWriteRef.current.catch(() => undefined).then(async () => {
+      if (request !== toolbarRequestRef.current) return;
+      const owner = toolbarOwnerRef.current;
+      if (owner && owner !== id) await update(owner, null);
+      if (!id) {
+        toolbarOwnerRef.current = null;
+        setNativeToolbar(false);
+        return;
+      }
+      const enabled = await update(id, presentation);
+      if (!enabled && owner === id) await update(id, null);
+      toolbarOwnerRef.current = enabled && presentation ? id : null;
+      if (request === toolbarRequestRef.current) setNativeToolbar(enabled && !!presentation);
+    }).catch(async () => {
+      if (request !== toolbarRequestRef.current) return;
+      setNativeToolbar(false);
+      if (id) await update(id, null).catch(() => undefined);
+      toolbarOwnerRef.current = null;
+    });
+  }, [platformPorts.commands, runtimeRenderState.sessionId, runtimeRenderState.status,
+    runtimeRenderState.isAnnotationToolbarVisible, runtimeRenderState.activeAnnotationTool,
+    runtimeRenderState.isRenderingOutput, derived.toolbarPosition?.x,
+    derived.toolbarPosition?.y, derived.toolbarSize.width, derived.canUndoAnnotation,
+    derived.canRedoAnnotation, uiScale, toolbarDark, nativeToolbarHeight, styling]);
+  useEffect(() => () => {
+    ++toolbarRequestRef.current;
+    const update = platformPorts.commands.updateCaptureEditorToolbar;
+    toolbarWriteRef.current = toolbarWriteRef.current.catch(() => undefined).then(async () => {
+      const owner = toolbarOwnerRef.current;
+      toolbarOwnerRef.current = null;
+      if (owner && update) await update(owner, null).catch(() => undefined);
+    });
+  }, [platformPorts.commands]);
   useEffect(() => {
     if (!derived.isTextSizingActive || !platformPorts.commands.listAnnotationFontFamilies) return;
     let active = true;
@@ -354,6 +438,8 @@ export function useCaptureWorkspaceRuntimeView({
         activeAnnotationTool: runtimeRenderState.activeAnnotationTool,
       },
       toolbar: {
+        nativeControls: nativeToolbar,
+        height: nativeToolbarHeight,
         fontFamilies,
         uiScale,
         position: derived.toolbarPosition,
@@ -398,6 +484,8 @@ export function useCaptureWorkspaceRuntimeView({
       screenshotPreferences?.magnifierZoom,
       fontFamilies,
       uiScale,
+      nativeToolbar,
+      nativeToolbarHeight,
     ],
   );
   const actions = useMemo<CaptureWorkspaceViewActions>(

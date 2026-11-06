@@ -240,7 +240,7 @@ where
     }
 }
 
-async fn run_on_main_thread<T, F>(
+pub(super) async fn run_on_main_thread<T, F>(
     app: &AppHandle,
     operation_name: &'static str,
     operation: F,

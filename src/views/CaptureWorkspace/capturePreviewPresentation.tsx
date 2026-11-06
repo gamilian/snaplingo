@@ -123,6 +123,7 @@ export function CaptureSelectedAnnotationBoundsOverlay({
 }
 
 interface CaptureTextDraftEditorProps {
+  preserveNativeFocus?: boolean;
   inputRef: Ref<HTMLTextAreaElement>;
   textDraft: TextAnnotationDraft;
   selectionViewportRect: LogicalRect;
@@ -133,6 +134,7 @@ interface CaptureTextDraftEditorProps {
 }
 
 export function CaptureTextDraftEditor({
+  preserveNativeFocus = false,
   inputRef,
   textDraft,
   selectionViewportRect,
@@ -164,7 +166,7 @@ export function CaptureTextDraftEditor({
         minHeight: `${Math.ceil(textDraft.fontSize * 1.35 * lines.length)}px`,
         color: annotationColorToCss(annotationStyle.color),
         fontSize: `${textDraft.fontSize}px`,
-        fontFamily: annotationStyle.fontFamily || undefined,
+        fontFamily: annotationStyle.fontFamily ? JSON.stringify(annotationStyle.fontFamily) : undefined,
         fontWeight: annotationStyle.bold ? 'bold' : 'normal',
         fontStyle: annotationStyle.italic ? 'italic' : 'normal',
         lineHeight: 1.2,
@@ -172,6 +174,7 @@ export function CaptureTextDraftEditor({
       }}
       value={textDraft.text}
       onBlur={(event) => {
+        if (preserveNativeFocus && !document.hasFocus()) return;
         if (event.relatedTarget instanceof Element && event.relatedTarget.closest('[data-capture-toolbar]')) return;
         onCommit();
       }}

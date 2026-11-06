@@ -130,6 +130,8 @@ pub fn reveal_capture_window(
         reveal_capture_window_for_current_space(&window)?;
     }
 
+    #[cfg(target_os = "macos")]
+    super::editor_toolbar_macos::reveal();
     Ok(())
 }
 
@@ -161,6 +163,8 @@ pub fn prepare_capture_window_for_reveal(
 }
 
 pub fn hide_capture_window(app: &AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    super::editor_toolbar_macos::hide();
     let Some(window) = app.get_webview_window(CAPTURE_WINDOW_LABEL) else {
         return Ok(());
     };
@@ -249,6 +253,18 @@ pub(super) fn prepare_capture_window(app: &AppHandle) -> Result<CaptureWindowUpd
     CAPTURE_WINDOW_PREPARED_FOR_SESSION.store(true, Ordering::SeqCst);
 
     Ok(CaptureWindowUpdate::Ready)
+}
+
+#[cfg(target_os = "macos")]
+pub(super) fn release_capture_editor(app: &AppHandle) -> Result<bool, String> {
+    super::editor_toolbar_macos::close();
+    CAPTURE_WINDOW_WEBVIEW_READY.store(false, Ordering::SeqCst);
+    CAPTURE_WINDOW_PREPARED_FOR_SESSION.store(false, Ordering::SeqCst);
+    let Some(window) = app.get_webview_window(CAPTURE_WINDOW_LABEL) else {
+        return Ok(false);
+    };
+    window.destroy().map_err(|error| error.to_string())?;
+    Ok(true)
 }
 
 pub async fn wait_for_capture_window_ready() -> Result<(), String> {
@@ -431,7 +447,10 @@ pub(super) fn bind_capture_window_session(app: &AppHandle, session_id: &str) {
         if let Some(runtime) = runtime.upgrade() {
             let session_id = session_id.clone();
             tauri::async_runtime::spawn(async move {
-                if let Err(error) = runtime.cancel_capture_session(&session_id).await {
+                if let Err(error) = runtime
+                    .cancel_capture_session_from_window(&session_id)
+                    .await
+                {
                     log::warn!("Failed to clean up destroyed capture session: {}", error);
                 }
             });

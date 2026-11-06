@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::AppHandle;
+#[cfg(not(target_os = "macos"))]
+use tauri::{Emitter, Manager};
 
 use crate::application::result_window::{
     ResultWindowNotifierPort, ResultWindowRequestId, ResultWindowWindowPort,
@@ -9,6 +11,7 @@ use crate::application::result_window::{
 use crate::Result;
 
 use super::backend::RESULT_WINDOW_LABEL;
+#[cfg(not(target_os = "macos"))]
 use super::tauri::show_or_create_result_window_without_context;
 
 pub(super) const RESULT_WINDOW_PAYLOAD_READY_EVENT: &str = "capture-result-payload-ready";
@@ -100,6 +103,9 @@ struct TauriResultWindowPlatform {
 impl ResultWindowTauriPlatform for TauriResultWindowPlatform {
     async fn show_or_create_on_main_thread(&self) -> std::result::Result<(), String> {
         run_on_main_thread(&self.app, "show result window", |app| {
+            #[cfg(target_os = "macos")]
+            return super::macos::show_or_create_result_window(&app);
+            #[cfg(not(target_os = "macos"))]
             show_or_create_result_window_without_context(&app).map(|_| ())
         })
         .await
@@ -112,18 +118,31 @@ impl ResultWindowTauriPlatform for TauriResultWindowPlatform {
         event: &str,
         payload: ResultWindowPayloadReadyEvent,
     ) -> std::result::Result<(), String> {
-        let target = target.to_string();
-        let event = event.to_string();
+        #[cfg(not(target_os = "macos"))]
+        let (target, event) = (target.to_string(), event.to_string());
+        #[cfg(target_os = "macos")]
+        let _ = (target, event);
         run_on_main_thread(
             &self.app,
             "notify result window payload readiness",
             move |app| {
-                let window = app
-                    .get_webview_window(&target)
-                    .ok_or("Result window is not available")?;
-                window
-                    .emit(&event, payload)
-                    .map_err(|error| error.to_string())
+                #[cfg(target_os = "macos")]
+                {
+                    let request_id = payload
+                        .request_id
+                        .parse()
+                        .map_err(|error| format!("Invalid result request ID: {error}"))?;
+                    super::macos::receive_payload(&app, ResultWindowRequestId(request_id))
+                }
+                #[cfg(not(target_os = "macos"))]
+                {
+                    let window = app
+                        .get_webview_window(&target)
+                        .ok_or("Result window is not available")?;
+                    window
+                        .emit(&event, payload)
+                        .map_err(|error| error.to_string())
+                }
             },
         )
         .await

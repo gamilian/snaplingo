@@ -91,8 +91,8 @@ accessibility-sys = "0.2"
 core-foundation = "0.9"
 core-graphics = "0.23"
 objc2 = "0.6.4"
-objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "libc", "NSApplication", "NSAffineTransform", "NSBezierPath", "NSBitmapImageRep", "NSBox", "NSButton", "NSColor", "NSControl", "NSCursor", "NSEvent", "NSFont", "NSGraphics", "NSGraphicsContext", "NSImage", "NSImageView", "NSMenu", "NSMenuItem", "NSPanel", "NSPasteboard", "NSRunningApplication", "NSTextField", "NSTrackingArea", "NSView", "NSWindow", "NSWorkspace"] }
-objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSData", "NSGeometry", "NSProcessInfo", "objc2-core-foundation"] }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "libc", "NSApplication", "NSAppearance", "NSAffineTransform", "NSBezierPath", "NSBitmapImageRep", "NSBox", "NSButton", "NSColor", "NSColorPanel", "NSColorSpace", "NSColorWell", "NSControl", "NSCursor", "NSEvent", "NSFont", "NSGraphics", "NSGraphicsContext", "NSImage", "NSImageView", "NSMenu", "NSMenuItem", "NSPanel", "NSPopUpButton", "NSPasteboard", "NSPrintInfo", "NSPrintOperation", "NSRunningApplication", "NSScreen", "NSSlider", "NSScroller", "NSScrollView", "NSText", "NSTextField", "NSTextInputClient", "NSTextView", "NSTextContainer", "NSLayoutManager", "NSTrackingArea", "NSView", "NSWindow", "NSWorkspace"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSData", "NSRegularExpression", "NSTextCheckingResult", "NSUserDefaults", "NSNotification", "NSGeometry", "NSProcessInfo", "objc2-core-foundation"] }
 objc2-vision = { version = "0.3.2", default-features = false, features = ["std", "VNObservation", "VNRecognizeTextRequest", "VNRequest", "VNRequestHandler", "VNTypes", "objc2-core-foundation"] }
 xcap = "0.9"
 

@@ -87,6 +87,8 @@ export interface CaptureWorkspaceViewRenderState {
     readonly activeAnnotationTool: AnnotationTool | null;
   };
   readonly toolbar: {
+    readonly nativeControls?: boolean;
+    readonly height?: number;
     readonly position: Point | null;
     readonly width: number;
     readonly isVisible: boolean;
@@ -492,6 +494,7 @@ export function CaptureWorkspaceView({
             />
             {renderState.editor.textDraft && (
               <CaptureTextDraftEditor
+                preserveNativeFocus={renderState.toolbar.nativeControls}
                 inputRef={renderState.dom.textDraftInputRef}
                 textDraft={renderState.editor.textDraft}
                 selectionViewportRect={renderState.editor.selectionViewportRect}
@@ -521,6 +524,7 @@ export function CaptureWorkspaceView({
               }}
             />
             <div
+              data-capture-editor-selection
               className={getCaptureEditorSelectionClassName(
                 renderState.status,
                 renderState.editor.activeAnnotationTool,
@@ -555,6 +559,15 @@ export function CaptureWorkspaceView({
               }}
             />
             {renderState.toolbar.position && renderState.toolbar.isVisible && (
+              renderState.toolbar.nativeControls ? <div
+                ref={renderState.dom.toolbarRef}
+                data-capture-toolbar
+                aria-hidden="true"
+                className="absolute"
+                style={{ left: renderState.toolbar.position.x, top: renderState.toolbar.position.y,
+                  width: renderState.toolbar.width, height: renderState.toolbar.height, zIndex: 2 }}
+                onPointerDown={event => event.stopPropagation()}
+              /> :
               <CaptureEditorToolbar
                 toolbarRef={renderState.dom.toolbarRef}
                 position={renderState.toolbar.position}

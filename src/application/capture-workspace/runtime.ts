@@ -43,6 +43,7 @@ import {
   restoreLastSuccessfulCaptureSelection,
   type CaptureSelectionStorage,
 } from './captureSelectionHistory';
+import { loadCaptureSelectionHistory, storeCaptureSelectionHistory } from './selectionMemory';
 import { emptyAnnotationHistory } from './annotationHistory';
 import type { AnnotationTool } from './annotationStyle';
 import { isScrollingCaptureShortcut, annotationShortcutBindings, normalizeEditorShortcutKey } from './annotationShortcuts';
@@ -188,6 +189,7 @@ export function createCaptureWorkspaceRuntime({
   annotationColorPresets,
   screenshotPreferences,
   persistScreenshotDefaults,
+  persistAnnotationColors,
   ocrPreferences,
   storage,
 }: {
@@ -202,6 +204,7 @@ export function createCaptureWorkspaceRuntime({
       Pick<CaptureScreenshotPreferences, 'defaultStrokeWidth' | 'defaultFontSize'>
     >,
   ) => void;
+  persistAnnotationColors?: (colors: AnnotationColor[]) => void | Promise<unknown>;
   ocrPreferences?: () => OcrSettings | undefined;
   storage?: CaptureSelectionStorage;
 }): CaptureWorkspaceRuntime {
@@ -562,6 +565,7 @@ export function createCaptureWorkspaceRuntime({
       if (storage) {
         recordSuccessfulCaptureSelection(storage, effect.action, rect);
       }
+      await platform.commands.rememberCaptureSelection?.(rect).catch(() => undefined);
       return;
     }
 
@@ -945,7 +949,19 @@ export function createCaptureWorkspaceRuntime({
           patch({ isMagnifierRequested: false });
         }
         if (plan.cancelSession) {
-          launch(cancelSession);
+          const id = state.session?.id;
+          const ownsFocus = platform.commands.captureEditorOwnsFocus;
+          if (state.status === 'preview' && id && ownsFocus) {
+            const blurGeneration = generation;
+            launch(async () => {
+              const owned = await ownsFocus(id).catch(() => false);
+              if (owned || disposed || connection.isClosed || generation !== blurGeneration ||
+                  state.session?.id !== id || state.status !== 'preview' || state.isRenderingOutput) return;
+              await cancelSession();
+            });
+          } else {
+            launch(cancelSession);
+          }
         }
       };
 
@@ -970,7 +986,10 @@ export function createCaptureWorkspaceRuntime({
         if (!disposed && !connection.isClosed && platform.events.subscribeScrollingCaptureEnded) {
           connection.retain(await platform.events.subscribeScrollingCaptureEnded(({ sessionId, completed }) => {
             if (disposed || connection.isClosed || state.status !== 'scrolling' || state.session?.id !== sessionId) return;
-            if (completed && state.selection && storage) recordSuccessfulCaptureSelection(storage, 'copy', state.selection);
+            if (completed && state.selection) {
+              if (storage) recordSuccessfulCaptureSelection(storage, 'copy', state.selection);
+              void platform.commands.rememberCaptureSelection?.(state.selection).catch(() => undefined);
+            }
             generation += 1;
             resetSession();
           }));
@@ -982,7 +1001,71 @@ export function createCaptureWorkspaceRuntime({
             else if (state.status === 'selecting' && state.hoverSelection && !state.startPoint) launch(() => completeCandidateSelection(state.hoverSelection!, 'pin'));
           }));
         }
+        if (!disposed && !connection.isClosed && platform.events.subscribeEditorToolbarAction) {
+          connection.retain(await platform.events.subscribeEditorToolbarAction((event) => {
+            const { sessionId, action } = event;
+            if (disposed || connection.isClosed || state.session?.id !== sessionId ||
+                state.status !== 'preview' || !state.selection || state.isRenderingOutput) return;
+            if (event.action === 'presets') {
+              const presetGeneration = generation;
+              launch(async () => {
+                if (presetGeneration === generation) patch({ error: null });
+                try {
+                  if (!persistAnnotationColors) throw new Error('颜色预设保存未配置');
+                  await persistAnnotationColors(event.colors);
+                } catch (error) {
+                  if (!disposed && presetGeneration === generation && state.session?.id === sessionId) {
+                    patch({ error: errorMessage(error) });
+                  }
+                }
+              });
+              return;
+            }
+            if (event.action === 'style') {
+              const style = { ...state.annotationStyle };
+              let fontSize = state.textFontSize;
+              switch (event.property) {
+                case 'color': style.color = event.value; break;
+                case 'stroke-width': style.strokeWidth = event.value; break;
+                case 'font-size': fontSize = event.value; break;
+                case 'filled': style.filled = event.value; break;
+                case 'corner-radius': style.cornerRadius = event.value; break;
+                case 'blur-radius': style.blurRadius = event.value; break;
+                case 'font-family': style.fontFamily = event.value; break;
+                case 'bold': style.bold = event.value; break;
+                case 'italic': style.italic = event.value; break;
+              }
+              actions.applySelectedAnnotationStyle(style, fontSize);
+              if (state.textDraft && event.property === 'font-size') actions.updateTextDraftFontSize(fontSize);
+              if (event.commit && event.property === 'stroke-width') actions.commitAnnotationSizeDefault('stroke', event.value);
+              if (event.commit && event.property === 'font-size') actions.commitAnnotationSizeDefault('font', event.value);
+              return;
+            }
+            switch (action) {
+              case 'select': actions.selectMoveTool(); break;
+              case 'rectangle': case 'ellipse': case 'arrow': case 'line':
+                if (state.activeAnnotationTool !== action) actions.toggleAnnotationTool(action);
+                break;
+              case 'pen': case 'text': case 'mosaic': case 'eraser': case 'highlight':
+              case 'region-highlight': case 'blur': case 'spotlight':
+                actions.toggleAnnotationTool(action); break;
+              case 'undo': actions.undoAnnotation(); break;
+              case 'redo': actions.redoAnnotation(); break;
+              case 'clear': actions.clearAnnotations(); break;
+              case 'cancel': launch(cancelSession); break;
+              case 'scrolling': launch(actions.beginScrollingCapture); break;
+              case 'ocr': case 'copy': case 'save': case 'quick-save': case 'pin': case 'favorite':
+                launch(() => actions.completePreviewSelection(action, state.selection!)); break;
+            }
+          }));
+        }
         if (!disposed && !connection.isClosed) {
+          if (storage && platform.commands.captureSelectionHistory) {
+            try {
+              const history = await platform.commands.captureSelectionHistory(loadCaptureSelectionHistory(storage));
+              if (!disposed && !connection.isClosed) storeCaptureSelectionHistory(storage, history);
+            } catch { /* Capture remains usable if selection history cannot be read. */ }
+          }
           await onHotkeySubscriptionReady?.();
         }
       } catch (error) {
@@ -1112,13 +1195,14 @@ export function createCaptureWorkspaceRuntime({
       snapshotHydration = null;
 
       try {
-        const [session, rememberedTool] = await Promise.all([
+        const [session, rememberedTool, editorSelection] = await Promise.all([
           requestedSessionId
             ? platform.commands.getCaptureSession(requestedSessionId)
             : platform.commands.createCaptureSession(),
           screenshotPreferences?.()?.rememberLastTool
             ? toolWrite.then(() => platform.commands.lastAnnotationTool?.()).catch(() => null)
             : Promise.resolve(null),
+          requestedSessionId ? platform.commands.captureEditorSelection?.(requestedSessionId) : null,
         ]);
         provisionalSessionIds.add(session.id);
         if (generation !== actionGeneration) {
@@ -1126,6 +1210,9 @@ export function createCaptureWorkspaceRuntime({
           await cancelNativeSessionOnce(session.id).catch(() => undefined);
           await cancelStalePrevious();
           return;
+        }
+        if (editorSelection && (mode !== 'screenshot' || editorSelection.sessionId !== session.id)) {
+          throw new Error('截图编辑选区所属会话已失效');
         }
         if (rememberedTool) lastAnnotationTool = rememberedTool;
         if (previousSessionId && previousSessionId !== session.id) {
@@ -1174,6 +1261,7 @@ export function createCaptureWorkspaceRuntime({
               )?.rect ?? null
             : null,
         });
+        if (editorSelection) await renderSelectionPreview(editorSelection.rect, [], editorSelection.includeCursor);
       } catch (error) {
         if (generation === actionGeneration) {
           if (

@@ -7,9 +7,11 @@ use crate::application::pinned_image::PinnedImageState;
 use crate::application::providers::ocr::OcrCoordinator;
 use crate::application::result_window::ResultWindowRuntime;
 use crate::infrastructure::system::capture_output::SystemCaptureOutputHost;
-use crate::infrastructure::system::capture_window::{
-    TauriCaptureOcrEffects, TauriCaptureSessionRuntimeHost,
-};
+#[cfg(target_os = "macos")]
+use crate::infrastructure::system::capture_window::NativeCaptureSessionRuntimeHost;
+use crate::infrastructure::system::capture_window::TauriCaptureOcrEffects;
+#[cfg(not(target_os = "macos"))]
+use crate::infrastructure::system::capture_window::TauriCaptureSessionRuntimeHost;
 use crate::infrastructure::system::pinned_window::TauriPinnedImageRuntimeHost;
 #[cfg(target_os = "linux")]
 use crate::infrastructure::system::screenshot::linux::LinuxCaptureSessionSource;
@@ -55,19 +57,22 @@ pub(crate) fn build_capture_runtime(
         .with_settings(settings.clone()),
     );
 
+    let delivery = Arc::new(CaptureOcrDelivery::new(
+        result_window,
+        Arc::new(TauriCaptureOcrEffects(app.clone())),
+    ));
+    #[cfg(target_os = "macos")]
+    let capture_host = Arc::new(NativeCaptureSessionRuntimeHost::new(app, delivery));
+    #[cfg(not(target_os = "macos"))]
+    let capture_host = Arc::new(TauriCaptureSessionRuntimeHost::new(app, delivery));
+
     let runtime = Arc::new(
         CaptureSessionRuntime::with_host(
             sessions.clone(),
             image_composer.clone(),
             output.clone(),
             ocr_coordinator,
-            Arc::new(TauriCaptureSessionRuntimeHost::new(
-                app.clone(),
-                Arc::new(CaptureOcrDelivery::new(
-                    result_window,
-                    Arc::new(TauriCaptureOcrEffects(app)),
-                )),
-            )),
+            capture_host,
             pinned_images.clone(),
         )
         .with_scrolling_host(scrolling_host)

@@ -37,7 +37,7 @@ fn main() {
     use std::{cell::RefCell, io::Cursor, rc::Rc};
 
     let mtm = MainThreadMarker::new().unwrap();
-    let _app = NSApplication::sharedApplication(mtm);
+    let app = NSApplication::sharedApplication(mtm);
     let image = |id: &str, width, height| {
         let pixels = image::RgbaImage::from_pixel(width, height, image::Rgba([180, 60, 30, 255]));
         let mut png = Cursor::new(Vec::new());
@@ -80,7 +80,10 @@ fn main() {
     .unwrap();
     assert!(native::visible(id));
     assert!(native::focus(id).unwrap());
-    assert!(native::has_key_window());
+    // Background test processes do not own the desktop keyboard.
+    if app.isActive() {
+        assert!(native::has_key_window());
+    }
     native::update_preferences(Preferences {
         opacity: 1.0,
         shadow: false,

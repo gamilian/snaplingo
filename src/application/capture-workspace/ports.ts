@@ -9,7 +9,7 @@ import type {
   OcrResult,
   Point,
 } from '../../domain/capture';
-import type { AnnotationTool } from './annotationStyle';
+import type { AnnotationColor, AnnotationStyle, AnnotationTool } from './annotationStyle';
 
 export type CaptureWorkspaceUnsubscribe = () => void;
 
@@ -29,7 +29,46 @@ export type CaptureHotkeyHandler = (
   launch: CaptureLaunch,
 ) => void | Promise<void>;
 
+export type CaptureEditorToolbarAction =
+  | AnnotationTool
+  | 'select' | 'undo' | 'redo' | 'clear' | 'cancel'
+  | 'ocr' | 'copy' | 'save' | 'quick-save' | 'pin' | 'favorite' | 'scrolling';
+
+export interface CaptureEditorToolbarPresentation {
+  frame: LogicalRect;
+  uiScale: number;
+  dark: boolean;
+  visible: boolean;
+  activeTool: AnnotationTool | null;
+  canUndo: boolean;
+  canRedo: boolean;
+  busy: boolean;
+  styling: {
+    style: AnnotationStyle;
+    fontSize: number;
+    textMode: boolean;
+    fillEnabled: boolean;
+    roundEnabled: boolean;
+    blurMode: boolean;
+    colorPresets: readonly AnnotationColor[];
+    fontFamilies: readonly string[];
+    error: string | null;
+  };
+}
+
+export type CaptureEditorStyleChange =
+  | { property: 'color'; value: AnnotationColor }
+  | { property: 'stroke-width' | 'font-size' | 'corner-radius' | 'blur-radius'; value: number }
+  | { property: 'filled' | 'bold' | 'italic'; value: boolean }
+  | { property: 'font-family'; value: string };
+
+export type CaptureEditorToolbarEvent =
+  | { sessionId: string; action: CaptureEditorToolbarAction }
+  | ({ sessionId: string; action: 'style'; commit: boolean } & CaptureEditorStyleChange)
+  | { sessionId: string; action: 'presets'; colors: AnnotationColor[] };
+
 export interface CaptureWorkspaceEventsPort {
+  subscribeEditorToolbarAction?(handler: (event: CaptureEditorToolbarEvent) => void): Promise<CaptureWorkspaceUnsubscribe>;
   subscribePinRequested?(handler: (event: { sessionId: string }) => void): Promise<CaptureWorkspaceUnsubscribe>;
   subscribeScrollingCaptureEnded?(handler: (event: { sessionId: string; completed: boolean }) => void): Promise<CaptureWorkspaceUnsubscribe>;
   subscribeHotkeyTriggered(
@@ -70,10 +109,15 @@ export interface OutputCaptureInput extends RenderCaptureOutputInput {
 }
 
 export interface CaptureWorkspaceCommandsPort {
+  updateCaptureEditorToolbar?(sessionId: string, presentation: CaptureEditorToolbarPresentation | null): Promise<boolean>;
+  captureEditorOwnsFocus?(sessionId: string): Promise<boolean>;
+  captureEditorSelection?(sessionId: string): Promise<{ sessionId: string; rect: LogicalRect; includeCursor: boolean } | null>;
   beginScrollingCapture?(sessionId: string, rect: LogicalRect): Promise<void>;
   listAnnotationFontFamilies?(): Promise<string[]>;
   lastAnnotationTool?(): Promise<AnnotationTool | null>;
   rememberAnnotationTool?(tool: AnnotationTool): Promise<void>;
+  captureSelectionHistory?(legacyHistory: LogicalRect[]): Promise<LogicalRect[]>;
+  rememberCaptureSelection?(rect: LogicalRect): Promise<void>;
   createCaptureSession(): Promise<CaptureSessionView>;
   getCaptureSession(sessionId: string): Promise<CaptureSessionView>;
   hydrateCaptureSessionSnapshots(sessionId: string): Promise<CaptureSessionView>;

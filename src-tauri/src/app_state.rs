@@ -73,6 +73,8 @@ pub struct AppState {
     pub logs: Arc<LogsRuntime>,
     pub tts: Arc<TtsRuntime>,
     pub(crate) result_window: Arc<ResultWindowRuntime>,
+    #[cfg(target_os = "macos")]
+    pub(crate) result_session: Arc<crate::application::result_window::ResultWindowSession>,
 }
 
 impl AppState {
@@ -80,6 +82,8 @@ impl AppState {
     pub async fn shutdown(&self) -> Result<()> {
         log::info!("Starting graceful shutdown...");
         self.capture.runtime.cancel_background_ocr();
+        #[cfg(target_os = "macos")]
+        self.result_session.close();
 
         // Wait for all pending events to complete (max 5 seconds)
         let drained = self

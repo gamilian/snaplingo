@@ -44,6 +44,7 @@ function CaptureWorkspaceContent({
     initialSessionId,
     onInactive,
     annotationColorPresets,
+    persistAnnotationColors: updateAnnotationColorPresets,
     screenshotPreferences: screenshotPreferences ?? undefined,
     persistScreenshotDefaults: (input) => {
       void updateScreenshotSettings(input);

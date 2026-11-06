@@ -255,10 +255,15 @@ export async function triggerScreenshot() {
 }
 
 export const captureWorkspaceCommands: CaptureWorkspaceCommandsPort = {
+  updateCaptureEditorToolbar: (sessionId, presentation) => invoke('update_capture_editor_toolbar', { sessionId, presentation }),
+  captureEditorOwnsFocus: (sessionId) => invoke('capture_editor_owns_focus', { sessionId }),
   beginScrollingCapture: async (sessionId, rect) => { await invoke('begin_scrolling_capture', { sessionId, rect }); },
   listAnnotationFontFamilies: () => invoke<string[]>('list_annotation_font_families'),
   lastAnnotationTool: () => invoke('last_annotation_tool'),
   rememberAnnotationTool: (tool) => invoke('remember_annotation_tool', { tool }),
+  captureSelectionHistory: (legacyHistory) => invoke('capture_selection_history', { legacyHistory }),
+  captureEditorSelection: (sessionId) => invoke('capture_editor_selection', { sessionId }),
+  rememberCaptureSelection: (rect) => invoke('remember_capture_selection', { rect }),
   createCaptureSession,
   getCaptureSession,
   hydrateCaptureSessionSnapshots,

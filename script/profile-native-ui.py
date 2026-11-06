@@ -1,16 +1,16 @@
-"""Compare native and React pin windows with the isolated macOS UI harness.
+"""Compare native and React pin/result/capture windows with the isolated macOS UI harness.
 
 Build native_ui_workflows with tauri/custom-protocol first. Use its executable and an output JSON path as
 arguments. Debug builds need Vite on 127.0.0.1:5189; release builds use dist.
 """
 import ctypes
+import argparse
 import json
 import os
 from pathlib import Path
 import signal
 import statistics
 import subprocess
-import sys
 import tempfile
 import time
 
@@ -104,16 +104,26 @@ def messages(path):
     return rows
 
 
-def measure(executable, renderer, pins, repetition, directory):
-    log_path = Path(directory) / f"{renderer}-{pins}-{repetition}.log"
-    root = launch(executable, ["--benchmark", renderer, "--pins", str(pins), "--seconds", "14"], log_path)
+def measure(executable, renderer, pins, repetition, directory, surface="pin"):
+    log_path = Path(directory) / f"{surface}-{renderer}-{pins}-{repetition}.log"
+    root = launch(executable, ["--benchmark", renderer, "--surface", surface, "--pins", str(pins), "--seconds", "14"], log_path)
     reaped = False
     try:
         time.sleep(4)
         assert lib.responsibility_get_pid_responsible_for_pid(root) == root
         metadata = messages(log_path)
         assert any(row.get("mode") == renderer and row.get("pins") == pins for row in metadata), log_path.read_text()
-        if renderer == "webview":
+        if surface == "result":
+            ready = [row for row in metadata if row.get("sourceText") == "native result benchmark"
+                     and row.get("resultText") == "原生译文：native result benchmark" and row.get("resultCards") == 1]
+            assert ready, "Result window did not finish loading: " + log_path.read_text()
+        elif surface == "capture":
+            ready = [row for row in metadata if row.get("captureWidth") == 1280
+                     and row.get("captureHeight") == 720 and row.get("selecting")
+                     and row.get("loading") is False
+                     and row.get("webviews") == (0 if renderer == "native" else 1)]
+            assert ready, "Frozen capture selection did not finish loading: " + log_path.read_text()
+        elif renderer == "webview":
             ready = [row for row in metadata if row.get("imageWidth") == 800 and row.get("toolbarButtons") == 3]
             assert len(ready) == pins, "React pin windows did not finish loading: " + log_path.read_text()
         previous = process_group(root)
@@ -135,7 +145,7 @@ def measure(executable, renderer, pins, repetition, directory):
         reaped = True
         assert os.waitstatus_to_exitcode(status) == 0, log_path.read_text()
         return {
-            "renderer": renderer, "pins": pins, "repetition": repetition,
+            "renderer": renderer, "pins": pins, "surface": surface, "repetition": repetition,
             "peak_physical_bytes": max(row["physical_bytes"] for row in samples),
             "mean_physical_bytes": statistics.mean(row["physical_bytes"] for row in samples),
             "mean_cpu_percent": statistics.mean(row["cpu_percent"] for row in samples),
@@ -154,13 +164,18 @@ def measure(executable, renderer, pins, repetition, directory):
 
 
 def main():
-    executable, output = map(Path, sys.argv[1:])
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("executable", type=Path)
+    parser.add_argument("output", type=Path)
+    parser.add_argument("--surface", choices=("pin", "result", "capture"), default="pin")
+    args = parser.parse_args()
+    executable, output = args.executable, args.output
     rows = []
     with tempfile.TemporaryDirectory(prefix="snaplingo-ui-profile-") as directory:
         for repetition in range(1, 4):
-            for pins in (1, 5):
+            for pins in ((1, 5) if args.surface == "pin" else (1,)):
                 for renderer in ("native", "webview"):
-                    row = measure(executable.resolve(), renderer, pins, repetition, directory)
+                    row = measure(executable.resolve(), renderer, pins, repetition, directory, args.surface)
                     rows.append(row)
                     output.parent.mkdir(parents=True, exist_ok=True)
                     output.write_text(json.dumps(rows, indent=2) + "\n")

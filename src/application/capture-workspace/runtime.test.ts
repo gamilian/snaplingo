@@ -1,9 +1,266 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { CaptureWorkspacePorts } from './ports';
+import type { CaptureEditorToolbarAction, CaptureEditorToolbarEvent, CaptureWorkspacePorts } from './ports';
 import { createCaptureWorkspaceRuntime } from './runtime';
 
 const selection = { x: 20, y: 30, width: 120, height: 80 };
+
+describe('native annotation style controls', () => {
+  it('retains a text draft while native controls own focus and cancels after focus leaves the editor', async () => {
+    const base = createPlatform();
+    const ownsFocus = vi.fn().mockResolvedValue(true);
+    const platform = { ...base, commands: { ...base.commands, captureEditorOwnsFocus: ownsFocus } };
+    const keyboard = createKeyboardTarget();
+    const runtime = createCaptureWorkspaceRuntime({ platform, keyboard: { target: keyboard.target } });
+    await runtime.actions.connectHost();
+    await runtime.actions.startSession('screenshot', 'session-1');
+    await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.toggleAnnotationTool('text');
+    runtime.actions.pointerDown({ point: { x: 35, y: 65 }, source: 'preview' });
+    runtime.actions.updateTextDraftText('原生样式');
+    keyboard.dispatchBlur();
+    await vi.waitFor(() => expect(ownsFocus).toHaveBeenCalledWith('session-1'));
+    expect(runtime.renderState).toMatchObject({ status: 'preview', textDraft: { text: '原生样式' } });
+    expect(base.commands.cancelCaptureSession).not.toHaveBeenCalled();
+    ownsFocus.mockResolvedValue(false);
+    keyboard.dispatchBlur();
+    await vi.waitFor(() => expect(base.commands.cancelCaptureSession).toHaveBeenCalledWith('session-1'));
+    expect(runtime.renderState.status).toBe('idle');
+    runtime.dispose();
+  });
+
+  it('ignores a focus check that finishes after its capture session has been replaced', async () => {
+    const base = createPlatform();
+    base.commands.getCaptureSession.mockImplementation(async id => ({ ...await createPlatform().commands.getCaptureSession(id), id }));
+    const pending = deferred<boolean>();
+    const ownsFocus = vi.fn(() => pending.promise);
+    const platform = { ...base, commands: { ...base.commands, captureEditorOwnsFocus: ownsFocus } };
+    const keyboard = createKeyboardTarget();
+    const runtime = createCaptureWorkspaceRuntime({ platform, keyboard: { target: keyboard.target } });
+    await runtime.actions.connectHost();
+    await runtime.actions.startSession('screenshot', 'session-1');
+    await runtime.actions.renderSelectionPreview(selection);
+    keyboard.dispatchBlur();
+    await vi.waitFor(() => expect(ownsFocus).toHaveBeenCalledWith('session-1'));
+    await runtime.actions.startSession('screenshot', 'session-2');
+    await runtime.actions.renderSelectionPreview(selection);
+    base.commands.cancelCaptureSession.mockClear();
+    pending.resolve(false);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(base.commands.cancelCaptureSession).not.toHaveBeenCalled();
+    expect(runtime.renderState).toMatchObject({ status: 'preview', sessionId: 'session-2' });
+    runtime.dispose();
+  });
+
+  it('updates selected shapes and text drafts and commits size defaults only at completion', async () => {
+    const base = createPlatform();
+    let receive!: (event: CaptureEditorToolbarEvent) => void;
+    const persist = vi.fn();
+    const platform = { ...base, events: { ...base.events,
+      subscribeEditorToolbarAction: async (handler: typeof receive) => { receive = handler; return () => undefined; },
+    } };
+    const runtime = createCaptureWorkspaceRuntime({ platform, persistScreenshotDefaults: persist });
+    await runtime.actions.connectHost();
+    await runtime.actions.startSession('screenshot', 'session-1');
+    await runtime.actions.renderSelectionPreview(selection);
+    runtime.actions.pointerDown({ point: { x: 30, y: 40 }, source: 'preview' });
+    await runtime.actions.pointerUp({ point: { x: 90, y: 80 }, source: 'preview' });
+    const set = (change: Extract<CaptureEditorToolbarEvent, { action: 'style' }>) => receive(change);
+    set({ sessionId: 'session-1', action: 'style', property: 'color', value: [10, 20, 30, 128], commit: false });
+    set({ sessionId: 'session-1', action: 'style', property: 'filled', value: true, commit: false });
+    set({ sessionId: 'session-1', action: 'style', property: 'corner-radius', value: 18, commit: false });
+    set({ sessionId: 'session-1', action: 'style', property: 'stroke-width', value: 8, commit: false });
+    expect(runtime.renderState.annotationHistory.annotations[0]).toMatchObject({
+      type: 'rectangle', color: [10, 20, 30, 128], filled: true, corner_radius: 18, stroke_width: 8,
+    });
+    expect(persist).not.toHaveBeenCalled();
+    set({ sessionId: 'session-1', action: 'style', property: 'stroke-width', value: 8, commit: true });
+    expect(persist).toHaveBeenCalledWith({ defaultStrokeWidth: 8 });
+    receive({ sessionId: 'session-1', action: 'text' });
+    runtime.actions.pointerDown({ point: { x: 35, y: 65 }, source: 'preview' });
+    runtime.actions.updateTextDraftText('原生文字');
+    set({ sessionId: 'session-1', action: 'style', property: 'font-family', value: 'Arial', commit: false });
+    set({ sessionId: 'session-1', action: 'style', property: 'bold', value: true, commit: false });
+    set({ sessionId: 'session-1', action: 'style', property: 'italic', value: true, commit: false });
+    set({ sessionId: 'session-1', action: 'style', property: 'font-size', value: 32, commit: true });
+    expect(runtime.renderState.textDraft).toMatchObject({ text: '原生文字', fontSize: 32 });
+    expect(persist).toHaveBeenCalledWith({ defaultFontSize: 32 });
+    runtime.actions.commitTextDraft();
+    const annotations = runtime.renderState.annotationHistory.annotations;
+    expect(annotations[annotations.length - 1]).toMatchObject({
+      type: 'text', text: '原生文字', color: [10, 20, 30, 128],
+      font_family: 'Arial', font_size: 32, bold: true, italic: true,
+    });
+    runtime.dispose();
+  });
+
+  it('retains editing after preset persistence fails and does not report stale failures', async () => {
+    const base = createPlatform();
+    base.commands.getCaptureSession.mockImplementation(async id => ({ ...await createPlatform().commands.getCaptureSession(id), id }));
+    let receive!: (event: CaptureEditorToolbarEvent) => void;
+    const pending = deferred<void>();
+    const save = vi.fn<(...args: [[number, number, number, number][]]) => Promise<void>>()
+      .mockRejectedValueOnce(new Error('颜色保存失败')).mockImplementationOnce(() => pending.promise);
+    const platform = { ...base, events: { ...base.events,
+      subscribeEditorToolbarAction: async (handler: typeof receive) => { receive = handler; return () => undefined; },
+    } };
+    const runtime = createCaptureWorkspaceRuntime({ platform, persistAnnotationColors: save });
+    await runtime.actions.connectHost();
+    await runtime.actions.startSession('screenshot', 'session-1');
+    await runtime.actions.renderSelectionPreview(selection);
+    receive({ sessionId: 'session-1', action: 'presets', colors: [[12, 34, 56, 255]] });
+    await vi.waitFor(() => expect(runtime.renderState.error).toBe('颜色保存失败'));
+    expect(runtime.renderState.status).toBe('preview');
+    receive({ sessionId: 'session-1', action: 'presets', colors: [[12, 34, 56, 255]] });
+    await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(2));
+    await runtime.actions.startSession('screenshot', 'new-session');
+    pending.reject(new Error('旧会话保存失败'));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(runtime.renderState.error).toBeNull();
+    runtime.dispose();
+  });
+});
+
+describe('native annotation toolbar actions', () => {
+  it('uses the existing tool, annotation history and output actions', async () => {
+    const base = createPlatform();
+    let receive!: (event: { sessionId: string; action: CaptureEditorToolbarAction }) => void;
+    const disconnect = vi.fn();
+    const platform = { ...base, events: { ...base.events,
+      subscribeEditorToolbarAction: vi.fn(async handler => { receive = handler; return disconnect; }),
+    } } satisfies CaptureWorkspacePorts;
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.connectHost();
+    await runtime.actions.startSession('screenshot', 'session-1');
+    await runtime.actions.renderSelectionPreview(selection);
+    const press = (action: CaptureEditorToolbarAction) => receive({ sessionId: 'session-1', action });
+    press('rectangle');
+    press('rectangle');
+    expect(runtime.renderState.activeAnnotationTool).toBe('rectangle');
+    runtime.actions.pointerDown({ point: { x: 30, y: 40 }, source: 'preview' });
+    runtime.actions.pointerMove({ point: { x: 90, y: 80 }, source: 'preview' });
+    await runtime.actions.pointerUp({ point: { x: 90, y: 80 }, source: 'preview' });
+    expect(runtime.renderState.annotationHistory.annotations).toHaveLength(1);
+    press('undo');
+    expect(runtime.renderState.annotationHistory.annotations).toHaveLength(0);
+    press('redo');
+    expect(runtime.renderState.annotationHistory.annotations).toHaveLength(1);
+    press('clear');
+    expect(runtime.renderState.annotationHistory.annotations).toHaveLength(0);
+    press('pen');
+    expect(runtime.renderState.activeAnnotationTool).toBe('pen');
+    press('pen');
+    expect(runtime.renderState.activeAnnotationTool).toBe('pen');
+    press('select');
+    expect(runtime.renderState.activeAnnotationTool).toBeNull();
+    press('copy');
+    await vi.waitFor(() => expect(base.commands.outputCapture).toHaveBeenCalledWith({
+      sessionId: 'session-1', rect: selection, annotations: [], action: { type: 'copy' },
+    }));
+    runtime.dispose();
+    expect(disconnect).toHaveBeenCalledOnce();
+  });
+
+  it('ignores stale clicks, duplicate output and callbacks after disposal', async () => {
+    const base = createPlatform();
+    const completed = deferred<void>();
+    base.commands.outputCapture.mockImplementation(() => completed.promise);
+    let receive!: (event: { sessionId: string; action: CaptureEditorToolbarAction }) => void;
+    const platform = { ...base, events: { ...base.events,
+      subscribeEditorToolbarAction: vi.fn(async handler => { receive = handler; return () => undefined; }),
+    } } satisfies CaptureWorkspacePorts;
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.connectHost();
+    await runtime.actions.startSession('screenshot', 'session-1');
+    await runtime.actions.renderSelectionPreview(selection);
+    receive({ sessionId: 'old-session', action: 'copy' });
+    expect(base.commands.outputCapture).not.toHaveBeenCalled();
+    receive({ sessionId: 'session-1', action: 'copy' });
+    receive({ sessionId: 'session-1', action: 'pin' });
+    await vi.waitFor(() => expect(base.commands.outputCapture).toHaveBeenCalledOnce());
+    completed.resolve();
+    await vi.waitFor(() => expect(runtime.renderState.status).toBe('idle'));
+    runtime.dispose();
+    receive({ sessionId: 'session-1', action: 'copy' });
+    expect(base.commands.outputCapture).toHaveBeenCalledOnce();
+  });
+});
+
+describe('native selection editor handoff', () => {
+  it('enters preview with the frozen selection and cursor state before revealing', async () => {
+    const base = createPlatform();
+    const editorSelection = vi.fn(async () => ({ sessionId: 'session-1', rect: selection, includeCursor: true }));
+    const platform = { ...base, commands: { ...base.commands, captureEditorSelection: editorSelection } };
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-1');
+    expect(editorSelection).toHaveBeenCalledWith('session-1');
+    expect(base.commands.createCaptureSession).not.toHaveBeenCalled();
+    expect(runtime.renderState).toMatchObject({ status: 'preview', selection, includeCapturedCursor: true, activeAnnotationTool: 'rectangle' });
+    expect(base.window.reveal).not.toHaveBeenCalled();
+    await runtime.actions.updateHostReadiness(true);
+    expect(base.window.reveal).toHaveBeenCalledWith('session-1');
+    runtime.dispose();
+  });
+
+  it('rejects editor rectangles from another capture session', async () => {
+    const base = createPlatform();
+    const platform = { ...base, commands: { ...base.commands, captureEditorSelection: vi.fn(async () => ({ sessionId: 'old-session', rect: selection, includeCursor: false })) } };
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-1');
+    expect(runtime.renderState.status).toBe('error');
+    expect(runtime.renderState.selection).toBeNull();
+    expect(base.window.reveal).not.toHaveBeenCalled();
+    runtime.dispose();
+  });
+
+  it('ignores a late native selection after a newer session loads', async () => {
+    const base = createPlatform();
+    const pending = deferred<{ sessionId: string; rect: typeof selection; includeCursor: boolean } | null>();
+    const editorSelection = vi.fn(async (id: string) => id === 'old-session' ? pending.promise : { sessionId: id, rect: selection, includeCursor: false });
+    base.commands.getCaptureSession.mockImplementation(async id => ({ ...await createPlatform().commands.getCaptureSession(id), id }));
+    const platform = { ...base, commands: { ...base.commands, captureEditorSelection: editorSelection } };
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    const old = runtime.actions.startSession('screenshot', 'old-session');
+    await runtime.actions.startSession('screenshot', 'new-session');
+    pending.resolve({ sessionId: 'old-session', rect: { ...selection, width: 300 }, includeCursor: true });
+    await old;
+    expect(runtime.renderState).toMatchObject({ status: 'preview', sessionId: 'new-session', selection, includeCapturedCursor: false });
+    runtime.dispose();
+  });
+});
+
+describe('shared native selection history', () => {
+  it('imports legacy entries and restores the latest native selection', async () => {
+    const base = createPlatform();
+    const previous = { x: 100, y: 120, width: 200, height: 100 };
+    const entries = new Map<string, string>([['snaplingo:last-capture-selection', JSON.stringify(previous)]]);
+    const storage = { getItem: (key: string) => entries.get(key) ?? null, setItem: (key: string, value: string) => entries.set(key, value) };
+    const history = vi.fn(async () => [selection, previous]);
+    const remember = vi.fn(async () => undefined);
+    const platform = { ...base, commands: { ...base.commands, captureSelectionHistory: history, rememberCaptureSelection: remember } };
+    const runtime = createCaptureWorkspaceRuntime({ platform, storage });
+    await runtime.actions.connectHost();
+    expect(history).toHaveBeenCalledWith([previous]);
+    await runtime.actions.startSession('screenshot-copy', 'session-1');
+    expect(runtime.actions.keyDown({ key: 'r' })).toBe(true);
+    await vi.waitFor(() => expect(base.commands.outputCapture).toHaveBeenCalledWith({ sessionId: 'session-1', rect: selection, annotations: [], action: { type: 'copy' } }));
+    await vi.waitFor(() => expect(remember).toHaveBeenCalledWith(selection));
+    runtime.dispose();
+  });
+
+  it('still finishes output when native selection memory cannot be saved', async () => {
+    const base = createPlatform();
+    const platform = { ...base, commands: { ...base.commands, rememberCaptureSelection: vi.fn(async () => { throw new Error('history unavailable'); }) } };
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'session-1');
+    await runtime.actions.renderSelectionPreview(selection);
+    await runtime.actions.completePreviewSelection('copy', selection);
+    expect(base.commands.outputCapture).toHaveBeenCalledTimes(1);
+    expect(base.commands.cancelCaptureSession).toHaveBeenCalledWith('session-1');
+    expect(runtime.renderState.status).toBe('idle');
+    runtime.dispose();
+  });
+});
 
 function createKeyboardTarget() {
   const listeners = new Map<string, Set<(event: KeyboardEvent) => void>>();

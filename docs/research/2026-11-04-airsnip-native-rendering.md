@@ -38,7 +38,7 @@ The non-OCR bundle is 22.0% smaller than the previous local build and 26.6% smal
 
 ## Remaining scope
 
-Capture Workspace/editor, Result Window and Settings still use WebViews. Windows and Linux retain the prior pin/scrolling frontend. Their native ports and real-platform UI acceptance remain future work. This continuation does not make SnapLingo a fully WebView-free application.
+At this checkpoint, Capture Workspace/editor, Result Window and Settings still used WebViews. The [2026-11-05 result continuation](2026-11-05-native-result-window.md) moves the macOS standalone Result Window to AppKit. The [quick-capture continuation](2026-11-05-native-quick-capture.md) moves macOS quick copy, OCR, silent OCR and screenshot translation selection to AppKit. The [ordinary screenshot entry continuation](2026-11-05-native-screenshot-entry.md) also moves initial ordinary selection to AppKit and defers the annotation editor until a region is chosen. The [annotation toolbar](2026-11-05-native-editor-toolbar.md) and [style panel](2026-11-06-native-editor-styles.md) now also use AppKit on macOS. The annotation canvas, in-editor selection/text rendering, Settings and its embedded result overlay remain. Windows and Linux retain the prior frontend; their native ports and real-platform UI acceptance remain future work.
 
 ## Pin-window performance
 

@@ -119,6 +119,8 @@ describe("CaptureWorkspaceView runtime seam", () => {
     expectTypeOf<
       keyof CaptureWorkspaceViewRenderState["toolbar"]
     >().toEqualTypeOf<
+      | "nativeControls"
+      | "height"
       | "position"
       | "width"
       | "isVisible"

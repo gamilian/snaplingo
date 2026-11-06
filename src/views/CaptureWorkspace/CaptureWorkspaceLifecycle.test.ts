@@ -19,6 +19,123 @@ Object.defineProperty(window, 'localStorage', {
 afterEach(() => vi.restoreAllMocks());
 
 describe('CaptureWorkspace React lifecycle', () => {
+  it.each(['native', 'fallback', 'failure'] as const)('keeps styles and adopts toolbar controls after %s acknowledgment', async mode => {
+    const previousTheme = document.documentElement.dataset.theme;
+    document.documentElement.dataset.theme = 'dark';
+    vi.spyOn(HTMLImageElement.prototype, 'decode').mockResolvedValue(undefined);
+    const base = createPlatform();
+    const confirmed = deferred<boolean>();
+    const update = vi.fn<NonNullable<CaptureWorkspacePorts['commands']['updateCaptureEditorToolbar']>>(
+      async (_id, presentation) => presentation ? confirmed.promise : true,
+    );
+    const platform = { ...base, commands: { ...base.commands,
+      captureEditorSelection: vi.fn(async () => ({
+        sessionId: 'loaded', rect: { x: 40, y: 30, width: 120, height: 80 }, includeCursor: false,
+      })),
+      updateCaptureEditorToolbar: update,
+    } };
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    try {
+      await act(async () => root.render(createElement(CaptureWorkspace, {
+        ports: platform, initialMode: 'screenshot', initialSessionId: 'loaded',
+      })));
+      await vi.waitFor(() => expect(update.mock.calls.some(([, state]) => state?.activeTool === 'rectangle')).toBe(true));
+      expect(update.mock.calls.some(([, state]) => state?.dark)).toBe(true);
+      expect(container.querySelector('[aria-label="Copy selection"]')).not.toBeNull();
+      await act(async () => {
+        if (mode === 'failure') confirmed.reject(new Error('Native toolbar unavailable'));
+        else confirmed.resolve(mode === 'native');
+      });
+      await vi.waitFor(() => {
+        const copy = container.querySelector('[aria-label="Copy selection"]');
+        if (mode === 'native') expect(copy).toBeNull();
+        else expect(copy).not.toBeNull();
+      });
+      if (mode === 'native') {
+        expect(container.querySelector('[aria-label="Annotation color"]')).toBeNull();
+        expect(container.querySelector('[aria-label="Annotation stroke width"]')).toBeNull();
+      } else {
+        expect(container.querySelector('[aria-label="Annotation color"]')).not.toBeNull();
+        expect(container.querySelector('[aria-label="Annotation stroke width"]')).not.toBeNull();
+      }
+    } finally {
+      await act(async () => root.unmount());
+      if (mode !== 'fallback') await vi.waitFor(() => expect(update).toHaveBeenCalledWith('loaded', null));
+      container.remove();
+      if (previousTheme === undefined) delete document.documentElement.dataset.theme;
+      else document.documentElement.dataset.theme = previousTheme;
+    }
+  });
+
+  it('discards a native toolbar acknowledgment that arrives after unmount', async () => {
+    vi.spyOn(HTMLImageElement.prototype, 'decode').mockResolvedValue(undefined);
+    const base = createPlatform();
+    const confirmed = deferred<boolean>();
+    const update = vi.fn<NonNullable<CaptureWorkspacePorts['commands']['updateCaptureEditorToolbar']>>(
+      async (_id, presentation) => presentation ? confirmed.promise : true,
+    );
+    const platform = { ...base, commands: { ...base.commands,
+      captureEditorSelection: vi.fn(async () => ({
+        sessionId: 'loaded', rect: { x: 40, y: 30, width: 120, height: 80 }, includeCursor: false,
+      })),
+      updateCaptureEditorToolbar: update,
+    } };
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => root.render(createElement(CaptureWorkspace, {
+      ports: platform, initialMode: 'screenshot', initialSessionId: 'loaded',
+    })));
+    await vi.waitFor(() => expect(update.mock.calls.some(([, state]) => state !== null)).toBe(true));
+    await act(async () => root.unmount());
+    await act(async () => confirmed.resolve(true));
+    await vi.waitFor(() => expect(update).toHaveBeenCalledWith('loaded', null));
+    expect(container.querySelector('[data-capture-toolbar]')).toBeNull();
+    container.remove();
+  });
+
+  it('releases an existing native toolbar before restoring frontend controls', async () => {
+    vi.spyOn(HTMLImageElement.prototype, 'decode').mockResolvedValue(undefined);
+    const base = createPlatform();
+    let available = true;
+    let receive!: Parameters<NonNullable<CaptureWorkspacePorts['events']['subscribeEditorToolbarAction']>>[0];
+    const update = vi.fn<NonNullable<CaptureWorkspacePorts['commands']['updateCaptureEditorToolbar']>>(
+      async (_id, presentation) => presentation ? available : true,
+    );
+    const platform = { ...base, commands: { ...base.commands,
+      captureEditorSelection: vi.fn(async () => ({
+        sessionId: 'loaded', rect: { x: 40, y: 30, width: 120, height: 80 }, includeCursor: false,
+      })),
+      updateCaptureEditorToolbar: update,
+    }, events: { ...base.events,
+      subscribeEditorToolbarAction: async (handler: typeof receive) => { receive = handler; return () => undefined; },
+    } };
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    try {
+      await act(async () => root.render(createElement(CaptureWorkspace, {
+        ports: platform, initialMode: 'screenshot', initialSessionId: 'loaded',
+      })));
+      await vi.waitFor(() => {
+        expect(update.mock.calls.some(([, state]) => state !== null)).toBe(true);
+        expect(container.querySelector('[data-capture-toolbar][aria-hidden="true"]')).not.toBeNull();
+        expect(container.querySelector('[aria-label="Copy selection"]')).toBeNull();
+      });
+      available = false;
+      await act(async () => receive({ sessionId: 'loaded', action: 'pen' }));
+      await vi.waitFor(() => {
+        expect(update).toHaveBeenCalledWith('loaded', null);
+        expect(container.querySelector('[aria-label="Copy selection"]')).not.toBeNull();
+      });
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+    }
+  });
+
   it('signals native capture readiness after the hotkey listener is active', async () => {
     const platform = createPlatform();
     let activeHotkeyListeners = 0;

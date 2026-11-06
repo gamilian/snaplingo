@@ -66,8 +66,46 @@ pub(crate) trait CaptureSessionRuntimeHost: Send + Sync {
     }
     async fn begin_capture_presentation(&self) -> Result<()>;
     async fn end_capture_presentation(&self) -> Result<()>;
-    /// Starts the hidden capture WebView before frozen pixels are ready.
+    /// Prepares the legacy capture surface before frozen pixels are ready.
     async fn prepare_capture_window(&self) -> Result<()> {
+        Ok(())
+    }
+    async fn prepare_capture_window_for_mode(&self, _mode: &str) -> Result<()> {
+        self.prepare_capture_window().await
+    }
+    async fn open_capture_editor_window(
+        &self,
+        _selection: &super::CaptureEditorSelection,
+        _geometry: &CaptureWindowGeometry,
+    ) -> Result<()> {
+        Err("Capture editor host is not configured".into())
+    }
+    async fn finish_capture_editor_transfer(&self, _session_id: &CaptureSessionId) -> Result<()> {
+        Ok(())
+    }
+    async fn discard_capture_editor(&self) -> Result<()> {
+        Ok(())
+    }
+    async fn update_capture_editor_toolbar(
+        &self,
+        _session_id: &CaptureSessionId,
+        _presentation: Option<&super::CaptureEditorToolbarPresentation>,
+    ) -> Result<bool> {
+        Ok(false)
+    }
+    async fn capture_editor_owns_focus(&self, _session_id: &CaptureSessionId) -> Result<bool> {
+        Ok(false)
+    }
+    fn capture_selection_history(
+        &self,
+        legacy_history: Vec<crate::domain::capture::LogicalRect>,
+    ) -> Result<Vec<crate::domain::capture::LogicalRect>> {
+        Ok(legacy_history)
+    }
+    fn remember_capture_selection(
+        &self,
+        _rect: &crate::domain::capture::LogicalRect,
+    ) -> Result<()> {
         Ok(())
     }
     /// No geometry is supplied when revealing a session-load error.

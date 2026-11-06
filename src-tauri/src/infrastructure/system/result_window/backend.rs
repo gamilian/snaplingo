@@ -1,7 +1,9 @@
+#[cfg(any(not(target_os = "macos"), test))]
 use std::path::PathBuf;
 
 pub(super) const RESULT_WINDOW_LABEL: &str = "capture-result";
 
+#[cfg(any(not(target_os = "macos"), test))]
 pub(super) struct ResultWindowDefinition {
     pub(super) label: &'static str,
     pub(super) url: PathBuf,
@@ -18,6 +20,7 @@ pub(super) struct ResultWindowDefinition {
     pub(super) shadow: bool,
 }
 
+#[cfg(any(not(target_os = "macos"), test))]
 pub(super) fn result_window_definition() -> ResultWindowDefinition {
     ResultWindowDefinition {
         label: RESULT_WINDOW_LABEL,

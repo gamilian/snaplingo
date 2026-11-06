@@ -235,6 +235,20 @@ pub(crate) fn build_app_state(
         Arc::new(TauriResultWindowRuntimeHost::new(app.clone())),
         Arc::new(TauriResultWindowNotifier::new(app.clone())),
     ));
+    #[cfg(target_os = "macos")]
+    let result_session = Arc::new(
+        crate::application::result_window::ResultWindowSession::new(
+            settings_configuration.clone(),
+            translation_coordinator.clone(),
+            history.clone(),
+            Arc::new(
+                crate::infrastructure::system::result_window::NativeResultWindowPresentation::new(
+                    app.clone(),
+                ),
+            ),
+        )
+        .expect("Result window settings are available"),
+    );
 
     let capture_runtime = build_capture_runtime(
         app.clone(),
@@ -327,6 +341,8 @@ pub(crate) fn build_app_state(
         logs,
         tts: build_tts_runtime(settings_configuration.clone()),
         result_window,
+        #[cfg(target_os = "macos")]
+        result_session,
     }
 }
 

@@ -321,6 +321,7 @@ fn capture_window_activation_suppression_policy_for_state(
 
 fn has_visible_non_capture_window_on_active_space(app: &AppHandle) -> bool {
     super::super::pinned_window::has_visible_native_window_on_active_space()
+        || super::super::result_window::has_visible_native_window_on_active_space()
         || app
             .webview_windows()
             .into_iter()
@@ -330,6 +331,7 @@ fn has_visible_non_capture_window_on_active_space(app: &AppHandle) -> bool {
 
 fn has_key_non_capture_window(app: &AppHandle) -> bool {
     super::super::pinned_window::has_key_native_window()
+        || super::super::result_window::has_key_native_window()
         || app
             .webview_windows()
             .into_iter()
@@ -421,7 +423,7 @@ fn install_native_crosshair_cursor_rect(
     Ok(())
 }
 
-fn push_native_crosshair_cursor() {
+pub(super) fn push_native_crosshair_cursor() {
     if !capture_overlay_uses_native_crosshair_cursor() {
         return;
     }
@@ -435,7 +437,7 @@ fn push_native_crosshair_cursor() {
     cursor.set();
 }
 
-fn restore_native_crosshair_cursor() {
+pub(super) fn restore_native_crosshair_cursor() {
     let was_pushed = CAPTURE_CROSSHAIR_CURSOR_PUSHED.swap(false, Ordering::SeqCst);
     if should_restore_native_crosshair_cursor(was_pushed) {
         NSCursor::pop_class();

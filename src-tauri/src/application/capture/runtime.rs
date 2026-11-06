@@ -33,6 +33,7 @@ pub struct CaptureSessionRuntime {
     pub(super) presentations: tokio::sync::Mutex<HashMap<CaptureSessionId, u64>>,
     pub(super) ocr_generation: tokio::sync::watch::Sender<u64>,
     pending_ocr: tokio::sync::Mutex<Option<PendingCaptureOcr>>,
+    pub(super) editor_transfer: std::sync::Mutex<Option<super::editor_handoff::EditorTransfer>>,
     last_annotation_tool: std::sync::Mutex<String>,
 }
 
@@ -75,6 +76,7 @@ impl CaptureSessionRuntime {
             presentations: tokio::sync::Mutex::new(HashMap::new()),
             ocr_generation: tokio::sync::watch::channel(0).0,
             pending_ocr: tokio::sync::Mutex::new(None),
+            editor_transfer: std::sync::Mutex::new(None),
             last_annotation_tool: std::sync::Mutex::new("rectangle".into()),
         }
     }
@@ -84,7 +86,7 @@ impl CaptureSessionRuntime {
         let _startup = self.startup.try_lock().map_err(|_| {
             crate::AppError::System("Capture session startup is already in progress".into())
         })?;
-        self.create_visible_desktop_session().await
+        self.create_visible_desktop_session(None).await
     }
 
     pub(crate) fn with_settings(
@@ -133,7 +135,10 @@ impl CaptureSessionRuntime {
         self.pin_output.pin_clipboard_image().await
     }
 
-    async fn create_visible_desktop_session(&self) -> Result<CaptureSessionView> {
+    async fn create_visible_desktop_session(
+        &self,
+        mode: Option<&str>,
+    ) -> Result<CaptureSessionView> {
         self.cancel_background_ocr();
         *self.pending_ocr.lock().await = None;
         let generation = *self.ocr_generation.borrow();
@@ -163,8 +168,14 @@ impl CaptureSessionRuntime {
             let result = self.sessions.create_session_without_monitor_images().await;
             (result, elapsed_ms(session_start))
         };
+        let preparation = async {
+            match mode {
+                Some(mode) => self.host.prepare_capture_window_for_mode(mode).await,
+                None => self.host.prepare_capture_window().await,
+            }
+        };
         let (prepare_window_result, (session_result, session_ms)) =
-            tokio::join!(self.host.prepare_capture_window(), session_future,);
+            tokio::join!(preparation, session_future);
         let prepare_window_ms = elapsed_ms(prepare_window_start);
 
         if let Err(window_err) = prepare_window_result {
@@ -223,7 +234,7 @@ impl CaptureSessionRuntime {
         };
         let total_start = Instant::now();
         let session_start = Instant::now();
-        let session = self.create_visible_desktop_session().await?;
+        let session = self.create_visible_desktop_session(Some(mode)).await?;
         let session_ms = elapsed_ms(session_start);
         let monitor_count = session.monitors.len();
         let candidate_count = session.candidates.len();
@@ -285,6 +296,7 @@ impl CaptureSessionRuntime {
         &self,
         session_id: Option<&CaptureSessionId>,
     ) -> Result<()> {
+        self.check_capture_editor_reveal(session_id)?;
         let geometry = session_id
             .map(|id| self.sessions.window_geometry(id))
             .transpose()?;
@@ -294,14 +306,28 @@ impl CaptureSessionRuntime {
     }
 
     pub async fn reveal_capture_window(&self, session_id: Option<&CaptureSessionId>) -> Result<()> {
+        self.check_capture_editor_reveal(session_id)?;
         let geometry = session_id
             .map(|id| self.sessions.window_geometry(id))
             .transpose()?;
-        self.host.reveal_capture_window(geometry.as_ref()).await
+        self.host.reveal_capture_window(geometry.as_ref()).await?;
+        self.capture_editor_revealed(session_id);
+        Ok(())
     }
 
     pub async fn hide_capture_window(&self) -> Result<()> {
         self.host.hide_capture_window().await
+    }
+
+    pub fn capture_selection_history(
+        &self,
+        legacy_history: Vec<LogicalRect>,
+    ) -> Result<Vec<LogicalRect>> {
+        self.host.capture_selection_history(legacy_history)
+    }
+
+    pub fn remember_capture_selection(&self, rect: &LogicalRect) -> Result<()> {
+        self.host.remember_capture_selection(rect)
     }
 
     pub async fn control_candidate_at(
@@ -320,11 +346,13 @@ impl CaptureSessionRuntime {
     }
 
     pub async fn cancel_capture_session(&self, session_id: &CaptureSessionId) -> Result<()> {
+        self.abort_capture_editor(session_id);
         let _startup = self.startup.lock().await;
         self.cancel_capture_session_inner(session_id).await
     }
 
     async fn cancel_capture_session_inner(&self, session_id: &CaptureSessionId) -> Result<()> {
+        self.clear_capture_editor(session_id);
         let mut pending = self.pending_ocr.lock().await;
         if pending
             .as_ref()
@@ -648,6 +676,28 @@ impl CaptureSessionRuntime {
         }
     }
 
+    pub(crate) async fn complete_capture_selection(
+        &self,
+        session_id: &CaptureSessionId,
+        rect: &LogicalRect,
+        include_cursor: bool,
+        action: CaptureOutputAction,
+    ) -> Result<()> {
+        let _startup = self.startup.lock().await;
+        let generation = *self.ocr_generation.borrow();
+        if self.presentations.lock().await.get(session_id) != Some(&generation) {
+            return Err("Capture session is no longer current".into());
+        }
+        self.output_selection(session_id, rect, &[], include_cursor, action)
+            .await?;
+        if let Err(error) = self.remember_capture_selection(rect) {
+            log::warn!("Failed to remember capture selection: {error}");
+        }
+        let hide_result = self.host.hide_capture_window().await;
+        let cancel_result = self.cancel_capture_session_inner(session_id).await;
+        hide_result.and(cancel_result)
+    }
+
     pub(super) fn ensure_selection_snapshots_ready(
         &self,
         session_id: &CaptureSessionId,
@@ -759,6 +809,8 @@ mod tests {
         clipboard_revision: std::sync::atomic::AtomicU64,
         pin_visible: std::sync::atomic::AtomicBool,
         pin_requests: Mutex<Vec<CaptureSessionId>>,
+        prepared_modes: Mutex<Vec<String>>,
+        selection_history: Mutex<Vec<LogicalRect>>,
     }
 
     impl RecordingRuntimeHost {
@@ -779,6 +831,8 @@ mod tests {
                 clipboard_revision: std::sync::atomic::AtomicU64::new(0),
                 pin_visible: std::sync::atomic::AtomicBool::new(false),
                 pin_requests: Mutex::new(Vec::new()),
+                prepared_modes: Mutex::new(Vec::new()),
+                selection_history: Mutex::new(Vec::new()),
             }
         }
 
@@ -803,6 +857,18 @@ mod tests {
 
     #[async_trait]
     impl CaptureSessionRuntimeHost for RecordingRuntimeHost {
+        async fn prepare_capture_window(&self) -> crate::Result<()> {
+            self.prepared_modes.lock().unwrap().push("legacy".into());
+            Ok(())
+        }
+        async fn prepare_capture_window_for_mode(&self, mode: &str) -> crate::Result<()> {
+            self.prepared_modes.lock().unwrap().push(mode.into());
+            Ok(())
+        }
+        fn remember_capture_selection(&self, rect: &LogicalRect) -> crate::Result<()> {
+            self.selection_history.lock().unwrap().push(rect.clone());
+            Ok(())
+        }
         async fn request_capture_selection_pin(
             &self,
             id: &CaptureSessionId,
@@ -2075,6 +2141,88 @@ mod tests {
 
         assert_eq!((decoded.width(), decoded.height()), (2, 2));
         assert!(decoded.pixels().all(|pixel| pixel.0 == [10, 20, 30, 255]));
+    }
+
+    #[tokio::test]
+    async fn preparation_receives_quick_mode_before_pixels_and_window_are_ready() {
+        let host = Arc::new(RecordingRuntimeHost::succeeds());
+        let (runtime, _, _) = make_runtime(host.clone(), vec![make_snapshot()]);
+        runtime
+            .open_capture_window_for_mode("screenshot-ocr")
+            .await
+            .unwrap();
+        runtime
+            .open_capture_window_for_mode("screenshot-copy")
+            .await
+            .unwrap();
+        runtime.create_session_from_visible_desktop().await.unwrap();
+        assert_eq!(
+            *host.prepared_modes.lock().unwrap(),
+            ["screenshot-ocr", "screenshot-copy", "legacy"]
+        );
+    }
+
+    #[tokio::test]
+    async fn completing_native_selection_outputs_once_and_releases_its_presentation() {
+        let host = Arc::new(RecordingRuntimeHost::succeeds());
+        let (runtime, sessions, pin_output) =
+            make_runtime(host.clone(), vec![make_renderable_snapshot()]);
+        runtime
+            .open_capture_window_for_mode("screenshot-copy")
+            .await
+            .unwrap();
+        let id = host
+            .calls()
+            .iter()
+            .find_map(|call| match call {
+                HostCall::OpenCaptureWindow { session_id, .. } => {
+                    Some(CaptureSessionId(session_id.clone()))
+                }
+                _ => None,
+            })
+            .unwrap();
+        let rect = LogicalRect {
+            x: 1.0,
+            y: 1.0,
+            width: 2.0,
+            height: 2.0,
+        };
+        runtime
+            .complete_capture_selection(&id, &rect, false, CaptureOutputAction::Pin)
+            .await
+            .unwrap();
+        assert!(!sessions.has_session(&id));
+        assert!(runtime.presentations.lock().await.is_empty());
+        assert_eq!(*host.selection_history.lock().unwrap(), [rect.clone()]);
+        assert_eq!(pin_output.pngs.lock().unwrap().len(), 1);
+        assert!(runtime
+            .complete_capture_selection(&id, &rect, false, CaptureOutputAction::Pin)
+            .await
+            .is_err());
+        assert_eq!(pin_output.pngs.lock().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_replaced_native_selection_cannot_copy_pin_or_remember_old_pixels() {
+        let host = Arc::new(RecordingRuntimeHost::succeeds());
+        let (runtime, _, pin_output) = make_runtime(host.clone(), vec![make_renderable_snapshot()]);
+        let old = runtime.create_session_from_visible_desktop().await.unwrap();
+        runtime
+            .open_capture_window_for_mode("screenshot-copy")
+            .await
+            .unwrap();
+        let rect = LogicalRect {
+            x: 1.0,
+            y: 1.0,
+            width: 2.0,
+            height: 2.0,
+        };
+        assert!(runtime
+            .complete_capture_selection(&old.id, &rect, false, CaptureOutputAction::Pin)
+            .await
+            .is_err());
+        assert!(pin_output.pngs.lock().unwrap().is_empty());
+        assert!(host.selection_history.lock().unwrap().is_empty());
     }
     #[tokio::test]
     async fn every_open_entry_ignores_overlap_until_native_open_finishes() {

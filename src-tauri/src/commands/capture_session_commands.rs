@@ -66,6 +66,69 @@ pub fn remember_annotation_tool(
 }
 
 #[tauri::command]
+pub fn capture_selection_history(
+    legacy_history: Vec<LogicalRect>,
+    state: State<'_, crate::AppState>,
+) -> Result<Vec<LogicalRect>, String> {
+    state
+        .capture
+        .runtime
+        .capture_selection_history(legacy_history)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn capture_editor_selection(
+    session_id: String,
+    state: State<'_, crate::AppState>,
+) -> Result<Option<crate::application::capture::CaptureEditorSelection>, String> {
+    state
+        .capture
+        .runtime
+        .capture_editor_selection(&CaptureSessionId(session_id))
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn remember_capture_selection(
+    rect: LogicalRect,
+    state: State<'_, crate::AppState>,
+) -> Result<(), String> {
+    state
+        .capture
+        .runtime
+        .remember_capture_selection(&rect)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn update_capture_editor_toolbar(
+    session_id: String,
+    presentation: Option<crate::application::capture::CaptureEditorToolbarPresentation>,
+    state: State<'_, crate::AppState>,
+) -> Result<bool, String> {
+    state
+        .capture
+        .runtime
+        .update_capture_editor_toolbar(&CaptureSessionId(session_id), presentation)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn capture_editor_owns_focus(
+    session_id: String,
+    state: State<'_, crate::AppState>,
+) -> Result<bool, String> {
+    state
+        .capture
+        .runtime
+        .capture_editor_owns_focus(&CaptureSessionId(session_id))
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 pub async fn reveal_capture_window(
     session_id: Option<String>,
     state: State<'_, crate::AppState>,
