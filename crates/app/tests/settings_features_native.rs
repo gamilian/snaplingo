@@ -71,6 +71,10 @@ fn main() {
         NSWindowStyleMask,
     };
     use objc2_foundation::{NSPoint, NSRect, NSSize};
+    use snaplingo_core::application::{
+        SelectedTextAcquirer, SelectionScheme, SystemSelectionProvider,
+    };
+    use snaplingo_core::domain::{OcrSettings, TranslationSettings};
     use std::sync::Arc;
     use window::settings::macos::{FeatureField, FeatureKind, FeaturePage};
     let mtm = MainThreadMarker::new().unwrap();

@@ -211,3 +211,11 @@ acquisition, selection, OCR, speech and HTTP remain infrastructure capabilities.
 resident tray behavior and shutdown. Settings navigation stays with its window
 owner; permission recovery uses an injected callback without reaching into the
 application event loop.
+
+Development executables have separate owners. `tools/reference` is an unpublished
+Cargo package with the macOS WebKit collectors and no production-crate dependency;
+App no longer has WebKit even as a development dependency. Production crates
+cannot depend on tool packages. `tools/native/pin_snapshot.rs` remains an explicit
+App example target so it exercises the actual private pixel-preparation module.
+`single_instance_native` is an automatically run App integration test with real
+child processes. Reusable UI/Render/Desktop examples stay beside their libraries.

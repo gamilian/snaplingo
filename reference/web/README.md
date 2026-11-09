@@ -15,3 +15,8 @@ select its page, route, theme, appearance and scenario. For example:
 The entry preserves these parameters and loads the isolated HTML fixture under
 `reference/web/fixtures`. Collectors open those HTML paths directly. The browser reference bundle is built by `npm run reference:build`; native
 application packaging uses `npm run native:build` and includes no frontend assets.
+
+The macOS WebKit collectors live in `tools/reference`. Start Vite on port 5194,
+then run `cargo run --locked -p snaplingo-reference --bin settings_snapshot` or
+`cargo run --locked -p snaplingo-reference --bin result_snapshot`. Scene options
+follow `--`; see [development tools](../../tools/README.md).

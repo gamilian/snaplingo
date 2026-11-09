@@ -1,5 +1,5 @@
 // Compare actual AppKit controls with the existing React views rendered by WebKit.
-// Generate fixtures with settings_reference_snapshot and settings_features_native.
+// Generate fixtures with cargo run --locked -p snaplingo-reference --bin settings_snapshot -- and settings_features_native.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';

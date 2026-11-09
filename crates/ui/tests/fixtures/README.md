@@ -1,10 +1,10 @@
 The OCR and Translation fixtures comes from the actual existing React page rendered in WKWebView,
-using `crates/app/examples/settings_reference_snapshot.rs`. It includes
+using `tools/reference/settings_snapshot.rs`. It includes
 all card and control bounding rectangles in 84 scenes: three interface themes,
 light/dark appearance, 900/700 DIP widths and three OCR or four Translation section routes. Disabled and
 offscreen controls are included. No rectangles are derived from shared Rust UI.
 
-To regenerate, start Vite on localhost port 5194, then run the reference example
+To regenerate, start Vite on localhost port 5194, then run the reference collector
 with `features`, `features dark`, `features compact` and `features dark compact`.
 Each run writes actual DOM metrics to `target/native-settings/reference-*.json`.
 `layout_report` and `compare-react-layout.mjs` compare those live references to the
@@ -41,14 +41,14 @@ geometry acceptance; the macOS fixture is not that baseline.
 light/dark appearance, 900/700 DIP widths and all six section routes. The actual
 React page supplies the card, theme-picker and preference/action rectangles.
 `general_react_layout` compares 2,520 rectangles, including the disabled reset
-control and all numeric increment/decrement buttons. Run the reference example
+control and all numeric increment/decrement buttons. Run the reference collector
 with no arguments, `dark`, `compact` and `dark compact` to regenerate
 `reference-*-general-*.json`. The General baseline has granted permissions, no
 logs and no available update; recovery, populated logs and update states are
 separately exercised through the shared model and production controller.
 
 To recapture Screenshot references, start Vite on port 5194 and run
-`cargo run --locked --manifest-path crates/app/Cargo.toml --example settings_reference_snapshot -- screenshot`
+`cargo run --locked -p snaplingo-reference --bin settings_snapshot -- screenshot`
 with no suffix, `dark`, `compact`, and `dark compact`. This writes the same
 36 `reference-*-screenshot-*.json` files and corresponding PNGs under
 `target/native-settings` without opening the installed application database.
@@ -60,7 +60,7 @@ shared Longshot height spinner's draft, boundary and empty-input regression.
 The field persists its rounded/clamped value only on blur, as the React page does.
 
 `react-library-layout.json` contains 60 actual React Library scenes captured by
-`settings_reference_snapshot library [dark] [compact]`: all three interface
+`settings_snapshot library [dark] [compact]`: all three interface
 themes, both appearances and widths, History translation/OCR and Favorites
 translation/OCR/screenshot details. The synthetic records and PNG are owned by
 `settings_library_fixture.ts` and `library-preview.png`; no installed records
@@ -83,7 +83,7 @@ prompt after scrolling 650 points. Rectangles are compact `[x,y,width,height]`
 arrays. The collector mounts the actual `SettingsWindow` and Services components
 with `settings_services_fixture.ts`; no installed credentials or settings are read.
 
-Run `settings_reference_snapshot services [dark] [compact]` in all four variants,
+Run `settings_snapshot services [dark] [compact]` in all four variants,
 then `node script/record-services-layout.mjs` to replace only the recorded DOM
 geometry and enabled flags. The recording script does not read renderer output.
 `cargo test --locked -p snaplingo-render --test services_react_layout --offline`
@@ -97,7 +97,7 @@ the real save handler), despite its raised/faint appearance. The same DTO fixtur
 `react-permission-guide-layout.json` contains 24 retained React
 `RequiredPermissionsGate` scenes: Native/Studio/Paper, light/dark, initial,
 attempted authorization, failed authorization and temporary installation.
-`settings_reference_snapshot permissions [dark]` mounts the actual component
+`settings_snapshot permissions [dark]` mounts the actual component
 with an isolated permission port. It records its card/action rectangles and
 computed font metrics without reading or requesting real OS permissions.
 `permission_prompt_layout` compares the shared card and controls within 0.5 DIP;

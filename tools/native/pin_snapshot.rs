@@ -1,5 +1,5 @@
 //! Review the portable pin scene without creating a native window.
-#[path = "../window/pinned/scene.rs"]
+#[path = "../../crates/app/window/pinned/scene.rs"]
 mod scene;
 use scene::{PinUi, Preferences};
 fn main() -> Result<(), String> {

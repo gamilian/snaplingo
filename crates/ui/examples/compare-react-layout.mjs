@@ -1,4 +1,4 @@
-// Run layout_report and the existing settings_reference_snapshot harness first.
+// Run layout_report and the existing cargo run --locked -p snaplingo-reference --bin settings_snapshot -- harness first.
 import { readFileSync } from 'node:fs';
 const referenceRoot = process.argv[2] ?? 'target/native-settings';
 const sharedRoot = process.argv[3] ?? 'target/shared-ui';

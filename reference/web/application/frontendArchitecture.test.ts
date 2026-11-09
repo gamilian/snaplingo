@@ -13,7 +13,7 @@ const captureRuntime = readFileSync(
   'utf8',
 );
 const appShell = readFileSync(
-  new URL('../../../crates/app/app_shell.rs', import.meta.url),
+  new URL('../../../crates/app/lifecycle/shell.rs', import.meta.url),
   'utf8',
 );
 

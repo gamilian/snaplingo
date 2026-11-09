@@ -6577,7 +6577,6 @@ dependencies = [
  "objc2-app-kit 0.3.2",
  "objc2-foundation 0.3.2",
  "objc2-vision",
- "objc2-web-kit",
  "ocr-rs",
  "open",
  "ort",
@@ -6671,6 +6670,20 @@ dependencies = [
  "tempfile",
  "windows-sys 0.59.0",
  "winit",
+]
+
+[[package]]
+name = "snaplingo-reference"
+version = "0.1.0"
+dependencies = [
+ "block2 0.6.2",
+ "dispatch2",
+ "objc2 0.6.4",
+ "objc2-app-kit 0.3.2",
+ "objc2-foundation 0.3.2",
+ "objc2-web-kit",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]

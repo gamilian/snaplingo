@@ -24,10 +24,24 @@ fn production_dependencies(package: &Value) -> BTreeSet<String> {
         .collect()
 }
 
+fn production_crate(package: &Value) -> bool {
+    Path::new(package["manifest_path"].as_str().unwrap())
+        .starts_with(root().canonicalize().unwrap().join("crates"))
+}
+
 fn dependency_violations(packages: &BTreeMap<String, Value>) -> Vec<String> {
     let mut errors = Vec::new();
-    for (name, package) in packages {
+    for (name, package) in packages
+        .iter()
+        .filter(|(_, package)| production_crate(package))
+    {
         for dependency in production_dependencies(package) {
+            if packages
+                .get(&dependency)
+                .is_some_and(|package| !production_crate(package))
+            {
+                errors.push(format!("{name} -> development tool {dependency}"));
+            }
             if dependency == "tauri"
                 || dependency.starts_with("tauri-")
                 || matches!(dependency.as_str(), "wry" | "tao" | "objc2-web-kit")
@@ -179,6 +193,25 @@ fn cargo_edges_keep_presentation_storage_and_platforms_separate() {
         violations.is_empty(),
         "Forbidden production dependencies: {violations:#?}"
     );
+
+    let reference = &packages["snaplingo-reference"];
+    assert!(!production_crate(reference));
+    assert!(production_dependencies(reference).contains("objc2-web-kit"));
+    assert!(
+        production_dependencies(reference).iter().all(|dependency| {
+            packages
+                .get(dependency)
+                .is_none_or(|package| !production_crate(package))
+        }),
+        "Reference collectors must build independently of production crates"
+    );
+    let mut forbidden = packages.clone();
+    forbidden.get_mut("snaplingo").unwrap()["dependencies"]
+        .as_array_mut()
+        .unwrap()
+        .push(serde_json::json!({"name":"snaplingo-reference","kind":null}));
+    assert!(dependency_violations(&forbidden)
+        .contains(&"snaplingo -> development tool snaplingo-reference".into()));
 
     for dependency in ["tauri", "tauri-build", "wry", "tao", "objc2-web-kit"] {
         let mut forbidden = packages.clone();

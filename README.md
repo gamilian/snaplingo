@@ -51,6 +51,9 @@ assets/
   text/                    Production UI text
   licenses/                Generated third-party notices
 reference/web/             Independent React views, behavior tests and fixtures
+tools/
+  reference/               Independent macOS WebKit collectors
+  native/                  App-specific development probes
 docs/
   adr/                     Accepted architectural decisions
   architecture/            Current runtime and ownership maps
@@ -113,6 +116,7 @@ npm test
 cargo fmt --all --check
 cargo test --locked -p snaplingo --lib
 cargo test --locked -p snaplingo --test native_app_smoke
+cargo test --locked -p snaplingo --test single_instance_native
 cargo check --locked -p snaplingo --all-targets
 cargo test --locked -p snaplingo-core -p snaplingo-storage -p snaplingo-ui -p snaplingo-render -p snaplingo-accessibility -p snaplingo-settings -p snaplingo-desktop --all-targets
 ```
@@ -121,6 +125,8 @@ cargo test --locked -p snaplingo-core -p snaplingo-storage -p snaplingo-ui -p sn
 the native application lifecycle and real Settings adapter. Renderer examples
 write visual comparison artifacts, for example
 `cargo run --locked -p snaplingo-render --example settings_snapshot`.
+WebKit collectors live in `tools/reference` and build independently of App;
+see [development tools](tools/README.md) for reference and native probe commands.
 
 ## Contributing
 

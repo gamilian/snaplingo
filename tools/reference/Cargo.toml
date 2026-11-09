@@ -1,0 +1,23 @@
+[package]
+name = "snaplingo-reference"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "settings_snapshot"
+path = "settings_snapshot.rs"
+
+[[bin]]
+name = "result_snapshot"
+path = "result_snapshot.rs"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+block2 = "0.6.2"
+dispatch2 = "0.3.1"
+objc2 = "0.6.4"
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "objc2-core-foundation", "NSApplication", "NSBitmapImageRep", "NSColorSpace", "NSEvent", "NSGraphics", "NSGraphicsContext", "NSImage", "NSImageRep", "NSResponder", "NSWindow"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSGeometry", "NSDictionary", "NSError", "NSString", "NSURL", "NSURLRequest"] }
+objc2-web-kit = { version = "0.3.2", default-features = false, features = ["std", "block2", "WKWebView", "WKWebViewConfiguration", "WKNavigation", "WKSnapshotConfiguration", "objc2-app-kit", "objc2-core-foundation"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["rt", "sync", "time"] }

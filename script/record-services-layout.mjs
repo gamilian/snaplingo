@@ -1,5 +1,5 @@
 // Persist only real DOM geometry; this script never reads Rust renderer output.
-// Run the four `settings_reference_snapshot services [dark] [compact]` variants first.
+// Run the four `cargo run --locked -p snaplingo-reference --bin settings_snapshot -- services [dark] [compact]` variants first.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';

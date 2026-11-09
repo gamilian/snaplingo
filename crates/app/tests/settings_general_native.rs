@@ -83,6 +83,11 @@ fn main() {
     use objc2_app_kit::{NSApplication, NSBackingStoreType, NSView, NSWindow, NSWindowStyleMask};
     use objc2_foundation::{NSPoint, NSRect, NSSize};
     use snaplingo_core::application::settings::{GeneralField, GeneralSection, GeneralValue};
+    use snaplingo_core::application::{
+        RequiredPermissions, RequiredPermissionsContext, RequiredPermissionsHost,
+        RequiredPermissionsStatus, SelectedTextAcquirer, SelectionScheme, SettingsApplication,
+        StartOnBoot, SystemPermission, SystemSelectionProvider,
+    };
     use std::sync::{Arc, Mutex};
 
     #[derive(Default)]

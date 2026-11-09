@@ -47,6 +47,9 @@ assets/
   licenses/
 reference/
   web/                 retained React views, behavior tests and fixtures
+tools/
+  reference/           independent WebKit reference collectors
+  native/              App-owned development probes
 docs/
 script/
 ```
@@ -177,10 +180,10 @@ AppKit presentation. Capture and Scrolling also retain native presentation paths
 - [x] Remove App/Storage Domain and Application module re-exports; import Core
   types and workflows directly and enforce this through architecture checks.
 - [x] Replace native test-only Domain copies with Core values.
-- [ ] Move browser reference collectors out of App examples, promote the
+- [x] Move browser reference collectors out of App examples, promote the
   single-instance probe to an integration test, and give pin rendering a
-  deliberate development target beside its pixel-preparation implementation.
-- [ ] Update commands, CI/tooling references and verification records.
+  deliberate App-owned development target for its pixel-preparation implementation.
+- [x] Update commands, CI/tooling references and verification records.
 
 Record implementation commits, commands, results and platform limits below as
 steps finish. Compilation is evidence of compilation, not desktop acceptance.
@@ -300,3 +303,16 @@ controller/editor behavior remain available for the corresponding vertical slice
   exports. Storage tests (29), App unit tests, real-adapter workflows (80), native
   application/capture/result/pin/scrolling checks, 16 architecture checks and
   Windows all-target cross compilation pass.
+
+- Development tools: browser collectors now build independently in
+  `tools/reference`, with WebKit removed from App's development dependencies.
+  The pin probe lives in `tools/native` as an explicit App example; the
+  single-instance subprocess probe is an ordinary integration-test target.
+  Production-to-tool Cargo edges are rejected by the workspace architecture
+  guard. Corrected explicit imports in three native Settings tests and the
+  browser architecture test's moved lifecycle path. Standalone collector builds,
+  actual light/dark permission and Result collection, the relocated pin probe,
+  single-instance subprocess tests, native Settings controls, 16 architecture
+  checks, macOS/Windows all-target checks, 941 browser/script tests, Reference
+  build and generated notice checks pass. The new tool package changes only
+  the lockfile hash in the production notice output; component counts are stable.

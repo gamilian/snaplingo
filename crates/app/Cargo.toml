@@ -165,6 +165,14 @@ name = "snaplingo-native"
 path = "native_main.rs"
 required-features = ["native-app"]
 
+[[example]]
+name = "pin_snapshot"
+path = "../../tools/native/pin_snapshot.rs"
+
+[[test]]
+name = "single_instance_native"
+harness = false
+
 [[test]]
 name = "native_app_smoke"
 harness = false
@@ -206,6 +214,3 @@ harness = false
 [[test]]
 name = "settings_hotkeys_native"
 harness = false
-
-[target.'cfg(target_os = "macos")'.dev-dependencies]
-objc2-web-kit = { version = "0.3.2", default-features = false, features = ["std", "block2", "WKWebView", "WKWebViewConfiguration", "WKNavigation", "WKSnapshotConfiguration", "objc2-app-kit", "objc2-core-foundation"] }

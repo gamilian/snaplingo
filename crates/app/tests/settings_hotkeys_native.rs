@@ -150,8 +150,9 @@ fn main() {
     };
     use objc2_foundation::{NSPoint, NSRect, NSSize, NSString};
     use snaplingo_core::application::hotkeys::{
-        HotkeyConfiguration, HotkeyRecording, HotkeyRegistrar, HotkeyRegistration,
+        HotkeyConfiguration, HotkeyRecording, HotkeyRegistrar, HotkeyRegistration, HotkeyRuntime,
     };
+    use snaplingo_core::domain::GeneralSettings;
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};
 
