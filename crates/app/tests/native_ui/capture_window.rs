@@ -20,10 +20,8 @@ use crate::domain::capture::*;
 use crate::domain::config::ScreenshotSettings;
 use crate::domain::ocr::{OcrRequest, OcrResult};
 use crate::fixture::on_main;
-use crate::infrastructure::system::capture_window::editor_toolbar_macos as toolbar;
-use crate::infrastructure::system::capture_window::native_view::{
-    self as native, Action, Operation,
-};
+use crate::window::capture::macos::toolbar;
+use crate::window::capture::macos::view::{self as native, Action, Operation};
 use crate::{AppState, Result};
 
 #[path = "editor_tools.rs"]
@@ -395,7 +393,7 @@ async fn released(app: &NativeTestApp, id: &str) {
     loop {
         let released = on_main(app, || {
             native::test_decoded_images() == 0
-                && !crate::infrastructure::system::capture_window::is_capture_presentation_active()
+                && !crate::window::capture::is_capture_presentation_active()
         })
         .await;
         if released {
@@ -733,7 +731,7 @@ async fn wait_for_styles(
 async fn native_editor_state(
     app: &NativeTestApp,
     id: &str,
-) -> crate::infrastructure::system::capture_window::editor_canvas_macos::TestState {
+) -> crate::window::capture::macos::canvas::TestState {
     let deadline = Instant::now() + Duration::from_secs(8);
     loop {
         let id = id.to_owned();

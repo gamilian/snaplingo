@@ -45,7 +45,7 @@ A concrete operating-system, storage, network, or native-library implementation 
 The only place that chooses concrete adapters and injects them into a runtime.
 
 - `crates/app/composition.rs` and its builders create native Application runtimes with Infrastructure adapters.
-- `native_app.rs` and `native_windows.rs` own the platform startup/event loops. `reference/web/App.tsx` only opens isolated visual-reference fixtures.
+- `lifecycle/macos.rs` and `lifecycle/windows.rs` own the platform startup/event loops. `reference/web/App.tsx` only opens isolated visual-reference fixtures.
 - Infrastructure may conditionally compile platform implementations, but only Composition selects which concrete adapter satisfies an Application seam.
 
 ### Capture Session
@@ -82,7 +82,7 @@ Application runtimes that own their workflows and request runtime-host effects. 
 
 ### Hotkey
 
-`domain/hotkey_config.rs` owns the supported category/action vocabulary. `application/hotkeys` owns configuration validation, registration state, display-key parsing, and pressed/released policy. The concrete global-shortcut registrar is an Infrastructure adapter. `startup_shortcuts.rs` only maps a valid category/action to an `AppAction` for startup composition.
+`domain/hotkey_config.rs` owns the supported category/action vocabulary. `application/hotkeys` owns configuration validation, registration state, display-key parsing, and pressed/released policy. The concrete global-shortcut registrar is an Infrastructure adapter. `actions/shortcuts.rs` only maps a valid category/action to an `AppAction` for startup composition.
 
 ### Settings
 

@@ -55,15 +55,15 @@ The `settings_preview` example owns its temporary Storage database and registrar
 ### Native application hosts
 
 The default `native-app` feature supplies the native entry used by `main.rs` and
-`native_main.rs`. `native_app.rs` owns the macOS AppKit event loop and application
-delegate; `native_windows.rs` owns the Windows winit loop and native event routing.
+`native_main.rs`. `lifecycle/macos.rs` owns the macOS AppKit event loop and application
+delegate; `lifecycle/windows.rs` owns the Windows winit loop and native event routing.
 Both compose `AppState`, tray actions, global shortcuts, single-instance activation,
 and native capture/result/pinned hosts plus `window/scrolling` adapters. `RuntimeLifecycle` owns startup
 history work, log cleanup and hotkey registration. Quit cancels/drains work before
 releasing platform owners; closing Settings hides it while the resident app runs.
 
-`native_settings_window.rs` owns the macOS Settings `NSWindow` and shared canvas;
-`native_settings_windows.rs` connects the Windows window host to the portable
+`window/settings/macos/host.rs` owns the macOS Settings `NSWindow` and shared canvas;
+`window/settings/windows/mod.rs` connects the Windows window host to the portable
 `SettingsWindowSession`. All seven page kinds use shared Rust layout and actions.
 `composition/settings` injects real workflows and native effects into the
 portable `snaplingo-settings` session. Both platform hosts use that session for
@@ -128,7 +128,7 @@ packaging do not execute it.
 - The macOS scrolling host owns its single 250 ms sampler, starts it after session adoption, pauses during output or errors, and stops it on close. Native controls update only changed properties and previews decode only changed PNGs. Native pinned views preserve their presentation and compressed PNG while hidden, release decoded/filter/inspection buffers, and restore those buffers when shown. Pin actions reuse Pinned Image, Settings, and Capture Output workflows.
 - Native Capture Editor owns portable annotation gestures, selection, styles, text drafts and bounded undo/redo in `application/capture`. Its AppKit adapter renders the frozen crop and transient annotations through the existing Rust compositor, coalesces preview requests, rejects stale revisions, and uses NSTextView for text input. The same native window continues from selection into editing; it does not hand the session to a WebView. Outputs and the global pin shortcut consume the editor's annotation state through Capture runtime.
 - `crates/app/composition.rs` and `composition/*_runtime.rs` construct concrete Infrastructure adapters and inject them into Application runtimes.
-- `app_actions.rs`, `app_shell.rs`, `native_app.rs`, `native_windows.rs` and `startup_shortcuts.rs` are native startup/action adapters. They map menu or hotkey intent to Application-facing actions; they do not own Application state.
+- `actions/mod.rs`, `lifecycle/shell.rs`, `lifecycle/macos.rs`, `lifecycle/windows.rs` and `actions/shortcuts.rs` are native startup/action adapters. They map menu or hotkey intent to Application-facing actions; they do not own Application state.
 - System integration uses Rust libraries directly: `fern` logs into SQLite, `global-hotkey` owns registered key events, `rfd` supplies native dialogs, `auto-launch` manages login entries, and `tray-icon`/`muda` own tray menus. Single-instance ownership uses an OS file lock plus authenticated loopback activation. `infrastructure/runtime.rs` owns Tokio workers; `ui_thread` dispatches effects onto the platform event loop.
 - Capture, editor, scrolling, result and pinned-image hosts call injected Rust services. AppKit supplies macOS native text controls and window presentation; Windows supplies winit input, native menus/dialogs and layered alpha presentation. Hidden editors retain frozen state for failed scrolling handoffs. Windows pin positions cross the OS boundary as physical coordinates, with capture logical origins converted through the primary desktop-scale policy and bounded virtual-desktop centering.
 - Application services publish typed notifications through `infrastructure/desktop_events.rs`. Native Settings/menu subscribers refresh through weak subscriptions; there is no frontend event bridge. `build_app_state` accepts paths, identity/version and selected-text inputs through `CompositionOptions`. The macOS selected-text adapter reads native text responders; native menu and single-instance callbacks publish Rust actions.
@@ -203,3 +203,11 @@ The app is pre-release. Action contracts, persisted settings, credentials, and h
 Scrolling Capture's shared sampler/action lifetime lives in
 `crates/app/window/scrolling/session.rs`; `macos/` and `windows/` retain
 native window/sample mechanics and share cancellation-safe restoration.
+
+Business-window adapters live in `app/window/{settings,capture,result,pinned,scrolling}`,
+with platform implementations adjacent in `macos/` and `windows/`. Screenshot
+acquisition, selection, OCR, speech and HTTP remain infrastructure capabilities.
+`actions/` owns entry routing; `lifecycle/` owns platform event loops, startup,
+resident tray behavior and shutdown. Settings navigation stays with its window
+owner; permission recovery uses an injected callback without reaching into the
+application event loop.

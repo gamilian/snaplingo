@@ -11,6 +11,9 @@ const FORBIDDEN_APPLICATION_DEPENDENCIES: &[&str] = &[
     "infrastructure",
     "commands",
     "composition",
+    "actions",
+    "lifecycle",
+    "window",
     "app_actions",
     "app_shell",
     "settings_window",
@@ -197,8 +200,7 @@ fn workflow_adapter_sources() -> Vec<SourceFile> {
     let mut sources = production_app_sources()
         .into_iter()
         .filter(|source| {
-            source.path == "infrastructure/system/result_window/controller.rs"
-                || source.path == "app_actions.rs"
+            source.path == "window/result/controller.rs" || source.path == "actions/mod.rs"
         })
         .collect::<Vec<_>>();
     let settings = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../settings");
@@ -231,10 +233,12 @@ fn workflow_adapter_sources() -> Vec<SourceFile> {
 #[test]
 fn native_production_sources_do_not_depend_on_a_web_runtime() {
     let sources = production_app_sources();
-    assert!(sources.iter().any(|source| source.path == "native_app.rs"));
     assert!(sources
         .iter()
-        .any(|source| source.path == "native_windows.rs"));
+        .any(|source| source.path == "lifecycle/macos.rs"));
+    assert!(sources
+        .iter()
+        .any(|source| source.path == "lifecycle/windows.rs"));
     assert_eq!(
         dependency_inventory_with_rules(&sources, &["tauri", "objc2_web_kit", "wry"]),
         BTreeSet::new()
@@ -332,6 +336,9 @@ fn dependency_inventory_with_rules(files: &[SourceFile], forbidden: &[&str]) -> 
                 .dependencies
                 .into_iter()
                 .filter(|dependency| {
+                    if matches!(dependency.as_str(), "window" | "actions") {
+                        return false;
+                    }
                     let dependency = dependency.strip_prefix("crate::").unwrap_or(dependency);
                     forbidden.contains(&dependency.split("::").next().unwrap_or(""))
                 })
@@ -425,7 +432,7 @@ fn native_action_routing_does_not_publish_durable_state_change_events() {
     let sources = production_app_sources();
     let router = sources
         .iter()
-        .find(|source| source.path == "app_actions.rs")
+        .find(|source| source.path == "actions/mod.rs")
         .unwrap();
     let production = router.source.split("#[cfg(test)]").next().unwrap();
     for changed in [
@@ -467,7 +474,7 @@ fn shared_workflow_adapters_keep_os_and_database_mechanics_in_their_ports() {
 #[test]
 fn native_capture_actions_delegate_startup_exclusion_and_pin_delivery_to_the_runtime() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let router = fs::read_to_string(root.join("app_actions.rs")).unwrap();
+    let router = fs::read_to_string(root.join("actions/mod.rs")).unwrap();
     let production = router.split("#[cfg(test)]").next().unwrap();
     for policy in [
         "compare_exchange",
@@ -498,9 +505,9 @@ fn native_capture_actions_delegate_startup_exclusion_and_pin_delivery_to_the_run
 fn capture_window_and_control_adapters_use_frozen_session_coordinates() {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     for path in [
-        "infrastructure/system/capture_window/native_host.rs",
-        "infrastructure/system/capture_window/windows.rs",
-        "infrastructure/system/capture_window/windows/view.rs",
+        "window/capture/macos/host.rs",
+        "window/capture/windows/mod.rs",
+        "window/capture/windows/view.rs",
     ] {
         let window = fs::read_to_string(manifest_dir.join(path)).unwrap();
         for live_read in [".primary_monitor(", ".available_monitors("] {
@@ -664,13 +671,15 @@ fn rejects_forbidden_synthetic_dependencies() {
     let files = [SourceFile {
         path: "application/example.rs".to_string(),
         source: r#"
-            use crate::app_actions::AppAction;
-            use crate::app_shell::apply_resting_activation_policy;
+            use crate::actions::AppAction;
+            use crate::lifecycle::shell::apply_resting_activation_policy;
             use crate::commands::trigger_screenshot;
             use crate::composition::build_app_state;
             use crate::infrastructure::storage::{SqliteConfigStore, SqliteCredentialStore};
             use crate::settings_window::show_settings_window;
-            use crate::startup_shortcuts::trigger_hotkey_action;
+            use crate::actions::shortcuts::trigger_hotkey_action;
+            use crate::window::capture::NativeCaptureSessionRuntimeHost;
+            fn local(window: u8) -> u8 { window }
             fn call() { crate::infrastructure::http::send(); }
             // use crate::infrastructure::comments::Ignored;
             const TEXT: &str = "crate::infrastructure::strings::Ignored";
@@ -698,10 +707,10 @@ fn rejects_forbidden_synthetic_dependencies() {
     }];
 
     assert_eq!(
-        dependency_inventory(&files).into_iter().collect::<Vec<_>>(),
-        vec![
-            "application/example.rs -> crate::app_actions::AppAction",
-            "application/example.rs -> crate::app_shell::apply_resting_activation_policy",
+        dependency_inventory(&files),
+        [
+            "application/example.rs -> crate::actions::AppAction",
+            "application/example.rs -> crate::lifecycle::shell::apply_resting_activation_policy",
             "application/example.rs -> crate::commands::trigger_screenshot",
             "application/example.rs -> crate::composition::build_app_state",
             "application/example.rs -> crate::infrastructure::Enum::Variant",
@@ -712,7 +721,11 @@ fn rejects_forbidden_synthetic_dependencies() {
             "application/example.rs -> crate::infrastructure::storage::SqliteConfigStore",
             "application/example.rs -> crate::infrastructure::storage::SqliteCredentialStore",
             "application/example.rs -> crate::settings_window::show_settings_window",
-            "application/example.rs -> crate::startup_shortcuts::trigger_hotkey_action",
+            "application/example.rs -> crate::actions::shortcuts::trigger_hotkey_action",
+            "application/example.rs -> crate::window::capture::NativeCaptureSessionRuntimeHost",
         ]
+        .into_iter()
+        .map(str::to_owned)
+        .collect::<BTreeSet<_>>()
     );
 }

@@ -308,6 +308,9 @@ impl CoreSources {
         (self.file, self.modules) = previous;
     }
     fn record(&mut self, path: &str) {
+        if matches!(path, "window" | "actions") {
+            return;
+        }
         let path = path.strip_prefix("crate::").unwrap_or(path);
         let first = path.split("::").next().unwrap_or("").replace('_', "-");
         if concrete_platform_dependency(&first)
@@ -316,6 +319,9 @@ impl CoreSources {
                 "infrastructure",
                 "commands",
                 "composition",
+                "actions",
+                "lifecycle",
+                "window",
                 "app-state",
                 "app-shell",
                 "app-actions",
@@ -455,6 +461,8 @@ fn source_guard_distinguishes_target_adapters_from_test_fixtures() {
         use crate::{infrastructure as adapter};
         #[cfg(target_os="windows")]
         use windows::Win32 as native;
+        use crate::window::capture::NativeCaptureSessionRuntimeHost;
+        fn local(window: u8) -> u8 { window }
     "#,
     )
     .unwrap();
@@ -464,6 +472,7 @@ fn source_guard_distinguishes_target_adapters_from_test_fixtures() {
         BTreeSet::from([
             "fixture.rs -> infrastructure".into(),
             "fixture.rs -> windows::Win32".into(),
+            "fixture.rs -> window::capture::NativeCaptureSessionRuntimeHost".into(),
         ])
     );
 }

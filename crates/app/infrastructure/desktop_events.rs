@@ -22,7 +22,7 @@ pub(crate) enum DesktopEvent {
     OpenSettings,
     OpenSettingsAt(SettingsRoute),
     Quit,
-    AppActionRequested(crate::app_actions::AppAction),
+    AppActionRequested(crate::actions::AppAction),
     Restart,
     HotkeyTriggered {
         category: String,

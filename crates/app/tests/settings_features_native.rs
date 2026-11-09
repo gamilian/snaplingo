@@ -2,11 +2,10 @@
 #![allow(dead_code, unused_imports, ambiguous_glob_reexports)]
 
 #[cfg(target_os = "macos")]
-#[path = "../app_actions.rs"]
-mod app_actions;
+#[path = "../actions/mod.rs"]
+mod actions;
 #[cfg(target_os = "macos")]
-#[path = "../app_shell.rs"]
-mod app_shell;
+use lifecycle::shell;
 #[cfg(target_os = "macos")]
 #[path = "../app_state.rs"]
 mod app_state;
@@ -24,8 +23,7 @@ use snaplingo_core::error;
 #[path = "../infrastructure/mod.rs"]
 mod infrastructure;
 #[cfg(target_os = "macos")]
-#[path = "../startup_shortcuts.rs"]
-mod startup_shortcuts;
+use actions::shortcuts;
 #[cfg(target_os = "macos")]
 #[path = "../window/mod.rs"]
 mod window;
@@ -42,7 +40,7 @@ pub use infrastructure::*;
 
 #[cfg(target_os = "macos")]
 struct LiveFeature {
-    page: std::rc::Rc<infrastructure::system::settings_window::FeaturePage>,
+    page: std::rc::Rc<window::settings::macos::FeaturePage>,
     window: objc2::rc::Retained<objc2_app_kit::NSWindow>,
 }
 #[cfg(target_os = "macos")]
@@ -51,10 +49,10 @@ thread_local! {
 }
 #[cfg(target_os = "macos")]
 fn feature_view(
-    page: &infrastructure::system::settings_window::FeaturePage,
-) -> &infrastructure::system::settings_window::FeatureView {
+    page: &window::settings::macos::FeaturePage,
+) -> &window::settings::macos::FeatureView {
     page.view()
-        .downcast_ref::<infrastructure::system::settings_window::FeatureView>()
+        .downcast_ref::<window::settings::macos::FeatureView>()
         .unwrap()
 }
 #[cfg(target_os = "macos")]
@@ -71,7 +69,6 @@ async fn on_main<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static) -
 #[cfg(target_os = "macos")]
 fn main() {
     use application::settings::{GeneralValue, OcrField, TranslationField};
-    use infrastructure::system::settings_window::{FeatureField, FeatureKind, FeaturePage};
     use objc2::MainThreadMarker;
     use objc2_app_kit::{
         NSApplication, NSBackingStoreType, NSEvent, NSEventModifierFlags, NSEventType, NSWindow,
@@ -79,6 +76,7 @@ fn main() {
     };
     use objc2_foundation::{NSPoint, NSRect, NSSize};
     use std::sync::Arc;
+    use window::settings::macos::{FeatureField, FeatureKind, FeaturePage};
     let mtm = MainThreadMarker::new().unwrap();
     let app = NSApplication::sharedApplication(mtm);
     app.finishLaunching();
@@ -347,7 +345,7 @@ fn main() {
 }
 #[cfg(target_os = "macos")]
 fn capture(
-    page: &infrastructure::system::settings_window::FeaturePage,
+    page: &window::settings::macos::FeaturePage,
     window: &objc2_app_kit::NSWindow,
     state: &AppState,
     artifacts: &std::path::Path,
@@ -357,9 +355,9 @@ fn capture(
     use application::settings::GeneralValue;
     use objc2_foundation::NSSize;
     let kind = if name == "ocr" {
-        infrastructure::system::settings_window::FeatureKind::Ocr
+        window::settings::macos::FeatureKind::Ocr
     } else {
-        infrastructure::system::settings_window::FeatureKind::Translation
+        window::settings::macos::FeatureKind::Translation
     };
     for appearance in ["light", "dark"] {
         for (theme, width, height, shell, compact) in [
@@ -414,3 +412,9 @@ fn capture(
 }
 #[cfg(not(target_os = "macos"))]
 fn main() {}
+
+#[cfg(target_os = "macos")]
+#[path = "../lifecycle/mod.rs"]
+mod lifecycle;
+#[cfg(target_os = "macos")]
+pub use lifecycle::{should_show_settings_on_startup, RuntimeLifecycle};

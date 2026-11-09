@@ -1,4 +1,5 @@
-use crate::infrastructure::system::{capture_window, shortcut_native};
+use crate::infrastructure::system::shortcut_native;
+use crate::window::capture as capture_window;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
 

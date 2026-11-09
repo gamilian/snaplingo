@@ -2,11 +2,10 @@
 #![allow(dead_code, unused_imports, ambiguous_glob_reexports)]
 
 #[cfg(target_os = "macos")]
-#[path = "../app_actions.rs"]
-mod app_actions;
+#[path = "../actions/mod.rs"]
+mod actions;
 #[cfg(target_os = "macos")]
-#[path = "../app_shell.rs"]
-mod app_shell;
+use lifecycle::shell;
 #[cfg(target_os = "macos")]
 #[path = "../app_state.rs"]
 mod app_state;
@@ -24,8 +23,7 @@ use snaplingo_core::error;
 #[path = "../infrastructure/mod.rs"]
 mod infrastructure;
 #[cfg(target_os = "macos")]
-#[path = "../startup_shortcuts.rs"]
-mod startup_shortcuts;
+use actions::shortcuts;
 #[cfg(target_os = "macos")]
 #[path = "../window/mod.rs"]
 mod window;
@@ -42,7 +40,7 @@ pub use infrastructure::*;
 
 #[cfg(target_os = "macos")]
 struct LivePage {
-    page: std::rc::Rc<infrastructure::system::settings_window::GeneralPage>,
+    page: std::rc::Rc<window::settings::macos::GeneralPage>,
     window: objc2::rc::Retained<objc2_app_kit::NSWindow>,
 }
 #[cfg(target_os = "macos")]
@@ -83,7 +81,7 @@ async fn wait_for_ui(ready: impl Fn() -> bool + Send + Sync + 'static) {
 #[cfg(target_os = "macos")]
 fn main() {
     use crate::application::settings::{GeneralField, GeneralSection, GeneralValue};
-    use crate::infrastructure::system::settings_window::{
+    use crate::window::settings::macos::{
         GeneralAction, GeneralController, GeneralPage, GeneralServices, UpdatePhase,
     };
     use objc2::MainThreadMarker;
@@ -529,7 +527,7 @@ fn main() {
                             let mut general = configuration.snapshot().unwrap().general;
                             general.interface_theme = theme.into();
                             general.theme = appearance.into();
-                            infrastructure::system::settings_window::test_notices_workflow(
+                            window::settings::macos::test_notices_workflow(
                                 &live.window,
                                 &general,
                                 &artifacts.join(format!("{theme}-notices.png")),
@@ -546,7 +544,7 @@ fn main() {
                 let permissions = state.permissions.clone();
                 let updates = app_updates.clone();
                 on_main(move || {
-                    use infrastructure::system::settings_window::native_settings_host as host;
+                    use window::settings::macos::native_settings_host as host;
                     let mtm = MainThreadMarker::new().unwrap();
                     let window = unsafe {
                         NSWindow::initWithContentRect_styleMask_backing_defer(
@@ -652,3 +650,9 @@ fn main() {
 
 #[cfg(not(target_os = "macos"))]
 fn main() {}
+
+#[cfg(target_os = "macos")]
+#[path = "../lifecycle/mod.rs"]
+mod lifecycle;
+#[cfg(target_os = "macos")]
+pub use lifecycle::{should_show_settings_on_startup, RuntimeLifecycle};

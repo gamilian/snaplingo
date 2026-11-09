@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
+[[bin]]
+name = "snaplingo-mnn-ocr-bench"
+path = "main.rs"
+
 # Keep this harness independent of the product workspace.
 [workspace]
 

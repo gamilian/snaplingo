@@ -29,7 +29,14 @@ For scrolling capture, select a region in the screenshot editor and press **S** 
 
 ```text
 crates/
-  app/                     Native entry, composition, lifecycle and window adapters
+  app/                     Native entry and application assembly
+    composition/           Concrete adapters and workflow construction
+    lifecycle/             Application event loops, tray, startup and shutdown
+    actions/               Menu and shortcut action routing
+    window/                Settings, Capture, Result, Pinned Image and Scrolling
+      <domain>/macos/      AppKit adapters
+      <domain>/windows/    Windows adapters
+    infrastructure/        Screenshot acquisition, selection, OCR, speech and HTTP
   core/                    Portable Domain/Application workflows and inward ports
   storage/                 SQLite repositories and persisted image assets
   settings/                Shared Settings sessions and UI projections

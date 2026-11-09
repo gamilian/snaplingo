@@ -83,8 +83,7 @@ pub fn build_app_state(
         target_os = "macos",
         all(target_os = "windows", feature = "native-app")
     ))]
-    let native_result_window =
-        Arc::new(crate::infrastructure::system::result_window::NativeResultWindowHost::default());
+    let native_result_window = Arc::new(crate::window::result::NativeResultWindowHost::default());
     #[cfg(any(
         target_os = "macos",
         all(target_os = "windows", feature = "native-app")
@@ -228,7 +227,7 @@ pub fn build_app_state(
             settings_configuration.clone(),
             translation_coordinator.clone(),
             history.clone(),
-            Arc::new(crate::infrastructure::system::result_window::NativeResultWindowPresentation),
+            Arc::new(crate::window::result::NativeResultWindowPresentation),
         )
         .expect("Result window settings are available"),
     );
@@ -305,7 +304,7 @@ pub fn build_app_state(
             ),
         ),
     });
-    let actions = crate::app_actions::AppActionDispatcher::new(
+    let actions = crate::actions::AppActionDispatcher::new(
         permissions.clone(),
         capture.clone(),
         selection.clone(),
@@ -414,9 +413,7 @@ pub fn build_app_state(
             move |session_id, completed| {
                 let session = session_id.clone();
                 crate::infrastructure::ui_thread::dispatch(move || {
-                    crate::infrastructure::system::capture_window::windows_scrolling_ended(
-                        &session, completed,
-                    );
+                    crate::window::capture::windows_scrolling_ended(&session, completed);
                 });
                 events.publish(DesktopEvent::ScrollingCaptureEnded {
                     session_id: session_id.clone(),
@@ -492,7 +489,7 @@ fn bind_native_notifications(state: &mut AppState) {
                         .upgrade()
                         .and_then(|hotkeys| hotkeys.snapshot().ok())
                     {
-                        crate::app_shell::refresh_menu_bar_shortcuts_native(snapshot);
+                        crate::lifecycle::shell::refresh_menu_bar_shortcuts_native(snapshot);
                     }
                 }
                 _ => {}
@@ -544,7 +541,7 @@ mod native_state_tests {
             Ok(())
         });
         notifications.publish(DesktopEvent::AppActionRequested(
-            crate::app_actions::AppAction::OpenHistory,
+            crate::actions::AppAction::OpenHistory,
         ));
         assert_eq!(routes.load(std::sync::atomic::Ordering::SeqCst), 1);
         notifications.publish(DesktopEvent::HotkeyTriggered {
@@ -573,7 +570,7 @@ mod native_state_tests {
         assert!(selection.upgrade().is_none());
         assert!(result.upgrade().is_none());
         notifications.publish(DesktopEvent::AppActionRequested(
-            crate::app_actions::AppAction::OpenHistory,
+            crate::actions::AppAction::OpenHistory,
         ));
         assert_eq!(
             routes.load(std::sync::atomic::Ordering::SeqCst),

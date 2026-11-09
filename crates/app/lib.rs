@@ -1,29 +1,11 @@
 pub(crate) mod window;
 // Module declarations
-mod app_actions;
-mod app_shell;
+mod actions;
 mod app_state;
 mod composition;
 pub use snaplingo_core::{application, domain, error};
 mod infrastructure;
-#[cfg(all(target_os = "macos", feature = "native-app"))]
-mod native_app;
-#[cfg(all(target_os = "macos", feature = "native-app"))]
-mod native_capacity;
-#[cfg(all(target_os = "windows", feature = "native-app"))]
-mod native_capacity_windows;
-#[cfg(all(target_os = "windows", feature = "native-app"))]
-mod native_notices_windows;
-#[cfg(all(target_os = "macos", feature = "native-app"))]
-mod native_permission_prompt;
-#[cfg(all(target_os = "macos", feature = "native-app"))]
-mod native_settings_window;
-#[cfg(all(target_os = "windows", feature = "native-app"))]
-mod native_settings_windows;
-#[cfg(all(target_os = "windows", feature = "native-app"))]
-mod native_windows;
-mod runtime_lifecycle;
-mod startup_shortcuts;
+mod lifecycle;
 
 // Public exports for new infrastructure layer
 pub use app_state::AppState;
@@ -39,11 +21,11 @@ pub use error::{AppError, Result};
 #[allow(ambiguous_glob_reexports)]
 pub use infrastructure::*;
 #[cfg(all(target_os = "macos", feature = "native-app"))]
-pub use native_app::{
+pub use lifecycle::macos::{
     run as run_native, run_with_options as run_native_with_options, NativeAppOptions,
 };
 #[cfg(all(target_os = "windows", feature = "native-app"))]
-pub use native_windows::{
+pub use lifecycle::windows::{
     run as run_native, run_with_options as run_native_with_options, NativeAppOptions,
 };
-pub use runtime_lifecycle::{should_show_settings_on_startup, RuntimeLifecycle};
+pub use lifecycle::{should_show_settings_on_startup, RuntimeLifecycle};

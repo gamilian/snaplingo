@@ -11,11 +11,11 @@ use crate::application::result_window::ResultWindowRuntime;
 #[cfg(target_os = "macos")]
 use crate::infrastructure::system::capture_output::SystemCaptureOutputHost;
 #[cfg(target_os = "macos")]
-use crate::infrastructure::system::capture_window::NativeCaptureOcrEffects;
-#[cfg(target_os = "macos")]
-use crate::infrastructure::system::capture_window::NativeCaptureSessionRuntimeHost;
-#[cfg(target_os = "macos")]
 use crate::infrastructure::system::screenshot::macos::MacOSCaptureSessionSource;
+#[cfg(target_os = "macos")]
+use crate::window::capture::NativeCaptureOcrEffects;
+#[cfg(target_os = "macos")]
+use crate::window::capture::NativeCaptureSessionRuntimeHost;
 use crate::{CaptureOutput, CaptureSessionRuntime, CaptureSessions, PinnedImageRuntime};
 
 pub(crate) struct CaptureRuntimeParts {
@@ -28,8 +28,7 @@ pub(crate) struct CaptureRuntimeParts {
     #[cfg(target_os = "macos")]
     pub scrolling_host: Arc<crate::window::scrolling::macos::NativeScrollingCaptureHost>,
     #[cfg(all(target_os = "windows", feature = "native-app"))]
-    pub native_capture_host:
-        Arc<crate::infrastructure::system::capture_window::WindowsCaptureSessionRuntimeHost>,
+    pub native_capture_host: Arc<crate::window::capture::WindowsCaptureSessionRuntimeHost>,
     #[cfg(all(target_os = "windows", feature = "native-app"))]
     pub native_scrolling_host: Arc<crate::window::scrolling::windows::NativeScrollingCaptureHost>,
 }
@@ -47,10 +46,9 @@ pub(crate) fn build_native_windows_runtime(
         pinned_image::PinnedImageState,
     };
     use crate::infrastructure::system::{
-        capture_output::SystemCaptureOutputHost,
-        capture_window::{WindowsCaptureOcrEffects, WindowsCaptureSessionRuntimeHost},
-        screenshot::windows::WindowsCaptureSessionSource,
+        capture_output::SystemCaptureOutputHost, screenshot::windows::WindowsCaptureSessionSource,
     };
+    use crate::window::capture::{WindowsCaptureOcrEffects, WindowsCaptureSessionRuntimeHost};
     use crate::window::scrolling::windows::NativeScrollingCaptureHost;
     let source = Arc::new(WindowsCaptureSessionSource::new());
     let scrolling = Arc::new(NativeScrollingCaptureHost::new(source.clone()));
@@ -139,7 +137,7 @@ pub(crate) fn build_capture_runtime(
     let capture_host = Arc::new(NativeCaptureSessionRuntimeHost::new(
         history_suite,
         delivery,
-        crate::app_shell::set_capture_ocr_status_native,
+        crate::lifecycle::shell::set_capture_ocr_status_native,
     ));
 
     let runtime = Arc::new(

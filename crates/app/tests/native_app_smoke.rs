@@ -4,14 +4,13 @@
     target_os = "macos",
     all(target_os = "windows", feature = "native-app")
 ))]
-#[path = "../app_actions.rs"]
-mod app_actions;
+#[path = "../actions/mod.rs"]
+mod actions;
 #[cfg(any(
     target_os = "macos",
     all(target_os = "windows", feature = "native-app")
 ))]
-#[path = "../app_shell.rs"]
-mod app_shell;
+use lifecycle::shell;
 #[cfg(any(
     target_os = "macos",
     all(target_os = "windows", feature = "native-app")
@@ -33,23 +32,13 @@ mod composition {
 #[path = "../infrastructure/mod.rs"]
 mod infrastructure;
 #[cfg(target_os = "macos")]
-#[path = "../native_app.rs"]
-mod native_app;
-#[cfg(target_os = "macos")]
-#[path = "../native_capacity.rs"]
-mod native_capacity;
-#[cfg(target_os = "macos")]
-#[path = "../native_permission_prompt.rs"]
-mod native_permission_prompt;
-#[cfg(target_os = "macos")]
-#[path = "../native_settings_window.rs"]
-mod native_settings_window;
+use lifecycle::macos as native_app;
 #[cfg(any(
     target_os = "macos",
     all(target_os = "windows", feature = "native-app")
 ))]
-#[path = "../runtime_lifecycle.rs"]
-mod runtime_lifecycle;
+#[path = "../lifecycle/mod.rs"]
+mod lifecycle;
 #[cfg(any(
     target_os = "macos",
     all(target_os = "windows", feature = "native-app")
@@ -58,8 +47,7 @@ mod runtime_lifecycle;
     target_os = "macos",
     all(target_os = "windows", feature = "native-app")
 ))]
-#[path = "../startup_shortcuts.rs"]
-mod startup_shortcuts;
+use actions::shortcuts;
 #[cfg(any(
     target_os = "macos",
     all(target_os = "windows", feature = "native-app")
@@ -95,7 +83,7 @@ pub use infrastructure::*;
     target_os = "macos",
     all(target_os = "windows", feature = "native-app")
 ))]
-pub use runtime_lifecycle::{should_show_settings_on_startup, RuntimeLifecycle};
+pub use lifecycle::{should_show_settings_on_startup, RuntimeLifecycle};
 #[cfg(any(
     target_os = "macos",
     all(target_os = "windows", feature = "native-app")
@@ -125,14 +113,4 @@ mod composition {
     include!(concat!(env!("OUT_DIR"), "/native_ui_composition.rs"));
 }
 #[cfg(all(target_os = "windows", feature = "native-app"))]
-#[path = "../native_capacity_windows.rs"]
-mod native_capacity_windows;
-#[cfg(all(target_os = "windows", feature = "native-app"))]
-#[path = "../native_notices_windows.rs"]
-mod native_notices_windows;
-#[cfg(all(target_os = "windows", feature = "native-app"))]
-#[path = "../native_settings_windows.rs"]
-mod native_settings_windows;
-#[cfg(all(target_os = "windows", feature = "native-app"))]
-#[path = "../native_windows.rs"]
-mod native_windows;
+use lifecycle::windows as native_windows;

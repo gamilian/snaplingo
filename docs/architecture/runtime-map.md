@@ -8,13 +8,13 @@ Windows hosts. `lib.rs` declares/exports those modules and the portable Core
 interfaces; it does not build a Tauri application or register IPC commands.
 
 ```text
-macOS native_app.rs / Windows native_windows.rs
+macOS lifecycle/macos.rs / Windows lifecycle/windows.rs
     -> AppState assembled by composition.rs
     -> Application runtimes <- Infrastructure adapters
     -> native Settings / capture / result / pin / scrolling windows
 ```
 
-`native_app.rs` owns AppKit startup and application delegation. `native_windows.rs`
+`lifecycle/macos.rs` owns AppKit startup and application delegation. `lifecycle/windows.rs`
 owns the winit event loop and routes native window/input/accessibility events.
 `ui_thread` marshals platform effects to those loops; `infrastructure/runtime.rs`
 owns Tokio workers. `RuntimeLifecycle` owns startup work, hotkey registration and
@@ -24,8 +24,8 @@ Single-instance activation and tray/menu actions enter the same application.
 ## Shared Settings and native surfaces
 
 All seven Settings pages use shared Rust layout, hit testing and typed intents.
-macOS `native_settings_window.rs` mounts `SharedFeaturePage`; Windows
-`native_settings_windows.rs` connects the desktop host to `SettingsWindowSession`.
+macOS `window/settings/macos/host.rs` mounts `SharedFeaturePage`; Windows
+`window/settings/windows/mod.rs` connects the desktop host to `SettingsWindowSession`.
 The adapters under `composition/settings` bind real preferences,
 provider and Library workflows, permission/update controllers and native sheets.
 Asynchronous notifications wake the host and refresh snapshots. Cached capacity
@@ -70,7 +70,7 @@ Library Index returns lightweight globally ordered IDs before Library loads only
 the selected History/Favorite records. History pages project visible content's
 favorite membership without loading complete Favorite bodies or thumbnails.
 
-`app_actions.rs` maps native actions to workflow calls. `startup_shortcuts.rs`
+`actions/mod.rs` maps native actions to workflow calls. `actions/shortcuts.rs`
 maps validated hotkey category/action pairs to `AppAction`; native shortcut
 registration stays in Infrastructure. Typed `DesktopEvents` refresh native
 subscribers without forwarding browser IPC events.

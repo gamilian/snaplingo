@@ -1,7 +1,6 @@
 pub(crate) mod annotation_fonts;
 pub mod capture_cursor;
 pub(crate) mod capture_output;
-pub mod capture_window;
 pub(crate) mod clipboard_text;
 pub(crate) mod dialogs;
 pub(crate) mod external_open;
@@ -20,12 +19,9 @@ pub(crate) mod native_view_snapshot;
 pub mod ocr;
 pub mod paths;
 pub mod required_permissions;
-pub mod result_window;
 pub mod screenshot;
 pub mod screenshot_favorites;
 pub mod selection;
-#[cfg(target_os = "macos")]
-pub(crate) mod settings_window;
 pub mod shortcut;
 pub(crate) mod shortcut_native;
 pub mod single_instance;

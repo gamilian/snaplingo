@@ -165,7 +165,7 @@ AppKit presentation. Capture and Scrolling also retain native presentation paths
   text composition, selection, surrounding text and accessibility capabilities.
 - [ ] Capture: retain frozen pixels and Core Editing; unify presentation against
   Mac controls without moving OS acquisition or output policy into UI.
-- [ ] Reorganize each window's common implementation and platform adapters under
+- [x] Reorganize each window's common implementation and platform adapters under
   `app/window/<domain>` as ownership settles.
 - [ ] Run interface behavior tests, independent geometry/color references and
   real macOS window workflows for each completed vertical slice.
@@ -260,3 +260,23 @@ steps finish. Compilation is evidence of compilation, not desktop acceptance.
   overlays, and step 2's sampling lifetime remains unchanged. Portable control
   and preview tests, actual Mac control/preview frames, six-theme pixel checks,
   overlay lifecycle, full native workflows and Windows all-target checks pass.
+
+- Directory ownership: all five business-window adapters now live under
+  `app/window/<domain>/{macos,windows}`. Settings sheets and input/reference
+  adapters sit beside their Settings host; Result retains its common controller;
+  Capture retains its common presentation calculations and Core Editing seam.
+  Menu/shortcut entry routing lives in `app/actions`; resident application loops,
+  tray and startup/shutdown live in `app/lifecycle`. Settings navigation uses its
+  own window owner; permission recovery receives a weak callback instead of
+  calling the global application entry. Architecture guards follow the new paths
+  and reject Core imports of Actions, Lifecycle and Window adapters while allowing
+  local variables with those names. Mac/Windows all-target checks, App unit tests,
+  15 architecture checks, seven-page application smoke, permission recovery and
+  complete native workflows pass. The independent MNN benchmark also uses a
+  direct `main.rs` entry, leaving no authored `src/` source directories. Its TOML
+  and entry path are checked; benchmark compilation needs the existing setup
+  checkout at `/tmp/snaplingo-ocr-benchmark/mnn/source`, absent on this machine.
+
+Remaining step 5 work is Result and Capture presentation consolidation. Their
+directory ownership is complete; their existing Mac native text/input and shared
+controller/editor behavior remain available for the corresponding vertical slices.

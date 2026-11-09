@@ -2,12 +2,12 @@
 // app handle, WebView, or Tauri event loop is initialized in this process.
 #![allow(dead_code, unused_imports)]
 #[cfg(target_os = "macos")]
-#[path = "../infrastructure/system/capture_window/backend.rs"]
+#[path = "../window/capture/backend.rs"]
 mod backend;
 #[cfg(target_os = "macos")]
 use snaplingo_core::error;
 #[cfg(target_os = "macos")]
-#[path = "../infrastructure/system/capture_window/presentation_macos.rs"]
+#[path = "../window/capture/macos/presentation.rs"]
 mod presentation;
 #[cfg(target_os = "macos")]
 #[path = "../infrastructure/system/shortcut_native.rs"]

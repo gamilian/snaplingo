@@ -16,7 +16,7 @@ use crate::application::result_window::{
 use crate::application::{SystemTtsHost, SystemTtsVoice, TtsRuntime};
 use crate::domain::translation::{TranslationRequest, TranslationResult};
 use crate::fixture::{on_main, png, NativeTestApp};
-use crate::infrastructure::system::result_window::native_view::{self as native, Action};
+use crate::window::result::macos::view::{self as native, Action};
 use crate::{AppState, Result};
 
 #[derive(Default)]

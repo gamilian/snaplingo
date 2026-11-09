@@ -61,7 +61,7 @@ pub struct LogsRuntime {
 }
 
 pub struct AppState {
-    pub(crate) actions: crate::app_actions::AppActionDispatcher,
+    pub(crate) actions: crate::actions::AppActionDispatcher,
     pub(crate) desktop_events: Arc<crate::infrastructure::desktop_events::DesktopEvents>,
     pub(crate) desktop_subscriptions:
         Vec<crate::infrastructure::desktop_events::DesktopSubscription>,
@@ -87,8 +87,7 @@ pub struct AppState {
         target_os = "macos",
         all(target_os = "windows", feature = "native-app")
     ))]
-    pub(crate) native_result_window:
-        Arc<crate::infrastructure::system::result_window::NativeResultWindowHost>,
+    pub(crate) native_result_window: Arc<crate::window::result::NativeResultWindowHost>,
     #[cfg(any(
         target_os = "macos",
         all(target_os = "windows", feature = "native-app")

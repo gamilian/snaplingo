@@ -1,5 +1,6 @@
 use super::super::session::{dispatch, Services, Session};
-use crate::infrastructure::system::{capture_window, shortcut_native};
+use crate::infrastructure::system::shortcut_native;
+use crate::window::capture as capture_window;
 // Native scrolling sampler and application actions on the shared Windows loop.
 use super::scrolling_view_windows as view;
 use crate::application::capture::{

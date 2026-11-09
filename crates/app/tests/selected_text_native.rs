@@ -2,11 +2,10 @@
 #![allow(dead_code, unused_imports, ambiguous_glob_reexports)]
 
 #[cfg(target_os = "macos")]
-#[path = "../app_actions.rs"]
-mod app_actions;
+#[path = "../actions/mod.rs"]
+mod actions;
 #[cfg(target_os = "macos")]
-#[path = "../app_shell.rs"]
-mod app_shell;
+use lifecycle::shell;
 #[cfg(target_os = "macos")]
 #[path = "../app_state.rs"]
 mod app_state;
@@ -24,8 +23,7 @@ use snaplingo_core::error;
 #[path = "../infrastructure/mod.rs"]
 mod infrastructure;
 #[cfg(target_os = "macos")]
-#[path = "../startup_shortcuts.rs"]
-mod startup_shortcuts;
+use actions::shortcuts;
 #[cfg(target_os = "macos")]
 #[path = "../window/mod.rs"]
 mod window;
@@ -59,7 +57,7 @@ fn main() {
     use std::sync::mpsc;
     use std::time::Duration;
 
-    use crate::infrastructure::system::settings_window::SharedFeatureView;
+    use crate::window::settings::macos::SharedFeatureView;
     use objc2::{rc::Retained, MainThreadMarker};
     use objc2_app_kit::{
         NSApplication, NSBackingStoreType, NSEvent, NSEventModifierFlags, NSEventType, NSTextView,
@@ -168,3 +166,9 @@ fn main() {
 
 #[cfg(not(target_os = "macos"))]
 fn main() {}
+
+#[cfg(target_os = "macos")]
+#[path = "../lifecycle/mod.rs"]
+mod lifecycle;
+#[cfg(target_os = "macos")]
+pub use lifecycle::{should_show_settings_on_startup, RuntimeLifecycle};

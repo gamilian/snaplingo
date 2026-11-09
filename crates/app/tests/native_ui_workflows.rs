@@ -3,11 +3,10 @@
 #![allow(dead_code, unused_imports, ambiguous_glob_reexports)]
 
 #[cfg(target_os = "macos")]
-#[path = "../app_actions.rs"]
-mod app_actions;
+#[path = "../actions/mod.rs"]
+mod actions;
 #[cfg(target_os = "macos")]
-#[path = "../app_shell.rs"]
-mod app_shell;
+use lifecycle::shell;
 #[cfg(target_os = "macos")]
 #[path = "../app_state.rs"]
 mod app_state;
@@ -25,8 +24,7 @@ use snaplingo_core::error;
 #[path = "../infrastructure/mod.rs"]
 mod infrastructure;
 #[cfg(target_os = "macos")]
-#[path = "../startup_shortcuts.rs"]
-mod startup_shortcuts;
+use actions::shortcuts;
 #[cfg(target_os = "macos")]
 #[path = "../window/mod.rs"]
 mod window;
@@ -48,22 +46,12 @@ mod capture_workflows;
 mod result_workflows;
 
 #[cfg(target_os = "macos")]
-#[path = "../native_app.rs"]
-mod native_app;
+use lifecycle::macos as native_app;
 #[cfg(target_os = "macos")]
-#[path = "../native_capacity.rs"]
-mod native_capacity;
+#[path = "../lifecycle/mod.rs"]
+mod lifecycle;
 #[cfg(target_os = "macos")]
-#[path = "../native_permission_prompt.rs"]
-mod native_permission_prompt;
-#[cfg(target_os = "macos")]
-#[path = "../native_settings_window.rs"]
-mod native_settings_window;
-#[cfg(target_os = "macos")]
-#[path = "../runtime_lifecycle.rs"]
-mod runtime_lifecycle;
-#[cfg(target_os = "macos")]
-pub use runtime_lifecycle::{should_show_settings_on_startup, RuntimeLifecycle};
+pub use lifecycle::{should_show_settings_on_startup, RuntimeLifecycle};
 
 #[cfg(target_os = "macos")]
 mod fixture {
@@ -90,7 +78,7 @@ mod fixture {
         PinnedImagePlacement, PinnedImageRuntimeHost, PinnedImageState,
     };
     use crate::domain::capture::*;
-    use crate::infrastructure::system::capture_window::NativeCaptureSessionRuntimeHost;
+    use crate::window::capture::NativeCaptureSessionRuntimeHost;
     use crate::window::scrolling::macos::NativeScrollingCaptureHost;
     use crate::*;
 
@@ -634,7 +622,7 @@ mod fixture {
         let observed_menu = menu_actions.clone();
         let _subscription = state.desktop_events.subscribe(move |event| {
             if matches!(event, DesktopEvent::HotkeyTriggered { category, action } if category == TRANSLATION_CATEGORY && action == SHOW_TRANSLATION_WINDOW_ACTION) { observed.fetch_add(1, Ordering::SeqCst); }
-            if *event == DesktopEvent::AppActionRequested(crate::app_actions::AppAction::OpenTranslationWindow) { observed_menu.fetch_add(1, Ordering::SeqCst); }
+            if *event == DesktopEvent::AppActionRequested(crate::actions::AppAction::OpenTranslationWindow) { observed_menu.fetch_add(1, Ordering::SeqCst); }
         });
         let mut selected = None;
         for key in ["F18", "F19", "F20"] {
@@ -685,13 +673,9 @@ mod fixture {
         registrar.unregister(key).unwrap();
 
         state.result_session.close();
-        on_main(
-            app,
-            infrastructure::system::result_window::native_view::test_destroy,
-        )
-        .await;
+        on_main(app, window::result::macos::view::test_destroy).await;
         let request_before = state.result_window.reserve_request().unwrap();
-        on_main(app, app_shell::test_show_translation_menu_action).await;
+        on_main(app, shell::test_show_translation_menu_action).await;
         assert_eq!(menu_actions.load(Ordering::SeqCst), 1);
         let deadline = Instant::now() + Duration::from_secs(8);
         while !state.result_session.snapshot().visible {
@@ -712,11 +696,7 @@ mod fixture {
             "Native menu action did not dispatch exactly once"
         );
         state.result_session.close();
-        on_main(
-            app,
-            infrastructure::system::result_window::native_view::test_destroy,
-        )
-        .await;
+        on_main(app, window::result::macos::view::test_destroy).await;
         println!("Real Carbon hotkey and AppKit menu each routed once through Rust desktop events and application actions to the native result window");
     }
 
@@ -840,7 +820,7 @@ mod fixture {
                 let deadline = Instant::now() + Duration::from_secs(8);
                 let (width, height, visible) = loop {
                     let size = on_main(app, || {
-                        use infrastructure::system::capture_window::native_view as native;
+                        use window::capture::macos::view as native;
                         native::session_id().map(|id| native::test_ready_size(&id))
                     })
                     .await;
@@ -976,7 +956,7 @@ mod fixture {
             native: NativeCaptureSessionRuntimeHost::new(
                 "com.snaplingo.native-ui-tests".into(),
                 delivery,
-                app_shell::set_capture_ocr_status_native,
+                shell::set_capture_ocr_status_native,
             ),
         });
         let output = Arc::new(Output {
@@ -1023,7 +1003,7 @@ mod fixture {
             pinned_images: pinned,
             cursor: Arc::new(FixtureCursor),
         });
-        state.actions = app_actions::AppActionDispatcher::new(
+        state.actions = actions::AppActionDispatcher::new(
             state.permissions.clone(),
             state.capture.clone(),
             state.selection.clone(),
@@ -1060,10 +1040,10 @@ mod fixture {
             },
         )
         .unwrap();
-        app_shell::initialize_menu_events();
-        app_shell::test_native_menu_bar();
+        shell::initialize_menu_events();
+        shell::test_native_menu_bar();
         let events = state.desktop_events.clone();
-        app_shell::setup_menu_bar(&state.settings.hotkeys.snapshot().unwrap(), move |action| {
+        shell::setup_menu_bar(&state.settings.hotkeys.snapshot().unwrap(), move |action| {
             events.publish(infrastructure::desktop_events::DesktopEvent::AppActionRequested(action))
         })
         .unwrap();
@@ -1130,7 +1110,7 @@ mod fixture {
             }
         });
         app.run();
-        app_shell::shutdown_menu_bar();
+        shell::shutdown_menu_bar();
         infrastructure::system::shortcut::shutdown_shortcuts().unwrap();
         drop(test_app);
         drop(directory);
