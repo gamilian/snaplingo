@@ -58,7 +58,16 @@ fn dependency_violations(packages: &BTreeMap<String, Value>) -> Vec<String> {
         ("snaplingo-assets", &[][..]),
         (
             "snaplingo-settings",
-            &["snaplingo-core", "snaplingo-storage", "snaplingo-ui"][..],
+            &[
+                "snaplingo-core",
+                "snaplingo-storage",
+                "snaplingo-ui",
+                "tokio",
+                "base64",
+                "chrono",
+                "image",
+                "log",
+            ][..],
         ),
         (
             "snaplingo-render",

@@ -13,7 +13,7 @@ async fn seven_page_backend_reuses_real_preferences_services_library_and_callbac
     let fixture = super::library::tests::fixture();
     let capacity = Arc::new(AtomicUsize::new(0));
     let calls = capacity.clone();
-    let mut window = SettingsWindowSession::new(
+    let (mut window, _subscription) = from_state(
         fixture.app.clone(),
         Default::default(),
         Arc::new(|| Ok(())),

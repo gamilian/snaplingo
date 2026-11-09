@@ -1,7 +1,4 @@
 //! Self-drawn first-use guide, confined to the standalone Settings window.
-use crate::infrastructure::settings_canvas::permission_prompt::{
-    PermissionPromptSession, Projection,
-};
 use accesskit::{
     Action, ActionHandler, ActionRequest, ActivationHandler, Node, NodeId, Role, TreeId, TreeInfo,
     TreeUpdate,
@@ -17,6 +14,7 @@ use objc2_app_kit::{
 };
 use objc2_foundation::{NSNotification, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString};
 use snaplingo_render::{Renderer, RendererTextMetrics};
+use snaplingo_settings::permission_prompt::{PermissionPromptSession, Projection};
 use snaplingo_ui::{permission_prompt::*, Key, Modifiers, Point};
 use std::{
     cell::RefCell,

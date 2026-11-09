@@ -69,6 +69,7 @@ END
             .map(|line| {
                 if let Some(module) = line
                     .strip_prefix("mod ")
+                    .or_else(|| line.strip_prefix("pub(crate) mod "))
                     .and_then(|line| line.strip_suffix(';'))
                 {
                     let path = root.join("src/composition").join(format!("{module}.rs"));

@@ -6692,10 +6692,19 @@ dependencies = [
 name = "snaplingo-settings"
 version = "0.1.23"
 dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.21.7",
+ "chrono",
+ "image",
+ "log",
+ "rusqlite",
+ "serde_json",
  "snaplingo-core",
  "snaplingo-storage",
  "snaplingo-ui",
  "tempfile",
+ "tokio",
 ]
 
 [[package]]

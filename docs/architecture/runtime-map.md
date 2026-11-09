@@ -26,7 +26,7 @@ Single-instance activation and tray/menu actions enter the same application.
 All seven Settings pages use shared Rust layout, hit testing and typed intents.
 macOS `native_settings_window.rs` mounts `SharedFeaturePage`; Windows
 `native_settings_windows.rs` connects the desktop host to `SettingsWindowSession`.
-The adapters under `infrastructure/settings_canvas` bind real preferences,
+The adapters under `composition/settings` bind real preferences,
 provider and Library workflows, permission/update controllers and native sheets.
 Asynchronous notifications wake the host and refresh snapshots. Cached capacity
 totals use lightweight `LibraryIndex` queries and reject stale completions.

@@ -61,8 +61,7 @@ pub(crate) struct NativeSettingsWindow {
     page: RefCell<Option<Rc<SharedFeaturePage>>>,
     state: Arc<AppState>,
     recording: HotkeyRecording,
-    permission_prompt:
-        Arc<crate::infrastructure::settings_canvas::permission_prompt::PermissionPromptSession>,
+    permission_prompt: Arc<snaplingo_settings::permission_prompt::PermissionPromptSession>,
 }
 
 impl NativeSettingsWindow {
@@ -115,7 +114,7 @@ impl NativeSettingsWindow {
         window.setContentView(Some(&root));
         window.setDelegate(Some(ProtocolObject::from_ref(&*root)));
         let permission_prompt = Arc::new(
-            crate::infrastructure::settings_canvas::permission_prompt::PermissionPromptSession::new(
+            snaplingo_settings::permission_prompt::PermissionPromptSession::new(
                 state.permissions.clone(),
             ),
         );

@@ -43,7 +43,11 @@ impl Application {
     ) -> Result<(), String> {
         let page = match route {
             Some(SettingsRoute::History) => Page::History,
-            _ => Page::General,
+            Some(_) => Page::General,
+            None => self
+                .settings
+                .as_ref()
+                .map_or(Page::General, |window| window.page()),
         };
         if self.settings.is_none() {
             self.settings = Some(NativeSettingsWindow::new(

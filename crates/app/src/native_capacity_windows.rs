@@ -1,9 +1,10 @@
 //! Windows modal host for the shared, explicitly saved capacity draft.
-use crate::infrastructure::{settings_canvas::capacity::CapacitySession, ui_thread};
+use crate::infrastructure::ui_thread;
 use accesskit::{ActivationHandler, TreeUpdate};
 use accesskit_winit::{Adapter, WindowEvent as AccessibilityEvent};
 use snaplingo_accessibility::{capacity_project, CapacityProjection};
 use snaplingo_render::{Renderer, RendererTextMetrics};
+use snaplingo_settings::capacity::CapacitySession;
 use snaplingo_ui::{capacity::*, Key, KeyStyle, Modifiers, Point};
 use std::{
     cell::{Cell, RefCell},

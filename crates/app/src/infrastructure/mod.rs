@@ -5,7 +5,6 @@ pub mod llm;
 pub(crate) mod logging;
 pub(crate) mod ocr;
 pub mod runtime;
-pub(crate) mod settings_canvas;
 pub use snaplingo_storage as storage;
 pub mod system;
 #[cfg(target_os = "macos")]

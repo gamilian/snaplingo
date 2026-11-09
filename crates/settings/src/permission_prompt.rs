@@ -1,9 +1,9 @@
 //! One Settings lifetime's guide state. Reading grants never requests them.
-use crate::application::{RequiredPermissions, SystemPermission};
+use snaplingo_core::application::{RequiredPermissions, SystemPermission};
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone, Debug)]
-pub(crate) struct Projection {
+pub struct Projection {
     pub visible: bool,
     pub needs_installation: bool,
     pub busy: bool,
@@ -19,18 +19,18 @@ struct State {
     error: Option<String>,
     generation: u64,
 }
-pub(crate) struct PermissionPromptSession {
+pub struct PermissionPromptSession {
     permissions: Arc<RequiredPermissions>,
     state: Mutex<State>,
 }
 impl PermissionPromptSession {
-    pub(crate) fn new(permissions: Arc<RequiredPermissions>) -> Self {
+    pub fn new(permissions: Arc<RequiredPermissions>) -> Self {
         Self {
             permissions,
             state: Mutex::new(State::default()),
         }
     }
-    pub(crate) fn set_visible(&self, visible: bool) {
+    pub fn set_visible(&self, visible: bool) {
         let mut state = self.state.lock().unwrap();
         if state.enabled != visible {
             state.generation = state.generation.wrapping_add(1);
@@ -38,7 +38,7 @@ impl PermissionPromptSession {
         }
         state.enabled = visible;
     }
-    pub(crate) fn projection(&self) -> Projection {
+    pub fn projection(&self) -> Projection {
         let status = self.permissions.status();
         let context = self.permissions.context();
         let state = self.state.lock().unwrap();
@@ -53,13 +53,13 @@ impl PermissionPromptSession {
             error: state.error.clone(),
         }
     }
-    pub(crate) fn dismiss(&self) {
+    pub fn dismiss(&self) {
         let mut state = self.state.lock().unwrap();
         state.dismissed = true;
         state.busy = false;
         state.generation = state.generation.wrapping_add(1);
     }
-    pub(crate) fn begin_authorize(&self) -> Option<u64> {
+    pub fn begin_authorize(&self) -> Option<u64> {
         let projection = self.projection();
         if !projection.visible || projection.needs_installation {
             return None;
@@ -73,7 +73,7 @@ impl PermissionPromptSession {
         state.error = None;
         Some(state.generation)
     }
-    pub(crate) fn authorize(&self, generation: u64) {
+    pub fn authorize(&self, generation: u64) {
         {
             let state = self.state.lock().unwrap();
             if state.generation != generation || !state.enabled || state.dismissed || !state.busy {
@@ -98,7 +98,7 @@ impl PermissionPromptSession {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::application::{
+    use snaplingo_core::application::{
         RequiredPermissionsContext, RequiredPermissionsHost, RequiredPermissionsStatus,
     };
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -123,7 +123,7 @@ mod tests {
                 can_reset: !self.temporary.load(Ordering::SeqCst),
             }
         }
-        fn request(&self, p: SystemPermission) -> crate::Result<()> {
+        fn request(&self, p: SystemPermission) -> snaplingo_core::Result<()> {
             self.calls.lock().unwrap().push(p);
             if self.fail.load(Ordering::SeqCst) {
                 Err("request failed".into())
@@ -131,10 +131,10 @@ mod tests {
                 Ok(())
             }
         }
-        fn reset(&self, _: SystemPermission) -> crate::Result<()> {
+        fn reset(&self, _: SystemPermission) -> snaplingo_core::Result<()> {
             panic!("First-use guide never resets")
         }
-        fn restart(&self) -> crate::Result<()> {
+        fn restart(&self) -> snaplingo_core::Result<()> {
             panic!("First-use guide never restarts")
         }
     }

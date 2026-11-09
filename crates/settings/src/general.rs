@@ -1,32 +1,11 @@
 //! Reuses the production General workflow behind the shared Rust drawing.
-use std::sync::Arc;
 
 use snaplingo_ui::{GeneralCommand, GeneralRuntime, Snapshot};
 
-use super::general_controller::{GeneralAction, GeneralController, GeneralServices, UpdatePhase};
-use crate::application::SystemPermission;
+use super::general_controller::{GeneralAction, GeneralController, UpdatePhase};
+use snaplingo_core::application::SystemPermission;
 
-pub(crate) fn from_state(
-    state: &crate::AppState,
-    version: String,
-    open_notices: Arc<dyn Fn() -> crate::Result<()> + Send + Sync>,
-) -> Arc<GeneralController> {
-    Arc::new(GeneralController::new(GeneralServices {
-        configuration: state.settings.configuration.clone(),
-        settings: state.settings.application.clone(),
-        history: state.history.history.clone(),
-        permissions: state.permissions.clone(),
-        updates: state.updates.clone(),
-        version,
-        open_url: Arc::new(crate::infrastructure::system::external_open::open_url),
-        open_notices,
-    }))
-}
-
-pub(crate) fn refresh(
-    controller: &GeneralController,
-    snapshot: &mut Snapshot,
-) -> Result<(), String> {
+pub fn refresh(controller: &GeneralController, snapshot: &mut Snapshot) -> Result<(), String> {
     let projection = controller.projection()?;
     let description = match projection.update_phase {
         UpdatePhase::Checking => "正在检查更新…".into(),
@@ -79,7 +58,7 @@ pub(crate) fn refresh(
     Ok(())
 }
 
-pub(crate) fn action(command: GeneralCommand) -> GeneralAction {
+pub fn action(command: GeneralCommand) -> GeneralAction {
     match command {
         GeneralCommand::RefreshPermissions => GeneralAction::RefreshPermissions,
         GeneralCommand::RequestScreenRecording => {
@@ -105,7 +84,7 @@ pub(crate) fn action(command: GeneralCommand) -> GeneralAction {
         GeneralCommand::DownloadUpdate => GeneralAction::DownloadUpdate,
     }
 }
-pub(crate) fn confirmation(command: GeneralCommand) -> Option<&'static str> {
+pub fn confirmation(command: GeneralCommand) -> Option<&'static str> {
     match command {
         GeneralCommand::ClearLogs => Some("确定要清空所有应用日志吗？"),
         GeneralCommand::ClearHistory => {

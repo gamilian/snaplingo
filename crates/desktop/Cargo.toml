@@ -6,7 +6,6 @@ rust-version = "1.88"
 license = "MIT"
 
 [dependencies]
-snaplingo-settings = { path = "../settings" }
 snaplingo-ui = { path = "../ui" }
 snaplingo-render = { path = "../render" }
 snaplingo-accessibility = { path = "../accessibility" }
@@ -18,6 +17,7 @@ accesskit = "0.25.2"
 accesskit_winit = { version = "0.34.2", default-features = false, features = ["rwh_06"] }
 
 [dev-dependencies]
+snaplingo-settings = { path = "../settings" }
 snaplingo-core = { path = "../core" }
 snaplingo-storage = { path = "../storage" }
 tempfile = "3.8"

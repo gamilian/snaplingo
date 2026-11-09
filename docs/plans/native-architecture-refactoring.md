@@ -94,15 +94,15 @@ Evidence: Windows uses `SettingsWindowSession`; macOS `SharedFeaturePage` separa
 owns dispatch, Hotkey mutation queues, refresh ordering and disposal. Reopening
 Settings without a route restores the Mac page but selects General on Windows.
 
-- [ ] Move portable session/projection logic into the existing Settings module.
-- [ ] Remove AppState and operating-system construction knowledge from that
+- [x] Move portable session/projection logic into the existing Settings module.
+- [x] Remove AppState and operating-system construction knowledge from that
   module; Composition injects existing workflows and concrete adapters.
-- [ ] Make both platform adapters use the same session for navigation, edit/save
+- [x] Make both platform adapters use the same session for navigation, edit/save
   ordering, refresh, stale-result rejection and disposal.
-- [ ] Keep native input, UI-thread delivery, dialogs and AX/UIA in adapters.
-- [ ] Preview reuses the common workflow; its temporary database/registrar setup
+- [x] Keep native input, UI-thread delivery, dialogs and AX/UIA in adapters.
+- [x] Preview reuses the common workflow; its temporary database/registrar setup
   belongs to its composition, not the production workflow interface.
-- [ ] Run common SQLite persistence and controlled-delay race tests on both
+- [x] Run common SQLite persistence and controlled-delay race tests on both
   platforms, without constructing the full OS AppState. Preserve existing
   Library, Services and General behavior coverage and Mac native input tests.
 
@@ -181,3 +181,15 @@ steps finish. Compilation is evidence of compilation, not desktop acceptance.
   Cargo metadata, all-target macOS/Windows checks, three architecture guards,
   shared Rust all-target tests, 941 browser/script tests and reference build pass.
   Cargo package names and native artifact identity are unchanged.
+
+- Step 1: both native hosts now use `settings::window::SettingsWindowSession`.
+  Portable General/Library/Services/capacity/permission behavior and race tests
+  live in Settings; construction lives in `app/src/composition/settings`.
+  Desktop no longer has a production dependency on Settings construction.
+  Preview SQLite/registrar setup and its ten behavior tests live beside its
+  example; projection and hotkey mutation remain shared. Recording IDs are
+  unique across recreated Mac pages; Windows restores its active page on reopen.
+  Portable tests (23), preview behavior (10), Desktop input (3), real application
+  composition and macOS seven-page/zoom/modal/quit smoke pass. Mac layout,
+  native text input, AX and dialogs are retained. Windows all-target and portable
+  session-test cross checks run separately from real Windows acceptance.

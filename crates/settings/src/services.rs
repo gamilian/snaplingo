@@ -1,13 +1,13 @@
 //! Projects the shared Services canvas onto the existing portable workflows.
 use std::sync::{Arc, Mutex};
 
-use crate::application::settings::{
-    self as core, CustomTranslationEdit, ServicesController, ServicesDependencies, ServicesKind,
-    TranslationServiceForm, TranslationServicesController, TranslationServicesRequest,
+use snaplingo_core::application::settings::{
+    self as core, CustomTranslationEdit, ServicesController, TranslationServiceForm,
+    TranslationServicesController, TranslationServicesRequest,
 };
 use snaplingo_ui::{services as ui, Page, Snapshot};
 
-pub(crate) enum ServicesHostEffect {
+pub enum ServicesHostEffect {
     Navigate(Page),
     ConfigureCapacity,
     ConfirmRemove(String),
@@ -21,41 +21,15 @@ struct State {
     ocr_revision: u64,
     disposed: bool,
 }
-pub(crate) struct ServicesSession {
+pub struct ServicesSession {
     ocr: Arc<ServicesController>,
     tts: Arc<ServicesController>,
     translation: Arc<TranslationServicesController>,
     state: Mutex<State>,
-    navigation: Option<Arc<crate::infrastructure::storage::SqliteConfigStore>>,
+    navigation: Option<Arc<snaplingo_storage::SqliteConfigStore>>,
 }
 impl ServicesSession {
-    pub(crate) fn from_state(state: &crate::AppState, route: ui::ServicesRoute) -> Self {
-        let navigation = state.settings.navigation.clone();
-        let route = match navigation.load_services_route() {
-            Ok(saved) => saved.as_deref().and_then(saved_route).unwrap_or(route),
-            Err(error) => {
-                log::warn!("Failed to load Services navigation: {error}");
-                route
-            }
-        };
-        let dependencies = || ServicesDependencies {
-            configuration: state.settings.configuration.clone(),
-            settings: state.settings.application.clone(),
-            providers: state.providers.administration.clone(),
-            tts: state.tts.clone(),
-        };
-        let mut session = Self::new(
-            Arc::new(ServicesController::new(ServicesKind::Ocr, dependencies())),
-            Arc::new(ServicesController::new(ServicesKind::Tts, dependencies())),
-            Arc::new(TranslationServicesController::new(
-                state.providers.administration.clone(),
-            )),
-            route,
-        );
-        session.navigation = Some(navigation);
-        session
-    }
-    fn new(
+    pub fn new(
         ocr: Arc<ServicesController>,
         tts: Arc<ServicesController>,
         translation: Arc<TranslationServicesController>,
@@ -74,7 +48,19 @@ impl ServicesSession {
             navigation: None,
         }
     }
-    pub(crate) fn snapshot(&self, shell: Snapshot) -> Result<ui::ServicesSnapshot, String> {
+    pub fn with_navigation(
+        mut self,
+        navigation: Arc<snaplingo_storage::SqliteConfigStore>,
+    ) -> Self {
+        if let Ok(Some(saved)) = navigation.load_services_route() {
+            if let Some(route) = saved_route(&saved) {
+                self.state.get_mut().unwrap().route = route;
+            }
+        }
+        self.navigation = Some(navigation);
+        self
+    }
+    pub fn snapshot(&self, shell: Snapshot) -> Result<ui::ServicesSnapshot, String> {
         let (route, revision, ocr_revision) = {
             let mut state = self.state.lock().unwrap();
             state.revision += 1;
@@ -148,7 +134,7 @@ impl ServicesSession {
                                 .fallback_reason
                                 .unwrap_or_else(|| match status.device {
                                     Some(
-                                        crate::application::providers::ocr::OcrExecutionDevice::Gpu,
+                                        snaplingo_core::application::providers::ocr::OcrExecutionDevice::Gpu,
                                     ) => "GPU 加速模式".into(),
                                     Some(_) => "CPU 模式".into(),
                                     None if status.gpu_enabled => "自动选择设备".into(),
@@ -184,7 +170,7 @@ impl ServicesSession {
         }
         Ok(snapshot)
     }
-    pub(crate) fn dispose(&self) {
+    pub fn dispose(&self) {
         self.state.lock().unwrap().disposed = true;
         self.ocr.dispose();
         self.tts.dispose();
@@ -192,7 +178,7 @@ impl ServicesSession {
     }
     /// Apply immediate UI events in delivery order. After Route, dispatch
     /// Refresh on a worker to load installed voices for the current route.
-    pub(crate) fn edit(&self, intent: &ui::ServicesIntent) -> Result<bool, String> {
+    pub fn edit(&self, intent: &ui::ServicesIntent) -> Result<bool, String> {
         if self.state.lock().unwrap().disposed {
             return Ok(true);
         }
@@ -240,7 +226,7 @@ impl ServicesSession {
             _ => Ok(false),
         }
     }
-    pub(crate) async fn dispatch(
+    pub async fn dispatch(
         &self,
         intent: ui::ServicesIntent,
         changed: impl Fn(),
@@ -340,11 +326,7 @@ impl ServicesSession {
         }
     }
     /// The host confirms removal before invoking this method.
-    pub(crate) async fn remove_confirmed(
-        &self,
-        id: String,
-        changed: impl Fn(),
-    ) -> Result<(), String> {
+    pub async fn remove_confirmed(&self, id: String, changed: impl Fn()) -> Result<(), String> {
         if self.state.lock().unwrap().disposed {
             return Ok(());
         }
@@ -450,7 +432,7 @@ fn translation_request(intent: ui::ServicesIntent) -> Result<TranslationServices
 }
 
 fn credential(
-    field: crate::application::providers::common::CredentialField,
+    field: snaplingo_core::application::providers::common::CredentialField,
 ) -> ui::ServiceCredentialField {
     ui::ServiceCredentialField {
         name: field.name,
@@ -466,8 +448,10 @@ fn protocol(value: &str) -> ui::ServiceProtocol {
         _ => ui::ServiceProtocol::OpenAi,
     }
 }
-fn core_protocol(value: ui::ServiceProtocol) -> crate::application::providers::LLMProtocol {
-    use crate::application::providers::LLMProtocol;
+fn core_protocol(
+    value: ui::ServiceProtocol,
+) -> snaplingo_core::application::providers::LLMProtocol {
+    use snaplingo_core::application::providers::LLMProtocol;
     match value {
         ui::ServiceProtocol::OpenAi => LLMProtocol::OpenAI,
         ui::ServiceProtocol::OpenAiResponses => LLMProtocol::OpenAIResponses,
@@ -519,7 +503,7 @@ fn project_form(form: TranslationServiceForm) -> ui::ServiceForm {
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 
 fn saved_route(value: &str) -> Option<ui::ServicesRoute> {
     match value {

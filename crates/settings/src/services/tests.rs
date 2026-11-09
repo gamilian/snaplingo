@@ -1,5 +1,6 @@
 use super::*;
-use crate::application::providers::{
+use async_trait::async_trait;
+use snaplingo_core::application::providers::{
     common::Provider,
     ocr::{OcrCoordinator, OcrProvider, OcrProviderConfiguration},
     translation::{DeepLProvider, TranslationCoordinator},
@@ -7,21 +8,21 @@ use crate::application::providers::{
     LlmIntrospection, LlmModelLister, LlmRuntime, ModelInfo, ProviderAdministration,
     ProviderConfiguration, ProviderCredentialStore, TranslationPromptConfiguration,
 };
-use crate::application::{
+use snaplingo_core::application::settings::{ServicesDependencies, ServicesKind};
+use snaplingo_core::application::{
     History, SettingsApplication, SettingsConfiguration, StartOnBoot, SystemTtsHost,
     SystemTtsVoice, TtsRuntime,
 };
-use crate::infrastructure::storage::{
+use snaplingo_storage::{
     Database, SqliteAppLogRepository, SqliteConfigStore, SqliteCredentialStore,
     SqliteHistoryRepository,
 };
-use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 struct Boot;
 impl StartOnBoot for Boot {
-    fn set_enabled(&self, _: bool) -> crate::Result<()> {
+    fn set_enabled(&self, _: bool) -> snaplingo_core::Result<()> {
         Ok(())
     }
 }
@@ -82,7 +83,7 @@ impl Provider for Ocr {
     fn reconfigure_credentials(
         &mut self,
         credentials: &HashMap<String, String>,
-    ) -> crate::Result<()> {
+    ) -> snaplingo_core::Result<()> {
         self.validate_credentials(credentials)?;
         self.configured = true;
         Ok(())
@@ -92,8 +93,8 @@ impl Provider for Ocr {
 impl OcrProvider for Ocr {
     async fn recognize(
         &self,
-        _: &crate::domain::ocr::OcrRequest,
-    ) -> crate::Result<crate::domain::ocr::OcrResult> {
+        _: &snaplingo_core::domain::ocr::OcrRequest,
+    ) -> snaplingo_core::Result<snaplingo_core::domain::ocr::OcrResult> {
         unreachable!()
     }
 }
@@ -103,14 +104,14 @@ struct Speech {
 }
 #[async_trait]
 impl SystemTtsHost for Speech {
-    async fn list_voices(&self) -> crate::Result<Vec<SystemTtsVoice>> {
+    async fn list_voices(&self) -> snaplingo_core::Result<Vec<SystemTtsVoice>> {
         Ok(vec![SystemTtsVoice {
             id: "opaque-voice".into(),
             name: "Fixture".into(),
             locale: "zh-CN".into(),
         }])
     }
-    async fn speak(&self, text: &str, voice: &str, rate: u16) -> crate::Result<()> {
+    async fn speak(&self, text: &str, voice: &str, rate: u16) -> snaplingo_core::Result<()> {
         self.calls
             .lock()
             .unwrap()
@@ -504,4 +505,8 @@ async fn destructive_and_platform_actions_are_returned_to_the_host_and_failures_
     assert!(error.is_err());
     assert!(changed.load(Ordering::SeqCst) > 0);
     assert!(snapshot(session).error.is_some());
+}
+
+pub(crate) fn session() -> ServicesSession {
+    fixture(ui::ServicesRoute::Ocr).session
 }

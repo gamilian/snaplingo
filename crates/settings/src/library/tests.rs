@@ -1,17 +1,9 @@
 use super::core::{LibraryIndexPage, LibraryIndexQuery, LibraryIndexRepository};
 use super::*;
-use crate::application::selected_text::{
-    SelectedTextAcquirer, SelectionContextProvider, SelectionScheme,
-};
-use crate::infrastructure::storage::{Database, SqliteLibraryIndexRepository};
 use async_trait::async_trait;
-
-struct Context;
-impl SelectionContextProvider for Context {
-    fn context(&self) -> crate::domain::SelectionContext {
-        Default::default()
-    }
-}
+use snaplingo_storage::{Database, SqliteLibraryIndexRepository};
+#[path = "test_fixture.rs"]
+mod test_fixture;
 struct Index {
     real: SqliteLibraryIndexRepository,
     entered: tokio::sync::Notify,
@@ -19,7 +11,10 @@ struct Index {
 }
 #[async_trait]
 impl LibraryIndexRepository for Index {
-    async fn query_history(&self, query: &LibraryIndexQuery) -> crate::Result<LibraryIndexPage> {
+    async fn query_history(
+        &self,
+        query: &LibraryIndexQuery,
+    ) -> snaplingo_core::Result<LibraryIndexPage> {
         let page = self.real.query_history(query).await?;
         if query.search == "old" {
             self.entered.notify_one();
@@ -27,18 +22,20 @@ impl LibraryIndexRepository for Index {
         }
         Ok(page)
     }
-    async fn query_favorites(&self, query: &LibraryIndexQuery) -> crate::Result<LibraryIndexPage> {
+    async fn query_favorites(
+        &self,
+        query: &LibraryIndexQuery,
+    ) -> snaplingo_core::Result<LibraryIndexPage> {
         self.real.query_favorites(query).await
     }
 }
-pub(in crate::infrastructure::settings_canvas) struct Fixture {
+pub(crate) struct Fixture {
     _directory: tempfile::TempDir,
     database: Arc<Database>,
     session: Arc<LibrarySession>,
     index: Arc<Index>,
-    pub(in crate::infrastructure::settings_canvas) app: Arc<crate::AppState>,
 }
-pub(in crate::infrastructure::settings_canvas) fn fixture() -> Fixture {
+pub(crate) fn fixture() -> Fixture {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("library.db");
     let database = Arc::new(Database::open(&path).unwrap());
@@ -50,41 +47,22 @@ pub(in crate::infrastructure::settings_canvas) fn fixture() -> Fixture {
         }
         Ok(())
     }).unwrap();
-    let state = crate::composition::build_app_state(
-        database.clone(),
-        path,
-        crate::composition::CompositionOptions {
-            identifier: "com.snaplingo.library-adapter-test".into(),
-            version: "0.1.23".into(),
-            ocr_resource_root: None,
-            cache_dir: Ok(directory.path().join("cache")),
-            selected_text: Arc::new(SelectedTextAcquirer::new(
-                SelectionScheme::new(vec![]),
-                vec![],
-                Arc::new(Context),
-            )),
-        },
-    );
     let index = Arc::new(Index {
         real: SqliteLibraryIndexRepository::new(database.clone()),
         entered: Default::default(),
         release: Default::default(),
     });
-    let mut session = LibrarySession::from_state(&state, ui::LibraryKind::History);
-    session.pages = core::LibraryPages::new(
-        state.history.history.clone(),
-        state.favorites.favorites.clone(),
-        state.screenshot_favorites.favorites.clone(),
-        Arc::new(core::LibraryIndex::new(index.clone())),
-        state.history.ocr_replay.clone(),
-        state.favorites.ocr_application.clone(),
+    let assets = Arc::new(test_fixture::Assets::default());
+    let session = LibrarySession::new(
+        test_fixture::pages(database.clone(), assets.clone(), index.clone()),
+        assets,
+        ui::LibraryKind::History,
     );
     Fixture {
         _directory: directory,
         database,
         session: Arc::new(session),
         index,
-        app: Arc::new(state),
     }
 }
 fn query(revision: u64, search: &str) -> ui::LibraryIntent {
@@ -123,18 +101,19 @@ async fn preparing_a_new_search_rejects_the_old_result_before_the_new_future_is_
 #[tokio::test]
 async fn metadata_blurs_preserve_input_order_when_worker_futures_are_polled_in_reverse() {
     let f = fixture();
-    let content =
-        FavoriteContent::Translation(crate::application::favorites::TranslationFavoriteSnapshot {
+    let content = FavoriteContent::Translation(
+        snaplingo_core::application::favorites::TranslationFavoriteSnapshot {
             source_text: "source".into(),
             source_lang: "en".into(),
             target_lang: "zh-CN".into(),
-            result: crate::domain::translation::TranslationResult::success(
+            result: snaplingo_core::domain::translation::TranslationResult::success(
                 "system",
                 "translated",
                 None,
                 None,
             ),
-        });
+        },
+    );
     f.database.with_connection(|connection| {
         connection.execute("INSERT INTO favorites(kind,created_at,fingerprint,content_json) VALUES ('translation','2026-11-08T01:00:00+00:00','fixture',?1)", [serde_json::to_string(&content)?])?;
         Ok(())
@@ -199,4 +178,15 @@ async fn disposing_the_page_cancels_queued_mutations_before_the_worker_starts() 
         .unwrap();
     assert_eq!(count, 2);
     assert!(f.session.state.lock().unwrap().pending.is_empty());
+}
+
+pub(crate) fn session(kind: ui::LibraryKind) -> LibrarySession {
+    let database = Arc::new(Database::in_memory().unwrap());
+    let assets = Arc::new(test_fixture::Assets::default());
+    let pages = test_fixture::pages(
+        database.clone(),
+        assets.clone(),
+        Arc::new(SqliteLibraryIndexRepository::new(database)),
+    );
+    LibrarySession::new(pages, assets, kind)
 }

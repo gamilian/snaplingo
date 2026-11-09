@@ -7,7 +7,7 @@ use snaplingo_core::application::favorites::FavoriteContent;
 use snaplingo_core::application::library_index as core;
 use snaplingo_ui::{library as ui, RasterImage, Snapshot};
 
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(test)]
 pub(super) mod tests;
 
 struct State {
@@ -19,23 +19,20 @@ struct State {
     disposed: bool,
 }
 
-pub(crate) struct LibrarySession {
+pub struct LibrarySession {
     pages: core::LibraryPages,
     clipboard: Arc<dyn core::LibraryClipboard>,
     state: Mutex<State>,
 }
 impl LibrarySession {
-    pub(crate) fn from_state(state: &crate::AppState, kind: ui::LibraryKind) -> Self {
+    pub fn new(
+        pages: core::LibraryPages,
+        clipboard: Arc<dyn core::LibraryClipboard>,
+        kind: ui::LibraryKind,
+    ) -> Self {
         Self {
-            pages: core::LibraryPages::new(
-                state.history.history.clone(),
-                state.favorites.favorites.clone(),
-                state.screenshot_favorites.favorites.clone(),
-                state.library_index.clone(),
-                state.history.ocr_replay.clone(),
-                state.favorites.ocr_application.clone(),
-            ),
-            clipboard: Arc::new(Clipboard),
+            pages,
+            clipboard,
             state: Mutex::new(State {
                 snapshot: ui::LibrarySnapshot {
                     kind,
@@ -49,19 +46,19 @@ impl LibrarySession {
             }),
         }
     }
-    pub(crate) fn snapshot(&self, shell: Snapshot) -> ui::LibrarySnapshot {
+    pub fn snapshot(&self, shell: Snapshot) -> ui::LibrarySnapshot {
         let mut snapshot = self.state.lock().unwrap().snapshot.clone();
         snapshot.shell = shell;
         snapshot
     }
-    pub(crate) fn dispose(&self) {
+    pub fn dispose(&self) {
         let mut state = self.state.lock().unwrap();
         state.disposed = true;
         state.request += 1;
     }
     /// Delete and clear intents reach this interface only after host confirmation.
     /// Clipboard reads are supplied by the view's OS adapter.
-    pub(crate) fn dispatch(
+    pub fn dispatch(
         self: &Arc<Self>,
         intent: ui::LibraryIntent,
         changed: impl Fn() + Send + Sync + 'static,
@@ -296,13 +293,6 @@ fn begin_query(state: &mut State) -> Option<Query> {
         state.snapshot.kind,
         state.snapshot.query.clone(),
     ))
-}
-struct Clipboard;
-#[async_trait::async_trait]
-impl core::LibraryClipboard for Clipboard {
-    async fn write_text(&self, text: &str) -> crate::Result<()> {
-        crate::infrastructure::system::clipboard_text::copy_text(text.into()).map_err(Into::into)
-    }
 }
 fn filter_value(filter: ui::LibraryFilter) -> core::LibraryFilter {
     match filter {

@@ -1,66 +1,72 @@
 //! Fixed preferences bound to the running application's service owners.
 //! Native hosts confirm destructive actions and supply their own modal windows.
 use super::general_controller::GeneralController;
-use crate::application::hotkeys::HotkeyRecording;
-use crate::domain::hotkey_config::{
+use snaplingo_core::application::hotkeys::HotkeyRecording;
+use snaplingo_core::domain::hotkey_config::{
     DEFAULT_HOTKEYS, OCR_CATEGORY, SCREENSHOT_CATEGORY, TRANSLATION_CATEGORY,
 };
 use snaplingo_ui::{Action, Page, Size, Snapshot};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
-pub(crate) struct PreferencesSession {
-    state: Arc<crate::AppState>,
-    pub(crate) general: Arc<GeneralController>,
+#[derive(Clone)]
+pub struct PreferencesDependencies {
+    pub configuration: Arc<snaplingo_core::SettingsConfiguration>,
+    pub settings: Arc<snaplingo_core::SettingsApplication>,
+    pub hotkeys: Arc<snaplingo_core::HotkeyRuntime>,
+    pub general: Arc<GeneralController>,
+    pub usage: Arc<super::capacity_usage::CapacityUsage>,
+}
+
+pub struct PreferencesSession {
+    dependencies: PreferencesDependencies,
+    executor: tokio::runtime::Handle,
+    changed: Arc<dyn Fn() + Send + Sync>,
+    pub general: Arc<GeneralController>,
     recording: HotkeyRecording,
     sequence: u64,
     hotkey_queue: Arc<Mutex<HotkeyQueue>>,
     usage: Arc<super::capacity_usage::CapacityUsage>,
-    _usage_subscription: crate::infrastructure::desktop_events::DesktopSubscription,
 }
 impl PreferencesSession {
-    pub(crate) fn new(
-        state: Arc<crate::AppState>,
+    pub fn new(
+        dependencies: PreferencesDependencies,
         recording: HotkeyRecording,
-        open_notices: Arc<dyn Fn() -> crate::Result<()> + Send + Sync>,
+        executor: tokio::runtime::Handle,
+        changed: Arc<dyn Fn() + Send + Sync>,
     ) -> Self {
-        let general =
-            super::general::from_state(&state, env!("CARGO_PKG_VERSION").into(), open_notices);
-        let notify = state.desktop_events.clone();
-        let (usage, usage_subscription) = super::capacity_usage::CapacityUsage::subscribe(
-            state.library_index.clone(),
-            &state.desktop_events,
-            move || {
-                notify.publish(crate::infrastructure::desktop_events::DesktopEvent::SettingsChanged)
-            },
-        );
         Self {
-            state,
-            general,
+            general: dependencies.general.clone(),
+            usage: dependencies.usage.clone(),
+            dependencies,
+            executor,
+            changed,
             recording,
             sequence: 0,
             hotkey_queue: Default::default(),
-            usage,
-            _usage_subscription: usage_subscription,
         }
     }
-    pub(crate) fn snapshot(&self) -> Result<Snapshot, String> {
+    pub fn saving_hotkeys(&self) -> bool {
+        self.hotkey_queue.lock().unwrap().running
+    }
+    pub fn recording_id(&self) -> Option<String> {
+        self.recording.session().map(|session| session.id)
+    }
+    pub fn snapshot(&self) -> Result<Snapshot, String> {
         let saved = self
-            .state
-            .settings
+            .dependencies
             .configuration
             .snapshot()
             .map_err(|e| e.to_string())?;
         let hotkeys = self
-            .state
-            .settings
+            .dependencies
             .hotkeys
             .snapshot()
             .map_err(|e| e.to_string())?;
-        let mut snapshot = snaplingo_settings::project_snapshot(
+        let mut snapshot = crate::project_snapshot(
             &saved,
             &hotkeys,
-            &self.state.settings.hotkeys.default_snapshot(),
+            &self.dependencies.hotkeys.default_snapshot(),
         );
         super::general::refresh(&self.general, &mut snapshot)?;
         self.usage.apply(&mut snapshot);
@@ -70,48 +76,38 @@ impl PreferencesSession {
         Ok(snapshot)
     }
     /// Window-only actions and General's async commands are handled by the host.
-    pub(crate) fn dispatch(&mut self, page: Page, action: Action) -> Result<(), String> {
-        let settings = &self.state.settings;
+    pub fn dispatch(&mut self, page: Page, action: Action) -> Result<(), String> {
+        let settings = &self.dependencies;
         match action {
             Action::EditGeneral { field, value } => {
                 if !field.accepts(&value) {
                     return Err("设置值不符合此通用控件".into());
                 }
-                self.general.edit(
-                    snaplingo_settings::general_field(field),
-                    snaplingo_settings::general_value(value),
-                )?;
+                self.general
+                    .edit(crate::general_field(field), crate::general_value(value))?;
             }
             Action::EditOcr { field, value } => {
                 settings
-                    .configuration
-                    .edit_ocr(
-                        snaplingo_settings::ocr_field(field),
-                        snaplingo_settings::general_value(value),
-                    )
+                    .settings
+                    .edit_ocr(crate::ocr_field(field), crate::general_value(value))
                     .map_err(|e| e.to_string())?;
             }
             Action::EditTranslation { field, value } => {
                 settings
-                    .configuration
-                    .edit_translation(
-                        snaplingo_settings::translation_field(field),
-                        snaplingo_settings::general_value(value),
-                    )
+                    .settings
+                    .edit_translation(crate::translation_field(field), crate::general_value(value))
                     .map_err(|e| e.to_string())?;
             }
             Action::EditScreenshot { field, value } => {
                 settings
                     .configuration
-                    .edit_screenshot(
-                        snaplingo_settings::screenshot_field(field),
-                        snaplingo_settings::general_value(value),
-                    )
+                    .edit_screenshot(crate::screenshot_field(field), crate::general_value(value))
                     .map_err(|e| e.to_string())?;
                 self.recording.cancel_for_window("settings");
             }
             Action::BeginHotkeyRecording { .. } | Action::BeginLocalShortcutRecording { .. } => {
-                self.sequence += 1;
+                static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+                self.sequence = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 self.recording
                     .begin("settings", format!("shared-preferences:{}", self.sequence));
             }
@@ -126,9 +122,9 @@ impl PreferencesSession {
                 if !queue.running {
                     queue.running = true;
                     let queue = self.hotkey_queue.clone();
-                    let runtime = self.state.settings.hotkeys.clone();
-                    let state = self.state.clone();
-                    crate::infrastructure::runtime::spawn_blocking(move || loop {
+                    let runtime = self.dependencies.hotkeys.clone();
+                    let changed = self.changed.clone();
+                    self.executor.spawn_blocking(move || loop {
                         let next = {
                             let mut queue = queue.lock().unwrap();
                             if queue.disposed {
@@ -145,13 +141,11 @@ impl PreferencesSession {
                         // Registration calls can marshal synchronously to the OS
                         // UI thread, so this worker never owns a Settings lock.
                         queue.lock().unwrap().error = result.err();
-                        state.desktop_events.publish(
-                            crate::infrastructure::desktop_events::DesktopEvent::HotkeysChanged,
-                        );
+                        changed();
                     });
                 }
             }
-            Action::CheckHotkeyConflicts => snaplingo_settings::validate_hotkey_conflicts(
+            Action::CheckHotkeyConflicts => crate::validate_hotkey_conflicts(
                 &settings.hotkeys.snapshot().map_err(|e| e.to_string())?,
             )?,
             Action::Navigate(_) => self.recording.cancel_for_window("settings"),
@@ -159,17 +153,16 @@ impl PreferencesSession {
         }
         Ok(())
     }
-    pub(crate) fn interface_scale(&self, display: Size) -> f32 {
+    pub fn interface_scale(&self, display: Size) -> f32 {
         let mode = self
-            .state
-            .settings
+            .dependencies
             .configuration
             .snapshot()
             .map(|s| s.screenshot.capture_ui_scale)
             .unwrap_or_else(|_| "auto".into());
-        crate::application::capture::interface_scale(
+        snaplingo_core::application::capture::interface_scale(
             &mode,
-            Some(&crate::domain::capture::LogicalRect {
+            Some(&snaplingo_core::domain::capture::LogicalRect {
                 x: 0.,
                 y: 0.,
                 width: display.width.into(),
@@ -186,7 +179,7 @@ impl Drop for PreferencesSession {
         self.usage.dispose();
     }
 }
-fn hotkey_target(page: Page, index: usize) -> Result<(&'static str, &'static str), String> {
+pub fn hotkey_target(page: Page, index: usize) -> Result<(&'static str, &'static str), String> {
     let category = match page {
         Page::Screenshot => SCREENSHOT_CATEGORY,
         Page::Ocr => OCR_CATEGORY,
@@ -208,12 +201,34 @@ struct HotkeyQueue {
     disposed: bool,
     error: Option<String>,
 }
-fn hotkey_mutation(
-    runtime: &crate::application::hotkeys::HotkeyRuntime,
+pub fn hotkey_mutation(
+    runtime: &snaplingo_core::application::hotkeys::HotkeyRuntime,
     page: Page,
     action: Action,
 ) -> Result<(), String> {
     let category = hotkey_target(page, 0)?.0;
+    let mut next = runtime.snapshot().map_err(|e| e.to_string())?;
+    use snaplingo_core::domain::hotkey_config::{hotkey_category, hotkey_category_mut};
+    let keys = hotkey_category_mut(&mut next, category).map_err(|e| e.to_string())?;
+    match &action {
+        Action::SaveHotkey { index, shortcut } => {
+            keys.insert(hotkey_target(page, *index)?.1.into(), shortcut.clone());
+        }
+        Action::ResetHotkey { index } => {
+            let target = hotkey_target(page, *index)?.1;
+            keys.insert(
+                target.into(),
+                hotkey_category(&runtime.default_snapshot(), category).unwrap()[target].clone(),
+            );
+        }
+        Action::ResetHotkeys => {
+            *keys = hotkey_category(&runtime.default_snapshot(), category)
+                .unwrap()
+                .clone();
+        }
+        _ => unreachable!(),
+    }
+    crate::validate_hotkey_conflicts(&next)?;
     match action {
         Action::SaveHotkey { index, shortcut } => runtime
             .update_hotkey(

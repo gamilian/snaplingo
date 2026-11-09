@@ -4,7 +4,7 @@
 mod feature_macos;
 #[cfg(test)]
 mod feature_page_macos;
-use crate::infrastructure::settings_canvas::general_controller;
+use snaplingo_settings::general_controller;
 #[cfg(test)]
 mod general_macos;
 #[cfg(test)]
@@ -15,7 +15,6 @@ mod hotkeys_macos;
 pub(crate) mod native_settings_host;
 mod notices_macos;
 mod shared_dialogs_macos;
-use crate::infrastructure::settings_canvas::general as shared_general_macos;
 mod shared_page_macos;
 mod shared_text_macos;
 mod shared_view_macos;

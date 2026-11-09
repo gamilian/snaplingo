@@ -45,11 +45,11 @@ The portable Domain/Application sources live in `crates/core`; persistence lives
 | `snaplingo-ui` | Shared Settings projection, logical layout, themes, hit testing, focus and interaction intents | None |
 | `snaplingo-render` | CPU shapes, text shaping/fallback and rasterization into premultiplied RGBA | UI, Assets |
 | `snaplingo-accessibility` | Shared scene bounds, roles, values and actions projected into AccessKit | UI |
-| `snaplingo-settings` | Persistent settings adapter and projections shared by standalone and embedded hosts | Core, Storage, UI |
-| `snaplingo-desktop` | Native window/event host, device scale, AX/UIA adapters, dialogs, redraw scheduling and opaque pixel presentation | UI, Render, Accessibility, Settings |
+| `snaplingo-settings` | Portable Settings sessions, ordered mutations and UI projections | Core, Storage, UI |
+| `snaplingo-desktop` | Native window/event host, device scale, AX/UIA adapters, dialogs, redraw scheduling and opaque pixel presentation | UI, Render, Accessibility |
 | `snaplingo-app` | Native application entry, platform integrations, shared Settings adapters, composition and lifecycle | Core, Storage, Assets, UI, Render, Accessibility, Settings, Desktop |
 
-The `settings_preview` example connects shared preferences to real Core settings/hotkey workflows and a temporary Storage database. Its recording-only registrar does not install global shortcuts. Production startup uses the complete native application host.
+The `settings_preview` example owns its temporary Storage database and registrar composition; it reuses the common preference projection and hotkey mutation workflow. Its recording-only registrar does not install global shortcuts. Production startup uses the complete native application host.
 
 ### Native application hosts
 
@@ -64,9 +64,10 @@ releasing platform owners; closing Settings hides it while the resident app runs
 `native_settings_window.rs` owns the macOS Settings `NSWindow` and shared canvas;
 `native_settings_windows.rs` connects the Windows window host to the portable
 `SettingsWindowSession`. All seven page kinds use shared Rust layout and actions.
-`infrastructure/settings_canvas` adapts preferences, providers, library queries,
-capacity counts, permissions and updates to the real application services.
-`SharedFeaturePage` supplies macOS text composition and native accessibility;
+`composition/settings` injects real workflows and native effects into the
+portable `snaplingo-settings` session. Both platform hosts use that session for
+preferences, providers, library queries, capacity totals, permissions and updates.
+`SharedFeaturePage` retains macOS text composition, native dialogs and accessibility;
 `snaplingo-desktop` supplies normalized Windows input, IME and UIA dispatch.
 Capacity and permission sheets have explicit native lifecycle owners. Device DPI
 remains separate from saved interface zoom and durable window geometry.
@@ -181,7 +182,7 @@ Portable data and policy are kept in Domain or Application. Infrastructure conta
 
 `src/architecture/frontendDependencyRules.test.ts` rejects production imports of Platform/Tauri from Views and frontend Application modules. `crates/app/tests/architecture_dependency_test.rs` rejects backend Application imports of Infrastructure and crate-root startup adapters. They also reject outward Domain dependencies. These tests are intentionally strict and contain no migration inventory or allowlist.
 
-`crates/ui/tests/workspace_architecture.rs` checks real Cargo metadata, including all target/build dependencies and renamed package dependencies. Core may depend on Assets but cannot depend on another workspace crate or a concrete native UI/OS adapter. Storage depends inward on Core; UI permits only its Unicode editing utility; Render, Accessibility and Settings have explicit inward dependency lists; Desktop permits their APIs and its native window/input/dialog adapters. The App crate owns concrete OS dependencies and has no Tauri production dependency. A Rust syntax traversal follows Core's production module graph and skips test-only adapter fixtures, rejecting concrete platform imports and production Rust modules outside Core. Dev dependencies used by isolated acceptance harnesses do not become production dependency edges.
+`crates/ui/tests/workspace_architecture.rs` checks real Cargo metadata, including all target/build dependencies and renamed package dependencies. Core may depend on Assets but cannot depend on another workspace crate or a concrete native UI/OS adapter. Storage depends inward on Core; UI permits only its Unicode editing utility; Render, Accessibility and Settings have explicit inward dependency lists; Desktop depends on UI, Render and Accessibility plus native window/input/dialog adapters; Settings workflow construction is injected by the application. The App crate owns concrete OS dependencies and has no Tauri production dependency. A Rust syntax traversal follows Core's production module graph and skips test-only adapter fixtures, rejecting concrete platform imports and production Rust modules outside Core. Dev dependencies used by isolated acceptance harnesses do not become production dependency edges.
 
 The shared-native CI workflow checks Core, Storage, UI, Render and Desktop on macOS and Windows and uploads rendered references. The application CI and release workflows package the same native entry and run installation smoke tests; these checks do not certify manual IME, accessibility or desktop screenshot acceptance.
 

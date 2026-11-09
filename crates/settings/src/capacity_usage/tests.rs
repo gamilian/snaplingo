@@ -1,7 +1,7 @@
 use super::*;
-use crate::application::library_index::{LibraryIndexPage, LibraryIndexRepository};
-use crate::infrastructure::storage::{Database, SqliteLibraryIndexRepository};
 use async_trait::async_trait;
+use snaplingo_core::application::library_index::{LibraryIndexPage, LibraryIndexRepository};
+use snaplingo_storage::{Database, SqliteLibraryIndexRepository};
 use std::sync::atomic::AtomicUsize;
 use tokio::sync::Notify;
 
@@ -20,16 +20,18 @@ async fn wait(notify: &Notify) {
 }
 
 #[tokio::test]
-async fn navigation_totals_follow_real_database_insert_and_delete_events() {
+async fn navigation_totals_follow_real_database_insert_and_delete() {
     let database = Arc::new(Database::in_memory().unwrap());
-    let events = Arc::new(DesktopEvents::default());
     let notify = Arc::new(Notify::new());
     let changed = notify.clone();
     let index = Arc::new(LibraryIndex::new(Arc::new(
         SqliteLibraryIndexRepository::new(database.clone()),
     )));
-    let (usage, _subscription) =
-        CapacityUsage::subscribe(index, &events, move || changed.notify_one());
+    let usage = CapacityUsage::new(
+        index,
+        tokio::runtime::Handle::current(),
+        Arc::new(move || changed.notify_one()),
+    );
     wait(&notify).await;
     assert_eq!(counts(&usage), (Some(0), Some(0)));
     database.with_connection(|connection|{
@@ -39,7 +41,7 @@ async fn navigation_totals_follow_real_database_insert_and_delete_events() {
         connection.execute("INSERT INTO screenshot_favorites(created_at,asset_path,thumbnail_path,width,height) VALUES ('2026-11-09T01:00:00Z','image.png','thumb.png',1,1)",[])?;
         Ok(())
     }).unwrap();
-    events.publish(DesktopEvent::ScreenshotFavoritesChanged);
+    usage.refresh();
     wait(&notify).await;
     assert_eq!(counts(&usage), (Some(1), Some(2)));
     database
@@ -49,7 +51,7 @@ async fn navigation_totals_follow_real_database_insert_and_delete_events() {
             Ok(())
         })
         .unwrap();
-    events.publish(DesktopEvent::HistoryChanged);
+    usage.refresh();
     wait(&notify).await;
     assert_eq!(counts(&usage), (Some(0), Some(1)));
     database
@@ -58,7 +60,7 @@ async fn navigation_totals_follow_real_database_insert_and_delete_events() {
             Ok(())
         })
         .unwrap();
-    events.publish(DesktopEvent::FavoritesChanged);
+    usage.refresh();
     wait(&notify).await;
     assert_eq!(counts(&usage), (Some(0), Some(0)));
 }
@@ -70,7 +72,10 @@ struct Delayed {
 }
 #[async_trait]
 impl LibraryIndexRepository for Delayed {
-    async fn query_history(&self, query: &LibraryIndexQuery) -> crate::Result<LibraryIndexPage> {
+    async fn query_history(
+        &self,
+        query: &LibraryIndexQuery,
+    ) -> snaplingo_core::Result<LibraryIndexPage> {
         assert_eq!(query.limit, 1);
         let call = self.calls.fetch_add(1, Ordering::SeqCst);
         if call % 2 == 0 {
@@ -82,7 +87,10 @@ impl LibraryIndexRepository for Delayed {
             total: if call % 2 == 0 { 99 } else { 3 },
         })
     }
-    async fn query_favorites(&self, query: &LibraryIndexQuery) -> crate::Result<LibraryIndexPage> {
+    async fn query_favorites(
+        &self,
+        query: &LibraryIndexQuery,
+    ) -> snaplingo_core::Result<LibraryIndexPage> {
         assert_eq!(query.limit, 1);
         Ok(LibraryIndexPage {
             items: vec![],
@@ -101,6 +109,7 @@ async fn newer_events_and_disposal_reject_a_delayed_capacity_query() {
     let changed = notify.clone();
     let usage = Arc::new(CapacityUsage {
         index: Arc::new(LibraryIndex::new(index.clone())),
+        executor: tokio::runtime::Handle::current(),
         revision: AtomicU64::new(0),
         disposed: AtomicBool::new(false),
         totals: Mutex::new(Totals::default()),

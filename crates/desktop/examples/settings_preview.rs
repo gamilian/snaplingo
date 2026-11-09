@@ -1,7 +1,9 @@
 //! Isolated native preferences acceptance harness with real SQLite persistence.
 //! Hotkeys use a recording-only registrar; no global shortcuts are installed.
 use snaplingo_core::domain::SettingsSnapshot;
-use snaplingo_desktop::settings_backend::{PersistentSettings, RecordingOnlyRegistrar};
+#[path = "support/preferences.rs"]
+mod preferences;
+use preferences::{PersistentSettings, RecordingOnlyRegistrar};
 use snaplingo_storage::{Database, SqliteConfigStore};
 use std::sync::Arc;
 
@@ -23,7 +25,7 @@ fn main() -> Result<(), String> {
     store
         .save_settings(&settings)
         .map_err(|error| error.to_string())?;
-    snaplingo_desktop::run(PersistentSettings::open(
+    snaplingo_desktop::run_window_backend(PersistentSettings::open(
         &path,
         Arc::new(RecordingOnlyRegistrar),
     )?)

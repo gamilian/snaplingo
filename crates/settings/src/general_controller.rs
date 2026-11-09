@@ -1,22 +1,22 @@
 use std::sync::{Arc, Mutex};
 
-use crate::application::settings::{AppLogEntry, GeneralField, GeneralValue};
-use crate::application::updates::{AppUpdateStatus, AppUpdates};
-use crate::application::{
+use snaplingo_core::application::settings::{AppLogEntry, GeneralField, GeneralValue};
+use snaplingo_core::application::updates::{AppUpdateStatus, AppUpdates};
+use snaplingo_core::application::{
     History, RequiredPermissions, RequiredPermissionsContext, RequiredPermissionsStatus,
     SettingsApplication, SettingsConfiguration, SystemPermission,
 };
-use crate::domain::GeneralSettings;
+use snaplingo_core::domain::GeneralSettings;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum UpdatePhase {
+pub enum UpdatePhase {
     Idle,
     Checking,
     Downloading,
 }
 
 #[derive(Clone)]
-pub(crate) struct GeneralProjection {
+pub struct GeneralProjection {
     pub general: GeneralSettings,
     pub logs: Vec<AppLogEntry>,
     pub permissions: Option<RequiredPermissionsStatus>,
@@ -30,7 +30,7 @@ pub(crate) struct GeneralProjection {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum GeneralAction {
+pub enum GeneralAction {
     Edit(GeneralField, GeneralValue),
     RefreshLogs,
     ClearLogs,
@@ -46,15 +46,15 @@ pub(crate) enum GeneralAction {
     Restart,
 }
 
-pub(crate) struct GeneralServices {
+pub struct GeneralServices {
     pub configuration: Arc<SettingsConfiguration>,
     pub settings: Arc<SettingsApplication>,
     pub history: Arc<History>,
     pub permissions: Arc<RequiredPermissions>,
     pub updates: Arc<AppUpdates>,
     pub version: String,
-    pub open_url: Arc<dyn Fn(&str) -> crate::Result<()> + Send + Sync>,
-    pub open_notices: Arc<dyn Fn() -> crate::Result<()> + Send + Sync>,
+    pub open_url: Arc<dyn Fn(&str) -> snaplingo_core::Result<()> + Send + Sync>,
+    pub open_notices: Arc<dyn Fn() -> snaplingo_core::Result<()> + Send + Sync>,
 }
 
 struct State {
@@ -78,13 +78,13 @@ impl Drop for PermissionOperation<'_> {
 
 /// Owns General-page actions and update state. The host supplies confirmation
 /// dialogs, launches async actions, and delivers projections on its UI thread.
-pub(crate) struct GeneralController {
+pub struct GeneralController {
     services: GeneralServices,
     state: Mutex<State>,
 }
 
 impl GeneralController {
-    pub(crate) fn new(services: GeneralServices) -> Self {
+    pub fn new(services: GeneralServices) -> Self {
         let logs = services.settings.list_logs(8).unwrap_or_default();
         Self {
             services,
@@ -101,7 +101,7 @@ impl GeneralController {
         }
     }
 
-    pub(crate) fn projection(&self) -> Result<GeneralProjection, String> {
+    pub fn projection(&self) -> Result<GeneralProjection, String> {
         let general = self
             .services
             .configuration
@@ -125,7 +125,7 @@ impl GeneralController {
         })
     }
 
-    pub(crate) fn edit(
+    pub fn edit(
         &self,
         field: GeneralField,
         value: GeneralValue,
@@ -140,7 +140,7 @@ impl GeneralController {
 
     /// Call when the owning native view is disposed. A late network result must
     /// not replace the state of a subsequently mounted page.
-    pub(crate) fn invalidate_pending_updates(&self) {
+    pub fn invalidate_pending_updates(&self) {
         let mut state = self.state.lock().unwrap();
         state.update_generation += 1;
         if state.phase == UpdatePhase::Checking {
@@ -149,7 +149,7 @@ impl GeneralController {
         state.phase = UpdatePhase::Idle;
     }
 
-    pub(crate) async fn ensure_checked(
+    pub async fn ensure_checked(
         &self,
         changed: impl Fn(GeneralProjection),
     ) -> Result<GeneralProjection, String> {
@@ -164,7 +164,7 @@ impl GeneralController {
         self.perform(GeneralAction::CheckUpdates, changed).await
     }
 
-    pub(crate) async fn perform(
+    pub async fn perform(
         &self,
         action: GeneralAction,
         changed: impl Fn(GeneralProjection),
@@ -219,7 +219,7 @@ impl GeneralController {
         result
     }
 
-    fn finish(&self, result: crate::Result<()>) -> Result<GeneralProjection, String> {
+    fn finish(&self, result: snaplingo_core::Result<()>) -> Result<GeneralProjection, String> {
         self.state.lock().unwrap().error = result.as_ref().err().map(ToString::to_string);
         result.map_err(|error| error.to_string())?;
         self.projection()
@@ -327,25 +327,41 @@ impl GeneralController {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
     use async_trait::async_trait;
 
-    use crate::application::settings::StartOnBoot;
-    use crate::application::updates::{
+    use snaplingo_core::application::settings::StartOnBoot;
+    use snaplingo_core::application::updates::{
         AppUpdateHost, PublishedRelease, ReleaseAsset, UpdateInstaller,
     };
-    use crate::application::RequiredPermissionsHost;
-    use crate::infrastructure::storage::{
+    use snaplingo_core::application::RequiredPermissionsHost;
+    use snaplingo_storage::{
         Database, SqliteAppLogRepository, SqliteConfigStore, SqliteHistoryRepository,
     };
 
+    struct Registrar;
+    impl snaplingo_core::application::hotkeys::HotkeyRegistrar for Registrar {
+        fn register(
+            &self,
+            _: snaplingo_core::application::hotkeys::HotkeyRegistration,
+        ) -> snaplingo_core::Result<()> {
+            Ok(())
+        }
+        fn unregister(&self, _: &str) -> snaplingo_core::Result<()> {
+            Ok(())
+        }
+    }
+    struct Notifier;
+    impl snaplingo_core::application::hotkeys::HotkeyChangeNotifier for Notifier {
+        fn hotkeys_changed(&self) {}
+    }
     #[derive(Default)]
     struct Boot(AtomicBool);
     impl StartOnBoot for Boot {
-        fn set_enabled(&self, _: bool) -> crate::Result<()> {
+        fn set_enabled(&self, _: bool) -> snaplingo_core::Result<()> {
             if self.0.load(Ordering::SeqCst) {
                 Err("startup registration failed".into())
             } else {
@@ -373,7 +389,7 @@ mod tests {
                 can_reset: true,
             }
         }
-        fn request(&self, permission: SystemPermission) -> crate::Result<()> {
+        fn request(&self, permission: SystemPermission) -> snaplingo_core::Result<()> {
             self.calls
                 .lock()
                 .unwrap()
@@ -396,14 +412,14 @@ mod tests {
             }
             Ok(())
         }
-        fn reset(&self, permission: SystemPermission) -> crate::Result<()> {
+        fn reset(&self, permission: SystemPermission) -> snaplingo_core::Result<()> {
             self.calls
                 .lock()
                 .unwrap()
                 .push(format!("reset:{permission:?}"));
             Ok(())
         }
-        fn restart(&self) -> crate::Result<()> {
+        fn restart(&self) -> snaplingo_core::Result<()> {
             self.calls.lock().unwrap().push("restart".into());
             Ok(())
         }
@@ -419,7 +435,7 @@ mod tests {
     }
     #[async_trait]
     impl AppUpdateHost for Updates {
-        async fn latest_release(&self) -> crate::Result<Option<PublishedRelease>> {
+        async fn latest_release(&self) -> snaplingo_core::Result<Option<PublishedRelease>> {
             self.checks.fetch_add(1, Ordering::SeqCst);
             let blocked = self.blocked.lock().unwrap().take();
             self.entered.notify_one();
@@ -447,17 +463,20 @@ mod tests {
                 }],
             }))
         }
-        async fn download_and_open(&self, installer: &UpdateInstaller) -> crate::Result<String> {
+        async fn download_and_open(
+            &self,
+            installer: &UpdateInstaller,
+        ) -> snaplingo_core::Result<String> {
             self.calls.lock().unwrap().push(installer.name.clone());
             Ok("/tmp/SnapLingo fixture.dmg".into())
         }
-        fn open_release_page(&self) -> crate::Result<()> {
+        fn open_release_page(&self) -> snaplingo_core::Result<()> {
             self.calls.lock().unwrap().push("releases".into());
             Ok(())
         }
     }
 
-    struct Fixture {
+    pub(crate) struct Fixture {
         controller: Arc<GeneralController>,
         database: Arc<Database>,
         boot: Arc<Boot>,
@@ -465,7 +484,31 @@ mod tests {
         updates: Arc<Updates>,
         opened: Arc<Mutex<Vec<String>>>,
     }
-    fn fixture() -> Fixture {
+    impl Fixture {
+        pub(crate) fn preferences(&self) -> crate::preferences::PreferencesDependencies {
+            let configuration = self.controller.services.configuration.clone();
+            crate::preferences::PreferencesDependencies {
+                configuration: configuration.clone(),
+                settings: self.controller.services.settings.clone(),
+                hotkeys: Arc::new(snaplingo_core::HotkeyRuntime::with_change_notifier(
+                    Arc::new(snaplingo_core::HotkeyConfiguration::new(Arc::new(
+                        SqliteConfigStore::new(self.database.clone()),
+                    ))),
+                    Arc::new(Registrar),
+                    Arc::new(Notifier),
+                )),
+                general: self.controller.clone(),
+                usage: crate::capacity_usage::CapacityUsage::new(
+                    Arc::new(snaplingo_core::LibraryIndex::new(Arc::new(
+                        snaplingo_storage::SqliteLibraryIndexRepository::new(self.database.clone()),
+                    ))),
+                    tokio::runtime::Handle::current(),
+                    Arc::new(|| {}),
+                ),
+            }
+        }
+    }
+    pub(crate) fn fixture() -> Fixture {
         let database = Arc::new(Database::in_memory().unwrap());
         let configuration = Arc::new(SettingsConfiguration::new(Arc::new(
             SqliteConfigStore::new(database.clone()),
@@ -711,10 +754,12 @@ mod tests {
         let observed = phases.clone();
         let controller = f.controller.clone();
         let pending = std::thread::spawn(move || {
-            crate::infrastructure::runtime::block_on(controller.perform(
-                GeneralAction::RequestPermission(SystemPermission::Accessibility),
-                move |projection| observed.lock().unwrap().push(projection.permission_busy),
-            ))
+            tokio::runtime::Runtime::new()
+                .unwrap()
+                .block_on(controller.perform(
+                    GeneralAction::RequestPermission(SystemPermission::Accessibility),
+                    move |projection| observed.lock().unwrap().push(projection.permission_busy),
+                ))
         });
         f.permissions.entered.notified().await;
         assert!(f.controller.projection().unwrap().permission_busy);

@@ -86,7 +86,7 @@ Application runtimes that own their workflows and request runtime-host effects. 
 
 ### Settings
 
-`application/settings` owns durable setting defaults, normalization and section updates. Shared Settings adapters own hydration, mutation ordering, Provider reload, Hotkey snapshots and invalidation through narrow ports. Shared UI projects snapshots into controls. Navigation remains presentation state; Services route restoration uses a dedicated UI namespace rather than adding fields to General settings. The retained frontend configuration/stores exercise the original browser contracts only.
+`application/settings` owns durable setting defaults, normalization and section updates. The portable Settings session owns hydration, mutation ordering, Provider reload, Hotkey snapshots and invalidation through narrow ports. Both native hosts use it; Composition injects concrete workflows and native effects. Shared UI projects snapshots into controls. Navigation remains presentation state; Services route restoration uses a dedicated UI namespace rather than adding fields to General settings. The retained frontend configuration/stores exercise the original browser contracts only.
 
 ### System Speech
 

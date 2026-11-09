@@ -1,6 +1,6 @@
 //! Resident Windows Settings owner; drawing and input remain in the shared host.
 use crate::application::hotkeys::HotkeyRecording;
-use crate::infrastructure::settings_canvas::window::SettingsWindowSession;
+use crate::composition::settings::window::SettingsWindowSession;
 use snaplingo_desktop::{HostEvent, WindowBackend, WindowHost};
 use snaplingo_ui::{Page, Size, WindowIntent, WindowSnapshot};
 use std::{cell::RefCell, rc::Rc, sync::Arc};
@@ -33,6 +33,7 @@ pub(crate) struct NativeSettingsWindow {
     backend: Backend,
     state: Arc<crate::AppState>,
     appearance: Option<String>,
+    _subscription: crate::infrastructure::desktop_events::DesktopSubscription,
 }
 impl NativeSettingsWindow {
     pub(crate) fn new(
@@ -59,12 +60,13 @@ impl NativeSettingsWindow {
         if let (Some(x), Some(y)) = (general.settings_window_x, general.settings_window_y) {
             attributes = attributes.with_position(LogicalPosition::new(x, y));
         }
-        let backend = Backend(Rc::new(RefCell::new(SettingsWindowSession::new(
+        let (session, subscription) = crate::composition::settings::window::from_state(
             state.clone(),
             recording,
             notices,
             capacity,
-        ))));
+        );
+        let backend = Backend(Rc::new(RefCell::new(session)));
         let mut host = WindowHost::new(backend.clone(), proxy, attributes, true)?;
         host.resumed(event_loop);
         if let Some(error) = host.take_failure() {
@@ -75,6 +77,7 @@ impl NativeSettingsWindow {
             backend,
             state,
             appearance: None,
+            _subscription: subscription,
         };
         owner.sync_theme();
         Ok(owner)
@@ -87,6 +90,9 @@ impl NativeSettingsWindow {
     }
     pub(crate) fn window_rc(&self) -> Rc<Window> {
         self.host.window_rc().unwrap()
+    }
+    pub(crate) fn page(&self) -> Page {
+        self.backend.0.borrow().page()
     }
     pub(crate) fn show(&mut self, page: Page) -> Result<(), String> {
         self.host.navigate(page)?;

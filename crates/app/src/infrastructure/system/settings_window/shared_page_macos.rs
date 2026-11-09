@@ -15,17 +15,14 @@ use objc2::{
 use objc2_app_kit::{NSAlert, NSEvent, NSEventMask, NSEventType, NSView};
 use objc2_foundation::NSString;
 use snaplingo_accessibility::{window_project_region, WindowProjection};
-use snaplingo_ui::{Action, Event, Page, Snapshot};
+use snaplingo_ui::{Action, Event, Page};
 
 use super::shared_view_macos::SharedFeatureView;
 use crate::application::hotkeys::HotkeyRecording;
-use crate::application::{HotkeyRuntime, SettingsApplication, SettingsConfiguration};
-use crate::domain::hotkey_config::{
-    DEFAULT_HOTKEYS, OCR_CATEGORY, SCREENSHOT_CATEGORY, TRANSLATION_CATEGORY,
-};
+use crate::application::SettingsConfiguration;
 use crate::infrastructure::desktop_events::{DesktopEvent, DesktopSubscription};
 use crate::infrastructure::{runtime, ui_thread};
-use std::collections::VecDeque;
+use snaplingo_settings::window::SettingsWindowSession;
 
 static NEXT: AtomicU64 = AtomicU64::new(1);
 thread_local! {static PAGES:RefCell<BTreeMap<u64,Weak<SharedFeaturePage>>>=const{RefCell::new(BTreeMap::new())};}
@@ -72,25 +69,17 @@ pub(crate) struct SharedFeaturePage {
     id: u64,
     view: Retained<SharedFeatureView>,
     configuration: Arc<SettingsConfiguration>,
-    settings: Arc<SettingsApplication>,
-    hotkeys: Arc<HotkeyRuntime>,
-    general: Option<Arc<super::GeneralController>>,
-    library: Option<Arc<crate::infrastructure::settings_canvas::library::LibrarySession>>,
-    services: Option<Arc<crate::infrastructure::settings_canvas::services::ServicesSession>>,
+    session: RefCell<Option<SettingsWindowSession>>,
     recording: HotkeyRecording,
     recording_id: RefCell<Option<String>>,
-    sequence: Cell<u64>,
     subscription: RefCell<Option<DesktopSubscription>>,
-    usage: Arc<crate::infrastructure::settings_canvas::capacity_usage::CapacityUsage>,
-    usage_subscription: RefCell<Option<DesktopSubscription>>,
+    hotkey_subscription: RefCell<Option<DesktopSubscription>>,
     monitor: RefCell<Option<Retained<AnyObject>>>,
     accessibility: RefCell<Option<SubclassingAdapter>>,
     projection: Arc<Mutex<Option<WindowProjection>>>,
     sent: RefCell<Option<WindowProjection>>,
-    saving: Cell<bool>,
     disposed: Cell<bool>,
     error: RefCell<Option<String>>,
-    hotkey_queue: RefCell<VecDeque<(Page, Action)>>,
     host_actions: RefCell<Option<Rc<dyn Fn(Action)>>>,
 }
 impl SharedFeaturePage {
@@ -106,92 +95,70 @@ impl SharedFeaturePage {
     pub(crate) fn from_state(
         mtm: MainThreadMarker,
         kind: Page,
-        state: &crate::AppState,
+        state: &Arc<crate::AppState>,
         recording: HotkeyRecording,
     ) -> Result<Rc<Self>, String> {
         let id = NEXT.fetch_add(1, Ordering::Relaxed);
-        let (usage, usage_subscription) =
-            crate::infrastructure::settings_canvas::capacity_usage::CapacityUsage::subscribe(
-                state.library_index.clone(),
-                &state.desktop_events,
-                move || refresh_later(id),
-            );
-        let services = (kind == Page::Services).then(|| {
-            Arc::new(
-                crate::infrastructure::settings_canvas::services::ServicesSession::from_state(
-                    state,
-                    Default::default(),
-                ),
-            )
-        });
-        let library = match kind {
-            Page::History => Some(snaplingo_ui::library::LibraryKind::History),
-            Page::Favorites => Some(snaplingo_ui::library::LibraryKind::Favorites),
-            _ => None,
-        }
-        .map(|kind| {
-            Arc::new(
-                crate::infrastructure::settings_canvas::library::LibrarySession::from_state(
-                    state, kind,
-                ),
-            )
-        });
-        let general = (kind == Page::General).then(|| {
-            super::shared_general_macos::from_state(
-                state,
-                env!("CARGO_PKG_VERSION").into(),
-                Arc::new(move || {
-                    ui_thread::dispatch(move || {
-                        if let Some(page) = lookup(id) {
-                            if let Some(window) = page.view.window() {
-                                if let Ok(saved) = page.configuration.snapshot() {
-                                    super::notices_macos::show(&window, &saved.general);
-                                }
+        let (mut session, subscription) = crate::composition::settings::window::from_state(
+            state.clone(),
+            recording.clone(),
+            Arc::new(move || {
+                ui_thread::dispatch(move || {
+                    if let Some(page) = lookup(id) {
+                        if let Some(window) = page.view.window() {
+                            if let Ok(saved) = page.configuration.snapshot() {
+                                super::notices_macos::show(&window, &saved.general);
                             }
                         }
-                    });
-                    Ok(())
-                }),
-            )
-        });
-        let mut snapshot = projection(&state.settings.configuration, &state.settings.hotkeys)?;
-        if let Some(controller) = &general {
-            super::shared_general_macos::refresh(controller, &mut snapshot)?;
-        }
-        let view = SharedFeatureView::new(mtm, kind, snapshot);
-        if let Some(services) = &services {
-            view.refresh_window(snaplingo_ui::WindowSnapshot::Services(services.snapshot(
-                projection(&state.settings.configuration, &state.settings.hotkeys)?,
-            )?));
-        }
-        if let Some(library) = &library {
-            view.refresh_window(snaplingo_ui::WindowSnapshot::Library(library.snapshot(
-                projection(&state.settings.configuration, &state.settings.hotkeys)?,
-            )));
-        }
+                    }
+                });
+                Ok(())
+            }),
+            Arc::new(move || {
+                ui_thread::dispatch(move || {
+                    if let Some(page) = lookup(id) {
+                        if let Some(handle) = page.host_actions.borrow().as_ref() {
+                            handle(Action::ConfigureCapacity);
+                        }
+                    }
+                });
+                Ok(())
+            }),
+        );
+        session.set_notifier(Some(Arc::new(move || refresh_later(id))));
+        session.set_system_dark(super::super::native_theme::is_dark(
+            &state
+                .settings
+                .configuration
+                .snapshot()
+                .map_err(|e| e.to_string())?
+                .general
+                .theme,
+        ));
+        session.navigate(kind)?;
+        let snapshot = session.snapshot()?;
+        let shell = match &snapshot {
+            snaplingo_ui::WindowSnapshot::Settings(shell) => shell.clone(),
+            snaplingo_ui::WindowSnapshot::Services(snapshot) => snapshot.shell.clone(),
+            snaplingo_ui::WindowSnapshot::Library(snapshot) => snapshot.shell.clone(),
+        };
+        let view = SharedFeatureView::new(mtm, kind, shell);
+        view.refresh_window(snapshot);
         let page = Rc::new(Self {
             id,
             view,
             configuration: state.settings.configuration.clone(),
-            settings: state.settings.application.clone(),
-            hotkeys: state.settings.hotkeys.clone(),
-            general,
-            library,
-            services,
+            session: RefCell::new(Some(session)),
             recording,
             recording_id: RefCell::new(None),
-            sequence: Cell::new(0),
-            subscription: RefCell::new(None),
-            usage,
-            usage_subscription: RefCell::new(Some(usage_subscription)),
+            subscription: RefCell::new(Some(subscription)),
+            hotkey_subscription: RefCell::new(None),
             monitor: RefCell::new(None),
             accessibility: RefCell::new(None),
             projection: Arc::new(Mutex::new(None)),
             sent: RefCell::new(None),
-            saving: Cell::new(false),
             disposed: Cell::new(false),
             error: RefCell::new(None),
-            hotkey_queue: RefCell::new(VecDeque::new()),
             host_actions: RefCell::new(None),
         });
         PAGES.with_borrow_mut(|pages| {
@@ -205,56 +172,32 @@ impl SharedFeaturePage {
                 Actions(id),
             )
         });
-        let subscription = state.desktop_events.subscribe(move |event| {
-            if matches!(
-                event,
-                DesktopEvent::SettingsChanged
-                    | DesktopEvent::HotkeysChanged
-                    | DesktopEvent::HotkeyRecorded { .. }
-                    | DesktopEvent::HistoryChanged
-                    | DesktopEvent::FavoritesChanged
-                    | DesktopEvent::ScreenshotFavoritesChanged
-                    | DesktopEvent::ProvidersChanged
-            ) {
-                let event = event.clone();
+        let hotkey_subscription = state.desktop_events.subscribe(move |event| {
+            if let DesktopEvent::HotkeyRecorded {
+                window_label,
+                recording_id,
+                hotkey,
+            } = event
+            {
+                if window_label != "settings" {
+                    return;
+                }
+                let recording_id = recording_id.clone();
+                let hotkey = hotkey.clone();
                 ui_thread::dispatch(move || {
                     if let Some(page) = lookup(id) {
-                        match event {
-                            DesktopEvent::HistoryChanged
-                            | DesktopEvent::FavoritesChanged
-                            | DesktopEvent::ScreenshotFavoritesChanged
-                                if page.library.is_some() =>
-                            {
-                                page.view.window_input(snaplingo_ui::WindowInput::Library(
-                                    snaplingo_ui::library::LibraryInput::Refresh,
-                                ));
-                            }
-                            DesktopEvent::HotkeyRecorded {
-                                window_label,
-                                recording_id,
-                                hotkey,
-                            } => {
-                                if window_label == "settings"
-                                    && page.recording_id.borrow().as_ref() == Some(&recording_id)
-                                    && page.recording.session().is_some_and(|session| {
-                                        session.id == recording_id
-                                            && session.window_label == "settings"
-                                    })
-                                {
-                                    page.view.input(Event::RecordedShortcut(hotkey));
-                                }
-                            }
-                            _ => {
-                                if let Err(error) = page.refresh() {
-                                    log::warn!("Failed to refresh shared preferences: {error}");
-                                }
-                            }
+                        if page.recording_id.borrow().as_ref() == Some(&recording_id)
+                            && page.recording.session().is_some_and(|session| {
+                                session.id == recording_id && session.window_label == "settings"
+                            })
+                        {
+                            page.view.input(Event::RecordedShortcut(hotkey));
                         }
                     }
                 });
             }
         });
-        *page.subscription.borrow_mut() = Some(subscription);
+        *page.hotkey_subscription.borrow_mut() = Some(hotkey_subscription);
         let monitor = RcBlock::new(move |event: NonNull<NSEvent>| -> *mut NSEvent {
             if lookup(id).is_some_and(|page| page.receive(unsafe { event.as_ref() })) {
                 std::ptr::null_mut()
@@ -271,19 +214,6 @@ impl SharedFeaturePage {
                 &monitor,
             )
         };
-        if let Some(controller) = page.general.clone() {
-            runtime::spawn(async move {
-                let _ = controller.ensure_checked(move |_| refresh_later(id)).await;
-            });
-        }
-        if page.library.is_some() {
-            page.view.window_input(snaplingo_ui::WindowInput::Library(
-                snaplingo_ui::library::LibraryInput::Refresh,
-            ));
-        }
-        if page.services.is_some() {
-            page.service_intent(snaplingo_ui::services::ServicesIntent::Refresh);
-        }
         Ok(page)
     }
     pub(crate) fn view(&self) -> &SharedFeatureView {
@@ -293,34 +223,37 @@ impl SharedFeaturePage {
         *self.host_actions.borrow_mut() = Some(handle);
     }
     pub(crate) fn refresh(&self) -> Result<(), String> {
-        if !self.disposed.get() {
-            let mut next = projection(&self.configuration, &self.hotkeys)?;
-            self.usage.apply(&mut next);
-            next.error = self.error.borrow().clone();
-            if let Some(controller) = &self.general {
-                super::shared_general_macos::refresh(controller, &mut next)?;
-            }
-            if let Some(services) = &self.services {
-                self.view
-                    .refresh_window(snaplingo_ui::WindowSnapshot::Services(
-                        services.snapshot(next)?,
-                    ));
-            } else if let Some(library) = &self.library {
-                self.view
-                    .refresh_window(snaplingo_ui::WindowSnapshot::Library(
-                        library.snapshot(next),
-                    ));
-            } else {
-                self.view.refresh(next);
-            }
+        if self.disposed.get() {
+            return Ok(());
         }
+        let snapshot = {
+            let mut session = self.session.borrow_mut();
+            let session = session.as_mut().ok_or("Settings session is closed")?;
+            session.set_system_dark(super::super::native_theme::is_dark(
+                &self
+                    .configuration
+                    .snapshot()
+                    .map_err(|e| e.to_string())?
+                    .general
+                    .theme,
+            ));
+            session.snapshot()?
+        };
+        self.view.refresh_window(snapshot);
         Ok(())
+    }
+    fn dispatch(&self, intent: snaplingo_ui::WindowIntent) -> Result<(), String> {
+        self.session
+            .borrow_mut()
+            .as_mut()
+            .ok_or("Settings session is closed")?
+            .dispatch(self.view.page(), intent)
     }
     fn service_intent(&self, intent: snaplingo_ui::services::ServicesIntent) {
         if self.disposed.get() {
             return;
         }
-        use crate::infrastructure::settings_canvas::services::ServicesHostEffect as Effect;
+        use snaplingo_settings::services::ServicesHostEffect as Effect;
         use snaplingo_ui::services::ServicesIntent as Intent;
         let effect = match &intent {
             Intent::Navigate(page) => Some(Effect::Navigate(*page)),
@@ -335,47 +268,13 @@ impl SharedFeaturePage {
             self.service_effect(effect);
             return;
         }
-        let Some(services) = self.services.clone() else {
-            return;
-        };
-        let route = matches!(&intent, snaplingo_ui::services::ServicesIntent::Route(_));
-        match services.edit(&intent) {
-            Ok(true) => {
-                let _ = self.refresh();
-                if route {
-                    self.service_intent(snaplingo_ui::services::ServicesIntent::Refresh);
-                }
-                return;
-            }
-            Err(error) => {
-                self.message(&error);
-                return;
-            }
-            Ok(false) => {}
+        if let Err(error) = self.dispatch(snaplingo_ui::WindowIntent::Services(intent)) {
+            self.message(&error);
         }
-        let id = self.id;
-        runtime::spawn(async move {
-            let result = services.dispatch(intent, move || refresh_later(id)).await;
-            ui_thread::dispatch(move || {
-                if let Some(page) = lookup(id) {
-                    match result {
-                        Ok(effects) => {
-                            for effect in effects {
-                                page.service_effect(effect);
-                            }
-                        }
-                        Err(error) => page.message(&error),
-                    }
-                    let _ = page.refresh();
-                }
-            });
-        });
+        let _ = self.refresh();
     }
-    fn service_effect(
-        &self,
-        effect: crate::infrastructure::settings_canvas::services::ServicesHostEffect,
-    ) {
-        use crate::infrastructure::settings_canvas::services::ServicesHostEffect as Effect;
+    fn service_effect(&self, effect: snaplingo_settings::services::ServicesHostEffect) {
+        use snaplingo_settings::services::ServicesHostEffect as Effect;
         match effect {
             Effect::Navigate(page) => self.perform(page, vec![Action::Navigate(page)]),
             Effect::ConfigureCapacity => {
@@ -407,22 +306,16 @@ impl SharedFeaturePage {
                     let id = self.id;
                     let callback = RcBlock::new(move |response| {
                         if response == 1000 {
-                            if let Some(services) =
-                                lookup(id).and_then(|page| page.services.clone())
-                            {
-                                let provider = provider.clone();
-                                runtime::spawn(async move {
-                                    if let Err(error) = services
-                                        .remove_confirmed(provider, move || refresh_later(id))
-                                        .await
-                                    {
-                                        ui_thread::dispatch(move || {
-                                            if let Some(page) = lookup(id) {
-                                                page.message(&error);
-                                            }
-                                        });
-                                    }
-                                });
+                            if let Some(page) = lookup(id) {
+                                if let Err(error) =
+                                    page.dispatch(snaplingo_ui::WindowIntent::Services(
+                                        snaplingo_ui::services::ServicesIntent::ConfirmRemove(
+                                            provider.clone(),
+                                        ),
+                                    ))
+                                {
+                                    page.message(&error);
+                                }
                             }
                         }
                     });
@@ -474,16 +367,12 @@ impl SharedFeaturePage {
             }
             return;
         }
-        if let Some(library) = self.library.clone() {
-            let id = self.id;
-            let task = library.dispatch(intent, move || refresh_later(id));
-            runtime::spawn(async move {
-                let _ = task.await;
-            });
+        if let Err(error) = self.dispatch(snaplingo_ui::WindowIntent::Library(intent)) {
+            self.message(&error);
         }
     }
     pub(crate) fn jump(&self, section: &str) -> Result<(), String> {
-        if self.services.is_some() {
+        if self.view.page() == Page::Services {
             let route = match section {
                 "ocr" => snaplingo_ui::services::ServicesRoute::Ocr,
                 "translation" => snaplingo_ui::services::ServicesRoute::Translation,
@@ -519,7 +408,7 @@ impl SharedFeaturePage {
             self.recording.end("settings", &id);
         }
     }
-    pub(crate) fn perform(&self, page: Page, actions: Vec<Action>) {
+    pub(crate) fn perform(&self, _page: Page, actions: Vec<Action>) {
         if self.disposed.get() {
             return;
         }
@@ -528,55 +417,27 @@ impl SharedFeaturePage {
                 self.error.borrow_mut().take();
             }
             let result = match action {
-                Action::EditOcr { field, value } => self
-                    .settings
-                    .edit_ocr(
-                        snaplingo_settings::ocr_field(field),
-                        snaplingo_settings::general_value(value),
-                    )
-                    .map(|_| ())
-                    .map_err(|e| e.to_string()),
-                Action::EditTranslation { field, value } => self
-                    .settings
-                    .edit_translation(
-                        snaplingo_settings::translation_field(field),
-                        snaplingo_settings::general_value(value),
-                    )
-                    .map(|_| ())
-                    .map_err(|e| e.to_string()),
-                Action::EditGeneral { field, value } => {
-                    let field = snaplingo_settings::general_field(field);
-                    let value = snaplingo_settings::general_value(value);
-                    if let Some(controller) = &self.general {
-                        controller.edit(field, value).map(|_| ())
-                    } else {
-                        self.settings
-                            .edit_general(field, value)
-                            .map(|_| ())
-                            .map_err(|e| e.to_string())
-                    }
+                action @ (Action::EditOcr { .. }
+                | Action::EditTranslation { .. }
+                | Action::EditGeneral { .. }
+                | Action::EditScreenshot { .. }) => {
+                    self.dispatch(snaplingo_ui::WindowIntent::Settings(action))
                 }
                 Action::GeneralCommand(command) => {
                     self.general_command(command, false);
                     Ok(())
                 }
-                Action::EditScreenshot { field, value } => self
-                    .configuration
-                    .edit_screenshot(
-                        snaplingo_settings::screenshot_field(field),
-                        snaplingo_settings::general_value(value),
-                    )
-                    .map(|_| ())
-                    .map_err(|e| e.to_string()),
                 Action::BeginHotkeyRecording { .. }
                 | Action::BeginLocalShortcutRecording { .. } => {
                     self.view.cancel_composition();
                     self.finish_recording();
-                    self.sequence.set(self.sequence.get() + 1);
-                    let id = format!("shared:{}:{}", self.id, self.sequence.get());
-                    self.recording.begin("settings", id.clone());
-                    *self.recording_id.borrow_mut() = Some(id);
-                    Ok(())
+                    let result = self.dispatch(snaplingo_ui::WindowIntent::Settings(action));
+                    *self.recording_id.borrow_mut() = self
+                        .session
+                        .borrow()
+                        .as_ref()
+                        .and_then(|session| session.recording_id());
+                    result
                 }
                 Action::EndHotkeyRecording => {
                     self.finish_recording();
@@ -584,18 +445,14 @@ impl SharedFeaturePage {
                 }
                 Action::SaveHotkey { .. } | Action::ResetHotkey { .. } | Action::ResetHotkeys => {
                     if matches!(action, Action::ResetHotkeys) {
-                        self.confirm_reset(page);
+                        self.confirm_reset();
                     } else {
-                        self.mutate(page, action);
+                        self.mutate(action);
                     }
                     Ok(())
                 }
                 Action::CheckHotkeyConflicts => {
-                    let result = self
-                        .hotkeys
-                        .snapshot()
-                        .map_err(|e| e.to_string())
-                        .and_then(|s| snaplingo_settings::validate_hotkey_conflicts(&s));
+                    let result = self.dispatch(snaplingo_ui::WindowIntent::Settings(action));
                     self.message(
                         result
                             .as_ref()
@@ -651,11 +508,8 @@ impl SharedFeaturePage {
         }
     }
     fn general_command(&self, command: snaplingo_ui::GeneralCommand, confirmed: bool) {
-        let Some(controller) = self.general.clone() else {
-            return;
-        };
         if !confirmed {
-            if let Some(message) = super::shared_general_macos::confirmation(command) {
+            if let Some(message) = snaplingo_settings::general::confirmation(command) {
                 if let Some(window) = self.view.window() {
                     let alert = NSAlert::new(self.view.mtm());
                     alert.setMessageText(&NSString::from_str(message));
@@ -674,14 +528,11 @@ impl SharedFeaturePage {
                 return;
             }
         }
-        let id = self.id;
-        runtime::spawn(async move {
-            let _ = controller
-                .perform(super::shared_general_macos::action(command), move |_| {
-                    refresh_later(id)
-                })
-                .await;
-        });
+        if let Err(error) = self.dispatch(snaplingo_ui::WindowIntent::Settings(
+            Action::GeneralCommand(command),
+        )) {
+            self.message(&error);
+        }
     }
     fn select_directory(&self) {
         let initial = self
@@ -709,67 +560,14 @@ impl SharedFeaturePage {
             });
         });
     }
-    fn mutate(&self, page: Page, action: Action) {
-        if self.saving.replace(true) {
-            self.hotkey_queue.borrow_mut().push_back((page, action));
-            return;
-        }
+    fn mutate(&self, action: Action) {
         self.finish_recording();
         self.view.cancel_composition();
-        let runtime = self.hotkeys.clone();
-        let id = self.id;
-        runtime::spawn_blocking(move || {
-            let category = match page {
-                Page::Ocr => OCR_CATEGORY,
-                Page::Screenshot => SCREENSHOT_CATEGORY,
-                _ => TRANSLATION_CATEGORY,
-            };
-            let target = |index| {
-                DEFAULT_HOTKEYS
-                    .iter()
-                    .filter(|binding| binding.category == category)
-                    .nth(index)
-                    .map(|binding| binding.action)
-                    .ok_or_else(|| "Unknown Settings shortcut".to_string())
-            };
-            let result = match action {
-                Action::SaveHotkey { index, shortcut } => target(index).and_then(|action| {
-                    runtime
-                        .update_hotkey(category.into(), action.into(), shortcut)
-                        .map(|_| ())
-                        .map_err(|e| e.to_string())
-                }),
-                Action::ResetHotkey { index } => target(index).and_then(|action| {
-                    runtime
-                        .reset_hotkey(category.into(), action.into())
-                        .map(|_| ())
-                        .map_err(|e| e.to_string())
-                }),
-                Action::ResetHotkeys => runtime
-                    .reset_category(category.into())
-                    .map(|_| ())
-                    .map_err(|e| e.to_string()),
-                _ => Ok(()),
-            };
-            ui_thread::dispatch(move || {
-                if let Some(page) = lookup(id) {
-                    page.saving.set(false);
-                    if let Err(error) = result {
-                        *page.error.borrow_mut() = Some(error.clone());
-                        page.message(&error);
-                    } else {
-                        page.error.borrow_mut().take();
-                    }
-                    let _ = page.refresh();
-                    let next = page.hotkey_queue.borrow_mut().pop_front();
-                    if let Some((kind, action)) = next {
-                        page.mutate(kind, action);
-                    }
-                }
-            });
-        });
+        if let Err(error) = self.dispatch(snaplingo_ui::WindowIntent::Settings(action)) {
+            self.message(&error);
+        }
     }
-    fn confirm_reset(&self, page: Page) {
+    fn confirm_reset(&self) {
         if let Some(window) = self.view.window() {
             let alert = NSAlert::new(self.view.mtm());
             alert.setMessageText(&NSString::from_str("确定要恢复这一组快捷键到默认值吗？"));
@@ -779,7 +577,7 @@ impl SharedFeaturePage {
             let callback = RcBlock::new(move |response| {
                 if response == 1000 {
                     if let Some(owner) = lookup(id) {
-                        owner.mutate(page, Action::ResetHotkeys);
+                        owner.mutate(Action::ResetHotkeys);
                     }
                 }
             });
@@ -828,7 +626,12 @@ impl SharedFeaturePage {
             }
             return false;
         }
-        if self.saving.get() {
+        if self
+            .session
+            .borrow()
+            .as_ref()
+            .is_some_and(|session| session.saving_hotkeys())
+        {
             return true;
         }
         if event.r#type() == NSEventType::KeyDown {
@@ -878,22 +681,12 @@ impl SharedFeaturePage {
         }
         self.finish_recording();
         self.view.cancel_composition();
-        if let Some(controller) = &self.general {
-            controller.invalidate_pending_updates();
-        }
-        if let Some(library) = &self.library {
-            library.dispose();
-        }
-        if let Some(services) = &self.services {
-            services.dispose();
-        }
+        self.session.borrow_mut().take();
         if let Some(window) = self.view.window() {
             super::notices_macos::close_for(&window);
         }
         self.subscription.borrow_mut().take();
-        self.usage_subscription.borrow_mut().take();
-        self.usage.dispose();
-        self.hotkey_queue.borrow_mut().clear();
+        self.hotkey_subscription.borrow_mut().take();
         if let Some(monitor) = self.monitor.borrow_mut().take() {
             unsafe {
                 NSEvent::removeMonitor(&monitor);
@@ -913,17 +706,4 @@ impl Drop for SharedFeaturePage {
     fn drop(&mut self) {
         self.dispose();
     }
-}
-fn projection(
-    configuration: &SettingsConfiguration,
-    hotkeys: &HotkeyRuntime,
-) -> Result<Snapshot, String> {
-    let saved = configuration.snapshot().map_err(|e| e.to_string())?;
-    let mut snapshot = snaplingo_settings::project_snapshot(
-        &saved,
-        &hotkeys.snapshot().map_err(|e| e.to_string())?,
-        &hotkeys.default_snapshot(),
-    );
-    snapshot.dark = super::super::native_theme::is_dark(&saved.general.theme);
-    Ok(snapshot)
 }

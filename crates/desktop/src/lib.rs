@@ -22,8 +22,7 @@ use winit::{
     window::{Window, WindowAttributes, WindowId},
 };
 
-pub use settings_backend::{SettingsWindowBackend, WindowBackend};
-pub use snaplingo_settings::SettingsBackend;
+pub use settings_backend::WindowBackend;
 
 /// Events shared with a resident application that embeds the settings window.
 pub enum HostEvent {
@@ -40,10 +39,6 @@ impl From<AccessibilityEvent> for HostEvent {
 
 /// Owns one event loop. It sleeps between OS/service events; pointer, keyboard,
 /// focus, wheel and DPI coordinates cross the same logical-DIP UI interface.
-pub fn run(backend: impl SettingsBackend + 'static) -> Result<(), String> {
-    run_window_backend(SettingsWindowBackend(backend))
-}
-
 pub fn run_window_backend(backend: impl WindowBackend + 'static) -> Result<(), String> {
     let event_loop = EventLoop::<HostEvent>::with_user_event()
         .build()

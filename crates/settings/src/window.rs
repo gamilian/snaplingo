@@ -1,7 +1,6 @@
 //! Application adapter for the shared seven-page Settings window.
 use super::{library::LibrarySession, preferences::PreferencesSession, services::ServicesSession};
-use crate::application::hotkeys::HotkeyRecording;
-use crate::infrastructure::desktop_events::{DesktopEvent, DesktopSubscription};
+use snaplingo_core::application::hotkeys::HotkeyRecording;
 use snaplingo_ui::{
     library as library_ui, services as services_ui, Action, Page, Size, WindowIntent,
     WindowSnapshot,
@@ -11,12 +10,12 @@ use std::sync::{
     Arc, Mutex,
 };
 
-#[derive(Default)]
 struct Changes {
     notifier: Mutex<Option<Arc<dyn Fn() + Send + Sync>>>,
     error: Mutex<Option<String>>,
     reload: AtomicBool,
     generation: AtomicU64,
+    executor: tokio::runtime::Handle,
 }
 impl Changes {
     fn notify(&self) {
@@ -31,7 +30,7 @@ impl Changes {
     ) {
         let changes = self.clone();
         let generation = self.generation.load(Ordering::Acquire);
-        crate::infrastructure::runtime::spawn(async move {
+        self.executor.spawn(async move {
             let result = future.await;
             if changes.generation.load(Ordering::Acquire) == generation {
                 *changes.error.lock().unwrap() = result.err();
@@ -40,66 +39,81 @@ impl Changes {
         });
     }
 }
-pub(crate) struct SettingsWindowSession {
-    state: Arc<crate::AppState>,
+pub struct SettingsSessionDependencies {
+    pub preferences: super::preferences::PreferencesDependencies,
+    pub services: Arc<dyn Fn() -> ServicesSession + Send + Sync>,
+    pub library: Arc<dyn Fn(library_ui::LibraryKind) -> LibrarySession + Send + Sync>,
+    pub capacity: Arc<dyn Fn() -> Result<(), String> + Send + Sync>,
+    pub open_url: Arc<dyn Fn(&str) -> Result<(), String> + Send + Sync>,
+}
+
+pub struct SettingsWindowSession {
+    dependencies: SettingsSessionDependencies,
     preferences: PreferencesSession,
     page: Page,
     services: Option<Arc<ServicesSession>>,
     library: Option<Arc<LibrarySession>>,
-    capacity: Arc<dyn Fn() -> crate::Result<()> + Send + Sync>,
     changes: Arc<Changes>,
-    _subscription: DesktopSubscription,
     system_dark: bool,
 }
 impl SettingsWindowSession {
-    pub(crate) fn new(
-        state: Arc<crate::AppState>,
+    pub fn new(
+        dependencies: SettingsSessionDependencies,
         recording: HotkeyRecording,
-        notices: Arc<dyn Fn() -> crate::Result<()> + Send + Sync>,
-        capacity: Arc<dyn Fn() -> crate::Result<()> + Send + Sync>,
+        executor: tokio::runtime::Handle,
     ) -> Self {
-        let changes = Arc::new(Changes::default());
-        let events = changes.clone();
-        let subscription = state.desktop_events.subscribe(move |event| {
-            if matches!(
-                event,
-                DesktopEvent::HistoryChanged
-                    | DesktopEvent::FavoritesChanged
-                    | DesktopEvent::ScreenshotFavoritesChanged
-            ) {
-                events.reload.store(true, Ordering::Release);
-            }
-            if matches!(
-                event,
-                DesktopEvent::SettingsChanged
-                    | DesktopEvent::HotkeysChanged
-                    | DesktopEvent::ProvidersChanged
-                    | DesktopEvent::HistoryChanged
-                    | DesktopEvent::FavoritesChanged
-                    | DesktopEvent::ScreenshotFavoritesChanged
-            ) {
-                events.notify();
-            }
+        let changes = Arc::new(Changes {
+            executor: executor.clone(),
+            notifier: Default::default(),
+            error: Default::default(),
+            reload: AtomicBool::new(false),
+            generation: AtomicU64::new(0),
         });
+        let notify = changes.clone();
+        let preferences = PreferencesSession::new(
+            dependencies.preferences.clone(),
+            recording,
+            executor,
+            Arc::new(move || notify.notify()),
+        );
         Self {
-            preferences: PreferencesSession::new(state.clone(), recording, notices),
-            state,
+            dependencies,
+            preferences,
             page: Page::General,
             services: None,
             library: None,
-            capacity,
             changes,
-            _subscription: subscription,
             system_dark: false,
         }
     }
-    pub(crate) fn set_notifier(&self, callback: Option<Arc<dyn Fn() + Send + Sync>>) {
+    /// Safe to call from synchronous workflow notifications, including dispatch.
+    pub fn invalidator(&self) -> Arc<dyn Fn(bool) + Send + Sync> {
+        let changes = self.changes.clone();
+        let usage = self.dependencies.preferences.usage.clone();
+        Arc::new(move |library_changed| {
+            if library_changed {
+                changes.reload.store(true, Ordering::Release);
+                usage.refresh();
+            }
+            changes.notify();
+        })
+    }
+    pub fn page(&self) -> Page {
+        self.page
+    }
+    pub fn saving_hotkeys(&self) -> bool {
+        self.preferences.saving_hotkeys()
+    }
+    pub fn recording_id(&self) -> Option<String> {
+        self.preferences.recording_id()
+    }
+    pub fn set_notifier(&self, callback: Option<Arc<dyn Fn() + Send + Sync>>) {
         *self.changes.notifier.lock().unwrap() = callback;
     }
-    pub(crate) fn set_system_dark(&mut self, dark: bool) {
+    pub fn set_system_dark(&mut self, dark: bool) {
         self.system_dark = dark;
     }
-    pub(crate) fn snapshot(&self) -> Result<WindowSnapshot, String> {
+    pub fn snapshot(&self) -> Result<WindowSnapshot, String> {
         let mut shell = self.preferences.snapshot()?;
         if shell.general.appearance == "system" {
             shell.dark = self.system_dark;
@@ -129,10 +143,10 @@ impl SettingsWindowSession {
         }
         Ok(WindowSnapshot::Settings(shell))
     }
-    pub(crate) fn interface_scale(&self, display: Size) -> f32 {
+    pub fn interface_scale(&self, display: Size) -> f32 {
         self.preferences.interface_scale(display)
     }
-    pub(crate) fn navigate(&mut self, page: Page) -> Result<(), String> {
+    pub fn navigate(&mut self, page: Page) -> Result<(), String> {
         self.preferences
             .dispatch(self.page, Action::Navigate(page))?;
         if page != self.page {
@@ -146,8 +160,7 @@ impl SettingsWindowSession {
             self.page = page;
             *self.changes.error.lock().unwrap() = None;
             if page == Page::Services {
-                let services =
-                    Arc::new(ServicesSession::from_state(&self.state, Default::default()));
+                let services = Arc::new((self.dependencies.services)());
                 self.services = Some(services);
                 self.service(services_ui::ServicesIntent::Refresh)?;
             } else if matches!(page, Page::History | Page::Favorites) {
@@ -156,7 +169,7 @@ impl SettingsWindowSession {
                 } else {
                     library_ui::LibraryKind::Favorites
                 };
-                let library = Arc::new(LibrarySession::from_state(&self.state, kind));
+                let library = Arc::new((self.dependencies.library)(kind));
                 self.reload_library(&library);
                 self.library = Some(library);
             }
@@ -186,7 +199,7 @@ impl SettingsWindowSession {
         );
         self.changes.spawn(future);
     }
-    pub(crate) fn dispatch(&mut self, page: Page, intent: WindowIntent) -> Result<(), String> {
+    pub fn dispatch(&mut self, page: Page, intent: WindowIntent) -> Result<(), String> {
         *self.changes.error.lock().unwrap() = None;
         match intent {
             WindowIntent::Settings(Action::Navigate(page))
@@ -195,7 +208,7 @@ impl SettingsWindowSession {
             }
             WindowIntent::Settings(Action::ConfigureCapacity)
             | WindowIntent::Services(services_ui::ServicesIntent::ConfigureCapacity) => {
-                (self.capacity)().map_err(|e| e.to_string())
+                (self.dependencies.capacity)()
             }
             WindowIntent::Settings(Action::GeneralCommand(command)) => {
                 let controller = self.preferences.general.clone();
@@ -221,8 +234,7 @@ impl SettingsWindowSession {
     }
     fn service(&self, intent: services_ui::ServicesIntent) -> Result<(), String> {
         if let services_ui::ServicesIntent::OpenUrl(url) = intent {
-            return crate::infrastructure::system::external_open::open_url(&url)
-                .map_err(|e| e.to_string());
+            return (self.dependencies.open_url)(&url);
         }
         let session = self.services.clone().ok_or("Services page is not active")?;
         let route = matches!(intent, services_ui::ServicesIntent::Route(_));

@@ -2,13 +2,13 @@
 use snaplingo_ui::{capacity::*, Snapshot};
 use std::sync::Arc;
 
-pub(crate) struct CapacitySession {
-    settings: Arc<crate::SettingsConfiguration>,
-    pub(crate) ui: CapacityUi,
+pub struct CapacitySession {
+    settings: Arc<snaplingo_core::SettingsConfiguration>,
+    pub ui: CapacityUi,
 }
 impl CapacitySession {
-    pub(crate) fn new(
-        settings: Arc<crate::SettingsConfiguration>,
+    pub fn new(
+        settings: Arc<snaplingo_core::SettingsConfiguration>,
         shell: Snapshot,
     ) -> Result<Self, String> {
         let saved = settings
@@ -27,13 +27,13 @@ impl CapacitySession {
         Ok(Self { settings, ui })
     }
     /// True closes the draft after cancellation or a durable successful save.
-    pub(crate) fn input(&mut self, input: CapacityInput) -> bool {
+    pub fn input(&mut self, input: CapacityInput) -> bool {
         match self.ui.update(input) {
             Some(CapacityIntent::Cancel) => true,
             Some(CapacityIntent::Save(value)) => {
                 match self
                     .settings
-                    .update_history(crate::domain::HistorySettings {
+                    .update_history(snaplingo_core::domain::HistorySettings {
                         auto_cleanup_enabled: value.automatic_cleanup,
                         retention_days: value.retention_days,
                         maximum_records: value.history_limit,
@@ -54,11 +54,11 @@ impl CapacitySession {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::infrastructure::storage::{Database, SqliteConfigStore};
+    use snaplingo_storage::{Database, SqliteConfigStore};
     #[test]
     fn save_persists_all_fields_while_cancel_and_drop_leave_sqlite_unchanged() {
         let database = Arc::new(Database::in_memory().unwrap());
-        let settings = Arc::new(crate::SettingsConfiguration::new(Arc::new(
+        let settings = Arc::new(snaplingo_core::SettingsConfiguration::new(Arc::new(
             SqliteConfigStore::new(database.clone()),
         )));
         let saved = settings.snapshot().unwrap().history;
@@ -91,7 +91,7 @@ mod tests {
         draft.input(CapacityInput::Activate(CapacityTarget::Cleanup));
         assert!(draft.input(CapacityInput::Activate(CapacityTarget::Save)));
         let reopened =
-            crate::SettingsConfiguration::new(Arc::new(SqliteConfigStore::new(database)));
+            snaplingo_core::SettingsConfiguration::new(Arc::new(SqliteConfigStore::new(database)));
         let history = reopened.snapshot().unwrap().history;
         assert_eq!(history.retention_days, 40);
         assert_eq!(history.maximum_records, 6000);
