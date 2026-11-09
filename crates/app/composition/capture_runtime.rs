@@ -40,7 +40,7 @@ pub(crate) fn build_native_windows_runtime(
     ocr: Arc<crate::application::providers::ocr::OcrCoordinator>,
     result: Arc<crate::application::result_window::ResultWindowRuntime>,
     settings: Arc<crate::SettingsConfiguration>,
-    pins: Arc<crate::infrastructure::system::pinned_window::NativePinnedImageRuntimeHost>,
+    pins: Arc<crate::window::pinned::NativePinnedImageRuntimeHost>,
 ) -> CaptureRuntimeParts {
     use crate::application::{
         capture::{CaptureImageComposer, CaptureOcrDelivery},
@@ -104,7 +104,7 @@ pub(crate) fn build_capture_runtime(
     ocr_coordinator: Arc<OcrCoordinator>,
     result_window: Arc<ResultWindowRuntime>,
     settings: Arc<crate::SettingsConfiguration>,
-    native_pins: Arc<crate::infrastructure::system::pinned_window::NativePinnedImageRuntimeHost>,
+    native_pins: Arc<crate::window::pinned::NativePinnedImageRuntimeHost>,
 ) -> CaptureRuntimeParts {
     let capture_session_source = build_capture_session_source();
     #[cfg(target_os = "macos")]

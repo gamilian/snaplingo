@@ -266,7 +266,7 @@ async fn keyboard_parity(app: &NativeTestApp) {
 }
 
 async fn global_pin_shortcut(app: &NativeTestApp, clipboard: &Mutex<Vec<u8>>) {
-    use crate::infrastructure::system::pinned_window;
+    use crate::window::pinned as pinned_window;
 
     let state = app.state.clone();
     let prior_ids = on_main(app, pinned_window::test_ids).await;

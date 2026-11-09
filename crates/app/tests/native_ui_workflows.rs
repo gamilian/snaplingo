@@ -582,10 +582,7 @@ mod fixture {
         );
         assert_eq!(pin_windows(&app).await, 2);
         assert_eq!(
-            on_main(&app, || {
-                infrastructure::system::pinned_window::test_decoded_images()
-            })
-            .await,
+            on_main(&app, || { window::pinned::test_decoded_images() }).await,
             0
         );
         state.capture.pinned_images.pin_clipboard().await.unwrap();

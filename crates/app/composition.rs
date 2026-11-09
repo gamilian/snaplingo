@@ -89,9 +89,8 @@ pub fn build_app_state(
         target_os = "macos",
         all(target_os = "windows", feature = "native-app")
     ))]
-    let native_pinned_images = Arc::new(
-        crate::infrastructure::system::pinned_window::NativePinnedImageRuntimeHost::default(),
-    );
+    let native_pinned_images =
+        Arc::new(crate::window::pinned::NativePinnedImageRuntimeHost::default());
     let asset_root = database_path
         .parent()
         .unwrap_or_else(|| std::path::Path::new("."))

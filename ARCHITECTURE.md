@@ -83,6 +83,13 @@ platform acceptance boundary.
 
 Both macOS and Windows are required for this shared path. UI/layout must stay in Rust and be shared; creating a second platform-specific widget tree for each page would duplicate those rules. Native adapters still own IME integration, accessibility, dialogs, menus, capture mechanics and transparent window presentation. Softbuffer accepts opaque `0x00RRGGBB`; alpha overlays/pins need platform presenters consuming the same shared RGBA frame. See [ADR 0012](docs/adr/0012-shared-rust-ui-and-platform-hosts.md) and the [source-based investigation](docs/research/2026-11-08-cross-platform-rust-ui.md).
 
+Pinned Image presentation lives in `ui/pinned`: transforms, input policy, toolbar
+and lens geometry, and the Scene share one owner. `app/window/pinned` owns decoded
+pixels, placement and adjacent macOS/Windows adapters. The AppKit adapter consumes
+the shared state and geometry while retaining native image presentation, buttons,
+menus and dragging. The Windows adapter renders the shared Scene into its alpha
+presenter. UI has no image decoder or Core dependency.
+
 The shared accessibility crate projects drawn Scene geometry into an AccessKit tree; the desktop host supplies native macOS AX and Windows UIA adapters, and the embedded AppKit canvas supplies its own native AX adapter. Navigation/section selection, toggle states, choice values/popups, range values, hotkey state and disabled actions come from the shared UI projection. Accessibility actions enter the same validated Focus/Activate/SetValue/key/scroll event path as regular input. Adapters cache a complete tree for synchronous activation and publish only changed nodes. These semantics and geometry are tested; actual VoiceOver/Narrator and text-field acceptance remains required. Shared fonts live in the root `assets/fonts` directory, used by Core output and shared rendering through Assets.
 
 ### Browser references

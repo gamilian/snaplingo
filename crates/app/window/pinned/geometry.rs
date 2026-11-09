@@ -1,7 +1,7 @@
+use super::position::{cascaded_center, union};
 use crate::application::capture::CaptureCoordinatePolicy;
 use crate::application::pinned_image::PinnedImagePlacement;
 use crate::domain::capture::{DesktopPosition, MonitorSnapshot, PhysicalPoint};
-use crate::infrastructure::system::window_position::{cascaded_center, union};
 
 /// Windows capture logical origins use one primary-display desktop scale.
 /// Keep the host boundary physical so winit cannot apply a second monitor DPI.

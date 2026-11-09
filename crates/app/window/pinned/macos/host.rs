@@ -1,17 +1,17 @@
 use std::sync::Arc;
 
-use super::native_host::Services;
+use super::Services;
 use crate::infrastructure::ui_thread;
 use core_graphics::display::CGDisplay;
 
-use super::native_view::{self as native, Action, Preferences};
-use super::presentation::Presentation;
+use super::view::{self as native, Action, Preferences};
+use snaplingo_ui::pinned::Presentation;
 
+use super::super::position::{cascaded_center, union};
 use crate::application::pinned_image::PinnedImagePlacement;
 use crate::domain::capture::{
     DesktopPosition, LogicalRect, PinnedImageExportSize, PinnedImageView,
 };
-use crate::infrastructure::system::window_position::{cascaded_center, union};
 
 pub(super) fn preferences(settings: &crate::SettingsConfiguration) -> Result<Preferences, String> {
     let screenshot = settings
@@ -154,7 +154,10 @@ fn dispatch(
     crate::infrastructure::runtime::spawn(async move {
         let _operation = gate.lock().await;
         if let Err(error) = run_action(&services, &id, action, size).await {
-            super::super::dialogs::show_native_error("贴图操作失败", &error.to_string());
+            crate::infrastructure::system::dialogs::show_native_error(
+                "贴图操作失败",
+                &error.to_string(),
+            );
         }
     });
 }

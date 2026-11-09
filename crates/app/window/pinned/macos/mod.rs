@@ -1,3 +1,6 @@
+mod host;
+pub(super) mod view;
+
 use std::sync::{Arc, RwLock, Weak};
 
 use crate::application::pinned_image::{PinnedImagePlacement, PinnedImageRuntimeHost};
@@ -44,12 +47,10 @@ impl NativePinnedImageRuntimeHost {
         let Ok(services) = self.services() else {
             return;
         };
-        ui_thread::dispatch(
-            move || match super::macos::preferences(&services.settings) {
-                Ok(preferences) => super::native_view::update_preferences(preferences),
-                Err(error) => log::warn!("Failed to refresh native pinned preferences: {error}"),
-            },
-        );
+        ui_thread::dispatch(move || match host::preferences(&services.settings) {
+            Ok(preferences) => view::update_preferences(preferences),
+            Err(error) => log::warn!("Failed to refresh native pinned preferences: {error}"),
+        });
     }
 }
 
@@ -62,7 +63,7 @@ impl PinnedImageRuntimeHost for NativePinnedImageRuntimeHost {
     ) -> crate::Result<()> {
         let services = self.services()?;
         ui_thread::run("open pinned image window", move || {
-            super::macos::open_pinned_image_window(&services, &image, placement)
+            host::open_pinned_image_window(&services, &image, placement)
         })
         .await
     }
@@ -70,14 +71,14 @@ impl PinnedImageRuntimeHost for NativePinnedImageRuntimeHost {
     async fn show_or_open(&self, image: PinnedImageView) -> crate::Result<()> {
         let services = self.services()?;
         ui_thread::run("show pinned image window", move || {
-            super::macos::show_or_open_pinned_image_window(&services, &image)
+            host::show_or_open_pinned_image_window(&services, &image)
         })
         .await
     }
 
     async fn hide(&self, image_id: String) -> crate::Result<()> {
         ui_thread::run("hide pinned image window", move || {
-            super::macos::close_pinned_image_window(&image_id)
+            host::close_pinned_image_window(&image_id)
         })
         .await
     }
@@ -85,29 +86,34 @@ impl PinnedImageRuntimeHost for NativePinnedImageRuntimeHost {
     async fn toggle_all(&self) -> crate::Result<Option<bool>> {
         ui_thread::run(
             "toggle pinned image windows",
-            super::macos::toggle_pinned_image_windows_visibility,
+            host::toggle_pinned_image_windows_visibility,
         )
         .await
     }
 
     async fn apply_group_switch(&self, hide: Vec<String>, show: Vec<String>) -> crate::Result<()> {
         ui_thread::run("switch pinned image group", move || {
-            super::macos::apply_pinned_group_window_switch(&hide, &show)
+            host::apply_pinned_group_window_switch(&hide, &show)
         })
         .await
     }
 
     async fn hide_group(&self, ids: Vec<String>) -> crate::Result<()> {
         ui_thread::run("hide pinned image group", move || {
-            super::macos::hide_pinned_group_windows(&ids)
+            host::hide_pinned_group_windows(&ids)
         })
         .await
     }
 
     async fn close_group(&self, ids: Vec<String>) -> crate::Result<()> {
         ui_thread::run("close pinned image group", move || {
-            super::macos::close_pinned_group_windows(&ids)
+            host::close_pinned_group_windows(&ids)
         })
         .await
     }
+}
+
+#[cfg(test)]
+pub(super) fn test_close(id: &str) {
+    view::close(id);
 }

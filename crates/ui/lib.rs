@@ -9,6 +9,7 @@ mod general_view;
 pub mod library;
 pub mod notices;
 pub mod permission_prompt;
+pub mod pinned;
 pub mod result;
 pub mod scrolling;
 pub mod services;

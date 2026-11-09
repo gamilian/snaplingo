@@ -156,7 +156,7 @@ Evidence: PinUi is Windows/test-only; Mac duplicates Action/Preferences, shortcu
 and toolbar presentation. Result shares a controller but still has a separate
 AppKit presentation. Capture and Scrolling also retain native presentation paths.
 
-- [ ] Pinned Image: unify presentation state, shortcuts and toolbar geometry,
+- [x] Pinned Image: unify presentation state, shortcuts and toolbar geometry,
   preserving Mac appearance and interactions. Keep decoding/image preparation
   outside pure UI; retain transforms, sampling, grouping and DPI tests.
 - [ ] Scrolling controls/preview: align shared presentation with Mac and connect
@@ -238,3 +238,15 @@ steps finish. Compilation is evidence of compilation, not desktop acceptance.
   workflows pass; the full native workflow needed one rerun after a pointer
   detection timeout. Local HTTP fixtures now inject clients with proxy disabled
   so their loopback requests cannot be redirected by system proxy settings.
+
+- Step 5a: `ui/pinned` owns portable presentation, keyboard/menu/wheel policy,
+  toolbar geometry, lens placement and the shared Scene. PNG decoding and image
+  preparation remain in App. The Mac adapter retains AppKit image presentation,
+  dragging, buttons and menus while consuming the shared state and geometry;
+  Windows consumes that state through the shared renderer. Mac toolbar dimensions,
+  lens placement, original color sampling and grayscale coefficients are the
+  reference. Both adapters now live under `app/window/pinned/{macos,windows}`;
+  pin placement geometry lives beside them. UI interface tests, Mac native pin
+  transforms/replacement/visibility and toolbar geometry checks, full native
+  application workflows, architecture guards and Windows all-target cross checks
+  pass. Real Windows GUI acceptance remains a separate platform check.

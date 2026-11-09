@@ -1,7 +1,11 @@
-use crate::domain::capture::PinnedImageExportSize;
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ImageSize {
+    pub width: u32,
+    pub height: u32,
+}
 
-#[derive(Clone, Debug)]
-pub(super) struct Presentation {
+#[derive(Clone, Debug, PartialEq)]
+pub struct Presentation {
     pub zoom: f64,
     pub opacity: f64,
     pub rotation: u16,
@@ -37,7 +41,7 @@ impl Presentation {
         self.opacity = ((self.opacity * 255.0).round() + step).clamp(12.0, 255.0) / 255.0;
     }
 
-    pub fn export_size(&self, width: u32, height: u32) -> PinnedImageExportSize {
+    pub fn export_size(&self, width: u32, height: u32) -> ImageSize {
         let (width, height) = (width.max(1) as f64, height.max(1) as f64);
         let scale = if self.thumbnail {
             (220.0 / width).min(160.0 / height).min(1.0)
@@ -47,7 +51,7 @@ impl Presentation {
                 .min(4096.0 / width)
                 .min(4096.0 / height)
         };
-        PinnedImageExportSize {
+        ImageSize {
             width: (width * scale)
                 .round()
                 .max(if self.thumbnail { 80.0 } else { 1.0 }) as u32,

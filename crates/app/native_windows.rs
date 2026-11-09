@@ -235,7 +235,7 @@ impl ApplicationHandler<HostEvent> for Loop {
         self.queue.drain(event_loop);
         if let HostEvent::Accessibility(event) = &event {
             crate::infrastructure::system::result_window::windows_accessibility(event);
-            crate::infrastructure::system::pinned_window::windows_accessibility(event);
+            crate::window::pinned::windows_accessibility(event);
             crate::infrastructure::system::capture_window::windows_accessibility(event);
             crate::window::scrolling::windows::windows_accessibility(event);
             crate::native_capacity_windows::accessibility(event);
@@ -247,7 +247,7 @@ impl ApplicationHandler<HostEvent> for Loop {
     }
     fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
         crate::infrastructure::system::result_window::windows_window_event(event_loop, id, &event);
-        crate::infrastructure::system::pinned_window::windows_window_event(event_loop, id, &event);
+        crate::window::pinned::windows_window_event(event_loop, id, &event);
         crate::infrastructure::system::capture_window::windows_window_event(event_loop, id, &event);
         crate::window::scrolling::windows::windows_window_event(event_loop, id, &event);
         crate::native_capacity_windows::window_event(event_loop, id, &event);
@@ -276,7 +276,7 @@ impl ApplicationHandler<HostEvent> for Loop {
         crate::app_shell::shutdown_menu_bar();
         let _ = shortcut::shutdown_shortcuts();
         crate::infrastructure::system::result_window::windows_close_all();
-        crate::infrastructure::system::pinned_window::windows_close_all();
+        crate::window::pinned::windows_close_all();
         crate::infrastructure::system::capture_window::windows_close_all();
         crate::window::scrolling::windows::windows_close_all();
     }

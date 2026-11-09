@@ -7,14 +7,9 @@ mod domain {
 }
 
 #[cfg(target_os = "macos")]
-mod presentation {
-    #![allow(unused_imports)]
-    include!("../infrastructure/system/pinned_window/presentation.rs");
-}
-#[cfg(target_os = "macos")]
 mod native_view {
     #![allow(dead_code)]
-    include!("../infrastructure/system/pinned_window/native_view.rs");
+    include!("../window/pinned/macos/view.rs");
 }
 
 #[cfg(target_os = "macos")]
@@ -80,6 +75,36 @@ fn main() {
     .unwrap();
     assert!(native::visible(id));
     assert!(native::focus(id).unwrap());
+    let (toolbar, buttons) = native::test_toolbar_frames(id);
+    assert_eq!(toolbar.origin, NSPoint::new(460., 4.));
+    assert_eq!(toolbar.size, objc2_foundation::NSSize::new(136., 30.));
+    assert_eq!(
+        buttons
+            .iter()
+            .map(|rect| (
+                rect.origin.x,
+                rect.origin.y,
+                rect.size.width,
+                rect.size.height
+            ))
+            .collect::<Vec<_>>(),
+        [
+            (2., 2., 50., 26.),
+            (52., 2., 50., 26.),
+            (102., 2., 30., 26.),
+        ]
+    );
+    native::test_key(id, &key(" ", Flags::empty(), 49));
+    if let Ok(directory) = std::env::var("SNAPLINGO_NATIVE_UI_SNAPSHOT_DIR") {
+        std::fs::create_dir_all(&directory).unwrap();
+        std::fs::write(
+            std::path::Path::new(&directory).join("pin-toolbar.png"),
+            native::test_snapshot(id),
+        )
+        .unwrap();
+    }
+    native::test_key(id, &key("\u{1b}", Flags::empty(), 53));
+    assert!(native::visible(id));
     // Background test processes do not own the desktop keyboard.
     if app.isActive() {
         assert!(native::has_key_window());

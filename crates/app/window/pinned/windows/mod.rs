@@ -1,8 +1,5 @@
 //! Transparent pin windows hosted by the application's single winit loop.
-use super::{
-    presentation::Presentation,
-    scene::{Action, PinUi, Preferences},
-};
+use super::scene::{Action, PinUi, Preferences};
 use crate::application::pinned_image::{PinnedImagePlacement, PinnedImageRuntimeHost};
 use crate::domain::capture::{
     LogicalRect, MonitorSnapshot, PhysicalRect, PinnedImageExportSize, PinnedImageView,
@@ -15,6 +12,7 @@ use accesskit::{
 use accesskit_winit::{Adapter, WindowEvent as AccessibilityEvent};
 use base64::Engine;
 use snaplingo_render::Renderer;
+use snaplingo_ui::pinned::Presentation;
 use snaplingo_ui::{Key, Modifiers, Point};
 use std::{
     cell::RefCell,
@@ -381,7 +379,7 @@ impl PinWindow {
     fn hide(&mut self) {
         self.window.set_visible(false);
         if let Some(ui) = self.ui.take() {
-            self.presentation = ui.presentation;
+            self.presentation = ui.presentation.clone();
         }
         self.presenter = None;
     }
@@ -442,41 +440,17 @@ impl PinWindow {
             self.image.id.clone(),
             self.gate.clone(),
             action,
-            size,
+            PinnedImageExportSize {
+                width: size.width,
+                height: size.height,
+            },
         );
     }
     fn menu(&mut self, tag: u32) -> Result<(), String> {
         let Some(ui) = &mut self.ui else {
             return Ok(());
         };
-        let action = match tag {
-            1 => {
-                ui.presentation.zoom = 1.;
-                ui.presentation.thumbnail = false;
-                None
-            }
-            2..=4 => {
-                ui.presentation.opacity = if tag == 2 {
-                    1.
-                } else if tag == 3 {
-                    0.75
-                } else {
-                    0.5
-                };
-                None
-            }
-            5 => Some(Action::MoveGroup),
-            6 => Some(Action::ToggleBorder),
-            7 => Some(Action::Close),
-            8 => Some(Action::HideGroup),
-            9 => Some(Action::Copy),
-            10 => Some(Action::Save),
-            11 => Some(Action::QuickSave),
-            12 => Some(Action::Destroy),
-            13 => Some(Action::DestroyGroup),
-            14 => Some(Action::CloseAll),
-            _ => None,
-        };
+        let action = ui.menu(tag);
         if let Some(action) = action {
             self.emit(action);
         }
@@ -767,19 +741,12 @@ pub(crate) fn window_event(_event_loop: &ActiveEventLoop, id: WindowId, event: &
             }
             WindowEvent::MouseWheel { delta, .. } => {
                 if let Some(ui) = &mut window.ui {
-                    if ui.modifiers.alt {
-                        return None;
-                    }
                     let y = match delta {
-                        MouseScrollDelta::LineDelta(_, y) => *y,
-                        MouseScrollDelta::PixelDelta(p) => p.y as f32,
+                        MouseScrollDelta::LineDelta(_, y) => *y as f64,
+                        MouseScrollDelta::PixelDelta(p) => p.y,
                     };
-                    if y != 0. {
-                        if ui.modifiers.control || ui.modifiers.meta {
-                            ui.presentation.opacity_by(f64::from(y.signum()) * 24.);
-                        } else {
-                            ui.presentation.zoom_by(f64::from(y.signum()) * 0.1);
-                        }
+                    if !ui.scroll(y) {
+                        return None;
                     }
                 }
                 if let Err(error) = window.change() {
@@ -791,29 +758,18 @@ pub(crate) fn window_event(_event_loop: &ActiveEventLoop, id: WindowId, event: &
                     return None;
                 };
                 if let Some(ui) = &mut window.ui {
-                    if !ui.modifiers.control && !ui.modifiers.meta && !ui.modifiers.alt {
-                        let step = if ui.modifiers.shift { 5. } else { 1. };
-                        let delta = match key {
-                            Key::ArrowLeft => Some((-step, 0.)),
-                            Key::ArrowRight => Some((step, 0.)),
-                            Key::ArrowUp => Some((0., -step)),
-                            Key::ArrowDown => Some((0., step)),
-                            _ => None,
-                        };
-                        if let Some((x, y)) = delta {
-                            if let Ok(position) = window.window.outer_position() {
-                                let p = position.to_logical::<f64>(window.window.scale_factor());
-                                window
-                                    .window
-                                    .set_outer_position(LogicalPosition::new(p.x + x, p.y + y));
-                            }
-                            return None;
-                        }
-                    }
                     match ui.key(key, event.repeat) {
                         Ok(Some(action)) => window.emit(action),
                         Ok(None) => {
-                            if let Err(error) = window.change() {
+                            if let Some((x, y)) = ui.movement(key) {
+                                if let Ok(position) = window.window.outer_position() {
+                                    let p =
+                                        position.to_logical::<f64>(window.window.scale_factor());
+                                    window
+                                        .window
+                                        .set_outer_position(LogicalPosition::new(p.x + x, p.y + y));
+                                }
+                            } else if let Err(error) = window.change() {
                                 log::warn!("Failed to transform pin: {error}");
                             }
                         }

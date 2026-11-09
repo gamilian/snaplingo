@@ -93,8 +93,7 @@ pub struct AppState {
         target_os = "macos",
         all(target_os = "windows", feature = "native-app")
     ))]
-    pub(crate) native_pinned_images:
-        Arc<crate::infrastructure::system::pinned_window::NativePinnedImageRuntimeHost>,
+    pub(crate) native_pinned_images: Arc<crate::window::pinned::NativePinnedImageRuntimeHost>,
 }
 
 impl AppState {

@@ -1,4 +1,4 @@
-use std::cell::{Cell, OnceCell, RefCell};
+use std::cell::{OnceCell, RefCell};
 use std::collections::HashMap;
 
 use base64::Engine;
@@ -18,46 +18,32 @@ use objc2_foundation::{
     NSAffineTransform, NSData, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString,
 };
 
-use super::presentation::Presentation;
 use crate::domain::capture::{LogicalRect, PinnedImageExportSize, PinnedImageView};
-
-#[derive(Clone, Debug)]
-pub(super) enum Action {
-    Copy,
-    Save,
-    QuickSave,
-    Close,
-    Destroy,
-    HideGroup,
-    DestroyGroup,
-    CloseAll,
-    MoveGroup,
-    Preferences,
-    Replace,
-    ToggleBorder,
-    CopyText(String),
-}
-
-#[derive(Clone)]
-pub(super) struct Preferences {
-    pub opacity: f64,
-    pub shadow: bool,
-    pub border: bool,
-    pub border_shortcut: String,
-}
+use snaplingo_ui::pinned::{color_text, Presentation, State};
+pub(super) use snaplingo_ui::pinned::{Action, Preferences};
+use snaplingo_ui::{Key, Modifiers, Point};
 
 struct ImageState {
-    width: u32,
-    height: u32,
-    source_text: Option<String>,
+    ui: State,
     data: Retained<NSData>,
     original: Option<Retained<NSImage>>,
     filtered: Option<Retained<NSImage>>,
-    presentation: Presentation,
+}
+
+impl std::ops::Deref for ImageState {
+    type Target = State;
+    fn deref(&self) -> &State {
+        &self.ui
+    }
+}
+impl std::ops::DerefMut for ImageState {
+    fn deref_mut(&mut self) -> &mut State {
+        &mut self.ui
+    }
 }
 
 impl ImageState {
-    fn new(image: PinnedImageView, opacity: f64) -> Result<Self, String> {
+    fn new(image: PinnedImageView, preferences: Preferences) -> Result<Self, String> {
         let png = base64::engine::general_purpose::STANDARD
             .decode(&image.image_base64)
             .map_err(|error| error.to_string())?;
@@ -66,16 +52,10 @@ impl ImageState {
             .ok_or("Could not decode pinned image")?;
         original.setSize(NSSize::new(image.width as f64, image.height as f64));
         Ok(Self {
-            width: image.width,
-            height: image.height,
-            source_text: image.source_text,
+            ui: State::new(image.width, image.height, image.source_text, preferences),
             data,
             original: Some(original),
             filtered: None,
-            presentation: Presentation {
-                opacity,
-                ..Presentation::default()
-            },
         })
     }
 
@@ -145,7 +125,6 @@ struct LensState {
     image: Retained<NSImage>,
     point: NSPoint,
     color: [u8; 3],
-    rgb: bool,
 }
 
 struct LensIvars {
@@ -197,26 +176,12 @@ define_class!(
     }
 );
 
-fn color_text(color: [u8; 3], rgb: bool) -> String {
-    if rgb {
-        format!("rgb({}, {}, {})", color[0], color[1], color[2])
-    } else {
-        format!("#{:02X}{:02X}{:02X}", color[0], color[1], color[2])
-    }
-}
-
 struct PinIvars {
     image: RefCell<ImageState>,
-    preferences: RefCell<Preferences>,
     dispatch: Box<dyn Fn(Action, PinnedImageExportSize)>,
     toolbar: OnceCell<Retained<NSBox>>,
     lens: OnceCell<Retained<LensView>>,
     inspection: RefCell<Option<image::RgbaImage>>,
-    forced_toolbar: Cell<bool>,
-    hovered: Cell<bool>,
-    magnifier: Cell<bool>,
-    rgb: Cell<bool>,
-    shift: Cell<bool>,
 }
 
 define_class!(
@@ -275,7 +240,7 @@ define_class!(
                 NSCompositingOperation::SourceOver, presentation.opacity, true, None,
             ); }
             NSGraphicsContext::restoreGraphicsState_class();
-            if self.ivars().preferences.borrow().border {
+            if self.ivars().image.borrow().preferences.border {
                 NSColor::colorWithSRGBRed_green_blue_alpha(0.23, 0.51, 0.96, 1.0).setStroke();
                 let border = NSBezierPath::bezierPathWithRect(NSRect::new(NSPoint::new(0.5, 0.5), NSSize::new((bounds.size.width - 1.0).max(0.0), (bounds.size.height - 1.0).max(0.0))));
                 border.setLineWidth(1.0);
@@ -301,7 +266,7 @@ define_class!(
         #[unsafe(method(otherMouseDown:))]
         fn other_mouse_down(&self, event: &NSEvent) {
             if event.buttonNumber() == 2 && input_modifiers(event).is_empty() {
-                let opacity = self.ivars().preferences.borrow().opacity;
+                let opacity = self.ivars().image.borrow().preferences.opacity;
                 self.change(|view| { view.zoom = 1.0; view.thumbnail = false; view.opacity = opacity; });
             }
         }
@@ -311,44 +276,37 @@ define_class!(
 
         #[unsafe(method(scrollWheel:))]
         fn scroll_wheel(&self, event: &NSEvent) {
-            let flags = event.modifierFlags();
-            if flags.contains(NSEventModifierFlags::Option) { return; }
-            if event.scrollingDeltaY() == 0.0 { return; }
-            let step = event.scrollingDeltaY().signum();
-            if flags.intersects(NSEventModifierFlags::Command | NSEventModifierFlags::Control) {
-                self.change(|view| view.opacity_by(step * 24.0));
-            } else { self.change(|view| view.zoom_by(step * 0.1)); }
+            self.ivars().image.borrow_mut().modifiers(modifiers(event));
+            let changed = self.ivars().image.borrow_mut().scroll(event.scrollingDeltaY());
+            if changed {
+                self.change(|_| {});
+            }
         }
 
         #[unsafe(method(mouseEntered:))]
         fn mouse_entered(&self, event: &NSEvent) {
-            self.ivars().hovered.set(true);
+            self.ivars().image.borrow_mut().hovered = true;
             self.update_toolbar();
-            self.ivars().magnifier.set(event.modifierFlags().contains(NSEventModifierFlags::Option));
+            self.ivars().image.borrow_mut().modifiers(modifiers(event));
             self.inspect(self.convertPoint_fromView(event.locationInWindow(), None));
         }
 
         #[unsafe(method(mouseExited:))]
         fn mouse_exited(&self, _event: &NSEvent) {
-            self.ivars().hovered.set(false);
+            self.ivars().image.borrow_mut().hovered = false;
             self.update_toolbar();
             self.hide_lens();
         }
 
         #[unsafe(method(mouseMoved:))]
         fn mouse_moved(&self, event: &NSEvent) {
-            if self.ivars().magnifier.get() { self.inspect(self.convertPoint_fromView(event.locationInWindow(), None)); }
+            if self.ivars().image.borrow().inspecting() { self.inspect(self.convertPoint_fromView(event.locationInWindow(), None)); }
         }
 
         #[unsafe(method(flagsChanged:))]
         fn flags_changed(&self, event: &NSEvent) {
-            let flags = event.modifierFlags();
-            let requested = flags.contains(NSEventModifierFlags::Option)
-                && !flags.intersects(NSEventModifierFlags::Command | NSEventModifierFlags::Control);
-            let shift = flags.contains(NSEventModifierFlags::Shift);
-            if requested && shift && !self.ivars().shift.get() { self.ivars().rgb.set(!self.ivars().rgb.get()); }
-            self.ivars().shift.set(shift);
-            self.ivars().magnifier.set(requested);
+            self.ivars().image.borrow_mut().modifiers(modifiers(event));
+            let requested = self.ivars().image.borrow().inspecting();
             if requested {
                 if let Some(window) = self.window() {
                     let point = window.convertPointFromScreen(NSEvent::mouseLocation());
@@ -362,22 +320,16 @@ define_class!(
 
         #[unsafe(method(toolbarAction:))]
         fn toolbar_action(&self, sender: &NSButton) {
-            self.ivars().forced_toolbar.set(false);
+            self.ivars().image.borrow_mut().forced_toolbar = false;
             self.update_toolbar();
             self.emit(match sender.tag() { 0 => Action::Copy, 1 => Action::Save, _ => Action::Close });
         }
 
         #[unsafe(method(menuAction:))]
         fn menu_action(&self, sender: &NSMenuItem) {
-            match sender.tag() {
-                1 => self.change(|view| { view.zoom = 1.0; view.thumbnail = false; }),
-                2..=4 => { let opacity = match sender.tag() { 2 => 1.0, 3 => 0.75, _ => 0.5 }; self.change(|view| view.opacity = opacity); }
-                5 => self.emit(Action::MoveGroup), 6 => self.emit(Action::ToggleBorder),
-                7 => self.emit(Action::Close), 8 => self.emit(Action::HideGroup),
-                9 => self.emit(Action::Copy), 10 => self.emit(Action::Save), 11 => self.emit(Action::QuickSave),
-                12 => self.emit(Action::Destroy), 13 => self.emit(Action::DestroyGroup), 14 => self.emit(Action::CloseAll),
-                _ => {}
-            }
+            let action = self.ivars().image.borrow_mut().menu(sender.tag() as u32);
+            if let Some(action) = action { self.emit(action); }
+            else { self.change(|_| {}); }
         }
     }
 );
@@ -388,7 +340,13 @@ impl PinView {
             let image = self.ivars().image.borrow();
             image.presentation.export_size(image.width, image.height)
         };
-        (self.ivars().dispatch)(action, size);
+        (self.ivars().dispatch)(
+            action,
+            PinnedImageExportSize {
+                width: size.width,
+                height: size.height,
+            },
+        );
     }
 
     fn change(&self, operation: impl FnOnce(&mut Presentation)) {
@@ -413,145 +371,60 @@ impl PinView {
             }
         }
         if let Some(toolbar) = self.ivars().toolbar.get() {
-            toolbar.setFrameOrigin(NSPoint::new((width - 140.0).max(0.0), 4.0));
+            let rect = self.ivars().image.borrow().toolbar_rect();
+            toolbar.setFrameOrigin(NSPoint::new(rect.x as f64, rect.y as f64));
         }
         self.hide_lens();
         self.setNeedsDisplay(true);
     }
 
     fn handle_key(&self, event: &NSEvent) {
-        let key = event
-            .charactersIgnoringModifiers()
-            .map(|key| key.to_string().to_lowercase())
-            .unwrap_or_default();
-        let flags = input_modifiers(event);
-        let command =
-            flags.intersects(NSEventModifierFlags::Command | NSEventModifierFlags::Control);
-        let shift = flags.contains(NSEventModifierFlags::Shift);
-        let alt = flags.contains(NSEventModifierFlags::Option);
-        if !event.isARepeat()
-            && shortcut_matches(event, &self.ivars().preferences.borrow().border_shortcut)
-        {
-            self.emit(Action::ToggleBorder);
+        let Some(key) = key(event) else {
             return;
-        }
-        if self.ivars().magnifier.get() && key == "c" && !command {
-            if let Some(lens) = self.ivars().lens.get() {
-                if let Some(state) = lens.ivars().state.borrow().as_ref() {
-                    self.emit(Action::CopyText(color_text(state.color, state.rgb)));
-                }
-            }
-            return;
-        }
-        if command && !alt {
-            let action = match (key.as_str(), shift) {
-                ("c", false) => Some(Action::Copy),
-                ("s", false) => Some(Action::Save),
-                ("s", true) => Some(Action::QuickSave),
-                ("p", true) => Some(Action::Preferences),
-                ("v", false) => Some(Action::Replace),
-                ("w", false) => Some(Action::Close),
-                ("c", true) => self
-                    .ivars()
-                    .image
-                    .borrow()
-                    .source_text
-                    .clone()
-                    .map(Action::CopyText),
-                _ => None,
-            };
-            if let Some(action) = action {
-                self.emit(action);
-                return;
-            }
-            if !shift && (key == "+" || key == "=" || key == "-") {
-                self.change(|view| view.opacity_by(if key == "-" { -24.0 } else { 24.0 }));
-                return;
-            }
-        }
-        if event.keyCode() == 53 {
-            if shift && !command && !alt {
-                self.emit(Action::Destroy);
-            } else if self.ivars().forced_toolbar.get() && flags.is_empty() {
-                self.ivars().forced_toolbar.set(false);
-                self.update_toolbar();
+        };
+        let color = self.ivars().lens.get().and_then(|lens| {
+            lens.ivars()
+                .state
+                .borrow()
+                .as_ref()
+                .map(|state| state.color)
+        });
+        let (action, movement) = {
+            let mut image = self.ivars().image.borrow_mut();
+            image.modifiers(modifiers(event));
+            let filters = (image.presentation.grayscale, image.presentation.inverted);
+            let action = image.ui.key(key, event.isARepeat(), color);
+            let movement = if action.is_none() {
+                image.movement(key)
             } else {
-                self.emit(Action::Close);
+                None
+            };
+            if filters != (image.presentation.grayscale, image.presentation.inverted) {
+                if let Err(error) = image.update_filter() {
+                    log::warn!("Could not filter pinned image: {error}");
+                }
+            }
+            (action, movement)
+        };
+        if let Some(action) = action {
+            self.emit(action);
+            return;
+        }
+        if let Some((x, y)) = movement {
+            if let Some(window) = self.window() {
+                let frame = window.frame();
+                window.setFrameOrigin(NSPoint::new(frame.origin.x + x, frame.origin.y - y));
             }
             return;
         }
-        if !command && !alt {
-            if let Some(window) = self.window() {
-                let step = if shift { 5.0 } else { 1.0 };
-                let delta = match event.keyCode() {
-                    123 => Some((-step, 0.0)),
-                    124 => Some((step, 0.0)),
-                    125 => Some((0.0, -step)),
-                    126 => Some((0.0, step)),
-                    _ => None,
-                };
-                if let Some((x, y)) = delta {
-                    let frame = window.frame();
-                    window.setFrameOrigin(NSPoint::new(frame.origin.x + x, frame.origin.y + y));
-                    return;
-                }
-            }
-        }
-        if !command {
-            match key.as_str() {
-                "+" | "=" => {
-                    self.change(|view| view.zoom_by(0.1));
-                    return;
-                }
-                "-" => {
-                    self.change(|view| view.zoom_by(-0.1));
-                    return;
-                }
-                "0" => {
-                    self.change(|view| {
-                        view.zoom = 1.0;
-                        view.thumbnail = false;
-                    });
-                    return;
-                }
-                _ => {}
-            }
-        }
-        if flags.is_empty() {
-            match key.as_str() {
-                " " => {
-                    self.ivars()
-                        .forced_toolbar
-                        .set(!self.ivars().forced_toolbar.get());
-                    self.update_toolbar();
-                }
-                "1" => self.change(|view| view.rotation = (view.rotation + 90) % 360),
-                "2" => self.change(|view| view.rotation = (view.rotation + 270) % 360),
-                "3" => self.change(|view| view.flip_x = !view.flip_x),
-                "4" => self.change(|view| view.flip_y = !view.flip_y),
-                "5" | "6" => {
-                    let result = {
-                        let mut image = self.ivars().image.borrow_mut();
-                        if key == "5" {
-                            image.presentation.grayscale = !image.presentation.grayscale;
-                        } else {
-                            image.presentation.inverted = !image.presentation.inverted;
-                        }
-                        image.update_filter()
-                    };
-                    if let Err(error) = result {
-                        log::warn!("Could not filter pinned image: {error}");
-                    }
-                    self.setNeedsDisplay(true);
-                }
-                _ => {}
-            }
-        }
+        self.change(|_| {});
+        self.update_toolbar();
     }
 
     fn update_toolbar(&self) {
         if let Some(toolbar) = self.ivars().toolbar.get() {
-            let hidden = !self.ivars().forced_toolbar.get() && !self.ivars().hovered.get();
+            let hidden =
+                !self.ivars().image.borrow().forced_toolbar && !self.ivars().image.borrow().hovered;
             if toolbar.isHidden() != hidden {
                 toolbar.setHidden(hidden);
             }
@@ -568,7 +441,7 @@ impl PinView {
 
     fn inspect(&self, point: NSPoint) {
         let bounds = self.bounds();
-        if !self.ivars().magnifier.get()
+        if !self.ivars().image.borrow().inspecting()
             || point.x < 0.0
             || point.y < 0.0
             || point.x >= bounds.size.width
@@ -577,6 +450,10 @@ impl PinView {
             self.hide_lens();
             return;
         }
+        self.ivars().image.borrow_mut().cursor = Point {
+            x: point.x as f32,
+            y: point.y as f32,
+        };
         let image = self.ivars().image.borrow();
         let Some(original) = image.original.as_ref() else {
             return;
@@ -597,21 +474,9 @@ impl PinView {
         let pixel = pixels.get_pixel(x, y);
         let color = [pixel[0], pixel[1], pixel[2]];
         if let Some(lens) = self.ivars().lens.get() {
-            let left = if point.x + 174.0 <= bounds.size.width {
-                point.x + 14.0
-            } else {
-                point.x - 174.0
-            };
-            let top = if point.y + 126.0 <= bounds.size.height {
-                point.y + 14.0
-            } else {
-                point.y - 126.0
-            };
-            lens.setFrameOrigin(NSPoint::new(
-                left.clamp(0.0, (bounds.size.width - 160.0).max(0.0)),
-                top.clamp(0.0, (bounds.size.height - 112.0).max(0.0)),
-            ));
-            let rgb = self.ivars().rgb.get();
+            let rect = image.lens_rect();
+            lens.setFrameOrigin(NSPoint::new(rect.x as f64, rect.y as f64));
+            let rgb = image.rgb;
             if let Some(label) = lens.ivars().label.get() {
                 let text = color_text(color, rgb);
                 if label.stringValue().to_string() != text {
@@ -622,7 +487,6 @@ impl PinView {
                 image: original.clone(),
                 point: NSPoint::new(x as f64, y as f64),
                 color,
-                rgb,
             });
             lens.setHidden(false);
             lens.setNeedsDisplay(true);
@@ -633,7 +497,7 @@ impl PinView {
         let mtm = self.mtm();
         let menu = NSMenu::new(mtm);
         menu.setAutoenablesItems(false);
-        let border = self.ivars().preferences.borrow().border;
+        let border = self.ivars().image.borrow().preferences.border;
         for (tag, title) in [
             (1, "重置大小"),
             (2, "透明度 100%"),
@@ -675,53 +539,37 @@ impl PinView {
     }
 }
 
-fn shortcut_matches(event: &NSEvent, shortcut: &str) -> bool {
-    if shortcut.is_empty() {
-        return false;
-    }
+fn key(event: &NSEvent) -> Option<Key> {
+    Some(match event.keyCode() {
+        53 => Key::Escape,
+        49 => Key::Space,
+        36 => Key::Enter,
+        48 => Key::Tab,
+        51 => Key::Backspace,
+        117 => Key::Delete,
+        123 => Key::ArrowLeft,
+        124 => Key::ArrowRight,
+        125 => Key::ArrowDown,
+        126 => Key::ArrowUp,
+        _ => {
+            let text = event.charactersIgnoringModifiers()?.to_string();
+            let c = text.chars().next()?;
+            if ('\u{f704}'..='\u{f71b}').contains(&c) {
+                Key::Function((c as u32 - 0xf704 + 1) as u8)
+            } else {
+                Key::Character(c.to_ascii_lowercase())
+            }
+        }
+    })
+}
+fn modifiers(event: &NSEvent) -> Modifiers {
     let flags = event.modifierFlags();
-    let mut parts = Vec::new();
-    if flags.contains(NSEventModifierFlags::Control) {
-        parts.push("ctrl".to_string());
+    Modifiers {
+        control: flags.contains(NSEventModifierFlags::Control),
+        meta: flags.contains(NSEventModifierFlags::Command),
+        alt: flags.contains(NSEventModifierFlags::Option),
+        shift: flags.contains(NSEventModifierFlags::Shift),
     }
-    if flags.contains(NSEventModifierFlags::Command) {
-        parts.push("meta".to_string());
-    }
-    if flags.contains(NSEventModifierFlags::Option) {
-        parts.push("alt".to_string());
-    }
-    if flags.contains(NSEventModifierFlags::Shift) {
-        parts.push("shift".to_string());
-    }
-    let key = match event.keyCode() {
-        53 => "escape".into(),
-        49 => "space".into(),
-        36 => "enter".into(),
-        48 => "tab".into(),
-        51 => "backspace".into(),
-        117 => "delete".into(),
-        123 => "arrowleft".into(),
-        124 => "arrowright".into(),
-        125 => "arrowdown".into(),
-        126 => "arrowup".into(),
-        _ => event
-            .charactersIgnoringModifiers()
-            .map(|value| {
-                let text = value.to_string().to_lowercase();
-                if let Some(character) = text
-                    .chars()
-                    .next()
-                    .filter(|character| ('\u{f704}'..='\u{f71b}').contains(character))
-                {
-                    format!("f{}", character as u32 - 0xf704 + 1)
-                } else {
-                    text
-                }
-            })
-            .unwrap_or_default(),
-    };
-    parts.push(key);
-    parts.join("+") == shortcut
 }
 
 fn input_modifiers(event: &NSEvent) -> NSEventModifierFlags {
@@ -744,7 +592,7 @@ pub(super) fn open(
 ) -> Result<(), String> {
     let mtm = MainThreadMarker::new().ok_or("Pinned images must open on the main thread")?;
     let id = image.id.clone();
-    let state = ImageState::new(image, preferences.opacity)?;
+    let state = ImageState::new(image, preferences.clone())?;
     let frame = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(rect.width, rect.height));
     let window = PinPanel::alloc(mtm).set_ivars(());
     let window: Retained<PinPanel> = unsafe {
@@ -770,16 +618,10 @@ pub(super) fn open(
     window.setExcludedFromWindowsMenu(true);
     let root = PinView::alloc(mtm).set_ivars(PinIvars {
         image: RefCell::new(state),
-        preferences: RefCell::new(preferences),
         dispatch: Box::new(dispatch),
         toolbar: OnceCell::new(),
         lens: OnceCell::new(),
         inspection: RefCell::new(None),
-        forced_toolbar: Cell::new(false),
-        hovered: Cell::new(false),
-        magnifier: Cell::new(false),
-        rgb: Cell::new(false),
-        shift: Cell::new(false),
     });
     let root: Retained<PinView> = unsafe { msg_send![super(root), initWithFrame: frame] };
     let tracking = unsafe {
@@ -796,21 +638,22 @@ pub(super) fn open(
     };
     root.addTrackingArea(&tracking);
     let toolbar = NSBox::new(mtm);
+    let panel = root.ivars().image.borrow().toolbar_rect();
     toolbar.setFrame(NSRect::new(
-        NSPoint::new((rect.width - 140.0).max(0.0), 4.0),
-        NSSize::new(136.0, 30.0),
+        NSPoint::new(panel.x as f64, panel.y as f64),
+        NSSize::new(panel.width as f64, panel.height as f64),
     ));
     toolbar.setBoxType(NSBoxType::Custom);
     toolbar.setTitlePosition(NSTitlePosition::NoTitle);
     toolbar.setFillColor(&NSColor::windowBackgroundColor());
     toolbar.setContentViewMargins(NSSize::new(0.0, 0.0));
-    for (index, (title, x, width)) in [
-        ("Copy", 2.0, 50.0),
-        ("Save", 52.0, 50.0),
-        ("X", 102.0, 30.0),
-    ]
-    .into_iter()
-    .enumerate()
+    for (index, (_, rect, title)) in root
+        .ivars()
+        .image
+        .borrow()
+        .toolbar_layout()
+        .into_iter()
+        .enumerate()
     {
         let button = unsafe {
             NSButton::buttonWithTitle_target_action(
@@ -822,7 +665,10 @@ pub(super) fn open(
         };
         button.setTag(index as isize);
         button.setFont(Some(&NSFont::systemFontOfSize(11.0)));
-        button.setFrame(NSRect::new(NSPoint::new(x, 2.0), NSSize::new(width, 26.0)));
+        button.setFrame(NSRect::new(
+            NSPoint::new((rect.x - panel.x) as f64, (rect.y - panel.y) as f64),
+            NSSize::new(rect.width as f64, rect.height as f64),
+        ));
         if let Some(content) = toolbar.contentView() {
             content.addSubview(&button);
         }
@@ -905,7 +751,7 @@ pub(super) fn hide(id: &str) {
             image.original = None;
             image.filtered = None;
             drop(image);
-            root.ivars().hovered.set(false);
+            root.ivars().image.borrow_mut().hovered = false;
             root.update_toolbar();
         }
     });
@@ -936,8 +782,8 @@ pub(super) fn visible(id: &str) -> bool {
 pub(super) fn update_preferences(preferences: Preferences) {
     WINDOWS.with(|windows| {
         for (window, root) in windows.borrow().values() {
-            let changed = root.ivars().preferences.borrow().border != preferences.border;
-            *root.ivars().preferences.borrow_mut() = preferences.clone();
+            let changed = root.ivars().image.borrow().preferences.border != preferences.border;
+            root.ivars().image.borrow_mut().preferences = preferences.clone();
             window.setHasShadow(preferences.shadow);
             if changed {
                 root.setNeedsDisplay(true);
@@ -954,7 +800,9 @@ pub(super) fn replace(image: PinnedImageView) -> Result<(), String> {
                 let state = root.ivars().image.borrow();
                 (state.presentation.grayscale, state.presentation.inverted)
             };
-            let mut state = ImageState::new(image, opacity)?;
+            let mut state =
+                ImageState::new(image, root.ivars().image.borrow().preferences.clone())?;
+            state.presentation.opacity = opacity;
             state.presentation.grayscale = filters.0;
             state.presentation.inverted = filters.1;
             state.update_filter()?;
@@ -999,7 +847,7 @@ pub(super) fn test_key(id: &str, event: &NSEvent) {
 pub(super) fn test_inspection(id: &str, point: Option<NSPoint>) -> Option<[u8; 3]> {
     let root = WINDOWS.with(|windows| windows.borrow().get(id).unwrap().1.clone());
     if let Some(point) = point {
-        root.ivars().magnifier.set(true);
+        root.ivars().image.borrow_mut().modifiers.alt = true;
         root.inspect(point);
         root.ivars()
             .lens
@@ -1011,7 +859,7 @@ pub(super) fn test_inspection(id: &str, point: Option<NSPoint>) -> Option<[u8; 3
             .as_ref()
             .map(|state| state.color)
     } else {
-        root.ivars().magnifier.set(false);
+        root.ivars().image.borrow_mut().modifiers.alt = false;
         root.hide_lens();
         assert!(root.ivars().inspection.borrow().is_none());
         None
@@ -1033,6 +881,23 @@ pub(crate) fn has_key_window() -> bool {
 #[allow(dead_code)]
 pub(super) fn test_frame(id: &str) -> NSRect {
     WINDOWS.with(|windows| windows.borrow().get(id).unwrap().0.frame())
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub(super) fn test_toolbar_frames(id: &str) -> (NSRect, Vec<NSRect>) {
+    WINDOWS.with(|windows| {
+        let windows = windows.borrow();
+        let toolbar = windows.get(id).unwrap().1.ivars().toolbar.get().unwrap();
+        let buttons = toolbar
+            .contentView()
+            .unwrap()
+            .subviews()
+            .iter()
+            .map(|button| button.frame())
+            .collect();
+        (toolbar.frame(), buttons)
+    })
 }
 
 #[cfg(test)]

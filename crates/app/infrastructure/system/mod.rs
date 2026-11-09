@@ -19,7 +19,6 @@ pub(crate) mod native_theme;
 pub(crate) mod native_view_snapshot;
 pub mod ocr;
 pub mod paths;
-pub mod pinned_window;
 pub mod required_permissions;
 pub mod result_window;
 pub mod screenshot;
@@ -33,7 +32,6 @@ pub mod single_instance;
 pub mod start_on_boot;
 pub mod tts;
 pub mod updates;
-pub(crate) mod window_position;
 
 pub use hotkey_recording::RecordedHotkey;
 pub(crate) use hotkey_registrar::NativeHotkeyRegistrar;
