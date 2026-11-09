@@ -42,7 +42,7 @@ impl SqliteHistoryRepository {
             transaction.execute(
                 "INSERT INTO history_records (kind, timestamp) VALUES ('translation', ?1)",
                 [timestamp.to_rfc3339()],
-            )?;
+            ).map_err(snaplingo_core::AppError::database)?;
             let history_id = transaction.last_insert_rowid();
             transaction.execute(
                 "INSERT INTO translation_history
@@ -57,7 +57,7 @@ impl SqliteHistoryRepository {
                     serde_json::to_string(results)?,
                     duration_ms as i64,
                 ],
-            )?;
+            ).map_err(snaplingo_core::AppError::database)?;
             Ok(())
         })
     }
@@ -74,28 +74,32 @@ impl SqliteHistoryRepository {
         let image_hash = format!("{:x}", md5::compute(&request.image_data));
 
         self.database.with_transaction(|transaction| {
-            transaction.execute(
-                "INSERT INTO history_records (kind, timestamp) VALUES ('ocr', ?1)",
-                [timestamp.to_rfc3339()],
-            )?;
+            transaction
+                .execute(
+                    "INSERT INTO history_records (kind, timestamp) VALUES ('ocr', ?1)",
+                    [timestamp.to_rfc3339()],
+                )
+                .map_err(snaplingo_core::AppError::database)?;
             let history_id = transaction.last_insert_rowid();
-            transaction.execute(
-                "INSERT INTO ocr_history
+            transaction
+                .execute(
+                    "INSERT INTO ocr_history
                  (history_id, image_hash, language, provider_used, recognized_text, confidence,
                   duration_ms, source_asset_path, thumbnail_asset_path)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-                params![
-                    history_id,
-                    image_hash,
-                    request.language.as_ref(),
-                    provider_used,
-                    result.text,
-                    result.confidence,
-                    duration_ms as i64,
-                    assets.map(|value| value.source_path.as_str()),
-                    assets.map(|value| value.thumbnail_path.as_str()),
-                ],
-            )?;
+                    params![
+                        history_id,
+                        image_hash,
+                        request.language.as_ref(),
+                        provider_used,
+                        result.text,
+                        result.confidence,
+                        duration_ms as i64,
+                        assets.map(|value| value.source_path.as_str()),
+                        assets.map(|value| value.thumbnail_path.as_str()),
+                    ],
+                )
+                .map_err(snaplingo_core::AppError::database)?;
             Ok(())
         })
     }
@@ -114,18 +118,19 @@ impl SqliteHistoryRepository {
                  WHERE r.kind = 'translation'
                  ORDER BY r.timestamp DESC
                  LIMIT ?1 OFFSET ?2",
-            )?;
+            ).map_err(snaplingo_core::AppError::database)?;
             let rows = statement.query_map(params![limit as i64, offset as i64], |row| {
                 translation_entry_from_row(connection, row)
-            })?;
-            rows.collect::<std::result::Result<Vec<_>, _>>().map_err(Into::into)
+            }).map_err(snaplingo_core::AppError::database)?;
+            rows.collect::<std::result::Result<Vec<_>, _>>().map_err(snaplingo_core::AppError::database)
         })
     }
 
     pub async fn query_ocr(&self, limit: usize, offset: usize) -> Result<Vec<OcrHistoryEntry>> {
         self.database.with_connection(|connection| {
-            let mut statement = connection.prepare(
-                "SELECT r.id, r.timestamp, r.note,
+            let mut statement = connection
+                .prepare(
+                    "SELECT r.id, r.timestamp, r.note,
                         o.image_hash, o.language, o.provider_used, o.recognized_text, o.confidence,
                         o.duration_ms, o.source_asset_path, o.thumbnail_asset_path
                  FROM history_records r
@@ -133,12 +138,15 @@ impl SqliteHistoryRepository {
                  WHERE r.kind = 'ocr'
                  ORDER BY r.timestamp DESC
                  LIMIT ?1 OFFSET ?2",
-            )?;
-            let rows = statement.query_map(params![limit as i64, offset as i64], |row| {
-                ocr_entry_from_row(connection, row)
-            })?;
+                )
+                .map_err(snaplingo_core::AppError::database)?;
+            let rows = statement
+                .query_map(params![limit as i64, offset as i64], |row| {
+                    ocr_entry_from_row(connection, row)
+                })
+                .map_err(snaplingo_core::AppError::database)?;
             rows.collect::<std::result::Result<Vec<_>, _>>()
-                .map_err(Into::into)
+                .map_err(snaplingo_core::AppError::database)
         })
     }
 
@@ -165,7 +173,7 @@ impl SqliteHistoryRepository {
                    AND (?4 IS NULL OR r.id IN (SELECT value FROM json_each(?4)))",
                 params![search, pattern, tag, ids],
                 |row| row.get::<_, i64>(0),
-            )? as usize;
+            ).map_err(snaplingo_core::AppError::database)? as usize;
             let mut statement = connection.prepare(
                 "SELECT r.id, r.timestamp, r.note,
                         t.source_text, t.source_lang, t.target_lang, t.providers_used, t.results, t.duration_ms
@@ -181,7 +189,7 @@ impl SqliteHistoryRepository {
                    AND (?4 IS NULL OR r.id IN (SELECT value FROM json_each(?4)))
                  ORDER BY r.timestamp DESC, r.id DESC
                  LIMIT ?5 OFFSET ?6",
-            )?;
+            ).map_err(snaplingo_core::AppError::database)?;
             let rows = statement.query_map(
                 params![
                     search,
@@ -192,9 +200,9 @@ impl SqliteHistoryRepository {
                     query.offset as i64,
                 ],
                 |row| translation_entry_from_row(connection, row),
-            )?;
+            ).map_err(snaplingo_core::AppError::database)?;
             Ok(HistoryPage {
-                items: rows.collect::<std::result::Result<Vec<_>, _>>()?,
+                items: rows.collect::<std::result::Result<Vec<_>, _>>().map_err(snaplingo_core::AppError::database)?,
                 total,
             })
         })
@@ -209,8 +217,9 @@ impl SqliteHistoryRepository {
         let pattern = format!("%{search}%");
         let ids = query.ids.as_ref().map(serde_json::to_string).transpose()?;
         self.database.with_connection(|connection| {
-            let total = connection.query_row(
-                "SELECT COUNT(*)
+            let total = connection
+                .query_row(
+                    "SELECT COUNT(*)
                  FROM history_records r
                  JOIN ocr_history o ON o.history_id = r.id
                  WHERE r.kind = 'ocr'
@@ -221,11 +230,13 @@ impl SqliteHistoryRepository {
                        WHERE ht.history_id = r.id AND tag.name = ?3
                    ))
                    AND (?4 IS NULL OR r.id IN (SELECT value FROM json_each(?4)))",
-                params![search, pattern, tag, ids],
-                |row| row.get::<_, i64>(0),
-            )? as usize;
-            let mut statement = connection.prepare(
-                "SELECT r.id, r.timestamp, r.note,
+                    params![search, pattern, tag, ids],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(snaplingo_core::AppError::database)? as usize;
+            let mut statement = connection
+                .prepare(
+                    "SELECT r.id, r.timestamp, r.note,
                         o.image_hash, o.language, o.provider_used, o.recognized_text, o.confidence,
                         o.duration_ms, o.source_asset_path, o.thumbnail_asset_path
                  FROM history_records r
@@ -240,20 +251,25 @@ impl SqliteHistoryRepository {
                    AND (?4 IS NULL OR r.id IN (SELECT value FROM json_each(?4)))
                  ORDER BY r.timestamp DESC, r.id DESC
                  LIMIT ?5 OFFSET ?6",
-            )?;
-            let rows = statement.query_map(
-                params![
-                    search,
-                    pattern,
-                    tag,
-                    ids,
-                    query.limit as i64,
-                    query.offset as i64,
-                ],
-                |row| ocr_entry_from_row(connection, row),
-            )?;
+                )
+                .map_err(snaplingo_core::AppError::database)?;
+            let rows = statement
+                .query_map(
+                    params![
+                        search,
+                        pattern,
+                        tag,
+                        ids,
+                        query.limit as i64,
+                        query.offset as i64,
+                    ],
+                    |row| ocr_entry_from_row(connection, row),
+                )
+                .map_err(snaplingo_core::AppError::database)?;
             Ok(HistoryPage {
-                items: rows.collect::<std::result::Result<Vec<_>, _>>()?,
+                items: rows
+                    .collect::<std::result::Result<Vec<_>, _>>()
+                    .map_err(snaplingo_core::AppError::database)?,
                 total,
             })
         })
@@ -271,11 +287,11 @@ impl SqliteHistoryRepository {
                  WHERE r.kind = 'translation' AND t.source_text LIKE ?1
                  ORDER BY r.timestamp DESC
                  LIMIT 50",
-            )?;
+            ).map_err(snaplingo_core::AppError::database)?;
             let translation_rows = translation_statement.query_map([&pattern], |row| {
                 translation_entry_from_row(connection, row).map(HistoryEntry::Translation)
-            })?;
-            entries.extend(translation_rows.collect::<std::result::Result<Vec<_>, _>>()?);
+            }).map_err(snaplingo_core::AppError::database)?;
+            entries.extend(translation_rows.collect::<std::result::Result<Vec<_>, _>>().map_err(snaplingo_core::AppError::database)?);
 
             let mut ocr_statement = connection.prepare(
                 "SELECT r.id, r.timestamp, r.note,
@@ -286,11 +302,11 @@ impl SqliteHistoryRepository {
                  WHERE r.kind = 'ocr' AND o.recognized_text LIKE ?1
                  ORDER BY r.timestamp DESC
                  LIMIT 50",
-            )?;
+            ).map_err(snaplingo_core::AppError::database)?;
             let ocr_rows = ocr_statement.query_map([&pattern], |row| {
                 ocr_entry_from_row(connection, row).map(HistoryEntry::Ocr)
-            })?;
-            entries.extend(ocr_rows.collect::<std::result::Result<Vec<_>, _>>()?);
+            }).map_err(snaplingo_core::AppError::database)?;
+            entries.extend(ocr_rows.collect::<std::result::Result<Vec<_>, _>>().map_err(snaplingo_core::AppError::database)?);
 
             Ok(entries)
         })
@@ -298,7 +314,9 @@ impl SqliteHistoryRepository {
 
     pub async fn delete(&self, id: i64) -> Result<()> {
         self.database.with_transaction(|transaction| {
-            let deleted = transaction.execute("DELETE FROM history_records WHERE id = ?1", [id])?;
+            let deleted = transaction
+                .execute("DELETE FROM history_records WHERE id = ?1", [id])
+                .map_err(snaplingo_core::AppError::database)?;
             ensure_history_exists(deleted, id)
         })
     }
@@ -306,10 +324,12 @@ impl SqliteHistoryRepository {
     pub async fn update_note(&self, id: i64, note: Option<String>) -> Result<()> {
         let note = note.and_then(|value| (!value.trim().is_empty()).then_some(value));
         self.database.with_transaction(|transaction| {
-            let updated = transaction.execute(
-                "UPDATE history_records SET note = ?1 WHERE id = ?2",
-                params![note, id],
-            )?;
+            let updated = transaction
+                .execute(
+                    "UPDATE history_records SET note = ?1 WHERE id = ?2",
+                    params![note, id],
+                )
+                .map_err(snaplingo_core::AppError::database)?;
             ensure_history_exists(updated, id)
         })
     }
@@ -318,22 +338,30 @@ impl SqliteHistoryRepository {
         let tags = normalize_tags(tags);
         self.database.with_transaction(|transaction| {
             ensure_history_exists(
-                transaction.execute("UPDATE history_records SET id = id WHERE id = ?1", [id])?,
+                transaction
+                    .execute("UPDATE history_records SET id = id WHERE id = ?1", [id])
+                    .map_err(snaplingo_core::AppError::database)?,
                 id,
             )?;
-            transaction.execute("DELETE FROM history_tags WHERE history_id = ?1", [id])?;
+            transaction
+                .execute("DELETE FROM history_tags WHERE history_id = ?1", [id])
+                .map_err(snaplingo_core::AppError::database)?;
 
             for tag in tags {
-                transaction.execute("INSERT OR IGNORE INTO tags (name) VALUES (?1)", [&tag])?;
-                let tag_id: i64 = transaction.query_row(
-                    "SELECT id FROM tags WHERE name = ?1",
-                    [&tag],
-                    |row| row.get(0),
-                )?;
-                transaction.execute(
-                    "INSERT INTO history_tags (history_id, tag_id) VALUES (?1, ?2)",
-                    params![id, tag_id],
-                )?;
+                transaction
+                    .execute("INSERT OR IGNORE INTO tags (name) VALUES (?1)", [&tag])
+                    .map_err(snaplingo_core::AppError::database)?;
+                let tag_id: i64 = transaction
+                    .query_row("SELECT id FROM tags WHERE name = ?1", [&tag], |row| {
+                        row.get(0)
+                    })
+                    .map_err(snaplingo_core::AppError::database)?;
+                transaction
+                    .execute(
+                        "INSERT INTO history_tags (history_id, tag_id) VALUES (?1, ?2)",
+                        params![id, tag_id],
+                    )
+                    .map_err(snaplingo_core::AppError::database)?;
             }
 
             remove_orphan_tags(transaction)?;
@@ -343,7 +371,9 @@ impl SqliteHistoryRepository {
 
     pub async fn clear_all(&self) -> Result<()> {
         self.database.with_transaction(|transaction| {
-            transaction.execute("DELETE FROM history_records", [])?;
+            transaction
+                .execute("DELETE FROM history_records", [])
+                .map_err(snaplingo_core::AppError::database)?;
             remove_orphan_tags(transaction)?;
             Ok(())
         })
@@ -351,10 +381,12 @@ impl SqliteHistoryRepository {
 
     pub async fn clear_kind(&self, kind: HistoryKind) -> Result<()> {
         self.database.with_transaction(|transaction| {
-            transaction.execute(
-                "DELETE FROM history_records WHERE kind = ?1",
-                [kind.as_str()],
-            )?;
+            transaction
+                .execute(
+                    "DELETE FROM history_records WHERE kind = ?1",
+                    [kind.as_str()],
+                )
+                .map_err(snaplingo_core::AppError::database)?;
             remove_orphan_tags(transaction)?;
             Ok(())
         })
@@ -362,15 +394,17 @@ impl SqliteHistoryRepository {
 }
 
 fn remove_orphan_tags(connection: &Connection) -> Result<()> {
-    connection.execute(
-        "DELETE FROM tags
+    connection
+        .execute(
+            "DELETE FROM tags
          WHERE NOT EXISTS (SELECT 1 FROM history_tags ht WHERE ht.tag_id = tags.id)
            AND NOT EXISTS (
                SELECT 1 FROM screenshot_favorite_tags sft WHERE sft.tag_id = tags.id
            )
            AND NOT EXISTS (SELECT 1 FROM favorite_tags ft WHERE ft.tag_id = tags.id)",
-        [],
-    )?;
+            [],
+        )
+        .map_err(snaplingo_core::AppError::database)?;
     Ok(())
 }
 
@@ -546,15 +580,21 @@ impl HistoryRepository for SqliteHistoryRepository {
 
     async fn ocr_asset_paths(&self, id: Option<i64>) -> Result<Vec<(String, String)>> {
         self.database.with_connection(|connection| {
-            let mut statement = connection.prepare(
-                "SELECT source_asset_path, thumbnail_asset_path
+            let mut statement = connection
+                .prepare(
+                    "SELECT source_asset_path, thumbnail_asset_path
                  FROM ocr_history
                  WHERE (?1 IS NULL OR history_id = ?1)
                    AND source_asset_path IS NOT NULL
                    AND thumbnail_asset_path IS NOT NULL",
-            )?;
-            let rows = statement.query_map([id], |row| Ok((row.get(0)?, row.get(1)?)))?;
-            Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+                )
+                .map_err(snaplingo_core::AppError::database)?;
+            let rows = statement
+                .query_map([id], |row| Ok((row.get(0)?, row.get(1)?)))
+                .map_err(snaplingo_core::AppError::database)?;
+            Ok(rows
+                .collect::<rusqlite::Result<Vec<_>>>()
+                .map_err(snaplingo_core::AppError::database)?)
         })
     }
 
@@ -567,24 +607,31 @@ impl HistoryRepository for SqliteHistoryRepository {
             if policy.retention_days > 0 {
                 let cutoff = (Utc::now() - chrono::Duration::days(policy.retention_days as i64))
                     .to_rfc3339();
-                let mut statement =
-                    transaction.prepare("SELECT id FROM history_records WHERE timestamp < ?1")?;
+                let mut statement = transaction
+                    .prepare("SELECT id FROM history_records WHERE timestamp < ?1")
+                    .map_err(snaplingo_core::AppError::database)?;
                 ids.extend(
                     statement
-                        .query_map([cutoff], |row| row.get::<_, i64>(0))?
-                        .collect::<rusqlite::Result<Vec<_>>>()?,
+                        .query_map([cutoff], |row| row.get::<_, i64>(0))
+                        .map_err(snaplingo_core::AppError::database)?
+                        .collect::<rusqlite::Result<Vec<_>>>()
+                        .map_err(snaplingo_core::AppError::database)?,
                 );
             }
             if policy.maximum_records > 0 {
-                let mut statement = transaction.prepare(
-                    "SELECT id FROM history_records
+                let mut statement = transaction
+                    .prepare(
+                        "SELECT id FROM history_records
                      ORDER BY timestamp DESC, id DESC
                      LIMIT -1 OFFSET ?1",
-                )?;
+                    )
+                    .map_err(snaplingo_core::AppError::database)?;
                 ids.extend(
                     statement
-                        .query_map([policy.maximum_records as i64], |row| row.get::<_, i64>(0))?
-                        .collect::<rusqlite::Result<Vec<_>>>()?,
+                        .query_map([policy.maximum_records as i64], |row| row.get::<_, i64>(0))
+                        .map_err(snaplingo_core::AppError::database)?
+                        .collect::<rusqlite::Result<Vec<_>>>()
+                        .map_err(snaplingo_core::AppError::database)?,
                 );
             }
 
@@ -600,11 +647,14 @@ impl HistoryRepository for SqliteHistoryRepository {
                         [id],
                         |row| Ok((row.get(0)?, row.get(1)?)),
                     )
-                    .optional()?;
+                    .optional()
+                    .map_err(snaplingo_core::AppError::database)?;
                 if let Some(paths) = paths {
                     assets.push(paths);
                 }
-                transaction.execute("DELETE FROM history_records WHERE id = ?1", [id])?;
+                transaction
+                    .execute("DELETE FROM history_records WHERE id = ?1", [id])
+                    .map_err(snaplingo_core::AppError::database)?;
             }
             remove_orphan_tags(transaction)?;
             Ok((ids.len(), assets))

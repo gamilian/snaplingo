@@ -20,28 +20,36 @@ impl SqliteAppLogRepository {
 
     pub fn list(&self, limit: usize) -> Result<Vec<AppLogEntry>> {
         self.database.with_connection(|connection| {
-            let mut statement = connection.prepare(
-                "SELECT id, timestamp, level, target, message
+            let mut statement = connection
+                .prepare(
+                    "SELECT id, timestamp, level, target, message
                  FROM app_logs
                  ORDER BY id DESC
                  LIMIT ?1",
-            )?;
-            let rows = statement.query_map([limit.clamp(1, 1_000) as i64], |row| {
-                Ok(AppLogEntry {
-                    id: row.get(0)?,
-                    timestamp: row.get(1)?,
-                    level: row.get(2)?,
-                    target: row.get(3)?,
-                    message: row.get(4)?,
+                )
+                .map_err(snaplingo_core::AppError::database)?;
+            let rows = statement
+                .query_map([limit.clamp(1, 1_000) as i64], |row| {
+                    Ok(AppLogEntry {
+                        id: row.get(0)?,
+                        timestamp: row.get(1)?,
+                        level: row.get(2)?,
+                        target: row.get(3)?,
+                        message: row.get(4)?,
+                    })
                 })
-            })?;
-            Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+                .map_err(snaplingo_core::AppError::database)?;
+            Ok(rows
+                .collect::<rusqlite::Result<Vec<_>>>()
+                .map_err(snaplingo_core::AppError::database)?)
         })
     }
 
     pub fn clear(&self) -> Result<()> {
         self.database.with_connection(|connection| {
-            connection.execute("DELETE FROM app_logs", [])?;
+            connection
+                .execute("DELETE FROM app_logs", [])
+                .map_err(snaplingo_core::AppError::database)?;
             Ok(())
         })
     }
@@ -49,10 +57,12 @@ impl SqliteAppLogRepository {
     pub fn delete_expired(&self, retention_days: u16) -> Result<usize> {
         let cutoff = Utc::now() - Duration::days(i64::from(retention_days.clamp(1, 365)));
         self.database.with_connection(|connection| {
-            Ok(connection.execute(
-                "DELETE FROM app_logs WHERE timestamp < ?1",
-                [cutoff.to_rfc3339()],
-            )?)
+            Ok(connection
+                .execute(
+                    "DELETE FROM app_logs WHERE timestamp < ?1",
+                    [cutoff.to_rfc3339()],
+                )
+                .map_err(snaplingo_core::AppError::database)?)
         })
     }
 
@@ -61,11 +71,13 @@ impl SqliteAppLogRepository {
             return Ok(());
         }
         self.database.with_connection(|connection| {
-            connection.execute(
-                "INSERT INTO app_logs (timestamp, level, target, message)
+            connection
+                .execute(
+                    "INSERT INTO app_logs (timestamp, level, target, message)
                  VALUES (?1, ?2, ?3, ?4)",
-                params![Utc::now().to_rfc3339(), level, target, message],
-            )?;
+                    params![Utc::now().to_rfc3339(), level, target, message],
+                )
+                .map_err(snaplingo_core::AppError::database)?;
             Ok(())
         })
     }
@@ -144,15 +156,17 @@ mod tests {
         let database = Arc::new(Database::in_memory().unwrap());
         database
             .with_connection(|connection| {
-                connection.execute(
-                    "INSERT INTO app_logs (timestamp, level, target, message)
+                connection
+                    .execute(
+                        "INSERT INTO app_logs (timestamp, level, target, message)
                      VALUES (?1, 'INFO', 'test', 'expired'),
                             (?2, 'INFO', 'test', 'current')",
-                    params![
-                        (Utc::now() - Duration::days(8)).to_rfc3339(),
-                        Utc::now().to_rfc3339()
-                    ],
-                )?;
+                        params![
+                            (Utc::now() - Duration::days(8)).to_rfc3339(),
+                            Utc::now().to_rfc3339()
+                        ],
+                    )
+                    .map_err(snaplingo_core::AppError::database)?;
                 Ok(())
             })
             .unwrap();

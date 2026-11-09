@@ -99,8 +99,10 @@ async fn download_installer(
         .get(&installer.url)
         .timeout(Duration::from_secs(600))
         .send()
-        .await?
-        .error_for_status()?;
+        .await
+        .map_err(snaplingo_core::AppError::http)?
+        .error_for_status()
+        .map_err(snaplingo_core::AppError::http)?;
     let mut file = tokio::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -108,7 +110,11 @@ async fn download_installer(
         .await?;
     let mut hasher = Sha256::new();
     let mut downloaded = 0_u64;
-    while let Some(chunk) = response.chunk().await? {
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(snaplingo_core::AppError::http)?
+    {
         downloaded += chunk.len() as u64;
         if downloaded > installer.size {
             return Err("安装包大小与发布信息不符，已停止下载。请重新检查更新。".into());

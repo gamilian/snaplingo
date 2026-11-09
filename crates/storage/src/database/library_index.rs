@@ -26,19 +26,22 @@ impl LibraryIndexRepository for SqliteLibraryIndexRepository {
         let search = query.search.trim();
         let pattern = format!("%{search}%");
         self.database.with_connection(|connection| {
-            let total = connection.query_row(
-                "SELECT COUNT(*)
+            let total = connection
+                .query_row(
+                    "SELECT COUNT(*)
                  FROM history_records r
                  LEFT JOIN translation_history t ON t.history_id = r.id
                  LEFT JOIN ocr_history o ON o.history_id = r.id
                  WHERE ?1 = ''
                     OR (r.kind = 'translation' AND (t.source_text LIKE ?2 OR t.results LIKE ?2))
                     OR (r.kind = 'ocr' AND o.recognized_text LIKE ?2)",
-                params![search, pattern],
-                |row| row.get::<_, i64>(0),
-            )? as usize;
-            let mut statement = connection.prepare(
-                "WITH filtered AS (
+                    params![search, pattern],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(snaplingo_core::AppError::database)? as usize;
+            let mut statement = connection
+                .prepare(
+                    "WITH filtered AS (
                     SELECT r.id, r.kind, r.timestamp,
                            CASE r.kind WHEN 'translation' THEN 0 ELSE 1 END AS source_order
                     FROM history_records r
@@ -52,7 +55,8 @@ impl LibraryIndexRepository for SqliteLibraryIndexRepository {
                  FROM filtered
                  ORDER BY timestamp DESC, source_order, id DESC
                  LIMIT ?3 OFFSET ?4",
-            )?;
+                )
+                .map_err(snaplingo_core::AppError::database)?;
             let items = statement
                 .query_map(
                     params![search, pattern, query.limit as i64, query.offset as i64],
@@ -66,8 +70,10 @@ impl LibraryIndexRepository for SqliteLibraryIndexRepository {
                             kind,
                         })
                     },
-                )?
-                .collect::<rusqlite::Result<Vec<_>>>()?;
+                )
+                .map_err(snaplingo_core::AppError::database)?
+                .collect::<rusqlite::Result<Vec<_>>>()
+                .map_err(snaplingo_core::AppError::database)?;
             Ok(LibraryIndexPage { items, total })
         })
     }
@@ -77,14 +83,17 @@ impl LibraryIndexRepository for SqliteLibraryIndexRepository {
         let pattern = format!("%{search}%");
         let lowercase_pattern = format!("%{}%", search.to_lowercase());
         self.database.with_connection(|connection| {
-            let regular_total = connection.query_row(
-                "SELECT COUNT(*) FROM favorites f
+            let regular_total = connection
+                .query_row(
+                    "SELECT COUNT(*) FROM favorites f
                  WHERE ?1 = '' OR f.content_json LIKE ?2 OR COALESCE(f.note, '') LIKE ?2",
-                params![search, pattern],
-                |row| row.get::<_, i64>(0),
-            )?;
-            let screenshot_total = connection.query_row(
-                "SELECT COUNT(*) FROM screenshot_favorites sf
+                    params![search, pattern],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(snaplingo_core::AppError::database)?;
+            let screenshot_total = connection
+                .query_row(
+                    "SELECT COUNT(*) FROM screenshot_favorites sf
                  WHERE ?1 = ''
                     OR lower(COALESCE(sf.note, '')) LIKE ?2
                     OR EXISTS (
@@ -92,11 +101,13 @@ impl LibraryIndexRepository for SqliteLibraryIndexRepository {
                         JOIN tags t ON t.id = sft.tag_id
                         WHERE sft.favorite_id = sf.id AND lower(t.name) LIKE ?2
                     )",
-                params![search, lowercase_pattern],
-                |row| row.get::<_, i64>(0),
-            )?;
-            let mut statement = connection.prepare(
-                "WITH regular AS (
+                    params![search, lowercase_pattern],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(snaplingo_core::AppError::database)?;
+            let mut statement = connection
+                .prepare(
+                    "WITH regular AS (
                     SELECT f.id, f.kind, f.created_at,
                            0 AS source_order
                     FROM favorites f
@@ -123,7 +134,8 @@ impl LibraryIndexRepository for SqliteLibraryIndexRepository {
                  FROM combined
                  ORDER BY created_at DESC, source_order, id DESC
                  LIMIT ?4 OFFSET ?5",
-            )?;
+                )
+                .map_err(snaplingo_core::AppError::database)?;
             let items = statement
                 .query_map(
                     params![
@@ -144,8 +156,10 @@ impl LibraryIndexRepository for SqliteLibraryIndexRepository {
                             kind,
                         })
                     },
-                )?
-                .collect::<rusqlite::Result<Vec<_>>>()?;
+                )
+                .map_err(snaplingo_core::AppError::database)?
+                .collect::<rusqlite::Result<Vec<_>>>()
+                .map_err(snaplingo_core::AppError::database)?;
             Ok(LibraryIndexPage {
                 items,
                 total: (regular_total + screenshot_total) as usize,
@@ -175,23 +189,29 @@ mod tests {
         let database = Arc::new(Database::in_memory().unwrap());
         database
             .with_connection(|connection| {
-                connection.execute(
-                    "INSERT INTO favorites (kind, created_at, fingerprint, content_json)
+                connection
+                    .execute(
+                        "INSERT INTO favorites (kind, created_at, fingerprint, content_json)
                      VALUES ('translation', ?1, 'regular', '{}')",
-                    ["2026-07-15T08:00:00Z"],
-                )?;
-                connection.execute(
-                    "INSERT INTO screenshot_favorites
+                        ["2026-07-15T08:00:00Z"],
+                    )
+                    .map_err(snaplingo_core::AppError::database)?;
+                connection
+                    .execute(
+                        "INSERT INTO screenshot_favorites
                      (created_at, asset_path, thumbnail_path, width, height)
                      VALUES (?1, 'one.png', 'one-thumb.png', 1, 1)",
-                    ["2026-07-15T09:00:00Z"],
-                )?;
-                connection.execute(
-                    "INSERT INTO screenshot_favorites
+                        ["2026-07-15T09:00:00Z"],
+                    )
+                    .map_err(snaplingo_core::AppError::database)?;
+                connection
+                    .execute(
+                        "INSERT INTO screenshot_favorites
                      (created_at, asset_path, thumbnail_path, width, height)
                      VALUES (?1, 'two.png', 'two-thumb.png', 1, 1)",
-                    ["2026-07-15T07:00:00Z"],
-                )?;
+                        ["2026-07-15T07:00:00Z"],
+                    )
+                    .map_err(snaplingo_core::AppError::database)?;
                 Ok(())
             })
             .unwrap();
@@ -224,7 +244,7 @@ mod tests {
                     connection.execute(
                         "INSERT INTO history_records (kind, timestamp) VALUES (?1, ?2)",
                         params![kind, timestamp],
-                    )?;
+                    ).map_err(snaplingo_core::AppError::database)?;
                     let id = connection.last_insert_rowid();
                     if kind == "translation" {
                         connection.execute(
@@ -232,14 +252,14 @@ mod tests {
                              (history_id, source_text, source_lang, target_lang, providers_used, results, duration_ms)
                              VALUES (?1, 'text', 'en', 'zh-CN', '[]', '[]', 1)",
                             [id],
-                        )?;
+                        ).map_err(snaplingo_core::AppError::database)?;
                     } else {
                         connection.execute(
                             "INSERT INTO ocr_history
                              (history_id, image_hash, provider_used, recognized_text, duration_ms)
                              VALUES (?1, 'hash', 'system', 'text', 1)",
                             [id],
-                        )?;
+                        ).map_err(snaplingo_core::AppError::database)?;
                     }
                 }
                 Ok(())

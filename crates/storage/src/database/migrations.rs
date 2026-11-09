@@ -5,7 +5,9 @@ use crate::{AppError, Result};
 const CURRENT_SCHEMA_VERSION: i32 = 6;
 
 pub(super) fn migrate(connection: &mut Connection) -> Result<()> {
-    let mut version: i32 = connection.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+    let mut version: i32 = connection
+        .query_row("PRAGMA user_version", [], |row| row.get(0))
+        .map_err(snaplingo_core::AppError::database)?;
 
     if version > CURRENT_SCHEMA_VERSION {
         return Err(AppError::Other(format!(
@@ -16,7 +18,9 @@ pub(super) fn migrate(connection: &mut Connection) -> Result<()> {
 
     while version < CURRENT_SCHEMA_VERSION {
         let next_version = version + 1;
-        let transaction = connection.transaction()?;
+        let transaction = connection
+            .transaction()
+            .map_err(snaplingo_core::AppError::database)?;
         match next_version {
             1 => migrate_to_v1(&transaction)?,
             2 => migrate_to_v2(&transaction)?,
@@ -26,8 +30,12 @@ pub(super) fn migrate(connection: &mut Connection) -> Result<()> {
             6 => migrate_to_v6(&transaction)?,
             _ => unreachable!("missing migration for version {}", next_version),
         }
-        transaction.pragma_update(None, "user_version", next_version)?;
-        transaction.commit()?;
+        transaction
+            .pragma_update(None, "user_version", next_version)
+            .map_err(snaplingo_core::AppError::database)?;
+        transaction
+            .commit()
+            .map_err(snaplingo_core::AppError::database)?;
         version = next_version;
     }
 
@@ -35,19 +43,22 @@ pub(super) fn migrate(connection: &mut Connection) -> Result<()> {
 }
 
 fn migrate_to_v5(transaction: &Transaction<'_>) -> Result<()> {
-    transaction.execute_batch(
-        "CREATE TABLE provider_credentials (
+    transaction
+        .execute_batch(
+            "CREATE TABLE provider_credentials (
             storage_key TEXT PRIMARY KEY,
             value TEXT NOT NULL,
             updated_at INTEGER NOT NULL
         );",
-    )?;
+        )
+        .map_err(snaplingo_core::AppError::database)?;
     Ok(())
 }
 
 fn migrate_to_v6(transaction: &Transaction<'_>) -> Result<()> {
-    transaction.execute_batch(
-        "INSERT INTO provider_credentials (storage_key, value, updated_at)
+    transaction
+        .execute_batch(
+            "INSERT INTO provider_credentials (storage_key, value, updated_at)
          SELECT
             substr(storage_key, 1, length(storage_key) - length(':api_key'))
                 || ':credential:api_key',
@@ -66,13 +77,15 @@ fn migrate_to_v6(transaction: &Transaction<'_>) -> Result<()> {
            AND storage_key NOT GLOB 'provider:*:credential:*';
 
          DROP TABLE IF EXISTS credential_store_metadata;",
-    )?;
+        )
+        .map_err(snaplingo_core::AppError::database)?;
     Ok(())
 }
 
 fn migrate_to_v4(transaction: &Transaction<'_>) -> Result<()> {
-    transaction.execute_batch(
-        "CREATE TABLE app_logs (
+    transaction
+        .execute_batch(
+            "CREATE TABLE app_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT NOT NULL,
             level TEXT NOT NULL CHECK(level IN ('DEBUG', 'INFO', 'WARN', 'ERROR')),
@@ -81,13 +94,15 @@ fn migrate_to_v4(transaction: &Transaction<'_>) -> Result<()> {
         );
 
         CREATE INDEX idx_app_logs_timestamp ON app_logs(timestamp DESC);",
-    )?;
+        )
+        .map_err(snaplingo_core::AppError::database)?;
     Ok(())
 }
 
 fn migrate_to_v3(transaction: &Transaction<'_>) -> Result<()> {
-    transaction.execute_batch(
-        "CREATE TABLE favorites (
+    transaction
+        .execute_batch(
+            "CREATE TABLE favorites (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             kind TEXT NOT NULL CHECK(kind IN ('translation', 'ocr')),
             source_history_id INTEGER,
@@ -107,13 +122,15 @@ fn migrate_to_v3(transaction: &Transaction<'_>) -> Result<()> {
             ON favorites(kind, created_at DESC);
         CREATE INDEX idx_favorite_tags_tag_id
             ON favorite_tags(tag_id);",
-    )?;
+        )
+        .map_err(snaplingo_core::AppError::database)?;
     Ok(())
 }
 
 fn migrate_to_v2(transaction: &Transaction<'_>) -> Result<()> {
-    transaction.execute_batch(
-        "ALTER TABLE ocr_history ADD COLUMN source_asset_path TEXT;
+    transaction
+        .execute_batch(
+            "ALTER TABLE ocr_history ADD COLUMN source_asset_path TEXT;
         ALTER TABLE ocr_history ADD COLUMN thumbnail_asset_path TEXT;
 
         CREATE TABLE screenshot_favorites (
@@ -136,13 +153,15 @@ fn migrate_to_v2(transaction: &Transaction<'_>) -> Result<()> {
             ON screenshot_favorites(created_at DESC);
         CREATE INDEX idx_screenshot_favorite_tags_tag_id
             ON screenshot_favorite_tags(tag_id);",
-    )?;
+        )
+        .map_err(snaplingo_core::AppError::database)?;
     Ok(())
 }
 
 fn migrate_to_v1(transaction: &Transaction<'_>) -> Result<()> {
-    transaction.execute_batch(
-        "CREATE TABLE settings (
+    transaction
+        .execute_batch(
+            "CREATE TABLE settings (
             namespace TEXT PRIMARY KEY,
             payload_version INTEGER NOT NULL,
             payload_json TEXT NOT NULL CHECK(json_valid(payload_json)),
@@ -192,7 +211,8 @@ fn migrate_to_v1(transaction: &Transaction<'_>) -> Result<()> {
         CREATE INDEX idx_history_records_timestamp ON history_records(timestamp DESC);
         CREATE INDEX idx_history_records_favorite ON history_records(favorite, timestamp DESC);
         CREATE INDEX idx_history_tags_tag_id ON history_tags(tag_id);",
-    )?;
+        )
+        .map_err(snaplingo_core::AppError::database)?;
     Ok(())
 }
 

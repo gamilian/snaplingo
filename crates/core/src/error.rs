@@ -4,9 +4,9 @@ use std::fmt;
 pub enum AppError {
     Io(std::io::Error),
     Json(serde_json::Error),
-    Http(reqwest::Error),
+    Http(Box<dyn std::error::Error + Send + Sync>),
     CredentialNotFound(String),
-    Database(rusqlite::Error),
+    Database(Box<dyn std::error::Error + Send + Sync>),
     Config(String),
     ProviderNotFound(String),
     ProviderNotConfigured(String),
@@ -51,8 +51,8 @@ impl std::error::Error for AppError {
         match self {
             AppError::Io(e) => Some(e),
             AppError::Json(e) => Some(e),
-            AppError::Http(e) => Some(e),
-            AppError::Database(e) => Some(e),
+            AppError::Http(e) => Some(e.as_ref()),
+            AppError::Database(e) => Some(e.as_ref()),
             _ => None,
         }
     }
@@ -70,15 +70,25 @@ impl From<serde_json::Error> for AppError {
     }
 }
 
+#[cfg(test)]
 impl From<reqwest::Error> for AppError {
-    fn from(err: reqwest::Error) -> Self {
-        AppError::Http(err)
+    fn from(error: reqwest::Error) -> Self {
+        Self::http(error)
+    }
+}
+#[cfg(test)]
+impl From<rusqlite::Error> for AppError {
+    fn from(error: rusqlite::Error) -> Self {
+        Self::database(error)
     }
 }
 
-impl From<rusqlite::Error> for AppError {
-    fn from(err: rusqlite::Error) -> Self {
-        AppError::Database(err)
+impl AppError {
+    pub fn http(error: impl std::error::Error + Send + Sync + 'static) -> Self {
+        Self::Http(Box::new(error))
+    }
+    pub fn database(error: impl std::error::Error + Send + Sync + 'static) -> Self {
+        Self::Database(Box::new(error))
     }
 }
 

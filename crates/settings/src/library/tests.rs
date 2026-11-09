@@ -41,9 +41,9 @@ pub(crate) fn fixture() -> Fixture {
     let database = Arc::new(Database::open(&path).unwrap());
     database.with_connection(|connection| {
         for text in ["old", "new"] {
-            connection.execute("INSERT INTO history_records(kind,timestamp) VALUES ('translation','2026-11-08T01:00:00+00:00')", [])?;
+            connection.execute("INSERT INTO history_records(kind,timestamp) VALUES ('translation','2026-11-08T01:00:00+00:00')", []).map_err(snaplingo_core::AppError::database)?;
             let id = connection.last_insert_rowid();
-            connection.execute("INSERT INTO translation_history(history_id,source_text,source_lang,target_lang,providers_used,results,duration_ms) VALUES (?1,?2,'en','zh-CN','[]','[]',1)", rusqlite::params![id,text])?;
+            connection.execute("INSERT INTO translation_history(history_id,source_text,source_lang,target_lang,providers_used,results,duration_ms) VALUES (?1,?2,'en','zh-CN','[]','[]',1)", rusqlite::params![id,text]).map_err(snaplingo_core::AppError::database)?;
         }
         Ok(())
     }).unwrap();
@@ -115,7 +115,7 @@ async fn metadata_blurs_preserve_input_order_when_worker_futures_are_polled_in_r
         },
     );
     f.database.with_connection(|connection| {
-        connection.execute("INSERT INTO favorites(kind,created_at,fingerprint,content_json) VALUES ('translation','2026-11-08T01:00:00+00:00','fixture',?1)", [serde_json::to_string(&content)?])?;
+        connection.execute("INSERT INTO favorites(kind,created_at,fingerprint,content_json) VALUES ('translation','2026-11-08T01:00:00+00:00','fixture',?1)", [serde_json::to_string(&content)?]).map_err(snaplingo_core::AppError::database)?;
         Ok(())
     }).unwrap();
     f.session
@@ -155,7 +155,7 @@ async fn metadata_blurs_preserve_input_order_when_worker_futures_are_polled_in_r
                 "SELECT note,(SELECT group_concat(name) FROM tags JOIN favorite_tags ON tags.id=favorite_tags.tag_id WHERE favorite_tags.favorite_id=favorites.id) FROM favorites WHERE id=?1",
                 [key.id],
                 |r| Ok((r.get(0)?, r.get(1)?)),
-            )?)
+            ).map_err(snaplingo_core::AppError::database)?)
         })
         .unwrap();
     assert_eq!(saved.0.as_deref(), Some("最后🙂"));
@@ -173,7 +173,9 @@ async fn disposing_the_page_cancels_queued_mutations_before_the_worker_starts() 
     let count: i64 = f
         .database
         .with_connection(|connection| {
-            Ok(connection.query_row("SELECT COUNT(*) FROM history_records", [], |r| r.get(0))?)
+            Ok(connection
+                .query_row("SELECT COUNT(*) FROM history_records", [], |r| r.get(0))
+                .map_err(snaplingo_core::AppError::database)?)
         })
         .unwrap();
     assert_eq!(count, 2);

@@ -157,20 +157,20 @@ fn pages(
 }
 fn history(database: &Database, kind: &str, second: i64, text: &str) -> i64 {
     database.with_connection(|connection| {
-        connection.execute("INSERT INTO history_records(kind,timestamp) VALUES (?1,?2)", rusqlite::params![kind,Utc.timestamp_opt(second,0).unwrap().to_rfc3339()])?;
+        connection.execute("INSERT INTO history_records(kind,timestamp) VALUES (?1,?2)", rusqlite::params![kind,Utc.timestamp_opt(second,0).unwrap().to_rfc3339()]).map_err(snaplingo_core::AppError::database)?;
         let id=connection.last_insert_rowid();
         if kind=="translation" {
             let results=serde_json::to_string(&vec![TranslationResult::success("system",format!("translated {text}"),None,None)])?;
-            connection.execute("INSERT INTO translation_history(history_id,source_text,source_lang,target_lang,providers_used,results,duration_ms) VALUES (?1,?2,'en','zh-CN','[\"system\"]',?3,1)",rusqlite::params![id,text,results])?;
+            connection.execute("INSERT INTO translation_history(history_id,source_text,source_lang,target_lang,providers_used,results,duration_ms) VALUES (?1,?2,'en','zh-CN','[\"system\"]',?3,1)",rusqlite::params![id,text,results]).map_err(snaplingo_core::AppError::database)?;
         } else {
-            connection.execute("INSERT INTO ocr_history(history_id,image_hash,provider_used,recognized_text,duration_ms,source_asset_path,thumbnail_asset_path) VALUES (?1,?2,'system',?3,1,?4,?5)",rusqlite::params![id,format!("hash-{id}"),text,format!("source-{id}"),format!("thumb-{id}")])?;
+            connection.execute("INSERT INTO ocr_history(history_id,image_hash,provider_used,recognized_text,duration_ms,source_asset_path,thumbnail_asset_path) VALUES (?1,?2,'system',?3,1,?4,?5)",rusqlite::params![id,format!("hash-{id}"),text,format!("source-{id}"),format!("thumb-{id}")]).map_err(snaplingo_core::AppError::database)?;
         }
         Ok(id)
     }).unwrap()
 }
 fn screenshot(database: &Database, second: i64) -> i64 {
     database.with_connection(|connection| {
-        connection.execute("INSERT INTO screenshot_favorites(created_at,asset_path,thumbnail_path,width,height) VALUES (?1,?2,?3,10,20)",rusqlite::params![Utc.timestamp_opt(second,0).unwrap().to_rfc3339(),format!("image-{second}"),format!("screen-thumb-{second}")])?;
+        connection.execute("INSERT INTO screenshot_favorites(created_at,asset_path,thumbnail_path,width,height) VALUES (?1,?2,?3,10,20)",rusqlite::params![Utc.timestamp_opt(second,0).unwrap().to_rfc3339(),format!("image-{second}"),format!("screen-thumb-{second}")]).map_err(snaplingo_core::AppError::database)?;
         Ok(connection.last_insert_rowid())
     }).unwrap()
 }
@@ -198,7 +198,7 @@ async fn global_history_page_hydrates_only_final_ids_and_membership_without_favo
         result: TranslationResult::success("system", "translated item-25", None, None),
     });
     database.with_connection(|connection| {
-        connection.execute("INSERT INTO favorites(kind,created_at,fingerprint,content_json) VALUES ('translation','2026-01-01','membership',?1)",[serde_json::to_string(&content)?])?;
+        connection.execute("INSERT INTO favorites(kind,created_at,fingerprint,content_json) VALUES ('translation','2026-01-01','membership',?1)",[serde_json::to_string(&content)?]).map_err(snaplingo_core::AppError::database)?;
         Ok(())
     }).unwrap();
     let library = pages(
@@ -312,7 +312,9 @@ impl LibraryIndexRepository for ChangingIndex {
             .await?;
         history(&self.database, "translation", 100, "inserted after index");
         self.database.with_connection(|connection| {
-            connection.execute("DELETE FROM history_records WHERE id=2", [])?;
+            connection
+                .execute("DELETE FROM history_records WHERE id=2", [])
+                .map_err(snaplingo_core::AppError::database)?;
             Ok(())
         })?;
         Ok(result)
@@ -361,7 +363,7 @@ async fn cross_source_favorites_keep_colliding_ids_distinct_and_search_source_me
         result: TranslationResult::success("system", "translated", None, None),
     });
     database.with_connection(|connection| {
-        connection.execute("INSERT INTO favorites(kind,created_at,fingerprint,content_json) VALUES ('translation',?1,'regular',?2)",rusqlite::params![Utc.timestamp_opt(2,0).unwrap().to_rfc3339(),serde_json::to_string(&content)?])?;
+        connection.execute("INSERT INTO favorites(kind,created_at,fingerprint,content_json) VALUES ('translation',?1,'regular',?2)",rusqlite::params![Utc.timestamp_opt(2,0).unwrap().to_rfc3339(),serde_json::to_string(&content)?]).map_err(snaplingo_core::AppError::database)?;
         Ok(())
     }).unwrap();
     let library = pages(

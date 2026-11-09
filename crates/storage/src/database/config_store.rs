@@ -80,7 +80,7 @@ impl SqliteConfigStore {
                     revision = settings.revision + 1,
                     updated_at = excluded.updated_at",
                 params![namespace, PAYLOAD_VERSION, payload, updated_at],
-            )?;
+            ).map_err(snaplingo_core::AppError::database)?;
             Ok(())
         })
     }
@@ -103,7 +103,7 @@ impl SqliteConfigStore {
                     |row| row.get::<_, String>(0),
                 )
                 .optional()
-                .map_err(Into::into)
+                .map_err(snaplingo_core::AppError::database)
         })?;
 
         payload

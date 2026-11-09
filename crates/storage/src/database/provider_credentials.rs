@@ -39,10 +39,12 @@ impl ProviderCredentialStore for SqliteCredentialStore {
     fn delete_provider_credential(&self, provider_id: &str) -> Result<()> {
         let storage_key = credential_storage_key(provider_id, "api_key");
         let deleted = self.database.with_transaction(|transaction| {
-            Ok(transaction.execute(
-                "DELETE FROM provider_credentials WHERE storage_key = ?1",
-                [&storage_key],
-            )?)
+            Ok(transaction
+                .execute(
+                    "DELETE FROM provider_credentials WHERE storage_key = ?1",
+                    [&storage_key],
+                )
+                .map_err(snaplingo_core::AppError::database)?)
         })?;
         if deleted == 0 {
             return Err(AppError::CredentialNotFound(storage_key));
@@ -110,10 +112,12 @@ impl ProviderCredentialStore for SqliteCredentialStore {
                 match value {
                     Some(value) => upsert(transaction, &storage_key, value, updated_at)?,
                     None => {
-                        transaction.execute(
-                            "DELETE FROM provider_credentials WHERE storage_key = ?1",
-                            [&storage_key],
-                        )?;
+                        transaction
+                            .execute(
+                                "DELETE FROM provider_credentials WHERE storage_key = ?1",
+                                [&storage_key],
+                            )
+                            .map_err(snaplingo_core::AppError::database)?;
                     }
                 }
             }
@@ -145,10 +149,12 @@ impl ProviderCredentialStore for SqliteCredentialStore {
     fn delete_provider_credentials(&self, provider_id: &str, field_names: &[String]) -> Result<()> {
         self.database.with_transaction(|transaction| {
             for field_name in field_names {
-                transaction.execute(
-                    "DELETE FROM provider_credentials WHERE storage_key = ?1",
-                    [credential_storage_key(provider_id, field_name)],
-                )?;
+                transaction
+                    .execute(
+                        "DELETE FROM provider_credentials WHERE storage_key = ?1",
+                        [credential_storage_key(provider_id, field_name)],
+                    )
+                    .map_err(snaplingo_core::AppError::database)?;
             }
             Ok(())
         })
@@ -166,7 +172,8 @@ fn load_optional(connection: &Connection, storage_key: &str) -> Result<Option<St
             [storage_key],
             |row| row.get::<_, String>(0),
         )
-        .optional()?)
+        .optional()
+        .map_err(snaplingo_core::AppError::database)?)
 }
 
 fn upsert(
@@ -175,14 +182,16 @@ fn upsert(
     value: &str,
     updated_at: i64,
 ) -> Result<()> {
-    transaction.execute(
-        "INSERT INTO provider_credentials (storage_key, value, updated_at)
+    transaction
+        .execute(
+            "INSERT INTO provider_credentials (storage_key, value, updated_at)
          VALUES (?1, ?2, ?3)
          ON CONFLICT(storage_key) DO UPDATE SET
             value = excluded.value,
             updated_at = excluded.updated_at",
-        params![storage_key, value, updated_at],
-    )?;
+            params![storage_key, value, updated_at],
+        )
+        .map_err(snaplingo_core::AppError::database)?;
     Ok(())
 }
 
@@ -212,14 +221,16 @@ mod tests {
         let database = Arc::new(Database::in_memory().unwrap());
         database
             .with_connection(|connection| {
-                connection.execute_batch(
-                    "CREATE TRIGGER reject_second_credential
+                connection
+                    .execute_batch(
+                        "CREATE TRIGGER reject_second_credential
                      BEFORE INSERT ON provider_credentials
                      WHEN NEW.storage_key LIKE '%:field2'
                      BEGIN
                        SELECT RAISE(ABORT, 'rejected field2');
                      END;",
-                )?;
+                    )
+                    .map_err(snaplingo_core::AppError::database)?;
                 Ok(())
             })
             .unwrap();

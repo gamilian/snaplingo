@@ -29,7 +29,7 @@ impl FavoriteCapacityRepository for SqliteFavoriteCapacityRepository {
                     |row| row.get::<_, i64>(0),
                 )
                 .map(|count| count as usize)
-                .map_err(Into::into)
+                .map_err(snaplingo_core::AppError::database)
         })
     }
 }
@@ -47,18 +47,22 @@ mod tests {
         let database = Arc::new(Database::in_memory().unwrap());
         database
             .with_connection(|connection| {
-                connection.execute(
-                    "INSERT INTO favorites
+                connection
+                    .execute(
+                        "INSERT INTO favorites
                      (kind, created_at, fingerprint, content_json)
                      VALUES ('translation', '2026-07-15T00:00:00Z', 'one', '{}')",
-                    [],
-                )?;
-                connection.execute(
-                    "INSERT INTO screenshot_favorites
+                        [],
+                    )
+                    .map_err(snaplingo_core::AppError::database)?;
+                connection
+                    .execute(
+                        "INSERT INTO screenshot_favorites
                      (created_at, asset_path, thumbnail_path, width, height)
                      VALUES ('2026-07-15T00:00:00Z', 'one.png', 'one-thumb.png', 1, 1)",
-                    [],
-                )?;
+                        [],
+                    )
+                    .map_err(snaplingo_core::AppError::database)?;
                 Ok(())
             })
             .unwrap();

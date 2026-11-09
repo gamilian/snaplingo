@@ -35,10 +35,10 @@ async fn navigation_totals_follow_real_database_insert_and_delete() {
     wait(&notify).await;
     assert_eq!(counts(&usage), (Some(0), Some(0)));
     database.with_connection(|connection|{
-        connection.execute("INSERT INTO history_records(kind,timestamp) VALUES ('translation','2026-11-09T01:00:00Z')",[])?;
-        let id=connection.last_insert_rowid();connection.execute("INSERT INTO translation_history(history_id,source_text,source_lang,target_lang,providers_used,results,duration_ms) VALUES (?1,'text','en','zh-CN','[]','[]',1)",[id])?;
-        connection.execute("INSERT INTO favorites(kind,created_at,fingerprint,content_json) VALUES ('translation','2026-11-09T01:00:00Z','fixture','{}')",[])?;
-        connection.execute("INSERT INTO screenshot_favorites(created_at,asset_path,thumbnail_path,width,height) VALUES ('2026-11-09T01:00:00Z','image.png','thumb.png',1,1)",[])?;
+        connection.execute("INSERT INTO history_records(kind,timestamp) VALUES ('translation','2026-11-09T01:00:00Z')",[]).map_err(snaplingo_core::AppError::database)?;
+        let id=connection.last_insert_rowid();connection.execute("INSERT INTO translation_history(history_id,source_text,source_lang,target_lang,providers_used,results,duration_ms) VALUES (?1,'text','en','zh-CN','[]','[]',1)",[id]).map_err(snaplingo_core::AppError::database)?;
+        connection.execute("INSERT INTO favorites(kind,created_at,fingerprint,content_json) VALUES ('translation','2026-11-09T01:00:00Z','fixture','{}')",[]).map_err(snaplingo_core::AppError::database)?;
+        connection.execute("INSERT INTO screenshot_favorites(created_at,asset_path,thumbnail_path,width,height) VALUES ('2026-11-09T01:00:00Z','image.png','thumb.png',1,1)",[]).map_err(snaplingo_core::AppError::database)?;
         Ok(())
     }).unwrap();
     usage.refresh();
@@ -46,8 +46,12 @@ async fn navigation_totals_follow_real_database_insert_and_delete() {
     assert_eq!(counts(&usage), (Some(1), Some(2)));
     database
         .with_connection(|connection| {
-            connection.execute("DELETE FROM history_records", [])?;
-            connection.execute("DELETE FROM favorites", [])?;
+            connection
+                .execute("DELETE FROM history_records", [])
+                .map_err(snaplingo_core::AppError::database)?;
+            connection
+                .execute("DELETE FROM favorites", [])
+                .map_err(snaplingo_core::AppError::database)?;
             Ok(())
         })
         .unwrap();
@@ -56,7 +60,9 @@ async fn navigation_totals_follow_real_database_insert_and_delete() {
     assert_eq!(counts(&usage), (Some(0), Some(1)));
     database
         .with_connection(|connection| {
-            connection.execute("DELETE FROM screenshot_favorites", [])?;
+            connection
+                .execute("DELETE FROM screenshot_favorites", [])
+                .map_err(snaplingo_core::AppError::database)?;
             Ok(())
         })
         .unwrap();

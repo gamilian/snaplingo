@@ -607,7 +607,7 @@ pub(crate) mod tests {
         let f = fixture();
         assert_eq!(f.controller.projection().unwrap().logs.len(), 1);
         f.database.with_connection(|connection| {
-            connection.execute("INSERT INTO history_records (kind, timestamp) VALUES ('translation', '2026-11-07')", [])?;
+            connection.execute("INSERT INTO history_records (kind, timestamp) VALUES ('translation', '2026-11-07')", []).map_err(snaplingo_core::AppError::database)?;
             Ok(())
         }).unwrap();
         for action in [
@@ -627,11 +627,11 @@ pub(crate) mod tests {
         let count = f
             .database
             .with_connection(|connection| {
-                Ok(
-                    connection.query_row("SELECT count(*) FROM history_records", [], |row| {
+                Ok(connection
+                    .query_row("SELECT count(*) FROM history_records", [], |row| {
                         row.get::<_, u32>(0)
-                    })?,
-                )
+                    })
+                    .map_err(snaplingo_core::AppError::database)?)
             })
             .unwrap();
         assert_eq!(count, 0);

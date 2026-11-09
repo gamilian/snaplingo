@@ -40,7 +40,7 @@ impl Database {
             restrict_directory_permissions(parent)?;
         }
 
-        let mut connection = Connection::open(path)?;
+        let mut connection = Connection::open(path).map_err(snaplingo_core::AppError::database)?;
         restrict_file_permissions(path)?;
         configure_connection(&connection)?;
         migrations::migrate(&mut connection)?;
@@ -52,7 +52,8 @@ impl Database {
 
     #[cfg(any(test, feature = "test-support"))]
     pub fn in_memory() -> Result<Self> {
-        let mut connection = Connection::open_in_memory()?;
+        let mut connection =
+            Connection::open_in_memory().map_err(snaplingo_core::AppError::database)?;
         configure_connection(&connection)?;
         migrations::migrate(&mut connection)?;
 
@@ -74,9 +75,13 @@ impl Database {
         operation: impl FnOnce(&Transaction<'_>) -> Result<T>,
     ) -> Result<T> {
         let mut connection = self.connection.lock().unwrap();
-        let transaction = connection.transaction()?;
+        let transaction = connection
+            .transaction()
+            .map_err(snaplingo_core::AppError::database)?;
         let value = operation(&transaction)?;
-        transaction.commit()?;
+        transaction
+            .commit()
+            .map_err(snaplingo_core::AppError::database)?;
         Ok(value)
     }
 }
@@ -104,12 +109,14 @@ fn restrict_file_permissions(_path: &Path) -> Result<()> {
 }
 
 fn configure_connection(connection: &Connection) -> Result<()> {
-    connection.execute_batch(
-        "PRAGMA foreign_keys = ON;
+    connection
+        .execute_batch(
+            "PRAGMA foreign_keys = ON;
          PRAGMA journal_mode = WAL;
          PRAGMA synchronous = NORMAL;
          PRAGMA busy_timeout = 5000;",
-    )?;
+        )
+        .map_err(snaplingo_core::AppError::database)?;
     Ok(())
 }
 
@@ -130,7 +137,9 @@ mod tests {
         let database = Database::open(&path).unwrap();
         let version = database
             .with_connection(|connection| {
-                Ok(connection.query_row("PRAGMA user_version", [], |row| row.get::<_, i32>(0))?)
+                Ok(connection
+                    .query_row("PRAGMA user_version", [], |row| row.get::<_, i32>(0))
+                    .map_err(snaplingo_core::AppError::database)?)
             })
             .unwrap();
         assert_eq!(version, 6);

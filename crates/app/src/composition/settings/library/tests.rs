@@ -44,9 +44,9 @@ pub(in crate::composition::settings) fn fixture() -> Fixture {
     let database = Arc::new(Database::open(&path).unwrap());
     database.with_connection(|connection| {
         for text in ["old", "new"] {
-            connection.execute("INSERT INTO history_records(kind,timestamp) VALUES ('translation','2026-11-08T01:00:00+00:00')", [])?;
+            connection.execute("INSERT INTO history_records(kind,timestamp) VALUES ('translation','2026-11-08T01:00:00+00:00')", []).map_err(snaplingo_core::AppError::database)?;
             let id = connection.last_insert_rowid();
-            connection.execute("INSERT INTO translation_history(history_id,source_text,source_lang,target_lang,providers_used,results,duration_ms) VALUES (?1,?2,'en','zh-CN','[]','[]',1)", rusqlite::params![id,text])?;
+            connection.execute("INSERT INTO translation_history(history_id,source_text,source_lang,target_lang,providers_used,results,duration_ms) VALUES (?1,?2,'en','zh-CN','[]','[]',1)", rusqlite::params![id,text]).map_err(snaplingo_core::AppError::database)?;
         }
         Ok(())
     }).unwrap();

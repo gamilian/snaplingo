@@ -124,9 +124,9 @@ and sampling restoration follows the ordinary await path.
 Evidence: public `AppError` contains Reqwest and SQLite error types; Core tests
 compile App/Storage sources through `#[path]` and `include!`.
 
-- [ ] Convert technical errors inside their adapters while retaining diagnostic
+- [x] Convert technical errors inside their adapters while retaining diagnostic
   causes and existing observable error classification.
-- [ ] Remove production Core dependencies required only by concrete error types.
+- [x] Remove production Core dependencies required only by concrete error types.
 - [ ] Keep portable behavior tests at existing workflow interfaces; locate real
   SQLite/network integration tests outside Core and remove source-file imports.
 - [ ] Narrow migration re-exports as callers/tests move to their owning crate.
@@ -203,3 +203,11 @@ steps finish. Compilation is evidence of compilation, not desktop acceptance.
   3 workspace) pass against the relocated portable Settings sources as well.
   Services navigation now has an injected store adapter; Settings has no
   production Storage dependency. Portable and preview regression tests pass.
+
+- Step 3a: Core errors retain opaque diagnostic causes while Storage and HTTP
+  adapters convert concrete errors explicitly. Reqwest and SQLite are now Core
+  dev-dependencies only, used by the existing adapter fixtures. The attempted
+  wholesale test relocation was discarded: private implementation tests need
+  individual interface-level replacement, not enlarged production visibility.
+  Existing Core test coverage remains in place; test ownership/re-export cleanup
+  is an explicit follow-up within step 3.

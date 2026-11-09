@@ -23,19 +23,26 @@ impl SqliteScreenshotFavoriteRepository {
     }
 
     fn read_record(connection: &Connection, row: &Row<'_>) -> Result<ScreenshotFavoriteRecord> {
-        let id = row.get(0)?;
-        let created_at = DateTime::parse_from_rfc3339(&row.get::<_, String>(1)?)
-            .map_err(|error| AppError::Other(error.to_string()))?
-            .with_timezone(&Utc);
+        let id = row.get(0).map_err(snaplingo_core::AppError::database)?;
+        let created_at = DateTime::parse_from_rfc3339(
+            &row.get::<_, String>(1)
+                .map_err(snaplingo_core::AppError::database)?,
+        )
+        .map_err(|error| AppError::Other(error.to_string()))?
+        .with_timezone(&Utc);
         Ok(ScreenshotFavoriteRecord {
             id,
             content_kind: "screenshot".to_string(),
             created_at,
-            asset_path: row.get(2)?,
-            thumbnail_path: row.get(3)?,
-            width: row.get::<_, i64>(4)? as u32,
-            height: row.get::<_, i64>(5)? as u32,
-            note: row.get(6)?,
+            asset_path: row.get(2).map_err(snaplingo_core::AppError::database)?,
+            thumbnail_path: row.get(3).map_err(snaplingo_core::AppError::database)?,
+            width: row
+                .get::<_, i64>(4)
+                .map_err(snaplingo_core::AppError::database)? as u32,
+            height: row
+                .get::<_, i64>(5)
+                .map_err(snaplingo_core::AppError::database)? as u32,
+            note: row.get(6).map_err(snaplingo_core::AppError::database)?,
             tags: read_tags(connection, id)?,
         })
     }
@@ -45,18 +52,20 @@ impl SqliteScreenshotFavoriteRepository {
 impl ScreenshotFavoriteRepository for SqliteScreenshotFavoriteRepository {
     async fn insert(&self, favorite: &NewScreenshotFavorite) -> Result<ScreenshotFavoriteRecord> {
         self.database.with_transaction(|transaction| {
-            transaction.execute(
-                "INSERT INTO screenshot_favorites
+            transaction
+                .execute(
+                    "INSERT INTO screenshot_favorites
                  (created_at, asset_path, thumbnail_path, width, height)
                  VALUES (?1, ?2, ?3, ?4, ?5)",
-                params![
-                    favorite.created_at.to_rfc3339(),
-                    favorite.asset_path,
-                    favorite.thumbnail_path,
-                    favorite.width as i64,
-                    favorite.height as i64,
-                ],
-            )?;
+                    params![
+                        favorite.created_at.to_rfc3339(),
+                        favorite.asset_path,
+                        favorite.thumbnail_path,
+                        favorite.width as i64,
+                        favorite.height as i64,
+                    ],
+                )
+                .map_err(snaplingo_core::AppError::database)?;
             Ok(ScreenshotFavoriteRecord {
                 id: transaction.last_insert_rowid(),
                 content_kind: "screenshot".to_string(),
@@ -91,8 +100,9 @@ impl ScreenshotFavoriteRepository for SqliteScreenshotFavoriteRepository {
                    ))
                    AND (?2 IS NULL OR sf.id IN (SELECT value FROM json_each(?2)))";
             let total_sql = format!("SELECT COUNT(*) FROM screenshot_favorites sf {where_clause}");
-            let total: i64 =
-                connection.query_row(&total_sql, params![search, ids], |row| row.get(0))?;
+            let total: i64 = connection
+                .query_row(&total_sql, params![search, ids], |row| row.get(0))
+                .map_err(snaplingo_core::AppError::database)?;
             let page_sql = format!(
                 "SELECT sf.id, sf.created_at, sf.asset_path, sf.thumbnail_path,
                         sf.width, sf.height, sf.note
@@ -100,15 +110,19 @@ impl ScreenshotFavoriteRepository for SqliteScreenshotFavoriteRepository {
                  {where_clause}
                  ORDER BY sf.created_at DESC, sf.id DESC LIMIT ?3 OFFSET ?4"
             );
-            let mut statement = connection.prepare(&page_sql)?;
-            let mut rows = statement.query(params![
-                search,
-                ids,
-                query.limit as i64,
-                query.offset as i64
-            ])?;
+            let mut statement = connection
+                .prepare(&page_sql)
+                .map_err(snaplingo_core::AppError::database)?;
+            let mut rows = statement
+                .query(params![
+                    search,
+                    ids,
+                    query.limit as i64,
+                    query.offset as i64
+                ])
+                .map_err(snaplingo_core::AppError::database)?;
             let mut records = Vec::new();
-            while let Some(row) = rows.next()? {
+            while let Some(row) = rows.next().map_err(snaplingo_core::AppError::database)? {
                 records.push(Self::read_record(connection, row)?);
             }
             Ok((records, total as usize))
@@ -117,12 +131,16 @@ impl ScreenshotFavoriteRepository for SqliteScreenshotFavoriteRepository {
 
     async fn find(&self, id: i64) -> Result<Option<ScreenshotFavoriteRecord>> {
         self.database.with_connection(|connection| {
-            let mut statement = connection.prepare(
-                "SELECT id, created_at, asset_path, thumbnail_path, width, height, note
+            let mut statement = connection
+                .prepare(
+                    "SELECT id, created_at, asset_path, thumbnail_path, width, height, note
                  FROM screenshot_favorites WHERE id = ?1",
-            )?;
-            let mut rows = statement.query([id])?;
-            match rows.next()? {
+                )
+                .map_err(snaplingo_core::AppError::database)?;
+            let mut rows = statement
+                .query([id])
+                .map_err(snaplingo_core::AppError::database)?;
+            match rows.next().map_err(snaplingo_core::AppError::database)? {
                 Some(row) => Ok(Some(Self::read_record(connection, row)?)),
                 None => Ok(None),
             }
@@ -141,25 +159,31 @@ impl ScreenshotFavoriteRepository for SqliteScreenshotFavoriteRepository {
             .filter(|tag| !tag.is_empty())
             .collect::<BTreeSet<_>>();
         self.database.with_transaction(|transaction| {
-            transaction.execute(
-                "UPDATE screenshot_favorites SET note = ?1 WHERE id = ?2",
-                params![note.filter(|value| !value.trim().is_empty()), id],
-            )?;
-            transaction.execute(
-                "DELETE FROM screenshot_favorite_tags WHERE favorite_id = ?1",
-                [id],
-            )?;
+            transaction
+                .execute(
+                    "UPDATE screenshot_favorites SET note = ?1 WHERE id = ?2",
+                    params![note.filter(|value| !value.trim().is_empty()), id],
+                )
+                .map_err(snaplingo_core::AppError::database)?;
+            transaction
+                .execute(
+                    "DELETE FROM screenshot_favorite_tags WHERE favorite_id = ?1",
+                    [id],
+                )
+                .map_err(snaplingo_core::AppError::database)?;
             for tag in tags {
-                transaction.execute("INSERT OR IGNORE INTO tags (name) VALUES (?1)", [&tag])?;
-                let tag_id: i64 = transaction.query_row(
-                    "SELECT id FROM tags WHERE name = ?1",
-                    [&tag],
-                    |row| row.get(0),
-                )?;
+                transaction
+                    .execute("INSERT OR IGNORE INTO tags (name) VALUES (?1)", [&tag])
+                    .map_err(snaplingo_core::AppError::database)?;
+                let tag_id: i64 = transaction
+                    .query_row("SELECT id FROM tags WHERE name = ?1", [&tag], |row| {
+                        row.get(0)
+                    })
+                    .map_err(snaplingo_core::AppError::database)?;
                 transaction.execute(
                     "INSERT INTO screenshot_favorite_tags (favorite_id, tag_id) VALUES (?1, ?2)",
                     params![id, tag_id],
-                )?;
+                ).map_err(snaplingo_core::AppError::database)?;
             }
             remove_orphan_tags(transaction)?;
             Ok(())
@@ -168,7 +192,9 @@ impl ScreenshotFavoriteRepository for SqliteScreenshotFavoriteRepository {
 
     async fn delete(&self, id: i64) -> Result<()> {
         self.database.with_transaction(|transaction| {
-            transaction.execute("DELETE FROM screenshot_favorites WHERE id = ?1", [id])?;
+            transaction
+                .execute("DELETE FROM screenshot_favorites WHERE id = ?1", [id])
+                .map_err(snaplingo_core::AppError::database)?;
             remove_orphan_tags(transaction)?;
             Ok(())
         })
@@ -176,27 +202,33 @@ impl ScreenshotFavoriteRepository for SqliteScreenshotFavoriteRepository {
 }
 
 fn read_tags(connection: &Connection, favorite_id: i64) -> Result<Vec<String>> {
-    let mut statement = connection.prepare(
-        "SELECT t.name FROM tags t
+    let mut statement = connection
+        .prepare(
+            "SELECT t.name FROM tags t
          JOIN screenshot_favorite_tags sft ON sft.tag_id = t.id
          WHERE sft.favorite_id = ?1 ORDER BY t.name",
-    )?;
+        )
+        .map_err(snaplingo_core::AppError::database)?;
     let tags = statement
-        .query_map([favorite_id], |row| row.get(0))?
-        .collect::<rusqlite::Result<Vec<String>>>()?;
+        .query_map([favorite_id], |row| row.get(0))
+        .map_err(snaplingo_core::AppError::database)?
+        .collect::<rusqlite::Result<Vec<String>>>()
+        .map_err(snaplingo_core::AppError::database)?;
     Ok(tags)
 }
 
 fn remove_orphan_tags(connection: &Connection) -> Result<()> {
-    connection.execute(
-        "DELETE FROM tags
+    connection
+        .execute(
+            "DELETE FROM tags
          WHERE NOT EXISTS (SELECT 1 FROM history_tags ht WHERE ht.tag_id = tags.id)
            AND NOT EXISTS (
                SELECT 1 FROM screenshot_favorite_tags sft WHERE sft.tag_id = tags.id
            )
            AND NOT EXISTS (SELECT 1 FROM favorite_tags ft WHERE ft.tag_id = tags.id)",
-        [],
-    )?;
+            [],
+        )
+        .map_err(snaplingo_core::AppError::database)?;
     Ok(())
 }
 
