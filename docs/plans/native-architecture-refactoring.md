@@ -1,0 +1,178 @@
+# Native Rust architecture refactoring
+
+Approved direction: 2026-11-09. Baseline commit: `ef69b24`.
+
+The architecture review found a sound Core / Storage / UI / Render split, but
+workflow ownership and production resource ownership still reflect the migration.
+This plan makes existing modules deeper: common behavior has one owner, platform
+adapters retain operating-system mechanics, and tests exercise the same interface
+as callers. It implements ADR 0012 rather than replacing it.
+
+## Acceptance policy
+
+- **macOS is the reference for overall UI consistency.** Preserve its layouts,
+  appearance, controls and interaction semantics when consolidating presentation.
+  Adapt the shared implementation and Windows presentation to that reference.
+- Architecture remains portable: Core owns business workflows; UI owns shared
+  presentation state and geometry; Render owns pixels; native adapters own input,
+  windows, dialogs, accessibility and presentation mechanics.
+- Preserve macOS IME, surrounding-text services, clipboard behavior, shortcuts,
+  window lifecycle and accessibility. A shared canvas must retain those adapter
+  capabilities rather than replacing them with incomplete generic behavior.
+- Preserve one application event loop on Windows, physical/logical coordinate
+  contracts, frozen capture pixels and explicit alpha presentation.
+- Real Windows GUI/IME/Narrator/install acceptance is separate from cross checks.
+  macOS exact-font fixtures are not Windows font baselines.
+- Each step is independently reviewable and verified before proceeding. Do not
+  change installation identity, executable names, persistence formats or package
+  identity as part of a source-directory move.
+
+## Target directory structure
+
+```text
+crates/
+  app/                 composition, lifecycle, actions, platform adapters
+  core/                domain, workflows, inward ports
+  storage/             SQLite and persisted-file adapters
+  settings/            common Settings session and projections
+  ui/                  presentation state, scene, interaction, theme
+  render/              text shaping and CPU rasterization
+  accessibility/       shared semantic projection
+  desktop/             existing winit window adapter
+  assets/              production resource embedding
+assets/
+  fonts/
+  defaults/
+  text/
+  licenses/
+reference/
+  web/                 retained React views, behavior tests and fixtures
+docs/
+script/
+```
+
+Cargo package names remain `snaplingo-*`; the app package remains `snaplingo`.
+Directories do not repeat the product prefix. Business-window adapters are
+organized by domain, with the two real platform adapters adjacent:
+
+```text
+crates/app/src/
+  composition/
+  lifecycle/
+  actions/
+  window/
+    settings/
+    capture/
+    result/
+    pinned/
+    scrolling/
+      mod.rs
+      session.rs
+      macos/
+      windows/
+  infrastructure/      screenshot acquisition, selection, OCR, speech, HTTP, etc.
+```
+
+This is a responsibility map, not a requirement to create empty directories or
+single-use forwarding modules. Source moves follow the corresponding ownership
+change. Existing native acceptance fixtures stay available until their equivalent
+interface tests protect the replacement.
+
+## Execution checklist
+
+### 0. Source directories
+
+- [ ] Rename all nine crate directories to the short names above.
+- [ ] Update workspace members, path dependencies, cross-crate source/fixture
+  references, scripts, CI, resource ignores and current documentation.
+- [ ] Verify Cargo metadata, formatting, architecture tests, script contracts,
+  reference build, macOS compilation and Windows cross compilation.
+
+### 1. One Settings workflow owner
+
+Evidence: Windows uses `SettingsWindowSession`; macOS `SharedFeaturePage` separately
+owns dispatch, Hotkey mutation queues, refresh ordering and disposal. Reopening
+Settings without a route restores the Mac page but selects General on Windows.
+
+- [ ] Move portable session/projection logic into the existing Settings module.
+- [ ] Remove AppState and operating-system construction knowledge from that
+  module; Composition injects existing workflows and concrete adapters.
+- [ ] Make both platform adapters use the same session for navigation, edit/save
+  ordering, refresh, stale-result rejection and disposal.
+- [ ] Keep native input, UI-thread delivery, dialogs and AX/UIA in adapters.
+- [ ] Preview reuses the common workflow; its temporary database/registrar setup
+  belongs to its composition, not the production workflow interface.
+- [ ] Run common SQLite persistence and controlled-delay race tests on both
+  platforms, without constructing the full OS AppState. Preserve existing
+  Library, Services and General behavior coverage and Mac native input tests.
+
+### 2. Scrolling Capture lifetime
+
+Evidence: both hosts implement sampler state/action sequencing. Windows owns an
+abortable task and Drop-based sampling restoration; Mac stop only marks closed
+and sampling restoration follows the ordinary await path.
+
+- [ ] Consolidate common sampling/action/lifetime policy in one session module.
+- [ ] Use the same failure/cancellation restoration path on both adapters.
+- [ ] Preserve Core stitching/output workflows and platform-specific sampling,
+  UI-thread delivery, visibility and file dialogs.
+- [ ] Verify start-once, close-during-sample, error pause/resume, cancellation
+  restoration, late-result rejection and native preview/output behavior.
+
+### 3. Core seam and test ownership
+
+Evidence: public `AppError` contains Reqwest and SQLite error types; Core tests
+compile App/Storage sources through `#[path]` and `include!`.
+
+- [ ] Convert technical errors inside their adapters while retaining diagnostic
+  causes and existing observable error classification.
+- [ ] Remove production Core dependencies required only by concrete error types.
+- [ ] Keep portable behavior tests at existing workflow interfaces; locate real
+  SQLite/network integration tests outside Core and remove source-file imports.
+- [ ] Narrow migration re-exports as callers/tests move to their owning crate.
+- [ ] Preserve transaction, credential rollback, concurrency and Provider tests;
+  verify dependency direction using Cargo metadata and production source graphs.
+
+### 4. Production assets and independent Reference
+
+Evidence: Core includes JSON from `src/domain`; native notices and packaging read
+the same tree; macOS production parses reference CSS for colors while UI stores
+another Rust palette. Browser fixtures are split between root src and App tests.
+
+- [ ] Move production defaults, text and notice outputs into neutral assets.
+- [ ] Make shared UI theme own production semantic colors; Mac adapters perform
+  native color conversion without parsing CSS.
+- [ ] Move retained browser source/fixtures into `reference/web`; preserve its
+  independent CSS/DOM/AppKit baselines, not renderer-generated expected values.
+- [ ] Update collectors, Vite, tests, notice generation and native packaging.
+- [ ] Verify native compilation without Reference sources in a temporary copy,
+  plus reference build/tests, notice generation and native bundle contracts.
+
+### 5. Shared window presentation, macOS reference
+
+Evidence: PinUi is Windows/test-only; Mac duplicates Action/Preferences, shortcuts
+and toolbar presentation. Result shares a controller but still has a separate
+AppKit presentation. Capture and Scrolling also retain native presentation paths.
+
+- [ ] Pinned Image: unify presentation state, shortcuts and toolbar geometry,
+  preserving Mac appearance and interactions. Keep decoding/image preparation
+  outside pure UI; retain transforms, sampling, grouping and DPI tests.
+- [ ] Scrolling controls/preview: align shared presentation with Mac and connect
+  both adapters to it, preserving the common lifetime from step 2.
+- [ ] Result: retain the shared controller, unify presentation and retain native
+  text composition, selection, surrounding text and accessibility capabilities.
+- [ ] Capture: retain frozen pixels and Core Editing; unify presentation against
+  Mac controls without moving OS acquisition or output policy into UI.
+- [ ] Reorganize each window's common implementation and platform adapters under
+  `app/src/window/<domain>` as ownership settles.
+- [ ] Run interface behavior tests, independent geometry/color references and
+  real macOS window workflows for each completed vertical slice.
+
+## Verification record
+
+Record implementation commits, commands, results and platform limits below as
+steps finish. Compilation is evidence of compilation, not desktop acceptance.
+
+- Baseline: `ef69b24` commits the native migration and source-platform font gates.
+  Prior native/shared/browser tests and macOS package verification are recorded
+  in the migration research documents. No refactoring is included in that commit.
