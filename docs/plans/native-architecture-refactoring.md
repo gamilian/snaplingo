@@ -112,11 +112,11 @@ Evidence: both hosts implement sampler state/action sequencing. Windows owns an
 abortable task and Drop-based sampling restoration; Mac stop only marks closed
 and sampling restoration follows the ordinary await path.
 
-- [ ] Consolidate common sampling/action/lifetime policy in one session module.
-- [ ] Use the same failure/cancellation restoration path on both adapters.
-- [ ] Preserve Core stitching/output workflows and platform-specific sampling,
+- [x] Consolidate common sampling/action/lifetime policy in one session module.
+- [x] Use the same failure/cancellation restoration path on both adapters.
+- [x] Preserve Core stitching/output workflows and platform-specific sampling,
   UI-thread delivery, visibility and file dialogs.
-- [ ] Verify start-once, close-during-sample, error pause/resume, cancellation
+- [x] Verify start-once, close-during-sample, error pause/resume, cancellation
   restoration, late-result rejection and native preview/output behavior.
 
 ### 3. Core seam and test ownership
@@ -193,3 +193,13 @@ steps finish. Compilation is evidence of compilation, not desktop acceptance.
   composition and macOS seven-page/zoom/modal/quit smoke pass. Mac layout,
   native text input, AX and dialogs are retained. Windows all-target and portable
   session-test cross checks run separately from real Windows acceptance.
+
+- Step 2: Scrolling Capture now owns one shared sampler/action session under
+  `app/src/window/scrolling`, with adjacent Mac/Windows adapters. Both use the
+  same Drop-based restoration, including cancellation before the hide response.
+  Mac window controls and native save dialog are retained. Shared geometry and
+  sampling tests (7), the complete real Mac capture/editor/result/pin/scrolling
+  workflow and Windows all-target checks pass. Architecture guards (11 app,
+  3 workspace) pass against the relocated portable Settings sources as well.
+  Services navigation now has an injected store adapter; Settings has no
+  production Storage dependency. Portable and preview regression tests pass.

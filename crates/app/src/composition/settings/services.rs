@@ -22,5 +22,15 @@ pub(crate) fn from_state(
         )),
         route,
     )
-    .with_navigation(state.settings.navigation.clone())
+    .with_navigation(Arc::new(Navigation(state.settings.navigation.clone())))
+}
+
+struct Navigation(Arc<crate::infrastructure::storage::SqliteConfigStore>);
+impl snaplingo_settings::services::ServicesNavigation for Navigation {
+    fn load(&self) -> Result<Option<String>, String> {
+        self.0.load_services_route().map_err(|e| e.to_string())
+    }
+    fn save(&self, route: &str) -> Result<(), String> {
+        self.0.save_services_route(route).map_err(|e| e.to_string())
+    }
 }

@@ -510,3 +510,12 @@ async fn destructive_and_platform_actions_are_returned_to_the_host_and_failures_
 pub(crate) fn session() -> ServicesSession {
     fixture(ui::ServicesRoute::Ocr).session
 }
+
+impl ServicesNavigation for SqliteConfigStore {
+    fn load(&self) -> Result<Option<String>, String> {
+        self.load_services_route().map_err(|e| e.to_string())
+    }
+    fn save(&self, route: &str) -> Result<(), String> {
+        self.save_services_route(route).map_err(|e| e.to_string())
+    }
+}

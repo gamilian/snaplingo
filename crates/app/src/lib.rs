@@ -1,3 +1,4 @@
+pub(crate) mod window;
 // Module declarations
 mod app_actions;
 mod app_shell;

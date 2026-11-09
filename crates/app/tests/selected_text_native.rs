@@ -27,6 +27,9 @@ mod infrastructure;
 #[path = "../src/startup_shortcuts.rs"]
 mod startup_shortcuts;
 #[cfg(target_os = "macos")]
+#[path = "../src/window/mod.rs"]
+mod window;
+#[cfg(target_os = "macos")]
 pub use app_state::AppState;
 #[cfg(target_os = "macos")]
 pub use application::*;

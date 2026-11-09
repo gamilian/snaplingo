@@ -429,7 +429,7 @@ fn scene(full: Rect, commands: Vec<DrawCommand>) -> Scene {
         viewport: full,
     }
 }
-pub(super) fn update(next: ScrollingCaptureView) {
+pub(crate) fn update(next: ScrollingCaptureView) {
     VIEWS.with_borrow_mut(|views| {
         let Some(host) = views.get_mut(&next.id) else {
             return;
@@ -445,7 +445,7 @@ pub(super) fn update(next: ScrollingCaptureView) {
         host.refresh();
     });
 }
-pub(super) fn set_working(id: &str, working: bool, error: Option<String>) {
+pub(crate) fn set_working(id: &str, working: bool, error: Option<String>) {
     VIEWS.with_borrow_mut(|views| {
         if let Some(host) = views.get_mut(id) {
             host.working = working;

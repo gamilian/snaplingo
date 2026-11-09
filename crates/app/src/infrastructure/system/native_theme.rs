@@ -5,7 +5,7 @@ use objc2::{rc::Retained, MainThreadMarker};
 use objc2_app_kit::{NSApplication, NSColor};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) struct Palette {
+pub(crate) struct Palette {
     pub canvas: [u8; 3],
     pub sidebar: [u8; 3],
     pub sunken: [u8; 3],
@@ -68,7 +68,7 @@ fn read_palette(css: &str, selector: &str) -> Palette {
     }
 }
 
-pub(super) fn palette(interface_theme: &str, dark: bool) -> Palette {
+pub(crate) fn palette(interface_theme: &str, dark: bool) -> Palette {
     static PALETTES: OnceLock<[Palette; 6]> = OnceLock::new();
     let colors = PALETTES.get_or_init(|| {
         let base = include_str!("../../../../../src/styles/index.css");
@@ -102,7 +102,7 @@ pub(super) fn palette(interface_theme: &str, dark: bool) -> Palette {
     colors[offset + usize::from(dark)]
 }
 
-pub(super) fn color(channels: [u8; 3]) -> Retained<NSColor> {
+pub(crate) fn color(channels: [u8; 3]) -> Retained<NSColor> {
     let [r, g, b] = channels.map(|value| f64::from(value) / 255.0);
     NSColor::colorWithSRGBRed_green_blue_alpha(r, g, b, 1.0)
 }

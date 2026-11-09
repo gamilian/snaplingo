@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 #[cfg(target_os = "macos")]
-pub(super) async fn select_native_capture_save_path(
+pub(crate) async fn select_native_capture_save_path(
     settings: &crate::SettingsConfiguration,
     output: &crate::CaptureOutput,
 ) -> crate::Result<Option<PathBuf>> {

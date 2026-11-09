@@ -448,9 +448,7 @@ pub fn build_app_state(
                         capture.settings_changed();
                     }
                     if let Some(settings) = settings.upgrade().and_then(|s| s.snapshot().ok()) {
-                        crate::infrastructure::system::scrolling_host_windows::settings_changed(
-                            settings.general,
-                        );
+                        crate::window::scrolling::windows::settings_changed(settings.general);
                     }
                 }
             }));
@@ -487,9 +485,7 @@ fn bind_native_notifications(state: &mut AppState) {
                         .upgrade()
                         .and_then(|settings| settings.snapshot().ok())
                     {
-                        crate::infrastructure::system::scrolling_host_macos::settings_changed(
-                            settings.general,
-                        );
+                        crate::window::scrolling::macos::settings_changed(settings.general);
                     }
                 }
                 DesktopEvent::HotkeysChanged => {

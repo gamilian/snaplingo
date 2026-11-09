@@ -28,6 +28,9 @@ mod infrastructure;
 #[path = "../src/startup_shortcuts.rs"]
 mod startup_shortcuts;
 #[cfg(target_os = "macos")]
+#[path = "../src/window/mod.rs"]
+mod window;
+#[cfg(target_os = "macos")]
 pub use app_state::AppState;
 #[cfg(target_os = "macos")]
 pub use application::*;
@@ -88,7 +91,7 @@ mod fixture {
     };
     use crate::domain::capture::*;
     use crate::infrastructure::system::capture_window::NativeCaptureSessionRuntimeHost;
-    use crate::infrastructure::system::scrolling_host_macos::NativeScrollingCaptureHost;
+    use crate::window::scrolling::macos::NativeScrollingCaptureHost;
     use crate::*;
 
     pub(super) fn png(width: u32, height: u32, offset: u32) -> Vec<u8> {

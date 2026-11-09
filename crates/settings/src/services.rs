@@ -7,6 +7,11 @@ use snaplingo_core::application::settings::{
 };
 use snaplingo_ui::{services as ui, Page, Snapshot};
 
+pub trait ServicesNavigation: Send + Sync {
+    fn load(&self) -> Result<Option<String>, String>;
+    fn save(&self, route: &str) -> Result<(), String>;
+}
+
 pub enum ServicesHostEffect {
     Navigate(Page),
     ConfigureCapacity,
@@ -26,7 +31,7 @@ pub struct ServicesSession {
     tts: Arc<ServicesController>,
     translation: Arc<TranslationServicesController>,
     state: Mutex<State>,
-    navigation: Option<Arc<snaplingo_storage::SqliteConfigStore>>,
+    navigation: Option<Arc<dyn ServicesNavigation>>,
 }
 impl ServicesSession {
     pub fn new(
@@ -48,11 +53,8 @@ impl ServicesSession {
             navigation: None,
         }
     }
-    pub fn with_navigation(
-        mut self,
-        navigation: Arc<snaplingo_storage::SqliteConfigStore>,
-    ) -> Self {
-        if let Ok(Some(saved)) = navigation.load_services_route() {
+    pub fn with_navigation(mut self, navigation: Arc<dyn ServicesNavigation>) -> Self {
+        if let Ok(Some(saved)) = navigation.load() {
             if let Some(route) = saved_route(&saved) {
                 self.state.get_mut().unwrap().route = route;
             }
@@ -186,7 +188,7 @@ impl ServicesSession {
             ui::ServicesIntent::Route(route) => {
                 if let Some(navigation) = &self.navigation {
                     navigation
-                        .save_services_route(match route {
+                        .save(match route {
                             ui::ServicesRoute::Ocr => "ocr",
                             ui::ServicesRoute::Translation => "translation",
                             ui::ServicesRoute::Tts => "tts",

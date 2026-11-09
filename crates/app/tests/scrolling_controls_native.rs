@@ -28,7 +28,7 @@ mod scrolling_geometry {
 
 #[cfg(target_os = "macos")]
 mod scrolling_controls_macos {
-    include!("../src/infrastructure/system/scrolling_controls_macos.rs");
+    include!("../src/window/scrolling/macos/controls.rs");
 }
 
 #[cfg(target_os = "macos")]

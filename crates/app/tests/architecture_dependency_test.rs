@@ -192,16 +192,28 @@ fn production_app_sources() -> Vec<SourceFile> {
 }
 
 fn workflow_adapter_sources() -> Vec<SourceFile> {
-    let sources = production_app_sources()
+    let mut sources = production_app_sources()
         .into_iter()
         .filter(|source| {
-            source
-                .path
-                .starts_with("src/infrastructure/settings_canvas/")
-                || source.path == "src/infrastructure/system/result_window/controller.rs"
+            source.path == "src/infrastructure/system/result_window/controller.rs"
                 || source.path == "src/app_actions.rs"
         })
         .collect::<Vec<_>>();
+    let settings = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../settings/src");
+    let mut paths = Vec::new();
+    collect_rust_files(&settings, &mut paths);
+    sources.extend(
+        paths
+            .into_iter()
+            .filter(|path| is_production_rust(path))
+            .map(|path| SourceFile {
+                path: format!(
+                    "settings/{}",
+                    path.strip_prefix(&settings).unwrap().to_string_lossy()
+                ),
+                source: fs::read_to_string(path).unwrap(),
+            }),
+    );
     assert!(sources
         .iter()
         .any(|source| source.path.ends_with("/services.rs")));
@@ -481,10 +493,7 @@ fn capture_window_and_control_adapters_use_frozen_session_coordinates() {
 #[test]
 fn native_adapters_and_composition_delegate_provider_and_ocr_policy_to_application_services() {
     let sources = workflow_adapter_sources();
-    for path in [
-        "src/infrastructure/settings_canvas/services.rs",
-        "src/infrastructure/settings_canvas/library.rs",
-    ] {
+    for path in ["settings/services.rs", "settings/library.rs"] {
         let source = &sources
             .iter()
             .find(|source| source.path == path)

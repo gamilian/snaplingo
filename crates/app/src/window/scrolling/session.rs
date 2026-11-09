@@ -1,40 +1,44 @@
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Weak};
-
+use super::platform::{set_working, update};
+use crate::domain::capture::{
+    CaptureSessionId, ScrollingCaptureOutputAction, ScrollingCaptureStatus,
+};
 use crate::infrastructure::ui_thread;
 use crate::{CaptureOutput, CaptureSessionRuntime, SettingsConfiguration};
-
+use snaplingo_ui::scrolling::ScrollingAction as Action;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, Mutex, Weak,
+};
 #[derive(Clone)]
 pub(super) struct Services {
-    pub(super) runtime: Weak<CaptureSessionRuntime>,
-    pub(super) settings: Arc<SettingsConfiguration>,
-    pub(super) output: Arc<CaptureOutput>,
-    pub(super) ended: Arc<dyn Fn(&crate::domain::capture::CaptureSessionId, bool) + Send + Sync>,
+    pub runtime: Weak<CaptureSessionRuntime>,
+    pub settings: Arc<SettingsConfiguration>,
+    pub output: Arc<CaptureOutput>,
+    pub ended: Arc<dyn Fn(&CaptureSessionId, bool) + Send + Sync>,
 }
-
-use super::scrolling_controls_macos::{self as controls, Action};
-use crate::domain::capture::{ScrollingCaptureOutputAction, ScrollingCaptureStatus};
-
 #[derive(Default)]
 pub(super) struct Session {
     started: AtomicBool,
     closed: AtomicBool,
     working: AtomicBool,
     paused: AtomicBool,
+    task: Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
-
 impl Session {
     pub(super) fn stop(&self) {
+        let mut task = self.task.lock().unwrap();
         self.closed.store(true, Ordering::SeqCst);
+        if let Some(task) = task.take() {
+            task.abort();
+        }
     }
-
-    // Start only after the runtime adopts the capture and publishes its first view.
     pub(super) fn start(self: &Arc<Self>, services: Services, id: String) {
-        if self.started.swap(true, Ordering::SeqCst) {
+        let mut owner = self.task.lock().unwrap();
+        if self.closed.load(Ordering::SeqCst) || self.started.swap(true, Ordering::SeqCst) {
             return;
         }
         let session = self.clone();
-        crate::infrastructure::runtime::spawn(async move {
+        let task = crate::infrastructure::runtime::spawn(async move {
             loop {
                 tokio::time::sleep(std::time::Duration::from_millis(250)).await;
                 if session.closed.load(Ordering::SeqCst) {
@@ -47,12 +51,12 @@ impl Session {
                     break;
                 };
                 match runtime.capture_scrolling_frame(&id).await {
-                    Ok(view) => {
+                    Ok(next) => {
                         session.paused.store(
-                            view.status == ScrollingCaptureStatus::Error,
+                            next.status == ScrollingCaptureStatus::Error,
                             Ordering::SeqCst,
                         );
-                        if view.status == ScrollingCaptureStatus::Completed {
+                        if next.status == ScrollingCaptureStatus::Completed {
                             break;
                         }
                     }
@@ -62,27 +66,34 @@ impl Session {
                         }
                         session.paused.store(true, Ordering::SeqCst);
                         let id = id.clone();
+                        let current = session.clone();
                         ui_thread::dispatch(move || {
-                            controls::set_working(&id, false, Some(error.to_string()))
+                            if !current.closed.load(Ordering::SeqCst) {
+                                set_working(&id, false, Some(error.to_string()));
+                            }
                         });
                     }
                 }
             }
         });
+        *owner = Some(task);
     }
 }
-
 pub(super) fn dispatch(services: Services, id: String, session: Arc<Session>, action: Action) {
     if session.closed.load(Ordering::SeqCst) || session.working.swap(true, Ordering::SeqCst) {
         return;
     }
     let working_id = id.clone();
-    ui_thread::dispatch(move || controls::set_working(&working_id, true, None));
+    let current = session.clone();
+    ui_thread::dispatch(move || {
+        if !current.closed.load(Ordering::SeqCst) {
+            set_working(&working_id, true, None);
+        }
+    });
     crate::infrastructure::runtime::spawn(async move {
         let result = run_action(&services, &id, action).await;
-        let runtime = services.runtime.upgrade();
-        let view = if !session.closed.load(Ordering::SeqCst) {
-            if let Some(runtime) = runtime {
+        let next = if !session.closed.load(Ordering::SeqCst) {
+            if let Some(runtime) = services.runtime.upgrade() {
                 runtime.scrolling_capture_view(&id).await.ok()
             } else {
                 None
@@ -93,21 +104,26 @@ pub(super) fn dispatch(services: Services, id: String, session: Arc<Session>, ac
         session.working.store(false, Ordering::SeqCst);
         session.paused.store(
             result.is_err()
-                || view
+                || next
                     .as_ref()
                     .is_some_and(|view| view.status == ScrollingCaptureStatus::Error),
             Ordering::SeqCst,
         );
         let error = result.err().map(|error| error.to_string());
+        if session.closed.load(Ordering::SeqCst) {
+            return;
+        }
         ui_thread::dispatch(move || {
-            if let Some(view) = view {
-                controls::update(view);
+            if session.closed.load(Ordering::SeqCst) {
+                return;
             }
-            controls::set_working(&id, false, error);
+            if let Some(next) = next {
+                update(next);
+            }
+            set_working(&id, false, error);
         });
     });
 }
-
 async fn run_action(services: &Services, id: &str, action: Action) -> crate::Result<()> {
     let runtime = services
         .runtime
@@ -141,11 +157,8 @@ async fn run_action(services: &Services, id: &str, action: Action) -> crate::Res
         }
         Action::Save => {
             let preferences = services.settings.snapshot()?.screenshot;
-            let Some(path) = super::image_save_dialog::select_native_capture_save_path(
-                &services.settings,
-                &services.output,
-            )
-            .await?
+            let Some(path) =
+                super::platform::select_save_path(&services.settings, &services.output).await?
             else {
                 return Ok(());
             };

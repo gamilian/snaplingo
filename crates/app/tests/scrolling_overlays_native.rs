@@ -23,7 +23,7 @@ mod scrolling_geometry {
 
 #[cfg(target_os = "macos")]
 mod scrolling_overlays_macos {
-    include!("../src/infrastructure/system/scrolling_overlays_macos.rs");
+    include!("../src/window/scrolling/macos/overlays.rs");
 }
 
 #[cfg(target_os = "macos")]

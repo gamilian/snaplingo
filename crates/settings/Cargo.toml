@@ -8,7 +8,6 @@ description = "Portable Settings sessions, ordered workflows and UI projections"
 
 [dependencies]
 snaplingo-core = { path = "../core" }
-snaplingo-storage = { path = "../storage" }
 snaplingo-ui = { path = "../ui" }
 
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }

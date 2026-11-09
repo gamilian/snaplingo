@@ -64,4 +64,29 @@ mod tests {
         assert!(task.await.unwrap_err().is_cancelled());
         assert!(visible.load(Ordering::SeqCst));
     }
+
+    #[tokio::test]
+    async fn cancellation_while_waiting_for_the_hide_response_still_restores() {
+        let visible = Arc::new(AtomicBool::new(true));
+        let hidden = visible.clone();
+        let restored = visible.clone();
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        let task = tokio::spawn(sample(
+            async move {
+                hidden.store(false, Ordering::SeqCst);
+                sender.send(()).unwrap();
+                std::future::pending::<crate::Result<bool>>().await
+            },
+            async {
+                panic!("capture must not run before hiding finishes");
+                #[allow(unreachable_code)]
+                Ok::<(), crate::AppError>(())
+            },
+            move || restored.store(true, Ordering::SeqCst),
+        ));
+        receiver.await.unwrap();
+        task.abort();
+        assert!(task.await.unwrap_err().is_cancelled());
+        assert!(visible.load(Ordering::SeqCst));
+    }
 }

@@ -1,3 +1,4 @@
+use crate::infrastructure::system::{capture_window, shortcut_native};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
 
@@ -9,8 +10,8 @@ use crate::domain::capture::{
 };
 use crate::infrastructure::ui_thread;
 
+use super::super::session::{self as actions, Services, Session};
 use super::scrolling_geometry::{outside_position, preview_placement};
-use super::scrolling_native_macos::{self as actions, Services, Session};
 
 pub(crate) fn settings_changed(general: crate::domain::config::GeneralSettings) {
     ui_thread::dispatch(move || super::scrolling_controls_macos::update_theme(general));
@@ -83,7 +84,7 @@ impl ScrollingCaptureHost for NativeScrollingCaptureHost {
         let event_session = session.clone();
         let event_services = services.clone();
         let preview_expanded = ui_thread::run("open scrolling capture", move || {
-            super::capture_window::yield_capture_window_focus();
+            capture_window::yield_capture_window_focus();
             let width = 408.0 * initial.ui_scale;
             let height = 132.0 * initial.ui_scale;
             let (x, y) = outside_position(&geometry, width, height).unwrap_or_else(|| {
@@ -129,7 +130,7 @@ impl ScrollingCaptureHost for NativeScrollingCaptureHost {
             ("Escape", ScrollingShortcutAction::Cancel),
             ("Super+Z", ScrollingShortcutAction::Undo),
         ] {
-            match super::shortcut_native::is_registered(key) {
+            match shortcut_native::is_registered(key) {
                 Ok(false) => {}
                 Ok(true) => continue,
                 Err(error) => {
@@ -148,9 +149,9 @@ impl ScrollingCaptureHost for NativeScrollingCaptureHost {
                 ScrollingShortcutAction::Undo => super::scrolling_controls_macos::Action::Undo,
                 ScrollingShortcutAction::Copy => unreachable!(),
             };
-            match super::shortcut_native::register(
+            match shortcut_native::register(
                 key,
-                super::shortcut_native::ShortcutTriggerTiming::Released,
+                shortcut_native::ShortcutTriggerTiming::Released,
                 move || {
                     actions::dispatch(services.clone(), id.clone(), session.clone(), action);
                 },
@@ -177,45 +178,48 @@ impl ScrollingCaptureHost for NativeScrollingCaptureHost {
         id: &str,
         geometry: &ScrollingCaptureGeometry,
     ) -> crate::Result<Vec<MonitorSnapshot>> {
-        let hidden_id = id.to_owned();
+        let hide_id = id.to_owned();
+        let restore_id = id.to_owned();
         let viewport = geometry.viewport.clone();
         let overlays = self.overlays.clone();
-        let hidden = ui_thread::run("hide scrolling capture overlays", move || {
-            Ok((
-                overlays.hide_if_overlapping(&hidden_id, &viewport),
-                overlays.hide_preview_if_overlapping(&hidden_id, &viewport),
-                super::scrolling_controls_macos::hide_if_overlapping(&hidden_id, &viewport),
-            ))
-        })
-        .await?;
-        if hidden.0 || hidden.1 || hidden.2 {
-            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-        }
-        let result = async {
-            let mut snapshots = Vec::new();
-            for monitor in &geometry.monitors {
-                snapshots.push(self.source.capture_monitor_snapshot(&monitor.id).await?);
-            }
-            Ok(snapshots)
-        }
+        let restore_overlays = self.overlays.clone();
+        let visibility = Arc::new(Mutex::new(None));
+        let hidden = visibility.clone();
+        let result = super::super::sampling::sample(
+            ui_thread::run("hide scrolling capture overlays", move || {
+                let before = (
+                    overlays.hide_if_overlapping(&hide_id, &viewport),
+                    overlays.hide_preview_if_overlapping(&hide_id, &viewport),
+                    super::scrolling_controls_macos::hide_if_overlapping(&hide_id, &viewport),
+                );
+                *hidden.lock().unwrap() = Some(before);
+                Ok(before.0 || before.1 || before.2)
+            }),
+            async {
+                let mut snapshots = Vec::new();
+                for monitor in &geometry.monitors {
+                    snapshots.push(self.source.capture_monitor_snapshot(&monitor.id).await?);
+                }
+                Ok(snapshots)
+            },
+            move || {
+                ui_thread::dispatch(move || {
+                    if let Some((outline, preview, controls)) = visibility.lock().unwrap().take() {
+                        if outline {
+                            restore_overlays.show(&restore_id);
+                        }
+                        if preview {
+                            restore_overlays.set_preview_visible(&restore_id, true);
+                        }
+                        if controls {
+                            super::scrolling_controls_macos::show(&restore_id);
+                        }
+                    }
+                })
+            },
+        )
         .await;
-        if hidden.0 || hidden.1 || hidden.2 {
-            let id = id.to_owned();
-            let overlays = self.overlays.clone();
-            ui_thread::run("restore scrolling capture overlays", move || {
-                if hidden.0 {
-                    overlays.show(&id);
-                }
-                if hidden.1 {
-                    overlays.set_preview_visible(&id, true);
-                }
-                if hidden.2 {
-                    super::scrolling_controls_macos::show(&id);
-                }
-                Ok(())
-            })
-            .await?;
-        }
+        ui_thread::run("restore scrolling capture overlays", || Ok(())).await?;
         result
     }
 
@@ -269,7 +273,7 @@ impl ScrollingCaptureHost for NativeScrollingCaptureHost {
             .remove(id)
             .unwrap_or_default();
         for key in keys {
-            if let Err(error) = super::shortcut_native::unregister(&key) {
+            if let Err(error) = shortcut_native::unregister(&key) {
                 log::debug!("Could not release scrolling capture key {key}: {error}");
             }
         }

@@ -237,7 +237,7 @@ impl ApplicationHandler<HostEvent> for Loop {
             crate::infrastructure::system::result_window::windows_accessibility(event);
             crate::infrastructure::system::pinned_window::windows_accessibility(event);
             crate::infrastructure::system::capture_window::windows_accessibility(event);
-            crate::infrastructure::system::scrolling_host_windows::windows_accessibility(event);
+            crate::window::scrolling::windows::windows_accessibility(event);
             crate::native_capacity_windows::accessibility(event);
             crate::native_notices_windows::accessibility(event);
         }
@@ -249,9 +249,7 @@ impl ApplicationHandler<HostEvent> for Loop {
         crate::infrastructure::system::result_window::windows_window_event(event_loop, id, &event);
         crate::infrastructure::system::pinned_window::windows_window_event(event_loop, id, &event);
         crate::infrastructure::system::capture_window::windows_window_event(event_loop, id, &event);
-        crate::infrastructure::system::scrolling_host_windows::windows_window_event(
-            event_loop, id, &event,
-        );
+        crate::window::scrolling::windows::windows_window_event(event_loop, id, &event);
         crate::native_capacity_windows::window_event(event_loop, id, &event);
         crate::native_notices_windows::window_event(event_loop, id, &event);
         let mut owner = self.owner.borrow_mut();
@@ -280,7 +278,7 @@ impl ApplicationHandler<HostEvent> for Loop {
         crate::infrastructure::system::result_window::windows_close_all();
         crate::infrastructure::system::pinned_window::windows_close_all();
         crate::infrastructure::system::capture_window::windows_close_all();
-        crate::infrastructure::system::scrolling_host_windows::windows_close_all();
+        crate::window::scrolling::windows::windows_close_all();
     }
 }
 

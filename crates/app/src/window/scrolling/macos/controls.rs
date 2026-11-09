@@ -18,17 +18,7 @@ use super::native_theme::{color, is_dark, palette, Palette};
 use crate::domain::capture::{LogicalRect, ScrollingCaptureView};
 use crate::domain::config::GeneralSettings;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum Action {
-    Undo,
-    Preview,
-    Copy,
-    Save,
-    Pin,
-    Complete,
-    Cancel,
-    Resume,
-}
+pub(super) use snaplingo_ui::scrolling::ScrollingAction as Action;
 
 struct ControlIvars {
     dispatch: Box<dyn Fn(Action)>,
@@ -489,7 +479,7 @@ pub(super) fn update_theme(general: GeneralSettings) {
     });
 }
 
-pub(super) fn update(mut view: ScrollingCaptureView) {
+pub(crate) fn update(mut view: ScrollingCaptureView) {
     view.preview_base64 = String::new();
     CONTROLS.with(|all| {
         if let Some(controls) = all.borrow_mut().get_mut(&view.id) {
@@ -508,7 +498,7 @@ pub(super) fn update(mut view: ScrollingCaptureView) {
     });
 }
 
-pub(super) fn set_working(id: &str, working: bool, error: Option<String>) {
+pub(crate) fn set_working(id: &str, working: bool, error: Option<String>) {
     CONTROLS.with(|all| {
         if let Some(controls) = all.borrow_mut().get_mut(id) {
             controls.working = working;

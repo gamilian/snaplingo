@@ -2,7 +2,7 @@ use super::core::{LibraryIndexPage, LibraryIndexQuery, LibraryIndexRepository};
 use super::*;
 use async_trait::async_trait;
 use snaplingo_storage::{Database, SqliteLibraryIndexRepository};
-#[path = "test_fixture.rs"]
+#[path = "test_fixture_test.rs"]
 mod test_fixture;
 struct Index {
     real: SqliteLibraryIndexRepository,

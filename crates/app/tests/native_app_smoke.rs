@@ -64,6 +64,12 @@ mod startup_shortcuts;
     target_os = "macos",
     all(target_os = "windows", feature = "native-app")
 ))]
+#[path = "../src/window/mod.rs"]
+mod window;
+#[cfg(any(
+    target_os = "macos",
+    all(target_os = "windows", feature = "native-app")
+))]
 pub use app_state::AppState;
 #[cfg(any(
     target_os = "macos",

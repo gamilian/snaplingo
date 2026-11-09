@@ -10,7 +10,7 @@ mod hotkey_registrar;
 #[cfg(any(all(target_os = "windows", feature = "native-app"), test))]
 pub(crate) mod image_print_windows;
 #[cfg(target_os = "macos")]
-mod image_save_dialog;
+pub(crate) mod image_save_dialog;
 #[cfg(all(target_os = "windows", feature = "native-app"))]
 pub(crate) mod layered_windows;
 #[cfg(target_os = "macos")]
@@ -24,15 +24,6 @@ pub mod required_permissions;
 pub mod result_window;
 pub mod screenshot;
 pub mod screenshot_favorites;
-#[cfg(target_os = "macos")]
-mod scrolling_controls_macos;
-mod scrolling_geometry;
-#[cfg(target_os = "macos")]
-pub(crate) mod scrolling_host_macos;
-#[cfg(target_os = "macos")]
-mod scrolling_native_macos;
-#[cfg(target_os = "macos")]
-mod scrolling_overlays_macos;
 pub mod selection;
 #[cfg(target_os = "macos")]
 pub(crate) mod settings_window;
@@ -58,11 +49,3 @@ mod tests {
         );
     }
 }
-
-#[cfg(all(target_os = "windows", feature = "native-app"))]
-pub(crate) mod scrolling_host_windows;
-#[cfg(all(target_os = "windows", feature = "native-app"))]
-mod scrolling_view_windows;
-
-#[cfg(any(all(target_os = "windows", feature = "native-app"), test))]
-mod scrolling_sampling;

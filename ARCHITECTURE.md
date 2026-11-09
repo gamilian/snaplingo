@@ -15,7 +15,7 @@ Production native path
        |
        | injected SettingsBackend
        v
-  snaplingo-settings  settings workflow/persistence and shared UI projection
+  snaplingo-settings  portable Settings sessions and shared UI projection
        v
   snaplingo-core    Domain/Application workflows and inward ports
        ^
@@ -45,7 +45,7 @@ The portable Domain/Application sources live in `crates/core`; persistence lives
 | `snaplingo-ui` | Shared Settings projection, logical layout, themes, hit testing, focus and interaction intents | None |
 | `snaplingo-render` | CPU shapes, text shaping/fallback and rasterization into premultiplied RGBA | UI, Assets |
 | `snaplingo-accessibility` | Shared scene bounds, roles, values and actions projected into AccessKit | UI |
-| `snaplingo-settings` | Portable Settings sessions, ordered mutations and UI projections | Core, Storage, UI |
+| `snaplingo-settings` | Portable Settings sessions, ordered mutations and UI projections | Core, UI |
 | `snaplingo-desktop` | Native window/event host, device scale, AX/UIA adapters, dialogs, redraw scheduling and opaque pixel presentation | UI, Render, Accessibility |
 | `snaplingo-app` | Native application entry, platform integrations, shared Settings adapters, composition and lifecycle | Core, Storage, Assets, UI, Render, Accessibility, Settings, Desktop |
 
@@ -57,7 +57,7 @@ The default `native-app` feature supplies the native entry used by `main.rs` and
 `native_main.rs`. `native_app.rs` owns the macOS AppKit event loop and application
 delegate; `native_windows.rs` owns the Windows winit loop and native event routing.
 Both compose `AppState`, tray actions, global shortcuts, single-instance activation,
-and native capture/result/pinned/scrolling hosts. `RuntimeLifecycle` owns startup
+and native capture/result/pinned hosts plus `window/scrolling` adapters. `RuntimeLifecycle` owns startup
 history work, log cleanup and hotkey registration. Quit cancels/drains work before
 releasing platform owners; closing Settings hides it while the resident app runs.
 
@@ -191,3 +191,7 @@ Capture guards also cover the retained browser runtime's Application location an
 ## Compatibility Policy
 
 The app is pre-release. Action contracts, persisted settings, credentials, and history formats may change with the architecture. The removed single-key Provider configuration command is not retained as a compatibility path; see [ADR 0007](docs/adr/0007-remove-provider-compatibility-command.md).
+
+Scrolling Capture's shared sampler/action lifetime lives in
+`crates/app/src/window/scrolling/session.rs`; `macos/` and `windows/` retain
+native window/sample mechanics and share cancellation-safe restoration.
