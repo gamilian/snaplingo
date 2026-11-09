@@ -63,6 +63,9 @@ fn ime_draft_survives_controller_feedback_and_enter_waits_for_commit() {
     assert!(ui
         .update(ResultInput::Key(Key::Enter, Modifiers::default()))
         .is_empty());
+    assert!(ui
+        .update(ResultInput::Key(Key::Escape, Modifiers::default()))
+        .is_empty());
     assert_eq!(
         ui.update(ResultInput::Commit("你".into())),
         [ResultIntent::Edit("你".into(), false)]
@@ -226,4 +229,106 @@ fn ocr_image_copy_fragments_dispatch_the_original_token_value() {
         ))),
         [ResultIntent::Copy("support@example.com".into())]
     );
+}
+
+#[test]
+fn native_and_canvas_actions_share_enabled_policy_without_requiring_a_frame() {
+    let mut model = snapshot();
+    model.source = " \n".into();
+    model.rows[0].status = RowStatus::Pending;
+    let mut ui = ResultUi::new(model.clone());
+    for target in [
+        ResultTarget::Translate,
+        ResultTarget::CopySource,
+        ResultTarget::Retry("fixture".into()),
+        ResultTarget::FavoriteResult("fixture".into()),
+    ] {
+        assert!(ui.update(ResultInput::Activate(target)).is_empty());
+    }
+    assert_eq!(
+        ui.update(ResultInput::Activate(ResultTarget::ClearSource)),
+        [ResultIntent::Edit(String::new(), false)]
+    );
+    model.revision = 1;
+    model.source = "hello".into();
+    model.composing = true;
+    model.rows[0].status = RowStatus::Error;
+    model.rows[0].error = Some("Configure the provider".into());
+    model.rows[0].retryable = false;
+    ui.replace(model.clone());
+    assert!(ui
+        .update(ResultInput::Activate(ResultTarget::Translate))
+        .is_empty());
+    assert!(ui
+        .update(ResultInput::Activate(ResultTarget::Retry("fixture".into())))
+        .is_empty());
+    model.revision = 2;
+    model.composing = false;
+    model.rows[0].retryable = true;
+    ui.replace(model);
+    assert_eq!(
+        ui.update(ResultInput::Activate(ResultTarget::Translate)),
+        [ResultIntent::Translate]
+    );
+    assert_eq!(
+        ui.update(ResultInput::Activate(ResultTarget::Retry("fixture".into()))),
+        [ResultIntent::Retry("fixture".into())]
+    );
+}
+
+#[test]
+fn fragment_popup_supports_keyboard_copy_escape_and_stale_value_rejection() {
+    let mut ui = ResultUi::new(ResultSnapshot {
+        visible: true,
+        mode: ResultMode::Ocr,
+        ocr_text: "support@example.com".into(),
+        ocr_tokens: vec![ResultCopyToken {
+            label: "邮箱".into(),
+            value: "support@example.com".into(),
+        }],
+        ..Default::default()
+    });
+    ui.update(ResultInput::Activate(ResultTarget::CopyFragments));
+    ui.update(ResultInput::Key(Key::ArrowDown, Modifiers::default()));
+    assert_eq!(
+        ui.focused(),
+        Some(&ResultTarget::CopyToken("support@example.com".into()))
+    );
+    assert_eq!(
+        ui.update(ResultInput::Key(Key::Enter, Modifiers::default())),
+        [ResultIntent::Copy("support@example.com".into())]
+    );
+    ui.update(ResultInput::Activate(ResultTarget::CopyFragments));
+    assert!(ui
+        .update(ResultInput::Key(Key::Escape, Modifiers::default()))
+        .is_empty());
+    ui.replace(ResultSnapshot {
+        revision: 1,
+        mode: ResultMode::Ocr,
+        ..Default::default()
+    });
+    assert!(ui
+        .update(ResultInput::Activate(ResultTarget::CopyToken(
+            "support@example.com".into()
+        )))
+        .is_empty());
+}
+
+#[test]
+fn presentation_uses_native_unicode_counts_and_character_density() {
+    let model = ResultSnapshot {
+        mode: ResultMode::Ocr,
+        source: "📷A".into(),
+        ocr_text: "📷A".into(),
+        ocr_confidence: Some(0.98),
+        ..Default::default()
+    };
+    let view = model.presentation();
+    assert_eq!(view.subtitle, "已识别 3 个字符 · 置信度 98%");
+    assert_eq!(view.ocr_metadata, "3 chars");
+    assert!(view.source_metadata.starts_with("3 chars"));
+    assert_eq!(text_size("hello", true), 14.);
+    assert_eq!(text_size(&"A".repeat(170), true), 13.);
+    assert_eq!(text_size(&"A".repeat(350), true), 12.);
+    assert_eq!(text_size(&"A".repeat(170), false), 14.);
 }

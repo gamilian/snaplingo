@@ -8,6 +8,9 @@ pub struct ResultUi {
     pub(super) editor: Option<TextEdit>,
     pub(super) text_regions: Vec<(ResultTarget, Rect, TextLayout)>,
     pub(super) menu: Option<bool>,
+    pub(super) fragment_menu: bool,
+    pub(super) menu_scroll: f32,
+    pub(super) menu_max_scroll: f32,
     pub(super) scroll: f32,
     pub(super) max_scroll: f32,
     pub(super) scale: f32,
@@ -25,6 +28,9 @@ impl ResultUi {
             editor: None,
             text_regions: vec![],
             menu: None,
+            fragment_menu: false,
+            menu_scroll: 0.,
+            menu_max_scroll: 0.,
             scroll: 0.,
             max_scroll: 0.,
             scale: 1.,
@@ -54,11 +60,24 @@ impl ResultUi {
             return;
         }
         let changed = self.snapshot.mode != snapshot.mode;
+        if self
+            .snapshot
+            .rows
+            .iter()
+            .map(|row| &row.id)
+            .ne(snapshot.rows.iter().map(|row| &row.id))
+        {
+            self.collapsed_rows.clear();
+        }
         self.snapshot = snapshot;
+        if !self.snapshot.visible {
+            self.pinned = false;
+        }
         if changed {
             self.focus = None;
             self.editor = None;
             self.menu = None;
+            self.fragment_menu = false;
             self.scroll = 0.;
         }
         if let Some(target) = &self.focus {
@@ -81,12 +100,13 @@ impl ResultUi {
         match target {
             ResultTarget::Source => Some(self.snapshot.source.clone()),
             ResultTarget::OcrText => Some(self.snapshot.ocr_text.clone()),
-            ResultTarget::ResultText(id) => self
-                .snapshot
-                .rows
-                .iter()
-                .find(|r| r.id == *id)
-                .map(|r| r.text.clone()),
+            ResultTarget::ResultText(id) => {
+                self.snapshot.rows.iter().find(|r| r.id == *id).map(|row| {
+                    row.presentation(self.snapshot.favorite_pending)
+                        .text
+                        .to_owned()
+                })
+            }
             _ => None,
         }
     }
@@ -133,16 +153,16 @@ impl ResultUi {
         }
     }
     fn activate(&mut self, target: ResultTarget) -> Vec<ResultIntent> {
-        if !self
-            .controls
-            .iter()
-            .any(|c| c.target == target && c.enabled)
+        if !self.snapshot.enabled(&target)
+            || target == ResultTarget::Source && self.source_collapsed
+            || matches!(&target, ResultTarget::ResultText(id) if !self.row_expanded(id))
         {
             return vec![];
         }
         if self.text(&target).is_some() {
             self.focus(target);
             self.menu = None;
+            self.fragment_menu = false;
             return vec![];
         }
         self.focus(target.clone());
@@ -169,6 +189,8 @@ impl ResultUi {
             ResultTarget::Translate => ResultIntent::Translate,
             ResultTarget::Swap => ResultIntent::Swap,
             ResultTarget::SourceLanguage | ResultTarget::TargetLanguage => {
+                self.fragment_menu = false;
+                self.menu_scroll = 0.;
                 let source = target == ResultTarget::SourceLanguage;
                 self.menu = if self.menu == Some(source) {
                     None
@@ -177,6 +199,12 @@ impl ResultUi {
                 };
                 self.focus = Some(target);
                 self.editor = None;
+                return vec![];
+            }
+            ResultTarget::CopyFragments => {
+                self.menu_scroll = 0.;
+                self.fragment_menu = !self.fragment_menu;
+                self.menu = None;
                 return vec![];
             }
             ResultTarget::Language(source, code) => {
@@ -224,6 +252,7 @@ impl ResultUi {
             _ => return vec![],
         };
         self.menu = None;
+        self.fragment_menu = false;
         if matches!(intent, ResultIntent::Edit(..)) {
             self.snapshot.source.clear();
             self.focus = Some(ResultTarget::Source);
@@ -259,6 +288,7 @@ impl ResultUi {
                     .map(|c| c.target.clone());
                 let Some(target) = target else {
                     self.menu = None;
+                    self.fragment_menu = false;
                     return vec![];
                 };
                 let text = self.text(&target).is_some();
@@ -276,7 +306,12 @@ impl ResultUi {
             }
             ResultInput::PointerUp => self.dragging = false,
             ResultInput::Scroll(delta) => {
-                self.scroll = (self.scroll + delta / self.scale).clamp(0., self.max_scroll);
+                if self.menu.is_some() || self.fragment_menu {
+                    self.menu_scroll =
+                        (self.menu_scroll + delta / self.scale).clamp(0., self.menu_max_scroll);
+                } else {
+                    self.scroll = (self.scroll + delta / self.scale).clamp(0., self.max_scroll);
+                }
             }
             ResultInput::Text(text) | ResultInput::Commit(text) => {
                 if self.focus == Some(ResultTarget::Source) {
@@ -308,6 +343,7 @@ impl ResultUi {
             ResultInput::FocusLost => {
                 self.dragging = false;
                 self.menu = None;
+                self.fragment_menu = false;
             }
             ResultInput::Key(key, modifiers) => return self.key(key, modifiers),
         }
@@ -316,28 +352,52 @@ impl ResultUi {
     fn key(&mut self, key: Key, modifiers: Modifiers) -> Vec<ResultIntent> {
         let command = modifiers.control || modifiers.meta;
         if key == Key::Escape {
-            if self.menu.take().is_some() {
+            if self.snapshot.composing
+                || self.editor.as_ref().is_some_and(|edit| edit.is_composing())
+            {
+                return vec![];
+            }
+            if self.menu.take().is_some() || std::mem::take(&mut self.fragment_menu) {
                 return vec![];
             }
             return vec![ResultIntent::Close];
         }
-        if let Some(source) = self.menu {
-            if matches!(key, Key::ArrowDown | Key::ArrowUp) {
-                let selected = self.focus.as_ref().and_then(|focus| {
-                    LANGUAGES.iter().position(|(code, _)| {
-                        *focus == ResultTarget::Language(source, (*code).into())
-                    })
-                });
-                let index = if key == Key::ArrowDown {
-                    selected.map_or(0, |i| (i + 1) % LANGUAGES.len())
-                } else {
-                    selected.map_or(LANGUAGES.len() - 1, |i| {
-                        (i + LANGUAGES.len() - 1) % LANGUAGES.len()
-                    })
-                };
-                self.focus(ResultTarget::Language(source, LANGUAGES[index].0.into()));
-                return vec![];
+        let options: Vec<_> = if let Some(source) = self.menu {
+            LANGUAGES
+                .iter()
+                .map(|(code, _)| ResultTarget::Language(source, (*code).into()))
+                .collect()
+        } else if self.fragment_menu {
+            self.snapshot
+                .ocr_tokens
+                .iter()
+                .map(|token| ResultTarget::CopyToken(token.value.clone()))
+                .collect()
+        } else {
+            vec![]
+        };
+        if !options.is_empty() && matches!(key, Key::ArrowDown | Key::ArrowUp) {
+            let selected = self
+                .focus
+                .as_ref()
+                .and_then(|focus| options.iter().position(|target| target == focus));
+            let index = if key == Key::ArrowDown {
+                selected.map_or(0, |index| (index + 1) % options.len())
+            } else {
+                selected.map_or(options.len() - 1, |index| {
+                    (index + options.len() - 1) % options.len()
+                })
+            };
+            let top = index as f32 * 28.;
+            let viewport = options.len() as f32 * 28. - self.menu_max_scroll;
+            if top < self.menu_scroll {
+                self.menu_scroll = top;
             }
+            if top + 28. > self.menu_scroll + viewport {
+                self.menu_scroll = top + 28. - viewport;
+            }
+            self.focus(options[index].clone());
+            return vec![];
         }
         if key == Key::Tab {
             let targets: Vec<_> = self
@@ -407,7 +467,14 @@ impl ResultUi {
                     edit.insert("\n");
                     return self.edited();
                 }
-                Key::Enter if editable => return vec![ResultIntent::Translate],
+                Key::Enter if editable => {
+                    return self
+                        .snapshot
+                        .enabled(&ResultTarget::Translate)
+                        .then_some(ResultIntent::Translate)
+                        .into_iter()
+                        .collect()
+                }
                 _ => {}
             }
             return vec![];

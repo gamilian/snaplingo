@@ -119,3 +119,15 @@ capture_toolbar_snapshot --offline` writes shared toolbar, text-style, palette
 and grouped-tool PNGs under `target/shared-capture`. These checks preserve the
 original controls' geometry; platform font antialiasing and native bevels are
 inspected separately in the paired rasters.
+
+`native-result-layout.json` records seven real AppKit Result scenes before
+presentation consolidation: translation, provider/source collapse, narrow long
+text, OCR with an image, dark OCR and empty file OCR. `test_geometry` reads actual
+native frames, font sizes and button enabled state; no shared layout generated
+the expected values. Run `native_ui_workflows --surface result` with
+`SNAPLINGO_NATIVE_UI_SNAPSHOT_DIR` set to write current geometry beside PNGs.
+The fixture omits controls hidden in that scene. `result_native_layout` in UI
+and Render compares body/header geometry, standard/175% scale, enabled state,
+popup copying, image aspect ratio and clipping. AppKit may snap fractional
+window bounds by half a point. The retained React Result measurements now live
+under `reference/web/fixtures/result` as browser references.

@@ -25,24 +25,14 @@ use objc2_foundation::{
 
 use snaplingo_core::application::result_window::{
     OcrCopyToken, ResultWindowMode, ResultWindowOrigin, ResultWindowSnapshot, TranslationRow,
-    TranslationStatus,
 };
 
 pub(crate) use super::super::controller::Action;
-
-const LANGUAGES: &[(&str, &str)] = &[
-    ("auto", "自动检测 Auto Detect"),
-    ("en", "英语 English"),
-    ("zh-CN", "中文简体 Chinese (Simplified)"),
-    ("zh-TW", "中文繁体 Chinese (Traditional)"),
-    ("ja", "日语 Japanese"),
-    ("ko", "韩语 Korean"),
-    ("es", "西班牙语 Spanish"),
-    ("fr", "法语 French"),
-    ("de", "德语 German"),
-    ("ru", "俄语 Russian"),
-    ("ar", "阿拉伯语 Arabic"),
-];
+use snaplingo_ui::result::{
+    ResultInput, ResultLayout, ResultMeasurements, ResultRow, ResultRowLayout, ResultTarget,
+    ResultUi, LANGUAGES,
+};
+use snaplingo_ui::{Rect, Size, Snapshot};
 
 define_class!(
     #[unsafe(super(NSPanel))]
@@ -261,6 +251,15 @@ fn place(view: &NSView, x: f64, y: f64, width: f64, height: f64) {
         view.setFrame(next);
     }
 }
+fn apply(view: &NSView, frame: Rect) {
+    place(
+        view,
+        f64::from(frame.x),
+        f64::from(frame.y),
+        f64::from(frame.width),
+        f64::from(frame.height),
+    );
+}
 fn label(parent: &NSView, text: &str, size: f64) -> Retained<Label> {
     let field = Label::alloc(parent.mtm()).set_ivars(());
     let field: Retained<Label> =
@@ -366,24 +365,7 @@ fn update_text(view: &NSTextView, text: &str, source: bool, force: bool) {
         if view.string().to_string() != text {
             view.setString(&NSString::from_str(text));
         }
-        let lines = text
-            .lines()
-            .map(|line| {
-                (line.chars().count() as f64 / if source { 54.0 } else { 72.0 })
-                    .ceil()
-                    .max(1.0)
-            })
-            .sum::<f64>()
-            .max(1.0);
-        let density = (text.chars().count() as f64 / if source { 140.0 } else { 180.0 })
-            .max(lines / if source { 2.0 } else { 3.0 });
-        let size = if density >= 2.2 {
-            12.0
-        } else if density >= 1.15 {
-            13.0
-        } else {
-            14.0
-        };
+        let size = f64::from(snaplingo_ui::result::text_size(text, source));
         if view.font().is_none_or(|font| font.pointSize() != size) {
             view.setFont(Some(&NSFont::systemFontOfSize(size)));
         }
@@ -469,7 +451,6 @@ struct TranslationCard {
     status: Retained<Label>,
     buttons: [Retained<NSButton>; 4],
     text: Retained<NSTextView>,
-    expanded: bool,
 }
 impl TranslationCard {
     fn new(parent: &NSView, root: &ResultView, row: &TranslationRow, index: usize) -> Self {
@@ -495,95 +476,49 @@ impl TranslationCard {
             status,
             buttons,
             text,
-            expanded: true,
         }
     }
-    fn layout(&self, row: &TranslationRow, pending_favorite: bool, width: f64, y: f64) -> f64 {
-        let pending = row.status == TranslationStatus::Pending;
-        let error = row.result.error.as_ref();
-        let status = if pending {
-            "翻译中"
-        } else if error.is_some() {
-            "失败"
-        } else {
-            ""
-        };
-        set_label(&self.status, status);
-        let status_color = if error.is_some() {
+    fn layout(
+        &self,
+        row: &ResultRow,
+        pending_favorite: bool,
+        layout: &ResultRowLayout,
+        expanded: bool,
+    ) {
+        let presentation = row.presentation(pending_favorite);
+        set_label(&self.status, presentation.status);
+        let status_color = if presentation.error {
             NSColor::systemRedColor()
         } else {
             NSColor::secondaryLabelColor()
         };
         self.status.setTextColor(Some(&status_color));
-        let title = format!("{} {}", if self.expanded { "▾" } else { "▸" }, row.name);
+        let title = format!("{} {}", if expanded { "▾" } else { "▸" }, row.name);
         if self.title.title().to_string() != title {
             self.title.setTitle(&NSString::from_str(&title));
         }
-        let narrow = width < 430.0;
-        let header = if narrow { 62.0 } else { 36.0 };
-        place(
-            &self.title,
-            8.0,
-            4.0,
-            (width - if narrow { 70.0 } else { 180.0 }).max(40.0),
-            28.0,
-        );
-        place(
-            &self.status,
-            width - if narrow { 62.0 } else { 170.0 },
-            10.0,
-            48.0,
-            18.0,
-        );
-        for (index, button) in self.buttons.iter().enumerate() {
-            place(
-                button,
-                width - 116.0 + index as f64 * 26.0,
-                if narrow { 32.0 } else { 4.0 },
-                24.0,
-                28.0,
-            );
-            let enabled = !pending
-                && match index {
-                    0 => error.is_none_or(|error| error.retryable),
-                    2 => {
-                        error.is_none()
-                            && !row.favorite
-                            && !pending_favorite
-                            && !row.result.translated_text.is_empty()
-                    }
-                    _ => error.is_none() && !row.result.translated_text.is_empty(),
-                };
-            button.setEnabled(enabled);
+        apply(&self.title, layout.title);
+        apply(&self.status, layout.status);
+        for ((button, state), frame) in self
+            .buttons
+            .iter()
+            .zip(&presentation.buttons)
+            .zip(layout.buttons)
+        {
+            apply(button, frame);
+            button.setEnabled(state.enabled);
+            button.setToolTip(Some(&NSString::from_str(state.label)));
         }
-        self.buttons[2].setToolTip(Some(&NSString::from_str(if row.favorite {
-            "已收藏"
-        } else {
-            "收藏"
-        })));
-        let text = if pending {
-            "正在请求翻译服务…"
-        } else {
-            error
-                .map(|error| error.message.as_str())
-                .unwrap_or(&row.result.translated_text)
-        };
-        update_text(&self.text, text, false, false);
-        let text_color = if error.is_some() {
+        update_text(&self.text, presentation.text, false, false);
+        let text_color = if presentation.error {
             NSColor::systemRedColor()
         } else {
             NSColor::labelColor()
         };
         self.text.setTextColor(Some(&text_color));
-        self.text.setHidden(!self.expanded);
-        let body = if self.expanded {
-            text_height(&self.text, width - 4.0, 44.0)
-        } else {
-            0.0
-        };
-        place(&self.text, 2.0, header, width - 4.0, body);
-        place(&self.box_, 0.0, y, width, header + body + 2.0);
-        header + body + 2.0
+        self.text.setHidden(!expanded);
+        apply(&self.text, layout.text);
+        apply(&self.box_, layout.frame);
     }
 }
 
@@ -622,7 +557,7 @@ struct NativeResult {
     decoded_source: Option<Arc<str>>,
     tokens: Vec<OcrCopyToken>,
     token_text: String,
-    collapsed: bool,
+    ui: ResultUi,
     view: ResultWindowSnapshot,
     defaults: Retained<NSUserDefaults>,
     last_position: String,
@@ -806,7 +741,10 @@ pub(crate) fn open(
             decoded_source: None,
             tokens: vec![],
             token_text: String::new(),
-            collapsed: false,
+            ui: ResultUi::new(super::super::presentation::project(
+                &initial,
+                Snapshot::default(),
+            )),
             view: initial,
             defaults,
             last_position: String::new(),
@@ -843,7 +781,7 @@ impl NativeResult {
         NSString::from_str(&format!("snaplingo.result-window.source-input.{origin}"))
     }
     fn restore_collapsed(&mut self) {
-        self.collapsed = match self.collapsed_setting() {
+        let collapsed = match self.collapsed_setting() {
             "collapsed" => true,
             "last" => self
                 .defaults
@@ -851,7 +789,9 @@ impl NativeResult {
                 .is_some_and(|value| value.to_string() == "collapsed"),
             _ => false,
         };
+        self.ui.restore_source_collapsed(collapsed);
     }
+
     fn render(&mut self, new_presentation: bool) {
         let view = &self.view;
         self.root.ivars().updating.set(true);
@@ -873,37 +813,47 @@ impl NativeResult {
             } else {
                 0
             });
-        set_label(&self.title, if translation { "翻译" } else { "OCR" });
-        let subtitle = if translation {
-            if view.rows.is_empty() {
-                "准备翻译".into()
-            } else {
-                format!(
-                    "{}/{} 个服务已返回",
-                    view.rows
-                        .iter()
-                        .filter(|row| row.status == TranslationStatus::Success)
-                        .count(),
-                    view.rows.len()
-                )
-            }
-        } else if view.ocr_running {
-            "识别中".into()
-        } else if view.ocr_text.is_empty() {
-            "等待上传".into()
-        } else {
-            let mut text = format!("已识别 {} 个字符", view.ocr_text.encode_utf16().count());
-            if view.preferences.ocr.show_confidence {
-                if let Some(confidence) = view.ocr_confidence {
-                    text.push_str(&format!(" · 置信度 {:.0}%", confidence * 100.0));
+        if !translation && self.token_text != view.ocr_text {
+            let tokens = super::tokens::tokens(&view.ocr_text);
+            self.fragments.removeAllItems();
+            self.fragments
+                .addItemWithTitle(&NSString::from_str(&format!(
+                    "推荐复制片段 · {} 个",
+                    tokens.len()
+                )));
+            for token in &tokens {
+                self.fragments
+                    .addItemWithTitle(&NSString::from_str(&format!(
+                        "{}  {}",
+                        token.label, token.value
+                    )));
+                let item = self.fragments.lastItem().unwrap();
+                unsafe {
+                    item.setTarget(Some(&self.root));
+                    item.setAction(Some(sel!(copyFragment:)));
+                    item.setRepresentedObject(Some(&NSString::from_str(&token.value)));
                 }
             }
-            text
-        };
-        set_label(&self.subtitle, &subtitle);
-        self.source_box.setHidden(!translation || self.collapsed);
+            self.tokens = tokens;
+            self.token_text = view.ocr_text.clone();
+        }
+        let mut model = super::super::presentation::project(view, Snapshot::default());
+        model.ocr_tokens = self
+            .tokens
+            .iter()
+            .map(|token| snaplingo_ui::result::ResultCopyToken {
+                label: token.label.clone(),
+                value: token.value.clone(),
+            })
+            .collect();
+        self.ui.replace(model);
+        let presentation = self.ui.snapshot().presentation();
+        set_label(&self.title, presentation.title);
+        set_label(&self.subtitle, &presentation.subtitle);
+        self.source_box
+            .setHidden(!translation || self.ui.source_collapsed());
         self.collapsed_source
-            .setHidden(!translation || !self.collapsed);
+            .setHidden(!translation || !self.ui.source_collapsed());
         self.source_language.setHidden(!translation);
         self.target_language.setHidden(!translation);
         self.swap.setHidden(!translation);
@@ -944,96 +894,34 @@ impl NativeResult {
             );
             self.source.setTextColor(Some(&NSColor::labelColor()));
             self.placeholder.setHidden(!view.source_text.is_empty());
-            let detected = view
-                .rows
-                .iter()
-                .find_map(|row| row.result.detected_language.as_deref())
-                .unwrap_or(&view.source_lang);
-            set_label(
-                &self.source_meta,
-                &format!(
-                    "{} chars · 识别为 {}",
-                    view.source_text.encode_utf16().count(),
-                    language_name(detected)
-                ),
-            );
-            let completed = view
-                .rows
-                .iter()
-                .filter(|row| {
-                    row.status == TranslationStatus::Success
-                        && !row.result.translated_text.is_empty()
-                })
-                .collect::<Vec<_>>();
-            let all_favorite = !completed.is_empty() && completed.iter().all(|row| row.favorite);
-            self.source_buttons[1]
-                .setEnabled(!completed.is_empty() && !all_favorite && !view.favorite_pending);
-            self.source_buttons[1].setToolTip(Some(&NSString::from_str(if all_favorite {
-                "已收藏"
-            } else {
-                "收藏全部结果"
-            })));
-            for button in &self.source_buttons[2..] {
-                button.setEnabled(!view.source_text.trim().is_empty());
+            set_label(&self.source_meta, &presentation.source_metadata);
+            for (button, state) in self.source_buttons.iter().zip(&presentation.source_buttons) {
+                button.setEnabled(state.enabled);
+                button.setToolTip(Some(&NSString::from_str(state.label)));
             }
-            self.source_buttons[4].setEnabled(
-                !view.source_text.trim().is_empty()
-                    && !view.translating
-                    && !self.source.hasMarkedText(),
-            );
-            self.source_buttons[5].setEnabled(!view.source_text.is_empty());
-            let preview = view
-                .source_text
-                .split_whitespace()
-                .collect::<Vec<_>>()
-                .join(" ");
-            self.collapsed_source.setTitle(&NSString::from_str(&format!(
-                "{}    · 展开原文",
-                preview.chars().take(80).collect::<String>()
-            )));
+            self.source_buttons[4]
+                .setEnabled(presentation.source_buttons[4].enabled && !self.source.hasMarkedText());
+            self.collapsed_source
+                .setTitle(&NSString::from_str(&presentation.collapsed_source));
             select_language(&self.source_language, &view.source_lang);
             select_language(&self.target_language, &view.target_lang);
         } else {
             update_text(&self.ocr_text, &view.ocr_text, true, false);
             self.ocr_placeholder.setHidden(!view.ocr_text.is_empty());
-            set_label(
-                &self.image_title,
-                if view.ocr_image.is_some() {
-                    "原图"
-                } else {
-                    "图片 · PNG/JPG/WebP"
-                },
-            );
+            set_label(&self.image_title, presentation.image_title);
+            set_label(&self.ocr_title, presentation.ocr_title);
             self.ocr_text.setTextColor(Some(&NSColor::labelColor()));
-            set_label(
-                &self.ocr_meta,
-                &format!("{} chars", view.ocr_text.encode_utf16().count()),
-            );
-            set_label(
-                &self.ocr_language,
-                &format!("识别语言：{}", view.ocr_language.as_deref().unwrap_or("")),
-            );
-            for button in &self.ocr_buttons {
-                button.setEnabled(!view.ocr_text.trim().is_empty());
+            set_label(&self.ocr_meta, &presentation.ocr_metadata);
+            set_label(&self.ocr_language, &presentation.ocr_language);
+            for (button, state) in self.ocr_buttons.iter().zip(&presentation.ocr_buttons) {
+                button.setEnabled(state.enabled);
+                button.setToolTip(Some(&NSString::from_str(state.label)));
             }
-            self.ocr_buttons[3].setEnabled(!view.ocr_text.is_empty());
-            self.ocr_buttons[1].setEnabled(
-                !view.ocr_text.trim().is_empty() && !view.ocr_favorite && !view.favorite_pending,
-            );
-            self.ocr_buttons[1].setToolTip(Some(&NSString::from_str(if view.ocr_favorite {
-                "已收藏"
-            } else {
-                "收藏"
-            })));
+            self.upload.setEnabled(presentation.upload.enabled);
             self.upload
-                .setEnabled(!view.ocr_running && !view.dialog_open);
-            self.upload
-                .setTitle(&NSString::from_str(if view.ocr_running {
-                    "识别中…"
-                } else {
-                    "上传图片 OCR"
-                }));
+                .setTitle(&NSString::from_str(presentation.upload.label));
         }
+
         if !translation && self.decoded_source != view.ocr_image {
             self.image.setImage(None);
             self.decoded_image = view.ocr_image.as_deref().and_then(|text| {
@@ -1049,30 +937,6 @@ impl NativeResult {
             self.image.setImage(None);
             self.decoded_image = None;
             self.decoded_source = None;
-        }
-        if !translation && self.token_text != view.ocr_text {
-            let tokens = super::tokens::tokens(&view.ocr_text);
-            self.fragments.removeAllItems();
-            self.fragments
-                .addItemWithTitle(&NSString::from_str(&format!(
-                    "推荐复制片段 · {} 个",
-                    tokens.len()
-                )));
-            for token in &tokens {
-                self.fragments
-                    .addItemWithTitle(&NSString::from_str(&format!(
-                        "{}  {}",
-                        token.label, token.value
-                    )));
-                let item = self.fragments.lastItem().unwrap();
-                unsafe {
-                    item.setTarget(Some(&self.root));
-                    item.setAction(Some(sel!(copyFragment:)));
-                    item.setRepresentedObject(Some(&NSString::from_str(&token.value)));
-                }
-            }
-            self.tokens = tokens;
-            self.token_text = view.ocr_text.clone();
         }
         self.fragments.setHidden(self.tokens.is_empty());
         if let Some(error) = &view.error {
@@ -1096,144 +960,104 @@ impl NativeResult {
         .clamp(300.0, 1000.0)
         .min(work.size.width - 16.0);
         let content_width = width - 24.0;
-        let mut y = 0.0;
-        if translation {
-            if self.collapsed {
-                place(&self.collapsed_source, 0.0, y, content_width, 40.0);
-                y += 52.0;
+        let measured = ResultMeasurements {
+            source: if translation {
+                text_height(&self.source, content_width - 4., 52.) as f32
             } else {
-                let body = text_height(&self.source, content_width - 4.0, 52.0);
-                let narrow = content_width < 430.0;
-                let footer = if narrow { 62.0 } else { 38.0 };
-                place(&self.source_box, 0.0, y, content_width, body + footer + 2.0);
-                place(&self.source, 2.0, 2.0, content_width - 4.0, body);
-                place(&self.placeholder, 12.0, 10.0, content_width - 24.0, 24.0);
-                place(
-                    &self.source_meta,
-                    12.0,
-                    body + 10.0,
-                    if narrow {
-                        content_width - 24.0
-                    } else {
-                        content_width - 226.0
-                    },
-                    20.0,
-                );
-                let mut x = content_width - 206.0;
-                for (index, button) in self.source_buttons.iter().enumerate() {
-                    let size = if index == 0 { 56.0 } else { 28.0 };
-                    place(
-                        button,
-                        x,
-                        body + if narrow { 30.0 } else { 4.0 },
-                        size,
-                        30.0,
+                0.
+            },
+            ocr: if translation {
+                0.
+            } else {
+                text_height(&self.ocr_text, content_width - 4., 72.) as f32
+            },
+            error: if view.error.is_some() {
+                text_height(&self.error, content_width, 40.) as f32
+            } else {
+                0.
+            },
+            rows: self
+                .cards
+                .iter()
+                .filter(|_| translation)
+                .zip(&self.ui.snapshot().rows)
+                .map(|(card, row)| {
+                    update_text(
+                        &card.text,
+                        row.presentation(view.favorite_pending).text,
+                        false,
+                        false,
                     );
-                    x += size + 1.0;
-                }
-                y += body + footer + 14.0;
+                    text_height(&card.text, content_width - 4., 44.) as f32
+                })
+                .collect(),
+            image: self.decoded_image.as_ref().map(|image| Size {
+                width: image.size().width as f32,
+                height: image.size().height as f32,
+            }),
+        };
+        let layout = self.ui.layout(width as f32, &measured);
+        if let Some(source) = &layout.source {
+            apply(&self.source_box, source.frame);
+            apply(&self.source, source.text);
+            apply(&self.placeholder, source.placeholder);
+            apply(&self.source_meta, source.metadata);
+            for (button, frame) in self.source_buttons.iter().zip(source.buttons) {
+                apply(button, frame);
             }
-            let language_width = (content_width - 40.0) / 2.0;
-            place(&self.source_language, 0.0, y, language_width, 36.0);
-            place(&self.swap, language_width, y, 40.0, 36.0);
-            place(
-                &self.target_language,
-                language_width + 40.0,
-                y,
-                language_width,
-                36.0,
-            );
-            y += 48.0;
-        } else {
-            if view.ocr_language.is_some() {
-                place(&self.ocr_language, 0.0, y, content_width, 20.0);
-                y += 26.0;
-            }
-            place(&self.image_title, 0.0, y, content_width, 20.0);
-            y += 26.0;
-            if let Some(image) = &self.decoded_image {
-                let size = image.size();
-                let height = (size.height * content_width / size.width.max(1.0)).clamp(48.0, 220.0);
-                place(&self.image, 0.0, y, content_width, height);
-                y += height + 8.0;
-            }
-            let height = if self.decoded_image.is_some() {
-                34.0
-            } else {
-                84.0
-            };
-            place(&self.upload, 0.0, y, content_width, height);
-            y += height + 12.0;
         }
-        if view.error.is_some() {
-            let height = text_height(&self.error, content_width, 40.0);
-            place(&self.error, 0.0, y, content_width, height);
-            y += height + 12.0;
+        if let Some(frame) = layout.collapsed_source {
+            apply(&self.collapsed_source, frame);
         }
-        if translation {
-            for (row, card) in view.rows.iter().zip(&self.cards) {
-                y += card.layout(row, view.favorite_pending, content_width, y) + 12.0;
-            }
-        } else {
-            set_label(
-                &self.ocr_title,
-                if view.ocr_image.is_some() {
-                    "OCR 结果"
-                } else {
-                    "识别文本"
-                },
-            );
-            place(&self.ocr_title, 0.0, y, content_width, 20.0);
-            y += 26.0;
-            let body = text_height(&self.ocr_text, content_width - 4.0, 72.0);
-            let token_height = if self.tokens.is_empty() { 0.0 } else { 34.0 };
-            place(&self.ocr_text, 2.0, 2.0, content_width - 4.0, body);
-            place(
-                &self.ocr_placeholder,
-                12.0,
-                10.0,
-                content_width - 24.0,
-                24.0,
-            );
-            place(
-                &self.fragments,
-                8.0,
-                body + 2.0,
-                content_width - 16.0,
-                token_height,
-            );
-            let footer_y = body + token_height;
-            place(
-                &self.ocr_meta,
-                12.0,
-                footer_y + 10.0,
-                content_width - 136.0,
-                20.0,
-            );
-            for (index, button) in self.ocr_buttons.iter().enumerate() {
-                place(
-                    button,
-                    content_width - 120.0 + index as f64 * 28.0,
-                    footer_y + 4.0,
-                    28.0,
-                    30.0,
-                );
-            }
-            place(
-                &self.ocr_box,
-                0.0,
-                y,
-                content_width,
-                body + token_height + 40.0,
-            );
-            y += body + token_height + 52.0;
+        if let Some([source, swap, target]) = layout.languages {
+            apply(&self.source_language, source);
+            apply(&self.swap, swap);
+            apply(&self.target_language, target);
         }
+        if let Some(frame) = layout.error {
+            apply(&self.error, frame);
+        }
+        for ((row, card), frame) in self
+            .ui
+            .snapshot()
+            .rows
+            .iter()
+            .zip(&self.cards)
+            .zip(&layout.rows)
+        {
+            card.layout(
+                row,
+                view.favorite_pending,
+                frame,
+                self.ui.row_expanded(&row.id),
+            );
+        }
+        if let Some(ocr) = &layout.ocr {
+            if let Some(frame) = ocr.language {
+                apply(&self.ocr_language, frame);
+            }
+            apply(&self.image_title, ocr.image_title);
+            if let Some(frame) = ocr.image {
+                apply(&self.image, frame);
+            }
+            apply(&self.upload, ocr.upload);
+            apply(&self.ocr_title, ocr.title);
+            apply(&self.ocr_box, ocr.frame);
+            apply(&self.ocr_text, ocr.text);
+            apply(&self.ocr_placeholder, ocr.placeholder);
+            apply(&self.fragments, ocr.fragments);
+            apply(&self.ocr_meta, ocr.metadata);
+            for (button, frame) in self.ocr_buttons.iter().zip(ocr.buttons) {
+                apply(button, frame);
+            }
+        }
+        let y = f64::from(layout.content_height);
         let maximum = if translation {
             work.size.height * view.preferences.translation.max_window_height_ratio as f64 / 100.0
         } else {
             work.size.height - 32.0
         };
-        let height = (y + 72.0).min(maximum).max(140.0);
+        let height = f64::from(layout.window_height(maximum as f32));
         let mut frame = self.window.frame();
         frame.origin.y += frame.size.height - height;
         frame.size = NSSize::new(width, height);
@@ -1252,18 +1076,16 @@ impl NativeResult {
         if self.window.frame() != frame {
             self.window.setFrame_display(frame, true);
         }
-        place(&self.pin, 10.0, 10.0, 28.0, 28.0);
-        place(&self.title, 48.0, 12.0, 52.0, 24.0);
-        place(&self.subtitle, 106.0, 16.0, width - 150.0, 20.0);
-        place(&self.close, width - 38.0, 10.0, 28.0, 28.0);
-        place(&self.scroll, 12.0, 60.0, content_width, height - 72.0);
-        place(
-            &self.document,
-            0.0,
-            0.0,
-            content_width,
-            y.max(height - 72.0),
-        );
+        let header = ResultLayout::header(Size {
+            width: width as f32,
+            height: height as f32,
+        });
+        apply(&self.pin, header.pin);
+        apply(&self.title, header.title);
+        apply(&self.subtitle, header.subtitle);
+        apply(&self.close, header.close);
+        apply(&self.scroll, header.viewport);
+        place(&self.document, 0., 0., content_width, y.max(height - 72.));
         self.root.ivars().updating.set(false);
     }
 }
@@ -1289,6 +1111,10 @@ pub(crate) fn update(view: ResultWindowSnapshot) {
             window.root.ivars().updating.set(true);
             window.window.orderOut(None);
             window.root.ivars().pinned.set(false);
+            window.ui.replace(super::super::presentation::project(
+                &window.view,
+                Snapshot::default(),
+            ));
             window.pin.setToolTip(Some(&NSString::from_str("固定窗口")));
             if let Some(image) = NSImage::imageWithSystemSymbolName_accessibilityDescription(
                 &NSString::from_str("pin"),
@@ -1311,7 +1137,7 @@ pub(crate) fn update(view: ResultWindowSnapshot) {
                 .activateWithOptions(NSApplicationActivationOptions::empty());
             window.window.makeKeyAndOrderFront(None);
             window.root.ivars().visible_since.set(Some(Instant::now()));
-            if window.view.mode == ResultWindowMode::Translation && !window.collapsed {
+            if window.view.mode == ResultWindowMode::Translation && !window.ui.source_collapsed() {
                 window.window.makeFirstResponder(Some(&window.source));
             } else {
                 window.window.makeFirstResponder(Some(&window.ocr_text));
@@ -1325,96 +1151,75 @@ fn activate(tag: isize) {
     let effect = WINDOW.with(|all| {
         let mut all = all.borrow_mut();
         let window = all.as_mut()?;
-        let view = &window.view;
-        let action = match tag {
-            0 => {
-                let pinned = !window.root.ivars().pinned.get();
-                window.root.ivars().pinned.set(pinned);
-                window.pin.setToolTip(Some(&NSString::from_str(if pinned {
-                    "取消固定"
-                } else {
-                    "固定窗口"
-                })));
-                if let Some(image) = NSImage::imageWithSystemSymbolName_accessibilityDescription(
-                    &NSString::from_str(if pinned { "pin.fill" } else { "pin" }),
-                    Some(&NSString::from_str("固定窗口")),
-                ) {
-                    window.pin.setImage(Some(&image));
-                }
-                return None;
-            }
-            1 => Action::Close,
-            2 => {
-                window.collapsed = !window.collapsed;
-                unsafe {
-                    window.defaults.setObject_forKey(
-                        Some(&NSString::from_str(if window.collapsed {
-                            "collapsed"
-                        } else {
-                            "expanded"
-                        })),
-                        &window.source_key(),
-                    );
-                }
-                window.render(false);
-                if !window.collapsed {
-                    window.window.makeFirstResponder(Some(&window.source));
-                }
-                return None;
-            }
-            3 => Action::Copy(view.source_text.clone()),
-            4 => Action::Speak(
-                view.source_text.clone(),
-                view.rows
-                    .iter()
-                    .find_map(|row| row.result.detected_language.clone())
-                    .or_else(|| (view.source_lang != "auto").then(|| view.source_lang.clone())),
-            ),
-            5 => Action::Translate,
-            6 => Action::Edit(String::new(), false),
-            7 => Action::Favorite(
-                view.clone(),
-                view.rows
-                    .iter()
-                    .filter(|row| {
-                        row.status == TranslationStatus::Success
-                            && !row.result.translated_text.is_empty()
-                            && !row.favorite
-                    })
-                    .map(|row| row.id.clone())
-                    .collect(),
-            ),
-            8 => Action::FileOcr,
-            9 => Action::Copy(view.ocr_text.clone()),
-            10 => Action::Speak(view.ocr_text.clone(), None),
-            11 => Action::Favorite(view.clone(), vec![]),
-            12 => Action::ClearOcr,
-            13 => Action::Swap,
+        let target = match tag {
+            0 => ResultTarget::Pin,
+            1 => ResultTarget::Close,
+            2 => ResultTarget::ToggleSource,
+            3 => ResultTarget::CopySource,
+            4 => ResultTarget::SpeakSource,
+            5 => ResultTarget::Translate,
+            6 => ResultTarget::ClearSource,
+            7 => ResultTarget::FavoriteAll,
+            8 => ResultTarget::FileOcr,
+            9 => ResultTarget::CopyOcr,
+            10 => ResultTarget::SpeakOcr,
+            11 => ResultTarget::FavoriteOcr,
+            12 => ResultTarget::ClearOcr,
+            13 => ResultTarget::Swap,
             tag if tag >= 100 => {
-                let index = ((tag - 100) / 10) as usize;
-                let row = view.rows.get(index)?;
+                let row = window.view.rows.get(((tag - 100) / 10) as usize)?;
                 match (tag - 100) % 10 {
-                    0 => {
-                        window.cards[index].expanded = !window.cards[index].expanded;
-                        window.render(false);
-                        return None;
-                    }
-                    1 => Action::Retry(row.id.clone()),
-                    2 => Action::Speak(
-                        row.result.translated_text.clone(),
-                        Some(snaplingo_core::application::result_window::resolved_target(
-                            &view.source_text,
-                            &view.source_lang,
-                            &view.target_lang,
-                        )),
-                    ),
-                    3 => Action::Favorite(view.clone(), vec![row.id.clone()]),
-                    4 => Action::Copy(row.result.translated_text.clone()),
+                    0 => ResultTarget::ToggleRow(row.id.clone()),
+                    1 => ResultTarget::Retry(row.id.clone()),
+                    2 => ResultTarget::SpeakResult(row.id.clone()),
+                    3 => ResultTarget::FavoriteResult(row.id.clone()),
+                    4 => ResultTarget::CopyResult(row.id.clone()),
                     _ => return None,
                 }
             }
             _ => return None,
         };
+        let intent = window
+            .ui
+            .update(ResultInput::Activate(target))
+            .into_iter()
+            .next();
+        if tag == 0 {
+            let pinned = window.ui.pinned();
+            window.root.ivars().pinned.set(pinned);
+            window.pin.setToolTip(Some(&NSString::from_str(if pinned {
+                "取消固定"
+            } else {
+                "固定窗口"
+            })));
+            if let Some(image) = NSImage::imageWithSystemSymbolName_accessibilityDescription(
+                &NSString::from_str(if pinned { "pin.fill" } else { "pin" }),
+                Some(&NSString::from_str("固定窗口")),
+            ) {
+                window.pin.setImage(Some(&image));
+            }
+            return None;
+        }
+        if tag == 2 {
+            unsafe {
+                window.defaults.setObject_forKey(
+                    Some(&NSString::from_str(if window.ui.source_collapsed() {
+                        "collapsed"
+                    } else {
+                        "expanded"
+                    })),
+                    &window.source_key(),
+                );
+            }
+        }
+        if tag == 2 || tag >= 100 && (tag - 100) % 10 == 0 {
+            window.render(false);
+            if tag == 2 && !window.ui.source_collapsed() {
+                window.window.makeFirstResponder(Some(&window.source));
+            }
+            return None;
+        }
+        let action = super::super::presentation::action(intent?, &window.view)?;
         Some((window.root.ivars().dispatch.clone(), action))
     });
     if let Some((dispatch, action)) = effect {
@@ -1422,22 +1227,6 @@ fn activate(tag: isize) {
     }
 }
 
-fn language_name(code: &str) -> &str {
-    match code {
-        "auto" => "自动检测",
-        "en" => "英语",
-        "zh" | "zh-CN" => "中文简体",
-        "zh-TW" => "中文繁体",
-        "ja" => "日语",
-        "ko" => "韩语",
-        "es" => "西班牙语",
-        "fr" => "法语",
-        "de" => "德语",
-        "ru" => "俄语",
-        "ar" => "阿拉伯语",
-        _ => code,
-    }
-}
 fn position_setting(view: &ResultWindowSnapshot) -> &str {
     if view.mode == ResultWindowMode::Ocr {
         &view.preferences.ocr.window_position
@@ -1551,7 +1340,7 @@ pub(crate) fn test_state() -> TestState {
             source: window.source.string().to_string(),
             source_height: window.source.frame().size.height,
             composing: window.source.hasMarkedText(),
-            collapsed: window.collapsed,
+            collapsed: window.ui.source_collapsed(),
             pinned: window.root.ivars().pinned.get(),
             ocr_text: window.ocr_text.string().to_string(),
             decoded_image: window.decoded_image.is_some(),
@@ -1595,7 +1384,7 @@ pub(crate) fn test_click(tag: isize) {
         if tag == 1 {
             return Some(window.close.clone());
         }
-        if tag == 2 && window.collapsed {
+        if tag == 2 && window.ui.source_collapsed() {
             return Some(window.collapsed_source.clone());
         }
         if tag == 8 {
@@ -1687,5 +1476,52 @@ pub(crate) fn test_snapshot() -> Vec<u8> {
         crate::infrastructure::system::native_view_snapshot::snapshot(
             &all.borrow().as_ref().unwrap().root,
         )
+    })
+}
+
+#[cfg(test)]
+pub(crate) fn test_geometry() -> serde_json::Value {
+    WINDOW.with_borrow(|window| {
+        let window = window.as_ref().unwrap();
+        let frame = |view: &NSView| {
+            let rect = view.frame();
+            serde_json::json!([rect.origin.x, rect.origin.y, rect.size.width, rect.size.height])
+        };
+        let buttons = |buttons: &[Retained<NSButton>]| {
+            buttons.iter().map(|button| serde_json::json!({
+                "frame": frame(button), "enabled": button.isEnabled(),
+                "label": button.toolTip().map(|label| label.to_string()),
+            })).collect::<Vec<_>>()
+        };
+        serde_json::json!({
+            "width": window.window.frame().size.width,
+            "height": window.window.frame().size.height,
+            "title": frame(&window.title), "subtitle": frame(&window.subtitle),
+            "pin": frame(&window.pin), "close": frame(&window.close),
+            "scroll": frame(&window.scroll), "document": frame(&window.document),
+            "source": {
+                "frame": frame(&window.source_box), "text": frame(&window.source),
+                "font": window.source.font().map(|font| font.pointSize()),
+                "placeholder": frame(&window.placeholder), "metadata": frame(&window.source_meta),
+                "buttons": buttons(&window.source_buttons), "collapsed": window.ui.source_collapsed(),
+                "toggle": frame(&window.collapsed_source),
+                "languages": [frame(&window.source_language), frame(&window.swap), frame(&window.target_language)],
+            },
+            "rows": window.cards.iter().map(|card| serde_json::json!({
+                "id": card.id, "frame": frame(&card.box_), "title": frame(&card.title),
+                "status": frame(&card.status), "text": frame(&card.text),
+                "font": card.text.font().map(|font| font.pointSize()),
+                "expanded": window.ui.row_expanded(&card.id), "buttons": buttons(&card.buttons),
+            })).collect::<Vec<_>>(),
+            "ocr": {
+                "language": frame(&window.ocr_language), "image_title": frame(&window.image_title),
+                "image": frame(&window.image), "upload": frame(&window.upload),
+                "title": frame(&window.ocr_title), "frame": frame(&window.ocr_box),
+                "text": frame(&window.ocr_text), "placeholder": frame(&window.ocr_placeholder),
+                "metadata": frame(&window.ocr_meta), "fragments": frame(&window.fragments),
+                "font": window.ocr_text.font().map(|font| font.pointSize()),
+                "buttons": buttons(&window.ocr_buttons),
+            },
+        })
     })
 }

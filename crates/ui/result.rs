@@ -1,24 +1,34 @@
 //! Result-window drawing and input shared by desktop hosts.
 mod draw;
 mod icons;
+mod layout;
+mod presentation;
 mod state;
 
 use crate::{Key, Modifiers, Point, RasterImage, Rect, Scene, Snapshot};
+pub use layout::{
+    ResultHeaderLayout, ResultLayout, ResultMeasurements, ResultOcrLayout, ResultRowLayout,
+    ResultSourceLayout,
+};
+pub use presentation::{
+    language_name, text_size, ResultButton, ResultPresentation, ResultRowPresentation,
+};
 pub use state::ResultUi;
 
 pub const LANGUAGES: &[(&str, &str)] = &[
-    ("auto", "自动检测"),
-    ("en", "英语"),
-    ("zh-CN", "简体中文"),
-    ("zh-TW", "繁体中文"),
-    ("ja", "日语"),
-    ("ko", "韩语"),
-    ("es", "西班牙语"),
-    ("fr", "法语"),
-    ("de", "德语"),
-    ("ru", "俄语"),
-    ("ar", "阿拉伯语"),
+    ("auto", "自动检测 Auto Detect"),
+    ("en", "英语 English"),
+    ("zh-CN", "中文简体 Chinese (Simplified)"),
+    ("zh-TW", "中文繁体 Chinese (Traditional)"),
+    ("ja", "日语 Japanese"),
+    ("ko", "韩语 Korean"),
+    ("es", "西班牙语 Spanish"),
+    ("fr", "法语 French"),
+    ("de", "德语 German"),
+    ("ru", "俄语 Russian"),
+    ("ar", "阿拉伯语 Arabic"),
 ];
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ResultMode {
     #[default]
@@ -64,7 +74,7 @@ pub struct ResultSnapshot {
     pub ocr_text: String,
     pub ocr_tokens: Vec<ResultCopyToken>,
     pub ocr_image: Option<RasterImage>,
-    pub ocr_metadata: String,
+    pub ocr_image_present: bool,
     pub ocr_language: Option<String>,
     pub ocr_confidence: Option<f32>,
     pub ocr_running: bool,
@@ -93,6 +103,7 @@ pub enum ResultTarget {
     OcrText,
     CopyOcr,
     CopyToken(String),
+    CopyFragments,
     SpeakOcr,
     FavoriteOcr,
     ClearOcr,

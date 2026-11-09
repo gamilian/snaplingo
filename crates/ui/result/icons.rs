@@ -4,15 +4,11 @@ use crate::{Color, DrawCommand, Point, Rect, Scene};
 pub(super) enum Icon {
     Close,
     Pin,
-    Language,
-    Scan,
-    Upload,
     Retry,
     Clear,
     Copy,
     Favorite,
     Volume,
-    Up,
     Down,
     Swap,
 }
@@ -50,33 +46,6 @@ pub(super) fn draw(scene: &mut Scene, rect: Rect, icon: Icon, color: Color) {
             ]);
             path(&[(9., 4.), (15., 4.)]);
             path(&[(12., 14.), (12., 21.)]);
-        }
-        Icon::Language => {
-            path(&[(5., 8.), (11., 14.)]);
-            path(&[(4., 14.), (10., 8.), (12., 5.)]);
-            path(&[(2., 5.), (14., 5.)]);
-            path(&[(7., 2.), (8., 2.)]);
-            path(&[(22., 22.), (17., 12.), (12., 22.)]);
-            path(&[(14., 18.), (20., 18.)]);
-        }
-        Icon::Scan => {
-            path(&[(4., 7.), (4., 5.), (5., 4.), (7., 4.)]);
-            path(&[(17., 4.), (19., 4.), (20., 5.), (20., 7.)]);
-            path(&[(20., 17.), (20., 19.), (19., 20.), (17., 20.)]);
-            path(&[(7., 20.), (5., 20.), (4., 19.), (4., 17.)]);
-            path(&[(7., 12.), (17., 12.)]);
-        }
-        Icon::Upload => {
-            path(&[(12., 16.), (12., 4.)]);
-            path(&[(7., 9.), (12., 4.), (17., 9.)]);
-            path(&[
-                (20., 16.),
-                (20., 19.),
-                (18., 21.),
-                (6., 21.),
-                (4., 19.),
-                (4., 16.),
-            ]);
         }
         Icon::Retry => {
             let points: Vec<_> = (0..=22)
@@ -144,7 +113,6 @@ pub(super) fn draw(scene: &mut Scene, rect: Rect, icon: Icon, color: Color) {
             path(&[(16., 9.5), (17., 11.), (17., 13.), (16., 14.5)]);
             path(&[(19., 7.), (21., 10.), (21., 14.), (19., 17.)]);
         }
-        Icon::Up => path(&[(18., 15.), (12., 9.), (6., 15.)]),
         Icon::Down => path(&[(6., 9.), (12., 15.), (18., 9.)]),
         Icon::Swap => {
             path(&[(6., 7.), (18., 7.)]);

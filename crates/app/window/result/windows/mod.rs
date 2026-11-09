@@ -7,14 +7,11 @@ use accesskit_winit::{Adapter, WindowEvent as AccessibilityEvent};
 use base64::Engine;
 use snaplingo_accessibility::{result_project, ResultProjection};
 use snaplingo_core::application::result_window::{
-    resolved_target, ResultWindowMode, ResultWindowNotifierPort, ResultWindowPresentationPort,
-    ResultWindowRequestId, ResultWindowSnapshot, ResultWindowWindowPort, TranslationStatus,
+    ResultWindowMode, ResultWindowNotifierPort, ResultWindowPresentationPort,
+    ResultWindowRequestId, ResultWindowSnapshot, ResultWindowWindowPort,
 };
 use snaplingo_render::{Renderer, RendererTextMetrics};
-use snaplingo_ui::result::{
-    ResultFrame, ResultInput, ResultIntent, ResultMode, ResultRow, ResultSnapshot, ResultUi,
-    RowStatus,
-};
+use snaplingo_ui::result::{ResultFrame, ResultInput, ResultIntent, ResultSnapshot, ResultUi};
 use snaplingo_ui::{Key, KeyStyle, Modifiers, Point, RasterImage, Size, Snapshot, Theme};
 use std::cell::RefCell;
 use std::path::PathBuf;
@@ -315,30 +312,6 @@ impl ResultView {
                     }
                     continue;
                 }
-                ResultIntent::Edit(text, composing) => Action::Edit(text, composing),
-                ResultIntent::SourceLanguage(code) => Action::SourceLanguage(code),
-                ResultIntent::TargetLanguage(code) => Action::TargetLanguage(code),
-                ResultIntent::Swap => Action::Swap,
-                ResultIntent::Translate => Action::Translate,
-                ResultIntent::Retry(id) => Action::Retry(id),
-                ResultIntent::FileOcr => Action::FileOcr,
-                ResultIntent::ClearOcr => Action::ClearOcr,
-                ResultIntent::Copy(text) => Action::Copy(text),
-                ResultIntent::Speak(text, language) => Action::Speak(
-                    text,
-                    language.map(|language| {
-                        if language == self.snapshot.target_lang {
-                            resolved_target(
-                                &self.snapshot.source_text,
-                                &self.snapshot.source_lang,
-                                &self.snapshot.target_lang,
-                            )
-                        } else {
-                            language
-                        }
-                    }),
-                ),
-                ResultIntent::Favorite(ids) => Action::Favorite(self.snapshot.clone(), ids),
                 ResultIntent::Drag => {
                     ui_thread::dispatch(|| {
                         let window =
@@ -349,9 +322,11 @@ impl ResultView {
                     });
                     continue;
                 }
-                ResultIntent::Close => {
-                    self.window.set_visible(false);
-                    Action::Close
+                intent => {
+                    if matches!(intent, ResultIntent::Close) {
+                        self.window.set_visible(false);
+                    }
+                    super::presentation::action(intent, &self.snapshot).unwrap()
                 }
             };
             self.controller.dispatch(action);
@@ -447,84 +422,9 @@ fn project(
         key_style: KeyStyle::Windows,
         ..Snapshot::default()
     };
-    let mut metadata = Vec::new();
-    if let Some(provider) = &snapshot.ocr_provider {
-        metadata.push(provider.clone());
-    }
-    if let Some(language) = &snapshot.ocr_language {
-        metadata.push(language.clone());
-    }
-    if snapshot.preferences.ocr.show_confidence {
-        if let Some(confidence) = snapshot.ocr_confidence {
-            metadata.push(format!("置信度 {:.0}%", confidence * 100.));
-        }
-    }
-    ResultSnapshot {
-        shell,
-        revision: snapshot.revision,
-        epoch: snapshot.epoch,
-        visible: snapshot.visible,
-        mode: if snapshot.mode == ResultWindowMode::Ocr {
-            ResultMode::Ocr
-        } else {
-            ResultMode::Translation
-        },
-        source: snapshot.source_text.clone(),
-        composing: snapshot.composing,
-        source_language: snapshot.source_lang.clone(),
-        target_language: snapshot.target_lang.clone(),
-        detected_language: snapshot
-            .rows
-            .iter()
-            .find_map(|row| row.result.detected_language.clone()),
-        rows: snapshot
-            .rows
-            .iter()
-            .map(|row| ResultRow {
-                id: row.id.clone(),
-                name: row.name.clone(),
-                text: row.result.translated_text.clone(),
-                status: match row.status {
-                    TranslationStatus::Pending => RowStatus::Pending,
-                    TranslationStatus::Success => RowStatus::Success,
-                    TranslationStatus::Error => RowStatus::Error,
-                },
-                error: row.result.error.as_ref().map(|error| error.message.clone()),
-                favorite: row.favorite,
-                retryable: row
-                    .result
-                    .error
-                    .as_ref()
-                    .is_none_or(|error| error.retryable),
-            })
-            .collect(),
-        translating: snapshot.translating,
-        ocr_text: snapshot.ocr_text.clone(),
-        ocr_tokens: snaplingo_core::application::result_window::copy_tokens(
-            &snapshot.ocr_text,
-            vec![],
-        )
-        .into_iter()
-        .map(|token| snaplingo_ui::result::ResultCopyToken {
-            label: token.label,
-            value: token.value,
-        })
-        .collect(),
-        ocr_image: image,
-        ocr_metadata: metadata.join(" · "),
-        ocr_language: snapshot.ocr_language.clone(),
-        ocr_confidence: snapshot
-            .preferences
-            .ocr
-            .show_confidence
-            .then_some(snapshot.ocr_confidence)
-            .flatten(),
-        ocr_running: snapshot.ocr_running,
-        dialog_open: snapshot.dialog_open,
-        favorite_pending: snapshot.favorite_pending,
-        ocr_favorite: snapshot.ocr_favorite,
-        error: snapshot.error.clone(),
-    }
+    let mut model = super::presentation::project(snapshot, shell);
+    model.ocr_image = image;
+    model
 }
 pub(crate) fn window_event(_event_loop: &ActiveEventLoop, id: WindowId, event: &WindowEvent) {
     VIEW.with_borrow_mut(|view| {

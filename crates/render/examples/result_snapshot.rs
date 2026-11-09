@@ -48,7 +48,6 @@ fn main() -> Result<(), String> {
             target_language: "zh-CN".into(),
             ocr_text: "SnapLingo 文字识别\n联系邮箱 support@example.com\n预约时间 2026-11-09 14:30"
                 .into(),
-            ocr_metadata: "系统 OCR · 中文 · 置信度 98%".into(),
             ocr_language: Some("zh-CN".into()),
             ocr_confidence: Some(0.98),
             rows: vec![

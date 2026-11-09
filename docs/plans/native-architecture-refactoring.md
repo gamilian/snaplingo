@@ -164,7 +164,7 @@ AppKit presentation. Capture and Scrolling also retain native presentation paths
   outside pure UI; retain transforms, sampling, grouping and DPI tests.
 - [x] Scrolling controls/preview: align shared presentation with Mac and connect
   both adapters to it, preserving the common lifetime from step 2.
-- [ ] Result: retain the shared controller, unify presentation and retain native
+- [x] Result: retain the shared controller, unify presentation and retain native
   text composition, selection, surrounding text and accessibility capabilities.
 - [ ] Capture: retain frozen pixels and Core Editing; unify presentation against
   Mac controls without moving OS acquisition or output policy into UI.
@@ -290,9 +290,9 @@ steps finish. Compilation is evidence of compilation, not desktop acceptance.
   and entry path are checked; benchmark compilation needs the existing setup
   checkout at `/tmp/snaplingo-ocr-benchmark/mnn/source`, absent on this machine.
 
-Remaining step 5 work is Result and Capture presentation consolidation. Their
-directory ownership is complete; their existing Mac native text/input and shared
-controller/editor behavior remain available for the corresponding vertical slices.
+Remaining step 5 work is Capture presentation consolidation. Its directory
+ownership is complete; its native input and Core Editing behavior remain
+available for that vertical slice.
 
 - Core ownership follow-up: App and Storage now import Domain/Application
   values directly from `snaplingo_core` instead of re-exporting its module tree
@@ -316,3 +316,18 @@ controller/editor behavior remain available for the corresponding vertical slice
   checks, macOS/Windows all-target checks, 941 browser/script tests, Reference
   build and generated notice checks pass. The new tool package changes only
   the lockfile hash in the production notice output; component counts are stable.
+
+- Step 5c: Result now uses one portable presentation for labels, enabled actions,
+  density thresholds, collapse/pin state and logical control rectangles. AppKit
+  supplies TextKit measurements and applies the layout to its existing native
+  controls; Windows supplies renderer measurements and draws that layout. Shared
+  App projection/action conversion stays beside the existing controller, outside
+  pure UI. The Windows copy-fragment popup follows the native menu interaction,
+  with keyboard/wheel navigation, clipped targets and original copy values.
+  Seven pre-refactor AppKit scenes define the independent geometry baseline;
+  their native frames and PNG pixels remain unchanged. Browser Result baselines
+  moved beside their Reference fixtures. UI/Render/Accessibility all-target tests,
+  203 App unit tests, native Result IME/controls and full capture/editor/pin/
+  scrolling workflows, 16 architecture checks and macOS/Windows all-target
+  compilation pass. Windows desktop font, IME and accessibility acceptance still
+  requires the actual platform.

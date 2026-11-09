@@ -40,3 +40,8 @@ paths for accessibility. Pointer-down/move/up drive slider gestures. Inspect
 for native input-method adapters. `TextSelection`, `ImePreedit`, `ImeCommit` and
 `ImeDisabled` update the same editor used for clipboard and keyboard input.
 The host supplies shaped caret metrics and converts native text-service offsets.
+
+`result/` also owns the Result window's presentation, actions and logical layout.
+Both AppKit controls and the Windows scene consume it; text measurement and
+native text services stay in their adapters. AppKit geometry is the reference
+for header, source card, provider cards, OCR controls and copy-fragment popup.

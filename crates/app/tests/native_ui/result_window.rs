@@ -109,6 +109,11 @@ fn snapshot(name: &str) {
     if let Ok(directory) = std::env::var("SNAPLINGO_NATIVE_UI_SNAPSHOT_DIR") {
         std::fs::create_dir_all(&directory).unwrap();
         std::fs::write(std::path::Path::new(&directory).join(name), bytes).unwrap();
+        std::fs::write(
+            std::path::Path::new(&directory).join(name.replace(".png", ".json")),
+            serde_json::to_vec_pretty(&native::test_geometry()).unwrap(),
+        )
+        .unwrap();
     }
 }
 
@@ -292,9 +297,11 @@ fn controls(mut view: ResultWindowSnapshot) {
     let height = native::test_state().frame.size.height;
     native::test_click(100);
     assert!(native::test_state().frame.size.height < height);
+    snapshot("result-row-collapsed.png");
     native::test_click(100);
     native::test_click(2);
     assert!(native::test_state().collapsed);
+    snapshot("result-source-collapsed.png");
     view.presentation += 1;
     view.revision += 1;
     view.preferences.translation.selection_input_state = "last".into();

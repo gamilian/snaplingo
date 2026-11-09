@@ -1,6 +1,7 @@
 mod controller;
 #[cfg(target_os = "macos")]
 pub(crate) mod macos;
+mod presentation;
 
 #[cfg(target_os = "macos")]
 pub(crate) use macos::{NativeResultWindowHost, NativeResultWindowPresentation};

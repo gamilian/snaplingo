@@ -219,3 +219,12 @@ cannot depend on tool packages. `tools/native/pin_snapshot.rs` remains an explic
 App example target so it exercises the actual private pixel-preparation module.
 `single_instance_native` is an automatically run App integration test with real
 child processes. Reusable UI/Render/Desktop examples stay beside their libraries.
+
+`ui/result` owns Result presentation state, labels, button policy, text density,
+logical layout and the renderer scene. The Mac adapter supplies TextKit heights
+and applies shared rectangles to native controls, retaining IME, selection,
+surrounding text, native accessibility, menus and file dialogs. Windows supplies
+renderer text heights and draws the same layout. App's adjacent
+`window/result/presentation.rs` converts workflow snapshots and intents; UI has
+no Core dependency. Independent AppKit measurements define the Result geometry
+baseline; the retained browser measurements live with Reference sources.
