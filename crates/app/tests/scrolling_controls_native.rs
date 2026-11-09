@@ -89,6 +89,25 @@ fn main() {
     assert!(!state.2[0]);
     assert!(!state.2[1]);
     assert!(state.3);
+    let frames = controls::test_frames(id);
+    assert_eq!(
+        (
+            frames[0].origin.x,
+            frames[0].origin.y,
+            frames[0].size.width,
+            frames[0].size.height
+        ),
+        (16.25, 49.6875, 48.75, 40.)
+    );
+    assert_eq!(
+        (
+            frames[7].origin.x,
+            frames[7].origin.y,
+            frames[7].size.width,
+            frames[7].size.height
+        ),
+        (436.25, 99.6875, 57.5, 20.)
+    );
     if let Ok(directory) = std::env::var("SNAPLINGO_NATIVE_UI_SNAPSHOT_DIR") {
         std::fs::create_dir_all(&directory).unwrap();
         std::fs::write(

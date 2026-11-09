@@ -64,6 +64,16 @@ fn main() {
         &base64::engine::general_purpose::STANDARD.encode(bytes.into_inner()),
     );
     assert_eq!(overlays.state(id), (Some(true), Some((true, true))));
+    let frame = overlays.preview_frame(id);
+    assert_eq!(
+        (
+            frame.origin.x,
+            frame.origin.y,
+            frame.size.width,
+            frame.size.height
+        ),
+        (54., 0., 2., 2.)
+    );
     assert!(overlays.hide_if_overlapping(id, &viewport));
     assert_eq!(overlays.state(id).0, Some(false));
     assert!(!overlays.hide_preview_if_overlapping(id, &viewport));

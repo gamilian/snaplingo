@@ -10,8 +10,11 @@ use accesskit_winit::{Adapter, WindowEvent as AccessibilityEvent};
 use base64::Engine;
 use snaplingo_render::Renderer;
 use snaplingo_ui::{
-    scrolling::{ScrollingAction, ScrollingSnapshot, ScrollingUi},
-    DrawCommand, Key, KeyStyle, Modifiers, Point, RasterImage, Rect, Scene, Size, Snapshot, Theme,
+    scrolling::{
+        outline_scene, preview_scene, ScrollingAction, ScrollingSnapshot, ScrollingUi,
+        VIEWPORT_BORDER,
+    },
+    Key, KeyStyle, Modifiers, Point, RasterImage, Scene, Size, Snapshot, Theme,
 };
 use std::{
     cell::RefCell,
@@ -214,7 +217,7 @@ pub(super) fn open(
         (screen.x + screen.width - actual.width - 12., screen.y + 12.)
     });
     place(&controls.window, x, y, geometry.desktop_scale);
-    let padding = 2. * view.ui_scale;
+    let padding = f64::from(VIEWPORT_BORDER) * view.ui_scale;
     let border = LogicalRect {
         x: geometry.viewport.x - padding,
         y: geometry.viewport.y - padding,
@@ -354,26 +357,12 @@ impl ScrollingView {
             .desktop_scale
             .unwrap_or(self.outline.window.scale_factor())
             / self.outline.window.scale_factor();
-        let stroke = (2. * self.view.ui_scale * ratio) as f32;
-        let full = Rect {
-            x: 0.,
-            y: 0.,
-            width: size.width,
-            height: size.height,
-        };
-        let scene = scene(
-            full,
-            vec![DrawCommand::StrokeRect {
-                rect: Rect {
-                    x: stroke / 2.,
-                    y: stroke / 2.,
-                    width: (size.width - stroke).max(0.),
-                    height: (size.height - stroke).max(0.),
-                },
-                radius: 0.,
-                width: stroke,
-                color: [59, 130, 246, 255],
-            }],
+        let scene = outline_scene(
+            Size {
+                width: size.width,
+                height: size.height,
+            },
+            (self.view.ui_scale * ratio) as f32,
         );
         self.outline.present(&scene)
     }
@@ -385,50 +374,16 @@ impl ScrollingView {
             .window
             .inner_size()
             .to_logical::<f32>(preview.window.scale_factor());
-        let full = Rect {
-            x: 0.,
-            y: 0.,
-            width: size.width,
-            height: size.height,
-        };
-        let mut commands = vec![DrawCommand::FillRect {
-            rect: full,
-            radius: 6.,
-            color: [22, 28, 36, 235],
-        }];
-        if let Some(image) = &self.preview_image {
-            let scale =
-                (size.width / image.width() as f32).min(size.height / image.height() as f32);
-            let width = image.width() as f32 * scale;
-            let height = image.height() as f32 * scale;
-            commands.push(DrawCommand::Image {
-                rect: Rect {
-                    x: (size.width - width) / 2.,
-                    y: size.height - height,
-                    width,
-                    height,
-                },
-                image: image.clone(),
-            });
-        }
-        preview.present(&scene(full, commands))
+        preview.present(&preview_scene(
+            Size {
+                width: size.width,
+                height: size.height,
+            },
+            self.preview_image.clone(),
+        ))
     }
 }
-fn scene(full: Rect, commands: Vec<DrawCommand>) -> Scene {
-    Scene {
-        size: Size {
-            width: full.width,
-            height: full.height,
-        },
-        ime_cursor: None,
-        content: full,
-        commands,
-        hits: vec![],
-        geometry: vec![],
-        content_height: full.height,
-        viewport: full,
-    }
-}
+
 pub(crate) fn update(next: ScrollingCaptureView) {
     VIEWS.with_borrow_mut(|views| {
         let Some(host) = views.get_mut(&next.id) else {
@@ -611,6 +566,14 @@ pub(crate) fn window_event(_event_loop: &ActiveEventLoop, id: WindowId, event: &
                     WindowEvent::CursorMoved { position, .. } => {
                         let p = position.to_logical::<f32>(host.controls.window.scale_factor());
                         host.cursor = Point { x: p.x, y: p.y };
+                        if host.ui.hover(Some(host.cursor)) {
+                            host.controls.window.request_redraw();
+                        }
+                    }
+                    WindowEvent::CursorLeft { .. } => {
+                        if host.ui.hover(None) {
+                            host.controls.window.request_redraw();
+                        }
                     }
                     WindowEvent::MouseInput {
                         state: ElementState::Pressed,

@@ -11,6 +11,8 @@ use objc2_app_kit::{
 use objc2_foundation::{NSData, NSPoint, NSRect, NSSize};
 
 use crate::domain::capture::LogicalRect;
+use snaplingo_ui::scrolling::{preview_rect, VIEWPORT_BORDER, VIEWPORT_COLOR};
+use snaplingo_ui::Size;
 
 thread_local! {
     static WINDOWS: RefCell<HashMap<String, objc2::rc::Retained<NSWindow>>> = RefCell::new(HashMap::new());
@@ -24,7 +26,7 @@ impl ScrollingOverlays {
     pub(super) fn open(&self, id: &str, viewport: &LogicalRect, scale: f64) -> Result<(), String> {
         let mtm =
             MainThreadMarker::new().ok_or("Scrolling outline must open on the main thread")?;
-        let border = 2.0 * scale;
+        let border = f64::from(VIEWPORT_BORDER) * scale;
         let frame = NSRect::new(
             NSPoint::new(0.0, 0.0),
             NSSize::new(
@@ -65,7 +67,10 @@ impl ScrollingOverlays {
         box_view.setContentViewMargins(NSSize::new(0.0, 0.0));
         box_view.setBorderWidth(border);
         box_view.setBorderColor(&NSColor::colorWithSRGBRed_green_blue_alpha(
-            0.23, 0.51, 0.96, 1.0,
+            f64::from(VIEWPORT_COLOR[0]) / 255.,
+            f64::from(VIEWPORT_COLOR[1]) / 255.,
+            f64::from(VIEWPORT_COLOR[2]) / 255.,
+            1.,
         ));
         box_view.setFillColor(&NSColor::clearColor());
         window.setContentView(Some(&box_view));
@@ -205,7 +210,26 @@ impl ScrollingOverlays {
             return;
         };
         PREVIEWS.with(|previews| {
-            if let Some((_, view)) = previews.borrow().get(id) {
+            if let Some((window, view)) = previews.borrow().get(id) {
+                let size = window.frame().size;
+                let pixels = image.size();
+                let rect = preview_rect(
+                    Size {
+                        width: size.width as f32,
+                        height: size.height as f32,
+                    },
+                    Size {
+                        width: pixels.width as f32,
+                        height: pixels.height as f32,
+                    },
+                );
+                view.setFrame(NSRect::new(
+                    NSPoint::new(
+                        rect.x as f64,
+                        size.height - rect.y as f64 - rect.height as f64,
+                    ),
+                    NSSize::new(rect.width as f64, rect.height as f64),
+                ));
                 view.setImage(Some(&image));
             }
         });
@@ -271,6 +295,12 @@ impl ScrollingOverlays {
                 window.close();
             }
         });
+    }
+
+    #[cfg(test)]
+    #[allow(dead_code)]
+    pub(super) fn preview_frame(&self, id: &str) -> NSRect {
+        PREVIEWS.with(|previews| previews.borrow().get(id).unwrap().1.frame())
     }
 
     #[cfg(test)]

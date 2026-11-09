@@ -19,13 +19,61 @@ use crate::domain::capture::{LogicalRect, ScrollingCaptureView};
 use crate::domain::config::GeneralSettings;
 
 pub(super) use snaplingo_ui::scrolling::ScrollingAction as Action;
+use snaplingo_ui::scrolling::{ScrollingFrame, ScrollingSnapshot, ScrollingUi};
+use snaplingo_ui::{KeyStyle, Point, Rect, Snapshot, Theme};
+
+fn model(
+    view: &ScrollingCaptureView,
+    general: &GeneralSettings,
+    working: bool,
+    error: Option<String>,
+) -> ScrollingSnapshot {
+    ScrollingSnapshot {
+        shell: Snapshot {
+            theme: match general.interface_theme.as_str() {
+                "studio" => Theme::Studio,
+                "paper" => Theme::Paper,
+                _ => Theme::Native,
+            },
+            dark: is_dark(&general.theme),
+            key_style: KeyStyle::Mac,
+            ..Snapshot::default()
+        },
+        width: view.width,
+        height: view.height,
+        can_undo: view.can_undo,
+        preview_available: view.preview_available,
+        preview_expanded: view.preview_expanded,
+        working,
+        hint: view.hint.clone(),
+        error,
+    }
+}
+fn native_rect(rect: Rect) -> NSRect {
+    NSRect::new(
+        NSPoint::new(rect.x as f64, rect.y as f64),
+        NSSize::new(rect.width as f64, rect.height as f64),
+    )
+}
+fn action(tag: isize) -> Action {
+    match tag {
+        0 => Action::Undo,
+        1 => Action::Preview,
+        2 => Action::Copy,
+        3 => Action::Save,
+        4 => Action::Pin,
+        5 => Action::Complete,
+        6 => Action::Cancel,
+        _ => Action::Resume,
+    }
+}
 
 struct ControlIvars {
     dispatch: Box<dyn Fn(Action)>,
     scale: f64,
     general: RefCell<GeneralSettings>,
     colors: Cell<Palette>,
-    hovered: Cell<Option<isize>>,
+    ui: RefCell<ScrollingUi>,
     error: Cell<bool>,
 }
 
@@ -64,7 +112,7 @@ define_class!(
                 }
                 let primary = button.tag() == 5;
                 let alpha = if button.isEnabled() { 1.0 } else { 0.4 };
-                let hovered = button.isEnabled() && self.ivars().hovered.get() == Some(button.tag());
+                let hovered = button.isEnabled() && self.ivars().ui.borrow().hovered() == Some(action(button.tag()));
                 let path = NSBezierPath::bezierPathWithRoundedRect_xRadius_yRadius(button.frame(), 4.0 * scale, 4.0 * scale);
                 let fill = match (primary, hovered) {
                     (true, true) => colors.accent_hover,
@@ -87,7 +135,8 @@ define_class!(
         fn mouse_entered(&self, event: &NSEvent) { self.hover(self.convertPoint_fromView(event.locationInWindow(), None)); }
         #[unsafe(method(mouseExited:))]
         fn mouse_exited(&self, _event: &NSEvent) {
-            if self.ivars().hovered.replace(None).is_some() { self.setNeedsDisplay(true); }
+            let changed = self.ivars().ui.borrow_mut().hover(None);
+            if changed { self.setNeedsDisplay(true); }
         }
 
         #[unsafe(method(mouseDown:))]
@@ -102,17 +151,9 @@ define_class!(
         #[unsafe(method(performAction:))]
         fn perform_action(&self, sender: &NSButton) {
             if !sender.isEnabled() { return; }
-            let action = match sender.tag() {
-                0 => Action::Undo,
-                1 => Action::Preview,
-                2 => Action::Copy,
-                3 => Action::Save,
-                4 => Action::Pin,
-                5 => Action::Complete,
-                6 => Action::Cancel,
-                _ => Action::Resume,
-            };
-            (self.ivars().dispatch)(action);
+            let action = self.ivars().ui.borrow().activate(action(sender.tag()));
+            if let Some(action) = action { (self.ivars().dispatch)(action); }
+
         }
         #[unsafe(method(viewDidChangeEffectiveAppearance))]
         fn appearance_changed(&self) { self.apply_palette(); }
@@ -121,17 +162,11 @@ define_class!(
 
 impl ControlView {
     fn hover(&self, point: NSPoint) {
-        let hovered = self.subviews().iter().find_map(|view| {
-            let button = view.downcast_ref::<NSButton>()?;
-            let frame = button.frame();
-            (button.isEnabled()
-                && point.x >= frame.origin.x
-                && point.x < frame.origin.x + frame.size.width
-                && point.y >= frame.origin.y
-                && point.y < frame.origin.y + frame.size.height)
-                .then_some(button.tag())
-        });
-        if self.ivars().hovered.replace(hovered) != hovered {
+        let changed = self.ivars().ui.borrow_mut().hover(Some(Point {
+            x: point.x as f32,
+            y: point.y as f32,
+        }));
+        if changed {
             self.setNeedsDisplay(true);
         }
     }
@@ -229,7 +264,7 @@ pub(super) fn open(
         dispatch: Box::new(dispatch),
         scale,
         colors: Cell::new(palette(&general.interface_theme, is_dark(&general.theme))),
-        hovered: Cell::new(None),
+        ui: RefCell::new(ScrollingUi::new(model(&view, &general, false, None))),
         error: Cell::new(false),
         general: RefCell::new(general.clone()),
     });
@@ -247,41 +282,27 @@ pub(super) fn open(
         )
     };
     root.addTrackingArea(&tracking);
-    let label = |text: &str, x: f64, y: f64, width: f64, height: f64, font_size: f64| {
+    let ui_frame = root.ivars().ui.borrow_mut().frame(scale as f32);
+    let label = |text: &str, rect: Rect, font_size: f64| {
         let field = NSTextField::labelWithString(&NSString::from_str(text), mtm);
         field.setFont(Some(&NSFont::systemFontOfSize(font_size * scale)));
-        field.setFrame(NSRect::new(
-            NSPoint::new(x * scale, y * scale),
-            NSSize::new(width * scale, height * scale),
-        ));
+        field.setFrame(native_rect(rect));
         root.addSubview(&field);
         field
     };
-    let title = label("长截图", 13.0, 13.0, 80.0, 18.75, 12.5);
+    let title = label("长截图", ui_frame.title, 12.5);
     title.setTag(10);
     title.setFont(Some(&NSFont::systemFontOfSize_weight(
         12.5 * scale,
         unsafe { NSFontWeightSemibold },
     )));
-    let dimensions = label("", 130.0, 13.0, 265.0, 18.75, 10.5);
+    let dimensions = label("", ui_frame.dimensions, 10.5);
     dimensions.setAlignment(NSTextAlignment::Right);
     let mut buttons = Vec::new();
-    let mut x = 13.0;
-    for (tag, (title, width)) in [
-        ("撤销", 39.0),
-        ("预览", 39.0),
-        ("复制", 39.0),
-        ("另存为", 49.5),
-        ("贴图", 39.0),
-        ("完成", 47.0),
-        ("取消", 39.0),
-    ]
-    .into_iter()
-    .enumerate()
-    {
+    for (tag, control) in ui_frame.controls.iter().enumerate() {
         let button = unsafe {
             NSButton::buttonWithTitle_target_action(
-                &NSString::from_str(title),
+                &NSString::from_str(&control.label),
                 Some(&root),
                 Some(sel!(performAction:)),
                 mtm,
@@ -297,15 +318,11 @@ pub(super) fn open(
                 unsafe { NSFontWeightMedium }
             },
         )));
-        button.setFrame(NSRect::new(
-            NSPoint::new(x * scale, 39.75 * scale),
-            NSSize::new(width * scale, 32.0 * scale),
-        ));
+        button.setFrame(native_rect(control.rect));
         root.addSubview(&button);
         buttons.push(button);
-        x += width + 6.0;
     }
-    let status = label("", 13.0, 79.75, 382.0, 39.25, 10.5);
+    let status = label("", ui_frame.status, 10.5);
     status.setTag(12);
     status.setMaximumNumberOfLines(2);
     status.setSelectable(true);
@@ -320,10 +337,7 @@ pub(super) fn open(
     retry.setTag(7);
     retry.setBordered(false);
     retry.setFont(Some(&NSFont::systemFontOfSize(10.5 * scale)));
-    retry.setFrame(NSRect::new(
-        NSPoint::new(349.0 * scale, 79.75 * scale),
-        NSSize::new(46.0 * scale, 16.0 * scale),
-    ));
+    retry.setFrame(native_rect(ui_frame.retry));
     root.addSubview(&retry);
     buttons.push(retry);
     window.setContentView(Some(&root));
@@ -364,26 +378,27 @@ impl Controls {
         if self.dimensions.stringValue().to_string() != text {
             self.dimensions.setStringValue(&NSString::from_str(&text));
         }
-        let hint = if self.working {
-            "正在处理…"
-        } else {
-            self.error
-                .as_deref()
-                .or(self.view.hint.as_deref())
-                .unwrap_or("手动滚动页面，完成后复制并保存 PNG。")
+        let snapshot = model(
+            &self.view,
+            &self.root.ivars().general.borrow(),
+            self.working,
+            self.error.clone(),
+        );
+        let frame: ScrollingFrame = {
+            let mut ui = self.root.ivars().ui.borrow_mut();
+            ui.replace(snapshot);
+            ui.frame(self.view.ui_scale as f32)
         };
+        let hint = self.root.ivars().ui.borrow().status_text().to_owned();
         if self.status.stringValue().to_string() != hint {
-            self.status.setStringValue(&NSString::from_str(hint));
+            self.status.setStringValue(&NSString::from_str(&hint));
         }
         let tooltip = self.status.toolTip().map(|tooltip| tooltip.to_string());
-        if tooltip.as_deref() != Some(hint) {
-            self.status.setToolTip(Some(&NSString::from_str(hint)));
+        if tooltip.as_deref() != Some(hint.as_str()) {
+            self.status.setToolTip(Some(&NSString::from_str(&hint)));
         }
-        let width = if self.error.is_some() { 328.0 } else { 382.0 } * self.view.ui_scale;
-        let frame = self.status.frame();
-        if frame.size.width != width {
-            self.status
-                .setFrameSize(NSSize::new(width, frame.size.height));
+        if self.status.frame() != native_rect(frame.status) {
+            self.status.setFrame(native_rect(frame.status));
         }
         let colors = self.root.ivars().colors.get();
         let color = color(if self.error.is_some() {
@@ -395,43 +410,27 @@ impl Controls {
             self.status.setTextColor(Some(&color));
         }
         for (index, button) in self.buttons.iter().enumerate() {
-            let enabled = !self.working
-                && match index {
-                    0 => self.view.can_undo,
-                    1 => self.view.preview_available,
-                    _ => true,
-                };
+            let control = frame.controls.get(index);
+            let enabled = control.is_some_and(|control| control.enabled);
+            let hidden = control.is_none();
             if button.isEnabled() != enabled {
                 button.setEnabled(enabled);
                 redraw = true;
             }
-        }
-        let preview_title = if self.view.preview_expanded {
-            "隐藏预览"
-        } else {
-            "预览"
-        };
-        if self.buttons[1].title().to_string() != preview_title {
-            self.buttons[1].setTitle(&NSString::from_str(preview_title));
-            redraw = true;
-        }
-        let mut x = 13.0;
-        for (index, button) in self.buttons.iter().take(7).enumerate() {
-            let width = match index {
-                1 if self.view.preview_expanded => 60.0,
-                3 => 49.5,
-                5 => 47.0,
-                _ => 39.0,
-            };
-            let frame = NSRect::new(
-                NSPoint::new(x * self.view.ui_scale, 39.75 * self.view.ui_scale),
-                NSSize::new(width * self.view.ui_scale, 32.0 * self.view.ui_scale),
-            );
-            if button.frame() != frame {
-                button.setFrame(frame);
+            if button.isHidden() != hidden {
+                button.setHidden(hidden);
                 redraw = true;
             }
-            x += width + 6.0;
+            if let Some(control) = control {
+                if button.title().to_string() != control.label {
+                    button.setTitle(&NSString::from_str(&control.label));
+                    redraw = true;
+                }
+                if button.frame() != native_rect(control.rect) {
+                    button.setFrame(native_rect(control.rect));
+                    redraw = true;
+                }
+            }
         }
         use crate::domain::capture::ScrollingShortcutAction;
         let shortcuts = &self.view.shortcut_actions;
@@ -463,9 +462,6 @@ impl Controls {
         }
         if redraw {
             self.root.setNeedsDisplay(true);
-        }
-        if self.buttons[7].isHidden() != self.error.is_none() {
-            self.buttons[7].setHidden(self.error.is_none());
         }
     }
 }
@@ -605,6 +601,20 @@ pub(super) fn test_click(id: &str, action: usize) {
 #[allow(dead_code)]
 pub(super) fn test_retry_visible(id: &str) -> bool {
     CONTROLS.with(|all| !all.borrow().get(id).unwrap().buttons[7].isHidden())
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub(super) fn test_frames(id: &str) -> Vec<NSRect> {
+    CONTROLS.with(|all| {
+        all.borrow()
+            .get(id)
+            .unwrap()
+            .buttons
+            .iter()
+            .map(|button| button.frame())
+            .collect()
+    })
 }
 
 #[cfg(test)]

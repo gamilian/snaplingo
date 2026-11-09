@@ -159,7 +159,7 @@ AppKit presentation. Capture and Scrolling also retain native presentation paths
 - [x] Pinned Image: unify presentation state, shortcuts and toolbar geometry,
   preserving Mac appearance and interactions. Keep decoding/image preparation
   outside pure UI; retain transforms, sampling, grouping and DPI tests.
-- [ ] Scrolling controls/preview: align shared presentation with Mac and connect
+- [x] Scrolling controls/preview: align shared presentation with Mac and connect
   both adapters to it, preserving the common lifetime from step 2.
 - [ ] Result: retain the shared controller, unify presentation and retain native
   text composition, selection, surrounding text and accessibility capabilities.
@@ -250,3 +250,13 @@ steps finish. Compilation is evidence of compilation, not desktop acceptance.
   transforms/replacement/visibility and toolbar geometry checks, full native
   application workflows, architecture guards and Windows all-target cross checks
   pass. Real Windows GUI acceptance remains a separate platform check.
+
+- Step 5b: Mac controls and Windows drawing consume `ScrollingUi` for button
+  geometry, enabled/hidden state, preview labels, hover and error/retry text.
+  Shared frame positions preserve Mac's fractional control coordinates, fonts,
+  title and right-aligned dimensions. Preview geometry is bottom-aligned and
+  scales down only, with transparent unused space; viewport stroke uses shared
+  size/color tokens. Both adapters retain native windows and mouse-through
+  overlays, and step 2's sampling lifetime remains unchanged. Portable control
+  and preview tests, actual Mac control/preview frames, six-theme pixel checks,
+  overlay lifecycle, full native workflows and Windows all-target checks pass.
