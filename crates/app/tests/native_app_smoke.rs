@@ -4,19 +4,19 @@
     target_os = "macos",
     all(target_os = "windows", feature = "native-app")
 ))]
-#[path = "../src/app_actions.rs"]
+#[path = "../app_actions.rs"]
 mod app_actions;
 #[cfg(any(
     target_os = "macos",
     all(target_os = "windows", feature = "native-app")
 ))]
-#[path = "../src/app_shell.rs"]
+#[path = "../app_shell.rs"]
 mod app_shell;
 #[cfg(any(
     target_os = "macos",
     all(target_os = "windows", feature = "native-app")
 ))]
-#[path = "../src/app_state.rs"]
+#[path = "../app_state.rs"]
 mod app_state;
 #[cfg(any(
     target_os = "macos",
@@ -30,25 +30,25 @@ mod composition {
     target_os = "macos",
     all(target_os = "windows", feature = "native-app")
 ))]
-#[path = "../src/infrastructure/mod.rs"]
+#[path = "../infrastructure/mod.rs"]
 mod infrastructure;
 #[cfg(target_os = "macos")]
-#[path = "../src/native_app.rs"]
+#[path = "../native_app.rs"]
 mod native_app;
 #[cfg(target_os = "macos")]
-#[path = "../src/native_capacity.rs"]
+#[path = "../native_capacity.rs"]
 mod native_capacity;
 #[cfg(target_os = "macos")]
-#[path = "../src/native_permission_prompt.rs"]
+#[path = "../native_permission_prompt.rs"]
 mod native_permission_prompt;
 #[cfg(target_os = "macos")]
-#[path = "../src/native_settings_window.rs"]
+#[path = "../native_settings_window.rs"]
 mod native_settings_window;
 #[cfg(any(
     target_os = "macos",
     all(target_os = "windows", feature = "native-app")
 ))]
-#[path = "../src/runtime_lifecycle.rs"]
+#[path = "../runtime_lifecycle.rs"]
 mod runtime_lifecycle;
 #[cfg(any(
     target_os = "macos",
@@ -58,13 +58,13 @@ mod runtime_lifecycle;
     target_os = "macos",
     all(target_os = "windows", feature = "native-app")
 ))]
-#[path = "../src/startup_shortcuts.rs"]
+#[path = "../startup_shortcuts.rs"]
 mod startup_shortcuts;
 #[cfg(any(
     target_os = "macos",
     all(target_os = "windows", feature = "native-app")
 ))]
-#[path = "../src/window/mod.rs"]
+#[path = "../window/mod.rs"]
 mod window;
 #[cfg(any(
     target_os = "macos",
@@ -125,14 +125,14 @@ mod composition {
     include!(concat!(env!("OUT_DIR"), "/native_ui_composition.rs"));
 }
 #[cfg(all(target_os = "windows", feature = "native-app"))]
-#[path = "../src/native_capacity_windows.rs"]
+#[path = "../native_capacity_windows.rs"]
 mod native_capacity_windows;
 #[cfg(all(target_os = "windows", feature = "native-app"))]
-#[path = "../src/native_notices_windows.rs"]
+#[path = "../native_notices_windows.rs"]
 mod native_notices_windows;
 #[cfg(all(target_os = "windows", feature = "native-app"))]
-#[path = "../src/native_settings_windows.rs"]
+#[path = "../native_settings_windows.rs"]
 mod native_settings_windows;
 #[cfg(all(target_os = "windows", feature = "native-app"))]
-#[path = "../src/native_windows.rs"]
+#[path = "../native_windows.rs"]
 mod native_windows;

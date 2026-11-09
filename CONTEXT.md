@@ -44,8 +44,8 @@ A concrete operating-system, storage, network, or native-library implementation 
 
 The only place that chooses concrete adapters and injects them into a runtime.
 
-- `crates/app/src/composition.rs` and its builders create native Application runtimes with Infrastructure adapters.
-- `native_app.rs` and `native_windows.rs` own the platform startup/event loops. `src/App.tsx` only opens isolated visual-reference fixtures.
+- `crates/app/composition.rs` and its builders create native Application runtimes with Infrastructure adapters.
+- `native_app.rs` and `native_windows.rs` own the platform startup/event loops. `reference/web/App.tsx` only opens isolated visual-reference fixtures.
 - Infrastructure may conditionally compile platform implementations, but only Composition selects which concrete adapter satisfies an Application seam.
 
 ### Capture Session

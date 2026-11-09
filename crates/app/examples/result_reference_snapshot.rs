@@ -176,7 +176,7 @@ mod native {
                 for (theme,dark,mode,scale,scenario) in [("native",false,"translation",1.,"baseline"),("studio",true,"translation",1.,"baseline"),("paper",false,"translation",1.75,"baseline"),("native",false,"ocr",1.,"baseline"),("native",false,"ocr",1.,"image"),("studio",true,"ocr",1.,"image"),("paper",false,"ocr",1.75,"image")] {
                     on_main(move || REFERENCE.with_borrow(|slot|unsafe {
                         let reference=slot.as_ref().unwrap();reference.window.setContentSize(NSSize::new(660.*scale,780.*scale));
-                        let url=NSURL::URLWithString(&NSString::from_str(&format!("http://127.0.0.1:5194/crates/app/tests/native_ui/result_reference.html?theme={theme}&appearance={}&mode={mode}&scale={scale}&scenario={scenario}",if dark{"dark"}else{"light"}))).unwrap();
+                        let url=NSURL::URLWithString(&NSString::from_str(&format!("http://127.0.0.1:5194/reference/web/fixtures/result_reference.html?theme={theme}&appearance={}&mode={mode}&scale={scale}&scenario={scenario}",if dark{"dark"}else{"light"}))).unwrap();
                         reference.webview.loadRequest(&NSURLRequest::requestWithURL(&url));
                     })).await;
                     wait_for(format!("document.documentElement.dataset.referenceResult === '{mode}-{theme}-{}-{scale}-{scenario}' && document.querySelector('.result-panel textarea')?'ready':''",if dark{"dark"}else{"light"}),"Result reference did not load").await;

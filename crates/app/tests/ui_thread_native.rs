@@ -2,18 +2,18 @@
 // app handle, WebView, or Tauri event loop is initialized in this process.
 #![allow(dead_code, unused_imports)]
 #[cfg(target_os = "macos")]
-#[path = "../src/infrastructure/system/capture_window/backend.rs"]
+#[path = "../infrastructure/system/capture_window/backend.rs"]
 mod backend;
 #[cfg(target_os = "macos")]
 use snaplingo_core::error;
 #[cfg(target_os = "macos")]
-#[path = "../src/infrastructure/system/capture_window/presentation_macos.rs"]
+#[path = "../infrastructure/system/capture_window/presentation_macos.rs"]
 mod presentation;
 #[cfg(target_os = "macos")]
-#[path = "../src/infrastructure/system/shortcut_native.rs"]
+#[path = "../infrastructure/system/shortcut_native.rs"]
 mod shortcut_native;
 #[cfg(target_os = "macos")]
-#[path = "../src/infrastructure/ui_thread.rs"]
+#[path = "../infrastructure/ui_thread.rs"]
 mod ui_thread;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;

@@ -52,11 +52,12 @@ script/
 ```
 
 Cargo package names remain `snaplingo-*`; the app package remains `snaplingo`.
-Directories do not repeat the product prefix. Business-window adapters are
+Directories do not repeat the product prefix. Rust entry files and modules live
+directly in each crate; no extra `src/` layer is used. Business-window adapters are
 organized by domain, with the two real platform adapters adjacent:
 
 ```text
-crates/app/src/
+crates/app/
   composition/
   lifecycle/
   actions/
@@ -83,6 +84,7 @@ interface tests protect the replacement.
 ### 0. Source directories
 
 - [x] Rename all nine crate directories to the short names above.
+- [x] Put Rust entry files/modules directly in each crate and remove `src/`.
 - [x] Update workspace members, path dependencies, cross-crate source/fixture
   references, scripts, CI, resource ignores and current documentation.
 - [x] Verify Cargo metadata, formatting, architecture tests, script contracts,
@@ -139,13 +141,13 @@ Evidence: Core includes JSON from `src/domain`; native notices and packaging rea
 the same tree; macOS production parses reference CSS for colors while UI stores
 another Rust palette. Browser fixtures are split between root src and App tests.
 
-- [ ] Move production defaults, text and notice outputs into neutral assets.
-- [ ] Make shared UI theme own production semantic colors; Mac adapters perform
+- [x] Move production defaults, text and notice outputs into neutral assets.
+- [x] Make shared UI theme own production semantic colors; Mac adapters perform
   native color conversion without parsing CSS.
-- [ ] Move retained browser source/fixtures into `reference/web`; preserve its
+- [x] Move retained browser source/fixtures into `reference/web`; preserve its
   independent CSS/DOM/AppKit baselines, not renderer-generated expected values.
-- [ ] Update collectors, Vite, tests, notice generation and native packaging.
-- [ ] Verify native compilation without Reference sources in a temporary copy,
+- [x] Update collectors, Vite, tests, notice generation and native packaging.
+- [x] Verify native compilation without Reference sources in a temporary copy,
   plus reference build/tests, notice generation and native bundle contracts.
 
 ### 5. Shared window presentation, macOS reference
@@ -164,7 +166,7 @@ AppKit presentation. Capture and Scrolling also retain native presentation paths
 - [ ] Capture: retain frozen pixels and Core Editing; unify presentation against
   Mac controls without moving OS acquisition or output policy into UI.
 - [ ] Reorganize each window's common implementation and platform adapters under
-  `app/src/window/<domain>` as ownership settles.
+  `app/window/<domain>` as ownership settles.
 - [ ] Run interface behavior tests, independent geometry/color references and
   real macOS window workflows for each completed vertical slice.
 
@@ -184,7 +186,7 @@ steps finish. Compilation is evidence of compilation, not desktop acceptance.
 
 - Step 1: both native hosts now use `settings::window::SettingsWindowSession`.
   Portable General/Library/Services/capacity/permission behavior and race tests
-  live in Settings; construction lives in `app/src/composition/settings`.
+  live in Settings; construction lives in `app/composition/settings`.
   Desktop no longer has a production dependency on Settings construction.
   Preview SQLite/registrar setup and its ten behavior tests live beside its
   example; projection and hotkey mutation remain shared. Recording IDs are
@@ -195,7 +197,7 @@ steps finish. Compilation is evidence of compilation, not desktop acceptance.
   session-test cross checks run separately from real Windows acceptance.
 
 - Step 2: Scrolling Capture now owns one shared sampler/action session under
-  `app/src/window/scrolling`, with adjacent Mac/Windows adapters. Both use the
+  `app/window/scrolling`, with adjacent Mac/Windows adapters. Both use the
   same Drop-based restoration, including cancellation before the hide response.
   Mac window controls and native save dialog are retained. Shared geometry and
   sampling tests (7), the complete real Mac capture/editor/result/pin/scrolling
@@ -221,3 +223,18 @@ steps finish. Compilation is evidence of compilation, not desktop acceptance.
   owner crates. Reqwest/SQLite are no longer Core dependencies even in tests.
   Existing returned Result auto-copy data is explicitly re-exported; production
   workflow implementation fields remain private.
+
+- Step 4 and source flattening: removed the `src/` layer from all nine crates.
+  Production defaults, UI text and generated notices live under `assets/`;
+  retained React sources and fixtures live under `reference/web`. Native Mac
+  theme adapters consume the shared Rust palette, with all semantic tokens
+  checked against the independent CSS reference. Packaging, collectors and
+  TypeScript/Vite paths use the new owners. A source guard rejects production
+  embedding of Reference resources. A temporary copy with no `reference/`
+  passes `cargo check --workspace --lib --bins --locked --offline`.
+  macOS and Windows all-target checks, all 759 Rust library tests, 941 browser
+  and script tests, reference build and regenerated notice checks pass. Mac
+  seven-page application smoke and native capture/editor/result/pin/scrolling
+  workflows pass; the full native workflow needed one rerun after a pointer
+  detection timeout. Local HTTP fixtures now inject clients with proxy disabled
+  so their loopback requests cannot be redirected by system proxy settings.

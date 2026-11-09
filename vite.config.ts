@@ -11,9 +11,9 @@ export default defineConfig(async ({ mode }) => ({
     rollupOptions: {
       input: {
         main: 'index.html',
-        settingsReference: 'crates/app/tests/native_ui/settings_reference.html',
-        resultReference: 'crates/app/tests/native_ui/result_reference.html',
-        permissionReference: 'crates/app/tests/native_ui/permission_reference.html',
+        settingsReference: 'reference/web/fixtures/settings_reference.html',
+        resultReference: 'reference/web/fixtures/result_reference.html',
+        permissionReference: 'reference/web/fixtures/permission_reference.html',
       },
     },
     // Match the retained reference collectors on macOS 12 and Windows.

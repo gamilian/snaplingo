@@ -24,8 +24,8 @@
 
 相关文件：
 
-- `crates/app/src/lib.rs`
-- `crates/app/src/infrastructure/system/shortcut.rs`
+- `crates/app/lib.rs`
+- `crates/app/infrastructure/system/shortcut.rs`
 - `src/stores/settingsStore.ts`
 - `src/components/SettingsWindow/Screenshot/HotkeysPage.tsx`
 
@@ -48,8 +48,8 @@
 
 相关文件：
 
-- `crates/app/src/commands/mod.rs`
-- `crates/app/src/commands/capture_session_commands.rs`
+- `crates/app/commands/mod.rs`
+- `crates/app/commands/capture_session_commands.rs`
 - `src/components/ScreenshotSession/index.tsx`
 - `src/components/ScreenshotSession/captureWindowVisibility.ts`
 
@@ -66,7 +66,7 @@
 
 相关文件：
 
-- `crates/app/src/commands/capture_session_commands.rs`
+- `crates/app/commands/capture_session_commands.rs`
 - `src/components/ScreenshotSession/captureWindowVisibility.ts`
 - `src/components/ScreenshotSession/index.tsx`
 - `crates/app/capabilities/default.json`
@@ -86,10 +86,10 @@
 
 相关文件：
 
-- `src/App.tsx`
+- `reference/web/App.tsx`
 - `src/components/ScreenshotSession/index.tsx`
 - `src/components/ScreenshotSession/captureActions.ts`
-- `crates/app/src/commands/capture_session_commands.rs`
+- `crates/app/commands/capture_session_commands.rs`
 
 ## 坑 5：macOS 权限已经给了，Release 仍然反复提示
 
@@ -130,8 +130,8 @@ macOS TCC 屏幕录制权限绑定的是应用身份，不只是应用名字。R
 
 相关文件：
 
-- `crates/app/src/infrastructure/system/screenshot/macos.rs`
-- `src/App.tsx`
+- `crates/app/infrastructure/system/screenshot/macos.rs`
+- `reference/web/App.tsx`
 
 ## 坑 7：Release 没有日志会让快捷键问题很难查
 

@@ -10,6 +10,7 @@ rust-version = "1.88"
 default-run = "snaplingo"
 
 [lib]
+path = "lib.rs"
 name = "snaplingo_lib"
 crate-type = ["rlib"]
 
@@ -156,12 +157,12 @@ syn = { version = "2", default-features = false, features = ["full", "parsing", 
 
 [[bin]]
 name = "snaplingo"
-path = "src/main.rs"
+path = "main.rs"
 required-features = ["native-app"]
 
 [[bin]]
 name = "snaplingo-native"
-path = "src/native_main.rs"
+path = "native_main.rs"
 required-features = ["native-app"]
 
 [[test]]

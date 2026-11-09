@@ -22,6 +22,7 @@ Production native path
   snaplingo-storage SQLite repositories and filesystem assets
 
   snaplingo-assets  bundled fonts shared by Core and Render
+  assets/           production defaults, text and third-party notices
 
 Application host
   snaplingo-app native entry -> AppKit / winit event loop
@@ -29,7 +30,7 @@ Application host
        -> shared Settings UI / native capture, result, pin and scrolling hosts
 
 Reference-only browser tree
-  src/App -> isolated React fixtures -> retained Views/Application tests
+  reference/web/App -> isolated React fixtures -> retained Views/Application tests
        (no desktop IPC; excluded from native packages)
 ```
 
@@ -86,25 +87,25 @@ The shared accessibility crate projects drawn Scene geometry into an AccessKit t
 
 ### Browser references
 
-The `src/` React tree retains original Views, Domain/Application workflows and
-behavior tests as independent references. `src/App.tsx` forwards Vite requests to
+The `reference/web/` React tree retains original Views, Domain/Application workflows and
+behavior tests as independent references. `reference/web/App.tsx` forwards Vite requests to
 isolated Settings, Result or Permission fixtures under
-`crates/app/tests/native_ui`, preserving scene query parameters. These
+`reference/web/fixtures`, preserving scene query parameters. These
 fixtures mount original components with test data. `reference:dev`,
 `reference:build` and `reference:preview` serve this harness; desktop startup and
 packaging do not execute it.
 
-- `src/views/`, `src/components/` and `src/styles/` retain the original browser UI.
-- `src/application/` retains testable capture, result, scrolling, settings, library
+- `reference/web/views/`, `reference/web/components/` and `reference/web/styles/` retain the original browser UI.
+- `reference/web/application/` retains testable capture, result, scrolling, settings, library
   and permission workflows; local runtime contexts inject fixture/test ports.
-- `src/stores/` projects those runtime snapshots, and `src/domain/` retains their
+- `reference/web/stores/` projects those runtime snapshots, and `reference/web/domain/` retains their
   portable types and vocabulary.
-- `src/platform/tauri` and the Tauri npm API/CLI dependencies are deleted. There
+- `reference/web/platform/tauri` and the Tauri npm API/CLI dependencies are deleted. There
   is no production browser IPC boundary or browser fallback for native windows.
 
 ### Backend
 
-- `crates/core/src/application/` owns business workflows:
+- `crates/core/application/` owns business workflows:
   - `providers` owns Provider coordination, administration, runtime configuration, credentials, HTTP/LLM vocabulary, and Provider event publication through local ports. Its File OCR workflow reads through `ImageFileReader` and uses identical bytes for recognition and preview.
   - `settings` and `hotkeys` own their independent durable-store ports.
   - `history` owns its repository and event-source ports.
@@ -115,11 +116,11 @@ packaging do not execute it.
   - `selected_text` owns its method and context ports. `SelectionTranslation` reads current Settings, acquires selected text, and opens Result Window; Hotkey and native menu adapters share this workflow.
   - `required_permissions` owns permission ordering and status policy.
   - `tts` owns speech normalization, locale-based voice selection, and persisted voice/rate policy. Voice IDs are opaque to Application so native adapters may use platform identifiers independently of display names.
-- `crates/app/src/infrastructure/` implements OS window, shortcut, network, native OCR and event capabilities. Its `storage` name re-exports the shared `snaplingo-storage` crate; database and asset implementations live there.
+- `crates/app/infrastructure/` implements OS window, shortcut, network, native OCR and event capabilities. Its `storage` name re-exports the shared `snaplingo-storage` crate; database and asset implementations live there.
 - Scrolling Capture remains in `application/capture`: it reuses the frozen layout while its host supplies fresh pixels and manages the compact control window, transparent input-pass-through preview and viewport outline, and temporary keys. The preview consumes revisioned updates without starting a second sampler. A pure stitcher owns overlap matching, segment undo, image limits, and thumbnails. Completion copies and saves PNG, including at the configurable image limit. System annotation fonts are supplied through the composer's font-provider port. The Capture runtime also retains the last annotation tool for this process, surviving native capture window recreation without persisting it to the database.
 - The macOS scrolling host owns its single 250 ms sampler, starts it after session adoption, pauses during output or errors, and stops it on close. Native controls update only changed properties and previews decode only changed PNGs. Native pinned views preserve their presentation and compressed PNG while hidden, release decoded/filter/inspection buffers, and restore those buffers when shown. Pin actions reuse Pinned Image, Settings, and Capture Output workflows.
 - Native Capture Editor owns portable annotation gestures, selection, styles, text drafts and bounded undo/redo in `application/capture`. Its AppKit adapter renders the frozen crop and transient annotations through the existing Rust compositor, coalesces preview requests, rejects stale revisions, and uses NSTextView for text input. The same native window continues from selection into editing; it does not hand the session to a WebView. Outputs and the global pin shortcut consume the editor's annotation state through Capture runtime.
-- `crates/app/src/composition.rs` and `composition/*_runtime.rs` construct concrete Infrastructure adapters and inject them into Application runtimes.
+- `crates/app/composition.rs` and `composition/*_runtime.rs` construct concrete Infrastructure adapters and inject them into Application runtimes.
 - `app_actions.rs`, `app_shell.rs`, `native_app.rs`, `native_windows.rs` and `startup_shortcuts.rs` are native startup/action adapters. They map menu or hotkey intent to Application-facing actions; they do not own Application state.
 - System integration uses Rust libraries directly: `fern` logs into SQLite, `global-hotkey` owns registered key events, `rfd` supplies native dialogs, `auto-launch` manages login entries, and `tray-icon`/`muda` own tray menus. Single-instance ownership uses an OS file lock plus authenticated loopback activation. `infrastructure/runtime.rs` owns Tokio workers; `ui_thread` dispatches effects onto the platform event loop.
 - Capture, editor, scrolling, result and pinned-image hosts call injected Rust services. AppKit supplies macOS native text controls and window presentation; Windows supplies winit input, native menus/dialogs and layered alpha presentation. Hidden editors retain frozen state for failed scrolling handoffs. Windows pin positions cross the OS boundary as physical coordinates, with capture logical origins converted through the primary desktop-scale policy and bounded virtual-desktop centering.
@@ -180,7 +181,7 @@ Portable data and policy are kept in Domain or Application. Infrastructure conta
 
 ## Enforcement
 
-`src/architecture/frontendDependencyRules.test.ts` rejects production imports of Platform/Tauri from Views and frontend Application modules. `crates/app/tests/architecture_dependency_test.rs` rejects backend Application imports of Infrastructure and crate-root startup adapters. They also reject outward Domain dependencies. These tests are intentionally strict and contain no migration inventory or allowlist.
+`reference/web/architecture/frontendDependencyRules.test.ts` rejects production imports of Platform/Tauri from Views and frontend Application modules. `crates/app/tests/architecture_dependency_test.rs` rejects backend Application imports of Infrastructure and crate-root startup adapters. They also reject outward Domain dependencies. These tests are intentionally strict and contain no migration inventory or allowlist.
 
 `crates/ui/tests/workspace_architecture.rs` checks real Cargo metadata, including all target/build dependencies and renamed package dependencies. Core may depend on Assets but cannot depend on another workspace crate or a concrete native UI/OS adapter. Storage depends inward on Core; UI permits only its Unicode editing utility; Render, Accessibility and Settings have explicit inward dependency lists; Desktop depends on UI, Render and Accessibility plus native window/input/dialog adapters; Settings workflow construction is injected by the application. The App crate owns concrete OS dependencies and has no Tauri production dependency. A Rust syntax traversal follows Core's production module graph, rejecting concrete platform imports and Rust modules outside Core. Core has no cross-crate test source mounts; real adapter workflow tests live in App integration tests, while Core uses memory adapters. Dev dependencies used by isolated acceptance harnesses do not become production dependency edges.
 
@@ -193,5 +194,5 @@ Capture guards also cover the retained browser runtime's Application location an
 The app is pre-release. Action contracts, persisted settings, credentials, and history formats may change with the architecture. The removed single-key Provider configuration command is not retained as a compatibility path; see [ADR 0007](docs/adr/0007-remove-provider-compatibility-command.md).
 
 Scrolling Capture's shared sampler/action lifetime lives in
-`crates/app/src/window/scrolling/session.rs`; `macos/` and `windows/` retain
+`crates/app/window/scrolling/session.rs`; `macos/` and `windows/` retain
 native window/sample mechanics and share cancellation-safe restoration.

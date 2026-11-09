@@ -1,6 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 
-// Semantic tokens live in CSS variables (see src/styles/index.css) so that one
+// Semantic tokens live in CSS variables (see reference/web/styles/index.css) so that one
 // palette swap flips the whole app between light and dark. Channels are written
 // as space-separated RGB so Tailwind's opacity modifiers keep working
 // (`bg-surface/95`, `border-line/50`).
@@ -9,7 +9,7 @@ const token = (name) => `rgb(var(--${name}) / <alpha-value>)`;
 export default {
   content: [
     "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
+    "./reference/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {

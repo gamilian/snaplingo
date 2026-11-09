@@ -14,7 +14,7 @@ function fixture() {
     'target/debug/snaplingo-native', 'crates/app/icons/icon.icns',
     'crates/app/resources/ocr/medium_det.mnn', 'crates/app/resources/ocr/medium_rec.mnn',
     'crates/app/resources/ocr/keys.txt', 'crates/app/resources/ocr/runtime/libonnxruntime.dylib',
-    'LICENSE', 'assets/fonts/LICENSE-NotoSans.txt', 'src/domain/thirdPartyNotices.json',
+    'LICENSE', 'assets/fonts/LICENSE-NotoSans.txt', 'assets/licenses/thirdPartyNotices.json',
   ];
   for (const file of files) { mkdirSync(dirname(join(root, file)), { recursive: true }); writeFileSync(join(root, file), file); }
   writeFileSync(join(root, 'crates/app/resources/ocr/.platform'), `darwin-${process.arch}`);

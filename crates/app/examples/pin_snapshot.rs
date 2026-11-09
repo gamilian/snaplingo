@@ -1,8 +1,8 @@
 //! Review the portable pin scene without creating a native window.
 pub use snaplingo_core::domain;
-#[path = "../src/infrastructure/system/pinned_window/presentation.rs"]
+#[path = "../infrastructure/system/pinned_window/presentation.rs"]
 mod presentation;
-#[path = "../src/infrastructure/system/pinned_window/scene.rs"]
+#[path = "../infrastructure/system/pinned_window/scene.rs"]
 mod scene;
 use scene::{PinUi, Preferences};
 fn main() -> Result<(), String> {

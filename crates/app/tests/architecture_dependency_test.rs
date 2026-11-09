@@ -114,7 +114,7 @@ impl DependencyVisitor {
 fn production_application_sources() -> Vec<SourceFile> {
     let manifest_dir = core_root();
     let mut paths = Vec::new();
-    collect_rust_files(&manifest_dir.join("src/application"), &mut paths);
+    collect_rust_files(&manifest_dir.join("application"), &mut paths);
     paths.sort();
 
     paths
@@ -155,7 +155,7 @@ fn portable_core_has_no_concrete_adapter_dependencies_or_source_mounts() {
             "Core manifest must not depend on {forbidden}"
         );
     }
-    let syntax = syn::parse_file(&fs::read_to_string(root.join("src/lib.rs")).unwrap()).unwrap();
+    let syntax = syn::parse_file(&fs::read_to_string(root.join("lib.rs")).unwrap()).unwrap();
     for item in &syntax.items {
         if let Item::Mod(module) = item {
             if module.ident == "infrastructure" {
@@ -177,7 +177,7 @@ fn portable_core_has_no_concrete_adapter_dependencies_or_source_mounts() {
 fn production_app_sources() -> Vec<SourceFile> {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let mut paths = Vec::new();
-    collect_rust_files(&root.join("src"), &mut paths);
+    collect_rust_files(&root.join("."), &mut paths);
     paths.sort();
     paths
         .into_iter()
@@ -197,11 +197,11 @@ fn workflow_adapter_sources() -> Vec<SourceFile> {
     let mut sources = production_app_sources()
         .into_iter()
         .filter(|source| {
-            source.path == "src/infrastructure/system/result_window/controller.rs"
-                || source.path == "src/app_actions.rs"
+            source.path == "infrastructure/system/result_window/controller.rs"
+                || source.path == "app_actions.rs"
         })
         .collect::<Vec<_>>();
-    let settings = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../settings/src");
+    let settings = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../settings");
     let mut paths = Vec::new();
     collect_rust_files(&settings, &mut paths);
     sources.extend(
@@ -231,15 +231,63 @@ fn workflow_adapter_sources() -> Vec<SourceFile> {
 #[test]
 fn native_production_sources_do_not_depend_on_a_web_runtime() {
     let sources = production_app_sources();
+    assert!(sources.iter().any(|source| source.path == "native_app.rs"));
     assert!(sources
         .iter()
-        .any(|source| source.path == "src/native_app.rs"));
-    assert!(sources
-        .iter()
-        .any(|source| source.path == "src/native_windows.rs"));
+        .any(|source| source.path == "native_windows.rs"));
     assert_eq!(
         dependency_inventory_with_rules(&sources, &["tauri", "objc2_web_kit", "wry"]),
         BTreeSet::new()
+    );
+}
+
+#[derive(Default)]
+struct ReferenceEmbeddings {
+    paths: BTreeSet<String>,
+}
+
+impl<'ast> Visit<'ast> for ReferenceEmbeddings {
+    fn visit_item(&mut self, item: &'ast Item) {
+        if !enum_has_cfg_test!(
+            item,
+            Item: Const, Enum, ExternCrate, Fn, ForeignMod, Impl, Macro, Mod, Static, Struct,
+            Trait, TraitAlias, Type, Union, Use,
+        ) {
+            visit::visit_item(self, item);
+        }
+    }
+
+    fn visit_macro(&mut self, mac: &'ast syn::Macro) {
+        if matches!(
+            mac.path.get_ident().map(ToString::to_string).as_deref(),
+            Some("include" | "include_str" | "include_bytes")
+        ) {
+            let source = mac.tokens.to_string();
+            if source.contains("reference/") {
+                self.paths.insert(source);
+            }
+        }
+        visit::visit_macro(self, mac);
+    }
+}
+
+#[test]
+fn production_resources_are_independent_of_browser_references() {
+    let crates = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+    let mut paths = Vec::new();
+    collect_rust_files(&crates, &mut paths);
+    let mut violations = Vec::new();
+    for path in paths.into_iter().filter(|path| is_production_rust(path)) {
+        let syntax = syn::parse_file(&fs::read_to_string(&path).unwrap()).unwrap();
+        let mut visitor = ReferenceEmbeddings::default();
+        visitor.visit_file(&syntax);
+        for resource in visitor.paths {
+            violations.push(format!("{} -> {resource}", path.display()));
+        }
+    }
+    assert!(
+        violations.is_empty(),
+        "Reference resource coupling: {violations:#?}"
     );
 }
 
@@ -247,6 +295,12 @@ fn collect_rust_files(directory: &Path, paths: &mut Vec<PathBuf>) {
     for entry in fs::read_dir(directory).unwrap() {
         let path = entry.unwrap().path();
         if path.is_dir() {
+            if matches!(
+                path.file_name().and_then(|name| name.to_str()),
+                Some("target" | "tests" | "examples" | "assets" | "icons" | "resources" | "gen")
+            ) {
+                continue;
+            }
             collect_rust_files(&path, paths);
         } else if path.extension().and_then(|extension| extension.to_str()) == Some("rs") {
             paths.push(path);
@@ -340,7 +394,7 @@ fn application_production_sources_do_not_import_outward_adapters() {
 fn domain_sources_remain_independent_of_workflows_and_native_adapters() {
     let manifest_dir = core_root();
     let mut paths = Vec::new();
-    collect_rust_files(&manifest_dir.join("src/domain"), &mut paths);
+    collect_rust_files(&manifest_dir.join("domain"), &mut paths);
     let files = paths
         .into_iter()
         .filter(|path| is_production_rust(path))
@@ -371,7 +425,7 @@ fn native_action_routing_does_not_publish_durable_state_change_events() {
     let sources = production_app_sources();
     let router = sources
         .iter()
-        .find(|source| source.path == "src/app_actions.rs")
+        .find(|source| source.path == "app_actions.rs")
         .unwrap();
     let production = router.source.split("#[cfg(test)]").next().unwrap();
     for changed in [
@@ -413,7 +467,7 @@ fn shared_workflow_adapters_keep_os_and_database_mechanics_in_their_ports() {
 #[test]
 fn native_capture_actions_delegate_startup_exclusion_and_pin_delivery_to_the_runtime() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let router = fs::read_to_string(root.join("src/app_actions.rs")).unwrap();
+    let router = fs::read_to_string(root.join("app_actions.rs")).unwrap();
     let production = router.split("#[cfg(test)]").next().unwrap();
     for policy in [
         "compare_exchange",
@@ -432,8 +486,7 @@ fn native_capture_actions_delegate_startup_exclusion_and_pin_delivery_to_the_run
             "Native capture action must reach the shared runtime through {request}"
         );
     }
-    let runtime =
-        fs::read_to_string(core_root().join("src/application/capture/runtime.rs")).unwrap();
+    let runtime = fs::read_to_string(core_root().join("application/capture/runtime.rs")).unwrap();
     let production = runtime.split("#[cfg(test)]").next().unwrap();
     assert!(
         !production.contains("Capture window is not open"),
@@ -445,9 +498,9 @@ fn native_capture_actions_delegate_startup_exclusion_and_pin_delivery_to_the_run
 fn capture_window_and_control_adapters_use_frozen_session_coordinates() {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     for path in [
-        "src/infrastructure/system/capture_window/native_host.rs",
-        "src/infrastructure/system/capture_window/windows.rs",
-        "src/infrastructure/system/capture_window/windows/view.rs",
+        "infrastructure/system/capture_window/native_host.rs",
+        "infrastructure/system/capture_window/windows.rs",
+        "infrastructure/system/capture_window/windows/view.rs",
     ] {
         let window = fs::read_to_string(manifest_dir.join(path)).unwrap();
         for live_read in [".primary_monitor(", ".available_monitors("] {
@@ -472,7 +525,7 @@ fn capture_window_and_control_adapters_use_frozen_session_coordinates() {
         }
     }
     let windows_source =
-        fs::read_to_string(manifest_dir.join("src/infrastructure/system/screenshot/windows.rs"))
+        fs::read_to_string(manifest_dir.join("infrastructure/system/screenshot/windows.rs"))
             .unwrap();
     let syntax = syn::parse_file(&windows_source).unwrap();
     let control_mapping = syntax
@@ -518,7 +571,7 @@ fn native_adapters_and_composition_delegate_provider_and_ocr_policy_to_applicati
         }
     }
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let composition = fs::read_to_string(root.join("src/composition/provider_runtime.rs")).unwrap();
+    let composition = fs::read_to_string(root.join("composition/provider_runtime.rs")).unwrap();
     for policy in [
         "load_baidu_ocr_credentials",
         "baidu_ocr_api_key",
@@ -543,38 +596,36 @@ fn composition_is_the_only_platform_adapter_selector() {
         }
     }
 
-    let lib_source = read("src/lib.rs");
+    let lib_source = read("lib.rs");
     if lib_source.contains("NativeHotkeyRegistrar") {
-        violations.push("src/lib.rs constructs NativeHotkeyRegistrar".to_string());
+        violations.push("lib.rs constructs NativeHotkeyRegistrar".to_string());
     }
 
-    let screenshot_module = read("src/infrastructure/system/screenshot/mod.rs");
+    let screenshot_module = read("infrastructure/system/screenshot/mod.rs");
     if screenshot_module.contains("get_capture_session_source") {
-        violations.push(
-            "src/infrastructure/system/screenshot/mod.rs selects a capture adapter".to_string(),
-        );
+        violations
+            .push("infrastructure/system/screenshot/mod.rs selects a capture adapter".to_string());
     }
 
-    let selection_module = read("src/infrastructure/system/selection/mod.rs");
+    let selection_module = read("infrastructure/system/selection/mod.rs");
     if selection_module.contains("platform_selection_provider") {
-        violations.push(
-            "src/infrastructure/system/selection/mod.rs selects a selection adapter".to_string(),
-        );
+        violations
+            .push("infrastructure/system/selection/mod.rs selects a selection adapter".to_string());
     }
 
-    let tts_module = read("src/infrastructure/system/tts/mod.rs");
+    let tts_module = read("infrastructure/system/tts/mod.rs");
     if tts_module.contains("build_system_tts_host") {
         violations
-            .push("src/infrastructure/system/tts/mod.rs selects a System TTS adapter".to_string());
+            .push("infrastructure/system/tts/mod.rs selects a System TTS adapter".to_string());
     }
     for platform in ["macos", "windows", "linux"] {
-        let path = format!("src/infrastructure/system/selection/{platform}/mod.rs");
+        let path = format!("infrastructure/system/selection/{platform}/mod.rs");
         if read(&path).contains("fn platform_selection_provider") {
             violations.push(format!("{path} selects a selection adapter"));
         }
     }
 
-    let capture_composition = read("src/composition/capture_runtime.rs");
+    let capture_composition = read("composition/capture_runtime.rs");
     for adapter in ["MacOSCaptureSessionSource", "WindowsCaptureSessionSource"] {
         assert!(
             capture_composition.contains(adapter),
@@ -582,14 +633,14 @@ fn composition_is_the_only_platform_adapter_selector() {
         );
     }
 
-    let selection_composition = read("src/composition/selection_runtime.rs");
+    let selection_composition = read("composition/selection_runtime.rs");
     for adapter in ["MacSelectionProvider", "PlatformSelectionProvider"] {
         assert!(
             selection_composition.contains(adapter),
             "selection Composition must select {adapter}"
         );
     }
-    let tts_composition = read("src/composition/tts_runtime.rs");
+    let tts_composition = read("composition/tts_runtime.rs");
     for adapter in [
         "MacOsSystemTtsHost",
         "WindowsSystemTtsHost",
@@ -601,7 +652,7 @@ fn composition_is_the_only_platform_adapter_selector() {
         );
     }
     assert!(
-        read("src/composition.rs").contains("NativeHotkeyRegistrar"),
+        read("composition.rs").contains("NativeHotkeyRegistrar"),
         "root Composition must select NativeHotkeyRegistrar"
     );
 
@@ -611,7 +662,7 @@ fn composition_is_the_only_platform_adapter_selector() {
 #[test]
 fn rejects_forbidden_synthetic_dependencies() {
     let files = [SourceFile {
-        path: "src/application/example.rs".to_string(),
+        path: "application/example.rs".to_string(),
         source: r#"
             use crate::app_actions::AppAction;
             use crate::app_shell::apply_resting_activation_policy;
@@ -649,19 +700,19 @@ fn rejects_forbidden_synthetic_dependencies() {
     assert_eq!(
         dependency_inventory(&files).into_iter().collect::<Vec<_>>(),
         vec![
-            "src/application/example.rs -> crate::app_actions::AppAction",
-            "src/application/example.rs -> crate::app_shell::apply_resting_activation_policy",
-            "src/application/example.rs -> crate::commands::trigger_screenshot",
-            "src/application/example.rs -> crate::composition::build_app_state",
-            "src/application/example.rs -> crate::infrastructure::Enum::Variant",
-            "src/application/example.rs -> crate::infrastructure::Foo",
-            "src/application/example.rs -> crate::infrastructure::SomeImplTrait",
-            "src/application/example.rs -> crate::infrastructure::SomeTraitBound",
-            "src/application/example.rs -> crate::infrastructure::http::send",
-            "src/application/example.rs -> crate::infrastructure::storage::SqliteConfigStore",
-            "src/application/example.rs -> crate::infrastructure::storage::SqliteCredentialStore",
-            "src/application/example.rs -> crate::settings_window::show_settings_window",
-            "src/application/example.rs -> crate::startup_shortcuts::trigger_hotkey_action",
+            "application/example.rs -> crate::app_actions::AppAction",
+            "application/example.rs -> crate::app_shell::apply_resting_activation_policy",
+            "application/example.rs -> crate::commands::trigger_screenshot",
+            "application/example.rs -> crate::composition::build_app_state",
+            "application/example.rs -> crate::infrastructure::Enum::Variant",
+            "application/example.rs -> crate::infrastructure::Foo",
+            "application/example.rs -> crate::infrastructure::SomeImplTrait",
+            "application/example.rs -> crate::infrastructure::SomeTraitBound",
+            "application/example.rs -> crate::infrastructure::http::send",
+            "application/example.rs -> crate::infrastructure::storage::SqliteConfigStore",
+            "application/example.rs -> crate::infrastructure::storage::SqliteCredentialStore",
+            "application/example.rs -> crate::settings_window::show_settings_window",
+            "application/example.rs -> crate::startup_shortcuts::trigger_hotkey_action",
         ]
     );
 }

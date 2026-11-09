@@ -5,6 +5,9 @@ edition = "2021"
 rust-version = "1.88"
 license = "MIT"
 
+[lib]
+path = "lib.rs"
+
 [dependencies]
 snaplingo-assets = { path = "../assets" }
 snaplingo-ui = { path = "../ui" }

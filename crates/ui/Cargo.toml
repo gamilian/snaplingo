@@ -4,6 +4,9 @@ version = "0.1.23"
 edition = "2021"
 license = "MIT"
 
+[lib]
+path = "lib.rs"
+
 [dependencies]
 unicode-segmentation = "1.12"
 

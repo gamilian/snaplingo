@@ -74,6 +74,6 @@ node script/smoke-test-macos.mjs
 
 ## 视觉基准与许可
 
-`npm run reference:dev` 打开已有 Settings fixture；查询参数可选择页面、主题和场景。`surface=result` 和 `surface=permission` 打开对应原 React 视图。原收集器 HTML 路径保持可用，详见 [参考页面说明](../src/README.md)。它们不读已安装应用设置，也不发送桌面 IPC。
+`npm run reference:dev` 打开已有 Settings fixture；查询参数可选择页面、主题和场景。`surface=result` 和 `surface=permission` 打开对应原 React 视图。收集器 HTML 和 fixtures 统一位于 `reference/web/fixtures`，详见 [参考页面说明](../reference/web/README.md)。它们不读已安装应用设置，也不发送桌面 IPC。
 
-依赖或 OCR 资源清单变更后运行 `npm run licenses:generate`，更新 `src/domain/thirdPartyNotices.json`。原生构建和 reference 构建都会检查它与锁文件一致。安装包、便携 ZIP 和关于页使用相同许可清单。
+依赖或 OCR 资源清单变更后运行 `npm run licenses:generate`，更新 `assets/licenses/thirdPartyNotices.json`。原生构建和 reference 构建都会检查它与锁文件一致。安装包、便携 ZIP 和关于页使用相同许可清单。

@@ -9,19 +9,19 @@ mod domain {
 #[cfg(target_os = "macos")]
 mod presentation {
     #![allow(unused_imports)]
-    include!("../src/infrastructure/system/pinned_window/presentation.rs");
+    include!("../infrastructure/system/pinned_window/presentation.rs");
 }
 #[cfg(target_os = "macos")]
 mod native_view {
     #![allow(dead_code)]
-    include!("../src/infrastructure/system/pinned_window/native_view.rs");
+    include!("../infrastructure/system/pinned_window/native_view.rs");
 }
 
 #[cfg(target_os = "macos")]
 mod infrastructure {
     pub mod system {
         pub mod native_view_snapshot {
-            include!("../src/infrastructure/system/native_view_snapshot.rs");
+            include!("../infrastructure/system/native_view_snapshot.rs");
         }
     }
 }

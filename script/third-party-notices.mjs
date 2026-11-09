@@ -5,7 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const output = join(root, 'src/domain/thirdPartyNotices.json');
+const output = join(root, 'assets/licenses/thirdPartyNotices.json');
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 const lockfiles = Object.fromEntries(['Cargo.lock', 'package-lock.json', 'script/ocr-assets.json'].map((file) => [file, hash(readFileSync(join(root, file)))]));
 

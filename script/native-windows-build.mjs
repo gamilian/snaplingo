@@ -49,13 +49,13 @@ export function stageNativeWindowsBundle(repositoryRoot, binary, destination, co
   for (const path of requiredResources) required(join(resources, path));
   for (const path of requiredCrt) required(join(crt, path));
   if (readFileSync(join(resources, '.platform'), 'utf8').trim() !== 'win32-x64') throw new Error('OCR resources do not match the native Windows x64 architecture');
-  for (const path of ['LICENSE', 'assets/fonts/LICENSE-NotoSans.txt', 'src/domain/thirdPartyNotices.json', 'crates/app/icons/icon.ico']) required(join(repositoryRoot, path));
+  for (const path of ['LICENSE', 'assets/fonts/LICENSE-NotoSans.txt', 'assets/licenses/thirdPartyNotices.json', 'crates/app/icons/icon.ico']) required(join(repositoryRoot, path));
   rmSync(destination, { recursive: true, force: true });
   mkdirSync(join(destination, 'licenses'), { recursive: true });
   copyFileSync(binary, join(destination, 'snaplingo.exe'));
   cpSync(resources, join(destination, 'ocr'), { recursive: true, filter: path => basename(path) !== '.gitkeep' });
   for (const file of readdirSync(crt).filter(file => file.toLowerCase().endsWith('.dll'))) copyFileSync(join(crt, file), join(destination, file));
-  for (const [source, target] of [['LICENSE', 'LICENSE'], ['assets/fonts/LICENSE-NotoSans.txt', 'licenses/NotoSans.txt'], ['src/domain/thirdPartyNotices.json', 'licenses/THIRD_PARTY_NOTICES.json'], ['crates/app/icons/icon.ico', 'icon.ico']]) copyFileSync(join(repositoryRoot, source), join(destination, target));
+  for (const [source, target] of [['LICENSE', 'LICENSE'], ['assets/fonts/LICENSE-NotoSans.txt', 'licenses/NotoSans.txt'], ['assets/licenses/thirdPartyNotices.json', 'licenses/THIRD_PARTY_NOTICES.json'], ['crates/app/icons/icon.ico', 'icon.ico']]) copyFileSync(join(repositoryRoot, source), join(destination, target));
   writeFileSync(join(destination, 'README.txt'), `${config.productName} ${config.version}\r\n\r\nLaunch snaplingo.exe to start the native application.\r\nKeep the OCR directory and DLL files beside the executable.\r\nSettings and saved history remain in the Windows application-data directory during upgrades and uninstallation.\r\n`);
   return destination;
 }

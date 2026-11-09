@@ -15,7 +15,7 @@ mod domain {
 }
 
 #[cfg(target_os = "macos")]
-#[path = "../src/infrastructure/system/native_theme.rs"]
+#[path = "../infrastructure/system/native_theme.rs"]
 mod native_theme;
 
 #[cfg(target_os = "macos")]
@@ -28,14 +28,14 @@ mod scrolling_geometry {
 
 #[cfg(target_os = "macos")]
 mod scrolling_controls_macos {
-    include!("../src/window/scrolling/macos/controls.rs");
+    include!("../window/scrolling/macos/controls.rs");
 }
 
 #[cfg(target_os = "macos")]
 mod infrastructure {
     pub mod system {
         pub mod native_view_snapshot {
-            include!("../src/infrastructure/system/native_view_snapshot.rs");
+            include!("../infrastructure/system/native_view_snapshot.rs");
         }
     }
 }

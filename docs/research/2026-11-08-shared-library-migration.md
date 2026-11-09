@@ -29,9 +29,9 @@ Library page is wired into a desktop window.
 
 ## Rust implementation seam
 
-- `crates/core/src/application/library_index.rs` owns the read-only
+- `crates/core/application/library_index.rs` owns the read-only
   index interface and clamps index limits to 1–100.
-- `crates/core/src/application/library_index/page.rs` is now exposed
+- `crates/core/application/library_index/page.rs` is now exposed
   as the `LibraryPages` application workflow. It owns the cross-source query,
   index-first hydration, stable `LibraryRecord` keys, favorite membership,
   deletion, history clearing, metadata routing, and OCR rerun orchestration.
@@ -40,11 +40,11 @@ Library page is wired into a desktop window.
   `reveal_screenshot`. OCR rerun must succeed before `LibraryClipboard` is
   invoked. The service accepts existing source workflows in its constructor;
   it opens no database and constructs no platform adapter.
-- `crates/storage/src/database/library_index.rs` orders history and
+- `crates/storage/database/library_index.rs` orders history and
   favorites in SQLite before hydration and applies `LIMIT/OFFSET`. The source
   repositories accept `ids`, so a page can be hydrated without loading earlier
   rows or image assets.
-- `crates/core/src/application/history/mod.rs`,
+- `crates/core/application/history/mod.rs`,
   `favorites/mod.rs`, and `screenshot_favorites/mod.rs` remain separate source
   modules. Their asset stores hydrate only returned OCR/screenshot records.
 
@@ -68,7 +68,7 @@ React effects' cancellation behavior. This remains presentation work; it should
 not duplicate SQL ordering, favorite fingerprints, asset cleanup, capacity or
 OCR workflow rules.
 
-`crates/app/src/app_state.rs` already exposes the six required source
+`crates/app/app_state.rs` already exposes the six required source
 workflows through `history.history`, `favorites.favorites`,
 `screenshot_favorites.favorites`, `library_index`, `history.ocr_replay`, and
 `favorites.ocr_application`. A native Library host can inject those existing
@@ -82,7 +82,7 @@ field or parallel database is required for that connection.
   filters, list title/preview rules, provider detail cards, image previews,
   pagination, disabled favorite membership actions and clear confirmation.
 - Image display is currently React `img` from hydrated data URLs. The shared
-  drawing commands in `crates/ui/src/types.rs` currently cover shapes,
+  drawing commands in `crates/ui/types.rs` currently cover shapes,
   text and clipping; image assets/decoding/cache and an image command still need
   a renderer contract. Load at most the page's thumbnail payloads; do not fetch
   full-size images just to draw a list or detail preview.
@@ -95,7 +95,7 @@ field or parallel database is required for that connection.
   inputs must be explicit in a deterministic rendering snapshot.
 - Desktop invalidations already exist as `HistoryChanged`, `FavoritesChanged`
   and `ScreenshotFavoritesChanged` in
-  `crates/app/src/infrastructure/desktop_events.rs`. Subscribe while
+  `crates/app/infrastructure/desktop_events.rs`. Subscribe while
   mounted, refresh membership for History on Favorites changes, and dispose
   subscriptions on page teardown.
 
@@ -111,12 +111,12 @@ semantics and records that limitation rather than claiming universal tag search.
 ## Verification and limits
 
 The SQLite index tests in
-`crates/storage/src/database/library_index.rs` prove global ordering,
+`crates/storage/database/library_index.rs` prove global ordering,
 stable IDs, and page-before-hydration for an in-memory database. Source query
 tests in `history.rs`, `favorites.rs`, and `screenshot_favorites.rs` prove ID
 bounded queries and asset hydration. The Rust page module includes identity and
 cross-source materialization tests. Six real SQLite workflow tests in
-`crates/storage/src/database/library_pages_tests.rs` additionally verify
+`crates/storage/database/library_pages_tests.rs` additionally verify
 mixed History ordering, only-page thumbnail reads, lightweight visible-content
 membership, a 120-screenshot deep page, colliding IDs across favorite sources,
 metadata search/deletion routing, concurrent insert/delete after index query,

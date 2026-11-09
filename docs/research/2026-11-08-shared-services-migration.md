@@ -6,7 +6,7 @@ Inspected 2026-11-08 against the current checkout. This is a source audit and an
 
 Services is still rendered by React. `SettingsSectionContent` in [index.tsx](../../src/views/SettingsWindow/index.tsx) delegates General, Screenshot, Translation and OCR preferences to `NativeSettingsPage`, but renders Services through its own context navigation, sticky header and scroll area. [navigationModel.tsx](../../src/views/SettingsWindow/navigationModel.tsx) defines exactly three Services routes: `ocr` / OCR 服务, `translation` / 翻译服务 and `tts` / 语音合成. The last selected route is persisted by [settingsStore.ts](../../src/stores/settingsStore.ts); its initial route is OCR. The top-level Translation/OCR preference pages are distinct from these provider-administration pages.
 
-There is already a portable [ServicesController](../../crates/core/src/application/settings/services.rs) for OCR and TTS. It is not mounted in a shared Rust Services view: no Services drawing module exists in `snaplingo-ui` and no Services page is mounted by the macOS shared host. Translation administration, model introspection and prompt configuration already exist behind [ProviderAdministration](../../crates/core/src/application/providers/administration.rs), but their form/workspace lifecycle remains in the frontend.
+There is already a portable [ServicesController](../../crates/core/application/settings/services.rs) for OCR and TTS. It is not mounted in a shared Rust Services view: no Services drawing module exists in `snaplingo-ui` and no Services page is mounted by the macOS shared host. Translation administration, model introspection and prompt configuration already exist behind [ProviderAdministration](../../crates/core/application/providers/administration.rs), but their form/workspace lifecycle remains in the frontend.
 
 ## Required behavior, with existing workflow ownership
 
@@ -31,16 +31,16 @@ OCR has no deactivate interface. The current shared React card can display a “
 
 ## Credential and form invariants
 
-`CredentialField` in [common/provider.rs](../../crates/core/src/application/providers/common/provider.rs) contains `name`, `label`, `secret`; it is dynamic data, not a fixed list of settings enum variants. Provider schema and backend validation remain authoritative.
+`CredentialField` in [common/provider.rs](../../crates/core/application/providers/common/provider.rs) contains `name`, `label`, `secret`; it is dynamic data, not a fixed list of settings enum variants. Provider schema and backend validation remain authoritative.
 
 - Baidu translation requires `app_id` (visible) and `secret_key` (secret).
 - Baidu OCR requires `api_key` (schema says visible) and `secret_key` (secret). Use the supplied flag, not a field-name guess.
-- DeepLX's schema contains `mode`, `endpoint`, `api_key`, but **all three are not simultaneously required**. [deepl.rs](../../crates/core/src/application/providers/translation/impls/deepl.rs) accepts `{mode: "deeplx", endpoint}` or `{mode: "deepl", api_key}`. The current form defaults to DeepLX and has a Standard DeepL switch. Hidden unused fields must not be sent as blank credentials: `ProviderConfiguration::save_credentials` rejects provided blank values.
+- DeepLX's schema contains `mode`, `endpoint`, `api_key`, but **all three are not simultaneously required**. [deepl.rs](../../crates/core/application/providers/translation/impls/deepl.rs) accepts `{mode: "deeplx", endpoint}` or `{mode: "deepl", api_key}`. The current form defaults to DeepLX and has a Standard DeepL switch. Hidden unused fields must not be sent as blank credentials: `ProviderConfiguration::save_credentials` rejects provided blank values.
 - Built-in credential forms start empty; no current UI interface loads stored keys. Custom-provider edits prefill metadata and keep API key empty, with “留空则保持现有 API Key”. Convert blank edit keys to `None`; adding requires a nonblank key.
 - Saving credentials reconfigures the registered runtime immediately. Configuration modules own persistence, provider locks, snapshot/rollback and change notification; the UI must not write SQLite or rebuild coordinators.
 - Existing OCR `ServicesController::save` already combines configure and activate, keeps the form after failure, excludes duplicate saves, and rejects stale schema completions after cancel/disposal. Reuse that behavior.
 
-The shared editor currently supports single-line text and deliberately strips CR/LF in [text_input.rs](../../crates/ui/src/text_input.rs). Services needs two real additional uses: masked credential display and a multiline prompt. Add those deliberately before switching the entire Services page; treating a prompt as the current single-line field would destroy its line breaks. Secret drafts must render masked text and protected accessibility values; do not place their committed text in `Scene::Text` or geometry diagnostics. Caret/selection indices still address the real committed UTF-8 text, so masked display needs an explicit index mapping.
+The shared editor currently supports single-line text and deliberately strips CR/LF in [text_input.rs](../../crates/ui/text_input.rs). Services needs two real additional uses: masked credential display and a multiline prompt. Add those deliberately before switching the entire Services page; treating a prompt as the current single-line field would destroy its line breaks. Secret drafts must render masked text and protected accessibility values; do not place their committed text in `Scene::Text` or geometry diagnostics. Caret/selection indices still address the real committed UTF-8 text, so masked display needs an explicit index mapping.
 
 ## Custom provider and prompt details
 
@@ -81,7 +81,7 @@ Keep the existing OCR/TTS controller. Add a focused translation workspace contro
 
 This seam hides the currently scattered React workflow state without duplicating coordinator/storage policy. The desktop adapter supplies worker execution, main-thread delivery, clipboard, external URLs, destructive-action confirmation and OS speech. `SettingsChanged` and `ProvidersChanged` refresh fresh projections. OCR refresh must respond to GPU changes; voice requests and model/schema requests require the current cancellation/revision rules. Host redraw should use the existing scene/scale reuse behavior rather than rasterizing unchanged Services scenes on each notification.
 
-TTS already has both target adapters: macOS `/usr/bin/say` and Windows `System.Speech` through `powershell.exe`, inspected in [system/tts](../../crates/app/src/infrastructure/system/tts). They cache installed voices and replace/reap a previous speech process. A successful `speak` means speech was started, not finished; the UI's “已开始朗读” must retain that meaning. The voice ID is opaque; do not validate it against a stale dropdown list or overwrite unrelated general preferences when saving voice/rate.
+TTS already has both target adapters: macOS `/usr/bin/say` and Windows `System.Speech` through `powershell.exe`, inspected in [system/tts](../../crates/app/infrastructure/system/tts). They cache installed voices and replace/reap a previous speech process. A successful `speak` means speech was started, not finished; the UI's “已开始朗读” must retain that meaning. The voice ID is opaque; do not validate it against a stale dropdown list or overwrite unrelated general preferences when saving voice/rate.
 
 ## Concrete parallel implementation slices
 

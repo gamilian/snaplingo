@@ -17,7 +17,7 @@ The original rollout constraint was:
 The default application and package entry now uses the native macOS/Windows
 hosts in `snaplingo-app`. The production Tauri shell, commands, configuration,
 frontend adapters and dependencies are removed. Core/Storage ownership and the
-shared Scene/CPU-rendering decision above are unchanged. `src/` and the isolated
+shared Scene/CPU-rendering decision above are unchanged. `reference/web/` and the isolated
 React/AppKit collectors remain independent visual and behavior references;
 `reference:*` commands serve them without desktop IPC or native packaging.
 

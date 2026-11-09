@@ -417,7 +417,7 @@ impl<'ast> Visit<'ast> for CoreSources {
 
 #[test]
 fn core_production_module_graph_has_no_concrete_adapters() {
-    let source_root = root().join("crates/core/src").canonicalize().unwrap();
+    let source_root = root().join("crates/core").canonicalize().unwrap();
     let mut sources = CoreSources {
         source_root: source_root.clone(),
         file: source_root.join("lib.rs"),

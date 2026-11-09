@@ -5,12 +5,12 @@ import { createRoot } from 'react-dom/client';
 import { useSettingsConfigStore } from '../../src/stores/settingsConfigStore';
 import { useHotkeyConfigStore } from '../../src/stores/hotkeyConfigStore';
 import { useSettingsStore } from '../../src/stores/settingsStore';
-import { SettingsWindow } from '../../src/views/SettingsWindow';
-import CaptureWorkspace from '../../src/views/CaptureWorkspace';
-import { PinnedImageWindow } from '../../src/views/PinnedImageWindow';
+import { SettingsWindow } from '../../reference/web/views/SettingsWindow';
+import CaptureWorkspace from '../../reference/web/views/CaptureWorkspace';
+import { PinnedImageWindow } from '../../reference/web/views/PinnedImageWindow';
 import { createPinnedImageRuntime } from '../../src/application/pinned-image/runtime';
 import { createScrollingCaptureRuntime } from '../../src/application/scrolling-capture/runtime';
-import { ScrollingCaptureWindow, ScrollingCapturePreviewWindow } from '../../src/views/ScrollingCaptureWindow';
+import { ScrollingCaptureWindow, ScrollingCapturePreviewWindow } from '../../reference/web/views/ScrollingCaptureWindow';
 import { useApplicationTheme } from '../../src/views/useApplicationTheme';
 import { DEFAULT_ANNOTATION_SHORTCUTS } from '../../src/application/capture-workspace/annotationShortcuts';
 

@@ -63,7 +63,7 @@ END
         Ok("macos" | "windows")
     ) {
         let root = std::path::PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap());
-        let source = std::fs::read_to_string(root.join("src/composition.rs")).unwrap();
+        let source = std::fs::read_to_string(root.join("composition.rs")).unwrap();
         let source = source
             .lines()
             .map(|line| {
@@ -72,7 +72,7 @@ END
                     .or_else(|| line.strip_prefix("pub(crate) mod "))
                     .and_then(|line| line.strip_suffix(';'))
                 {
-                    let path = root.join("src/composition").join(format!("{module}.rs"));
+                    let path = root.join("composition").join(format!("{module}.rs"));
                     format!("#[path = {path:?}]\n{line}")
                 } else {
                     line.to_owned()
@@ -82,6 +82,6 @@ END
             .join("\n");
         let output = std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap());
         std::fs::write(output.join("native_ui_composition.rs"), source).unwrap();
-        println!("cargo:rerun-if-changed=src/composition.rs");
+        println!("cargo:rerun-if-changed=composition.rs");
     }
 }

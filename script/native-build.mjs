@@ -48,7 +48,7 @@ export function stageNativeMacBundle(repositoryRoot, binary, destination, config
   copyFileSync(join(appRoot, 'icons/icon.icns'), join(contents, 'Resources/icon.icns'));
   copyFileSync(join(repositoryRoot, 'LICENSE'), join(contents, 'Resources/licenses/LICENSE'));
   copyFileSync(join(repositoryRoot, 'assets/fonts/LICENSE-NotoSans.txt'), join(contents, 'Resources/licenses/NotoSans.txt'));
-  copyFileSync(join(repositoryRoot, 'src/domain/thirdPartyNotices.json'), join(contents, 'Resources/licenses/THIRD_PARTY_NOTICES.json'));
+  copyFileSync(join(repositoryRoot, 'assets/licenses/thirdPartyNotices.json'), join(contents, 'Resources/licenses/THIRD_PARTY_NOTICES.json'));
   writeFileSync(join(contents, 'Info.plist'), nativeInfoPlist(config));
   return destination;
 }

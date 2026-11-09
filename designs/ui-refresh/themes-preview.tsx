@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { SettingsWindow } from '../../src/views/SettingsWindow';
+import { SettingsWindow } from '../../reference/web/views/SettingsWindow';
 import { useSettingsConfigStore } from '../../src/stores/settingsConfigStore';
 import { useSettingsStore } from '../../src/stores/settingsStore';
 import { useApplicationTheme } from '../../src/views/useApplicationTheme';
@@ -10,7 +10,7 @@ import { DEFAULT_ANNOTATION_STYLE, ANNOTATION_COLORS, type AnnotationTool } from
 import { DemoCanvas } from './capture.jsx';
 import { sourceText, translatedText, alternateTranslation } from './data.js';
 import { runtime, ready } from './themes-preview-runtime';
-import '../../src/styles/index.css';
+import '../../reference/web/styles/index.css';
 import './themes-preview.css';
 
 const names = { native: '澄明 · Native', studio: '夜航 · Studio', paper: '松间 · Paper' };

@@ -6,6 +6,9 @@ rust-version = "1.88"
 license = "MIT"
 description = "Portable Settings sessions, ordered workflows and UI projections"
 
+[lib]
+path = "lib.rs"
+
 [dependencies]
 snaplingo-core = { path = "../core" }
 snaplingo-ui = { path = "../ui" }

@@ -2,13 +2,13 @@
 #![allow(dead_code, unused_imports, ambiguous_glob_reexports)]
 
 #[cfg(target_os = "macos")]
-#[path = "../src/app_actions.rs"]
+#[path = "../app_actions.rs"]
 mod app_actions;
 #[cfg(target_os = "macos")]
-#[path = "../src/app_shell.rs"]
+#[path = "../app_shell.rs"]
 mod app_shell;
 #[cfg(target_os = "macos")]
-#[path = "../src/app_state.rs"]
+#[path = "../app_state.rs"]
 mod app_state;
 #[cfg(target_os = "macos")]
 use snaplingo_core::application;
@@ -21,13 +21,13 @@ use snaplingo_core::domain;
 #[cfg(target_os = "macos")]
 use snaplingo_core::error;
 #[cfg(target_os = "macos")]
-#[path = "../src/infrastructure/mod.rs"]
+#[path = "../infrastructure/mod.rs"]
 mod infrastructure;
 #[cfg(target_os = "macos")]
-#[path = "../src/startup_shortcuts.rs"]
+#[path = "../startup_shortcuts.rs"]
 mod startup_shortcuts;
 #[cfg(target_os = "macos")]
-#[path = "../src/window/mod.rs"]
+#[path = "../window/mod.rs"]
 mod window;
 #[cfg(target_os = "macos")]
 pub use app_state::AppState;
@@ -42,7 +42,7 @@ pub use infrastructure::*;
 
 #[cfg(target_os = "macos")]
 mod native_selection {
-    include!("../src/infrastructure/system/selection/macos/self_webview.rs");
+    include!("../infrastructure/system/selection/macos/self_webview.rs");
 
     pub(super) fn read_window(
         window: &objc2_app_kit::NSWindow,

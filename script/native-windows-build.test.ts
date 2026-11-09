@@ -15,7 +15,7 @@ function fixture() {
   for (const path of resources) { mkdirSync(dirname(join(ocrRoot,path)), { recursive: true }); writeFileSync(join(ocrRoot,path), path); }
   writeFileSync(join(ocrRoot,'.platform'), 'win32-x64'); mkdirSync(crtRoot, { recursive: true });
   for (const path of ['vcruntime140.dll','vcruntime140_1.dll','msvcp140.dll','msvcp140_1.dll']) writeFileSync(join(crtRoot,path), path);
-  for (const path of ['LICENSE','assets/fonts/LICENSE-NotoSans.txt','src/domain/thirdPartyNotices.json','crates/app/icons/icon.ico']) { mkdirSync(dirname(join(root,path)), { recursive: true }); writeFileSync(join(root,path), path); }
+  for (const path of ['LICENSE','assets/fonts/LICENSE-NotoSans.txt','assets/licenses/thirdPartyNotices.json','crates/app/icons/icon.ico']) { mkdirSync(dirname(join(root,path)), { recursive: true }); writeFileSync(join(root,path), path); }
   const binary = join(root,'target/release/snaplingo-native.exe'); mkdirSync(dirname(binary), { recursive: true });
   const pe = Buffer.alloc(128); pe.write('MZ'); pe.writeUInt32LE(64,60); pe.write('PE\0\0',64); pe.writeUInt16LE(0x8664,68); writeFileSync(binary, pe);
   return { root, binary, ocrRoot, crtRoot, stage: join(root,'target/native/release/app') };

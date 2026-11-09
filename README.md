@@ -28,25 +28,22 @@ For scrolling capture, select a region in the screenshot editor and press **S** 
 ## Project structure
 
 ```text
-src/
-  domain/                  Portable data and domain vocabulary
-  application/             Workflows, state transitions, and their ports
-  views/                   Retained React visual references
-  components/common/       Shared UI
-  stores/                  Application projections and invalidation signals
-  styles/                  Shared styles and themes
 crates/
-  snaplingo-assets/        Shared bundled font bytes and licenses
-  snaplingo-core/          Portable Rust Domain/Application workflows and ports
-  snaplingo-storage/       SQLite repositories/migrations and persisted image assets
-  snaplingo-ui/            Shared Rust Settings layout, input state, scenes and actions
-  snaplingo-render/        CPU drawing with tiny-skia and cosmic-text
-  snaplingo-accessibility/ Shared scene semantics and validated native actions
-  snaplingo-settings/      Persistent settings workflows and shared UI projections
-  snaplingo-desktop/       Native window/input/DPI host with winit and softbuffer
-  snaplingo-app/src/       Native application entry and platform integrations
-    infrastructure/        OS, HTTP and native-library adapters
-    composition/           Concrete adapter selection and runtime assembly
+  app/                     Native entry, composition, lifecycle and window adapters
+  core/                    Portable Domain/Application workflows and inward ports
+  storage/                 SQLite repositories and persisted image assets
+  settings/                Shared Settings sessions and UI projections
+  ui/                      Presentation state, layout, themes and interaction
+  render/                  CPU drawing and text shaping
+  accessibility/           Shared scene semantics and native actions
+  desktop/                 Native window/input/DPI adapter
+  assets/                  Production resource embedding
+assets/
+  fonts/                   Bundled fonts and their licenses
+  defaults/                Shared configuration defaults
+  text/                    Production UI text
+  licenses/                Generated third-party notices
+reference/web/             Independent React views, behavior tests and fixtures
 docs/
   adr/                     Accepted architectural decisions
   architecture/            Current runtime and ownership maps
@@ -57,7 +54,7 @@ designs/                   Current visual explorations and previews
 script/                    Development and release verification
 ```
 
-Frontend tests live beside the behavior they verify. Rust integration tests live in `crates/app/tests/`. See [Architecture](ARCHITECTURE.md) and [Domain language](CONTEXT.md) for dependency and ownership rules.
+Reference tests live beside the behavior they verify. Rust integration tests live in each crate’s `tests/` directory. Cargo entry files and modules live directly in their crate directories without an extra `src/` layer. See [Architecture](ARCHITECTURE.md) and [Domain language](CONTEXT.md) for dependency and ownership rules.
 
 The Rust application lives under `crates/app`; historical research and ADRs may refer to its former `src-tauri` path.
 
@@ -100,7 +97,7 @@ npm run reference:build
 
 Queries such as `/?page=services&route=tts&appearance=dark` select the original
 Settings scenes. `/?surface=result&mode=ocr` and `/?surface=permission` open other
-references. Native packages include no browser assets. See [reference usage](src/README.md).
+references. Native packages include no browser assets. See [reference usage](reference/web/README.md).
 
 Run the relevant regression suites:
 
