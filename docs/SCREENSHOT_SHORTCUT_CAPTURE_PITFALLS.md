@@ -24,8 +24,8 @@
 
 相关文件：
 
-- `src-tauri/src/lib.rs`
-- `src-tauri/src/infrastructure/system/shortcut.rs`
+- `crates/snaplingo-app/src/lib.rs`
+- `crates/snaplingo-app/src/infrastructure/system/shortcut.rs`
 - `src/stores/settingsStore.ts`
 - `src/components/SettingsWindow/Screenshot/HotkeysPage.tsx`
 
@@ -48,8 +48,8 @@
 
 相关文件：
 
-- `src-tauri/src/commands/mod.rs`
-- `src-tauri/src/commands/capture_session_commands.rs`
+- `crates/snaplingo-app/src/commands/mod.rs`
+- `crates/snaplingo-app/src/commands/capture_session_commands.rs`
 - `src/components/ScreenshotSession/index.tsx`
 - `src/components/ScreenshotSession/captureWindowVisibility.ts`
 
@@ -66,10 +66,10 @@
 
 相关文件：
 
-- `src-tauri/src/commands/capture_session_commands.rs`
+- `crates/snaplingo-app/src/commands/capture_session_commands.rs`
 - `src/components/ScreenshotSession/captureWindowVisibility.ts`
 - `src/components/ScreenshotSession/index.tsx`
-- `src-tauri/capabilities/default.json`
+- `crates/snaplingo-app/capabilities/default.json`
 
 注意：如果后续尝试 macOS transparent window，要单独评估 Tauri 的 `macos-private-api` 影响，不要把它作为默认排障手段。
 
@@ -89,7 +89,7 @@
 - `src/App.tsx`
 - `src/components/ScreenshotSession/index.tsx`
 - `src/components/ScreenshotSession/captureActions.ts`
-- `src-tauri/src/commands/capture_session_commands.rs`
+- `crates/snaplingo-app/src/commands/capture_session_commands.rs`
 
 ## 坑 5：macOS 权限已经给了，Release 仍然反复提示
 
@@ -105,7 +105,7 @@ macOS TCC 屏幕录制权限绑定的是应用身份，不只是应用名字。R
 
 相关文件：
 
-- `src-tauri/tauri.conf.json`
+- `crates/snaplingo-app/tauri.conf.json`
 - `script/fix-macos-release-signing.mjs`
 - `package.json`
 - `script/build-release.sh`
@@ -130,7 +130,7 @@ macOS TCC 屏幕录制权限绑定的是应用身份，不只是应用名字。R
 
 相关文件：
 
-- `src-tauri/src/infrastructure/system/screenshot/macos.rs`
+- `crates/snaplingo-app/src/infrastructure/system/screenshot/macos.rs`
 - `src/App.tsx`
 
 ## 坑 7：Release 没有日志会让快捷键问题很难查
@@ -155,7 +155,7 @@ tail -f ~/Library/Logs/com.snaplingo.app/SnapLingo.log
 ```bash
 npm test
 npm run build
-cargo test --manifest-path src-tauri/Cargo.toml
+cargo test --manifest-path crates/snaplingo-app/Cargo.toml
 ```
 
 Release 构建后额外检查：

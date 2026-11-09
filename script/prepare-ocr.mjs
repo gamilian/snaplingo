@@ -53,7 +53,7 @@ function extract(archive, destination) {
   if (result.error || result.status !== 0) throw new Error(`Could not unpack OCR runtime: ${result.error ?? result.stderr}`);
 }
 
-export async function prepareOcr(platform, destination = join(root, 'src-tauri/resources/ocr'), cache = process.env.SNAPLINGO_OCR_ASSET_CACHE ?? join(homedir(), '.cache/snaplingo/ocr')) {
+export async function prepareOcr(platform, destination = join(root, 'crates/snaplingo-app/resources/ocr'), cache = process.env.SNAPLINGO_OCR_ASSET_CACHE ?? join(homedir(), '.cache/snaplingo/ocr')) {
   if (!['darwin-arm64','darwin-x64','win32-x64','linux-x64'].includes(platform)) throw new Error(`Unsupported OCR target: ${platform}`);
   await mkdir(destination, { recursive: true });
   await mkdir(cache, { recursive: true });
@@ -112,6 +112,6 @@ export async function prepareOcr(platform, destination = join(root, 'src-tauri/r
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const index = process.argv.indexOf('--target');
-  const target = index >= 0 ? process.argv[index + 1] : process.env.TAURI_ENV_TARGET_TRIPLE;
+  const target = index >= 0 ? process.argv[index + 1] : process.env.CARGO_BUILD_TARGET;
   await prepareOcr(targetNames[target] ?? target ?? `${process.platform}-${process.arch}`);
 }

@@ -5,20 +5,22 @@
   "type": "module",
   "scripts": {
     "ocr:prepare": "node script/prepare-ocr.mjs",
-    "dev": "vite",
-    "build": "node script/third-party-notices.mjs --check && tsc && vite build",
+    "dev": "npm run native:dev",
+    "build": "npm run native:build",
+    "native:dev": "node script/native-run.mjs --build",
+    "native:run": "node script/native-run.mjs",
+    "native:build": "node script/native-build.mjs build",
+    "native:bundle": "node script/native-build.mjs bundle",
+    "reference:dev": "vite",
+    "reference:build": "node script/third-party-notices.mjs --check && tsc && vite build",
+    "reference:preview": "vite preview",
     "licenses:generate": "node script/third-party-notices.mjs",
     "test": "vitest run",
-    "preview": "vite preview",
-    "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "node script/release-verification.mjs build",
-    "tauri:build:beta": "node script/release-verification.mjs build --clean",
-    "release:verify": "node script/release-verification.mjs verify"
+    "release:build": "node script/release-verification.mjs build",
+    "release:verify": "node script/release-verification.mjs verify",
+    "release:collect": "node script/release-verification.mjs collect"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.0.0",
-    "@tauri-apps/plugin-dialog": "^2.7.1",
     "libphonenumber-js": "^1.13.8",
     "linkify-it": "^5.0.2",
     "react": "^18.3.1",
@@ -26,7 +28,6 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.0.0",
     "@types/linkify-it": "^5.0.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",

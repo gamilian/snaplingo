@@ -149,11 +149,10 @@ function moduleImports(files: SourceFile[]): ModuleImport[] {
 
 function forbiddenPlatformImports(files: SourceFile[]) {
   return moduleImports(files)
-    .filter(({ path, specifier }) => {
-      if (path.startsWith('src/platform/tauri/')) return false;
+    .filter(({ specifier }) => {
       if (specifier.startsWith('@tauri-apps/')) return true;
       if (/(?:^|\/)platform(?:\/|$)/.test(specifier)) {
-        return path !== 'src/App.tsx' && path !== 'src/CaptureApp.tsx';
+        return true;
       }
       return /(?:^|\/)tauri(?:\/|$)/.test(specifier);
     })
@@ -295,8 +294,7 @@ function tauriEventUses(files: SourceFile[]): TauriEventUse[] {
 
 function unexpectedTauriEventUses(files: SourceFile[]) {
   return tauriEventUses(files)
-    .filter(({ path, eventName }) => {
-      if (path.startsWith('src/platform/tauri/')) return false;
+    .filter(({ eventName }) => {
       return eventName.length > 0;
     })
     .map(({ path, eventName }) => `${path} -> ${eventName}`)
@@ -401,43 +399,18 @@ describe('frontend dependency rules', () => {
     expect(crossViewRootImports(viewSourceFilesIncludingTests())).toEqual([]);
   });
 
-  test.each([
-    ['src/App.tsx', [
-      './application/result-window/platformRuntime',
-      './application/pinned-image/runtime',
-      './application/settings/runtime',
-      './views/ResultWindow',
-      './views/PinnedImageWindow',
-      './views/SettingsWindow',
-    ]],
-    ['src/CaptureApp.tsx', [
-      './application/capture-workspace/ports',
-      './application/settings/configuration',
-      './views/CaptureWorkspace',
-    ]],
-  ])('%s composes Platform adapters into Application runtimes', (entryPoint, expectedImports) => {
-    const appFile = productionSourceFiles().find(({ path }) => path === entryPoint);
+  test('the browser entry loads only isolated visual references', () => {
+    const appFile = productionSourceFiles().find(({ path }) => path === 'src/App.tsx');
     expect(appFile).toBeDefined();
-
     const imports = moduleImports([appFile!]).map(({ specifier }) => specifier);
-
-    expect(imports).toEqual(
-      expect.arrayContaining(expectedImports),
-    );
-    expect(imports.some((specifier) => specifier.startsWith('./platform/tauri/'))).toBe(true);
-    expect(imports.some((specifier) => specifier.startsWith('./tauri/'))).toBe(false);
-    expect(imports.some((specifier) => specifier.startsWith('@tauri-apps/'))).toBe(false);
+    expect(imports).toEqual(['react']);
+    expect(appFile!.source).toContain('/crates/snaplingo-app/tests/native_ui/');
+    expect(appFile!.source).toContain('referenceUrl(window.location.search)');
+    expect(allSourceFiles().some(({ path }) => path === 'src/CaptureApp.tsx')).toBe(false);
   });
 
   test('Settings configuration lifecycle stays behind the Application seam', () => {
     const productionFiles = productionSourceFiles();
-    const appFile = productionFiles.find(({ path }) => path === 'src/App.tsx');
-    expect(appFile).toBeDefined();
-    expect(appFile!.source).toContain(
-      'configurationEvents: persistentStateEvents',
-    );
-    expect(appFile!.source).not.toContain('persistentStateEvents.subscribe');
-
     const storePaths = new Set([
       'src/stores/settingsConfigStore.ts',
       'src/stores/hotkeyConfigStore.ts',
@@ -465,21 +438,17 @@ describe('frontend dependency rules', () => {
 
   test('Result Window projects application-owned state and scheduling', () => {
     const productionFiles = productionSourceFiles();
-    const appFile = productionFiles.find(({ path }) => path === 'src/App.tsx');
     const viewFile = productionFiles.find(
       ({ path }) => path === 'src/views/ResultWindow/ResultWindow.tsx',
     );
 
-    expect(appFile).toBeDefined();
     expect(viewFile).toBeDefined();
-    expect(appFile!.source).toContain('initializeResultWindowStore(resultWindowRuntime)');
     expect(viewFile!.source).not.toContain('autoTranslateRequestId');
     expect(viewFile!.source).not.toContain('incrementalTranslation');
     const storeFile = productionFiles.find(({ path }) => path === 'src/stores/resultWindowStore.ts');
     expect(storeFile!.source).toContain('runtime.subscribe(');
     expect(storeFile!.source).not.toContain('startTranslationSession');
     expect(storeFile!.source).not.toContain('completeProviderTranslation');
-    expect(appFile!.source).not.toContain('useResultWindowStore.getState()');
     expect(viewFile!.source).toContain('useResultWindowProjection()');
     expect(viewFile!.source).not.toContain('\n    setSourceText,');
     expect(viewFile!.source).not.toContain('\n    setSourceLang,');
@@ -495,23 +464,11 @@ describe('frontend dependency rules', () => {
     expect(
       allSourceFiles()
         .map(({ path }) => path)
-        .filter((path) => path.startsWith(`${LEGACY_TAURI_ROOT}/`)),
+        .filter((path) => path.startsWith(`${LEGACY_TAURI_ROOT}/`) || path.startsWith('src/platform/tauri/')),
     ).toEqual([]);
   });
 
-  test('Platform adapters do not own browser-persisted application state', () => {
-    const violations = productionSourceFiles()
-      .filter(({ path }) => path.startsWith('src/platform/tauri/'))
-      .filter(
-        ({ source }) =>
-          source.includes('localStorage') || source.includes('sessionStorage'),
-      )
-      .map(({ path }) => path);
-
-    expect(violations).toEqual([]);
-  });
-
-  test('only the Tauri platform boundary imports Platform or Tauri modules', () => {
+  test('reference frontend does not import Platform or Tauri modules', () => {
     expect(forbiddenPlatformImports(allSourceFiles())).toEqual([]);
   });
 
@@ -529,7 +486,7 @@ describe('frontend dependency rules', () => {
     ).toEqual([]);
   });
 
-  test('raw Tauri event strings stay behind the Tauri platform boundary', () => {
+  test('reference frontend does not subscribe to desktop Tauri events', () => {
     expect(unexpectedTauriEventUses(allSourceFiles())).toEqual([]);
   });
 

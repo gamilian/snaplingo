@@ -1,6 +1,5 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { CAPTURE_WINDOW_LABEL } from './views/CaptureWorkspace/windowMode';
 import { CAPTURE_RESULT_WINDOW_LABEL } from "./appWindowRouting";
 import "./styles/index.css";
 
@@ -14,11 +13,7 @@ if (new URLSearchParams(window.location.search).get('window') === 'pin') {
   document.documentElement.dataset.pinnedImage = 'true';
 }
 
-const App = React.lazy(() =>
-  new URLSearchParams(window.location.search).get('window') === CAPTURE_WINDOW_LABEL
-    ? import('./CaptureApp')
-    : import('./App'),
-);
+const App = React.lazy(() => import('./App'));
 
 if (
   new URLSearchParams(window.location.search).get('window') ===

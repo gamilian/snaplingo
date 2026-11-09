@@ -1195,14 +1195,13 @@ export function createCaptureWorkspaceRuntime({
       snapshotHydration = null;
 
       try {
-        const [session, rememberedTool, editorSelection] = await Promise.all([
+        const [session, rememberedTool] = await Promise.all([
           requestedSessionId
             ? platform.commands.getCaptureSession(requestedSessionId)
             : platform.commands.createCaptureSession(),
           screenshotPreferences?.()?.rememberLastTool
             ? toolWrite.then(() => platform.commands.lastAnnotationTool?.()).catch(() => null)
             : Promise.resolve(null),
-          requestedSessionId ? platform.commands.captureEditorSelection?.(requestedSessionId) : null,
         ]);
         provisionalSessionIds.add(session.id);
         if (generation !== actionGeneration) {
@@ -1210,9 +1209,6 @@ export function createCaptureWorkspaceRuntime({
           await cancelNativeSessionOnce(session.id).catch(() => undefined);
           await cancelStalePrevious();
           return;
-        }
-        if (editorSelection && (mode !== 'screenshot' || editorSelection.sessionId !== session.id)) {
-          throw new Error('截图编辑选区所属会话已失效');
         }
         if (rememberedTool) lastAnnotationTool = rememberedTool;
         if (previousSessionId && previousSessionId !== session.id) {
@@ -1261,7 +1257,6 @@ export function createCaptureWorkspaceRuntime({
               )?.rect ?? null
             : null,
         });
-        if (editorSelection) await renderSelectionPreview(editorSelection.rect, [], editorSelection.includeCursor);
       } catch (error) {
         if (generation === actionGeneration) {
           if (

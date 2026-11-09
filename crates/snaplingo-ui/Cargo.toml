@@ -1,0 +1,12 @@
+[package]
+name = "snaplingo-ui"
+version = "0.1.23"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+unicode-segmentation = "1.12"
+
+[dev-dependencies]
+serde_json = "1.0"
+syn = { version = "2", default-features = false, features = ["full", "parsing", "visit"] }

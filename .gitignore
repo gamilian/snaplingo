@@ -4,13 +4,13 @@ node_modules/
 # Build outputs
 dist/
 
-# Tauri
-src-tauri/target/
+# Rust application resources
+crates/snaplingo-app/target/
 target/
-src-tauri/resources/ocr/*
-!src-tauri/resources/ocr/.gitkeep
-src-tauri/resources/windows-crt/*
-!src-tauri/resources/windows-crt/.gitkeep
+crates/snaplingo-app/resources/ocr/*
+!crates/snaplingo-app/resources/ocr/.gitkeep
+crates/snaplingo-app/resources/windows-crt/*
+!crates/snaplingo-app/resources/windows-crt/.gitkeep
 
 # IDE
 .vscode/

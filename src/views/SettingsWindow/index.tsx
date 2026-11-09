@@ -14,6 +14,7 @@ import {
 } from './navigationModel';
 import { createSettingsNavigationState } from './settingsNavigationState';
 import { SettingsRuntimeProvider, useSettingsRuntime } from './runtimeContext';
+import { NativeSettingsPage } from './NativeSettingsPage';
 
 export function SettingsWindow({ runtime }: { runtime: SettingsRuntime }) {
   return (
@@ -75,20 +76,22 @@ function SettingsWindowContent() {
       />
 
       <div className="settings-content flex-1 min-h-0 min-w-0 overflow-hidden flex">
-        <SettingsSectionContent section={activeSection} />
+        <SettingsSectionContent section={activeSection} interfaceScale={uiScale} />
       </div>
     </div>
   );
 }
 
-function SettingsSectionContent({ section }: { section: SettingsSection }) {
+function SettingsSectionContent({ section, interfaceScale }: { section: SettingsSection; interfaceScale: number }) {
+  const retained = <RetainedSettingsSectionContent section={section} />;
+  return <NativeSettingsPage key={section.key} page={section.key} interfaceScale={interfaceScale} fallback={retained} />;
+}
+
+function RetainedSettingsSectionContent({ section }: { section: SettingsSection }) {
   const servicesSubTab = useSettingsStore((state) => state.servicesSubTab);
   const setServicesSubTab = useSettingsStore((state) => state.setServicesSubTab);
 
-  if (!('secondary' in section)) {
-    if (section.key === 'favorites' || section.key === 'history') {
-      return section.render();
-    }
+  if (section.key === 'general' || section.key === 'ocr' || section.key === 'translation' || section.key === 'screenshot' || section.key === 'history' || section.key === 'favorites') {
     return section.render();
   }
 

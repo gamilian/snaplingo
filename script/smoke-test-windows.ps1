@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 if ($env:GITHUB_ACTIONS -ne 'true') { throw 'Run this installer smoke test on an ephemeral GitHub Actions runner.' }
 
 if (-not $Installer) {
-    $bundleDirectory = "target/release/bundle/$InstallerType"
+    $bundleDirectory = (Join-Path $(if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { 'target' }) "native/release/bundle/$InstallerType")
     $extension = if ($InstallerType -eq 'msi') { '*.msi' } elseif ($InstallerType -eq 'portable') { '*-portable.zip' } else { '*.exe' }
     $installers = @(Get-ChildItem $bundleDirectory -Filter $extension)
     if ($installers.Count -ne 1) { throw "Expected exactly one $InstallerType installer." }

@@ -1,45 +1,100 @@
 # SnapLingo Runtime Map
 
-## Frontend Runtime
+## Native application entry
 
-macOS Pinned Image and scrolling-capture surfaces render through Rust/AppKit adapters and call backend workflows directly. Their frontend counterparts below remain the Windows/Linux implementations.
-
-Each window starts in `src/views/`. Its view-local runtime context supplies one of the frontend Application runtimes:
-
-```text
-SettingsWindow       -> application/settings
-CaptureWorkspace     -> application/capture-workspace
-ResultWindow         -> application/result-window
-PinnedImageWindow    -> application/pinned-image
-Permission Gate      -> application/permissions
-```
-
-The Settings runtime includes the Library workflow. It combines History, Favorites, and Screenshot Favorites through narrow ports while Views retain only rendering and local interaction state. A backend Library Index returns the final page's ordered stable IDs before the frontend hydrates only those records. History pages include favorite membership for their visible content identities, without loading all Favorite records or thumbnails.
-
-Result Window owns its translation state, session validity, Provider retries, and automatic translation timers. Its Zustand Store subscribes to runtime snapshots and projects them with Settings for the View. Capture Session loading/output live in `application/capture-workspace/runtime.ts`, while shared edit transitions live in its `editing.ts` module; Views supply React, Canvas, DOM decoding/painting, input conversion, and printing.
-
-The runtime receives typed adapters from `src/platform/tauri/`. Those adapters own Tauri command names, event payload parsing, subscriptions, and Tauri-window effects. Views and frontend Application modules do not import Tauri packages or Platform modules.
-
-## Backend Runtime
-
-`src-tauri/src/lib.rs` is the Tauri startup shell. It builds `AppState` through `composition.rs`, registers commands, and coordinates shell lifecycle concerns.
+`crates/snaplingo-app/src/main.rs` and `native_main.rs` enter the same native
+application. The default `native-app` feature supplies the complete macOS and
+Windows hosts. `lib.rs` declares/exports those modules and the portable Core
+interfaces; it does not build a Tauri application or register IPC commands.
 
 ```text
-Tauri command -> Application runtime <- Infrastructure adapter
-                        ^
-                  Composition wiring
+macOS native_app.rs / Windows native_windows.rs
+    -> AppState assembled by composition.rs
+    -> Application runtimes <- Infrastructure adapters
+    -> native Settings / capture / result / pin / scrolling windows
 ```
 
-`application/` owns Capture, Providers, History, Result Window, Pinned Image, Settings, Hotkeys, and Selected Text workflows. Each module declares the port it needs. `infrastructure/` owns the implementations for storage, credentials, HTTP, LLM transport, events, database, clipboard, windows, shortcuts, screenshots, selection, and native OCR.
+`native_app.rs` owns AppKit startup and application delegation. `native_windows.rs`
+owns the winit event loop and routes native window/input/accessibility events.
+`ui_thread` marshals platform effects to those loops; `infrastructure/runtime.rs`
+owns Tokio workers. `RuntimeLifecycle` owns startup work, hotkey registration and
+quit draining. Closing Settings hides the window while the resident app remains.
+Single-instance activation and tray/menu actions enter the same application.
 
-Capture's runtime serializes startup across all entry points: overlapping window-open intents are ignored, while direct session creation returns a busy error. Startup completion or failure permits retry. Each session keeps its frozen monitor geometry and coordinate convention; preparation and reveal name the session so refreshes cannot reuse an older session's scale. Pin output passes the rendered PNG through `CapturePinOutput` to the existing Pinned Image runtime, which stores the image before opening its window.
+## Shared Settings and native surfaces
 
-Required Permissions owns polling and the ordered explicit request workflow. TTS owns text normalization, locale-based voice selection, and persisted voice/rate policy; Composition selects the native speech adapter. Provider credentials are implemented directly by `SqliteCredentialStore`, including atomic multi-field writes.
+All seven Settings pages use shared Rust layout, hit testing and typed intents.
+macOS `native_settings_window.rs` mounts `SharedFeaturePage`; Windows
+`native_settings_windows.rs` connects the desktop host to `SettingsWindowSession`.
+The adapters under `infrastructure/settings_canvas` bind real preferences,
+provider and Library workflows, permission/update controllers and native sheets.
+Asynchronous notifications wake the host and refresh snapshots. Cached capacity
+totals use lightweight `LibraryIndex` queries and reject stale completions.
 
-Composition connects `SelectionTranslation` to Settings, Selected Text, and Result Window so Hotkey/IPC entry points share sequencing. `CaptureOcrDelivery` maps OCR targets and rejects stale handoffs with the injected Result Window runtime. File OCR reads through an asynchronous filesystem adapter and shares the original image bytes with its preview.
+`snaplingo-ui` produces logical-DIP Scenes and actions; `snaplingo-render` produces
+CPU pixels, and `snaplingo-accessibility` projects scene semantics. Platform hosts
+own device DPI, IME, clipboard, menus/dialogs, accessibility and presentation.
+Opaque Windows Settings uses the desktop presenter; alpha capture, result, pin
+and scrolling surfaces use native layered presentation. AppKit supplies macOS
+native windows and text controls. Interface zoom is separate from device DPI.
 
-`app_actions.rs` maps shell actions to workflow calls. `startup_shortcuts.rs` maps validated hotkey category/action pairs to `AppAction`; `infrastructure/system/shortcut.rs` implements global shortcut registration. `application/hotkeys` owns parsing, registration state, and pressed/released policy.
+Capture serializes startup across entry points. Each session retains frozen
+monitor pixels, geometry and its coordinate convention; selection, editing,
+magnification and output consume that same snapshot. Windows capture uses the
+primary desktop scale. Pin origins cross into Windows as physical coordinates;
+logical sources are converted once, and center/cascade uses the virtual desktop
+and actual physical window extent. Pin output stores the image through
+`PinnedImageRuntime` before opening the native window.
 
-## Native Targets
+Result Window owns request validity, Provider retries, automatic translation and
+file-OCR/favorite sequencing. Scrolling Capture owns one sampler and revisioned
+preview updates, with native controls, a pass-through preview and viewport outline.
+Native window adapters call these portable runtimes directly.
 
-The CI workflow runs frontend tests/build plus backend formatting, tests, and checks on native macOS, Ubuntu, and Windows runners. Platform dependencies are installed on the runner that executes the target; no workflow treats that as cross-compilation verification.
+## Application workflows
+
+`crates/snaplingo-core/src/application` owns Capture, Providers, History, Result
+Window, Pinned Image, Settings, Hotkeys and Selected Text policy. Each module
+consumes local ports. `snaplingo-storage` supplies durable repositories and image
+assets. `snaplingo-app/src/infrastructure` supplies OS/network/native-library
+capabilities; `composition.rs` and its builders choose implementations.
+
+Composition connects `SelectionTranslation` to Settings, Selected Text and Result
+Window so hotkey and menu actions share sequencing. `CaptureOcrDelivery` rejects
+stale handoffs through the injected Result Window runtime. File OCR shares the
+original image bytes with its preview. Required Permissions owns grant checks and
+explicit requests; TTS owns normalization, locale-based voice selection and saved
+voice/rate policy. Provider credentials use atomic SQLite multi-field writes.
+
+Library Index returns lightweight globally ordered IDs before Library loads only
+the selected History/Favorite records. History pages project visible content's
+favorite membership without loading complete Favorite bodies or thumbnails.
+
+`app_actions.rs` maps native actions to workflow calls. `startup_shortcuts.rs`
+maps validated hotkey category/action pairs to `AppAction`; native shortcut
+registration stays in Infrastructure. Typed `DesktopEvents` refresh native
+subscribers without forwarding browser IPC events.
+
+## Browser reference harness
+
+The retained React tree under `src/` is independent reference/test code.
+`src/App.tsx` forwards browser requests to isolated Settings, Result and Permission
+fixtures under `crates/snaplingo-app/tests/native_ui`. Those fixtures mount original
+components with test data and preserve collector query parameters. Domain,
+Application, View and Store regression tests remain alongside the original code.
+The production Tauri adapters and npm dependencies are deleted.
+
+Use `npm run reference:dev` or `reference:build` for these references. Default
+`dev`/`build` commands use the native application, and native packages contain no
+browser assets. AppKit/React frame and raster collectors supply independent visual
+baselines for shared UI tests.
+
+## Build and acceptance evidence
+
+CI/release matrices target macOS Apple Silicon, macOS Intel and Windows, with
+native build, final artifact verification and installation smoke. Windows
+compilation and PE linking have passed; actual Windows GUI/installer execution
+requires the Windows runner and desktop acceptance. macOS runtime checks, pure
+geometry/workflow tests, cross compilation, linking and manual IME/accessibility
+acceptance describe separate verification boundaries. Portable crates retain
+other platform capabilities; the complete Linux application host is unsupported.

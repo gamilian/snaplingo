@@ -1,0 +1,51 @@
+name: Shared native Rust UI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  native-ui:
+    if: github.event.repository.private == false
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      NO_PROXY: 127.0.0.1,localhost
+      no_proxy: 127.0.0.1,localhost
+      SNAPLINGO_SIGNING_MODE: adhoc
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run ocr:prepare
+      - run: cargo fmt --all --check
+      - run: cargo test --locked -p snaplingo-core -p snaplingo-storage -p snaplingo-settings -p snaplingo-ui -p snaplingo-accessibility -p snaplingo-render -p snaplingo-desktop --all-targets
+      - run: cargo check --locked -p snaplingo-desktop --all-targets
+      - run: cargo test --locked -p snaplingo --no-default-features --features native-app --lib
+      - run: cargo test --locked -p snaplingo --no-default-features --features native-app --test native_app_smoke
+      - run: cargo build --locked -p snaplingo --no-default-features --features native-app --bin snaplingo-native
+      - run: cargo run --locked -p snaplingo-render --example settings_snapshot
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-ui-${{ runner.os }}
+          path: target/shared-ui/*.png
+      - name: Package and verify native macOS application
+        if: runner.os == 'macOS'
+        run: npm run native:build
+      - name: Install native Windows installer compilers
+        if: runner.os == 'Windows'
+        run: choco install nsis wixtoolset --no-progress -y
+      - name: Package native Windows installers and portable archive
+        if: runner.os == 'Windows'
+        run: npm run native:build

@@ -1,0 +1,10 @@
+[package]
+name = "snaplingo-accessibility"
+version = "0.1.23"
+edition = "2021"
+rust-version = "1.88"
+license = "MIT"
+
+[dependencies]
+snaplingo-ui = { path = "../snaplingo-ui" }
+accesskit = "0.25.2"

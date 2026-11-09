@@ -205,11 +205,11 @@ export function useCaptureWorkspaceRuntimeView({
   }), [runtimeRenderState.annotationStyle, runtimeRenderState.textFontSize,
     runtimeRenderState.error, derived.isTextSizingActive, derived.isFillModeActive,
     roundEnabled, blurMode, annotationColorPresets, fontFamilies]);
-  const nativeToolbarHeight = (64 + 36 * (
-    ((derived.toolbarSize.width - 8 * uiScale) / uiScale < 560 ? 2 : 1) +
-    (styling.textMode ? 1 : 0) + (styling.roundEnabled ? 1 : 0) +
-    (styling.error ? 1 : 0)
-  )) * uiScale;
+  const propertyRows = Number(styling.textMode) + Number(styling.roundEnabled) + Number(Boolean(styling.error));
+  const nativeToolbarHeight = (
+    (derived.toolbarSize.width / uiScale < 460 ? 100 : 68) +
+    (propertyRows ? 8 + 36 * propertyRows : 0)
+  ) * uiScale;
   useEffect(() => {
     const update = platformPorts.commands.updateCaptureEditorToolbar;
     if (!update) return;
@@ -218,10 +218,11 @@ export function useCaptureWorkspaceRuntimeView({
     const position = derived.toolbarPosition;
     const presentation = id && position && runtimeRenderState.status === 'preview' &&
       runtimeRenderState.isAnnotationToolbarVisible ? {
-        frame: { x: position.x + 4 * uiScale, y: position.y + 4 * uiScale,
-          width: derived.toolbarSize.width - 8 * uiScale, height: nativeToolbarHeight },
+        frame: { x: position.x, y: position.y,
+          width: derived.toolbarSize.width, height: nativeToolbarHeight },
         uiScale,
         dark: toolbarDark,
+        interfaceTheme: document.documentElement.dataset.interfaceTheme ?? 'native',
         visible: true,
         activeTool: runtimeRenderState.activeAnnotationTool,
         canUndo: derived.canUndoAnnotation,

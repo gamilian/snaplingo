@@ -13,7 +13,7 @@ function run(command, args) {
   return result.stdout;
 }
 const metadata = JSON.parse(run('cargo', ['metadata', '--no-deps', '--format-version', '1']));
-const dmgDir = join(metadata.target_directory, 'release/bundle/dmg');
+const dmgDir = join(metadata.target_directory, 'native/release/bundle/dmg');
 const images = readdirSync(dmgDir).filter(name => name.endsWith('.dmg') && !name.startsWith('rw.'));
 if (images.length !== 1) throw new Error('Expected exactly one DMG');
 const output = run('/usr/bin/hdiutil', ['attach', join(dmgDir, images[0]), '-nobrowse', '-readonly']);

@@ -1,0 +1,40 @@
+{
+  "source": "reference-native-screenshot-number-steps.json; actual WKWebView number input.stepUp()/stepDown(), settings_reference_snapshot screenshot",
+  "cases": [
+    {
+      "value": "30000",
+      "up": "31000",
+      "down": "29000"
+    },
+    {
+      "value": "100",
+      "up": "1100",
+      "down": "100"
+    },
+    {
+      "value": "100000",
+      "up": "100000",
+      "down": "99000"
+    },
+    {
+      "value": "100.5",
+      "up": "1100.5",
+      "down": "100"
+    },
+    {
+      "value": "100001",
+      "up": "100001",
+      "down": "99001"
+    },
+    {
+      "value": "99.9",
+      "up": "1099.9",
+      "down": "99.9"
+    },
+    {
+      "value": "",
+      "up": "1000",
+      "down": ""
+    }
+  ]
+}

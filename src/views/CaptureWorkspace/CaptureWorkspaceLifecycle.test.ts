@@ -29,9 +29,6 @@ describe('CaptureWorkspace React lifecycle', () => {
       async (_id, presentation) => presentation ? confirmed.promise : true,
     );
     const platform = { ...base, commands: { ...base.commands,
-      captureEditorSelection: vi.fn(async () => ({
-        sessionId: 'loaded', rect: { x: 40, y: 30, width: 120, height: 80 }, includeCursor: false,
-      })),
       updateCaptureEditorToolbar: update,
     } };
     const container = document.createElement('div');
@@ -41,6 +38,7 @@ describe('CaptureWorkspace React lifecycle', () => {
       await act(async () => root.render(createElement(CaptureWorkspace, {
         ports: platform, initialMode: 'screenshot', initialSessionId: 'loaded',
       })));
+      await enterEditor(container, platform);
       await vi.waitFor(() => expect(update.mock.calls.some(([, state]) => state?.activeTool === 'rectangle')).toBe(true));
       expect(update.mock.calls.some(([, state]) => state?.dark)).toBe(true);
       expect(container.querySelector('[aria-label="Copy selection"]')).not.toBeNull();
@@ -77,9 +75,6 @@ describe('CaptureWorkspace React lifecycle', () => {
       async (_id, presentation) => presentation ? confirmed.promise : true,
     );
     const platform = { ...base, commands: { ...base.commands,
-      captureEditorSelection: vi.fn(async () => ({
-        sessionId: 'loaded', rect: { x: 40, y: 30, width: 120, height: 80 }, includeCursor: false,
-      })),
       updateCaptureEditorToolbar: update,
     } };
     const container = document.createElement('div');
@@ -88,6 +83,7 @@ describe('CaptureWorkspace React lifecycle', () => {
     await act(async () => root.render(createElement(CaptureWorkspace, {
       ports: platform, initialMode: 'screenshot', initialSessionId: 'loaded',
     })));
+    await enterEditor(container, platform);
     await vi.waitFor(() => expect(update.mock.calls.some(([, state]) => state !== null)).toBe(true));
     await act(async () => root.unmount());
     await act(async () => confirmed.resolve(true));
@@ -105,9 +101,6 @@ describe('CaptureWorkspace React lifecycle', () => {
       async (_id, presentation) => presentation ? available : true,
     );
     const platform = { ...base, commands: { ...base.commands,
-      captureEditorSelection: vi.fn(async () => ({
-        sessionId: 'loaded', rect: { x: 40, y: 30, width: 120, height: 80 }, includeCursor: false,
-      })),
       updateCaptureEditorToolbar: update,
     }, events: { ...base.events,
       subscribeEditorToolbarAction: async (handler: typeof receive) => { receive = handler; return () => undefined; },
@@ -119,6 +112,7 @@ describe('CaptureWorkspace React lifecycle', () => {
       await act(async () => root.render(createElement(CaptureWorkspace, {
         ports: platform, initialMode: 'screenshot', initialSessionId: 'loaded',
       })));
+      await enterEditor(container, platform);
       await vi.waitFor(() => {
         expect(update.mock.calls.some(([, state]) => state !== null)).toBe(true);
         expect(container.querySelector('[data-capture-toolbar][aria-hidden="true"]')).not.toBeNull();
@@ -501,6 +495,30 @@ describe('CaptureWorkspace React lifecycle', () => {
     container.remove();
   });
 });
+
+async function enterEditor(container: HTMLDivElement, platform: CaptureWorkspacePorts) {
+  await vi.waitFor(() => expect(platform.window.reveal).toHaveBeenCalledOnce());
+  const surface = container.firstElementChild as HTMLDivElement;
+  surface.setPointerCapture = vi.fn();
+  for (const [type, x, y] of [
+    ['pointerdown', 40, 30],
+    ['pointermove', 160, 110],
+    ['pointerup', 160, 110],
+  ] as const) {
+    await act(async () => {
+      surface.dispatchEvent(new PointerEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 1,
+        pointerType: 'mouse',
+        button: 0,
+        buttons: type === 'pointerup' ? 0 : 1,
+        clientX: x,
+        clientY: y,
+      }));
+    });
+  }
+}
 
 function listenerCalls(
   spy: { mock: { calls: unknown[][] } },

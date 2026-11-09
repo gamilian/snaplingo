@@ -38,6 +38,7 @@ export interface CaptureEditorToolbarPresentation {
   frame: LogicalRect;
   uiScale: number;
   dark: boolean;
+  interfaceTheme?: string;
   visible: boolean;
   activeTool: AnnotationTool | null;
   canUndo: boolean;
@@ -111,7 +112,6 @@ export interface OutputCaptureInput extends RenderCaptureOutputInput {
 export interface CaptureWorkspaceCommandsPort {
   updateCaptureEditorToolbar?(sessionId: string, presentation: CaptureEditorToolbarPresentation | null): Promise<boolean>;
   captureEditorOwnsFocus?(sessionId: string): Promise<boolean>;
-  captureEditorSelection?(sessionId: string): Promise<{ sessionId: string; rect: LogicalRect; includeCursor: boolean } | null>;
   beginScrollingCapture?(sessionId: string, rect: LogicalRect): Promise<void>;
   listAnnotationFontFamilies?(): Promise<string[]>;
   lastAnnotationTool?(): Promise<AnnotationTool | null>;

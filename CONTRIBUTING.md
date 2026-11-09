@@ -2,17 +2,17 @@
 
 ## Development setup
 
-Use Node.js 22, npm, and a current stable Rust toolchain. The project declares its Rust version in `src-tauri/Cargo.toml`; CI currently verifies the stable toolchain rather than a separate minimum-version matrix.
+Use Node.js 22, npm, and a current stable Rust toolchain. The project declares its Rust version in `crates/snaplingo-app/Cargo.toml`; CI currently verifies the stable toolchain rather than a separate minimum-version matrix.
 
 Native dependencies:
 
 - macOS: Xcode Command Line Tools. Official builds use Vision OCR. Tesseract is optional; see [Tesseract setup](docs/TESSERACT_SETUP.md).
-- Windows: the Rust MSVC toolchain, Visual Studio C++ Build Tools, and WebView2 Runtime.
-- Ubuntu: the packages installed by [.github/workflows/ci.yml](.github/workflows/ci.yml), including GTK 3, WebKitGTK 4.1, Ayatana AppIndicator, Tesseract/Leptonica, PipeWire, Clang, and libxdo.
+- Windows: the x64 Rust MSVC toolchain and Visual Studio C++ Build Tools. Packaging additionally needs NSIS and WiX 3 (`choco install nsis wixtoolset`).
+- Linux: portable crates can be developed independently; the complete native application host is not supported.
 
 ```bash
 npm ci
-npm run tauri:dev
+npm run native:dev
 ```
 
 ## Making changes
@@ -27,13 +27,13 @@ SQLite schema changes need a new ordered migration. History and Favorites keep i
 
 ```bash
 npm test
-npm run build
-cargo fmt --manifest-path src-tauri/Cargo.toml --check
-cargo test --locked --manifest-path src-tauri/Cargo.toml
-cargo check --locked --manifest-path src-tauri/Cargo.toml --all-targets
+npm run reference:build
+cargo fmt --manifest-path crates/snaplingo-app/Cargo.toml --check
+cargo test --locked --manifest-path crates/snaplingo-app/Cargo.toml
+cargo check --locked --manifest-path crates/snaplingo-app/Cargo.toml --all-targets
 ```
 
-Run the relevant focused tests while developing, then complete the checks above before submitting. Native CI covers macOS Apple Silicon, macOS Intel, Ubuntu, and Windows. Platform-specific behavior also needs the acceptance scenarios in [Releasing](docs/RELEASING.md). The root Cross/Docker configuration is experimental and is not part of that native CI verification.
+Run the relevant focused tests while developing, then complete the checks above before submitting. Native CI covers macOS Apple Silicon, macOS Intel, and Windows. `npm run native:build` creates the platform packages; `npm run release:verify` checks final artifacts. The React/Vite tree is retained only for isolated reference scenes and regression tests; use `npm run reference:dev` to open it. Platform-specific behavior also needs the acceptance scenarios in [Releasing](docs/RELEASING.md). The root Cross/Docker configuration is experimental and is not part of that native CI verification.
 
 ## Pull requests
 

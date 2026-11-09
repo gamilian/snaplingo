@@ -1,7 +1,7 @@
-"""Compare native and React pin/result/capture windows with the isolated macOS UI harness.
+"""Measure native pin/result/capture windows with the isolated macOS UI harness.
 
-Build native_ui_workflows with tauri/custom-protocol first. Use its executable and an output JSON path as
-arguments. Debug builds need Vite on 127.0.0.1:5189; release builds use dist.
+Build native_ui_workflows with --features native-app first. Pass its executable and an output JSON path.
+The fixture uses AppKit directly and requires no web server.
 """
 import ctypes
 import argparse
@@ -120,12 +120,8 @@ def measure(executable, renderer, pins, repetition, directory, surface="pin"):
         elif surface == "capture":
             ready = [row for row in metadata if row.get("captureWidth") == 1280
                      and row.get("captureHeight") == 720 and row.get("selecting")
-                     and row.get("loading") is False
-                     and row.get("webviews") == (0 if renderer == "native" else 1)]
+                     and row.get("loading") is False]
             assert ready, "Frozen capture selection did not finish loading: " + log_path.read_text()
-        elif renderer == "webview":
-            ready = [row for row in metadata if row.get("imageWidth") == 800 and row.get("toolbarButtons") == 3]
-            assert len(ready) == pins, "React pin windows did not finish loading: " + log_path.read_text()
         previous = process_group(root)
         previous_time = time.monotonic()
         samples = []
@@ -174,7 +170,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix="snaplingo-ui-profile-") as directory:
         for repetition in range(1, 4):
             for pins in ((1, 5) if args.surface == "pin" else (1,)):
-                for renderer in ("native", "webview"):
+                for renderer in ("native",):
                     row = measure(executable.resolve(), renderer, pins, repetition, directory, args.surface)
                     rows.append(row)
                     output.parent.mkdir(parents=True, exist_ok=True)

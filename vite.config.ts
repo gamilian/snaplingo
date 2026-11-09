@@ -9,24 +9,26 @@ export default defineConfig(async ({ mode }) => ({
   },
   build: {
     rollupOptions: {
-      input: { main: 'index.html', capture: 'capture.html' },
+      input: {
+        main: 'index.html',
+        settingsReference: 'crates/snaplingo-app/tests/native_ui/settings_reference.html',
+        resultReference: 'crates/snaplingo-app/tests/native_ui/result_reference.html',
+        permissionReference: 'crates/snaplingo-app/tests/native_ui/permission_reference.html',
+      },
     },
-    // macOS 12 ships Safari 15; Windows uses the installed WebView2 runtime.
+    // Match the retained reference collectors on macOS 12 and Windows.
     target: ["safari15", "chrome105"],
     cssTarget: ["safari15", "chrome105"],
   },
 
-  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
-  //
-  // 1. prevent vite from obscuring rust errors
+  // This server is only a visual-reference and frontend-test harness.
   clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
   server: {
     port: 5173,
     strictPort: true,
     watch: {
-      // 3. tell vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
+      // Keep the HTML/React references watchable while Rust builds run.
+      ignored: ["**/crates/**/*.rs", "**/target/**"],
     },
   },
 }));

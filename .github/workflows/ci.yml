@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-15, macos-15-intel, ubuntu-24.04, windows-2022]
+        os: [macos-15, macos-15-intel, windows-2022]
     env:
       SNAPLINGO_SIGNING_MODE: adhoc
       CARGO_INCREMENTAL: '0'
@@ -33,23 +33,21 @@ jobs:
         with:
           node-version: 22
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install Linux desktop dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential libayatana-appindicator3-dev libgbm-dev libgtk-3-dev \
-            libjavascriptcoregtk-4.1-dev libleptonica-dev librsvg2-dev libsoup-3.0-dev \
-            libwebkit2gtk-4.1-dev tesseract-ocr libtesseract-dev libpipewire-0.3-dev libclang-dev libxdo-dev
       - run: npm ci
       - run: npm test
       - run: npm run ocr:prepare
-      - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
-      - run: cargo test --locked --manifest-path src-tauri/Cargo.toml
+      - run: cargo fmt --manifest-path crates/snaplingo-app/Cargo.toml --check
+      - run: cargo test --locked --manifest-path crates/snaplingo-app/Cargo.toml
       - name: Smoke test bundled medium OCR
-        run: cargo test --locked --manifest-path src-tauri/Cargo.toml bundled_medium_smoke -- --ignored --nocapture
-      - run: cargo check --locked --manifest-path src-tauri/Cargo.toml --all-targets
-      - name: Build and verify desktop release
-        run: npm run tauri:build
+        run: cargo test --locked --manifest-path crates/snaplingo-app/Cargo.toml bundled_medium_smoke -- --ignored --nocapture
+      - run: cargo check --locked --manifest-path crates/snaplingo-app/Cargo.toml --all-targets
+      - name: Install native Windows installer compilers
+        if: runner.os == 'Windows'
+        run: choco install nsis wixtoolset --no-progress -y
+      - name: Build native desktop release
+        run: npm run native:build
+      - name: Verify final native release artifacts
+        run: npm run release:verify
       - name: Smoke test macOS installation
         if: runner.os == 'macOS'
         run: node script/smoke-test-macos.mjs

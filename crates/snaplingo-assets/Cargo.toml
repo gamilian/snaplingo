@@ -1,0 +1,5 @@
+[package]
+name = "snaplingo-assets"
+version = "0.1.23"
+edition = "2021"
+license = "MIT"

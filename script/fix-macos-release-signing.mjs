@@ -23,14 +23,15 @@ import {
 
 const root = process.cwd();
 const allowAdhoc = process.env.SNAPLINGO_SIGNING_MODE === "adhoc";
-const config = JSON.parse(readFileSync(resolve(root, "src-tauri/tauri.conf.json"), "utf8"));
+const config = JSON.parse(readFileSync(resolve(root, process.env.SNAPLINGO_BUNDLE_CONFIG ?? "crates/snaplingo-app/desktop.json"), "utf8"));
+config.version ??= JSON.parse(readFileSync(resolve(root, "package.json"), "utf8")).version;
 const identifier = config.identifier;
 const productName = config.productName ?? "SnapLingo";
 const appPath = resolve(
   root,
-  process.argv[2] ?? `target/release/bundle/macos/${productName}.app`,
+  process.argv[2] ?? `target/native/release/${productName}.app`,
 );
-const entitlementsPath = resolve(root, "src-tauri/entitlements.plist");
+const entitlementsPath = resolve(root, "crates/snaplingo-app/entitlements.plist");
 const localCodesignDir = join(homedir(), ".snaplingo", "codesign");
 const localKeychainPath = join(localCodesignDir, "SnapLingoLocalCodesign.keychain-db");
 const localKeychainPasswordPath = join(localCodesignDir, "keychain-password.txt");
@@ -494,13 +495,16 @@ function verifyDmgSignature(path) {
 }
 
 function findDmgPaths() {
-  const dmgDir = resolve(dirname(dirname(appPath)), "dmg");
+  if (process.env.SNAPLINGO_DMG_OUTPUT) {
+    return [resolve(root, process.env.SNAPLINGO_DMG_OUTPUT)];
+  }
+  const dmgDir = resolve(dirname(appPath), "bundle/dmg");
   if (!existsSync(dmgDir)) {
     return [];
   }
 
   return readdirSync(dmgDir)
-    .filter((name) => name.startsWith(`${productName}_${config.version}_`) && name.endsWith(".dmg") && !name.startsWith("rw."))
+    .filter((name) => name.startsWith(`${productName.toLowerCase()}-v${config.version}-macos-`) && name.endsWith(".dmg") && !name.startsWith("rw."))
     .map((name) => resolve(dmgDir, name));
 }
 
@@ -585,7 +589,7 @@ if (process.argv.includes("--prepare-identity")) {
 }
 
 if (!identifier) {
-  throw new Error("[macos-sign] Missing top-level identifier in src-tauri/tauri.conf.json.");
+  throw new Error("[macos-sign] Missing top-level identifier in crates/snaplingo-app/desktop.json.");
 }
 
 if (!existsSync(appPath)) {
@@ -604,7 +608,7 @@ const bundleIdentifier = run("/usr/bin/plutil", [
 
 if (bundleIdentifier !== identifier) {
   throw new Error(
-    `[macos-sign] CFBundleIdentifier (${bundleIdentifier}) does not match Tauri identifier (${identifier}).`,
+    `[macos-sign] CFBundleIdentifier (${bundleIdentifier}) does not match desktop identifier (${identifier}).`,
   );
 }
 

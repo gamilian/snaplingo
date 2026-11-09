@@ -193,7 +193,7 @@ export function MainNav({ activeTab, onTabChange, library }: MainNavProps) {
             if (event.target === event.currentTarget) setCapacityOpen(false);
           }}
         >
-          <section className="w-full max-w-[440px] overflow-hidden rounded-2xl border border-black/10 bg-surface shadow-2xl">
+          <section role="dialog" aria-modal="true" aria-label={t('historyAndFavorites')} className="w-full max-w-[440px] overflow-hidden rounded-2xl border border-black/10 bg-surface shadow-2xl">
             <header className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
               <div>
                 <h2 className="text-base font-bold text-ink">{t('historyAndFavorites')}</h2>

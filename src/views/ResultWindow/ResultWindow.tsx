@@ -725,6 +725,8 @@ function ResultWindowContent({
     >
       <div
         ref={resultWindowPanelRef}
+        role={presentation === 'overlay' ? 'dialog' : undefined}
+        aria-modal={presentation === 'overlay' ? true : undefined}
         className={resultWindowPanelClassName(presentation, {
           fitContent: isOcrMode,
         })}

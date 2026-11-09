@@ -186,49 +186,6 @@ describe('native annotation toolbar actions', () => {
   });
 });
 
-describe('native selection editor handoff', () => {
-  it('enters preview with the frozen selection and cursor state before revealing', async () => {
-    const base = createPlatform();
-    const editorSelection = vi.fn(async () => ({ sessionId: 'session-1', rect: selection, includeCursor: true }));
-    const platform = { ...base, commands: { ...base.commands, captureEditorSelection: editorSelection } };
-    const runtime = createCaptureWorkspaceRuntime({ platform });
-    await runtime.actions.startSession('screenshot', 'session-1');
-    expect(editorSelection).toHaveBeenCalledWith('session-1');
-    expect(base.commands.createCaptureSession).not.toHaveBeenCalled();
-    expect(runtime.renderState).toMatchObject({ status: 'preview', selection, includeCapturedCursor: true, activeAnnotationTool: 'rectangle' });
-    expect(base.window.reveal).not.toHaveBeenCalled();
-    await runtime.actions.updateHostReadiness(true);
-    expect(base.window.reveal).toHaveBeenCalledWith('session-1');
-    runtime.dispose();
-  });
-
-  it('rejects editor rectangles from another capture session', async () => {
-    const base = createPlatform();
-    const platform = { ...base, commands: { ...base.commands, captureEditorSelection: vi.fn(async () => ({ sessionId: 'old-session', rect: selection, includeCursor: false })) } };
-    const runtime = createCaptureWorkspaceRuntime({ platform });
-    await runtime.actions.startSession('screenshot', 'session-1');
-    expect(runtime.renderState.status).toBe('error');
-    expect(runtime.renderState.selection).toBeNull();
-    expect(base.window.reveal).not.toHaveBeenCalled();
-    runtime.dispose();
-  });
-
-  it('ignores a late native selection after a newer session loads', async () => {
-    const base = createPlatform();
-    const pending = deferred<{ sessionId: string; rect: typeof selection; includeCursor: boolean } | null>();
-    const editorSelection = vi.fn(async (id: string) => id === 'old-session' ? pending.promise : { sessionId: id, rect: selection, includeCursor: false });
-    base.commands.getCaptureSession.mockImplementation(async id => ({ ...await createPlatform().commands.getCaptureSession(id), id }));
-    const platform = { ...base, commands: { ...base.commands, captureEditorSelection: editorSelection } };
-    const runtime = createCaptureWorkspaceRuntime({ platform });
-    const old = runtime.actions.startSession('screenshot', 'old-session');
-    await runtime.actions.startSession('screenshot', 'new-session');
-    pending.resolve({ sessionId: 'old-session', rect: { ...selection, width: 300 }, includeCursor: true });
-    await old;
-    expect(runtime.renderState).toMatchObject({ status: 'preview', sessionId: 'new-session', selection, includeCapturedCursor: false });
-    runtime.dispose();
-  });
-});
-
 describe('shared native selection history', () => {
   it('imports legacy entries and restores the latest native selection', async () => {
     const base = createPlatform();

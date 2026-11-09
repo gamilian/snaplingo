@@ -53,6 +53,7 @@ export interface SettingsRuntime {
     displayBounds(): Promise<import('../../domain/capture').LogicalRect | null>;
     applyInterfaceScale(scale: number): Promise<void>;
     openExternal(url: string): Promise<void>;
+    presentNativeSettingsPage?: SettingsWindowPort['presentNativeSettingsPage'];
     subscribeNavigationRequested: SettingsWindowEventsPort['subscribeNavigationRequested'];
   };
   providers: Pick<
@@ -110,6 +111,7 @@ export function createSettingsRuntime(
       displayBounds: () => ports.window.displayBounds?.() ?? Promise.resolve(null),
       applyInterfaceScale: (scale) => ports.window.applyInterfaceScale?.(scale) ?? Promise.resolve(),
       openExternal: (url) => ports.window.openExternal?.(url) ?? Promise.resolve(),
+      presentNativeSettingsPage: ports.window.presentNativeSettingsPage,
       subscribeNavigationRequested: (handler) =>
         ports.windowEvents.subscribeNavigationRequested(handler),
     },
