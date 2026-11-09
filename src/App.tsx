@@ -10,7 +10,7 @@ export function referenceUrl(search: string) {
     : surface === 'result' || parameters.get('window') === 'capture-result'
       ? 'result'
       : 'settings';
-  return `/crates/snaplingo-app/tests/native_ui/${reference}_reference.html${search}`;
+  return `/crates/app/tests/native_ui/${reference}_reference.html${search}`;
 }
 
 export default function App() {

@@ -5,12 +5,12 @@ node_modules/
 dist/
 
 # Rust application resources
-crates/snaplingo-app/target/
+crates/app/target/
 target/
-crates/snaplingo-app/resources/ocr/*
-!crates/snaplingo-app/resources/ocr/.gitkeep
-crates/snaplingo-app/resources/windows-crt/*
-!crates/snaplingo-app/resources/windows-crt/.gitkeep
+crates/app/resources/ocr/*
+!crates/app/resources/ocr/.gitkeep
+crates/app/resources/windows-crt/*
+!crates/app/resources/windows-crt/.gitkeep
 
 # IDE
 .vscode/

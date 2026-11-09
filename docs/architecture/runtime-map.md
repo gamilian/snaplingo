@@ -2,7 +2,7 @@
 
 ## Native application entry
 
-`crates/snaplingo-app/src/main.rs` and `native_main.rs` enter the same native
+`crates/app/src/main.rs` and `native_main.rs` enter the same native
 application. The default `native-app` feature supplies the complete macOS and
 Windows hosts. `lib.rs` declares/exports those modules and the portable Core
 interfaces; it does not build a Tauri application or register IPC commands.
@@ -53,7 +53,7 @@ Native window adapters call these portable runtimes directly.
 
 ## Application workflows
 
-`crates/snaplingo-core/src/application` owns Capture, Providers, History, Result
+`crates/core/src/application` owns Capture, Providers, History, Result
 Window, Pinned Image, Settings, Hotkeys and Selected Text policy. Each module
 consumes local ports. `snaplingo-storage` supplies durable repositories and image
 assets. `snaplingo-app/src/infrastructure` supplies OS/network/native-library
@@ -79,7 +79,7 @@ subscribers without forwarding browser IPC events.
 
 The retained React tree under `src/` is independent reference/test code.
 `src/App.tsx` forwards browser requests to isolated Settings, Result and Permission
-fixtures under `crates/snaplingo-app/tests/native_ui`. Those fixtures mount original
+fixtures under `crates/app/tests/native_ui`. Those fixtures mount original
 components with test data and preserve collector query parameters. Domain,
 Application, View and Store regression tests remain alongside the original code.
 The production Tauri adapters and npm dependencies are deleted.

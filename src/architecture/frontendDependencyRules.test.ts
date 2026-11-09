@@ -404,7 +404,7 @@ describe('frontend dependency rules', () => {
     expect(appFile).toBeDefined();
     const imports = moduleImports([appFile!]).map(({ specifier }) => specifier);
     expect(imports).toEqual(['react']);
-    expect(appFile!.source).toContain('/crates/snaplingo-app/tests/native_ui/');
+    expect(appFile!.source).toContain('/crates/app/tests/native_ui/');
     expect(appFile!.source).toContain('referenceUrl(window.location.search)');
     expect(allSourceFiles().some(({ path }) => path === 'src/CaptureApp.tsx')).toBe(false);
   });

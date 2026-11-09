@@ -30,7 +30,7 @@ export function nativeInfoPlist(config) {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n${Object.entries(entries).map(([key, value]) => `<key>${key}</key><string>${xml(value)}</string>`).join('\n')}\n<key>LSUIElement</key><true/>\n<key>NSHighResolutionCapable</key><true/>\n</dict></plist>\n`;
 }
 export function stageNativeMacBundle(repositoryRoot, binary, destination, config) {
-  const appRoot = join(repositoryRoot, 'crates/snaplingo-app');
+  const appRoot = join(repositoryRoot, 'crates/app');
   const resources = join(appRoot, 'resources/ocr');
   required(binary);
   for (const path of ['medium_det.mnn', 'medium_rec.mnn', 'keys.txt', 'runtime/libonnxruntime.dylib']) required(join(resources, path));
@@ -55,8 +55,8 @@ export function stageNativeMacBundle(repositoryRoot, binary, destination, config
 async function main(args) {
   const command = args[0] ?? 'build';
   if (!['build', 'bundle'].includes(command) || args.slice(1).some(a => a !== '--debug')) throw new Error('Usage: node script/native-build.mjs [build|bundle] [--debug]');
-  const config = { ...JSON.parse(readFileSync(join(root, 'crates/snaplingo-app/desktop.json'), 'utf8')), version: JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version };
-  const cargoVersion = readFileSync(join(root, 'crates/snaplingo-app/Cargo.toml'), 'utf8').match(/^version\s*=\s*"([^"]+)"/m)?.[1];
+  const config = { ...JSON.parse(readFileSync(join(root, 'crates/app/desktop.json'), 'utf8')), version: JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version };
+  const cargoVersion = readFileSync(join(root, 'crates/app/Cargo.toml'), 'utf8').match(/^version\s*=\s*"([^"]+)"/m)?.[1];
   if (cargoVersion !== config.version) throw new Error(`Native application version ${cargoVersion} differs from package version ${config.version}`);
   const profile = args.includes('--debug') ? 'debug' : 'release';
   const targetDirectory = process.env.CARGO_TARGET_DIR ? resolve(root, process.env.CARGO_TARGET_DIR) : join(root, 'target');

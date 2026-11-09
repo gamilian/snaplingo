@@ -2,7 +2,7 @@
 
 The native installers retain the installed product identity of the repository's Tauri CLI 2.11.2 configuration. This is required for upgrades to replace the existing installation instead of registering a second application.
 
-- MSI UpgradeCode is `a6e0f6d1-4f1f-5967-aeb3-62e77a923554`. Tauri derives its default with UUIDv5 using the DNS namespace and `SnapLingo.exe.app.x64`. Running the installed CLI's `inspect wix-upgrade-code` in `crates/snaplingo-app` printed that same value. It is now fixed in `desktop.json`.
+- MSI UpgradeCode is `a6e0f6d1-4f1f-5967-aeb3-62e77a923554`. Tauri derives its default with UUIDv5 using the DNS namespace and `SnapLingo.exe.app.x64`. Running the installed CLI's `inspect wix-upgrade-code` in `crates/app` printed that same value. It is now fixed in `desktop.json`.
 - MSI scope remains `perMachine` and its default directory remains `ProgramFiles64Folder/SnapLingo`. A different installation context would prevent a normal major upgrade from finding the old product.
 - The default publisher is `snaplingo`, from the second segment of `com.snaplingo.app`.
 - NSIS retains its current-user scope, `$LOCALAPPDATA/SnapLingo` default directory, `HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/SnapLingo` uninstall identity, and `HKCU/Software/snaplingo/SnapLingo` installation-location record. Both its default value and named `InstallDir` are written.

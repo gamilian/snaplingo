@@ -13,6 +13,6 @@ select its page, route, theme, appearance and scenario. For example:
 - `/?surface=permission&scenario=attempted`
 
 The entry preserves these parameters and loads the isolated HTML fixture under
-`crates/snaplingo-app/tests/native_ui`. Collectors can continue opening those HTML
+`crates/app/tests/native_ui`. Collectors can continue opening those HTML
 paths directly. The browser reference bundle is built by `npm run reference:build`; native
 application packaging uses `npm run native:build` and includes no frontend assets.

@@ -10,7 +10,7 @@ describe('browser visual reference entry', () => {
     ['?surface=permission&scenario=attempted', 'permission'],
   ])('keeps fixture parameters for %s', (search, reference) => {
     expect(referenceUrl(search)).toBe(
-      `/crates/snaplingo-app/tests/native_ui/${reference}_reference.html${search}`,
+      `/crates/app/tests/native_ui/${reference}_reference.html${search}`,
     );
   });
 });

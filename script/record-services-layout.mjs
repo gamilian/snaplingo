@@ -30,5 +30,5 @@ for (const theme of ['native', 'studio', 'paper']) {
 }
 const fixture = '{\n  "source": "Actual retained React SettingsWindow Services rendered by WKWebView; rectangles are [x,y,width,height] in logical points.",\n  "scenes": [\n'
   + scenes.map(scene => `    ${JSON.stringify(scene)}`).join(',\n') + '\n  ]\n}\n';
-writeFileSync(join(root, 'crates/snaplingo-ui/tests/fixtures/react-services-layout.json'), fixture);
+writeFileSync(join(root, 'crates/ui/tests/fixtures/react-services-layout.json'), fixture);
 console.log(`Recorded ${scenes.length} actual React Services scenes.`);

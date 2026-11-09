@@ -82,10 +82,10 @@ interface tests protect the replacement.
 
 ### 0. Source directories
 
-- [ ] Rename all nine crate directories to the short names above.
-- [ ] Update workspace members, path dependencies, cross-crate source/fixture
+- [x] Rename all nine crate directories to the short names above.
+- [x] Update workspace members, path dependencies, cross-crate source/fixture
   references, scripts, CI, resource ignores and current documentation.
-- [ ] Verify Cargo metadata, formatting, architecture tests, script contracts,
+- [x] Verify Cargo metadata, formatting, architecture tests, script contracts,
   reference build, macOS compilation and Windows cross compilation.
 
 ### 1. One Settings workflow owner
@@ -176,3 +176,8 @@ steps finish. Compilation is evidence of compilation, not desktop acceptance.
 - Baseline: `ef69b24` commits the native migration and source-platform font gates.
   Prior native/shared/browser tests and macOS package verification are recorded
   in the migration research documents. No refactoring is included in that commit.
+
+- Step 0: renamed all nine crate directories and updated 56 textual path consumers.
+  Cargo metadata, all-target macOS/Windows checks, three architecture guards,
+  shared Rust all-target tests, 941 browser/script tests and reference build pass.
+  Cargo package names and native artifact identity are unchanged.

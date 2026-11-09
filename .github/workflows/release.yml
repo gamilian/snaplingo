@@ -60,10 +60,10 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run ocr:prepare
-      - run: cargo fmt --manifest-path crates/snaplingo-app/Cargo.toml --check
-      - run: cargo test --locked --manifest-path crates/snaplingo-app/Cargo.toml
+      - run: cargo fmt --manifest-path crates/app/Cargo.toml --check
+      - run: cargo test --locked --manifest-path crates/app/Cargo.toml
       - name: Smoke test bundled medium OCR
-        run: cargo test --locked --manifest-path crates/snaplingo-app/Cargo.toml bundled_medium_smoke -- --ignored --nocapture
+        run: cargo test --locked --manifest-path crates/app/Cargo.toml bundled_medium_smoke -- --ignored --nocapture
       - name: Import persistent macOS certificate
         if: runner.os == 'macOS'
         env:

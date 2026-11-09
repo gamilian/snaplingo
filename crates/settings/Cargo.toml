@@ -1,0 +1,15 @@
+[package]
+name = "snaplingo-settings"
+version = "0.1.23"
+edition = "2021"
+rust-version = "1.88"
+license = "MIT"
+description = "Shared persistent settings adapter and UI workflow projections"
+
+[dependencies]
+snaplingo-core = { path = "../core" }
+snaplingo-storage = { path = "../storage" }
+snaplingo-ui = { path = "../ui" }
+
+[dev-dependencies]
+tempfile = "3.8"

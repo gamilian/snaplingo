@@ -11,9 +11,9 @@ export default defineConfig(async ({ mode }) => ({
     rollupOptions: {
       input: {
         main: 'index.html',
-        settingsReference: 'crates/snaplingo-app/tests/native_ui/settings_reference.html',
-        resultReference: 'crates/snaplingo-app/tests/native_ui/result_reference.html',
-        permissionReference: 'crates/snaplingo-app/tests/native_ui/permission_reference.html',
+        settingsReference: 'crates/app/tests/native_ui/settings_reference.html',
+        resultReference: 'crates/app/tests/native_ui/result_reference.html',
+        permissionReference: 'crates/app/tests/native_ui/permission_reference.html',
       },
     },
     // Match the retained reference collectors on macOS 12 and Windows.

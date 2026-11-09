@@ -57,9 +57,9 @@ designs/                   Current visual explorations and previews
 script/                    Development and release verification
 ```
 
-Frontend tests live beside the behavior they verify. Rust integration tests live in `crates/snaplingo-app/tests/`. See [Architecture](ARCHITECTURE.md) and [Domain language](CONTEXT.md) for dependency and ownership rules.
+Frontend tests live beside the behavior they verify. Rust integration tests live in `crates/app/tests/`. See [Architecture](ARCHITECTURE.md) and [Domain language](CONTEXT.md) for dependency and ownership rules.
 
-The Rust application lives under `crates/snaplingo-app`; historical research and ADRs may refer to its former `src-tauri` path.
+The Rust application lives under `crates/app`; historical research and ADRs may refer to its former `src-tauri` path.
 
 ## Development
 
