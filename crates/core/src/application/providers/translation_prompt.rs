@@ -345,7 +345,7 @@ mod tests {
 
     use super::*;
     use crate::application::providers::ProviderChangeNotifier;
-    use crate::infrastructure::storage::SqliteConfigStore;
+    use crate::test_support_config::MemoryConfigStore;
 
     struct CountingNotifier(AtomicUsize);
 
@@ -381,7 +381,7 @@ mod tests {
     fn saving_prompt_strategies_notifies_runtime_observers() {
         let notifier = Arc::new(CountingNotifier(AtomicUsize::new(0)));
         let configuration =
-            TranslationPromptConfiguration::new(Arc::new(SqliteConfigStore::new_in_memory()))
+            TranslationPromptConfiguration::new(Arc::new(MemoryConfigStore::new_in_memory()))
                 .with_change_notifier(notifier.clone());
 
         configuration

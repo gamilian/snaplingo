@@ -739,7 +739,3 @@ fn request_for(view: &ResultWindowSnapshot) -> TranslationRequest {
         source_lang: view.source_lang.clone(),
     }
 }
-
-#[cfg(test)]
-#[path = "session_test.rs"]
-mod tests;

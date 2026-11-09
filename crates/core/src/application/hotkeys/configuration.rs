@@ -156,11 +156,11 @@ mod hotkey_configuration_tests {
         default_hotkey_snapshot, HotkeySettingsSnapshot, HOTKEY_UNSET, SELECTION_TRANSLATE_ACTION,
         SHOW_TRANSLATION_WINDOW_ACTION, TRANSLATION_CATEGORY,
     };
-    use crate::infrastructure::storage::SqliteConfigStore;
+    use crate::test_support_config::MemoryConfigStore;
 
     #[test]
     fn snapshot_returns_defaults_when_no_configuration_exists() {
-        let store = Arc::new(SqliteConfigStore::new_in_memory());
+        let store = Arc::new(MemoryConfigStore::new_in_memory());
         let configuration = HotkeyConfiguration::new(store);
 
         assert_eq!(configuration.snapshot().unwrap(), default_hotkey_snapshot());
@@ -168,7 +168,7 @@ mod hotkey_configuration_tests {
 
     #[test]
     fn update_preserves_other_actions() {
-        let store = Arc::new(SqliteConfigStore::new_in_memory());
+        let store = Arc::new(MemoryConfigStore::new_in_memory());
         let configuration = HotkeyConfiguration::new(store.clone());
 
         let updated = configuration
@@ -186,7 +186,7 @@ mod hotkey_configuration_tests {
 
     #[test]
     fn invalid_saved_shortcuts_fall_back_to_defaults() {
-        let store = Arc::new(SqliteConfigStore::new_in_memory());
+        let store = Arc::new(MemoryConfigStore::new_in_memory());
         store
             .save_hotkeys(&HotkeySettingsSnapshot {
                 translation: std::collections::HashMap::from([(
@@ -212,7 +212,7 @@ mod hotkey_configuration_tests {
 
     #[test]
     fn unknown_saved_actions_are_ignored() {
-        let store = Arc::new(SqliteConfigStore::new_in_memory());
+        let store = Arc::new(MemoryConfigStore::new_in_memory());
         store
             .save_hotkeys(&HotkeySettingsSnapshot {
                 translation: std::collections::HashMap::from([
@@ -234,7 +234,7 @@ mod hotkey_configuration_tests {
 
     #[test]
     fn legacy_input_translate_hotkey_moves_to_show_window() {
-        let store = Arc::new(SqliteConfigStore::new_in_memory());
+        let store = Arc::new(MemoryConfigStore::new_in_memory());
         store
             .save_hotkeys(&HotkeySettingsSnapshot {
                 translation: std::collections::HashMap::from([
@@ -259,7 +259,7 @@ mod hotkey_configuration_tests {
 
     #[test]
     fn explicit_show_window_hotkey_wins_over_legacy_value() {
-        let store = Arc::new(SqliteConfigStore::new_in_memory());
+        let store = Arc::new(MemoryConfigStore::new_in_memory());
         store
             .save_hotkeys(&HotkeySettingsSnapshot {
                 translation: std::collections::HashMap::from([

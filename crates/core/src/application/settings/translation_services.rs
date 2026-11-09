@@ -1004,6 +1004,3 @@ fn custom_prompt_id() -> String {
         NEXT.fetch_add(1, Ordering::Relaxed)
     )
 }
-
-#[cfg(test)]
-mod tests;

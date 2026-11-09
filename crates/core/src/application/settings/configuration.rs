@@ -443,7 +443,7 @@ mod settings_configuration_tests {
     use crate::domain::{
         GeneralSettings, HistorySettings, OcrSettings, ScreenshotSettings, TranslationSettings,
     };
-    use crate::infrastructure::storage::SqliteConfigStore;
+    use crate::test_support_config::MemoryConfigStore;
 
     struct CountingNotifier(AtomicUsize);
 
@@ -455,7 +455,7 @@ mod settings_configuration_tests {
 
     #[test]
     fn loads_default_snapshot_when_no_settings_are_stored() {
-        let store = Arc::new(SqliteConfigStore::new_in_memory());
+        let store = Arc::new(MemoryConfigStore::new_in_memory());
         let home_dir = tempdir().unwrap();
         let default_save_dir = home_dir.path().join("Snapshots");
         let configuration = SettingsConfiguration::with_paths(
@@ -479,7 +479,7 @@ mod settings_configuration_tests {
 
     #[test]
     fn updating_one_section_preserves_other_sections() {
-        let store = Arc::new(SqliteConfigStore::new_in_memory());
+        let store = Arc::new(MemoryConfigStore::new_in_memory());
         let home_dir = tempdir().unwrap();
         let default_save_dir = home_dir.path().join("Snapshots");
         let configuration = SettingsConfiguration::with_paths(
@@ -511,7 +511,7 @@ mod settings_configuration_tests {
 
     #[test]
     fn interface_themes_persist_and_notify_other_windows_without_changing_appearance() {
-        let store = Arc::new(SqliteConfigStore::new_in_memory());
+        let store = Arc::new(MemoryConfigStore::new_in_memory());
         let notifier = Arc::new(CountingNotifier(AtomicUsize::new(0)));
         let configuration =
             SettingsConfiguration::with_change_notifier(store.clone(), notifier.clone());
@@ -537,7 +537,7 @@ mod settings_configuration_tests {
     #[test]
     fn unknown_interface_themes_fall_back_to_native() {
         let configuration =
-            SettingsConfiguration::new(Arc::new(SqliteConfigStore::new_in_memory()));
+            SettingsConfiguration::new(Arc::new(MemoryConfigStore::new_in_memory()));
         let updated = configuration
             .update_general(GeneralSettings {
                 interface_theme: "unknown".to_string(),
@@ -549,7 +549,7 @@ mod settings_configuration_tests {
 
     #[test]
     fn updating_result_window_position_preserves_the_latest_general_settings() {
-        let store = Arc::new(SqliteConfigStore::new_in_memory());
+        let store = Arc::new(MemoryConfigStore::new_in_memory());
         let configuration = SettingsConfiguration::new(store);
         configuration
             .update_general(GeneralSettings {
@@ -570,7 +570,7 @@ mod settings_configuration_tests {
 
     #[test]
     fn unsupported_interface_languages_fall_back_to_simplified_chinese() {
-        let store = Arc::new(SqliteConfigStore::new_in_memory());
+        let store = Arc::new(MemoryConfigStore::new_in_memory());
         let configuration = SettingsConfiguration::new(store);
 
         let updated = configuration
@@ -585,7 +585,7 @@ mod settings_configuration_tests {
 
     #[test]
     fn screenshot_save_path_normalization_expands_tilde() {
-        let store = Arc::new(SqliteConfigStore::new_in_memory());
+        let store = Arc::new(MemoryConfigStore::new_in_memory());
         let home_dir = tempdir().unwrap();
         let configuration = SettingsConfiguration::with_paths(
             store,
@@ -616,7 +616,7 @@ mod settings_configuration_tests {
 
     #[test]
     fn screenshot_editor_settings_are_normalized_before_persisting() {
-        let store = Arc::new(SqliteConfigStore::new_in_memory());
+        let store = Arc::new(MemoryConfigStore::new_in_memory());
         let home_dir = tempdir().unwrap();
         let configuration = SettingsConfiguration::with_paths(
             store,
@@ -663,7 +663,7 @@ mod settings_configuration_tests {
         assert_eq!(legacy.capture_ui_scale, "auto");
         assert_eq!(legacy.annotation_tool_shortcuts["scrolling"], "s");
         let configuration =
-            SettingsConfiguration::new(Arc::new(SqliteConfigStore::new_in_memory()));
+            SettingsConfiguration::new(Arc::new(MemoryConfigStore::new_in_memory()));
         let updated = configuration
             .update_screenshot(ScreenshotSettings {
                 annotation_tool_shortcuts: [
@@ -693,7 +693,7 @@ mod settings_configuration_tests {
     #[test]
     fn invalid_editor_shortcuts_do_not_replace_saved_preferences_and_scrolling_can_be_reassigned() {
         let configuration =
-            SettingsConfiguration::new(Arc::new(SqliteConfigStore::new_in_memory()));
+            SettingsConfiguration::new(Arc::new(MemoryConfigStore::new_in_memory()));
         let original = configuration.snapshot().unwrap();
         for (tool, key) in [
             ("arrow", "O"),
@@ -727,7 +727,7 @@ mod settings_configuration_tests {
 
     #[test]
     fn library_capacities_are_normalized_before_persisting() {
-        let store = Arc::new(SqliteConfigStore::new_in_memory());
+        let store = Arc::new(MemoryConfigStore::new_in_memory());
         let configuration = SettingsConfiguration::new(store);
 
         let updated = configuration
@@ -744,7 +744,7 @@ mod settings_configuration_tests {
 
     #[test]
     fn successful_settings_updates_notify_runtime_observers() {
-        let store = Arc::new(SqliteConfigStore::new_in_memory());
+        let store = Arc::new(MemoryConfigStore::new_in_memory());
         let notifier = Arc::new(CountingNotifier(AtomicUsize::new(0)));
         let configuration = SettingsConfiguration::with_change_notifier(store, notifier.clone());
 
@@ -770,7 +770,7 @@ mod settings_configuration_tests {
     #[test]
     fn save_choice_survives_a_stale_full_settings_update() {
         let configuration =
-            SettingsConfiguration::new(Arc::new(SqliteConfigStore::new_in_memory()));
+            SettingsConfiguration::new(Arc::new(MemoryConfigStore::new_in_memory()));
         let old = configuration.snapshot().unwrap().screenshot;
         configuration
             .record_screenshot_save_choice(std::path::Path::new("/chosen/region.webp"), "webp")

@@ -6,12 +6,12 @@ use crate::application::providers::{
 
 use super::{AnthropicLLMClient, GeminiLLMClient, OpenAILLMClient};
 
-pub(crate) struct InfrastructureLlmRuntime {
+pub struct InfrastructureLlmRuntime {
     http_client: Arc<dyn HttpClient>,
 }
 
 impl InfrastructureLlmRuntime {
-    pub(crate) fn new(http_client: Arc<dyn HttpClient>) -> Self {
+    pub fn new(http_client: Arc<dyn HttpClient>) -> Self {
         Self { http_client }
     }
 }

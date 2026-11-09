@@ -84,7 +84,7 @@ mod tests {
     use super::*;
     use crate::application::providers::ocr::{OcrCoordinator, OcrExecutionDevice};
     use crate::domain::OcrSettings;
-    use crate::infrastructure::storage::SqliteConfigStore;
+    use crate::test_support_config::MemoryConfigStore;
     use parking_lot::Mutex;
 
     struct StubEngine {
@@ -121,7 +121,7 @@ mod tests {
 
     #[tokio::test]
     async fn provider_uses_live_persisted_settings_through_the_existing_coordinator() {
-        let store = Arc::new(SqliteConfigStore::new_temp());
+        let store = Arc::new(MemoryConfigStore::new_temp());
         let settings = Arc::new(SettingsConfiguration::new(store.clone()));
         let engine = Arc::new(StubEngine {
             calls: Mutex::new(vec![]),

@@ -12,9 +12,6 @@ use crate::Result;
 
 mod ocr_application;
 
-#[cfg(test)]
-mod tests;
-
 pub use ocr_application::{
     OcrFavoriteApplication, OcrFavoriteHistory, OcrFavoriteRecognizer, OcrFavoriteStore,
 };

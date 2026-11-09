@@ -70,19 +70,6 @@ impl From<serde_json::Error> for AppError {
     }
 }
 
-#[cfg(test)]
-impl From<reqwest::Error> for AppError {
-    fn from(error: reqwest::Error) -> Self {
-        Self::http(error)
-    }
-}
-#[cfg(test)]
-impl From<rusqlite::Error> for AppError {
-    fn from(error: rusqlite::Error) -> Self {
-        Self::database(error)
-    }
-}
-
 impl AppError {
     pub fn http(error: impl std::error::Error + Send + Sync + 'static) -> Self {
         Self::Http(Box::new(error))

@@ -4,7 +4,7 @@ mod tests {
     use super::super::OcrProvider;
     use crate::application::providers::common::Provider;
     use crate::domain::ocr::{OcrRequest, OcrResult};
-    use crate::infrastructure::storage::SqliteConfigStore;
+    use crate::test_support_config::MemoryConfigStore;
     use crate::Result;
     use async_trait::async_trait;
     use std::sync::{Arc, Mutex};
@@ -107,7 +107,7 @@ mod tests {
 
     #[test]
     fn test_register_provider() {
-        let config = Arc::new(SqliteConfigStore::new_temp());
+        let config = Arc::new(MemoryConfigStore::new_temp());
         let coordinator = OcrCoordinator::new(config);
         coordinator
             .register(MockOcrProvider::new("tesseract", "Tesseract OCR"))
@@ -120,7 +120,7 @@ mod tests {
 
     #[test]
     fn test_activate_single_provider() {
-        let config = Arc::new(SqliteConfigStore::new_temp());
+        let config = Arc::new(MemoryConfigStore::new_temp());
         let coordinator = OcrCoordinator::new(config);
         coordinator
             .register(MockOcrProvider::new("tesseract", "Tesseract OCR"))
@@ -135,7 +135,7 @@ mod tests {
 
     #[test]
     fn test_switch_provider() {
-        let config = Arc::new(SqliteConfigStore::new_temp());
+        let config = Arc::new(MemoryConfigStore::new_temp());
         let coordinator = OcrCoordinator::new(config);
         coordinator
             .register(MockOcrProvider::new("tesseract", "Tesseract OCR"))
@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn test_activate_nonexistent_provider() {
-        let config = Arc::new(SqliteConfigStore::new_temp());
+        let config = Arc::new(MemoryConfigStore::new_temp());
         let coordinator = OcrCoordinator::new(config);
 
         let result = coordinator.activate("nonexistent");
@@ -170,7 +170,7 @@ mod tests {
 
     #[test]
     fn test_activate_persists() {
-        let config = Arc::new(SqliteConfigStore::new_temp());
+        let config = Arc::new(MemoryConfigStore::new_temp());
         let coordinator = OcrCoordinator::new(config.clone());
         coordinator
             .register(MockOcrProvider::new("tesseract", "Tesseract"))
@@ -184,7 +184,7 @@ mod tests {
 
     #[test]
     fn test_restore_from_config_skips_unregistered() {
-        let config = Arc::new(SqliteConfigStore::new_temp());
+        let config = Arc::new(MemoryConfigStore::new_temp());
         config
             .save("active_ocr_provider", &"ghost".to_string())
             .unwrap();
@@ -204,7 +204,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_recognize_with_active_provider() {
-        let config = Arc::new(SqliteConfigStore::new_temp());
+        let config = Arc::new(MemoryConfigStore::new_temp());
         let coordinator = OcrCoordinator::new(config);
         coordinator
             .register(MockOcrProvider::with_text(
@@ -223,7 +223,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_reconfigure_provider_updates_runtime_provider() {
-        let config = Arc::new(SqliteConfigStore::new_temp());
+        let config = Arc::new(MemoryConfigStore::new_temp());
         let coordinator = OcrCoordinator::new(config);
         coordinator
             .register(MockOcrProvider::with_text("mock", "Mock OCR", "before"))
@@ -244,7 +244,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_recognize_image_builds_default_request() {
-        let config = Arc::new(SqliteConfigStore::new_temp());
+        let config = Arc::new(MemoryConfigStore::new_temp());
         let coordinator = OcrCoordinator::new(config);
         let observed_request = Arc::new(Mutex::new(None));
         coordinator
@@ -266,7 +266,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_recognize_with_no_active_provider() {
-        let config = Arc::new(SqliteConfigStore::new_temp());
+        let config = Arc::new(MemoryConfigStore::new_temp());
         let coordinator = OcrCoordinator::new(config);
 
         let result = coordinator.recognize(&sample_request()).await;

@@ -127,10 +127,10 @@ compile App/Storage sources through `#[path]` and `include!`.
 - [x] Convert technical errors inside their adapters while retaining diagnostic
   causes and existing observable error classification.
 - [x] Remove production Core dependencies required only by concrete error types.
-- [ ] Keep portable behavior tests at existing workflow interfaces; locate real
+- [x] Keep portable behavior tests at existing workflow interfaces; locate real
   SQLite/network integration tests outside Core and remove source-file imports.
-- [ ] Narrow migration re-exports as callers/tests move to their owning crate.
-- [ ] Preserve transaction, credential rollback, concurrency and Provider tests;
+- [x] Narrow migration re-exports as callers/tests move to their owning crate.
+- [x] Preserve transaction, credential rollback, concurrency and Provider tests;
   verify dependency direction using Cargo metadata and production source graphs.
 
 ### 4. Production assets and independent Reference
@@ -211,3 +211,13 @@ steps finish. Compilation is evidence of compilation, not desktop acceptance.
   individual interface-level replacement, not enlarged production visibility.
   Existing Core test coverage remains in place; test ownership/re-export cleanup
   is an explicit follow-up within step 3.
+
+- Step 3b: completed test ownership without exposing private Core state. Portable
+  tests use memory configuration/credential/event adapters; 80 real-adapter tests
+  now live in `app/tests/core_workflows`, retaining their injected dependencies
+  explicitly. Removed Core's `test_infrastructure.rs` and all cross-crate source
+  mounts. Core tests (408) and integration tests (80) pass; the old aggregate
+  Core count included duplicate Storage/network adapter tests now run in their
+  owner crates. Reqwest/SQLite are no longer Core dependencies even in tests.
+  Existing returned Result auto-copy data is explicitly re-exported; production
+  workflow implementation fields remain private.

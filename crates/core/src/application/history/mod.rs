@@ -10,9 +10,6 @@ use std::sync::Arc;
 mod event_source;
 mod repository;
 
-#[cfg(test)]
-mod tests;
-
 pub use event_source::EventSubscriber;
 pub use repository::{
     HistoryCleanupPolicy, HistoryEntry, HistoryKind, HistoryPage, HistoryPolicyProvider,

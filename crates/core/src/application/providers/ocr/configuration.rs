@@ -18,7 +18,8 @@ mod tests {
     use crate::application::providers::common::Provider;
     use crate::application::providers::ocr::OcrProvider;
     use crate::domain::ocr::{OcrRequest, OcrResult};
-    use crate::infrastructure::storage::{Database, SqliteConfigStore, SqliteCredentialStore};
+    use crate::test_support_config::MemoryConfigStore as SqliteConfigStore;
+    use crate::test_support_credentials::MemoryCredentials;
     use async_trait::async_trait;
 
     struct RejectingOcrProvider;
@@ -67,9 +68,7 @@ mod tests {
     fn save_credentials_uses_provider_validation_before_persisting() {
         let coordinator = Arc::new(OcrCoordinator::new(Arc::new(SqliteConfigStore::new_temp())));
         coordinator.register(RejectingOcrProvider).unwrap();
-        let credential_store = Arc::new(SqliteCredentialStore::new(Arc::new(
-            Database::in_memory().unwrap(),
-        )));
+        let credential_store = Arc::new(MemoryCredentials::default());
         let configuration = OcrProviderConfiguration::new(coordinator, credential_store.clone());
         let credentials = HashMap::from([("api_key".to_string(), "blocked".to_string())]);
 
@@ -84,7 +83,7 @@ mod tests {
 
     #[test]
     fn baidu_hydration_prefers_structured_credentials() {
-        let credential_store = SqliteCredentialStore::new(Arc::new(Database::in_memory().unwrap()));
+        let credential_store = MemoryCredentials::default();
         credential_store
             .save_provider_credentials(
                 "baidu-ocr",
@@ -109,7 +108,7 @@ mod tests {
 
     #[test]
     fn baidu_hydration_preserves_legacy_credential_fallback() {
-        let credential_store = SqliteCredentialStore::new(Arc::new(Database::in_memory().unwrap()));
+        let credential_store = MemoryCredentials::default();
         credential_store
             .save_provider_credential("baidu_ocr_api_key", "legacy-api")
             .unwrap();

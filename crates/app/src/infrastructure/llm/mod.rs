@@ -12,4 +12,4 @@ pub use client::{
 };
 pub use gemini::GeminiLLMClient;
 pub use openai::OpenAILLMClient;
-pub(crate) use runtime::InfrastructureLlmRuntime;
+pub use runtime::InfrastructureLlmRuntime;

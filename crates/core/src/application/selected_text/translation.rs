@@ -50,7 +50,7 @@ mod tests {
         MethodAvailability, SelectionAttempt, SelectionContext, SelectionMethodKind,
         SelectionSource,
     };
-    use crate::infrastructure::storage::SqliteConfigStore;
+    use crate::test_support_config::MemoryConfigStore;
     use async_trait::async_trait;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -108,7 +108,7 @@ mod tests {
         Arc<ResultWindowRuntime>,
     ) {
         let settings = Arc::new(SettingsConfiguration::new(Arc::new(
-            SqliteConfigStore::new_in_memory(),
+            MemoryConfigStore::new_in_memory(),
         )));
         let window = Arc::new(Window::default());
         let result = Arc::new(ResultWindowRuntime::new(window.clone(), window.clone()));

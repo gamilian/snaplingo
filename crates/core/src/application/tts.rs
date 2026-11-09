@@ -89,7 +89,7 @@ mod tests {
     use super::{select_voice_for_language, SystemTtsHost, SystemTtsVoice, TtsRuntime};
     use crate::application::SettingsConfiguration;
     use crate::domain::GeneralSettings;
-    use crate::infrastructure::storage::SqliteConfigStore;
+    use crate::test_support_config::MemoryConfigStore;
     use crate::Result;
 
     type SpeechCall = (String, String, u16);
@@ -122,7 +122,7 @@ mod tests {
     #[tokio::test]
     async fn uses_persisted_voice_and_rate_for_speech() {
         let settings = Arc::new(SettingsConfiguration::new(Arc::new(
-            SqliteConfigStore::new_in_memory(),
+            MemoryConfigStore::new_in_memory(),
         )));
         settings
             .update_general(GeneralSettings {
@@ -145,7 +145,7 @@ mod tests {
     #[tokio::test]
     async fn selects_voice_id_for_the_requested_language() {
         let settings = Arc::new(SettingsConfiguration::new(Arc::new(
-            SqliteConfigStore::new_in_memory(),
+            MemoryConfigStore::new_in_memory(),
         )));
         let host = Arc::new(Host::default());
         let runtime = TtsRuntime::new(host.clone(), settings);

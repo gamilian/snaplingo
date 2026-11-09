@@ -799,7 +799,7 @@ mod tests {
         MonitorSnapshot, PhysicalRect, ScreenRegion, WindowCandidate,
     };
     use crate::error::AppError;
-    use crate::infrastructure::storage::SqliteConfigStore;
+    use crate::test_support_config::MemoryConfigStore;
 
     #[derive(Debug, Clone, PartialEq)]
     enum HostCall {
@@ -1204,7 +1204,7 @@ mod tests {
             sessions.clone(),
             Arc::new(CaptureImageComposer::new()),
             Arc::new(CaptureOutput::new()),
-            Arc::new(OcrCoordinator::new(Arc::new(SqliteConfigStore::new_temp()))),
+            Arc::new(OcrCoordinator::new(Arc::new(MemoryConfigStore::new_temp()))),
             host,
             pin_output.clone(),
         );
@@ -1350,7 +1350,7 @@ mod tests {
                     vec![snapshot(0)],
                 );
                 let settings = Arc::new(crate::application::settings::SettingsConfiguration::new(
-                    Arc::new(crate::infrastructure::storage::SqliteConfigStore::new_in_memory()),
+                    Arc::new(crate::test_support_config::MemoryConfigStore::new_in_memory()),
                 ));
                 settings
                     .update_screenshot(crate::domain::ScreenshotSettings {
@@ -1866,7 +1866,7 @@ mod tests {
             sessions.clone(),
             Arc::new(CaptureImageComposer::new()),
             Arc::new(CaptureOutput::new()),
-            Arc::new(OcrCoordinator::new(Arc::new(SqliteConfigStore::new_temp()))),
+            Arc::new(OcrCoordinator::new(Arc::new(MemoryConfigStore::new_temp()))),
             host.clone(),
             Arc::new(RecordingPinOutput::default()),
         );
@@ -2017,7 +2017,7 @@ mod tests {
             sessions,
             Arc::new(CaptureImageComposer::new()),
             Arc::new(CaptureOutput::new()),
-            Arc::new(OcrCoordinator::new(Arc::new(SqliteConfigStore::new_temp()))),
+            Arc::new(OcrCoordinator::new(Arc::new(MemoryConfigStore::new_temp()))),
             host,
             Arc::new(RecordingPinOutput::default()),
         );
@@ -2324,7 +2324,7 @@ mod tests {
             sessions,
             Arc::new(CaptureImageComposer::new()),
             Arc::new(CaptureOutput::new()),
-            Arc::new(OcrCoordinator::new(Arc::new(SqliteConfigStore::new_temp()))),
+            Arc::new(OcrCoordinator::new(Arc::new(MemoryConfigStore::new_temp()))),
             host,
             Arc::new(RecordingPinOutput::default()),
         ));

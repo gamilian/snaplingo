@@ -9,15 +9,6 @@ pub use application::*;
 pub use domain::*;
 pub use error::{AppError, Result};
 
-// Existing workflow tests exercise real portable persistence/network adapters.
-// Loading their sources only in tests keeps production dependency direction
-// inward while preserving access to workflow-private behavior during extraction.
-#[cfg(test)]
-extern crate self as snaplingo_core;
-#[cfg(test)]
-#[path = "test_infrastructure.rs"]
-mod infrastructure;
-
 /// Fixtures for adapter contract tests; absent from ordinary application builds.
 #[cfg(feature = "test-support")]
 pub mod test_support {
@@ -42,3 +33,9 @@ pub mod test_support {
         configuration.reset_category(category)
     }
 }
+
+#[cfg(test)]
+mod test_support_config;
+
+#[cfg(test)]
+mod test_support_credentials;

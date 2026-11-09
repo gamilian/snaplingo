@@ -159,11 +159,11 @@ async fn capture_pins_use_the_latest_position_setting_and_preserve_the_source_co
     use crate::application::settings::SettingsConfiguration;
     use crate::domain::capture::{DesktopPosition, LogicalPoint, PhysicalPoint};
     use crate::domain::ScreenshotSettings;
-    use crate::infrastructure::storage::SqliteConfigStore;
+    use crate::test_support_config::MemoryConfigStore;
 
     let (runtime, _, host) = make_runtime();
     let settings = Arc::new(SettingsConfiguration::new(Arc::new(
-        SqliteConfigStore::new_in_memory(),
+        MemoryConfigStore::new_in_memory(),
     )));
     let runtime = runtime.with_settings(settings.clone());
     for (position, centered) in [

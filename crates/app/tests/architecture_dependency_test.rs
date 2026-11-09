@@ -136,7 +136,7 @@ fn core_root() -> PathBuf {
 }
 
 #[test]
-fn portable_core_keeps_adapter_fixtures_out_of_production() {
+fn portable_core_has_no_concrete_adapter_dependencies_or_source_mounts() {
     let root = core_root();
     let manifest = fs::read_to_string(root.join("Cargo.toml")).unwrap();
     for forbidden in [
@@ -146,6 +146,8 @@ fn portable_core_keeps_adapter_fixtures_out_of_production() {
         "enigo",
         "snaplingo-storage",
         "snaplingo-app",
+        "reqwest",
+        "rusqlite",
         "windows =",
     ] {
         assert!(

@@ -17,6 +17,6 @@ pub use port::{
 pub use runtime::ResultWindowRuntime;
 pub use session::{
     resolved_target, AutoTranslationPlan, ResultWindowPresentationPort, ResultWindowSession,
-    ResultWindowSnapshot, TranslationRow, TranslationStatus,
+    ResultWindowSnapshot, TranslationAutoCopy, TranslationRow, TranslationStatus,
 };
 pub use text::{copy_tokens, normalize_ocr_text, OcrCopyToken, TokenCandidate};
