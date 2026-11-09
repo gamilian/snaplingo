@@ -78,9 +78,10 @@ pub(crate) fn show(
     shell.key_style = KeyStyle::Windows;
     shell.dark = saved.general.theme == "dark"
         || saved.general.theme == "system" && parent.theme() == Some(winit::window::Theme::Dark);
-    let scale =
-        crate::application::capture::interface_scale(&saved.screenshot.capture_ui_scale, None)
-            as f32;
+    let scale = snaplingo_core::application::capture::interface_scale(
+        &saved.screenshot.capture_ui_scale,
+        None,
+    ) as f32;
     let handle = parent.window_handle().map_err(|e| e.to_string())?;
     let RawWindowHandle::Win32(handle) = handle.as_raw() else {
         return Err("Capacity owner requires a Win32 window".into());

@@ -1,4 +1,4 @@
-use crate::application::{
+use snaplingo_core::application::{
     RequiredPermissionsContext, RequiredPermissionsHost, RequiredPermissionsStatus,
     SystemPermission,
 };

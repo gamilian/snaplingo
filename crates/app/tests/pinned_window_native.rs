@@ -1,12 +1,4 @@
 #[cfg(target_os = "macos")]
-mod domain {
-    pub mod capture {
-        #![allow(dead_code, unused_imports)]
-        pub use snaplingo_core::domain::capture::*;
-    }
-}
-
-#[cfg(target_os = "macos")]
 mod native_view {
     #![allow(dead_code)]
     include!("../window/pinned/macos/view.rs");
@@ -24,11 +16,11 @@ mod infrastructure {
 #[cfg(target_os = "macos")]
 fn main() {
     use base64::Engine;
-    use domain::capture::{LogicalRect, PinnedImageView};
     use native_view::{self as native, Action, Preferences};
     use objc2::MainThreadMarker;
     use objc2_app_kit::{NSApplication, NSEvent, NSEventModifierFlags as Flags, NSEventType};
     use objc2_foundation::{NSPoint, NSString};
+    use snaplingo_core::domain::capture::{LogicalRect, PinnedImageView};
     use std::{cell::RefCell, io::Cursor, rc::Rc};
 
     let mtm = MainThreadMarker::new().unwrap();

@@ -5,10 +5,10 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 
-use crate::application::favorites::{
+use crate::{AppError, Result};
+use snaplingo_core::application::favorites::{
     FavoriteContent, FavoriteKind, FavoritePage, FavoriteQuery, FavoriteRecord, FavoriteRepository,
 };
-use crate::{AppError, Result};
 
 use super::Database;
 

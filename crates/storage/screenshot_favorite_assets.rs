@@ -4,12 +4,12 @@ use std::path::{Component, Path, PathBuf};
 use chrono::Utc;
 use image::{GenericImageView, ImageFormat};
 
-use crate::application::favorites::{FavoriteAssetStore, StoredFavoriteAssets};
-use crate::application::history::{OcrHistoryAssetStore, StoredOcrHistoryAssets};
-use crate::application::screenshot_favorites::{
+use crate::{AppError, Result};
+use snaplingo_core::application::favorites::{FavoriteAssetStore, StoredFavoriteAssets};
+use snaplingo_core::application::history::{OcrHistoryAssetStore, StoredOcrHistoryAssets};
+use snaplingo_core::application::screenshot_favorites::{
     ScreenshotFavoriteAssetStore, StoredScreenshotAssets,
 };
-use crate::{AppError, Result};
 
 pub struct FilesystemScreenshotFavoriteAssets {
     root: PathBuf,

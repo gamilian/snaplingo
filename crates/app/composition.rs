@@ -26,16 +26,6 @@ use crate::app_state::{
     AppState, CaptureRuntimeState, FavoritesRuntime, HistoryRuntime, LogsRuntime, ProviderRuntime,
     ScreenshotFavoritesRuntime, SelectionRuntime, SettingsRuntime,
 };
-use crate::application::favorites::FavoriteRepository;
-use crate::application::hotkeys::HotkeyStore;
-use crate::application::providers::ocr::OcrProviderConfiguration;
-use crate::application::providers::HttpClient;
-use crate::application::providers::{
-    ProviderChangeNotifier, ProviderConfigStore, ProviderCredentialStore,
-    TranslationPromptConfiguration,
-};
-use crate::application::result_window::ResultWindowRuntime;
-use crate::application::settings::SettingsStore;
 use crate::infrastructure::desktop_events::{DesktopEvent, DesktopEvents};
 use crate::infrastructure::events::EventBus;
 use crate::infrastructure::http::ReqwestHttpClient;
@@ -45,7 +35,17 @@ use crate::infrastructure::storage::{
 };
 use crate::infrastructure::storage::{FilesystemOcrHistoryAssets, SqliteFavoriteRepository};
 use crate::infrastructure::system::NativeHotkeyRegistrar;
-use crate::{
+use snaplingo_core::application::favorites::FavoriteRepository;
+use snaplingo_core::application::hotkeys::HotkeyStore;
+use snaplingo_core::application::providers::ocr::OcrProviderConfiguration;
+use snaplingo_core::application::providers::HttpClient;
+use snaplingo_core::application::providers::{
+    ProviderChangeNotifier, ProviderConfigStore, ProviderCredentialStore,
+    TranslationPromptConfiguration,
+};
+use snaplingo_core::application::result_window::ResultWindowRuntime;
+use snaplingo_core::application::settings::SettingsStore;
+use snaplingo_core::application::{
     FavoriteCapacity, HotkeyConfiguration, HotkeyRuntime, LibraryIndex, SettingsConfiguration,
 };
 
@@ -54,7 +54,7 @@ pub struct CompositionOptions {
     pub version: String,
     pub ocr_resource_root: Option<PathBuf>,
     pub cache_dir: std::result::Result<PathBuf, String>,
-    pub selected_text: Arc<crate::application::SelectedTextAcquirer>,
+    pub selected_text: Arc<snaplingo_core::application::SelectedTextAcquirer>,
     #[cfg(not(any(
         target_os = "macos",
         all(target_os = "windows", feature = "native-app")
@@ -66,7 +66,7 @@ pub struct CompositionOptions {
     )))]
     pub capture: Box<
         dyn FnOnce(
-            Arc<crate::application::providers::ocr::OcrCoordinator>,
+            Arc<snaplingo_core::application::providers::ocr::OcrCoordinator>,
             Arc<ResultWindowRuntime>,
             Arc<SettingsConfiguration>,
         ) -> capture_runtime::CaptureRuntimeParts,
@@ -139,14 +139,16 @@ pub fn build_app_state(
     let library_index = Arc::new(LibraryIndex::new(Arc::new(
         SqliteLibraryIndexRepository::new(database.clone()),
     )));
-    let favorites = Arc::new(crate::application::Favorites::with_notifier_and_capacity(
-        favorite_repository,
-        Arc::new(FilesystemOcrHistoryAssets::new(
-            asset_root.join("favorites"),
-        )),
-        desktop_events.clone(),
-        favorite_capacity.clone(),
-    ));
+    let favorites = Arc::new(
+        snaplingo_core::application::Favorites::with_notifier_and_capacity(
+            favorite_repository,
+            Arc::new(FilesystemOcrHistoryAssets::new(
+                asset_root.join("favorites"),
+            )),
+            desktop_events.clone(),
+            favorite_capacity.clone(),
+        ),
+    );
 
     let llm_runtime = build_llm_runtime(http_client.clone());
     let llm_introspection = build_llm_introspection(llm_runtime.clone());
@@ -193,17 +195,18 @@ pub fn build_app_state(
         llm_introspection,
         prompt_strategies,
     );
-    let ocr_history_replay = Arc::new(crate::application::OcrHistoryReplay::new(
+    let ocr_history_replay = Arc::new(snaplingo_core::application::OcrHistoryReplay::new(
         history.clone(),
         Arc::new(OcrCoordinatorHistoryRecognizer::new(
             ocr_coordinator.clone(),
         )),
     ));
-    let ocr_favorite_application = Arc::new(crate::application::OcrFavoriteApplication::new(
-        history.clone(),
-        favorites.clone(),
-        ocr_coordinator.clone(),
-    ));
+    let ocr_favorite_application =
+        Arc::new(snaplingo_core::application::OcrFavoriteApplication::new(
+            history.clone(),
+            favorites.clone(),
+            ocr_coordinator.clone(),
+        ));
 
     #[cfg(not(any(
         target_os = "macos",
@@ -223,7 +226,7 @@ pub fn build_app_state(
         all(target_os = "windows", feature = "native-app")
     ))]
     let result_session = Arc::new(
-        crate::application::result_window::ResultWindowSession::new(
+        snaplingo_core::application::result_window::ResultWindowSession::new(
             settings_configuration.clone(),
             translation_coordinator.clone(),
             history.clone(),
@@ -272,22 +275,24 @@ pub fn build_app_state(
 
     hydrate_provider_credentials_in_background(provider_administration.clone());
 
-    let settings_application = Arc::new(crate::application::SettingsApplication::new(
+    let settings_application = Arc::new(snaplingo_core::application::SettingsApplication::new(
         settings_configuration.clone(),
         Arc::new(crate::infrastructure::system::start_on_boot::NativeStartOnBoot::new()),
         history.clone(),
         logs.repository.clone(),
     ));
 
-    let permissions = Arc::new(crate::application::RequiredPermissions::new(Arc::new(
-        crate::infrastructure::system::required_permissions::SystemRequiredPermissions::new(
-            options.identifier,
-            {
-                let events = desktop_events.clone();
-                move || events.request(DesktopEvent::Restart).map_err(Into::into)
-            },
+    let permissions = Arc::new(snaplingo_core::application::RequiredPermissions::new(
+        Arc::new(
+            crate::infrastructure::system::required_permissions::SystemRequiredPermissions::new(
+                options.identifier,
+                {
+                    let events = desktop_events.clone();
+                    move || events.request(DesktopEvent::Restart).map_err(Into::into)
+                },
+            ),
         ),
-    )));
+    ));
     let capture = Arc::new(CaptureRuntimeState {
         sessions: capture_runtime.sessions,
         output: capture_runtime.output,
@@ -297,7 +302,7 @@ pub fn build_app_state(
     });
     let selection = Arc::new(SelectionRuntime {
         translation: Arc::new(
-            crate::application::selected_text::SelectionTranslation::new(
+            snaplingo_core::application::selected_text::SelectionTranslation::new(
                 settings_configuration.clone(),
                 selected_text_acquirer,
                 result_window.clone(),
@@ -315,7 +320,7 @@ pub fn build_app_state(
         actions,
         desktop_events: desktop_events.clone(),
         desktop_subscriptions: Vec::new(),
-        updates: Arc::new(crate::application::updates::AppUpdates::new(
+        updates: Arc::new(snaplingo_core::application::updates::AppUpdates::new(
             Arc::new(
                 crate::infrastructure::system::updates::SystemAppUpdateHost::new(
                     Arc::new(ReqwestHttpClient::with_settings(
@@ -338,7 +343,7 @@ pub fn build_app_state(
         }),
         providers: Arc::new(ProviderRuntime {
             translation: translation_coordinator,
-            file_ocr: Arc::new(crate::application::providers::ocr::FileOcr::new(
+            file_ocr: Arc::new(snaplingo_core::application::providers::ocr::FileOcr::new(
                 Arc::new(crate::infrastructure::system::ocr::FilesystemImageReader),
                 ocr_coordinator.clone(),
             )),
@@ -453,7 +458,7 @@ pub fn build_app_state(
 }
 
 fn hydrate_provider_credentials_in_background(
-    administration: Arc<crate::application::providers::ProviderAdministration>,
+    administration: Arc<snaplingo_core::application::providers::ProviderAdministration>,
 ) {
     crate::infrastructure::runtime::spawn_blocking(move || {
         hydrate_provider_credentials(administration);

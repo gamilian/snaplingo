@@ -19,12 +19,14 @@ use objc2_foundation::{
     NSNotification, NSNotificationCenter, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString,
 };
 
-use crate::application::hotkeys::{HotkeyRecording, HotkeyRuntime};
-use crate::domain::hotkey_config::{hotkey_category, HotkeySettingsSnapshot, HOTKEY_UNSET};
-use crate::domain::GeneralSettings;
 use crate::infrastructure::desktop_events::{DesktopEvent, DesktopEvents, DesktopSubscription};
 use crate::infrastructure::system::native_theme::{self, Palette};
 use crate::infrastructure::{runtime, ui_thread};
+use snaplingo_core::application::hotkeys::{HotkeyRecording, HotkeyRuntime};
+use snaplingo_core::domain::hotkey_config::{
+    hotkey_category, HotkeySettingsSnapshot, HOTKEY_UNSET,
+};
+use snaplingo_core::domain::GeneralSettings;
 
 #[derive(Clone)]
 pub(crate) struct HotkeyViewServices {
@@ -1039,7 +1041,7 @@ mod tests {
     }
     #[test]
     fn conflict_detection_matches_each_feature_without_counting_unset_keys() {
-        let mut snapshot = crate::domain::hotkey_config::default_hotkey_snapshot();
+        let mut snapshot = snaplingo_core::domain::hotkey_config::default_hotkey_snapshot();
         assert_eq!(conflict_message(&snapshot, "ocr"), "未发现冲突的快捷键");
         snapshot
             .translation

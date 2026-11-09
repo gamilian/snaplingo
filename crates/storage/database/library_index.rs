@@ -3,10 +3,10 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use rusqlite::params;
 
-use crate::application::library_index::{
+use crate::Result;
+use snaplingo_core::application::library_index::{
     LibraryIndexItem, LibraryIndexKind, LibraryIndexPage, LibraryIndexQuery, LibraryIndexRepository,
 };
-use crate::Result;
 
 use super::Database;
 
@@ -178,7 +178,7 @@ mod tests {
 
     use rusqlite::params;
 
-    use crate::application::library_index::{
+    use snaplingo_core::application::library_index::{
         LibraryIndexKind, LibraryIndexQuery, LibraryIndexRepository,
     };
 

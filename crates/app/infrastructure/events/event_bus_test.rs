@@ -1,12 +1,12 @@
 #[cfg(test)]
 mod tests {
     use super::super::EventBus;
-    use crate::application::history::EventSubscriber;
-    use crate::domain::events::DomainEvent;
-    use crate::domain::ocr::{OcrRequest, OcrResult};
-    use crate::domain::translation::{TranslationRequest, TranslationResult};
     use async_trait::async_trait;
     use chrono::Utc;
+    use snaplingo_core::application::history::EventSubscriber;
+    use snaplingo_core::domain::events::DomainEvent;
+    use snaplingo_core::domain::ocr::{OcrRequest, OcrResult};
+    use snaplingo_core::domain::translation::{TranslationRequest, TranslationResult};
     use std::sync::Arc;
     use tokio::sync::Mutex as TokioMutex;
 

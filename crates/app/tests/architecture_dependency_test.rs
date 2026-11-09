@@ -245,6 +245,69 @@ fn native_production_sources_do_not_depend_on_a_web_runtime() {
     );
 }
 
+#[test]
+fn app_and_storage_use_core_without_reexporting_its_module_tree() {
+    let mut sources = production_app_sources();
+    let storage = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../storage");
+    let mut paths = Vec::new();
+    collect_rust_files(&storage, &mut paths);
+    sources.extend(
+        paths
+            .into_iter()
+            .filter(|path| is_production_rust(path))
+            .map(|path| SourceFile {
+                path: format!("storage/{}", path.strip_prefix(&storage).unwrap().display()),
+                source: fs::read_to_string(path).unwrap(),
+            }),
+    );
+    let indirect = sources
+        .iter()
+        .flat_map(|source| {
+            let syntax = syn::parse_file(&source.source).unwrap();
+            let mut visitor = DependencyVisitor::default();
+            visitor.visit_file(&syntax);
+            visitor
+                .dependencies
+                .into_iter()
+                .filter(|path| {
+                    path == "crate::domain"
+                        || path.starts_with("crate::domain::")
+                        || path == "crate::application"
+                        || path.starts_with("crate::application::")
+                })
+                .map(|path| format!("{} -> {path}", source.path))
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        indirect.is_empty(),
+        "Core dependencies must name their owner: {indirect:#?}"
+    );
+
+    for name in ["lib.rs", "storage/lib.rs"] {
+        let source = sources.iter().find(|source| source.path == name).unwrap();
+        let syntax = syn::parse_file(&source.source).unwrap();
+        for item in syntax.items {
+            if let Item::Use(item) = item {
+                if !matches!(item.vis, syn::Visibility::Public(_)) {
+                    continue;
+                }
+                let mut exports = BTreeSet::new();
+                expand_use_tree(&item.tree, Vec::new(), &mut exports);
+                for export in exports {
+                    assert!(
+                        !matches!(export.as_str(),
+                            "snaplingo_core::*" | "snaplingo_core::application" | "snaplingo_core::domain"
+                            | "snaplingo_core::application::*" | "snaplingo_core::domain::*"
+                            | "application::*" | "domain::*"),
+                        "{name} must expose its own interface rather than Core's module tree: {export}"
+                    );
+                }
+            }
+        }
+    }
+}
+
 #[derive(Default)]
 struct ReferenceEmbeddings {
     paths: BTreeSet<String>,

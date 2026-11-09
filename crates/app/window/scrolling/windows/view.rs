@@ -3,11 +3,11 @@ use super::{
     layered_windows::LayeredPresenter,
     scrolling_geometry::{outside_position, overlaps, preview_placement},
 };
-use crate::application::capture::ScrollingCaptureGeometry;
-use crate::domain::capture::{LogicalRect, ScrollingCaptureStatus, ScrollingCaptureView};
 use accesskit::{Action, ActivationHandler, Node, NodeId, Role, TreeId, TreeInfo, TreeUpdate};
 use accesskit_winit::{Adapter, WindowEvent as AccessibilityEvent};
 use base64::Engine;
+use snaplingo_core::application::capture::ScrollingCaptureGeometry;
+use snaplingo_core::domain::capture::{LogicalRect, ScrollingCaptureStatus, ScrollingCaptureView};
 use snaplingo_render::Renderer;
 use snaplingo_ui::{
     scrolling::{
@@ -136,7 +136,7 @@ struct ScrollingView {
     preview: Option<Surface>,
     view: ScrollingCaptureView,
     ui: ScrollingUi,
-    general: crate::domain::GeneralSettings,
+    general: snaplingo_core::domain::GeneralSettings,
     dispatch: Box<dyn Fn(ScrollingAction)>,
     stop: Box<dyn Fn()>,
     working: bool,
@@ -156,7 +156,7 @@ impl Drop for ScrollingView {
         (self.stop)();
     }
 }
-fn shell(general: &crate::domain::GeneralSettings, window: &Window) -> Snapshot {
+fn shell(general: &snaplingo_core::domain::GeneralSettings, window: &Window) -> Snapshot {
     Snapshot {
         theme: match general.interface_theme.as_str() {
             "studio" => Theme::Studio,
@@ -171,7 +171,7 @@ fn shell(general: &crate::domain::GeneralSettings, window: &Window) -> Snapshot 
 }
 fn model(
     view: &ScrollingCaptureView,
-    general: &crate::domain::GeneralSettings,
+    general: &snaplingo_core::domain::GeneralSettings,
     window: &Window,
     working: bool,
     error: Option<String>,
@@ -192,7 +192,7 @@ pub(super) fn open(
     event_loop: &ActiveEventLoop,
     view: ScrollingCaptureView,
     geometry: ScrollingCaptureGeometry,
-    general: crate::domain::GeneralSettings,
+    general: snaplingo_core::domain::GeneralSettings,
     dispatch: impl Fn(ScrollingAction) + 'static,
     stop: impl Fn() + 'static,
 ) -> Result<bool, String> {
@@ -494,7 +494,7 @@ pub(super) fn close(id: &str) {
 pub(crate) fn close_all() {
     VIEWS.with_borrow_mut(HashMap::clear);
 }
-pub(super) fn settings_changed(general: crate::domain::GeneralSettings) {
+pub(super) fn settings_changed(general: snaplingo_core::domain::GeneralSettings) {
     VIEWS.with_borrow_mut(|views| {
         for host in views.values_mut() {
             host.general = general.clone();
@@ -598,7 +598,7 @@ pub(crate) fn window_event(_event_loop: &ActiveEventLoop, id: WindowId, event: &
                     WindowEvent::KeyboardInput { event, .. } if event.state.is_pressed() => {
                         if let Some(key) = key(&event.logical_key) {
                             if let Some(action) = host.ui.key(key, host.modifiers) {
-                                use crate::domain::capture::ScrollingShortcutAction;
+                                use snaplingo_core::domain::capture::ScrollingShortcutAction;
                                 let registered = match key {
                                     Key::Enter => host
                                         .view

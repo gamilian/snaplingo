@@ -11,7 +11,8 @@ use chrono::{Days, Local, NaiveDateTime, TimeZone};
 use tokio::task::JoinHandle;
 
 use crate::infrastructure::{runtime, storage::SqliteAppLogRepository};
-use crate::{AppState, Result, SettingsConfiguration};
+use crate::{AppState, Result};
+use snaplingo_core::application::SettingsConfiguration;
 
 pub struct RuntimeLifecycle {
     tasks: Mutex<Vec<JoinHandle<()>>>,
@@ -180,10 +181,12 @@ mod tests {
     #[cfg(target_os = "macos")]
     #[tokio::test]
     async fn shutdown_cancels_background_work_then_waits_for_pending_event_writes() {
-        use crate::application::history::EventSubscriber;
-        use crate::application::{SelectedTextAcquirer, SelectionScheme, SystemSelectionProvider};
-        use crate::domain::events::DomainEvent;
         use crate::infrastructure::storage::Database;
+        use snaplingo_core::application::history::EventSubscriber;
+        use snaplingo_core::application::{
+            SelectedTextAcquirer, SelectionScheme, SystemSelectionProvider,
+        };
+        use snaplingo_core::domain::events::DomainEvent;
         use tokio::sync::Notify;
 
         struct Cancelled(Arc<Notify>);

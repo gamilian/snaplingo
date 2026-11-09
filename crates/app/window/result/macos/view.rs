@@ -23,7 +23,7 @@ use objc2_foundation::{
     NSUserDefaults,
 };
 
-use crate::application::result_window::{
+use snaplingo_core::application::result_window::{
     OcrCopyToken, ResultWindowMode, ResultWindowOrigin, ResultWindowSnapshot, TranslationRow,
     TranslationStatus,
 };
@@ -1402,7 +1402,7 @@ fn activate(tag: isize) {
                     1 => Action::Retry(row.id.clone()),
                     2 => Action::Speak(
                         row.result.translated_text.clone(),
-                        Some(crate::application::result_window::resolved_target(
+                        Some(snaplingo_core::application::result_window::resolved_target(
                             &view.source_text,
                             &view.source_lang,
                             &view.target_lang,

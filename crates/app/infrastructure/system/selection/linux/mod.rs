@@ -1,8 +1,8 @@
 mod shortcut_copy;
 
-use crate::domain::{SelectionContext, SelectionMethodKind};
+use snaplingo_core::domain::{SelectionContext, SelectionMethodKind};
 
-use crate::application::selected_text::{
+use snaplingo_core::application::selected_text::{
     SelectionContextProvider, SelectionMethod, SystemSelectionProvider,
 };
 
@@ -27,7 +27,7 @@ impl SystemSelectionProvider for PlatformSelectionProvider {
 #[cfg(test)]
 mod selection_provider_tests {
     use super::*;
-    use crate::application::selected_text::SystemSelectionProvider;
+    use snaplingo_core::application::selected_text::SystemSelectionProvider;
 
     mod linux {
         mod shortcut_copy {

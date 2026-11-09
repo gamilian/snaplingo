@@ -3,9 +3,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::application::capture::{
-    CaptureEditorControlAction, CaptureEditorStylePresentation, CaptureEditorToolbarPresentation,
-};
 use objc2::rc::Retained;
 use objc2::{
     define_class, msg_send, sel, AnyThread, DefinedClass, MainThreadMarker, MainThreadOnly,
@@ -17,6 +14,9 @@ use objc2_app_kit::{
     NSWindowOrderingMode, NSWindowSharingType, NSWindowStyleMask,
 };
 use objc2_foundation::{NSData, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString};
+use snaplingo_core::application::capture::{
+    CaptureEditorControlAction, CaptureEditorStylePresentation, CaptureEditorToolbarPresentation,
+};
 
 pub(crate) type Dispatch = Rc<dyn Fn(CaptureEditorControlAction)>;
 

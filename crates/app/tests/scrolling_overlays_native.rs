@@ -1,20 +1,7 @@
 // AppKit needs the process main thread; exercise actual native windows without a test harness.
 #[cfg(target_os = "macos")]
-mod domain {
-    pub mod capture {
-        #[derive(Clone, Debug)]
-        pub struct LogicalRect {
-            pub x: f64,
-            pub y: f64,
-            pub width: f64,
-            pub height: f64,
-        }
-    }
-}
-
-#[cfg(target_os = "macos")]
 mod scrolling_geometry {
-    use crate::domain::capture::LogicalRect;
+    use snaplingo_core::domain::capture::LogicalRect;
 
     pub(super) fn overlaps(a: &LogicalRect, b: &LogicalRect) -> bool {
         a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
@@ -28,10 +15,10 @@ mod scrolling_overlays_macos {
 
 #[cfg(target_os = "macos")]
 fn main() {
-    use crate::domain::capture::LogicalRect;
     use base64::Engine;
     use objc2::MainThreadMarker;
     use objc2_app_kit::NSApplication;
+    use snaplingo_core::domain::capture::LogicalRect;
 
     let main = MainThreadMarker::new().expect("Native overlay test requires the main thread");
     let _app = NSApplication::sharedApplication(main);

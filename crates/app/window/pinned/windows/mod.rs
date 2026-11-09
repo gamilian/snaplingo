@@ -1,16 +1,16 @@
 //! Transparent pin windows hosted by the application's single winit loop.
 use super::scene::{Action, PinUi, Preferences};
-use crate::application::pinned_image::{PinnedImagePlacement, PinnedImageRuntimeHost};
-use crate::domain::capture::{
-    LogicalRect, MonitorSnapshot, PhysicalRect, PinnedImageExportSize, PinnedImageView,
-};
 use crate::infrastructure::{system::layered_windows::LayeredPresenter, ui_thread};
-use crate::{CaptureOutput, PinnedImageRuntime, SettingsConfiguration};
 use accesskit::{
     Action as AxAction, ActivationHandler, Node, NodeId, Role, TreeId, TreeInfo, TreeUpdate,
 };
 use accesskit_winit::{Adapter, WindowEvent as AccessibilityEvent};
 use base64::Engine;
+use snaplingo_core::application::pinned_image::{PinnedImagePlacement, PinnedImageRuntimeHost};
+use snaplingo_core::application::{CaptureOutput, PinnedImageRuntime, SettingsConfiguration};
+use snaplingo_core::domain::capture::{
+    LogicalRect, MonitorSnapshot, PhysicalRect, PinnedImageExportSize, PinnedImageView,
+};
 use snaplingo_render::Renderer;
 use snaplingo_ui::pinned::Presentation;
 use snaplingo_ui::{Key, Modifiers, Point};

@@ -18,10 +18,10 @@ use snaplingo_accessibility::{window_project_region, WindowProjection};
 use snaplingo_ui::{Action, Event, Page};
 
 use super::view::SharedFeatureView;
-use crate::application::hotkeys::HotkeyRecording;
-use crate::application::SettingsConfiguration;
 use crate::infrastructure::desktop_events::{DesktopEvent, DesktopSubscription};
 use crate::infrastructure::{runtime, ui_thread};
+use snaplingo_core::application::hotkeys::HotkeyRecording;
+use snaplingo_core::application::SettingsConfiguration;
 use snaplingo_settings::window::SettingsWindowSession;
 
 static NEXT: AtomicU64 = AtomicU64::new(1);

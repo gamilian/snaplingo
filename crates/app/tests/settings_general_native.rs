@@ -30,10 +30,6 @@ mod window;
 #[cfg(target_os = "macos")]
 pub use app_state::AppState;
 #[cfg(target_os = "macos")]
-pub use application::*;
-#[cfg(target_os = "macos")]
-pub use domain::*;
-#[cfg(target_os = "macos")]
 pub use error::{AppError, Result};
 #[cfg(target_os = "macos")]
 pub use infrastructure::*;
@@ -80,13 +76,13 @@ async fn wait_for_ui(ready: impl Fn() -> bool + Send + Sync + 'static) {
 
 #[cfg(target_os = "macos")]
 fn main() {
-    use crate::application::settings::{GeneralField, GeneralSection, GeneralValue};
     use crate::window::settings::macos::{
         GeneralAction, GeneralController, GeneralPage, GeneralServices, UpdatePhase,
     };
     use objc2::MainThreadMarker;
     use objc2_app_kit::{NSApplication, NSBackingStoreType, NSView, NSWindow, NSWindowStyleMask};
     use objc2_foundation::{NSPoint, NSRect, NSSize};
+    use snaplingo_core::application::settings::{GeneralField, GeneralSection, GeneralValue};
     use std::sync::{Arc, Mutex};
 
     #[derive(Default)]

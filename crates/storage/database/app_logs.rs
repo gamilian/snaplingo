@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use crate::application::settings::{AppLogEntry, AppLogRepository};
 use chrono::{Duration, Utc};
 use rusqlite::params;
+use snaplingo_core::application::settings::{AppLogEntry, AppLogRepository};
 
-use crate::domain::SettingsSnapshot;
 use crate::Result;
+use snaplingo_core::domain::SettingsSnapshot;
 
 use super::Database;
 

@@ -1,8 +1,8 @@
 //! Resident Windows Settings owner; drawing and input remain in the shared host.
 pub(crate) mod capacity;
 pub(crate) mod notices;
-use crate::application::hotkeys::HotkeyRecording;
 use crate::composition::settings::window::SettingsWindowSession;
+use snaplingo_core::application::hotkeys::HotkeyRecording;
 use snaplingo_desktop::{HostEvent, WindowBackend, WindowHost};
 use snaplingo_ui::{Page, Size, WindowIntent, WindowSnapshot};
 use std::{cell::RefCell, rc::Rc, sync::Arc};

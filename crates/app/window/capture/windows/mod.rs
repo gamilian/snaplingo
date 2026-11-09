@@ -2,18 +2,19 @@
 mod actions;
 mod view;
 
-use crate::application::capture::{
+use crate::infrastructure::ui_thread;
+use crate::Result;
+use snaplingo_core::application::capture::{
     merge_selection_history, remember_selection, CaptureOcrDelivery, CaptureOcrEffects,
     CaptureOcrStatus, CaptureOcrTarget, CaptureSelectionMode, CaptureSessionRuntimeHost,
     CaptureWindowGeometry,
 };
-use crate::domain::capture::{CaptureSessionId, LogicalRect};
-use crate::domain::ocr::OcrResult;
-use crate::infrastructure::ui_thread;
-use crate::{
-    CaptureCursorMover, CaptureOutput, CaptureSessionRuntime, CaptureSessions, Result,
+use snaplingo_core::application::{
+    CaptureCursorMover, CaptureOutput, CaptureSessionRuntime, CaptureSessions,
     SettingsConfiguration,
 };
+use snaplingo_core::domain::capture::{CaptureSessionId, LogicalRect};
+use snaplingo_core::domain::ocr::OcrResult;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, RwLock, Weak};
 
@@ -24,7 +25,7 @@ pub(super) struct Services {
     settings: Arc<SettingsConfiguration>,
     output: Arc<CaptureOutput>,
     cursor: Arc<dyn CaptureCursorMover>,
-    favorites: Weak<crate::application::ScreenshotFavoriteCapture>,
+    favorites: Weak<snaplingo_core::application::ScreenshotFavoriteCapture>,
 }
 impl Services {
     fn runtime(&self) -> Result<Arc<CaptureSessionRuntime>> {

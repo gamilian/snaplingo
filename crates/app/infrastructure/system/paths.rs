@@ -1,4 +1,4 @@
-use crate::error::{AppError, Result};
+use snaplingo_core::error::{AppError, Result};
 use std::path::PathBuf;
 
 /// Returns the platform-specific application data directory for SnapLingo.

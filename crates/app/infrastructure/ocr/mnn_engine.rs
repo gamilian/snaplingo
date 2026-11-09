@@ -1,8 +1,8 @@
 use super::{from_lines, normalized_box, MediumSession};
-use crate::domain::ocr::OcrLine;
 use crate::{AppError, Result};
 use image::RgbImage;
 use ocr_rs::{Backend, OcrEngine, OcrEngineConfig, RecOptions};
+use snaplingo_core::domain::ocr::OcrLine;
 use std::path::Path;
 
 pub(super) struct MnnMediumSession {
@@ -27,7 +27,7 @@ impl MnnMediumSession {
 }
 
 impl MediumSession for MnnMediumSession {
-    fn recognize(&mut self, image: &RgbImage) -> Result<crate::domain::ocr::OcrResult> {
+    fn recognize(&mut self, image: &RgbImage) -> Result<snaplingo_core::domain::ocr::OcrResult> {
         let results = self
             .engine
             .recognize(&image::DynamicImage::ImageRgb8(image.clone()))

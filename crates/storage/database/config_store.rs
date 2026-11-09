@@ -4,14 +4,14 @@ use chrono::Utc;
 use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
-use crate::application::hotkeys::HotkeyStore;
-use crate::application::providers::{
+use crate::{AppError, Result};
+use snaplingo_core::application::hotkeys::HotkeyStore;
+use snaplingo_core::application::providers::{
     CustomTranslationProviderDef, ProviderConfigStore, TranslationPromptStrategyConfig,
 };
-use crate::application::settings::SettingsStore;
-use crate::domain::hotkey_config::HotkeySettingsSnapshot;
-use crate::domain::SettingsSnapshot;
-use crate::{AppError, Result};
+use snaplingo_core::application::settings::SettingsStore;
+use snaplingo_core::domain::hotkey_config::HotkeySettingsSnapshot;
+use snaplingo_core::domain::SettingsSnapshot;
 
 use super::Database;
 
@@ -192,8 +192,8 @@ impl ProviderConfigStore for SqliteConfigStore {
 
 #[cfg(test)]
 mod tests {
-    use crate::domain::SettingsSnapshot;
-    use crate::error::AppError;
+    use snaplingo_core::domain::SettingsSnapshot;
+    use snaplingo_core::error::AppError;
 
     use super::SqliteConfigStore;
 

@@ -1,18 +1,20 @@
 use super::*;
-use crate::application::favorite_capacity::FavoriteCapacity;
-use crate::application::providers::common::Provider;
-use crate::application::providers::ocr::ImageFileReader;
-use crate::application::providers::translation::{TranslationCoordinator, TranslationProvider};
-use crate::application::result_window::{
-    ResultWindowNotifierPort, ResultWindowOpenRequest, ResultWindowPresentationPort,
-    ResultWindowWindowPort,
-};
-use crate::application::{History, SystemTtsHost, SystemTtsVoice, TtsRuntime};
-use crate::domain::translation::TranslationResult;
 use crate::infrastructure::storage::{
     Database, FilesystemOcrHistoryAssets, SqliteConfigStore, SqliteFavoriteCapacityRepository,
     SqliteFavoriteRepository, SqliteHistoryRepository,
 };
+use snaplingo_core::application::favorite_capacity::FavoriteCapacity;
+use snaplingo_core::application::providers::common::Provider;
+use snaplingo_core::application::providers::ocr::ImageFileReader;
+use snaplingo_core::application::providers::translation::{
+    TranslationCoordinator, TranslationProvider,
+};
+use snaplingo_core::application::result_window::{
+    ResultWindowNotifierPort, ResultWindowOpenRequest, ResultWindowPresentationPort,
+    ResultWindowWindowPort,
+};
+use snaplingo_core::application::{History, SystemTtsHost, SystemTtsVoice, TtsRuntime};
+use snaplingo_core::domain::translation::TranslationResult;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
@@ -106,7 +108,9 @@ struct Fixture {
 fn fixture() -> Fixture {
     let database = Arc::new(Database::in_memory().unwrap());
     let config = Arc::new(SqliteConfigStore::new(database.clone()));
-    let settings = Arc::new(crate::SettingsConfiguration::new(config.clone()));
+    let settings = Arc::new(snaplingo_core::application::SettingsConfiguration::new(
+        config.clone(),
+    ));
     let mut translation_settings = settings.snapshot().unwrap().translation;
     translation_settings.auto_translate = true;
     translation_settings.incremental_translation = true;
@@ -129,12 +133,10 @@ fn fixture() -> Fixture {
         .unwrap(),
     );
     let window = Arc::new(ResultWindowRuntime::new(Arc::new(Host), Arc::new(Host)));
-    let ocr = Arc::new(crate::application::providers::ocr::OcrCoordinator::new(
-        config,
-    ));
+    let ocr = Arc::new(snaplingo_core::application::providers::ocr::OcrCoordinator::new(config));
     let reader = Arc::new(Reader::default());
     let directory = tempfile::tempdir().unwrap();
-    let favorites = Arc::new(crate::application::Favorites::new(
+    let favorites = Arc::new(snaplingo_core::application::Favorites::new(
         Arc::new(SqliteFavoriteRepository::new(database.clone())),
         Arc::new(FilesystemOcrHistoryAssets::new(
             directory.path().to_path_buf(),
@@ -150,7 +152,7 @@ fn fixture() -> Fixture {
         window: Arc::downgrade(&window),
         session,
         settings: settings.clone(),
-        file_ocr: Arc::new(crate::application::providers::ocr::FileOcr::new(
+        file_ocr: Arc::new(snaplingo_core::application::providers::ocr::FileOcr::new(
             reader.clone(),
             ocr.clone(),
         )),

@@ -1,9 +1,11 @@
 use super::*;
-use crate::application::providers::common::CredentialField;
-use crate::application::providers::translation::{LLMTranslationProvider, TranslationCoordinator};
 use crate::AppError;
 use serde::{Deserialize, Serialize};
+use snaplingo_core::application::providers::common::CredentialField;
 use snaplingo_core::application::providers::configuration::*;
+use snaplingo_core::application::providers::translation::{
+    LLMTranslationProvider, TranslationCoordinator,
+};
 use std::collections::HashMap;
 use std::sync::Arc;
 mod cases {
@@ -12,13 +14,13 @@ mod cases {
     };
 
     use super::*;
-    use crate::application::providers::translation::TranslationCoordinator;
-    use crate::application::providers::{
-        CredentialSnapshot, HttpClient, HttpResponse, LlmRuntime, ProviderCredentialStore,
-    };
     use crate::infrastructure::storage::{Database, SqliteConfigStore, SqliteCredentialStore};
     use anyhow::Result;
     use async_trait::async_trait;
+    use snaplingo_core::application::providers::translation::TranslationCoordinator;
+    use snaplingo_core::application::providers::{
+        CredentialSnapshot, HttpClient, HttpResponse, LlmRuntime, ProviderCredentialStore,
+    };
     use std::collections::HashMap;
     use std::sync::{Arc, Mutex};
 
@@ -101,12 +103,12 @@ mod cases {
         let http_client: Arc<dyn HttpClient> = Arc::new(MockHttpClient);
         let llm_runtime = llm_runtime_from_http(http_client.clone());
         let coordinator = Arc::new(TranslationCoordinator::new(config_store.clone()));
-        let llm_introspection = Arc::new(crate::application::providers::LlmIntrospection::new(
-            llm_runtime.clone(),
-        ));
+        let llm_introspection = Arc::new(
+            snaplingo_core::application::providers::LlmIntrospection::new(llm_runtime.clone()),
+        );
 
         // Register builtin DeepL provider for testing
-        use crate::application::providers::translation::DeepLProvider;
+        use snaplingo_core::application::providers::translation::DeepLProvider;
         let deeplx_provider = DeepLProvider::new(http_client.clone());
         let _ = coordinator.register(deeplx_provider);
 
@@ -458,9 +460,9 @@ mod cases {
         let http_client: Arc<dyn HttpClient> = Arc::new(MockHttpClient);
         let llm_runtime = llm_runtime_from_http(http_client.clone());
         let coordinator = Arc::new(TranslationCoordinator::new(config_file.clone()));
-        let llm_introspection = Arc::new(crate::application::providers::LlmIntrospection::new(
-            llm_runtime.clone(),
-        ));
+        let llm_introspection = Arc::new(
+            snaplingo_core::application::providers::LlmIntrospection::new(llm_runtime.clone()),
+        );
 
         let config = ProviderConfiguration::new(
             config_file.clone(),

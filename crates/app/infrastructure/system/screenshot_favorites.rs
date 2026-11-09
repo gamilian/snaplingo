@@ -1,7 +1,7 @@
 use std::process::Command;
 
-use crate::application::screenshot_favorites::ScreenshotFavoriteHost;
 use crate::{AppError, Result};
+use snaplingo_core::application::screenshot_favorites::ScreenshotFavoriteHost;
 
 pub struct SystemScreenshotFavoriteHost;
 

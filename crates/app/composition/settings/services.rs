@@ -1,4 +1,4 @@
-use crate::application::settings::{
+use snaplingo_core::application::settings::{
     ServicesController, ServicesDependencies, ServicesKind, TranslationServicesController,
 };
 pub(crate) use snaplingo_settings::services::ServicesSession;

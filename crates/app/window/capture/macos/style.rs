@@ -4,9 +4,6 @@ use std::cell::{Cell, OnceCell, RefCell};
 use std::io::Cursor;
 
 use super::toolbar::Dispatch;
-use crate::application::capture::{
-    CaptureEditorControlAction, CaptureEditorStyleChange as Change, CaptureEditorStylePresentation,
-};
 use objc2::rc::Retained;
 use objc2::{define_class, msg_send, sel, AnyThread, DefinedClass, MainThreadOnly, Message};
 use objc2_app_kit::{
@@ -16,6 +13,9 @@ use objc2_app_kit::{
     NSWindowSharingType, NSWindowStyleMask,
 };
 use objc2_foundation::{NSData, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString};
+use snaplingo_core::application::capture::{
+    CaptureEditorControlAction, CaptureEditorStyleChange as Change, CaptureEditorStylePresentation,
+};
 
 struct ColorPanelLease {
     level: isize,

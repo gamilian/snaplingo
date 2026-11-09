@@ -1,4 +1,4 @@
-use crate::domain::capture::LogicalRect;
+use snaplingo_core::domain::capture::LogicalRect;
 
 pub(super) fn union(rects: &[LogicalRect]) -> Result<LogicalRect, String> {
     let first = rects.first().ok_or("No desktop display is available")?;
@@ -26,9 +26,9 @@ pub(super) fn cascaded_center(
     bounds: &LogicalRect,
     size: (f64, f64),
     cascade: usize,
-) -> crate::domain::capture::LogicalPoint {
+) -> snaplingo_core::domain::capture::LogicalPoint {
     let offset = cascade as f64 * 20.0;
-    crate::domain::capture::LogicalPoint {
+    snaplingo_core::domain::capture::LogicalPoint {
         x: (bounds.x + (bounds.width - size.0) / 2.0 + offset).clamp(
             bounds.x + 4.0,
             (bounds.x + bounds.width - size.0 - 4.0).max(bounds.x + 4.0),

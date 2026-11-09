@@ -2,11 +2,11 @@ use super::client::{
     LLMClient, LLMRequest, LLMResponse, LlmModelLister, ModelInfo, ReasoningLevel,
 };
 use super::endpoint_url::complete_standard_endpoint;
-use crate::error::AppError;
 use crate::infrastructure::http::HttpClient;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde_json::json;
+use snaplingo_core::error::AppError;
 use std::collections::HashMap;
 use std::sync::Arc;
 

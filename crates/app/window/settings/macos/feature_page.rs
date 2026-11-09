@@ -10,10 +10,10 @@ use objc2_app_kit::NSView;
 
 use super::feature::{FeatureField, FeatureKind, FeatureProjection, FeatureView};
 use super::hotkeys::{HotkeyView, HotkeyViewServices};
-use crate::application::hotkeys::HotkeyRecording;
-use crate::application::SettingsConfiguration;
 use crate::infrastructure::desktop_events::{DesktopEvent, DesktopSubscription};
 use crate::infrastructure::ui_thread;
+use snaplingo_core::application::hotkeys::HotkeyRecording;
+use snaplingo_core::application::SettingsConfiguration;
 
 static NEXT_PAGE: AtomicU64 = AtomicU64::new(1);
 thread_local! { static PAGES: RefCell<BTreeMap<u64,Weak<FeaturePage>>> = const { RefCell::new(BTreeMap::new()) }; }
@@ -147,7 +147,7 @@ fn projection(configuration: &SettingsConfiguration) -> Result<FeatureProjection
         .map_err(|error| error.to_string())?;
     Ok(FeatureProjection {
         general: snapshot.general,
-        preferences: crate::application::settings::FeaturePreferences {
+        preferences: snaplingo_core::application::settings::FeaturePreferences {
             ocr: snapshot.ocr,
             translation: snapshot.translation,
         },

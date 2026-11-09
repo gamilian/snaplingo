@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 
-use crate::domain::capture::CaptureSessionId;
+use snaplingo_core::domain::capture::CaptureSessionId;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum SettingsRoute {
@@ -143,32 +143,34 @@ impl Drop for DesktopSubscription {
     }
 }
 
-impl crate::application::settings::SettingsChangeNotifier for DesktopEvents {
+impl snaplingo_core::application::settings::SettingsChangeNotifier for DesktopEvents {
     fn settings_changed(&self) {
         self.publish(DesktopEvent::SettingsChanged);
     }
 }
-impl crate::application::hotkeys::HotkeyChangeNotifier for DesktopEvents {
+impl snaplingo_core::application::hotkeys::HotkeyChangeNotifier for DesktopEvents {
     fn hotkeys_changed(&self) {
         self.publish(DesktopEvent::HotkeysChanged);
     }
 }
-impl crate::application::providers::ProviderChangeNotifier for DesktopEvents {
+impl snaplingo_core::application::providers::ProviderChangeNotifier for DesktopEvents {
     fn providers_changed(&self) {
         self.publish(DesktopEvent::ProvidersChanged);
     }
 }
-impl crate::application::history::HistoryChangeNotifier for DesktopEvents {
+impl snaplingo_core::application::history::HistoryChangeNotifier for DesktopEvents {
     fn history_changed(&self) {
         self.publish(DesktopEvent::HistoryChanged);
     }
 }
-impl crate::application::favorites::FavoriteChangeNotifier for DesktopEvents {
+impl snaplingo_core::application::favorites::FavoriteChangeNotifier for DesktopEvents {
     fn favorites_changed(&self) {
         self.publish(DesktopEvent::FavoritesChanged);
     }
 }
-impl crate::application::screenshot_favorites::ScreenshotFavoriteChangeNotifier for DesktopEvents {
+impl snaplingo_core::application::screenshot_favorites::ScreenshotFavoriteChangeNotifier
+    for DesktopEvents
+{
     fn screenshot_favorites_changed(&self) {
         self.publish(DesktopEvent::ScreenshotFavoritesChanged);
     }

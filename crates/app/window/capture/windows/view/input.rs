@@ -521,7 +521,7 @@ impl View {
                             })
                             .unwrap_or(0)
                     };
-                    if let Some(rect) = crate::application::capture::restore_selection(
+                    if let Some(rect) = snaplingo_core::application::capture::restore_selection(
                         &self.history[index],
                         &self.geometry.bounds,
                     ) {

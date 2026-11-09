@@ -1,5 +1,5 @@
 //! Capture presentation calculations, independent of a native window's DPI.
-use crate::application::capture::AnnotationFontProvider;
+use snaplingo_core::application::capture::AnnotationFontProvider;
 
 #[derive(Default)]
 pub(super) struct PreviewRequests {
@@ -23,9 +23,9 @@ impl PreviewRequests {
         self.requested.is_some() && revision == self.revision
     }
 }
-use crate::application::capture::CaptureEditor;
-use crate::domain::capture::{AnnotationCommand, CapturedCursor, LogicalRect};
 use ab_glyph::{Font, FontArc, ScaleFont};
+use snaplingo_core::application::capture::CaptureEditor;
+use snaplingo_core::domain::capture::{AnnotationCommand, CapturedCursor, LogicalRect};
 use snaplingo_ui::{Point, Rect};
 
 /// The same font, fallback-glyph and pixel rounding rules as annotation output.
@@ -160,11 +160,11 @@ pub(super) fn preview_annotations(editor: &CaptureEditor) -> Vec<AnnotationComma
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::application::capture::{
+    use snaplingo_core::application::capture::{
         AnnotationTool, CaptureEditorControlAction as Control, CaptureEditorStylePresentation,
         Selection,
     };
-    use crate::domain::capture::LogicalPoint;
+    use snaplingo_core::domain::capture::LogicalPoint;
 
     fn point(x: f64, y: f64) -> LogicalPoint {
         LogicalPoint { x, y }
@@ -311,7 +311,7 @@ mod tests {
                 _: &str,
                 _: bool,
                 _: bool,
-            ) -> Option<crate::application::capture::AnnotationFont> {
+            ) -> Option<snaplingo_core::application::capture::AnnotationFont> {
                 None
             }
         }

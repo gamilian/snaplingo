@@ -14,9 +14,9 @@ use objc2_app_kit::{
 use objc2_foundation::{NSNotification, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString};
 use snaplingo_ui::{Action, Page};
 
-use crate::application::hotkeys::HotkeyRecording;
 use crate::window::settings::macos::SharedFeaturePage;
 use crate::AppState;
+use snaplingo_core::application::hotkeys::HotkeyRecording;
 
 struct RootState {
     owner: RefCell<Weak<NativeSettingsWindow>>,
@@ -217,14 +217,14 @@ impl NativeSettingsWindow {
             let viewport = self.root.frame().size;
             let display = self.window.screen().map(|screen| screen.frame());
             let saved = self.state.settings.configuration.snapshot().ok();
-            let scale = crate::application::capture::interface_scale(
+            let scale = snaplingo_core::application::capture::interface_scale(
                 saved
                     .as_ref()
                     .map(|saved| saved.screenshot.capture_ui_scale.as_str())
                     .unwrap_or("auto"),
                 display
                     .as_ref()
-                    .map(|frame| crate::domain::capture::LogicalRect {
+                    .map(|frame| snaplingo_core::domain::capture::LogicalRect {
                         x: frame.origin.x,
                         y: frame.origin.y,
                         width: frame.size.width,

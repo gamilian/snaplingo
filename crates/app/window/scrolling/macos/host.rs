@@ -3,18 +3,18 @@ use crate::window::capture as capture_window;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
 
-use crate::application::capture::{
+use crate::infrastructure::ui_thread;
+use snaplingo_core::application::capture::{
     CaptureSessionSource, ScrollingCaptureGeometry, ScrollingCaptureHost, ScrollingWindowOptions,
 };
-use crate::domain::capture::{
+use snaplingo_core::domain::capture::{
     CaptureSessionId, LogicalRect, MonitorSnapshot, ScrollingCaptureView, ScrollingShortcutAction,
 };
-use crate::infrastructure::ui_thread;
 
 use super::super::session::{self as actions, Services, Session};
 use super::scrolling_geometry::{outside_position, preview_placement};
 
-pub(crate) fn settings_changed(general: crate::domain::config::GeneralSettings) {
+pub(crate) fn settings_changed(general: snaplingo_core::domain::config::GeneralSettings) {
     ui_thread::dispatch(move || super::scrolling_controls_macos::update_theme(general));
 }
 

@@ -6,11 +6,11 @@ use super::geometry::{
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use super::image::rgba_image_to_png;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
-use crate::domain::capture::{MonitorLayout, MonitorSnapshot, WindowCandidate};
+use snaplingo_core::domain::capture::{MonitorLayout, MonitorSnapshot, WindowCandidate};
 #[cfg(any(target_os = "windows", target_os = "linux", test))]
-use crate::domain::capture::{PhysicalRect, ScreenRegion};
+use snaplingo_core::domain::capture::{PhysicalRect, ScreenRegion};
 #[cfg(any(target_os = "windows", target_os = "linux"))]
-use crate::error::AppError;
+use snaplingo_core::error::AppError;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use xcap::{Monitor, Window};
 
@@ -290,7 +290,7 @@ fn local_region_for_monitor(region: ScreenRegion, monitor: &PhysicalRect) -> Opt
 #[cfg(test)]
 mod tests {
     use super::local_region_for_monitor;
-    use crate::domain::capture::{PhysicalRect, ScreenRegion};
+    use snaplingo_core::domain::capture::{PhysicalRect, ScreenRegion};
 
     #[test]
     fn converts_global_secondary_monitor_coordinates_to_local_coordinates() {

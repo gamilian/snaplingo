@@ -18,12 +18,12 @@ use objc2_foundation::{
     NSCopying, NSData, NSNotification, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString,
 };
 
-use crate::application::capture::{
+use snaplingo_core::application::capture::{
     contains, restore_selection, CaptureEditor, CaptureEditorControlAction, CaptureSelectionMode,
     CaptureSession, CaptureWindowGeometry, Selection,
 };
-use crate::domain::capture::{CapturedCursor, LogicalPoint, LogicalRect, MonitorSnapshot};
-use crate::domain::config::ScreenshotSettings;
+use snaplingo_core::domain::capture::{CapturedCursor, LogicalPoint, LogicalRect, MonitorSnapshot};
+use snaplingo_core::domain::config::ScreenshotSettings;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Operation {
@@ -916,8 +916,10 @@ pub(crate) fn open(
     if monitors.is_empty() {
         return Err("Capture session has no frozen image for this display".into());
     }
-    let ui_scale =
-        crate::application::capture::interface_scale(&preferences.capture_ui_scale, Some(&bounds));
+    let ui_scale = snaplingo_core::application::capture::interface_scale(
+        &preferences.capture_ui_scale,
+        Some(&bounds),
+    );
     let selection = Rc::new(RefCell::new(Selection::new(
         bounds.clone(),
         monitors

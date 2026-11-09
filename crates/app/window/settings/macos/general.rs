@@ -16,12 +16,12 @@ use objc2_foundation::{
     NSSize, NSString,
 };
 
-use crate::application::settings::{
+use crate::infrastructure::system::native_theme::{self, Palette};
+use snaplingo_core::application::settings::{
     settings_ui_text as t, GeneralField, GeneralSection, GeneralValue,
 };
-use crate::application::SystemPermission;
-use crate::domain::GeneralSettings;
-use crate::infrastructure::system::native_theme::{self, Palette};
+use snaplingo_core::application::SystemPermission;
+use snaplingo_core::domain::GeneralSettings;
 
 use super::{GeneralAction, GeneralProjection, UpdatePhase};
 

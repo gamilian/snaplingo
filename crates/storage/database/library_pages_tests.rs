@@ -7,26 +7,28 @@ use super::super::{
     Database, SqliteFavoriteCapacityRepository, SqliteFavoriteRepository, SqliteHistoryRepository,
     SqliteLibraryIndexRepository, SqliteScreenshotFavoriteRepository,
 };
-use crate::application::favorite_capacity::{FavoriteCapacity, FavoriteCapacityPolicyProvider};
-use crate::application::favorites::{
+use crate::Result;
+use snaplingo_core::application::favorite_capacity::{
+    FavoriteCapacity, FavoriteCapacityPolicyProvider,
+};
+use snaplingo_core::application::favorites::{
     FavoriteAssetStore, FavoriteContent, Favorites, OcrFavoriteApplication, OcrFavoriteRecognizer,
     StoredFavoriteAssets, TranslationFavoriteSnapshot,
 };
-use crate::application::history::{
+use snaplingo_core::application::history::{
     History, HistoryChangeNotifier, OcrHistoryAssetStore, OcrHistoryRecognizer, OcrHistoryReplay,
     StoredOcrHistoryAssets,
 };
-use crate::application::library_index::{
+use snaplingo_core::application::library_index::{
     LibraryClipboard, LibraryFilter, LibraryIndex, LibraryIndexPage, LibraryIndexQuery,
     LibraryIndexRepository, LibraryKind, LibraryPageRequest, LibraryPages, LibraryRecord,
 };
-use crate::application::screenshot_favorites::{
+use snaplingo_core::application::screenshot_favorites::{
     ScreenshotFavoriteAssetStore, ScreenshotFavoriteClipboard, ScreenshotFavoriteHost,
     ScreenshotFavorites, StoredScreenshotAssets,
 };
-use crate::domain::ocr::OcrResult;
-use crate::domain::translation::TranslationResult;
-use crate::Result;
+use snaplingo_core::domain::ocr::OcrResult;
+use snaplingo_core::domain::translation::TranslationResult;
 
 #[derive(Default)]
 struct Assets {

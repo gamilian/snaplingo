@@ -1,4 +1,4 @@
-use crate::domain::{FrontmostApp, SelectionContext};
+use snaplingo_core::domain::{FrontmostApp, SelectionContext};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 static ACCESSIBILITY_PROMPT_REQUESTED: AtomicBool = AtomicBool::new(false);

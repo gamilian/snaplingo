@@ -1,5 +1,5 @@
-use crate::application::capture::ScrollingCaptureGeometry;
-use crate::domain::capture::LogicalRect;
+use snaplingo_core::application::capture::ScrollingCaptureGeometry;
+use snaplingo_core::domain::capture::LogicalRect;
 
 pub(super) fn preview_placement(
     geometry: &ScrollingCaptureGeometry,
@@ -103,7 +103,7 @@ pub(super) fn outside_position(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::capture::{MonitorSnapshot, PhysicalRect};
+    use snaplingo_core::domain::capture::{MonitorSnapshot, PhysicalRect};
 
     fn geometry(viewport: LogicalRect) -> ScrollingCaptureGeometry {
         ScrollingCaptureGeometry {

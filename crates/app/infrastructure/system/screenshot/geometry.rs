@@ -1,8 +1,8 @@
 #[cfg(any(target_os = "windows", target_os = "linux", test))]
-use crate::domain::capture::LogicalPoint;
+use snaplingo_core::domain::capture::LogicalPoint;
 #[cfg(any(target_os = "windows", target_os = "linux", test))]
-use crate::domain::capture::WindowCandidate;
-use crate::domain::capture::{LogicalRect, MonitorLayout, MonitorSnapshot, PhysicalRect};
+use snaplingo_core::domain::capture::WindowCandidate;
+use snaplingo_core::domain::capture::{LogicalRect, MonitorLayout, MonitorSnapshot, PhysicalRect};
 
 pub fn monitor_snapshot_from_physical_geometry(
     id: String,
@@ -206,11 +206,13 @@ mod tests {
                 scale_factor: monitor.scale_factor,
             })
             .collect::<Vec<_>>();
-        use crate::application::capture::CaptureCoordinatePolicy;
+        use snaplingo_core::application::capture::CaptureCoordinatePolicy;
         CaptureCoordinatePolicy::PrimaryMonitorScale.normalize(&mut snapshots);
         let mut layout_snapshots = layouts
             .drain(..)
-            .map(|layout| crate::domain::capture::monitor_snapshot_from_layout(layout, Vec::new()))
+            .map(|layout| {
+                snaplingo_core::domain::capture::monitor_snapshot_from_layout(layout, Vec::new())
+            })
             .collect::<Vec<_>>();
         CaptureCoordinatePolicy::PrimaryMonitorScale.normalize(&mut layout_snapshots);
 

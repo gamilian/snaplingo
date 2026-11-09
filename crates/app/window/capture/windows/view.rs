@@ -6,18 +6,18 @@ use super::{
     actions::{self, Action},
     Services,
 };
-use crate::application::capture::{
+use crate::infrastructure::system::layered_windows::LayeredPresenter;
+use accesskit::{ActivationHandler, TreeUpdate};
+use accesskit_winit::{Adapter, WindowEvent as AccessibilityEvent};
+use snaplingo_core::application::capture::{
     AnnotationTool, CaptureEditor, CaptureEditorControlAction, CaptureEditorStyleChange,
     CaptureEditorStylePresentation, CaptureSelectionMode, CaptureSession, CaptureWindowGeometry,
     Selection,
 };
-use crate::domain::{
+use snaplingo_core::domain::{
     capture::{CaptureSessionId, LogicalPoint, LogicalRect},
     config::SettingsSnapshot,
 };
-use crate::infrastructure::system::layered_windows::LayeredPresenter;
-use accesskit::{ActivationHandler, TreeUpdate};
-use accesskit_winit::{Adapter, WindowEvent as AccessibilityEvent};
 use snaplingo_render::{Renderer, RendererTextMetrics};
 use snaplingo_ui::{capture::*, Modifiers, Point, RasterImage, Rect, Size, Theme};
 use std::{
@@ -290,7 +290,7 @@ impl View {
             dark: self.preferences.general.theme == "dark"
                 || self.preferences.general.theme == "system"
                     && self.window.theme() == Some(winit::window::Theme::Dark),
-            ui_scale: crate::application::capture::interface_scale(
+            ui_scale: snaplingo_core::application::capture::interface_scale(
                 &s.capture_ui_scale,
                 Some(bounds),
             ) as f32,

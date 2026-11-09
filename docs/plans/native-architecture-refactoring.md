@@ -172,6 +172,16 @@ AppKit presentation. Capture and Scrolling also retain native presentation paths
 
 ## Verification record
 
+### Follow-up: explicit crate ownership and development tools
+
+- [x] Remove App/Storage Domain and Application module re-exports; import Core
+  types and workflows directly and enforce this through architecture checks.
+- [x] Replace native test-only Domain copies with Core values.
+- [ ] Move browser reference collectors out of App examples, promote the
+  single-instance probe to an integration test, and give pin rendering a
+  deliberate development target beside its pixel-preparation implementation.
+- [ ] Update commands, CI/tooling references and verification records.
+
 Record implementation commits, commands, results and platform limits below as
 steps finish. Compilation is evidence of compilation, not desktop acceptance.
 
@@ -280,3 +290,13 @@ steps finish. Compilation is evidence of compilation, not desktop acceptance.
 Remaining step 5 work is Result and Capture presentation consolidation. Their
 directory ownership is complete; their existing Mac native text/input and shared
 controller/editor behavior remain available for the corresponding vertical slices.
+
+- Core ownership follow-up: App and Storage now import Domain/Application
+  values directly from `snaplingo_core` instead of re-exporting its module tree
+  or using root glob exports. Shared error types remain explicit exports.
+  Native pin/scrolling fixtures use the real Core values; local Domain copies
+  and native test root globs are removed. A production-source architecture check
+  rejects imports through `crate::domain`/`crate::application` and Core module-tree
+  exports. Storage tests (29), App unit tests, real-adapter workflows (80), native
+  application/capture/result/pin/scrolling checks, 16 architecture checks and
+  Windows all-target cross compilation pass.

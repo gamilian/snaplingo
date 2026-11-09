@@ -5,8 +5,8 @@ use objc2::{msg_send, rc::Retained, sel, MainThreadMarker};
 use objc2_app_kit::{NSApplication, NSTextView, NSWindow};
 use objc2_foundation::{NSAttributedString, NSNotFound, NSObjectProtocol, NSRange};
 
-use crate::application::selected_text::SelectionMethod;
-use crate::domain::{
+use snaplingo_core::application::selected_text::SelectionMethod;
+use snaplingo_core::domain::{
     MethodAvailability, SelectionAttempt, SelectionContext, SelectionMethodKind, SelectionSource,
 };
 const READ_TIMEOUT: Duration = Duration::from_millis(300);

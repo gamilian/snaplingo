@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::application::providers::{
+use snaplingo_core::application::providers::{
     HttpClient, LLMClient, LLMProtocol, LlmClientConfig, LlmModelLister, LlmRuntime,
 };
 

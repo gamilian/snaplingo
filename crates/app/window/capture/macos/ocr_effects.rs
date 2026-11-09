@@ -1,5 +1,5 @@
-use crate::application::capture::CaptureOcrEffects;
 use crate::Result;
+use snaplingo_core::application::capture::CaptureOcrEffects;
 
 pub(crate) struct NativeCaptureOcrEffects;
 

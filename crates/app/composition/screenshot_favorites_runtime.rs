@@ -2,18 +2,19 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::application::screenshot_favorites::{
-    ScreenshotFavoriteCapture, ScreenshotFavoriteCaptureRenderer, ScreenshotFavoriteClipboard,
-    ScreenshotFavorites,
-};
-use crate::application::{CaptureSessionRuntime, FavoriteCapacity};
-use crate::domain::capture::{AnnotationCommand, CaptureSessionId, LogicalRect};
 use crate::infrastructure::desktop_events::DesktopEvents;
 use crate::infrastructure::storage::{
     Database, FilesystemScreenshotFavoriteAssets, SqliteScreenshotFavoriteRepository,
 };
 use crate::infrastructure::system::screenshot_favorites::SystemScreenshotFavoriteHost;
-use crate::{CaptureOutput, Result};
+use crate::Result;
+use snaplingo_core::application::screenshot_favorites::{
+    ScreenshotFavoriteCapture, ScreenshotFavoriteCaptureRenderer, ScreenshotFavoriteClipboard,
+    ScreenshotFavorites,
+};
+use snaplingo_core::application::CaptureOutput;
+use snaplingo_core::application::{CaptureSessionRuntime, FavoriteCapacity};
+use snaplingo_core::domain::capture::{AnnotationCommand, CaptureSessionId, LogicalRect};
 
 struct CaptureRuntimeFavoriteRenderer {
     runtime: Arc<CaptureSessionRuntime>,

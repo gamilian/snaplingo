@@ -6,18 +6,18 @@ use base64::Engine;
 use objc2::AnyThread;
 use objc2_foundation::{NSString, NSUserDefaults};
 
-use crate::application::favorites::{FavoriteContent, FavoriteKind, FavoriteQuery};
-use crate::application::providers::common::Provider;
-use crate::application::providers::translation::TranslationProvider;
-use crate::application::result_window::{
-    ResultWindowMode, ResultWindowOpenRequest, ResultWindowOrigin, ResultWindowSnapshot,
-    TranslationRow, TranslationStatus,
-};
-use crate::application::{SystemTtsHost, SystemTtsVoice, TtsRuntime};
-use crate::domain::translation::{TranslationRequest, TranslationResult};
 use crate::fixture::{on_main, png, NativeTestApp};
 use crate::window::result::macos::view::{self as native, Action};
 use crate::{AppState, Result};
+use snaplingo_core::application::favorites::{FavoriteContent, FavoriteKind, FavoriteQuery};
+use snaplingo_core::application::providers::common::Provider;
+use snaplingo_core::application::providers::translation::TranslationProvider;
+use snaplingo_core::application::result_window::{
+    ResultWindowMode, ResultWindowOpenRequest, ResultWindowOrigin, ResultWindowSnapshot,
+    TranslationRow, TranslationStatus,
+};
+use snaplingo_core::application::{SystemTtsHost, SystemTtsVoice, TtsRuntime};
+use snaplingo_core::domain::translation::{TranslationRequest, TranslationResult};
 
 #[derive(Default)]
 pub(crate) struct Services {

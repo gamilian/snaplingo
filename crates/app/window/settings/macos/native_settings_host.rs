@@ -13,7 +13,7 @@ use objc2_foundation::{
 use serde::Deserialize;
 
 use super::{GeneralPage, SharedFeaturePage};
-use crate::application::settings::GeneralSection;
+use snaplingo_core::application::settings::GeneralSection;
 
 #[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]

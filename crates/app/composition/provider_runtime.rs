@@ -1,29 +1,5 @@
 use std::sync::Arc;
 
-#[cfg(any(target_os = "macos", target_os = "windows"))]
-use crate::application::providers::ocr::impls::SystemOcrProvider;
-#[cfg(any(
-    target_os = "linux",
-    all(target_os = "macos", feature = "tesseract-ocr")
-))]
-use crate::application::providers::ocr::impls::TesseractProvider;
-#[cfg(any(target_os = "macos", target_os = "windows"))]
-use crate::application::providers::ocr::SystemOcrEngine;
-use crate::application::providers::ocr::{
-    impls::{BaiduOcrProvider, PaddleOcrProvider},
-    OcrCoordinator, PaddleOcrEngine,
-};
-use crate::application::providers::translation::{
-    BaiduTranslateProvider, DeepLProvider, GoogleTranslateProvider as GoogleTranslateProviderV2,
-    TranslationCoordinator,
-};
-#[cfg(any(target_os = "macos", target_os = "windows"))]
-use crate::application::providers::Provider;
-use crate::application::providers::{
-    HttpClient, LlmIntrospection, LlmRuntime, ProviderAdministration, ProviderConfigStore,
-    ProviderConfiguration, ProviderCredentialStore, ProviderEventSink,
-    TranslationPromptConfiguration,
-};
 #[cfg(all(test, target_os = "macos"))]
 use crate::infrastructure::events::EventBus;
 use crate::infrastructure::llm::InfrastructureLlmRuntime;
@@ -36,6 +12,30 @@ use crate::infrastructure::system::ocr::get_tesseract_engine;
 use crate::infrastructure::system::ocr::MacOSVisionOcrEngine;
 #[cfg(target_os = "windows")]
 use crate::infrastructure::system::ocr::WindowsOcrEngine;
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+use snaplingo_core::application::providers::ocr::impls::SystemOcrProvider;
+#[cfg(any(
+    target_os = "linux",
+    all(target_os = "macos", feature = "tesseract-ocr")
+))]
+use snaplingo_core::application::providers::ocr::impls::TesseractProvider;
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+use snaplingo_core::application::providers::ocr::SystemOcrEngine;
+use snaplingo_core::application::providers::ocr::{
+    impls::{BaiduOcrProvider, PaddleOcrProvider},
+    OcrCoordinator, PaddleOcrEngine,
+};
+use snaplingo_core::application::providers::translation::{
+    BaiduTranslateProvider, DeepLProvider, GoogleTranslateProvider as GoogleTranslateProviderV2,
+    TranslationCoordinator,
+};
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+use snaplingo_core::application::providers::Provider;
+use snaplingo_core::application::providers::{
+    HttpClient, LlmIntrospection, LlmRuntime, ProviderAdministration, ProviderConfigStore,
+    ProviderConfiguration, ProviderCredentialStore, ProviderEventSink,
+    TranslationPromptConfiguration,
+};
 
 pub(crate) fn build_llm_runtime(http_client: Arc<dyn HttpClient>) -> Arc<dyn LlmRuntime> {
     Arc::new(InfrastructureLlmRuntime::new(http_client))
@@ -50,10 +50,10 @@ pub(crate) fn build_provider_configuration(
     credential_store: Arc<dyn ProviderCredentialStore>,
     llm_runtime: Arc<dyn LlmRuntime>,
     translation_coordinator: Arc<
-        crate::application::providers::translation::TranslationCoordinator,
+        snaplingo_core::application::providers::translation::TranslationCoordinator,
     >,
     llm_introspection: Arc<LlmIntrospection>,
-    change_notifier: Arc<dyn crate::application::providers::ProviderChangeNotifier>,
+    change_notifier: Arc<dyn snaplingo_core::application::providers::ProviderChangeNotifier>,
 ) -> Arc<ProviderConfiguration> {
     Arc::new(
         ProviderConfiguration::new(
@@ -71,7 +71,7 @@ pub(crate) fn build_provider_administration(
     translation_coordinator: Arc<TranslationCoordinator>,
     ocr_coordinator: Arc<OcrCoordinator>,
     provider_configuration: Arc<ProviderConfiguration>,
-    ocr_configuration: Arc<crate::application::providers::ocr::OcrProviderConfiguration>,
+    ocr_configuration: Arc<snaplingo_core::application::providers::ocr::OcrProviderConfiguration>,
     llm_introspection: Arc<LlmIntrospection>,
     prompt_strategies: Arc<TranslationPromptConfiguration>,
 ) -> Arc<ProviderAdministration> {
@@ -119,9 +119,9 @@ pub(crate) fn build_ocr_coordinator(
     config_store: Arc<dyn ProviderConfigStore>,
     http_client: Arc<dyn HttpClient>,
     event_sink: Arc<dyn ProviderEventSink>,
-    change_notifier: Arc<dyn crate::application::providers::ProviderChangeNotifier>,
+    change_notifier: Arc<dyn snaplingo_core::application::providers::ProviderChangeNotifier>,
     paddle_engine: Arc<dyn PaddleOcrEngine>,
-    settings: Arc<crate::SettingsConfiguration>,
+    settings: Arc<snaplingo_core::application::SettingsConfiguration>,
 ) -> Arc<OcrCoordinator> {
     let ocr_coordinator = OcrCoordinator::new(config_store);
     ocr_coordinator
@@ -181,11 +181,11 @@ pub(crate) fn hydrate_provider_credentials(administration: Arc<ProviderAdministr
 #[cfg(all(test, any(target_os = "macos", target_os = "windows")))]
 mod tests {
     use super::*;
-    #[cfg(target_os = "macos")]
-    use crate::application::providers::HttpResponse;
     use crate::infrastructure::storage::SqliteConfigStore;
     #[cfg(target_os = "macos")]
     use async_trait::async_trait;
+    #[cfg(target_os = "macos")]
+    use snaplingo_core::application::providers::HttpResponse;
     #[cfg(target_os = "macos")]
     use std::collections::HashMap;
 
@@ -203,8 +203,8 @@ mod tests {
 
         fn recognize(
             &self,
-            _request: &crate::domain::ocr::OcrRequest,
-        ) -> crate::Result<crate::domain::ocr::OcrResult> {
+            _request: &snaplingo_core::domain::ocr::OcrRequest,
+        ) -> crate::Result<snaplingo_core::domain::ocr::OcrResult> {
             unimplemented!("provider registration should not recognize text")
         }
     }
@@ -242,9 +242,9 @@ mod tests {
                 None,
                 std::path::PathBuf::new(),
             )),
-            Arc::new(crate::SettingsConfiguration::new(Arc::new(
-                SqliteConfigStore::new_temp(),
-            ))),
+            Arc::new(snaplingo_core::application::SettingsConfiguration::new(
+                Arc::new(SqliteConfigStore::new_temp()),
+            )),
         );
 
         assert!(coordinator.get("system-ocr").is_some());
@@ -279,7 +279,7 @@ mod tests {
     struct TestProviderChangeNotifier;
 
     #[cfg(target_os = "macos")]
-    impl crate::application::providers::ProviderChangeNotifier for TestProviderChangeNotifier {
+    impl snaplingo_core::application::providers::ProviderChangeNotifier for TestProviderChangeNotifier {
         fn providers_changed(&self) {}
     }
 }

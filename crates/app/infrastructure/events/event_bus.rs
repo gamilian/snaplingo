@@ -1,6 +1,6 @@
-use crate::application::history::EventSubscriber;
-use crate::application::providers::ProviderEventSink;
-use crate::domain::events::DomainEvent;
+use snaplingo_core::application::history::EventSubscriber;
+use snaplingo_core::application::providers::ProviderEventSink;
+use snaplingo_core::domain::events::DomainEvent;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;

@@ -13,11 +13,11 @@ use objc2_app_kit::{
 };
 use objc2_foundation::{NSNotification, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString};
 
-use crate::application::capture::{
+use snaplingo_core::application::capture::{
     AnnotationHandle, AnnotationTool, CaptureEditor, CaptureEditorControlAction,
     CaptureEditorStyleChange, CaptureEditorToolbarPresentation,
 };
-use crate::domain::capture::{AnnotationCommand, LogicalPoint, LogicalRect};
+use snaplingo_core::domain::capture::{AnnotationCommand, LogicalPoint, LogicalRect};
 
 #[derive(Clone, Debug)]
 pub(crate) enum Request {
@@ -802,7 +802,7 @@ pub(crate) struct TestState {
     pub annotations: Vec<AnnotationCommand>,
     pub selection: LogicalRect,
     pub text: Option<String>,
-    pub styling: crate::application::capture::CaptureEditorStylePresentation,
+    pub styling: snaplingo_core::application::capture::CaptureEditorStylePresentation,
     pub ready: bool,
     pub busy: bool,
 }

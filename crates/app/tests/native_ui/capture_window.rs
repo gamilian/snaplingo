@@ -10,19 +10,19 @@ use objc2::MainThreadMarker;
 use objc2_app_kit::{NSApplication, NSEvent, NSEventModifierFlags as Flags, NSEventType};
 use objc2_foundation::{NSPoint, NSString};
 
-use crate::application::capture::{
-    CaptureOcrEffects, CaptureSelectionMode, CaptureSession, CaptureWindowGeometry,
-};
-use crate::application::providers::common::Provider;
-use crate::application::providers::ocr::OcrProvider;
-use crate::application::result_window::{ResultWindowMode, TranslationStatus};
-use crate::domain::capture::*;
-use crate::domain::config::ScreenshotSettings;
-use crate::domain::ocr::{OcrRequest, OcrResult};
 use crate::fixture::on_main;
 use crate::window::capture::macos::toolbar;
 use crate::window::capture::macos::view::{self as native, Action, Operation};
 use crate::{AppState, Result};
+use snaplingo_core::application::capture::{
+    CaptureOcrEffects, CaptureSelectionMode, CaptureSession, CaptureWindowGeometry,
+};
+use snaplingo_core::application::providers::common::Provider;
+use snaplingo_core::application::providers::ocr::OcrProvider;
+use snaplingo_core::application::result_window::{ResultWindowMode, TranslationStatus};
+use snaplingo_core::domain::capture::*;
+use snaplingo_core::domain::config::ScreenshotSettings;
+use snaplingo_core::domain::ocr::{OcrRequest, OcrResult};
 
 #[path = "editor_tools.rs"]
 mod editor_tools;
@@ -709,8 +709,8 @@ async fn wait_for_toolbar(
 
 async fn wait_for_styles(
     app: &NativeTestApp,
-    ready: impl Fn(&crate::application::capture::CaptureEditorStylePresentation) -> bool,
-) -> crate::application::capture::CaptureEditorStylePresentation {
+    ready: impl Fn(&snaplingo_core::application::capture::CaptureEditorStylePresentation) -> bool,
+) -> snaplingo_core::application::capture::CaptureEditorStylePresentation {
     let deadline = Instant::now() + Duration::from_secs(8);
     loop {
         let style = on_main(app, || {

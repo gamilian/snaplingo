@@ -13,14 +13,14 @@ use objc2_app_kit::{
 use objc2_foundation::{NSObject, NSObjectProtocol, NSPoint};
 use snaplingo_ui::Page;
 
-use crate::application::{
-    HotkeyRecording, SelectedTextAcquirer, SelectionScheme, SystemSelectionProvider,
-};
 use crate::infrastructure::desktop_events::{DesktopEvent, DesktopSubscription, SettingsRoute};
 use crate::infrastructure::storage::Database;
 use crate::infrastructure::{runtime, ui_thread};
 use crate::window::settings::macos::NativeSettingsWindow;
 use crate::{AppState, RuntimeLifecycle};
+use snaplingo_core::application::{
+    HotkeyRecording, SelectedTextAcquirer, SelectionScheme, SystemSelectionProvider,
+};
 
 pub struct NativeAppOptions {
     pub data_dir: PathBuf,
@@ -370,7 +370,7 @@ async fn smoke_on_main<T: Send + 'static>(
 
 #[cfg(test)]
 pub(crate) fn permission_smoke_test() {
-    use crate::application::{
+    use snaplingo_core::application::{
         RequiredPermissions, RequiredPermissionsContext, RequiredPermissionsHost,
         RequiredPermissionsStatus, SystemPermission,
     };
@@ -379,7 +379,7 @@ pub(crate) fn permission_smoke_test() {
     };
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     struct Startup;
-    impl crate::application::StartOnBoot for Startup {
+    impl snaplingo_core::application::StartOnBoot for Startup {
         fn set_enabled(&self, _: bool) -> crate::Result<()> {
             Ok(())
         }
@@ -429,7 +429,7 @@ pub(crate) fn permission_smoke_test() {
     });
     let directory = tempfile::tempdir().unwrap();
     run_application(NativeAppOptions{data_dir:directory.path().into(),identifier:"com.snaplingo.permission-guide-smoke".into(),ocr_resource_root:None},
-        |state|{state.permissions=Arc::new(RequiredPermissions::new(permissions.clone()));let settings=Arc::get_mut(&mut state.settings).unwrap();settings.application=Arc::new(crate::application::SettingsApplication::new(settings.configuration.clone(),Arc::new(Startup),state.history.history.clone(),state.logs.repository.clone()));},
+        |state|{state.permissions=Arc::new(RequiredPermissions::new(permissions.clone()));let settings=Arc::get_mut(&mut state.settings).unwrap();settings.application=Arc::new(snaplingo_core::application::SettingsApplication::new(settings.configuration.clone(),Arc::new(Startup),state.history.history.clone(),state.logs.repository.clone()));},
         |owner|{
             let settings=owner.settings.borrow().as_ref().unwrap().clone();
             assert!(settings.test_window().attachedSheet().is_some(),"Missing Screen Recording must present the permission guide when native Settings opens");
@@ -467,7 +467,7 @@ pub(crate) fn permission_smoke_test() {
 
 #[cfg(test)]
 pub(crate) fn smoke_test() {
-    use crate::application::{SettingsApplication, StartOnBoot};
+    use snaplingo_core::application::{SettingsApplication, StartOnBoot};
     use std::time::Duration;
 
     struct Startup;
@@ -477,25 +477,25 @@ pub(crate) fn smoke_test() {
         }
     }
     struct Granted;
-    impl crate::application::RequiredPermissionsHost for Granted {
-        fn status(&self) -> crate::application::RequiredPermissionsStatus {
-            crate::application::RequiredPermissionsStatus {
+    impl snaplingo_core::application::RequiredPermissionsHost for Granted {
+        fn status(&self) -> snaplingo_core::application::RequiredPermissionsStatus {
+            snaplingo_core::application::RequiredPermissionsStatus {
                 screen_recording: true,
                 accessibility: true,
             }
         }
-        fn context(&self) -> crate::application::RequiredPermissionsContext {
-            crate::application::RequiredPermissionsContext {
+        fn context(&self) -> snaplingo_core::application::RequiredPermissionsContext {
+            snaplingo_core::application::RequiredPermissionsContext {
                 platform: "macos".into(),
                 app_path: None,
                 needs_installation: false,
                 can_reset: false,
             }
         }
-        fn request(&self, _: crate::application::SystemPermission) -> crate::Result<()> {
+        fn request(&self, _: snaplingo_core::application::SystemPermission) -> crate::Result<()> {
             panic!("Settings smoke must not request real permissions")
         }
-        fn reset(&self, _: crate::application::SystemPermission) -> crate::Result<()> {
+        fn reset(&self, _: snaplingo_core::application::SystemPermission) -> crate::Result<()> {
             panic!("Settings smoke must not reset real permissions")
         }
         fn restart(&self) -> crate::Result<()> {
@@ -514,7 +514,7 @@ pub(crate) fn smoke_test() {
         |state| {
             // The isolated application exercises the production lifecycle without
             // changing the user's login item while using a temporary database.
-            state.permissions=Arc::new(crate::application::RequiredPermissions::new(Arc::new(Granted)));
+            state.permissions=Arc::new(snaplingo_core::application::RequiredPermissions::new(Arc::new(Granted)));
             let settings = Arc::get_mut(&mut state.settings).unwrap();
             settings.application = Arc::new(SettingsApplication::new(
                 settings.configuration.clone(),

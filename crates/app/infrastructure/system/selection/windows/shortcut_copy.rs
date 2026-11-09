@@ -2,12 +2,12 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 
-use crate::application::selected_text::SelectionMethod;
-use crate::domain::{
-    MethodAvailability, SelectionAttempt, SelectionContext, SelectionMethodKind, SelectionSource,
-};
 use crate::infrastructure::system::selection::common::clipboard_transaction;
 use crate::infrastructure::system::selection::common::shortcut_copy::wait_for_shortcut_modifiers_to_clear_with;
+use snaplingo_core::application::selected_text::SelectionMethod;
+use snaplingo_core::domain::{
+    MethodAvailability, SelectionAttempt, SelectionContext, SelectionMethodKind, SelectionSource,
+};
 
 const CLIPBOARD_TIMEOUT: Duration = Duration::from_millis(700);
 const CLIPBOARD_POLL_INTERVAL: Duration = Duration::from_millis(15);
@@ -219,12 +219,12 @@ extern "system" {
 #[cfg(test)]
 mod windows {
     mod shortcut_copy {
-        use crate::domain::{MethodAvailability, SelectionContext, SelectionMethodKind};
+        use snaplingo_core::domain::{MethodAvailability, SelectionContext, SelectionMethodKind};
 
         use super::super::{
             press_copy_shortcut_with, KeyPress, ShortcutCopySelectionMethod, ShortcutKeySink,
         };
-        use crate::application::selected_text::SelectionMethod;
+        use snaplingo_core::application::selected_text::SelectionMethod;
 
         #[test]
         fn method_kind_is_shortcut_copy() {

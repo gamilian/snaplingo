@@ -10,11 +10,11 @@ use std::sync::Arc;
 use image::RgbImage;
 use parking_lot::{Mutex, RwLock};
 
-use crate::application::providers::ocr::{
+use crate::{AppError, Result};
+use snaplingo_core::application::providers::ocr::{
     OcrAccelerationStatus, OcrExecutionDevice, PaddleOcrEngine,
 };
-use crate::domain::ocr::{OcrBoundingBox, OcrLine, OcrRequest, OcrResult};
-use crate::{AppError, Result};
+use snaplingo_core::domain::ocr::{OcrBoundingBox, OcrLine, OcrRequest, OcrResult};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum OcrBackend {

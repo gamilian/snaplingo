@@ -30,10 +30,6 @@ mod window;
 #[cfg(target_os = "macos")]
 pub use app_state::AppState;
 #[cfg(target_os = "macos")]
-pub use application::*;
-#[cfg(target_os = "macos")]
-pub use domain::*;
-#[cfg(target_os = "macos")]
 pub use error::{AppError, Result};
 #[cfg(target_os = "macos")]
 pub use infrastructure::*;

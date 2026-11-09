@@ -1,9 +1,9 @@
 use super::platform::{set_working, update};
-use crate::domain::capture::{
+use crate::infrastructure::ui_thread;
+use snaplingo_core::application::{CaptureOutput, CaptureSessionRuntime, SettingsConfiguration};
+use snaplingo_core::domain::capture::{
     CaptureSessionId, ScrollingCaptureOutputAction, ScrollingCaptureStatus,
 };
-use crate::infrastructure::ui_thread;
-use crate::{CaptureOutput, CaptureSessionRuntime, SettingsConfiguration};
 use snaplingo_ui::scrolling::ScrollingAction as Action;
 use std::sync::{
     atomic::{AtomicBool, Ordering},

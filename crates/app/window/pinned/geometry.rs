@@ -1,7 +1,7 @@
 use super::position::{cascaded_center, union};
-use crate::application::capture::CaptureCoordinatePolicy;
-use crate::application::pinned_image::PinnedImagePlacement;
-use crate::domain::capture::{DesktopPosition, MonitorSnapshot, PhysicalPoint};
+use snaplingo_core::application::capture::CaptureCoordinatePolicy;
+use snaplingo_core::application::pinned_image::PinnedImagePlacement;
+use snaplingo_core::domain::capture::{DesktopPosition, MonitorSnapshot, PhysicalPoint};
 
 /// Windows capture logical origins use one primary-display desktop scale.
 /// Keep the host boundary physical so winit cannot apply a second monitor DPI.
@@ -46,7 +46,7 @@ pub(super) fn position(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::capture::{LogicalPoint, LogicalRect, PhysicalRect};
+    use snaplingo_core::domain::capture::{LogicalPoint, LogicalRect, PhysicalRect};
 
     fn monitors() -> Vec<MonitorSnapshot> {
         [(0, 0, 3840, 2160, 2.), (-2560, -200, 2560, 1440, 1.25)]

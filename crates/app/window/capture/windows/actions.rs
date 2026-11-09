@@ -1,11 +1,11 @@
 use super::{view, Services};
-use crate::application::capture::{
+use crate::infrastructure::ui_thread;
+use snaplingo_core::application::capture::{
     CaptureEditorStyleChange, CaptureOcrTarget, CaptureSelectionMode,
 };
-use crate::domain::capture::{
+use snaplingo_core::domain::capture::{
     AnnotationCommand, CaptureOutputAction, CaptureSessionId, LogicalRect,
 };
-use crate::infrastructure::ui_thread;
 use snaplingo_ui::capture::CaptureCommand;
 use std::{
     collections::{hash_map::Entry, HashMap},
@@ -34,7 +34,7 @@ pub(super) enum Action {
         include_cursor: bool,
     },
     Inspect {
-        point: crate::domain::capture::LogicalPoint,
+        point: snaplingo_core::domain::capture::LogicalPoint,
         revision: u64,
     },
     Render {
@@ -385,7 +385,7 @@ async fn run(
 }
 fn save(
     path: std::path::PathBuf,
-    s: &crate::domain::config::ScreenshotSettings,
+    s: &snaplingo_core::domain::config::ScreenshotSettings,
     remember_choice: bool,
 ) -> CaptureOutputAction {
     CaptureOutputAction::Save {

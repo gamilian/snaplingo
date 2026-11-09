@@ -1,1 +1,1 @@
-pub use crate::application::providers::{HttpClient, HttpResponse};
+pub use snaplingo_core::application::providers::{HttpClient, HttpResponse};

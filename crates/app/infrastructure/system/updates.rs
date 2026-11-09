@@ -6,11 +6,11 @@ use async_trait::async_trait;
 use sha2::{Digest, Sha256};
 use tokio::io::AsyncWriteExt;
 
-use crate::application::providers::HttpClient;
-use crate::application::updates::{
+use crate::infrastructure::http::ReqwestHttpClient;
+use snaplingo_core::application::providers::HttpClient;
+use snaplingo_core::application::updates::{
     AppUpdateHost, PublishedRelease, UpdateInstaller, LATEST_RELEASE_API, RELEASES_URL,
 };
-use crate::infrastructure::http::ReqwestHttpClient;
 
 pub struct SystemAppUpdateHost {
     http: Arc<ReqwestHttpClient>,

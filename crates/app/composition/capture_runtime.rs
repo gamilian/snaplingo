@@ -1,14 +1,6 @@
 use std::sync::Arc;
 
 #[cfg(target_os = "macos")]
-use crate::application::capture::{CaptureImageComposer, CaptureOcrDelivery, CaptureSessionSource};
-#[cfg(target_os = "macos")]
-use crate::application::pinned_image::PinnedImageState;
-#[cfg(target_os = "macos")]
-use crate::application::providers::ocr::OcrCoordinator;
-#[cfg(target_os = "macos")]
-use crate::application::result_window::ResultWindowRuntime;
-#[cfg(target_os = "macos")]
 use crate::infrastructure::system::capture_output::SystemCaptureOutputHost;
 #[cfg(target_os = "macos")]
 use crate::infrastructure::system::screenshot::macos::MacOSCaptureSessionSource;
@@ -16,7 +8,19 @@ use crate::infrastructure::system::screenshot::macos::MacOSCaptureSessionSource;
 use crate::window::capture::NativeCaptureOcrEffects;
 #[cfg(target_os = "macos")]
 use crate::window::capture::NativeCaptureSessionRuntimeHost;
-use crate::{CaptureOutput, CaptureSessionRuntime, CaptureSessions, PinnedImageRuntime};
+#[cfg(target_os = "macos")]
+use snaplingo_core::application::capture::{
+    CaptureImageComposer, CaptureOcrDelivery, CaptureSessionSource,
+};
+#[cfg(target_os = "macos")]
+use snaplingo_core::application::pinned_image::PinnedImageState;
+#[cfg(target_os = "macos")]
+use snaplingo_core::application::providers::ocr::OcrCoordinator;
+#[cfg(target_os = "macos")]
+use snaplingo_core::application::result_window::ResultWindowRuntime;
+use snaplingo_core::application::{
+    CaptureOutput, CaptureSessionRuntime, CaptureSessions, PinnedImageRuntime,
+};
 
 pub(crate) struct CaptureRuntimeParts {
     pub sessions: Arc<CaptureSessions>,
@@ -36,20 +40,20 @@ pub(crate) struct CaptureRuntimeParts {
 #[cfg(all(target_os = "windows", feature = "native-app"))]
 pub(crate) fn build_native_windows_runtime(
     history_path: std::path::PathBuf,
-    ocr: Arc<crate::application::providers::ocr::OcrCoordinator>,
-    result: Arc<crate::application::result_window::ResultWindowRuntime>,
-    settings: Arc<crate::SettingsConfiguration>,
+    ocr: Arc<snaplingo_core::application::providers::ocr::OcrCoordinator>,
+    result: Arc<snaplingo_core::application::result_window::ResultWindowRuntime>,
+    settings: Arc<snaplingo_core::application::SettingsConfiguration>,
     pins: Arc<crate::window::pinned::NativePinnedImageRuntimeHost>,
 ) -> CaptureRuntimeParts {
-    use crate::application::{
-        capture::{CaptureImageComposer, CaptureOcrDelivery},
-        pinned_image::PinnedImageState,
-    };
     use crate::infrastructure::system::{
         capture_output::SystemCaptureOutputHost, screenshot::windows::WindowsCaptureSessionSource,
     };
     use crate::window::capture::{WindowsCaptureOcrEffects, WindowsCaptureSessionRuntimeHost};
     use crate::window::scrolling::windows::NativeScrollingCaptureHost;
+    use snaplingo_core::application::{
+        capture::{CaptureImageComposer, CaptureOcrDelivery},
+        pinned_image::PinnedImageState,
+    };
     let source = Arc::new(WindowsCaptureSessionSource::new());
     let scrolling = Arc::new(NativeScrollingCaptureHost::new(source.clone()));
     let sessions = Arc::new(CaptureSessions::new(source));
@@ -101,7 +105,7 @@ pub(crate) fn build_capture_runtime(
     history_suite: String,
     ocr_coordinator: Arc<OcrCoordinator>,
     result_window: Arc<ResultWindowRuntime>,
-    settings: Arc<crate::SettingsConfiguration>,
+    settings: Arc<snaplingo_core::application::SettingsConfiguration>,
     native_pins: Arc<crate::window::pinned::NativePinnedImageRuntimeHost>,
 ) -> CaptureRuntimeParts {
     let capture_session_source = build_capture_session_source();
@@ -130,7 +134,7 @@ pub(crate) fn build_capture_runtime(
     );
 
     #[cfg(target_os = "macos")]
-    let effects: Arc<dyn crate::application::capture::CaptureOcrEffects> =
+    let effects: Arc<dyn snaplingo_core::application::capture::CaptureOcrEffects> =
         Arc::new(NativeCaptureOcrEffects);
     let delivery = Arc::new(CaptureOcrDelivery::new(result_window, effects));
     #[cfg(target_os = "macos")]

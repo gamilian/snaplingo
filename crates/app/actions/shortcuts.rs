@@ -1,5 +1,5 @@
 use crate::actions::{AppAction, CaptureLaunchMode};
-use crate::domain::hotkey_config::{
+use snaplingo_core::domain::hotkey_config::{
     FILE_OCR_ACTION, OCR_CATEGORY, PIN_ACTION, PIN_SWITCH_GROUP_ACTION, PIN_TOGGLE_ALL_ACTION,
     SCREENSHOT_ACTION, SCREENSHOT_CATEGORY, SCREENSHOT_COPY_ACTION, SCREENSHOT_OCR_ACTION,
     SCREENSHOT_TRANSLATE_ACTION, SELECTION_TRANSLATE_ACTION, SHOW_TRANSLATION_WINDOW_ACTION,
@@ -49,7 +49,7 @@ mod tests {
 
     use super::hotkey_action_binding;
     use crate::actions::{AppAction, CaptureLaunchMode};
-    use crate::domain::hotkey_config::{
+    use snaplingo_core::domain::hotkey_config::{
         DEFAULT_HOTKEYS, FILE_OCR_ACTION, OCR_CATEGORY, PIN_ACTION, PIN_SWITCH_GROUP_ACTION,
         PIN_TOGGLE_ALL_ACTION, SCREENSHOT_ACTION, SCREENSHOT_CATEGORY, SCREENSHOT_COPY_ACTION,
         SCREENSHOT_OCR_ACTION, SCREENSHOT_TRANSLATE_ACTION, SELECTION_TRANSLATE_ACTION,

@@ -10,8 +10,8 @@ use core_graphics::window::{
     kCGWindowListOptionOnScreenOnly,
 };
 
-use crate::domain::capture::LogicalRect;
-use crate::error::{AppError, Result};
+use snaplingo_core::domain::capture::LogicalRect;
+use snaplingo_core::error::{AppError, Result};
 
 type WindowInfo = CFDictionary<CFString, CFType>;
 

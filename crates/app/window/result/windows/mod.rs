@@ -1,15 +1,15 @@
 //! A result window on the application's shared winit loop.
 use super::controller::{Action, ResultWindowController, ResultWindowEffects, Services};
-use crate::application::result_window::{
-    resolved_target, ResultWindowMode, ResultWindowNotifierPort, ResultWindowPresentationPort,
-    ResultWindowRequestId, ResultWindowSnapshot, ResultWindowWindowPort, TranslationStatus,
-};
 use crate::infrastructure::system::layered_windows::LayeredPresenter;
 use crate::infrastructure::ui_thread;
 use accesskit::{ActivationHandler, TreeUpdate};
 use accesskit_winit::{Adapter, WindowEvent as AccessibilityEvent};
 use base64::Engine;
 use snaplingo_accessibility::{result_project, ResultProjection};
+use snaplingo_core::application::result_window::{
+    resolved_target, ResultWindowMode, ResultWindowNotifierPort, ResultWindowPresentationPort,
+    ResultWindowRequestId, ResultWindowSnapshot, ResultWindowWindowPort, TranslationStatus,
+};
 use snaplingo_render::{Renderer, RendererTextMetrics};
 use snaplingo_ui::result::{
     ResultFrame, ResultInput, ResultIntent, ResultMode, ResultRow, ResultSnapshot, ResultUi,
@@ -155,14 +155,14 @@ impl ResultView {
             .or_else(|| event_loop.available_monitors().next());
         let display = monitor.as_ref().map(|monitor| {
             let size = monitor.size().to_logical::<f64>(monitor.scale_factor());
-            crate::domain::capture::LogicalRect {
+            snaplingo_core::domain::capture::LogicalRect {
                 x: 0.,
                 y: 0.,
                 width: size.width,
                 height: size.height,
             }
         });
-        let ui_scale = crate::application::capture::interface_scale(
+        let ui_scale = snaplingo_core::application::capture::interface_scale(
             &snapshot.preferences.screenshot.capture_ui_scale,
             display.as_ref(),
         );
@@ -366,14 +366,14 @@ impl ResultView {
             .to_logical::<f32>(self.window.scale_factor());
         let display = self.window.current_monitor().map(|monitor| {
             let size = monitor.size().to_logical::<f64>(monitor.scale_factor());
-            crate::domain::capture::LogicalRect {
+            snaplingo_core::domain::capture::LogicalRect {
                 x: 0.,
                 y: 0.,
                 width: size.width,
                 height: size.height,
             }
         });
-        let scale = crate::application::capture::interface_scale(
+        let scale = snaplingo_core::application::capture::interface_scale(
             &self.snapshot.preferences.screenshot.capture_ui_scale,
             display.as_ref(),
         );
@@ -500,13 +500,16 @@ fn project(
             .collect(),
         translating: snapshot.translating,
         ocr_text: snapshot.ocr_text.clone(),
-        ocr_tokens: crate::application::result_window::copy_tokens(&snapshot.ocr_text, vec![])
-            .into_iter()
-            .map(|token| snaplingo_ui::result::ResultCopyToken {
-                label: token.label,
-                value: token.value,
-            })
-            .collect(),
+        ocr_tokens: snaplingo_core::application::result_window::copy_tokens(
+            &snapshot.ocr_text,
+            vec![],
+        )
+        .into_iter()
+        .map(|token| snaplingo_ui::result::ResultCopyToken {
+            label: token.label,
+            value: token.value,
+        })
+        .collect(),
         ocr_image: image,
         ocr_metadata: metadata.join(" · "),
         ocr_language: snapshot.ocr_language.clone(),

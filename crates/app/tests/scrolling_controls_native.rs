@@ -1,26 +1,11 @@
 // AppKit callbacks and window lifecycle must run on the process main thread.
 #[cfg(target_os = "macos")]
-mod domain {
-    pub mod config {
-        #[derive(Clone, Default)]
-        pub struct GeneralSettings {
-            pub theme: String,
-            pub interface_theme: String,
-        }
-    }
-    pub mod capture {
-        #![allow(dead_code, unused_imports)]
-        pub use snaplingo_core::domain::capture::*;
-    }
-}
-
-#[cfg(target_os = "macos")]
 #[path = "../infrastructure/system/native_theme.rs"]
 mod native_theme;
 
 #[cfg(target_os = "macos")]
 mod scrolling_geometry {
-    use crate::domain::capture::LogicalRect;
+    use snaplingo_core::domain::capture::LogicalRect;
     pub(super) fn overlaps(a: &LogicalRect, b: &LogicalRect) -> bool {
         a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
     }
@@ -42,10 +27,12 @@ mod infrastructure {
 
 #[cfg(target_os = "macos")]
 fn main() {
-    use domain::capture::{LogicalRect, ScrollingCaptureStatus, ScrollingCaptureView};
     use objc2::MainThreadMarker;
     use objc2_app_kit::NSApplication;
     use scrolling_controls_macos::{self as controls, Action};
+    use snaplingo_core::domain::capture::{
+        LogicalRect, ScrollingCaptureStatus, ScrollingCaptureView,
+    };
     use std::{cell::RefCell, rc::Rc};
 
     let mtm = MainThreadMarker::new().unwrap();
@@ -76,9 +63,10 @@ fn main() {
     controls::open(
         view.clone(),
         &rect,
-        domain::config::GeneralSettings {
+        snaplingo_core::domain::config::GeneralSettings {
             theme: "light".into(),
             interface_theme: "native".into(),
+            ..Default::default()
         },
         move |action| clicked.borrow_mut().push(action),
     )
@@ -174,9 +162,10 @@ fn main() {
         ("paper", false, [253, 252, 247], [83, 115, 92]),
         ("paper", true, [41, 52, 43], [168, 191, 145]),
     ] {
-        controls::update_theme(domain::config::GeneralSettings {
+        controls::update_theme(snaplingo_core::domain::config::GeneralSettings {
             theme: if dark { "dark" } else { "light" }.into(),
             interface_theme: theme.into(),
+            ..Default::default()
         });
         let bytes = controls::test_snapshot(id);
         let pixels = image::load_from_memory(&bytes).unwrap().into_rgba8();

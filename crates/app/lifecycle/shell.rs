@@ -8,8 +8,10 @@ use tray_icon::{
 
 use crate::actions::shortcuts::hotkey_action_binding;
 use crate::actions::{AppAction, CaptureLaunchMode};
-use crate::application::hotkeys::display_hotkey_to_accelerator;
-use crate::domain::hotkey_config::{hotkey_category, HotkeySettingsSnapshot, DEFAULT_HOTKEYS};
+use snaplingo_core::application::hotkeys::display_hotkey_to_accelerator;
+use snaplingo_core::domain::hotkey_config::{
+    hotkey_category, HotkeySettingsSnapshot, DEFAULT_HOTKEYS,
+};
 
 struct MenuBar {
     menu: Menu,
@@ -60,15 +62,15 @@ const QUIT_ID: &str = "quit";
     all(target_os = "windows", feature = "native-app")
 ))]
 pub(crate) fn set_capture_ocr_status_native(
-    status: Option<crate::application::capture::CaptureOcrStatus>,
+    status: Option<snaplingo_core::application::capture::CaptureOcrStatus>,
 ) {
     crate::infrastructure::ui_thread::dispatch(capture_ocr_status_update(status));
 }
 
 pub(crate) fn capture_ocr_status_update(
-    status: Option<crate::application::capture::CaptureOcrStatus>,
+    status: Option<snaplingo_core::application::capture::CaptureOcrStatus>,
 ) -> impl FnOnce() + Send {
-    use crate::application::capture::CaptureOcrStatus;
+    use snaplingo_core::application::capture::CaptureOcrStatus;
     let (title, tooltip) = match status {
         Some(CaptureOcrStatus::Recognizing) => {
             ("OCR…", "SnapLingo — Recognizing text…".to_string())
@@ -186,7 +188,7 @@ pub(crate) fn test_native_menu_bar() {
     use tray_icon::menu::ContextMenu;
 
     let mtm = MainThreadMarker::new().unwrap();
-    let hotkeys = crate::domain::hotkey_config::default_hotkey_snapshot();
+    let hotkeys = snaplingo_core::domain::hotkey_config::default_hotkey_snapshot();
     let bar = create_menu_bar(&hotkeys).unwrap();
     let menu = unsafe { &*(bar.menu.ns_menu() as *const NSMenu) };
     assert_eq!(menu.numberOfItems(), 10);
@@ -338,7 +340,7 @@ mod tests {
 
     #[test]
     fn menu_shortcuts_match_the_configured_actions() {
-        let hotkeys = crate::domain::hotkey_config::default_hotkey_snapshot();
+        let hotkeys = snaplingo_core::domain::hotkey_config::default_hotkey_snapshot();
         for (id, expected) in [
             (SCREENSHOT_ID, Some("F1")),
             (TRANSLATE_SELECTION_ID, Some("Alt+KeyD")),
@@ -363,9 +365,9 @@ mod tests {
     fn menu_shortcuts_follow_custom_clear_and_reset_configuration() {
         use std::sync::Arc;
 
-        use crate::application::hotkeys::HotkeyConfiguration;
-        use crate::domain::hotkey_config::{FILE_OCR_ACTION, HOTKEY_UNSET, OCR_CATEGORY};
         use crate::infrastructure::storage::SqliteConfigStore;
+        use snaplingo_core::application::hotkeys::HotkeyConfiguration;
+        use snaplingo_core::domain::hotkey_config::{FILE_OCR_ACTION, HOTKEY_UNSET, OCR_CATEGORY};
 
         let configuration = HotkeyConfiguration::new(Arc::new(SqliteConfigStore::new_in_memory()));
         for (value, expected) in [

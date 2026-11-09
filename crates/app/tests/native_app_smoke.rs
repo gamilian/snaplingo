@@ -63,16 +63,6 @@ pub use app_state::AppState;
     target_os = "macos",
     all(target_os = "windows", feature = "native-app")
 ))]
-pub use application::*;
-#[cfg(any(
-    target_os = "macos",
-    all(target_os = "windows", feature = "native-app")
-))]
-pub use domain::*;
-#[cfg(any(
-    target_os = "macos",
-    all(target_os = "windows", feature = "native-app")
-))]
 pub use error::{AppError, Result};
 #[cfg(any(
     target_os = "macos",

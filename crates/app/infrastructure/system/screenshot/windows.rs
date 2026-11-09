@@ -1,11 +1,11 @@
 use super::xcap_common;
-use crate::application::capture::CaptureCoordinatePolicy;
-use crate::application::CaptureSessionSource;
-use crate::domain::capture::{
+use snaplingo_core::application::capture::CaptureCoordinatePolicy;
+use snaplingo_core::application::CaptureSessionSource;
+use snaplingo_core::domain::capture::{
     CapturedCursor, ControlCandidate, LogicalPoint, LogicalRect, MonitorLayout, MonitorSnapshot,
     ScreenRegion, WindowCandidate,
 };
-use crate::error::AppError;
+use snaplingo_core::error::AppError;
 use windows::Win32::Foundation::{HANDLE, POINT};
 use windows::Win32::Graphics::Gdi::{
     CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, SelectObject, BITMAPINFO,
@@ -426,7 +426,7 @@ fn physical_point_for_logical_point(
 #[cfg(test)]
 mod tests {
     use super::{control_candidate_from_physical_bounds, physical_point_for_logical_point};
-    use crate::domain::capture::{LogicalPoint, LogicalRect, MonitorLayout, PhysicalRect};
+    use snaplingo_core::domain::capture::{LogicalPoint, LogicalRect, MonitorLayout, PhysicalRect};
 
     #[test]
     fn converts_ui_automation_physical_bounds_to_capture_coordinates() {

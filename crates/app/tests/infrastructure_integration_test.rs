@@ -1,8 +1,8 @@
 use mockito::Server;
+use snaplingo_core::domain::SettingsSnapshot;
 use snaplingo_lib::http::{HttpClient, ReqwestHttpClient};
 use snaplingo_lib::storage::{Database, SqliteConfigStore};
 use snaplingo_lib::system::get_database_path;
-use snaplingo_lib::SettingsSnapshot;
 use std::collections::HashMap;
 use std::net::{Ipv4Addr, TcpListener};
 use std::sync::Arc;

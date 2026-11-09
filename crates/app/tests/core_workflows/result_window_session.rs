@@ -1,22 +1,22 @@
 use super::*;
-use crate::application::history::History;
-use crate::application::providers::translation::TranslationCoordinator;
-use crate::application::settings::SettingsConfiguration;
-use crate::domain::translation::{TranslationRequest, TranslationResult};
-use crate::domain::SettingsSnapshot;
 use crate::Result;
+use snaplingo_core::application::history::History;
+use snaplingo_core::application::providers::translation::TranslationCoordinator;
 use snaplingo_core::application::result_window::*;
 use snaplingo_core::application::result_window::{
     ResultWindowMode, ResultWindowOcrIntent, ResultWindowOrigin, ResultWindowPayload,
 };
+use snaplingo_core::application::settings::SettingsConfiguration;
+use snaplingo_core::domain::translation::{TranslationRequest, TranslationResult};
+use snaplingo_core::domain::SettingsSnapshot;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 mod cases {
     use super::*;
-    use crate::application::providers::common::Provider;
-    use crate::application::providers::translation::TranslationProvider;
     use crate::infrastructure::storage::{SqliteConfigStore, SqliteHistoryRepository};
+    use snaplingo_core::application::providers::common::Provider;
+    use snaplingo_core::application::providers::translation::TranslationProvider;
     use tokio::sync::{mpsc, oneshot};
 
     type Request = (TranslationRequest, oneshot::Sender<TranslationResult>);
@@ -435,7 +435,7 @@ mod cases {
         session.finish_file_ocr(
             obsolete,
             Ok((
-                crate::domain::ocr::OcrResult::from_text("late", None),
+                snaplingo_core::domain::ocr::OcrResult::from_text("late", None),
                 "image".into(),
             )),
         );
@@ -445,7 +445,7 @@ mod cases {
         session.finish_file_ocr(
             current,
             Ok((
-                crate::domain::ocr::OcrResult::from_text("你 好", Some(0.9)),
+                snaplingo_core::domain::ocr::OcrResult::from_text("你 好", Some(0.9)),
                 "image".into(),
             )),
         );

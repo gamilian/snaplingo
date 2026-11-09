@@ -194,8 +194,10 @@ pub(crate) fn refresh(
         .configuration
         .snapshot()
         .map_err(|e| e.to_string())?;
-    let zoom =
-        crate::application::capture::interface_scale(&saved.screenshot.capture_ui_scale, None);
+    let zoom = snaplingo_core::application::capture::interface_scale(
+        &saved.screenshot.capture_ui_scale,
+        None,
+    );
     let mut ui = PermissionPromptUi::new(model(&state, projection)?);
     let mut metrics = RendererTextMetrics::default();
     let frame = ui.frame(1., &mut metrics);

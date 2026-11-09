@@ -4,8 +4,8 @@ use std::sync::Arc;
 use chrono::Utc;
 use rusqlite::{params, Connection, OptionalExtension, Transaction};
 
-use crate::application::providers::{CredentialSnapshot, ProviderCredentialStore};
 use crate::{AppError, Result};
+use snaplingo_core::application::providers::{CredentialSnapshot, ProviderCredentialStore};
 
 use super::Database;
 

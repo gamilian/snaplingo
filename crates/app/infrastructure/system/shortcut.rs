@@ -1,4 +1,4 @@
-use crate::error::Result;
+use snaplingo_core::error::Result;
 
 pub use super::shortcut_native::{ShortcutTriggerTiming, UiTask};
 
@@ -8,7 +8,7 @@ pub use super::hotkey_recording::initialize_shortcuts;
 /// Initialize on the platform event-loop thread with the host's dispatcher and
 /// recording destination. No desktop shell owns the native shortcut registry.
 pub fn initialize_native_shortcuts(
-    recording: crate::application::hotkeys::HotkeyRecording,
+    recording: snaplingo_core::application::hotkeys::HotkeyRecording,
     dispatch: impl Fn(UiTask) -> Result<()> + Send + Sync + 'static,
     is_focused: impl Fn(&str) -> bool + Send + Sync + 'static,
     deliver: impl Fn(&str, super::RecordedHotkey) + Send + Sync + 'static,

@@ -2,8 +2,8 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use crate::application::providers::ocr::TesseractEngine;
 use crate::{AppError, Result};
+use snaplingo_core::application::providers::ocr::TesseractEngine;
 
 static TESSERACT_OCR_LOCK: Mutex<()> = Mutex::new(());
 

@@ -5,9 +5,9 @@ use std::sync::Arc;
 mod cases {
 
     use super::*;
-    use crate::application::providers::{HttpClient, HttpResponse};
     use anyhow::Result;
     use async_trait::async_trait;
+    use snaplingo_core::application::providers::{HttpClient, HttpResponse};
     use std::collections::HashMap;
     use std::sync::Arc;
 

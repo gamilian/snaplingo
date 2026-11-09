@@ -1,18 +1,18 @@
 use std::sync::Arc;
 
-use crate::application::providers::ocr::OcrCoordinator;
-use crate::application::providers::translation::TranslationCoordinator;
-use crate::application::providers::ProviderAdministration;
-use crate::application::result_window::ResultWindowRuntime;
-use crate::application::{
+use crate::infrastructure::events::EventBus;
+use crate::infrastructure::storage::SqliteAppLogRepository;
+use crate::Result;
+use snaplingo_core::application::providers::ocr::OcrCoordinator;
+use snaplingo_core::application::providers::translation::TranslationCoordinator;
+use snaplingo_core::application::providers::ProviderAdministration;
+use snaplingo_core::application::result_window::ResultWindowRuntime;
+use snaplingo_core::application::{
     CaptureCursorMover, CaptureOutput, CaptureSessionRuntime, CaptureSessions, Favorites, History,
     HotkeyRuntime, LibraryIndex, OcrHistoryReplay, PinnedImageRuntime, RequiredPermissions,
     ScreenshotFavoriteCapture, ScreenshotFavorites, SettingsApplication, SettingsConfiguration,
     TtsRuntime,
 };
-use crate::infrastructure::events::EventBus;
-use crate::infrastructure::storage::SqliteAppLogRepository;
-use crate::Result;
 
 pub struct SettingsRuntime {
     pub configuration: Arc<SettingsConfiguration>,
@@ -24,7 +24,7 @@ pub struct SettingsRuntime {
 pub struct ProviderRuntime {
     pub translation: Arc<TranslationCoordinator>,
     pub ocr: Arc<OcrCoordinator>,
-    pub(crate) file_ocr: Arc<crate::application::providers::ocr::FileOcr>,
+    pub(crate) file_ocr: Arc<snaplingo_core::application::providers::ocr::FileOcr>,
     pub administration: Arc<ProviderAdministration>,
 }
 
@@ -49,11 +49,11 @@ pub struct ScreenshotFavoritesRuntime {
 
 pub struct FavoritesRuntime {
     pub favorites: Arc<Favorites>,
-    pub ocr_application: Arc<crate::application::OcrFavoriteApplication>,
+    pub ocr_application: Arc<snaplingo_core::application::OcrFavoriteApplication>,
 }
 
 pub struct SelectionRuntime {
-    pub(crate) translation: Arc<crate::application::selected_text::SelectionTranslation>,
+    pub(crate) translation: Arc<snaplingo_core::application::selected_text::SelectionTranslation>,
 }
 
 pub struct LogsRuntime {
@@ -65,7 +65,7 @@ pub struct AppState {
     pub(crate) desktop_events: Arc<crate::infrastructure::desktop_events::DesktopEvents>,
     pub(crate) desktop_subscriptions:
         Vec<crate::infrastructure::desktop_events::DesktopSubscription>,
-    pub updates: Arc<crate::application::updates::AppUpdates>,
+    pub updates: Arc<snaplingo_core::application::updates::AppUpdates>,
     pub permissions: Arc<RequiredPermissions>,
     pub settings: Arc<SettingsRuntime>,
     pub providers: Arc<ProviderRuntime>,
@@ -82,7 +82,7 @@ pub struct AppState {
         target_os = "macos",
         all(target_os = "windows", feature = "native-app")
     ))]
-    pub(crate) result_session: Arc<crate::application::result_window::ResultWindowSession>,
+    pub(crate) result_session: Arc<snaplingo_core::application::result_window::ResultWindowSession>,
     #[cfg(any(
         target_os = "macos",
         all(target_os = "windows", feature = "native-app")
@@ -127,7 +127,7 @@ impl AppState {
 mod tests {
     use std::sync::Arc;
 
-    use crate::application::result_window::ResultWindowRuntime;
+    use snaplingo_core::application::result_window::ResultWindowRuntime;
 
     use super::AppState;
 

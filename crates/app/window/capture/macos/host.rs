@@ -6,18 +6,21 @@ use objc2::{rc::Retained, AnyThread};
 use objc2_app_kit::{NSApplication, NSPasteboard};
 use objc2_foundation::{NSString, NSUserDefaults};
 
-use crate::application::capture::{
+use crate::infrastructure::ui_thread;
+use crate::Result;
+use snaplingo_core::application::capture::{
     merge_selection_history, remember_selection, AnnotationTool, CaptureEditor,
     CaptureEditorStylePresentation, CaptureOcrDelivery, CaptureOcrStatus, CaptureOcrTarget,
     CaptureSelectionMode, CaptureSessionRuntimeHost, CaptureWindowGeometry,
 };
-use crate::domain::capture::{CaptureOutputAction, CaptureSessionId, LogicalPoint, LogicalRect};
-use crate::domain::ocr::OcrResult;
-use crate::infrastructure::ui_thread;
-use crate::{
-    CaptureCursorMover, CaptureOutput, CaptureSessionRuntime, CaptureSessions, Result,
+use snaplingo_core::application::{
+    CaptureCursorMover, CaptureOutput, CaptureSessionRuntime, CaptureSessions,
     SettingsConfiguration,
 };
+use snaplingo_core::domain::capture::{
+    CaptureOutputAction, CaptureSessionId, LogicalPoint, LogicalRect,
+};
+use snaplingo_core::domain::ocr::OcrResult;
 
 use super::presentation;
 use super::view::{self as native, Action, Operation};
@@ -29,7 +32,7 @@ struct Services {
     settings: Arc<SettingsConfiguration>,
     output: Arc<CaptureOutput>,
     cursor: Arc<dyn CaptureCursorMover>,
-    favorites: Weak<crate::application::ScreenshotFavoriteCapture>,
+    favorites: Weak<snaplingo_core::application::ScreenshotFavoriteCapture>,
 }
 
 impl Services {
@@ -425,7 +428,9 @@ fn dispatch(
         action,
         Action::Refresh
             | Action::Editor(super::canvas::Request::Control(
-                crate::application::capture::CaptureEditorControlAction::Command("refresh")
+                snaplingo_core::application::capture::CaptureEditorControlAction::Command(
+                    "refresh"
+                )
             ))
     );
     crate::infrastructure::runtime::spawn(async move {
@@ -628,7 +633,7 @@ async fn editor_request(
     request: super::canvas::Request,
 ) -> Result<()> {
     use super::canvas::Request;
-    use crate::application::capture::{
+    use snaplingo_core::application::capture::{
         CaptureEditorControlAction as Control, CaptureEditorStyleChange as Style,
     };
     let runtime = services.runtime()?;
@@ -796,7 +801,7 @@ async fn editor_request(
 
 fn save_action(
     path: std::path::PathBuf,
-    screenshot: &crate::domain::config::ScreenshotSettings,
+    screenshot: &snaplingo_core::domain::config::ScreenshotSettings,
     remember_choice: bool,
 ) -> CaptureOutputAction {
     CaptureOutputAction::Save {

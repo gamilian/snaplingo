@@ -1,5 +1,3 @@
-use crate::application::providers::ocr::SystemOcrEngine;
-use crate::domain::ocr::{OcrBoundingBox, OcrLine, OcrRequest, OcrResult};
 use crate::{AppError, Result};
 use objc2::runtime::AnyObject;
 use objc2::AnyThread;
@@ -8,6 +6,8 @@ use objc2_vision::{
     VNDetectedObjectObservation, VNImageOption, VNImageRequestHandler, VNRecognizeTextRequest,
     VNRequest, VNRequestTextRecognitionLevel,
 };
+use snaplingo_core::application::providers::ocr::SystemOcrEngine;
+use snaplingo_core::domain::ocr::{OcrBoundingBox, OcrLine, OcrRequest, OcrResult};
 use std::io::Cursor;
 
 pub struct MacOSVisionOcrEngine;

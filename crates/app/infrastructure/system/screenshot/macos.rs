@@ -2,12 +2,6 @@ use super::geometry::{
     monitor_layout_from_physical_geometry, monitor_snapshot_from_physical_geometry,
 };
 use super::macos_window_list::{visible_windows, VisibleWindow};
-use crate::application::CaptureSessionSource;
-use crate::domain::capture::{
-    CapturedCursor, ControlCandidate, LogicalPoint, LogicalRect, MonitorLayout, MonitorSnapshot,
-    ScreenRegion, WindowCandidate,
-};
-use crate::error::AppError;
 use accessibility_sys::{
     kAXErrorSuccess, kAXPositionAttribute, kAXSizeAttribute, kAXValueTypeCGPoint,
     kAXValueTypeCGSize, AXIsProcessTrusted, AXUIElementCopyAttributeValue,
@@ -24,6 +18,12 @@ use image::codecs::png::{
 };
 use image::{ExtendedColorType, ImageEncoder};
 use objc2_app_kit::{NSCursor, NSEvent};
+use snaplingo_core::application::CaptureSessionSource;
+use snaplingo_core::domain::capture::{
+    CapturedCursor, ControlCandidate, LogicalPoint, LogicalRect, MonitorLayout, MonitorSnapshot,
+    ScreenRegion, WindowCandidate,
+};
+use snaplingo_core::error::AppError;
 use std::io::Cursor;
 use std::ptr;
 use std::time::Instant;
@@ -794,7 +794,9 @@ mod tests {
         let monitors = capture_visible_display_layouts()
             .unwrap()
             .into_iter()
-            .map(|layout| crate::domain::capture::monitor_snapshot_from_layout(layout, Vec::new()))
+            .map(|layout| {
+                snaplingo_core::domain::capture::monitor_snapshot_from_layout(layout, Vec::new())
+            })
             .collect::<Vec<_>>();
         let mut durations = Vec::new();
         let mut candidate_count = 0;
@@ -812,7 +814,7 @@ mod tests {
 
     #[test]
     fn builds_captured_cursor_from_appkit_bottom_left_coordinates() {
-        let primary_bounds = crate::domain::capture::LogicalRect {
+        let primary_bounds = snaplingo_core::domain::capture::LogicalRect {
             x: 0.0,
             y: 0.0,
             width: 120.0,
@@ -834,11 +836,11 @@ mod tests {
 
         assert_eq!(
             cursor.logical_position,
-            crate::domain::capture::LogicalPoint { x: 18.0, y: 27.0 }
+            snaplingo_core::domain::capture::LogicalPoint { x: 18.0, y: 27.0 }
         );
         assert_eq!(
             cursor.hotspot,
-            crate::domain::capture::LogicalPoint { x: 2.0, y: 3.0 }
+            snaplingo_core::domain::capture::LogicalPoint { x: 2.0, y: 3.0 }
         );
         assert_eq!(cursor.image_width, 20);
         assert_eq!(cursor.image_height, 24);
@@ -848,7 +850,7 @@ mod tests {
 
     #[test]
     fn rejects_cursor_geometry_without_point_size() {
-        let primary_bounds = crate::domain::capture::LogicalRect {
+        let primary_bounds = snaplingo_core::domain::capture::LogicalRect {
             x: 0.0,
             y: 0.0,
             width: 120.0,
@@ -871,7 +873,7 @@ mod tests {
 
     #[test]
     fn maps_appkit_mouse_position_through_primary_logical_origin() {
-        let primary_bounds = crate::domain::capture::LogicalRect {
+        let primary_bounds = snaplingo_core::domain::capture::LogicalRect {
             x: -200.0,
             y: 50.0,
             width: 120.0,
@@ -880,7 +882,7 @@ mod tests {
 
         assert_eq!(
             appkit_mouse_to_logical_point(25.0, 70.0, &primary_bounds),
-            Some(crate::domain::capture::LogicalPoint { x: -175.0, y: 60.0 })
+            Some(snaplingo_core::domain::capture::LogicalPoint { x: -175.0, y: 60.0 })
         );
     }
 
@@ -889,13 +891,13 @@ mod tests {
         let monitors = vec![
             MonitorSnapshot {
                 id: "secondary".to_string(),
-                logical_bounds: crate::domain::capture::LogicalRect {
+                logical_bounds: snaplingo_core::domain::capture::LogicalRect {
                     x: -100.0,
                     y: 0.0,
                     width: 100.0,
                     height: 50.0,
                 },
-                physical_bounds: crate::domain::capture::PhysicalRect {
+                physical_bounds: snaplingo_core::domain::capture::PhysicalRect {
                     x: -200,
                     y: 0,
                     width: 200,
@@ -906,13 +908,13 @@ mod tests {
             },
             MonitorSnapshot {
                 id: "primary".to_string(),
-                logical_bounds: crate::domain::capture::LogicalRect {
+                logical_bounds: snaplingo_core::domain::capture::LogicalRect {
                     x: 0.0,
                     y: 0.0,
                     width: 120.0,
                     height: 80.0,
                 },
-                physical_bounds: crate::domain::capture::PhysicalRect {
+                physical_bounds: snaplingo_core::domain::capture::PhysicalRect {
                     x: 0,
                     y: 0,
                     width: 240,
@@ -925,7 +927,7 @@ mod tests {
 
         assert_eq!(
             primary_screen_bounds(&monitors),
-            Some(crate::domain::capture::LogicalRect {
+            Some(snaplingo_core::domain::capture::LogicalRect {
                 x: 0.0,
                 y: 0.0,
                 width: 120.0,
@@ -1080,7 +1082,7 @@ mod tests {
         assert_eq!(snapshot.png_data, vec![1, 2, 3]);
         assert_eq!(
             snapshot.physical_bounds,
-            crate::domain::capture::PhysicalRect {
+            snaplingo_core::domain::capture::PhysicalRect {
                 x: -2560,
                 y: 0,
                 width: 2560,
@@ -1089,7 +1091,7 @@ mod tests {
         );
         assert_eq!(
             snapshot.logical_bounds,
-            crate::domain::capture::LogicalRect {
+            snaplingo_core::domain::capture::LogicalRect {
                 x: -1280.0,
                 y: 0.0,
                 width: 1280.0,
@@ -1124,7 +1126,7 @@ mod tests {
 
         assert_eq!(
             candidate.logical_bounds,
-            crate::domain::capture::LogicalRect {
+            snaplingo_core::domain::capture::LogicalRect {
                 x: -1200.0,
                 y: 100.0,
                 width: 400.0,

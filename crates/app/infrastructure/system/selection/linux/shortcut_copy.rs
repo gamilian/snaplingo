@@ -7,11 +7,11 @@ use std::{
 
 use async_trait::async_trait;
 
-use crate::application::selected_text::SelectionMethod;
-use crate::domain::{
+use crate::infrastructure::system::selection::common::clipboard_transaction;
+use snaplingo_core::application::selected_text::SelectionMethod;
+use snaplingo_core::domain::{
     MethodAvailability, SelectionAttempt, SelectionContext, SelectionMethodKind, SelectionSource,
 };
-use crate::infrastructure::system::selection::common::clipboard_transaction;
 
 const CLIPBOARD_TIMEOUT: Duration = Duration::from_millis(700);
 const CLIPBOARD_POLL_INTERVAL: Duration = Duration::from_millis(15);
@@ -185,12 +185,14 @@ fn read_clipboard_text() -> Result<String, String> {
 #[cfg(test)]
 mod linux {
     mod shortcut_copy {
-        use crate::domain::{SelectionAttemptStatus, SelectionContext, SelectionMethodKind};
+        use snaplingo_core::domain::{
+            SelectionAttemptStatus, SelectionContext, SelectionMethodKind,
+        };
 
         use super::super::{
             selection_attempt_from_shortcut_copy_result, ShortcutCopySelectionMethod,
         };
-        use crate::application::selected_text::SelectionMethod;
+        use snaplingo_core::application::selected_text::SelectionMethod;
 
         #[test]
         fn method_kind_is_shortcut_copy() {

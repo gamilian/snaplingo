@@ -20,9 +20,11 @@ use objc2_foundation::{
 };
 
 use super::HotkeyView;
-use crate::application::settings::{FeaturePreferences, GeneralValue, OcrField, TranslationField};
-use crate::domain::GeneralSettings;
 use crate::infrastructure::system::native_theme::{self, Palette};
+use snaplingo_core::application::settings::{
+    FeaturePreferences, GeneralValue, OcrField, TranslationField,
+};
+use snaplingo_core::domain::GeneralSettings;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum FeatureKind {

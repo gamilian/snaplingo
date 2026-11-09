@@ -3,13 +3,13 @@ use crate::infrastructure::system::shortcut_native;
 use crate::window::capture as capture_window;
 // Native scrolling sampler and application actions on the shared Windows loop.
 use super::scrolling_view_windows as view;
-use crate::application::capture::{
+use crate::infrastructure::ui_thread;
+use snaplingo_core::application::capture::{
     CaptureSessionSource, ScrollingCaptureGeometry, ScrollingCaptureHost, ScrollingWindowOptions,
 };
-use crate::domain::capture::{
+use snaplingo_core::domain::capture::{
     CaptureSessionId, MonitorSnapshot, ScrollingCaptureView, ScrollingShortcutAction,
 };
-use crate::infrastructure::ui_thread;
 use snaplingo_ui::scrolling::ScrollingAction as Action;
 use std::{
     collections::HashMap,
@@ -196,7 +196,7 @@ impl ScrollingCaptureHost for NativeScrollingCaptureHost {
         .await
     }
 }
-pub(crate) fn settings_changed(general: crate::domain::GeneralSettings) {
+pub(crate) fn settings_changed(general: snaplingo_core::domain::GeneralSettings) {
     ui_thread::dispatch(move || view::settings_changed(general));
 }
 pub(crate) use view::{

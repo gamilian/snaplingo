@@ -5,13 +5,13 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 
-use crate::application::history::{
+use crate::{AppError, Result};
+use snaplingo_core::application::history::{
     HistoryCleanupPolicy, HistoryEntry, HistoryKind, HistoryPage, HistoryQuery, HistoryRepository,
     OcrHistoryEntry, StoredOcrHistoryAssets, TranslationHistoryEntry,
 };
-use crate::domain::ocr::{OcrRequest, OcrResult};
-use crate::domain::translation::{TranslationRequest, TranslationResult};
-use crate::{AppError, Result};
+use snaplingo_core::domain::ocr::{OcrRequest, OcrResult};
+use snaplingo_core::domain::translation::{TranslationRequest, TranslationResult};
 
 use super::Database;
 
@@ -667,8 +667,10 @@ mod tests {
     use chrono::{Duration, Utc};
 
     use super::SqliteHistoryRepository;
-    use crate::application::history::{HistoryCleanupPolicy, HistoryQuery, HistoryRepository};
-    use crate::domain::translation::{TranslationRequest, TranslationResult};
+    use snaplingo_core::application::history::{
+        HistoryCleanupPolicy, HistoryQuery, HistoryRepository,
+    };
+    use snaplingo_core::domain::translation::{TranslationRequest, TranslationResult};
 
     async fn insert_translation(repository: &SqliteHistoryRepository) -> i64 {
         repository
@@ -703,11 +705,11 @@ mod tests {
         let newer = insert_translation(&repository).await;
         repository
             .insert_ocr(
-                &crate::domain::ocr::OcrRequest {
+                &snaplingo_core::domain::ocr::OcrRequest {
                     image_data: vec![1, 2, 3],
                     language: None,
                 },
-                &crate::domain::ocr::OcrResult::from_text("recognized", Some(0.9)),
+                &snaplingo_core::domain::ocr::OcrResult::from_text("recognized", Some(0.9)),
                 "system",
                 Utc::now(),
                 1,

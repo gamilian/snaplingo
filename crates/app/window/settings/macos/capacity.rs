@@ -176,8 +176,10 @@ pub(crate) fn show(parent: &NSWindow, state: Arc<crate::AppState>) -> Result<(),
         history_limit: saved.history.maximum_records,
         favorites_limit: saved.history.maximum_favorites,
     };
-    let interface_scale =
-        crate::application::capture::interface_scale(&saved.screenshot.capture_ui_scale, None);
+    let interface_scale = snaplingo_core::application::capture::interface_scale(
+        &saved.screenshot.capture_ui_scale,
+        None,
+    );
     let window = unsafe {
         NSWindow::initWithContentRect_styleMask_backing_defer(
             mtm.alloc(),
@@ -259,16 +261,14 @@ pub(crate) fn test_is_open() -> bool {
 impl Sheet {
     fn perform(&self, intent: CapacityIntent) {
         if let CapacityIntent::Save(value) = intent {
-            let saved =
-                self.state
-                    .settings
-                    .configuration
-                    .update_history(crate::domain::HistorySettings {
-                        auto_cleanup_enabled: value.automatic_cleanup,
-                        retention_days: value.retention_days,
-                        maximum_records: value.history_limit,
-                        maximum_favorites: value.favorites_limit,
-                    });
+            let saved = self.state.settings.configuration.update_history(
+                snaplingo_core::domain::HistorySettings {
+                    auto_cleanup_enabled: value.automatic_cleanup,
+                    retention_days: value.retention_days,
+                    maximum_records: value.history_limit,
+                    maximum_favorites: value.favorites_limit,
+                },
+            );
             if let Err(error) = saved {
                 self.view.ivars().ui.borrow_mut().error(error.to_string());
                 self.redraw();

@@ -8,7 +8,7 @@ use crate::infrastructure::ui_thread;
 
 use self::view as native;
 use super::controller::{ResultWindowController, ResultWindowEffects, Services};
-use crate::application::result_window::{
+use snaplingo_core::application::result_window::{
     ResultWindowNotifierPort, ResultWindowPresentationPort, ResultWindowRequestId,
     ResultWindowSnapshot, ResultWindowWindowPort,
 };

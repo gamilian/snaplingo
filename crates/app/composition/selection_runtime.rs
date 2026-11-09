@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use crate::application::{SelectedTextAcquirer, SelectionScheme, SystemSelectionProvider};
 #[cfg(target_os = "linux")]
 use crate::infrastructure::system::selection::linux::PlatformSelectionProvider;
 #[cfg(target_os = "macos")]
 use crate::infrastructure::system::selection::macos::MacSelectionProvider;
 #[cfg(target_os = "windows")]
 use crate::infrastructure::system::selection::windows::PlatformSelectionProvider;
+use snaplingo_core::application::{SelectedTextAcquirer, SelectionScheme, SystemSelectionProvider};
 
 pub(crate) fn build_selected_text_acquirer(identifier: String) -> Arc<SelectedTextAcquirer> {
     let selection_provider = build_selection_provider(identifier);

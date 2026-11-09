@@ -5,11 +5,11 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, Row};
 
-use crate::application::screenshot_favorites::{
+use crate::{AppError, Result};
+use snaplingo_core::application::screenshot_favorites::{
     NewScreenshotFavorite, ScreenshotFavoriteQuery, ScreenshotFavoriteRecord,
     ScreenshotFavoriteRepository,
 };
-use crate::{AppError, Result};
 
 use super::Database;
 

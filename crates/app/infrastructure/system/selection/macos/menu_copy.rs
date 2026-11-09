@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
-use crate::application::selected_text::SelectionMethod;
-use crate::domain::{
+use snaplingo_core::application::selected_text::SelectionMethod;
+use snaplingo_core::domain::{
     MethodAvailability, SelectionAttempt, SelectionContext, SelectionMethodKind, SelectionSource,
 };
 

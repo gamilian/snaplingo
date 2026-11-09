@@ -3,9 +3,9 @@ use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::thread;
 use std::time::Duration;
 
-use crate::application::providers::ocr::SystemOcrEngine;
-use crate::domain::ocr::{OcrRequest, OcrResult};
 use crate::{AppError, Result};
+use snaplingo_core::application::providers::ocr::SystemOcrEngine;
+use snaplingo_core::domain::ocr::{OcrRequest, OcrResult};
 use windows::core::HSTRING;
 use windows::Foundation::{AsyncOperationCompletedHandler, AsyncStatus};
 use windows::Globalization::Language;

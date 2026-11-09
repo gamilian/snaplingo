@@ -25,6 +25,6 @@ pub(crate) use windows::WindowsOcrEngine;
     all(target_os = "macos", feature = "tesseract-ocr")
 ))]
 pub(crate) fn get_tesseract_engine(
-) -> std::sync::Arc<dyn crate::application::providers::ocr::TesseractEngine> {
+) -> std::sync::Arc<dyn snaplingo_core::application::providers::ocr::TesseractEngine> {
     std::sync::Arc::new(tesseract::SystemTesseractEngine::new())
 }

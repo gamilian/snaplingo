@@ -5,7 +5,7 @@ use ab_glyph::{FontArc, FontVec};
 use fontdb::{Database, Family, Query, Stretch, Style, Weight};
 use parking_lot::Mutex;
 
-use crate::application::capture::{AnnotationFont, AnnotationFontProvider};
+use snaplingo_core::application::capture::{AnnotationFont, AnnotationFontProvider};
 
 #[derive(Default)]
 pub(crate) struct SystemAnnotationFonts {

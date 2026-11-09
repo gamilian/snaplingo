@@ -6,9 +6,9 @@ mod pasteboard;
 mod self_webview;
 mod shortcut_copy;
 
-use crate::domain::{SelectionContext, SelectionMethodKind};
+use snaplingo_core::domain::{SelectionContext, SelectionMethodKind};
 
-use crate::application::selected_text::{
+use snaplingo_core::application::selected_text::{
     SelectionContextProvider, SelectionMethod, SystemSelectionProvider,
 };
 

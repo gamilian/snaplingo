@@ -11,8 +11,8 @@ use ort::session::{builder::GraphOptimizationLevel, Session};
 use ort::value::Tensor;
 
 use super::{from_lines, normalized_box, MediumSession, OcrBackend};
-use crate::domain::ocr::{OcrLine, OcrResult};
 use crate::{AppError, Result};
+use snaplingo_core::domain::ocr::{OcrLine, OcrResult};
 
 #[cfg(target_os = "macos")]
 pub(super) const LIBRARY_NAME: &str = "libonnxruntime.dylib";

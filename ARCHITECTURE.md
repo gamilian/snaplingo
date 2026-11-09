@@ -36,7 +36,7 @@ Reference-only browser tree
 
 ### Rust workspace
 
-The portable Domain/Application sources live in `crates/core`; persistence lives in `crates/storage`. `snaplingo-app` re-exports these production modules for its system adapters. Its Cargo package is named `snaplingo`. The former `src-tauri` root, Tauri commands, shell feature, configuration and frontend IPC adapters have been removed.
+The portable Domain/Application sources live in `crates/core`; persistence lives in `crates/storage`. App and Storage import domain values and workflows directly from `snaplingo_core`; neither re-exports Core's module tree. The app Cargo package is named `snaplingo`. The former `src-tauri` root, Tauri commands, shell feature, configuration and frontend IPC adapters have been removed.
 
 | Crate | Responsibility | Production workspace dependencies |
 | --- | --- | --- |

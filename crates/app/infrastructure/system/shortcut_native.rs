@@ -1,9 +1,9 @@
 //! Global-hotkey ownership, registration and delivery independent of the desktop shell.
-use crate::error::{AppError, Result};
 use global_hotkey::{
     hotkey::HotKey as Shortcut, GlobalHotKeyEvent, GlobalHotKeyManager,
     HotKeyState as ShortcutState,
 };
+use snaplingo_core::error::{AppError, Result};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::str::FromStr;

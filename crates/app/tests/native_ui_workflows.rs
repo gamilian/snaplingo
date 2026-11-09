@@ -31,10 +31,6 @@ mod window;
 #[cfg(target_os = "macos")]
 pub use app_state::AppState;
 #[cfg(target_os = "macos")]
-pub use application::*;
-#[cfg(target_os = "macos")]
-pub use domain::*;
-#[cfg(target_os = "macos")]
 pub use error::{AppError, Result};
 #[cfg(target_os = "macos")]
 pub use infrastructure::*;
@@ -70,17 +66,22 @@ mod fixture {
     use objc2_app_kit::{NSApplication, NSEvent, NSEventModifierFlags, NSEventType, NSView};
     use objc2_foundation::{NSPoint, NSString};
 
-    use crate::application::capture::{
-        CaptureImageComposer, CaptureOcrDelivery, CaptureOutputHost, CaptureOutputSystemPaths,
-        CaptureSelectionMode, CaptureSessionRuntimeHost, CaptureWindowGeometry,
-    };
-    use crate::application::pinned_image::{
-        PinnedImagePlacement, PinnedImageRuntimeHost, PinnedImageState,
-    };
-    use crate::domain::capture::*;
     use crate::window::capture::NativeCaptureSessionRuntimeHost;
     use crate::window::scrolling::macos::NativeScrollingCaptureHost;
     use crate::*;
+    use snaplingo_core::application::capture::{
+        CaptureImageComposer, CaptureOcrDelivery, CaptureOutputHost, CaptureOutputSystemPaths,
+        CaptureSelectionMode, CaptureSessionRuntimeHost, CaptureWindowGeometry,
+    };
+    use snaplingo_core::application::pinned_image::{
+        PinnedImagePlacement, PinnedImageRuntimeHost, PinnedImageState,
+    };
+    use snaplingo_core::application::{
+        CaptureCursorMover, CaptureOutput, CaptureSessionRuntime, CaptureSessionSource,
+        CaptureSessions, HotkeyRecording, PinnedImageRuntime, SelectedTextAcquirer,
+        SelectionScheme, SystemSelectionProvider,
+    };
+    use snaplingo_core::domain::capture::*;
 
     pub(super) fn png(width: u32, height: u32, offset: u32) -> Vec<u8> {
         let pixels = image::RgbaImage::from_fn(width, height, |x, y| {
@@ -189,12 +190,12 @@ mod fixture {
         source: Arc<Source>,
     }
     #[async_trait]
-    impl crate::application::capture::ScrollingCaptureHost for ScrollingHost {
+    impl snaplingo_core::application::capture::ScrollingCaptureHost for ScrollingHost {
         async fn open(
             &self,
             view: &ScrollingCaptureView,
-            geometry: &crate::application::capture::ScrollingCaptureGeometry,
-        ) -> Result<crate::application::capture::ScrollingWindowOptions> {
+            geometry: &snaplingo_core::application::capture::ScrollingCaptureGeometry,
+        ) -> Result<snaplingo_core::application::capture::ScrollingWindowOptions> {
             if self
                 .source
                 .fail_scrolling_open
@@ -207,7 +208,7 @@ mod fixture {
         async fn capture_snapshots(
             &self,
             id: &str,
-            geometry: &crate::application::capture::ScrollingCaptureGeometry,
+            geometry: &snaplingo_core::application::capture::ScrollingCaptureGeometry,
         ) -> Result<Vec<MonitorSnapshot>> {
             self.native.capture_snapshots(id, geometry).await
         }
@@ -252,7 +253,9 @@ mod fixture {
         async fn update_capture_editor_toolbar(
             &self,
             id: &CaptureSessionId,
-            presentation: Option<&crate::application::capture::CaptureEditorToolbarPresentation>,
+            presentation: Option<
+                &snaplingo_core::application::capture::CaptureEditorToolbarPresentation,
+            >,
         ) -> Result<bool> {
             self.native
                 .update_capture_editor_toolbar(id, presentation)
@@ -272,21 +275,21 @@ mod fixture {
         }
         fn reserve_capture_ocr_result(
             &self,
-            target: crate::application::capture::CaptureOcrTarget,
+            target: snaplingo_core::application::capture::CaptureOcrTarget,
         ) -> Result<u64> {
             self.native.reserve_capture_ocr_result(target)
         }
         fn set_capture_ocr_status(
             &self,
-            status: Option<crate::application::capture::CaptureOcrStatus>,
+            status: Option<snaplingo_core::application::capture::CaptureOcrStatus>,
         ) {
             self.native.set_capture_ocr_status(status);
         }
         async fn publish_capture_ocr(
             &self,
-            target: crate::application::capture::CaptureOcrTarget,
+            target: snaplingo_core::application::capture::CaptureOcrTarget,
             result_id: u64,
-            result: crate::domain::ocr::OcrResult,
+            result: snaplingo_core::domain::ocr::OcrResult,
             preview: Option<String>,
         ) -> Result<()> {
             self.native
@@ -295,7 +298,7 @@ mod fixture {
         }
         async fn report_capture_ocr_error(
             &self,
-            target: crate::application::capture::CaptureOcrTarget,
+            target: snaplingo_core::application::capture::CaptureOcrTarget,
             result_id: u64,
             error: &str,
         ) {
@@ -603,11 +606,13 @@ mod fixture {
     }
 
     async fn test_hotkey_event_route(app: &NativeTestApp) {
-        use crate::application::hotkeys::{
+        use crate::infrastructure::desktop_events::DesktopEvent;
+        use snaplingo_core::application::hotkeys::{
             HotkeyRegistrar, HotkeyRegistration, HotkeyTriggerTiming,
         };
-        use crate::domain::hotkey_config::{SHOW_TRANSLATION_WINDOW_ACTION, TRANSLATION_CATEGORY};
-        use crate::infrastructure::desktop_events::DesktopEvent;
+        use snaplingo_core::domain::hotkey_config::{
+            SHOW_TRANSLATION_WINDOW_ACTION, TRANSLATION_CATEGORY,
+        };
         let state = app.state.clone();
         // Frontend bridge replacement must not register another action route.
 
@@ -664,9 +669,11 @@ mod fixture {
         assert!(
             state
                 .result_window
-                .is_current(crate::application::result_window::ResultWindowRequestId(
-                    request_before.0 + 1
-                ))
+                .is_current(
+                    snaplingo_core::application::result_window::ResultWindowRequestId(
+                        request_before.0 + 1
+                    )
+                )
                 .unwrap(),
             "A duplicate desktop observer dispatched the same hotkey action more than once"
         );
@@ -689,9 +696,11 @@ mod fixture {
         assert!(
             state
                 .result_window
-                .is_current(crate::application::result_window::ResultWindowRequestId(
-                    request_before.0 + 1
-                ))
+                .is_current(
+                    snaplingo_core::application::result_window::ResultWindowRequestId(
+                        request_before.0 + 1
+                    )
+                )
                 .unwrap(),
             "Native menu action did not dispatch exactly once"
         );
@@ -839,7 +848,7 @@ mod fixture {
                 );
             }
             "result" => {
-                app.state.result_window.open(crate::application::result_window::ResultWindowOpenRequest::selection_translation("native result benchmark".into())).await.unwrap();
+                app.state.result_window.open(snaplingo_core::application::result_window::ResultWindowOpenRequest::selection_translation("native result benchmark".into())).await.unwrap();
                 let deadline = Instant::now() + Duration::from_secs(8);
                 while app
                     .state
@@ -848,7 +857,7 @@ mod fixture {
                     .rows
                     .first()
                     .is_none_or(|row| {
-                        row.status != crate::application::result_window::TranslationStatus::Success
+                        row.status != snaplingo_core::application::result_window::TranslationStatus::Success
                     })
                 {
                     assert!(

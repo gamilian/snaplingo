@@ -18,7 +18,7 @@ use objc2_foundation::{
     NSAffineTransform, NSData, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString,
 };
 
-use crate::domain::capture::{LogicalRect, PinnedImageExportSize, PinnedImageView};
+use snaplingo_core::domain::capture::{LogicalRect, PinnedImageExportSize, PinnedImageView};
 use snaplingo_ui::pinned::{color_text, Presentation, State};
 pub(super) use snaplingo_ui::pinned::{Action, Preferences};
 use snaplingo_ui::{Key, Modifiers, Point};

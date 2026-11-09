@@ -5,8 +5,8 @@ use arboard::{Clipboard, ImageData};
 use chrono::{DateTime, Local};
 use image::ImageEncoder;
 
-use crate::application::capture::{CaptureOutputHost, CaptureOutputSystemPaths};
 use crate::{AppError, Result};
+use snaplingo_core::application::capture::{CaptureOutputHost, CaptureOutputSystemPaths};
 
 pub(crate) struct SystemCaptureOutputHost;
 

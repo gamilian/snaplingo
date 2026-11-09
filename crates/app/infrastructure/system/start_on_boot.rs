@@ -1,5 +1,5 @@
-use crate::application::StartOnBoot;
 use crate::Result;
+use snaplingo_core::application::StartOnBoot;
 use std::path::{Path, PathBuf};
 
 pub struct NativeStartOnBoot {

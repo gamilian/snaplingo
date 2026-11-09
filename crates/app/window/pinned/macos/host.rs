@@ -8,12 +8,14 @@ use super::view::{self as native, Action, Preferences};
 use snaplingo_ui::pinned::Presentation;
 
 use super::super::position::{cascaded_center, union};
-use crate::application::pinned_image::PinnedImagePlacement;
-use crate::domain::capture::{
+use snaplingo_core::application::pinned_image::PinnedImagePlacement;
+use snaplingo_core::domain::capture::{
     DesktopPosition, LogicalRect, PinnedImageExportSize, PinnedImageView,
 };
 
-pub(super) fn preferences(settings: &crate::SettingsConfiguration) -> Result<Preferences, String> {
+pub(super) fn preferences(
+    settings: &snaplingo_core::application::SettingsConfiguration,
+) -> Result<Preferences, String> {
     let screenshot = settings
         .snapshot()
         .map_err(|error| error.to_string())?
@@ -68,12 +70,12 @@ pub(super) fn open_pinned_image_window(
             Some(DesktopPosition::Physical(point)) => {
                 let display = CGDisplay::main();
                 let scale = display.pixels_wide() as f64 / display.bounds().size.width;
-                crate::domain::capture::LogicalPoint {
+                snaplingo_core::domain::capture::LogicalPoint {
                     x: point.x as f64 / scale,
                     y: point.y as f64 / scale,
                 }
             }
-            None => crate::domain::capture::LogicalPoint { x: 0.0, y: 0.0 },
+            None => snaplingo_core::domain::capture::LogicalPoint { x: 0.0, y: 0.0 },
         }
     };
     let rect = LogicalRect {

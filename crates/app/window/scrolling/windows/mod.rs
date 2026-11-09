@@ -6,8 +6,8 @@ pub(crate) use host::*;
 use view as scrolling_view_windows;
 pub(super) use view::{set_working, update};
 pub(super) async fn select_save_path(
-    settings: &crate::SettingsConfiguration,
-    output: &crate::CaptureOutput,
+    settings: &snaplingo_core::application::SettingsConfiguration,
+    output: &snaplingo_core::application::CaptureOutput,
 ) -> crate::Result<Option<std::path::PathBuf>> {
     let preferences = settings.snapshot()?.screenshot;
     let format = preferences

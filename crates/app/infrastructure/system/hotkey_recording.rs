@@ -3,7 +3,7 @@ use global_hotkey::{
     HotKeyState as ShortcutState,
 };
 
-use crate::application::hotkeys::HotkeyRecording;
+use snaplingo_core::application::hotkeys::HotkeyRecording;
 
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,7 @@ pub struct RecordedHotkey {
 /// Initialize on AppKit's main thread without retaining a desktop shell handle.
 #[cfg(target_os = "macos")]
 pub fn initialize_shortcuts(
-    recording: crate::application::hotkeys::HotkeyRecording,
+    recording: snaplingo_core::application::hotkeys::HotkeyRecording,
     deliver: impl Fn(&str, super::RecordedHotkey) + Send + Sync + 'static,
 ) -> crate::Result<()> {
     super::shortcut::initialize_native_shortcuts(
@@ -174,9 +174,10 @@ mod tests {
             "⇧⌥S".to_string(),
             format!("{primary_modifier}2"),
         ] {
-            let accelerator = crate::application::hotkeys::display_hotkey_to_accelerator(&display)
-                .unwrap()
-                .unwrap();
+            let accelerator =
+                snaplingo_core::application::hotkeys::display_hotkey_to_accelerator(&display)
+                    .unwrap()
+                    .unwrap();
             let shortcut = accelerator.parse::<Shortcut>().unwrap();
             assert_eq!(shortcut_display_hotkey(&shortcut), display);
         }

@@ -1,5 +1,4 @@
 //! Application ownership for the native Windows event loop.
-use crate::application::hotkeys::HotkeyRecording;
 use crate::infrastructure::system::{shortcut, single_instance::SingleInstance};
 use crate::infrastructure::{
     desktop_events::{DesktopEvent, DesktopSubscription, SettingsRoute},
@@ -8,6 +7,7 @@ use crate::infrastructure::{
 };
 use crate::window::settings::windows::NativeSettingsWindow;
 use crate::{AppState, RuntimeLifecycle};
+use snaplingo_core::application::hotkeys::HotkeyRecording;
 use snaplingo_desktop::HostEvent;
 use snaplingo_ui::{Page, Section};
 use std::{cell::RefCell, rc::Rc, sync::Arc};
@@ -301,8 +301,10 @@ pub fn run() -> Result<(), String> {
     })
 }
 pub fn run_with_options(options: NativeAppOptions) -> Result<(), String> {
-    use crate::application::{SelectedTextAcquirer, SelectionScheme, SystemSelectionProvider};
     use crate::infrastructure::storage::{Database, SqliteAppLogRepository};
+    use snaplingo_core::application::{
+        SelectedTextAcquirer, SelectionScheme, SystemSelectionProvider,
+    };
     std::fs::create_dir_all(&options.data_dir).map_err(|e| e.to_string())?;
     let Some(instance) = SingleInstance::acquire(&options.data_dir.join("instance.lock"))
         .map_err(|e| e.to_string())?
@@ -431,11 +433,11 @@ async fn smoke_on_ui<T: Send + 'static>(
 
 #[cfg(test)]
 pub(crate) fn smoke_test() {
-    use crate::application::{
+    use crate::infrastructure::storage::{Database, SqliteAppLogRepository};
+    use snaplingo_core::application::{
         SelectedTextAcquirer, SelectionScheme, SettingsApplication, StartOnBoot,
         SystemSelectionProvider,
     };
-    use crate::infrastructure::storage::{Database, SqliteAppLogRepository};
     use snaplingo_ui::Event;
     use std::time::{Duration, Instant};
     struct Startup;

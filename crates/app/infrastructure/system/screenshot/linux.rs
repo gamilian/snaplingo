@@ -1,7 +1,9 @@
 use super::xcap_common;
-use crate::application::CaptureSessionSource;
-use crate::domain::capture::{MonitorLayout, MonitorSnapshot, ScreenRegion, WindowCandidate};
-use crate::error::AppError;
+use snaplingo_core::application::CaptureSessionSource;
+use snaplingo_core::domain::capture::{
+    MonitorLayout, MonitorSnapshot, ScreenRegion, WindowCandidate,
+};
+use snaplingo_core::error::AppError;
 
 /// Linux screenshot backend using the cross-platform XCap crate.
 ///

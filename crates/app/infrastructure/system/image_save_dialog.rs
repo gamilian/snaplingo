@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 #[cfg(target_os = "macos")]
 pub(crate) async fn select_native_capture_save_path(
-    settings: &crate::SettingsConfiguration,
-    output: &crate::CaptureOutput,
+    settings: &snaplingo_core::application::SettingsConfiguration,
+    output: &snaplingo_core::application::CaptureOutput,
 ) -> crate::Result<Option<PathBuf>> {
     let preferences = settings.snapshot()?.screenshot;
     let format = preferences

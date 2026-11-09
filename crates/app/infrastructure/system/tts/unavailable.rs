@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
-use crate::application::{SystemTtsHost, SystemTtsVoice};
 use crate::{AppError, Result};
+use snaplingo_core::application::{SystemTtsHost, SystemTtsVoice};
 
 pub(crate) struct UnavailableSystemTtsHost {
     platform: &'static str,

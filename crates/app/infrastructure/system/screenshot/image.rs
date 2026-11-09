@@ -1,4 +1,4 @@
-use crate::error::AppError;
+use snaplingo_core::error::AppError;
 
 #[allow(dead_code)]
 pub fn rgba_image_to_png(image: image::RgbaImage) -> Result<Vec<u8>, AppError> {

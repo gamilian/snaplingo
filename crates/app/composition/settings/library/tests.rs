@@ -1,14 +1,14 @@
 use super::core::{LibraryIndexPage, LibraryIndexQuery, LibraryIndexRepository};
 use super::*;
-use crate::application::selected_text::{
-    SelectedTextAcquirer, SelectionContextProvider, SelectionScheme,
-};
 use crate::infrastructure::storage::{Database, SqliteLibraryIndexRepository};
 use async_trait::async_trait;
+use snaplingo_core::application::selected_text::{
+    SelectedTextAcquirer, SelectionContextProvider, SelectionScheme,
+};
 
 struct Context;
 impl SelectionContextProvider for Context {
-    fn context(&self) -> crate::domain::SelectionContext {
+    fn context(&self) -> snaplingo_core::domain::SelectionContext {
         Default::default()
     }
 }

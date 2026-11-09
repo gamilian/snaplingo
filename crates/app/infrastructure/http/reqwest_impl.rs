@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use crate::application::providers::{HttpClient, HttpResponse};
-use crate::application::settings::SettingsConfiguration;
+use snaplingo_core::application::providers::{HttpClient, HttpResponse};
+use snaplingo_core::application::settings::SettingsConfiguration;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct NetworkConfiguration {
@@ -197,9 +197,9 @@ mod tests {
     use std::sync::Arc;
 
     use super::ReqwestHttpClient;
-    use crate::application::settings::SettingsConfiguration;
-    use crate::domain::GeneralSettings;
     use crate::infrastructure::storage::SqliteConfigStore;
+    use snaplingo_core::application::settings::SettingsConfiguration;
+    use snaplingo_core::domain::GeneralSettings;
 
     #[test]
     fn reads_proxy_timeout_and_retry_settings_for_each_request() {

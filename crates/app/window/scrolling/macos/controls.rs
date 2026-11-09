@@ -15,8 +15,8 @@ use objc2_app_kit::{
 use objc2_foundation::{NSObjectProtocol, NSPoint, NSRect, NSSize, NSString};
 
 use super::native_theme::{color, is_dark, palette, Palette};
-use crate::domain::capture::{LogicalRect, ScrollingCaptureView};
-use crate::domain::config::GeneralSettings;
+use snaplingo_core::domain::capture::{LogicalRect, ScrollingCaptureView};
+use snaplingo_core::domain::config::GeneralSettings;
 
 pub(super) use snaplingo_ui::scrolling::ScrollingAction as Action;
 use snaplingo_ui::scrolling::{ScrollingFrame, ScrollingSnapshot, ScrollingUi};
@@ -432,7 +432,7 @@ impl Controls {
                 }
             }
         }
-        use crate::domain::capture::ScrollingShortcutAction;
+        use snaplingo_core::domain::capture::ScrollingShortcutAction;
         let shortcuts = &self.view.shortcut_actions;
         let tooltips = [
             shortcuts
@@ -482,12 +482,12 @@ pub(crate) fn update(mut view: ScrollingCaptureView) {
             if view.revision < controls.view.revision {
                 return;
             }
-            controls.error = if view.status == crate::domain::capture::ScrollingCaptureStatus::Error
-            {
-                view.hint.clone()
-            } else {
-                None
-            };
+            controls.error =
+                if view.status == snaplingo_core::domain::capture::ScrollingCaptureStatus::Error {
+                    view.hint.clone()
+                } else {
+                    None
+                };
             controls.view = view;
             controls.refresh();
         }
@@ -500,7 +500,8 @@ pub(crate) fn set_working(id: &str, working: bool, error: Option<String>) {
             controls.working = working;
             controls.error = error.or_else(|| {
                 if !working
-                    && controls.view.status == crate::domain::capture::ScrollingCaptureStatus::Error
+                    && controls.view.status
+                        == snaplingo_core::domain::capture::ScrollingCaptureStatus::Error
                 {
                     controls.view.hint.clone()
                 } else {

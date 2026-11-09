@@ -1,7 +1,7 @@
 use objc2::rc::Retained;
 use objc2_foundation::{NSDataDetector, NSMatchingOptions, NSRange, NSString, NSTextCheckingType};
 
-use crate::application::result_window::{
+use snaplingo_core::application::result_window::{
     copy_tokens, normalize_ocr_text, OcrCopyToken, TokenCandidate,
 };
 

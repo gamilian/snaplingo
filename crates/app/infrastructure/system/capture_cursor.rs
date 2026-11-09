@@ -1,6 +1,6 @@
 use enigo::{Enigo, MouseControllable};
 
-use crate::application::CaptureCursorMover;
+use snaplingo_core::application::CaptureCursorMover;
 
 pub struct EnigoCaptureCursorMover;
 

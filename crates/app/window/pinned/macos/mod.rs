@@ -3,10 +3,10 @@ pub(super) mod view;
 
 use std::sync::{Arc, RwLock, Weak};
 
-use crate::application::pinned_image::{PinnedImagePlacement, PinnedImageRuntimeHost};
-use crate::domain::capture::PinnedImageView;
 use crate::infrastructure::ui_thread;
-use crate::{CaptureOutput, PinnedImageRuntime, SettingsConfiguration};
+use snaplingo_core::application::pinned_image::{PinnedImagePlacement, PinnedImageRuntimeHost};
+use snaplingo_core::application::{CaptureOutput, PinnedImageRuntime, SettingsConfiguration};
+use snaplingo_core::domain::capture::PinnedImageView;
 
 #[derive(Clone)]
 pub(super) struct Services {

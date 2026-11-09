@@ -10,7 +10,7 @@ use objc2_app_kit::{
 };
 use objc2_foundation::{NSData, NSPoint, NSRect, NSSize};
 
-use crate::domain::capture::LogicalRect;
+use snaplingo_core::domain::capture::LogicalRect;
 use snaplingo_ui::scrolling::{preview_rect, VIEWPORT_BORDER, VIEWPORT_COLOR};
 use snaplingo_ui::Size;
 

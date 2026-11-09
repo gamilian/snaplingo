@@ -31,8 +31,8 @@ mod tests {
 
     use log::{Level, Metadata, Record};
 
-    use crate::domain::SettingsSnapshot;
     use crate::infrastructure::storage::{Database, SqliteConfigStore};
+    use snaplingo_core::domain::SettingsSnapshot;
 
     use super::{dispatch, SqliteAppLogRepository};
 

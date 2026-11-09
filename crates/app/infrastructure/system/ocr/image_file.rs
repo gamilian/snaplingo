@@ -1,5 +1,5 @@
-use crate::application::providers::ocr::ImageFileReader;
 use async_trait::async_trait;
+use snaplingo_core::application::providers::ocr::ImageFileReader;
 
 pub(crate) struct FilesystemImageReader;
 

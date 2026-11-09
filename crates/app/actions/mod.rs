@@ -2,13 +2,13 @@ pub(crate) mod shortcuts;
 use std::sync::{Arc, Mutex};
 
 use crate::app_state::{CaptureRuntimeState, SelectionRuntime};
-use crate::application::result_window::{ResultWindowOpenRequest, ResultWindowRuntime};
-use crate::application::{RequiredPermissions, SystemPermission};
 use crate::infrastructure::desktop_events::{
     DesktopEvent, DesktopEvents, DesktopSubscription, SettingsRoute,
 };
 #[cfg(any(test, not(target_os = "macos")))]
 use crate::AppState;
+use snaplingo_core::application::result_window::{ResultWindowOpenRequest, ResultWindowRuntime};
+use snaplingo_core::application::{RequiredPermissions, SystemPermission};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum CaptureLaunchMode {
@@ -217,7 +217,7 @@ fn spawn_action(
 
 fn action_permissions_granted(
     action: AppAction,
-    status: crate::application::RequiredPermissionsStatus,
+    status: snaplingo_core::application::RequiredPermissionsStatus,
 ) -> bool {
     match action {
         AppAction::OpenCapture(_) => status.screen_recording,
@@ -253,7 +253,7 @@ mod tests {
 
     use async_trait::async_trait;
 
-    use crate::application::result_window::{
+    use snaplingo_core::application::result_window::{
         ResultWindowMode, ResultWindowNotifierPort, ResultWindowOpenRequest, ResultWindowRequestId,
         ResultWindowRuntime, ResultWindowWindowPort,
     };
@@ -265,12 +265,12 @@ mod tests {
     #[cfg(target_os = "macos")]
     #[tokio::test]
     async fn settings_actions_and_permission_fallback_route_without_a_framework_owner() {
-        use crate::application::{
+        use crate::infrastructure::desktop_events::{DesktopEvent, SettingsRoute};
+        use snaplingo_core::application::{
             RequiredPermissions, RequiredPermissionsContext, RequiredPermissionsHost,
             RequiredPermissionsStatus, SelectedTextAcquirer, SelectionScheme, SystemPermission,
             SystemSelectionProvider,
         };
-        use crate::infrastructure::desktop_events::{DesktopEvent, SettingsRoute};
         use std::sync::Mutex;
 
         #[derive(Default)]
@@ -382,8 +382,8 @@ mod tests {
             .desktop_events
             .publish(DesktopEvent::AppActionRequested(AppAction::OpenHistory));
         state.desktop_events.publish(DesktopEvent::HotkeyTriggered {
-            category: crate::domain::hotkey_config::TRANSLATION_CATEGORY.into(),
-            action: crate::domain::hotkey_config::SELECTION_TRANSLATE_ACTION.into(),
+            category: snaplingo_core::domain::hotkey_config::TRANSLATION_CATEGORY.into(),
+            action: snaplingo_core::domain::hotkey_config::SELECTION_TRANSLATE_ACTION.into(),
         });
         // The observer sees the published request and exactly one derived route.
         assert_eq!(
@@ -396,8 +396,9 @@ mod tests {
         for (index, event) in [
             DesktopEvent::AppActionRequested(AppAction::OpenTranslationWindow),
             DesktopEvent::HotkeyTriggered {
-                category: crate::domain::hotkey_config::TRANSLATION_CATEGORY.into(),
-                action: crate::domain::hotkey_config::SHOW_TRANSLATION_WINDOW_ACTION.into(),
+                category: snaplingo_core::domain::hotkey_config::TRANSLATION_CATEGORY.into(),
+                action: snaplingo_core::domain::hotkey_config::SHOW_TRANSLATION_WINDOW_ACTION
+                    .into(),
             },
         ]
         .into_iter()
@@ -444,7 +445,7 @@ mod tests {
 
     #[test]
     fn each_action_requires_only_the_permissions_it_uses() {
-        use crate::application::RequiredPermissionsStatus;
+        use snaplingo_core::application::RequiredPermissionsStatus;
         let none = RequiredPermissionsStatus {
             screen_recording: false,
             accessibility: false,

@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::application::favorite_capacity::FavoriteCapacityRepository;
 use crate::Result;
+use snaplingo_core::application::favorite_capacity::FavoriteCapacityRepository;
 
 use super::Database;
 
@@ -38,7 +38,7 @@ impl FavoriteCapacityRepository for SqliteFavoriteCapacityRepository {
 mod tests {
     use std::sync::Arc;
 
-    use crate::application::favorite_capacity::FavoriteCapacityRepository;
+    use snaplingo_core::application::favorite_capacity::FavoriteCapacityRepository;
 
     use super::{Database, SqliteFavoriteCapacityRepository};
 

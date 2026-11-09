@@ -2,12 +2,12 @@ use base64::Engine;
 use std::path::PathBuf;
 use std::sync::{Arc, Weak};
 
-use crate::application::result_window::{
+use snaplingo_core::application::result_window::{
     resolved_target, AutoTranslationPlan, ResultWindowMode, ResultWindowRequestId,
     ResultWindowRuntime, ResultWindowSession, ResultWindowSnapshot, TranslationStatus,
 };
-use crate::domain::ocr::OcrResult;
-use crate::domain::translation::TranslationRequest;
+use snaplingo_core::domain::ocr::OcrResult;
+use snaplingo_core::domain::translation::TranslationRequest;
 
 #[derive(Clone, Debug)]
 pub(crate) enum Action {
@@ -36,12 +36,12 @@ pub(crate) trait ResultWindowEffects: Send + Sync {
 pub(crate) struct Services {
     pub(crate) window: Weak<ResultWindowRuntime>,
     pub(crate) session: Arc<ResultWindowSession>,
-    pub(crate) settings: Arc<crate::SettingsConfiguration>,
-    pub(crate) ocr: Arc<crate::application::providers::ocr::OcrCoordinator>,
-    pub(crate) file_ocr: Arc<crate::application::providers::ocr::FileOcr>,
-    pub(crate) favorites: Arc<crate::application::Favorites>,
+    pub(crate) settings: Arc<snaplingo_core::application::SettingsConfiguration>,
+    pub(crate) ocr: Arc<snaplingo_core::application::providers::ocr::OcrCoordinator>,
+    pub(crate) file_ocr: Arc<snaplingo_core::application::providers::ocr::FileOcr>,
+    pub(crate) favorites: Arc<snaplingo_core::application::Favorites>,
     pub(crate) effects: Arc<dyn ResultWindowEffects>,
-    pub(crate) tts: Arc<crate::application::TtsRuntime>,
+    pub(crate) tts: Arc<snaplingo_core::application::TtsRuntime>,
 }
 
 /// Shared result workflows; a host supplies UI presentation and platform effects.

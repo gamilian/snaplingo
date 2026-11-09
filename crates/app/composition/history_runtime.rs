@@ -2,16 +2,18 @@ use std::sync::Arc;
 
 use crate::infrastructure::desktop_events::DesktopEvents;
 
-use crate::application::history::{EventSubscriber, HistoryRepository, OcrHistoryRecognizer};
-use crate::application::providers::ocr::OcrCoordinator;
-use crate::application::settings::SettingsConfiguration;
-use crate::application::History;
-use crate::domain::ocr::OcrResult;
 use crate::infrastructure::storage::{
     Database, FilesystemOcrHistoryAssets, SqliteHistoryRepository,
 };
 use crate::AppState;
 use crate::Result;
+use snaplingo_core::application::history::{
+    EventSubscriber, HistoryRepository, OcrHistoryRecognizer,
+};
+use snaplingo_core::application::providers::ocr::OcrCoordinator;
+use snaplingo_core::application::settings::SettingsConfiguration;
+use snaplingo_core::application::History;
+use snaplingo_core::domain::ocr::OcrResult;
 
 pub(crate) struct OcrCoordinatorHistoryRecognizer {
     coordinator: Arc<OcrCoordinator>,

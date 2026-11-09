@@ -21,8 +21,8 @@ use objc2_foundation::{
 };
 use serde::Deserialize;
 
-use crate::domain::GeneralSettings;
 use crate::infrastructure::system::native_theme::{self, Palette};
+use snaplingo_core::domain::GeneralSettings;
 
 #[derive(Deserialize)]
 struct Component {

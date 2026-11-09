@@ -1,6 +1,6 @@
 //! Composition of the portable Settings session and native application adapters.
-use crate::application::hotkeys::HotkeyRecording;
 use crate::infrastructure::desktop_events::{DesktopEvent, DesktopSubscription};
+use snaplingo_core::application::hotkeys::HotkeyRecording;
 pub(crate) use snaplingo_settings::window::SettingsWindowSession;
 use snaplingo_settings::{
     preferences::PreferencesDependencies, window::SettingsSessionDependencies,

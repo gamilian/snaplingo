@@ -1,6 +1,6 @@
 //! SQLite repositories and filesystem assets shared by native desktop hosts.
 //! Persistence implements portable application ports without a UI framework.
-pub use snaplingo_core::{application, domain, error, AppError, Result};
+pub use snaplingo_core::{AppError, Result};
 
 mod database;
 mod screenshot_favorite_assets;

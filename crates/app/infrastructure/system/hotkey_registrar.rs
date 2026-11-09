@@ -12,12 +12,12 @@ impl NativeHotkeyRegistrar {
         }
     }
 }
-impl crate::application::hotkeys::HotkeyRegistrar for NativeHotkeyRegistrar {
+impl snaplingo_core::application::hotkeys::HotkeyRegistrar for NativeHotkeyRegistrar {
     fn register(
         &self,
-        registration: crate::application::hotkeys::HotkeyRegistration,
+        registration: snaplingo_core::application::hotkeys::HotkeyRegistration,
     ) -> Result<()> {
-        use crate::application::hotkeys::HotkeyTriggerTiming;
+        use snaplingo_core::application::hotkeys::HotkeyTriggerTiming;
         let trigger = self.trigger.clone();
         let timing = match registration.timing {
             HotkeyTriggerTiming::Pressed => ShortcutTriggerTiming::Pressed,

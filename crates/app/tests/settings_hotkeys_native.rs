@@ -30,10 +30,6 @@ mod window;
 #[cfg(target_os = "macos")]
 pub use app_state::AppState;
 #[cfg(target_os = "macos")]
-pub use application::*;
-#[cfg(target_os = "macos")]
-pub use domain::*;
-#[cfg(target_os = "macos")]
 pub use error::{AppError, Result};
 #[cfg(target_os = "macos")]
 pub use infrastructure::*;
@@ -144,9 +140,6 @@ fn send(kind: objc2_app_kit::NSEventType, code: u16, flags: objc2_app_kit::NSEve
 
 #[cfg(target_os = "macos")]
 fn main() {
-    use crate::application::hotkeys::{
-        HotkeyConfiguration, HotkeyRecording, HotkeyRegistrar, HotkeyRegistration,
-    };
     use crate::infrastructure::desktop_events::{DesktopEvent, DesktopEvents};
     use crate::window::settings::macos::{HotkeyView, HotkeyViewServices};
     use objc2::MainThreadMarker;
@@ -156,6 +149,9 @@ fn main() {
         NSWindow, NSWindowStyleMask,
     };
     use objc2_foundation::{NSPoint, NSRect, NSSize, NSString};
+    use snaplingo_core::application::hotkeys::{
+        HotkeyConfiguration, HotkeyRecording, HotkeyRegistrar, HotkeyRegistration,
+    };
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};
 
