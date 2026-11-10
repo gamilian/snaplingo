@@ -105,6 +105,7 @@ describe('native Windows packages', () => {
     // ICE50 compares the Icon table identifier with the advertised key file.
     expect(extname(icon.getAttribute('Id')!)).toBe(extname(executable.getAttribute('Name')!));
     expect(['.exe', '.ico']).toContain(extname(icon.getAttribute('Id')!));
+    expect(icon.getAttribute('SourceFile')).toBe(executable.getAttribute('Source'));
     expect(document.querySelector('Property[Id="ARPPRODUCTICON"]')?.getAttribute('Value')).toBe(icon.getAttribute('Id'));
     expect(component.parentElement?.getAttribute('Id')).toBe('INSTALLFOLDER');
     expect(component.querySelector('RegistryValue[Root="HKLM"][Name="InstallDir"]')?.getAttribute('Value')).toBe('[INSTALLFOLDER]');
@@ -118,13 +119,13 @@ describe('native Windows packages', () => {
   it.skipIf(process.platform !== 'win32' || (!wix && process.env.GITHUB_ACTIONS !== 'true'))('compiles the MSI with WiX and all ICE validation enabled', () => {
     expect(wix, 'Install WiX 3 before running Windows CI tests').not.toBeNull();
     const f = fixture();
-    const source = join(f.root, 'fixture.rs');
-    writeFileSync(source, 'fn main() {}\n');
     const run = (command: string, args: string[]) => {
       const result = spawnSync(command, args, { encoding: 'utf8' });
       expect(result.status, `${command}\n${result.error?.message ?? ''}\n${result.stdout}\n${result.stderr}`).toBe(0);
     };
-    run('rustc', ['--crate-name', 'snaplingo_installer_fixture', '--edition', '2021', source, '-o', f.binary]);
+    // A small, real Windows PE with icon resources exercises the advertised
+    // shortcut's Icon stream without compiling the application or OCR providers.
+    copyFileSync(join(process.env.WINDIR!, 'System32/notepad.exe'), f.binary);
     copyFileSync(new URL('../app/icons/icon.ico', import.meta.url), join(f.root, 'app/icons/icon.ico'));
     stageNativeWindowsBundle(f.root, f.binary, f.stage, config, f);
     const wxs = join(f.root, 'installer.wxs');
