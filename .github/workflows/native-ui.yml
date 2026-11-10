@@ -19,7 +19,6 @@ jobs:
     timeout-minutes: 60
     env:
       NO_PROXY: 127.0.0.1,localhost
-      no_proxy: 127.0.0.1,localhost
       SNAPLINGO_SIGNING_MODE: adhoc
     steps:
       - uses: actions/checkout@v5

@@ -1,7 +1,7 @@
 {
   "lockfiles": {
     "Cargo.lock": "3fdb8dffd5701c351c2654e2a71b5e14eda93a0dd4d0fe025dab5301d9c16887",
-    "package-lock.json": "963f9e6fd93677b924a56ec996c0368918aee19ffb9e675008b2594af14ff73c",
+    "package-lock.json": "e86d36801ccf43246225309c459a34b5b2ecd9a14263aea2ef37053779e5c988",
     "script/ocr-assets.json": "1c297be78cd285e13c4a01d6c0aa7324ecc0fc116cfd71913e45699921fd127b"
   },
   "components": [
