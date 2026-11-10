@@ -5,12 +5,12 @@ node_modules/
 dist/
 
 # Rust application resources
-apps/desktop/target/
+app/target/
 target/
-apps/desktop/resources/ocr/*
-!apps/desktop/resources/ocr/.gitkeep
-apps/desktop/resources/windows-crt/*
-!apps/desktop/resources/windows-crt/.gitkeep
+app/resources/ocr/*
+!app/resources/ocr/.gitkeep
+app/resources/windows-crt/*
+!app/resources/windows-crt/.gitkeep
 
 # IDE
 .vscode/

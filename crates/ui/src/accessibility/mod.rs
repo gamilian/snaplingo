@@ -4,8 +4,8 @@ mod notices;
 mod result;
 mod window;
 use crate::{
-    Event, GeometryKind, Key, Modifiers, OcrField, Page, Point, Rect, Scene, Section, SettingsUi,
-    Snapshot, Target, TranslationField, Value,
+    Event, GeometryKind, Key, Modifiers, OcrField, Page, Point, Rect, Section, SettingsFrame,
+    SettingsUi, Snapshot, Target, TranslationField, Value,
 };
 use accesskit::{
     Action, ActionData, ActionRequest, AriaCurrent, HasPopup, Live, Node, NodeId, Orientation,
@@ -464,7 +464,7 @@ fn option(choices: &[(&str, &str)], index: usize, value: Value) -> Node {
     node
 }
 
-pub fn project(scene: &Scene, ui: &SettingsUi, device_scale: f64) -> Projection {
+pub fn project(scene: &SettingsFrame, ui: &SettingsUi, device_scale: f64) -> Projection {
     let snapshot = ui.snapshot();
     let page = ui.page();
     let mut nodes = BTreeMap::new();
@@ -528,8 +528,8 @@ pub fn project(scene: &Scene, ui: &SettingsUi, device_scale: f64) -> Projection 
         Rect {
             x: 0.,
             y: 0.,
-            width: scene.size.width,
-            height: scene.size.height,
+            width: scene.scene.size.width,
+            height: scene.scene.size.height,
         },
         device_scale,
     ));
@@ -594,10 +594,10 @@ pub fn project(scene: &Scene, ui: &SettingsUi, device_scale: f64) -> Projection 
     }
 }
 
-/// Native embedded pages show only Scene.content. Keep the same semantic
+/// Native embedded pages show only SettingsFrame.content. Keep the same semantic
 /// controls/actions while translating their real geometry into that NSView.
 pub fn project_region(
-    scene: &Scene,
+    scene: &SettingsFrame,
     ui: &SettingsUi,
     device_scale: f64,
     region: Rect,

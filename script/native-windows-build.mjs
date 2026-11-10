@@ -43,19 +43,19 @@ export function createNativeWindowsPortable(stage, archive) {
   return archive;
 }
 export function stageNativeWindowsBundle(repositoryRoot, binary, destination, config, options = {}) {
-  const resources = options.ocrRoot ?? join(repositoryRoot, 'apps/desktop/resources/ocr');
-  const crt = options.crtRoot ?? join(repositoryRoot, 'apps/desktop/resources/windows-crt');
+  const resources = options.ocrRoot ?? join(repositoryRoot, 'app/resources/ocr');
+  const crt = options.crtRoot ?? join(repositoryRoot, 'app/resources/windows-crt');
   verifyWindowsExecutable(binary);
   for (const path of requiredResources) required(join(resources, path));
   for (const path of requiredCrt) required(join(crt, path));
   if (readFileSync(join(resources, '.platform'), 'utf8').trim() !== 'win32-x64') throw new Error('OCR resources do not match the native Windows x64 architecture');
-  for (const path of ['LICENSE', 'assets/fonts/LICENSE-NotoSans.txt', 'assets/licenses/thirdPartyNotices.json', 'apps/desktop/icons/icon.ico']) required(join(repositoryRoot, path));
+  for (const path of ['LICENSE', 'assets/fonts/LICENSE-NotoSans.txt', 'assets/licenses/thirdPartyNotices.json', 'app/icons/icon.ico']) required(join(repositoryRoot, path));
   rmSync(destination, { recursive: true, force: true });
   mkdirSync(join(destination, 'licenses'), { recursive: true });
   copyFileSync(binary, join(destination, 'snaplingo.exe'));
   cpSync(resources, join(destination, 'ocr'), { recursive: true, filter: path => basename(path) !== '.gitkeep' });
   for (const file of readdirSync(crt).filter(file => file.toLowerCase().endsWith('.dll'))) copyFileSync(join(crt, file), join(destination, file));
-  for (const [source, target] of [['LICENSE', 'LICENSE'], ['assets/fonts/LICENSE-NotoSans.txt', 'licenses/NotoSans.txt'], ['assets/licenses/thirdPartyNotices.json', 'licenses/THIRD_PARTY_NOTICES.json'], ['apps/desktop/icons/icon.ico', 'icon.ico']]) copyFileSync(join(repositoryRoot, source), join(destination, target));
+  for (const [source, target] of [['LICENSE', 'LICENSE'], ['assets/fonts/LICENSE-NotoSans.txt', 'licenses/NotoSans.txt'], ['assets/licenses/thirdPartyNotices.json', 'licenses/THIRD_PARTY_NOTICES.json'], ['app/icons/icon.ico', 'icon.ico']]) copyFileSync(join(repositoryRoot, source), join(destination, target));
   writeFileSync(join(destination, 'README.txt'), `${config.productName} ${config.version}\r\n\r\nLaunch snaplingo.exe to start the native application.\r\nKeep the OCR directory and DLL files beside the executable.\r\nSettings and saved history remain in the Windows application-data directory during upgrades and uninstallation.\r\n`);
   return destination;
 }
@@ -227,6 +227,6 @@ export async function buildNativeWindows({ repositoryRoot = root, command = 'bui
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2); const command = args[0] ?? 'build'; const formatsIndex = args.indexOf('--formats');
-  const config = { ...JSON.parse(readFileSync(join(root,'apps/desktop/desktop.json'),'utf8')), version: JSON.parse(readFileSync(join(root,'package.json'),'utf8')).version };
+  const config = { ...JSON.parse(readFileSync(join(root,'app/desktop.json'),'utf8')), version: JSON.parse(readFileSync(join(root,'package.json'),'utf8')).version };
   buildNativeWindows({ command, config, profile: args.includes('--debug') ? 'debug' : 'release', targetDirectory: process.env.CARGO_TARGET_DIR ? resolve(root, process.env.CARGO_TARGET_DIR) : join(root,'target'), ...(formatsIndex >= 0 ? { formats: args[formatsIndex+1]?.split(',') ?? [] } : {}) }).catch(error => { console.error(error.message); process.exitCode = 1; });
 }

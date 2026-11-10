@@ -16,6 +16,7 @@ fn r(x: f32, y: f32, width: f32, height: f32) -> Rect {
 }
 struct Paint {
     scene: Scene,
+    ime_cursor: Option<Rect>,
     controls: Vec<ResultControl>,
     clip: Rect,
     p: Palette,
@@ -251,18 +252,16 @@ impl ResultUi {
             header.viewport.width,
             layout.content_height,
         );
-        let p = palette(self.snapshot.shell.theme, self.snapshot.shell.dark);
+        let p = palette(
+            self.snapshot.appearance.theme,
+            self.snapshot.appearance.dark,
+        );
         let mut b = Paint {
             scene: Scene {
                 size: logical,
-                ime_cursor: None,
-                content: full,
                 commands: vec![],
-                hits: vec![],
-                geometry: vec![],
-                content_height: layout.content_height + 72.,
-                viewport: header.viewport,
             },
+            ime_cursor: None,
             controls: vec![],
             clip: full,
             p,
@@ -665,6 +664,9 @@ impl ResultUi {
             .collect();
         ResultFrame {
             scene: b.scene.scaled(self.scale),
+            ime_cursor: b.ime_cursor.map(|rect| rect.scaled(self.scale)),
+            content_height: (layout.content_height + 72.) * self.scale,
+            viewport: header.viewport.scaled(self.scale),
             controls: self.controls.clone(),
             panel: full.scaled(self.scale),
             cards: cards
@@ -727,7 +729,7 @@ impl ResultUi {
                     let caret = r(rect.x + caret.x, rect.y + caret.y, 1., line);
                     b.fill(caret, 0., b.p.accent);
                     if target == ResultTarget::Source {
-                        b.scene.ime_cursor = Some(caret);
+                        b.ime_cursor = Some(caret);
                     }
                 }
             }

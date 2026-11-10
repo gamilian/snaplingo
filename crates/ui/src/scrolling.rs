@@ -1,7 +1,7 @@
 //! Compact scrolling-capture controls shared by native desktop hosts.
 use crate::{
-    theme::palette, DrawCommand, FontFamily, Key, Modifiers, Point, RasterImage, Rect, Scene, Size,
-    Snapshot, TextAlign,
+    theme::palette, Appearance, DrawCommand, FontFamily, Key, Modifiers, Point, RasterImage, Rect,
+    Scene, Size, TextAlign,
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ScrollingAction {
@@ -30,7 +30,7 @@ impl ScrollingAction {
 }
 #[derive(Clone, Debug)]
 pub struct ScrollingSnapshot {
-    pub shell: Snapshot,
+    pub appearance: Appearance,
     pub width: u32,
     pub height: u32,
     pub can_undo: bool,
@@ -155,7 +155,10 @@ impl ScrollingUi {
         } else {
             1.
         };
-        let p = palette(self.snapshot.shell.theme, self.snapshot.shell.dark);
+        let p = palette(
+            self.snapshot.appearance.theme,
+            self.snapshot.appearance.dark,
+        );
         let full = Rect {
             x: 0.,
             y: 0.,
@@ -167,8 +170,6 @@ impl ScrollingUi {
                 width: 408.,
                 height: 132.,
             },
-            ime_cursor: None,
-            content: full,
             commands: vec![
                 DrawCommand::FillRect {
                     rect: full,
@@ -187,10 +188,6 @@ impl ScrollingUi {
                     color: p.line,
                 },
             ],
-            hits: vec![],
-            geometry: vec![],
-            content_height: 132.,
-            viewport: full,
         };
         let title = Rect {
             x: 13.,
@@ -457,22 +454,7 @@ pub fn outline_scene(size: Size, scale: f32) -> Scene {
 }
 
 fn overlay_scene(size: Size, commands: Vec<DrawCommand>) -> Scene {
-    let full = Rect {
-        x: 0.,
-        y: 0.,
-        width: size.width,
-        height: size.height,
-    };
-    Scene {
-        size,
-        ime_cursor: None,
-        content: full,
-        commands,
-        hits: vec![],
-        geometry: vec![],
-        content_height: size.height,
-        viewport: full,
-    }
+    Scene { size, commands }
 }
 #[cfg(test)]
 mod tests {
@@ -480,7 +462,7 @@ mod tests {
     #[test]
     fn scaled_controls_reject_busy_or_unavailable_actions_and_expose_retry() {
         let mut ui = ScrollingUi::new(ScrollingSnapshot {
-            shell: Snapshot::default(),
+            appearance: Appearance::default(),
             width: 640,
             height: 12000,
             can_undo: false,

@@ -58,10 +58,10 @@ fn translation_ranges_drag_in_scaled_window_coordinates_and_stop_at_release() {
     };
     ui.frame(size, 1.5);
     ui.update(Event::Activate(Target::Section(Section::Window)));
-    let scene = ui.frame(size, 1.5);
+    let frame = ui.frame(size, 1.5);
     let field = TranslationField::WindowWidth;
     let target = Target::Translation(field);
-    let track = scene
+    let track = frame
         .geometry
         .iter()
         .find(|n| n.kind == GeometryKind::Control(target))

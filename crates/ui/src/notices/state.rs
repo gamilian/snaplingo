@@ -1,7 +1,7 @@
 use super::*;
-use crate::{Movement, Snapshot, TextEdit, TextLayout};
+use crate::{Appearance, Movement, TextEdit, TextLayout};
 pub struct NoticesUi {
-    pub(super) shell: Snapshot,
+    pub(super) appearance: Appearance,
     pub(super) components: Vec<NoticeComponent>,
     pub(super) filtered: Vec<usize>,
     pub(super) selected: Option<usize>,
@@ -17,10 +17,10 @@ pub struct NoticesUi {
     dragging: bool,
 }
 impl NoticesUi {
-    pub fn new(shell: Snapshot, components: Vec<NoticeComponent>) -> Self {
+    pub fn new(appearance: Appearance, components: Vec<NoticeComponent>) -> Self {
         let filtered = (0..components.len()).collect();
         Self {
-            shell,
+            appearance,
             components,
             filtered,
             selected: None,

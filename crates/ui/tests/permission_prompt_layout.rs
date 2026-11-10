@@ -1,6 +1,6 @@
 //! Independently collected rectangles from the retained React permission gate.
 use snaplingo_ui::render::RendererTextMetrics;
-use snaplingo_ui::{permission_prompt::*, Snapshot, Theme};
+use snaplingo_ui::{permission_prompt::*, Appearance, Theme};
 #[test]
 #[cfg_attr(
     not(target_os = "macos"),
@@ -22,7 +22,7 @@ fn permission_guide_matches_actual_retained_card_and_actions() {
             Theme::Native
         };
         let snapshot = PermissionPromptSnapshot {
-            shell: Snapshot {
+            appearance: Appearance {
                 theme,
                 dark: name.contains("-dark"),
                 ..Default::default()

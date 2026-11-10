@@ -211,7 +211,7 @@ function run(command, args, options = {}) {
 function loadReleaseContext() {
   const packageManifest = readJson(join(repositoryRoot, "package.json"));
   const desktopConfig = readJson(
-    join(repositoryRoot, "apps/desktop", "desktop.json"),
+    join(repositoryRoot, "app", "desktop.json"),
   );
   const cargoMetadata = JSON.parse(
     run("cargo", [
@@ -221,7 +221,7 @@ function loadReleaseContext() {
       "1",
       "--locked",
       "--manifest-path",
-      "apps/desktop/Cargo.toml",
+      "app/Cargo.toml",
     ]),
   );
   const cargoPackage = cargoMetadata.packages.find(

@@ -1,6 +1,6 @@
 # SnapLingo runtime map
 
-Both binaries under `apps/desktop/src` enter the native application. The Cargo
+Both binaries under `app/src` enter the native application. The Cargo
 package remains `snaplingo`; executable, installation and persisted-data identities
 are unchanged by the module reorganization.
 
@@ -57,9 +57,9 @@ Provider coordination, settings/hotkey durability, history/favorite policy,
 selected-text translation, permission ordering and speech policy remain Core
 features. SQLite repositories and image persistence live in Storage. Platform
 supplies system OCR, speech, selection, screenshot acquisition, clipboard, fonts,
-shortcuts, paths, login registration and single-instance ownership. Application
-integrations provide HTTP/LLM transport, packaged local OCR inference, updates,
-logs and native-window helpers.
+shortcuts, paths, login registration and single-instance ownership. Providers
+supplies HTTP/LLM and translation/OCR protocols plus optional local inference.
+Application integrations provide updates, logs and native-window helpers.
 
 `reference/web` is an isolated React reference harness; `tools/reference` supplies
 independent collectors. Neither runs during native startup nor ships as a browser

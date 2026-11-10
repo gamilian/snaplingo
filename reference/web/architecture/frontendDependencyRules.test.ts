@@ -404,7 +404,7 @@ describe('frontend dependency rules', () => {
     expect(appFile).toBeDefined();
     const imports = moduleImports([appFile!]).map(({ specifier }) => specifier);
     expect(imports).toEqual(['react']);
-    expect(appFile!.source).toContain('/reference/web/fixtures/');
+    expect(appFile!.source).toContain('/fixtures/');
     expect(appFile!.source).toContain('referenceUrl(window.location.search)');
     expect(allSourceFiles().some(({ path }) => path === 'reference/web/CaptureApp.tsx')).toBe(false);
   });

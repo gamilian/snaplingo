@@ -1,5 +1,5 @@
 mod coordinator;
-mod impls;
+mod llm;
 pub mod model;
 mod trait_def;
 
@@ -7,7 +7,5 @@ mod trait_def;
 mod coordinator_test;
 
 pub use coordinator::TranslationCoordinator;
-pub use impls::{
-    BaiduTranslateProvider, DeepLProvider, GoogleTranslateProvider, LLMTranslationProvider,
-};
+pub use llm::LLMTranslationProvider;
 pub use trait_def::TranslationProvider;

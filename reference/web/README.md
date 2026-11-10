@@ -12,8 +12,15 @@ select its page, route, theme, appearance and scenario. For example:
 - `/?surface=result&mode=ocr&scenario=image`
 - `/?surface=permission&scenario=attempted`
 
+The Vite root, TypeScript/CSS configuration, HTML entry and public resources all
+live in this directory. Root npm commands remain the common entry point; the
+root Vitest configuration runs both `script/` and browser-reference tests.
+
 The entry preserves these parameters and loads the isolated HTML fixture under
-`reference/web/fixtures`. Collectors open those HTML paths directly. The browser reference bundle is built by `npm run reference:build`; native
+`/fixtures/` (for example `/fixtures/settings_reference.html`). Collectors open
+those URLs directly. The browser reference bundle is built by
+`npm run reference:build` into `reference/web/dist`; `npm run reference:preview`
+serves that bundle. Native
 application packaging uses `npm run native:build` and includes no frontend assets.
 
 The macOS WebKit collectors live in `tools/reference`. Start Vite on port 5194,

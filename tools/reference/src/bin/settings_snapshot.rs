@@ -176,7 +176,7 @@ mod native {
         for page in ["history", "favorites"] {
             for theme in ["native", "studio", "paper"] {
                 on_main(move || REFERENCE.with_borrow(|reference| unsafe {
-                let url=NSURL::URLWithString(&NSString::from_str(&format!("http://127.0.0.1:5194/reference/web/fixtures/settings_reference.html?theme={theme}&appearance={appearance}&page={page}"))).unwrap();
+                let url=NSURL::URLWithString(&NSString::from_str(&format!("http://127.0.0.1:5194/fixtures/settings_reference.html?theme={theme}&appearance={appearance}&page={page}"))).unwrap();
                 reference.as_ref().unwrap().webview.loadRequest(&NSURLRequest::requestWithURL(&url));
             })).await;
                 wait_for(format!("document.documentElement.dataset.referencePage==='{page}' && document.querySelectorAll('.library-list-item').length===20 && window.libraryReference ? 'ready' : ''"),"Library reference did not load").await;
@@ -268,7 +268,7 @@ mod native {
                 ("custom", "translation", "我的 GPT"),
             ] {
                 on_main(move || REFERENCE.with_borrow(|reference| unsafe {
-                    let url=NSURL::URLWithString(&NSString::from_str(&format!("http://127.0.0.1:5194/reference/web/fixtures/settings_reference.html?theme={theme}&appearance={appearance}&page=services&route={route}"))).unwrap();
+                    let url=NSURL::URLWithString(&NSString::from_str(&format!("http://127.0.0.1:5194/fixtures/settings_reference.html?theme={theme}&appearance={appearance}&page=services&route={route}"))).unwrap();
                     reference.as_ref().unwrap().webview.loadRequest(&NSURLRequest::requestWithURL(&url));
                 })).await;
                 wait_for(format!("document.documentElement.dataset.referencePage==='services' && window.servicesReference?.snapshot().route==='{route}' && document.querySelectorAll('.settings-page-header').length===1 && (document.querySelectorAll('.provider-card').length>0 || document.querySelectorAll('.settings-control-row').length===3)?'ready':''"),"Services reference did not load").await;
@@ -348,7 +348,7 @@ mod native {
                     if compact { "-compact" } else { "" }
                 );
                 on_main(move || REFERENCE.with_borrow(|reference| unsafe {
-                    let url = NSURL::URLWithString(&NSString::from_str(&format!("http://127.0.0.1:5194/reference/web/fixtures/settings_reference.html?theme={theme}&appearance={appearance}&page={page}&reference=features"))).unwrap();
+                    let url = NSURL::URLWithString(&NSString::from_str(&format!("http://127.0.0.1:5194/fixtures/settings_reference.html?theme={theme}&appearance={appearance}&page={page}&reference=features"))).unwrap();
                     reference.as_ref().unwrap().webview.loadRequest(&NSURLRequest::requestWithURL(&url));
                 })).await;
                 wait_for(format!("document.documentElement.dataset.referencePage==='{page}' && document.documentElement.dataset.interfaceTheme==='{theme}' && document.documentElement.dataset.theme==='{appearance}' && document.querySelectorAll('.settings-hotkey-row').length==={} && window.settingsFeatureReference ? 'ready' : ''", if screenshot_only { 5 } else { 3 }), "Feature reference did not render").await;
@@ -443,7 +443,7 @@ mod native {
     async fn capture_permission_references(artifacts: &std::path::Path, appearance: &'static str) {
         for theme in ["native", "studio", "paper"] {
             for scenario in ["initial", "attempted", "error", "installation"] {
-                on_main(move||REFERENCE.with_borrow(|reference|unsafe{let url=NSURL::URLWithString(&NSString::from_str(&format!("http://127.0.0.1:5194/reference/web/fixtures/permission_reference.html?theme={theme}&appearance={appearance}&scenario={scenario}"))).unwrap();reference.as_ref().unwrap().webview.loadRequest(&NSURLRequest::requestWithURL(&url));})).await;
+                on_main(move||REFERENCE.with_borrow(|reference|unsafe{let url=NSURL::URLWithString(&NSString::from_str(&format!("http://127.0.0.1:5194/fixtures/permission_reference.html?theme={theme}&appearance={appearance}&scenario={scenario}"))).unwrap();reference.as_ref().unwrap().webview.loadRequest(&NSURLRequest::requestWithURL(&url));})).await;
                 wait_for(format!("new URL(location.href).searchParams.get('theme')==='{theme}' && new URL(location.href).searchParams.get('scenario')==='{scenario}' && document.querySelector('[role=dialog]') && !document.querySelector('button:disabled') && ('{scenario}'==='initial'||'{scenario}'==='installation'||'{scenario}'==='error'&&document.querySelector('[role=alert]')||'{scenario}'==='attempted'&&document.querySelectorAll('button').length===3)?'ready':''"),"Permission guide reference did not load").await;
                 tokio::time::sleep(Duration::from_millis(100)).await;
                 let metrics:serde_json::Value=serde_json::from_str(&evaluate(r#"JSON.stringify((()=>{const card=document.querySelector('[role=dialog]');const rect=e=>{const r=e.getBoundingClientRect();return[r.x,r.y,r.width,r.height]};return{card:rect(card),controls:[...card.querySelectorAll('button')].map(e=>({text:e.textContent,frame:rect(e),disabled:e.disabled})),elements:[...card.children].map(e=>({tag:e.tagName,text:e.innerText,frame:rect(e),font:getComputedStyle(e).fontSize,line:getComputedStyle(e).lineHeight,margin:getComputedStyle(e).margin})),text:card.innerText}})())"#).await).unwrap();
@@ -521,7 +521,7 @@ mod native {
                 for theme in ["native", "studio", "paper"] {
                     let theme_key=format!("{theme}{}{}",if appearance=="dark"{"-dark"}else{""},if compact{"-compact"}else{""});
                     on_main(move || REFERENCE.with_borrow(|reference| unsafe {
-                        let url = NSURL::URLWithString(&NSString::from_str(&format!("http://127.0.0.1:5194/reference/web/fixtures/settings_reference.html?theme={theme}&appearance={appearance}"))).unwrap();
+                        let url = NSURL::URLWithString(&NSString::from_str(&format!("http://127.0.0.1:5194/fixtures/settings_reference.html?theme={theme}&appearance={appearance}"))).unwrap();
                         reference.as_ref().unwrap().webview.loadRequest(&NSURLRequest::requestWithURL(&url));
                     })).await;
                     let deadline = Instant::now() + Duration::from_secs(10);
@@ -558,7 +558,7 @@ mod native {
                     }
                     for (scenario,index,section) in [("recovery",1,"permissions-recovery"),("update",5,"about-update"),("logs",3,"maintenance-logs")] {
                         on_main(move || REFERENCE.with_borrow(|reference| unsafe {
-                            let url=NSURL::URLWithString(&NSString::from_str(&format!("http://127.0.0.1:5194/reference/web/fixtures/settings_reference.html?theme={theme}&appearance={appearance}&scenario={scenario}"))).unwrap();
+                            let url=NSURL::URLWithString(&NSString::from_str(&format!("http://127.0.0.1:5194/fixtures/settings_reference.html?theme={theme}&appearance={appearance}&scenario={scenario}"))).unwrap();
                             reference.as_ref().unwrap().webview.loadRequest(&NSURLRequest::requestWithURL(&url));
                         })).await;
                         let deadline=Instant::now()+Duration::from_secs(10);
@@ -583,7 +583,7 @@ mod native {
                 }
                 for (theme, appearance) in [("native", "light"), ("paper", "dark")] {
                     on_main(move || REFERENCE.with_borrow(|reference| unsafe {
-                        let url = NSURL::URLWithString(&NSString::from_str(&format!("http://127.0.0.1:5194/reference/web/fixtures/settings_reference.html?theme={theme}&appearance={appearance}&notices=1"))).unwrap();
+                        let url = NSURL::URLWithString(&NSString::from_str(&format!("http://127.0.0.1:5194/fixtures/settings_reference.html?theme={theme}&appearance={appearance}&notices=1"))).unwrap();
                         reference.as_ref().unwrap().webview.loadRequest(&NSURLRequest::requestWithURL(&url));
                     })).await;
                     let deadline = Instant::now() + Duration::from_secs(10);

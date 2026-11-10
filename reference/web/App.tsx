@@ -10,7 +10,7 @@ export function referenceUrl(search: string) {
     : surface === 'result' || parameters.get('window') === 'capture-result'
       ? 'result'
       : 'settings';
-  return `/reference/web/fixtures/${reference}_reference.html${search}`;
+  return `/fixtures/${reference}_reference.html${search}`;
 }
 
 export default function App() {

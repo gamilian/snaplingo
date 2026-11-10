@@ -18,13 +18,14 @@ pub mod settings;
 
 pub use foundation::theme;
 pub use foundation::{
-    Color, DrawCommand, FontFamily, Key, KeyStyle, Modifiers, Movement, Point, RasterImage, Rect,
-    Size, TextAlign, TextEdit, TextLayout, TextMeasurement, TextMeasurer, Theme,
+    Appearance, Color, DrawCommand, FontFamily, Key, KeyStyle, Modifiers, Movement, Point,
+    RasterImage, Rect, Scene, Size, TextAlign, TextEdit, TextLayout, TextMeasurement, TextMeasurer,
+    Theme,
 };
 pub use settings::{
     Action, Capacity, Event, GeneralCommand, GeneralField, GeneralPreferences, GeneralRuntime,
-    GeometryKind, GeometryNode, HitRegion, Hotkey, OcrField, OcrPreferences, Page, Scene,
-    ScreenshotField, ScreenshotPreferences, Section, SettingsUi, Snapshot, Target,
-    TranslationField, TranslationPreferences, Value, WindowControls, WindowFrame, WindowInput,
-    WindowIntent, WindowSnapshot, WindowUi, ANNOTATION_SHORTCUT_LABELS,
+    GeometryKind, GeometryNode, HitRegion, Hotkey, OcrField, OcrPreferences, Page, ScreenshotField,
+    ScreenshotPreferences, Section, SettingsFrame, SettingsUi, Snapshot, Target, TranslationField,
+    TranslationPreferences, Value, WindowControls, WindowFrame, WindowInput, WindowIntent,
+    WindowSnapshot, WindowUi, ANNOTATION_SHORTCUT_LABELS,
 };

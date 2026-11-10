@@ -29,7 +29,7 @@ pub struct SettingsUi {
     pub(super) hover: Option<Target>,
     pub(super) menu: Option<Menu>,
     pub(super) recording: Option<Recording>,
-    pub(super) scene: Scene,
+    pub(super) frame: SettingsFrame,
     pub(super) focus_order: Vec<(Target, Rect)>,
     pub(super) offsets: [f32; 6],
     pub(super) max_scroll: f32,
@@ -59,11 +59,13 @@ impl SettingsUi {
             hover: None,
             menu: None,
             recording: None,
-            scene: Scene {
-                size,
+            frame: SettingsFrame {
+                scene: crate::Scene {
+                    size,
+                    commands: vec![],
+                },
                 content: Rect::default(),
                 ime_cursor: None,
-                commands: vec![],
                 hits: vec![],
                 geometry: vec![],
                 content_height: 0.,
@@ -116,7 +118,7 @@ impl SettingsUi {
         size: Size,
         scale: f32,
         measurer: &mut impl TextMeasurer,
-    ) -> Scene {
+    ) -> SettingsFrame {
         if let Some(edit) = self.editing.as_mut() {
             let display = edit.buffer.display_text();
             let measured =
@@ -130,7 +132,7 @@ impl SettingsUi {
             });
             if let Some(x) = caret {
                 let width = self
-                    .scene
+                    .frame
                     .geometry
                     .iter()
                     .find(|n| n.kind == GeometryKind::Control(edit.field.target()))
@@ -149,7 +151,7 @@ impl SettingsUi {
     }
     /// `size` is window DIP, `interface_scale` is the user's UI zoom. Device
     /// pixel ratio belongs exclusively to the renderer and window adapter.
-    pub fn frame(&mut self, size: Size, interface_scale: f32) -> Scene {
+    pub fn frame(&mut self, size: Size, interface_scale: f32) -> SettingsFrame {
         self.size = Size {
             width: size.width.max(1.),
             height: size.height.max(1.),
@@ -160,9 +162,9 @@ impl SettingsUi {
             1.
         };
         self.rebuild();
-        let mut scene = self.scene.clone().scaled(self.scale);
-        scene.size = self.size;
-        scene
+        let mut frame = self.frame.clone().scaled(self.scale);
+        frame.scene.size = self.size;
+        frame
     }
 
     pub fn update(&mut self, event: Event) -> Vec<Action> {
@@ -265,14 +267,14 @@ impl SettingsUi {
                 self.dragging = None;
             }
             Event::PointerMove(point) => {
-                self.hover = self.scene.hit_test(self.logical(point));
+                self.hover = self.frame.hit_test(self.logical(point));
                 if let Some(field) = self.dragging {
                     self.drag_range(field, self.logical(point), &mut actions);
                 }
             }
             Event::PointerDown(point) => {
                 let logical = self.logical(point);
-                let next = self.scene.hit_test(logical);
+                let next = self.frame.hit_test(logical);
                 if self
                     .editing
                     .as_ref()
@@ -281,7 +283,7 @@ impl SettingsUi {
                     self.finish_text_edit(&mut actions);
                 }
                 self.keyboard_focus = false;
-                let hit = self.scene.hit_test(self.logical(point));
+                let hit = self.frame.hit_test(self.logical(point));
                 let close_menu = hit
                     .and_then(Field::from_target)
                     .is_some_and(|field| self.menu.is_some_and(|menu| menu.field == field));
@@ -326,7 +328,7 @@ impl SettingsUi {
                 if delta_y.is_finite() {
                     let point = self.logical(position);
                     if let Some(menu) = self.menu.as_mut() {
-                        if self.scene.hits.iter().any(|h| {
+                        if self.frame.hits.iter().any(|h| {
                             matches!(
                                 h.target,
                                 Target::Option(..)
@@ -341,7 +343,7 @@ impl SettingsUi {
                             self.scroll =
                                 (self.scroll + delta_y / self.scale).clamp(0., self.max_scroll);
                         }
-                    } else if point.x >= self.scene.viewport.x && point.y >= self.page_top() {
+                    } else if point.x >= self.frame.viewport.x && point.y >= self.page_top() {
                         self.scroll =
                             (self.scroll + delta_y / self.scale).clamp(0., self.max_scroll);
                     }
@@ -500,11 +502,11 @@ impl SettingsUi {
                             }
                         }
                         Key::PageDown => {
-                            self.scroll = (self.scroll + self.scene.viewport.height * 0.8)
+                            self.scroll = (self.scroll + self.frame.viewport.height * 0.8)
                                 .min(self.max_scroll)
                         }
                         Key::PageUp => {
-                            self.scroll = (self.scroll - self.scene.viewport.height * 0.8).max(0.)
+                            self.scroll = (self.scroll - self.frame.viewport.height * 0.8).max(0.)
                         }
                         _ => {}
                     }
@@ -757,7 +759,7 @@ impl SettingsUi {
                 | Target::ClearHotkey(_)
                 | Target::ResetHotkey(_)
         ) {
-            let view = self.scene.viewport;
+            let view = self.frame.viewport;
             if rect.y < view.y {
                 self.scroll = (self.scroll + rect.y - view.y - 12.).max(0.);
             }
@@ -772,7 +774,7 @@ impl SettingsUi {
             return;
         };
         let Some(node) = self
-            .scene
+            .frame
             .geometry
             .iter()
             .find(|g| g.kind == GeometryKind::Control(field.target()))
@@ -817,7 +819,7 @@ impl SettingsUi {
     }
     pub(super) fn rebuild(&mut self) {
         self.scroll = self.scroll.max(0.);
-        let (scene, focus, offsets, max_scroll) = self.layout();
+        let (frame, focus, offsets, max_scroll) = self.layout();
         self.focus_order = focus;
         if self.embedded {
             self.focus_order
@@ -827,11 +829,11 @@ impl SettingsUi {
         self.max_scroll = max_scroll;
         if self.scroll > max_scroll {
             self.scroll = max_scroll;
-            let (scene, focus, _, _) = self.layout();
-            self.scene = scene;
+            let (frame, focus, _, _) = self.layout();
+            self.frame = frame;
             self.focus_order = focus;
         } else {
-            self.scene = scene;
+            self.frame = frame;
         }
         let sections = self.sections();
         let general_order = self

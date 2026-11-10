@@ -24,7 +24,7 @@ pub enum WindowControls {
 }
 #[derive(Clone, Debug)]
 pub struct WindowFrame {
-    pub scene: Scene,
+    pub page: SettingsFrame,
     pub controls: WindowControls,
 }
 pub enum WindowUi {
@@ -98,20 +98,20 @@ impl WindowUi {
     ) -> WindowFrame {
         match self {
             Self::Settings(ui) => WindowFrame {
-                scene: ui.frame_with_text(size, scale, metrics),
+                page: ui.frame_with_text(size, scale, metrics),
                 controls: WindowControls::Settings,
             },
             Self::Services(ui) => {
                 let frame = ui.frame(size, scale, metrics);
                 WindowFrame {
-                    scene: frame.scene,
+                    page: frame.page,
                     controls: WindowControls::Services(frame.controls),
                 }
             }
             Self::Library(ui) => {
                 let frame = ui.frame(size, scale, metrics);
                 WindowFrame {
-                    scene: frame.scene,
+                    page: frame.page,
                     controls: WindowControls::Library(frame.controls),
                 }
             }

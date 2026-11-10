@@ -51,7 +51,7 @@ if (process.argv.includes('--check')) {
   components.push({ name: 'Noto Sans CJK SC', version: 'Bundled font', license: 'OFL-1.1', source: 'https://github.com/notofonts/noto-cjk', category: '资源', notices: [notice(join(root, 'assets/fonts/LICENSE-NotoSans.txt'))] });
   const assets = JSON.parse(readFileSync(join(root, 'script/ocr-assets.json'), 'utf8'));
   for (const asset of assets.models.filter((asset) => asset.file.startsWith('licenses/'))) {
-    const path = join(root, 'apps/desktop/resources/ocr', asset.file);
+    const path = join(root, 'app/resources/ocr', asset.file);
     if (existsSync(path)) components.push({ name: asset.file.includes('paddle') ? 'PaddleOCR models' : 'ocr-rs models', version: 'Bundled models', license: 'Apache-2.0', source: asset.url, category: '资源', notices: [notice(path)] });
   }
   for (const [name, file, source, license] of [
@@ -59,10 +59,10 @@ if (process.argv.includes('--check')) {
     ['ONNX Runtime third-party notices', 'onnxruntime-third-party.txt', 'https://github.com/microsoft/onnxruntime', 'See notices'],
     ['MNN', 'mnn/LICENSE-MNN.txt', 'https://github.com/alibaba/MNN', 'Apache-2.0'],
   ]) {
-    const path = join(root, 'apps/desktop/resources/ocr/licenses', file);
+    const path = join(root, 'app/resources/ocr/licenses', file);
     if (existsSync(path)) components.push({ name, version: 'Bundled runtime', license, source, category: '资源', notices: [notice(path)] });
   }
-  const mnnThirdParty = join(root, 'apps/desktop/resources/ocr/licenses/mnn/licenses/3rd_party');
+  const mnnThirdParty = join(root, 'app/resources/ocr/licenses/mnn/licenses/3rd_party');
   if (existsSync(mnnThirdParty)) for (const name of readdirSync(mnnThirdParty)) {
     components.push({ name: `MNN / ${name}`, version: 'Bundled runtime', license: 'See notices', source: 'https://github.com/alibaba/MNN/tree/master/3rd_party', category: '资源', notices: noticeFiles(join(mnnThirdParty, name)) });
   }

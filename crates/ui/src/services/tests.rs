@@ -292,7 +292,7 @@ fn credential_schema_drives_dynamic_keys_secret_masking_and_deepl_mode() {
         "sensitive-秘密🙂",
     );
     let drawn = frame(&mut ui);
-    assert!(!format!("{:?}", drawn.scene.commands).contains("sensitive"));
+    assert!(!format!("{:?}", drawn.page.scene.commands).contains("sensitive"));
     assert!(drawn
         .controls
         .iter()
@@ -388,7 +388,7 @@ fn custom_form_preserves_protocol_modes_and_only_enables_valid_save_and_introspe
         activate(&mut ui, ServiceControl::SaveForm).as_slice(),
         [ServicesIntent::SaveCustom { revision: 41 }]
     ));
-    assert!(!format!("{:?}", frame(&mut ui).scene.commands).contains("private-key"));
+    assert!(!format!("{:?}", frame(&mut ui).page.scene.commands).contains("private-key"));
 }
 
 #[test]
@@ -414,8 +414,8 @@ fn multiline_prompt_keeps_ime_newlines_clipboard_selection_and_strategy_rules() 
     });
     assert!(ui.text_edit().unwrap().text().contains('\n'));
     let drawn = frame(&mut ui);
-    assert!(drawn.scene.ime_cursor.is_some());
-    assert!(drawn.scene.commands.iter().any(
+    assert!(drawn.page.ime_cursor.is_some());
+    assert!(drawn.page.scene.commands.iter().any(
         |command| matches!(command,DrawCommand::TextBlock{text,..}if text.contains("新内容\n"))
     ));
     assert!(!drawn
@@ -640,7 +640,7 @@ fn all_service_routes_draw_the_same_navigation_and_clip_controls_at_every_theme_
                     &mut Metrics,
                 );
                 assert_eq!(
-                    current.scene.size,
+                    current.page.scene.size,
                     Size {
                         width: 900.,
                         height: 650.

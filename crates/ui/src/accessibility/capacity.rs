@@ -133,7 +133,7 @@ pub fn capacity_project(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{FontFamily, Snapshot, TextMeasurement, TextMeasurer};
+    use crate::{Appearance, FontFamily, KeyStyle, TextMeasurement, TextMeasurer};
     struct Metrics;
     impl TextMeasurer for Metrics {
         fn measure(&mut self, _: &str, _: f32, _: u16, _: FontFamily) -> TextMeasurement {
@@ -143,7 +143,8 @@ mod tests {
     #[test]
     fn numeric_actions_respect_modal_epoch_and_validate_through_the_draft() {
         let mut ui = CapacityUi::new(
-            Snapshot::default(),
+            Appearance::default(),
+            KeyStyle::Mac,
             CapacityValue {
                 automatic_cleanup: true,
                 retention_days: 30,

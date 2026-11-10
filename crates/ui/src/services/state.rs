@@ -302,7 +302,7 @@ impl ServicesUi {
                 .is_some_and(|(s, t)| s.active == t.active)
     }
     fn provider_at(&self, point: Point) -> Option<String> {
-        if !self.frame.as_ref()?.scene.viewport.contains(point) {
+        if !self.frame.as_ref()?.page.viewport.contains(point) {
             return None;
         }
         let point = Point {

@@ -1,5 +1,5 @@
 use super::*;
-use crate::{FontFamily, Size, Snapshot, TextMeasurement, TextMeasurer};
+use crate::{Appearance, FontFamily, Size, TextMeasurement, TextMeasurer};
 struct Metrics;
 impl TextMeasurer for Metrics {
     fn measure(&mut self, _: &str, _: f32, _: u16, _: FontFamily) -> TextMeasurement {
@@ -18,7 +18,7 @@ fn frame(ui: &mut NoticesUi) {
 }
 fn ui() -> NoticesUi {
     NoticesUi::new(
-        Snapshot::default(),
+        Appearance::default(),
         vec![
             NoticeComponent {
                 name: "Renderer".into(),

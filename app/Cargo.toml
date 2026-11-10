@@ -1,0 +1,189 @@
+[package]
+name = "snaplingo"
+version.workspace = true
+description = "A cross-platform screenshot, OCR, and translation tool"
+authors = ["SnapLingo Contributors"]
+license.workspace = true
+repository = "https://github.com/gamilian/snaplingo"
+edition.workspace = true
+rust-version.workspace = true
+default-run = "snaplingo"
+
+[lib]
+path = "src/lib.rs"
+name = "snaplingo_lib"
+crate-type = ["rlib"]
+
+[features]
+default = ["native-app"]
+native-app = ["dep:winit", "dep:softbuffer", "dep:accesskit_winit", "dep:embed-resource"]
+tesseract-ocr = ["snaplingo-platform/tesseract-ocr"]
+
+[build-dependencies]
+embed-resource = { version = "3.0.9", optional = true }
+
+[dependencies]
+accesskit_winit = { version = "0.34.2", default-features = false, features = ["rwh_06"], optional = true }
+softbuffer = { version = "0.4.8", optional = true }
+winit = { version = "0.30.12", optional = true }
+snaplingo-ui = { path = "../crates/ui", features = ["rendering", "accessibility"] }
+snaplingo-platform = { path = "../crates/platform" }
+snaplingo-providers = { path = "../crates/providers", features = ["local-ocr"] }
+snaplingo-assets = { path = "../crates/assets" }
+accesskit = "0.25.2"
+snaplingo-core = { path = "../crates/core" }
+snaplingo-storage = { path = "../crates/storage" }
+serde_json.workspace = true
+regex = "1"
+serde = { workspace = true, features = ["derive"] }
+tray-icon = { version = "0.23", default-features = false }
+fern = "0.7"
+open = { version = "5.3.5", features = ["shellexecute-on-windows"] }
+global-hotkey = "0.8"
+rfd = { version = "0.16", default-features = false, features = ["gtk3", "common-controls-v6"] }
+log.workspace = true
+
+# Error handling
+anyhow.workspace = true
+thiserror = "1.0"
+
+# Async traits
+async-trait.workspace = true
+
+# Image processing
+image.workspace = true
+webp = "0.3"
+ab_glyph = "0.2"
+
+# Clipboard and keyboard
+arboard = "3.2"
+
+# HTTP downloads and external URL validation
+reqwest = { workspace = true, features = ["json", "socks"] }
+tokio = { workspace = true, features = ["full"] }
+md5.workspace = true
+sha2 = "0.10"
+semver = "1"
+tempfile.workspace = true
+
+# Language detection
+lingua = "1.5"
+
+# OCR
+base64.workspace = true
+
+# Configuration
+json-patch = "1.2"
+
+# Database and credentials
+rusqlite = { workspace = true, features = ["bundled"] }
+
+# Date and time
+chrono = { workspace = true, features = ["serde"] }
+
+# Concurrency
+parking_lot = { workspace = true, features = ["send_guard"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+accesskit_macos = "0.27.2"
+dispatch2 = "0.3.1"
+block2 = "0.6.2"
+core-graphics = "0.23"
+objc2 = "0.6.4"
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "libc", "NSApplication", "NSAppearance", "NSAttributedString", "NSAffineTransform", "NSBezierPath", "NSBitmapImageRep", "NSBox", "NSButton", "NSColor", "NSColorPanel", "NSColorSpace", "NSColorWell", "NSControl", "NSCursor", "NSEvent", "NSFont", "NSFontManager", "NSGraphics", "NSGraphicsContext", "objc2-core-foundation", "NSImage", "NSImageView", "NSMenu", "NSMenuItem", "NSPanel", "NSParagraphStyle", "NSPopUpButton", "NSPasteboard", "NSPrintInfo", "NSPrintOperation", "NSRunningApplication", "NSScreen", "NSShadow", "NSSlider", "NSScroller", "NSScrollView", "NSTableView", "NSTableColumn", "NSTableHeaderView", "NSTableCellView", "NSText", "NSTextField", "NSTextInputClient", "NSTextInputContext", "NSTextStorage", "NSTextView", "NSTextContainer", "NSLayoutManager", "NSTrackingArea", "NSView", "NSUserInterfaceItemIdentification", "NSWindow", "NSWorkspace"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSData", "NSRegularExpression", "NSTextCheckingResult", "NSUserDefaults", "NSNotification", "NSGeometry", "NSProcessInfo", "objc2-core-foundation"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.51", features = [
+    "Foundation",
+    "Foundation_Collections",
+    "Globalization",
+    "Win32_Graphics_Gdi",
+    "Win32_Storage_FileSystem",
+    "Win32_Storage_Xps",
+    "Win32_System_IO",
+    "Win32_System_DataExchange",
+    "Win32_System_Com",
+    "Graphics_Imaging",
+    "Media_Ocr",
+    "Storage_Streams",
+    "Win32_Foundation",
+    "Win32_System_WinRT",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Accessibility",
+    "Win32_UI_Controls_Dialogs",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+
+[target.'cfg(target_os = "linux")'.dependencies]
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+snaplingo-platform = { path = "../crates/platform", features = ["test-support"] }
+snaplingo-core = { path = "../crates/core", features = ["test-support"] }
+snaplingo-storage = { path = "../crates/storage", features = ["test-support"] }
+mockito = "1.2"
+syn = { workspace = true, default-features = false, features = ["full", "parsing", "visit"] }
+
+[[bin]]
+name = "snaplingo"
+path = "src/main.rs"
+required-features = ["native-app"]
+
+[[bin]]
+name = "snaplingo-native"
+path = "src/native_main.rs"
+required-features = ["native-app"]
+
+[[example]]
+name = "pin_snapshot"
+path = "../tools/native/pin_snapshot.rs"
+
+[[test]]
+name = "native_app_smoke"
+harness = false
+required-features = ["native-app"]
+
+[[test]]
+name = "scrolling_overlays_native"
+harness = false
+
+[[test]]
+name = "scrolling_controls_native"
+harness = false
+
+[[test]]
+name = "pinned_window_native"
+harness = false
+
+[[test]]
+name = "native_ui_workflows"
+harness = false
+required-features = ["native-app"]
+
+[[test]]
+name = "ui_thread_native"
+harness = false
+
+[[test]]
+name = "selected_text_native"
+harness = false
+
+[[test]]
+name = "settings_general_native"
+harness = false
+
+[[test]]
+name = "settings_features_native"
+harness = false
+
+[[test]]
+name = "settings_hotkeys_native"
+harness = false
+
+[[example]]
+name = "settings_preview"
+required-features = ["native-app"]

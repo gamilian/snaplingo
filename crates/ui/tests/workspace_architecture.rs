@@ -27,7 +27,28 @@ fn production_dependencies(package: &Value) -> BTreeSet<String> {
 fn production_crate(package: &Value) -> bool {
     let workspace = root().canonicalize().unwrap();
     let manifest = Path::new(package["manifest_path"].as_str().unwrap());
-    manifest.starts_with(workspace.join("crates")) || manifest.starts_with(workspace.join("apps"))
+    manifest.starts_with(workspace.join("crates")) || manifest.starts_with(workspace.join("app"))
+}
+
+// Each independently built capability declares its allowed workspace edges.
+// Adding a package requires choosing its ownership, not preserving a package count.
+fn allowed_workspace_dependencies(name: &str) -> Option<&'static [&'static str]> {
+    match name {
+        "snaplingo" => Some(&[
+            "snaplingo-core",
+            "snaplingo-ui",
+            "snaplingo-platform",
+            "snaplingo-providers",
+            "snaplingo-storage",
+            "snaplingo-assets",
+        ]),
+        "snaplingo-core" | "snaplingo-ui" => Some(&["snaplingo-assets"]),
+        "snaplingo-platform" | "snaplingo-providers" | "snaplingo-storage" => {
+            Some(&["snaplingo-core"])
+        }
+        "snaplingo-assets" => Some(&[]),
+        _ => None,
+    }
 }
 
 fn dependency_violations(packages: &BTreeMap<String, Value>) -> Vec<String> {
@@ -36,7 +57,18 @@ fn dependency_violations(packages: &BTreeMap<String, Value>) -> Vec<String> {
         .iter()
         .filter(|(_, package)| production_crate(package))
     {
+        let Some(allowed) = allowed_workspace_dependencies(name) else {
+            errors.push(format!(
+                "{name} has no declared workspace dependency policy"
+            ));
+            continue;
+        };
         for dependency in production_dependencies(package) {
+            if packages.get(&dependency).is_some_and(production_crate)
+                && !allowed.contains(&dependency.as_str())
+            {
+                errors.push(format!("{name} -> {dependency}"));
+            }
             if packages
                 .get(&dependency)
                 .is_some_and(|package| !production_crate(package))
@@ -84,17 +116,21 @@ fn dependency_violations(packages: &BTreeMap<String, Value>) -> Vec<String> {
         }
     }
     for dependency in production_dependencies(&packages["snaplingo-core"]) {
-        if (packages.contains_key(&dependency) && dependency != "snaplingo-assets")
-            || concrete_platform_dependency(&dependency)
+        if concrete_platform_dependency(&dependency)
+            || matches!(
+                dependency.as_str(),
+                "reqwest" | "rusqlite" | "ort" | "ocr-rs" | "oar-ocr-core" | "ndarray"
+            )
         {
             errors.push(format!("snaplingo-core -> {dependency}"));
         }
     }
-    for dependency in production_dependencies(&packages["snaplingo-platform"]) {
-        if packages.contains_key(&dependency)
-            && !matches!(dependency.as_str(), "snaplingo-core" | "snaplingo-assets")
+    for dependency in production_dependencies(&packages["snaplingo-providers"]) {
+        // Local inference uses NSProcessInfo to select the supported macOS engine.
+        if (concrete_platform_dependency(&dependency) && dependency != "objc2-foundation")
+            || dependency == "rusqlite"
         {
-            errors.push(format!("snaplingo-platform -> {dependency}"));
+            errors.push(format!("snaplingo-providers -> {dependency}"));
         }
     }
     errors
@@ -166,22 +202,6 @@ fn cargo_edges_keep_presentation_storage_and_platforms_separate() {
         "Forbidden production dependencies: {violations:#?}"
     );
 
-    let production = packages
-        .iter()
-        .filter(|(_, package)| production_crate(package))
-        .map(|(name, _)| name.as_str())
-        .collect::<BTreeSet<_>>();
-    assert_eq!(
-        production,
-        BTreeSet::from([
-            "snaplingo",
-            "snaplingo-core",
-            "snaplingo-ui",
-            "snaplingo-platform",
-            "snaplingo-storage",
-            "snaplingo-assets",
-        ])
-    );
     let ui = &packages["snaplingo-ui"];
     assert_eq!(
         ui["features"]["default"],
@@ -208,6 +228,11 @@ fn cargo_edges_keep_presentation_storage_and_platforms_separate() {
         ("snaplingo-ui", "snaplingo-platform"),
         ("snaplingo-platform", "snaplingo"),
         ("snaplingo-platform", "snaplingo-ui"),
+        ("snaplingo-core", "snaplingo-providers"),
+        ("snaplingo-providers", "snaplingo"),
+        ("snaplingo-providers", "snaplingo-ui"),
+        ("snaplingo-providers", "snaplingo-platform"),
+        ("snaplingo-providers", "snaplingo-storage"),
     ] {
         let mut forbidden = packages.clone();
         forbidden.get_mut(owner).unwrap()["dependencies"]
@@ -290,6 +315,44 @@ fn cargo_edges_keep_presentation_storage_and_platforms_separate() {
         production_dependencies(&fixture),
         BTreeSet::from(["objc2".into(), "windows-sys".into()])
     );
+}
+
+#[test]
+fn provider_protocol_build_excludes_native_inference_dependencies() {
+    let output = Command::new(env!("CARGO"))
+        .args([
+            "tree",
+            "--locked",
+            "--offline",
+            "-p",
+            "snaplingo-providers",
+            "--no-default-features",
+            "--edges",
+            "normal,build",
+            "--prefix",
+            "none",
+            "--format",
+            "{p}",
+        ])
+        .current_dir(root())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let tree = String::from_utf8(output.stdout).unwrap();
+    for line in tree.lines() {
+        let package = line.split_whitespace().next().unwrap_or("");
+        assert!(
+            !matches!(
+                package,
+                "ort" | "ort-sys" | "ocr-rs" | "oar-ocr-core" | "oar-ocr-derive" | "ndarray"
+            ),
+            "Protocol-only providers must not build local inference: {line}"
+        );
+    }
 }
 
 // Evaluate whether a cfg can exist with `test = false`; other features/targets
@@ -529,6 +592,169 @@ fn source_guard_distinguishes_target_adapters_from_test_fixtures() {
             "fixture.rs -> infrastructure".into(),
             "fixture.rs -> windows::Win32".into(),
             "fixture.rs -> window::capture::NativeCaptureSessionRuntimeHost".into(),
+        ])
+    );
+}
+
+// Lower UI modules use explicit owning-module imports so a crate-root re-export
+// cannot quietly make drawing depend on a product page again.
+struct UiFoundationImports {
+    module: Vec<String>,
+    owner: String,
+    violations: BTreeSet<String>,
+}
+
+impl UiFoundationImports {
+    fn record(&mut self, path: &str) {
+        let parts = path.split("::").collect::<Vec<_>>();
+        let mut resolved = self.module.clone();
+        let mut index;
+        match parts.first().copied() {
+            Some("crate" | "snaplingo_ui") => {
+                resolved.clear();
+                index = 1;
+            }
+            Some("super") => {
+                index = 0;
+                while parts.get(index) == Some(&"super") {
+                    resolved.pop();
+                    index += 1;
+                }
+            }
+            Some("self") => {
+                index = 1;
+            }
+            _ => return,
+        }
+        resolved.extend(parts[index..].iter().map(|part| (*part).to_owned()));
+        let dependency = resolved.first().map(String::as_str).unwrap_or("");
+        if dependency != "foundation" && !(self.owner == "render" && dependency == "render") {
+            self.violations.insert(path.into());
+        }
+    }
+}
+
+impl<'ast> Visit<'ast> for UiFoundationImports {
+    // pub(crate) is visibility, not a dependency on the crate root's exports.
+    fn visit_visibility(&mut self, _visibility: &'ast syn::Visibility) {}
+
+    fn visit_item(&mut self, item: &'ast Item) {
+        // Tests may construct whole product frames to exercise the renderer.
+        if let Item::Mod(module) = item {
+            if !production(&module.attrs) {
+                return;
+            }
+            if module
+                .attrs
+                .iter()
+                .any(|attribute| attribute.path().is_ident("path"))
+            {
+                self.violations.insert("source mount #[path]".into());
+            }
+            if let Some((_, items)) = &module.content {
+                self.module.push(module.ident.to_string());
+                for item in items {
+                    self.visit_item(item);
+                }
+                self.module.pop();
+                return;
+            }
+        }
+        visit::visit_item(self, item);
+    }
+
+    fn visit_item_use(&mut self, item: &'ast syn::ItemUse) {
+        if !production(&item.attrs) {
+            return;
+        }
+        let mut paths = Vec::new();
+        use_paths(&item.tree, String::new(), &mut paths);
+        for path in paths {
+            self.record(&path);
+        }
+    }
+
+    fn visit_path(&mut self, path: &'ast syn::Path) {
+        self.record(
+            &path
+                .segments
+                .iter()
+                .map(|segment| segment.ident.to_string())
+                .collect::<Vec<_>>()
+                .join("::"),
+        );
+        visit::visit_path(self, path);
+    }
+
+    fn visit_macro(&mut self, mac: &'ast syn::Macro) {
+        if mac.path.is_ident("include") {
+            self.violations.insert("source mount include!".into());
+        }
+        visit::visit_macro(self, mac);
+    }
+}
+
+fn ui_foundation_imports(source: &str, module: Vec<String>) -> BTreeSet<String> {
+    let mut visitor = UiFoundationImports {
+        owner: module[0].clone(),
+        module,
+        violations: BTreeSet::new(),
+    };
+    visitor.visit_file(&syn::parse_file(source).unwrap());
+    visitor.violations
+}
+
+#[test]
+fn ui_foundation_and_renderer_do_not_import_product_pages() {
+    let source_root = root().join("crates/ui/src");
+    let mut pending = vec![source_root.join("foundation"), source_root.join("render")];
+    while let Some(path) = pending.pop() {
+        if path.is_dir() {
+            pending.extend(
+                fs::read_dir(path)
+                    .unwrap()
+                    .map(|entry| entry.unwrap().path()),
+            );
+        } else if path.extension().is_some_and(|extension| extension == "rs") {
+            let relative = path.strip_prefix(&source_root).unwrap();
+            let mut module = relative
+                .with_extension("")
+                .components()
+                .map(|component| component.as_os_str().to_str().unwrap().to_owned())
+                .collect::<Vec<_>>();
+            if module.last().is_some_and(|name| name == "mod") {
+                module.pop();
+            }
+            let violations = ui_foundation_imports(&fs::read_to_string(&path).unwrap(), module);
+            assert!(
+                violations.is_empty(),
+                "{} imports product UI: {violations:#?}",
+                relative.display()
+            );
+        }
+    }
+    let invalid = r#"
+        use crate::settings::Snapshot;
+        use crate::{Scene as HiddenSettingsScene};
+        use super::settings::Target;
+        #[cfg(target_os = "windows")]
+        fn native() { crate::result::run(); }
+        #[cfg(test)]
+        mod tests { use crate::settings::Snapshot; }
+        use crate::foundation::Scene;
+        pub(crate) fn permitted_visibility() {}
+        #[path = "../settings/mod.rs"] mod page;
+        include!("../settings/state.rs");
+    "#;
+    assert_eq!(
+        ui_foundation_imports(invalid, vec!["render".into()]),
+        BTreeSet::from([
+            "crate::settings::Snapshot".into(),
+            "crate::Scene".into(),
+            "super::settings::Target".into(),
+            "crate::result::run".into(),
+            "source mount #[path]".into(),
+            "source mount include!".into(),
         ])
     );
 }

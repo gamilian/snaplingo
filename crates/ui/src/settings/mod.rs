@@ -25,7 +25,9 @@ use draw::{r, Paint};
 use field::{fields, Field};
 pub use general::{GeneralCommand, GeneralField, GeneralPreferences, GeneralRuntime};
 pub use model::{Action, Capacity, Event, Hotkey, OcrPreferences, Snapshot, Value};
-pub use scene::{GeometryKind, GeometryNode, HitRegion, OcrField, Page, Scene, Section, Target};
+pub use scene::{
+    GeometryKind, GeometryNode, HitRegion, OcrField, Page, Section, SettingsFrame, Target,
+};
 pub use screenshot::{ScreenshotField, ScreenshotPreferences, ANNOTATION_SHORTCUT_LABELS};
 use screenshot_edit::Editing;
 use state::Menu;

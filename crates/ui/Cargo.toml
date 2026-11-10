@@ -1,9 +1,9 @@
 [package]
 name = "snaplingo-ui"
-version = "0.1.23"
-edition = "2021"
-rust-version = "1.88"
-license = "MIT"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
 description = "Portable views, input, drawing and optional CPU rendering and accessibility"
 
 [features]
@@ -19,8 +19,8 @@ cosmic-text = { version = "0.14.2", optional = true }
 accesskit = { version = "0.25.2", optional = true }
 
 [dev-dependencies]
-serde_json = "1.0"
-syn = { version = "2", default-features = false, features = ["full", "parsing", "visit"] }
+serde_json.workspace = true
+syn = { workspace = true, default-features = false, features = ["full", "parsing", "visit"] }
 
 [[example]]
 name = "capture_selection_snapshot"

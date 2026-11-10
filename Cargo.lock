@@ -6557,20 +6557,14 @@ dependencies = [
  "image",
  "json-patch",
  "libc",
- "libloading 0.9.0",
  "lingua",
  "log",
  "md5",
  "mockito",
- "ndarray 0.17.2",
- "oar-ocr-core",
- "oar-ocr-derive",
  "objc2 0.6.4",
  "objc2-app-kit 0.3.2",
  "objc2-foundation 0.3.2",
- "ocr-rs",
  "open",
- "ort",
  "parking_lot",
  "regex",
  "reqwest",
@@ -6583,6 +6577,7 @@ dependencies = [
  "snaplingo-assets",
  "snaplingo-core",
  "snaplingo-platform",
+ "snaplingo-providers",
  "snaplingo-storage",
  "snaplingo-ui",
  "softbuffer",
@@ -6591,7 +6586,6 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tray-icon",
- "urlencoding",
  "webp",
  "windows 0.51.1",
  "winit",
@@ -6622,7 +6616,6 @@ dependencies = [
  "snaplingo-assets",
  "tempfile",
  "tokio",
- "urlencoding",
  "webp",
 ]
 
@@ -6662,6 +6655,34 @@ dependencies = [
  "windows 0.51.1",
  "windows-sys 0.59.0",
  "xcap",
+]
+
+[[package]]
+name = "snaplingo-providers"
+version = "0.1.23"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.21.7",
+ "image",
+ "libloading 0.9.0",
+ "log",
+ "md5",
+ "mockito",
+ "ndarray 0.17.2",
+ "oar-ocr-core",
+ "oar-ocr-derive",
+ "objc2-foundation 0.3.2",
+ "ocr-rs",
+ "ort",
+ "parking_lot",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "snaplingo-core",
+ "tempfile",
+ "tokio",
+ "urlencoding",
 ]
 
 [[package]]

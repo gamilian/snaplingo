@@ -60,7 +60,7 @@ fn main() -> Result<(), String> {
                             if dark { "-dark" } else { "" },
                             if compact { "-compact" } else { "" }
                         );
-                        renderer.render(&scene, 1.0)?.save_png(path)?;
+                        renderer.render(&scene.scene, 1.0)?.save_png(path)?;
                     }
                 }
             }

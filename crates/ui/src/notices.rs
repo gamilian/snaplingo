@@ -31,6 +31,7 @@ pub struct NoticesControl {
 }
 pub struct NoticesFrame {
     pub scene: Scene,
+    pub ime_cursor: Option<Rect>,
     pub controls: Vec<NoticesControl>,
 }
 pub enum NoticesInput {

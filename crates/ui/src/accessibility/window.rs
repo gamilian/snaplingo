@@ -232,7 +232,7 @@ impl WindowProjection {
 pub fn window_project(frame: &WindowFrame, ui: &WindowUi, device_scale: f64) -> WindowProjection {
     if let (WindowControls::Settings, WindowUi::Settings(ui)) = (&frame.controls, ui) {
         return WindowProjection(Content::Settings(super::project(
-            &frame.scene,
+            &frame.page,
             ui,
             device_scale,
         )));
@@ -240,15 +240,15 @@ pub fn window_project(frame: &WindowFrame, ui: &WindowUi, device_scale: f64) -> 
     let region = Rect {
         x: 0.,
         y: 0.,
-        width: frame.scene.size.width,
-        height: frame.scene.size.height,
+        width: frame.page.scene.size.width,
+        height: frame.page.scene.size.height,
     };
     let mut projection = window_project_region(frame, ui, device_scale, region);
     let Content::Dynamic(dynamic) = &mut projection.0 else {
         unreachable!()
     };
     let mut navigation = Vec::new();
-    for hit in &frame.scene.hits {
+    for hit in &frame.page.hits {
         if !matches!(hit.target, Target::Navigate(_) | Target::Capacity) {
             continue;
         }
@@ -355,7 +355,7 @@ pub fn window_project_region(
 ) -> WindowProjection {
     if let (WindowControls::Settings, WindowUi::Settings(ui)) = (&frame.controls, ui) {
         return WindowProjection(Content::Settings(project_region(
-            &frame.scene,
+            &frame.page,
             ui,
             device_scale,
             region,
@@ -518,7 +518,7 @@ pub fn window_project_region(
     let scroll_id = id(page, "scroll");
     let mut scroll = Node::new(Role::ScrollView);
     scroll.set_label(format!("{}内容", page.label()));
-    scroll.set_bounds(relative(frame.scene.content, region, device_scale));
+    scroll.set_bounds(relative(frame.page.content, region, device_scale));
     scroll.set_clips_children();
     scroll.set_children(children);
     scroll.add_action(Action::ScrollDown);
@@ -526,8 +526,8 @@ pub fn window_project_region(
     projection.scroll.insert(
         scroll_id,
         Point {
-            x: frame.scene.viewport.x + frame.scene.viewport.width * 0.5,
-            y: frame.scene.viewport.y + frame.scene.viewport.height * 0.5,
+            x: frame.page.viewport.x + frame.page.viewport.width * 0.5,
+            y: frame.page.viewport.y + frame.page.viewport.height * 0.5,
         },
     );
     projection.nodes.insert(scroll_id, scroll);
@@ -590,7 +590,7 @@ mod tests {
     }
     fn project(ui: &mut WindowUi) -> WindowProjection {
         let frame = make_frame(ui);
-        window_project_region(&frame, ui, 2., frame.scene.content)
+        window_project_region(&frame, ui, 2., frame.page.content)
     }
     fn nodes(projection: &WindowProjection) -> &BTreeMap<NodeId, Node> {
         match &projection.0 {
@@ -645,7 +645,7 @@ mod tests {
         }));
         let frame = make_frame(&mut ui);
         let target = service_target(&frame, ServiceControl::DeepLMode(true));
-        let projection = window_project_region(&frame, &ui, 1., frame.scene.content);
+        let projection = window_project_region(&frame, &ui, 1., frame.page.content);
         let node_id = id(Page::Services, &target);
         let node = &nodes(&projection)[&node_id];
         assert_eq!(node.role(), Role::Switch);
@@ -655,7 +655,7 @@ mod tests {
         }
         let frame = make_frame(&mut ui);
         let target = service_target(&frame, ServiceControl::DeepLMode(false));
-        let projection = window_project_region(&frame, &ui, 1., frame.scene.content);
+        let projection = window_project_region(&frame, &ui, 1., frame.page.content);
         assert_eq!(
             nodes(&projection)[&id(Page::Services, &target)].toggled(),
             Some(accesskit::Toggled::True)
@@ -672,7 +672,7 @@ mod tests {
             ServiceControl::Field(ServiceField::Custom(ServiceCustomField::ApiKey)),
         );
         let node_id = id(Page::Services, &target);
-        let projection = window_project_region(&frame, &ui, 2., frame.scene.content);
+        let projection = window_project_region(&frame, &ui, 2., frame.page.content);
         let node = &nodes(&projection)[&node_id];
         assert_eq!(node.role(), Role::PasswordInput);
         assert!(node
@@ -713,7 +713,7 @@ mod tests {
         let frame = make_frame(&mut ui);
         let target = service_target(&frame, ServiceControl::Rate);
         let node_id = id(Page::Services, &target);
-        let projection = window_project_region(&frame, &ui, 1.75, frame.scene.content);
+        let projection = window_project_region(&frame, &ui, 1.75, frame.page.content);
         let node = &nodes(&projection)[&node_id];
         assert_eq!(node.role(), Role::Slider);
         assert_eq!(node.numeric_value(), Some(180.));
@@ -727,7 +727,7 @@ mod tests {
             .rect;
         assert_eq!(
             node.bounds(),
-            Some(relative(rect, frame.scene.content, 1.75))
+            Some(relative(rect, frame.page.content, 1.75))
         );
         for input in projection.actions(&request(node_id, Action::Focus)) {
             ui.input(input);
@@ -745,7 +745,7 @@ mod tests {
         ui.snapshot(WindowSnapshot::Services(snapshot));
         let frame = make_frame(&mut ui);
         let save = service_target(&frame, ServiceControl::SaveForm);
-        let projection = window_project_region(&frame, &ui, 1., frame.scene.content);
+        let projection = window_project_region(&frame, &ui, 1., frame.page.content);
         let node_id = id(Page::Services, &save);
         assert!(nodes(&projection)[&node_id].is_disabled());
         assert!(projection
@@ -856,7 +856,7 @@ mod tests {
             let mut ui = WindowUi::new(snapshot);
             let frame = make_frame(&mut ui);
             let full = window_project(&frame, &ui, 2.);
-            let embedded = window_project_region(&frame, &ui, 2., frame.scene.content);
+            let embedded = window_project_region(&frame, &ui, 2., frame.page.content);
             for target in [Target::Navigate(Page::General), Target::Capacity] {
                 let node_id = id(ui.page(), target);
                 assert!(nodes(&full).contains_key(&node_id));

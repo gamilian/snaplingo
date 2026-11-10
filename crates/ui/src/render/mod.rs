@@ -4,7 +4,7 @@ use std::collections::HashMap;
 mod text_metrics;
 pub use text_metrics::RendererTextMetrics;
 
-use crate::{Color, DrawCommand, FontFamily, Rect, Scene, TextAlign};
+use crate::foundation::{Color, DrawCommand, FontFamily, Rect, Scene, TextAlign};
 use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, Shaping, SwashCache, Weight};
 use tiny_skia::{
     FillRule, FilterQuality, Mask, Paint, Path, PathBuilder, Pixmap, PixmapPaint, PixmapRef,
@@ -521,12 +521,6 @@ mod tests {
                 width: 180.,
                 height: 40.,
             };
-            scene.viewport = Rect {
-                x: 0.,
-                y: 0.,
-                width: 180.,
-                height: 40.,
-            };
             scene
         };
         let opaque = renderer.render(&picture(255), 1.).unwrap();
@@ -595,22 +589,6 @@ mod tests {
                 height: 20.0,
             },
             commands,
-            geometry: vec![],
-            ime_cursor: None,
-            content: Rect {
-                x: 0.0,
-                y: 0.0,
-                width: 20.0,
-                height: 20.0,
-            },
-            hits: vec![],
-            content_height: 20.0,
-            viewport: Rect {
-                x: 0.0,
-                y: 0.0,
-                width: 20.0,
-                height: 20.0,
-            },
         }
     }
     #[test]

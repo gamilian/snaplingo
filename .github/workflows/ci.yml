@@ -36,11 +36,14 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run ocr:prepare
-      - run: cargo fmt --manifest-path apps/desktop/Cargo.toml --check
-      - run: cargo test --locked --manifest-path apps/desktop/Cargo.toml
+      - run: npm run reference:build
+      - run: cargo fmt --manifest-path app/Cargo.toml --check
+      - run: cargo test --locked --manifest-path app/Cargo.toml
       - name: Smoke test bundled medium OCR
-        run: cargo test --locked --manifest-path apps/desktop/Cargo.toml bundled_medium_smoke -- --ignored --nocapture
-      - run: cargo check --locked --manifest-path apps/desktop/Cargo.toml --all-targets
+        env:
+          SNAPLINGO_OCR_SMOKE_ROOT: ${{ github.workspace }}/app/resources/ocr
+        run: cargo test --locked -p snaplingo-providers --features local-ocr bundled_medium_smoke -- --ignored --nocapture
+      - run: cargo check --locked --manifest-path app/Cargo.toml --all-targets
       - name: Install native Windows installer compilers
         if: runner.os == 'Windows'
         run: choco install nsis wixtoolset --no-progress -y

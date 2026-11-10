@@ -11,6 +11,7 @@ fn r(x: f32, y: f32, width: f32, height: f32) -> Rect {
 }
 struct Paint {
     scene: Scene,
+    ime_cursor: Option<Rect>,
     controls: Vec<NoticesControl>,
     clip: Rect,
     p: Palette,
@@ -70,20 +71,15 @@ impl NoticesUi {
             width: size.width / self.scale,
             height: size.height / self.scale,
         };
-        let p = palette(self.shell.theme, self.shell.dark);
+        let p = palette(self.appearance.theme, self.appearance.dark);
         let full = r(0., 0., size.width, size.height);
         let body = r(20., 140., size.width - 40., size.height - 160.);
         let mut b = Paint {
             scene: Scene {
                 size,
-                ime_cursor: None,
-                content: full,
                 commands: vec![],
-                hits: vec![],
-                geometry: vec![],
-                content_height: 0.,
-                viewport: body,
             },
+            ime_cursor: None,
             controls: vec![],
             clip: full,
             p,
@@ -144,7 +140,7 @@ impl NoticesUi {
             if let Some(byte) = self.search.display_caret() {
                 let caret = r(32. + x(byte), 97., 1., 20.);
                 b.fill(caret, p.accent);
-                b.scene.ime_cursor = Some(caret);
+                b.ime_cursor = Some(caret);
             }
         }
         b.scene.commands.push(DrawCommand::PushClip(body));
@@ -293,7 +289,6 @@ impl NoticesUi {
         b.scene.commands.push(DrawCommand::PopClip);
         self.max_scroll = (y + self.scroll - body.y - body.height).max(0.);
         self.scroll = self.scroll.min(self.max_scroll);
-        b.scene.content_height = y + self.scroll;
         self.controls = b
             .controls
             .into_iter()
@@ -305,6 +300,7 @@ impl NoticesUi {
             .collect();
         NoticesFrame {
             scene: b.scene.scaled(self.scale),
+            ime_cursor: b.ime_cursor.map(|rect| rect.scaled(self.scale)),
             controls: self.controls.clone(),
         }
     }

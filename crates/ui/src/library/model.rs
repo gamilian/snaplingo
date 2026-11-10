@@ -1,4 +1,4 @@
-use crate::{Key, KeyStyle, Modifiers, Point, RasterImage, Rect, Scene, Snapshot};
+use crate::{Key, KeyStyle, Modifiers, Point, RasterImage, Rect, SettingsFrame, Snapshot};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum LibraryKind {
@@ -237,7 +237,7 @@ pub struct LibraryControl {
 }
 #[derive(Clone, Debug)]
 pub struct LibraryFrame {
-    pub scene: Scene,
+    pub page: SettingsFrame,
     pub controls: Vec<LibraryControl>,
 }
 impl LibraryFrame {

@@ -12,8 +12,8 @@ fn center(rect: Rect) -> Point {
     }
 }
 fn click(ui: &mut SettingsUi, target: Target) -> Vec<Action> {
-    let scene = ui.frame(ui.size, ui.scale);
-    let hit = scene
+    let frame = ui.frame(ui.size, ui.scale);
+    let hit = frame
         .hits
         .iter()
         .find(|hit| hit.target == target)
@@ -57,17 +57,17 @@ fn six_theme_appearances_preserve_original_colors_and_navigation_geometry() {
                 dark,
                 ..Snapshot::default()
             });
-            let scene = ui.frame(size(), 1.);
+            let frame = ui.frame(size(), 1.);
             let palette = palette(theme, dark);
             assert_eq!(
-                scene.commands.first(),
+                frame.scene.commands.first(),
                 Some(&DrawCommand::FillRect {
                     rect: r(0., 0., 1000., 700.),
                     radius: 0.,
                     color: palette.canvas
                 })
             );
-            let ocr = scene
+            let ocr = frame
                 .hits
                 .iter()
                 .find(|h| h.target == Target::Navigate(Page::Ocr))
@@ -77,12 +77,13 @@ fn six_theme_appearances_preserve_original_colors_and_navigation_geometry() {
                 Theme::Studio => assert_eq!(ocr.rect.width, 54.),
                 Theme::Paper => assert_eq!(ocr.rect.height, 33.),
             }
-            assert!(scene.commands.iter().any(|op|matches!(op,DrawCommand::Text{text,font:FontFamily::Serif,..}if text=="OCR"))== (theme==Theme::Paper));
-            assert!(scene
+            assert!(frame.scene.commands.iter().any(|op|matches!(op,DrawCommand::Text{text,font:FontFamily::Serif,..}if text=="OCR"))== (theme==Theme::Paper));
+            assert!(frame
                 .hits
                 .iter()
                 .any(|hit| hit.target == Target::Section(Section::Recognition)));
-            assert!(scene
+            assert!(frame
+                .scene
                 .commands
                 .iter()
                 .any(|op| matches!(op,DrawCommand::Text{text,..}if text=="本地模型 GPU 加速")));
@@ -186,14 +187,14 @@ fn zoom_keeps_drawing_and_hit_testing_in_the_same_window_coordinates() {
 #[test]
 fn clipped_controls_do_not_receive_clicks_and_focus_scrolls_to_hidden_controls() {
     let mut ui = SettingsUi::new(Snapshot::default());
-    let scene = ui.frame(
+    let frame = ui.frame(
         Size {
             width: 700.,
             height: 500.,
         },
         1.,
     );
-    assert!(!scene
+    assert!(!frame
         .hits
         .iter()
         .any(|h| h.target == Target::Ocr(OcrField::HideSilentStatus)));
@@ -206,13 +207,13 @@ fn clipped_controls_do_not_receive_clicks_and_focus_scrolls_to_hidden_controls()
     }
     assert_eq!(ui.focused(), Some(Target::Ocr(OcrField::HideSilentStatus)));
     assert!(ui.scroll > original_scroll);
-    let scene = ui.frame(ui.size, 1.);
-    let hit = scene
+    let frame = ui.frame(ui.size, 1.);
+    let hit = frame
         .hits
         .iter()
         .find(|h| h.target == Target::Ocr(OcrField::HideSilentStatus))
         .unwrap();
-    assert_eq!(hit.rect, hit.rect.intersect(scene.viewport));
+    assert_eq!(hit.rect, hit.rect.intersect(frame.viewport));
     key(&mut ui, Key::Home);
     assert_eq!(ui.scroll, 0.);
     ui.update(Event::Scroll {
@@ -285,12 +286,14 @@ fn windows_hotkeys_keep_ctrl_and_win_distinct_in_display_and_storage() {
         key_style: KeyStyle::Windows,
         ..Snapshot::default()
     });
-    let scene = ui.frame(size(), 1.);
-    assert!(scene
+    let frame = ui.frame(size(), 1.);
+    assert!(frame
+        .scene
         .commands
         .iter()
         .any(|op| matches!(op,DrawCommand::Text{text,..} if text=="Alt")));
-    assert!(!scene
+    assert!(!frame
+        .scene
         .commands
         .iter()
         .any(|op| matches!(op,DrawCommand::Text{text,..} if text=="⌥")));
@@ -323,13 +326,13 @@ fn dropdown_overlays_own_pointer_hits_and_escape_and_resize_dismiss_them() {
     ui.frame(size(), 1.);
     click(&mut ui, Target::Section(Section::Recognition));
     click(&mut ui, Target::Ocr(OcrField::RecognitionLanguage));
-    let scene = ui.frame(ui.size, 1.);
-    let option = scene
+    let frame = ui.frame(ui.size, 1.);
+    let option = frame
         .hits
         .iter()
         .find(|h| h.target == Target::Option(OcrField::RecognitionLanguage, 2))
         .unwrap();
-    assert_eq!(scene.hit_test(center(option.rect)), Some(option.target));
+    assert_eq!(frame.hit_test(center(option.rect)), Some(option.target));
     key(&mut ui, Key::Escape);
     assert!(ui.menu.is_none());
     key(&mut ui, Key::Space);
@@ -339,14 +342,16 @@ fn dropdown_overlays_own_pointer_hits_and_escape_and_resize_dismiss_them() {
         height: 500.,
     }));
     assert!(ui.menu.is_none());
-    let scene = ui.frame(ui.size, 1.);
+    let frame = ui.frame(ui.size, 1.);
     assert!(
-        scene
+        frame
+            .scene
             .commands
             .iter()
             .filter(|op| matches!(op, DrawCommand::PushClip(_)))
             .count()
-            == scene
+            == frame
+                .scene
                 .commands
                 .iter()
                 .filter(|op| matches!(op, DrawCommand::PopClip))

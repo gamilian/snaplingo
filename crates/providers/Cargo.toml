@@ -1,0 +1,46 @@
+[package]
+name = "snaplingo-providers"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "External translation, LLM and OCR adapters for SnapLingo"
+
+[features]
+default = []
+local-ocr = ["dep:image", "dep:ndarray", "dep:oar-ocr-core", "dep:oar-ocr-derive", "dep:ort", "dep:ocr-rs", "dep:objc2-foundation", "dep:libloading", "dep:parking_lot"]
+
+[dependencies]
+snaplingo-core = { path = "../core" }
+anyhow.workspace = true
+async-trait.workspace = true
+base64.workspace = true
+log.workspace = true
+md5.workspace = true
+reqwest = { workspace = true, features = ["json", "socks"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+tokio = { workspace = true, features = ["rt", "time"] }
+urlencoding = "2.1"
+image = { workspace = true, optional = true }
+ndarray = { version = "0.17", optional = true }
+oar-ocr-core = { version = "=0.6.0", default-features = false, optional = true }
+# The 0.6.3 macro release changed the 0.6.0 core's validation syntax.
+oar-ocr-derive = { version = "=0.6.0", optional = true }
+ort = { version = "=2.0.0-rc.11", default-features = false, features = ["std", "ndarray", "load-dynamic"], optional = true }
+parking_lot = { workspace = true, features = ["send_guard"], optional = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+ocr-rs = { git = "https://github.com/zibo-chen/ocr-rs", rev = "664a945953e46186b37203fa4902a20d60a32809", default-features = false, optional = true }
+ort = { version = "=2.0.0-rc.11", default-features = false, features = ["coreml"], optional = true }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSProcessInfo"], optional = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+libloading = { version = "0.9", optional = true }
+ort = { version = "=2.0.0-rc.11", default-features = false, features = ["directml"], optional = true }
+
+[dev-dependencies]
+mockito = "1.2"
+tempfile.workspace = true
+snaplingo-core = { path = "../core", features = ["test-support"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

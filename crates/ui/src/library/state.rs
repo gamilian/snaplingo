@@ -65,7 +65,7 @@ impl LibraryUi {
     pub(crate) fn frame_shell_hit(&self, point: Point) -> Option<crate::Target> {
         self.frame
             .as_ref()?
-            .scene
+            .page
             .hit_test(point)
             .filter(|target| matches!(target, crate::Target::Navigate(_) | crate::Target::Capacity))
     }

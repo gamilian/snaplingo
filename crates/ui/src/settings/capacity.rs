@@ -62,7 +62,8 @@ pub struct CapacityFrame {
     pub controls: Vec<CapacityControl>,
 }
 pub struct CapacityUi {
-    shell: Snapshot,
+    appearance: Appearance,
+    key_style: KeyStyle,
     draft: CapacityValue,
     focus: Option<CapacityTarget>,
     editor: Option<TextEdit>,
@@ -70,9 +71,10 @@ pub struct CapacityUi {
     error: Option<String>,
 }
 impl CapacityUi {
-    pub fn new(shell: Snapshot, draft: CapacityValue) -> Self {
+    pub fn new(appearance: Appearance, key_style: KeyStyle, draft: CapacityValue) -> Self {
         Self {
-            shell,
+            appearance,
+            key_style,
             draft,
             focus: None,
             editor: None,
@@ -221,7 +223,7 @@ impl CapacityUi {
                     return None;
                 }
                 if let (Some(target), Some(edit)) = (self.focus, self.editor.as_mut()) {
-                    let primary = if self.shell.key_style == KeyStyle::Mac {
+                    let primary = if self.key_style == KeyStyle::Mac {
                         m.meta
                     } else {
                         m.control
@@ -266,7 +268,7 @@ impl CapacityUi {
         None
     }
     pub fn frame(&mut self, scale: f32, metrics: &mut impl TextMeasurer) -> CapacityFrame {
-        let p = palette(self.shell.theme, self.shell.dark);
+        let p = palette(self.appearance.theme, self.appearance.dark);
         let mut b = Paint::new(
             Size {
                 width: 440.,
@@ -482,14 +484,14 @@ impl CapacityUi {
             );
             control(target, rect, None, None);
         }
-        b.scene.content = r(0., 0., 440., 510.);
-        b.scene.viewport = b.scene.content;
+        b.frame.content = r(0., 0., 440., 510.);
+        b.frame.viewport = b.frame.content;
         self.controls = controls.clone();
         for control in &mut controls {
             control.rect = control.rect.scaled(scale);
         }
         CapacityFrame {
-            scene: b.scene.scaled(scale),
+            scene: b.frame.scene.scaled(scale),
             controls,
         }
     }
@@ -506,7 +508,7 @@ mod tests {
             history_limit: 5000,
             favorites_limit: 1000,
         };
-        let mut ui = CapacityUi::new(Snapshot::default(), saved.clone());
+        let mut ui = CapacityUi::new(Appearance::default(), KeyStyle::Mac, saved.clone());
         struct Metrics;
         impl TextMeasurer for Metrics {
             fn measure(&mut self, _: &str, _: f32, _: u16, _: FontFamily) -> TextMeasurement {
@@ -526,7 +528,7 @@ mod tests {
         };
         assert_eq!(value.retention_days, 365);
         assert_eq!(saved.retention_days, 30);
-        let mut ui = CapacityUi::new(Snapshot::default(), saved.clone());
+        let mut ui = CapacityUi::new(Appearance::default(), KeyStyle::Mac, saved.clone());
         ui.update(CapacityInput::Activate(CapacityTarget::Cleanup));
         assert!(matches!(
             ui.update(CapacityInput::Key(Key::Escape, Modifiers::default())),

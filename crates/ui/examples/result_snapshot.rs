@@ -1,6 +1,6 @@
 //! Render the shared result surface without a platform window.
 use snaplingo_ui::render::{Renderer, RendererTextMetrics};
-use snaplingo_ui::{result::*, Size, Snapshot, Theme};
+use snaplingo_ui::{result::*, Appearance, Size, Theme};
 fn main() -> Result<(), String> {
     let directory = std::env::args()
         .nth(1)
@@ -36,10 +36,10 @@ fn main() -> Result<(), String> {
         ("ocr-image-175", Theme::Paper, false, ResultMode::Ocr, 1.75),
     ] {
         let mut model = ResultSnapshot {
-            shell: Snapshot {
+            appearance: Appearance {
                 theme,
                 dark,
-                ..Snapshot::default()
+                ..Appearance::default()
             },
             mode,
             source: "The best way to predict the future is to create it.\n创造未来。".into(),

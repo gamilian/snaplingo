@@ -48,7 +48,7 @@ fn main() -> Result<(), String> {
                             if compact { "-compact" } else { "" }
                         );
                         renderer
-                            .render(&frame.scene, 1.)?
+                            .render(&frame.page.scene, 1.)?
                             .save_png(format!("{directory}/{name}.png"))?;
                         let controls = frame
                             .controls
@@ -66,7 +66,7 @@ fn main() -> Result<(), String> {
                             format!("{directory}/{name}.json"),
                             format!(
                                 "{{\"content\":{},\"controls\":[{controls}]}}",
-                                rect(frame.scene.content)
+                                rect(frame.page.content)
                             ),
                         )
                         .map_err(|e| e.to_string())?;

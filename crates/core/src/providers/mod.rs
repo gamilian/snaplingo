@@ -6,7 +6,6 @@ pub mod configuration;
 mod credential_store;
 mod event_sink;
 pub mod events;
-mod http_transport;
 pub mod llm_introspection;
 mod llm_runtime;
 pub mod ocr;
@@ -27,7 +26,6 @@ pub use configuration::{
 };
 pub use credential_store::{CredentialSnapshot, ProviderCredentialStore};
 pub use event_sink::ProviderEventSink;
-pub use http_transport::{HttpClient, HttpResponse};
 pub use llm_introspection::LlmIntrospection;
 pub use llm_runtime::{
     LLMClient, LLMOptions, LLMProtocol, LLMRequest, LLMResponse, LlmClientConfig, LlmModelLister,

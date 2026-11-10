@@ -101,7 +101,7 @@ fn library_matches_60_real_react_scenes_with_actual_text_layout() {
                 }
             }
         };
-        compare(frame.scene.content, &reference["content"], "content");
+        compare(frame.page.content, &reference["content"], "content");
         for (index, row) in reference["rows"].as_array().unwrap().iter().enumerate() {
             let key = ui.snapshot().items[index].key;
             let control = frame

@@ -187,7 +187,7 @@ impl SettingsUi {
         };
         let target = edit.field.target();
         let Some(node) = self
-            .scene
+            .frame
             .geometry
             .iter()
             .find(|n| n.kind == GeometryKind::Control(target))
@@ -324,7 +324,7 @@ impl SettingsUi {
             if let Some(byte) = edit.buffer.display_caret() {
                 if let Some(cx) = caret_x(edit, byte) {
                     b.line(tx + cx, ty, tx + cx, ty + 18., p.ink);
-                    b.scene.ime_cursor = Some(r(tx + cx, ty, 1., 18.));
+                    b.frame.ime_cursor = Some(r(tx + cx, ty, 1., 18.));
                 }
             }
         }

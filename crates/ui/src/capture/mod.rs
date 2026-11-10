@@ -295,6 +295,7 @@ pub struct CaptureControl {
 #[derive(Clone, Debug)]
 pub struct CaptureFrame {
     pub scene: Scene,
+    pub ime_cursor: Option<Rect>,
     pub controls: Vec<CaptureControl>,
 }
 impl CaptureFrame {
@@ -362,13 +363,7 @@ impl CaptureUi {
         let mut b = Painter {
             scene: Scene {
                 size: s.size,
-                ime_cursor: s.text_caret,
-                content: bounds,
                 commands: vec![],
-                hits: vec![],
-                geometry: vec![],
-                content_height: s.size.height,
-                viewport: bounds,
             },
             controls: vec![],
             scale: s.ui_scale.clamp(0.5, 3.),
@@ -550,6 +545,7 @@ impl CaptureUi {
         }
         let f = CaptureFrame {
             scene: b.scene,
+            ime_cursor: s.text_caret,
             controls: b.controls,
         };
         self.frame = Some(f.clone());

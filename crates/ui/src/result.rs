@@ -5,7 +5,7 @@ mod layout;
 mod presentation;
 mod state;
 
-use crate::{Key, Modifiers, Point, RasterImage, Rect, Scene, Snapshot};
+use crate::{Appearance, Key, Modifiers, Point, RasterImage, Rect, Scene};
 pub use layout::{
     ResultHeaderLayout, ResultLayout, ResultMeasurements, ResultOcrLayout, ResultRowLayout,
     ResultSourceLayout,
@@ -59,7 +59,7 @@ pub struct ResultCopyToken {
 
 #[derive(Clone, Debug, Default)]
 pub struct ResultSnapshot {
-    pub shell: Snapshot,
+    pub appearance: Appearance,
     pub revision: u64,
     pub epoch: u64,
     pub visible: bool,
@@ -133,6 +133,9 @@ pub struct ResultControl {
 }
 pub struct ResultFrame {
     pub scene: Scene,
+    pub ime_cursor: Option<Rect>,
+    pub content_height: f32,
+    pub viewport: Rect,
     pub controls: Vec<ResultControl>,
     pub panel: Rect,
     pub cards: Vec<Rect>,

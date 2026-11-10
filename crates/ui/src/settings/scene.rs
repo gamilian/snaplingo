@@ -1,4 +1,4 @@
-use crate::{DrawCommand, Point, Rect, Size};
+use crate::{Point, Rect, Scene};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Page {
@@ -81,13 +81,12 @@ pub struct GeometryNode {
     pub rect: Rect,
 }
 #[derive(Clone, Debug, PartialEq)]
-pub struct Scene {
-    pub size: Size,
+pub struct SettingsFrame {
+    pub scene: Scene,
     pub ime_cursor: Option<Rect>,
     /// Page body, including its section directory, excluding the main navigation.
     /// An embedded host may crop this frame and offset input by its origin.
     pub content: Rect,
-    pub commands: Vec<DrawCommand>,
     /// Already intersected with the corresponding drawing clip, in paint order.
     pub hits: Vec<HitRegion>,
     /// Unclipped layout frames, including disabled controls, for visual parity QA.
@@ -95,10 +94,9 @@ pub struct Scene {
     pub content_height: f32,
     pub viewport: Rect,
 }
-impl Scene {
+impl SettingsFrame {
     pub fn scaled(mut self, scale: f32) -> Self {
-        self.size.width *= scale;
-        self.size.height *= scale;
+        self.scene = self.scene.scaled(scale);
         self.ime_cursor = self.ime_cursor.map(|rect| rect.scaled(scale));
         self.content = self.content.scaled(scale);
         self.viewport = self.viewport.scaled(scale);
@@ -108,51 +106,6 @@ impl Scene {
         }
         for node in &mut self.geometry {
             node.rect = node.rect.scaled(scale);
-        }
-        for command in &mut self.commands {
-            match command {
-                DrawCommand::Image { rect, .. } | DrawCommand::PushClip(rect) => {
-                    *rect = rect.scaled(scale)
-                }
-                DrawCommand::FillRect { rect, radius, .. } => {
-                    *rect = rect.scaled(scale);
-                    *radius *= scale;
-                }
-                DrawCommand::StrokeRect {
-                    rect,
-                    radius,
-                    width,
-                    ..
-                } => {
-                    *rect = rect.scaled(scale);
-                    *radius *= scale;
-                    *width *= scale;
-                }
-                DrawCommand::Line {
-                    from, to, width, ..
-                } => {
-                    from.x *= scale;
-                    from.y *= scale;
-                    to.x *= scale;
-                    to.y *= scale;
-                    *width *= scale;
-                }
-                DrawCommand::Text { rect, size, .. } => {
-                    *rect = rect.scaled(scale);
-                    *size *= scale;
-                }
-                DrawCommand::TextBlock {
-                    rect,
-                    size,
-                    line_height,
-                    ..
-                } => {
-                    *rect = rect.scaled(scale);
-                    *size *= scale;
-                    *line_height *= scale;
-                }
-                DrawCommand::PopClip => {}
-            }
         }
         self
     }

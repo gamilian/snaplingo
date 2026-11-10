@@ -1,12 +1,12 @@
 //! The Settings Window's first-use Screen Recording guide.
 use crate::{
-    theme::palette, DrawCommand, FontFamily, Key, Modifiers, Point, Rect, Scene, Size, Snapshot,
+    theme::palette, Appearance, DrawCommand, FontFamily, Key, Modifiers, Point, Rect, Scene, Size,
     TextAlign, TextMeasurer,
 };
 pub const GRANT_EXPLANATION:&str="如果你此前已授权，重装或更新时的应用签名变化可能使旧版本的授权未对当前应用生效。仅凭系统检测无法判断是尚未授权，还是旧授权未生效。若系统中已开启，请先重新检测；仅在 macOS 要求时重启应用，仍不可用再重新授权。";
 #[derive(Clone, Debug)]
 pub struct PermissionPromptSnapshot {
-    pub shell: Snapshot,
+    pub appearance: Appearance,
     pub needs_installation: bool,
     pub busy: bool,
     pub attempted: bool,
@@ -157,7 +157,7 @@ impl PermissionPromptUi {
     }
     pub fn frame(&mut self, scale: f32, metrics: &mut impl TextMeasurer) -> PermissionPromptFrame {
         let s = &self.snapshot;
-        let p = palette(s.shell.theme, s.shell.dark);
+        let p = palette(s.appearance.theme, s.appearance.dark);
         let scale = scale.clamp(0.5, 3.);
         let width = 380.;
         let inner = 330.;
@@ -169,7 +169,7 @@ impl PermissionPromptUi {
             width,
             height,
         };
-        let title_font = if s.shell.theme == crate::Theme::Paper {
+        let title_font = if s.appearance.theme == crate::Theme::Paper {
             FontFamily::Serif
         } else {
             FontFamily::Sans
@@ -190,7 +190,7 @@ impl PermissionPromptUi {
             rect(25., 89., inner, 25.),
             s.title(),
             17.,
-            if s.shell.theme == crate::Theme::Paper {
+            if s.appearance.theme == crate::Theme::Paper {
                 400
             } else {
                 600
@@ -438,12 +438,6 @@ impl PermissionPromptUi {
         let scene = Scene {
             size: Size { width, height },
             commands,
-            hits: vec![],
-            ime_cursor: None,
-            content: full,
-            viewport: full,
-            geometry: vec![],
-            content_height: height,
         }
         .scaled(scale);
         for c in &mut controls {
@@ -481,7 +475,7 @@ mod tests {
     }
     fn model() -> PermissionPromptUi {
         PermissionPromptUi::new(PermissionPromptSnapshot {
-            shell: Snapshot::default(),
+            appearance: Appearance::default(),
             needs_installation: false,
             busy: false,
             attempted: false,

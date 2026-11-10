@@ -1,7 +1,30 @@
 [workspace]
-members = ["apps/desktop", "crates/core", "crates/ui", "crates/platform", "crates/storage", "crates/assets", "tools/reference"]
-default-members = ["apps/desktop"]
+members = ["app", "crates/core", "crates/ui", "crates/platform", "crates/providers", "crates/storage", "crates/assets", "tools/reference"]
+default-members = ["app"]
 resolver = "2"
+
+[workspace.package]
+version = "0.1.23"
+edition = "2021"
+rust-version = "1.88"
+license = "MIT"
+
+[workspace.dependencies]
+anyhow = "1.0"
+async-trait = "0.1"
+base64 = "0.21"
+chrono = "0.4"
+image = "0.25"
+log = "0.4"
+md5 = "0.7"
+parking_lot = "0.12.5"
+reqwest = "0.11"
+rusqlite = "0.29"
+serde = "1.0"
+serde_json = "1.0"
+tempfile = "3.8"
+tokio = "1"
+syn = { version = "2", default-features = false }
 
 [profile.release]
 lto = "thin"

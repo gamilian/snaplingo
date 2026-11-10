@@ -1,6 +1,6 @@
 # Development tools
 
-The desktop product lives under `apps/desktop/`; reusable libraries live under `crates/`. These executables collect independent
+The desktop product lives under `app/`; reusable libraries live under `crates/`. These executables collect independent
 references or inspect production behavior; they are excluded from native bundles.
 Reference collectors use `src/bin`; native probes use explicit Cargo example targets.
 
@@ -33,6 +33,12 @@ Settings output stays under `target/native-settings`; Result output stays under
 never open the installed application's database. They run on macOS; Windows
 cross compilation checks only the platform gates.
 
+Vite serves `reference/web` as its root. Collectors load
+`http://127.0.0.1:5194/fixtures/settings_reference.html`,
+`/fixtures/result_reference.html` and `/fixtures/permission_reference.html`.
+The same fixture paths are available from `npm run reference:preview` after a
+reference build.
+
 ## Native probes and tests
 
 `native/pin_snapshot.rs` is an explicit App example because it exercises App's
@@ -51,5 +57,5 @@ checking early/live activation and takeover after process termination. Ordinary
 Platform tests and CI run it automatically.
 
 Reusable UI geometry reports, renderer snapshots and the standalone Settings
-preview live in `crates/ui/examples` and `apps/desktop/examples` respectively and run with
+preview live in `crates/ui/examples` and `app/examples` respectively and run with
 `cargo run -p <package> --example <name>`.

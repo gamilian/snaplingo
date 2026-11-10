@@ -1,3 +1,10 @@
+/// The appearance required to draw a view, independent of product preferences.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Appearance {
+    pub theme: Theme,
+    pub dark: bool,
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Theme {
     #[default]

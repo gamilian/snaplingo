@@ -30,7 +30,8 @@ A narrow trait declared beside the Application module that consumes it. It descr
 Examples:
 
 - Settings, Hotkeys, and Providers own independent configuration/credential store ports.
-- Providers own HTTP transport, LLM runtime, and event-sink ports.
+- Core Providers own LLM runtime and event-sink ports. The external Providers
+  package owns its HTTP transport contract and concrete protocol adapters.
 - History owns repository and event-source ports.
 - Capture, Result Window, and Pinned Image own their runtime-host ports.
 
@@ -44,8 +45,8 @@ A concrete operating-system, storage, network, or native-library implementation 
 
 The only place that chooses concrete adapters and injects them into a runtime.
 
-- `apps/desktop/src/bootstrap/mod.rs` and its builders create native Application runtimes with Infrastructure adapters.
-- `apps/desktop/src/shell/macos.rs` and `apps/desktop/src/shell/windows.rs` own the platform startup/event loops. `reference/web/App.tsx` only opens isolated visual-reference fixtures.
+- `app/src/bootstrap/mod.rs` and its builders create native Application runtimes with Infrastructure adapters.
+- `app/src/shell/macos.rs` and `app/src/shell/windows.rs` own the platform startup/event loops. `reference/web/App.tsx` only opens isolated visual-reference fixtures.
 - Infrastructure may conditionally compile platform implementations, but only Composition selects which concrete adapter satisfies an Application seam.
 
 ### Capture Session
@@ -82,7 +83,7 @@ Application runtimes that own their workflows and request runtime-host effects. 
 
 ### Hotkey
 
-`crates/core/src/hotkeys/model.rs` owns the supported category/action vocabulary. `crates/core/src/hotkeys` owns configuration validation, registration state, display-key parsing, and pressed/released policy. The concrete global-shortcut registrar is an Infrastructure adapter. `apps/desktop/src/shell/actions/shortcuts.rs` only maps a valid category/action to an `AppAction` for startup composition.
+`crates/core/src/hotkeys/model.rs` owns the supported category/action vocabulary. `crates/core/src/hotkeys` owns configuration validation, registration state, display-key parsing, and pressed/released policy. The concrete global-shortcut registrar is an Infrastructure adapter. `app/src/shell/actions/shortcuts.rs` only maps a valid category/action to an `AppAction` for startup composition.
 
 ### Settings
 

@@ -29,8 +29,7 @@ pub fn fixture() -> CaptureSnapshot {
         [255, 255, 255, 255],
         [0, 0, 0, 255],
     ];
-    let root =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/desktop/assets/toolbar");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../app/assets/toolbar");
     for name in [
         "select",
         "shapes",

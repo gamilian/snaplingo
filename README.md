@@ -28,13 +28,13 @@ For scrolling capture, select a region in the screenshot editor and press **S** 
 ## Project structure
 
 ```text
-apps/desktop/                Desktop product (Cargo package: snaplingo)
+app/                         Desktop product (Cargo package: snaplingo)
   src/
     bootstrap/               Composition and application-owned state
     shell/                   Event loops, tray, actions, startup/shutdown
     features/                Settings, Capture, Result, Pinned and Scrolling
       <feature>/             Shared presenter/session + native adapters
-    integrations/            Provider transports, runtime and native UI helpers
+    integrations/            Product events, updates, runtime and native helpers
   tests/                     Adapter and native application acceptance
   examples/                  Isolated native previews
 crates/
@@ -50,6 +50,7 @@ crates/
     render/                  Optional CPU shaping and rasterization
     accessibility/           Optional semantic projection
   platform/src/              Native capabilities, organized by capability
+  providers/src/             External protocols and optional local OCR inference
   storage/src/               SQLite and persisted image adapters
   assets/src/                Shared embedded font resources
 assets/                      Production defaults, fonts, UI text and licenses
@@ -59,7 +60,7 @@ docs/                        Architecture, product specs and release instruction
 script/                      Development, packaging and verification
 ```
 
-This workspace has six production packages. Business features are Rust modules;
+This workspace has seven production packages. Business features are Rust modules;
 only independently reusable capabilities become packages. Every package uses the
 standard Cargo `src/`, `tests/` and `examples/` layout. UI's default feature set has
 no renderer or native window dependency. Enable `rendering` and/or `accessibility`
@@ -67,9 +68,12 @@ when a host needs those implementations.
 
 The desktop product composes feature dependencies explicitly. Feature hosts do
 not receive `AppState` or construct their own production services. Core, UI,
-Platform and Storage cannot depend on the desktop application. See
+Platform, Providers and Storage cannot depend on the desktop application. See
 [Architecture](ARCHITECTURE.md) for dependency rules and extension examples.
-Historical records may refer to the former `src-tauri` or `crates/app` paths.
+Historical records may refer to the former `src-tauri`, `crates/app` or
+`apps/desktop` paths. Package metadata and common dependency versions live in
+the workspace manifest. Providers defaults to protocol-only builds; the product
+explicitly enables `local-ocr` for its packaged inference engines.
 
 ## Development
 
@@ -122,6 +126,8 @@ cargo test --locked -p snaplingo --test native_app_smoke
 cargo test --locked -p snaplingo-platform --test single_instance_native
 cargo check --locked -p snaplingo --all-targets
 cargo test --locked -p snaplingo-core -p snaplingo-storage -p snaplingo-platform -p snaplingo-ui --features snaplingo-ui/rendering,snaplingo-ui/accessibility --all-targets
+cargo test --locked -p snaplingo-providers --no-default-features --all-targets
+cargo test --locked -p snaplingo-providers --features local-ocr --all-targets
 ```
 
 `native_app_smoke` uses a temporary database. On macOS and Windows it exercises

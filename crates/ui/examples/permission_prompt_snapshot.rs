@@ -1,6 +1,6 @@
 //! Render the shared first-use guide without requesting OS permissions.
 use snaplingo_ui::render::{Renderer, RendererTextMetrics};
-use snaplingo_ui::{permission_prompt::*, Snapshot, Theme};
+use snaplingo_ui::{permission_prompt::*, Appearance, Theme};
 fn main() -> Result<(), String> {
     let directory = std::env::args()
         .nth(1)
@@ -16,7 +16,7 @@ fn main() -> Result<(), String> {
         for dark in [false, true] {
             for scenario in ["initial", "attempted", "error", "installation"] {
                 let snapshot = PermissionPromptSnapshot {
-                    shell: Snapshot {
+                    appearance: Appearance {
                         theme,
                         dark,
                         ..Default::default()

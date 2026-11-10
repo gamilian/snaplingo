@@ -88,7 +88,7 @@ fn services_match_108_actual_react_scenes_with_renderer_text_metrics() {
             }
         };
         compare(
-            frame.scene.content,
+            frame.page.content,
             expected(&reference["content"]),
             "content",
         );
@@ -129,8 +129,8 @@ fn services_match_108_actual_react_scenes_with_renderer_text_metrics() {
                         channels[3].as_u64().unwrap() as u8,
                     ]
                 };
-                assert!(frame.scene.commands.iter().any(|command|matches!(command,DrawCommand::FillRect{rect,color:background,..}if *rect==actual.rect&&*background==color("background"))),"{} {label} background",reference["source"]);
-                assert!(frame.scene.commands.iter().any(|command|matches!(command,DrawCommand::Text{text,color:foreground,..}if text==label&&*foreground==color("foreground"))),"{} {label} foreground",reference["source"]);
+                assert!(frame.page.scene.commands.iter().any(|command|matches!(command,DrawCommand::FillRect{rect,color:background,..}if *rect==actual.rect&&*background==color("background"))),"{} {label} background",reference["source"]);
+                assert!(frame.page.scene.commands.iter().any(|command|matches!(command,DrawCommand::Text{text,color:foreground,..}if text==label&&*foreground==color("foreground"))),"{} {label} foreground",reference["source"]);
             }
         }
         for provider in reference["providers"].as_array().unwrap() {
@@ -142,6 +142,7 @@ fn services_match_108_actual_react_scenes_with_renderer_text_metrics() {
                     + (r.height - expected.height).abs()
             };
             let actual = frame
+                .page
                 .scene
                 .commands
                 .iter()

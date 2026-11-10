@@ -299,12 +299,12 @@ mod tests {
         let mut ui = ui();
         assert_eq!(Section::for_page(ui.page()).len(), 6);
         assert!(!ui
-            .scene
+            .frame
             .geometry
             .iter()
             .any(|n| n.kind == GeometryKind::Control(Target::Hotkey(0))));
         assert!(!ui
-            .scene
+            .frame
             .geometry
             .iter()
             .any(|n| n.kind == GeometryKind::Control(Target::General(GeneralField::ProxyUrl))));
@@ -319,7 +319,7 @@ mod tests {
             }]
         );
         assert!(ui
-            .scene
+            .frame
             .geometry
             .iter()
             .any(|n| n.kind == GeometryKind::Control(Target::General(GeneralField::ProxyUrl))));
@@ -438,12 +438,12 @@ mod tests {
             ))),
             [Action::GeneralCommand(GeneralCommand::ClearLogs)]
         );
-        assert!(!ui.scene.geometry.iter().any(|n| n.kind
+        assert!(!ui.frame.geometry.iter().any(|n| n.kind
             == GeometryKind::Control(Target::GeneralCommand(
                 GeneralCommand::ResetScreenRecording
             ))));
         ui.update(Event::Activate(Target::GeneralDisclosure(false)));
-        assert!(ui.scene.geometry.iter().any(|n| n.kind
+        assert!(ui.frame.geometry.iter().any(|n| n.kind
             == GeometryKind::Control(Target::GeneralCommand(
                 GeneralCommand::ResetScreenRecording
             ))));

@@ -10,10 +10,10 @@ keep CPU rendering and AccessKit projection in the same package without making
 those dependencies mandatory for layout and interaction:
 
 ```toml
-snaplingo-ui = { path = "../../crates/ui", features = ["rendering", "accessibility"] }
+snaplingo-ui = { path = "../crates/ui", features = ["rendering", "accessibility"] }
 ```
 
-- `foundation/`: geometry, drawing commands, text editing, normalized keys and theme.
+- `foundation/`: geometry, pure drawing scenes, text editing, normalized keys and appearance.
 - `settings/`: settings models, fields, state/input, drawing, capacity and page routing.
 - `capture/`, `result/`, `pinned/`, `scrolling.rs`, `services/`, `library/`: feature views.
 - `render/`: optional CPU rasterization and text measurement, accessed through
@@ -28,8 +28,26 @@ The existing root exports for common UI values and Settings remain available.
 ```rust
 use snaplingo_ui::{SettingsUi, Snapshot, Size};
 let mut ui = SettingsUi::new(Snapshot::default());
-let scene = ui.frame(Size { width: 900.0, height: 650.0 }, 1.25);
+let frame = ui.frame(Size { width: 900.0, height: 650.0 }, 1.25);
 ```
+
+`foundation::Scene` contains only output size and drawing commands. `Renderer`
+consumes this drawing data and imports no product page. `SettingsFrame` owns the
+Settings hit regions, geometry, viewport, scroll extent and IME caret, with its
+pixels described by `frame.scene`. Settings, Library and Services share the
+Settings navigation frame through `WindowFrame::page`; render
+`window_frame.page.scene`. Independent Capture, Result and Notices frames own
+their own controls and IME data.
+
+Independent Result, scrolling and permission views receive `Appearance { theme,
+dark }`, and Notices receives the same small value. Capacity takes appearance,
+`KeyStyle` and its draft values separately. None needs a full Settings snapshot.
+Presenters prepare these inputs; views never load application configuration.
+
+Foundation and rendering may depend only on other UI foundations, never on
+Settings or another product view. Feature implementation stays private where
+possible; the public frame and intent types are the host's interface. The
+workspace architecture test checks this direction as well as Cargo edges.
 
 Window sizes and pointer positions use logical DIP. The interface scale is the
 user's 100%/125% setting. Both drawing commands and hit regions contain that same

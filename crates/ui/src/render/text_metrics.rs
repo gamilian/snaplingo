@@ -1,5 +1,5 @@
 //! Single-line caret geometry uses the same shaping engine and fonts as paint.
-use crate::{FontFamily, Point, TextLayout, TextMeasurement, TextMeasurer};
+use crate::foundation::{FontFamily, Point, TextLayout, TextMeasurement, TextMeasurer};
 use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, Shaping, Weight, Wrap};
 use std::collections::HashMap;
 use unicode_segmentation::UnicodeSegmentation;

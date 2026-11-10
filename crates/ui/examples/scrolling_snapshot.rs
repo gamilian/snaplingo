@@ -1,5 +1,5 @@
 use snaplingo_ui::render::Renderer;
-use snaplingo_ui::{scrolling::*, Snapshot, Theme};
+use snaplingo_ui::{scrolling::*, Appearance, Theme};
 fn main() -> Result<(), String> {
     let directory = "target/shared-scrolling";
     std::fs::create_dir_all(directory).map_err(|e| e.to_string())?;
@@ -17,7 +17,7 @@ fn main() -> Result<(), String> {
         ("working", false, None, true, 1.),
     ] {
         let mut ui = ScrollingUi::new(ScrollingSnapshot {
-            shell: Snapshot {
+            appearance: Appearance {
                 theme: Theme::Native,
                 dark,
                 ..Default::default()

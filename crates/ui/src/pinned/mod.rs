@@ -322,16 +322,10 @@ impl State {
                 width: width as f32,
                 height: height as f32,
             },
-            ime_cursor: None,
-            content: full,
             commands: vec![DrawCommand::Image {
                 rect: full,
                 image: display,
             }],
-            hits: vec![],
-            geometry: vec![],
-            content_height: height as f32,
-            viewport: full,
         };
         if self.preferences.border {
             scene.commands.push(DrawCommand::StrokeRect {

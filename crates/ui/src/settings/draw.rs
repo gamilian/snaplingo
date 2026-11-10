@@ -9,7 +9,7 @@ pub(super) fn r(x: f32, y: f32, width: f32, height: f32) -> Rect {
     }
 }
 pub(super) struct Paint {
-    pub(super) scene: Scene,
+    pub(super) frame: SettingsFrame,
     pub(super) focus: Vec<(Target, Rect)>,
     pub(super) clips: Vec<Rect>,
     pub(super) focus_target: Option<Target>,
@@ -24,11 +24,13 @@ impl Paint {
         hover: Option<Target>,
     ) -> Self {
         Self {
-            scene: Scene {
-                size,
+            frame: SettingsFrame {
+                scene: crate::Scene {
+                    size,
+                    commands: vec![],
+                },
                 content: Rect::default(),
                 ime_cursor: None,
-                commands: vec![],
                 hits: vec![],
                 geometry: vec![],
                 content_height: 0.,
@@ -42,14 +44,14 @@ impl Paint {
         }
     }
     pub(super) fn fill(&mut self, rect: Rect, radius: f32, color: Color) {
-        self.scene.commands.push(DrawCommand::FillRect {
+        self.frame.scene.commands.push(DrawCommand::FillRect {
             rect,
             radius,
             color,
         });
     }
     pub(super) fn stroke(&mut self, rect: Rect, radius: f32, width: f32, color: Color) {
-        self.scene.commands.push(DrawCommand::StrokeRect {
+        self.frame.scene.commands.push(DrawCommand::StrokeRect {
             rect,
             radius,
             width,
@@ -57,7 +59,7 @@ impl Paint {
         });
     }
     pub(super) fn line(&mut self, x: f32, y: f32, x2: f32, y2: f32, color: Color) {
-        self.scene.commands.push(DrawCommand::Line {
+        self.frame.scene.commands.push(DrawCommand::Line {
             from: Point { x, y },
             to: Point { x: x2, y: y2 },
             width: 1.,
@@ -73,7 +75,7 @@ impl Paint {
         color: Color,
         font: FontFamily,
     ) {
-        self.scene.commands.push(DrawCommand::Text {
+        self.frame.scene.commands.push(DrawCommand::Text {
             rect,
             text: text.into(),
             size,
@@ -84,7 +86,7 @@ impl Paint {
         });
     }
     pub(super) fn center(&mut self, rect: Rect, text: impl Into<String>, size: f32, color: Color) {
-        self.scene.commands.push(DrawCommand::Text {
+        self.frame.scene.commands.push(DrawCommand::Text {
             rect,
             text: text.into(),
             size,
@@ -97,21 +99,21 @@ impl Paint {
     pub(super) fn clip(&mut self, rect: Rect) {
         let rect = rect.intersect(*self.clips.last().unwrap());
         self.clips.push(rect);
-        self.scene.commands.push(DrawCommand::PushClip(rect));
+        self.frame.scene.commands.push(DrawCommand::PushClip(rect));
     }
     pub(super) fn unclip(&mut self) {
         self.clips.pop();
-        self.scene.commands.push(DrawCommand::PopClip);
+        self.frame.scene.commands.push(DrawCommand::PopClip);
     }
     pub(super) fn hit(&mut self, rect: Rect, target: Target, label: &str) {
-        self.scene.geometry.push(GeometryNode {
+        self.frame.geometry.push(GeometryNode {
             kind: GeometryKind::Control(target),
             rect,
         });
         self.focus.push((target, rect));
         let visible = rect.intersect(*self.clips.last().unwrap());
         if visible.width > 0. && visible.height > 0. {
-            self.scene.hits.push(HitRegion {
+            self.frame.hits.push(HitRegion {
                 rect: visible,
                 target,
                 label: label.into(),
@@ -164,7 +166,7 @@ impl Paint {
     }
 }
 impl SettingsUi {
-    pub(super) fn layout(&self) -> (Scene, Vec<(Target, Rect)>, [f32; 6], f32) {
+    pub(super) fn layout(&self) -> (SettingsFrame, Vec<(Target, Rect)>, [f32; 6], f32) {
         let size = Size {
             width: self.size.width / self.scale,
             height: self.size.height / self.scale,
@@ -190,7 +192,7 @@ impl SettingsUi {
             202.
         };
         let topbar = if paper { 68. } else { 0. };
-        b.scene.content = r(rail, topbar, size.width - rail, size.height - topbar);
+        b.frame.content = r(rail, topbar, size.width - rail, size.height - topbar);
         self.navigation(&mut b, rail, topbar, narrow);
         let context = if (studio || paper) && !narrow {
             if size.width <= 900. {
@@ -231,7 +233,7 @@ impl SettingsUi {
             pane_width,
             (size.height - topbar - sticky_top - header_h).max(0.),
         );
-        b.scene.viewport = content_clip;
+        b.frame.viewport = content_clip;
         b.clip(content_clip);
         let mut y = top + header_h + 24.;
         let mut offsets = [0.; 6];
@@ -348,7 +350,7 @@ impl SettingsUi {
                 row_y += self.general_extra_height(section, width - if paper { 0. } else { 46. });
             }
             let height = row_y - cy + if paper { 0. } else { 1. };
-            b.scene.geometry.push(GeometryNode {
+            b.frame.geometry.push(GeometryNode {
                 kind: GeometryKind::Card(section),
                 rect: r(x, cy, width, height),
             });
@@ -596,7 +598,7 @@ impl SettingsUi {
                         b.fill(r(track.x, track.y, knob - track.x, 6.), 3., p.accent);
                         b.fill(r(knob - 9., rect.y + 1., 18., 18.), 9., [255; 4]);
                         b.stroke(r(knob - 8., rect.y + 2., 16., 16.), 8., 2., p.accent);
-                        b.scene.commands.push(DrawCommand::Text {
+                        b.frame.scene.commands.push(DrawCommand::Text {
                             rect: r(
                                 rx + track_width + 12.,
                                 control_y,
@@ -615,7 +617,7 @@ impl SettingsUi {
                             align: TextAlign::Right,
                         });
                         b.hit(rect, field.target(), field.label());
-                        b.scene.geometry.last_mut().unwrap().rect = track;
+                        b.frame.geometry.last_mut().unwrap().rect = track;
                     }
                     Value::Text(value) => {
                         let rect = r(
@@ -699,7 +701,7 @@ impl SettingsUi {
         } else {
             max_scroll
         };
-        b.scene.content_height = content_h;
+        b.frame.content_height = content_h;
         if context > 0. {
             let dx = rail;
             b.fill(r(dx, topbar, context, size.height - topbar), 0., p.canvas);
@@ -908,7 +910,7 @@ impl SettingsUi {
         if let Some(menu) = self.menu {
             self.dropdown(&mut b, menu);
         }
-        (b.scene, b.focus, offsets, max_scroll)
+        (b.frame, b.focus, offsets, max_scroll)
     }
     pub(super) fn hotkey_rows(&self, b: &mut Paint, x: f32, y: f32, width: f32, inner: f32) {
         let p = b.p;
@@ -1007,7 +1009,7 @@ impl SettingsUi {
                         },
                     );
                 } else {
-                    b.scene.geometry.push(GeometryNode {
+                    b.frame.geometry.push(GeometryNode {
                         kind: GeometryKind::Control(target),
                         rect,
                     });
@@ -1026,9 +1028,9 @@ impl SettingsUi {
         };
         let p = b.p;
         let count = menu.field.choices().len();
-        let height = (count as f32 * 34. + 8.).min((b.scene.size.height - 16.).max(0.));
+        let height = (count as f32 * 34. + 8.).min((b.frame.scene.size.height - 16.).max(0.));
         let below = anchor.y + anchor.height + 5.;
-        let y = if below + height <= b.scene.size.height - 8. {
+        let y = if below + height <= b.frame.scene.size.height - 8. {
             below
         } else {
             (anchor.y - height - 5.).max(8.)
@@ -1036,7 +1038,7 @@ impl SettingsUi {
         let rect = r(
             anchor
                 .x
-                .clamp(8., (b.scene.size.width - anchor.width - 8.).max(8.)),
+                .clamp(8., (b.frame.scene.size.width - anchor.width - 8.).max(8.)),
             y,
             anchor.width,
             height,
@@ -1078,7 +1080,7 @@ impl SettingsUi {
     }
     pub(super) fn navigation(&self, b: &mut Paint, rail: f32, topbar: f32, narrow: bool) {
         let p = b.p;
-        let size = b.scene.size;
+        let size = b.frame.scene.size;
         let paper = topbar > 0.;
         let studio = self.snapshot.theme == Theme::Studio;
         b.fill(
@@ -1329,7 +1331,7 @@ impl SettingsUi {
                     p.muted,
                     FontFamily::Sans,
                 );
-                b.scene.commands.push(DrawCommand::Text {
+                b.frame.scene.commands.push(DrawCommand::Text {
                     rect: r(rect.x + 73., y, rect.width - 83., 17.),
                     text: value,
                     size: 10.5,
@@ -1349,7 +1351,7 @@ pub(super) fn nav_icon(b: &mut Paint, page: Page, rect: Rect, color: Color) {
     };
     let line = |b: &mut Paint, points: &[(f32, f32)]| {
         for pair in points.windows(2) {
-            b.scene.commands.push(DrawCommand::Line {
+            b.frame.scene.commands.push(DrawCommand::Line {
                 from: point(pair[0].0, pair[0].1),
                 to: point(pair[1].0, pair[1].1),
                 width: 1.5,

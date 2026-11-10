@@ -1,7 +1,7 @@
 //! Common navigation pixels for the independently owned dynamic settings pages.
 use super::*;
 
-pub(crate) fn shell_frame(snapshot: &Snapshot, page: Page, size: Size) -> Scene {
+pub(crate) fn shell_frame(snapshot: &Snapshot, page: Page, size: Size) -> SettingsFrame {
     let mut ui = SettingsUi::new(snapshot.clone());
     ui.page = page;
     let p = palette(snapshot.theme, snapshot.dark);
@@ -20,12 +20,12 @@ pub(crate) fn shell_frame(snapshot: &Snapshot, page: Page, size: Size) -> Scene 
         0.
     };
     ui.navigation(&mut paint, rail, top, narrow);
-    paint.scene.content = r(
+    paint.frame.content = r(
         rail,
         top,
         (size.width - rail).max(1.),
         (size.height - top).max(1.),
     );
-    paint.scene.viewport = paint.scene.content;
-    paint.scene
+    paint.frame.viewport = paint.frame.content;
+    paint.frame
 }

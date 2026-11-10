@@ -170,7 +170,7 @@ fn ocr_popup_copies_original_values_and_scrolling_keeps_hit_targets_clipped() {
     for scale in [1., 1.75] {
         let mut ui = ResultUi::new(ocr());
         let first = frame(&mut ui, 660., 400., scale);
-        assert!(first.scene.content_height > 400. * scale);
+        assert!(first.content_height > 400. * scale);
         ui.update(ResultInput::Scroll(10000.));
         let scrolled = frame(&mut ui, 660., 400., scale);
         let fragments = scrolled
@@ -202,10 +202,10 @@ fn ocr_popup_copies_original_values_and_scrolling_keeps_hit_targets_clipped() {
                 ResultTarget::Header | ResultTarget::Pin | ResultTarget::Close
             );
             if !header && control.hit_rect.height > 0. {
-                assert!(control.hit_rect.y >= scrolled.scene.viewport.y);
+                assert!(control.hit_rect.y >= scrolled.viewport.y);
                 assert!(
                     control.hit_rect.y + control.hit_rect.height
-                        <= scrolled.scene.viewport.y + scrolled.scene.viewport.height + 0.01
+                        <= scrolled.viewport.y + scrolled.viewport.height + 0.01
                 );
             }
         }
@@ -230,8 +230,8 @@ fn six_themes_render_both_modes_and_keep_native_narrow_control_rows() {
     for theme in [Theme::Native, Theme::Studio, Theme::Paper] {
         for dark in [false, true] {
             for mut model in [translation(), ocr()] {
-                model.shell.theme = theme;
-                model.shell.dark = dark;
+                model.appearance.theme = theme;
+                model.appearance.dark = dark;
                 let mut ui = ResultUi::new(model);
                 let frame = frame(&mut ui, 300., 650., 1.);
                 let pixels = renderer.render(&frame.scene, 1.).unwrap();

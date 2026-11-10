@@ -10,7 +10,7 @@ describe('browser visual reference entry', () => {
     ['?surface=permission&scenario=attempted', 'permission'],
   ])('keeps fixture parameters for %s', (search, reference) => {
     expect(referenceUrl(search)).toBe(
-      `/reference/web/fixtures/${reference}_reference.html${search}`,
+      `/fixtures/${reference}_reference.html${search}`,
     );
   });
 });

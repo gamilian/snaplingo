@@ -1,4 +1,4 @@
-use crate::{Key, Modifiers, Page, Point, Rect, Scene, Snapshot, Target};
+use crate::{Key, Modifiers, Page, Point, Rect, SettingsFrame, Snapshot, Target};
 use std::collections::BTreeMap;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -286,7 +286,7 @@ pub struct ServicesControlInfo {
 }
 #[derive(Clone, Debug)]
 pub struct ServicesFrame {
-    pub scene: Scene,
+    pub page: SettingsFrame,
     pub controls: Vec<ServicesControlInfo>,
 }
 impl ServicesFrame {

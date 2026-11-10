@@ -1,34 +1,32 @@
 [package]
 name = "snaplingo-core"
-version = "0.1.23"
-edition = "2021"
-rust-version = "1.88"
-license = "MIT"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
 description = "Portable SnapLingo domain types, workflows and adapter contracts"
 
 [features]
-tesseract-ocr = []
 test-support = []
 
 [dependencies]
 snaplingo-assets = { path = "../assets" }
-serde_json = "1.0"
+serde_json.workspace = true
 regex = "1"
-serde = { version = "1.0", features = ["derive"] }
-log = "0.4"
-anyhow = "1.0"
-async-trait = "0.1"
-image = "0.25"
+serde = { workspace = true, features = ["derive"] }
+log.workspace = true
+anyhow.workspace = true
+async-trait.workspace = true
+image.workspace = true
 webp = "0.3"
 ab_glyph = "0.2"
-tokio = { version = "1", features = ["full"] }
-urlencoding = "2.1"
-md5 = "0.7"
+tokio = { workspace = true, features = ["full"] }
+md5.workspace = true
 semver = "1"
 lingua = "1.5"
-base64 = "0.21"
-chrono = { version = "0.4", features = ["serde"] }
-parking_lot = { version = "0.12.5", features = ["send_guard"] }
+base64.workspace = true
+chrono = { workspace = true, features = ["serde"] }
+parking_lot = { workspace = true, features = ["send_guard"] }
 
 [dev-dependencies]
-tempfile = "3.8"
+tempfile.workspace = true

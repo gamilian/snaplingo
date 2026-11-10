@@ -15,7 +15,7 @@ import {
 describe("capture presentation", () => {
   it("keeps the capture html shell transparent before React renders", () => {
     const html = readFileSync(
-      new URL("../../../../index.html", import.meta.url),
+      new URL("../../index.html", import.meta.url),
       "utf8",
     );
 
@@ -27,7 +27,7 @@ describe("capture presentation", () => {
 
   it("keeps the capture result html shell transparent before React renders", () => {
     const html = readFileSync(
-      new URL("../../../../index.html", import.meta.url),
+      new URL("../../index.html", import.meta.url),
       "utf8",
     );
 

@@ -237,7 +237,7 @@ fn screenshot_uses_real_pixels_and_metadata_keeps_multiline_note_and_separate_ta
         ..Default::default()
     });
     let f = frame(&mut ui);
-    assert!(f.scene.commands.iter().any(
+    assert!(f.page.scene.commands.iter().any(
         |c| matches!(c,crate::DrawCommand::Image{image,..}if image.width()==2&&image.height()==1)
     ));
     assert_eq!(

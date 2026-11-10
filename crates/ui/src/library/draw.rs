@@ -1,7 +1,8 @@
 use super::*;
 use crate::theme::{palette, Palette};
 use crate::{
-    Color, DrawCommand, FontFamily, Page, Point, Rect, Scene, Size, TextAlign, TextMeasurer, Theme,
+    Color, DrawCommand, FontFamily, Page, Point, Rect, SettingsFrame, Size, TextAlign,
+    TextMeasurer, Theme,
 };
 
 fn r(x: f32, y: f32, width: f32, height: f32) -> Rect {
@@ -13,21 +14,21 @@ fn r(x: f32, y: f32, width: f32, height: f32) -> Rect {
     }
 }
 struct Paint {
-    scene: Scene,
+    page: SettingsFrame,
     controls: Vec<LibraryControl>,
     p: Palette,
     clip: Rect,
 }
 impl Paint {
     fn fill(&mut self, rect: Rect, radius: f32, color: Color) {
-        self.scene.commands.push(DrawCommand::FillRect {
+        self.page.scene.commands.push(DrawCommand::FillRect {
             rect,
             radius,
             color,
         });
     }
     fn stroke(&mut self, rect: Rect, radius: f32, color: Color) {
-        self.scene.commands.push(DrawCommand::StrokeRect {
+        self.page.scene.commands.push(DrawCommand::StrokeRect {
             rect,
             radius,
             width: 1.,
@@ -35,7 +36,7 @@ impl Paint {
         });
     }
     fn text(&mut self, rect: Rect, text: impl Into<String>, size: f32, weight: u16, color: Color) {
-        self.scene.commands.push(DrawCommand::Text {
+        self.page.scene.commands.push(DrawCommand::Text {
             rect,
             text: text.into(),
             size,
@@ -46,7 +47,7 @@ impl Paint {
         });
     }
     fn block(&mut self, rect: Rect, text: &str, size: f32, line_height: f32, color: Color) {
-        self.scene.commands.push(DrawCommand::TextBlock {
+        self.page.scene.commands.push(DrawCommand::TextBlock {
             rect,
             text: text.into(),
             size,
@@ -108,11 +109,11 @@ impl Paint {
     }
     fn clip(&mut self, rect: Rect) {
         self.clip = rect;
-        self.scene.commands.push(DrawCommand::PushClip(rect));
+        self.page.scene.commands.push(DrawCommand::PushClip(rect));
     }
     fn unclip(&mut self) {
-        self.scene.commands.push(DrawCommand::PopClip);
-        self.clip = self.scene.content;
+        self.page.scene.commands.push(DrawCommand::PopClip);
+        self.clip = self.page.content;
     }
 }
 
@@ -129,9 +130,9 @@ impl LibraryUi {
         } else {
             Page::Favorites
         };
-        let scene = crate::settings::canvas::shell_frame(&self.snapshot.shell, page, logical);
+        let page = crate::settings::canvas::shell_frame(&self.snapshot.shell, page, logical);
         let p = palette(self.snapshot.shell.theme, self.snapshot.shell.dark);
-        let content = scene.content;
+        let content = page.content;
         let narrow = logical.width <= 700.;
         let list_width = ((content.width * if narrow { 0.4 } else { 0.36 })
             .max(if narrow { 185. } else { 250. })
@@ -147,7 +148,7 @@ impl LibraryUi {
             content.height,
         );
         let mut b = Paint {
-            scene,
+            page,
             controls: vec![],
             p,
             clip: content,
@@ -159,11 +160,11 @@ impl LibraryUi {
         self.draw_list(&mut b, list, metrics);
         b.unclip();
         b.clip(detail);
-        let commands = b.scene.commands.len();
+        let commands = b.page.scene.commands.len();
         let controls = b.controls.len();
         self.draw_detail(&mut b, detail, narrow, metrics);
         if self.detail_limit > 0. {
-            b.scene.commands.truncate(commands);
+            b.page.scene.commands.truncate(commands);
             b.controls.truncate(controls);
             self.draw_detail(
                 &mut b,
@@ -177,7 +178,7 @@ impl LibraryUi {
         if let Some(target) = self.focus.filter(|_| self.keyboard_focus) {
             if let Some(control) = b.controls.iter().find(|c| c.target == target).cloned() {
                 if control.hit_rect.height > 0. {
-                    b.scene.commands.push(DrawCommand::StrokeRect {
+                    b.page.scene.commands.push(DrawCommand::StrokeRect {
                         rect: r(
                             control.rect.x + 1.,
                             control.rect.y + 1.,
@@ -192,7 +193,7 @@ impl LibraryUi {
             }
         }
         let frame = LibraryFrame {
-            scene: b.scene.scaled(self.scale),
+            page: b.page.scaled(self.scale),
             controls: b
                 .controls
                 .into_iter()
@@ -243,7 +244,7 @@ impl LibraryUi {
         } else {
             FontFamily::Sans
         };
-        b.scene.commands.push(DrawCommand::Text {
+        b.page.scene.commands.push(DrawCommand::Text {
             rect: r(area.x + 16., area.y + 20., area.width - 32., 36.),
             text: title.into(),
             size: 26.,
@@ -452,7 +453,7 @@ impl LibraryUi {
             );
         }
         b.unclip();
-        b.clip(b.scene.content);
+        b.clip(b.page.content);
     }
     fn draw_detail(
         &mut self,
@@ -522,7 +523,7 @@ impl LibraryUi {
         } else {
             21.75
         };
-        b.scene.commands.push(DrawCommand::Text {
+        b.page.scene.commands.push(DrawCommand::Text {
             rect: r(x, y, width - 76., date_height),
             text: item.date.clone(),
             size: if self.snapshot.shell.theme == Theme::Paper {
@@ -775,7 +776,7 @@ impl LibraryUi {
             p.faint,
         );
         let width = (rect.width - 2. * pad) * 0.6;
-        b.scene.commands.push(DrawCommand::Text {
+        b.page.scene.commands.push(DrawCommand::Text {
             rect: r(rect.x + rect.width - pad - width, rect.y + top, width, 16.),
             text: meta.into(),
             size: 10.5,
@@ -882,7 +883,7 @@ impl LibraryUi {
             };
         self.card(b, r(x, y, width, height), label, meta);
         b.fill(r(x + pad, y + body_y, inside, h), 10., b.p.sunken);
-        b.scene.commands.push(DrawCommand::Image {
+        b.page.scene.commands.push(DrawCommand::Image {
             rect: r(
                 x + pad + (inside - draw_width) / 2.,
                 y + body_y,
@@ -1070,7 +1071,7 @@ impl LibraryUi {
         }
         let clip = b.clip;
         let visible = text_rect.intersect(clip);
-        b.scene.commands.push(DrawCommand::PushClip(visible));
+        b.page.scene.commands.push(DrawCommand::PushClip(visible));
         if let Some(edit) = self.editing.as_ref().filter(|e| e.field == field) {
             if let Some(selection) = edit.buffer.display_selection().filter(|s| !s.is_empty()) {
                 for pair in layout.caret_stops.windows(2) {
@@ -1137,12 +1138,12 @@ impl LibraryUi {
                     );
                     b.fill(caret, 0., p.ink);
                     if caret.intersect(visible).height > 0. {
-                        b.scene.ime_cursor = Some(caret);
+                        b.page.ime_cursor = Some(caret);
                     }
                 }
             }
         }
-        b.scene.commands.push(DrawCommand::PopClip);
+        b.page.scene.commands.push(DrawCommand::PopClip);
         b.control(
             target,
             rect,

@@ -490,7 +490,7 @@ impl SettingsUi {
                         );
                         if !command.enabled(runtime) {
                             b.fill(rect, 8., p.raised);
-                            b.scene.geometry.push(GeometryNode {
+                            b.frame.geometry.push(GeometryNode {
                                 kind: GeometryKind::Control(Target::GeneralCommand(command)),
                                 rect,
                             });
@@ -600,7 +600,7 @@ impl SettingsUi {
                     );
                     b.fill(rect, 8., p.raised);
                     b.stroke(rect, 8., 1., p.line);
-                    b.scene.geometry.push(GeometryNode {
+                    b.frame.geometry.push(GeometryNode {
                         kind: GeometryKind::Control(Target::GeneralUnavailable),
                         rect,
                     });
@@ -646,7 +646,7 @@ impl SettingsUi {
                         let rect = r(x, control_y, width, 36.);
                         if !command.enabled(&self.snapshot.general_runtime) {
                             b.fill(rect, 8., p.raised);
-                            b.scene.geometry.push(GeometryNode {
+                            b.frame.geometry.push(GeometryNode {
                                 kind: GeometryKind::Control(Target::GeneralCommand(command)),
                                 rect,
                             });

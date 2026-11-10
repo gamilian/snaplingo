@@ -1,12 +1,13 @@
 use super::*;
 use crate::theme::{palette, Palette};
 use crate::{
-    Color, DrawCommand, FontFamily, Page, Point, Rect, Scene, Size, TextAlign, TextMeasurer, Theme,
+    Color, DrawCommand, FontFamily, Page, Point, Rect, SettingsFrame, Size, TextAlign,
+    TextMeasurer, Theme,
 };
 use unicode_segmentation::UnicodeSegmentation;
 
 struct Draw {
-    scene: Scene,
+    page: SettingsFrame,
     controls: Vec<ServicesControlInfo>,
     epoch: u64,
     p: Palette,
@@ -23,14 +24,14 @@ fn r(x: f32, y: f32, width: f32, height: f32) -> Rect {
 }
 impl Draw {
     fn fill(&mut self, rect: Rect, radius: f32, color: Color) {
-        self.scene.commands.push(DrawCommand::FillRect {
+        self.page.scene.commands.push(DrawCommand::FillRect {
             rect,
             radius,
             color,
         });
     }
     fn border(&mut self, rect: Rect, radius: f32, color: Color) {
-        self.scene.commands.push(DrawCommand::StrokeRect {
+        self.page.scene.commands.push(DrawCommand::StrokeRect {
             rect,
             radius,
             width: 1.,
@@ -38,7 +39,7 @@ impl Draw {
         });
     }
     fn text(&mut self, rect: Rect, text: impl Into<String>, size: f32, weight: u16, color: Color) {
-        self.scene.commands.push(DrawCommand::Text {
+        self.page.scene.commands.push(DrawCommand::Text {
             rect,
             text: text.into(),
             size,
@@ -49,7 +50,7 @@ impl Draw {
         });
     }
     fn block(&mut self, rect: Rect, text: impl Into<String>, size: f32, color: Color) {
-        self.scene.commands.push(DrawCommand::TextBlock {
+        self.page.scene.commands.push(DrawCommand::TextBlock {
             rect,
             text: text.into(),
             size,
@@ -71,7 +72,7 @@ impl Draw {
     ) {
         let hit_rect = rect.intersect(self.clip);
         if self.focus.as_ref() == Some(&control) {
-            self.scene.commands.push(DrawCommand::StrokeRect {
+            self.page.scene.commands.push(DrawCommand::StrokeRect {
                 rect: r(rect.x - 2., rect.y - 2., rect.width + 4., rect.height + 4.),
                 radius: 7.,
                 width: 2.,
@@ -191,7 +192,7 @@ impl Draw {
             };
             for path in points {
                 for pair in path.windows(2) {
-                    self.scene.commands.push(DrawCommand::Line {
+                    self.page.scene.commands.push(DrawCommand::Line {
                         from: Point {
                             x: rect.x + 10. + pair[0].0 * 16. / 24.,
                             y: rect.y + 10. + pair[0].1 * 16. / 24.,
@@ -232,7 +233,7 @@ impl Draw {
                     | ServiceControl::Voice(_)
                     | ServiceControl::ChooseModel(_)
             ) {
-                if let Some(DrawCommand::Text { align, .. }) = self.scene.commands.last_mut() {
+                if let Some(DrawCommand::Text { align, .. }) = self.page.scene.commands.last_mut() {
                     *align = TextAlign::Center;
                 }
             }
@@ -244,7 +245,7 @@ impl Draw {
                 };
                 for path in paths {
                     for pair in path.windows(2) {
-                        self.scene.commands.push(DrawCommand::Line {
+                        self.page.scene.commands.push(DrawCommand::Line {
                             from: Point {
                                 x: rect.x + 12. + pair[0].0 * 16. / 24.,
                                 y: rect.y + 10. + pair[0].1 * 16. / 24.,
@@ -261,7 +262,7 @@ impl Draw {
             }
             if control == ServiceControl::VoiceMenu {
                 for (a, b) in [((0., 0.), (4., 4.)), ((4., 4.), (8., 0.))] {
-                    self.scene.commands.push(DrawCommand::Line {
+                    self.page.scene.commands.push(DrawCommand::Line {
                         from: Point {
                             x: rect.x + rect.width - 28. + a.0,
                             y: rect.y + 19. + a.1,
@@ -321,7 +322,7 @@ impl ServicesUi {
             self.scroll = self.scroll_limit;
             frame = self.draw(logical, measurer);
         }
-        frame.scene = frame.scene.scaled(self.scale);
+        frame.page = frame.page.scaled(self.scale);
         for control in &mut frame.controls {
             control.rect = control.rect.scaled(self.scale);
             control.hit_rect = control.hit_rect.scaled(self.scale);
@@ -333,9 +334,8 @@ impl ServicesUi {
         self.provider_rows.clear();
         self.input_layouts.clear();
         let p = palette(self.snapshot.shell.theme, self.snapshot.shell.dark);
-        let scene =
-            crate::settings::canvas::shell_frame(&self.snapshot.shell, Page::Services, size);
-        let content = scene.content;
+        let page = crate::settings::canvas::shell_frame(&self.snapshot.shell, Page::Services, size);
+        let content = page.content;
         let paper = self.snapshot.shell.theme == Theme::Paper;
         let studio = self.snapshot.shell.theme == Theme::Studio;
         let narrow = size.width <= 700.;
@@ -372,12 +372,12 @@ impl ServicesUi {
         let mut d = Draw {
             clip: r(0., 0., size.width, size.height),
             controls: vec![],
-            scene,
+            page,
             epoch: self.epoch,
             p,
             focus: self.focus.clone(),
         };
-        for hit in d.scene.hits.clone() {
+        for hit in d.page.hits.clone() {
             d.control(
                 hit.rect,
                 ServiceControl::Shell(hit.target),
@@ -417,7 +417,9 @@ impl ServicesUi {
                 p.ink,
             );
             if paper {
-                if let Some(DrawCommand::Text { font, weight, .. }) = d.scene.commands.last_mut() {
+                if let Some(DrawCommand::Text { font, weight, .. }) =
+                    d.page.scene.commands.last_mut()
+                {
                     *font = FontFamily::Serif;
                     *weight = 400;
                 }
@@ -494,7 +496,7 @@ impl ServicesUi {
             p.ink,
         );
         if paper {
-            if let Some(DrawCommand::Text { font, weight, .. }) = d.scene.commands.last_mut() {
+            if let Some(DrawCommand::Text { font, weight, .. }) = d.page.scene.commands.last_mut() {
                 *font = FontFamily::Serif;
                 *weight = 400;
             }
@@ -587,9 +589,12 @@ impl ServicesUi {
             pane.width,
             (size.height - header_bottom).max(1.),
         );
-        d.scene.viewport = self.viewport;
+        d.page.viewport = self.viewport;
         d.clip = self.viewport;
-        d.scene.commands.push(DrawCommand::PushClip(self.viewport));
+        d.page
+            .scene
+            .commands
+            .push(DrawCommand::PushClip(self.viewport));
         let mut y = page_top + if paper { 89. } else { 82. } + 24. - self.scroll;
         if let Some(error) = self.snapshot.error.clone() {
             d.notice(x, &mut y, width, &error, true);
@@ -612,11 +617,11 @@ impl ServicesUi {
             d.notice(x, &mut y, width, "正在处理…", false);
         }
         let height = y + self.scroll + 56. - content.y;
-        d.scene.content_height = height;
+        d.page.content_height = height;
         self.scroll_limit = (height - content.height).max(0.);
-        d.scene.commands.push(DrawCommand::PopClip);
+        d.page.scene.commands.push(DrawCommand::PopClip);
         ServicesFrame {
-            scene: d.scene,
+            page: d.page,
             controls: d.controls,
         }
     }
@@ -840,7 +845,7 @@ impl ServicesUi {
                 d.p.ink,
             );
             if self.snapshot.shell.theme == Theme::Paper {
-                if let Some(DrawCommand::Text { font, .. }) = d.scene.commands.last_mut() {
+                if let Some(DrawCommand::Text { font, .. }) = d.page.scene.commands.last_mut() {
                     *font = FontFamily::Serif;
                 }
             }
@@ -889,7 +894,7 @@ impl ServicesUi {
                     d.p.muted
                 },
             );
-            let action_commands = d.scene.commands.len();
+            let action_commands = d.page.scene.commands.len();
             let mut ax = x + width - padding - actions;
             let action_y = *y
                 + (row_h - 36.) / 2.
@@ -944,7 +949,7 @@ impl ServicesUi {
             }
             let focused=self.focus.as_ref().is_some_and(|control|matches!(control,ServiceControl::Configure(id)|ServiceControl::Drag(id)|ServiceControl::TestSaved(id)|ServiceControl::Remove(id)if id==&provider.id)||matches!(control,ServiceControl::SetActive{provider_id,..}if provider_id==&provider.id));
             if !hovered && !focused {
-                d.scene.commands.truncate(action_commands);
+                d.page.scene.commands.truncate(action_commands);
             }
             if self
                 .drag
@@ -980,7 +985,7 @@ impl ServicesUi {
         let start = *y;
         let paper = self.snapshot.shell.theme == Theme::Paper;
         let studio = self.snapshot.shell.theme == Theme::Studio;
-        let narrow = d.scene.content.width + d.scene.content.x <= 700.;
+        let narrow = d.page.content.width + d.page.content.x <= 700.;
         let inset = if paper { 0. } else { 22. };
         let row_x = x + inset;
         let row_w = width - inset * 2.;
@@ -1080,7 +1085,7 @@ impl ServicesUi {
                         + (track.width - 18.)
                             * (self.snapshot.rate.saturating_sub(80) as f32 / 320.).clamp(0., 1.);
                     d.fill(r(thumb - 9., cy - 6., 18., 18.), 9., [255, 255, 255, 255]);
-                    d.scene.commands.push(DrawCommand::StrokeRect {
+                    d.page.scene.commands.push(DrawCommand::StrokeRect {
                         rect: r(thumb - 8., cy - 5., 16., 16.),
                         radius: 8.,
                         width: 2.,
@@ -1146,7 +1151,7 @@ impl ServicesUi {
             d.border(popup, 8., d.p.line);
             let clip = d.clip;
             d.clip = popup.intersect(clip);
-            d.scene.commands.push(DrawCommand::PushClip(d.clip));
+            d.page.scene.commands.push(DrawCommand::PushClip(d.clip));
             let mut yy = yy + 4. - self.voice_scroll;
             for (id, label) in std::iter::once((String::new(), "系统默认".into())).chain(
                 self.snapshot.voices.iter().map(|voice| {
@@ -1166,7 +1171,7 @@ impl ServicesUi {
                 d.controls.last_mut().unwrap().role = ServicesRole::Option;
                 yy += 34.;
             }
-            d.scene.commands.push(DrawCommand::PopClip);
+            d.page.scene.commands.push(DrawCommand::PopClip);
             d.clip = clip;
         }
     }
@@ -1809,7 +1814,7 @@ impl ServicesUi {
                 d.p.line_strong
             },
         );
-        d.scene.commands.push(DrawCommand::PushClip(r(
+        d.page.scene.commands.push(DrawCommand::PushClip(r(
             rect.x + 1.,
             rect.y + 1.,
             rect.width - 2.,
@@ -1881,7 +1886,7 @@ impl ServicesUi {
                     line_height - 2.,
                 );
                 d.fill(caret, 0., d.p.ink);
-                d.scene.ime_cursor = Some(caret);
+                d.page.ime_cursor = Some(caret);
             }
             if let Some(range) = editor.buffer.composition_range() {
                 for (byte, point) in &layout.caret_stops {
@@ -1900,7 +1905,7 @@ impl ServicesUi {
                 }
             }
         }
-        d.scene.commands.push(DrawCommand::TextBlock {
+        d.page.scene.commands.push(DrawCommand::TextBlock {
             rect: r(
                 inner.x - offset.x,
                 inner.y - offset.y,
@@ -1926,7 +1931,7 @@ impl ServicesUi {
             font: FontFamily::Sans,
             line_height,
         });
-        d.scene.commands.push(DrawCommand::PopClip);
+        d.page.scene.commands.push(DrawCommand::PopClip);
         d.control(
             rect,
             ServiceControl::Field(field),

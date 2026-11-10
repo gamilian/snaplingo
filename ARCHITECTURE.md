@@ -1,14 +1,17 @@
 # SnapLingo architecture
 
+For the architecture rationale, upstream comparisons and migration steps,
+see [Native workspace design](docs/architecture/native-workspace-design.md).
+The current refactor's checks are recorded in
+[Native workspace implementation](docs/plans/native-workspace-implementation.md).
+
 SnapLingo is a native Rust application organized around cohesive product features.
-Six production Cargo packages separate the desktop product from reusable business,
-presentation, system, persistence and asset code. A package is introduced for an
+Seven production Cargo packages separate the desktop product from reusable business,
+presentation, system, provider, persistence and asset code. A package is introduced for an
 independent dependency or reuse constraint; related implementation modules stay
 together inside that package.
 
-The implementation and verification record is [Modular workspace refactoring](docs/plans/modular-workspace-refactor.md).
-It records the completed refactor and the scope of native platform verification. Earlier migration plans are historical evidence, not the current
-module map.
+Earlier migration records are historical evidence, not the current module map.
 
 ## Dependency direction
 
@@ -17,12 +20,14 @@ machine does not compile them.
 
 ```mermaid
 flowchart TD
-    App[apps/desktop: product assembly and native hosts] --> Core[core: business features]
+    App[app: product assembly and native hosts] --> Core[core: business features]
     App --> UI[ui: presentation and drawing]
     App --> Platform[platform: system capabilities]
+    App --> Providers[providers: external protocols and local inference]
     App --> Storage[storage: persistence]
     App --> Assets[assets: embedded resources]
     Platform --> Core
+    Providers --> Core
     Storage --> Core
     Core --> Assets
     UI -->|optional rendering feature| Assets
@@ -30,7 +35,7 @@ flowchart TD
 
 `core` does not depend on UI, storage, native frameworks or the application.
 `ui` does not depend on Core, platform adapters, databases or window frameworks.
-Platform and Storage implement contracts owned by the Core module that consumes
+Platform, Providers and Storage implement contracts owned by the Core module that consumes
 them. The desktop application is the composition root: it selects adapters and
 supplies each native feature with its actual dependencies.
 
@@ -41,7 +46,7 @@ and behavior references. They do not participate in native startup or packaging.
 ## Directory map
 
 ```text
-apps/desktop/
+app/
   Cargo.toml                    package snaplingo; existing executable identities
   src/
     main.rs, native_main.rs     native entry points
@@ -57,7 +62,7 @@ apps/desktop/
       result/                  controller, presentation mapping, native adapters
       pinned/                  image preparation, placement, native adapters
       scrolling/               sampler lifetime, native controls and overlays
-    integrations/              application-specific external implementations
+    integrations/              product events, runtime, updates and native helpers
   tests/                       real composition and native acceptance
   examples/                    application-owned previews and probes
 crates/
@@ -79,6 +84,8 @@ crates/
     accessibility/             optional AccessKit semantic projection
   platform/src/                screenshot, selection, system OCR/TTS, clipboard,
                                fonts, hotkeys, permissions, paths, login, dialogs
+  providers/src/               external HTTP/translation/LLM/OCR protocols;
+    ocr/paddle/                optional local inference with ORT/MNN
   storage/src/                 SQLite repositories and filesystem assets
   assets/src/                  production resource embedding
 assets/                        fonts, defaults, UI text and generated notices
@@ -103,6 +110,7 @@ contents through wildcard exports.
 | UI rendering | Text shaping, glyph/shape rasterization, premultiplied RGBA | Business policy and OS event routing |
 | UI accessibility | Roles, values, bounds and actions derived from shared presentation | Native AX/UIA lifetime and application service lookup |
 | Platform capability | Actual OS capability implementations behind Core contracts | AppState, application event loops, product layout and storage |
+| Provider adapter | External protocols, HTTP transport and optional inference sessions | Product windows, AppState and database implementations |
 | Storage adapter | Database migrations/transactions and persisted image files | Provider choice, window state and UI interaction |
 | Desktop feature | Shared presenter/controller, feature dependencies and adjacent native hosts | Resolving AppState or constructing dependencies through bootstrap |
 | Bootstrap | Concrete adapter selection, state assembly, subscriptions and injected callbacks | Reusable interaction or business decisions |
@@ -149,9 +157,17 @@ request validity, stale-result rejection and native text selection/IME behavior.
 Platform capabilities group real OS implementations beside each other, for
 example `platform/selection/{macos,windows,linux}`. Native window helpers that
 need the application's event loop stay in desktop integrations. General color
-selection serves Settings and Capture through Platform directly. App-specific
-HTTP clients, packaged local inference, log delivery and update integration remain
-in desktop integrations; their business policy remains in Core.
+selection serves Settings and Capture through Platform directly. Providers owns
+HTTP, cloud protocols and packaged local inference; its default build excludes
+ORT/MNN, enabled by the product through `local-ocr`. Core retains provider
+selection/configuration and pure translation/OCR strategies. Desktop integrations
+retain log delivery, update installation and event-loop helpers.
+
+`ui::foundation::Scene` contains only size and drawing commands. Feature frames
+own hit regions, geometry, scrolling, IME and semantics. The renderer imports
+foundation directly; independent windows receive `Appearance` and any needed
+key style instead of the Settings snapshot. Retained AppKit reference pages live
+under `features/settings/test_support`, compiled only for tests.
 
 ## Extending the codebase
 
@@ -176,7 +192,7 @@ application services or decode persisted files while drawing.
 ## Verification
 
 [Workspace architecture tests](crates/ui/tests/workspace_architecture.rs) inspect
-Cargo edges and source ownership. [Desktop architecture tests](apps/desktop/tests/architecture_dependency_test.rs)
+Cargo edges and source ownership. [Desktop architecture tests](app/tests/architecture_dependency_test.rs)
 cover Core model/workflow isolation, injected feature dependencies, explicit
 adapter imports, frozen capture coordinates, provider delegation and independent
 production resources. Synthetic invalid examples verify that the guards reject
