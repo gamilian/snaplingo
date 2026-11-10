@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use objc2::{rc::Retained, MainThreadMarker};
 
-use super::{GeneralAction, GeneralController, GeneralServices, GeneralView};
+use super::{GeneralAction, GeneralController, GeneralView};
 use crate::integrations::desktop_events::DesktopEvent;
 use crate::integrations::desktop_events::DesktopEvents;
 use crate::integrations::desktop_events::DesktopSubscription;
@@ -29,31 +29,6 @@ pub(crate) struct GeneralPage {
 }
 
 impl GeneralPage {
-    pub(crate) fn from_services(
-        mtm: MainThreadMarker,
-        mut services: GeneralServices,
-        events: &Arc<DesktopEvents>,
-    ) -> Result<Rc<Self>, String> {
-        let id = NEXT_PAGE.fetch_add(1, Ordering::Relaxed);
-        services.open_notices = Arc::new(move || {
-            ui_thread::dispatch(move || {
-                if let Some(page) = lookup(id) {
-                    if let Some(parent) = page.view.window() {
-                        match page.controller.projection() {
-                            Ok(projection) => super::notices::show(&parent, &projection.general),
-                            Err(error) => {
-                                log::warn!("Failed to open component notices: {error}")
-                            }
-                        }
-                    }
-                }
-            });
-            Ok(())
-        });
-        let controller = Arc::new(GeneralController::new(services));
-        Self::mount(mtm, id, controller, events)
-    }
-
     pub(crate) fn new(
         mtm: MainThreadMarker,
         controller: Arc<GeneralController>,

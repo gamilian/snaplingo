@@ -26,6 +26,9 @@ consumer and does not create a browser event bridge.
 
 `features/settings/presenter` owns one Settings session shared by both hosts:
 navigation, edit/save ordering, refresh, stale-result rejection and disposal.
+It also owns pending destructive-action confirmations. Native dialogs return a
+decision token; the session consumes it once and rejects responses after page
+changes or window closure.
 Bootstrap supplies real settings/provider/library workflows and native effects.
 The Settings host consumes `ui/settings` plus the optional UI renderer and
 accessibility projector. AppKit supplies its native text, dialog and accessibility
@@ -40,6 +43,12 @@ primary-desktop-scale policy. Both native hosts consume `ui::capture::presentati
 geometry and state, selection labels and magnifier sampling/placement. The Mac
 adapter retains native controls and text composition; its actual frames and state
 match the preserved AppKit baseline.
+
+`features/capture/completion` maps quick-capture/editor commands and preferences
+to the existing Core output and OCR workflows. Both native adapters use it for
+save, copy, pin, OCR, favorite and print completion. Dialog cancellation resumes
+the original session; errors return to the native action dispatcher for one
+combined recovery/error update, so an old callback cannot release busy state twice.
 
 Result request validity, automatic translation and stale-result policy live in
 Core. The desktop Result controller coordinates product effects; UI owns shared
@@ -66,3 +75,9 @@ independent collectors. Neither runs during native startup nor ships as a browse
 fallback. Native acceptance, visual references, cross compilation and installer
 checks are separate evidence, recorded in the refactor verification record and release
 verification documents.
+
+Native acceptance links the same product modules through an optional
+`test_support::run(Case)` entry. Each target remains a separate main-thread
+process. Shared fixture support owns temporary database paths, selected-text
+assembly and UI-thread dispatch; individual scenarios retain their own fake
+effects. No build-time source rewriting or production source mounts are needed.

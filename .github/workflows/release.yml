@@ -61,7 +61,7 @@ jobs:
       - run: npm test
       - run: npm run ocr:prepare
       - run: cargo fmt --manifest-path app/Cargo.toml --check
-      - run: cargo test --locked --manifest-path app/Cargo.toml
+      - run: cargo test --locked --manifest-path app/Cargo.toml --features test-support
       - name: Smoke test bundled medium OCR
         env:
           SNAPLINGO_OCR_SMOKE_ROOT: ${{ github.workspace }}/app/resources/ocr

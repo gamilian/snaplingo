@@ -29,7 +29,7 @@ extern "C" {
     fn ReleaseEvent(event: *mut c_void);
 }
 
-pub(super) fn send_hotkey(shortcut: &Shortcut, released: bool) {
+pub(in crate::test_support) fn send_hotkey(shortcut: &Shortcut, released: bool) {
     let id = HotkeyId {
         signature: u32::from_be_bytes(*b"htrs"),
         id: shortcut.id(),

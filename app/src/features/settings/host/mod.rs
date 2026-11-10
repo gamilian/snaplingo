@@ -8,8 +8,8 @@ use accesskit_winit::{Event as AccessibilityEvent, WindowEvent as AccessibilityW
 
 use snaplingo_ui::render::{Renderer, RendererTextMetrics};
 use snaplingo_ui::{
-    library::LibraryIntent, services::ServicesIntent, Action, Event, GeneralCommand, Key, KeyStyle,
-    Modifiers, Page, Point, Size, Snapshot, WindowInput, WindowIntent, WindowSnapshot, WindowUi,
+    library::LibraryIntent, services::ServicesIntent, Action, Event, Key, KeyStyle, Modifiers,
+    Page, Point, Size, Snapshot, WindowInput, WindowIntent, WindowSnapshot, WindowUi,
 };
 use winit::{
     application::ApplicationHandler,
@@ -128,6 +128,7 @@ impl WindowHost {
     }
 
     pub fn hide(&mut self) {
+        self.backend.cancel_confirmation();
         self.input(Event::FocusLost);
         if let Some(window) = &self.window {
             window.set_visible(false);
@@ -232,19 +233,21 @@ impl WindowHost {
                     }
                     _ => {}
                 }
-                if let Some(message) = confirmation(&intent) {
-                    if rfd::MessageDialog::new()
-                        .set_title("确认操作")
-                        .set_description(message)
-                        .set_buttons(rfd::MessageButtons::OkCancel)
-                        .show()
-                        != rfd::MessageDialogResult::Ok
-                    {
-                        continue;
-                    }
-                }
                 let destination = navigation_page(&intent);
-                if let Err(message) = self.backend.dispatch(page, intent) {
+                let result = self.backend.dispatch(page, intent).and_then(|request| {
+                    if let Some(request) = request {
+                        let accepted = rfd::MessageDialog::new()
+                            .set_title("确认操作")
+                            .set_description(request.message)
+                            .set_buttons(rfd::MessageButtons::OkCancel)
+                            .show()
+                            == rfd::MessageDialogResult::Ok;
+                        self.backend.confirm(request, accepted)
+                    } else {
+                        Ok(())
+                    }
+                });
+                if let Err(message) = result {
                     error = Some(message);
                 } else if destination.is_some() {
                     navigation = destination;
@@ -385,6 +388,7 @@ impl ApplicationHandler<HostEvent> for WindowHost {
                 if self.close_to_hide {
                     self.hide();
                 } else {
+                    self.backend.cancel_confirmation();
                     self.input(Event::FocusLost);
                     event_loop.exit();
                 }
@@ -539,6 +543,7 @@ impl ApplicationHandler<HostEvent> for WindowHost {
 
 impl Drop for WindowHost {
     fn drop(&mut self) {
+        self.backend.cancel_confirmation();
         self.backend.set_notifier(None);
     }
 }
@@ -614,26 +619,6 @@ fn navigation_page(intent: &WindowIntent) -> Option<Page> {
     match intent {
         WindowIntent::Settings(Action::Navigate(page))
         | WindowIntent::Services(ServicesIntent::Navigate(page)) => Some(*page),
-        _ => None,
-    }
-}
-
-fn confirmation(intent: &WindowIntent) -> Option<&'static str> {
-    match intent {
-        WindowIntent::Settings(Action::ResetHotkeys) => Some("确定要恢复当前分类的默认快捷键吗？"),
-        WindowIntent::Settings(Action::GeneralCommand(command)) => match command {
-            GeneralCommand::ClearLogs => Some("确定要清空所有应用日志吗？"),
-            GeneralCommand::ClearHistory => Some("确定要清空全部历史记录吗？独立收藏不会被删除。"),
-            GeneralCommand::ResetScreenRecording => Some("确定要重置 SnapLingo 的屏幕录制权限吗？"),
-            GeneralCommand::ResetAccessibility => Some("确定要重置 SnapLingo 的辅助功能权限吗？"),
-            _ => None,
-        },
-        WindowIntent::Services(ServicesIntent::ConfirmRemove(_)) => {
-            Some("确定要删除这个翻译服务吗？")
-        }
-        WindowIntent::Library(LibraryIntent::ConfirmClearHistory(_)) => {
-            Some("确定要清空当前分类的历史记录吗？独立收藏不会被删除。")
-        }
         _ => None,
     }
 }
@@ -749,9 +734,24 @@ mod tests {
                     self.snapshot.lock().unwrap().clone(),
                 ))
             }
-            fn dispatch(&mut self, _: Page, _: WindowIntent) -> Result<(), String> {
+            fn dispatch(
+                &mut self,
+                _: Page,
+                _: WindowIntent,
+            ) -> Result<
+                Option<crate::features::settings::presenter::confirmation::Confirmation>,
+                String,
+            > {
+                Ok(None)
+            }
+            fn confirm(
+                &mut self,
+                _: crate::features::settings::presenter::confirmation::Confirmation,
+                _: bool,
+            ) -> Result<(), String> {
                 Ok(())
             }
+            fn cancel_confirmation(&mut self) {}
             fn set_notifier(&mut self, notifier: Option<Arc<dyn Fn() + Send + Sync>>) {
                 *self.notifier.lock().unwrap() = notifier;
             }
@@ -815,9 +815,24 @@ mod tests {
                     ..Default::default()
                 }))
             }
-            fn dispatch(&mut self, _: Page, _: WindowIntent) -> Result<(), String> {
+            fn dispatch(
+                &mut self,
+                _: Page,
+                _: WindowIntent,
+            ) -> Result<
+                Option<crate::features::settings::presenter::confirmation::Confirmation>,
+                String,
+            > {
+                Ok(None)
+            }
+            fn confirm(
+                &mut self,
+                _: crate::features::settings::presenter::confirmation::Confirmation,
+                _: bool,
+            ) -> Result<(), String> {
                 Ok(())
             }
+            fn cancel_confirmation(&mut self) {}
         }
         let mut ui = WindowUi::new(WindowSnapshot::Services(ServicesSnapshot {
             route: ServicesRoute::Translation,

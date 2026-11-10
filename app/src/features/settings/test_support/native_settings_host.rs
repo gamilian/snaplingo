@@ -3,7 +3,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use base64::Engine;
 use objc2::rc::Retained;
 use objc2::{define_class, msg_send, sel, DefinedClass, MainThreadOnly};
 use objc2_app_kit::{NSView, NSWindow};
@@ -135,7 +134,6 @@ impl Drop for Host {
 struct Mounted {
     token: String,
     host: Retained<Host>,
-    preview: Option<String>,
 }
 thread_local! { static MOUNTED: RefCell<Option<Mounted>> = const { RefCell::new(None) }; }
 
@@ -179,7 +177,6 @@ pub(crate) fn present(
             *slot = Some(Mounted {
                 token,
                 host: host.clone(),
-                preview: None,
             })
         });
         host
@@ -219,39 +216,6 @@ pub(crate) fn dismiss(token: &str) {
     }
 }
 
-pub(crate) fn set_hidden(token: &str, hidden: bool) -> Result<Option<String>, String> {
-    let host = MOUNTED.with_borrow(|slot| {
-        slot.as_ref()
-            .and_then(|mounted| (mounted.token == token).then(|| mounted.host.clone()))
-    });
-    if let Some(host) = host {
-        if hidden && !host.isHidden() {
-            if let Some(window) = host.window() {
-                prepare_hide(&window);
-            }
-            let png = crate::integrations::system::native_view_snapshot::try_snapshot(&host)?;
-            let preview = base64::engine::general_purpose::STANDARD.encode(png);
-            MOUNTED.with_borrow_mut(|slot| {
-                if let Some(mounted) = slot.as_mut().filter(|mounted| mounted.token == token) {
-                    mounted.preview = Some(preview);
-                }
-            });
-        }
-        host.setHidden(hidden);
-        return Ok(MOUNTED.with_borrow_mut(|slot| {
-            slot.as_mut()
-                .filter(|mounted| mounted.token == token)
-                .and_then(|mounted| {
-                    if !hidden {
-                        mounted.preview = None;
-                    }
-                    mounted.preview.clone()
-                })
-        }));
-    }
-    Ok(None)
-}
-
 pub(crate) fn prepare_hide(window: &NSWindow) {
     super::notices::close_for(window);
     let host = MOUNTED.with_borrow(|slot| slot.as_ref().map(|mounted| mounted.host.clone()));
@@ -280,7 +244,7 @@ fn parse_section(id: &str) -> Result<GeneralSection, String> {
         .ok_or_else(|| "Unknown General preferences section".into())
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub(crate) fn test_mounted_view() -> Option<Retained<NSView>> {
     MOUNTED.with_borrow(|slot| {
         slot.as_ref()

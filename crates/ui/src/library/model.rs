@@ -291,7 +291,7 @@ pub enum LibraryIntent {
         result: usize,
     },
     Delete(ItemKey),
-    /// The host confirms this destructive action before calling clear_history.
+    /// Requests the shared Settings confirmation workflow before clearing history.
     ConfirmClearHistory(LibraryFilter),
     RerunOcrAndCopy(ItemKey),
     SaveMetadata {

@@ -172,7 +172,7 @@ pub(crate) fn setup_menu_bar(
     Ok(())
 }
 
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(all(feature = "test-support", target_os = "macos"))]
 pub(crate) fn test_show_translation_menu_action() {
     use tray_icon::menu::ContextMenu;
     MENU_BAR.with_borrow(|bar| {
@@ -182,7 +182,7 @@ pub(crate) fn test_show_translation_menu_action() {
     });
 }
 
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(all(feature = "test-support", target_os = "macos"))]
 pub(crate) fn test_native_menu_bar() {
     use objc2::MainThreadMarker;
     use objc2_app_kit::{NSApplication, NSEventModifierFlags, NSMenu};
@@ -302,10 +302,6 @@ fn menu_item(id: &str, text: &str) -> MenuItem {
     MenuItem::with_id(id, text, true, None)
 }
 
-pub(crate) fn should_prevent_implicit_exit(exit_code: Option<i32>) -> bool {
-    exit_code.is_none()
-}
-
 #[cfg(target_os = "macos")]
 fn menu_bar_resting_activation_policy() -> objc2_app_kit::NSApplicationActivationPolicy {
     objc2_app_kit::NSApplicationActivationPolicy::Accessory
@@ -328,11 +324,6 @@ pub(crate) fn apply_resting_activation_policy() -> Result<(), String> {
         crate::integrations::ui_thread::dispatch(update);
         Ok(())
     }
-}
-
-#[cfg(not(target_os = "macos"))]
-pub(crate) fn apply_resting_activation_policy() -> Result<(), String> {
-    Ok(())
 }
 
 #[cfg(test)]
@@ -406,16 +397,6 @@ mod tests {
             menu_bar_resting_activation_policy(),
             objc2_app_kit::NSApplicationActivationPolicy::Accessory
         ));
-    }
-
-    #[test]
-    fn menu_bar_shell_stays_alive_when_last_window_is_destroyed() {
-        assert!(should_prevent_implicit_exit(None));
-    }
-
-    #[test]
-    fn menu_bar_shell_allows_explicit_quit() {
-        assert!(!should_prevent_implicit_exit(Some(0)));
     }
 
     #[test]

@@ -71,9 +71,9 @@ fn factory(state: &crate::AppState) -> crate::features::settings::SessionFactory
 pub(crate) fn services(state: Arc<crate::AppState>) -> crate::features::settings::Services {
     crate::features::settings::Services {
         configuration: state.settings.configuration.clone(),
-        #[cfg(test)]
+        #[cfg(any(test, feature = "test-support"))]
         hotkeys: state.settings.hotkeys.clone(),
-        #[cfg(test)]
+        #[cfg(any(test, feature = "test-support"))]
         application: state.settings.application.clone(),
         permissions: state.permissions.clone(),
         events: state.desktop_events.clone(),

@@ -2,17 +2,17 @@
 // Native ports are in-memory fixtures; this page cannot change application data.
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { useSettingsConfigStore } from '../../src/stores/settingsConfigStore';
-import { useHotkeyConfigStore } from '../../src/stores/hotkeyConfigStore';
-import { useSettingsStore } from '../../src/stores/settingsStore';
+import { useSettingsConfigStore } from '../../reference/web/stores/settingsConfigStore';
+import { useHotkeyConfigStore } from '../../reference/web/stores/hotkeyConfigStore';
+import { useSettingsStore } from '../../reference/web/stores/settingsStore';
 import { SettingsWindow } from '../../reference/web/views/SettingsWindow';
 import CaptureWorkspace from '../../reference/web/views/CaptureWorkspace';
 import { PinnedImageWindow } from '../../reference/web/views/PinnedImageWindow';
-import { createPinnedImageRuntime } from '../../src/application/pinned-image/runtime';
-import { createScrollingCaptureRuntime } from '../../src/application/scrolling-capture/runtime';
+import { createPinnedImageRuntime } from '../../reference/web/application/pinned-image/runtime';
+import { createScrollingCaptureRuntime } from '../../reference/web/application/scrolling-capture/runtime';
 import { ScrollingCaptureWindow, ScrollingCapturePreviewWindow } from '../../reference/web/views/ScrollingCaptureWindow';
-import { useApplicationTheme } from '../../src/views/useApplicationTheme';
-import { DEFAULT_ANNOTATION_SHORTCUTS } from '../../src/application/capture-workspace/annotationShortcuts';
+import { useApplicationTheme } from '../../reference/web/views/useApplicationTheme';
+import { DEFAULT_ANNOTATION_SHORTCUTS } from '../../reference/web/application/capture-workspace/annotationShortcuts';
 
 const params = new URLSearchParams(location.search);
 const view = params.get('view');

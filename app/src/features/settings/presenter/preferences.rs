@@ -1,5 +1,5 @@
 //! Fixed preferences bound to the running application's service owners.
-//! Native hosts confirm destructive actions and supply their own modal windows.
+//! The shared Settings workflow confirms destructive actions; native adapters show dialogs.
 use super::general_controller::GeneralController;
 use snaplingo_core::hotkeys::model::DEFAULT_HOTKEYS;
 use snaplingo_core::hotkeys::model::OCR_CATEGORY;

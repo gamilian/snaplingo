@@ -23,7 +23,6 @@ ab_glyph = "0.2"
 tokio = { workspace = true, features = ["full"] }
 md5.workspace = true
 semver = "1"
-lingua = "1.5"
 base64.workspace = true
 chrono = { workspace = true, features = ["serde"] }
 parking_lot = { workspace = true, features = ["send_guard"] }

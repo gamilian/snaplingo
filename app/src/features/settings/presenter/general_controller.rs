@@ -83,8 +83,8 @@ impl Drop for PermissionOperation<'_> {
     }
 }
 
-/// Owns General-page actions and update state. The host supplies confirmation
-/// dialogs, launches async actions, and delivers projections on its UI thread.
+/// Owns General-page actions and update state. The shared Settings session owns confirmation and async dispatch; native
+/// adapters display dialogs and deliver projections on their UI thread.
 pub struct GeneralController {
     services: GeneralServices,
     state: Mutex<State>,

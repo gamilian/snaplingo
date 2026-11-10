@@ -1,8 +1,8 @@
-use super::backend;
+const CAPTURE_WINDOW_LABEL: &str = "capture";
 pub(crate) mod canvas;
 mod host;
 mod ocr_effects;
-pub(super) mod presentation;
+pub(crate) mod presentation;
 pub(crate) mod style;
 pub(crate) mod toolbar;
 pub(crate) mod view;

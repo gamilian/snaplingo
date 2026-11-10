@@ -1,5 +1,4 @@
-//! Standalone AppKit application ownership. The retained Tauri entry stays the
-//! default while the complete native window surface is being accepted.
+//! Standalone AppKit application ownership and resident native lifecycle.
 use std::cell::{Cell, RefCell};
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -354,7 +353,7 @@ fn ocr_resource_root() -> Option<PathBuf> {
     })
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 async fn smoke_on_main<T: Send + 'static>(
     work: impl FnOnce() -> Result<T, String> + Send + 'static,
 ) -> Result<T, String> {
@@ -372,7 +371,7 @@ async fn smoke_on_main<T: Send + 'static>(
     }
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn permission_smoke_test() {
     use snaplingo_core::permissions::RequiredPermissions;
     use snaplingo_core::permissions::RequiredPermissionsContext;
@@ -470,7 +469,7 @@ pub(crate) fn permission_smoke_test() {
     println!("Native permission guide: explicit-only authorization, duplicate guard, failure/retry, returning grant refresh, optional accessibility, temporary-copy block, recovery navigation and dismissal passed");
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn smoke_test() {
     use snaplingo_core::settings::SettingsApplication;
     use snaplingo_core::settings::StartOnBoot;

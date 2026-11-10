@@ -7,8 +7,6 @@ use crate::integrations::desktop_events::DesktopEvent;
 use crate::integrations::desktop_events::DesktopEvents;
 use crate::integrations::desktop_events::DesktopSubscription;
 use crate::integrations::desktop_events::SettingsRoute;
-#[cfg(any(test, not(target_os = "macos")))]
-use crate::AppState;
 use snaplingo_core::permissions::RequiredPermissions;
 use snaplingo_core::permissions::SystemPermission;
 use snaplingo_core::result::ResultWindowOpenRequest;
@@ -48,11 +46,6 @@ pub(crate) enum AppAction {
     OpenHistory,
     OpenAbout,
     Quit,
-}
-
-#[cfg(any(test, not(target_os = "macos")))]
-pub(crate) fn dispatch_app_action(state: &AppState, action: AppAction) {
-    state.actions.dispatch(action);
 }
 
 struct ActionTargets {
@@ -102,11 +95,6 @@ impl AppActionDispatcher {
             _targets: targets,
             subscription: Mutex::new(Some(subscription)),
         }
-    }
-
-    #[cfg(any(test, not(target_os = "macos")))]
-    pub(crate) fn dispatch(&self, action: AppAction) {
-        self._targets.dispatch(action);
     }
 
     pub(crate) fn shutdown(&self) {
@@ -368,10 +356,18 @@ mod tests {
             AppAction::OpenCapture(CaptureLaunchMode::Screenshot),
             AppAction::TranslateSelection,
         ] {
-            super::dispatch_app_action(&state, action);
+            state
+                .desktop_events
+                .publish(DesktopEvent::AppActionRequested(action));
         }
         assert_eq!(
-            *received.lock().unwrap(),
+            received
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|event| !matches!(event, DesktopEvent::AppActionRequested(_)))
+                .cloned()
+                .collect::<Vec<_>>(),
             vec![
                 DesktopEvent::OpenSettings,
                 DesktopEvent::OpenSettingsAt(SettingsRoute::History),

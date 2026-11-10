@@ -19,7 +19,7 @@ use snaplingo_core::capture::model::LogicalRect;
 use snaplingo_core::capture::model::ScrollingCaptureView;
 use snaplingo_core::settings::model::GeneralSettings;
 
-pub(super) use snaplingo_ui::scrolling::ScrollingAction as Action;
+pub(crate) use snaplingo_ui::scrolling::ScrollingAction as Action;
 use snaplingo_ui::scrolling::{ScrollingFrame, ScrollingSnapshot, ScrollingUi};
 use snaplingo_ui::{Appearance, Point, Rect, Theme};
 
@@ -224,7 +224,7 @@ thread_local! {
     static CONTROLS: RefCell<HashMap<String, Controls>> = RefCell::new(HashMap::new());
 }
 
-pub(super) fn open(
+pub(crate) fn open(
     mut view: ScrollingCaptureView,
     rect: &LogicalRect,
     general: GeneralSettings,
@@ -465,7 +465,7 @@ impl Controls {
     }
 }
 
-pub(super) fn update_theme(general: GeneralSettings) {
+pub(crate) fn update_theme(general: GeneralSettings) {
     CONTROLS.with(|all| {
         for controls in all.borrow_mut().values_mut() {
             controls.root.update_theme(general.clone());
@@ -512,7 +512,7 @@ pub(crate) fn set_working(id: &str, working: bool, error: Option<String>) {
     });
 }
 
-pub(super) fn rect(id: &str) -> Option<LogicalRect> {
+pub(crate) fn rect(id: &str) -> Option<LogicalRect> {
     CONTROLS.with(|all| {
         all.borrow().get(id).map(|controls| {
             let frame = controls.window.frame();
@@ -530,7 +530,7 @@ pub(super) fn rect(id: &str) -> Option<LogicalRect> {
     })
 }
 
-pub(super) fn hide_if_overlapping(id: &str, viewport: &LogicalRect) -> bool {
+pub(crate) fn hide_if_overlapping(id: &str, viewport: &LogicalRect) -> bool {
     let Some(bounds) = rect(id) else {
         return false;
     };
@@ -548,7 +548,7 @@ pub(super) fn hide_if_overlapping(id: &str, viewport: &LogicalRect) -> bool {
     })
 }
 
-pub(super) fn show(id: &str) {
+pub(crate) fn show(id: &str) {
     CONTROLS.with(|all| {
         if let Some(controls) = all.borrow().get(id) {
             controls.window.orderFront(None);
@@ -556,7 +556,7 @@ pub(super) fn show(id: &str) {
     });
 }
 
-pub(super) fn close(id: &str) {
+pub(crate) fn close(id: &str) {
     CONTROLS.with(|all| {
         if let Some(controls) = all.borrow_mut().remove(id) {
             controls.window.orderOut(None);
@@ -565,9 +565,8 @@ pub(super) fn close(id: &str) {
     });
 }
 
-#[cfg(test)]
-#[allow(dead_code)]
-pub(super) fn test_state(id: &str) -> Option<(String, String, Vec<bool>, bool)> {
+#[cfg(feature = "test-support")]
+pub(crate) fn test_state(id: &str) -> Option<(String, String, Vec<bool>, bool)> {
     CONTROLS.with(|all| {
         all.borrow().get(id).map(|controls| {
             (
@@ -584,9 +583,8 @@ pub(super) fn test_state(id: &str) -> Option<(String, String, Vec<bool>, bool)> 
     })
 }
 
-#[cfg(test)]
-#[allow(dead_code)]
-pub(super) fn test_click(id: &str, action: usize) {
+#[cfg(feature = "test-support")]
+pub(crate) fn test_click(id: &str, action: usize) {
     let button = CONTROLS.with(|all| {
         all.borrow()
             .get(id)
@@ -597,15 +595,13 @@ pub(super) fn test_click(id: &str, action: usize) {
     }
 }
 
-#[cfg(test)]
-#[allow(dead_code)]
-pub(super) fn test_retry_visible(id: &str) -> bool {
+#[cfg(feature = "test-support")]
+pub(crate) fn test_retry_visible(id: &str) -> bool {
     CONTROLS.with(|all| !all.borrow().get(id).unwrap().buttons[7].isHidden())
 }
 
-#[cfg(test)]
-#[allow(dead_code)]
-pub(super) fn test_frames(id: &str) -> Vec<NSRect> {
+#[cfg(feature = "test-support")]
+pub(crate) fn test_frames(id: &str) -> Vec<NSRect> {
     CONTROLS.with(|all| {
         all.borrow()
             .get(id)
@@ -617,9 +613,8 @@ pub(super) fn test_frames(id: &str) -> Vec<NSRect> {
     })
 }
 
-#[cfg(test)]
-#[allow(dead_code)]
-pub(super) fn test_snapshot(id: &str) -> Vec<u8> {
+#[cfg(feature = "test-support")]
+pub(crate) fn test_snapshot(id: &str) -> Vec<u8> {
     CONTROLS.with(|all| {
         crate::integrations::system::native_view_snapshot::snapshot(
             all.borrow()

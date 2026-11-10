@@ -53,11 +53,6 @@ impl RuntimeLifecycle {
         }
     }
 
-    #[cfg(not(target_os = "macos"))]
-    pub(crate) fn track(&self, task: JoinHandle<()>) {
-        self.tasks.lock().unwrap().push(task);
-    }
-
     /// Claim an explicit exit request without starting duplicate shutdown work.
     pub(crate) fn request_shutdown(&self) -> bool {
         !self.shutdown_requested.swap(true, Ordering::AcqRel)

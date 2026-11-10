@@ -910,9 +910,7 @@ pub(crate) fn open(
         msg_send![super(window), initWithContentRect: frame, styleMask: NSWindowStyleMask::Borderless, backing: NSBackingStoreType::Buffered, defer: false]
     };
     window.setTitle(&NSString::from_str("SnapLingo Capture"));
-    window.setIdentifier(Some(&NSString::from_str(
-        super::backend::CAPTURE_WINDOW_LABEL,
-    )));
+    window.setIdentifier(Some(&NSString::from_str(super::CAPTURE_WINDOW_LABEL)));
     window.setOpaque(true);
     window.setHasShadow(false);
     window.setHidesOnDeactivate(false);
@@ -1337,8 +1335,7 @@ pub(crate) fn print(id: &str, png: Vec<u8>) -> Result<(), String> {
     Ok(())
 }
 
-#[cfg(test)]
-#[allow(dead_code)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_ready_size(id: &str) -> (u32, u32, bool) {
     let view = current_view(id).unwrap();
     let image = &view.ivars().rasters[0].bitmap;
@@ -1348,8 +1345,7 @@ pub(crate) fn test_ready_size(id: &str) -> (u32, u32, bool) {
         !image.bitmapData().is_null() && view.window().unwrap().isVisible(),
     )
 }
-#[cfg(test)]
-#[allow(dead_code)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_key(id: &str, event: &NSEvent) {
     let view = current_view(id).unwrap();
     let equivalent: bool = unsafe { msg_send![&view, performKeyEquivalent: event] };
@@ -1366,13 +1362,11 @@ pub(crate) fn test_key(id: &str, event: &NSEvent) {
         }
     }
 }
-#[cfg(test)]
-#[allow(dead_code)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_window_number(id: &str) -> isize {
     current_view(id).unwrap().window().unwrap().windowNumber()
 }
-#[cfg(test)]
-#[allow(dead_code)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_pointer(id: &str, event: &NSEvent, phase: &str) {
     let view = current_view(id).unwrap();
     if let Some(editor) = current_editor(id) {
@@ -1416,25 +1410,23 @@ pub(crate) fn test_pointer(id: &str, event: &NSEvent, phase: &str) {
     }
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_editor_state(id: &str) -> Option<super::canvas::TestState> {
     current_editor(id).map(|editor| editor.test_state())
 }
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_editor_text(id: &str, text: &str) {
     current_editor(id).unwrap().test_text(text);
 }
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_editor_commit_text(id: &str) -> bool {
     current_editor(id).unwrap().test_commit_text()
 }
-#[cfg(test)]
-#[allow(dead_code)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_frame(id: &str) -> NSRect {
     current_view(id).unwrap().window().unwrap().frame()
 }
-#[cfg(test)]
-#[allow(dead_code)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_selection(id: &str) -> Option<LogicalRect> {
     current_view(id)
         .unwrap()
@@ -1444,18 +1436,15 @@ pub(crate) fn test_selection(id: &str) -> Option<LogicalRect> {
         .active_rect()
         .cloned()
 }
-#[cfg(test)]
-#[allow(dead_code)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_color(id: &str) -> Option<[u8; 3]> {
     current_view(id).unwrap().sampled_color()
 }
-#[cfg(test)]
-#[allow(dead_code)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_snapshot(id: &str) -> Vec<u8> {
     crate::integrations::system::native_view_snapshot::snapshot(&current_view(id).unwrap())
 }
-#[cfg(test)]
-#[allow(dead_code)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_decoded_images() -> usize {
     WINDOW.with_borrow(|current| {
         current
@@ -1463,8 +1452,7 @@ pub(crate) fn test_decoded_images() -> usize {
             .map_or(0, |(_, _, view)| view.ivars().rasters.len())
     })
 }
-#[cfg(test)]
-#[allow(dead_code)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_print_snapshot(png: &[u8]) -> Vec<u8> {
     crate::integrations::system::native_view_snapshot::snapshot(
         &print_view(png, MainThreadMarker::new().unwrap()).unwrap(),

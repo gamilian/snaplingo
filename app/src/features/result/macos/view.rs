@@ -1302,7 +1302,7 @@ fn placement_origin(
     }
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_destroy() {
     let window = WINDOW.with(|all| all.borrow_mut().take());
     if let Some(window) = window {
@@ -1312,7 +1312,7 @@ pub(crate) fn test_destroy() {
     }
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 #[derive(Debug)]
 pub(crate) struct TestState {
     pub visible: bool,
@@ -1329,7 +1329,7 @@ pub(crate) struct TestState {
     pub fragments: usize,
     pub results: Vec<String>,
 }
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_state() -> TestState {
     WINDOW.with(|all| {
         let all = all.borrow();
@@ -1355,7 +1355,7 @@ pub(crate) fn test_state() -> TestState {
         }
     })
 }
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_pointer_event(origin: NSPoint, point: NSPoint, down: bool) -> (NSPoint, isize) {
     let (window, root) = WINDOW.with(|all| {
         let all = all.borrow();
@@ -1375,7 +1375,7 @@ pub(crate) fn test_pointer_event(origin: NSPoint, point: NSPoint, down: bool) ->
     }
     (location, window.windowNumber())
 }
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_click(tag: isize) {
     let button = WINDOW.with(|all| {
         let all = all.borrow();
@@ -1416,7 +1416,7 @@ pub(crate) fn test_click(tag: isize) {
         }
     }
 }
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_source(text: &str, marked: bool) {
     let source = WINDOW.with(|all| all.borrow().as_ref().unwrap().source.clone());
     let string = NSString::from_str(text);
@@ -1433,7 +1433,7 @@ pub(crate) fn test_source(text: &str, marked: bool) {
         }
     }
 }
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_escape() {
     let window = WINDOW.with(|all| all.borrow().as_ref().unwrap().window.clone());
     let event = NSEvent::keyEventWithType_location_modifierFlags_timestamp_windowNumber_context_characters_charactersIgnoringModifiers_isARepeat_keyCode(
@@ -1442,7 +1442,7 @@ pub(crate) fn test_escape() {
     ).unwrap();
     window.sendEvent(&event);
 }
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_blur(age: Duration, dragging: bool) {
     let root = WINDOW.with(|all| all.borrow().as_ref().unwrap().root.clone());
     root.ivars().visible_since.set(Some(Instant::now() - age));
@@ -1458,7 +1458,7 @@ pub(crate) fn test_blur(age: Duration, dragging: bool) {
     }
     root.ivars().dragging.set(false);
 }
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_copy_fragment(index: usize) {
     let (root, item) = WINDOW.with(|all| {
         let all = all.borrow();
@@ -1472,7 +1472,7 @@ pub(crate) fn test_copy_fragment(index: usize) {
         let _: () = msg_send![&root, copyFragment: &*item];
     }
 }
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_snapshot() -> Vec<u8> {
     WINDOW.with(|all| {
         crate::integrations::system::native_view_snapshot::snapshot(
@@ -1481,7 +1481,7 @@ pub(crate) fn test_snapshot() -> Vec<u8> {
     })
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_geometry() -> serde_json::Value {
     WINDOW.with_borrow(|window| {
         let window = window.as_ref().unwrap();

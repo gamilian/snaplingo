@@ -14,7 +14,6 @@ import {
 } from './navigationModel';
 import { createSettingsNavigationState } from './settingsNavigationState';
 import { SettingsRuntimeProvider, useSettingsRuntime } from './runtimeContext';
-import { NativeSettingsPage } from './NativeSettingsPage';
 
 export function SettingsWindow({ runtime }: { runtime: SettingsRuntime }) {
   return (
@@ -76,18 +75,13 @@ function SettingsWindowContent() {
       />
 
       <div className="settings-content flex-1 min-h-0 min-w-0 overflow-hidden flex">
-        <SettingsSectionContent section={activeSection} interfaceScale={uiScale} />
+        <SettingsSectionContent key={activeSection.key} section={activeSection} />
       </div>
     </div>
   );
 }
 
-function SettingsSectionContent({ section, interfaceScale }: { section: SettingsSection; interfaceScale: number }) {
-  const retained = <RetainedSettingsSectionContent section={section} />;
-  return <NativeSettingsPage key={section.key} page={section.key} interfaceScale={interfaceScale} fallback={retained} />;
-}
-
-function RetainedSettingsSectionContent({ section }: { section: SettingsSection }) {
+function SettingsSectionContent({ section }: { section: SettingsSection }) {
   const servicesSubTab = useSettingsStore((state) => state.servicesSubTab);
   const setServicesSubTab = useSettingsStore((state) => state.setServicesSubTab);
 

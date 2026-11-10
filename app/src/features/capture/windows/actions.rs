@@ -1,11 +1,11 @@
 use super::{view, Services};
+use crate::features::capture::completion;
 use crate::integrations::ui_thread;
+use async_trait::async_trait;
 use snaplingo_core::capture::model::AnnotationCommand;
-use snaplingo_core::capture::model::CaptureOutputAction;
 use snaplingo_core::capture::model::CaptureSessionId;
 use snaplingo_core::capture::model::LogicalRect;
 use snaplingo_core::capture::CaptureEditorStyleChange;
-use snaplingo_core::capture::CaptureOcrTarget;
 use snaplingo_core::capture::CaptureSelectionMode;
 use snaplingo_ui::capture::CaptureCommand;
 use std::{
@@ -268,164 +268,72 @@ async fn run(
             annotations,
             include_cursor,
         } => {
-            let preferences = services.settings.snapshot()?;
-            let screenshot = &preferences.screenshot;
-            if command == CaptureCommand::Primary
-                && matches!(
-                    mode,
-                    CaptureSelectionMode::Ocr
-                        | CaptureSelectionMode::SilentOcr
-                        | CaptureSelectionMode::Translate
-                )
-            {
-                let target = match mode {
-                    CaptureSelectionMode::Ocr => CaptureOcrTarget::OcrWindow,
-                    CaptureSelectionMode::SilentOcr => CaptureOcrTarget::Clipboard,
-                    _ => CaptureOcrTarget::TranslationWindow,
-                };
-                runtime
-                    .prepare_capture_ocr(id, &rect, &annotations, target, preferences.ocr)
-                    .await?;
-                return runtime.complete_capture_ocr(id).await;
-            }
-            if command == CaptureCommand::Ocr {
-                runtime
-                    .prepare_capture_ocr(
-                        id,
-                        &rect,
-                        &annotations,
-                        CaptureOcrTarget::OcrWindow,
-                        preferences.ocr,
-                    )
-                    .await?;
-                return runtime.complete_capture_ocr(id).await;
-            }
-            if command == CaptureCommand::Scrolling {
-                return runtime
-                    .begin_scrolling_capture(id.clone(), rect)
-                    .await
-                    .map(|_| ());
-            }
-            if command == CaptureCommand::Favorite {
-                services
-                    .favorites
-                    .upgrade()
-                    .ok_or("Screenshot favorites have stopped")?
-                    .add_selection(id, &rect, &annotations, include_cursor)
-                    .await?;
-                runtime.remember_capture_selection(&rect)?;
-                let session = id.0.clone();
-                ui_thread::run("close favorited capture", move || {
-                    view::close_session(&session);
-                    Ok(())
-                })
-                .await?;
-                return runtime.cancel_capture_session(id).await;
-            }
-            if command == CaptureCommand::Print {
-                let png = runtime.render_png(id, &rect, &annotations, include_cursor)?;
-                if !print_png(id, &png).await? {
-                    let session = id.0.clone();
-                    return ui_thread::run("resume cancelled print", move || {
-                        view::action_finished(&session, None);
-                        Ok(())
-                    })
-                    .await;
-                }
-                let session = id.0.clone();
-                ui_thread::run("close printed capture", move || {
-                    view::close_session(&session);
-                    Ok(())
-                })
-                .await?;
-                return runtime.cancel_capture_session(id).await;
-            }
-            let action = match command {
-                CaptureCommand::Copy | CaptureCommand::Primary => CaptureOutputAction::Copy,
-                CaptureCommand::Pin => CaptureOutputAction::Pin,
-                CaptureCommand::QuickSave => save(
-                    services.output.quick_capture_save_path(
-                        Some(&screenshot.save_path),
-                        &screenshot.format,
-                        &screenshot.naming_rule,
-                        &screenshot.custom_file_name,
-                    ),
-                    screenshot,
-                    false,
-                ),
-                CaptureCommand::Save => {
-                    let session = id.0.clone();
-                    ui_thread::run("hide capture for save dialog", move || {
-                        view::suspend(&session);
-                        Ok(())
-                    })
-                    .await?;
-                    let Some(path) = pick_save(services).await? else {
-                        let session = id.0.clone();
-                        return ui_thread::run("resume capture after save", move || {
-                            view::action_finished(&session, None);
-                            Ok(())
-                        })
-                        .await;
-                    };
-                    save(path, screenshot, true)
-                }
-                _ => return Err("Unknown capture output".into()),
-            };
-            runtime
-                .complete_annotated_capture_selection(
+            completion::complete(
+                services,
+                completion::Request {
                     id,
-                    &rect,
-                    &annotations,
+                    mode,
+                    command,
+                    rect: &rect,
+                    annotations: &annotations,
                     include_cursor,
-                    action,
-                )
-                .await
+                },
+                &NativeCompletionEffects,
+            )
+            .await
         }
     }
 }
-fn save(
-    path: std::path::PathBuf,
-    s: &snaplingo_core::settings::model::ScreenshotSettings,
-    remember_choice: bool,
-) -> CaptureOutputAction {
-    CaptureOutputAction::Save {
-        path: path.to_string_lossy().into_owned(),
-        format: if remember_choice {
-            s.last_save_format.as_deref().unwrap_or(&s.format)
-        } else {
-            &s.format
-        }
-        .into(),
-        quality: s.quality,
-        copy_after_save: s.auto_copy,
-        remember_choice,
+
+struct NativeCompletionEffects;
+
+#[async_trait]
+impl completion::Effects for NativeCompletionEffects {
+    async fn is_current(&self, id: &CaptureSessionId) -> crate::Result<bool> {
+        current(id).await
+    }
+    async fn save_path(
+        &self,
+        id: &CaptureSessionId,
+        default: std::path::PathBuf,
+        _format: &str,
+    ) -> crate::Result<Option<std::path::PathBuf>> {
+        let session = id.0.clone();
+        let future = ui_thread::run("capture save file dialog", move || {
+            view::suspend(&session);
+            Ok(rfd::AsyncFileDialog::new()
+                .set_title("保存截图")
+                .set_directory(default.parent().unwrap_or(std::path::Path::new(".")))
+                .set_file_name(default.file_name().unwrap_or_default().to_string_lossy())
+                .add_filter("PNG", &["png"])
+                .add_filter("JPEG", &["jpg", "jpeg"])
+                .add_filter("WebP", &["webp"])
+                .save_file())
+        })
+        .await?;
+        Ok(future.await.map(|file| file.path().to_path_buf()))
+    }
+    async fn print(&self, id: &CaptureSessionId, png: Vec<u8>) -> crate::Result<bool> {
+        print_png(id, &png).await
+    }
+    async fn resume(&self, id: &CaptureSessionId) -> crate::Result<()> {
+        let session = id.0.clone();
+        ui_thread::run("resume capture completion", move || {
+            view::action_finished(&session, None);
+            Ok(())
+        })
+        .await
+    }
+    async fn close(&self, id: &CaptureSessionId) -> crate::Result<()> {
+        let session = id.0.clone();
+        ui_thread::run("close completed capture", move || {
+            view::close_session(&session);
+            Ok(())
+        })
+        .await
     }
 }
-async fn pick_save(services: &Services) -> crate::Result<Option<std::path::PathBuf>> {
-    let s = services.settings.snapshot()?.screenshot;
-    let format = s.last_save_format.as_deref().unwrap_or(&s.format);
-    let directory = s.last_save_directory.as_deref().unwrap_or(&s.save_path);
-    let default = services.output.dialog_capture_save_path(
-        Some(directory),
-        s.last_save_directory.as_ref().map(|_| s.save_path.as_str()),
-        format,
-        &s.naming_rule,
-        &s.custom_file_name,
-    );
-    let future = ui_thread::run("capture save file dialog", move || {
-        Ok(rfd::AsyncFileDialog::new()
-            .set_title("保存截图")
-            .set_directory(default.parent().unwrap_or(std::path::Path::new(".")))
-            .set_file_name(default.file_name().unwrap_or_default().to_string_lossy())
-            .add_filter("PNG", &["png"])
-            .add_filter("JPEG", &["jpg", "jpeg"])
-            .add_filter("WebP", &["webp"])
-            .save_file())
-    })
-    .await?;
-    Ok(future.await.map(|file| file.path().to_path_buf()))
-}
+
 async fn print_png(id: &CaptureSessionId, png: &[u8]) -> crate::Result<bool> {
     // The system print path finishes before returning, so its unique spool
     // file is removed immediately afterward, including cancellation or errors.

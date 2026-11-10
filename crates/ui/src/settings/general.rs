@@ -202,7 +202,7 @@ pub(crate) fn fields(section: Section, s: &GeneralPreferences) -> Vec<GeneralFie
     }
 }
 
-/// System operations stay with the host; clearing/resetting must be confirmed there.
+/// System operations use native effects; shared Settings owns clearing/reset confirmation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GeneralCommand {
     RefreshPermissions,

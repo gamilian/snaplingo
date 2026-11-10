@@ -2178,15 +2178,15 @@ impl GeneralView {
         self.ivars().active.set(section);
         self.reflow();
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_projection(&self) -> GeneralProjection {
         self.ivars().projection.borrow().clone()
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_action(&self, action: GeneralAction) {
         self.dispatch(action);
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_geometry(&self) -> serde_json::Value {
         let contents = self.ivars().contents.borrow();
         let c = contents.as_ref().unwrap();
@@ -2195,7 +2195,7 @@ impl GeneralView {
         let local = |r: NSRect| frame(self.convertRect_fromView(r, Some(&card.surface)));
         serde_json::json!({"card":frame(self.convertRect_fromView(card.surface.bounds(), Some(&card.surface))),"themes":card.themes.iter().map(|theme| local(theme.frame())).collect::<Vec<_>>(),"scroll":frame(c.scroll.frame()),"clip":frame(c.scroll.contentView().bounds()),"document":frame(c.document.frame()),"viewBounds":frame(self.bounds()),"contentInsets":format!("{:?}",c.scroll.contentInsets())})
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_toggle(&self, field: GeneralField) {
         let button = self
             .ivars()
@@ -2215,7 +2215,7 @@ impl GeneralView {
             button.performClick(None);
         }
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_theme(&self, id: &str) {
         let index = THEMES.iter().position(|theme| theme.0 == id).unwrap();
         let button =
@@ -2224,7 +2224,7 @@ impl GeneralView {
             button.performClick(None);
         }
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_choose(&self, field: GeneralField, id: &str) {
         let (tag, index) = self
             .ivars()
@@ -2257,7 +2257,7 @@ impl GeneralView {
                 .sendAction_to_from(sel!(selectChoice:), Some(self), Some(&item)));
         }
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_input(&self, field: GeneralField, value: &str) {
         let input = self
             .ivars()
@@ -2291,7 +2291,7 @@ impl GeneralView {
                 ));
         }
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_begin_edit(
         &self,
         field: GeneralField,
@@ -2325,11 +2325,11 @@ impl GeneralView {
         editor.setSelectedRange(NSRange::new(3, 5));
         editor
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_has_editor(&self) -> bool {
         self.has_editor()
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_scroll_to(&self, offset: f64) {
         {
             let contents = self.ivars().contents.borrow();
@@ -2341,19 +2341,19 @@ impl GeneralView {
         }
         self.did_scroll();
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_section_offset(&self, section: GeneralSection) -> f64 {
         self.ivars().section_offsets.borrow()[section as usize]
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_active_section(&self) -> GeneralSection {
         self.ivars().active.get()
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_disclosure(&self, release_notes: bool) {
         self.perform(if release_notes { 50_001 } else { 50_000 });
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_control_count(&self) -> usize {
         self.ivars()
             .contents

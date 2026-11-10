@@ -20,10 +20,10 @@ thread_local! {
 }
 
 /// Static viewport border and preview are AppKit windows, without WebViews.
-pub(super) struct ScrollingOverlays;
+pub(crate) struct ScrollingOverlays;
 
 impl ScrollingOverlays {
-    pub(super) fn open(&self, id: &str, viewport: &LogicalRect, scale: f64) -> Result<(), String> {
+    pub(crate) fn open(&self, id: &str, viewport: &LogicalRect, scale: f64) -> Result<(), String> {
         let mtm =
             MainThreadMarker::new().ok_or("Scrolling outline must open on the main thread")?;
         let border = f64::from(VIEWPORT_BORDER) * scale;
@@ -93,7 +93,7 @@ impl ScrollingOverlays {
         Ok(())
     }
 
-    pub(super) fn hide_if_overlapping(&self, id: &str, viewport: &LogicalRect) -> bool {
+    pub(crate) fn hide_if_overlapping(&self, id: &str, viewport: &LogicalRect) -> bool {
         if MainThreadMarker::new().is_none() {
             return false;
         }
@@ -125,7 +125,7 @@ impl ScrollingOverlays {
         })
     }
 
-    pub(super) fn show(&self, id: &str) {
+    pub(crate) fn show(&self, id: &str) {
         if MainThreadMarker::new().is_none() {
             return;
         }
@@ -136,7 +136,7 @@ impl ScrollingOverlays {
         });
     }
 
-    pub(super) fn close(&self, id: &str) {
+    pub(crate) fn close(&self, id: &str) {
         if MainThreadMarker::new().is_none() {
             return;
         }
@@ -148,7 +148,7 @@ impl ScrollingOverlays {
         });
     }
 
-    pub(super) fn open_preview(&self, id: &str, rect: &LogicalRect) -> Result<(), String> {
+    pub(crate) fn open_preview(&self, id: &str, rect: &LogicalRect) -> Result<(), String> {
         let mtm =
             MainThreadMarker::new().ok_or("Scrolling preview must open on the main thread")?;
         let frame = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(rect.width, rect.height));
@@ -198,7 +198,7 @@ impl ScrollingOverlays {
         Ok(())
     }
 
-    pub(super) fn update_preview(&self, id: &str, preview_base64: &str) {
+    pub(crate) fn update_preview(&self, id: &str, preview_base64: &str) {
         if MainThreadMarker::new().is_none() {
             return;
         }
@@ -235,7 +235,7 @@ impl ScrollingOverlays {
         });
     }
 
-    pub(super) fn hide_preview_if_overlapping(&self, id: &str, viewport: &LogicalRect) -> bool {
+    pub(crate) fn hide_preview_if_overlapping(&self, id: &str, viewport: &LogicalRect) -> bool {
         if MainThreadMarker::new().is_none() {
             return false;
         }
@@ -267,7 +267,7 @@ impl ScrollingOverlays {
         })
     }
 
-    pub(super) fn set_preview_visible(&self, id: &str, visible: bool) -> bool {
+    pub(crate) fn set_preview_visible(&self, id: &str, visible: bool) -> bool {
         if MainThreadMarker::new().is_none() {
             return false;
         }
@@ -285,7 +285,7 @@ impl ScrollingOverlays {
         })
     }
 
-    pub(super) fn close_preview(&self, id: &str) {
+    pub(crate) fn close_preview(&self, id: &str) {
         if MainThreadMarker::new().is_none() {
             return;
         }
@@ -297,15 +297,13 @@ impl ScrollingOverlays {
         });
     }
 
-    #[cfg(test)]
-    #[allow(dead_code)]
-    pub(super) fn preview_frame(&self, id: &str) -> NSRect {
+    #[cfg(feature = "test-support")]
+    pub(crate) fn preview_frame(&self, id: &str) -> NSRect {
         PREVIEWS.with(|previews| previews.borrow().get(id).unwrap().1.frame())
     }
 
-    #[cfg(test)]
-    #[allow(dead_code)]
-    pub(super) fn state(&self, id: &str) -> (Option<bool>, Option<(bool, bool)>) {
+    #[cfg(feature = "test-support")]
+    pub(crate) fn state(&self, id: &str) -> (Option<bool>, Option<(bool, bool)>) {
         let outline =
             WINDOWS.with(|windows| windows.borrow().get(id).map(|window| window.isVisible()));
         let preview = PREVIEWS.with(|previews| {

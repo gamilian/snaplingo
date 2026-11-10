@@ -23,7 +23,7 @@ pub(crate) fn try_snapshot(view: &NSView) -> Result<Vec<u8>, String> {
     Ok(unsafe { bytes.as_bytes_unchecked() }.to_vec())
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub(crate) fn snapshot(view: &NSView) -> Vec<u8> {
     try_snapshot(view).expect("Native view can render a PNG snapshot")
 }

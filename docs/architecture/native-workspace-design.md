@@ -1,6 +1,6 @@
 # SnapLingo 原生 Rust 架构与目录设计
 
-日期：2026-11-10。状态：**已实施并完成本机验证**。实现基线：`cebc309`，已将此前未提交的工作保存为一次本地提交。[ARCHITECTURE.md](../../ARCHITECTURE.md) 继续描述当前实现；本文记录设计取舍；当前实现和验证进度见[实施记录](../plans/native-workspace-implementation.md)。
+日期：2026-11-10。状态：**已实施并完成本机验证**。实现基线：`cebc309`，已将此前未提交的工作保存为一次本地提交。[ARCHITECTURE.md](../../ARCHITECTURE.md) 继续描述当前实现；本文记录设计取舍；当前实现和验证范围见[验证说明](verification.md)。
 
 ## 1. 推荐结论
 
@@ -61,7 +61,7 @@ snaplingo/
 ├── Cargo.toml                         # workspace、公共版本/依赖约束
 ├── Cargo.lock
 ├── README.md
-├── ARCHITECTURE.md                     # 实现完成后更新为真实模块图
+├── ARCHITECTURE.md                     # 当前模块图和依赖规则
 ├── CONTRIBUTING.md
 ├── app/                              # 唯一桌面产品
 │   ├── Cargo.toml                    # 保持 snaplingo 包和可执行文件身份
@@ -128,7 +128,7 @@ snaplingo/
 ├── script/                            # 开发、资源准备、打包、验收
 ├── docs/
 │   ├── architecture/, adr/, prd/
-│   ├── research/, plans/, releases/
+│   ├── research/, releases/
 │   └── archive/
 └── .github/workflows/
 ```
@@ -235,29 +235,10 @@ Core 中 [Tesseract 契约](../../crates/core/src/providers/ocr/mod.rs) 的 OS �
 
 Linux 扩展需要实现缺失的系统能力与完整 desktop host，并验证 Wayland/X11 的截图、快捷键和权限机制。目录预留 Linux 位置并不等于 Linux 产品已经可用。当前产品仍以 macOS / Windows 为实际验收目标。
 
-## 8. 分阶段迁移与验收
+## 8. 持续验证
 
-每一步应独立可编译、可回退；移动文件与行为调整分开提交。不要同时更换 UI 框架、存储格式、Provider ID 或应用安装身份。
+架构测试检查实际依赖方向，包含目标平台、可选功能和构建依赖。UI 内部的 foundation/render 方向也纳入检查；源码扫描是补充，不能代替行为和原生验收。
 
-| 阶段 | 具体改动 | 完成判据 |
-| --- | --- | --- |
-| 0，已完成 | 提交原有工作区为 `cebc309`；保存当前设计与源码研究 | 基线可定位；本轮运行的 workspace architecture 3 项测试通过 |
-| 0a，已实现 | 将唯一产品 `apps/desktop` 收拢为 `app`，同步 Cargo 路径、资源引用、脚本、CI 和架构检查 | 包名/可执行文件/安装身份不变；架构检查能识别新应用路径；原生构建、测试及打包入口继续可用 |
-| 1a，已实现 | 增加 providers，迁走外部协议、HTTP 及其现有测试；bootstrap 显式组装 | Core 不再拥有云端 wire protocol；providers 无 desktop/UI/platform 依赖；协议测试保持行为；修改网络设置后无需重启即生效 |
-| 1b，已实现 | 迁移本地推理与测试，增加 local-ocr feature，更新产品依赖和资源接线 | 关闭 feature 不引入 ORT/MNN；动态库和模型路径、macOS 版本选择、GPU 失败后的 CPU 回退及产品打包通过验收 |
-| 2，已实现 | Core 纯 OCR 契约全平台可见；平台选择只控制实际 adapter | 默认 Core 测试包含假 Tesseract 引擎测试；各目标编译通过；产品实际可用能力不被误报 |
-| 3，已实现 | UI 绘图基础脱离 Settings；窗口只接收所需外观/输入值；更新 presenter/host | foundation/render 不依赖 Settings；现有布局、颜色、renderer 和输入测试通过；macOS/Windows 实际 UI 保持行为 |
-| 4，已实现 | 将旧 AppKit 页面基准集中到 feature test_support；完善文档与依赖规则 | 基准没有删除或从新实现反向生成；测试描述区分旧基准验证和生产宿主验收；新增平台不改纯 UI/业务 |
-| 5，已实现 | 收拢 Web reference 配置；统一重复的 workspace 元数据/依赖；整理工具入口 | 原生 dev/build/release 命令及版本校验继续成立；reference build、采集器和资源许可检查通过 |
+沿用 Core 流程/并发/过期结果测试、供应商协议 fixtures、Storage 真实事务、UI 布局/输入/renderer 基准和原生宿主验收。保留的 [AppKit 参考实现](../../app/src/features/settings/test_support) 仅用于测试，不能替代生产共享页面验收。
 
-架构测试检查目标依赖矩阵和被禁止的方向，包含 target-specific、optional、build dependencies。新增 providers 时更新规则；不要把“永远恰好六个包”当作架构原则。UI 内部方向也要纳入检查；源码扫描只是补充，不能代替行为与原生验收。
-
-优先沿用已有测试：Core 的流程/并发/过期结果测试，供应商协议 fixtures，Storage 的真实事务，UI 的布局/输入/renderer 基准，Desktop 的 Core workflows 和 native UI workflows。macOS Settings 的一些旧页面在 [macos/mod.rs](../../app/src/features/settings/macos/mod.rs) 中仅由 `#[cfg(test)]` 引入，它们不是第二套生产 UI，不能误删，也不能拿它们的通过代替生产共享页面验收。
-
-迁移时的最低检查包括 `cargo fmt --all --check`、相应包测试、`cargo check --locked --workspace --all-targets` 和当前 Node/资源检查。协议-only providers 与启用 local-ocr 的产品构建分开验证。Windows 交叉编译只证明编译，Windows runner 的 IME/UIA/透明窗口与安装验收、macOS 的输入/权限/AX 验收都另行保留。
-
-## 9. 本轮交付与验证范围
-
-本轮已完成原有代码的基线提交、当前源码/依赖审阅、四个成熟项目的第一手研究，以及本设计。目标采用统一的功能优先组织规则、明确的职责依赖约束和单一 `app/` 应用目录。目录、Provider、UI 和工具迁移已实施；各平台验证范围以[实施记录](../plans/native-workspace-implementation.md)为准，旧迁移记录不证明本轮验收。
-
-本设计阶段的基线检查与本次重构的测试分开记录；详见实施记录的测试结果与尚待完成的验收。
+完整命令和平台覆盖范围见[验证说明](verification.md)。普通产品与启用 test-support 的验收构建分别检查；Windows 交叉编译和真实 Windows 桌面验收分别记录。已完成的临时迁移清单由 Git 历史保存。

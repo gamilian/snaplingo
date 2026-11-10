@@ -251,6 +251,7 @@ fn workflow_adapter_sources() -> Vec<SourceFile> {
         .into_iter()
         .filter(|source| {
             source.path == "features/result/controller.rs"
+                || source.path == "features/capture/completion.rs"
                 || source.path == "shell/actions/mod.rs"
                 || source.path.starts_with("features/settings/presenter/")
         })
@@ -259,6 +260,7 @@ fn workflow_adapter_sources() -> Vec<SourceFile> {
         "features/settings/presenter/services.rs",
         "features/settings/presenter/library.rs",
         "features/result/controller.rs",
+        "features/capture/completion.rs",
         "shell/actions/mod.rs",
     ] {
         assert!(
@@ -407,7 +409,16 @@ fn collect_rust_files(directory: &Path, paths: &mut Vec<PathBuf>) {
         if path.is_dir() {
             if matches!(
                 path.file_name().and_then(|name| name.to_str()),
-                Some("target" | "tests" | "examples" | "assets" | "icons" | "resources" | "gen")
+                Some(
+                    "target"
+                        | "tests"
+                        | "test_support"
+                        | "examples"
+                        | "assets"
+                        | "icons"
+                        | "resources"
+                        | "gen"
+                )
             ) {
                 continue;
             }
@@ -491,6 +502,13 @@ fn has_cfg_test(attributes: &[Attribute]) -> bool {
         use syn::{punctuated::Punctuated, Meta, Token};
         match meta {
             Meta::Path(path) if path.is_ident("test") => (true, false),
+            Meta::NameValue(value)
+                if value.path.is_ident("feature")
+                    && matches!(&value.value, syn::Expr::Lit(lit)
+                        if matches!(&lit.lit, syn::Lit::Str(name) if name.value() == "test-support")) =>
+            {
+                (true, false)
+            }
             Meta::List(list) => {
                 let nested = list
                     .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
@@ -792,11 +810,13 @@ fn composition_is_the_only_platform_adapter_selector() {
         );
     }
 
-    let selection_composition = read("bootstrap/selection_runtime.rs");
-    for adapter in ["MacSelectionProvider", "PlatformSelectionProvider"] {
+    for (entry, adapter) in [
+        ("shell/macos.rs", "MacSelectionProvider"),
+        ("shell/windows.rs", "PlatformSelectionProvider"),
+    ] {
         assert!(
-            selection_composition.contains(adapter),
-            "selection Composition must select {adapter}"
+            read(entry).contains(adapter),
+            "native startup must select {adapter}"
         );
     }
     let tts_composition = read("bootstrap/tts_runtime.rs");
@@ -1012,6 +1032,8 @@ fn cfg_filter_checks_all_production_targets_without_loading_test_fixtures() {
         source: r#"
             #[cfg(all(test, target_os = "macos"))]
             use objc2::Ignored;
+            #[cfg(feature = "test-support")]
+            use crate::bootstrap::OnlyForNativeAcceptance;
             #[cfg(any(test, target_os = "windows"))]
             use windows::Required;
             #[cfg(not(test))]
@@ -1026,4 +1048,128 @@ fn cfg_filter_checks_all_production_targets_without_loading_test_fixtures() {
             "capture/example.rs -> snaplingo_storage::Database".into(),
         ])
     );
+}
+
+#[derive(Default)]
+struct IntegrationSourceMounts {
+    violations: BTreeSet<String>,
+}
+impl<'ast> Visit<'ast> for IntegrationSourceMounts {
+    fn visit_attribute(&mut self, attribute: &'ast Attribute) {
+        if attribute.path().is_ident("path") {
+            if let syn::Meta::NameValue(value) = &attribute.meta {
+                if let syn::Expr::Lit(lit) = &value.value {
+                    if let syn::Lit::Str(path) = &lit.lit {
+                        // Test fixtures can use paths within tests/, but cannot
+                        // mount a parent source tree under another module graph.
+                        let path = path.value().replace('\\', "/");
+                        if Path::new(&path).is_absolute()
+                            || path.split('/').any(|part| part == "..")
+                        {
+                            self.violations.insert(path);
+                        }
+                    }
+                }
+            }
+        }
+        visit::visit_attribute(self, attribute);
+    }
+    fn visit_macro(&mut self, mac: &'ast syn::Macro) {
+        if mac.path.is_ident("include") {
+            self.violations.insert("include! source mount".into());
+        }
+        visit::visit_macro(self, mac);
+    }
+}
+
+#[test]
+fn native_acceptance_links_the_application_instead_of_remounting_its_sources() {
+    let tests = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests");
+    let mut sources = Vec::new();
+    collect_rust_files(&tests, &mut sources);
+    collect_rust_files(&app_source_root().join("test_support"), &mut sources);
+    for path in sources {
+        let mut mounts = IntegrationSourceMounts::default();
+        mounts.visit_file(&syn::parse_file(&fs::read_to_string(&path).unwrap()).unwrap());
+        assert!(
+            mounts.violations.is_empty(),
+            "{}: {:?}",
+            path.display(),
+            mounts.violations
+        );
+    }
+    let mut mounts = IntegrationSourceMounts::default();
+    mounts.visit_file(
+        &syn::parse_file(
+            r#"
+        #[cfg(target_os = "windows")]
+        #[path = "../src/shell/mod.rs"] mod copied;
+        include!(concat!(env!("OUT_DIR"), "/generated_composition.rs"));
+        #[path = "core_workflows/history.rs"] mod fixture;
+    "#,
+        )
+        .unwrap(),
+    );
+    assert_eq!(
+        mounts.violations,
+        BTreeSet::from(["../src/shell/mod.rs".into(), "include! source mount".into(),])
+    );
+    let build =
+        fs::read_to_string(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("build.rs")).unwrap();
+    assert!(
+        !build.contains("native_ui_composition"),
+        "Build must not generate a second composition module graph"
+    );
+
+    let manifest =
+        fs::read_to_string(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml")).unwrap();
+    for target in [
+        "native_app_smoke",
+        "native_ui_workflows",
+        "pinned_window_native",
+        "scrolling_controls_native",
+        "scrolling_overlays_native",
+        "selected_text_native",
+        "settings_features_native",
+        "settings_general_native",
+        "settings_hotkeys_native",
+        "ui_thread_native",
+    ] {
+        let section = manifest
+            .split("[[test]]")
+            .find(|section| section.contains(&format!("name = \"{target}\"")))
+            .unwrap_or_else(|| {
+                panic!("Native acceptance target {target} must remain independently runnable")
+            });
+        let section = section.split("[[").next().unwrap();
+        assert!(section.contains("harness = false"));
+        assert!(
+            section.contains("\"test-support\""),
+            "{target} must explicitly select the native acceptance implementation"
+        );
+        let entry = fs::read_to_string(tests.join(format!("{target}.rs"))).unwrap();
+        assert!(
+            entry.contains("snaplingo_lib::test_support"),
+            "{target} must call the linked scenario runner"
+        );
+    }
+    let syntax =
+        syn::parse_file(&fs::read_to_string(app_source_root().join("lib.rs")).unwrap()).unwrap();
+    let support = syntax
+        .items
+        .iter()
+        .find_map(|item| match item {
+            Item::Mod(module) if module.ident == "test_support" => Some(module),
+            _ => None,
+        })
+        .expect("The scenario runner must belong to the application");
+    assert!(
+        has_cfg_test(&support.attrs),
+        "Native acceptance must be absent from ordinary product builds"
+    );
+    let default = manifest
+        .lines()
+        .find(|line| line.starts_with("default = "))
+        .unwrap();
+    assert!(!default.contains("test-support"));
 }

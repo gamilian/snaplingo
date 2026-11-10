@@ -1,26 +1,23 @@
 //! Standalone preview composition; production hosts use SettingsWindowSession.
 use snaplingo_core::capture::interface_scale;
 use snaplingo_core::capture::model::LogicalRect;
-use snaplingo_core::hotkeys::model as hotkey_config;
-use snaplingo_core::hotkeys::model::HOTKEY_UNSET;
 use snaplingo_core::hotkeys::HotkeyChangeNotifier;
 use snaplingo_core::hotkeys::HotkeyConfiguration;
 use snaplingo_core::hotkeys::HotkeyRecording;
 use snaplingo_core::hotkeys::HotkeyRegistrar;
 use snaplingo_core::hotkeys::HotkeyRegistration;
 use snaplingo_core::hotkeys::HotkeyRuntime;
-use snaplingo_core::settings::model::SettingsSnapshot;
 use snaplingo_core::settings::SettingsConfiguration;
 use snaplingo_core::settings::StartOnBoot;
+use snaplingo_lib::features::settings::presenter::confirmation::{
+    Confirmation, Confirmations, PreparedAction,
+};
 use snaplingo_lib::features::settings::presenter::{
     general_field, general_value, ocr_field, project_snapshot, screenshot_field, translation_field,
     validate_hotkey_conflicts,
 };
 use snaplingo_storage::{Database, SqliteConfigStore};
-use snaplingo_ui::{
-    Action, GeneralField, OcrField, Page, ScreenshotField, Size, Snapshot, Theme, TranslationField,
-    Value,
-};
+use snaplingo_ui::{Action, Page, ScreenshotField, Size, Snapshot};
 use std::{
     collections::BTreeSet,
     path::Path,
@@ -28,7 +25,7 @@ use std::{
 };
 pub trait SettingsBackend {
     fn snapshot(&self) -> Result<Snapshot, String>;
-    /// Group resets must be confirmed by the host before this call.
+    /// Group resets must be confirmed by the shared Settings workflow before this call.
     fn dispatch(&mut self, page: Page, action: Action) -> Result<(), String>;
     fn interface_scale(&self, _display: Size) -> f32 {
         1.0
@@ -90,6 +87,7 @@ pub struct PersistentSettings {
     recording: HotkeyRecording,
     recording_sequence: u64,
     start_on_boot: Arc<dyn StartOnBoot>,
+    confirmations: Confirmations,
 }
 
 struct UnavailableStartOnBoot;
@@ -133,6 +131,7 @@ impl PersistentSettings {
             ),
             recording: HotkeyRecording::default(),
             recording_sequence: 0,
+            confirmations: Confirmations::default(),
             start_on_boot,
         })
     }
@@ -257,6 +256,21 @@ impl SettingsBackend for PersistentSettings {
     }
 }
 
+impl PersistentSettings {
+    fn execute_window_intent(
+        &mut self,
+        page: Page,
+        intent: snaplingo_ui::WindowIntent,
+    ) -> Result<(), String> {
+        match intent {
+            snaplingo_ui::WindowIntent::Settings(action) => {
+                SettingsBackend::dispatch(self, page, action)
+            }
+            _ => Err("当前设置预览未接入此页面".into()),
+        }
+    }
+}
+
 impl Drop for PersistentSettings {
     fn drop(&mut self) {
         self.recording.cancel_for_window(WINDOW);
@@ -267,13 +281,26 @@ impl snaplingo_lib::features::settings::host::WindowBackend for PersistentSettin
     fn snapshot(&self) -> Result<snaplingo_ui::WindowSnapshot, String> {
         SettingsBackend::snapshot(self).map(snaplingo_ui::WindowSnapshot::Settings)
     }
-    fn dispatch(&mut self, page: Page, intent: snaplingo_ui::WindowIntent) -> Result<(), String> {
-        match intent {
-            snaplingo_ui::WindowIntent::Settings(action) => {
-                SettingsBackend::dispatch(self, page, action)
+    fn dispatch(
+        &mut self,
+        page: Page,
+        intent: snaplingo_ui::WindowIntent,
+    ) -> Result<Option<Confirmation>, String> {
+        match self.confirmations.prepare(page, intent) {
+            PreparedAction::Confirm(request) => Ok(Some(request)),
+            PreparedAction::Execute(page, intent) => {
+                self.execute_window_intent(page, intent).map(|_| None)
             }
-            _ => Err("当前设置预览未接入此页面".into()),
         }
+    }
+    fn confirm(&mut self, request: Confirmation, accepted: bool) -> Result<(), String> {
+        if let Some((page, intent)) = self.confirmations.resolve(request, accepted) {
+            self.execute_window_intent(page, intent)?;
+        }
+        Ok(())
+    }
+    fn cancel_confirmation(&mut self) {
+        self.confirmations.cancel();
     }
     fn interface_scale(&self, display: Size) -> f32 {
         SettingsBackend::interface_scale(self, display)
@@ -282,6 +309,10 @@ impl snaplingo_lib::features::settings::host::WindowBackend for PersistentSettin
 #[cfg(test)]
 mod tests {
     use super::*;
+    use snaplingo_core::hotkeys::model as hotkey_config;
+    use snaplingo_core::hotkeys::model::HOTKEY_UNSET;
+    use snaplingo_core::settings::model::SettingsSnapshot;
+    use snaplingo_ui::{GeneralField, OcrField, Theme, TranslationField, Value};
     #[test]
     fn general_edits_preserve_other_preferences_and_survive_reopen() {
         let directory = tempfile::tempdir().unwrap();
@@ -568,7 +599,7 @@ mod tests {
                 },
             )
             .unwrap();
-        // The host has confirmed this group reset before delivering the action.
+        // The shared confirmation flow has accepted this group reset.
         backend
             .dispatch(Page::Translation, Action::ResetHotkeys)
             .unwrap();

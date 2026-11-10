@@ -56,7 +56,7 @@ impl LibrarySession {
         state.disposed = true;
         state.request += 1;
     }
-    /// Delete and clear intents reach this interface only after host confirmation.
+    /// Delete and clear intents reach this interface only after shared Settings confirmation.
     /// Clipboard reads are supplied by the view's OS adapter.
     pub fn dispatch(
         self: &Arc<Self>,

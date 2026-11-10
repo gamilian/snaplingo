@@ -586,7 +586,7 @@ thread_local! {
     static WINDOWS: RefCell<HashMap<String, (Retained<PinPanel>, Retained<PinView>)>> = RefCell::new(HashMap::new());
 }
 
-pub(super) fn open(
+pub(crate) fn open(
     image: PinnedImageView,
     rect: &LogicalRect,
     preferences: Preferences,
@@ -717,7 +717,7 @@ pub(super) fn open(
     Ok(())
 }
 
-pub(super) fn show(id: &str) -> Result<bool, String> {
+pub(crate) fn show(id: &str) -> Result<bool, String> {
     WINDOWS.with(|windows| {
         let windows = windows.borrow();
         let Some((window, root)) = windows.get(id) else {
@@ -730,7 +730,7 @@ pub(super) fn show(id: &str) -> Result<bool, String> {
     })
 }
 
-pub(super) fn focus(id: &str) -> Result<bool, String> {
+pub(crate) fn focus(id: &str) -> Result<bool, String> {
     WINDOWS.with(|windows| {
         let windows = windows.borrow();
         let Some((window, root)) = windows.get(id) else {
@@ -744,7 +744,7 @@ pub(super) fn focus(id: &str) -> Result<bool, String> {
     })
 }
 
-pub(super) fn hide(id: &str) {
+pub(crate) fn hide(id: &str) {
     WINDOWS.with(|windows| {
         if let Some((window, root)) = windows.borrow().get(id) {
             window.orderOut(None);
@@ -759,7 +759,7 @@ pub(super) fn hide(id: &str) {
     });
 }
 
-pub(super) fn close(id: &str) {
+pub(crate) fn close(id: &str) {
     WINDOWS.with(|windows| {
         if let Some((window, _)) = windows.borrow_mut().remove(id) {
             window.orderOut(None);
@@ -768,11 +768,11 @@ pub(super) fn close(id: &str) {
     });
 }
 
-pub(super) fn ids() -> Vec<String> {
+pub(crate) fn ids() -> Vec<String> {
     WINDOWS.with(|windows| windows.borrow().keys().cloned().collect())
 }
 
-pub(super) fn visible(id: &str) -> bool {
+pub(crate) fn visible(id: &str) -> bool {
     WINDOWS.with(|windows| {
         windows
             .borrow()
@@ -781,7 +781,7 @@ pub(super) fn visible(id: &str) -> bool {
     })
 }
 
-pub(super) fn update_preferences(preferences: Preferences) {
+pub(crate) fn update_preferences(preferences: Preferences) {
     WINDOWS.with(|windows| {
         for (window, root) in windows.borrow().values() {
             let changed = root.ivars().image.borrow().preferences.border != preferences.border;
@@ -794,7 +794,7 @@ pub(super) fn update_preferences(preferences: Preferences) {
     });
 }
 
-pub(super) fn replace(image: PinnedImageView) -> Result<(), String> {
+pub(crate) fn replace(image: PinnedImageView) -> Result<(), String> {
     WINDOWS.with(|windows| {
         if let Some((window, root)) = windows.borrow().get(&image.id) {
             let opacity = root.ivars().image.borrow().presentation.opacity;
@@ -820,9 +820,8 @@ pub(super) fn replace(image: PinnedImageView) -> Result<(), String> {
     })
 }
 
-#[cfg(test)]
-#[allow(dead_code)]
-pub(super) fn test_presentation(id: &str) -> Presentation {
+#[cfg(feature = "test-support")]
+pub(crate) fn test_presentation(id: &str) -> Presentation {
     WINDOWS.with(|windows| {
         windows
             .borrow()
@@ -837,16 +836,14 @@ pub(super) fn test_presentation(id: &str) -> Presentation {
     })
 }
 
-#[cfg(test)]
-#[allow(dead_code)]
-pub(super) fn test_key(id: &str, event: &NSEvent) {
+#[cfg(feature = "test-support")]
+pub(crate) fn test_key(id: &str, event: &NSEvent) {
     let root = WINDOWS.with(|windows| windows.borrow().get(id).unwrap().1.clone());
     root.handle_key(event);
 }
 
-#[cfg(test)]
-#[allow(dead_code)]
-pub(super) fn test_inspection(id: &str, point: Option<NSPoint>) -> Option<[u8; 3]> {
+#[cfg(feature = "test-support")]
+pub(crate) fn test_inspection(id: &str, point: Option<NSPoint>) -> Option<[u8; 3]> {
     let root = WINDOWS.with(|windows| windows.borrow().get(id).unwrap().1.clone());
     if let Some(point) = point {
         root.ivars().image.borrow_mut().modifiers.alt = true;
@@ -868,8 +865,7 @@ pub(super) fn test_inspection(id: &str, point: Option<NSPoint>) -> Option<[u8; 3
     }
 }
 
-#[cfg(test)]
-#[allow(dead_code)]
+#[cfg(feature = "test-support")]
 pub(crate) fn has_key_window() -> bool {
     WINDOWS.with(|windows| {
         windows
@@ -879,15 +875,13 @@ pub(crate) fn has_key_window() -> bool {
     })
 }
 
-#[cfg(test)]
-#[allow(dead_code)]
-pub(super) fn test_frame(id: &str) -> NSRect {
+#[cfg(feature = "test-support")]
+pub(crate) fn test_frame(id: &str) -> NSRect {
     WINDOWS.with(|windows| windows.borrow().get(id).unwrap().0.frame())
 }
 
-#[cfg(test)]
-#[allow(dead_code)]
-pub(super) fn test_toolbar_frames(id: &str) -> (NSRect, Vec<NSRect>) {
+#[cfg(feature = "test-support")]
+pub(crate) fn test_toolbar_frames(id: &str) -> (NSRect, Vec<NSRect>) {
     WINDOWS.with(|windows| {
         let windows = windows.borrow();
         let toolbar = windows.get(id).unwrap().1.ivars().toolbar.get().unwrap();
@@ -902,9 +896,8 @@ pub(super) fn test_toolbar_frames(id: &str) -> (NSRect, Vec<NSRect>) {
     })
 }
 
-#[cfg(test)]
-#[allow(dead_code)]
-pub(super) fn test_snapshot(id: &str) -> Vec<u8> {
+#[cfg(feature = "test-support")]
+pub(crate) fn test_snapshot(id: &str) -> Vec<u8> {
     WINDOWS.with(|windows| {
         crate::integrations::system::native_view_snapshot::snapshot(
             &windows.borrow().get(id).unwrap().1,
@@ -912,8 +905,7 @@ pub(super) fn test_snapshot(id: &str) -> Vec<u8> {
     })
 }
 
-#[cfg(test)]
-#[allow(dead_code)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_decoded_images() -> usize {
     WINDOWS.with(|windows| {
         windows
@@ -924,7 +916,7 @@ pub(crate) fn test_decoded_images() -> usize {
     })
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_ids() -> Vec<String> {
     ids()
 }

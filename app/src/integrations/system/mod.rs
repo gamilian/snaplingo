@@ -10,7 +10,7 @@ pub(crate) mod image_save_dialog;
 pub(crate) mod layered_windows;
 #[cfg(target_os = "macos")]
 pub(crate) mod native_theme;
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", feature = "test-support"))]
 pub(crate) mod native_view_snapshot;
 #[cfg(target_os = "macos")]
 pub mod shortcut;

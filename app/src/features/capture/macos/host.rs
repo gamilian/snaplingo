@@ -1,15 +1,13 @@
-use objc2_app_kit::NSUserInterfaceItemIdentification;
 use std::sync::{Arc, Mutex, RwLock};
 
 use async_trait::async_trait;
 use objc2::{rc::Retained, AnyThread};
-use objc2_app_kit::{NSApplication, NSPasteboard};
+use objc2_app_kit::NSPasteboard;
 use objc2_foundation::{NSString, NSUserDefaults};
 
 use crate::integrations::ui_thread;
 use crate::Result;
 use snaplingo_core::capture::merge_selection_history;
-use snaplingo_core::capture::model::CaptureOutputAction;
 use snaplingo_core::capture::model::CaptureSessionId;
 use snaplingo_core::capture::model::LogicalPoint;
 use snaplingo_core::capture::model::LogicalRect;
@@ -28,7 +26,8 @@ use snaplingo_core::providers::ocr::model::OcrResult;
 use super::presentation;
 use super::view::{self as native, Action, Operation};
 
-use crate::features::capture::Services;
+use crate::features::capture::{completion, Services};
+use snaplingo_ui::capture::CaptureCommand;
 
 pub(crate) struct NativeCaptureSessionRuntimeHost {
     services: RwLock<Option<Services>>,
@@ -260,23 +259,9 @@ impl CaptureSessionRuntimeHost for NativeCaptureSessionRuntimeHost {
     }
     async fn restore_capture_snapshot_windows(
         &self,
-        hidden_window_labels: Vec<String>,
+        _hidden_window_labels: Vec<String>,
     ) -> Result<()> {
-        let labels =
-            super::backend::capture_snapshot_window_labels_to_restore(&hidden_window_labels);
-        ui_thread::run("restore native capture snapshot windows", move || {
-            let app = NSApplication::sharedApplication(objc2::MainThreadMarker::new().unwrap());
-            for window in app.windows().iter() {
-                if window
-                    .identifier()
-                    .is_some_and(|id| labels.contains(&id.to_string()))
-                {
-                    window.orderFront(None);
-                }
-            }
-            Ok(())
-        })
-        .await
+        Ok(())
     }
 }
 
@@ -527,77 +512,28 @@ async fn run_action(
                 })
                 .await;
             }
-            let screenshot = services.settings.snapshot()?.screenshot;
-            if operation == Operation::Primary
-                && matches!(
-                    mode,
-                    CaptureSelectionMode::Ocr
-                        | CaptureSelectionMode::SilentOcr
-                        | CaptureSelectionMode::Translate
-                )
-            {
-                let target = match mode {
-                    CaptureSelectionMode::Ocr => CaptureOcrTarget::OcrWindow,
-                    CaptureSelectionMode::SilentOcr => CaptureOcrTarget::Clipboard,
-                    CaptureSelectionMode::Translate => CaptureOcrTarget::TranslationWindow,
-                    CaptureSelectionMode::Copy | CaptureSelectionMode::Edit => unreachable!(),
-                };
-                runtime
-                    .prepare_capture_ocr(id, &rect, &[], target, services.settings.snapshot()?.ocr)
-                    .await?;
-                return runtime.complete_capture_ocr(id).await;
-            }
-            let output = match operation {
+            let command = match operation {
                 Operation::Edit => unreachable!(),
-                Operation::Primary | Operation::Copy => CaptureOutputAction::Copy,
-                Operation::Pin => CaptureOutputAction::Pin,
-                Operation::QuickSave => {
-                    let path = services.output.quick_capture_save_path(
-                        Some(&screenshot.save_path),
-                        &screenshot.format,
-                        &screenshot.naming_rule,
-                        &screenshot.custom_file_name,
-                    );
-                    save_action(path, &screenshot, false)
-                }
-                Operation::Save => {
-                    let suspend_id = id.0.clone();
-                    ui_thread::run("show capture save dialog", move || {
-                        native::suspend(&suspend_id);
-                        Ok(())
-                    })
-                    .await?;
-                    let Some(path) =
-                        crate::integrations::system::image_save_dialog::select_native_capture_save_path(
-                            &services.settings, &services.output,
-                        )
-                        .await?
-                    else {
-                        let resume_id = id.0.clone();
-                        return ui_thread::run("return to capture selection", move || {
-                            native::action_finished(&resume_id, None);
-                            Ok(())
-                        })
-                        .await;
-                    };
-                    save_action(path, &screenshot, true)
-                }
-                Operation::Print => {
-                    let png = runtime.render_png(id, &rect, &[], include_cursor)?;
-                    let print_id = id.0.clone();
-                    ui_thread::run("print capture", move || native::print(&print_id, png)).await?;
-                    let close_id = id.0.clone();
-                    ui_thread::run("finish capture print", move || {
-                        native::close_session(&close_id);
-                        Ok(())
-                    })
-                    .await?;
-                    return runtime.cancel_capture_session(id).await;
-                }
+                Operation::Primary => CaptureCommand::Primary,
+                Operation::Copy => CaptureCommand::Copy,
+                Operation::Pin => CaptureCommand::Pin,
+                Operation::QuickSave => CaptureCommand::QuickSave,
+                Operation::Save => CaptureCommand::Save,
+                Operation::Print => CaptureCommand::Print,
             };
-            runtime
-                .complete_capture_selection(id, &rect, include_cursor, output)
-                .await
+            completion::complete(
+                services,
+                completion::Request {
+                    id,
+                    mode,
+                    command,
+                    rect: &rect,
+                    annotations: &[],
+                    include_cursor,
+                },
+                &NativeCompletionEffects,
+            )
+            .await
         }
         Action::Inspect(_, _) => unreachable!(),
         Action::Editor(request) => editor_request(services, id, mode, request).await,
@@ -678,114 +614,81 @@ async fn editor_request(
             annotations,
             include_cursor,
         } => {
-            let screenshot = services.settings.snapshot()?.screenshot;
-            let action = match command {
-                "copy" => CaptureOutputAction::Copy,
-                "pin" => CaptureOutputAction::Pin,
-                "quick-save" => save_action(
-                    services.output.quick_capture_save_path(
-                        Some(&screenshot.save_path),
-                        &screenshot.format,
-                        &screenshot.naming_rule,
-                        &screenshot.custom_file_name,
-                    ),
-                    &screenshot,
-                    false,
-                ),
-                "save" => {
-                    let session = id.0.clone();
-                    ui_thread::run("show native editor save dialog", move || {
-                        native::suspend(&session);
-                        Ok(())
-                    })
-                    .await?;
-                    let Some(path) =
-                        crate::integrations::system::image_save_dialog::select_native_capture_save_path(
-                            &services.settings, &services.output,
-                        )
-                        .await?
-                    else {
-                        let session = id.0.clone();
-                        return ui_thread::run("resume native editor", move || {
-                            native::action_finished(&session, None);
-                            Ok(())
-                        })
-                        .await;
-                    };
-                    save_action(path, &screenshot, true)
-                }
-                "ocr" => {
-                    runtime
-                        .prepare_capture_ocr(
-                            id,
-                            &rect,
-                            &annotations,
-                            CaptureOcrTarget::OcrWindow,
-                            services.settings.snapshot()?.ocr,
-                        )
-                        .await?;
-                    return runtime.complete_capture_ocr(id).await;
-                }
-                "scrolling" => {
-                    runtime.begin_scrolling_capture(id.clone(), rect).await?;
-                    return Ok(());
-                }
-                "favorite" => {
-                    services
-                        .favorites
-                        .upgrade()
-                        .ok_or("Screenshot favorite runtime has stopped")?
-                        .add_selection(id, &rect, &annotations, include_cursor)
-                        .await?;
-                    runtime.remember_capture_selection(&rect)?;
-                    let session = id.0.clone();
-                    ui_thread::run("finish native editor favorite", move || {
-                        native::close_session(&session);
-                        Ok(())
-                    })
-                    .await?;
-                    return runtime.cancel_capture_session(id).await;
-                }
-                "print" => {
-                    let png = runtime.render_png(id, &rect, &annotations, include_cursor)?;
-                    let session = id.0.clone();
-                    ui_thread::run("print native annotations", move || {
-                        native::print(&session, png)
-                    })
-                    .await?;
-                    let session = id.0.clone();
-                    ui_thread::run("finish native editor print", move || {
-                        native::close_session(&session);
-                        Ok(())
-                    })
-                    .await?;
-                    return runtime.cancel_capture_session(id).await;
-                }
+            let command = match command {
+                "copy" => CaptureCommand::Copy,
+                "pin" => CaptureCommand::Pin,
+                "quick-save" => CaptureCommand::QuickSave,
+                "save" => CaptureCommand::Save,
+                "ocr" => CaptureCommand::Ocr,
+                "scrolling" => CaptureCommand::Scrolling,
+                "favorite" => CaptureCommand::Favorite,
+                "print" => CaptureCommand::Print,
                 _ => return Err("Unknown native editor command".into()),
             };
-            runtime
-                .complete_annotated_capture_selection(
+            completion::complete(
+                services,
+                completion::Request {
                     id,
-                    &rect,
-                    &annotations,
+                    mode,
+                    command,
+                    rect: &rect,
+                    annotations: &annotations,
                     include_cursor,
-                    action,
-                )
-                .await
+                },
+                &NativeCompletionEffects,
+            )
+            .await
         }
     }
 }
 
-fn save_action(
-    path: std::path::PathBuf,
-    screenshot: &snaplingo_core::settings::model::ScreenshotSettings,
-    remember_choice: bool,
-) -> CaptureOutputAction {
-    CaptureOutputAction::Save {
-        path: path.to_string_lossy().into_owned(),
-        format: screenshot.format.clone(),
-        quality: screenshot.quality,
-        copy_after_save: screenshot.auto_copy,
-        remember_choice,
+struct NativeCompletionEffects;
+
+#[async_trait]
+impl completion::Effects for NativeCompletionEffects {
+    async fn is_current(&self, id: &CaptureSessionId) -> Result<bool> {
+        let id = id.0.clone();
+        ui_thread::run("check capture completion", move || {
+            Ok(native::is_current(&id))
+        })
+        .await
+    }
+    async fn save_path(
+        &self,
+        id: &CaptureSessionId,
+        default_path: std::path::PathBuf,
+        format: &str,
+    ) -> Result<Option<std::path::PathBuf>> {
+        let id = id.0.clone();
+        ui_thread::run("suspend capture for save", move || {
+            native::suspend(&id);
+            Ok(())
+        })
+        .await?;
+        crate::integrations::system::dialogs::save_native_capture_file(default_path, format).await
+    }
+    async fn print(&self, id: &CaptureSessionId, png: Vec<u8>) -> Result<bool> {
+        let id = id.0.clone();
+        // Preserve AppKit's existing finish-after-print-dialog behavior.
+        ui_thread::run("print capture", move || {
+            native::print(&id, png).map(|()| true)
+        })
+        .await
+    }
+    async fn resume(&self, id: &CaptureSessionId) -> Result<()> {
+        let id = id.0.clone();
+        ui_thread::run("resume capture completion", move || {
+            native::action_finished(&id, None);
+            Ok(())
+        })
+        .await
+    }
+    async fn close(&self, id: &CaptureSessionId) -> Result<()> {
+        let id = id.0.clone();
+        ui_thread::run("close completed capture", move || {
+            native::close_session(&id);
+            Ok(())
+        })
+        .await
     }
 }

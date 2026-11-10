@@ -421,11 +421,11 @@ impl Sheet {
         }
     }
 }
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_is_open() -> bool {
     SHEET.with_borrow(Option::is_some)
 }
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_input(input: PermissionPromptInput) -> bool {
     let sheet = SHEET.with_borrow(Clone::clone);
     if let Some(sheet) = sheet {
@@ -435,7 +435,7 @@ pub(crate) fn test_input(input: PermissionPromptInput) -> bool {
         false
     }
 }
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_snapshot() -> Option<PermissionPromptSnapshot> {
     SHEET.with_borrow(|slot| {
         slot.as_ref()

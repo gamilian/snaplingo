@@ -122,7 +122,7 @@ Run the relevant regression suites:
 npm test
 cargo fmt --all --check
 cargo test --locked -p snaplingo --lib
-cargo test --locked -p snaplingo --test native_app_smoke
+cargo test --locked -p snaplingo --features test-support
 cargo test --locked -p snaplingo-platform --test single_instance_native
 cargo check --locked -p snaplingo --all-targets
 cargo test --locked -p snaplingo-core -p snaplingo-storage -p snaplingo-platform -p snaplingo-ui --features snaplingo-ui/rendering,snaplingo-ui/accessibility --all-targets
@@ -130,6 +130,9 @@ cargo test --locked -p snaplingo-providers --no-default-features --all-targets
 cargo test --locked -p snaplingo-providers --features local-ocr --all-targets
 ```
 
+`test-support` enables the native acceptance targets. Their small executables
+link one compiled application implementation through a controlled scenario runner;
+they do not remount production sources. Normal product builds omit these probes.
 `native_app_smoke` uses a temporary database. On macOS and Windows it exercises
 the native application lifecycle and real Settings adapter. Renderer examples
 write visual comparison artifacts, for example

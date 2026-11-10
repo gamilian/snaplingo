@@ -73,6 +73,15 @@ The handoff of a Capture Session OCR result to the OCR window, translation windo
 
 The editing state within a Capture Session: selection geometry, annotation gestures, selected annotations, text drafts, styles, and undo/redo history. Pointer, keyboard, and toolbar intents share its state transitions. An edit commit publishes a consistent snapshot; Capture Session loading, cancellation, and output remain separate workflows.
 
+### Capture Completion
+
+The workflow that turns a quick-capture or editor command into an output or OCR
+handoff using the session's frozen pixels, annotations and cursor preference.
+Capture mode determines the primary action's destination. Saving follows the
+current output preferences and the user's chosen path; successful output ends
+the session, while cancelled file selection or failed output leaves it available
+for retry. A delayed native dialog cannot complete a replacement Capture Session.
+
 ### Scrolling Capture
 
 A sequence of images from one selected viewport while the user scrolls its content. Matching overlapping content produces one long image, retaining fixed headers and footers once. The latest appended segment can be undone without discarding earlier content. A Scrolling Capture is distinct from the frozen desktop image of an ordinary Capture Session. Complete copies and saves a PNG; reaching its configured height limit invokes the same output. A separate transparent Preview observes the task and passes mouse input through. A transparent viewport outline indicates the original capture region and also passes mouse input through.
@@ -88,6 +97,15 @@ Application runtimes that own their workflows and request runtime-host effects. 
 ### Settings
 
 `crates/core/src/settings` owns durable setting defaults, normalization and section updates. The portable Settings session owns hydration, mutation ordering, Provider reload, Hotkey snapshots and invalidation through narrow ports. Both native hosts use it; Composition injects concrete workflows and native effects. Shared UI projects snapshots into controls. Navigation remains presentation state; Services route restoration uses a dedicated UI namespace rather than adding fields to General settings. The retained frontend configuration/stores exercise the original browser contracts only.
+
+### Settings Confirmation
+
+A pending decision about a destructive Settings or Library action. Approval applies
+only to that action in the originating Settings session and page. Cancellation
+leaves stored data unchanged; changing pages or closing the window invalidates the
+decision. Approval is consumed once. Showing a native dialog does not itself
+authorize or execute the action, and temporarily losing focus to that dialog does
+not close the Settings session.
 
 ### System Speech
 
@@ -117,15 +135,15 @@ macOS verification mounts the final DMG and checks signing identity, dependencie
 
 ### Permissions and Software Updates
 
-`application/required_permissions` reads current OS grants and targets explicit requests/repairs to one permission. The system adapter detects temporary macOS installs, scopes TCC resets to this app and one service, and handles user-requested restarts. The first-use guide is confined to the Settings Window; the persistent General permissions section shares its native controller.
+The Required Permissions workflow reads current OS grants and targets explicit requests/repairs to one permission. The system adapter detects temporary macOS installs, scopes TCC resets to this app and one service, and handles user-requested restarts. The first-use guide is confined to the Settings Window; the persistent General permissions section shares its native controller.
 
-`application/updates` selects newer stable GitHub releases and verified installers for the running platform/architecture. Its system adapter downloads to a private temporary directory, checks size and SHA-256, marks the internet origin, and opens the system installer. The native General controller checks once per settings session and serializes explicit checks/downloads. This uses the existing free release packages and requires no Apple Developer ID; it does not silently replace the app. Stable self-signed releases keep the same code identity; migrating from historical ad-hoc builds may require granting permissions again, and macOS controls permission retention.
+The Software Updates workflow selects newer stable GitHub releases and verified installers for the running platform/architecture. Its system adapter downloads to a private temporary directory, checks size and SHA-256, marks the internet origin, and opens the system installer. The native General controller checks once per settings session and serializes explicit checks/downloads. This uses the existing free release packages and requires no Apple Developer ID; it does not silently replace the app. Stable self-signed releases keep the same code identity; migrating from historical ad-hoc builds may require granting permissions again, and macOS controls permission retention.
 
 ## Dependency Direction
 
 ```text
-Desktop bootstrap -> Core + UI + Platform + Storage
-Platform / Storage -> consumer-owned Core contracts
+Desktop bootstrap -> Core + UI + Platform + Providers + Storage
+Platform / Providers / Storage -> consumer-owned Core contracts
 Desktop features -> Core workflows + UI scenes/intents
 Native hosts -> shared UI presentation + optional render/accessibility modules
 Browser references -> original Views/Application + isolated fixture ports

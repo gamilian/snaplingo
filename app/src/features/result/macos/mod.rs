@@ -51,19 +51,6 @@ impl NativeResultWindowHost {
         };
         ui_thread::dispatch(move || controller.settings_changed());
     }
-
-    #[cfg(test)]
-    pub(super) fn show_on_main_thread(&self) -> Result<(), String> {
-        show(self.controller()?)
-    }
-
-    #[cfg(test)]
-    pub(super) fn receive_on_main_thread(
-        &self,
-        request_id: ResultWindowRequestId,
-    ) -> Result<(), String> {
-        self.controller()?.receive_payload(request_id)
-    }
 }
 
 #[async_trait::async_trait]

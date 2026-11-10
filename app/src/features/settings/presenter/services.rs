@@ -329,7 +329,7 @@ impl ServicesSession {
             self.tts.load_voices().await;
         }
     }
-    /// The host confirms removal before invoking this method.
+    /// The shared Settings workflow confirms removal before invoking this method.
     pub async fn remove_confirmed(&self, id: String, changed: impl Fn()) -> Result<(), String> {
         if self.state.lock().unwrap().disposed {
             return Ok(());

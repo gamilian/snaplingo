@@ -1,6 +1,6 @@
 """Measure native pin/result/capture windows with the isolated macOS UI harness.
 
-Build native_ui_workflows with --features native-app first. Pass its executable and an output JSON path.
+Build native_ui_workflows with --features test-support first. Pass its executable and an output JSON path.
 The fixture uses AppKit directly and requires no web server.
 """
 import ctypes

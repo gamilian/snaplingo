@@ -2,12 +2,8 @@
 #[path = "library/tests.rs"]
 pub(super) mod tests;
 pub(crate) use crate::features::settings::presenter::library::LibrarySession;
-#[cfg(all(test, target_os = "macos"))]
-use snaplingo_core::library::index as core;
 use snaplingo_core::library::index::LibraryClipboard;
 use snaplingo_core::library::index::LibraryPages;
-#[cfg(all(test, target_os = "macos"))]
-use snaplingo_ui::library as ui;
 use std::sync::Arc;
 
 pub(super) fn factory(

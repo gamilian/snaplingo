@@ -1,6 +1,5 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { CAPTURE_RESULT_WINDOW_LABEL } from "./appWindowRouting";
 import "./styles/index.css";
 
 if (/win/i.test(navigator.platform)) {
@@ -17,7 +16,7 @@ const App = React.lazy(() => import('./App'));
 
 if (
   new URLSearchParams(window.location.search).get('window') ===
-  CAPTURE_RESULT_WINDOW_LABEL
+  'capture-result'
 ) {
   document.documentElement.dataset.resultWindow = 'true';
 }

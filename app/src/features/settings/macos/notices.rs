@@ -105,6 +105,7 @@ struct Contents {
     empty: Retained<NSTextField>,
     detail_scroll: Retained<NSScrollView>,
     detail: Retained<Document>,
+    #[cfg(feature = "test-support")]
     back: Retained<NSButton>,
     name: Retained<NSTextField>,
     version: Retained<NSTextField>,
@@ -435,6 +436,7 @@ impl NoticesView {
             empty,
             detail_scroll,
             detail,
+            #[cfg(feature = "test-support")]
             back,
             name,
             version,
@@ -716,6 +718,7 @@ impl Backdrop {
 
 struct Modal {
     window: Retained<NSWindow>,
+    #[cfg(feature = "test-support")]
     view: Retained<NoticesView>,
     backdrop: Retained<Backdrop>,
 }
@@ -802,6 +805,7 @@ pub(in crate::features::settings) fn show(parent: &NSWindow, general: &GeneralSe
     MODAL.with_borrow_mut(|slot| {
         *slot = Some(Modal {
             window,
+            #[cfg(feature = "test-support")]
             view,
             backdrop,
         })
@@ -835,7 +839,7 @@ pub(in crate::features::settings) fn close_for(parent: &NSWindow) {
     }
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 fn artifact_variant(artifact: &std::path::Path, variant: &str) -> std::path::PathBuf {
     artifact.with_file_name(format!(
         "{}-{variant}.png",
@@ -843,7 +847,7 @@ fn artifact_variant(artifact: &std::path::Path, variant: &str) -> std::path::Pat
     ))
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_workflow(
     parent: &NSWindow,
     general: &GeneralSettings,

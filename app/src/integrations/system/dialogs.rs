@@ -1,3 +1,4 @@
+#[cfg(any(target_os = "macos", test))]
 use std::path::PathBuf;
 
 #[cfg(target_os = "macos")]
@@ -68,6 +69,7 @@ pub(crate) fn show_native_error(title: &str, message: &str) {
     });
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn capture_format(format: &str) -> crate::Result<&str> {
     match format {
         "png" | "jpg" | "jpeg" | "webp" => Ok(format),
@@ -75,6 +77,7 @@ fn capture_format(format: &str) -> crate::Result<&str> {
     }
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn capture_filters(format: &str) -> [(&'static str, &'static [&'static str]); 3] {
     let mut filters = [
         ("PNG（无损）", &["png"][..]),
@@ -85,6 +88,7 @@ fn capture_filters(format: &str) -> [(&'static str, &'static [&'static str]); 3]
     filters
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn complete_capture_extension(mut path: PathBuf, format: &str) -> PathBuf {
     if path.extension().is_none() {
         path.set_extension(format);

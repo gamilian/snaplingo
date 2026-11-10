@@ -7,7 +7,7 @@ pub(super) async fn draw_annotation(
     end: (f64, f64),
 ) {
     let id = id.to_owned();
-    on_main(app, move || {
+    on_main(move || {
         pointer(
             &id,
             &fixture_bounds(),
@@ -80,16 +80,16 @@ pub(super) async fn run(app: &NativeTestApp, clipboard: &Mutex<Vec<u8>>) {
         drag(app, &id).await;
         native_editor_state(app, &id).await;
         // Enter select mode before choosing the tool for this isolated workflow.
-        on_main(app, || toolbar::test_click("select")).await;
+        on_main(|| toolbar::test_click("select")).await;
         if tool == "eraser" {
-            on_main(app, || toolbar::test_click("rectangle")).await;
-            on_main(app, || toolbar::test_styles(|style| style.test_button(0))).await;
+            on_main(|| toolbar::test_click("rectangle")).await;
+            on_main(|| toolbar::test_styles(|style| style.test_button(0))).await;
             wait_for_styles(app, |style| style.style.filled).await;
             draw_annotation(app, &id, (150.0, 170.0), (300.0, 250.0)).await;
             native_editor_state(app, &id).await;
-            on_main(app, || toolbar::test_click("select")).await;
+            on_main(|| toolbar::test_click("select")).await;
         }
-        on_main(app, move || toolbar::test_click(tool)).await;
+        on_main(move || toolbar::test_click(tool)).await;
         wait_for_toolbar(app, &id, Some(tool), tool == "eraser", false, true).await;
         if tool == "eraser" {
             draw_annotation(app, &id, (160.0, 210.0), (290.0, 210.0)).await;
@@ -133,7 +133,7 @@ pub(super) async fn run(app: &NativeTestApp, clipboard: &Mutex<Vec<u8>>) {
                 "Keyboard nudge moved the selection instead of the selected annotation"
             );
         } else if tool == "arrow" {
-            on_main(app, || toolbar::test_click("select")).await;
+            on_main(|| toolbar::test_click("select")).await;
             draw_annotation(app, &id, (225.0, 210.0), (225.0, 210.0)).await;
             native_editor_state(app, &id).await;
             draw_annotation(
@@ -186,29 +186,29 @@ pub(super) async fn run(app: &NativeTestApp, clipboard: &Mutex<Vec<u8>>) {
                 "Native eraser did not restore frozen pixels"
             );
         }
-        on_main(app, || toolbar::test_click("undo")).await;
+        on_main(|| toolbar::test_click("undo")).await;
         let undone = native_editor_state(app, &id).await.annotations;
         assert_ne!(
             undone, annotations,
             "Native {tool} undo did not change state"
         );
-        on_main(app, || toolbar::test_click("redo")).await;
+        on_main(|| toolbar::test_click("redo")).await;
         assert_eq!(
             native_editor_state(app, &id).await.annotations,
             annotations,
             "Native {tool} redo lost its geometry"
         );
         let snapshot_id = id.clone();
-        let bytes = on_main(app, move || native::test_snapshot(&snapshot_id)).await;
+        let bytes = on_main(move || native::test_snapshot(&snapshot_id)).await;
         snapshot(&format!("capture-native-editor-{tool}.png"), &bytes);
-        on_main(app, || toolbar::test_click("copy")).await;
+        on_main(|| toolbar::test_click("copy")).await;
         released(app, &id).await;
         assert_eq!(
             *clipboard.lock().unwrap(),
             expected,
             "Native {tool} clipboard output differed from its annotation state"
         );
-        assert!(on_main(app, toolbar::test_state).await.is_none());
+        assert!(on_main(toolbar::test_state).await.is_none());
     }
     selection_and_suspension(app, clipboard).await;
     global_pin_shortcut(app, clipboard).await;
@@ -269,12 +269,12 @@ async fn global_pin_shortcut(app: &NativeTestApp, clipboard: &Mutex<Vec<u8>>) {
     use crate::features::pinned as pinned_window;
 
     let state = app.state.clone();
-    let prior_ids = on_main(app, pinned_window::test_ids).await;
+    let prior_ids = on_main(pinned_window::test_ids).await;
     let id = open(app, "screenshot").await;
     drag(app, &id).await;
     native_editor_state(app, &id).await;
-    on_main(app, || toolbar::test_click("select")).await;
-    on_main(app, || toolbar::test_click("rectangle")).await;
+    on_main(|| toolbar::test_click("select")).await;
+    on_main(|| toolbar::test_click("rectangle")).await;
     draw_annotation(app, &id, (150.0, 170.0), (300.0, 250.0)).await;
     let edited = native_editor_state(app, &id).await;
     let expected = state
@@ -290,7 +290,7 @@ async fn global_pin_shortcut(app: &NativeTestApp, clipboard: &Mutex<Vec<u8>>) {
     *clipboard.lock().unwrap() = vec![1, 2, 3];
     state.capture.runtime.pin_from_shortcut().await.unwrap();
     released(app, &id).await;
-    let new_ids = on_main(app, pinned_window::test_ids)
+    let new_ids = on_main(pinned_window::test_ids)
         .await
         .into_iter()
         .filter(|id| !prior_ids.contains(id))
@@ -311,14 +311,14 @@ async fn global_pin_shortcut(app: &NativeTestApp, clipboard: &Mutex<Vec<u8>>) {
     );
     state.capture.pinned_images.remove(pin_id).unwrap();
     let closing_id = pin_id.clone();
-    on_main(app, move || pinned_window::test_close(&closing_id))
+    on_main(move || pinned_window::test_close(&closing_id))
         .await
         .unwrap();
     assert_eq!(
-        on_main(app, pinned_window::test_ids).await.len(),
+        on_main(pinned_window::test_ids).await.len(),
         prior_ids.len()
     );
-    assert!(on_main(app, toolbar::test_state).await.is_none());
+    assert!(on_main(toolbar::test_state).await.is_none());
     println!("Global pin shortcut preserved native annotations and released its editor and pin resources");
 }
 
@@ -327,11 +327,11 @@ async fn selection_and_suspension(app: &NativeTestApp, clipboard: &Mutex<Vec<u8>
     let id = open(app, "screenshot").await;
     drag(app, &id).await;
     native_editor_state(app, &id).await;
-    on_main(app, || toolbar::test_click("select")).await;
-    on_main(app, || toolbar::test_click("rectangle")).await;
+    on_main(|| toolbar::test_click("select")).await;
+    on_main(|| toolbar::test_click("rectangle")).await;
     draw_annotation(app, &id, (150.0, 170.0), (300.0, 250.0)).await;
     let annotations = native_editor_state(app, &id).await.annotations;
-    on_main(app, || toolbar::test_click("select")).await;
+    on_main(|| toolbar::test_click("select")).await;
 
     draw_annotation(app, &id, (360.0, 300.0), (390.0, 320.0)).await;
     let resized = native_editor_state(app, &id).await;
@@ -350,7 +350,7 @@ async fn selection_and_suspension(app: &NativeTestApp, clipboard: &Mutex<Vec<u8>
     );
 
     let pointer_id = id.clone();
-    on_main(app, move || {
+    on_main(move || {
         pointer(
             &pointer_id,
             &fixture_bounds(),
@@ -399,24 +399,16 @@ async fn selection_and_suspension(app: &NativeTestApp, clipboard: &Mutex<Vec<u8>
         "Moving the crop changed local annotation coordinates"
     );
 
-    on_main(app, || {
-        toolbar::test_styles(|style| style.test_open_color())
-    })
-    .await;
-    assert!(
-        on_main(app, || toolbar::test_styles(
-            |style| style.test_color_active()
-        ))
-        .await
-    );
+    on_main(|| toolbar::test_styles(|style| style.test_open_color())).await;
+    assert!(on_main(|| toolbar::test_styles(|style| style.test_color_active())).await);
     let suspend_id = id.clone();
-    on_main(app, move || native::suspend(&suspend_id)).await;
+    on_main(move || native::suspend(&suspend_id)).await;
     assert!(
-        !on_main(app, toolbar::test_state).await.unwrap().visible,
+        !on_main(toolbar::test_state).await.unwrap().visible,
         "Suspending the capture left its toolbar visible"
     );
     assert!(
-        !on_main(app, || {
+        !on_main(|| {
             objc2_app_kit::NSColorPanel::sharedColorPanel(MainThreadMarker::new().unwrap())
                 .isVisible()
         })
@@ -424,24 +416,16 @@ async fn selection_and_suspension(app: &NativeTestApp, clipboard: &Mutex<Vec<u8>
         "Suspending the capture left its color picker visible"
     );
     let query_id = id.clone();
-    assert!(
-        !on_main(app, move || native::test_ready_size(&query_id))
-            .await
-            .2
-    );
+    assert!(!on_main(move || native::test_ready_size(&query_id)).await.2);
     let resume_id = id.clone();
-    on_main(app, move || native::action_finished(&resume_id, None)).await;
+    on_main(move || native::action_finished(&resume_id, None)).await;
     let resumed = native_editor_state(app, &id).await;
     assert!(!resumed.busy);
     assert_eq!(resumed.selection, moved.selection);
     assert_eq!(resumed.annotations, annotations);
-    assert!(on_main(app, toolbar::test_state).await.unwrap().visible);
+    assert!(on_main(toolbar::test_state).await.unwrap().visible);
     let query_id = id.clone();
-    assert!(
-        on_main(app, move || native::test_ready_size(&query_id))
-            .await
-            .2
-    );
+    assert!(on_main(move || native::test_ready_size(&query_id)).await.2);
 
     let expected = state
         .capture
@@ -453,7 +437,7 @@ async fn selection_and_suspension(app: &NativeTestApp, clipboard: &Mutex<Vec<u8>
             false,
         )
         .unwrap();
-    on_main(app, || toolbar::test_click("copy")).await;
+    on_main(|| toolbar::test_click("copy")).await;
     released(app, &id).await;
     assert_eq!(
         *clipboard.lock().unwrap(),
@@ -462,6 +446,6 @@ async fn selection_and_suspension(app: &NativeTestApp, clipboard: &Mutex<Vec<u8>
     );
     let copied = image::load_from_memory(&expected).unwrap();
     assert_eq!((copied.width(), copied.height()), (270, 180));
-    assert!(on_main(app, toolbar::test_state).await.is_none());
+    assert!(on_main(toolbar::test_state).await.is_none());
     println!("Native crop move/resize, Escape restoration, keyboard nudges and dialog suspension passed with preserved annotations");
 }

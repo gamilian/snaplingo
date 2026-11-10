@@ -4,6 +4,7 @@ pub(crate) mod notices;
 use crate::features::settings::host::HostEvent;
 use crate::features::settings::host::WindowBackend;
 use crate::features::settings::host::WindowHost;
+use crate::features::settings::presenter::confirmation::Confirmation;
 use crate::features::settings::presenter::window::SettingsWindowSession;
 use snaplingo_core::hotkeys::HotkeyRecording;
 use snaplingo_ui::{Page, Size, WindowIntent, WindowSnapshot};
@@ -22,8 +23,18 @@ impl WindowBackend for Backend {
     fn snapshot(&self) -> Result<WindowSnapshot, String> {
         self.0.borrow().snapshot()
     }
-    fn dispatch(&mut self, page: Page, intent: WindowIntent) -> Result<(), String> {
+    fn dispatch(
+        &mut self,
+        page: Page,
+        intent: WindowIntent,
+    ) -> Result<Option<Confirmation>, String> {
         self.0.borrow_mut().dispatch(page, intent)
+    }
+    fn confirm(&mut self, request: Confirmation, accepted: bool) -> Result<(), String> {
+        self.0.borrow_mut().confirm(request, accepted)
+    }
+    fn cancel_confirmation(&mut self) {
+        self.0.borrow_mut().cancel_confirmation();
     }
     fn set_notifier(&mut self, callback: Option<Arc<dyn Fn() + Send + Sync>>) {
         self.0.borrow().set_notifier(callback);
@@ -185,7 +196,7 @@ impl NativeSettingsWindow {
     }
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 impl NativeSettingsWindow {
     pub(crate) fn test_page(&self) -> Page {
         self.host.page()

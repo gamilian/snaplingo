@@ -7,7 +7,7 @@ use objc2_app_kit::{
     NSRunningApplication, NSWindow, NSWorkspace,
 };
 
-use super::backend::CAPTURE_WINDOW_LABEL;
+use super::CAPTURE_WINDOW_LABEL;
 
 static CAPTURE_PRESENTATION_DEPTH: AtomicUsize = AtomicUsize::new(0);
 static CAPTURE_WINDOW_ACTIVATION_SUPPRESSED: AtomicBool = AtomicBool::new(false);
@@ -25,11 +25,6 @@ fn application() -> objc2::rc::Retained<NSApplication> {
     NSApplication::sharedApplication(
         MainThreadMarker::new().expect("capture lifecycle runs on the main thread"),
     )
-}
-
-#[cfg(test)]
-pub(super) fn activation_suppressed() -> bool {
-    CAPTURE_WINDOW_ACTIVATION_SUPPRESSED.load(Ordering::SeqCst)
 }
 
 fn set_activation_policy(policy: NSApplicationActivationPolicy) -> Result<(), String> {

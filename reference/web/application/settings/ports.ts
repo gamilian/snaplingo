@@ -1,21 +1,6 @@
 import type { SettingsNavigationRequest } from './navigation';
 import type { InterfaceTheme } from './theme';
 
-export type NativeSettingsPageKind = 'general' | 'ocr' | 'translation' | 'screenshot' | 'history' | 'favorites' | 'services';
-
-export interface NativeSettingsRequest {
-  token: string;
-  page: NativeSettingsPageKind;
-  viewport: { x: number; y: number; width: number; height: number; scale: number } | null;
-  section?: string;
-  hidden?: boolean;
-}
-
-export interface NativeSettingsPresentation {
-  supported: boolean;
-  preview?: string;
-}
-
 export interface SettingsWindowPort {
   openSettings(): Promise<void>;
   selectScreenshotDirectory(): Promise<string | null>;
@@ -23,7 +8,6 @@ export interface SettingsWindowPort {
   displayBounds?(): Promise<import('../../domain/capture').LogicalRect | null>;
   applyInterfaceScale?(scale: number): Promise<void>;
   openExternal?(url: string): Promise<void>;
-  presentNativeSettingsPage?(request: NativeSettingsRequest): Promise<NativeSettingsPresentation>;
 }
 
 export interface SettingsWindowEventsPort {

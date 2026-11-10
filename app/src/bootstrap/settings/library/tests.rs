@@ -1,11 +1,8 @@
-use super::core::{LibraryIndexPage, LibraryIndexQuery, LibraryIndexRepository};
 use super::*;
-use async_trait::async_trait;
 use snaplingo_core::selection::SelectedTextAcquirer;
 use snaplingo_core::selection::SelectionContextProvider;
 use snaplingo_core::selection::SelectionScheme;
 use snaplingo_storage::Database;
-use snaplingo_storage::SqliteLibraryIndexRepository;
 
 struct Context;
 impl SelectionContextProvider for Context {
@@ -13,31 +10,9 @@ impl SelectionContextProvider for Context {
         Default::default()
     }
 }
-struct Index {
-    real: SqliteLibraryIndexRepository,
-    entered: tokio::sync::Notify,
-    release: tokio::sync::Notify,
-}
-#[async_trait]
-impl LibraryIndexRepository for Index {
-    async fn query_history(&self, query: &LibraryIndexQuery) -> crate::Result<LibraryIndexPage> {
-        let page = self.real.query_history(query).await?;
-        if query.search == "old" {
-            self.entered.notify_one();
-            self.release.notified().await;
-        }
-        Ok(page)
-    }
-    async fn query_favorites(&self, query: &LibraryIndexQuery) -> crate::Result<LibraryIndexPage> {
-        self.real.query_favorites(query).await
-    }
-}
 pub(in crate::bootstrap::settings) struct Fixture {
-    _directory: tempfile::TempDir,
-    database: Arc<Database>,
-    session: Arc<LibrarySession>,
-    index: Arc<Index>,
     pub(in crate::bootstrap::settings) app: Arc<crate::AppState>,
+    _directory: tempfile::TempDir,
 }
 pub(in crate::bootstrap::settings) fn fixture() -> Fixture {
     let directory = tempfile::tempdir().unwrap();
@@ -66,25 +41,8 @@ pub(in crate::bootstrap::settings) fn fixture() -> Fixture {
             )),
         },
     );
-    let index = Arc::new(Index {
-        real: SqliteLibraryIndexRepository::new(database.clone()),
-        entered: Default::default(),
-        release: Default::default(),
-    });
-    let pages = core::LibraryPages::new(
-        state.history.history.clone(),
-        state.favorites.favorites.clone(),
-        state.screenshot_favorites.favorites.clone(),
-        Arc::new(core::LibraryIndex::new(index.clone())),
-        state.history.ocr_replay.clone(),
-        state.favorites.ocr_application.clone(),
-    );
-    let session = LibrarySession::new(pages, Arc::new(super::Clipboard), ui::LibraryKind::History);
     Fixture {
         _directory: directory,
-        database,
-        session: Arc::new(session),
-        index,
         app: Arc::new(state),
     }
 }

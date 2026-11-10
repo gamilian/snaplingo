@@ -2,8 +2,8 @@
 
 This is the current ownership map for the seven-package native workspace.
 [ARCHITECTURE.md](../../ARCHITECTURE.md) contains the package graph and directory
-map. [The active refactor plan](../plans/native-workspace-implementation.md) records
-implementation and verification status.
+map. [Architecture verification](verification.md) records the automated checks
+and native acceptance scope.
 
 A **module** is a cohesive implementation behind an **interface**. Its interface
 includes types, ordering, lifetime and error behavior. **Depth** means callers

@@ -6,7 +6,7 @@ pub fn rgba_image_to_png(image: image::RgbaImage) -> Result<Vec<u8>, AppError> {
     use image::{ExtendedColorType, ImageEncoder};
 
     let mut buffer = Vec::new();
-    // Frozen desktop pixels are decoded immediately by the WebView and OCR.
+    // Frozen desktop pixels are decoded immediately by the capture surface and OCR.
     // Sub avoids adaptive row analysis without inflating the full-screen buffer.
     PngEncoder::new_with_quality(&mut buffer, CompressionType::Fast, FilterType::Sub)
         .write_image(

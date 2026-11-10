@@ -489,7 +489,7 @@ impl CaptureSessionRuntime {
         .await
     }
 
-    /// Own the selected pixels before the WebView finishes its selection workflow.
+    /// Own the selected pixels before the capture surface finishes its selection workflow.
     pub async fn prepare_capture_ocr(
         &self,
         session_id: &CaptureSessionId,
@@ -531,7 +531,7 @@ impl CaptureSessionRuntime {
         Ok(())
     }
 
-    /// Commit the handoff. Destruction of the old WebView cannot cancel this owned job.
+    /// Commit the handoff. Destruction of the old capture window cannot cancel this owned job.
     pub async fn complete_capture_ocr(
         self: &Arc<Self>,
         session_id: &CaptureSessionId,
@@ -743,7 +743,7 @@ impl CaptureSessionRuntime {
     }
 
     async fn end_session_presentation(&self, session_id: &CaptureSessionId) -> Result<()> {
-        // A late IPC response or a destroyed old window may cancel the same ID again.
+        // A late completion callback or a destroyed old window may cancel the same ID again.
         // Only its owner can decrement the native presentation depth.
         if self.presentations.lock().await.remove(session_id).is_some() {
             self.host.end_capture_presentation().await?;
@@ -2604,7 +2604,7 @@ mod tests {
                 assert_eq!(image.dimensions(), (4, 4));
                 assert_eq!(image.get_pixel(0, 0).0, [10, 20, 30, 255]);
 
-                // This models the late Destroyed event from the closed WebView.
+                // This models the late destruction callback from the closed capture window.
                 f.runtime
                     .cancel_capture_session(&f.session_id)
                     .await

@@ -34,8 +34,9 @@ jobs:
       - run: cargo test --locked -p snaplingo-providers --features local-ocr --all-targets
       - run: cargo test --locked -p snaplingo-core -p snaplingo-storage -p snaplingo-platform -p snaplingo-ui --features snaplingo-ui/rendering,snaplingo-ui/accessibility --all-targets
       - run: cargo check --locked --workspace --all-targets
+      - run: cargo check --locked -p snaplingo --features test-support --all-targets
       - run: cargo test --locked -p snaplingo --no-default-features --features native-app --lib
-      - run: cargo test --locked -p snaplingo --no-default-features --features native-app --test native_app_smoke
+      - run: cargo test --locked -p snaplingo --no-default-features --features test-support --test native_app_smoke
       - run: cargo build --locked -p snaplingo --no-default-features --features native-app --bin snaplingo-native
       - run: cargo run --locked -p snaplingo-ui --features rendering --example settings_snapshot
       - uses: actions/upload-artifact@v4

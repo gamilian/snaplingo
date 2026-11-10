@@ -1,6 +1,6 @@
-mod controls;
+pub(crate) mod controls;
 mod host;
-mod overlays;
+pub(crate) mod overlays;
 use super::geometry as scrolling_geometry;
 use crate::integrations::system::native_theme;
 use controls as scrolling_controls_macos;

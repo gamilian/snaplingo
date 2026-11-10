@@ -66,7 +66,7 @@ pub trait CaptureSessionRuntimeHost: Send + Sync {
     }
     async fn begin_capture_presentation(&self) -> Result<()>;
     async fn end_capture_presentation(&self) -> Result<()>;
-    /// Prepares the legacy capture surface before frozen pixels are ready.
+    /// Prepares the capture surface before frozen pixels are ready.
     async fn prepare_capture_window(&self) -> Result<()> {
         Ok(())
     }

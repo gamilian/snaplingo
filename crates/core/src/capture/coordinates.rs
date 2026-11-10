@@ -6,7 +6,7 @@ use crate::capture::model::MonitorSnapshot;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CaptureCoordinatePolicy {
     NativeLogical,
-    /// One spanning WebView uses the primary monitor's scale for the desktop.
+    /// A spanning capture surface uses the primary monitor's scale for the desktop.
     /// The source must return the primary monitor first.
     PrimaryMonitorScale,
 }
@@ -14,7 +14,7 @@ pub enum CaptureCoordinatePolicy {
 #[derive(Debug, Clone, PartialEq)]
 pub struct CaptureWindowGeometry {
     pub bounds: LogicalRect,
-    /// Physical pixels per CSS pixel for a desktop with one uniform scale.
+    /// Physical pixels per logical pixel for a desktop with one uniform scale.
     /// Native logical coordinate systems retain their own window conversion.
     pub desktop_scale: Option<f64>,
 }

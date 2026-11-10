@@ -1,19 +1,18 @@
 #[cfg(any(all(target_os = "windows", feature = "native-app"), test))]
 mod geometry;
 #[cfg(target_os = "macos")]
-mod macos;
+pub(crate) mod macos;
 mod position;
 #[cfg(any(all(target_os = "windows", feature = "native-app"), test))]
 mod scene;
 #[cfg(all(target_os = "windows", feature = "native-app"))]
 mod windows;
 
-#[cfg(all(test, target_os = "macos"))]
-#[allow(unused_imports)]
+#[cfg(all(feature = "test-support", target_os = "macos"))]
 pub(crate) use macos::view::{test_decoded_images, test_ids};
 #[cfg(target_os = "macos")]
 pub(crate) use macos::NativePinnedImageRuntimeHost;
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(all(feature = "test-support", target_os = "macos"))]
 pub(crate) fn test_close(id: &str) -> Result<(), String> {
     macos::test_close(id);
     Ok(())

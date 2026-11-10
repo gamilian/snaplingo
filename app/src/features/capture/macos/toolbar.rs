@@ -1,5 +1,3 @@
-#![cfg_attr(test, allow(dead_code))]
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -523,16 +521,7 @@ pub(crate) fn close_session(id: &str) {
     });
 }
 
-#[cfg(test)]
-pub(crate) fn close() {
-    TOOLBAR.with(|toolbar| {
-        if let Some(toolbar) = toolbar.borrow_mut().take() {
-            toolbar.close();
-        }
-    });
-}
-
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 #[derive(Debug)]
 pub(crate) struct TestState {
     pub session_id: String,
@@ -544,7 +533,7 @@ pub(crate) struct TestState {
     pub can_become_key: bool,
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_state() -> Option<TestState> {
     TOOLBAR.with(|toolbar| {
         toolbar.borrow().as_ref().map(|toolbar| {
@@ -562,7 +551,7 @@ pub(crate) fn test_state() -> Option<TestState> {
     })
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_click(action: &str) {
     let button = TOOLBAR.with(|toolbar| {
         let toolbar = toolbar.borrow();
@@ -579,7 +568,7 @@ pub(crate) fn test_click(action: &str) {
     }
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_snapshot() -> Vec<u8> {
     TOOLBAR.with(|toolbar| {
         crate::integrations::system::native_view_snapshot::snapshot(
@@ -588,7 +577,7 @@ pub(crate) fn test_snapshot() -> Vec<u8> {
     })
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_geometry() -> serde_json::Value {
     TOOLBAR.with_borrow(|toolbar| {
         let toolbar=toolbar.as_ref().unwrap();
@@ -602,7 +591,7 @@ pub(crate) fn test_geometry() -> serde_json::Value {
     })
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_styles<T>(action: impl FnOnce(&super::style::StyleControls) -> T) -> T {
     let styles = TOOLBAR.with(|toolbar| toolbar.borrow().as_ref().unwrap().styles.clone());
     action(&styles)

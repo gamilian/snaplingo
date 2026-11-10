@@ -6,9 +6,11 @@ use crate::features::capture::NativeCaptureOcrEffects;
 use crate::features::capture::NativeCaptureSessionRuntimeHost;
 #[cfg(target_os = "macos")]
 use snaplingo_core::capture::CaptureImageComposer;
+#[cfg(target_os = "macos")]
 use snaplingo_core::capture::CaptureOcrDelivery;
 use snaplingo_core::capture::CaptureOutput;
 use snaplingo_core::capture::CaptureSessionRuntime;
+#[cfg(target_os = "macos")]
 use snaplingo_core::capture::CaptureSessionSource;
 use snaplingo_core::capture::CaptureSessions;
 use snaplingo_core::pinned::PinnedImageRuntime;

@@ -10,9 +10,9 @@ pub(crate) mod native_settings_host;
 
 use super::macos::{notices, SharedFeaturePage};
 use super::presenter::general_controller::{
-    GeneralAction, GeneralController, GeneralProjection, GeneralServices, UpdatePhase,
+    GeneralAction, GeneralController, GeneralProjection, UpdatePhase,
 };
-pub(crate) use feature::{FeatureField, FeatureKind, FeatureProjection, FeatureView};
+pub(crate) use feature::{FeatureField, FeatureKind, FeatureView};
 pub(crate) use feature_page::FeaturePage;
 pub(crate) use general::GeneralView;
 pub(crate) use general_page::GeneralPage;

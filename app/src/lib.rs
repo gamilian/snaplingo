@@ -4,6 +4,10 @@ pub mod features;
 pub mod integrations;
 mod shell;
 
+#[cfg(feature = "test-support")]
+#[doc(hidden)]
+pub mod test_support;
+
 pub use bootstrap::state::AppState;
 #[cfg(target_os = "macos")]
 pub use bootstrap::{

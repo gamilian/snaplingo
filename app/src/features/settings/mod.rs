@@ -3,7 +3,7 @@ pub mod host;
 #[cfg(target_os = "macos")]
 pub(crate) mod macos;
 pub mod presenter;
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(all(any(test, feature = "test-support"), target_os = "macos"))]
 pub(crate) mod test_support;
 #[cfg(all(target_os = "windows", feature = "native-app"))]
 pub(crate) mod windows;
@@ -12,10 +12,10 @@ use crate::integrations::desktop_events::DesktopEvents;
 use crate::integrations::desktop_events::DesktopSubscription;
 use presenter::window::SettingsWindowSession;
 use snaplingo_core::hotkeys::HotkeyRecording;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use snaplingo_core::hotkeys::HotkeyRuntime;
 use snaplingo_core::permissions::RequiredPermissions;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 use snaplingo_core::settings::SettingsApplication;
 use snaplingo_core::settings::SettingsConfiguration;
 use std::sync::Arc;
@@ -36,9 +36,9 @@ pub(crate) type SessionFactory = Arc<
 #[derive(Clone)]
 pub(crate) struct Services {
     pub configuration: Arc<SettingsConfiguration>,
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub hotkeys: Arc<HotkeyRuntime>,
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub application: Arc<SettingsApplication>,
     pub permissions: Arc<RequiredPermissions>,
     pub events: Arc<DesktopEvents>,

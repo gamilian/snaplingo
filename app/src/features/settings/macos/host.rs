@@ -239,6 +239,7 @@ impl NativeSettingsWindow {
         crate::features::settings::macos::permissions::close_for(&self.window);
         crate::features::settings::macos::capacity::close_for(&self.window);
         if let Some(page) = self.page.borrow().as_ref() {
+            page.cancel_confirmation();
             page.suspend();
         }
         self.remember_geometry()?;
@@ -291,21 +292,16 @@ impl NativeSettingsWindow {
         self.window.close();
     }
 
-    #[cfg(test)]
+    #[cfg(feature = "test-support")]
     pub(crate) fn test_window(&self) -> &NSWindow {
         &self.window
     }
-    #[cfg(test)]
-    pub(crate) fn test_page(&self) -> Option<Page> {
-        self.page.borrow().as_ref().map(|page| page.view().page())
-    }
-
-    #[cfg(test)]
+    #[cfg(feature = "test-support")]
     pub(crate) fn test_navigate(&self, page: Page) {
         self.test_activate(snaplingo_ui::Target::Navigate(page));
     }
 
-    #[cfg(test)]
+    #[cfg(feature = "test-support")]
     pub(crate) fn test_activate(&self, target: snaplingo_ui::Target) {
         let current = self.page.borrow().as_ref().unwrap().clone();
         let point = current
@@ -340,7 +336,7 @@ impl NativeSettingsWindow {
             .input(snaplingo_ui::Event::PointerDown(point));
     }
 
-    #[cfg(test)]
+    #[cfg(feature = "test-support")]
     pub(crate) fn test_geometry(&self) -> (NSSize, f64) {
         let page = self.page.borrow().as_ref().unwrap().clone();
         (

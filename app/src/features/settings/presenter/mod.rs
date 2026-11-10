@@ -2,6 +2,7 @@
 //! Composition supplies workflows and native effects; hosts own windows and input.
 pub mod capacity;
 pub mod capacity_usage;
+pub mod confirmation;
 pub mod general;
 pub mod general_controller;
 pub mod library;

@@ -1330,7 +1330,7 @@ impl FeatureView {
             }
         }
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_toggle(&self, field: FeatureField) {
         let button = self
             .ivars()
@@ -1356,7 +1356,7 @@ impl FeatureView {
             button.performClick(None);
         }
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_choose(&self, field: FeatureField, value: &str) {
         let (index, choice) = self
             .ivars()
@@ -1400,7 +1400,7 @@ impl FeatureView {
             );
         }
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_range(&self, field: FeatureField, value: f64) {
         let range = self
             .ivars()
@@ -1431,15 +1431,15 @@ impl FeatureView {
             );
         }
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_projection(&self) -> FeatureProjection {
         self.ivars().projection.borrow().clone()
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_kind(&self) -> FeatureKind {
         self.ivars().kind
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_scroll_to(&self, y: f64) {
         {
             let c = self.ivars().contents.borrow();
@@ -1448,11 +1448,11 @@ impl FeatureView {
         }
         self.did_scroll();
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_active_section(&self) -> &'static str {
         self.ivars().kind.sections()[self.ivars().active.get()].0
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_section_offset(&self, id: &str) -> f64 {
         let index = self
             .ivars()
@@ -1463,7 +1463,7 @@ impl FeatureView {
             .unwrap();
         self.ivars().offsets.borrow()[index]
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_geometry(&self) -> serde_json::Value {
         let c = self.ivars().contents.borrow();
         let c = c.as_ref().unwrap();

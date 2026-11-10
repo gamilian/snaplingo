@@ -1,4 +1,5 @@
 //! Application adapter for the shared seven-page Settings window.
+use super::confirmation::{Confirmation, Confirmations, PreparedAction};
 use super::{library::LibrarySession, preferences::PreferencesSession, services::ServicesSession};
 use snaplingo_core::hotkeys::HotkeyRecording;
 use snaplingo_ui::{
@@ -55,6 +56,7 @@ pub struct SettingsWindowSession {
     library: Option<Arc<LibrarySession>>,
     changes: Arc<Changes>,
     system_dark: bool,
+    confirmations: Confirmations,
 }
 impl SettingsWindowSession {
     pub fn new(
@@ -84,6 +86,7 @@ impl SettingsWindowSession {
             library: None,
             changes,
             system_dark: false,
+            confirmations: Confirmations::default(),
         }
     }
     /// Safe to call from synchronous workflow notifications, including dispatch.
@@ -147,6 +150,7 @@ impl SettingsWindowSession {
         self.preferences.interface_scale(display)
     }
     pub fn navigate(&mut self, page: Page) -> Result<(), String> {
+        self.cancel_confirmation();
         self.preferences
             .dispatch(self.page, Action::Navigate(page))?;
         if page != self.page {
@@ -199,7 +203,31 @@ impl SettingsWindowSession {
         );
         self.changes.spawn(future);
     }
-    pub fn dispatch(&mut self, page: Page, intent: WindowIntent) -> Result<(), String> {
+    pub fn dispatch(
+        &mut self,
+        page: Page,
+        intent: WindowIntent,
+    ) -> Result<Option<Confirmation>, String> {
+        if page != self.page {
+            return Err("Settings page is no longer active".into());
+        }
+        match self.confirmations.prepare(page, intent) {
+            PreparedAction::Confirm(request) => Ok(Some(request)),
+            PreparedAction::Execute(page, intent) => self.execute(page, intent).map(|_| None),
+        }
+    }
+    pub fn confirm(&mut self, request: Confirmation, accepted: bool) -> Result<(), String> {
+        if let Some((page, intent)) = self.confirmations.resolve(request, accepted) {
+            self.execute(page, intent)?;
+        }
+        Ok(())
+    }
+    /// Closing/hiding invalidates a dialog; ordinary focus loss does not, since
+    /// a native confirmation sheet itself temporarily takes focus.
+    pub fn cancel_confirmation(&mut self) {
+        self.confirmations.cancel();
+    }
+    fn execute(&mut self, page: Page, intent: WindowIntent) -> Result<(), String> {
         *self.changes.error.lock().unwrap() = None;
         match intent {
             WindowIntent::Settings(Action::Navigate(page))

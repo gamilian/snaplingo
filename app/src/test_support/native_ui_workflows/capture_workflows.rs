@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime};
 
-use crate::fixture::NativeTestApp;
+use crate::test_support::native_ui_workflows::fixture::NativeTestApp;
 use async_trait::async_trait;
 use objc2::MainThreadMarker;
 use objc2_app_kit::{NSApplication, NSEvent, NSEventModifierFlags as Flags, NSEventType};
@@ -14,7 +14,7 @@ use crate::features::capture::macos::toolbar;
 use crate::features::capture::macos::view as native;
 use crate::features::capture::macos::view::Action;
 use crate::features::capture::macos::view::Operation;
-use crate::fixture::on_main;
+use crate::test_support::native_ui_workflows::fixture::on_main;
 use crate::{AppState, Result};
 use snaplingo_core::capture::model::*;
 use snaplingo_core::capture::CaptureOcrEffects;
@@ -29,7 +29,6 @@ use snaplingo_core::result::ResultWindowMode;
 use snaplingo_core::result::TranslationStatus;
 use snaplingo_core::settings::model::ScreenshotSettings;
 
-#[path = "editor_tools.rs"]
 mod editor_tools;
 
 #[derive(Default)]
@@ -199,7 +198,7 @@ fn controls() {
             image_width: 20,
             image_height: 10,
             scale_factor: 2.0,
-            png_data: crate::fixture::png(20, 10, 0),
+            png_data: crate::test_support::native_ui_workflows::fixture::png(20, 10, 0),
         }),
         hidden_window_labels: Vec::new(),
         created_at: SystemTime::now(),
@@ -319,7 +318,7 @@ fn controls() {
     assert!(matches!(actions.borrow().last(), Some(Action::Cancel)));
     native::close();
     assert_eq!(native::test_decoded_images(), 0);
-    let png = crate::fixture::png(300, 180, 0);
+    let png = crate::test_support::native_ui_workflows::fixture::png(300, 180, 0);
     let printed = native::test_print_snapshot(&png);
     let printed_image = image::load_from_memory(&printed).unwrap();
     assert!(printed_image.width() >= 300 && printed_image.height() >= 180);
@@ -334,7 +333,7 @@ async fn until(_app: &NativeTestApp, condition: impl Fn() -> bool, message: &str
     }
 }
 async fn open(app: &NativeTestApp, mode: &str) -> String {
-    let previous = on_main(app, native::session_id).await;
+    let previous = on_main(native::session_id).await;
     let deadline = Instant::now() + Duration::from_secs(8);
     loop {
         // The runtime deliberately ignores reentry while OCR delivery/startup
@@ -346,7 +345,7 @@ async fn open(app: &NativeTestApp, mode: &str) -> String {
             .open_capture_window_for_mode(mode)
             .await
             .unwrap();
-        if let Some(id) = on_main(app, native::session_id)
+        if let Some(id) = on_main(native::session_id)
             .await
             .filter(|id| Some(id) != previous.as_ref())
         {
@@ -361,14 +360,11 @@ async fn open(app: &NativeTestApp, mode: &str) -> String {
 }
 async fn at_candidate(app: &NativeTestApp, id: &str) {
     let id = id.to_owned();
-    on_main(app, move || {
-        pointer(&id, &fixture_bounds(), 500.0, 350.0, "move", Flags::empty())
-    })
-    .await;
+    on_main(move || pointer(&id, &fixture_bounds(), 500.0, 350.0, "move", Flags::empty())).await;
 }
 async fn drag(app: &NativeTestApp, id: &str) {
     let id = id.to_owned();
-    on_main(app, move || {
+    on_main(move || {
         pointer(&id, &fixture_bounds(), 120.0, 140.0, "down", Flags::empty());
         pointer(&id, &fixture_bounds(), 360.0, 300.0, "move", Flags::empty());
         pointer(&id, &fixture_bounds(), 360.0, 300.0, "up", Flags::empty());
@@ -377,7 +373,7 @@ async fn drag(app: &NativeTestApp, id: &str) {
 }
 async fn press(app: &NativeTestApp, id: &str, text: &'static str, flags: Flags, code: u16) {
     let id = id.to_owned();
-    on_main(app, move || key(&id, text, flags, code)).await;
+    on_main(move || key(&id, text, flags, code)).await;
 }
 async fn released(app: &NativeTestApp, id: &str) {
     let state = app.state.clone();
@@ -396,7 +392,7 @@ async fn released(app: &NativeTestApp, id: &str) {
     // for the complete shutdown contract, not that intermediate state alone.
     let deadline = Instant::now() + Duration::from_secs(8);
     loop {
-        let released = on_main(app, || {
+        let released = on_main(|| {
             native::test_decoded_images() == 0
                 && !crate::features::capture::is_capture_presentation_active()
         })
@@ -413,7 +409,7 @@ async fn released(app: &NativeTestApp, id: &str) {
 }
 
 pub(crate) async fn run(app: &NativeTestApp, directory: &Path, clipboard: &Mutex<Vec<u8>>) {
-    on_main(app, controls).await;
+    on_main(controls).await;
     let state = app.state.clone();
     let services = app.capture_services.clone();
     let id = open(app, "screenshot-copy").await;
@@ -471,13 +467,13 @@ pub(crate) async fn run(app: &NativeTestApp, directory: &Path, clipboard: &Mutex
         "Explicit pin should bypass the OCR mode"
     );
     assert_eq!(
-        on_main(app, || NSApplication::sharedApplication(
-            MainThreadMarker::new().unwrap()
+        on_main(
+            || NSApplication::sharedApplication(MainThreadMarker::new().unwrap())
+                .windows()
+                .iter()
+                .filter(|window| window.title().to_string() == "SnapLingo Pin")
+                .count()
         )
-        .windows()
-        .iter()
-        .filter(|window| window.title().to_string() == "SnapLingo Pin")
-        .count())
         .await,
         1
     );
@@ -568,7 +564,7 @@ pub(crate) async fn run(app: &NativeTestApp, directory: &Path, clipboard: &Mutex
     let deadline = Instant::now() + Duration::from_secs(5);
     loop {
         let query = id.clone();
-        if on_main(app, move || {
+        if on_main(move || {
             native::test_selection(&query)
                 .is_some_and(|rect| rect.width == 160.0 && rect.height == 80.0)
         })
@@ -591,7 +587,7 @@ pub(crate) async fn run(app: &NativeTestApp, directory: &Path, clipboard: &Mutex
     press(app, &id, "\u{f708}", Flags::empty(), 96).await;
     let deadline = Instant::now() + Duration::from_secs(5);
     let refreshed = loop {
-        if let Some(current) = on_main(app, native::session_id)
+        if let Some(current) = on_main(native::session_id)
             .await
             .filter(|current| current != &id)
         {
@@ -627,7 +623,7 @@ pub(crate) async fn run(app: &NativeTestApp, directory: &Path, clipboard: &Mutex
     )
     .await;
     let check = replacement.clone();
-    on_main(app, move || {
+    on_main(move || {
         pointer(
             &check,
             &fixture_bounds(),
@@ -689,7 +685,7 @@ async fn wait_for_toolbar(
 ) {
     let deadline = Instant::now() + Duration::from_secs(8);
     loop {
-        let state = on_main(app, toolbar::test_state).await;
+        let state = on_main(toolbar::test_state).await;
         if state.as_ref().is_some_and(|state| {
             state.session_id == id
                 && state.active_tool.as_deref() == tool
@@ -718,10 +714,7 @@ async fn wait_for_styles(
 ) -> snaplingo_core::capture::CaptureEditorStylePresentation {
     let deadline = Instant::now() + Duration::from_secs(8);
     loop {
-        let style = on_main(app, || {
-            toolbar::test_styles(|controls| controls.test_state())
-        })
-        .await;
+        let style = on_main(|| toolbar::test_styles(|controls| controls.test_state())).await;
         if ready(&style) {
             return style;
         }
@@ -740,7 +733,7 @@ async fn native_editor_state(
     let deadline = Instant::now() + Duration::from_secs(8);
     loop {
         let id = id.to_owned();
-        if let Some(state) = on_main(app, move || native::test_editor_state(&id)).await {
+        if let Some(state) = on_main(move || native::test_editor_state(&id)).await {
             if state.ready {
                 return state;
             }
@@ -770,12 +763,9 @@ pub(crate) async fn editor_handoff(app: &NativeTestApp, clipboard: &Mutex<Vec<u8
     drag(app, &id).await;
     native_editor_state(app, &id).await;
     wait_for_toolbar(app, &id, Some("rectangle"), false, false, true).await;
-    on_main(app, || {
-        toolbar::test_styles(|style| style.test_color([8, 16, 24, 200]))
-    })
-    .await;
+    on_main(|| toolbar::test_styles(|style| style.test_color([8, 16, 24, 200]))).await;
     wait_for_styles(app, |style| style.style.color == [8, 16, 24, 200]).await;
-    on_main(app, || toolbar::test_styles(|style| style.test_button(5))).await;
+    on_main(|| toolbar::test_styles(|style| style.test_button(5))).await;
     let colors = wait_for_styles(app, |style| style.color_presets.contains(&[8, 16, 24, 200]))
         .await
         .color_presets;
@@ -783,39 +773,27 @@ pub(crate) async fn editor_handoff(app: &NativeTestApp, clipboard: &Mutex<Vec<u8
         .iter()
         .position(|color| *color == [8, 16, 24, 200])
         .unwrap();
-    on_main(app, move || {
-        toolbar::test_styles(|style| style.test_preset(added))
-    })
-    .await;
-    on_main(app, || {
-        toolbar::test_styles(|style| style.test_color([90, 80, 70, 128]))
-    })
-    .await;
+    on_main(move || toolbar::test_styles(|style| style.test_preset(added))).await;
+    on_main(|| toolbar::test_styles(|style| style.test_color([90, 80, 70, 128]))).await;
     wait_for_styles(app, |style| style.style.color == [90, 80, 70, 128]).await;
-    on_main(app, || toolbar::test_styles(|style| style.test_button(6))).await;
+    on_main(|| toolbar::test_styles(|style| style.test_button(6))).await;
     wait_for_styles(app, |style| {
         style.color_presets.contains(&[90, 80, 70, 128])
             && !style.color_presets.contains(&[8, 16, 24, 200])
     })
     .await;
-    on_main(app, || toolbar::test_styles(|style| style.test_button(7))).await;
+    on_main(|| toolbar::test_styles(|style| style.test_button(7))).await;
     wait_for_styles(app, |style| {
         !style.color_presets.contains(&[90, 80, 70, 128])
     })
     .await;
-    on_main(app, || {
-        toolbar::test_styles(|style| style.test_size(6.0, true))
-    })
-    .await;
+    on_main(|| toolbar::test_styles(|style| style.test_size(6.0, true))).await;
     wait_for_styles(app, |style| style.style.stroke_width == 6).await;
-    on_main(app, || {
-        toolbar::test_styles(|style| style.test_corner(12.0))
-    })
-    .await;
+    on_main(|| toolbar::test_styles(|style| style.test_corner(12.0))).await;
     wait_for_styles(app, |style| style.style.corner_radius == 12.0).await;
-    let bytes = on_main(app, toolbar::test_snapshot).await;
+    let bytes = on_main(toolbar::test_snapshot).await;
     snapshot("capture-native-editor-controls.png", &bytes);
-    let geometry = on_main(app, toolbar::test_geometry).await;
+    let geometry = on_main(toolbar::test_geometry).await;
     // Independent AppKit placement reference for the 120,140 / 240x160 fixture:
     // preserve left alignment, the 14-point gap and the existing style row.
     assert_eq!(
@@ -826,33 +804,17 @@ pub(crate) async fn editor_handoff(app: &NativeTestApp, clipboard: &Mutex<Vec<u8
         "capture-native-editor-controls.json",
         serde_json::to_string_pretty(&geometry).unwrap().as_bytes(),
     );
-    on_main(app, || {
-        toolbar::test_styles(|style| style.test_open_palette())
-    })
-    .await;
-    assert!(
-        on_main(app, || toolbar::test_styles(
-            |style| style.test_palette_visible()
-        ))
-        .await
-    );
-    let bytes = on_main(app, || {
-        toolbar::test_styles(|style| style.test_palette_snapshot())
-    })
-    .await;
+    on_main(|| toolbar::test_styles(|style| style.test_open_palette())).await;
+    assert!(on_main(|| toolbar::test_styles(|style| style.test_palette_visible())).await);
+    let bytes = on_main(|| toolbar::test_styles(|style| style.test_palette_snapshot())).await;
     snapshot("capture-native-editor-colors.png", &bytes);
-    let geometry = on_main(app, toolbar::test_geometry).await;
+    let geometry = on_main(toolbar::test_geometry).await;
     snapshot(
         "capture-native-editor-colors.json",
         serde_json::to_string_pretty(&geometry).unwrap().as_bytes(),
     );
     press(app, &id, "", Flags::empty(), 53).await;
-    assert!(
-        !on_main(app, || toolbar::test_styles(
-            |style| style.test_palette_visible()
-        ))
-        .await
-    );
+    assert!(!on_main(|| toolbar::test_styles(|style| style.test_palette_visible())).await);
 
     assert!(state
         .capture
@@ -872,7 +834,7 @@ pub(crate) async fn editor_handoff(app: &NativeTestApp, clipboard: &Mutex<Vec<u8
         "spotlight",
         "rectangle",
     ] {
-        on_main(app, move || toolbar::test_click(tool)).await;
+        on_main(move || toolbar::test_click(tool)).await;
         wait_for_toolbar(app, &id, Some(tool), false, false, true).await;
         if tool == "text" {
             let family = wait_for_styles(app, |style| {
@@ -882,7 +844,7 @@ pub(crate) async fn editor_handoff(app: &NativeTestApp, clipboard: &Mutex<Vec<u8
             .font_families[0]
                 .clone();
             let pointer_id = id.clone();
-            on_main(app, move || {
+            on_main(move || {
                 pointer(
                     &pointer_id,
                     &fixture_bounds(),
@@ -903,70 +865,50 @@ pub(crate) async fn editor_handoff(app: &NativeTestApp, clipboard: &Mutex<Vec<u8
             })
             .await;
             let selected_family = family.clone();
-            on_main(app, move || {
-                toolbar::test_styles(|style| style.test_font(&family))
-            })
-            .await;
+            on_main(move || toolbar::test_styles(|style| style.test_font(&family))).await;
             wait_for_styles(app, |style| style.style.font_family == selected_family).await;
-            on_main(app, || toolbar::test_styles(|style| style.test_button(1))).await;
+            on_main(|| toolbar::test_styles(|style| style.test_button(1))).await;
             wait_for_styles(app, |style| style.style.bold).await;
-            on_main(app, || toolbar::test_styles(|style| style.test_button(2))).await;
+            on_main(|| toolbar::test_styles(|style| style.test_button(2))).await;
             wait_for_styles(app, |style| style.style.italic).await;
-            on_main(app, || {
-                toolbar::test_styles(|style| style.test_size(36.0, true))
-            })
-            .await;
+            on_main(|| toolbar::test_styles(|style| style.test_size(36.0, true))).await;
             wait_for_styles(app, |style| style.font_size == 36).await;
-            let geometry = on_main(app, toolbar::test_geometry).await;
+            let geometry = on_main(toolbar::test_geometry).await;
             snapshot(
                 "capture-native-editor-text-controls.json",
                 serde_json::to_string_pretty(&geometry).unwrap().as_bytes(),
             );
-            let bytes = on_main(app, toolbar::test_snapshot).await;
+            let bytes = on_main(toolbar::test_snapshot).await;
             snapshot("capture-native-editor-text-controls.png", &bytes);
-            on_main(app, || {
-                toolbar::test_styles(|style| style.test_open_color())
-            })
-            .await;
-            assert!(
-                on_main(app, || toolbar::test_styles(
-                    |style| style.test_color_active()
-                ))
-                .await
-            );
+            on_main(|| toolbar::test_styles(|style| style.test_open_color())).await;
+            assert!(on_main(|| toolbar::test_styles(|style| style.test_color_active())).await);
             let text_state = native_editor_state(app, &id).await;
             assert_eq!(text_state.text.as_deref(), Some("原生样式"));
             assert_eq!(text_state.styling.font_size, 36);
             assert!(text_state.styling.style.bold && text_state.styling.style.italic);
             assert_eq!(text_state.styling.style.font_family, selected_family);
-            on_main(app, || {
-                toolbar::test_styles(|style| style.close_color_panel())
-            })
-            .await;
+            on_main(|| toolbar::test_styles(|style| style.close_color_panel())).await;
             let text_id = id.clone();
-            assert!(on_main(app, move || native::test_editor_commit_text(&text_id)).await);
+            assert!(on_main(move || native::test_editor_commit_text(&text_id)).await);
             wait_for_toolbar(app, &id, Some("text"), true, false, true).await;
             let text_state = native_editor_state(app, &id).await;
             assert!(
                 matches!(&text_state.annotations[0], AnnotationCommand::Text { text, font_size: 36, bold: true, italic: true, .. } if text == "原生样式")
             );
             let image_id = id.clone();
-            let bytes = on_main(app, move || native::test_snapshot(&image_id)).await;
+            let bytes = on_main(move || native::test_snapshot(&image_id)).await;
             snapshot("capture-native-editor-text.png", &bytes);
-            on_main(app, || toolbar::test_click("clear")).await;
+            on_main(|| toolbar::test_click("clear")).await;
             wait_for_toolbar(app, &id, Some("text"), false, false, true).await;
         } else if tool == "blur" {
-            on_main(app, || {
-                toolbar::test_styles(|style| style.test_size(32.0, false))
-            })
-            .await;
+            on_main(|| toolbar::test_styles(|style| style.test_size(32.0, false))).await;
             wait_for_styles(app, |style| style.style.blur_radius == 32.0).await;
         }
     }
-    on_main(app, || toolbar::test_styles(|style| style.test_button(0))).await;
+    on_main(|| toolbar::test_styles(|style| style.test_button(0))).await;
     wait_for_styles(app, |style| style.style.filled).await;
     let pointer_id = id.clone();
-    on_main(app, move || {
+    on_main(move || {
         pointer(
             &pointer_id,
             &fixture_bounds(),
@@ -999,11 +941,11 @@ pub(crate) async fn editor_handoff(app: &NativeTestApp, clipboard: &Mutex<Vec<u8
         matches!(&annotation.annotations[0], AnnotationCommand::Rectangle { rect, stroke_width: 6, filled: true, corner_radius, .. }
         if rect.width == 120.0 && rect.height == 75.0 && *corner_radius == 12.0)
     );
-    on_main(app, || toolbar::test_click("undo")).await;
+    on_main(|| toolbar::test_click("undo")).await;
     wait_for_toolbar(app, &id, Some("rectangle"), false, true, true).await;
-    on_main(app, || toolbar::test_click("redo")).await;
+    on_main(|| toolbar::test_click("redo")).await;
     wait_for_toolbar(app, &id, Some("rectangle"), true, false, true).await;
-    on_main(app, || toolbar::test_click("clear")).await;
+    on_main(|| toolbar::test_click("clear")).await;
     wait_for_toolbar(app, &id, Some("rectangle"), false, false, true).await;
     assert!(native_editor_state(app, &id).await.annotations.is_empty());
     assert_eq!(
@@ -1014,16 +956,13 @@ pub(crate) async fn editor_handoff(app: &NativeTestApp, clipboard: &Mutex<Vec<u8
             .unwrap(),
         expected
     );
-    on_main(app, || {
-        toolbar::test_styles(|style| style.test_open_color())
-    })
-    .await;
-    on_main(app, || toolbar::test_click("copy")).await;
+    on_main(|| toolbar::test_styles(|style| style.test_open_color())).await;
+    on_main(|| toolbar::test_click("copy")).await;
     released(app, &id).await;
     assert_eq!(*clipboard.lock().unwrap(), expected);
-    assert!(on_main(app, toolbar::test_state).await.is_none());
+    assert!(on_main(toolbar::test_state).await.is_none());
     assert!(
-        !on_main(app, || objc2_app_kit::NSColorPanel::sharedColorPanel(
+        !on_main(|| objc2_app_kit::NSColorPanel::sharedColorPanel(
             MainThreadMarker::new().unwrap()
         )
         .isVisible())
@@ -1033,9 +972,9 @@ pub(crate) async fn editor_handoff(app: &NativeTestApp, clipboard: &Mutex<Vec<u8
     let id = open(app, "screenshot").await;
     drag(app, &id).await;
     native_editor_state(app, &id).await;
-    on_main(app, || toolbar::test_click("rectangle")).await;
+    on_main(|| toolbar::test_click("rectangle")).await;
     let pointer_id = id.clone();
-    on_main(app, move || {
+    on_main(move || {
         pointer(
             &pointer_id,
             &fixture_bounds(),
@@ -1074,7 +1013,7 @@ pub(crate) async fn editor_handoff(app: &NativeTestApp, clipboard: &Mutex<Vec<u8
             false,
         )
         .unwrap();
-    on_main(app, || toolbar::test_click("copy")).await;
+    on_main(|| toolbar::test_click("copy")).await;
     released(app, &id).await;
     assert_eq!(
         *clipboard.lock().unwrap(),
@@ -1085,11 +1024,11 @@ pub(crate) async fn editor_handoff(app: &NativeTestApp, clipboard: &Mutex<Vec<u8
     let id = open(app, "screenshot").await;
     drag(app, &id).await;
     native_editor_state(app, &id).await;
-    on_main(app, || toolbar::test_click("select")).await;
+    on_main(|| toolbar::test_click("select")).await;
     press(app, &id, "", Flags::empty(), 96).await;
     let deadline = Instant::now() + Duration::from_secs(8);
     loop {
-        if on_main(app, native::session_id)
+        if on_main(native::session_id)
             .await
             .is_some_and(|current| current != id)
         {
@@ -1102,8 +1041,8 @@ pub(crate) async fn editor_handoff(app: &NativeTestApp, clipboard: &Mutex<Vec<u8
         tokio::time::sleep(Duration::from_millis(25)).await;
     }
     assert!(!state.capture.sessions.has_session(&CaptureSessionId(id)));
-    assert!(on_main(app, toolbar::test_state).await.is_none());
-    let id = on_main(app, native::session_id).await.unwrap();
+    assert!(on_main(toolbar::test_state).await.is_none());
+    let id = on_main(native::session_id).await.unwrap();
     press(app, &id, "", Flags::empty(), 53).await;
     released(app, &id).await;
     editor_tools::run(app, clipboard).await;
@@ -1119,7 +1058,7 @@ pub(crate) async fn editor_output_recovery(
     let id = open(app, "screenshot").await;
     drag(app, &id).await;
     native_editor_state(app, &id).await;
-    on_main(app, || {
+    on_main(|| {
         toolbar::test_click("select");
         toolbar::test_click("rectangle");
     })
@@ -1128,7 +1067,7 @@ pub(crate) async fn editor_output_recovery(
     let editor = native_editor_state(app, &id).await;
     assert_eq!(editor.annotations.len(), 1);
     fail_scrolling_open.store(true, Ordering::SeqCst);
-    on_main(app, || toolbar::test_click("scrolling")).await;
+    on_main(|| toolbar::test_click("scrolling")).await;
     wait_for_styles(app, |style| {
         style.error.as_deref() == Some("Synthetic scrolling window open failure")
     })
@@ -1138,7 +1077,7 @@ pub(crate) async fn editor_output_recovery(
     assert_eq!(restored.annotations, editor.annotations);
     assert!(!restored.busy);
     assert!(
-        on_main(app, {
+        on_main({
             let id = id.clone();
             move || native::test_ready_size(&id).2
         })
@@ -1158,7 +1097,7 @@ pub(crate) async fn editor_output_recovery(
         .unwrap();
     let before = clipboard.lock().unwrap().clone();
     fail_copy.store(true, Ordering::SeqCst);
-    on_main(app, || toolbar::test_click("copy")).await;
+    on_main(|| toolbar::test_click("copy")).await;
     wait_for_styles(app, |style| {
         style.error.as_deref() == Some("Synthetic native editor copy failure")
     })
@@ -1171,7 +1110,7 @@ pub(crate) async fn editor_output_recovery(
         .sessions
         .has_session(&CaptureSessionId(id.clone())));
     assert_eq!(*clipboard.lock().unwrap(), before);
-    on_main(app, || toolbar::test_click("copy")).await;
+    on_main(|| toolbar::test_click("copy")).await;
     released(app, &id).await;
     assert_eq!(*clipboard.lock().unwrap(), expected);
     println!("Native editor copy failure and retry retained frozen pixels and session ownership");

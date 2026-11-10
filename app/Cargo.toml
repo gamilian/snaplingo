@@ -18,6 +18,7 @@ crate-type = ["rlib"]
 default = ["native-app"]
 native-app = ["dep:winit", "dep:softbuffer", "dep:accesskit_winit", "dep:embed-resource"]
 tesseract-ocr = ["snaplingo-platform/tesseract-ocr"]
+test-support = ["native-app", "snaplingo-core/test-support", "snaplingo-platform/test-support", "snaplingo-storage/test-support"]
 
 [build-dependencies]
 embed-resource = { version = "3.0.9", optional = true }
@@ -34,7 +35,6 @@ accesskit = "0.25.2"
 snaplingo-core = { path = "../crates/core" }
 snaplingo-storage = { path = "../crates/storage" }
 serde_json.workspace = true
-regex = "1"
 serde = { workspace = true, features = ["derive"] }
 tray-icon = { version = "0.23", default-features = false }
 fern = "0.7"
@@ -43,16 +43,11 @@ global-hotkey = "0.8"
 rfd = { version = "0.16", default-features = false, features = ["gtk3", "common-controls-v6"] }
 log.workspace = true
 
-# Error handling
-anyhow.workspace = true
-thiserror = "1.0"
-
 # Async traits
 async-trait.workspace = true
 
 # Image processing
 image.workspace = true
-webp = "0.3"
 ab_glyph = "0.2"
 
 # Clipboard and keyboard
@@ -61,28 +56,14 @@ arboard = "3.2"
 # HTTP downloads and external URL validation
 reqwest = { workspace = true, features = ["json", "socks"] }
 tokio = { workspace = true, features = ["full"] }
-md5.workspace = true
 sha2 = "0.10"
-semver = "1"
 tempfile.workspace = true
-
-# Language detection
-lingua = "1.5"
 
 # OCR
 base64.workspace = true
 
-# Configuration
-json-patch = "1.2"
-
-# Database and credentials
-rusqlite = { workspace = true, features = ["bundled"] }
-
 # Date and time
 chrono = { workspace = true, features = ["serde"] }
-
-# Concurrency
-parking_lot = { workspace = true, features = ["send_guard"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 accesskit_macos = "0.27.2"
@@ -116,12 +97,9 @@ windows = { version = "0.51", features = [
 ] }
 
 
-[target.'cfg(target_os = "linux")'.dependencies]
-
-[target.'cfg(unix)'.dependencies]
-libc = "0.2"
-
 [dev-dependencies]
+anyhow.workspace = true
+rusqlite = { workspace = true, features = ["bundled"] }
 snaplingo-platform = { path = "../crates/platform", features = ["test-support"] }
 snaplingo-core = { path = "../crates/core", features = ["test-support"] }
 snaplingo-storage = { path = "../crates/storage", features = ["test-support"] }
@@ -145,44 +123,52 @@ path = "../tools/native/pin_snapshot.rs"
 [[test]]
 name = "native_app_smoke"
 harness = false
-required-features = ["native-app"]
+required-features = ["test-support"]
 
 [[test]]
 name = "scrolling_overlays_native"
 harness = false
+required-features = ["test-support"]
 
 [[test]]
 name = "scrolling_controls_native"
 harness = false
+required-features = ["test-support"]
 
 [[test]]
 name = "pinned_window_native"
 harness = false
+required-features = ["test-support"]
 
 [[test]]
 name = "native_ui_workflows"
 harness = false
-required-features = ["native-app"]
+required-features = ["test-support"]
 
 [[test]]
 name = "ui_thread_native"
 harness = false
+required-features = ["test-support"]
 
 [[test]]
 name = "selected_text_native"
 harness = false
+required-features = ["test-support"]
 
 [[test]]
 name = "settings_general_native"
 harness = false
+required-features = ["test-support"]
 
 [[test]]
 name = "settings_features_native"
 harness = false
+required-features = ["test-support"]
 
 [[test]]
 name = "settings_hotkeys_native"
 harness = false
+required-features = ["test-support"]
 
 [[example]]
 name = "settings_preview"

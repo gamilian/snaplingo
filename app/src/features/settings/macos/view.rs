@@ -1,6 +1,6 @@
 //! AppKit supplies only input and pixels; shared Rust owns every page layout.
 use std::cell::{Cell, RefCell};
-use std::rc::{Rc, Weak};
+use std::rc::Weak;
 
 use objc2::rc::Retained;
 use objc2::{
@@ -173,19 +173,11 @@ impl SharedFeatureView {
             scene.content
         }
     }
-    pub(crate) fn set_layout_widths(&self, shell: f64, viewport: f64) {
-        self.ivars().shell_width.set(shell);
-        self.ivars().viewport_width.set(viewport);
-        self.redraw();
-    }
     pub(crate) fn set_layout(&self, shell: f64, viewport: f64, size: NSSize) {
         self.ivars().shell_width.set(shell);
         self.ivars().viewport_width.set(viewport);
         self.setFrameSize(size);
         self.redraw();
-    }
-    pub(crate) fn refresh(&self, snapshot: Snapshot) {
-        self.refresh_window(WindowSnapshot::Settings(snapshot));
     }
     pub(crate) fn refresh_window(&self, snapshot: WindowSnapshot) {
         self.ivars().ui.borrow_mut().snapshot(snapshot);
@@ -333,23 +325,6 @@ impl SharedFeatureView {
             log::warn!("Failed to render shared Settings page: {error}");
         }
     }
-    pub(crate) fn with_scene<T>(
-        &self,
-        read: impl FnOnce(&SettingsFrame, &SettingsUi, f64) -> T,
-    ) -> Option<T> {
-        let scene = self.ivars().scene.borrow();
-        scene.as_ref().and_then(|scene| {
-            let ui = self.ivars().ui.borrow();
-            let preferences = ui.preferences()?;
-            Some(read(
-                scene,
-                preferences,
-                // AccessKit converts view coordinates through AppKit, which
-                // already applies the enclosing host's UI zoom.
-                self.window().map(|w| w.backingScaleFactor()).unwrap_or(1.),
-            ))
-        })
-    }
     pub(crate) fn with_window<T>(
         &self,
         read: impl FnOnce(&snaplingo_ui::WindowFrame, &WindowUi, f64) -> T,
@@ -368,74 +343,6 @@ impl SharedFeatureView {
     }
     pub(crate) fn page(&self) -> Page {
         self.ivars().ui.borrow().page()
-    }
-    pub(crate) fn recording_index(&self) -> Option<usize> {
-        self.ivars()
-            .ui
-            .borrow()
-            .preferences()
-            .and_then(SettingsUi::recording_index)
-    }
-    #[cfg(test)]
-    pub(crate) fn test_snapshot(&self) -> Snapshot {
-        self.ivars()
-            .ui
-            .borrow()
-            .preferences()
-            .unwrap()
-            .snapshot()
-            .clone()
-    }
-    #[cfg(test)]
-    pub(crate) fn test_kind(&self) -> crate::features::settings::test_support::FeatureKind {
-        if self.page() == Page::Ocr {
-            crate::features::settings::test_support::FeatureKind::Ocr
-        } else {
-            crate::features::settings::test_support::FeatureKind::Translation
-        }
-    }
-    #[cfg(test)]
-    pub(crate) fn test_recording_id(&self) -> Option<String> {
-        self.ivars()
-            .page
-            .borrow()
-            .upgrade()
-            .and_then(|page| page.test_recording_id())
-    }
-    #[cfg(test)]
-    pub(crate) fn test_geometry(&self) -> serde_json::Value {
-        self.with_window(|frame,_,_| { let scene=&frame.page; serde_json::json!({"shellWidth":self.ivars().shell_width.get(),"viewportWidth":self.ivars().viewport_width.get(),"content":{"x":scene.content.x,"y":scene.content.y,"width":scene.content.width,"height":scene.content.height},"controls":scene.geometry.len(),"pixelWidth":self.ivars().image.borrow().as_ref().map(|image|image.size().width),"pixelHeight":self.ivars().image.borrow().as_ref().map(|image|image.size().height),"rasterIdentity":self.ivars().image.borrow().as_ref().map(|image|Retained::as_ptr(image) as usize)}) }).unwrap_or_default()
-    }
-    #[cfg(test)]
-    pub(crate) fn test_choose(
-        &self,
-        field: crate::features::settings::test_support::FeatureField,
-        value: &str,
-    ) {
-        let target = match field {
-            crate::features::settings::test_support::FeatureField::Ocr(f) => {
-                snaplingo_ui::Target::Ocr(
-                    snaplingo_ui::OcrField::ALL
-                        .into_iter()
-                        .find(|field| crate::features::settings::presenter::ocr_field(*field) == f)
-                        .unwrap(),
-                )
-            }
-            crate::features::settings::test_support::FeatureField::Translation(f) => {
-                snaplingo_ui::Target::Translation(
-                    snaplingo_ui::TranslationField::ALL
-                        .into_iter()
-                        .find(|field| {
-                            crate::features::settings::presenter::translation_field(*field) == f
-                        })
-                        .unwrap(),
-                )
-            }
-        };
-        self.input(Event::SetValue(
-            target,
-            snaplingo_ui::Value::Text(value.into()),
-        ));
     }
 }
 impl Drop for SharedFeatureView {

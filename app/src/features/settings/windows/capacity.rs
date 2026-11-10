@@ -311,12 +311,12 @@ fn key(key: &NativeKey, modifiers: Modifiers) -> Option<Key> {
     })
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_is_open() -> bool {
     SHEET.with_borrow(|sheet| sheet.is_some())
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_input(input: CapacityInput) {
     let close = SHEET.with_borrow_mut(|sheet| {
         sheet

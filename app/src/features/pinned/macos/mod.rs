@@ -1,5 +1,5 @@
 mod host;
-pub(super) mod view;
+pub(crate) mod view;
 
 use std::sync::RwLock;
 
@@ -98,7 +98,7 @@ impl PinnedImageRuntimeHost for NativePinnedImageRuntimeHost {
     }
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(super) fn test_close(id: &str) {
     view::close(id);
 }

@@ -806,7 +806,7 @@ fn ns_point(point: &LogicalPoint) -> NSPoint {
     NSPoint::new(point.x, point.y)
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 #[derive(Debug)]
 pub(crate) struct TestState {
     pub annotations: Vec<AnnotationCommand>,
@@ -817,7 +817,7 @@ pub(crate) struct TestState {
     pub busy: bool,
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 impl EditorView {
     pub(crate) fn test_state(&self) -> TestState {
         let model = self.ivars().model.borrow();

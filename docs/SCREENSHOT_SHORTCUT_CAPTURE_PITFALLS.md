@@ -154,16 +154,16 @@ tail -f ~/Library/Logs/com.snaplingo.app/SnapLingo.log
 
 ```bash
 npm test
-npm run build
-cargo test --manifest-path app/Cargo.toml
+npm run reference:build
+cargo test --locked -p snaplingo --features test-support
 ```
 
 Release 构建后额外检查：
 
 ```bash
-npm run tauri:build
-codesign --verify --deep --strict --verbose=2 target/release/bundle/macos/SnapLingo.app
-hdiutil verify target/release/bundle/dmg/SnapLingo_0.1.0_aarch64.dmg
+npm run native:build
+npm run release:verify
+codesign --verify --deep --strict --verbose=2 target/native/release/SnapLingo.app
 ```
 
 手动验收：

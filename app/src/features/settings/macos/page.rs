@@ -9,15 +9,14 @@ use std::sync::{Arc, Mutex};
 use accesskit::{ActionHandler, ActionRequest, ActivationHandler, TreeUpdate};
 use accesskit_macos::SubclassingAdapter;
 use block2::RcBlock;
-use objc2::{
-    rc::Retained, runtime::AnyObject, sel, DefinedClass, MainThreadMarker, MainThreadOnly,
-};
-use objc2_app_kit::{NSAlert, NSEvent, NSEventMask, NSEventType, NSView};
+use objc2::{rc::Retained, runtime::AnyObject, MainThreadMarker, MainThreadOnly};
+use objc2_app_kit::{NSAlert, NSEvent, NSEventMask, NSEventType};
 use objc2_foundation::NSString;
 use snaplingo_ui::accessibility::{window_project_region, WindowProjection};
 use snaplingo_ui::{Action, Event, Page};
 
 use super::view::SharedFeatureView;
+use crate::features::settings::presenter::confirmation::Confirmation;
 use crate::features::settings::presenter::window::SettingsWindowSession;
 use crate::integrations::desktop_events::DesktopEvent;
 use crate::integrations::desktop_events::DesktopSubscription;
@@ -89,7 +88,7 @@ impl SharedFeaturePage {
         for action in actions {
             match action {
                 snaplingo_ui::WindowIntent::Settings(action) => self.perform(page, vec![action]),
-                snaplingo_ui::WindowIntent::Library(intent) => self.library_intent(intent, false),
+                snaplingo_ui::WindowIntent::Library(intent) => self.library_intent(intent),
                 snaplingo_ui::WindowIntent::Services(intent) => self.service_intent(intent),
             }
         }
@@ -243,130 +242,86 @@ impl SharedFeaturePage {
         Ok(())
     }
     fn dispatch(&self, intent: snaplingo_ui::WindowIntent) -> Result<(), String> {
-        self.session
+        let request = self
+            .session
             .borrow_mut()
             .as_mut()
             .ok_or("Settings session is closed")?
-            .dispatch(self.view.page(), intent)
+            .dispatch(self.view.page(), intent)?;
+        if let Some(request) = request {
+            self.show_confirmation(request);
+        }
+        Ok(())
+    }
+    fn show_confirmation(&self, request: Confirmation) {
+        let Some(window) = self.view.window() else {
+            self.cancel_confirmation();
+            return;
+        };
+        let alert = NSAlert::new(self.view.mtm());
+        alert.setMessageText(&NSString::from_str(request.message));
+        alert.addButtonWithTitle(&NSString::from_str("确认"));
+        alert.addButtonWithTitle(&NSString::from_str("取消"));
+        let id = self.id;
+        let callback = RcBlock::new(move |response| {
+            if let Some(page) = lookup(id).filter(|page| !page.disposed.get()) {
+                let result = page
+                    .session
+                    .borrow_mut()
+                    .as_mut()
+                    .map(|session| session.confirm(request.clone(), response == 1000));
+                if let Some(Err(error)) = result {
+                    page.message(&error);
+                }
+                let _ = page.refresh();
+            }
+        });
+        alert.beginSheetModalForWindow_completionHandler(&window, Some(&callback));
+    }
+    pub(crate) fn cancel_confirmation(&self) {
+        if let Some(session) = self.session.borrow_mut().as_mut() {
+            session.cancel_confirmation();
+        }
     }
     fn service_intent(&self, intent: snaplingo_ui::services::ServicesIntent) {
         if self.disposed.get() {
             return;
         }
-        use crate::features::settings::presenter::services::ServicesHostEffect as Effect;
         use snaplingo_ui::services::ServicesIntent as Intent;
-        let effect = match &intent {
-            Intent::Navigate(page) => Some(Effect::Navigate(*page)),
-            Intent::ConfigureCapacity => Some(Effect::ConfigureCapacity),
-            Intent::CopyText(text) => Some(Effect::CopyText(text.clone())),
-            Intent::ReadClipboard => Some(Effect::ReadClipboard),
-            Intent::OpenUrl(url) => Some(Effect::OpenUrl(url.clone())),
-            Intent::ConfirmRemove(id) => Some(Effect::ConfirmRemove(id.clone())),
-            _ => None,
-        };
-        if let Some(effect) = effect {
-            self.service_effect(effect);
-            return;
-        }
-        if let Err(error) = self.dispatch(snaplingo_ui::WindowIntent::Services(intent)) {
-            self.message(&error);
-        }
-        let _ = self.refresh();
-    }
-    fn service_effect(
-        &self,
-        effect: crate::features::settings::presenter::services::ServicesHostEffect,
-    ) {
-        use crate::features::settings::presenter::services::ServicesHostEffect as Effect;
-        match effect {
-            Effect::Navigate(page) => self.perform(page, vec![Action::Navigate(page)]),
-            Effect::ConfigureCapacity => {
+        match intent {
+            Intent::Navigate(page) => self.perform(page, vec![Action::Navigate(page)]),
+            Intent::ConfigureCapacity => {
                 self.perform(self.view.page(), vec![Action::ConfigureCapacity])
             }
-            Effect::CopyText(text) => {
-                if let Err(error) = snaplingo_platform::clipboard_text::copy_text(text) {
+            Intent::CopyText(text) => {
+                self.perform(self.view.page(), vec![Action::CopyToClipboard(text)])
+            }
+            Intent::ReadClipboard => {
+                match arboard::Clipboard::new().and_then(|mut clipboard| clipboard.get_text()) {
+                    Ok(text) => self.view.window_input(snaplingo_ui::WindowInput::Services(
+                        snaplingo_ui::services::ServicesInput::ClipboardText(text),
+                    )),
+                    Err(error) => self.message(&error.to_string()),
+                }
+            }
+            intent => {
+                if let Err(error) = self.dispatch(snaplingo_ui::WindowIntent::Services(intent)) {
                     self.message(&error);
                 }
             }
-            Effect::ReadClipboard => match arboard::Clipboard::new().and_then(|mut c| c.get_text())
-            {
-                Ok(text) => self.view.window_input(snaplingo_ui::WindowInput::Services(
-                    snaplingo_ui::services::ServicesInput::ClipboardText(text),
-                )),
-                Err(error) => self.message(&error.to_string()),
-            },
-            Effect::OpenUrl(url) => {
-                if let Err(error) = crate::integrations::system::external_open::open_url(&url) {
-                    self.message(&error.to_string());
-                }
-            }
-            Effect::ConfirmRemove(provider) => {
-                if let Some(window) = self.view.window() {
-                    let alert = NSAlert::new(self.view.mtm());
-                    alert.setMessageText(&NSString::from_str("确定要删除这个自定义翻译服务吗？"));
-                    alert.addButtonWithTitle(&NSString::from_str("确认"));
-                    alert.addButtonWithTitle(&NSString::from_str("取消"));
-                    let id = self.id;
-                    let callback = RcBlock::new(move |response| {
-                        if response == 1000 {
-                            if let Some(page) = lookup(id) {
-                                if let Err(error) =
-                                    page.dispatch(snaplingo_ui::WindowIntent::Services(
-                                        snaplingo_ui::services::ServicesIntent::ConfirmRemove(
-                                            provider.clone(),
-                                        ),
-                                    ))
-                                {
-                                    page.message(&error);
-                                }
-                            }
-                        }
-                    });
-                    alert.beginSheetModalForWindow_completionHandler(&window, Some(&callback));
-                }
-            }
         }
+        let _ = self.refresh();
     }
-    fn library_intent(&self, intent: snaplingo_ui::library::LibraryIntent, confirmed: bool) {
-        use snaplingo_ui::library::{LibraryInput, LibraryIntent};
+    fn library_intent(&self, intent: snaplingo_ui::library::LibraryIntent) {
         if self.disposed.get() {
             return;
         }
-        if matches!(intent, LibraryIntent::ReadClipboard) {
+        if matches!(intent, snaplingo_ui::library::LibraryIntent::ReadClipboard) {
             match arboard::Clipboard::new().and_then(|mut clipboard| clipboard.get_text()) {
                 Ok(text) => self.view.window_input(snaplingo_ui::WindowInput::Library(
-                    LibraryInput::ClipboardText(text),
+                    snaplingo_ui::library::LibraryInput::ClipboardText(text),
                 )),
                 Err(error) => self.message(&error.to_string()),
-            }
-            return;
-        }
-        if !confirmed
-            && matches!(
-                intent,
-                LibraryIntent::Delete(_) | LibraryIntent::ConfirmClearHistory(_)
-            )
-        {
-            if let Some(window) = self.view.window() {
-                let alert = NSAlert::new(self.view.mtm());
-                alert.setMessageText(&NSString::from_str(
-                    if matches!(intent, LibraryIntent::Delete(_)) {
-                        "确定要删除这条记录吗？"
-                    } else {
-                        "确定要清空当前类型的全部历史记录吗？独立收藏不会被删除。"
-                    },
-                ));
-                alert.addButtonWithTitle(&NSString::from_str("确认"));
-                alert.addButtonWithTitle(&NSString::from_str("取消"));
-                let id = self.id;
-                let callback = RcBlock::new(move |response| {
-                    if response == 1000 {
-                        if let Some(page) = lookup(id) {
-                            page.library_intent(intent.clone(), true);
-                        }
-                    }
-                });
-                alert.beginSheetModalForWindow_completionHandler(&window, Some(&callback));
             }
             return;
         }
@@ -426,9 +381,8 @@ impl SharedFeaturePage {
                 | Action::EditScreenshot { .. }) => {
                     self.dispatch(snaplingo_ui::WindowIntent::Settings(action))
                 }
-                Action::GeneralCommand(command) => {
-                    self.general_command(command, false);
-                    Ok(())
+                Action::GeneralCommand(_) => {
+                    self.dispatch(snaplingo_ui::WindowIntent::Settings(action))
                 }
                 Action::BeginHotkeyRecording { .. }
                 | Action::BeginLocalShortcutRecording { .. } => {
@@ -447,11 +401,7 @@ impl SharedFeaturePage {
                     Ok(())
                 }
                 Action::SaveHotkey { .. } | Action::ResetHotkey { .. } | Action::ResetHotkeys => {
-                    if matches!(action, Action::ResetHotkeys) {
-                        self.confirm_reset();
-                    } else {
-                        self.mutate(action);
-                    }
+                    self.mutate(action);
                     Ok(())
                 }
                 Action::CheckHotkeyConflicts => {
@@ -510,35 +460,6 @@ impl SharedFeaturePage {
             log::warn!("Failed to refresh shared preferences after edit: {error}");
         }
     }
-    fn general_command(&self, command: snaplingo_ui::GeneralCommand, confirmed: bool) {
-        if !confirmed {
-            if let Some(message) =
-                crate::features::settings::presenter::general::confirmation(command)
-            {
-                if let Some(window) = self.view.window() {
-                    let alert = NSAlert::new(self.view.mtm());
-                    alert.setMessageText(&NSString::from_str(message));
-                    alert.addButtonWithTitle(&NSString::from_str("确认"));
-                    alert.addButtonWithTitle(&NSString::from_str("取消"));
-                    let id = self.id;
-                    let callback = RcBlock::new(move |response| {
-                        if response == 1000 {
-                            if let Some(page) = lookup(id) {
-                                page.general_command(command, true);
-                            }
-                        }
-                    });
-                    alert.beginSheetModalForWindow_completionHandler(&window, Some(&callback));
-                }
-                return;
-            }
-        }
-        if let Err(error) = self.dispatch(snaplingo_ui::WindowIntent::Settings(
-            Action::GeneralCommand(command),
-        )) {
-            self.message(&error);
-        }
-    }
     fn select_directory(&self) {
         let initial = self
             .configuration
@@ -570,23 +491,6 @@ impl SharedFeaturePage {
         self.view.cancel_composition();
         if let Err(error) = self.dispatch(snaplingo_ui::WindowIntent::Settings(action)) {
             self.message(&error);
-        }
-    }
-    fn confirm_reset(&self) {
-        if let Some(window) = self.view.window() {
-            let alert = NSAlert::new(self.view.mtm());
-            alert.setMessageText(&NSString::from_str("确定要恢复这一组快捷键到默认值吗？"));
-            alert.addButtonWithTitle(&NSString::from_str("确认"));
-            alert.addButtonWithTitle(&NSString::from_str("取消"));
-            let id = self.id;
-            let callback = RcBlock::new(move |response| {
-                if response == 1000 {
-                    if let Some(owner) = lookup(id) {
-                        owner.mutate(Action::ResetHotkeys);
-                    }
-                }
-            });
-            alert.beginSheetModalForWindow_completionHandler(&window, Some(&callback));
         }
     }
     fn message(&self, message: &str) {
@@ -696,10 +600,6 @@ impl SharedFeaturePage {
         PAGES.with_borrow_mut(|pages| {
             pages.remove(&self.id);
         });
-    }
-    #[cfg(test)]
-    pub(crate) fn test_recording_id(&self) -> Option<String> {
-        self.recording_id.borrow().clone()
     }
 }
 impl Drop for SharedFeaturePage {

@@ -183,7 +183,13 @@ async fn disposing_the_page_cancels_queued_mutations_before_the_worker_starts() 
 }
 
 pub(crate) fn session(kind: ui::LibraryKind) -> LibrarySession {
-    let database = Arc::new(Database::in_memory().unwrap());
+    session_with_database(Arc::new(Database::in_memory().unwrap()), kind)
+}
+
+pub(crate) fn session_with_database(
+    database: Arc<Database>,
+    kind: ui::LibraryKind,
+) -> LibrarySession {
     let assets = Arc::new(test_fixture::Assets::default());
     let pages = test_fixture::pages(
         database.clone(),

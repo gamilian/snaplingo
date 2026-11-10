@@ -10,6 +10,9 @@ export default defineConfig({
   esbuild: {
     logOverride: { "unsupported-regexp": "error" },
   },
+  css: {
+    postcss: referenceFile("."),
+  },
   build: {
     rollupOptions: {
       input: {

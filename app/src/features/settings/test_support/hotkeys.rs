@@ -838,19 +838,19 @@ impl HotkeyView {
             views.remove(&self.ivars().id);
         });
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_record(&self, row: usize) {
         self.perform(row as isize * 3);
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_clear(&self, row: usize) {
         self.perform(row as isize * 3 + 2);
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_reset(&self, row: usize) {
         self.perform(row as isize * 3 + 1);
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_recording_id(&self) -> Option<String> {
         self.ivars()
             .recording
@@ -858,25 +858,25 @@ impl HotkeyView {
             .as_ref()
             .map(|s| s.id.clone())
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_busy(&self) -> bool {
         self.ivars().saving.get()
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_error(&self) -> Option<String> {
         self.ivars().error.borrow().clone()
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_buttons(&self, row: usize) -> (bool, bool) {
         let contents = self.ivars().contents.borrow();
         let row = &contents.as_ref().unwrap().rows[row];
         (row.reset.isEnabled(), row.clear.isEnabled())
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_key(&self, event: &NSEvent) -> bool {
         self.receive_event(event)
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn test_geometry(&self, root: &NSView) -> Vec<serde_json::Value> {
         let frame = |view: &NSView| {
             let r = root.convertRect_fromView(view.bounds(), Some(view));

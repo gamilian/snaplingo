@@ -1,5 +1,3 @@
-#![cfg_attr(test, allow(dead_code))]
-
 use std::cell::{Cell, OnceCell, RefCell};
 use std::io::Cursor;
 
@@ -712,50 +710,21 @@ impl StyleControls {
         self.color.isActive() && NSColorPanel::sharedColorPanel(self.view.mtm()).isKeyWindow()
     }
 
-    #[cfg(test)]
+    #[cfg(feature = "test-support")]
     pub(crate) fn test_state(&self) -> CaptureEditorStylePresentation {
         self.view.ivars().state.borrow().clone()
     }
-    #[cfg(test)]
+    #[cfg(feature = "test-support")]
     pub(crate) fn test_size(&self, value: f64, commit: bool) {
         self.size.setDoubleValue(value);
         self.view.send_size(&self.size, commit);
     }
-    #[cfg(test)]
-    pub(crate) fn test_size_value(&self) -> (f64, f64, f64) {
-        (
-            self.size.doubleValue(),
-            self.size.minValue(),
-            self.size.maxValue(),
-        )
-    }
-    #[cfg(test)]
-    pub(crate) fn test_drag_size(&self) -> u32 {
-        use objc2_app_kit::{NSApplication, NSEventModifierFlags, NSEventType};
-        let window = self.size.window().unwrap();
-        let bounds = self.size.bounds();
-        let point = self.size.convertPoint_toView(
-            NSPoint::new(bounds.size.width * 0.75, bounds.size.height / 2.0),
-            None,
-        );
-        let event = |kind| {
-            NSEvent::mouseEventWithType_location_modifierFlags_timestamp_windowNumber_context_eventNumber_clickCount_pressure(
-                kind, point, NSEventModifierFlags::empty(), 0.0, window.windowNumber(), None, 1, 1, 0.0,
-            ).unwrap()
-        };
-        let down = event(NSEventType::LeftMouseDown);
-        let up = event(NSEventType::LeftMouseUp);
-        let application = NSApplication::sharedApplication(self.view.mtm());
-        application.postEvent_atStart(&up, true);
-        application.sendEvent(&down);
-        self.size.doubleValue().round() as u32
-    }
-    #[cfg(test)]
+    #[cfg(feature = "test-support")]
     pub(crate) fn test_corner(&self, value: f64) {
         self.corner.setDoubleValue(value);
         self.view.send_size(&self.corner, false);
     }
-    #[cfg(test)]
+    #[cfg(feature = "test-support")]
     pub(crate) fn test_color(&self, channels: [u8; 4]) {
         let [r, g, b, a] = channels.map(|value| f64::from(value) / 255.0);
         self.color
@@ -764,14 +733,14 @@ impl StyleControls {
             let _: () = msg_send![&self.view, changeColor: &*self.color];
         }
     }
-    #[cfg(test)]
+    #[cfg(feature = "test-support")]
     pub(crate) fn test_preset(&self, index: usize) {
         self.presets.selectItemAtIndex(index as isize + 1);
         unsafe {
             let _: () = msg_send![&self.view, selectValue: &*self.presets];
         }
     }
-    #[cfg(test)]
+    #[cfg(feature = "test-support")]
     pub(crate) fn test_font(&self, family: &str) {
         self.font
             .selectItemAtIndex(self.font.indexOfItemWithTitle(&NSString::from_str(family)));
@@ -779,7 +748,7 @@ impl StyleControls {
             let _: () = msg_send![&self.view, selectValue: &*self.font];
         }
     }
-    #[cfg(test)]
+    #[cfg(feature = "test-support")]
     pub(crate) fn test_button(&self, tag: isize) {
         let button = match tag {
             0 => &self.filled,
@@ -791,19 +760,19 @@ impl StyleControls {
             button.performClick(None);
         }
     }
-    #[cfg(test)]
+    #[cfg(feature = "test-support")]
     pub(crate) fn test_open_color(&self) {
         self.color.prepare_panel();
         self.color.activate(true);
         NSColorPanel::sharedColorPanel(self.view.mtm()).makeKeyAndOrderFront(None);
     }
-    #[cfg(test)]
+    #[cfg(feature = "test-support")]
     pub(crate) fn test_open_palette(&self) {
         unsafe {
             self.palette_toggle.performClick(None);
         }
     }
-    #[cfg(test)]
+    #[cfg(feature = "test-support")]
     pub(crate) fn test_palette_visible(&self) -> bool {
         self.view
             .ivars()
@@ -811,12 +780,12 @@ impl StyleControls {
             .get()
             .is_some_and(|palette| palette.isVisible())
     }
-    #[cfg(test)]
+    #[cfg(feature = "test-support")]
     pub(crate) fn test_palette_snapshot(&self) -> Vec<u8> {
         let palette = self.view.ivars().palette.get().unwrap();
         crate::integrations::system::native_view_snapshot::snapshot(&palette.contentView().unwrap())
     }
-    #[cfg(test)]
+    #[cfg(feature = "test-support")]
     pub(crate) fn test_geometry(&self) -> serde_json::Value {
         let frame = |view: &NSView| {
             let r = view.frame();
@@ -856,7 +825,7 @@ impl StyleControls {
         let buttons=self.palette_buttons.iter().map(|button|serde_json::json!({"label":button.title().to_string(),"frame":frame(button),"enabled":button.isEnabled()})).collect::<Vec<_>>();
         serde_json::json!({"controls":controls,"palette":{"size":[content.bounds().size.width,content.bounds().size.height],"swatches":swatches,"buttons":buttons},"strokeWidth":self.size.doubleValue(),"corner":self.corner.doubleValue(),"presets":self.view.ivars().state.borrow().color_presets,"color":self.view.ivars().state.borrow().style.color})
     }
-    #[cfg(test)]
+    #[cfg(feature = "test-support")]
     pub(crate) fn test_color_active(&self) -> bool {
         let panel = NSColorPanel::sharedColorPanel(self.view.mtm());
         self.color.isActive() && panel.isVisible() && panel.showsAlpha()

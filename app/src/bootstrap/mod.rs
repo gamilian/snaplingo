@@ -7,7 +7,6 @@ mod capture_runtime;
 mod history_runtime;
 mod provider_runtime;
 mod screenshot_favorites_runtime;
-mod selection_runtime;
 mod tts_runtime;
 
 #[cfg(target_os = "macos")]
@@ -568,12 +567,20 @@ fn bind_native_notifications(state: &mut AppState) {
 #[cfg(all(test, target_os = "macos"))]
 mod native_state_tests {
     use super::*;
+    use snaplingo_core::selection::{
+        SelectedTextAcquirer, SelectionScheme, SystemSelectionProvider,
+    };
 
     #[test]
     fn constructs_state_and_releases_the_capture_runtime_without_a_framework_owner() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("state.db");
         let database = Arc::new(Database::open(&path).unwrap());
+        let selection = Arc::new(
+            snaplingo_platform::selection::macos::MacSelectionProvider::new(Some(
+                "com.snaplingo.native-state-test".into(),
+            )),
+        );
         let state = build_app_state(
             database,
             path,
@@ -582,9 +589,11 @@ mod native_state_tests {
                 version: "0.1.23".into(),
                 ocr_resource_root: None,
                 cache_dir: Ok(directory.path().join("cache")),
-                selected_text: selection_runtime::build_selected_text_acquirer(
-                    "com.snaplingo.native-state-test".into(),
-                ),
+                selected_text: Arc::new(SelectedTextAcquirer::new(
+                    SelectionScheme::new(selection.default_scheme()),
+                    selection.methods(),
+                    selection,
+                )),
             },
         );
         let runtime = Arc::downgrade(&state.capture.runtime);

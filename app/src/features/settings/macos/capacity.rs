@@ -243,7 +243,7 @@ pub(crate) fn close_for(parent: &NSWindow) {
         sheet.adapter.borrow_mut().take();
     }
 }
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_input(input: CapacityInput) -> bool {
     let sheet = SHEET.with_borrow(Clone::clone);
     if let Some(sheet) = sheet {
@@ -253,7 +253,7 @@ pub(crate) fn test_input(input: CapacityInput) -> bool {
         false
     }
 }
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn test_is_open() -> bool {
     SHEET.with_borrow(Option::is_some)
 }

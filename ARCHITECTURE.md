@@ -2,8 +2,8 @@
 
 For the architecture rationale, upstream comparisons and migration steps,
 see [Native workspace design](docs/architecture/native-workspace-design.md).
-The current refactor's checks are recorded in
-[Native workspace implementation](docs/plans/native-workspace-implementation.md).
+Checks and native acceptance scope are documented in
+[Architecture verification](docs/architecture/verification.md).
 
 SnapLingo is a native Rust application organized around cohesive product features.
 Seven production Cargo packages separate the desktop product from reusable business,
@@ -63,6 +63,7 @@ app/
       pinned/                  image preparation, placement, native adapters
       scrolling/               sampler lifetime, native controls and overlays
     integrations/              product events, runtime, updates and native helpers
+    test_support/              optional linked native scenarios and isolated setup
   tests/                       real composition and native acceptance
   examples/                    application-owned previews and probes
 crates/
@@ -128,6 +129,12 @@ product workflows; its UI projection and layout remain reusable in `ui`. The
 former Settings, Render, Accessibility and Desktop packages are modules under
 their actual owners, avoiding a package for every technical layer.
 
+Settings owns confirmation and execution in its shared window session. A pending
+confirmation retains the original page and intent; native adapters only display
+the request and return a decision. Cancellation, navigation and window closure
+invalidate it, and acceptance consumes it once. Both the product and standalone
+preview use the same confirmation policy.
+
 ## Native behavior and reuse
 
 Both macOS and Windows consume shared Rust presentation. AppKit can apply shared
@@ -154,6 +161,12 @@ control detection and output after refresh as well as initial capture. Scrolling
 keeps one sampler and cancellation-safe restoration. Result controllers retain
 request validity, stale-result rejection and native text selection/IME behavior.
 
+Capture completion in the desktop feature owns command/mode decisions, save
+preferences, OCR handoff and favorite completion ordering. Native adapters
+provide dialogs, printing and window effects. Core retains frozen pixels and
+output execution. Cancellation restores the existing session; failures return
+to one native error/recovery update and keep failed output retryable.
+
 Platform capabilities group real OS implementations beside each other, for
 example `platform/selection/{macos,windows,linux}`. Native window helpers that
 need the application's event loop stay in desktop integrations. General color
@@ -167,7 +180,8 @@ retain log delivery, update installation and event-loop helpers.
 own hit regions, geometry, scrolling, IME and semantics. The renderer imports
 foundation directly; independent windows receive `Appearance` and any needed
 key style instead of the Settings snapshot. Retained AppKit reference pages live
-under `features/settings/test_support`, compiled only for tests.
+under `features/settings/test_support`, compiled only for tests or the explicit
+native acceptance feature.
 
 ## Extending the codebase
 
@@ -201,7 +215,11 @@ the coupling they claim to prevent.
 Core tests exercise portable workflows with memory adapters. Storage tests cover
 actual transactions and persistence. Platform tests cover capability contracts,
 including real subprocess single-instance ownership. Desktop integration tests
-cover real composition and native window/input workflows. AppKit/React fixtures
+cover real composition and native window/input workflows. Native targets opt in
+with `--features test-support` and call one linked scenario runner. Its internal
+support owns isolated database/path setup and main-thread delivery. Tests do not
+rewrite bootstrap source or mount a second copy of the production module graph;
+normal product builds omit the runner and native probes. AppKit/React fixtures
 are independent geometry and visual baselines; expected values are not generated
 from the new shared implementation.
 

@@ -8,7 +8,7 @@ use objc2_foundation::{NSString, NSUserDefaults};
 
 use crate::features::result::macos::view as native;
 use crate::features::result::macos::view::Action;
-use crate::fixture::{on_main, png, NativeTestApp};
+use crate::test_support::native_ui_workflows::fixture::{on_main, png, NativeTestApp};
 use crate::{AppState, Result};
 use snaplingo_core::library::favorites::FavoriteContent;
 use snaplingo_core::library::favorites::FavoriteKind;
@@ -488,7 +488,7 @@ async fn until(mut condition: impl FnMut() -> bool, message: &str) {
 pub(crate) async fn run(app: &NativeTestApp, services: Arc<Services>) {
     let state = &*app.state;
     let view = state.result_session.snapshot();
-    on_main(app, move || controls(view)).await;
+    on_main(move || controls(view)).await;
     state
         .result_window
         .open(ResultWindowOpenRequest::selection_translation(
@@ -551,7 +551,7 @@ pub(crate) async fn run(app: &NativeTestApp, services: Arc<Services>) {
             .translated_text,
         "原生译文：native source"
     );
-    on_main(app, || native::test_click(5)).await;
+    on_main(|| native::test_click(5)).await;
     until(
         || {
             services.requests.lock().unwrap().len() == 2
@@ -560,7 +560,7 @@ pub(crate) async fn run(app: &NativeTestApp, services: Arc<Services>) {
         "Native translate button did not run",
     )
     .await;
-    on_main(app, || native::test_click(103)).await;
+    on_main(|| native::test_click(103)).await;
     until(
         || state.result_session.snapshot().rows[0].favorite,
         "Native provider favorite did not finish",
@@ -580,7 +580,7 @@ pub(crate) async fn run(app: &NativeTestApp, services: Arc<Services>) {
     assert!(
         matches!(&favorites.items[0].content, FavoriteContent::Translation(result) if result.source_text == "native source" && result.result.translated_text == "原生译文：native source")
     );
-    on_main(app, || native::test_click(4)).await;
+    on_main(|| native::test_click(4)).await;
     until(
         || !services.speech.lock().unwrap().is_empty(),
         "Native source speech did not reach the TTS service",
@@ -601,7 +601,7 @@ pub(crate) async fn run(app: &NativeTestApp, services: Arc<Services>) {
         ))
         .await
         .unwrap();
-    on_main(app, || {
+    on_main(|| {
         assert!(native::test_state().decoded_image);
         native::test_click(11);
     })
@@ -625,13 +625,13 @@ pub(crate) async fn run(app: &NativeTestApp, services: Arc<Services>) {
     assert!(
         matches!(&favorites.items[0].content, FavoriteContent::Ocr(result) if result.recognized_text == "你好" && result.confidence == Some(0.93) && result.source_asset_path.is_some())
     );
-    on_main(app, || native::test_click(12)).await;
+    on_main(|| native::test_click(12)).await;
     until(
         || state.result_session.snapshot().ocr_text.is_empty(),
         "Native OCR clear did not finish",
     )
     .await;
-    on_main(app, || {
+    on_main(|| {
         assert!(!native::test_state().decoded_image);
         native::test_escape();
     })
@@ -641,6 +641,6 @@ pub(crate) async fn run(app: &NativeTestApp, services: Arc<Services>) {
         "Escape did not hide the native result window",
     )
     .await;
-    on_main(app, native::test_destroy).await;
+    on_main(native::test_destroy).await;
     println!("Native result controls, IME, sizing, OCR rendering, copy actions, favorites, speech and lifecycle passed");
 }

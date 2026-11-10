@@ -21,7 +21,7 @@ use winit::{
 };
 
 thread_local! { static ACTIVE: RefCell<Option<Rc<RefCell<Application>>>> = const { RefCell::new(None) }; }
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 thread_local! {static SMOKE_READY:RefCell<Option<Box<dyn FnOnce()>>>=const {RefCell::new(None)};}
 fn current() -> Option<Rc<RefCell<Application>>> {
     ACTIVE.with_borrow(Clone::clone)
@@ -225,7 +225,7 @@ impl ApplicationHandler<HostEvent> for Loop {
             self.owner.borrow_mut().failure = Some(error);
             event_loop.exit();
         }
-        #[cfg(test)]
+        #[cfg(feature = "test-support")]
         if self.owner.borrow().failure.is_none() {
             let ready = SMOKE_READY.with_borrow_mut(Option::take);
             if let Some(ready) = ready {
@@ -413,7 +413,7 @@ pub(crate) fn run_state(
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 async fn smoke_on_ui<T: Send + 'static>(
     work: impl FnOnce(&ActiveEventLoop) -> Result<T, String> + Send + 'static,
 ) -> Result<T, String> {
@@ -433,7 +433,7 @@ async fn smoke_on_ui<T: Send + 'static>(
     }
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-support")]
 pub(crate) fn smoke_test() {
     use snaplingo_core::selection::SelectedTextAcquirer;
     use snaplingo_core::selection::SelectionScheme;
