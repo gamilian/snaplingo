@@ -49,7 +49,7 @@ describe('native macOS bundle', () => {
       const f = fixture('arm64');
       mkdirSync(f.app, { recursive: true }); writeFileSync(join(f.app, 'previous'), 'keep');
       rmSync(join(f.root, 'app/resources/ocr', file));
-      expect(() => stageNativeMacBundle(f.root, f.binary, f.app, config, { architecture: 'arm64' })).toThrow(file);
+      expect(() => stageNativeMacBundle(f.root, f.binary, f.app, config, { architecture: 'arm64' })).toThrow(join(f.root, 'app/resources/ocr', file));
       expect(readFileSync(join(f.app, 'previous'), 'utf8')).toBe('keep');
     }
   });
