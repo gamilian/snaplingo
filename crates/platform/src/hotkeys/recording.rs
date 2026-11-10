@@ -96,7 +96,9 @@ mod tests {
                 )),
             ));
         }
-        let modifier = if cfg!(target_os = "linux") {
+        let modifier = if cfg!(target_os = "windows") {
+            '⊞'
+        } else if cfg!(target_os = "linux") {
             '⌃'
         } else {
             '⌘'

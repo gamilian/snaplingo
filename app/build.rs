@@ -46,13 +46,11 @@ END
             ),
         )
         .unwrap();
-        embed_resource::compile_for(
-            &resource,
-            &["snaplingo-native", "snaplingo"],
-            embed_resource::NONE,
-        )
-        .manifest_required()
-        .expect("Native Windows application resources must compile");
+        // Native tests and examples also import Common Controls v6 APIs through
+        // rfd. Their executables need the same activation manifest as the app.
+        embed_resource::compile_for_everything(&resource, embed_resource::NONE)
+            .manifest_required()
+            .expect("Native Windows application resources must compile");
         println!("cargo:rerun-if-changed=icons/icon.ico");
         println!("cargo:rerun-if-changed=native.manifest");
     }

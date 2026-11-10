@@ -1,6 +1,6 @@
 //! Single-line caret geometry uses the same shaping engine and fonts as paint.
 use crate::foundation::{FontFamily, Point, TextLayout, TextMeasurement, TextMeasurer};
-use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, Shaping, Weight, Wrap};
+use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, Weight, Wrap};
 use std::collections::HashMap;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -49,11 +49,11 @@ impl TextMeasurer for RendererTextMetrics {
             FontFamily::Serif => Family::Serif,
             FontFamily::Mono => Family::Monospace,
         };
-        buffer.set_text(
+        super::text::set_text(
+            &mut buffer,
             &mut self.fonts,
             text,
             &Attrs::new().family(family).weight(Weight(weight)),
-            Shaping::Advanced,
         );
         buffer.shape_until_scroll(&mut self.fonts, false);
         let mut starts = vec![0];
@@ -140,11 +140,11 @@ impl TextMeasurer for RendererTextMetrics {
             FontFamily::Serif => Family::Serif,
             FontFamily::Mono => Family::Monospace,
         };
-        buffer.set_text(
+        super::text::set_text(
+            &mut buffer,
             &mut state.fonts,
             text,
             &Attrs::new().family(family).weight(Weight(weight)),
-            Shaping::Advanced,
         );
         buffer.shape_until_scroll(&mut state.fonts, false);
         let boundaries: Vec<_> = text

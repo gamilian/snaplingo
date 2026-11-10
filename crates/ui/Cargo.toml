@@ -8,11 +8,12 @@ description = "Portable views, input, drawing and optional CPU rendering and acc
 
 [features]
 default = []
-rendering = ["dep:snaplingo-assets", "dep:tiny-skia", "dep:cosmic-text"]
+rendering = ["dep:snaplingo-assets", "dep:tiny-skia", "dep:cosmic-text", "dep:unicode-script"]
 accessibility = ["dep:accesskit"]
 
 [dependencies]
 unicode-segmentation = "1.12"
+unicode-script = { version = "0.5", optional = true }
 snaplingo-assets = { path = "../assets", optional = true }
 tiny-skia = { version = "0.11.4", optional = true }
 cosmic-text = { version = "0.14.2", optional = true }

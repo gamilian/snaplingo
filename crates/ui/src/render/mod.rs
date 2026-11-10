@@ -1,11 +1,12 @@
 //! Shared CPU rendering. Hosts present RGBA pixels and own their event loop;
 //! neither layout nor rasterization depends on an operating-system toolkit.
 use std::collections::HashMap;
+mod text;
 mod text_metrics;
 pub use text_metrics::RendererTextMetrics;
 
 use crate::foundation::{Color, DrawCommand, FontFamily, Rect, Scene, TextAlign};
-use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, Shaping, SwashCache, Weight};
+use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, SwashCache, Weight};
 use tiny_skia::{
     FillRule, FilterQuality, Mask, Paint, Path, PathBuilder, Pixmap, PixmapPaint, PixmapRef,
     Stroke, Transform,
@@ -370,11 +371,11 @@ impl Renderer {
                 FontFamily::Serif => Family::Serif,
                 FontFamily::Mono => Family::Monospace,
             };
-            buffer.set_text(
+            text::set_text(
+                &mut buffer,
                 &mut self.fonts,
                 text,
                 &Attrs::new().family(family).weight(Weight(weight)),
-                Shaping::Advanced,
             );
             let align = match align {
                 TextAlign::Left => cosmic_text::Align::Left,

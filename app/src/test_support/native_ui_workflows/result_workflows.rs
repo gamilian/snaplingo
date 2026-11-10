@@ -314,11 +314,37 @@ fn controls(mut view: ResultWindowSnapshot) {
         count,
         "Pending favorite and permanent error retry are disabled"
     );
-    let height = native::test_state().frame.size.height;
-    native::test_click(100);
-    assert!(native::test_state().frame.size.height < height);
-    snapshot("result-row-collapsed.png");
-    native::test_click(100);
+    let height_ratio = view.preferences.translation.max_window_height_ratio;
+    for ratio in [30, 100] {
+        view.preferences.translation.max_window_height_ratio = ratio;
+        view.revision += 1;
+        native::update(view.clone());
+        let expanded = native::test_state();
+        native::test_click(100);
+        let collapsed = native::test_state();
+        assert!(
+            collapsed.document_height < expanded.document_height,
+            "Collapsing a row must shrink its content at {ratio}% screen height"
+        );
+        assert_eq!(
+            collapsed.frame.size.height,
+            (collapsed.document_height + 72.0).min(expanded.frame.size.height),
+            "The window must shrink to its content while respecting the screen height limit"
+        );
+        snapshot("result-row-collapsed.png");
+        native::test_click(100);
+        assert_eq!(
+            native::test_state().document_height,
+            expanded.document_height
+        );
+        assert_eq!(
+            native::test_state().frame.size.height,
+            expanded.frame.size.height
+        );
+    }
+    view.preferences.translation.max_window_height_ratio = height_ratio;
+    view.revision += 1;
+    native::update(view.clone());
     native::test_click(2);
     assert!(native::test_state().collapsed);
     snapshot("result-source-collapsed.png");

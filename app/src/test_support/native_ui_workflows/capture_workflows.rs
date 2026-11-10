@@ -560,6 +560,22 @@ pub(crate) async fn run(app: &NativeTestApp, directory: &Path, clipboard: &Mutex
     state.result_session.close();
     let id = open(app, "screenshot-copy").await;
     at_candidate(app, &id).await;
+    let query = id.clone();
+    on_main(move || {
+        // Reproduce an unrelated runner cursor movement through AppKit's real
+        // event path while the scenario owns a synthetic pointer at (500, 350).
+        let event = NSEvent::mouseEventWithType_location_modifierFlags_timestamp_windowNumber_context_eventNumber_clickCount_pressure(
+            NSEventType::MouseMoved, NSPoint::new(50.0, 670.0), Flags::empty(), 1.0,
+            native::test_window_number(&query), None, 1, 0, 0.0,
+        ).unwrap();
+        NSApplication::sharedApplication(MainThreadMarker::new().unwrap()).sendEvent(&event);
+        assert_eq!(native::test_selection(&query), Some(LogicalRect {
+            x: 400.0,
+            y: 300.0,
+            width: 320.0,
+            height: 200.0,
+        }), "AppKit's ambient pointer stream must not overwrite fixture coordinates");
+    }).await;
     press(app, &id, "\t", Flags::empty(), 48).await;
     let deadline = Instant::now() + Duration::from_secs(5);
     loop {

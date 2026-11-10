@@ -1027,6 +1027,23 @@ mod fixture {
         };
         let worker = test_app.clone();
         app.finishLaunching();
+        // Workflows feed fixture coordinates directly to native responders.
+        // AppKit's ambient pointer stream belongs to the runner's real desktop
+        // and must not replace those coordinates between asynchronous actions.
+        let pointer_monitor = (!measuring).then(|| {
+            let handler = block2::RcBlock::new(|_: std::ptr::NonNull<NSEvent>| {
+                std::ptr::null_mut::<NSEvent>()
+            });
+            unsafe {
+                NSEvent::addLocalMonitorForEventsMatchingMask_handler(
+                    objc2_app_kit::NSEventMask::MouseMoved
+                        | objc2_app_kit::NSEventMask::MouseEntered
+                        | objc2_app_kit::NSEventMask::MouseExited,
+                    &handler,
+                )
+                .expect("Native workflows must isolate their pointer input")
+            }
+        });
         let worker_thread = std::thread::spawn(move || {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 crate::integrations::runtime::block_on(async {
@@ -1088,6 +1105,9 @@ mod fixture {
         });
         app.run();
         worker_thread.join().expect("Native workflow worker failed");
+        if let Some(monitor) = pointer_monitor {
+            unsafe { NSEvent::removeMonitor(&monitor) };
+        }
         resident::shutdown_menu_bar();
         snaplingo_platform::hotkeys::shutdown_shortcuts().unwrap();
         drop(test_app);

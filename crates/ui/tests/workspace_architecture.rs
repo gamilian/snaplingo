@@ -101,6 +101,7 @@ fn dependency_violations(packages: &BTreeMap<String, Value>) -> Vec<String> {
             "snaplingo-ui",
             &[
                 "unicode-segmentation",
+                "unicode-script",
                 "snaplingo-assets",
                 "tiny-skia",
                 "cosmic-text",
@@ -215,7 +216,13 @@ fn cargo_edges_keep_presentation_storage_and_platforms_separate() {
         .filter(|dependency| {
             matches!(
                 dependency["name"].as_str(),
-                Some("snaplingo-assets" | "tiny-skia" | "cosmic-text" | "accesskit")
+                Some(
+                    "snaplingo-assets"
+                        | "tiny-skia"
+                        | "cosmic-text"
+                        | "unicode-script"
+                        | "accesskit"
+                )
             )
         })
     {
