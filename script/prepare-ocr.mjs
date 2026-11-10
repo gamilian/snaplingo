@@ -18,6 +18,13 @@ const targetNames = {
   'x86_64-unknown-linux-gnu': 'linux-x64',
 };
 
+export function ocrResourceFiles(platform) {
+  return [
+    ...manifest.models.filter(asset => asset.platforms.includes(platform)).map(asset => asset.file),
+    ...manifest.archives.filter(asset => asset.platform === platform || asset.platforms?.includes(platform)).flatMap(asset => Object.values(asset.files)),
+  ];
+}
+
 export async function sha256(path) {
   const digest = createHash('sha256');
   for await (const chunk of createReadStream(path)) digest.update(chunk);

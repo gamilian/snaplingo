@@ -162,17 +162,24 @@ export function nativeWixSource(stage, config) {
   const directoryId = path => path ? `D${hash(path).slice(0,20)}` : 'INSTALLFOLDER';
   const componentId = path => `C${hash(path).slice(0,20)}`;
   const fileId = path => `F${hash(path).slice(0,20)}`;
-  const directory = path => `<Directory Id="${directoryId(path)}" Name="${xml(path ? basename(path) : config.productName)}">${directories.get(path).map(entry => `<Component Id="${componentId(entry.path)}" Guid="*" Win64="yes"><File Id="${fileId(entry.path)}" Name="${xml(basename(entry.path))}" Source="${xml(windowsPath(entry.file).replaceAll('$', () => '$$'))}" KeyPath="yes"/></Component>`).join('')}${[...directories.keys()].filter(child => child && (dirname(child) === '.' ? '' : dirname(child)) === path).sort().map(directory).join('')}</Directory>`;
+  const component = entry => {
+    const application = entry.path === 'snaplingo.exe';
+    const shortcut = application ? `<Shortcut Id="ApplicationShortcut" Name="${xml(config.productName)}" Directory="ApplicationProgramsFolder" Advertise="yes" WorkingDirectory="INSTALLFOLDER" Icon="AppIcon"/>` : '';
+    const registration = application ? `<RemoveFolder Id="RemoveProgramMenu" Directory="ApplicationProgramsFolder" On="uninstall"/><RegistryValue Root="HKLM" Key="Software\\${xml(publisher(config))}\\${xml(config.productName)}" Name="InstallDir" Type="string" Value="[INSTALLFOLDER]"/>` : '';
+    return `<Component Id="${componentId(entry.path)}" Guid="*" Win64="yes"><File Id="${fileId(entry.path)}" Name="${xml(basename(entry.path))}" Source="${xml(windowsPath(entry.file).replaceAll('$', () => '$$'))}" KeyPath="yes">${shortcut}</File>${registration}</Component>`;
+  };
+  const directory = path => `<Directory Id="${directoryId(path)}" Name="${xml(path ? basename(path) : config.productName)}">${directories.get(path).map(component).join('')}${[...directories.keys()].filter(child => child && (dirname(child) === '.' ? '' : dirname(child)) === path).sort().map(directory).join('')}</Directory>`;
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"><Product Id="*" Name="${xml(config.productName)}" Language="1033" Version="${config.version}" Manufacturer="${xml(publisher(config))}" UpgradeCode="${nativeWindowsUpgradeCode(config)}">
 <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" Platform="x64"/>
 <MajorUpgrade Schedule="afterInstallInitialize" AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer version of ${xml(config.productName)} is already installed."/>
 <MediaTemplate EmbedCab="yes" CompressionLevel="high"/>
 <Property Id="INSTALLFOLDER"><RegistrySearch Id="PreviousTauriInstallDir" Root="HKCU" Key="Software\\${xml(publisher(config))}\\${xml(config.productName)}" Name="InstallDir" Type="raw"/></Property>
-<Icon Id="AppIcon" SourceFile="${xml(windowsPath(join(stage,'icon.ico')).replaceAll('$', () => '$$'))}"/><Property Id="ARPPRODUCTICON" Value="AppIcon"/><Property Id="ARPINSTALLLOCATION" Value="[INSTALLFOLDER]"/>
+<Icon Id="AppIcon" SourceFile="${xml(windowsPath(join(stage,'icon.ico')).replaceAll('$', () => '$$'))}"/><Property Id="ARPPRODUCTICON" Value="AppIcon"/>
+<SetProperty Id="ARPINSTALLLOCATION" Value="[INSTALLFOLDER]" After="CostFinalize" Sequence="execute"/>
 <Directory Id="TARGETDIR" Name="SourceDir"><Directory Id="ProgramFiles64Folder">${directory('')}</Directory>
-<Directory Id="ProgramMenuFolder"><Directory Id="ApplicationProgramsFolder" Name="${xml(config.productName)}"><Component Id="StartMenuShortcut" Guid="*" Win64="yes"><Shortcut Id="ApplicationShortcut" Name="${xml(config.productName)}" Target="[#${fileId('snaplingo.exe')}]" WorkingDirectory="INSTALLFOLDER"/><RemoveFolder Id="RemoveProgramMenu" On="uninstall"/><RegistryValue Root="HKLM" Key="Software\\${xml(publisher(config))}\\${xml(config.productName)}" Name="InstallDir" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes"/></Component></Directory></Directory></Directory>
-<Feature Id="MainFeature" Title="${xml(config.productName)}" Level="1">${inventory.map(entry=>`<ComponentRef Id="${componentId(entry.path)}"/>`).join('')}<ComponentRef Id="StartMenuShortcut"/></Feature>
+<Directory Id="ProgramMenuFolder"><Directory Id="ApplicationProgramsFolder" Name="${xml(config.productName)}"/></Directory></Directory>
+<Feature Id="MainFeature" Title="${xml(config.productName)}" Level="1">${inventory.map(entry=>`<ComponentRef Id="${componentId(entry.path)}"/>`).join('')}</Feature>
 </Product></Wix>\n`;
 }
 function run(command, args, repositoryRoot) {

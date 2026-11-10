@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it } from 'vitest';
+import { Window } from 'happy-dom';
 import { createNativeWindowsPortable, verifyNativeWindowsBundle, nativeNsisSource, nativeWindowsUpgradeCode, nativeWixSource, stageNativeWindowsBundle, verifyWindowsExecutable } from './native-windows-build.mjs';
 const directories: string[] = [];
 afterEach(() => { for (const path of directories.splice(0)) rmSync(path, { recursive: true, force: true }); });
@@ -73,6 +74,27 @@ describe('native Windows packages', () => {
     expect(source).toContain('AllowSameVersionUpgrades="yes" DowngradeErrorMessage=');
     expect(source).not.toContain('Id="AppDataFolder"');
     expect(() => nativeWixSource(f.stage,{ ...config,version:'0.1.24-beta' })).toThrow('three numeric');
+  });
+  it('owns the advertised Start menu shortcut and machine registration with the executable', () => {
+    const f = fixture(); stageNativeWindowsBundle(f.root, f.binary, f.stage, config, f);
+    const window = new Window();
+    const document = new window.DOMParser().parseFromString(nativeWixSource(f.stage, config), 'application/xml');
+    const executable = document.querySelector('File[Name="snaplingo.exe"]')!;
+    const component = executable.parentElement!;
+    const shortcut = document.querySelector('Shortcut[Id="ApplicationShortcut"]')!;
+    expect(executable.getAttribute('KeyPath')).toBe('yes');
+    expect(shortcut.parentElement).toBe(executable);
+    expect(shortcut.getAttribute('Advertise')).toBe('yes');
+    expect(shortcut.getAttribute('Directory')).toBe('ApplicationProgramsFolder');
+    expect(shortcut.hasAttribute('Target')).toBe(false);
+    expect(component.parentElement?.getAttribute('Id')).toBe('INSTALLFOLDER');
+    expect(component.querySelector('RegistryValue[Root="HKLM"][Name="InstallDir"]')?.getAttribute('Value')).toBe('[INSTALLFOLDER]');
+    expect(component.querySelector('RemoveFolder[On="uninstall"]')?.getAttribute('Directory')).toBe('ApplicationProgramsFolder');
+    const installLocation = document.querySelector('SetProperty[Id="ARPINSTALLLOCATION"]')!;
+    expect(installLocation.getAttribute('Value')).toBe('[INSTALLFOLDER]');
+    expect(installLocation.getAttribute('After')).toBe('CostFinalize');
+    expect(installLocation.getAttribute('Sequence')).toBe('execute');
+    expect(document.querySelector('Property[Id="ARPINSTALLLOCATION"]')).toBeNull();
   });
 });
 

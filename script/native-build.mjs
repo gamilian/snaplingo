@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { chmodSync, copyFileSync, cpSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { prepareOcr, sha256 } from './prepare-ocr.mjs';
+import { ocrResourceFiles, prepareOcr, sha256 } from './prepare-ocr.mjs';
 import { verifyMacOSApplication } from './macos-release-verification.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -29,12 +29,13 @@ export function nativeInfoPlist(config) {
   };
   return `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n${Object.entries(entries).map(([key, value]) => `<key>${key}</key><string>${xml(value)}</string>`).join('\n')}\n<key>LSUIElement</key><true/>\n<key>NSHighResolutionCapable</key><true/>\n</dict></plist>\n`;
 }
-export function stageNativeMacBundle(repositoryRoot, binary, destination, config) {
+export function stageNativeMacBundle(repositoryRoot, binary, destination, config, { architecture = process.arch } = {}) {
+  if (!['arm64', 'x64'].includes(architecture)) throw new Error(`Unsupported native macOS architecture: ${architecture}`);
   const appRoot = join(repositoryRoot, 'app');
   const resources = join(appRoot, 'resources/ocr');
   required(binary);
-  for (const path of ['medium_det.mnn', 'medium_rec.mnn', 'keys.txt', 'runtime/libonnxruntime.dylib']) required(join(resources, path));
-  if (readFileSync(join(resources, '.platform'), 'utf8').trim() !== `darwin-${process.arch}`) throw new Error('OCR resources do not match the native build architecture');
+  for (const path of ocrResourceFiles(`darwin-${architecture}`)) required(join(resources, path));
+  if (readFileSync(join(resources, '.platform'), 'utf8').trim() !== `darwin-${architecture}`) throw new Error('OCR resources do not match the native build architecture');
   required(join(appRoot, 'icons/icon.icns'));
   // Only the generated application directory is replaced; build caches and
   // installed applications have separate ownership.
