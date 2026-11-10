@@ -17,11 +17,11 @@ The Application module that owns Provider registration, active-provider state, p
 - `TranslationCoordinator` supports multiple active Providers and runs them concurrently.
 - `OcrCoordinator` supports one active Provider.
 
-Provider execution enters a Coordinator. Native administration actions call `ProviderAdministration`; entry adapters do not read Coordinator internals, choose implementations, or persist Provider state themselves.
+Execution Commands may call a Coordinator. Provider administration Commands call `ProviderAdministration`; Commands do not read Coordinator state, select an implementation, or persist Provider state themselves.
 
 ### Workflow Application
 
-An Application module that owns sequencing and fallback policy across narrower modules. `OcrFavoriteApplication` coordinates Provider, History, and Favorites through local seams. `ProviderAdministration` coordinates Provider configuration, introspection, prompt configuration, and Coordinator state. Native action adapters call these interfaces without duplicating workflow policy.
+An Application module that owns sequencing and fallback policy across narrower modules. `OcrFavoriteApplication` coordinates Provider, History, and Favorites through local seams. `ProviderAdministration` coordinates Provider configuration, introspection, prompt configuration, and Coordinator state. Commands only convert IPC data and call these interfaces.
 
 ### Application Port
 
@@ -30,8 +30,7 @@ A narrow trait declared beside the Application module that consumes it. It descr
 Examples:
 
 - Settings, Hotkeys, and Providers own independent configuration/credential store ports.
-- Core Providers own LLM runtime and event-sink ports. The external Providers
-  package owns its HTTP transport contract and concrete protocol adapters.
+- Providers own HTTP transport, LLM runtime, and event-sink ports.
 - History owns repository and event-source ports.
 - Capture, Result Window, and Pinned Image own their runtime-host ports.
 
@@ -39,23 +38,23 @@ An Application module must not import Infrastructure or crate-root startup adapt
 
 ### Platform Adapter
 
-A concrete operating-system, storage, network, or native-library implementation of an Application port. The retained browser references inject isolated fixture ports and have no desktop IPC adapter.
+A concrete Tauri, operating-system, storage, network, or native-library implementation of an Application or frontend port. Platform adapters live under `src/platform/tauri/` on the frontend and `src-tauri/src/infrastructure/` on the backend.
 
 ### Composition
 
 The only place that chooses concrete adapters and injects them into a runtime.
 
-- `app/src/bootstrap/mod.rs` and its builders create native Application runtimes with Infrastructure adapters.
-- `app/src/shell/macos.rs` and `app/src/shell/windows.rs` own the platform startup/event loops. `reference/web/App.tsx` only opens isolated visual-reference fixtures.
+- Frontend view entry points create an Application runtime with `src/platform/tauri/*` adapters.
+- Backend `src-tauri/src/composition.rs` and its builders create Application runtimes with Infrastructure adapters.
 - Infrastructure may conditionally compile platform implementations, but only Composition selects which concrete adapter satisfies an Application seam.
 
 ### Capture Session
 
-A frozen snapshot of the desktop used to produce screenshot output, OCR input, and capture-window effects. Capture policy is owned by `crates/core/src/capture`; OS screenshot and window mechanics are Infrastructure adapters.
+A frozen snapshot of the desktop used to produce screenshot output, OCR input, and capture-window effects. Capture policy is owned by `application/capture`; OS screenshot and window mechanics are Infrastructure adapters.
 
-The selection surface displays the same frozen monitor images used by preview, magnification, OCR, and output. It waits for every image to decode before reveal; selection completion never replaces the session pixels with another desktop capture. Windows uses one primary-display coordinate scale for the capture surface, monitor snapshots, and cursor/window geometry. Physical OS window positions are converted once at that boundary, including pin origins on mixed-DPI displays.
+The selection surface displays the same frozen monitor images used by preview, magnification, OCR, and output. It waits for every image to decode before reveal; selection completion never replaces the session pixels with another desktop capture. Windows uses one primary-display coordinate scale for the spanning WebView, monitor snapshots, and cursor/window geometry.
 
-On macOS, the session pins the native selection window and monitor view to the display under the pointer before capture begins. A spanning NSWindow is clipped to one display when displays have separate Spaces; the session retains all monitor layouts for native cursor coordinates and output.
+On macOS, the session pins the selection window and frontend monitor view to the display under the pointer before capture begins. A spanning NSWindow is clipped to one display when displays have separate Spaces; the session retains all monitor layouts for native cursor coordinates and output.
 
 ### File OCR
 
@@ -63,7 +62,7 @@ The workflow that reads one image file, uses those same bytes for both OCR input
 
 ### Selection Translation
 
-The workflow that reads the current selection-text mode, acquires selected text, and presents it in the Result Window with Selection origin and automatic translation. Hotkey and native menu entry points share the same sequencing; failed acquisition leaves the current result intact.
+The workflow that reads the current selection-text mode, acquires selected text, and presents it in the Result Window with Selection origin and automatic translation. Hotkey and IPC entry points share the same sequencing; failed acquisition leaves the current result intact.
 
 ### Capture OCR Delivery
 
@@ -73,39 +72,21 @@ The handoff of a Capture Session OCR result to the OCR window, translation windo
 
 The editing state within a Capture Session: selection geometry, annotation gestures, selected annotations, text drafts, styles, and undo/redo history. Pointer, keyboard, and toolbar intents share its state transitions. An edit commit publishes a consistent snapshot; Capture Session loading, cancellation, and output remain separate workflows.
 
-### Capture Completion
-
-The workflow that turns a quick-capture or editor command into an output or OCR
-handoff using the session's frozen pixels, annotations and cursor preference.
-Capture mode determines the primary action's destination. Saving follows the
-current output preferences and the user's chosen path; successful output ends
-the session, while cancelled file selection or failed output leaves it available
-for retry. A delayed native dialog cannot complete a replacement Capture Session.
-
 ### Scrolling Capture
 
 A sequence of images from one selected viewport while the user scrolls its content. Matching overlapping content produces one long image, retaining fixed headers and footers once. The latest appended segment can be undone without discarding earlier content. A Scrolling Capture is distinct from the frozen desktop image of an ordinary Capture Session. Complete copies and saves a PNG; reaching its configured height limit invokes the same output. A separate transparent Preview observes the task and passes mouse input through. A transparent viewport outline indicates the original capture region and also passes mouse input through.
 
 ### Result Window and Pinned Image
 
-Application runtimes that own their workflows and request runtime-host effects. Result Window owns one read-only View-facing state projection, editable text and language intents, translation/OCR favorite sequencing, OCR Provider fallback, and clipboard intents. Their native window, clipboard, and notification mechanics remain in Infrastructure. Windows pin placement preserves physical origins and centers/cascades against the virtual desktop without changing render DPI.
+Application runtimes that own their workflows and request runtime-host effects. Result Window owns one read-only View-facing state projection, editable text and language intents, translation/OCR favorite sequencing, OCR Provider fallback, and clipboard intents. Their Tauri window, clipboard, and notification mechanics remain in Infrastructure.
 
 ### Hotkey
 
-`crates/core/src/hotkeys/model.rs` owns the supported category/action vocabulary. `crates/core/src/hotkeys` owns configuration validation, registration state, display-key parsing, and pressed/released policy. The concrete global-shortcut registrar is an Infrastructure adapter. `app/src/shell/actions/shortcuts.rs` only maps a valid category/action to an `AppAction` for startup composition.
+`domain/hotkey_config.rs` owns the supported category/action vocabulary. `application/hotkeys` owns configuration validation, registration state, display-key parsing, and pressed/released policy. The concrete global-shortcut registrar is an Infrastructure adapter. `startup_shortcuts.rs` only maps a valid category/action to an `AppAction` for startup composition.
 
 ### Settings
 
-`crates/core/src/settings` owns durable setting defaults, normalization and section updates. The portable Settings session owns hydration, mutation ordering, Provider reload, Hotkey snapshots and invalidation through narrow ports. Both native hosts use it; Composition injects concrete workflows and native effects. Shared UI projects snapshots into controls. Navigation remains presentation state; Services route restoration uses a dedicated UI namespace rather than adding fields to General settings. The retained frontend configuration/stores exercise the original browser contracts only.
-
-### Settings Confirmation
-
-A pending decision about a destructive Settings or Library action. Approval applies
-only to that action in the originating Settings session and page. Cancellation
-leaves stored data unchanged; changing pages or closing the window invalidates the
-decision. Approval is consumed once. Showing a native dialog does not itself
-authorize or execute the action, and temporarily losing focus to that dialog does
-not close the Settings session.
+`application/settings` owns durable setting defaults, normalization, and section updates. Its frontend Settings Configuration module owns hydration, mutation serialization, Provider reload policy, Hotkey snapshots, and cross-window invalidation through narrow ports. Frontend stores only project Application state for Views. UI navigation state is view-local and not durable settings.
 
 ### System Speech
 
@@ -117,7 +98,7 @@ The History module turns Application events into stored records and serves histo
 
 ### Library
 
-The Library is the Settings Window's unified browsing surface for History and Favorites across screenshot, translation, and OCR content. Its application adapter owns cross-source filtering, ordering, pagination and mutation sequencing; shared UI owns rendering and local interaction state. The portable Library Index performs lightweight global ordering before the adapter loads only the final page's source records and thumbnails.
+The Library is the Settings Window's unified browsing surface for History and Favorites across screenshot, translation, and OCR content. Its frontend Application module owns cross-source filtering, ordering, pagination, and mutation sequencing; Views own rendering and local interaction state. A backend Library Index port performs lightweight global ordering before the frontend loads only the final page's source records and thumbnails.
 
 Library hydrates the selected records by stable ID rather than source offsets. Its history-page projection includes favorite membership for only the visible content identities, without loading all Favorite records or thumbnails.
 
@@ -129,31 +110,28 @@ Favorite Capacity is the backend Application module that owns the global maximum
 
 ### Release Verification
 
-`script/release-verification.mjs` is the shared release module used by local npm commands and native CI. It requires npm/Cargo manifests and locks to agree on the version, discovers Cargo's target directory, invokes `native-build.mjs`, and verifies macOS app/DMG or Windows NSIS/MSI/portable artifacts under `target/native/`. `desktop.json` owns stable application and installer identity; it does not duplicate the version. Release filenames and SHA-256 manifests remain compatible with the update selector.
-
-macOS verification mounts the final DMG and checks signing identity, dependencies, architecture and deployment targets. The release workflow imports one persistent self-signed identity into a temporary keychain without changing system trust; ordinary CI uses ad-hoc signing. Windows packaging verifies the native PE and bundled OCR/CRT/license tree, and native runner smoke tests cover installation and startup. Compilation/linking success is distinct from those runtime checks. See `docs/RELEASING.md` for setup and manual acceptance.
+`script/release-verification.mjs` is the shared release module used by local npm commands and native CI. It requires the package, Cargo, and Tauri versions to match, discovers the Cargo target directory through metadata, invokes the Tauri bundle build, and verifies the expected macOS, Linux, or Windows artifacts. macOS verification also mounts the final DMG and checks signing identity, bundled dependencies, architecture, and deployment targets. Official macOS builds use system OCR; Tesseract is opt-in via `tesseract-ocr`. Windows installation smoke tests run on GitHub Actions. `.github/workflows/release.yml` imports a persistent self-signed macOS identity from GitHub Secrets, pins its certificate fingerprint, builds macOS and unsigned Windows installers, and creates draft releases for version tags. The importer uses a temporary keychain without changing system trust; ordinary CI stays ad-hoc and never imports release keys. See `docs/RELEASING.md` for setup and manual acceptance.
 
 ### Permissions and Software Updates
 
-The Required Permissions workflow reads current OS grants and targets explicit requests/repairs to one permission. The system adapter detects temporary macOS installs, scopes TCC resets to this app and one service, and handles user-requested restarts. The first-use guide is confined to the Settings Window; the persistent General permissions section shares its native controller.
+`application/required_permissions` reads current OS grants and targets explicit requests/repairs to one permission. The system adapter detects temporary macOS installs, scopes TCC resets to this app and one service, and handles user-requested restarts. The first-use guide is confined to the Settings Window; the persistent General permissions section shares its frontend runtime.
 
-The Software Updates workflow selects newer stable GitHub releases and verified installers for the running platform/architecture. Its system adapter downloads to a private temporary directory, checks size and SHA-256, marks the internet origin, and opens the system installer. The native General controller checks once per settings session and serializes explicit checks/downloads. This uses the existing free release packages and requires no Apple Developer ID; it does not silently replace the app. Stable self-signed releases keep the same code identity; migrating from historical ad-hoc builds may require granting permissions again, and macOS controls permission retention.
+`application/updates` selects newer stable GitHub releases and verified installers for the running platform/architecture. Its system adapter downloads to a private temporary directory, checks size and SHA-256, marks the internet origin, and opens the system installer. The frontend runtime checks once per settings session and serializes explicit checks/downloads. This uses the existing free release packages and requires no Apple Developer ID; it does not silently replace the app. Stable self-signed releases keep the same code identity; migrating from historical ad-hoc builds may require granting permissions again, and macOS controls permission retention.
 
 ## Dependency Direction
 
 ```text
-Desktop bootstrap -> Core + UI + Platform + Providers + Storage
-Platform / Providers / Storage -> consumer-owned Core contracts
-Desktop features -> Core workflows + UI scenes/intents
-Native hosts -> shared UI presentation + optional render/accessibility modules
-Browser references -> original Views/Application + isolated fixture ports
+Frontend: Views -> Application -> Platform port -> Tauri
+Backend:  Commands -> Application <- Infrastructure
+                         ^
+                    Composition injects adapters
 ```
 
-Core feature-local `model.rs` files contain business data and vocabulary. They do not depend on workflows, UI, Platform, Storage or the desktop application.
+`domain/` contains shared data and vocabulary. It does not depend on Application, Platform, Tauri, or Infrastructure.
 
 ## Verification Rules
 
-- Browser reference Views and Application modules do not import desktop Platform modules or Tauri packages; the old production adapters are deleted.
-- Core production modules do not import concrete adapters or desktop startup code. Desktop features receive explicit dependencies and do not import AppState or bootstrap.
+- Frontend production views and Application modules do not import Platform modules or Tauri packages.
+- Backend Application production modules do not import `crate::infrastructure` or crate-root startup adapters.
 - Architecture tests enforce these rules; no migration allowlist is retained.
-- Application CI targets macOS Apple Silicon, macOS Intel and Windows and runs native build/verification plus installer smoke. The React reference build and tests remain independent tools. Native runtime acceptance is not inferred from Windows cross compilation or PE linking.
+- Native CI runs the frontend test/build and backend format/test/check commands on macOS, Ubuntu, and Windows. It is native verification, not a cross-compilation claim.

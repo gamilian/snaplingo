@@ -115,7 +115,7 @@ SnapLingo 目前缺少一个主设置窗口（Settings Window），用户无法�
 - `src/stores/providerStore.ts` - Provider configuration state management (Zustand)
 
 **Modules to Modify**:
-- `reference/web/App.tsx` - Replace prototype import with real SettingsWindow
+- `src/App.tsx` - Replace prototype import with real SettingsWindow
 - `src/main.tsx` - Restore normal App import
 
 ### State Management
@@ -299,7 +299,7 @@ Provider activation:
 Look at existing tests for patterns:
 - Component interaction tests (if any exist in `src/components/`)
 - Store tests (check if Zustand stores have test files)
-- Tauri command mocking patterns (check `app/` for test examples)
+- Tauri command mocking patterns (check `src-tauri/` for test examples)
 
 If no prior art exists, follow these patterns:
 - Use Vitest + React Testing Library

@@ -11,7 +11,7 @@ import {
 } from "node:fs";
 import { createHash } from "node:crypto";
 import { verifyMacOSApplication } from "./macos-release-verification.mjs";
-import { verifyNativeWindowsBundle } from "./native-windows-build.mjs";
+import { createWindowsPortableArtifact } from "./windows-portable.mjs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -64,6 +64,8 @@ export function verifyReleaseArtifacts({
 export function releaseAssetName({ projectName, version, target, kind }) {
   const extension = {
     "macOS disk image": ".dmg",
+    "Linux AppImage": ".AppImage",
+    "Debian package": ".deb",
     "Windows MSI installer": ".msi",
     "Windows NSIS installer": "-setup.exe",
     "Windows portable archive": "-portable.zip",
@@ -73,33 +75,65 @@ export function releaseAssetName({ projectName, version, target, kind }) {
 }
 
 export function releaseArtifactContract(platform, productName, version) {
+  const isCurrentVersion = (name) => !version || name.includes(`_${version}_`);
   switch (platform) {
     case "darwin":
       return [
         {
           kind: "macOS application",
-          directory: ".",
+          directory: "macos",
           matches: (name) => name === `${productName}.app`,
           validate: validateMacOsApplication,
         },
         {
           kind: "macOS disk image",
-          directory: "bundle/dmg",
-          matches: (name) => ["aarch64", "x86_64"].some(architecture =>
-            name === `${productName.toLowerCase()}-v${version}-macos-${architecture}.dmg`),
+          directory: "dmg",
+          matches: (name) =>
+            name.endsWith(".dmg") &&
+            !name.startsWith("rw.") &&
+            isCurrentVersion(name),
+          validate: validateNonEmptyFile,
+        },
+      ];
+    case "linux":
+      return [
+        {
+          kind: "Linux AppImage",
+          directory: "appimage",
+          matches: (name) =>
+            name.endsWith(".AppImage") && isCurrentVersion(name),
+          validate: validateExecutableFile,
+        },
+        {
+          kind: "Debian package",
+          directory: "deb",
+          matches: (name) => name.endsWith(".deb") && isCurrentVersion(name),
           validate: validateNonEmptyFile,
         },
       ];
     case "win32":
       return [
-        { kind: "Windows MSI installer", directory: "bundle/msi", suffix: ".msi" },
-        { kind: "Windows NSIS installer", directory: "bundle/nsis", suffix: "-setup.exe" },
-        { kind: "Windows portable archive", directory: "bundle/portable", suffix: "-portable.zip" },
-      ].map(artifact => ({
-        ...artifact,
-        matches: (name) => name === `${productName}_${version}_x64${artifact.suffix}`,
-        validate: validateNonEmptyFile,
-      }));
+        {
+          kind: "Windows MSI installer",
+          directory: "msi",
+          matches: (name) =>
+            name.toLowerCase().endsWith(".msi") && isCurrentVersion(name),
+          validate: validateNonEmptyFile,
+        },
+        {
+          kind: "Windows NSIS installer",
+          directory: "nsis",
+          matches: (name) =>
+            name.toLowerCase().endsWith(".exe") && isCurrentVersion(name),
+          validate: validateNonEmptyFile,
+        },
+        {
+          kind: "Windows portable archive",
+          directory: "portable",
+          matches: (name) => name.endsWith("-portable.zip") && isCurrentVersion(name),
+          validate: validateNonEmptyFile,
+        },
+      ];
     default:
       throw new Error(`Unsupported release platform: ${platform}`);
   }
@@ -210,8 +244,8 @@ function run(command, args, options = {}) {
 
 function loadReleaseContext() {
   const packageManifest = readJson(join(repositoryRoot, "package.json"));
-  const desktopConfig = readJson(
-    join(repositoryRoot, "app", "desktop.json"),
+  const tauriConfig = readJson(
+    join(repositoryRoot, "src-tauri", "tauri.conf.json"),
   );
   const cargoMetadata = JSON.parse(
     run("cargo", [
@@ -221,7 +255,7 @@ function loadReleaseContext() {
       "1",
       "--locked",
       "--manifest-path",
-      "app/Cargo.toml",
+      "src-tauri/Cargo.toml",
     ]),
   );
   const cargoPackage = cargoMetadata.packages.find(
@@ -244,6 +278,7 @@ function loadReleaseContext() {
     "package-lock.json packages['']": packageLockRoot?.version,
     "Cargo.toml": cargoPackage.version,
     "Cargo.lock": cargoLockVersion,
+    "tauri.conf.json": tauriConfig.version,
   });
   assertMatchingReleaseTag(version);
 
@@ -251,24 +286,32 @@ function loadReleaseContext() {
     repositoryRoot,
     version,
     packageName: packageManifest.name,
-    config: { ...desktopConfig, version },
-    productName: desktopConfig.productName ?? packageManifest.name,
+    config: tauriConfig,
+    productName: tauriConfig.productName ?? packageManifest.name,
     targetDirectory: cargoMetadata.target_directory,
-    bundleDirectory: join(cargoMetadata.target_directory, "native", "release"),
+    bundleDirectory: join(cargoMetadata.target_directory, "release", "bundle"),
   };
 }
 
 function cleanReleaseOutputs(targetDirectory) {
+  rmSync(join(repositoryRoot, "dist"), { recursive: true, force: true });
   rmSync(join(targetDirectory, "release"), { recursive: true, force: true });
-  rmSync(join(targetDirectory, "native", "release"), { recursive: true, force: true });
 }
 
 function buildRelease(context, args) {
-  if (args.length) throw new Error(`Unsupported release build options: ${args.join(" ")}`);
-  // Native packaging owns its staging directory; keep Cargo compilation caches.
+  // Remove stale bundles without discarding Cargo incremental compilation.
   rmSync(context.bundleDirectory, { recursive: true, force: true });
-  run(process.execPath, [join(repositoryRoot, "script", "native-build.mjs"), "build"],
-    { stdio: "inherit" });
+  run(
+    process.execPath,
+    [join(repositoryRoot, "script", "run-tauri-build.mjs"), ...args],
+    { stdio: "inherit" },
+  );
+  run(
+    process.execPath,
+    [join(repositoryRoot, "script", "fix-macos-release-signing.mjs"),
+      join(context.bundleDirectory, "macos", `${context.productName}.app`)],
+    { stdio: "inherit" },
+  );
 }
 
 function verifyNativeMacOSArtifacts(context, artifacts) {
@@ -295,31 +338,34 @@ function verifyNativeMacOSArtifacts(context, artifacts) {
   console.log(`[release] Gatekeeper (unnotarized beta rejection is expected): ${assessment.stderr?.trim()}`);
 }
 
-export function collectArtifacts(context, artifacts, environment = process.env) {
-  const output = join(context.repositoryRoot, "release-assets");
+function collectArtifacts(context, artifacts) {
+  const output = join(repositoryRoot, "release-assets");
   mkdirSync(output, { recursive: true });
   const checksums = [];
-  const target = environment.SNAPLINGO_RELEASE_TARGET ?? releaseTarget();
-  if (!/^(macos-(aarch64|x86_64)|windows-x86_64)$/.test(target)) throw new Error("Invalid release target");
+  const suffix = process.env.SNAPLINGO_ARTIFACT_SUFFIX ?? "";
+  if (suffix && !/^[a-z0-9-]+$/.test(suffix)) throw new Error("Invalid artifact suffix");
+  const target = process.env.SNAPLINGO_RELEASE_TARGET ?? releaseTarget();
+  const label = `${target}${suffix ? `-${suffix}` : ""}`;
   for (const artifact of artifacts) {
     if (statSync(artifact.path).isDirectory()) continue;
+    if (artifact.kind === "Windows portable archive" && label.endsWith("-offline")) continue;
     const name = releaseAssetName({
       projectName: context.packageName,
       version: context.version,
-      target,
+      target: `${target}${suffix ? `-${suffix}` : ""}`,
       kind: artifact.kind,
     });
     copyFileSync(artifact.path, join(output, name));
     const hash = createHash("sha256").update(readFileSync(artifact.path)).digest("hex");
     checksums.push(`${hash}  ${name}`);
   }
-  const assetPrefix = `${context.packageName}-v${context.version}-${target}`;
+  const assetPrefix = `${context.packageName}-v${context.version}-${label}`;
   writeFileSync(join(output, `${assetPrefix}.SHA256SUMS.txt`), `${checksums.join("\n")}\n`);
   writeFileSync(join(output, `${assetPrefix}.build.json`), JSON.stringify({
-    version: context.version, commit: environment.GITHUB_SHA ?? run("git", ["rev-parse", "HEAD"]).trim(),
+    version: context.version, commit: process.env.GITHUB_SHA ?? run("git", ["rev-parse", "HEAD"]).trim(),
     platform: process.platform, architecture: process.arch,
-    signing: process.platform === "darwin" ? (environment.SNAPLINGO_SIGNING_MODE ?? "self-signed") : "unsigned",
-    certificateSha1: environment.SNAPLINGO_CERTIFICATE_SHA1 ?? null,
+    signing: process.platform === "darwin" ? (process.env.SNAPLINGO_SIGNING_MODE ?? "self-signed") : "unsigned",
+    certificateSha1: process.env.SNAPLINGO_CERTIFICATE_SHA1 ?? null,
   }, null, 2) + "\n");
 }
 
@@ -363,12 +409,12 @@ async function main(args) {
   if (command === "build") {
     if (args.includes("--clean")) {
       cleanReleaseOutputs(context.targetDirectory);
-      console.log("[release] Removed previous native release outputs");
+      console.log("[release] Removed previous frontend and release outputs");
     }
     buildRelease(context, args.slice(1).filter(arg => arg !== "--clean" && arg !== "--"));
+    if (process.platform === "win32") createWindowsPortableArtifact(context);
   }
 
-  if (process.platform === "win32") verifyNativeWindowsBundle(join(context.bundleDirectory, "app"));
   const artifacts = verifyReleaseArtifacts({
     platform: process.platform,
     bundleDirectory: context.bundleDirectory,

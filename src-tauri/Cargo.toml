@@ -1,0 +1,134 @@
+[package]
+name = "snaplingo"
+version = "0.1.23"
+description = "A cross-platform screenshot, OCR, and translation tool"
+authors = ["SnapLingo Contributors"]
+license = "MIT"
+repository = "https://github.com/gamilian/snaplingo"
+edition = "2021"
+rust-version = "1.88"
+
+[lib]
+name = "snaplingo_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[features]
+default = []
+tesseract-ocr = ["dep:tesseract"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.2", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+regex = "1"
+serde = { version = "1.0", features = ["derive"] }
+tauri = { version = "2.0", features = ["macos-private-api", "tray-icon"] }
+tauri-plugin-log = "2"
+fern = "0.7"
+tauri-plugin-shell = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-autostart = "2"
+tauri-plugin-screenshots = { git = "https://github.com/ayangweb/tauri-plugin-screenshots" }
+log = "0.4"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Async traits
+async-trait = "0.1"
+
+# Image processing
+image = "0.25"
+webp = "0.3"
+ab_glyph = "0.2"
+fontdb = "0.23"
+
+# Clipboard and keyboard
+arboard = "3.2"
+enigo = "0.1"
+
+# HTTP client for providers
+reqwest = { version = "0.11", features = ["json", "socks"] }
+tokio = { version = "1", features = ["full"] }
+urlencoding = "2.1"
+md5 = "0.7"
+sha2 = "0.10"
+semver = "1"
+tempfile = "3.8"
+
+# Language detection
+lingua = "1.5"
+
+# OCR
+base64 = "0.21"
+oar-ocr-core = { version = "=0.6.0", default-features = false }
+# The 0.6.3 macro release changed the 0.6.0 core's validation syntax.
+oar-ocr-derive = "=0.6.0"
+ort = { version = "=2.0.0-rc.11", default-features = false, features = ["std", "ndarray", "load-dynamic"] }
+ndarray = "0.17"
+
+# Configuration
+dirs = "5.0"
+json-patch = "1.2"
+
+# Database and credentials
+rusqlite = { version = "0.29", features = ["bundled"] }
+
+# Date and time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Concurrency
+parking_lot = { version = "0.12.5", features = ["send_guard"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+ocr-rs = { git = "https://github.com/zibo-chen/ocr-rs", rev = "664a945953e46186b37203fa4902a20d60a32809", default-features = false }
+ort = { version = "=2.0.0-rc.11", default-features = false, features = ["coreml"] }
+accessibility-sys = "0.2"
+core-foundation = "0.9"
+core-graphics = "0.23"
+objc2 = "0.6.4"
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "libc", "NSApplication", "NSCursor", "NSEvent", "NSGraphicsContext", "NSImage", "NSPasteboard", "NSRunningApplication", "NSView", "NSWindow", "NSWorkspace"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSData", "NSGeometry", "NSProcessInfo", "objc2-core-foundation"] }
+objc2-vision = { version = "0.3.2", default-features = false, features = ["std", "VNObservation", "VNRecognizeTextRequest", "VNRequest", "VNRequestHandler", "VNTypes", "objc2-core-foundation"] }
+xcap = "0.9"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+libloading = "0.9"
+ort = { version = "=2.0.0-rc.11", default-features = false, features = ["directml"] }
+clipboard-win = "5.4.1"
+windows = { version = "0.51", features = [
+    "Foundation",
+    "Foundation_Collections",
+    "Globalization",
+    "Win32_Graphics_Gdi",
+    "Win32_System_Com",
+    "Graphics_Imaging",
+    "Media_Ocr",
+    "Storage_Streams",
+    "Win32_Foundation",
+    "Win32_System_WinRT",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Accessibility",
+    "Win32_UI_WindowsAndMessaging",
+] }
+xcap = "0.9"
+
+[target.'cfg(target_os = "macos")'.dependencies.tesseract]
+version = "0.14"
+optional = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+tesseract = "0.14"
+xcap = "0.9"
+
+[dev-dependencies]
+mockito = "1.2"
+syn = { version = "2", default-features = false, features = ["full", "parsing", "visit"] }
+
+[[test]]
+name = "result_window_drag"
+harness = false

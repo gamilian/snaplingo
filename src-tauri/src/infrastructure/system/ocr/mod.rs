@@ -1,0 +1,30 @@
+mod image_file;
+pub(crate) use image_file::FilesystemImageReader;
+
+#[cfg(target_os = "macos")]
+mod macos;
+#[cfg(any(
+    target_os = "linux",
+    all(target_os = "macos", feature = "tesseract-ocr")
+))]
+mod tesseract;
+#[cfg(target_os = "windows")]
+mod windows;
+#[cfg(any(target_os = "windows", test))]
+mod windows_image;
+
+#[cfg(all(test, target_os = "macos"))]
+pub(crate) use macos::vision_languages_for_request;
+#[cfg(target_os = "macos")]
+pub(crate) use macos::MacOSVisionOcrEngine;
+#[cfg(target_os = "windows")]
+pub(crate) use windows::WindowsOcrEngine;
+
+#[cfg(any(
+    target_os = "linux",
+    all(target_os = "macos", feature = "tesseract-ocr")
+))]
+pub(crate) fn get_tesseract_engine(
+) -> std::sync::Arc<dyn crate::application::providers::ocr::TesseractEngine> {
+    std::sync::Arc::new(tesseract::SystemTesseractEngine::new())
+}

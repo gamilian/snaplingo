@@ -1,0 +1,457 @@
+import { invoke } from '@tauri-apps/api/core';
+import { resolveInterfaceTheme, type InterfaceTheme } from '../../application/settings/theme';
+import type {
+  AppLogEntry,
+  AnnotationColorPreset,
+  ScreenshotFormat,
+  ScreenshotNamingRule,
+  ResultWindowPosition,
+  SelectionTextMode,
+  TranslationInputState,
+} from '../../application/settings/ports';
+
+interface BackendGeneralSettings {
+  language: string;
+  theme: string;
+  interface_theme?: string;
+  start_on_boot: boolean;
+  proxy_mode?: 'system' | 'none' | 'manual';
+  proxy_url?: string;
+  request_timeout_ms?: number;
+  retry_count?: number;
+  log_level?: 'debug' | 'info' | 'warn' | 'error';
+  log_retention_days?: number;
+  performance_monitoring?: boolean;
+  experimental_gpu_acceleration?: boolean;
+  system_tts_voice?: string;
+  system_tts_rate?: number;
+  settings_window_x?: number;
+  settings_window_y?: number;
+  settings_window_width?: number;
+  settings_window_height?: number;
+  last_result_window_x?: number;
+  last_result_window_y?: number;
+}
+
+interface BackendScreenshotSettings {
+  save_path: string;
+  format: ScreenshotFormat;
+  quality: number;
+  naming_rule: ScreenshotNamingRule;
+  custom_file_name: string;
+  last_save_directory?: string | null;
+  last_save_format?: ScreenshotFormat | null;
+  auto_copy: boolean;
+  default_stroke_width: number;
+  default_font_size: number;
+  remember_last_tool: boolean;
+  show_selection_size: boolean;
+  show_magnifier: boolean;
+  magnifier_zoom?: number;
+  pin_opacity: number;
+  pin_shadow: boolean;
+  pin_border?: boolean;
+  pin_position?: 'original' | 'center';
+  pin_border_shortcut?: string;
+  longshot_max_height?: number;
+  capture_ui_scale?: import('../../application/settings/ports').CaptureUiScale;
+  annotation_tool_shortcuts?: Record<string, string>;
+  annotation_colors: AnnotationColorPreset[];
+  selection_border_width?: number;
+  selection_border_color?: AnnotationColorPreset;
+  selection_mask_color?: AnnotationColorPreset;
+}
+
+interface BackendTranslationSettings {
+  default_source_lang: string;
+  default_target_lang: string;
+  auto_translate: boolean;
+  auto_copy: boolean;
+  preserve_line_breaks: boolean;
+  incremental_translation: boolean;
+  window_always_on_top: boolean;
+  hide_on_blur: boolean;
+  selection_window_position?: ResultWindowPosition;
+  input_window_position?: ResultWindowPosition;
+  selection_input_state?: TranslationInputState;
+  screenshot_input_state?: TranslationInputState;
+  max_window_height_ratio?: number;
+  window_width?: number;
+  selection_text_mode?: SelectionTextMode;
+}
+
+interface BackendOcrSettings {
+  gpu_acceleration?: boolean;
+  recognition_language: string;
+  preserve_formatting: boolean;
+  remove_chinese_spaces: boolean;
+  show_confidence: boolean;
+  window_position?: ResultWindowPosition;
+  hide_silent_status?: boolean;
+}
+
+interface BackendHistorySettings {
+  auto_cleanup_enabled: boolean;
+  retention_days: number;
+  maximum_records: number;
+  maximum_favorites: number;
+}
+
+interface BackendSettingsSnapshot {
+  general: BackendGeneralSettings;
+  screenshot: BackendScreenshotSettings;
+  translation: BackendTranslationSettings;
+  ocr: BackendOcrSettings;
+  history: BackendHistorySettings;
+}
+
+interface GeneralSettingsInput {
+  language: string;
+  theme: string;
+  interfaceTheme?: InterfaceTheme;
+  startOnBoot: boolean;
+  proxyMode?: 'system' | 'none' | 'manual';
+  proxyUrl?: string;
+  requestTimeoutMs?: number;
+  retryCount?: number;
+  logLevel?: 'debug' | 'info' | 'warn' | 'error';
+  logRetentionDays?: number;
+  performanceMonitoring?: boolean;
+  experimentalGpuAcceleration?: boolean;
+  systemTtsVoice?: string;
+  systemTtsRate?: number;
+  settingsWindowX?: number;
+  settingsWindowY?: number;
+  settingsWindowWidth?: number;
+  settingsWindowHeight?: number;
+  lastResultWindowX?: number;
+  lastResultWindowY?: number;
+}
+
+interface ScreenshotSettingsInput {
+  savePath: string;
+  format: ScreenshotFormat;
+  quality: number;
+  namingRule: ScreenshotNamingRule;
+  customFileName: string;
+  lastSaveDirectory?: string;
+  lastSaveFormat?: ScreenshotFormat;
+  autoCopy: boolean;
+  defaultStrokeWidth: number;
+  defaultFontSize: number;
+  rememberLastTool: boolean;
+  showSelectionSize: boolean;
+  showMagnifier: boolean;
+  magnifierZoom?: number;
+  pinOpacity: number;
+  pinShadow: boolean;
+  pinBorder?: boolean;
+  pinPosition?: 'original' | 'center';
+  pinBorderShortcut?: string;
+  longshotMaxHeight?: number;
+  captureUiScale?: import('../../application/settings/ports').CaptureUiScale;
+  annotationToolShortcuts?: Record<string, string>;
+  annotationColors: AnnotationColorPreset[];
+  selectionBorderWidth?: number;
+  selectionBorderColor?: AnnotationColorPreset;
+  selectionMaskColor?: AnnotationColorPreset;
+}
+
+interface TranslationSettingsInput {
+  defaultSourceLang: string;
+  defaultTargetLang: string;
+  autoTranslate: boolean;
+  autoCopy: boolean;
+  preserveLineBreaks: boolean;
+  incrementalTranslation: boolean;
+  windowAlwaysOnTop: boolean;
+  hideOnBlur: boolean;
+  selectionWindowPosition?: ResultWindowPosition;
+  inputWindowPosition?: ResultWindowPosition;
+  selectionInputState?: TranslationInputState;
+  screenshotInputState?: TranslationInputState;
+  maxWindowHeightRatio?: number;
+  windowWidth?: number;
+  selectionTextMode?: SelectionTextMode;
+}
+
+interface OcrSettingsInput {
+  gpuAcceleration?: boolean;
+  recognitionLanguage: string;
+  preserveFormatting: boolean;
+  removeChineseSpaces: boolean;
+  showConfidence: boolean;
+  windowPosition?: ResultWindowPosition;
+  hideSilentStatus?: boolean;
+}
+
+function normalizeSnapshot(snapshot: BackendSettingsSnapshot) {
+  return {
+    general: {
+      language: snapshot.general.language,
+      theme: snapshot.general.theme,
+      interfaceTheme: resolveInterfaceTheme(snapshot.general.interface_theme),
+      startOnBoot: snapshot.general.start_on_boot,
+      proxyMode: snapshot.general.proxy_mode ?? 'system',
+      proxyUrl: snapshot.general.proxy_url ?? '',
+      requestTimeoutMs: snapshot.general.request_timeout_ms ?? 10_000,
+      retryCount: snapshot.general.retry_count ?? 1,
+      logLevel: snapshot.general.log_level ?? 'info',
+      logRetentionDays: snapshot.general.log_retention_days ?? 7,
+      performanceMonitoring: snapshot.general.performance_monitoring ?? false,
+      experimentalGpuAcceleration:
+        snapshot.general.experimental_gpu_acceleration ?? false,
+      systemTtsVoice: snapshot.general.system_tts_voice ?? '',
+      systemTtsRate: snapshot.general.system_tts_rate ?? 180,
+      ...(snapshot.general.settings_window_x !== undefined
+        ? { settingsWindowX: snapshot.general.settings_window_x }
+        : {}),
+      ...(snapshot.general.settings_window_y !== undefined
+        ? { settingsWindowY: snapshot.general.settings_window_y }
+        : {}),
+      ...(snapshot.general.settings_window_width !== undefined
+        ? { settingsWindowWidth: snapshot.general.settings_window_width }
+        : {}),
+      ...(snapshot.general.settings_window_height !== undefined
+        ? { settingsWindowHeight: snapshot.general.settings_window_height }
+        : {}),
+      ...(snapshot.general.last_result_window_x !== undefined
+        ? { lastResultWindowX: snapshot.general.last_result_window_x }
+        : {}),
+      ...(snapshot.general.last_result_window_y !== undefined
+        ? { lastResultWindowY: snapshot.general.last_result_window_y }
+        : {}),
+    },
+    screenshot: {
+      savePath: snapshot.screenshot.save_path,
+      format: snapshot.screenshot.format,
+      quality: snapshot.screenshot.quality,
+      namingRule: snapshot.screenshot.naming_rule,
+      customFileName: snapshot.screenshot.custom_file_name,
+      ...(snapshot.screenshot.last_save_directory ? { lastSaveDirectory: snapshot.screenshot.last_save_directory } : {}),
+      ...(snapshot.screenshot.last_save_format ? { lastSaveFormat: snapshot.screenshot.last_save_format } : {}),
+      autoCopy: snapshot.screenshot.auto_copy,
+      defaultStrokeWidth: snapshot.screenshot.default_stroke_width,
+      defaultFontSize: snapshot.screenshot.default_font_size,
+      rememberLastTool: snapshot.screenshot.remember_last_tool,
+      showSelectionSize: snapshot.screenshot.show_selection_size,
+      showMagnifier: snapshot.screenshot.show_magnifier,
+      magnifierZoom: snapshot.screenshot.magnifier_zoom ?? 12,
+      pinOpacity: snapshot.screenshot.pin_opacity,
+      pinShadow: snapshot.screenshot.pin_shadow,
+      pinBorder: snapshot.screenshot.pin_border ?? false,
+      pinPosition: snapshot.screenshot.pin_position ?? 'original',
+      pinBorderShortcut: snapshot.screenshot.pin_border_shortcut ?? 'b',
+      longshotMaxHeight: snapshot.screenshot.longshot_max_height ?? 30_000,
+      captureUiScale: snapshot.screenshot.capture_ui_scale ?? 'auto',
+      annotationToolShortcuts: snapshot.screenshot.annotation_tool_shortcuts ?? {},
+      annotationColors: snapshot.screenshot.annotation_colors,
+      selectionBorderWidth: snapshot.screenshot.selection_border_width ?? 2,
+      selectionBorderColor:
+        snapshot.screenshot.selection_border_color ?? [91, 127, 255, 242],
+      selectionMaskColor: snapshot.screenshot.selection_mask_color ?? [0, 0, 0, 46],
+    },
+    translation: {
+      defaultSourceLang: snapshot.translation.default_source_lang,
+      defaultTargetLang: snapshot.translation.default_target_lang,
+      autoTranslate: snapshot.translation.auto_translate,
+      autoCopy: snapshot.translation.auto_copy,
+      preserveLineBreaks: snapshot.translation.preserve_line_breaks,
+      incrementalTranslation: snapshot.translation.incremental_translation,
+      windowAlwaysOnTop: snapshot.translation.window_always_on_top,
+      hideOnBlur: snapshot.translation.hide_on_blur,
+      selectionWindowPosition:
+        snapshot.translation.selection_window_position ?? 'below-cursor',
+      inputWindowPosition: snapshot.translation.input_window_position ?? 'center',
+      selectionInputState: snapshot.translation.selection_input_state ?? 'last',
+      screenshotInputState: snapshot.translation.screenshot_input_state ?? 'last',
+      maxWindowHeightRatio: snapshot.translation.max_window_height_ratio ?? 70,
+      windowWidth: snapshot.translation.window_width ?? 660,
+      selectionTextMode: snapshot.translation.selection_text_mode ?? 'smart',
+    },
+    ocr: {
+      gpuAcceleration: snapshot.ocr.gpu_acceleration ?? true,
+      recognitionLanguage: snapshot.ocr.recognition_language,
+      preserveFormatting: snapshot.ocr.preserve_formatting,
+      removeChineseSpaces: snapshot.ocr.remove_chinese_spaces,
+      showConfidence: snapshot.ocr.show_confidence,
+      windowPosition: snapshot.ocr.window_position ?? 'cursor',
+      hideSilentStatus: snapshot.ocr.hide_silent_status ?? false,
+    },
+    history: {
+      autoCleanupEnabled: snapshot.history.auto_cleanup_enabled,
+      retentionDays: snapshot.history.retention_days,
+      maximumRecords: snapshot.history.maximum_records,
+      maximumFavorites: snapshot.history.maximum_favorites,
+    },
+  };
+}
+
+export async function getSettingsSnapshot() {
+  return normalizeSnapshot(
+    await invoke<BackendSettingsSnapshot>('get_settings_snapshot'),
+  );
+}
+
+export async function updateGeneralSettings(input: GeneralSettingsInput) {
+  return normalizeSnapshot(
+    await invoke<BackendSettingsSnapshot>('update_general_settings', {
+      input: {
+        language: input.language,
+        theme: input.theme,
+        interface_theme: input.interfaceTheme ?? 'native',
+        start_on_boot: input.startOnBoot,
+        proxy_mode: input.proxyMode ?? 'system',
+        proxy_url: input.proxyUrl ?? '',
+        request_timeout_ms: input.requestTimeoutMs ?? 10_000,
+        retry_count: input.retryCount ?? 1,
+        log_level: input.logLevel ?? 'info',
+        log_retention_days: input.logRetentionDays ?? 7,
+        performance_monitoring: input.performanceMonitoring ?? false,
+        experimental_gpu_acceleration:
+          input.experimentalGpuAcceleration ?? false,
+        system_tts_voice: input.systemTtsVoice ?? '',
+        system_tts_rate: input.systemTtsRate ?? 180,
+        ...(input.settingsWindowX !== undefined
+          ? { settings_window_x: input.settingsWindowX }
+          : {}),
+        ...(input.settingsWindowY !== undefined
+          ? { settings_window_y: input.settingsWindowY }
+          : {}),
+        ...(input.settingsWindowWidth !== undefined
+          ? { settings_window_width: input.settingsWindowWidth }
+          : {}),
+        ...(input.settingsWindowHeight !== undefined
+          ? { settings_window_height: input.settingsWindowHeight }
+          : {}),
+        ...(input.lastResultWindowX !== undefined
+          ? { last_result_window_x: input.lastResultWindowX }
+          : {}),
+        ...(input.lastResultWindowY !== undefined
+          ? { last_result_window_y: input.lastResultWindowY }
+          : {}),
+      },
+    }),
+  );
+}
+
+export async function updateLastResultWindowPosition(position: {
+  x: number;
+  y: number;
+}) {
+  await invoke<void>('update_last_result_window_position', {
+    x: Math.round(position.x),
+    y: Math.round(position.y),
+  });
+}
+
+export async function listAppLogs(limit: number) {
+  return invoke<AppLogEntry[]>('list_app_logs', { limit });
+}
+
+export async function clearAppLogs() {
+  await invoke<void>('clear_app_logs');
+}
+
+export async function updateScreenshotSettings(input: ScreenshotSettingsInput) {
+  return normalizeSnapshot(
+    await invoke<BackendSettingsSnapshot>('update_screenshot_settings', {
+      input: {
+        save_path: input.savePath,
+        format: input.format,
+        quality: input.quality,
+        naming_rule: input.namingRule,
+        custom_file_name: input.customFileName,
+        auto_copy: input.autoCopy,
+        default_stroke_width: input.defaultStrokeWidth,
+        default_font_size: input.defaultFontSize,
+        remember_last_tool: input.rememberLastTool,
+        show_selection_size: input.showSelectionSize,
+        show_magnifier: input.showMagnifier,
+        magnifier_zoom: input.magnifierZoom ?? 12,
+        pin_opacity: input.pinOpacity,
+        pin_shadow: input.pinShadow,
+        pin_border: input.pinBorder ?? false,
+        pin_position: input.pinPosition ?? 'original',
+        pin_border_shortcut: input.pinBorderShortcut ?? 'b',
+        longshot_max_height: input.longshotMaxHeight ?? 30_000,
+        capture_ui_scale: input.captureUiScale ?? 'auto',
+        annotation_tool_shortcuts: input.annotationToolShortcuts ?? {},
+        annotation_colors: input.annotationColors,
+        selection_border_width: input.selectionBorderWidth ?? 2,
+        selection_border_color:
+          input.selectionBorderColor ?? [91, 127, 255, 242],
+        selection_mask_color: input.selectionMaskColor ?? [0, 0, 0, 46],
+      },
+    }),
+  );
+}
+
+export async function updateAnnotationColors(colors: AnnotationColorPreset[]) {
+  return normalizeSnapshot(
+    await invoke<BackendSettingsSnapshot>('update_annotation_colors', {
+      colors,
+    }),
+  );
+}
+
+export async function updateTranslationSettings(
+  input: TranslationSettingsInput,
+) {
+  return normalizeSnapshot(
+    await invoke<BackendSettingsSnapshot>('update_translation_settings', {
+      input: {
+        default_source_lang: input.defaultSourceLang,
+        default_target_lang: input.defaultTargetLang,
+        auto_translate: input.autoTranslate,
+        auto_copy: input.autoCopy,
+        preserve_line_breaks: input.preserveLineBreaks,
+        incremental_translation: input.incrementalTranslation,
+        window_always_on_top: input.windowAlwaysOnTop,
+        hide_on_blur: input.hideOnBlur,
+        selection_window_position:
+          input.selectionWindowPosition ?? 'below-cursor',
+        input_window_position: input.inputWindowPosition ?? 'center',
+        selection_input_state: input.selectionInputState ?? 'last',
+        screenshot_input_state: input.screenshotInputState ?? 'last',
+        max_window_height_ratio: input.maxWindowHeightRatio ?? 70,
+        window_width: input.windowWidth ?? 660,
+        selection_text_mode: input.selectionTextMode ?? 'smart',
+      },
+    }),
+  );
+}
+
+export async function updateOcrSettings(input: OcrSettingsInput) {
+  return normalizeSnapshot(
+    await invoke<BackendSettingsSnapshot>('update_ocr_settings', {
+      input: {
+        recognition_language: input.recognitionLanguage,
+        gpu_acceleration: input.gpuAcceleration ?? true,
+        preserve_formatting: input.preserveFormatting,
+        remove_chinese_spaces: input.removeChineseSpaces,
+        show_confidence: input.showConfidence,
+        window_position: input.windowPosition ?? 'cursor',
+        hide_silent_status: input.hideSilentStatus ?? false,
+      },
+    }),
+  );
+}
+
+export async function updateHistorySettings(input: {
+  autoCleanupEnabled: boolean;
+  retentionDays: number;
+  maximumRecords: number;
+  maximumFavorites: number;
+}) {
+  return normalizeSnapshot(
+    await invoke<BackendSettingsSnapshot>('update_history_settings', {
+      input: {
+        auto_cleanup_enabled: input.autoCleanupEnabled,
+        retention_days: input.retentionDays,
+        maximum_records: input.maximumRecords,
+        maximum_favorites: input.maximumFavorites,
+      },
+    }),
+  );
+}

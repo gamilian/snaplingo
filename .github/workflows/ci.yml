@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-15, macos-15-intel, windows-2022]
+        os: [macos-15, macos-15-intel, ubuntu-24.04, windows-2022]
     env:
       SNAPLINGO_SIGNING_MODE: adhoc
       CARGO_INCREMENTAL: '0'
@@ -33,24 +33,23 @@ jobs:
         with:
           node-version: 22
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install native Windows installer compilers
-        if: runner.os == 'Windows'
-        run: choco install nsis wixtoolset --no-progress -y
+      - name: Install Linux desktop dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libayatana-appindicator3-dev libgbm-dev libgtk-3-dev \
+            libjavascriptcoregtk-4.1-dev libleptonica-dev librsvg2-dev libsoup-3.0-dev \
+            libwebkit2gtk-4.1-dev tesseract-ocr libtesseract-dev libpipewire-0.3-dev libclang-dev libxdo-dev
       - run: npm ci
       - run: npm test
       - run: npm run ocr:prepare
-      - run: npm run reference:build
-      - run: cargo fmt --manifest-path app/Cargo.toml --check
-      - run: cargo test --locked --manifest-path app/Cargo.toml --features test-support
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+      - run: cargo test --locked --manifest-path src-tauri/Cargo.toml
       - name: Smoke test bundled medium OCR
-        env:
-          SNAPLINGO_OCR_SMOKE_ROOT: ${{ github.workspace }}/app/resources/ocr
-        run: cargo test --locked -p snaplingo-providers --features local-ocr bundled_medium_smoke -- --ignored --nocapture
-      - run: cargo check --locked --manifest-path app/Cargo.toml --all-targets
-      - name: Build native desktop release
-        run: npm run native:build
-      - name: Verify final native release artifacts
-        run: npm run release:verify
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml bundled_medium_smoke -- --ignored --nocapture
+      - run: cargo check --locked --manifest-path src-tauri/Cargo.toml --all-targets
+      - name: Build and verify desktop release
+        run: npm run tauri:build
       - name: Smoke test macOS installation
         if: runner.os == 'macOS'
         run: node script/smoke-test-macos.mjs

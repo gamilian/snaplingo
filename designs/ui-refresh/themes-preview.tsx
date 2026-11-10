@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { SettingsWindow } from '../../reference/web/views/SettingsWindow';
-import { useSettingsConfigStore } from '../../reference/web/stores/settingsConfigStore';
-import { useSettingsStore } from '../../reference/web/stores/settingsStore';
-import { useApplicationTheme } from '../../reference/web/views/useApplicationTheme';
-import TranslationCard from '../../reference/web/views/ResultWindow/TranslationCard';
-import { CaptureEditorToolbar } from '../../reference/web/views/CaptureWorkspace/captureEditorToolbar';
-import { DEFAULT_ANNOTATION_STYLE, ANNOTATION_COLORS, type AnnotationTool } from '../../reference/web/application/capture-workspace/annotationStyle';
+import { SettingsWindow } from '../../src/views/SettingsWindow';
+import { useSettingsConfigStore } from '../../src/stores/settingsConfigStore';
+import { useSettingsStore } from '../../src/stores/settingsStore';
+import { useApplicationTheme } from '../../src/views/useApplicationTheme';
+import TranslationCard from '../../src/views/ResultWindow/TranslationCard';
+import { CaptureEditorToolbar } from '../../src/views/CaptureWorkspace/captureEditorToolbar';
+import { DEFAULT_ANNOTATION_STYLE, ANNOTATION_COLORS, type AnnotationTool } from '../../src/application/capture-workspace/annotationStyle';
 import { DemoCanvas } from './capture.jsx';
 import { sourceText, translatedText, alternateTranslation } from './data.js';
 import { runtime, ready } from './themes-preview-runtime';
-import '../../reference/web/styles/index.css';
+import '../../src/styles/index.css';
 import './themes-preview.css';
 
 const names = { native: '澄明 · Native', studio: '夜航 · Studio', paper: '松间 · Paper' };

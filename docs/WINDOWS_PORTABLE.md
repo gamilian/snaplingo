@@ -4,7 +4,7 @@
 
 保留程序旁边的 DLL、`ocr` 和 `licenses` 文件夹；只复制 EXE 会导致本地 OCR 或程序启动失败。压缩包已包含 OCR 模型、ONNX Runtime、DirectML 和 Visual C++ 运行库。
 
-原生便携包不需要 WebView2。ZIP 已包含 OCR 模型、ONNX Runtime、DirectML 和 Visual C++ 运行库；请完整解压并保留这些目录与 DLL，不要只复制 EXE。
+电脑需要已安装 Microsoft Edge WebView2 Runtime。若启动提示缺少运行时，请从 [Microsoft 官方下载页](https://developer.microsoft.com/microsoft-edge/webview2/) 安装 Evergreen Standalone Installer，或改用 SnapLingo 的在线安装包。便携 ZIP 不包含 WebView2；离线安装包是另一种发布产物。
 
 设置、数据库和历史记录仍保存在当前 Windows 用户的应用数据目录，与安装版共用。退出程序后可删除解压目录；这不会删除已有用户数据。更新时退出旧版，解压新版到另一个目录后启动。
 

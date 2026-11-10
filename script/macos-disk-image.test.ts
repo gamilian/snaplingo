@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  createTauriBuildEnvironment,
   findAttachedDiskImageDevices,
   retryDiskImageAttach,
 } from './macos-disk-image.mjs';
@@ -51,5 +52,27 @@ image-path      : /tmp/SnapLingo.dmg
         2,
       ),
     ).toThrow('still unavailable');
+  });
+});
+
+describe('Tauri build environment', () => {
+  it('skips redundant Finder automation and repairs the unsupported macOS locale', () => {
+    expect(createTauriBuildEnvironment('darwin', {
+      CI: 'false',
+      LANG: 'C.UTF-8',
+      LC_ALL: 'C.UTF-8',
+      TAURI_BUNDLER_DMG_IGNORE_CI: 'true',
+    })).toEqual({
+      CI: 'true',
+      LANG: 'en_US.UTF-8',
+      LC_ALL: 'en_US.UTF-8',
+      TAURI_BUNDLER_DMG_IGNORE_CI: 'false',
+    });
+  });
+
+  it('does not change the build environment on other platforms', () => {
+    expect(createTauriBuildEnvironment('linux', { CI: 'false' })).toEqual({
+      CI: 'false',
+    });
   });
 });

@@ -1,0 +1,21 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default permissions for the application",
+  "windows": ["*"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-close",
+    "core:window:allow-hide",
+    "core:window:allow-set-focus",
+    "core:window:allow-set-position",
+    "core:window:allow-set-size",
+    "core:window:allow-set-min-size",
+    "core:window:allow-show",
+    "core:window:allow-start-dragging",
+    "dialog:default",
+    "shell:allow-open",
+    "autostart:default",
+    "screenshots:default"
+  ]
+}

@@ -17,6 +17,23 @@ if [ ! -d "node_modules" ]; then
     exit 1
 fi
 
-# Native hosts own their windows, input, and platform commands.
+# Set Rust backtrace for better debugging
 export RUST_BACKTRACE=1
-exec npm run native:dev
+
+# Show developer tools hint based on platform
+OS=$(uname -s)
+case "$OS" in
+    Darwin)
+        echo -e "${YELLOW}💡 提示: 按 Cmd+Option+I 打开开发者工具${NC}"
+        ;;
+    Linux)
+        echo -e "${YELLOW}💡 提示: 按 Ctrl+Shift+I 打开开发者工具${NC}"
+        ;;
+esac
+
+echo ""
+echo -e "${GREEN}启动应用中...${NC}"
+echo ""
+
+# Start Tauri dev mode
+npm run tauri:dev

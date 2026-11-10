@@ -1,11 +1,11 @@
 // Local visual QA uses the production settings runtime with in-memory ports.
-import { createSettingsRuntime } from '../../reference/web/application/settings/runtime';
-import { createRequiredPermissionsRuntime } from '../../reference/web/application/permissions/runtime';
-import { createAppUpdatesRuntime } from '../../reference/web/application/updates/runtime';
-import type { SettingsSnapshot, HotkeySnapshot, ProviderInfo } from '../../reference/web/application/settings/ports';
-import { initializeSettingsConfigStore } from '../../reference/web/stores/settingsConfigStore';
-import { initializeHotkeyConfigStore } from '../../reference/web/stores/hotkeyConfigStore';
-import { initializeProviderStore } from '../../reference/web/stores/providerStore';
+import { createSettingsRuntime } from '../../src/application/settings/runtime';
+import { createRequiredPermissionsRuntime } from '../../src/application/permissions/runtime';
+import { createAppUpdatesRuntime } from '../../src/application/updates/runtime';
+import type { SettingsSnapshot, HotkeySnapshot, ProviderInfo } from '../../src/application/settings/ports';
+import { initializeSettingsConfigStore } from '../../src/stores/settingsConfigStore';
+import { initializeHotkeyConfigStore } from '../../src/stores/hotkeyConfigStore';
+import { initializeProviderStore } from '../../src/stores/providerStore';
 
 const key = 'snaplingo-production-theme-preview-v1';
 const copy = <T,>(value: T): T => JSON.parse(JSON.stringify(value));

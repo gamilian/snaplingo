@@ -4,37 +4,19 @@
 
 ## 1. 方案与支持范围
 
-默认开发和发布入口都运行 Rust 原生应用。`npm run native:build`（或
-`npm run build`）准备 OCR 资源、构建二进制并生成平台包；
-`npm run release:build` 复用该构建，再验证最终产物。已有二进制仅需重新包装时
-运行 `npm run native:bundle`，重新检查时运行 `npm run release:verify`。
-
-macOS 产物在 `target/native/release/SnapLingo.app` 和
-`target/native/release/bundle/dmg/`。Windows 产物在
-`target/native/release/bundle/{nsis,msi,portable}/`，staged 应用在
-`target/native/release/app/`，隔离 OCR/CRT 资源在
-`target/native/resources/win32-x64/`。`CARGO_TARGET_DIR` 可替换 `target`。
-`desktop.json` 保存应用标识、最低系统版本和固定 MSI UpgradeCode；版本来自
-`package.json`，发布入口要求 npm 与 Cargo 清单/锁文件的版本一致。
-
-本地临时验证可显式使用 `SNAPLINGO_SIGNING_MODE=adhoc` 和 `-- --debug`。
-正式 macOS 发布仍使用同一张固定证书。Windows 使用 NSIS 与 WiX 3，沿用
-既有注册表位置、安装权限范围和 UpgradeCode。原生包不依赖前端资源或 WebView2。
-
 | 平台 | 默认产物 | Release 文件名 | 构建位置 | 默认签名 |
 | --- | --- | --- | --- | --- |
 | macOS 12+ / Apple Silicon | DMG | `snaplingo-vX.Y.Z-macos-aarch64.dmg` | Actions `macos-15`，原生 arm64 | 固定自签名证书 |
 | macOS 12+ / Intel | DMG | `snaplingo-vX.Y.Z-macos-x86_64.dmg` | Actions `macos-15-intel`，原生 x64 | 与 arm64 同一张证书 |
 | Windows 10 / 11 x64 | NSIS EXE、备选 MSI、便携 ZIP | `snaplingo-vX.Y.Z-windows-x86_64-setup.exe`、`snaplingo-vX.Y.Z-windows-x86_64.msi`、`snaplingo-vX.Y.Z-windows-x86_64-portable.zip` | Actions `windows-2022` | 未签名，可后续申请 SignPath Foundation |
 
-Windows 便携 ZIP 包含可执行文件、OCR 模型、ONNX Runtime、DirectML、Visual C++ 运行库及许可声明；解压后运行 EXE，无需安装 SnapLingo。用户数据与安装版共用。所有 Windows 包都携带本地 OCR/CRT 运行依赖，可离线启动；不再区分 WebView2 在线/离线安装包。详细用法见 [Windows 便携版](WINDOWS_PORTABLE.md)。
+Windows 便携 ZIP 包含可执行文件、OCR 模型、ONNX Runtime、DirectML、Visual C++ 运行库及许可声明；解压后运行 EXE，无需安装 SnapLingo。WebView2 仍是系统依赖，ZIP 不打包此运行时，用户数据与安装版共用。详细用法见 [Windows 便携版](WINDOWS_PORTABLE.md)。离线 WebView2 安装包仍单独构建，不重复发布便携 ZIP。
 
 以上是兼容目标；最低系统版本是构建约束，并不代替对应系统真机验收。公开发布前需覆盖 macOS 12、13、14、15 及更新版本，以及 Windows 10 / 11 x64 的安装、首次授权、拖动选区、预览、复制、保存和 OCR。Windows runner 是服务器环境，不足以证明 Windows 桌面配置都兼容。此流程不要求本地 Mac 构建 Windows 包。
 
-macOS 最低版本为 12.0。Vision 自动识别语言仅在 macOS 13+ 启用；macOS 12
-使用指定的识别语言和 MNN 本地 OCR。不得只修改 Info.plist 降低最低版本，必须
-重新编译并通过所有内嵌二进制的 deployment target 校验。浏览器 reference
-仍以 Safari 15 / Chromium 105 为测试目标，它不参与原生包运行。
+macOS 构建最低版本为 12.0，前端以 Safari 15 / Chromium 105 为目标；Windows 使用安装器配置的 Evergreen WebView2。前端构建拒绝目标引擎不支持的正则语法，OCR 字段提取使用捕获组，避免依赖 [Safari 16.4 才支持的正则回溯](https://webkit.org/blog/13966/webkit-features-in-safari-16-4/)。Vision 自动识别语言仅在 macOS 13+ 启用，macOS 12 使用指定的识别语言。不得只改安装包的 Info.plist 来降低最低版本，必须重新编译并通过所有内嵌二进制的 deployment target 校验。
+
+macOS 默认使用 Vision 系统 OCR，不再动态链接 Homebrew 的 Tesseract/Leptonica。Linux 保留 Tesseract。开发者若明确需要 macOS Tesseract，可自行安装 Tesseract 和语言数据，并运行 `npm run tauri:build -- --features tesseract-ocr`；该自定义包不是自包含的官方包。脚本仍校验所有动态库的最低系统版本和架构，不合格就失败。
 
 无需购买 Apple Developer Program、Windows 证书、Azure 签名服务，也无需登记信用卡。Actions 的 macOS release 使用长期自签名证书保持签名身份稳定，无需把该证书加入 runner 或用户电脑的系统信任。自签名不能替代 Apple 公证，系统首次打开提示仍然存在。Windows 免费可信签名需要申请审核；未获批准前按未签名包发布。账号开通、免费额度及 SignPath 完整申请过程见 [免费账号与签名申请](research/free-release-accounts.md)。
 
@@ -69,7 +51,7 @@ macOS 最低版本为 12.0。Vision 自动识别语言仅在 macOS 13+ 启用；
 
 ### CI：每次 push / PR
 
-运行前端测试、Rust 格式/测试/check、原生打包验证。Windows 分别执行 NSIS 和 MSI 安装、启动、重装、卸载检查；macOS 从最终 DMG 复制安装、验证签名、启动两次。完整应用的发布矩阵只包括 macOS 和 Windows。
+运行前端测试、Rust 格式/测试/check、原生打包验证。Windows 分别执行 NSIS 和 MSI 安装、启动、重装、卸载检查；macOS 从最终 DMG 复制安装、验证签名、启动两次。Linux 同样执行原生测试与打包。
 
 macOS CI 使用临时 ad-hoc 签名；Desktop packages 使用固定自签名身份。启动检查不等同于 Gatekeeper 信任检查，不会绕过或修改系统信任策略。
 
@@ -77,14 +59,15 @@ macOS CI 使用临时 ad-hoc 签名；Desktop packages 使用固定自签名身�
 
 工作流合入默认分支后，在 **Actions → Desktop packages → Run workflow** 选择分支。
 
-- 默认构建两个 macOS DMG 和 Windows 原生 EXE/MSI、便携 ZIP；所有 Windows 包包含本地运行依赖。
+- 默认构建两个 macOS DMG 和 Windows 在线 EXE/MSI、便携 ZIP。
+- 勾选 `windows_offline`，增加带 WebView2 的离线安装包。离线包明显更大；普通包遇到没有运行时的电脑需要联网。
 - `codex/release-*` 测试分支的 push 也会触发，便于首次搭建时验证工作流。
-- 全部成功后，在运行页 **Artifacts** 下载 `snaplingo-macos-aarch64`、`snaplingo-macos-x86_64`、`snaplingo-windows-x86_64`；压缩包内有按 `snaplingo-vX.Y.Z-平台-架构[-安装器]` 命名的安装包、SHA-256 清单和构建来源 JSON。保留 3 天，下载后可删除 artifact。
+- 全部成功后，在运行页 **Artifacts** 下载 `snaplingo-macos-aarch64`、`snaplingo-macos-x86_64`、`snaplingo-windows-x86_64`；压缩包内有按 `snaplingo-vX.Y.Z-平台-架构[-变体][-安装器]` 命名的安装包、SHA-256 清单和构建来源 JSON。保留 3 天，下载后可删除 artifact。
 - 每个平台独立产物，不要拿 Mac 本地 `.app` 当成 Windows 发布结果。
 
 ### tag：创建 Release 草稿
 
-1. 同步 `package.json`、`package-lock.json` 的根版本及 `packages[""]` 版本、根 `Cargo.toml` 的 `[workspace.package]` 版本，以及 `Cargo.lock` 中继承该版本的工作区包版本。`app/Cargo.toml` 和共享库通过 `version.workspace = true` 继承版本。运行 `npm run licenses:generate` 更新锁文件校验值，提交变更。
+1. 同步 `package.json`、`package-lock.json` 的根版本、`src-tauri/Cargo.toml`、`Cargo.lock` 的根包版本、`src-tauri/tauri.conf.json`，提交变更。
 2. 从 `docs/RELEASE_NOTES_TEMPLATE.md` 创建 `docs/releases/v0.2.0.md`，填写本版面向用户的变化、安装说明和已知限制。
 3. 在准备发行的提交上创建匹配版本的 tag，例如版本 `0.2.0`：
 
@@ -97,7 +80,7 @@ macOS CI 使用临时 ad-hoc 签名；Desktop packages 使用固定自签名身�
 5. 仅所有平台成功后，下载并重新校验 artifacts，再使用对应的版本化 Release notes 创建 GitHub Release **草稿**。
 6. 完成下面的交互验收后点 Publish release。缺少对应版本的 notes 或包含占位内容时，工作流会失败；失败时不要复用同一版本号发布不同内容。
 
-构建用 `Cargo.lock` 和 `npm ci` 固定依赖。依赖变更后运行 `npm run licenses:generate` 更新关于页与便携包的许可清单；构建会校验清单是否过期。普通 `npm run release:build` 仅清理原生 staging/产物，保留 Rust 编译缓存；需要清理 release 编译输出时运行 `npm run release:build -- --clean`。
+构建用 `Cargo.lock` 和 `npm ci` 固定依赖。依赖变更后运行 `npm run licenses:generate` 更新关于页与便携包的许可清单；构建会校验清单是否过期。普通构建仅清理 bundle，不删除整个 Rust release 缓存；`npm run tauri:build:beta` 才执行完整清理。避免绕过统一入口直接运行 `npm run tauri build`。
 
 ## 5. 验收边界与必测场景
 
@@ -111,13 +94,13 @@ macOS CI 使用临时 ad-hoc 签名；Desktop packages 使用固定自签名身�
 | 拒绝所有权限 | 设置、文本翻译、文件 OCR 可用；可跳过权限向导 |
 | 只授予屏幕录制 | 可截图、截图 OCR/翻译；无需先授予辅助功能 |
 | 使用选中文本/元素检测 | 按需提示辅助功能；浏览器自动化有明确用途说明 |
-| Windows 离线启动 | 未安装 WebView2 的干净测试机可安装并启动 EXE/MSI/ZIP，PaddleOCR 的本地模型与运行库可用 |
+| Windows WebView2 缺失 | 在线版在联网环境自动安装；离线版在断网且未安装运行时的测试机安装成功 |
 | Windows OCR 语言缺失 | 有可理解的安装语言提示；补充系统 OCR 语言能力后重新启动验证 |
 | 真实 N→N+1 更新 | 同架构、同证书、同 bundle ID 覆盖安装；数据库、API 配置、历史保留；截图/选中文本授权复测；首次从 ad-hoc 迁移可能需要重新授权 |
 | 多屏、缩放 | Windows 混合 DPI，macOS Retina/外接屏截图和选区正确 |
 | 滚动长截图 | 原页面可持续滚动；固定页眉/页脚、反向滚动、撤销、尺寸上限及失败后输出正常；控制窗口不出现在成图中；完成/取消恢复原应用 |
 | 新标注与贴图设置 | 模糊、聚光灯、区域高亮、圆角、曲线箭头及字体预览与导出一致；改键生效；贴图原位置/居中、边框以及 UI 缩放正常 |
-| 遮罩与十字光标出现后拖动 | 按下、拖动、松开应形成选区并生成预览；Esc 可退出。若失败，在设置中启用性能监控后复现，检查日志中的 `[capture-input]` 和 `selection_pointer_down` / `selection_pointer_up`，区分原生焦点与共享 UI 输入 |
+| 遮罩与十字光标出现后拖动 | 按下、拖动、松开应形成选区并生成预览；Esc 可退出。若失败，在设置中启用性能监控后复现，检查日志中的 `[capture-input]` 和 `selection_pointer_down` / `selection_pointer_up`，区分原生焦点与前端输入 |
 
 未公证自签名包和 CI ad-hoc 包的 `spctl` 拒绝是预期结果；脚本记录结果，不要求用户关闭 Gatekeeper、删除 quarantine 或修改 TCC。
 
@@ -137,7 +120,7 @@ Windows 便携 ZIP 在生成前检查必需的 OCR 和 DLL 资源；CI 和 Deskt
 
 ## 6. 免费 Windows 签名的后续接入
 
-当前可立即交付的路线是未签名 EXE/MSI，不需要额外账号。SignPath 是可选增强，申请过程见 [免费账号与签名申请](research/free-release-accounts.md)。项目使用 MIT 许可证；申请仍需由维护者提交。
+当前可立即交付的路线是未签名 EXE/MSI，不需要额外账号。SignPath 是可选增强，申请过程见 [免费账号与签名申请](research/free-release-accounts.md)。项目许可证目前是 TBD；维护者需要先确定一个合格的开源许可证，本次不代替作者选择或申请。
 
 获批后的正确次序：可信 Actions 构建 → SignPath 校验构建来源并签名（包含内嵌应用与安装器）→ 下载签名结果 → 再做安装测试 → 重新计算 SHA-256 → 上传 Release。不能只替换安装器签名却保留旧校验值，也不能使用面向测试的证书冒充可信签名。审批前不创建会阻断免费未签名发布的签名步骤；实际项目 ID、策略和 artifact 配置以审核通过的配置为准。
 
@@ -145,7 +128,6 @@ Windows 便携 ZIP 在生成前检查必需的 OCR 和 DLL 资源；CI 和 Deskt
 
 - [GitHub 标准 runner 与架构](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
 - [GitHub Actions 计费](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
-- [WiX MajorUpgrade](https://docs.firegiant.com/wix3/xsd/wix/majorupgrade/)
-- [NSIS 文档](https://nsis.sourceforge.io/Docs/)
+- [Tauri Windows 安装器与 WebView2](https://v2.tauri.app/distribute/windows-installer/)
 - [Apple：安全打开 Mac App](https://support.apple.com/en-us/102445)
 - [SignPath Foundation 条件](https://signpath.org/terms)

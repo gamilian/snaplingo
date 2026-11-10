@@ -24,8 +24,8 @@
 
 相关文件：
 
-- `app/src/lib.rs`
-- `app/src/integrations/system/shortcut.rs`
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/infrastructure/system/shortcut.rs`
 - `src/stores/settingsStore.ts`
 - `src/components/SettingsWindow/Screenshot/HotkeysPage.tsx`
 
@@ -48,8 +48,8 @@
 
 相关文件：
 
-- `app/commands/mod.rs`
-- `app/commands/capture_session_commands.rs`
+- `src-tauri/src/commands/mod.rs`
+- `src-tauri/src/commands/capture_session_commands.rs`
 - `src/components/ScreenshotSession/index.tsx`
 - `src/components/ScreenshotSession/captureWindowVisibility.ts`
 
@@ -66,10 +66,10 @@
 
 相关文件：
 
-- `app/commands/capture_session_commands.rs`
+- `src-tauri/src/commands/capture_session_commands.rs`
 - `src/components/ScreenshotSession/captureWindowVisibility.ts`
 - `src/components/ScreenshotSession/index.tsx`
-- `app/capabilities/default.json`
+- `src-tauri/capabilities/default.json`
 
 注意：如果后续尝试 macOS transparent window，要单独评估 Tauri 的 `macos-private-api` 影响，不要把它作为默认排障手段。
 
@@ -86,10 +86,10 @@
 
 相关文件：
 
-- `reference/web/App.tsx`
+- `src/App.tsx`
 - `src/components/ScreenshotSession/index.tsx`
 - `src/components/ScreenshotSession/captureActions.ts`
-- `app/commands/capture_session_commands.rs`
+- `src-tauri/src/commands/capture_session_commands.rs`
 
 ## 坑 5：macOS 权限已经给了，Release 仍然反复提示
 
@@ -105,7 +105,7 @@ macOS TCC 屏幕录制权限绑定的是应用身份，不只是应用名字。R
 
 相关文件：
 
-- `app/tauri.conf.json`
+- `src-tauri/tauri.conf.json`
 - `script/fix-macos-release-signing.mjs`
 - `package.json`
 - `script/build-release.sh`
@@ -130,8 +130,8 @@ macOS TCC 屏幕录制权限绑定的是应用身份，不只是应用名字。R
 
 相关文件：
 
-- `app/src/integrations/system/screenshot/macos.rs`
-- `reference/web/App.tsx`
+- `src-tauri/src/infrastructure/system/screenshot/macos.rs`
+- `src/App.tsx`
 
 ## 坑 7：Release 没有日志会让快捷键问题很难查
 
@@ -154,16 +154,16 @@ tail -f ~/Library/Logs/com.snaplingo.app/SnapLingo.log
 
 ```bash
 npm test
-npm run reference:build
-cargo test --locked -p snaplingo --features test-support
+npm run build
+cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
 Release 构建后额外检查：
 
 ```bash
-npm run native:build
-npm run release:verify
-codesign --verify --deep --strict --verbose=2 target/native/release/SnapLingo.app
+npm run tauri:build
+codesign --verify --deep --strict --verbose=2 target/release/bundle/macos/SnapLingo.app
+hdiutil verify target/release/bundle/dmg/SnapLingo_0.1.0_aarch64.dmg
 ```
 
 手动验收：

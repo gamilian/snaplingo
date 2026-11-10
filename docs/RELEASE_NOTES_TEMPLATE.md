@@ -8,9 +8,9 @@
 
 ## 下载与安装
 
-- macOS 12 或更新：Apple Silicon 下载 `snaplingo-vX.Y.Z-macos-aarch64.dmg`；Intel 下载 `snaplingo-vX.Y.Z-macos-x86_64.dmg`。拖入“应用程序”后启动。
-- Windows 10 / 11 x64：优先下载 `snaplingo-vX.Y.Z-windows-x86_64-setup.exe`（当前用户安装）；`snaplingo-vX.Y.Z-windows-x86_64.msi` 为备选安装器，不必重复安装。便携版为 `snaplingo-vX.Y.Z-windows-x86_64-portable.zip`，解压整个目录后运行 EXE。
-- 原生包无需 WebView2。所有 Windows 包均包含本地 OCR 模型与运行依赖，可离线启动。
+- macOS 14 或更新：Apple Silicon 下载 `snaplingo-vX.Y.Z-macos-aarch64.dmg`；Intel 下载 `snaplingo-vX.Y.Z-macos-x86_64.dmg`。拖入“应用程序”后启动。
+- Windows x64：优先下载 `snaplingo-vX.Y.Z-windows-x86_64-setup.exe`（当前用户安装）；`snaplingo-vX.Y.Z-windows-x86_64.msi` 为备选安装器，不必重复安装。
+- Windows 缺少 WebView2 时，普通安装器需要联网。带 `offline` 的包内含运行时；该包仅在维护者选择构建时提供。
 
 ## 免费版本的签名说明
 
@@ -28,5 +28,3 @@ Release 附一个 `SHA256SUMS.txt`，以及每个构建目标的 `snaplingo-vX.Y
 - Windows PowerShell：`Get-FileHash .\下载的文件.exe -Algorithm SHA256`
 
 更新前退出 SnapLingo，覆盖安装同一架构版本。系统隐私授权是否跨版本保留仍需实际检查。正常覆盖安装不应删除 API 配置或历史记录。
-
-便携版与安装版共用用户数据。保持便携使用方式时，退出程序后手动解压新版 ZIP；应用内更新会打开标准安装包。

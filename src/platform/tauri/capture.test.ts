@@ -1,0 +1,322 @@
+import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
+import type { CaptureMode, CaptureSessionView } from '../../domain/capture';
+
+const { invoke, save, convertFileSrc, getSettingsSnapshot } = vi.hoisted(() => ({
+  invoke: vi.fn(),
+  convertFileSrc: vi.fn((path: string, protocol: string) => `${protocol}://localhost${path}`),
+  save: vi.fn(),
+  getSettingsSnapshot: vi.fn(),
+}));
+
+vi.mock('@tauri-apps/api/core', () => ({ invoke, convertFileSrc }));
+vi.mock('@tauri-apps/plugin-dialog', () => ({ save }));
+vi.mock('./settings', () => ({ getSettingsSnapshot }));
+
+beforeEach(() => {
+  invoke.mockReset();
+  save.mockReset();
+  getSettingsSnapshot.mockReset();
+  getSettingsSnapshot.mockResolvedValue({ screenshot: {} });
+  convertFileSrc.mockClear();
+  convertFileSrc.mockImplementation(
+    (path: string, protocol: string) => `${protocol}://localhost${path}`,
+  );
+});
+
+describe('Tauri capture command adapter', () => {
+  it('prepares OCR pixels before committing the native handoff', async () => {
+    const { prepareCaptureOcr, completeCaptureOcr } = await import('./capture');
+    const input = {
+      sessionId: 'capture-ocr', rect: { x: 10, y: 20, width: 30, height: 40 },
+      annotations: [], target: 'translation-window' as const, language: 'ja',
+    };
+    await prepareCaptureOcr(input);
+    expect(invoke).toHaveBeenCalledWith('prepare_capture_ocr', input);
+    await completeCaptureOcr(input.sessionId);
+    expect(invoke).toHaveBeenCalledWith('complete_capture_ocr', { sessionId: 'capture-ocr' });
+  });
+
+  it('accepts only the domain capture mode vocabulary', async () => {
+    const { logCaptureFrontendPerf, openCaptureWindow } = await import('./capture');
+
+    expectTypeOf(openCaptureWindow).parameter(0).toEqualTypeOf<CaptureMode>();
+    expectTypeOf<Parameters<typeof logCaptureFrontendPerf>[0]['mode']>()
+      .toEqualTypeOf<CaptureMode>();
+  });
+
+  it('omits includeCursor when false', async () => {
+    const { renderCaptureOutput } = await import('./capture');
+    invoke.mockResolvedValueOnce('base64');
+
+    await renderCaptureOutput({
+      sessionId: 'capture-1',
+      rect: { x: 0, y: 0, width: 10, height: 10 },
+      annotations: [],
+      includeCursor: false,
+    });
+
+    expect(invoke).toHaveBeenCalledWith('render_capture_output', {
+      sessionId: 'capture-1',
+      rect: { x: 0, y: 0, width: 10, height: 10 },
+      annotations: [],
+    });
+  });
+
+  it('passes pin action to output_capture', async () => {
+    const { outputCapture } = await import('./capture');
+    invoke.mockResolvedValueOnce(undefined);
+
+    await outputCapture({
+      sessionId: 'capture-1',
+      rect: { x: 1, y: 2, width: 3, height: 4 },
+      annotations: [],
+      includeCursor: true,
+      action: { type: 'pin' },
+    });
+
+    expect(invoke).toHaveBeenCalledWith('output_capture', {
+      sessionId: 'capture-1',
+      rect: { x: 1, y: 2, width: 3, height: 4 },
+      annotations: [],
+      includeCursor: true,
+      action: { type: 'pin' },
+    });
+  });
+
+  it('routes favorite output through the screenshot favorite workflow', async () => {
+    const { outputCapture } = await import('./capture');
+    invoke.mockResolvedValueOnce(undefined);
+
+    await outputCapture({
+      sessionId: 'capture-1',
+      rect: { x: 1, y: 2, width: 3, height: 4 },
+      annotations: [],
+      includeCursor: true,
+      action: { type: 'favorite' },
+    });
+
+    expect(invoke).toHaveBeenCalledWith('favorite_capture_selection', {
+      sessionId: 'capture-1',
+      rect: { x: 1, y: 2, width: 3, height: 4 },
+      annotations: [],
+      includeCursor: true,
+    });
+  });
+
+  it('opens a PNG save dialog from the suggested capture path', async () => {
+    const { selectCaptureSavePath } = await import('./capture');
+    invoke.mockResolvedValueOnce('/Downloads/SnapLingo-1.png');
+    save.mockResolvedValueOnce('/Pictures/SnapLingo-1.png');
+
+    await expect(selectCaptureSavePath()).resolves.toBe(
+      '/Pictures/SnapLingo-1.png',
+    );
+    expect(save).toHaveBeenCalledWith({
+      defaultPath: '/Downloads/SnapLingo-1.png',
+      filters: [{ name: 'PNG（无损）', extensions: ['png'] }, { name: 'JPEG', extensions: ['jpg', 'jpeg'] }, { name: 'WebP（无损）', extensions: ['webp'] }],
+    });
+  });
+
+  it('uses the last saved directory and format while preserving the chosen suffix', async () => {
+    const { selectCaptureSavePath } = await import('./capture');
+    getSettingsSnapshot.mockResolvedValue({ screenshot: { lastSaveDirectory: '/selected', lastSaveFormat: 'webp' } });
+    invoke.mockResolvedValue('/selected/next.webp');
+    save.mockResolvedValue('/selected/changed.JPEG');
+    expect(await selectCaptureSavePath({ directory: '/default', format: 'png' })).toBe('/selected/changed.JPEG');
+    expect(invoke).toHaveBeenCalledWith('default_capture_save_path', expect.objectContaining({ directory: '/selected', format: 'webp' }));
+    expect(save.mock.calls[0][0].filters[0].extensions).toEqual(['webp']);
+    save.mockResolvedValueOnce('/selected/no-suffix');
+    expect(await selectCaptureSavePath()).toBe('/selected/no-suffix.webp');
+    save.mockResolvedValueOnce(null);
+    expect(await selectCaptureSavePath()).toBeNull();
+  });
+
+  it('loads frozen monitor URLs without transporting Base64 pixels', async () => {
+    const { hydrateCaptureSessionSnapshots } = await import('./capture');
+    const hydratedSession: CaptureSessionView = {
+      id: 'capture-1',
+      monitors: [
+        {
+          id: 'monitor-1',
+          logical_bounds: { x: 0, y: 0, width: 100, height: 80 },
+          physical_bounds: { x: 0, y: 0, width: 200, height: 160 },
+          scale_factor: 2,
+          image_base64: '',
+        },
+      ],
+      candidates: [],
+      captured_cursor: null,
+    };
+    invoke.mockResolvedValueOnce(hydratedSession);
+
+    const result: CaptureSessionView =
+      await hydrateCaptureSessionSnapshots('capture-1');
+
+    expect(invoke).toHaveBeenCalledWith('hydrate_capture_session_snapshots', {
+      sessionId: 'capture-1',
+    });
+    expect(result.monitors[0].image_base64).toBe('');
+    expect(result.monitors[0].image_url).toBe('capture-image://localhost/capture-1/monitor-1');
+    expect(convertFileSrc).toHaveBeenCalledWith('/capture-1/monitor-1', 'capture-image');
+  });
+
+  it('attaches frozen monitor URLs to initial session metadata', async () => {
+    const { createCaptureSession, getCaptureSession } = await import('./capture');
+    const session: CaptureSessionView = {
+      id: 'capture-2',
+      monitors: [
+        {
+          id: 'monitor-1',
+          logical_bounds: { x: 0, y: 0, width: 100, height: 80 },
+          physical_bounds: { x: 0, y: 0, width: 200, height: 160 },
+          scale_factor: 2,
+          image_base64: '',
+        },
+      ],
+      candidates: [],
+      captured_cursor: null,
+    };
+    invoke.mockResolvedValueOnce(session).mockResolvedValueOnce(session);
+
+    await expect(createCaptureSession()).resolves.toMatchObject({
+      id: 'capture-2',
+      monitors: [
+        expect.objectContaining({
+          image_url: 'capture-image://localhost/capture-2/monitor-1',
+        }),
+      ],
+    });
+    await expect(getCaptureSession('capture-2')).resolves.toMatchObject({
+      id: 'capture-2',
+      monitors: [
+        expect.objectContaining({
+          image_url: 'capture-image://localhost/capture-2/monitor-1',
+        }),
+      ],
+    });
+    expect(invoke).toHaveBeenNthCalledWith(1, 'create_capture_session');
+    expect(invoke).toHaveBeenNthCalledWith(2, 'get_capture_session', {
+      sessionId: 'capture-2',
+    });
+    expect(convertFileSrc).toHaveBeenCalledWith('/capture-2/monitor-1', 'capture-image');
+  });
+
+  it('hydrates only the monitor needed by the magnifier', async () => {
+    const { hydrateCaptureMonitorSnapshot } = await import('./capture');
+    const monitor = {
+      id: 'monitor-1',
+      logical_bounds: { x: 0, y: 0, width: 100, height: 80 },
+      physical_bounds: { x: 0, y: 0, width: 200, height: 160 },
+      scale_factor: 2,
+      image_base64: '',
+    };
+    invoke.mockResolvedValueOnce(monitor);
+
+    await expect(
+      hydrateCaptureMonitorSnapshot('capture-1', 'monitor-1'),
+    ).resolves.toEqual({ ...monitor, image_url: 'capture-image://localhost/capture-1/monitor-1' });
+    expect(invoke).toHaveBeenCalledWith('hydrate_capture_monitor_snapshot', {
+      sessionId: 'capture-1',
+      monitorId: 'monitor-1',
+    });
+  });
+
+  it('queries control candidates and moves the native cursor through commands', async () => {
+    const { currentCaptureControlCandidate, moveCaptureCursor } = await import(
+      './capture'
+    );
+    const candidate = {
+      id: 'control-1',
+      kind: 'control' as const,
+      rect: { x: 10, y: 20, width: 80, height: 30 },
+      priority: 10_001,
+    };
+    invoke.mockResolvedValueOnce(candidate).mockResolvedValueOnce(undefined);
+
+    await expect(
+      currentCaptureControlCandidate('capture-1', { x: 30, y: 40 }),
+    ).resolves.toEqual(candidate);
+    await moveCaptureCursor({ x: -1, y: 0 });
+
+    expect(invoke).toHaveBeenCalledWith('current_capture_control_candidate', {
+      sessionId: 'capture-1',
+      point: { x: 30, y: 40 },
+    });
+    expect(invoke).toHaveBeenCalledWith('move_capture_cursor', {
+      deltaX: -1,
+      deltaY: 0,
+    });
+  });
+
+  it('opens screenshot OCR results with the capture result command', async () => {
+    const { openCaptureOcrResultWindow } = await import('./capture');
+    invoke.mockResolvedValueOnce(undefined);
+
+    await openCaptureOcrResultWindow('ocr text', 'rendered-image-base64');
+
+    expect(invoke).toHaveBeenCalledWith('open_capture_ocr_result_window', {
+      text: 'ocr text',
+      imageBase64: 'rendered-image-base64',
+    });
+  });
+
+  it('opens screenshot translation results with the capture result command', async () => {
+    const { openCaptureTranslationResultWindow } = await import('./capture');
+    invoke.mockResolvedValueOnce(undefined);
+
+    await openCaptureTranslationResultWindow('text to translate');
+
+    expect(invoke).toHaveBeenCalledWith(
+      'open_capture_translation_result_window',
+      { text: 'text to translate' },
+    );
+  });
+
+  it('passes OCR detected language when opening screenshot translation', async () => {
+    const { openCaptureTranslationResultWindow } = await import('./capture');
+    invoke.mockResolvedValueOnce(undefined);
+
+    await openCaptureTranslationResultWindow('bonjour', 'fr');
+
+    expect(invoke).toHaveBeenCalledWith(
+      'open_capture_translation_result_window',
+      { text: 'bonjour', detectedLanguage: 'fr' },
+    );
+  });
+
+  it('loads the current result window request ID for standalone bootstrap', async () => {
+    const { currentCaptureResultWindowRequestId } = await import('./capture');
+    invoke.mockResolvedValueOnce('42');
+
+    await expect(currentCaptureResultWindowRequestId()).resolves.toBe('42');
+
+    expect(invoke).toHaveBeenCalledWith(
+      'current_capture_result_window_request_id',
+    );
+  });
+
+  it('takes a capture result payload by request ID', async () => {
+    const { takeCaptureResultWindowPayload } = await import('./capture');
+    const payload = {
+      mode: 'translation',
+      text: 'hello',
+      autoTranslate: false,
+    };
+    invoke.mockResolvedValueOnce(payload);
+
+    await expect(takeCaptureResultWindowPayload('42')).resolves.toBe(payload);
+
+    expect(invoke).toHaveBeenCalledWith('take_capture_result_window_payload', {
+      requestId: '42',
+    });
+  });
+
+  it('keeps the Advanced Settings screenshot entrypoint on the capture adapter', async () => {
+    const { triggerScreenshot } = await import('./capture');
+    invoke.mockResolvedValueOnce(undefined);
+
+    await triggerScreenshot();
+
+    expect(invoke).toHaveBeenCalledWith('trigger_screenshot');
+  });
+});

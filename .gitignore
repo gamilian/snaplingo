@@ -4,13 +4,13 @@ node_modules/
 # Build outputs
 dist/
 
-# Rust application resources
-app/target/
+# Tauri
+src-tauri/target/
 target/
-app/resources/ocr/*
-!app/resources/ocr/.gitkeep
-app/resources/windows-crt/*
-!app/resources/windows-crt/.gitkeep
+src-tauri/resources/ocr/*
+!src-tauri/resources/ocr/.gitkeep
+src-tauri/resources/windows-crt/*
+!src-tauri/resources/windows-crt/.gitkeep
 
 # IDE
 .vscode/
