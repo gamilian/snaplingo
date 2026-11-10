@@ -179,8 +179,7 @@ impl WindowHost {
     }
 
     fn window_input(&mut self, input: WindowInput) {
-        let page = self.ui.page();
-        let actions = self.ui.input(input);
+        let (page, actions) = input_actions(&mut self.ui, input);
         if !actions.is_empty() {
             let mut error = None;
             let mut refresh = false;
@@ -235,24 +234,19 @@ impl WindowHost {
                     }
                     _ => {}
                 }
-                let destination = navigation_page(&intent);
-                let result = self.backend.dispatch(page, intent).and_then(|request| {
-                    if let Some(request) = request {
-                        let accepted = rfd::MessageDialog::new()
+                let result =
+                    dispatch_input_intent(self.backend.as_mut(), page, intent, |request| {
+                        rfd::MessageDialog::new()
                             .set_title("确认操作")
                             .set_description(request.message)
                             .set_buttons(rfd::MessageButtons::OkCancel)
                             .show()
-                            == rfd::MessageDialogResult::Ok;
-                        self.backend.confirm(request, accepted)
-                    } else {
-                        Ok(())
-                    }
-                });
-                if let Err(message) = result {
-                    error = Some(message);
-                } else if destination.is_some() {
-                    navigation = destination;
+                            == rfd::MessageDialogResult::Ok
+                    });
+                match result {
+                    Err(message) => error = Some(message),
+                    Ok(Some(destination)) => navigation = Some(destination),
+                    Ok(None) => {}
                 }
                 refresh = true;
             }
@@ -330,6 +324,31 @@ fn initial_ui(snapshot: WindowSnapshot, page: Page) -> WindowUi {
         ui.update(Event::Activate(snaplingo_ui::Target::Navigate(page)));
     }
     ui
+}
+
+fn input_actions(ui: &mut WindowUi, input: WindowInput) -> (Page, Vec<WindowIntent>) {
+    let page = ui.page();
+    let mut actions = ui.input(input);
+    if ui.page() != page {
+        // Fixed preference pages navigate locally. Their session must receive
+        // the transition too, after any edits committed on the source page.
+        actions.push(WindowIntent::Settings(Action::Navigate(ui.page())));
+    }
+    (page, actions)
+}
+
+fn dispatch_input_intent(
+    backend: &mut dyn WindowBackend,
+    page: Page,
+    intent: WindowIntent,
+    confirm: impl FnOnce(&crate::features::settings::presenter::confirmation::Confirmation) -> bool,
+) -> Result<Option<Page>, String> {
+    let destination = navigation_page(&intent);
+    if let Some(request) = backend.dispatch(page, intent)? {
+        let accepted = confirm(&request);
+        backend.confirm(request, accepted)?;
+    }
+    Ok(destination)
 }
 
 impl ApplicationHandler<HostEvent> for WindowHost {
@@ -730,6 +749,144 @@ fn key(physical: &PhysicalKey, key: &NativeKey) -> Option<Key> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::features::settings::presenter::{
+        confirmation::Confirmation, window::SettingsWindowSession,
+    };
+
+    struct SessionBackend(SettingsWindowSession);
+    impl WindowBackend for SessionBackend {
+        fn snapshot(&self) -> Result<WindowSnapshot, String> {
+            self.0.snapshot()
+        }
+        fn dispatch(
+            &mut self,
+            page: Page,
+            intent: WindowIntent,
+        ) -> Result<Option<Confirmation>, String> {
+            self.0.dispatch(page, intent)
+        }
+        fn confirm(&mut self, request: Confirmation, accepted: bool) -> Result<(), String> {
+            self.0.confirm(request, accepted)
+        }
+        fn cancel_confirmation(&mut self) {
+            self.0.cancel_confirmation();
+        }
+    }
+
+    fn apply_session_input(ui: &mut WindowUi, backend: &mut SessionBackend, input: Event) {
+        let (source, actions) = input_actions(ui, WindowInput::Event(input));
+        let mut navigation = None;
+        for intent in actions {
+            if let Some(page) = dispatch_input_intent(backend, source, intent, |_| {
+                panic!("No destructive action in this scenario")
+            })
+            .unwrap()
+            {
+                navigation = Some(page);
+            }
+        }
+        refresh_ui(ui, backend, None, navigation);
+    }
+
+    #[tokio::test]
+    async fn seven_page_input_navigation_keeps_the_session_active_across_async_refreshes() {
+        use crate::features::settings::presenter::{
+            general_controller, library, services, window::SettingsSessionDependencies,
+        };
+        let fixture = general_controller::tests::fixture();
+        let preferences = fixture.preferences();
+        let configuration = preferences.configuration.clone();
+        let capacity = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let called = capacity.clone();
+        let mut backend = SessionBackend(SettingsWindowSession::new(
+            SettingsSessionDependencies {
+                preferences,
+                services: Arc::new(services::tests::session),
+                library: Arc::new(library::tests::session),
+                capacity: Arc::new(move || {
+                    called.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    Ok(())
+                }),
+                open_url: Arc::new(|_| Ok(())),
+            },
+            Default::default(),
+            tokio::runtime::Handle::current(),
+        ));
+        let mut ui = initial_ui(backend.snapshot().unwrap(), backend.0.page());
+        for destination in [
+            Page::Screenshot,
+            Page::Translation,
+            Page::Ocr,
+            Page::Services,
+            Page::Favorites,
+            Page::History,
+            Page::General,
+        ] {
+            apply_session_input(
+                &mut ui,
+                &mut backend,
+                Event::Activate(snaplingo_ui::Target::Navigate(destination)),
+            );
+            assert_eq!(
+                backend.0.page(),
+                destination,
+                "Session must follow input to {destination:?}"
+            );
+            assert_eq!(ui.page(), destination);
+            tokio::task::yield_now().await;
+            refresh_ui(&mut ui, &backend, None, None);
+            assert_eq!(
+                ui.page(),
+                destination,
+                "Refresh must preserve {destination:?}"
+            );
+        }
+        apply_session_input(
+            &mut ui,
+            &mut backend,
+            Event::Activate(snaplingo_ui::Target::Navigate(Page::Screenshot)),
+        );
+        apply_session_input(
+            &mut ui,
+            &mut backend,
+            Event::SetValue(
+                snaplingo_ui::Target::Screenshot(snaplingo_ui::ScreenshotField::CaptureUiScale),
+                snaplingo_ui::Value::Text("175".into()),
+            ),
+        );
+        assert_eq!(
+            configuration
+                .snapshot()
+                .unwrap()
+                .screenshot
+                .capture_ui_scale,
+            "175"
+        );
+        assert_eq!(
+            backend.0.interface_scale(Size {
+                width: 1920.,
+                height: 1080.
+            }),
+            1.75
+        );
+        apply_session_input(
+            &mut ui,
+            &mut backend,
+            Event::Activate(snaplingo_ui::Target::Capacity),
+        );
+        assert_eq!(capacity.load(std::sync::atomic::Ordering::SeqCst), 1);
+        backend.0.invalidator()(true);
+        refresh_ui(&mut ui, &backend, None, None);
+        assert_eq!(ui.page(), Page::Screenshot);
+        assert!(backend
+            .0
+            .dispatch(
+                Page::General,
+                WindowIntent::Settings(Action::ConfigureCapacity)
+            )
+            .is_err());
+    }
+
     #[tokio::test]
     async fn initial_view_uses_the_session_page_before_the_first_application_route() {
         use crate::features::settings::presenter::{

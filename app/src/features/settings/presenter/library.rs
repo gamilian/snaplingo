@@ -8,7 +8,7 @@ use snaplingo_core::library::index as core;
 use snaplingo_ui::{library as ui, RasterImage, Snapshot};
 
 #[cfg(test)]
-pub(super) mod tests;
+pub(crate) mod tests;
 
 struct State {
     snapshot: ui::LibrarySnapshot,
