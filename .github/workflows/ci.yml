@@ -33,6 +33,9 @@ jobs:
         with:
           node-version: 22
       - uses: dtolnay/rust-toolchain@stable
+      - name: Install native Windows installer compilers
+        if: runner.os == 'Windows'
+        run: choco install nsis wixtoolset --no-progress -y
       - run: npm ci
       - run: npm test
       - run: npm run ocr:prepare
@@ -44,9 +47,6 @@ jobs:
           SNAPLINGO_OCR_SMOKE_ROOT: ${{ github.workspace }}/app/resources/ocr
         run: cargo test --locked -p snaplingo-providers --features local-ocr bundled_medium_smoke -- --ignored --nocapture
       - run: cargo check --locked --manifest-path app/Cargo.toml --all-targets
-      - name: Install native Windows installer compilers
-        if: runner.os == 'Windows'
-        run: choco install nsis wixtoolset --no-progress -y
       - name: Build native desktop release
         run: npm run native:build
       - name: Verify final native release artifacts

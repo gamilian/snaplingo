@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { copyFileSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { join, dirname, extname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Window } from 'happy-dom';
@@ -21,6 +21,20 @@ function fixture() {
   const pe = Buffer.alloc(128); pe.write('MZ'); pe.writeUInt32LE(64,60); pe.write('PE\0\0',64); pe.writeUInt16LE(0x8664,68); writeFileSync(binary, pe);
   return { root, binary, ocrRoot, crtRoot, stage: join(root,'target/native/release/app') };
 }
+function wixTools() {
+  if (process.platform !== 'win32') return null;
+  const directory = process.env.SNAPLINGO_WIX_BIN ?? (process.env.WIX ? join(process.env.WIX, 'bin') : undefined);
+  const commands = ['candle.exe', 'light.exe'].map(name => {
+    if (directory) {
+      const path = join(directory, name);
+      return existsSync(path) ? path : undefined;
+    }
+    const result = spawnSync('where.exe', [name], { encoding: 'utf8' });
+    return result.status === 0 ? result.stdout.trim().split(/\r?\n/)[0] : undefined;
+  });
+  return commands.every(Boolean) ? commands as [string, string] : null;
+}
+const wix = wixTools();
 describe('native Windows packages', () => {
   it('stages the native PE and complete offline OCR/CRT tree using isolated resources', () => {
     const f = fixture(); stageNativeWindowsBundle(f.root,f.binary,f.stage,config,f);
@@ -87,6 +101,11 @@ describe('native Windows packages', () => {
     expect(shortcut.getAttribute('Advertise')).toBe('yes');
     expect(shortcut.getAttribute('Directory')).toBe('ApplicationProgramsFolder');
     expect(shortcut.hasAttribute('Target')).toBe(false);
+    const icon = document.querySelector(`Icon[Id="${shortcut.getAttribute('Icon')}"]`)!;
+    // ICE50 compares the Icon table identifier with the advertised key file.
+    expect(extname(icon.getAttribute('Id')!)).toBe(extname(executable.getAttribute('Name')!));
+    expect(['.exe', '.ico']).toContain(extname(icon.getAttribute('Id')!));
+    expect(document.querySelector('Property[Id="ARPPRODUCTICON"]')?.getAttribute('Value')).toBe(icon.getAttribute('Id'));
     expect(component.parentElement?.getAttribute('Id')).toBe('INSTALLFOLDER');
     expect(component.querySelector('RegistryValue[Root="HKLM"][Name="InstallDir"]')?.getAttribute('Value')).toBe('[INSTALLFOLDER]');
     expect(component.querySelector('RemoveFolder[On="uninstall"]')?.getAttribute('Directory')).toBe('ApplicationProgramsFolder');
@@ -96,6 +115,26 @@ describe('native Windows packages', () => {
     expect(installLocation.getAttribute('Sequence')).toBe('execute');
     expect(document.querySelector('Property[Id="ARPINSTALLLOCATION"]')).toBeNull();
   });
+  it.skipIf(process.platform !== 'win32' || (!wix && process.env.GITHUB_ACTIONS !== 'true'))('compiles the MSI with WiX and all ICE validation enabled', () => {
+    expect(wix, 'Install WiX 3 before running Windows CI tests').not.toBeNull();
+    const f = fixture();
+    const source = join(f.root, 'fixture.rs');
+    writeFileSync(source, 'fn main() {}\n');
+    const run = (command: string, args: string[]) => {
+      const result = spawnSync(command, args, { encoding: 'utf8' });
+      expect(result.status, `${command}\n${result.error?.message ?? ''}\n${result.stdout}\n${result.stderr}`).toBe(0);
+    };
+    run('rustc', ['--crate-name', 'snaplingo_installer_fixture', '--edition', '2021', source, '-o', f.binary]);
+    copyFileSync(new URL('../app/icons/icon.ico', import.meta.url), join(f.root, 'app/icons/icon.ico'));
+    stageNativeWindowsBundle(f.root, f.binary, f.stage, config, f);
+    const wxs = join(f.root, 'installer.wxs');
+    const object = join(f.root, 'installer.wixobj');
+    const installer = join(f.root, 'fixture.msi');
+    writeFileSync(wxs, nativeWixSource(f.stage, config));
+    run(wix![0], ['-nologo', '-arch', 'x64', '-out', object, wxs]);
+    run(wix![1], ['-nologo', '-out', installer, object]);
+    expect(readFileSync(installer).byteLength).toBeGreaterThan(0);
+  }, 120_000);
 });
 
 

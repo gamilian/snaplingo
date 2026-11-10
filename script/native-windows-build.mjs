@@ -162,9 +162,12 @@ export function nativeWixSource(stage, config) {
   const directoryId = path => path ? `D${hash(path).slice(0,20)}` : 'INSTALLFOLDER';
   const componentId = path => `C${hash(path).slice(0,20)}`;
   const fileId = path => `F${hash(path).slice(0,20)}`;
+  // ICE50 requires this Icon table name to match the advertised key file's
+  // extension. The stream can still contain the small, standalone ICO resource.
+  const iconId = 'AppIcon.exe';
   const component = entry => {
     const application = entry.path === 'snaplingo.exe';
-    const shortcut = application ? `<Shortcut Id="ApplicationShortcut" Name="${xml(config.productName)}" Directory="ApplicationProgramsFolder" Advertise="yes" WorkingDirectory="INSTALLFOLDER" Icon="AppIcon"/>` : '';
+    const shortcut = application ? `<Shortcut Id="ApplicationShortcut" Name="${xml(config.productName)}" Directory="ApplicationProgramsFolder" Advertise="yes" WorkingDirectory="INSTALLFOLDER" Icon="${iconId}"/>` : '';
     const registration = application ? `<RemoveFolder Id="RemoveProgramMenu" Directory="ApplicationProgramsFolder" On="uninstall"/><RegistryValue Root="HKLM" Key="Software\\${xml(publisher(config))}\\${xml(config.productName)}" Name="InstallDir" Type="string" Value="[INSTALLFOLDER]"/>` : '';
     return `<Component Id="${componentId(entry.path)}" Guid="*" Win64="yes"><File Id="${fileId(entry.path)}" Name="${xml(basename(entry.path))}" Source="${xml(windowsPath(entry.file).replaceAll('$', () => '$$'))}" KeyPath="yes">${shortcut}</File>${registration}</Component>`;
   };
@@ -175,7 +178,7 @@ export function nativeWixSource(stage, config) {
 <MajorUpgrade Schedule="afterInstallInitialize" AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer version of ${xml(config.productName)} is already installed."/>
 <MediaTemplate EmbedCab="yes" CompressionLevel="high"/>
 <Property Id="INSTALLFOLDER"><RegistrySearch Id="PreviousTauriInstallDir" Root="HKCU" Key="Software\\${xml(publisher(config))}\\${xml(config.productName)}" Name="InstallDir" Type="raw"/></Property>
-<Icon Id="AppIcon" SourceFile="${xml(windowsPath(join(stage,'icon.ico')).replaceAll('$', () => '$$'))}"/><Property Id="ARPPRODUCTICON" Value="AppIcon"/>
+<Icon Id="${iconId}" SourceFile="${xml(windowsPath(join(stage,'icon.ico')).replaceAll('$', () => '$$'))}"/><Property Id="ARPPRODUCTICON" Value="${iconId}"/>
 <SetProperty Id="ARPINSTALLLOCATION" Value="[INSTALLFOLDER]" After="CostFinalize" Sequence="execute"/>
 <Directory Id="TARGETDIR" Name="SourceDir"><Directory Id="ProgramFiles64Folder">${directory('')}</Directory>
 <Directory Id="ProgramMenuFolder"><Directory Id="ApplicationProgramsFolder" Name="${xml(config.productName)}"/></Directory></Directory>
