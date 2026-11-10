@@ -1025,14 +1025,28 @@ pub(crate) fn test_workflow(
     assert!(MODAL.with_borrow(|slot| slot.is_none()));
     show(parent, general);
     let original_size = parent.contentView().unwrap().bounds().size;
-    let resized = NSSize::new(original_size.width + 80.0, original_size.height + 40.0);
-    parent.setContentSize(resized);
     let modal_window = MODAL.with_borrow(|slot| slot.as_ref().unwrap().window.clone());
-    let modal_size = modal_window.contentView().unwrap().bounds().size;
-    assert_eq!(modal_size, resized);
-    let dialog_frame = MODAL.with_borrow(|slot| slot.as_ref().unwrap().view.frame());
-    assert!((dialog_frame.origin.x * 2.0 + dialog_frame.size.width - resized.width).abs() < 0.01);
-    assert!((dialog_frame.origin.y * 2.0 + dialog_frame.size.height - resized.height).abs() < 0.01);
+    let screen_height = parent.screen().unwrap().visibleFrame().size.height;
+    for height in [original_size.height - 40.0, screen_height + 80.0] {
+        let requested = NSSize::new(original_size.width + 80.0, height);
+        parent.setContentSize(requested);
+        // AppKit constrains titled windows to the screen. The backdrop must
+        // cover the actual parent content, including when a resize is capped.
+        let resized = parent.contentView().unwrap().bounds().size;
+        assert_ne!(resized, original_size);
+        if height > screen_height {
+            assert!(resized.height < requested.height);
+        }
+        let modal_size = modal_window.contentView().unwrap().bounds().size;
+        assert_eq!(modal_size, resized);
+        let dialog_frame = MODAL.with_borrow(|slot| slot.as_ref().unwrap().view.frame());
+        assert!(
+            (dialog_frame.origin.x * 2.0 + dialog_frame.size.width - resized.width).abs() < 0.01
+        );
+        assert!(
+            (dialog_frame.origin.y * 2.0 + dialog_frame.size.height - resized.height).abs() < 0.01
+        );
+    }
     let other = unsafe {
         NSWindow::initWithContentRect_styleMask_backing_defer(
             parent.mtm().alloc(),

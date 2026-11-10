@@ -45,6 +45,7 @@ pub fn run_window_backend(backend: impl WindowBackend + 'static) -> Result<(), S
     let proxy = event_loop.create_proxy();
     let mut host = WindowHost::new(
         backend,
+        Page::Ocr,
         proxy,
         Window::default_attributes()
             .with_title("SnapLingo")
@@ -84,6 +85,7 @@ pub struct WindowHost {
 impl WindowHost {
     pub fn new(
         mut backend: impl WindowBackend + 'static,
+        page: Page,
         proxy: EventLoopProxy<HostEvent>,
         attributes: WindowAttributes,
         close_to_hide: bool,
@@ -94,7 +96,7 @@ impl WindowHost {
             let _ = refresh.send_event(HostEvent::Refresh);
         })));
         Ok(Self {
-            ui: WindowUi::new(initial),
+            ui: initial_ui(initial, page),
             backend: Box::new(backend),
             renderer: Renderer::default(),
             metrics: RendererTextMetrics::default(),
@@ -318,6 +320,16 @@ impl WindowHost {
         pixels.write_opaque_rgb(&mut buffer)?;
         buffer.present().map_err(|error| error.to_string())
     }
+}
+
+fn initial_ui(snapshot: WindowSnapshot, page: Page) -> WindowUi {
+    let mut ui = WindowUi::new(snapshot);
+    if ui.preferences().is_some() {
+        // Fixed preference snapshots carry data, not navigation. Establish the
+        // session's page before dispatching the first application route.
+        ui.update(Event::Activate(snaplingo_ui::Target::Navigate(page)));
+    }
+    ui
 }
 
 impl ApplicationHandler<HostEvent> for WindowHost {
@@ -718,6 +730,50 @@ fn key(physical: &PhysicalKey, key: &NativeKey) -> Option<Key> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn initial_view_uses_the_session_page_before_the_first_application_route() {
+        use crate::features::settings::presenter::{
+            general_controller, services,
+            window::{SettingsSessionDependencies, SettingsWindowSession},
+        };
+        let fixture = general_controller::tests::fixture();
+        let mut session = SettingsWindowSession::new(
+            SettingsSessionDependencies {
+                preferences: fixture.preferences(),
+                services: Arc::new(services::tests::session),
+                library: Arc::new(|_| panic!("This scenario does not open Library")),
+                capacity: Arc::new(|| Ok(())),
+                open_url: Arc::new(|_| Ok(())),
+            },
+            Default::default(),
+            tokio::runtime::Handle::current(),
+        );
+        let ui = initial_ui(session.snapshot().unwrap(), session.page());
+        session
+            .dispatch(
+                ui.page(),
+                WindowIntent::Settings(Action::Navigate(Page::General)),
+            )
+            .expect("The first Windows application route must come from the active page");
+        assert_eq!(ui.page(), session.page());
+        session
+            .dispatch(
+                ui.page(),
+                WindowIntent::Settings(Action::Navigate(Page::Screenshot)),
+            )
+            .unwrap();
+        assert_eq!(session.page(), Page::Screenshot);
+        assert!(
+            session
+                .dispatch(
+                    Page::General,
+                    WindowIntent::Settings(Action::Navigate(Page::Ocr))
+                )
+                .is_err(),
+            "The session must still reject stale input"
+        );
+    }
+
     #[test]
     fn async_backend_notification_refreshes_the_active_dynamic_page_and_can_be_released() {
         use snaplingo_ui::services::{ServicesRoute, ServicesSnapshot};

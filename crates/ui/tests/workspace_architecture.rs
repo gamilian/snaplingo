@@ -26,8 +26,47 @@ fn production_dependencies(package: &Value) -> BTreeSet<String> {
 
 fn production_crate(package: &Value) -> bool {
     let workspace = root().canonicalize().unwrap();
-    let manifest = Path::new(package["manifest_path"].as_str().unwrap());
+    let manifest = Path::new(package["manifest_path"].as_str().unwrap())
+        .canonicalize()
+        .unwrap();
     manifest.starts_with(workspace.join("crates")) || manifest.starts_with(workspace.join("app"))
+}
+
+#[test]
+fn production_crate_classification_normalizes_manifest_paths() {
+    for (relative, expected) in [
+        ("app/Cargo.toml", true),
+        ("crates/ui/Cargo.toml", true),
+        ("tools/reference/Cargo.toml", false),
+    ] {
+        let original = root().join(relative);
+        let canonical = original.canonicalize().unwrap();
+        for manifest in [&original, &canonical] {
+            assert_eq!(
+                production_crate(&serde_json::json!({"manifest_path": manifest})),
+                expected,
+                "{}",
+                manifest.display()
+            );
+        }
+        #[cfg(windows)]
+        {
+            // Cargo metadata uses normal paths while canonicalize adds \\?\.
+            let verbatim = canonical.to_str().unwrap();
+            let ordinary = if let Some(unc) = verbatim.strip_prefix(r"\\?\UNC\") {
+                format!(r"\\{unc}")
+            } else {
+                verbatim.strip_prefix(r"\\?\").unwrap().to_owned()
+            };
+            for manifest in [&ordinary, &ordinary.replace('\\', "/")] {
+                assert_eq!(
+                    production_crate(&serde_json::json!({"manifest_path": manifest})),
+                    expected,
+                    "{manifest}"
+                );
+            }
+        }
+    }
 }
 
 // Each independently built capability declares its allowed workspace edges.

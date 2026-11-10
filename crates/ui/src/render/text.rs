@@ -1,5 +1,6 @@
 use cosmic_text::{
-    fontdb::Query, Attrs, Buffer, Fallback, Family, FontSystem, PlatformFallback, Shaping,
+    fontdb::Query, Attrs, AttrsList, Buffer, BufferLine, Fallback, Family, FontSystem, LineEnding,
+    LineIter, PlatformFallback, Scroll, Shaping,
 };
 use std::collections::HashMap;
 use unicode_script::{Script, UnicodeScript};
@@ -19,9 +20,13 @@ pub(super) fn set_text(buffer: &mut Buffer, fonts: &mut FontSystem, text: &str, 
         })
         .and_then(|id| fonts.get_font(id));
     let mut choices = HashMap::new();
-    let spans = text
-        .graphemes(true)
-        .map(|grapheme| {
+    // Use the same line parser as Buffer::set_text. set_rich_text uses bidi
+    // paragraphs instead, splitting CRLF and discarding original line endings.
+    buffer.lines.clear();
+    for (range, ending) in LineIter::new(text) {
+        let line = &text[range];
+        let mut attributes = AttrsList::new(attrs);
+        for (offset, grapheme) in line.grapheme_indices(true) {
             let mut selected = attrs.clone();
             let cjk = grapheme.chars().find(|ch| {
                 matches!(
@@ -63,16 +68,79 @@ pub(super) fn set_text(buffer: &mut Buffer, fonts: &mut FontSystem, text: &str, 
                     selected = selected.family(Family::Name(family)).weight(*weight);
                 }
             }
-            (grapheme, selected)
-        })
-        .collect::<Vec<_>>();
-    buffer.set_rich_text(fonts, spans, attrs, Shaping::Advanced, None);
+            if selected != *attrs {
+                attributes.add_span(offset..offset + grapheme.len(), &selected);
+            }
+        }
+        buffer
+            .lines
+            .push(BufferLine::new(line, ending, attributes, Shaping::Advanced));
+    }
+    if buffer.lines.is_empty() {
+        buffer.lines.push(BufferLine::new(
+            "",
+            LineEnding::default(),
+            AttrsList::new(attrs),
+            Shaping::Advanced,
+        ));
+    }
+    buffer.set_scroll(Scroll::default());
+    buffer.shape_until_scroll(fonts, false);
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use cosmic_text::{Metrics, Weight, Wrap};
+
+    #[test]
+    fn fallback_preserves_plain_text_lines_endings_and_glyph_offsets() {
+        let mut fonts = super::super::system_fonts();
+        let attrs = Attrs::new().family(Family::SansSerif);
+        for text in [
+            "",
+            "line\r\nnext",
+            "a\r\n\r\nb",
+            "a\rb",
+            "a\n\rb",
+            "a\nb\n",
+            "a\u{2029}b",
+            "中文\r\nnext",
+            "a\r\n",
+        ] {
+            let mut plain = Buffer::new(&mut fonts, Metrics::new(12.5, 17.));
+            plain.set_text(&mut fonts, text, &attrs, Shaping::Advanced);
+            plain.shape_until_scroll(&mut fonts, false);
+            let mut fallback = Buffer::new(&mut fonts, Metrics::new(12.5, 17.));
+            set_text(&mut fallback, &mut fonts, text, &attrs);
+            fallback.shape_until_scroll(&mut fonts, false);
+            let lines = |buffer: &Buffer| {
+                buffer
+                    .lines
+                    .iter()
+                    .map(|line| (line.text().to_owned(), line.ending()))
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(lines(&fallback), lines(&plain), "{text:?}");
+            let offsets = |buffer: &Buffer| {
+                buffer
+                    .layout_runs()
+                    .map(|run| {
+                        (
+                            run.line_i,
+                            run.line_top,
+                            run.line_height,
+                            run.glyphs
+                                .iter()
+                                .map(|glyph| (glyph.start, glyph.end))
+                                .collect::<Vec<_>>(),
+                        )
+                    })
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(offsets(&fallback), offsets(&plain), "{text:?}");
+        }
+    }
 
     #[test]
     fn missing_system_cjk_fonts_use_bundled_glyphs_without_changing_latin() {

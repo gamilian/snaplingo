@@ -76,7 +76,8 @@ impl NativeSettingsWindow {
         }
         let (session, subscription) = (state.session)(recording, notices, capacity);
         let backend = Backend(Rc::new(RefCell::new(session)));
-        let mut host = WindowHost::new(backend.clone(), proxy, attributes, true)?;
+        let page = backend.0.borrow().page();
+        let mut host = WindowHost::new(backend.clone(), page, proxy, attributes, true)?;
         host.resumed(event_loop);
         if let Some(error) = host.take_failure() {
             return Err(error);

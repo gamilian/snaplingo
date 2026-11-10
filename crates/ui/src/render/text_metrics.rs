@@ -202,6 +202,33 @@ impl TextMeasurer for RendererTextMetrics {
 mod tests {
     use super::*;
     #[test]
+    fn windows_line_endings_keep_original_caret_bytes_without_extra_lines() {
+        let mut metrics = RendererTextMetrics::default();
+        for (text, lines) in [("中文\r\nnext", 2), ("中文\r\n\r\nnext", 3)] {
+            let layout = metrics.line_layout(text, 300., 14., 500, FontFamily::Sans, 28.);
+            assert_eq!(layout.height, lines as f32 * 28.);
+            let offset = text.find("next").unwrap();
+            assert_eq!(
+                layout
+                    .caret_stops
+                    .iter()
+                    .find(|(byte, _)| *byte == offset)
+                    .unwrap()
+                    .1,
+                Point {
+                    x: 0.,
+                    y: (lines - 1) as f32 * 28.
+                }
+            );
+            assert_eq!(layout.caret_stops.last().unwrap().0, text.len());
+            assert!(layout
+                .caret_stops
+                .iter()
+                .all(|(byte, _)| text.is_char_boundary(*byte)));
+        }
+    }
+
+    #[test]
     fn wrapped_multiline_layout_keeps_caret_bytes_and_requested_line_height() {
         let mut metrics = RendererTextMetrics::default();
         let text = "中文 e\u{301}🙂 wraps across lines\nnext";
