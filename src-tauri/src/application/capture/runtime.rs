@@ -509,7 +509,19 @@ impl CaptureSessionRuntime {
         let cancel_result = self.cancel_capture_session_inner(session_id).await;
         if let Err(error) = hide_result.and(cancel_result) {
             self.host
-                .report_capture_ocr_error(job.target, result_id, &error.to_string())
+                .report_capture_ocr_start_error(job.target, result_id, &error.to_string())
+                .await;
+            return Err(error);
+        }
+        // Reveal the empty result before any provider initialization or inference.
+        // The window owns its loading state after the capture WebView is destroyed.
+        if let Err(error) = self
+            .host
+            .begin_capture_ocr_result(job.target, result_id, job.preview.clone())
+            .await
+        {
+            self.host
+                .report_capture_ocr_start_error(job.target, result_id, &error.to_string())
                 .await;
             return Err(error);
         }
@@ -537,16 +549,25 @@ impl CaptureSessionRuntime {
         mut generation: tokio::sync::watch::Receiver<u64>,
     ) {
         if *generation.borrow() != job.generation {
+            self.host
+                .cancel_capture_ocr_result(job.target, result_id)
+                .await;
             return;
         }
         let result = tokio::select! {
             biased;
-            _ = generation.changed() => return,
+            _ = generation.changed() => {
+                self.host.cancel_capture_ocr_result(job.target, result_id).await;
+                return;
+            },
             result = self.ocr.recognize(&job.request) => result,
         };
         // Serialize delivery with a new capture's startup, including native window calls.
         let startup = self.startup.lock().await;
         if *self.ocr_generation.borrow() != job.generation {
+            self.host
+                .cancel_capture_ocr_result(job.target, result_id)
+                .await;
             return;
         }
         if job.target == CaptureOcrTarget::Clipboard
@@ -737,6 +758,52 @@ mod tests {
         EndPresentation,
     }
 
+    #[derive(Default)]
+    struct OcrWindowEffects {
+        opens: std::sync::atomic::AtomicUsize,
+        fail_notification: std::sync::atomic::AtomicBool,
+        fail_open: std::sync::atomic::AtomicBool,
+        errors: Mutex<Vec<String>>,
+    }
+    impl super::super::CaptureOcrEffects for OcrWindowEffects {
+        fn copy_text(&self, _: String) -> crate::Result<()> {
+            Ok(())
+        }
+        fn show_error(&self, error: &str) {
+            self.errors.lock().unwrap().push(error.into());
+        }
+    }
+    #[async_trait]
+    impl crate::application::result_window::ResultWindowWindowPort for OcrWindowEffects {
+        async fn show_or_create(&self) -> crate::Result<()> {
+            self.opens.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            if self
+                .fail_open
+                .swap(false, std::sync::atomic::Ordering::SeqCst)
+            {
+                Err("Result window failed to open".into())
+            } else {
+                Ok(())
+            }
+        }
+    }
+    #[async_trait]
+    impl crate::application::result_window::ResultWindowNotifierPort for OcrWindowEffects {
+        async fn notify_payload_ready(
+            &self,
+            _: crate::application::result_window::ResultWindowRequestId,
+        ) -> crate::Result<()> {
+            if self
+                .fail_notification
+                .swap(false, std::sync::atomic::Ordering::SeqCst)
+            {
+                Err("Result notification failed".into())
+            } else {
+                Ok(())
+            }
+        }
+    }
+
     struct RecordingRuntimeHost {
         calls: Arc<Mutex<Vec<HostCall>>>,
         hide_result: Result<(), String>,
@@ -746,6 +813,10 @@ mod tests {
         end_result: Result<(), String>,
         destroy_result: Result<(), String>,
         destroy_calls: std::sync::atomic::AtomicUsize,
+        fail_cleanup: std::sync::atomic::AtomicBool,
+        result_window: Arc<crate::application::result_window::ResultWindowRuntime>,
+        result_effects: Arc<OcrWindowEffects>,
+        ocr_delivery: super::super::CaptureOcrDelivery,
         ocr_results: Mutex<
             Vec<(
                 super::CaptureOcrTarget,
@@ -763,7 +834,20 @@ mod tests {
 
     impl RecordingRuntimeHost {
         fn succeeds() -> Self {
+            let result_effects = Arc::new(OcrWindowEffects::default());
+            let result_window =
+                Arc::new(crate::application::result_window::ResultWindowRuntime::new(
+                    result_effects.clone(),
+                    result_effects.clone(),
+                ));
+            let ocr_delivery = super::super::CaptureOcrDelivery::new(
+                result_window.clone(),
+                result_effects.clone(),
+            );
             Self {
+                result_window,
+                result_effects,
+                ocr_delivery,
                 calls: Arc::new(Mutex::new(Vec::new())),
                 hide_result: Ok(()),
                 open_result: Mutex::new(Ok(())),
@@ -772,6 +856,7 @@ mod tests {
                 end_result: Ok(()),
                 destroy_result: Ok(()),
                 destroy_calls: std::sync::atomic::AtomicUsize::new(0),
+                fail_cleanup: std::sync::atomic::AtomicBool::new(false),
                 ocr_results: Mutex::new(Vec::new()),
                 ocr_errors: Mutex::new(Vec::new()),
                 ocr_statuses: Mutex::new(Vec::new()),
@@ -818,13 +903,36 @@ mod tests {
             self.ocr_statuses.lock().unwrap().push(status);
         }
 
+        fn reserve_capture_ocr_result(
+            &self,
+            target: super::CaptureOcrTarget,
+        ) -> crate::Result<u64> {
+            self.ocr_delivery.reserve_result(target)
+        }
+
+        async fn begin_capture_ocr_result(
+            &self,
+            target: super::CaptureOcrTarget,
+            result_id: u64,
+            preview: Option<String>,
+        ) -> crate::Result<()> {
+            self.ocr_delivery.begin(target, result_id, preview).await
+        }
+
+        async fn cancel_capture_ocr_result(&self, target: super::CaptureOcrTarget, result_id: u64) {
+            self.ocr_delivery.cancel(target, result_id).await;
+        }
+
         async fn publish_capture_ocr(
             &self,
             target: super::CaptureOcrTarget,
-            _: u64,
+            result_id: u64,
             result: crate::domain::ocr::OcrResult,
             preview: Option<String>,
         ) -> crate::Result<()> {
+            self.ocr_delivery
+                .publish(target, result_id, result.clone(), preview.clone())
+                .await?;
             self.ocr_results
                 .lock()
                 .unwrap()
@@ -833,7 +941,28 @@ mod tests {
             Ok(())
         }
 
-        async fn report_capture_ocr_error(&self, _: super::CaptureOcrTarget, _: u64, error: &str) {
+        async fn report_capture_ocr_start_error(
+            &self,
+            target: super::CaptureOcrTarget,
+            result_id: u64,
+            error: &str,
+        ) {
+            self.ocr_delivery
+                .report_start_error(target, result_id, error)
+                .await;
+            self.ocr_errors.lock().unwrap().push(error.into());
+            self.ocr_completed.notify_one();
+        }
+
+        async fn report_capture_ocr_error(
+            &self,
+            target: super::CaptureOcrTarget,
+            result_id: u64,
+            error: &str,
+        ) {
+            self.ocr_delivery
+                .report_error(target, result_id, error)
+                .await;
             self.ocr_errors.lock().unwrap().push(error.into());
             self.ocr_completed.notify_one();
         }
@@ -879,7 +1008,14 @@ mod tests {
         async fn destroy_inactive_capture_window(&self) -> crate::Result<()> {
             self.destroy_calls
                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            self.destroy_result.clone().map_err(AppError::from)
+            if self
+                .fail_cleanup
+                .swap(false, std::sync::atomic::Ordering::SeqCst)
+            {
+                Err("Capture cleanup failed".into())
+            } else {
+                self.destroy_result.clone().map_err(AppError::from)
+            }
         }
 
         async fn open_capture_window_for_session(
@@ -2394,6 +2530,125 @@ mod tests {
         }
 
         #[tokio::test]
+        async fn result_window_opens_before_suspended_recognition_finishes() {
+            use crate::application::result_window::ResultWindowOcrStatus;
+            for target in [
+                CaptureOcrTarget::OcrWindow,
+                CaptureOcrTarget::TranslationWindow,
+            ] {
+                let f = prepared(target, Ok("recognized"), false).await;
+                f.runtime.complete_capture_ocr(&f.session_id).await.unwrap();
+                notified(&f.barrier.entered).await;
+                assert_eq!(
+                    f.host
+                        .result_effects
+                        .opens
+                        .load(std::sync::atomic::Ordering::SeqCst),
+                    1,
+                    "The result window must already be open while OCR is suspended"
+                );
+                assert!(!f.runtime.sessions.has_session(&f.session_id));
+                assert!(f.host.ocr_results.lock().unwrap().is_empty());
+                let id = f.host.result_window.current_request_id().unwrap().unwrap();
+                let loading = f.host.result_window.take_if_current(id).unwrap().unwrap();
+                assert_eq!(loading.ocr_status, Some(ResultWindowOcrStatus::Recognizing));
+                assert!(
+                    !loading.auto_translate,
+                    "Translation must wait for recognized text"
+                );
+                assert!(loading.text.is_empty());
+                assert_eq!(
+                    loading.image_base64.is_some(),
+                    target == CaptureOcrTarget::OcrWindow
+                );
+                f.barrier.release.notify_one();
+                notified(&f.host.ocr_completed).await;
+                let completed = f.host.result_window.take_if_current(id).unwrap().unwrap();
+                assert_eq!(completed.ocr_status, Some(ResultWindowOcrStatus::Complete));
+                assert_eq!(completed.text, "recognized");
+                assert_eq!(
+                    completed.auto_translate,
+                    target == CaptureOcrTarget::TranslationWindow
+                );
+                assert_eq!(completed.image_base64, loading.image_base64);
+                assert_eq!(
+                    f.host
+                        .result_effects
+                        .opens
+                        .load(std::sync::atomic::Ordering::SeqCst),
+                    1,
+                    "Completing OCR must not show or focus the result window again"
+                );
+            }
+        }
+
+        #[tokio::test]
+        async fn startup_failures_are_visible_even_without_a_result_window() {
+            for cleanup in [false, true] {
+                let f = prepared(CaptureOcrTarget::OcrWindow, Ok("unused"), false).await;
+                if cleanup {
+                    f.host
+                        .fail_cleanup
+                        .store(true, std::sync::atomic::Ordering::SeqCst);
+                } else {
+                    f.host
+                        .result_effects
+                        .fail_open
+                        .store(true, std::sync::atomic::Ordering::SeqCst);
+                }
+                let error = f
+                    .runtime
+                    .complete_capture_ocr(&f.session_id)
+                    .await
+                    .unwrap_err();
+                let expected = if cleanup {
+                    "Capture cleanup failed"
+                } else {
+                    "Result window failed to open"
+                };
+                assert_eq!(error.to_string(), expected);
+                assert!(f.request.lock().unwrap().is_none());
+                assert_eq!(
+                    *f.host.result_effects.errors.lock().unwrap(),
+                    vec![expected]
+                );
+            }
+        }
+
+        #[tokio::test]
+        async fn failed_initial_notification_leaves_a_terminal_payload_without_starting_ocr() {
+            let f = prepared(CaptureOcrTarget::OcrWindow, Ok("unused"), false).await;
+            f.host
+                .result_effects
+                .fail_notification
+                .store(true, std::sync::atomic::Ordering::SeqCst);
+            let error = f
+                .runtime
+                .complete_capture_ocr(&f.session_id)
+                .await
+                .unwrap_err();
+            assert_eq!(error.to_string(), "Result notification failed");
+            assert!(f.request.lock().unwrap().is_none());
+            let id = f.host.result_window.current_request_id().unwrap().unwrap();
+            let payload = f.host.result_window.take_if_current(id).unwrap().unwrap();
+            assert_eq!(
+                payload.ocr_status,
+                Some(crate::application::result_window::ResultWindowOcrStatus::Failed)
+            );
+            assert_eq!(
+                payload.ocr_error.as_deref(),
+                Some("Result notification failed")
+            );
+            assert_eq!(
+                f.host
+                    .result_effects
+                    .opens
+                    .load(std::sync::atomic::Ordering::SeqCst),
+                1
+            );
+        }
+
+        #[tokio::test]
         async fn ocr_job_survives_window_cleanup_and_uses_owned_pixels() {
             for target in [
                 CaptureOcrTarget::OcrWindow,
@@ -2411,6 +2666,16 @@ mod tests {
                 );
                 notified(&f.barrier.entered).await;
                 assert!(f.host.ocr_results.lock().unwrap().is_empty());
+                if target == CaptureOcrTarget::Clipboard {
+                    assert_eq!(
+                        f.host
+                            .result_effects
+                            .opens
+                            .load(std::sync::atomic::Ordering::SeqCst),
+                        0
+                    );
+                    assert!(f.host.result_window.current_request_id().unwrap().is_none());
+                }
                 let request = f.request.lock().unwrap().clone().unwrap();
                 assert_eq!(request.language.as_deref(), Some("ja"));
                 let image = image::load_from_memory(&request.image_data)
@@ -2462,6 +2727,7 @@ mod tests {
             let f = prepared(CaptureOcrTarget::TranslationWindow, Ok("stale"), false).await;
             f.runtime.complete_capture_ocr(&f.session_id).await.unwrap();
             notified(&f.barrier.entered).await;
+            let result_id = f.host.result_window.current_request_id().unwrap().unwrap();
             let new_session = f
                 .runtime
                 .create_session_from_visible_desktop()
@@ -2473,19 +2739,63 @@ mod tests {
             assert!(f.host.ocr_errors.lock().unwrap().is_empty());
             assert!(f.runtime.sessions.has_session(&new_session.id));
             assert_eq!(f.host.ocr_statuses.lock().unwrap().last(), Some(&None));
+            let cancelled = f
+                .host
+                .result_window
+                .take_if_current(result_id)
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                cancelled.ocr_status,
+                Some(crate::application::result_window::ResultWindowOcrStatus::Cancelled)
+            );
+            assert_eq!(
+                f.host
+                    .result_effects
+                    .opens
+                    .load(std::sync::atomic::Ordering::SeqCst),
+                1
+            );
         }
 
         #[tokio::test]
         async fn failures_and_empty_results_report_after_the_overlay_has_closed() {
-            for result in [Err("recognition failed"), Ok("  \n ")] {
-                let f = prepared(CaptureOcrTarget::Clipboard, result, false).await;
-                f.runtime.complete_capture_ocr(&f.session_id).await.unwrap();
-                notified(&f.barrier.entered).await;
-                f.barrier.release.notify_one();
-                notified(&f.host.ocr_completed).await;
-                assert!(!f.runtime.sessions.has_session(&f.session_id));
-                assert!(f.host.ocr_results.lock().unwrap().is_empty());
-                assert_eq!(f.host.ocr_errors.lock().unwrap().len(), 1);
+            for target in [
+                CaptureOcrTarget::Clipboard,
+                CaptureOcrTarget::OcrWindow,
+                CaptureOcrTarget::TranslationWindow,
+            ] {
+                for result in [Err("recognition failed"), Ok("  \n ")] {
+                    let f = prepared(target, result, false).await;
+                    f.runtime.complete_capture_ocr(&f.session_id).await.unwrap();
+                    notified(&f.barrier.entered).await;
+                    f.barrier.release.notify_one();
+                    notified(&f.host.ocr_completed).await;
+                    assert!(!f.runtime.sessions.has_session(&f.session_id));
+                    assert!(f.host.ocr_results.lock().unwrap().is_empty());
+                    assert_eq!(f.host.ocr_errors.lock().unwrap().len(), 1);
+                    if target != CaptureOcrTarget::Clipboard {
+                        assert!(
+                            f.host.result_effects.errors.lock().unwrap().is_empty(),
+                            "An opened result window must display errors inline"
+                        );
+                        let id = f.host.result_window.current_request_id().unwrap().unwrap();
+                        let failed = f.host.result_window.take_if_current(id).unwrap().unwrap();
+                        assert_eq!(
+                            failed.ocr_status,
+                            Some(crate::application::result_window::ResultWindowOcrStatus::Failed)
+                        );
+                        assert!(failed.ocr_error.is_some());
+                        assert!(!failed.auto_translate);
+                        assert_eq!(
+                            f.host
+                                .result_effects
+                                .opens
+                                .load(std::sync::atomic::Ordering::SeqCst),
+                            1
+                        );
+                    }
+                }
             }
         }
 

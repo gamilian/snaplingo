@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use super::CaptureOcrTarget;
 use crate::application::result_window::{
-    ResultWindowOpenRequest, ResultWindowRequestId, ResultWindowRuntime,
+    ResultWindowMode, ResultWindowOcrStatus, ResultWindowOpenRequest, ResultWindowRequestId,
+    ResultWindowRuntime,
 };
 use crate::domain::ocr::OcrResult;
 use crate::Result;
@@ -35,6 +36,29 @@ impl CaptureOcrDelivery {
         self.result_window.reserve_request().map(|id| id.0)
     }
 
+    pub(crate) async fn begin(
+        &self,
+        target: CaptureOcrTarget,
+        result_id: u64,
+        preview: Option<String>,
+    ) -> Result<()> {
+        if target == CaptureOcrTarget::Clipboard {
+            return Ok(());
+        }
+        self.result_window
+            .open_reserved(
+                ResultWindowRequestId(result_id),
+                capture_request(
+                    target,
+                    ResultWindowOcrStatus::Recognizing,
+                    None,
+                    preview,
+                    None,
+                ),
+            )
+            .await
+    }
+
     pub(crate) async fn publish(
         &self,
         target: CaptureOcrTarget,
@@ -45,32 +69,101 @@ impl CaptureOcrDelivery {
         if target == CaptureOcrTarget::Clipboard {
             return self.effects.copy_text(result.text);
         }
-        let request = if target == CaptureOcrTarget::TranslationWindow {
-            ResultWindowOpenRequest::screenshot_translation(result.text, result.detected_language)
-        } else {
-            ResultWindowOpenRequest::capture_ocr(
-                result.text,
-                preview,
-                result.confidence,
-                result.detected_language,
-            )
-        };
         self.result_window
-            .open_reserved(ResultWindowRequestId(result_id), request)
+            .update_reserved(
+                ResultWindowRequestId(result_id),
+                capture_request(
+                    target,
+                    ResultWindowOcrStatus::Complete,
+                    Some(result),
+                    preview,
+                    None,
+                ),
+            )
             .await
     }
 
-    pub(crate) fn report_error(&self, target: CaptureOcrTarget, result_id: u64, error: &str) {
-        log::error!("Capture OCR failed: {error}");
+    pub(crate) async fn cancel(&self, target: CaptureOcrTarget, result_id: u64) {
+        if target != CaptureOcrTarget::Clipboard {
+            if let Err(error) = self
+                .result_window
+                .update_reserved(
+                    ResultWindowRequestId(result_id),
+                    capture_request(target, ResultWindowOcrStatus::Cancelled, None, None, None),
+                )
+                .await
+            {
+                log::error!("Could not finish cancelled capture OCR: {error}");
+            }
+        }
+    }
+
+    /// Startup can fail before a result window exists, so it needs a native error.
+    pub(crate) async fn report_start_error(
+        &self,
+        target: CaptureOcrTarget,
+        result_id: u64,
+        error: &str,
+    ) {
+        self.report_error(target, result_id, error).await;
         if target != CaptureOcrTarget::Clipboard
-            && !self
+            && self
                 .result_window
                 .is_current(ResultWindowRequestId(result_id))
                 .unwrap_or(false)
         {
+            self.effects.show_error(error);
+        }
+    }
+
+    pub(crate) async fn report_error(&self, target: CaptureOcrTarget, result_id: u64, error: &str) {
+        log::error!("Capture OCR failed: {error}");
+        if target == CaptureOcrTarget::Clipboard {
+            self.effects.show_error(error);
             return;
         }
-        self.effects.show_error(error);
+        if let Err(delivery_error) = self
+            .result_window
+            .update_reserved(
+                ResultWindowRequestId(result_id),
+                capture_request(
+                    target,
+                    ResultWindowOcrStatus::Failed,
+                    None,
+                    None,
+                    Some(error.into()),
+                ),
+            )
+            .await
+        {
+            log::error!("Could not show capture OCR failure: {delivery_error}");
+        }
+    }
+}
+
+fn capture_request(
+    target: CaptureOcrTarget,
+    status: ResultWindowOcrStatus,
+    result: Option<OcrResult>,
+    preview: Option<String>,
+    error: Option<String>,
+) -> ResultWindowOpenRequest {
+    let translation = target == CaptureOcrTarget::TranslationWindow;
+    let (text, confidence, detected_language) = result
+        .map(|result| (result.text, result.confidence, result.detected_language))
+        .unwrap_or_default();
+    ResultWindowOpenRequest::CaptureOcr {
+        mode: if translation {
+            ResultWindowMode::Translation
+        } else {
+            ResultWindowMode::Ocr
+        },
+        status,
+        text,
+        image_base64: if translation { None } else { preview },
+        confidence,
+        detected_language,
+        error,
     }
 }
 
@@ -131,12 +224,25 @@ mod tests {
     }
     #[tokio::test]
     async fn maps_both_window_targets_and_preserves_preview_metadata() {
-        let (delivery, window, _) = runtime();
-        for target in [
+        let (delivery, window, effects) = runtime();
+        for (index, target) in [
             CaptureOcrTarget::OcrWindow,
             CaptureOcrTarget::TranslationWindow,
-        ] {
+        ]
+        .into_iter()
+        .enumerate()
+        {
             let id = delivery.reserve_result(target).unwrap();
+            delivery
+                .begin(target, id, Some("frozen-preview".into()))
+                .await
+                .unwrap();
+            let loading = window
+                .take_if_current(ResultWindowRequestId(id))
+                .unwrap()
+                .unwrap();
+            assert_eq!(loading.ocr_status, Some(ResultWindowOcrStatus::Recognizing));
+            assert_eq!(*effects.opens.lock().unwrap(), index + 1);
             delivery
                 .publish(target, id, result(), Some("frozen-preview".into()))
                 .await
@@ -146,6 +252,8 @@ mod tests {
                 .unwrap()
                 .unwrap();
             assert_eq!(payload.text, "recognized");
+            assert_eq!(payload.ocr_status, Some(ResultWindowOcrStatus::Complete));
+            assert_eq!(*effects.opens.lock().unwrap(), index + 1);
             assert_eq!(payload.detected_language.as_deref(), Some("en"));
             if target == CaptureOcrTarget::OcrWindow {
                 assert_eq!(payload.mode, ResultWindowMode::Ocr);
@@ -164,6 +272,10 @@ mod tests {
         let stale = delivery
             .reserve_result(CaptureOcrTarget::OcrWindow)
             .unwrap();
+        delivery
+            .begin(CaptureOcrTarget::OcrWindow, stale, None)
+            .await
+            .unwrap();
         window
             .open(ResultWindowOpenRequest::manual_translation("newer".into()))
             .await
@@ -173,18 +285,32 @@ mod tests {
             .publish(CaptureOcrTarget::OcrWindow, stale, result(), None)
             .await
             .unwrap();
-        delivery.report_error(CaptureOcrTarget::OcrWindow, stale, "old failure");
+        delivery
+            .report_error(CaptureOcrTarget::OcrWindow, stale, "old failure")
+            .await;
+        delivery.cancel(CaptureOcrTarget::OcrWindow, stale).await;
+        delivery
+            .report_start_error(CaptureOcrTarget::OcrWindow, stale, "stale startup failure")
+            .await;
         assert_eq!(
             window.take_if_current(current).unwrap().unwrap().text,
             "newer"
         );
-        assert_eq!(*effects.opens.lock().unwrap(), 1);
+        assert_eq!(*effects.opens.lock().unwrap(), 2);
         assert!(effects.errors.lock().unwrap().is_empty());
         let current = delivery
             .reserve_result(CaptureOcrTarget::OcrWindow)
             .unwrap();
-        delivery.report_error(CaptureOcrTarget::OcrWindow, current, "current failure");
-        assert_eq!(*effects.errors.lock().unwrap(), vec!["current failure"]);
+        delivery
+            .report_error(CaptureOcrTarget::OcrWindow, current, "current failure")
+            .await;
+        let failed = window
+            .take_if_current(ResultWindowRequestId(current))
+            .unwrap()
+            .unwrap();
+        assert_eq!(failed.ocr_status, Some(ResultWindowOcrStatus::Failed));
+        assert_eq!(failed.ocr_error.as_deref(), Some("current failure"));
+        assert!(effects.errors.lock().unwrap().is_empty());
     }
     #[tokio::test]
     async fn clipboard_delivery_preserves_the_current_window_request() {
@@ -200,10 +326,19 @@ mod tests {
             .reserve_result(CaptureOcrTarget::Clipboard)
             .unwrap();
         delivery
+            .begin(CaptureOcrTarget::Clipboard, clipboard, None)
+            .await
+            .unwrap();
+        delivery
+            .cancel(CaptureOcrTarget::Clipboard, clipboard)
+            .await;
+        delivery
             .publish(CaptureOcrTarget::Clipboard, clipboard, result(), None)
             .await
             .unwrap();
-        delivery.report_error(CaptureOcrTarget::Clipboard, clipboard, "clipboard failure");
+        delivery
+            .report_error(CaptureOcrTarget::Clipboard, clipboard, "clipboard failure")
+            .await;
         assert_eq!(*effects.copies.lock().unwrap(), vec!["recognized"]);
         assert_eq!(*effects.errors.lock().unwrap(), vec!["clipboard failure"]);
         assert_eq!(

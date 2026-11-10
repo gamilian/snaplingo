@@ -57,6 +57,8 @@ export interface CaptureResultWindowPayload {
   imageBase64?: string;
   confidence?: number;
   detectedLanguage?: string | null;
+  ocrStatus?: 'recognizing' | 'complete' | 'failed' | 'cancelled';
+  ocrError?: string;
 }
 
 export interface ResultWindowCommandsPort {

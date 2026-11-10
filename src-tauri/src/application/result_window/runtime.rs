@@ -68,6 +68,18 @@ impl ResultWindowRuntime {
         self.notifier.notify_payload_ready(request_id).await
     }
 
+    /// Update an already-open request without showing or focusing its window again.
+    pub(crate) async fn update_reserved(
+        &self,
+        request_id: ResultWindowRequestId,
+        request: ResultWindowOpenRequest,
+    ) -> crate::Result<()> {
+        if self.store_if_current(request_id, self.payload_for(request))? {
+            self.notifier.notify_payload_ready(request_id).await?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn take_if_current(
         &self,
         request_id: ResultWindowRequestId,
@@ -108,6 +120,33 @@ impl ResultWindowRuntime {
 
     fn payload_for(&self, request: ResultWindowOpenRequest) -> ResultWindowPayload {
         match request {
+            ResultWindowOpenRequest::CaptureOcr {
+                mode,
+                status,
+                text,
+                image_base64,
+                confidence,
+                detected_language,
+                error,
+            } => {
+                let translation = mode == ResultWindowMode::Translation;
+                ResultWindowPayload {
+                    origin: if translation {
+                        super::ResultWindowOrigin::Screenshot
+                    } else {
+                        super::ResultWindowOrigin::Ocr
+                    },
+                    auto_translate: translation && status == super::ResultWindowOcrStatus::Complete,
+                    ocr_intent: (!translation).then_some(super::ResultWindowOcrIntent::DisplayText),
+                    mode,
+                    text,
+                    image_base64,
+                    confidence,
+                    detected_language,
+                    ocr_status: Some(status),
+                    ocr_error: error,
+                }
+            }
             ResultWindowOpenRequest::Translation {
                 text,
                 auto_translate,
@@ -121,6 +160,8 @@ impl ResultWindowRuntime {
                 confidence,
                 detected_language,
             } => ResultWindowPayload {
+                ocr_status: None,
+                ocr_error: None,
                 mode: ResultWindowMode::Ocr,
                 origin: super::ResultWindowOrigin::Ocr,
                 text,
@@ -181,6 +222,8 @@ fn translation_payload(
     detected_language: Option<String>,
 ) -> ResultWindowPayload {
     ResultWindowPayload {
+        ocr_status: None,
+        ocr_error: None,
         mode: ResultWindowMode::Translation,
         origin,
         text,

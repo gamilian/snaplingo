@@ -66,7 +66,7 @@ The workflow that reads the current selection-text mode, acquires selected text,
 
 ### Capture OCR Delivery
 
-The handoff of a Capture Session OCR result to the OCR window, translation window, or clipboard. Window handoffs reserve a Result Window request identity; a newer request supersedes older results and errors. Clipboard delivery does not replace a pending Result Window request.
+The handoff of a Capture Session OCR result to the OCR window, translation window, or clipboard. After releasing the capture overlay, window handoffs open a recognizing state before Provider initialization or inference. Loading, completion, failure and cancellation share a Result Window request identity; completion updates the existing window without showing or focusing it again. A newer request supersedes older results and errors, and closing or editing the result dismisses late updates from that request. Clipboard delivery does not open a result window or replace a pending Result Window request.
 
 ### Capture Editing
 

@@ -103,6 +103,10 @@ export function createResultWindowRuntime({
   let automaticTranslationTimer: ReturnType<typeof setTimeout> | null = null;
   let lastTranslationKey: string | null = null;
   let ocrGeneration = 0;
+  let payloadGeneration = 0;
+  let latestPayloadRequestId: bigint | null = null;
+  let ignoredPayloadThrough: bigint | null = null;
+  let capturePayload: { requestId: string; settled: boolean } | null = null;
 
   function updateState(update: Partial<ResultWindowState>) {
     state = { ...state, ...update };
@@ -128,6 +132,14 @@ export function createResultWindowRuntime({
     updateState({ isOcrRunning: false });
   }
 
+  function dismissCapturePayload() {
+    // A hidden result window keeps its subscriber. Never let a late capture
+    // completion reopen it or replace text the user has started editing.
+    payloadGeneration += 1;
+    ignoredPayloadThrough = latestPayloadRequestId;
+    updateState({ isOcrRunning: false, ocrError: null });
+  }
+
   function currentTranslationInput(): TranslationInput {
     return {
       text: state.sourceText,
@@ -146,6 +158,7 @@ export function createResultWindowRuntime({
     if (
       !state.resultWindowVisible ||
       state.resultWindowMode !== 'translation' ||
+      state.isOcrRunning ||
       !state.sourceText.trim() ||
       state.isTranslating ||
       (!immediate && !settings?.autoTranslate)
@@ -195,6 +208,7 @@ export function createResultWindowRuntime({
   }
 
   function changeSourceLanguage(language: string) {
+    dismissCapturePayload();
     invalidateTranslationSession();
     const { targetLang } = state;
     updateState({
@@ -207,6 +221,7 @@ export function createResultWindowRuntime({
   }
 
   function swapTranslationLanguages() {
+    dismissCapturePayload();
     invalidateTranslationSession();
     const next = swapTranslationLanguagePair(
       state.sourceLang,
@@ -365,13 +380,30 @@ export function createResultWindowRuntime({
     await requestProviderTranslation(session, providerId);
   }
 
-  async function applyPayload(payload: CaptureResultWindowPayload) {
+  async function applyPayload(payload: CaptureResultWindowPayload, continuation = false) {
     invalidateTranslationSession();
     invalidateOcrGeneration();
     updateState({
       resultWindowOrigin: payload.origin ?? (payload.mode === 'ocr' ? 'ocr' : 'input'),
     });
-    needsPlacement = true;
+    if (!continuation) needsPlacement = true;
+    if (payload.ocrStatus && payload.ocrStatus !== 'complete') {
+      lastTranslationKey = null;
+      updateState({
+        resultWindowVisible: true,
+        resultWindowMode: payload.mode,
+        sourceText: '',
+        providerTranslations: [],
+        ocrText: '',
+        ocrConfidence: null,
+        ocrDetectedLanguage: null,
+        ocrImageBase64: payload.imageBase64 ?? (continuation ? state.ocrImageBase64 : null),
+        isOcrRunning: payload.ocrStatus === 'recognizing',
+        ocrError: payload.ocrStatus === 'failed' ? payload.ocrError ?? '图片识别失败' : null,
+      });
+      return;
+    }
+    updateState({ ocrError: null });
     if (payload.mode === 'translation') {
       if (shouldClearTranslationResultsForPayload(payload)) {
         lastTranslationKey = null;
@@ -416,16 +448,29 @@ export function createResultWindowRuntime({
   }
 
   async function loadPayload(requestId: string) {
+    const id = BigInt(requestId);
+    if (latestPayloadRequestId !== null && id < latestPayloadRequestId) return false;
+    latestPayloadRequestId = id;
     const payload = await platform.commands.takePayload(requestId);
-    if (!payload) return false;
+    if (
+      !payload || id !== latestPayloadRequestId ||
+      (ignoredPayloadThrough !== null && id <= ignoredPayloadThrough)
+    ) return false;
 
-    await applyPayload(payload);
+    const continuation = capturePayload?.requestId === requestId;
+    if (continuation && capturePayload?.settled) return false;
+    capturePayload = payload.ocrStatus
+      ? { requestId, settled: payload.ocrStatus !== 'recognizing' }
+      : null;
+
+    await applyPayload(payload, continuation);
     return true;
   }
 
   async function loadCurrentPayload() {
+    const generation = payloadGeneration;
     const requestId = await platform.commands.currentPayloadRequestId();
-    if (!requestId) return false;
+    if (!requestId || generation !== payloadGeneration) return false;
 
     return loadPayload(requestId);
   }
@@ -433,7 +478,7 @@ export function createResultWindowRuntime({
   async function subscribeToPayloads(
     onLoaded?: () => void,
   ): Promise<ResultWindowUnsubscribe> {
-    return platform.onPayloadReady((requestId) => {
+    const unlisten = await platform.onPayloadReady((requestId) => {
       void loadPayload(requestId)
         .then((loaded) => {
           if (loaded) {
@@ -444,9 +489,20 @@ export function createResultWindowRuntime({
           console.error('Failed to reload result window payload:', err);
         });
     });
+    // Subscribe before claiming the initial payload: a capture can finish while
+    // the result WebView starts, and its completion must not fall into that gap.
+    void loadCurrentPayload()
+      .then((loaded) => {
+        if (loaded) onLoaded?.();
+      })
+      .catch((err) => {
+        console.error('Failed to load capture result window payload:', err);
+      });
+    return unlisten;
   }
 
   async function startFileOcr() {
+    dismissCapturePayload();
     invalidateTranslationSession();
     const generation = ++ocrGeneration;
     const settings = getOcrSettings?.();
@@ -531,6 +587,7 @@ export function createResultWindowRuntime({
   }
 
   async function close(presentation: ResultWindowPresentation) {
+    dismissCapturePayload();
     invalidateTranslationSession();
     invalidateOcrGeneration();
     updateState({ resultWindowVisible: false });
@@ -622,6 +679,7 @@ export function createResultWindowRuntime({
     },
     updateSourceText: (text: string) => {
       if (text === state.sourceText) return;
+      dismissCapturePayload();
       invalidateTranslationSession();
       updateState({ sourceText: text });
       scheduleAutomaticTranslation();
@@ -629,12 +687,14 @@ export function createResultWindowRuntime({
     changeSourceLanguage,
     changeTargetLanguage: (language: string) => {
       if (language === state.targetLang) return;
+      dismissCapturePayload();
       invalidateTranslationSession();
       updateState({ targetLang: language });
       scheduleAutomaticTranslation();
     },
     swapTranslationLanguages,
     updateOcrText: (text: string) => {
+      dismissCapturePayload();
       invalidateOcrGeneration();
       updateState({ ocrText: text });
     },

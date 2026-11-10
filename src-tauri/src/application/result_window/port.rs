@@ -28,9 +28,22 @@ pub(crate) enum ResultWindowOcrIntent {
     File,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum ResultWindowOcrStatus {
+    Recognizing,
+    Complete,
+    Failed,
+    Cancelled,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ResultWindowPayload {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) ocr_status: Option<ResultWindowOcrStatus>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) ocr_error: Option<String>,
     pub(crate) mode: ResultWindowMode,
     pub(crate) origin: ResultWindowOrigin,
     pub(crate) text: String,
@@ -47,6 +60,15 @@ pub(crate) struct ResultWindowPayload {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum ResultWindowOpenRequest {
+    CaptureOcr {
+        mode: ResultWindowMode,
+        status: ResultWindowOcrStatus,
+        text: String,
+        image_base64: Option<String>,
+        confidence: Option<f32>,
+        detected_language: Option<String>,
+        error: Option<String>,
+    },
     Translation {
         text: String,
         auto_translate: bool,
