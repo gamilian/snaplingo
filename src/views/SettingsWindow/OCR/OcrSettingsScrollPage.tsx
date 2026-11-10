@@ -45,7 +45,7 @@ export function OcrSettingsScrollPage() {
             <SettingsGroup>
               <ToggleRow
                 label="本地模型 GPU 加速"
-                description="用于 PaddleOCR；设备不支持时自动使用 CPU"
+                description="用于支持 GPU 的本地模型；macOS 使用 tiny CPU 模型，识别后释放内存"
                 checked={ocr.gpuAcceleration ?? true}
                 onChange={(gpuAcceleration) => updateOcr({ gpuAcceleration })}
               />

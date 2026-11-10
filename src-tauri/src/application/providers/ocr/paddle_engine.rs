@@ -18,6 +18,9 @@ pub struct OcrAccelerationStatus {
 
 pub(crate) trait PaddleOcrEngine: Send + Sync {
     fn is_available(&self) -> bool;
+    fn supports_gpu(&self) -> bool {
+        true
+    }
     fn recognize(&self, request: &OcrRequest, gpu_enabled: bool) -> Result<OcrResult>;
     fn status(&self) -> OcrAccelerationStatus;
 }

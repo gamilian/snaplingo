@@ -5,7 +5,6 @@
       "url": "https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_det_onnx/resolve/61323801669c338b7891481ec7bac61ce31b576a/inference.onnx",
       "sha256": "eb13b44b25bb36f89528b68720af8a61d9cf381176107f465db1757b65d086e1",
       "platforms": [
-        "darwin-arm64",
         "win32-x64",
         "linux-x64"
       ]
@@ -15,24 +14,23 @@
       "url": "https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_rec_onnx/resolve/50c7eacafc52fa7bcf4194e8cd08e46f8558504b/inference.onnx",
       "sha256": "9c09abf0957f7968c7586464b7397b84ad2387a0497a351af40e9acc71b673ba",
       "platforms": [
-        "darwin-arm64",
         "win32-x64",
         "linux-x64"
       ]
     },
     {
-      "file": "medium_det.mnn",
-      "url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/PP-OCRv6_medium_det.mnn",
-      "sha256": "a174009ef81dd84f29034047cd56e50b73ef624a3a409226418be63ffc46ca60",
+      "file": "tiny_det.mnn",
+      "url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/PP-OCRv6_tiny_det.mnn",
+      "sha256": "7fab7b858f136bc93a760bdca66aaf25f0ff10accabb31e6ef853a897fb9cfec",
       "platforms": [
         "darwin-arm64",
         "darwin-x64"
       ]
     },
     {
-      "file": "medium_rec.mnn",
-      "url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/PP-OCRv6_medium_rec.mnn",
-      "sha256": "11bbedb5af3a33cb7fee505de19223243d85b82c7b507af51e345ea1b4e68e72",
+      "file": "tiny_rec.mnn",
+      "url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/PP-OCRv6_tiny_rec.mnn",
+      "sha256": "0a43c3c979a98b905f5e84913209998f510189419b5a5d4152bbb01ce8d17a93",
       "platforms": [
         "darwin-arm64",
         "darwin-x64"
@@ -43,10 +41,17 @@
       "url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/ppocr_keys_v6_medium.txt",
       "sha256": "b5f2bfe2bdd9448429e3e82b51c789775d9b42f2403d082b00662eb77e401c5d",
       "platforms": [
-        "darwin-arm64",
-        "darwin-x64",
         "win32-x64",
         "linux-x64"
+      ]
+    },
+    {
+      "file": "tiny_keys.txt",
+      "url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/ppocr_keys_v6_tiny.txt",
+      "sha256": "c5cbe34ef40c29c4df07ed012bf96569cb69a2d2a01a07027e9f13cb832bd9cd",
+      "platforms": [
+        "darwin-arm64",
+        "darwin-x64"
       ]
     },
     {
@@ -71,16 +76,6 @@
     }
   ],
   "archives": [
-    {
-      "platform": "darwin-arm64",
-      "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.31.1/onnxruntime-osx-arm64-1.31.1.tgz",
-      "sha256": "2e1344a1926ee50eb25b38153cb6992c3567515aef0e677a1a520a1798896d6f",
-      "files": {
-        "onnxruntime-osx-arm64-1.31.1/lib/libonnxruntime.1.31.1.dylib": "runtime/libonnxruntime.dylib",
-        "onnxruntime-osx-arm64-1.31.1/LICENSE": "licenses/onnxruntime.txt",
-        "onnxruntime-osx-arm64-1.31.1/ThirdPartyNotices.txt": "licenses/onnxruntime-third-party.txt"
-      }
-    },
     {
       "platform": "linux-x64",
       "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.31.1/onnxruntime-linux-x64-1.31.1.tgz",

@@ -1,0 +1,1202 @@
+[
+  {
+    "image": "small-light",
+    "threads": 4,
+    "parallel": false,
+    "iteration": 0,
+    "process_total_ms": 78.28616601182148,
+    "events": [
+      {
+        "batch": 8,
+        "height": 100,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/small-light.png",
+        "mode": "worker",
+        "parallel": false,
+        "pid": 92959,
+        "threads": 4,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 512
+      },
+      {
+        "chars": 118,
+        "iteration": 0,
+        "lines": 3,
+        "load_ms": 33.003667,
+        "peak_rss_bytes": 85245952,
+        "recognize_ms": 31.230542,
+        "request_ms": 64.234375,
+        "rss_after_bytes": 85245952,
+        "rss_before_bytes": 5324800,
+        "type": "request"
+      },
+      {
+        "drop_ms": 1.4282089999999998,
+        "iteration": 0,
+        "peak_rss_bytes": 85262336,
+        "rss_bytes": 85213184,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "small-light",
+    "threads": 4,
+    "parallel": false,
+    "iteration": 1,
+    "process_total_ms": 80.16800001496449,
+    "events": [
+      {
+        "batch": 8,
+        "height": 100,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/small-light.png",
+        "mode": "worker",
+        "parallel": false,
+        "pid": 92996,
+        "threads": 4,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 512
+      },
+      {
+        "chars": 118,
+        "iteration": 0,
+        "lines": 3,
+        "load_ms": 33.23325,
+        "peak_rss_bytes": 87408640,
+        "recognize_ms": 31.837459,
+        "request_ms": 65.070833,
+        "rss_after_bytes": 87408640,
+        "rss_before_bytes": 5324800,
+        "type": "request"
+      },
+      {
+        "drop_ms": 1.4469999999999998,
+        "iteration": 0,
+        "peak_rss_bytes": 87425024,
+        "rss_bytes": 87375872,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "small-light",
+    "threads": 4,
+    "parallel": false,
+    "iteration": 2,
+    "process_total_ms": 75.97254199208692,
+    "events": [
+      {
+        "batch": 8,
+        "height": 100,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/small-light.png",
+        "mode": "worker",
+        "parallel": false,
+        "pid": 93033,
+        "threads": 4,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 512
+      },
+      {
+        "chars": 118,
+        "iteration": 0,
+        "lines": 3,
+        "load_ms": 30.753708,
+        "peak_rss_bytes": 86638592,
+        "recognize_ms": 31.395167,
+        "request_ms": 62.148959,
+        "rss_after_bytes": 86638592,
+        "rss_before_bytes": 5324800,
+        "type": "request"
+      },
+      {
+        "drop_ms": 1.5353750000000002,
+        "iteration": 0,
+        "peak_rss_bytes": 86654976,
+        "rss_bytes": 86622208,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "small-light",
+    "threads": 4,
+    "parallel": false,
+    "iteration": 3,
+    "process_total_ms": 75.64308401197195,
+    "events": [
+      {
+        "batch": 8,
+        "height": 100,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/small-light.png",
+        "mode": "worker",
+        "parallel": false,
+        "pid": 93070,
+        "threads": 4,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 512
+      },
+      {
+        "chars": 118,
+        "iteration": 0,
+        "lines": 3,
+        "load_ms": 31.302833000000003,
+        "peak_rss_bytes": 83705856,
+        "recognize_ms": 30.650291,
+        "request_ms": 61.953250000000004,
+        "rss_after_bytes": 83705856,
+        "rss_before_bytes": 5324800,
+        "type": "request"
+      },
+      {
+        "drop_ms": 1.563917,
+        "iteration": 0,
+        "peak_rss_bytes": 83722240,
+        "rss_bytes": 83673088,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "small-light",
+    "threads": 4,
+    "parallel": false,
+    "iteration": 4,
+    "process_total_ms": 79.47970804525539,
+    "events": [
+      {
+        "batch": 8,
+        "height": 100,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/small-light.png",
+        "mode": "worker",
+        "parallel": false,
+        "pid": 93107,
+        "threads": 4,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 512
+      },
+      {
+        "chars": 118,
+        "iteration": 0,
+        "lines": 3,
+        "load_ms": 33.429292,
+        "peak_rss_bytes": 84738048,
+        "recognize_ms": 30.608,
+        "request_ms": 64.037375,
+        "rss_after_bytes": 84738048,
+        "rss_before_bytes": 5324800,
+        "type": "request"
+      },
+      {
+        "drop_ms": 1.3655,
+        "iteration": 0,
+        "peak_rss_bytes": 84754432,
+        "rss_bytes": 84721664,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "document-light",
+    "threads": 4,
+    "parallel": false,
+    "iteration": 0,
+    "process_total_ms": 376.0632500052452,
+    "events": [
+      {
+        "batch": 8,
+        "height": 960,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/document-light.png",
+        "mode": "worker",
+        "parallel": false,
+        "pid": 93149,
+        "threads": 4,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 1280
+      },
+      {
+        "chars": 1153,
+        "iteration": 0,
+        "lines": 28,
+        "load_ms": 37.164209,
+        "peak_rss_bytes": 363528192,
+        "recognize_ms": 316.008709,
+        "request_ms": 353.173041,
+        "rss_after_bytes": 363528192,
+        "rss_before_bytes": 8847360,
+        "type": "request"
+      },
+      {
+        "drop_ms": 3.439083,
+        "iteration": 0,
+        "peak_rss_bytes": 363544576,
+        "rss_bytes": 363495424,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "document-light",
+    "threads": 4,
+    "parallel": false,
+    "iteration": 1,
+    "process_total_ms": 376.7229160293937,
+    "events": [
+      {
+        "batch": 8,
+        "height": 960,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/document-light.png",
+        "mode": "worker",
+        "parallel": false,
+        "pid": 93186,
+        "threads": 4,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 1280
+      },
+      {
+        "chars": 1153,
+        "iteration": 0,
+        "lines": 28,
+        "load_ms": 31.239709,
+        "peak_rss_bytes": 371458048,
+        "recognize_ms": 319.728542,
+        "request_ms": 350.96833300000003,
+        "rss_after_bytes": 371458048,
+        "rss_before_bytes": 8847360,
+        "type": "request"
+      },
+      {
+        "drop_ms": 3.632917,
+        "iteration": 0,
+        "peak_rss_bytes": 371474432,
+        "rss_bytes": 371425280,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "document-light",
+    "threads": 4,
+    "parallel": false,
+    "iteration": 2,
+    "process_total_ms": 369.64362498838454,
+    "events": [
+      {
+        "batch": 8,
+        "height": 960,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/document-light.png",
+        "mode": "worker",
+        "parallel": false,
+        "pid": 93233,
+        "threads": 4,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 1280
+      },
+      {
+        "chars": 1153,
+        "iteration": 0,
+        "lines": 28,
+        "load_ms": 33.724416,
+        "peak_rss_bytes": 366657536,
+        "recognize_ms": 308.97891599999997,
+        "request_ms": 342.703416,
+        "rss_after_bytes": 366657536,
+        "rss_before_bytes": 9076736,
+        "type": "request"
+      },
+      {
+        "drop_ms": 3.493625,
+        "iteration": 0,
+        "peak_rss_bytes": 366673920,
+        "rss_bytes": 366624768,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "document-light",
+    "threads": 4,
+    "parallel": false,
+    "iteration": 3,
+    "process_total_ms": 371.5780829661526,
+    "events": [
+      {
+        "batch": 8,
+        "height": 960,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/document-light.png",
+        "mode": "worker",
+        "parallel": false,
+        "pid": 93271,
+        "threads": 4,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 1280
+      },
+      {
+        "chars": 1153,
+        "iteration": 0,
+        "lines": 28,
+        "load_ms": 30.7375,
+        "peak_rss_bytes": 371572736,
+        "recognize_ms": 314.179459,
+        "request_ms": 344.917041,
+        "rss_after_bytes": 371572736,
+        "rss_before_bytes": 8847360,
+        "type": "request"
+      },
+      {
+        "drop_ms": 3.7935410000000003,
+        "iteration": 0,
+        "peak_rss_bytes": 371589120,
+        "rss_bytes": 371539968,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "document-light",
+    "threads": 4,
+    "parallel": false,
+    "iteration": 4,
+    "process_total_ms": 369.12487499648705,
+    "events": [
+      {
+        "batch": 8,
+        "height": 960,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/document-light.png",
+        "mode": "worker",
+        "parallel": false,
+        "pid": 93308,
+        "threads": 4,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 1280
+      },
+      {
+        "chars": 1153,
+        "iteration": 0,
+        "lines": 28,
+        "load_ms": 31.780708999999998,
+        "peak_rss_bytes": 374194176,
+        "recognize_ms": 312.911292,
+        "request_ms": 344.69212500000003,
+        "rss_after_bytes": 374194176,
+        "rss_before_bytes": 9240576,
+        "type": "request"
+      },
+      {
+        "drop_ms": 3.742667,
+        "iteration": 0,
+        "peak_rss_bytes": 374210560,
+        "rss_bytes": 374161408,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "small-light",
+    "threads": 2,
+    "parallel": false,
+    "iteration": 0,
+    "process_total_ms": 95.20216699456796,
+    "events": [
+      {
+        "batch": 8,
+        "height": 100,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/small-light.png",
+        "mode": "worker",
+        "parallel": false,
+        "pid": 93345,
+        "threads": 2,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 512
+      },
+      {
+        "chars": 118,
+        "iteration": 0,
+        "lines": 3,
+        "load_ms": 34.60916700000001,
+        "peak_rss_bytes": 84688896,
+        "recognize_ms": 46.217458,
+        "request_ms": 80.826708,
+        "rss_after_bytes": 84688896,
+        "rss_before_bytes": 5324800,
+        "type": "request"
+      },
+      {
+        "drop_ms": 1.3051670000000002,
+        "iteration": 0,
+        "peak_rss_bytes": 84705280,
+        "rss_bytes": 84656128,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "small-light",
+    "threads": 2,
+    "parallel": false,
+    "iteration": 1,
+    "process_total_ms": 90.07183398352936,
+    "events": [
+      {
+        "batch": 8,
+        "height": 100,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/small-light.png",
+        "mode": "worker",
+        "parallel": false,
+        "pid": 93382,
+        "threads": 2,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 512
+      },
+      {
+        "chars": 118,
+        "iteration": 0,
+        "lines": 3,
+        "load_ms": 30.366084,
+        "peak_rss_bytes": 81805312,
+        "recognize_ms": 40.091042,
+        "request_ms": 70.457209,
+        "rss_after_bytes": 81805312,
+        "rss_before_bytes": 5324800,
+        "type": "request"
+      },
+      {
+        "drop_ms": 1.623,
+        "iteration": 0,
+        "peak_rss_bytes": 81821696,
+        "rss_bytes": 81772544,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "small-light",
+    "threads": 2,
+    "parallel": false,
+    "iteration": 2,
+    "process_total_ms": 87.55349996499717,
+    "events": [
+      {
+        "batch": 8,
+        "height": 100,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/small-light.png",
+        "mode": "worker",
+        "parallel": false,
+        "pid": 93419,
+        "threads": 2,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 512
+      },
+      {
+        "chars": 118,
+        "iteration": 0,
+        "lines": 3,
+        "load_ms": 31.722208000000002,
+        "peak_rss_bytes": 85131264,
+        "recognize_ms": 40.772166999999996,
+        "request_ms": 72.4945,
+        "rss_after_bytes": 85131264,
+        "rss_before_bytes": 5324800,
+        "type": "request"
+      },
+      {
+        "drop_ms": 1.393834,
+        "iteration": 0,
+        "peak_rss_bytes": 85147648,
+        "rss_bytes": 85098496,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "small-light",
+    "threads": 2,
+    "parallel": false,
+    "iteration": 3,
+    "process_total_ms": 84.86645802622661,
+    "events": [
+      {
+        "batch": 8,
+        "height": 100,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/small-light.png",
+        "mode": "worker",
+        "parallel": false,
+        "pid": 93456,
+        "threads": 2,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 512
+      },
+      {
+        "chars": 118,
+        "iteration": 0,
+        "lines": 3,
+        "load_ms": 29.350416,
+        "peak_rss_bytes": 86048768,
+        "recognize_ms": 41.713291,
+        "request_ms": 71.063833,
+        "rss_after_bytes": 86048768,
+        "rss_before_bytes": 5324800,
+        "type": "request"
+      },
+      {
+        "drop_ms": 1.3852499999999999,
+        "iteration": 0,
+        "peak_rss_bytes": 86065152,
+        "rss_bytes": 86032384,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "small-light",
+    "threads": 2,
+    "parallel": false,
+    "iteration": 4,
+    "process_total_ms": 89.68512498540804,
+    "events": [
+      {
+        "batch": 8,
+        "height": 100,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/small-light.png",
+        "mode": "worker",
+        "parallel": false,
+        "pid": 93493,
+        "threads": 2,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 512
+      },
+      {
+        "chars": 118,
+        "iteration": 0,
+        "lines": 3,
+        "load_ms": 34.29025,
+        "peak_rss_bytes": 81625088,
+        "recognize_ms": 41.020708000000006,
+        "request_ms": 75.311,
+        "rss_after_bytes": 81625088,
+        "rss_before_bytes": 5324800,
+        "type": "request"
+      },
+      {
+        "drop_ms": 1.184208,
+        "iteration": 0,
+        "peak_rss_bytes": 81641472,
+        "rss_bytes": 81592320,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "document-light",
+    "threads": 2,
+    "parallel": false,
+    "iteration": 0,
+    "process_total_ms": 490.69091700948775,
+    "events": [
+      {
+        "batch": 8,
+        "height": 960,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/document-light.png",
+        "mode": "worker",
+        "parallel": false,
+        "pid": 93530,
+        "threads": 2,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 1280
+      },
+      {
+        "chars": 1153,
+        "iteration": 0,
+        "lines": 28,
+        "load_ms": 33.905833,
+        "peak_rss_bytes": 350502912,
+        "recognize_ms": 433.01725000000005,
+        "request_ms": 466.92312499999997,
+        "rss_after_bytes": 350502912,
+        "rss_before_bytes": 8847360,
+        "type": "request"
+      },
+      {
+        "drop_ms": 3.284167,
+        "iteration": 0,
+        "peak_rss_bytes": 350535680,
+        "rss_bytes": 350486528,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "document-light",
+    "threads": 2,
+    "parallel": false,
+    "iteration": 1,
+    "process_total_ms": 486.35370802367106,
+    "events": [
+      {
+        "batch": 8,
+        "height": 960,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/document-light.png",
+        "mode": "worker",
+        "parallel": false,
+        "pid": 93576,
+        "threads": 2,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 1280
+      },
+      {
+        "chars": 1153,
+        "iteration": 0,
+        "lines": 28,
+        "load_ms": 29.957958,
+        "peak_rss_bytes": 355270656,
+        "recognize_ms": 431.784667,
+        "request_ms": 461.742708,
+        "rss_after_bytes": 355270656,
+        "rss_before_bytes": 8847360,
+        "type": "request"
+      },
+      {
+        "drop_ms": 3.236583,
+        "iteration": 0,
+        "peak_rss_bytes": 355287040,
+        "rss_bytes": 355237888,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "document-light",
+    "threads": 2,
+    "parallel": false,
+    "iteration": 2,
+    "process_total_ms": 488.35574998520315,
+    "events": [
+      {
+        "batch": 8,
+        "height": 960,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/document-light.png",
+        "mode": "worker",
+        "parallel": false,
+        "pid": 93613,
+        "threads": 2,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 1280
+      },
+      {
+        "chars": 1153,
+        "iteration": 0,
+        "lines": 28,
+        "load_ms": 30.408708999999998,
+        "peak_rss_bytes": 354861056,
+        "recognize_ms": 433.893292,
+        "request_ms": 464.30204200000003,
+        "rss_after_bytes": 354861056,
+        "rss_before_bytes": 8847360,
+        "type": "request"
+      },
+      {
+        "drop_ms": 3.5593339999999998,
+        "iteration": 0,
+        "peak_rss_bytes": 354877440,
+        "rss_bytes": 354828288,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "document-light",
+    "threads": 2,
+    "parallel": false,
+    "iteration": 3,
+    "process_total_ms": 528.8618339691311,
+    "events": [
+      {
+        "batch": 8,
+        "height": 960,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/document-light.png",
+        "mode": "worker",
+        "parallel": false,
+        "pid": 93650,
+        "threads": 2,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 1280
+      },
+      {
+        "chars": 1153,
+        "iteration": 0,
+        "lines": 28,
+        "load_ms": 30.763583,
+        "peak_rss_bytes": 350273536,
+        "recognize_ms": 473.365917,
+        "request_ms": 504.1295,
+        "rss_after_bytes": 350273536,
+        "rss_before_bytes": 8847360,
+        "type": "request"
+      },
+      {
+        "drop_ms": 3.235875,
+        "iteration": 0,
+        "peak_rss_bytes": 350289920,
+        "rss_bytes": 350240768,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "document-light",
+    "threads": 2,
+    "parallel": false,
+    "iteration": 4,
+    "process_total_ms": 495.6480000400916,
+    "events": [
+      {
+        "batch": 8,
+        "height": 960,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/document-light.png",
+        "mode": "worker",
+        "parallel": false,
+        "pid": 93688,
+        "threads": 2,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 1280
+      },
+      {
+        "chars": 1153,
+        "iteration": 0,
+        "lines": 28,
+        "load_ms": 31.972958000000002,
+        "peak_rss_bytes": 352665600,
+        "recognize_ms": 438.855709,
+        "request_ms": 470.82875,
+        "rss_after_bytes": 352665600,
+        "rss_before_bytes": 8847360,
+        "type": "request"
+      },
+      {
+        "drop_ms": 3.430084,
+        "iteration": 0,
+        "peak_rss_bytes": 352681984,
+        "rss_bytes": 352649216,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "small-light",
+    "threads": 4,
+    "parallel": true,
+    "iteration": 0,
+    "process_total_ms": 82.21883303485811,
+    "events": [
+      {
+        "batch": 8,
+        "height": 100,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/small-light.png",
+        "mode": "worker",
+        "parallel": true,
+        "pid": 93734,
+        "threads": 4,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 512
+      },
+      {
+        "chars": 118,
+        "iteration": 0,
+        "lines": 3,
+        "load_ms": 33.61025,
+        "peak_rss_bytes": 84017152,
+        "recognize_ms": 34.650708,
+        "request_ms": 68.261083,
+        "rss_after_bytes": 84017152,
+        "rss_before_bytes": 5324800,
+        "type": "request"
+      },
+      {
+        "drop_ms": 1.2485,
+        "iteration": 0,
+        "peak_rss_bytes": 84033536,
+        "rss_bytes": 84000768,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "small-light",
+    "threads": 4,
+    "parallel": true,
+    "iteration": 1,
+    "process_total_ms": 86.26633399398997,
+    "events": [
+      {
+        "batch": 8,
+        "height": 100,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/small-light.png",
+        "mode": "worker",
+        "parallel": true,
+        "pid": 93771,
+        "threads": 4,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 512
+      },
+      {
+        "chars": 118,
+        "iteration": 0,
+        "lines": 3,
+        "load_ms": 31.964792,
+        "peak_rss_bytes": 84951040,
+        "recognize_ms": 39.422125,
+        "request_ms": 71.387,
+        "rss_after_bytes": 84951040,
+        "rss_before_bytes": 5324800,
+        "type": "request"
+      },
+      {
+        "drop_ms": 1.453583,
+        "iteration": 0,
+        "peak_rss_bytes": 84967424,
+        "rss_bytes": 84918272,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "small-light",
+    "threads": 4,
+    "parallel": true,
+    "iteration": 2,
+    "process_total_ms": 77.49549997970462,
+    "events": [
+      {
+        "batch": 8,
+        "height": 100,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/small-light.png",
+        "mode": "worker",
+        "parallel": true,
+        "pid": 93808,
+        "threads": 4,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 512
+      },
+      {
+        "chars": 118,
+        "iteration": 0,
+        "lines": 3,
+        "load_ms": 30.591584,
+        "peak_rss_bytes": 84836352,
+        "recognize_ms": 31.048792,
+        "request_ms": 61.640459,
+        "rss_after_bytes": 84836352,
+        "rss_before_bytes": 5324800,
+        "type": "request"
+      },
+      {
+        "drop_ms": 1.379,
+        "iteration": 0,
+        "peak_rss_bytes": 84852736,
+        "rss_bytes": 84803584,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "small-light",
+    "threads": 4,
+    "parallel": true,
+    "iteration": 3,
+    "process_total_ms": 78.64095800323412,
+    "events": [
+      {
+        "batch": 8,
+        "height": 100,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/small-light.png",
+        "mode": "worker",
+        "parallel": true,
+        "pid": 93845,
+        "threads": 4,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 512
+      },
+      {
+        "chars": 118,
+        "iteration": 0,
+        "lines": 3,
+        "load_ms": 33.331624999999995,
+        "peak_rss_bytes": 83165184,
+        "recognize_ms": 31.555334,
+        "request_ms": 64.887,
+        "rss_after_bytes": 83165184,
+        "rss_before_bytes": 5324800,
+        "type": "request"
+      },
+      {
+        "drop_ms": 1.329167,
+        "iteration": 0,
+        "peak_rss_bytes": 83181568,
+        "rss_bytes": 83132416,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "small-light",
+    "threads": 4,
+    "parallel": true,
+    "iteration": 4,
+    "process_total_ms": 75.47066704137251,
+    "events": [
+      {
+        "batch": 8,
+        "height": 100,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/small-light.png",
+        "mode": "worker",
+        "parallel": true,
+        "pid": 93882,
+        "threads": 4,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 512
+      },
+      {
+        "chars": 118,
+        "iteration": 0,
+        "lines": 3,
+        "load_ms": 30.279917,
+        "peak_rss_bytes": 83640320,
+        "recognize_ms": 31.061791,
+        "request_ms": 61.34175,
+        "rss_after_bytes": 83640320,
+        "rss_before_bytes": 5324800,
+        "type": "request"
+      },
+      {
+        "drop_ms": 1.3657910000000002,
+        "iteration": 0,
+        "peak_rss_bytes": 83673088,
+        "rss_bytes": 83623936,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "document-light",
+    "threads": 4,
+    "parallel": true,
+    "iteration": 0,
+    "process_total_ms": 318.10337502975017,
+    "events": [
+      {
+        "batch": 8,
+        "height": 960,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/document-light.png",
+        "mode": "worker",
+        "parallel": true,
+        "pid": 93919,
+        "threads": 4,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 1280
+      },
+      {
+        "chars": 1165,
+        "iteration": 0,
+        "lines": 28,
+        "load_ms": 31.040916000000003,
+        "peak_rss_bytes": 220971008,
+        "recognize_ms": 265.366917,
+        "request_ms": 296.407917,
+        "rss_after_bytes": 220971008,
+        "rss_before_bytes": 8847360,
+        "type": "request"
+      },
+      {
+        "drop_ms": 2.4767080000000004,
+        "iteration": 0,
+        "peak_rss_bytes": 220987392,
+        "rss_bytes": 220938240,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "document-light",
+    "threads": 4,
+    "parallel": true,
+    "iteration": 1,
+    "process_total_ms": 323.79929203307256,
+    "events": [
+      {
+        "batch": 8,
+        "height": 960,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/document-light.png",
+        "mode": "worker",
+        "parallel": true,
+        "pid": 93956,
+        "threads": 4,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 1280
+      },
+      {
+        "chars": 1165,
+        "iteration": 0,
+        "lines": 28,
+        "load_ms": 30.887999999999998,
+        "peak_rss_bytes": 232996864,
+        "recognize_ms": 271.398792,
+        "request_ms": 302.286959,
+        "rss_after_bytes": 232996864,
+        "rss_before_bytes": 8847360,
+        "type": "request"
+      },
+      {
+        "drop_ms": 2.6385419999999997,
+        "iteration": 0,
+        "peak_rss_bytes": 233013248,
+        "rss_bytes": 232964096,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "document-light",
+    "threads": 4,
+    "parallel": true,
+    "iteration": 2,
+    "process_total_ms": 321.8449580017477,
+    "events": [
+      {
+        "batch": 8,
+        "height": 960,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/document-light.png",
+        "mode": "worker",
+        "parallel": true,
+        "pid": 93993,
+        "threads": 4,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 1280
+      },
+      {
+        "chars": 1165,
+        "iteration": 0,
+        "lines": 28,
+        "load_ms": 31.608125,
+        "peak_rss_bytes": 237010944,
+        "recognize_ms": 268.26887500000004,
+        "request_ms": 299.87708299999997,
+        "rss_after_bytes": 237010944,
+        "rss_before_bytes": 8847360,
+        "type": "request"
+      },
+      {
+        "drop_ms": 2.293625,
+        "iteration": 0,
+        "peak_rss_bytes": 237027328,
+        "rss_bytes": 236978176,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "document-light",
+    "threads": 4,
+    "parallel": true,
+    "iteration": 3,
+    "process_total_ms": 328.85350001743063,
+    "events": [
+      {
+        "batch": 8,
+        "height": 960,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/document-light.png",
+        "mode": "worker",
+        "parallel": true,
+        "pid": 94030,
+        "threads": 4,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 1280
+      },
+      {
+        "chars": 1165,
+        "iteration": 0,
+        "lines": 28,
+        "load_ms": 30.200667,
+        "peak_rss_bytes": 229621760,
+        "recognize_ms": 277.481334,
+        "request_ms": 307.68204199999997,
+        "rss_after_bytes": 229621760,
+        "rss_before_bytes": 8847360,
+        "type": "request"
+      },
+      {
+        "drop_ms": 2.5669579999999996,
+        "iteration": 0,
+        "peak_rss_bytes": 229638144,
+        "rss_bytes": 229588992,
+        "type": "drop"
+      }
+    ]
+  },
+  {
+    "image": "document-light",
+    "threads": 4,
+    "parallel": true,
+    "iteration": 4,
+    "process_total_ms": 316.0329170059413,
+    "events": [
+      {
+        "batch": 8,
+        "height": 960,
+        "image": "/private/tmp/snaplingo-tiny-mnn-lifecycle/images/document-light.png",
+        "mode": "worker",
+        "parallel": true,
+        "pid": 94067,
+        "threads": 4,
+        "timing": "load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified",
+        "type": "start",
+        "width": 1280
+      },
+      {
+        "chars": 1165,
+        "iteration": 0,
+        "lines": 28,
+        "load_ms": 31.056875,
+        "peak_rss_bytes": 228425728,
+        "recognize_ms": 262.24362499999995,
+        "request_ms": 293.30066700000003,
+        "rss_after_bytes": 228425728,
+        "rss_before_bytes": 8847360,
+        "type": "request"
+      },
+      {
+        "drop_ms": 2.451833,
+        "iteration": 0,
+        "peak_rss_bytes": 228442112,
+        "rss_bytes": 228392960,
+        "type": "drop"
+      }
+    ]
+  }
+]

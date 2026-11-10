@@ -1,0 +1,138 @@
+{
+  "date": "2026-11-11",
+  "binary_sha256": "68f5ad87572b19ec03ced05ce7644849e820e18558aa8e42cac60a5036df60b1",
+  "build": "optimized Tauri application, persistent local signature, arm64",
+  "parameters": {
+    "threads": 4,
+    "parallel": true,
+    "batch": 8
+  },
+  "scope": "Serial fresh application workers, measured through /usr/bin/time -l; startup/decode/model load/inference/result serialization/exit included, UI and parent image write excluded; filesystem cache not flushed. First launch retained. macOS time maximum RSS is bytes.",
+  "validation": {
+    "malformed_image_exit": 1,
+    "missing_models_exit": 1,
+    "malformed_arguments_exit": 2,
+    "workers_remaining": 0
+  },
+  "sizes": {
+    "app_bytes": 58586580,
+    "ocr_bytes": 3234085,
+    "without_ocr_bytes": 55352495
+  },
+  "summary": {
+    "small-light": {
+      "median_ms": 81.96041599148884,
+      "min_ms": 80.72537503903732,
+      "max_ms": 989.9092499981634,
+      "median_peak_rss_bytes": 95780864
+    },
+    "document-light": {
+      "median_ms": 313.9932499616407,
+      "min_ms": 306.8839579937048,
+      "max_ms": 319.58695797948167,
+      "median_peak_rss_bytes": 255508480
+    }
+  },
+  "runs": [
+    {
+      "image": "small-light",
+      "iteration": 0,
+      "exit_code": 0,
+      "process_total_ms": 989.9092499981634,
+      "peak_rss_bytes": 94765056,
+      "lines": 3,
+      "chars": 120,
+      "normalized_bounds_valid": true
+    },
+    {
+      "image": "small-light",
+      "iteration": 1,
+      "exit_code": 0,
+      "process_total_ms": 81.96041599148884,
+      "peak_rss_bytes": 97746944,
+      "lines": 3,
+      "chars": 120,
+      "normalized_bounds_valid": true
+    },
+    {
+      "image": "small-light",
+      "iteration": 2,
+      "exit_code": 0,
+      "process_total_ms": 82.34891598112881,
+      "peak_rss_bytes": 96206848,
+      "lines": 3,
+      "chars": 120,
+      "normalized_bounds_valid": true
+    },
+    {
+      "image": "small-light",
+      "iteration": 3,
+      "exit_code": 0,
+      "process_total_ms": 80.92404098715633,
+      "peak_rss_bytes": 94584832,
+      "lines": 3,
+      "chars": 120,
+      "normalized_bounds_valid": true
+    },
+    {
+      "image": "small-light",
+      "iteration": 4,
+      "exit_code": 0,
+      "process_total_ms": 80.72537503903732,
+      "peak_rss_bytes": 95780864,
+      "lines": 3,
+      "chars": 120,
+      "normalized_bounds_valid": true
+    },
+    {
+      "image": "document-light",
+      "iteration": 0,
+      "exit_code": 0,
+      "process_total_ms": 311.00595800671726,
+      "peak_rss_bytes": 232980480,
+      "lines": 28,
+      "chars": 1192,
+      "normalized_bounds_valid": true
+    },
+    {
+      "image": "document-light",
+      "iteration": 1,
+      "exit_code": 0,
+      "process_total_ms": 306.8839579937048,
+      "peak_rss_bytes": 255508480,
+      "lines": 28,
+      "chars": 1192,
+      "normalized_bounds_valid": true
+    },
+    {
+      "image": "document-light",
+      "iteration": 2,
+      "exit_code": 0,
+      "process_total_ms": 318.3662500232458,
+      "peak_rss_bytes": 245645312,
+      "lines": 28,
+      "chars": 1192,
+      "normalized_bounds_valid": true
+    },
+    {
+      "image": "document-light",
+      "iteration": 3,
+      "exit_code": 0,
+      "process_total_ms": 319.58695797948167,
+      "peak_rss_bytes": 262602752,
+      "lines": 28,
+      "chars": 1192,
+      "normalized_bounds_valid": true
+    },
+    {
+      "image": "document-light",
+      "iteration": 4,
+      "exit_code": 0,
+      "process_total_ms": 313.9932499616407,
+      "peak_rss_bytes": 260800512,
+      "lines": 28,
+      "chars": 1192,
+      "normalized_bounds_valid": true
+    }
+  ]
+}

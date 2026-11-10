@@ -11,17 +11,32 @@ pub(super) struct MnnMediumSession {
 
 impl MnnMediumSession {
     pub(super) fn new(root: &Path) -> Result<Self> {
+        Self::from_models(root, "medium_det.mnn", "medium_rec.mnn", "keys.txt", true)
+    }
+
+    pub(super) fn new_tiny(root: &Path) -> Result<Self> {
+        Self::from_models(root, "tiny_det.mnn", "tiny_rec.mnn", "tiny_keys.txt", true)
+    }
+
+    fn from_models(
+        root: &Path,
+        detection: &str,
+        recognition: &str,
+        dictionary: &str,
+        parallel: bool,
+    ) -> Result<Self> {
         let config = OcrEngineConfig::new()
             .with_backend(Backend::CPU)
             .with_threads(4)
+            .with_parallel(parallel)
             .with_rec_options(RecOptions::default().with_batch_size(8));
         let engine = OcrEngine::new(
-            root.join("medium_det.mnn"),
-            root.join("medium_rec.mnn"),
-            root.join("keys.txt"),
+            root.join(detection),
+            root.join(recognition),
+            root.join(dictionary),
             Some(config),
         )
-        .map_err(|error| AppError::Other(format!("Could not initialize MNN medium: {error}")))?;
+        .map_err(|error| AppError::Other(format!("Could not initialize MNN OCR: {error}")))?;
         Ok(Self { engine })
     }
 }
@@ -31,7 +46,7 @@ impl MediumSession for MnnMediumSession {
         let results = self
             .engine
             .recognize(&image::DynamicImage::ImageRgb8(image.clone()))
-            .map_err(|error| AppError::Other(format!("MNN medium inference failed: {error}")))?;
+            .map_err(|error| AppError::Other(format!("MNN OCR inference failed: {error}")))?;
         Ok(from_lines(
             results
                 .into_iter()

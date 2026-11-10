@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { cpSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { setTimeout } from 'node:timers/promises';
@@ -28,6 +28,15 @@ try {
     cpSync(join(mount, 'SnapLingo.app'), installed, { recursive: true, verbatimSymlinks: true });
     run('/usr/bin/codesign', ['--verify', '--deep', '--strict', installed]);
     const executable = run('/usr/bin/plutil', ['-extract', 'CFBundleExecutable', 'raw', '-o', '-', join(installed, 'Contents/Info.plist')]).trim();
+    const resultPath = join(directory, `ocr-${attempt}.json`);
+    run(join(installed, 'Contents/MacOS', executable), [
+      '--ocr-tiny-worker', join(installed, 'Contents/Resources/ocr'),
+      join(process.cwd(), 'src-tauri/tests/fixtures/ocr-medium-small.png'), resultPath,
+    ]);
+    const result = JSON.parse(readFileSync(resultPath, 'utf8'));
+    if (!result.Ok?.text?.trim() || !result.Ok.lines?.length) {
+      throw new Error('Installed tiny OCR worker did not return recognized text');
+    }
     processHandle = spawn(join(installed, 'Contents/MacOS', executable), [], { stdio: 'inherit' });
     let launchError;
     processHandle.on('error', error => { launchError = error; });

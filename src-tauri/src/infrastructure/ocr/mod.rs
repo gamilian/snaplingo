@@ -3,6 +3,8 @@ mod mnn_engine;
 mod ort_engine;
 #[cfg(test)]
 mod tests;
+#[cfg(target_os = "macos")]
+pub(crate) mod tiny_worker;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -51,20 +53,35 @@ pub(crate) struct LocalPaddleOcrEngine {
     factory: Arc<dyn SessionFactory>,
     state: Mutex<SessionState>,
     status: RwLock<OcrAccelerationStatus>,
+    #[cfg(target_os = "macos")]
+    worker_root: Option<PathBuf>,
 }
 
 impl LocalPaddleOcrEngine {
     pub(crate) fn new(root: Option<PathBuf>, cache_dir: PathBuf) -> Self {
-        Self::with_factory(Arc::new(NativeSessionFactory {
-            root,
+        let engine = Self::with_factory(Arc::new(NativeSessionFactory {
+            root: root.clone(),
             cache_dir,
             platform: Platform::current(),
-        }))
+        }));
+        #[cfg(target_os = "macos")]
+        let engine = Self {
+            status: RwLock::new(OcrAccelerationStatus {
+                gpu_enabled: false,
+                device: Some(OcrExecutionDevice::Cpu),
+                fallback_reason: Some("tiny · CPU · 识别后释放模型".into()),
+            }),
+            worker_root: root,
+            ..engine
+        };
+        engine
     }
 
     fn with_factory(factory: Arc<dyn SessionFactory>) -> Self {
         Self {
             factory,
+            #[cfg(target_os = "macos")]
+            worker_root: None,
             state: Mutex::new(SessionState {
                 gpu_enabled: None,
                 backend: None,
@@ -102,7 +119,20 @@ impl LocalPaddleOcrEngine {
 }
 
 impl PaddleOcrEngine for LocalPaddleOcrEngine {
+    fn supports_gpu(&self) -> bool {
+        #[cfg(target_os = "macos")]
+        if self.worker_root.is_some() {
+            return false;
+        }
+        true
+    }
     fn is_available(&self) -> bool {
+        #[cfg(target_os = "macos")]
+        if let Some(root) = &self.worker_root {
+            return ["tiny_det.mnn", "tiny_rec.mnn", "tiny_keys.txt"]
+                .iter()
+                .all(|file| root.join(file).is_file());
+        }
         self.factory.is_available()
     }
 
@@ -111,6 +141,19 @@ impl PaddleOcrEngine for LocalPaddleOcrEngine {
     }
 
     fn recognize(&self, request: &OcrRequest, gpu_enabled: bool) -> Result<OcrResult> {
+        #[cfg(target_os = "macos")]
+        if let Some(root) = &self.worker_root {
+            // Serialize requests without retaining model sessions in the desktop
+            // process. Exiting the worker also releases native allocator caches.
+            let _state = self.state.lock();
+            let result = tiny_worker::recognize(root, request);
+            *self.status.write() = OcrAccelerationStatus {
+                gpu_enabled: false,
+                device: result.as_ref().ok().map(|_| OcrExecutionDevice::Cpu),
+                fallback_reason: Some("tiny · CPU · 识别后释放模型".into()),
+            };
+            return result;
+        }
         // Decode before initializing GPU resources; invalid input must not disable acceleration.
         let image = image::load_from_memory(&request.image_data)
             .map_err(|error| AppError::Other(format!("Invalid OCR image: {error}")))?

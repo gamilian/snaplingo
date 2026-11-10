@@ -136,6 +136,22 @@ fn missing_bundle_resources_do_not_fall_back_to_the_working_directory() {
         .contains("resources are unavailable"));
 }
 
+#[cfg(target_os = "macos")]
+#[test]
+fn macos_tiny_is_available_without_ort_or_resident_model_sessions() {
+    let root = tempfile::tempdir().unwrap();
+    for name in ["tiny_det.mnn", "tiny_rec.mnn", "tiny_keys.txt"] {
+        std::fs::write(root.path().join(name), name).unwrap();
+    }
+    let engine = LocalPaddleOcrEngine::new(Some(root.path().to_path_buf()), PathBuf::new());
+    assert!(engine.is_available());
+    assert!(!engine.supports_gpu());
+    assert!(engine.state.lock().session.is_none());
+    assert_eq!(engine.status().device, Some(OcrExecutionDevice::Cpu));
+    std::fs::remove_file(root.path().join("tiny_keys.txt")).unwrap();
+    assert!(!engine.is_available());
+}
+
 #[test]
 fn platform_selection_keeps_old_macos_away_from_ort() {
     assert_eq!(Platform::MacArm(12).cpu(), OcrBackend::MnnCpu);
@@ -156,7 +172,7 @@ fn boxes_use_normalized_bottom_left_coordinates_and_clip_to_the_image() {
 }
 
 #[test]
-#[ignore = "requires npm run ocr:prepare; exercises real bundled medium CPU/GPU models"]
+#[ignore = "requires npm run ocr:prepare; exercises the bundled platform OCR model"]
 fn bundled_medium_smoke() {
     let root = std::env::var_os("SNAPLINGO_OCR_SMOKE_ROOT")
         .map(PathBuf::from)
@@ -170,6 +186,7 @@ fn bundled_medium_smoke() {
         image_data: std::fs::read(fixture).unwrap(),
         language: None,
     };
+    #[cfg(not(target_os = "macos"))]
     for gpu in [false, true] {
         let result = engine.recognize(&request, gpu).unwrap();
         assert!(!result.text.is_empty(), "medium returned no text");
@@ -178,7 +195,9 @@ fn bundled_medium_smoke() {
     }
     #[cfg(target_os = "macos")]
     {
-        let mut session = mnn_engine::MnnMediumSession::new(&root).unwrap();
+        // The installation smoke test exercises the signed worker process.
+        // Here the test executable validates the exact CPU model directly.
+        let mut session = mnn_engine::MnnMediumSession::new_tiny(&root).unwrap();
         let result = session
             .recognize(
                 &image::load_from_memory(&request.image_data)
@@ -188,6 +207,6 @@ fn bundled_medium_smoke() {
             .unwrap();
         assert!(!result.text.is_empty());
         assert!(result.lines.iter().all(|line| line.bounding_box.is_some()));
-        println!("MNN CPU: {}", result.text);
+        println!("tiny MNN CPU: {}", result.text);
     }
 }

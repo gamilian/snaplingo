@@ -4,6 +4,27 @@
 
 Accepted (2026-11-01).
 
+## macOS trial update — 2026-11-11
+
+The macOS local provider now uses PP-OCRv6 **tiny with MNN CPU**. Every request
+starts a short-lived worker from the signed application executable, before Tauri,
+database and tray initialization. It loads the paired tiny models and dictionary,
+returns the OCR result, and exits. The desktop serializes requests but retains no
+model session. Destroying an in-process session did not return its allocator caches
+to the OS in the measured workloads; process exit provides the requested memory
+lifetime. There is no prewarming or idle inference loop.
+
+macOS packages include approximately 3.18 MB of tiny models/dictionary plus their
+licenses, without the former medium weights or ONNX Runtime. Tiny does not support
+Japanese. The GPU preference is retained for other supported backends but is not
+used by this CPU-only provider. Windows and Linux continue to use the medium ORT
+configuration below; Windows MNN/CRT compatibility has not been validated in this
+trial. System OCR and user-selected provider identities are unchanged.
+
+The model smoke test checks tiny directly on macOS, and the installation smoke
+test runs a real OCR request through the signed application's worker entrypoint.
+The initial decision and its historical measurements follow.
+
 ## Decision
 
 Add `paddle-ocr` as a selectable local provider using PP-OCRv6 medium detection and recognition. Existing persisted provider selection remains authoritative. Screenshots and file OCR continue through `OcrCoordinator`; capture, translation, history, and result-window workflows do not select inference engines.

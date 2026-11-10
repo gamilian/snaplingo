@@ -1,0 +1,15 @@
+{"batch":8,"height":960,"image":"/private/tmp/snaplingo-tiny-mnn-lifecycle/images/document-light.png","mode":"per-request","parallel":true,"pid":91916,"threads":4,"timing":"load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified","type":"start","width":1280}
+{"cpu_ms":0.015000000000000568,"cpu_pct_one_core":0.0007499068083310503,"duration_ms":2000.248542,"label":"baseline","peak_rss_bytes":9027584,"rss_after_bytes":9027584,"rss_before_bytes":8847360,"type":"idle"}
+{"chars":1165,"iteration":0,"lines":28,"load_ms":46.698916,"peak_rss_bytes":232751104,"recognize_ms":291.378209,"request_ms":338.07733299999995,"rss_after_bytes":232751104,"rss_before_bytes":9076736,"type":"request"}
+{"drop_ms":2.579125,"iteration":0,"peak_rss_bytes":232767488,"rss_bytes":232718336,"type":"drop"}
+{"cpu_ms":0.012000000000057298,"cpu_pct_one_core":0.0005995714311404572,"duration_ms":2001.4295839999997,"label":"after_first_drop","peak_rss_bytes":232767488,"rss_after_bytes":232718336,"rss_before_bytes":232718336,"type":"idle"}
+{"chars":1165,"iteration":1,"lines":28,"load_ms":3.58625,"peak_rss_bytes":253673472,"recognize_ms":267.829542,"request_ms":271.415958,"rss_after_bytes":253673472,"rss_before_bytes":232718336,"type":"request"}
+{"drop_ms":2.445583,"iteration":1,"peak_rss_bytes":253689856,"rss_bytes":253640704,"type":"drop"}
+{"chars":1165,"iteration":2,"lines":28,"load_ms":1.873125,"peak_rss_bytes":271843328,"recognize_ms":262.46275,"request_ms":264.336,"rss_after_bytes":271843328,"rss_before_bytes":253640704,"type":"request"}
+{"drop_ms":2.9025000000000003,"iteration":2,"peak_rss_bytes":271859712,"rss_bytes":271810560,"type":"drop"}
+{"chars":1165,"iteration":3,"lines":28,"load_ms":1.839334,"peak_rss_bytes":285507584,"recognize_ms":256.902084,"request_ms":258.74154100000004,"rss_after_bytes":285507584,"rss_before_bytes":271810560,"type":"request"}
+{"drop_ms":2.302334,"iteration":3,"peak_rss_bytes":285523968,"rss_bytes":285474816,"type":"drop"}
+{"chars":1165,"iteration":4,"lines":28,"load_ms":2.0295,"peak_rss_bytes":289570816,"recognize_ms":258.63045800000003,"request_ms":260.660042,"rss_after_bytes":289570816,"rss_before_bytes":285474816,"type":"request"}
+{"drop_ms":3.3180829999999997,"iteration":4,"peak_rss_bytes":289587200,"rss_bytes":289538048,"type":"drop"}
+{"cpu_ms":0.07899999999972351,"cpu_pct_one_core":0.003940112779480168,"duration_ms":2005.0187500000002,"label":"after_final_drop","peak_rss_bytes":289587200,"rss_after_bytes":289521664,"rss_before_bytes":289538048,"type":"idle"}
+The device supports: i8sdot:1, fp16:1, i8mm: 0, sve2: 0, sme2: 0

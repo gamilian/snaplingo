@@ -163,7 +163,7 @@ function providerSubtitle(provider: Provider) {
       const mode = status?.device === 'gpu'
         ? 'GPU 加速模式'
         : status?.device ? 'CPU 模式' : status?.gpuEnabled ? '自动选择设备' : 'CPU 模式';
-      return `离线文字识别 · medium · ${status?.fallbackReason ?? mode}`;
+      return `离线文字识别 · ${status?.fallbackReason ?? `medium · ${mode}`}`;
     }
     case 'google-translate':
       return 'https://translate.googleapis.com';

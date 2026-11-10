@@ -46,6 +46,20 @@ describe('ProviderCard', () => {
       .toContain('本地处理');
     expect(textContent(ProviderCard({ provider }))).toContain('发送到服务');
   });
+
+  it('shows the actual local model status without a hardcoded medium label', () => {
+    const provider = {
+      id: 'paddle-ocr', name: 'PaddleOCR', type: 'ocr' as const,
+      status: 'active' as const, isBuiltin: true, requiresApiKey: false,
+      acceleration: { gpuEnabled: true, device: 'cpu' as const, fallbackReason: 'tiny · CPU · 识别后释放模型' },
+    };
+    const text = textContent(ProviderCard({ provider }));
+    expect(text).toContain('tiny · CPU · 识别后释放模型');
+    expect(text).not.toContain('medium');
+    expect(textContent(ProviderCard({ provider: {
+      ...provider, acceleration: { gpuEnabled: true, device: 'gpu', fallbackReason: null },
+    } }))).toContain('medium · GPU 加速模式');
+  });
 });
 
 function textContent(node: ReactNode): string {

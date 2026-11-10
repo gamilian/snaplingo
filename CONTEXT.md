@@ -60,6 +60,11 @@ On macOS, the session pins the selection window and frontend monitor view to the
 
 The workflow that reads one image file, uses those same bytes for both OCR input and its preview, and returns recognition metadata. File access is supplied by an adapter; Provider selection and execution remain with the OCR Coordinator.
 
+The macOS local PaddleOCR provider uses tiny MNN CPU in a worker that exits after
+each request. It starts before Tauri initialization, returns through temporary
+files, and retains no model session in the desktop process. Requests are serialized;
+no model warmup or idle inference is performed. Windows/Linux retain medium ORT.
+
 ### Selection Translation
 
 The workflow that reads the current selection-text mode, acquires selected text, and presents it in the Result Window with Selection origin and automatic translation. Hotkey and IPC entry points share the same sequencing; failed acquisition leaves the current result intact.

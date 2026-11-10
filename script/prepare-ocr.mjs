@@ -53,22 +53,34 @@ function extract(archive, destination) {
   if (result.error || result.status !== 0) throw new Error(`Could not unpack OCR runtime: ${result.error ?? result.stderr}`);
 }
 
+export async function cleanupOcrResources(platform, destination) {
+  if (!['darwin-arm64','darwin-x64','win32-x64','linux-x64'].includes(platform)) throw new Error(`Unsupported OCR target: ${platform}`);
+  const required = new Set([
+    ...manifest.models.filter(asset => asset.platforms.includes(platform)).map(asset => asset.file),
+    ...manifest.archives.filter(asset => asset.platform === platform || asset.platforms?.includes(platform)).flatMap(asset => Object.values(asset.files)),
+  ]);
+  const managed = new Set([
+    ...manifest.models.map(asset => asset.file),
+    ...manifest.archives.flatMap(asset => Object.values(asset.files)),
+    // These files were managed by the former macOS medium/ORT distribution.
+    'medium_det.mnn', 'medium_rec.mnn', 'runtime/libonnxruntime.dylib',
+  ]);
+  // Model revisions can change without changing .platform. Remove only known
+  // assets no longer required by this target, preserving unrelated local files.
+  for (const file of managed) {
+    if (!required.has(file)) await rm(join(destination, file), { force: true });
+  }
+  for (const file of await readdir(destination)) {
+    if (/^runtime-[a-f0-9]+\.json$/.test(file)) await rm(join(destination, file));
+  }
+}
+
 export async function prepareOcr(platform, destination = join(root, 'src-tauri/resources/ocr'), cache = process.env.SNAPLINGO_OCR_ASSET_CACHE ?? join(homedir(), '.cache/snaplingo/ocr')) {
   if (!['darwin-arm64','darwin-x64','win32-x64','linux-x64'].includes(platform)) throw new Error(`Unsupported OCR target: ${platform}`);
   await mkdir(destination, { recursive: true });
   await mkdir(cache, { recursive: true });
   const platformFile = join(destination, '.platform');
-  const previous = await readFile(platformFile, 'utf8').catch(() => null);
-  if (previous && previous !== platform) {
-    await rm(join(destination, 'runtime'), { recursive: true, force: true });
-    await rm(join(destination, 'licenses'), { recursive: true, force: true });
-    for (const asset of manifest.models.filter(asset => !asset.platforms.includes(platform))) {
-      await rm(join(destination, asset.file), { force: true });
-    }
-  }
-  for (const file of await readdir(destination)) {
-    if (/^runtime-[a-f0-9]+\.json$/.test(file)) await rm(join(destination, file));
-  }
+  await cleanupOcrResources(platform, destination);
   for (const asset of manifest.models.filter(asset => asset.platforms.includes(platform))) {
     const output = join(destination, asset.file);
     if (await exists(output) && await sha256(output) === asset.sha256) continue;
@@ -107,7 +119,7 @@ export async function prepareOcr(platform, destination = join(root, 'src-tauri/r
   if (platform === 'win32-x64' && process.platform === 'win32') {
     await copyWindowsCrt(await findWindowsCrt(), join(dirname(destination), 'windows-crt'));
   }
-  console.log(`[ocr] PP-OCRv6 medium assets ready (${platform}).`);
+  console.log(`[ocr] PP-OCRv6 ${platform.startsWith('darwin-') ? 'tiny' : 'medium'} assets ready (${platform}).`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

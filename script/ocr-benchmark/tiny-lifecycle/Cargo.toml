@@ -1,0 +1,18 @@
+[package]
+name = "snaplingo-tiny-mnn-lifecycle"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Research harness, independent of the application dependency graph.
+[workspace]
+
+[dependencies]
+ocr-rs = { git = "https://github.com/zibo-chen/ocr-rs", rev = "664a945953e46186b37203fa4902a20d60a32809", default-features = false }
+image = { version = "=0.25.10", default-features = false, features = ["png"] }
+serde_json = "=1.0.150"
+libc = "=0.2.186"
+
+[profile.release]
+debug = 0
+strip = "symbols"
