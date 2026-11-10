@@ -1,44 +1,60 @@
-# Target Module Ownership
+# Module ownership
 
-**Status:** Implemented and enforced
+This is the current ownership map for the six-package native workspace.
+[ARCHITECTURE.md](../../ARCHITECTURE.md) contains the package graph and directory
+map. [The active refactor plan](../plans/modular-workspace-refactor.md) records
+implementation and verification status.
 
-This document records the implemented ownership rules. [ARCHITECTURE.md](../../ARCHITECTURE.md) remains the current-state overview; accepted ADRs below explain the retained decisions.
+A **module** is a cohesive implementation behind an **interface**. Its interface
+includes types, ordering, lifetime and error behavior. **Depth** means callers
+exercise useful behavior without knowing implementation details. A **seam** is
+where an implementation can be replaced; an **adapter** supplies that behavior.
+Ports belong beside their consuming workflow so changes remain local.
 
-## Vocabulary
+| Module | Interface and ownership |
+| --- | --- |
+| `core/capture` | Frozen capture session, selection/editor transitions, output ordering and consumed capture/output ports |
+| `core/providers` | OCR/translation execution, provider administration, configuration/credential ordering and event publication |
+| `core/library` | History, Favorites, shared capacity and lightweight ordered index; repository contracts remain inward-owned |
+| Other Core features | Settings/hotkeys, selected-text policy, result requests, pins, permission and speech policy |
+| `ui/<feature>` | Presentation snapshot, input/state transition, Scene or native-control geometry; no Core or OS types |
+| `ui/foundation` | Reusable geometry, raster values, normalized input, text editing and semantic theme |
+| `ui/render`, `ui/accessibility` | Optional rasterization and semantic projection of UI data |
+| `platform/<capability>` | Real system implementations; Mac/Windows/Linux variants sit by capability |
+| `storage` | SQLite migrations/repositories and filesystem assets implementing Core ports |
+| `apps/desktop/features/<feature>` | Shared presenter/controller and feature-specific dependencies; native adapters own OS window mechanics |
+| `apps/desktop/bootstrap` | Whole-application state, concrete construction and feature injection |
+| `apps/desktop/shell` | Resident lifecycle, event routing, tray and application entry actions |
+| `apps/desktop/integrations` | Product-specific network/inference/event/runtime integrations and native window helpers |
 
-- A **module** is a cohesive body of behavior hidden behind an **interface**.
-- An **interface** is the narrow surface callers use and tests target.
-- **Depth** is leverage at the interface: how much behavior callers can exercise per fact they must know.
-- A **seam** is a location where an implementation can be substituted.
-- A **port** is an inward-owned interface for a capability supplied across a seam.
-- An **adapter** implements an inward-owned interface using outward platform mechanics.
-- **Leverage** means one interface serves multiple callers or tests.
-- **Locality** means related state and decisions live in the same module.
+Feature models live beside their workflows in Core. Model files cannot import
+workflow implementations or concrete adapters. Workflow modules may depend on
+other feature interfaces when their policy requires it; a cross-feature call does
+not justify another forwarding layer. Callers name the owning module explicitly,
+for example `snaplingo_core::capture` or `snaplingo_core::library::history`.
 
-The target favors deep modules: narrow interfaces should hide meaningful workflow or platform complexity. A seam is justified when it reverses an outward dependency or provides testing leverage, not when it only forwards a call.
+The application has an acyclic assembly direction: bootstrap constructs feature
+dependencies, then native hosts consume them. Feature code cannot import AppState,
+bootstrap or the resident shell. A platform effect that needs application behavior
+receives a callback. Global shortcut recording, for example, receives the host's
+UI dispatcher and focus query; Platform does not reach into a Settings window.
 
-## Ownership Boundaries
+Core and UI remain independent of concrete system adapters. Platform and Storage
+cannot import the desktop application. Their implementations are imported directly
+from their owning crates, without an application `system` or `storage` alias.
+`lib.rs` files expose their own interfaces; they do not re-export Core's old
+`domain`/`application` tree or a complete infrastructure module tree.
 
-| Boundary | Owns | Must not own |
-| --- | --- | --- |
-| **Frontend View** | Rendering, view-local presentation state, and translation of user interaction into Frontend Application actions. | Workflow decisions, raw Tauri objects, `@tauri-apps` imports, event-name strings, or direct Frontend Platform access. |
-| **Frontend Application** | Window workflow state, transitions, effect planning, and narrow interfaces consumed by Views and exercised by workflow tests. It owns the workflow-facing interface needed from the platform seam. | JSX rendering, raw Tauri mechanics, command or event names, or platform object lifetime. |
-| **Frontend Platform** | Domain-named Tauri adapters that own command names, event names, payload parsing, window operations, Tauri object lifetime, and subscription cleanup. | Business workflow decisions or View state. |
-| **Backend Command** | IPC parsing, AppState access, one Backend Application interface call, and final conversion of an Application error into an IPC error payload. | Workflow state, platform selection, direct Infrastructure orchestration, or duplicate compatibility behavior. |
-| **Backend Application** | Domain workflows, state transitions, commit and rollback ordering, portable errors, and the inward ports each module needs. Ports stay beside their consuming module to preserve locality. | Infrastructure imports, platform configuration, Tauri/AppKit/Windows/GTK types, or concrete adapter construction. |
-| **Composition** | Runtime assembly, concrete adapter selection, and injection across seams. The frontend composition root injects Frontend Platform adapters into Frontend Application modules; backend Application Composition is the sole selector of concrete OS adapters. | Business workflow decisions or reusable domain behavior. |
-| **Infrastructure** | Outward adapters for OS integration, storage, events, HTTP, windows, OCR engines, and other external mechanics. Infrastructure translates platform failures at the seam and implements Backend Application-owned ports. | Backend Application workflow vocabulary, port ownership, or imports that make Infrastructure depend on Application implementations. |
+Shared UI does not require duplicating widgets on each platform. Native adapters
+consume the same logical layout/state while retaining text services, accessibility,
+menus and native presentation. Product presenters translate Core snapshots into
+UI data. This keeps product workflow vocabulary out of reusable drawing code.
 
-The dependency direction follows ownership: Views consume Frontend Application interfaces; Frontend Platform adapters satisfy the platform seam; Backend Commands call Backend Application interfaces; Backend Application owns ports; Composition selects and injects Infrastructure adapters. This preserves locality inside workflow modules and gives their interfaces leverage across production callers and tests.
+The retained browser tree is reference/test code. Its View/Application rules
+continue to protect independent behavior baselines, but there is no production
+frontend platform, Tauri command registry or browser IPC seam in this workspace.
 
-## Enforcement
-
-The frontend and backend architecture suites enforce these ownership boundaries without a migration inventory or allowlist. Production frontend Views and Application modules cannot import Platform/Tauri mechanics. Production backend Application modules cannot import Infrastructure or crate-root startup adapters.
-
-The Result Window runtime owns translation state and scheduling; its Store projects snapshots. Capture Session lifecycle and the deepened Capture Editing module reside in Frontend Application, with shared DOM/Canvas sampling behind View adapters. Library owns stable-ID hydration and visible-content favorite membership; Stores retain only the projections and invalidation signals used by current Views. Backend Capture owns startup exclusion, frozen coordinate policy, and Pin delivery through an inward port. Pure clipboard IPC forwards to a native Infrastructure adapter without creating a policy-free Application module. Guards cover Domain independence, Application DOM/native isolation, and these concrete seams, and runtime tests verify the state and effect ordering they protect.
-
-## Accepted ADR Alignment
-
-- [ADR 0004](../adr/0004-coordinator-consolidation.md) remains accepted. Translation and OCR Provider Coordinators remain deep modules that own activation, persistence, execution, and coordination; they are not split into shallow forwarding modules.
-- [ADR 0005](../adr/0005-runtime-provider-reconfiguration.md) remains accepted for runtime Provider reconfiguration through the Coordinator interface. Its older single-`api_key` compatibility-command requirement is superseded and removed by [ADR 0007](../adr/0007-remove-provider-compatibility-command.md).
-- [ADR 0006](../adr/0006-menu-bar-app-shell.md) remains accepted. SnapLingo keeps a menu-bar resident shell, with Settings opened explicitly and business workflows independent of the Settings Window lifecycle.
+The workspace and desktop architecture tests enforce these directions, including
+all target-specific Cargo edges. Behavioral tests remain at workflow and native
+host interfaces; moving files or passing a syntax guard alone does not establish
+feature equivalence.

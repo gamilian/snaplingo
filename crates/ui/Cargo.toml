@@ -2,14 +2,78 @@
 name = "snaplingo-ui"
 version = "0.1.23"
 edition = "2021"
+rust-version = "1.88"
 license = "MIT"
+description = "Portable views, input, drawing and optional CPU rendering and accessibility"
 
-[lib]
-path = "lib.rs"
+[features]
+default = []
+rendering = ["dep:snaplingo-assets", "dep:tiny-skia", "dep:cosmic-text"]
+accessibility = ["dep:accesskit"]
 
 [dependencies]
 unicode-segmentation = "1.12"
+snaplingo-assets = { path = "../assets", optional = true }
+tiny-skia = { version = "0.11.4", optional = true }
+cosmic-text = { version = "0.14.2", optional = true }
+accesskit = { version = "0.25.2", optional = true }
 
 [dev-dependencies]
 serde_json = "1.0"
 syn = { version = "2", default-features = false, features = ["full", "parsing", "visit"] }
+
+[[example]]
+name = "capture_selection_snapshot"
+required-features = ["rendering"]
+
+[[example]]
+name = "capture_toolbar_snapshot"
+required-features = ["rendering"]
+
+[[example]]
+name = "library_snapshot"
+required-features = ["rendering"]
+
+[[example]]
+name = "notices_snapshot"
+required-features = ["rendering"]
+
+[[example]]
+name = "permission_prompt_snapshot"
+required-features = ["rendering"]
+
+[[example]]
+name = "result_snapshot"
+required-features = ["rendering"]
+
+[[example]]
+name = "scrolling_snapshot"
+required-features = ["rendering"]
+
+[[example]]
+name = "services_snapshot"
+required-features = ["rendering"]
+
+[[example]]
+name = "settings_snapshot"
+required-features = ["rendering"]
+
+[[test]]
+name = "capture_toolbar_layout"
+required-features = ["rendering"]
+
+[[test]]
+name = "library_react_layout"
+required-features = ["rendering"]
+
+[[test]]
+name = "permission_prompt_layout"
+required-features = ["rendering"]
+
+[[test]]
+name = "result_render_layout"
+required-features = ["rendering"]
+
+[[test]]
+name = "services_react_layout"
+required-features = ["rendering"]

@@ -24,8 +24,8 @@
 
 相关文件：
 
-- `crates/app/lib.rs`
-- `crates/app/infrastructure/system/shortcut.rs`
+- `apps/desktop/src/lib.rs`
+- `apps/desktop/src/integrations/system/shortcut.rs`
 - `src/stores/settingsStore.ts`
 - `src/components/SettingsWindow/Screenshot/HotkeysPage.tsx`
 
@@ -48,8 +48,8 @@
 
 相关文件：
 
-- `crates/app/commands/mod.rs`
-- `crates/app/commands/capture_session_commands.rs`
+- `apps/desktop/commands/mod.rs`
+- `apps/desktop/commands/capture_session_commands.rs`
 - `src/components/ScreenshotSession/index.tsx`
 - `src/components/ScreenshotSession/captureWindowVisibility.ts`
 
@@ -66,10 +66,10 @@
 
 相关文件：
 
-- `crates/app/commands/capture_session_commands.rs`
+- `apps/desktop/commands/capture_session_commands.rs`
 - `src/components/ScreenshotSession/captureWindowVisibility.ts`
 - `src/components/ScreenshotSession/index.tsx`
-- `crates/app/capabilities/default.json`
+- `apps/desktop/capabilities/default.json`
 
 注意：如果后续尝试 macOS transparent window，要单独评估 Tauri 的 `macos-private-api` 影响，不要把它作为默认排障手段。
 
@@ -89,7 +89,7 @@
 - `reference/web/App.tsx`
 - `src/components/ScreenshotSession/index.tsx`
 - `src/components/ScreenshotSession/captureActions.ts`
-- `crates/app/commands/capture_session_commands.rs`
+- `apps/desktop/commands/capture_session_commands.rs`
 
 ## 坑 5：macOS 权限已经给了，Release 仍然反复提示
 
@@ -105,7 +105,7 @@ macOS TCC 屏幕录制权限绑定的是应用身份，不只是应用名字。R
 
 相关文件：
 
-- `crates/app/tauri.conf.json`
+- `apps/desktop/tauri.conf.json`
 - `script/fix-macos-release-signing.mjs`
 - `package.json`
 - `script/build-release.sh`
@@ -130,7 +130,7 @@ macOS TCC 屏幕录制权限绑定的是应用身份，不只是应用名字。R
 
 相关文件：
 
-- `crates/app/infrastructure/system/screenshot/macos.rs`
+- `apps/desktop/src/integrations/system/screenshot/macos.rs`
 - `reference/web/App.tsx`
 
 ## 坑 7：Release 没有日志会让快捷键问题很难查
@@ -155,7 +155,7 @@ tail -f ~/Library/Logs/com.snaplingo.app/SnapLingo.log
 ```bash
 npm test
 npm run build
-cargo test --manifest-path crates/app/Cargo.toml
+cargo test --manifest-path apps/desktop/Cargo.toml
 ```
 
 Release 构建后额外检查：

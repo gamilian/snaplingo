@@ -1,8 +1,29 @@
-# Shared Settings UI
+# Shared Rust UI
 
-This crate owns the portable General, OCR, Translation and Screenshot Settings pages’ state, layout, display list and
-hit testing. It has no windowing, platform, font, raster or backend dependencies.
-The host supplies `Snapshot` and executes `Action`; the renderer draws `Scene`.
+This package owns portable view state, layout, input and drawing for Settings,
+Capture, Result, Pinned Image and Scrolling Capture. Native hosts supply snapshots,
+execute actions and present the resulting scene or native control geometry.
+No module creates windows, opens a database, or calls an operating-system toolkit.
+
+The default build needs only Unicode text segmentation. Optional Cargo features
+keep CPU rendering and AccessKit projection in the same package without making
+those dependencies mandatory for layout and interaction:
+
+```toml
+snaplingo-ui = { path = "../../crates/ui", features = ["rendering", "accessibility"] }
+```
+
+- `foundation/`: geometry, drawing commands, text editing, normalized keys and theme.
+- `settings/`: settings models, fields, state/input, drawing, capacity and page routing.
+- `capture/`, `result/`, `pinned/`, `scrolling.rs`, `services/`, `library/`: feature views.
+- `render/`: optional CPU rasterization and text measurement, accessed through
+  `snaplingo_ui::render::{Renderer, RendererTextMetrics, Frame}`.
+- `accessibility/`: optional semantic projection, accessed through
+  `snaplingo_ui::accessibility`; native AX/UIA adapters remain in the desktop host.
+
+All Rust implementation files live under `src/`. The crate root exposes the small
+public entry points; feature state, drawing and tests stay beside their owner.
+The existing root exports for common UI values and Settings remain available.
 
 ```rust
 use snaplingo_ui::{SettingsUi, Snapshot, Size};
@@ -30,7 +51,7 @@ its system commands require a host. Navigation among these four pages changes
 the active page in the shared state; other routes remain host actions.
 Other navigation items emit `Navigate` to the host. They do not replace the page
 with incomplete content. Capacity, shortcut reset and conflict actions likewise
-remain host actions. This is a migration component, not the complete app UI.
+remain host actions. The product host owns business workflows and window lifetime.
 
 `Event::Activate`, `Focus` and `SetValue` reuse the same validated interaction
 paths for accessibility. Pointer-down/move/up drive slider gestures. Inspect
@@ -41,7 +62,15 @@ for native input-method adapters. `TextSelection`, `ImePreedit`, `ImeCommit` and
 `ImeDisabled` update the same editor used for clipboard and keyboard input.
 The host supplies shaped caret metrics and converts native text-service offsets.
 
-`result/` also owns the Result window's presentation, actions and logical layout.
+`result.rs` also owns the Result window's presentation, actions and logical layout.
 Both AppKit controls and the Windows scene consume it; text measurement and
 native text services stay in their adapters. AppKit geometry is the reference
 for header, source card, provider cards, OCR controls and copy-fragment popup.
+
+`capture/presentation.rs` owns the editor toolbar's placement, control geometry,
+enabled/selected state, style ranges and error rows, plus palette geometry and
+mutation availability. AppKit controls and the shared scene consume the same
+presentation. It also owns selection labels, masks, magnifier geometry and sample
+rectangles. Hosts supply frozen pixels and measured text, retain native text and
+color input, and convert the returned intents into Core editor actions. Native
+coordinates are normalized to top-left logical coordinates before using it.

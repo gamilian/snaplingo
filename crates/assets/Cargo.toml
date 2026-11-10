@@ -5,4 +5,4 @@ edition = "2021"
 license = "MIT"
 
 [lib]
-path = "lib.rs"
+path = "src/lib.rs"

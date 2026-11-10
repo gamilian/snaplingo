@@ -23,7 +23,7 @@ import {
 
 const root = process.cwd();
 const allowAdhoc = process.env.SNAPLINGO_SIGNING_MODE === "adhoc";
-const config = JSON.parse(readFileSync(resolve(root, process.env.SNAPLINGO_BUNDLE_CONFIG ?? "crates/app/desktop.json"), "utf8"));
+const config = JSON.parse(readFileSync(resolve(root, process.env.SNAPLINGO_BUNDLE_CONFIG ?? "apps/desktop/desktop.json"), "utf8"));
 config.version ??= JSON.parse(readFileSync(resolve(root, "package.json"), "utf8")).version;
 const identifier = config.identifier;
 const productName = config.productName ?? "SnapLingo";
@@ -31,7 +31,7 @@ const appPath = resolve(
   root,
   process.argv[2] ?? `target/native/release/${productName}.app`,
 );
-const entitlementsPath = resolve(root, "crates/app/entitlements.plist");
+const entitlementsPath = resolve(root, "apps/desktop/entitlements.plist");
 const localCodesignDir = join(homedir(), ".snaplingo", "codesign");
 const localKeychainPath = join(localCodesignDir, "SnapLingoLocalCodesign.keychain-db");
 const localKeychainPasswordPath = join(localCodesignDir, "keychain-password.txt");
@@ -589,7 +589,7 @@ if (process.argv.includes("--prepare-identity")) {
 }
 
 if (!identifier) {
-  throw new Error("[macos-sign] Missing top-level identifier in crates/app/desktop.json.");
+  throw new Error("[macos-sign] Missing top-level identifier in apps/desktop/desktop.json.");
 }
 
 if (!existsSync(appPath)) {

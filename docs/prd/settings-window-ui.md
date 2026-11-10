@@ -299,7 +299,7 @@ Provider activation:
 Look at existing tests for patterns:
 - Component interaction tests (if any exist in `src/components/`)
 - Store tests (check if Zustand stores have test files)
-- Tauri command mocking patterns (check `crates/app/` for test examples)
+- Tauri command mocking patterns (check `apps/desktop/` for test examples)
 
 If no prior art exists, follow these patterns:
 - Use Vitest + React Testing Library

@@ -6,11 +6,11 @@ publish = false
 
 [[bin]]
 name = "settings_snapshot"
-path = "settings_snapshot.rs"
+path = "src/bin/settings_snapshot.rs"
 
 [[bin]]
 name = "result_snapshot"
-path = "result_snapshot.rs"
+path = "src/bin/result_snapshot.rs"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6.2"

@@ -52,7 +52,7 @@ npm run release:build
 npm run release:collect
 ```
 
-发布前检查 `package.json`、`package-lock.json` 的根版本、`crates/app/Cargo.toml`、`Cargo.lock` 一致；tag 必须为相同版本的 `vX.Y.Z`。`desktop.json` 保存平台身份配置，不重复保存版本。
+发布前检查 `package.json`、`package-lock.json` 的根版本、`apps/desktop/Cargo.toml`、`Cargo.lock` 一致；tag 必须为相同版本的 `vX.Y.Z`。`desktop.json` 保存平台身份配置，不重复保存版本。
 
 普通发布构建只移除原生 staging 和 bundle，保留 Cargo 缓存。需要重建 release 编译输出时使用 `npm run release:build -- --clean`，或执行 `./script/build-release.sh`。
 

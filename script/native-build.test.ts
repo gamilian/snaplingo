@@ -11,13 +11,13 @@ function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'snaplingo-native-bundle-'));
   directories.push(root);
   const files = [
-    'target/debug/snaplingo-native', 'crates/app/icons/icon.icns',
-    'crates/app/resources/ocr/medium_det.mnn', 'crates/app/resources/ocr/medium_rec.mnn',
-    'crates/app/resources/ocr/keys.txt', 'crates/app/resources/ocr/runtime/libonnxruntime.dylib',
+    'target/debug/snaplingo-native', 'apps/desktop/icons/icon.icns',
+    'apps/desktop/resources/ocr/medium_det.mnn', 'apps/desktop/resources/ocr/medium_rec.mnn',
+    'apps/desktop/resources/ocr/keys.txt', 'apps/desktop/resources/ocr/runtime/libonnxruntime.dylib',
     'LICENSE', 'assets/fonts/LICENSE-NotoSans.txt', 'assets/licenses/thirdPartyNotices.json',
   ];
   for (const file of files) { mkdirSync(dirname(join(root, file)), { recursive: true }); writeFileSync(join(root, file), file); }
-  writeFileSync(join(root, 'crates/app/resources/ocr/.platform'), `darwin-${process.arch}`);
+  writeFileSync(join(root, 'apps/desktop/resources/ocr/.platform'), `darwin-${process.arch}`);
   return { root, binary: join(root, 'target/debug/snaplingo-native'), app: join(root, 'target/native/debug/SnapLingo.app') };
 }
 describe('native macOS bundle', () => {
@@ -33,9 +33,9 @@ describe('native macOS bundle', () => {
   it('rejects missing models and wrong-architecture OCR before replacing a previous bundle', () => {
     const f = fixture();
     mkdirSync(f.app, { recursive: true }); writeFileSync(join(f.app, 'previous'), 'keep');
-    writeFileSync(join(f.root, 'crates/app/resources/ocr/.platform'), 'windows-x64');
+    writeFileSync(join(f.root, 'apps/desktop/resources/ocr/.platform'), 'windows-x64');
     expect(() => stageNativeMacBundle(f.root, f.binary, f.app, config)).toThrow('architecture');
-    rmSync(join(f.root, 'crates/app/resources/ocr/medium_det.mnn'));
+    rmSync(join(f.root, 'apps/desktop/resources/ocr/medium_det.mnn'));
     expect(() => stageNativeMacBundle(f.root, f.binary, f.app, config)).toThrow('Missing native bundle resource');
     expect(readFileSync(join(f.app, 'previous'), 'utf8')).toBe('keep');
   });

@@ -28,45 +28,48 @@ For scrolling capture, select a region in the screenshot editor and press **S** 
 ## Project structure
 
 ```text
+apps/desktop/                Desktop product (Cargo package: snaplingo)
+  src/
+    bootstrap/               Composition and application-owned state
+    shell/                   Event loops, tray, actions, startup/shutdown
+    features/                Settings, Capture, Result, Pinned and Scrolling
+      <feature>/             Shared presenter/session + native adapters
+    integrations/            Provider transports, runtime and native UI helpers
+  tests/                     Adapter and native application acceptance
+  examples/                  Isolated native previews
 crates/
-  app/                     Native entry and application assembly
-    composition/           Concrete adapters and workflow construction
-    lifecycle/             Application event loops, tray, startup and shutdown
-    actions/               Menu and shortcut action routing
-    window/                Settings, Capture, Result, Pinned Image and Scrolling
-      <domain>/macos/      AppKit adapters
-      <domain>/windows/    Windows adapters
-    infrastructure/        Screenshot acquisition, selection, OCR, speech and HTTP
-  core/                    Portable Domain/Application workflows and inward ports
-  storage/                 SQLite repositories and persisted image assets
-  settings/                Shared Settings sessions and UI projections
-  ui/                      Presentation state, layout, themes and interaction
-  render/                  CPU drawing and text shaping
-  accessibility/           Shared scene semantics and native actions
-  desktop/                 Native window/input/DPI adapter
-  assets/                  Production resource embedding
-assets/
-  fonts/                   Bundled fonts and their licenses
-  defaults/                Shared configuration defaults
-  text/                    Production UI text
-  licenses/                Generated third-party notices
-reference/web/             Independent React views, behavior tests and fixtures
-tools/
-  reference/               Independent macOS WebKit collectors
-  native/                  App-specific development probes
-docs/
-  adr/                     Accepted architectural decisions
-  architecture/            Current runtime and ownership maps
-  prd/                     Product specifications index
-  releases/                Versioned release notes
-  archive/                 Historical product requirements
-designs/                   Current visual explorations and previews
-script/                    Development and release verification
+  core/src/                  Feature-owned models, workflows and consumed ports
+    capture/                 Frozen capture, selection, annotation and output
+    providers/               OCR/translation coordination and provider contracts
+    settings/                Preferences and their mutation rules
+    library/                 History, Favorites, capacity and indexing
+  ui/src/
+    foundation/              Geometry, text, input, theme and drawing primitives
+    settings/                Settings models, interactions and layout
+    capture/, result/, ...   Reusable feature presentation
+    render/                  Optional CPU shaping and rasterization
+    accessibility/           Optional semantic projection
+  platform/src/              Native capabilities, organized by capability
+  storage/src/               SQLite and persisted image adapters
+  assets/src/                Shared embedded font resources
+assets/                      Production defaults, fonts, UI text and licenses
+reference/web/               Independent React views and regression fixtures
+tools/                       Reference collectors and native development probes
+docs/                        Architecture, product specs and release instructions
+script/                      Development, packaging and verification
 ```
 
-Reference tests live beside the behavior they verify. Rust integration tests live in each crate’s `tests/` directory. Cargo entry files and modules live directly in their crate directories without an extra `src/` layer. See [Architecture](ARCHITECTURE.md) and [Domain language](CONTEXT.md) for dependency and ownership rules.
+This workspace has six production packages. Business features are Rust modules;
+only independently reusable capabilities become packages. Every package uses the
+standard Cargo `src/`, `tests/` and `examples/` layout. UI's default feature set has
+no renderer or native window dependency. Enable `rendering` and/or `accessibility`
+when a host needs those implementations.
 
-The Rust application lives under `crates/app`; historical research and ADRs may refer to its former `src-tauri` path.
+The desktop product composes feature dependencies explicitly. Feature hosts do
+not receive `AppState` or construct their own production services. Core, UI,
+Platform and Storage cannot depend on the desktop application. See
+[Architecture](ARCHITECTURE.md) for dependency rules and extension examples.
+Historical records may refer to the former `src-tauri` or `crates/app` paths.
 
 ## Development
 
@@ -116,15 +119,15 @@ npm test
 cargo fmt --all --check
 cargo test --locked -p snaplingo --lib
 cargo test --locked -p snaplingo --test native_app_smoke
-cargo test --locked -p snaplingo --test single_instance_native
+cargo test --locked -p snaplingo-platform --test single_instance_native
 cargo check --locked -p snaplingo --all-targets
-cargo test --locked -p snaplingo-core -p snaplingo-storage -p snaplingo-ui -p snaplingo-render -p snaplingo-accessibility -p snaplingo-settings -p snaplingo-desktop --all-targets
+cargo test --locked -p snaplingo-core -p snaplingo-storage -p snaplingo-platform -p snaplingo-ui --features snaplingo-ui/rendering,snaplingo-ui/accessibility --all-targets
 ```
 
 `native_app_smoke` uses a temporary database. On macOS and Windows it exercises
 the native application lifecycle and real Settings adapter. Renderer examples
 write visual comparison artifacts, for example
-`cargo run --locked -p snaplingo-render --example settings_snapshot`.
+`cargo run --locked -p snaplingo-ui --features rendering --example settings_snapshot`.
 WebKit collectors live in `tools/reference` and build independently of App;
 see [development tools](tools/README.md) for reference and native probe commands.
 

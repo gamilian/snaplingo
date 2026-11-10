@@ -6540,27 +6540,19 @@ name = "snaplingo"
 version = "0.1.23"
 dependencies = [
  "ab_glyph",
- "accessibility-sys",
  "accesskit",
  "accesskit_macos",
  "accesskit_winit",
  "anyhow",
  "arboard",
  "async-trait",
- "auto-launch",
  "base64 0.21.7",
  "block2 0.6.2",
  "chrono",
- "clipboard-win",
- "core-foundation 0.9.4",
  "core-graphics",
- "dirs 5.0.1",
  "dispatch2",
  "embed-resource",
- "enigo",
  "fern",
- "fontdb 0.23.0",
- "getrandom 0.3.4",
  "global-hotkey",
  "image",
  "json-patch",
@@ -6576,7 +6568,6 @@ dependencies = [
  "objc2 0.6.4",
  "objc2-app-kit 0.3.2",
  "objc2-foundation 0.3.2",
- "objc2-vision",
  "ocr-rs",
  "open",
  "ort",
@@ -6589,18 +6580,14 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "snaplingo-accessibility",
  "snaplingo-assets",
  "snaplingo-core",
- "snaplingo-desktop",
- "snaplingo-render",
- "snaplingo-settings",
+ "snaplingo-platform",
  "snaplingo-storage",
  "snaplingo-ui",
  "softbuffer",
  "syn 2.0.117",
  "tempfile",
- "tesseract",
  "thiserror 1.0.69",
  "tokio",
  "tray-icon",
@@ -6608,15 +6595,6 @@ dependencies = [
  "webp",
  "windows 0.51.1",
  "winit",
- "xcap",
-]
-
-[[package]]
-name = "snaplingo-accessibility"
-version = "0.1.23"
-dependencies = [
- "accesskit",
- "snaplingo-ui",
 ]
 
 [[package]]
@@ -6632,7 +6610,6 @@ dependencies = [
  "async-trait",
  "base64 0.21.7",
  "chrono",
- "dirs 5.0.1",
  "image",
  "lingua",
  "log",
@@ -6650,26 +6627,41 @@ dependencies = [
 ]
 
 [[package]]
-name = "snaplingo-desktop"
+name = "snaplingo-platform"
 version = "0.1.23"
 dependencies = [
- "accesskit",
- "accesskit_winit",
+ "ab_glyph",
+ "accessibility-sys",
  "arboard",
+ "async-trait",
+ "auto-launch",
+ "chrono",
+ "clipboard-win",
+ "core-foundation 0.9.4",
+ "core-graphics",
+ "dirs 5.0.1",
+ "dispatch2",
+ "enigo",
+ "fontdb 0.23.0",
+ "getrandom 0.3.4",
+ "global-hotkey",
+ "image",
+ "libc",
+ "log",
  "objc2 0.6.4",
  "objc2-app-kit 0.3.2",
  "objc2-foundation 0.3.2",
- "rfd",
- "snaplingo-accessibility",
+ "objc2-vision",
+ "parking_lot",
+ "serde",
+ "serde_json",
  "snaplingo-core",
- "snaplingo-render",
- "snaplingo-settings",
- "snaplingo-storage",
- "snaplingo-ui",
- "softbuffer",
  "tempfile",
+ "tesseract",
+ "tokio",
+ "windows 0.51.1",
  "windows-sys 0.59.0",
- "winit",
+ "xcap",
 ]
 
 [[package]]
@@ -6683,37 +6675,6 @@ dependencies = [
  "objc2-foundation 0.3.2",
  "objc2-web-kit",
  "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "snaplingo-render"
-version = "0.1.0"
-dependencies = [
- "cosmic-text",
- "serde_json",
- "snaplingo-assets",
- "snaplingo-ui",
- "tiny-skia",
- "unicode-segmentation",
-]
-
-[[package]]
-name = "snaplingo-settings"
-version = "0.1.23"
-dependencies = [
- "anyhow",
- "async-trait",
- "base64 0.21.7",
- "chrono",
- "image",
- "log",
- "rusqlite",
- "serde_json",
- "snaplingo-core",
- "snaplingo-storage",
- "snaplingo-ui",
- "tempfile",
  "tokio",
 ]
 
@@ -6737,8 +6698,12 @@ dependencies = [
 name = "snaplingo-ui"
 version = "0.1.23"
 dependencies = [
+ "accesskit",
+ "cosmic-text",
  "serde_json",
+ "snaplingo-assets",
  "syn 2.0.117",
+ "tiny-skia",
  "unicode-segmentation",
 ]
 

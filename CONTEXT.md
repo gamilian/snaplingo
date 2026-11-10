@@ -44,13 +44,13 @@ A concrete operating-system, storage, network, or native-library implementation 
 
 The only place that chooses concrete adapters and injects them into a runtime.
 
-- `crates/app/composition.rs` and its builders create native Application runtimes with Infrastructure adapters.
-- `lifecycle/macos.rs` and `lifecycle/windows.rs` own the platform startup/event loops. `reference/web/App.tsx` only opens isolated visual-reference fixtures.
+- `apps/desktop/src/bootstrap/mod.rs` and its builders create native Application runtimes with Infrastructure adapters.
+- `apps/desktop/src/shell/macos.rs` and `apps/desktop/src/shell/windows.rs` own the platform startup/event loops. `reference/web/App.tsx` only opens isolated visual-reference fixtures.
 - Infrastructure may conditionally compile platform implementations, but only Composition selects which concrete adapter satisfies an Application seam.
 
 ### Capture Session
 
-A frozen snapshot of the desktop used to produce screenshot output, OCR input, and capture-window effects. Capture policy is owned by `application/capture`; OS screenshot and window mechanics are Infrastructure adapters.
+A frozen snapshot of the desktop used to produce screenshot output, OCR input, and capture-window effects. Capture policy is owned by `crates/core/src/capture`; OS screenshot and window mechanics are Infrastructure adapters.
 
 The selection surface displays the same frozen monitor images used by preview, magnification, OCR, and output. It waits for every image to decode before reveal; selection completion never replaces the session pixels with another desktop capture. Windows uses one primary-display coordinate scale for the capture surface, monitor snapshots, and cursor/window geometry. Physical OS window positions are converted once at that boundary, including pin origins on mixed-DPI displays.
 
@@ -82,11 +82,11 @@ Application runtimes that own their workflows and request runtime-host effects. 
 
 ### Hotkey
 
-`domain/hotkey_config.rs` owns the supported category/action vocabulary. `application/hotkeys` owns configuration validation, registration state, display-key parsing, and pressed/released policy. The concrete global-shortcut registrar is an Infrastructure adapter. `actions/shortcuts.rs` only maps a valid category/action to an `AppAction` for startup composition.
+`crates/core/src/hotkeys/model.rs` owns the supported category/action vocabulary. `crates/core/src/hotkeys` owns configuration validation, registration state, display-key parsing, and pressed/released policy. The concrete global-shortcut registrar is an Infrastructure adapter. `apps/desktop/src/shell/actions/shortcuts.rs` only maps a valid category/action to an `AppAction` for startup composition.
 
 ### Settings
 
-`application/settings` owns durable setting defaults, normalization and section updates. The portable Settings session owns hydration, mutation ordering, Provider reload, Hotkey snapshots and invalidation through narrow ports. Both native hosts use it; Composition injects concrete workflows and native effects. Shared UI projects snapshots into controls. Navigation remains presentation state; Services route restoration uses a dedicated UI namespace rather than adding fields to General settings. The retained frontend configuration/stores exercise the original browser contracts only.
+`crates/core/src/settings` owns durable setting defaults, normalization and section updates. The portable Settings session owns hydration, mutation ordering, Provider reload, Hotkey snapshots and invalidation through narrow ports. Both native hosts use it; Composition injects concrete workflows and native effects. Shared UI projects snapshots into controls. Navigation remains presentation state; Services route restoration uses a dedicated UI namespace rather than adding fields to General settings. The retained frontend configuration/stores exercise the original browser contracts only.
 
 ### System Speech
 
@@ -123,18 +123,18 @@ macOS verification mounts the final DMG and checks signing identity, dependencie
 ## Dependency Direction
 
 ```text
-Native host/actions -> Application <- Infrastructure
-                            ^
-                       Composition injects adapters
-Shared UI -> Scene/actions -> Renderer + native input/presentation
+Desktop bootstrap -> Core + UI + Platform + Storage
+Platform / Storage -> consumer-owned Core contracts
+Desktop features -> Core workflows + UI scenes/intents
+Native hosts -> shared UI presentation + optional render/accessibility modules
 Browser references -> original Views/Application + isolated fixture ports
 ```
 
-`domain/` contains shared data and vocabulary. It does not depend on Application, Platform, Tauri, or Infrastructure.
+Core feature-local `model.rs` files contain business data and vocabulary. They do not depend on workflows, UI, Platform, Storage or the desktop application.
 
 ## Verification Rules
 
 - Browser reference Views and Application modules do not import desktop Platform modules or Tauri packages; the old production adapters are deleted.
-- Backend Application production modules do not import `crate::infrastructure` or crate-root startup adapters.
+- Core production modules do not import concrete adapters or desktop startup code. Desktop features receive explicit dependencies and do not import AppState or bootstrap.
 - Architecture tests enforce these rules; no migration allowlist is retained.
 - Application CI targets macOS Apple Silicon, macOS Intel and Windows and runs native build/verification plus installer smoke. The React reference build and tests remain independent tools. Native runtime acceptance is not inferred from Windows cross compilation or PE linking.

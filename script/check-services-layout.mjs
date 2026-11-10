@@ -1,6 +1,6 @@
 // Compare isolated shared Rust Services with actual retained React/WebKit views.
 // Generate references: cargo run --locked -p snaplingo-reference --bin settings_snapshot -- services [dark] [compact].
-// Generate shared frames: cargo run -p snaplingo-render --example services_snapshot.
+// Generate shared frames: cargo run -p snaplingo-ui --features rendering --example services_snapshot.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';

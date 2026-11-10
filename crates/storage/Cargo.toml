@@ -8,9 +8,6 @@ license = "MIT"
 [features]
 test-support = []
 
-[lib]
-path = "lib.rs"
-
 [dependencies]
 snaplingo-core = { path = "../core" }
 async-trait = "0.1"

@@ -36,11 +36,11 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run ocr:prepare
-      - run: cargo fmt --manifest-path crates/app/Cargo.toml --check
-      - run: cargo test --locked --manifest-path crates/app/Cargo.toml
+      - run: cargo fmt --manifest-path apps/desktop/Cargo.toml --check
+      - run: cargo test --locked --manifest-path apps/desktop/Cargo.toml
       - name: Smoke test bundled medium OCR
-        run: cargo test --locked --manifest-path crates/app/Cargo.toml bundled_medium_smoke -- --ignored --nocapture
-      - run: cargo check --locked --manifest-path crates/app/Cargo.toml --all-targets
+        run: cargo test --locked --manifest-path apps/desktop/Cargo.toml bundled_medium_smoke -- --ignored --nocapture
+      - run: cargo check --locked --manifest-path apps/desktop/Cargo.toml --all-targets
       - name: Install native Windows installer compilers
         if: runner.os == 'Windows'
         run: choco install nsis wixtoolset --no-progress -y

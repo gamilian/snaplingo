@@ -1,100 +1,68 @@
-# SnapLingo Runtime Map
+# SnapLingo runtime map
 
-## Native application entry
-
-`crates/app/main.rs` and `native_main.rs` enter the same native
-application. The default `native-app` feature supplies the complete macOS and
-Windows hosts. `lib.rs` declares/exports those modules and the portable Core
-interfaces; it does not build a Tauri application or register IPC commands.
+Both binaries under `apps/desktop/src` enter the native application. The Cargo
+package remains `snaplingo`; executable, installation and persisted-data identities
+are unchanged by the module reorganization.
 
 ```text
-macOS lifecycle/macos.rs / Windows lifecycle/windows.rs
-    -> AppState assembled by composition.rs
-    -> Application runtimes <- Infrastructure adapters
-    -> native Settings / capture / result / pin / scrolling windows
+shell/macos.rs or shell/windows.rs
+  -> bootstrap constructs AppState, adapters and feature dependencies
+  -> shell actions route menu/global-key/single-instance intent
+  -> Core feature workflow -> Platform/Storage/integration contract
+  -> desktop feature presenter/controller -> UI snapshot/intents
+  -> native host consumes presentation and applies OS effects
 ```
 
-`lifecycle/macos.rs` owns AppKit startup and application delegation. `lifecycle/windows.rs`
-owns the winit event loop and routes native window/input/accessibility events.
-`ui_thread` marshals platform effects to those loops; `infrastructure/runtime.rs`
-owns Tokio workers. `RuntimeLifecycle` owns startup work, hotkey registration and
-quit draining. Closing Settings hides the window while the resident app remains.
-Single-instance activation and tray/menu actions enter the same application.
+AppKit owns the macOS loop; winit owns the Windows loop. Desktop integrations
+marshal work to the correct loop and own worker execution. Shell lifecycle owns
+startup, tray residency and shutdown. Closing Settings hides its window while the
+resident application continues. Shutdown cancels/drains work before releasing
+native owners.
 
-## Shared Settings and native surfaces
+Bootstrap is the only code that resolves the complete application into feature
+`Services` and session factories. Native features do not import AppState or call
+bootstrap. Notifications carry typed updates; subscriber lifetime belongs to the
+consumer and does not create a browser event bridge.
 
-All seven Settings pages use shared Rust layout, hit testing and typed intents.
-macOS `window/settings/macos/host.rs` mounts `SharedFeaturePage`; Windows
-`window/settings/windows/mod.rs` connects the desktop host to `SettingsWindowSession`.
-The adapters under `composition/settings` bind real preferences,
-provider and Library workflows, permission/update controllers and native sheets.
-Asynchronous notifications wake the host and refresh snapshots. Cached capacity
-totals use lightweight `LibraryIndex` queries and reject stale completions.
+`features/settings/presenter` owns one Settings session shared by both hosts:
+navigation, edit/save ordering, refresh, stale-result rejection and disposal.
+Bootstrap supplies real settings/provider/library workflows and native effects.
+The Settings host consumes `ui/settings` plus the optional UI renderer and
+accessibility projector. AppKit supplies its native text, dialog and accessibility
+adapters; Windows uses the feature's winit host. Saved interface zoom and device
+DPI are independent.
 
-`snaplingo-ui` produces logical-DIP Scenes and actions; `snaplingo-render` produces
-CPU pixels, and `snaplingo-accessibility` projects scene semantics. Platform hosts
-own device DPI, IME, clipboard, menus/dialogs, accessibility and presentation.
-Opaque Windows Settings uses the desktop presenter; alpha capture, result, pin
-and scrolling surfaces use native layered presentation. AppKit supplies macOS
-native windows and text controls. Interface zoom is separate from device DPI.
+Capture startup is serialized by `core/capture`. A session freezes pixels,
+monitor geometry and the coordinate convention together. Platform supplies screen
+acquisition; Core owns selection, editing and output policy. Native Capture hosts
+render that frozen state and send typed editing intent. Windows retains its
+primary-desktop-scale policy. Both native hosts consume `ui::capture::presentation` for toolbar/palette
+geometry and state, selection labels and magnifier sampling/placement. The Mac
+adapter retains native controls and text composition; its actual frames and state
+match the preserved AppKit baseline.
 
-Capture serializes startup across entry points. Each session retains frozen
-monitor pixels, geometry and its coordinate convention; selection, editing,
-magnification and output consume that same snapshot. Windows capture uses the
-primary desktop scale. Pin origins cross into Windows as physical coordinates;
-logical sources are converted once, and center/cascade uses the virtual desktop
-and actual physical window extent. Pin output stores the image through
-`PinnedImageRuntime` before opening the native window.
+Result request validity, automatic translation and stale-result policy live in
+Core. The desktop Result controller coordinates product effects; UI owns shared
+presentation and native-control geometry. AppKit retains TextKit/IME/selection;
+Windows supplies shared-renderer measurements and native text events.
 
-Result Window owns request validity, Provider retries, automatic translation and
-file-OCR/favorite sequencing. Scrolling Capture owns one sampler and revisioned
-preview updates, with native controls, a pass-through preview and viewport outline.
-Native window adapters call these portable runtimes directly.
+Pinned Image owns portable transforms/input in UI, business state in Core, and
+decoding/placement in the desktop feature. Mac image controls and Windows alpha
+presentation consume shared state. Scrolling Capture owns one shared sampler and
+cancellation-safe lifecycle, observing Core stitching/output through revisioned
+previews. Its native controls, pass-through preview and viewport outline retain
+explicit window owners.
 
-## Application workflows
+Provider coordination, settings/hotkey durability, history/favorite policy,
+selected-text translation, permission ordering and speech policy remain Core
+features. SQLite repositories and image persistence live in Storage. Platform
+supplies system OCR, speech, selection, screenshot acquisition, clipboard, fonts,
+shortcuts, paths, login registration and single-instance ownership. Application
+integrations provide HTTP/LLM transport, packaged local OCR inference, updates,
+logs and native-window helpers.
 
-`crates/core/application` owns Capture, Providers, History, Result
-Window, Pinned Image, Settings, Hotkeys and Selected Text policy. Each module
-consumes local ports. `snaplingo-storage` supplies durable repositories and image
-assets. `app/infrastructure` supplies OS/network/native-library
-capabilities; `composition.rs` and its builders choose implementations.
-
-Composition connects `SelectionTranslation` to Settings, Selected Text and Result
-Window so hotkey and menu actions share sequencing. `CaptureOcrDelivery` rejects
-stale handoffs through the injected Result Window runtime. File OCR shares the
-original image bytes with its preview. Required Permissions owns grant checks and
-explicit requests; TTS owns normalization, locale-based voice selection and saved
-voice/rate policy. Provider credentials use atomic SQLite multi-field writes.
-
-Library Index returns lightweight globally ordered IDs before Library loads only
-the selected History/Favorite records. History pages project visible content's
-favorite membership without loading complete Favorite bodies or thumbnails.
-
-`actions/mod.rs` maps native actions to workflow calls. `actions/shortcuts.rs`
-maps validated hotkey category/action pairs to `AppAction`; native shortcut
-registration stays in Infrastructure. Typed `DesktopEvents` refresh native
-subscribers without forwarding browser IPC events.
-
-## Browser reference harness
-
-The retained React tree under `reference/web/` is independent reference/test code.
-`reference/web/App.tsx` forwards browser requests to isolated Settings, Result and Permission
-fixtures under `reference/web/fixtures`. Those fixtures mount original
-components with test data and preserve collector query parameters. Domain,
-Application, View and Store regression tests remain alongside the original code.
-The production Tauri adapters and npm dependencies are deleted.
-
-Use `npm run reference:dev` or `reference:build` for these references. Default
-`dev`/`build` commands use the native application, and native packages contain no
-browser assets. AppKit/React frame and raster collectors supply independent visual
-baselines for shared UI tests.
-
-## Build and acceptance evidence
-
-CI/release matrices target macOS Apple Silicon, macOS Intel and Windows, with
-native build, final artifact verification and installation smoke. Windows
-compilation and PE linking have passed; actual Windows GUI/installer execution
-requires the Windows runner and desktop acceptance. macOS runtime checks, pure
-geometry/workflow tests, cross compilation, linking and manual IME/accessibility
-acceptance describe separate verification boundaries. Portable crates retain
-other platform capabilities; the complete Linux application host is unsupported.
+`reference/web` is an isolated React reference harness; `tools/reference` supplies
+independent collectors. Neither runs during native startup nor ships as a browser
+fallback. Native acceptance, visual references, cross compilation and installer
+checks are separate evidence, recorded in the refactor verification record and release
+verification documents.

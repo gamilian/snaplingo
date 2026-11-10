@@ -1,5 +1,9 @@
 # Native Rust architecture refactoring
 
+> Superseded on 2026-11-10 by [Modular native workspace refactoring](modular-workspace-refactor.md).
+> The directory/package target below is historical. Its implementation and verification
+> records are retained, but they do not certify the current workspace refactor.
+
 Approved direction: 2026-11-09. Baseline commit: `ef69b24`.
 
 The architecture review found a sound Core / Storage / UI / Render split, but

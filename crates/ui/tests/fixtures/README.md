@@ -67,11 +67,11 @@ translation/OCR/screenshot details. The synthetic records and PNG are owned by
 are read. The collector also exercises pagination, filter reset and a search
 with no results, writing 24 extra `search-empty` DOM reports.
 
-`snaplingo-render/tests/library_react_layout.rs` uses the real shared font
+`crates/ui/tests/library_react_layout.rs` uses the real shared font
 measurer and compares 2,016 content/list/control rectangles against that fixture.
 Disabled controls are included. Body text wraps through `TextBlock`, image
 previews use the same actual PNG pixels, and multiline notes retain line breaks.
-Run `cargo run --locked -p snaplingo-render --example library_snapshot` for the
+Run `cargo run --locked -p snaplingo-ui --features rendering --example library_snapshot` for the
 matching 60 shared raster artifacts under `target/shared-library`.
 This gate establishes geometry for these fixtures; it does not claim identical
 system font antialiasing, all hover states or platform accessibility acceptance.
@@ -86,13 +86,13 @@ with `settings_services_fixture.ts`; no installed credentials or settings are re
 Run `settings_snapshot services [dark] [compact]` in all four variants,
 then `node script/record-services-layout.mjs` to replace only the recorded DOM
 geometry and enabled flags. The recording script does not read renderer output.
-`cargo test --locked -p snaplingo-render --test services_react_layout --offline`
+`cargo test --locked -p snaplingo-ui --features rendering --test services_react_layout --offline`
 uses actual `RendererTextMetrics` and independently renders the paired provider,
 voice/schema/prompt DTOs; it checks 1,788 content/card/control frames and button
 enabled state without depending on `target/`. Prompt-save foreground/background
 colors are also retained: the original button is clickable (the collector calls
 the real save handler), despite its raised/faint appearance. The same DTO fixture powers
-`cargo run --locked -p snaplingo-render --example services_snapshot` for raster QA.
+`cargo run --locked -p snaplingo-ui --features rendering --example services_snapshot` for raster QA.
 
 `react-permission-guide-layout.json` contains 24 retained React
 `RequiredPermissionsGate` scenes: Native/Studio/Paper, light/dark, initial,
@@ -112,9 +112,9 @@ toolbar PNGs when `native_ui_workflows --surface editor` runs with
 `EditorToolbar::test_geometry` and `EditorStyle::test_geometry`, never shared UI
 coordinates. Its `text` member is the independently captured text-mode scene.
 
-`cargo test --locked -p snaplingo-render --test capture_toolbar_layout --offline`
+`cargo test --locked -p snaplingo-ui --features rendering --test capture_toolbar_layout --offline`
 compares 207 actual control frames at interface scales 1, 1.25 and 2, including
-disabled and selected state. `cargo run --locked -p snaplingo-render --example
+disabled and selected state. `cargo run --locked -p snaplingo-ui --features rendering --example
 capture_toolbar_snapshot --offline` writes shared toolbar, text-style, palette
 and grouped-tool PNGs under `target/shared-capture`. These checks preserve the
 original controls' geometry; platform font antialiasing and native bevels are
@@ -126,8 +126,7 @@ text, OCR with an image, dark OCR and empty file OCR. `test_geometry` reads actu
 native frames, font sizes and button enabled state; no shared layout generated
 the expected values. Run `native_ui_workflows --surface result` with
 `SNAPLINGO_NATIVE_UI_SNAPSHOT_DIR` set to write current geometry beside PNGs.
-The fixture omits controls hidden in that scene. `result_native_layout` in UI
-and Render compares body/header geometry, standard/175% scale, enabled state,
+The fixture omits controls hidden in that scene. `result_native_layout` and `result_render_layout` compares body/header geometry, standard/175% scale, enabled state,
 popup copying, image aspect ratio and clipping. AppKit may snap fractional
 window bounds by half a point. The retained React Result measurements now live
 under `reference/web/fixtures/result` as browser references.

@@ -25,8 +25,9 @@ fn production_dependencies(package: &Value) -> BTreeSet<String> {
 }
 
 fn production_crate(package: &Value) -> bool {
-    Path::new(package["manifest_path"].as_str().unwrap())
-        .starts_with(root().canonicalize().unwrap().join("crates"))
+    let workspace = root().canonicalize().unwrap();
+    let manifest = Path::new(package["manifest_path"].as_str().unwrap());
+    manifest.starts_with(workspace.join("crates")) || manifest.starts_with(workspace.join("apps"))
 }
 
 fn dependency_violations(packages: &BTreeMap<String, Value>) -> Vec<String> {
@@ -64,53 +65,17 @@ fn dependency_violations(packages: &BTreeMap<String, Value>) -> Vec<String> {
                 "serde_json",
             ][..],
         ),
-        ("snaplingo-ui", &["unicode-segmentation"][..]),
         (
-            "snaplingo-accessibility",
-            &["snaplingo-ui", "accesskit"][..],
-        ),
-        ("snaplingo-assets", &[][..]),
-        (
-            "snaplingo-settings",
+            "snaplingo-ui",
             &[
-                "snaplingo-core",
-                "snaplingo-ui",
-                "tokio",
-                "base64",
-                "chrono",
-                "image",
-                "log",
-            ][..],
-        ),
-        (
-            "snaplingo-render",
-            &[
-                "snaplingo-ui",
+                "unicode-segmentation",
                 "snaplingo-assets",
                 "tiny-skia",
                 "cosmic-text",
-                "unicode-segmentation",
-            ][..],
-        ),
-        (
-            "snaplingo-desktop",
-            &[
-                "snaplingo-ui",
-                "snaplingo-render",
-                "snaplingo-accessibility",
-                "snaplingo-settings",
-                "winit",
-                "softbuffer",
                 "accesskit",
-                "accesskit_winit",
-                "rfd",
-                "objc2",
-                "objc2-foundation",
-                "objc2-app-kit",
-                "windows-sys",
-                "arboard",
             ][..],
         ),
+        ("snaplingo-assets", &[][..]),
     ] {
         for dependency in production_dependencies(&packages[name]) {
             if !allowed.contains(&dependency.as_str()) {
@@ -123,6 +88,13 @@ fn dependency_violations(packages: &BTreeMap<String, Value>) -> Vec<String> {
             || concrete_platform_dependency(&dependency)
         {
             errors.push(format!("snaplingo-core -> {dependency}"));
+        }
+    }
+    for dependency in production_dependencies(&packages["snaplingo-platform"]) {
+        if packages.contains_key(&dependency)
+            && !matches!(dependency.as_str(), "snaplingo-core" | "snaplingo-assets")
+        {
+            errors.push(format!("snaplingo-platform -> {dependency}"));
         }
     }
     errors
@@ -194,6 +166,57 @@ fn cargo_edges_keep_presentation_storage_and_platforms_separate() {
         "Forbidden production dependencies: {violations:#?}"
     );
 
+    let production = packages
+        .iter()
+        .filter(|(_, package)| production_crate(package))
+        .map(|(name, _)| name.as_str())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        production,
+        BTreeSet::from([
+            "snaplingo",
+            "snaplingo-core",
+            "snaplingo-ui",
+            "snaplingo-platform",
+            "snaplingo-storage",
+            "snaplingo-assets",
+        ])
+    );
+    let ui = &packages["snaplingo-ui"];
+    assert_eq!(
+        ui["features"]["default"],
+        serde_json::json!([]),
+        "Layout and interaction must build without rendering or semantic adapters"
+    );
+    for dependency in ui["dependencies"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|dependency| {
+            matches!(
+                dependency["name"].as_str(),
+                Some("snaplingo-assets" | "tiny-skia" | "cosmic-text" | "accesskit")
+            )
+        })
+    {
+        assert_eq!(
+            dependency["optional"], true,
+            "Rendering/accessibility dependencies must remain opt-in"
+        );
+    }
+    for (owner, dependency) in [
+        ("snaplingo-ui", "snaplingo-platform"),
+        ("snaplingo-platform", "snaplingo"),
+        ("snaplingo-platform", "snaplingo-ui"),
+    ] {
+        let mut forbidden = packages.clone();
+        forbidden.get_mut(owner).unwrap()["dependencies"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({"name": dependency, "kind": null}));
+        assert!(dependency_violations(&forbidden).contains(&format!("{owner} -> {dependency}")));
+    }
+
     let reference = &packages["snaplingo-reference"];
     assert!(!production_crate(reference));
     assert!(production_dependencies(reference).contains("objc2-web-kit"));
@@ -252,7 +275,7 @@ fn cargo_edges_keep_presentation_storage_and_platforms_separate() {
             .push(dependency.clone());
         assert!(dependency_violations(&forbidden).contains(&format!("snaplingo-core -> {name}")));
         let mut allowed = packages.clone();
-        allowed.get_mut("snaplingo-desktop").unwrap()["dependencies"]
+        allowed.get_mut("snaplingo-platform").unwrap()["dependencies"]
             .as_array_mut()
             .unwrap()
             .push(dependency);
@@ -456,7 +479,7 @@ impl<'ast> Visit<'ast> for CoreSources {
 
 #[test]
 fn core_production_module_graph_has_no_concrete_adapters() {
-    let source_root = root().join("crates/core").canonicalize().unwrap();
+    let source_root = root().join("crates/core/src").canonicalize().unwrap();
     let mut sources = CoreSources {
         source_root: source_root.clone(),
         file: source_root.join("lib.rs"),

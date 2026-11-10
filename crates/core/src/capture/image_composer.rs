@@ -1,0 +1,1322 @@
+use std::f64::consts::PI;
+use std::io::Cursor;
+use std::sync::Arc;
+
+use ab_glyph::{point, Font, FontArc, Glyph, PxScale, ScaleFont};
+
+use crate::capture::model::PhysicalPoint;
+use crate::capture::model::PhysicalRect;
+use crate::error::{AppError, Result};
+
+const TEXT_FONT_BYTES: &[u8] = snaplingo_assets::NOTO_SANS_CJK_SC;
+const TEXT_PIN_FONT_SIZE: f32 = 20.0;
+const TEXT_PIN_MAX_TEXT_WIDTH: f32 = 640.0;
+const TEXT_PIN_PADDING: f32 = 16.0;
+const TEXT_PIN_MIN_WIDTH: u32 = 160;
+const TEXT_PIN_MIN_HEIGHT: u32 = 60;
+const TEXT_PIN_BACKGROUND: [u8; 4] = [255, 255, 255, 255];
+const TEXT_PIN_FOREGROUND: [u8; 4] = [32, 32, 32, 255];
+const COLOR_PIN_WIDTH: u32 = 160;
+const COLOR_PIN_HEIGHT: u32 = 100;
+
+pub struct PngPlacement<'a> {
+    pub png_data: &'a [u8],
+    pub source_rect: PhysicalRect,
+    pub destination_rect: PhysicalRect,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ImageAnnotation {
+    Rectangle {
+        rect: PhysicalRect,
+        color: [u8; 4],
+        stroke_width: u32,
+        filled: bool,
+        corner_radius: u32,
+    },
+    Ellipse {
+        rect: PhysicalRect,
+        color: [u8; 4],
+        stroke_width: u32,
+        filled: bool,
+    },
+    Arrow {
+        start: PhysicalPoint,
+        end: PhysicalPoint,
+        color: [u8; 4],
+        stroke_width: u32,
+        control1: Option<PhysicalPoint>,
+        control2: Option<PhysicalPoint>,
+    },
+    Line {
+        start: PhysicalPoint,
+        end: PhysicalPoint,
+        color: [u8; 4],
+        stroke_width: u32,
+    },
+    Freehand {
+        points: Vec<PhysicalPoint>,
+        color: [u8; 4],
+        stroke_width: u32,
+    },
+    Highlight {
+        points: Vec<PhysicalPoint>,
+        color: [u8; 4],
+        stroke_width: u32,
+    },
+    Mosaic {
+        points: Vec<PhysicalPoint>,
+        stroke_width: u32,
+        block_size: u32,
+    },
+    Eraser {
+        points: Vec<PhysicalPoint>,
+        stroke_width: u32,
+    },
+    Text {
+        position: PhysicalPoint,
+        text: String,
+        color: [u8; 4],
+        font_size: u32,
+        font_family: String,
+        bold: bool,
+        italic: bool,
+    },
+    RegionHighlight {
+        rect: PhysicalRect,
+        color: [u8; 4],
+        corner_radius: u32,
+    },
+    Blur {
+        rect: PhysicalRect,
+        radius: f32,
+        corner_radius: u32,
+    },
+    Spotlight {
+        rect: PhysicalRect,
+        corner_radius: u32,
+    },
+}
+
+#[derive(Clone)]
+pub struct AnnotationFont {
+    pub font: FontArc,
+    pub bold: bool,
+    pub italic: bool,
+}
+
+pub trait AnnotationFontProvider: Send + Sync {
+    fn families(&self) -> Vec<String>;
+    fn resolve(&self, family: &str, bold: bool, italic: bool) -> Option<AnnotationFont>;
+}
+
+pub struct CaptureImageComposer {
+    font_provider: Option<Arc<dyn AnnotationFontProvider>>,
+}
+
+impl CaptureImageComposer {
+    pub fn new() -> Self {
+        Self {
+            font_provider: None,
+        }
+    }
+
+    pub fn with_font_provider(provider: Arc<dyn AnnotationFontProvider>) -> Self {
+        Self {
+            font_provider: Some(provider),
+        }
+    }
+
+    pub fn annotation_font_families(&self) -> Vec<String> {
+        self.font_provider
+            .as_ref()
+            .map(|provider| provider.families())
+            .unwrap_or_default()
+    }
+
+    pub fn crop_png(&self, png_data: &[u8], rect: &PhysicalRect) -> Result<Vec<u8>> {
+        if rect.width == 0 || rect.height == 0 {
+            return Err(AppError::System(
+                "Cannot crop a zero-sized capture region".to_string(),
+            ));
+        }
+        if rect.x < 0 || rect.y < 0 {
+            return Err(AppError::System(
+                "Cannot crop a capture region with negative coordinates".to_string(),
+            ));
+        }
+
+        let image = image::load_from_memory(png_data)
+            .map_err(|e| AppError::System(format!("Failed to decode PNG: {}", e)))?;
+        let x = rect.x as u32;
+        let y = rect.y as u32;
+        if x + rect.width > image.width() || y + rect.height > image.height() {
+            return Err(AppError::System(
+                "Capture crop region exceeds frozen image bounds".to_string(),
+            ));
+        }
+
+        let cropped = image.crop_imm(x, y, rect.width, rect.height);
+        let mut output = Vec::new();
+        cropped
+            .write_to(&mut Cursor::new(&mut output), image::ImageFormat::Png)
+            .map_err(|e| AppError::System(format!("Failed to encode cropped PNG: {}", e)))?;
+        Ok(output)
+    }
+
+    pub fn compose_png(
+        &self,
+        width: u32,
+        height: u32,
+        placements: &[PngPlacement<'_>],
+    ) -> Result<Vec<u8>> {
+        self.compose_png_with_annotations(width, height, placements, &[])
+    }
+
+    pub fn compose_png_with_annotations(
+        &self,
+        width: u32,
+        height: u32,
+        placements: &[PngPlacement<'_>],
+        annotations: &[ImageAnnotation],
+    ) -> Result<Vec<u8>> {
+        let output = self.compose_rgba_with_annotations(width, height, placements, annotations)?;
+        let mut png = Vec::new();
+        image::DynamicImage::ImageRgba8(output)
+            .write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png)
+            .map_err(|error| AppError::System(format!("Failed to encode composed PNG: {error}")))?;
+        Ok(png)
+    }
+
+    pub fn compose_rgba_with_annotations(
+        &self,
+        width: u32,
+        height: u32,
+        placements: &[PngPlacement<'_>],
+        annotations: &[ImageAnnotation],
+    ) -> Result<image::RgbaImage> {
+        if width == 0 || height == 0 {
+            return Err(AppError::System(
+                "Cannot compose a zero-sized capture output".to_string(),
+            ));
+        }
+
+        let mut output = image::RgbaImage::from_pixel(width, height, image::Rgba([0, 0, 0, 0]));
+
+        for placement in placements {
+            if placement.source_rect.width == 0
+                || placement.source_rect.height == 0
+                || placement.destination_rect.width == 0
+                || placement.destination_rect.height == 0
+            {
+                return Err(AppError::System(
+                    "Cannot compose a zero-sized capture region".to_string(),
+                ));
+            }
+            if placement.source_rect.x < 0
+                || placement.source_rect.y < 0
+                || placement.destination_rect.x < 0
+                || placement.destination_rect.y < 0
+            {
+                return Err(AppError::System(
+                    "Cannot compose a capture region with negative coordinates".to_string(),
+                ));
+            }
+
+            let image = image::load_from_memory(placement.png_data)
+                .map_err(|e| AppError::System(format!("Failed to decode PNG: {}", e)))?;
+            let source_x = placement.source_rect.x as u32;
+            let source_y = placement.source_rect.y as u32;
+            if source_x + placement.source_rect.width > image.width()
+                || source_y + placement.source_rect.height > image.height()
+            {
+                return Err(AppError::System(
+                    "Capture compose source region exceeds frozen image bounds".to_string(),
+                ));
+            }
+
+            let destination_x = placement.destination_rect.x as u32;
+            let destination_y = placement.destination_rect.y as u32;
+            if destination_x + placement.destination_rect.width > width
+                || destination_y + placement.destination_rect.height > height
+            {
+                return Err(AppError::System(
+                    "Capture compose destination region exceeds output bounds".to_string(),
+                ));
+            }
+
+            let crop = image
+                .crop_imm(
+                    source_x,
+                    source_y,
+                    placement.source_rect.width,
+                    placement.source_rect.height,
+                )
+                .to_rgba8();
+            let composed = if crop.width() == placement.destination_rect.width
+                && crop.height() == placement.destination_rect.height
+            {
+                crop
+            } else {
+                image::imageops::resize(
+                    &crop,
+                    placement.destination_rect.width,
+                    placement.destination_rect.height,
+                    image::imageops::FilterType::Triangle,
+                )
+            };
+
+            image::imageops::overlay(
+                &mut output,
+                &composed,
+                placement.destination_rect.x.into(),
+                placement.destination_rect.y.into(),
+            );
+        }
+        let source = output.clone();
+        let spotlights = annotations
+            .iter()
+            .filter_map(|annotation| match annotation {
+                ImageAnnotation::Spotlight {
+                    rect,
+                    corner_radius,
+                } => Some((rect, *corner_radius)),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        super::image_effects::apply_spotlights(&mut output, &source, &spotlights);
+        for annotation in annotations {
+            draw_annotation(
+                &mut output,
+                &source,
+                annotation,
+                self.font_provider.as_deref(),
+            );
+        }
+
+        Ok(output)
+    }
+
+    pub fn render_text_png(&self, text: &str) -> Result<Vec<u8>> {
+        let normalized_text = text.replace("\r\n", "\n").replace('\r', "\n");
+        if normalized_text.trim().is_empty() {
+            return Err(AppError::System(
+                "Cannot pin empty clipboard text".to_string(),
+            ));
+        }
+
+        let font = FontArc::try_from_slice(TEXT_FONT_BYTES)
+            .map_err(|_| AppError::System("Failed to load text pin font".to_string()))?;
+        let lines = wrap_text_for_png(&font, &normalized_text, TEXT_PIN_MAX_TEXT_WIDTH);
+        let line_height = text_line_height(&font, TEXT_PIN_FONT_SIZE);
+        let text_width = lines
+            .iter()
+            .map(|line| text_width(&font, TEXT_PIN_FONT_SIZE, line))
+            .fold(0.0, f32::max);
+        let width = ((text_width + TEXT_PIN_PADDING * 2.0).ceil() as u32).max(TEXT_PIN_MIN_WIDTH);
+        let height = ((line_height * lines.len() as f32 + TEXT_PIN_PADDING * 2.0).ceil() as u32)
+            .max(TEXT_PIN_MIN_HEIGHT);
+        let mut output =
+            image::RgbaImage::from_pixel(width, height, image::Rgba(TEXT_PIN_BACKGROUND));
+
+        for (index, line) in lines.iter().enumerate() {
+            draw_text_annotation(
+                &mut output,
+                &PhysicalPoint {
+                    x: TEXT_PIN_PADDING as i32,
+                    y: (TEXT_PIN_PADDING + TEXT_PIN_FONT_SIZE + line_height * index as f32).round()
+                        as i32,
+                },
+                line,
+                TEXT_PIN_FOREGROUND,
+                TEXT_PIN_FONT_SIZE as u32,
+                "",
+                false,
+                false,
+                None,
+            );
+        }
+
+        let mut output_png = Vec::new();
+        image::DynamicImage::ImageRgba8(output)
+            .write_to(&mut Cursor::new(&mut output_png), image::ImageFormat::Png)
+            .map_err(|e| AppError::System(format!("Failed to encode text pin PNG: {}", e)))?;
+        Ok(output_png)
+    }
+
+    pub fn render_clipboard_text_png(&self, text: &str) -> Result<Vec<u8>> {
+        if let Some(color) = parse_clipboard_color(text) {
+            return render_color_png(color);
+        }
+
+        self.render_text_png(text)
+    }
+}
+
+fn render_color_png(color: [u8; 4]) -> Result<Vec<u8>> {
+    let output =
+        image::RgbaImage::from_pixel(COLOR_PIN_WIDTH, COLOR_PIN_HEIGHT, image::Rgba(color));
+    let mut output_png = Vec::new();
+    image::DynamicImage::ImageRgba8(output)
+        .write_to(&mut Cursor::new(&mut output_png), image::ImageFormat::Png)
+        .map_err(|e| AppError::System(format!("Failed to encode color pin PNG: {}", e)))?;
+    Ok(output_png)
+}
+
+fn parse_clipboard_color(text: &str) -> Option<[u8; 4]> {
+    let value = text.trim();
+    if value.is_empty() {
+        return None;
+    }
+
+    parse_hex_color(value)
+        .or_else(|| parse_rgb_color(value))
+        .map(|[red, green, blue]| [red, green, blue, 255])
+}
+
+fn parse_hex_color(value: &str) -> Option<[u8; 3]> {
+    let hex = value.strip_prefix('#')?;
+    let expanded = match hex.len() {
+        3 => hex
+            .chars()
+            .flat_map(|character| [character, character])
+            .collect::<String>(),
+        6 => hex.to_string(),
+        _ => return None,
+    };
+
+    let red = u8::from_str_radix(&expanded[0..2], 16).ok()?;
+    let green = u8::from_str_radix(&expanded[2..4], 16).ok()?;
+    let blue = u8::from_str_radix(&expanded[4..6], 16).ok()?;
+
+    Some([red, green, blue])
+}
+
+fn parse_rgb_color(value: &str) -> Option<[u8; 3]> {
+    let lower = value.to_lowercase();
+    let body = lower
+        .strip_prefix("rgb(")
+        .and_then(|rgb| rgb.strip_suffix(')'))
+        .unwrap_or(value);
+    let parts = body
+        .split(|character: char| character == ',' || character.is_whitespace())
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>();
+    if parts.len() != 3 {
+        return None;
+    }
+
+    Some([
+        parse_color_channel(parts[0])?,
+        parse_color_channel(parts[1])?,
+        parse_color_channel(parts[2])?,
+    ])
+}
+
+fn parse_color_channel(value: &str) -> Option<u8> {
+    if value.contains('.') {
+        let channel = value.parse::<f32>().ok()?;
+        if !(0.0..=1.0).contains(&channel) {
+            return None;
+        }
+        return Some((channel * 255.0).round() as u8);
+    }
+
+    value.parse::<u8>().ok()
+}
+
+fn wrap_text_for_png(font: &FontArc, text: &str, max_width: f32) -> Vec<String> {
+    let mut lines = Vec::new();
+
+    for hard_line in text.split('\n') {
+        if hard_line.is_empty() {
+            lines.push(String::new());
+            continue;
+        }
+
+        let mut current_line = String::new();
+        for character in hard_line.chars() {
+            let mut candidate = current_line.clone();
+            candidate.push(character);
+
+            if !current_line.is_empty()
+                && text_width(font, TEXT_PIN_FONT_SIZE, &candidate) > max_width
+            {
+                lines.push(current_line);
+                current_line = character.to_string();
+            } else {
+                current_line = candidate;
+            }
+        }
+
+        lines.push(current_line);
+    }
+
+    lines
+}
+
+fn text_line_height(font: &FontArc, font_size: f32) -> f32 {
+    font.as_scaled(PxScale::from(font_size))
+        .height()
+        .max(font_size)
+}
+
+fn text_width(font: &FontArc, font_size: f32, text: &str) -> f32 {
+    let scaled_font = font.as_scaled(PxScale::from(font_size));
+
+    text.chars()
+        .map(|character| scaled_font.h_advance(font.glyph_id(character)))
+        .sum()
+}
+
+fn draw_annotation(
+    output: &mut image::RgbaImage,
+    source: &image::RgbaImage,
+    annotation: &ImageAnnotation,
+    fonts: Option<&dyn AnnotationFontProvider>,
+) {
+    match annotation {
+        ImageAnnotation::Rectangle {
+            rect,
+            color,
+            stroke_width,
+            filled,
+            corner_radius,
+        } => {
+            if *corner_radius > 0 {
+                super::image_effects::rounded_rectangle(
+                    output,
+                    rect,
+                    *color,
+                    *stroke_width,
+                    *filled,
+                    *corner_radius,
+                );
+            } else {
+                draw_rectangle_annotation(output, rect, *color, *stroke_width, *filled);
+            }
+        }
+        ImageAnnotation::Ellipse {
+            rect,
+            color,
+            stroke_width,
+            filled,
+        } => draw_ellipse_annotation(output, rect, *color, *stroke_width, *filled),
+        ImageAnnotation::Arrow {
+            start,
+            end,
+            color,
+            stroke_width,
+            control1,
+            control2,
+        } => draw_arrow_annotation(
+            output,
+            start,
+            end,
+            *color,
+            *stroke_width,
+            control1.as_ref(),
+            control2.as_ref(),
+        ),
+        ImageAnnotation::Line {
+            start,
+            end,
+            color,
+            stroke_width,
+        } => draw_line_annotation(output, start, end, *color, *stroke_width),
+        ImageAnnotation::Freehand {
+            points,
+            color,
+            stroke_width,
+        } => draw_freehand_annotation(output, points, *color, *stroke_width),
+        ImageAnnotation::Highlight {
+            points,
+            color,
+            stroke_width,
+        } => draw_highlight_annotation(output, points, *color, *stroke_width),
+        ImageAnnotation::Mosaic {
+            points,
+            stroke_width,
+            block_size,
+        } => draw_mosaic_annotation(output, source, points, *stroke_width, *block_size),
+        ImageAnnotation::Eraser {
+            points,
+            stroke_width,
+        } => erase_annotation(output, source, points, *stroke_width),
+        ImageAnnotation::Text {
+            position,
+            text,
+            color,
+            font_size,
+            font_family,
+            bold,
+            italic,
+        } => draw_text_annotation(
+            output,
+            position,
+            text,
+            *color,
+            *font_size,
+            font_family,
+            *bold,
+            *italic,
+            fonts,
+        ),
+        ImageAnnotation::RegionHighlight {
+            rect,
+            color,
+            corner_radius,
+        } => super::image_effects::highlight_region(output, rect, *color, *corner_radius),
+        ImageAnnotation::Blur {
+            rect,
+            radius,
+            corner_radius,
+        } => super::image_effects::blur_region(output, rect, *radius, *corner_radius),
+        ImageAnnotation::Spotlight { .. } => {}
+    }
+}
+
+fn draw_rectangle_annotation(
+    output: &mut image::RgbaImage,
+    rect: &PhysicalRect,
+    color: [u8; 4],
+    stroke_width: u32,
+    filled: bool,
+) {
+    if rect.width == 0 || rect.height == 0 {
+        return;
+    }
+
+    let stroke_width = stroke_width.max(1);
+    let color = image::Rgba(color);
+    let output_width = output.width() as i64;
+    let output_height = output.height() as i64;
+    let left = rect.x as i64;
+    let top = rect.y as i64;
+    let right = left + rect.width as i64 - 1;
+    let bottom = top + rect.height as i64 - 1;
+
+    if filled {
+        for y in top..=bottom {
+            draw_horizontal_line(output, left, right, y, output_width, output_height, color);
+        }
+        return;
+    }
+
+    for stroke in 0..stroke_width as i64 {
+        draw_horizontal_line(
+            output,
+            left,
+            right,
+            top + stroke,
+            output_width,
+            output_height,
+            color,
+        );
+        draw_horizontal_line(
+            output,
+            left,
+            right,
+            bottom - stroke,
+            output_width,
+            output_height,
+            color,
+        );
+        draw_vertical_line(
+            output,
+            top,
+            bottom,
+            left + stroke,
+            output_width,
+            output_height,
+            color,
+        );
+        draw_vertical_line(
+            output,
+            top,
+            bottom,
+            right - stroke,
+            output_width,
+            output_height,
+            color,
+        );
+    }
+}
+
+fn draw_ellipse_annotation(
+    output: &mut image::RgbaImage,
+    rect: &PhysicalRect,
+    color: [u8; 4],
+    stroke_width: u32,
+    filled: bool,
+) {
+    if rect.width == 0 || rect.height == 0 {
+        return;
+    }
+
+    let color = image::Rgba(color);
+    let stroke_width = stroke_width.max(1);
+    let radius_x = (rect.width.saturating_sub(1) as f64) / 2.0;
+    let radius_y = (rect.height.saturating_sub(1) as f64) / 2.0;
+    let center_x = rect.x as f64 + radius_x;
+    let center_y = rect.y as f64 + radius_y;
+    if radius_x <= f64::EPSILON || radius_y <= f64::EPSILON {
+        draw_rectangle_annotation(output, rect, color.0, stroke_width, filled);
+        return;
+    }
+
+    if filled {
+        let output_width = output.width() as i64;
+        let output_height = output.height() as i64;
+        let top = rect.y as i64;
+        let bottom = top + rect.height as i64 - 1;
+        for y in top..=bottom {
+            let normalized_y = (y as f64 - center_y) / radius_y;
+            let x_extent = (1.0 - normalized_y.powi(2)).max(0.0).sqrt() * radius_x;
+            let left = (center_x - x_extent).ceil() as i64;
+            let right = (center_x + x_extent).floor() as i64;
+            draw_horizontal_line(
+                output,
+                left,
+                right,
+                y as i64,
+                output_width,
+                output_height,
+                color,
+            );
+        }
+        return;
+    }
+
+    let steps = ((radius_x + radius_y) * 12.0).ceil().max(36.0) as u32;
+    for step in 0..steps {
+        let angle = (step as f64 / steps as f64) * 2.0 * PI;
+        let x = (center_x + radius_x * angle.cos()).round() as i32;
+        let y = (center_y + radius_y * angle.sin()).round() as i32;
+        draw_stroked_point(output, x, y, color, stroke_width);
+    }
+}
+
+fn draw_arrow_annotation(
+    output: &mut image::RgbaImage,
+    start: &PhysicalPoint,
+    end: &PhysicalPoint,
+    color: [u8; 4],
+    stroke_width: u32,
+    control1: Option<&PhysicalPoint>,
+    control2: Option<&PhysicalPoint>,
+) {
+    let color = image::Rgba(color);
+    let stroke_width = stroke_width.max(1);
+    let default_control = |t: f64| PhysicalPoint {
+        x: (start.x as f64 + (end.x - start.x) as f64 * t).round() as i32,
+        y: (start.y as f64 + (end.y - start.y) as f64 * t).round() as i32,
+    };
+    let c1 = control1
+        .cloned()
+        .unwrap_or_else(|| default_control(1.0 / 3.0));
+    let c2 = control2
+        .cloned()
+        .unwrap_or_else(|| default_control(2.0 / 3.0));
+    if control1.is_some() || control2.is_some() {
+        let length = ((c1.x - start.x) as f64).hypot((c1.y - start.y) as f64)
+            + ((c2.x - c1.x) as f64).hypot((c2.y - c1.y) as f64)
+            + ((end.x - c2.x) as f64).hypot((end.y - c2.y) as f64);
+        let steps = (length / 4.0).ceil().clamp(16.0, 512.0) as u32;
+        let mut previous = start.clone();
+        for i in 1..=steps {
+            let t = i as f64 / steps as f64;
+            let u = 1.0 - t;
+            let next = PhysicalPoint {
+                x: (u.powi(3) * start.x as f64
+                    + 3.0 * u.powi(2) * t * c1.x as f64
+                    + 3.0 * u * t.powi(2) * c2.x as f64
+                    + t.powi(3) * end.x as f64)
+                    .round() as i32,
+                y: (u.powi(3) * start.y as f64
+                    + 3.0 * u.powi(2) * t * c1.y as f64
+                    + 3.0 * u * t.powi(2) * c2.y as f64
+                    + t.powi(3) * end.y as f64)
+                    .round() as i32,
+            };
+            draw_line(
+                output,
+                previous.x,
+                previous.y,
+                next.x,
+                next.y,
+                color,
+                stroke_width,
+            );
+            previous = next;
+        }
+    } else {
+        draw_line(output, start.x, start.y, end.x, end.y, color, stroke_width);
+    }
+
+    let tangent = control2
+        .filter(|point| point.x != end.x || point.y != end.y)
+        .or_else(|| {
+            control2.and_then(|_| control1.filter(|point| point.x != end.x || point.y != end.y))
+        })
+        .unwrap_or(start);
+    let dx = (end.x - tangent.x) as f64;
+    let dy = (end.y - tangent.y) as f64;
+    let length = dx.hypot(dy);
+    if length <= f64::EPSILON {
+        return;
+    }
+
+    let head_length = ((stroke_width as f64) * 6.0).max(6.0).min(length * 0.8);
+    let line_angle = dy.atan2(dx);
+    let head_angle = 35.0_f64.to_radians();
+    let wings = [line_angle + PI - head_angle, line_angle + PI + head_angle].map(|wing_angle| {
+        PhysicalPoint {
+            x: (end.x as f64 + wing_angle.cos() * head_length).round() as i32,
+            y: (end.y as f64 + wing_angle.sin() * head_length).round() as i32,
+        }
+    });
+    super::image_effects::arrow_head(output, end, &wings[0], &wings[1], color.0);
+    for wing_end in &wings {
+        draw_line(
+            output,
+            end.x,
+            end.y,
+            wing_end.x,
+            wing_end.y,
+            color,
+            stroke_width,
+        );
+    }
+}
+
+fn draw_line_annotation(
+    output: &mut image::RgbaImage,
+    start: &PhysicalPoint,
+    end: &PhysicalPoint,
+    color: [u8; 4],
+    stroke_width: u32,
+) {
+    draw_line(
+        output,
+        start.x,
+        start.y,
+        end.x,
+        end.y,
+        image::Rgba(color),
+        stroke_width.max(1),
+    );
+}
+
+fn draw_freehand_annotation(
+    output: &mut image::RgbaImage,
+    points: &[PhysicalPoint],
+    color: [u8; 4],
+    stroke_width: u32,
+) {
+    if points.is_empty() {
+        return;
+    }
+
+    let color = image::Rgba(color);
+    let stroke_width = stroke_width.max(1);
+    if points.len() == 1 {
+        draw_stroked_point(output, points[0].x, points[0].y, color, stroke_width);
+        return;
+    }
+
+    for segment in points.windows(2) {
+        let start = &segment[0];
+        let end = &segment[1];
+        draw_line(output, start.x, start.y, end.x, end.y, color, stroke_width);
+    }
+}
+
+fn draw_highlight_annotation(
+    output: &mut image::RgbaImage,
+    points: &[PhysicalPoint],
+    color: [u8; 4],
+    stroke_width: u32,
+) {
+    if points.is_empty() {
+        return;
+    }
+
+    let color = image::Rgba(color);
+    let stroke_width = stroke_width.max(1);
+    if points.len() == 1 {
+        draw_alpha_stroked_point(output, points[0].x, points[0].y, color, stroke_width);
+        return;
+    }
+
+    for segment in points.windows(2) {
+        let start = &segment[0];
+        let end = &segment[1];
+        draw_alpha_line(output, start.x, start.y, end.x, end.y, color, stroke_width);
+    }
+}
+
+fn draw_mosaic_annotation(
+    output: &mut image::RgbaImage,
+    source: &image::RgbaImage,
+    points: &[PhysicalPoint],
+    stroke_width: u32,
+    block_size: u32,
+) {
+    let Some(mask) = rasterize_brush_mask(output, points, stroke_width) else {
+        return;
+    };
+
+    let block_size = block_size.max(1) as i64;
+    let mut y = mask.top;
+    while y < mask.bottom {
+        let block_bottom = (y + block_size).min(mask.bottom);
+        let mut x = mask.left;
+        while x < mask.right {
+            let block_right = (x + block_size).min(mask.right);
+            let color = average_block_color(source, x, y, block_right, block_bottom);
+
+            for pixel_y in y..block_bottom {
+                for pixel_x in x..block_right {
+                    if mask.contains(pixel_x, pixel_y) {
+                        output.put_pixel(pixel_x as u32, pixel_y as u32, color);
+                    }
+                }
+            }
+
+            x += block_size;
+        }
+
+        y += block_size;
+    }
+}
+
+fn erase_annotation(
+    output: &mut image::RgbaImage,
+    source: &image::RgbaImage,
+    points: &[PhysicalPoint],
+    stroke_width: u32,
+) {
+    let Some(mask) = rasterize_brush_mask(output, points, stroke_width) else {
+        return;
+    };
+
+    for y in mask.top..mask.bottom {
+        for x in mask.left..mask.right {
+            if mask.contains(x, y) {
+                let pixel = *source.get_pixel(x as u32, y as u32);
+                output.put_pixel(x as u32, y as u32, pixel);
+            }
+        }
+    }
+}
+
+struct BrushMask {
+    left: i64,
+    top: i64,
+    right: i64,
+    bottom: i64,
+    width: usize,
+    pixels: Vec<bool>,
+}
+
+impl BrushMask {
+    fn contains(&self, x: i64, y: i64) -> bool {
+        let index = (y - self.top) as usize * self.width + (x - self.left) as usize;
+        self.pixels[index]
+    }
+}
+
+fn rasterize_brush_mask(
+    image: &image::RgbaImage,
+    points: &[PhysicalPoint],
+    stroke_width: u32,
+) -> Option<BrushMask> {
+    let first = points.first()?;
+    let radius = (stroke_width.max(1) as i64 + 1) / 2;
+    let (mut min_x, mut max_x) = (first.x as i64, first.x as i64);
+    let (mut min_y, mut max_y) = (first.y as i64, first.y as i64);
+    for point in points.iter().skip(1) {
+        min_x = min_x.min(point.x as i64);
+        max_x = max_x.max(point.x as i64);
+        min_y = min_y.min(point.y as i64);
+        max_y = max_y.max(point.y as i64);
+    }
+
+    let left = (min_x - radius).max(0);
+    let top = (min_y - radius).max(0);
+    let right = (max_x + radius + 1).min(image.width() as i64);
+    let bottom = (max_y + radius + 1).min(image.height() as i64);
+    if left >= right || top >= bottom {
+        return None;
+    }
+    let width = (right - left) as usize;
+    let mut mask = BrushMask {
+        left,
+        top,
+        right,
+        bottom,
+        width,
+        pixels: vec![false; width * (bottom - top) as usize],
+    };
+    let segments: Vec<_> = if points.len() == 1 {
+        vec![(first, first)]
+    } else {
+        points
+            .windows(2)
+            .map(|segment| (&segment[0], &segment[1]))
+            .collect()
+    };
+    let radius = stroke_width.max(1) as f64 / 2.0;
+    let radius_squared = radius * radius;
+
+    for (start, end) in segments {
+        let delta_x = (end.x - start.x) as f64;
+        let delta_y = (end.y - start.y) as f64;
+        let length_squared = delta_x * delta_x + delta_y * delta_y;
+        let inverse_length_squared = if length_squared == 0.0 {
+            0.0
+        } else {
+            1.0 / length_squared
+        };
+        let segment_left = (i64::from(start.x.min(end.x)) - radius.ceil() as i64).max(left);
+        let segment_top = (i64::from(start.y.min(end.y)) - radius.ceil() as i64).max(top);
+        let segment_right = (i64::from(start.x.max(end.x)) + radius.ceil() as i64 + 1).min(right);
+        let segment_bottom = (i64::from(start.y.max(end.y)) + radius.ceil() as i64 + 1).min(bottom);
+
+        for y in segment_top..segment_bottom {
+            for x in segment_left..segment_right {
+                if point_within_segment_brush(
+                    start,
+                    delta_x,
+                    delta_y,
+                    inverse_length_squared,
+                    radius_squared,
+                    x,
+                    y,
+                ) {
+                    let index = (y - top) as usize * width + (x - left) as usize;
+                    mask.pixels[index] = true;
+                }
+            }
+        }
+    }
+
+    Some(mask)
+}
+
+fn point_within_segment_brush(
+    start: &PhysicalPoint,
+    delta_x: f64,
+    delta_y: f64,
+    inverse_length_squared: f64,
+    radius_squared: f64,
+    x: i64,
+    y: i64,
+) -> bool {
+    let point_x = x as f64 + 0.5;
+    let point_y = y as f64 + 0.5;
+    let t = (((point_x - start.x as f64) * delta_x + (point_y - start.y as f64) * delta_y)
+        * inverse_length_squared)
+        .clamp(0.0, 1.0);
+    let closest_x = start.x as f64 + t * delta_x;
+    let closest_y = start.y as f64 + t * delta_y;
+    let distance_x = point_x - closest_x;
+    let distance_y = point_y - closest_y;
+    distance_x * distance_x + distance_y * distance_y <= radius_squared
+}
+
+fn draw_text_annotation(
+    output: &mut image::RgbaImage,
+    position: &PhysicalPoint,
+    text: &str,
+    color: [u8; 4],
+    font_size: u32,
+    font_family: &str,
+    bold: bool,
+    italic: bool,
+    fonts: Option<&dyn AnnotationFontProvider>,
+) {
+    if text.is_empty() {
+        return;
+    }
+
+    let resolved = fonts.and_then(|provider| provider.resolve(font_family, bold, italic));
+    let fallback_font = FontArc::try_from_slice(TEXT_FONT_BYTES).ok();
+    let (font, synthetic_bold, synthetic_italic) = if let Some(resolved) = resolved {
+        (
+            resolved.font,
+            bold && !resolved.bold,
+            italic && !resolved.italic,
+        )
+    } else {
+        let Some(font) = fallback_font.clone() else {
+            return;
+        };
+        (font, bold, italic)
+    };
+    let font_size = font_size.max(1) as f32;
+    let scale = PxScale::from(font_size);
+    let line_height = font_size * 1.2;
+    let start_x = position.x as f32;
+    let mut caret = point(start_x, position.y as f32);
+
+    for character in text.chars() {
+        if character == '\n' {
+            caret.x = start_x;
+            caret.y += line_height;
+            continue;
+        }
+
+        let use_fallback = font.glyph_id(character).0 == 0 && fallback_font.is_some();
+        let glyph_font = if use_fallback {
+            fallback_font.as_ref().unwrap()
+        } else {
+            &font
+        };
+        let glyph_id = glyph_font.glyph_id(character);
+        let glyph: Glyph = glyph_id.with_scale_and_position(scale, caret);
+        caret.x += glyph_font.as_scaled(scale).h_advance(glyph_id);
+
+        if let Some(outlined_glyph) = glyph_font.outline_glyph(glyph) {
+            let bounds = outlined_glyph.px_bounds();
+            outlined_glyph.draw(|x, y, coverage| {
+                let alpha = ((color[3] as f32) * coverage).round() as u8;
+                if alpha == 0 {
+                    return;
+                }
+
+                let pixel_y = bounds.min.y as i32 + y as i32;
+                let skew = if synthetic_italic || (use_fallback && italic) {
+                    ((caret.y - pixel_y as f32) * 0.2).round() as i32
+                } else {
+                    0
+                };
+                let pixel_x = bounds.min.x as i32 + x as i32 + skew;
+                let weight = if synthetic_bold || (use_fallback && bold) {
+                    (font_size / 24.0).ceil().max(1.0) as i32
+                } else {
+                    0
+                };
+                for offset in 0..=weight {
+                    blend_pixel_if_in_bounds(
+                        output,
+                        pixel_x + offset,
+                        pixel_y,
+                        image::Rgba([color[0], color[1], color[2], alpha]),
+                    );
+                }
+            });
+        }
+    }
+}
+
+fn average_block_color(
+    output: &image::RgbaImage,
+    left: i64,
+    top: i64,
+    right: i64,
+    bottom: i64,
+) -> image::Rgba<u8> {
+    let mut totals = [0_u64; 4];
+    let mut count = 0_u64;
+
+    for y in top..bottom {
+        for x in left..right {
+            let pixel = output.get_pixel(x as u32, y as u32).0;
+            for channel in 0..4 {
+                totals[channel] += pixel[channel] as u64;
+            }
+            count += 1;
+        }
+    }
+
+    image::Rgba([
+        (totals[0] / count) as u8,
+        (totals[1] / count) as u8,
+        (totals[2] / count) as u8,
+        (totals[3] / count) as u8,
+    ])
+}
+
+fn blend_pixel_if_in_bounds(output: &mut image::RgbaImage, x: i32, y: i32, color: image::Rgba<u8>) {
+    if x < 0 || y < 0 {
+        return;
+    }
+
+    let x = x as u32;
+    let y = y as u32;
+    if x >= output.width() || y >= output.height() {
+        return;
+    }
+
+    let source = color.0;
+    let destination = output.get_pixel(x, y).0;
+    let source_alpha = source[3] as u32;
+    let inverse_alpha = 255_u32.saturating_sub(source_alpha);
+    let blended = image::Rgba([
+        (((source[0] as u32 * source_alpha) + (destination[0] as u32 * inverse_alpha)) / 255) as u8,
+        (((source[1] as u32 * source_alpha) + (destination[1] as u32 * inverse_alpha)) / 255) as u8,
+        (((source[2] as u32 * source_alpha) + (destination[2] as u32 * inverse_alpha)) / 255) as u8,
+        (source_alpha + (destination[3] as u32 * inverse_alpha) / 255).min(255) as u8,
+    ]);
+    output.put_pixel(x, y, blended);
+}
+
+fn draw_line(
+    output: &mut image::RgbaImage,
+    start_x: i32,
+    start_y: i32,
+    end_x: i32,
+    end_y: i32,
+    color: image::Rgba<u8>,
+    stroke_width: u32,
+) {
+    let mut x = start_x;
+    let mut y = start_y;
+    let dx = (end_x - start_x).abs();
+    let sx = if start_x < end_x { 1 } else { -1 };
+    let dy = -(end_y - start_y).abs();
+    let sy = if start_y < end_y { 1 } else { -1 };
+    let mut err = dx + dy;
+
+    loop {
+        draw_stroked_point(output, x, y, color, stroke_width);
+        if x == end_x && y == end_y {
+            break;
+        }
+        let e2 = err * 2;
+        if e2 >= dy {
+            err += dy;
+            x += sx;
+        }
+        if e2 <= dx {
+            err += dx;
+            y += sy;
+        }
+    }
+}
+
+fn draw_stroked_point(
+    output: &mut image::RgbaImage,
+    x: i32,
+    y: i32,
+    color: image::Rgba<u8>,
+    stroke_width: u32,
+) {
+    let stroke_width = stroke_width.max(1) as i32;
+    let min_offset = -(stroke_width / 2);
+    let max_offset = (stroke_width - 1) / 2;
+
+    for offset_y in min_offset..=max_offset {
+        for offset_x in min_offset..=max_offset {
+            put_pixel_if_in_bounds(output, x + offset_x, y + offset_y, color);
+        }
+    }
+}
+
+fn put_pixel_if_in_bounds(output: &mut image::RgbaImage, x: i32, y: i32, color: image::Rgba<u8>) {
+    if x < 0 || y < 0 {
+        return;
+    }
+
+    let x = x as u32;
+    let y = y as u32;
+    if x < output.width() && y < output.height() {
+        output.put_pixel(x, y, color);
+    }
+}
+
+fn draw_horizontal_line(
+    output: &mut image::RgbaImage,
+    left: i64,
+    right: i64,
+    y: i64,
+    output_width: i64,
+    output_height: i64,
+    color: image::Rgba<u8>,
+) {
+    if y < 0 || y >= output_height {
+        return;
+    }
+
+    for x in left.max(0)..=right.min(output_width - 1) {
+        output.put_pixel(x as u32, y as u32, color);
+    }
+}
+
+fn draw_vertical_line(
+    output: &mut image::RgbaImage,
+    top: i64,
+    bottom: i64,
+    x: i64,
+    output_width: i64,
+    output_height: i64,
+    color: image::Rgba<u8>,
+) {
+    if x < 0 || x >= output_width {
+        return;
+    }
+
+    for y in top.max(0)..=bottom.min(output_height - 1) {
+        output.put_pixel(x as u32, y as u32, color);
+    }
+}
+
+impl Default for CaptureImageComposer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn draw_alpha_line(
+    output: &mut image::RgbaImage,
+    start_x: i32,
+    start_y: i32,
+    end_x: i32,
+    end_y: i32,
+    color: image::Rgba<u8>,
+    stroke_width: u32,
+) {
+    let mut x = start_x;
+    let mut y = start_y;
+    let dx = (end_x - start_x).abs();
+    let sx = if start_x < end_x { 1 } else { -1 };
+    let dy = -(end_y - start_y).abs();
+    let sy = if start_y < end_y { 1 } else { -1 };
+    let mut err = dx + dy;
+
+    loop {
+        draw_alpha_stroked_point(output, x, y, color, stroke_width);
+        if x == end_x && y == end_y {
+            break;
+        }
+        let e2 = err * 2;
+        if e2 >= dy {
+            err += dy;
+            x += sx;
+        }
+        if e2 <= dx {
+            err += dx;
+            y += sy;
+        }
+    }
+}
+
+fn draw_alpha_stroked_point(
+    output: &mut image::RgbaImage,
+    x: i32,
+    y: i32,
+    color: image::Rgba<u8>,
+    stroke_width: u32,
+) {
+    let stroke_width = stroke_width.max(1) as i32;
+    let min_offset = -(stroke_width / 2);
+    let max_offset = (stroke_width - 1) / 2;
+
+    for offset_y in min_offset..=max_offset {
+        for offset_x in min_offset..=max_offset {
+            blend_pixel_if_in_bounds(output, x + offset_x, y + offset_y, color);
+        }
+    }
+}

@@ -1,6 +1,6 @@
 [workspace]
-members = ["crates/*", "tools/reference"]
-default-members = ["crates/app"]
+members = ["apps/desktop", "crates/core", "crates/ui", "crates/platform", "crates/storage", "crates/assets", "tools/reference"]
+default-members = ["apps/desktop"]
 resolver = "2"
 
 [profile.release]

@@ -1,5 +1,5 @@
 //! Review the portable pin scene without creating a native window.
-#[path = "../../crates/app/window/pinned/scene.rs"]
+#[path = "../../apps/desktop/src/features/pinned/scene.rs"]
 mod scene;
 use scene::{PinUi, Preferences};
 fn main() -> Result<(), String> {
@@ -27,7 +27,7 @@ fn main() -> Result<(), String> {
             border_shortcut: "f8".into(),
         },
     )?;
-    let mut renderer = snaplingo_render::Renderer::default();
+    let mut renderer = snaplingo_ui::render::Renderer::default();
     ui.hovered = true;
     renderer
         .render(&ui.scene(), 1.)?

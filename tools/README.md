@@ -1,8 +1,8 @@
 # Development tools
 
-Production crates live under `crates/`. These executables collect independent
+The desktop product lives under `apps/desktop/`; reusable libraries live under `crates/`. These executables collect independent
 references or inspect production behavior; they are excluded from native bundles.
-Rust entries live directly beside their manifests or explicit Cargo targets.
+Reference collectors use `src/bin`; native probes use explicit Cargo example targets.
 
 ## Browser reference collectors
 
@@ -42,14 +42,14 @@ implementation details or copying pixel preparation into the probe.
 
 ```sh
 cargo run --locked -p snaplingo --example pin_snapshot
-cargo test --locked -p snaplingo --test single_instance_native
+cargo test --locked -p snaplingo-platform --test single_instance_native
 ```
 
 The pin probe writes synthetic images to `target/shared-pin`. The single-instance
 integration test launches real child processes with a temporary lock directory,
 checking early/live activation and takeover after process termination. Ordinary
-App tests and CI run it automatically.
+Platform tests and CI run it automatically.
 
 Reusable UI geometry reports, renderer snapshots and the standalone Settings
-preview remain in their owning library's `examples/` directory and run with
+preview live in `crates/ui/examples` and `apps/desktop/examples` respectively and run with
 `cargo run -p <package> --example <name>`.
