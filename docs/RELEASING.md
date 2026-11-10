@@ -84,7 +84,7 @@ macOS CI 使用临时 ad-hoc 签名；Desktop packages 使用固定自签名身�
 
 ### tag：创建 Release 草稿
 
-1. 同步 `package.json`、`package-lock.json` 的根版本、`app/Cargo.toml`、`Cargo.lock` 的根包版本，提交变更。
+1. 同步 `package.json`、`package-lock.json` 的根版本及 `packages[""]` 版本、根 `Cargo.toml` 的 `[workspace.package]` 版本，以及 `Cargo.lock` 中继承该版本的工作区包版本。`app/Cargo.toml` 和共享库通过 `version.workspace = true` 继承版本。运行 `npm run licenses:generate` 更新锁文件校验值，提交变更。
 2. 从 `docs/RELEASE_NOTES_TEMPLATE.md` 创建 `docs/releases/v0.2.0.md`，填写本版面向用户的变化、安装说明和已知限制。
 3. 在准备发行的提交上创建匹配版本的 tag，例如版本 `0.2.0`：
 
