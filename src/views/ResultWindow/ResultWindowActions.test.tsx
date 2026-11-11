@@ -57,6 +57,20 @@ describe('result window text actions', () => {
     });
   });
 
+  it.each([
+    ['ocr', null], ['ocr', 'frozen-image'], ['translation', null],
+  ] as const)('keeps an animated recognition status visible in %s with preview %s', async (resultWindowMode, ocrImageBase64) => {
+    useResultWindowStore.setState({ resultWindowVisible: true, resultWindowMode, ocrImageBase64, isOcrRunning: true });
+    const view = await renderResultWindow();
+    const status = view.container.querySelector('[role="status"]');
+    expect(status?.textContent).toContain('正在识别图片');
+    expect(status?.querySelector('.animate-spin')).not.toBeNull();
+    await act(async () => useResultWindowStore.setState({ isOcrRunning: false, ocrError: 'Recognition unavailable' }));
+    expect(view.container.querySelector('[role="status"]')).toBeNull();
+    expect(view.container.querySelector('[role="alert"]')?.textContent).toContain('Recognition unavailable');
+    await view.unmount();
+  });
+
   it('offers a session favorite action beside the translation source text actions', async () => {
     useResultWindowStore.setState({
       resultWindowVisible: true,

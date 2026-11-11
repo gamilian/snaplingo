@@ -86,6 +86,7 @@ interface ResultWindowProps {
 function Header({
   mode,
   subtitle,
+  busy,
   isPinned,
   onTogglePinned,
   onStartDrag,
@@ -93,6 +94,7 @@ function Header({
 }: {
   mode: 'translation' | 'ocr';
   subtitle: string;
+  busy: boolean;
   isPinned: boolean;
   onTogglePinned: () => void;
   onStartDrag?: () => void;
@@ -133,7 +135,10 @@ function Header({
           <h2 className="text-base font-bold leading-tight text-ink">
             {isOcr ? 'OCR' : '翻译'}
           </h2>
-          <span className="text-xs font-semibold text-muted">{subtitle}</span>
+          <span role={busy ? 'status' : undefined} aria-live={busy ? 'polite' : undefined} className="inline-flex items-center gap-2 text-xs font-semibold text-muted">
+            {busy && <span aria-hidden="true" className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />}
+            {subtitle}
+          </span>
         </div>
       </div>
 
@@ -697,7 +702,7 @@ function ResultWindowContent({
     isTranslating,
   );
   const ocrSubtitle = isOcrRunning
-    ? '识别中'
+    ? '正在识别图片…'
     : ocrText
       ? `已识别 ${ocrText.length} 个字符${
           ocrSettings?.showConfidence && ocrConfidence !== null
@@ -715,6 +720,11 @@ function ResultWindowContent({
   const panelStyle = isOcrMode
     ? { height: 'auto' }
     : { height: translationPanelHeight };
+  const ocrErrorMessage = ocrError ? (
+    <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-sm font-medium text-red-700">
+      {ocrError}
+    </div>
+  ) : null;
 
   return (
     <div
@@ -732,7 +742,8 @@ function ResultWindowContent({
       >
         <Header
           mode={isOcrMode ? 'ocr' : 'translation'}
-          subtitle={isOcrMode ? ocrSubtitle : translationSubtitle}
+          subtitle={isOcrRunning ? '正在识别图片…' : isOcrMode ? ocrSubtitle : translationSubtitle}
+          busy={isOcrRunning || isTranslating}
           isPinned={isResultWindowPinned}
           onTogglePinned={() => setResultWindowPinned((isPinned) => !isPinned)}
           onStartDrag={presentation === 'standalone' ? handleStartDrag : undefined}
@@ -743,6 +754,7 @@ function ResultWindowContent({
           <ResultWindowScrollArea
             className={resultWindowOcrContentClassName()}
           >
+            {ocrErrorMessage}
             {ocrDetectedLanguage && (
               <div className="mb-2 text-hint text-muted" title="OCR 引擎实际使用的识别语言">
                 识别语言：{ocrDetectedLanguage}
@@ -790,7 +802,7 @@ function ResultWindowContent({
                       ref={ocrImageTextAreaRef}
                       value={ocrText}
                       readOnly
-                      placeholder="OCR 结果..."
+                      placeholder={isOcrRunning ? '正在识别图片…' : 'OCR 结果...'}
                       rows={resultWindowTextAreaRows(ocrText, 'ocr')}
                       className={resultWindowOcrResultTextAreaClassName()}
                       style={ocrTextStyle}
@@ -920,12 +932,6 @@ function ResultWindowContent({
                   </button>
                 </div>
 
-                {ocrError && (
-                  <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-sm font-medium text-red-700">
-                    {ocrError}
-                  </div>
-                )}
-
                 <div className="min-h-0 space-y-3">
                   <div className="flex min-h-[18px] items-center justify-between gap-3">
                     <h3 className="text-card font-bold text-muted">识别文本</h3>
@@ -939,7 +945,7 @@ function ResultWindowContent({
                       value={ocrText}
                       readOnly
                       rows={resultWindowTextAreaRows(ocrText, 'ocr')}
-                      placeholder="OCR 结果..."
+                      placeholder={isOcrRunning ? '正在识别图片…' : 'OCR 结果...'}
                       className={resultWindowTextAreaClassName('ocr')}
                       style={ocrTextStyle}
                     />
@@ -1016,6 +1022,7 @@ function ResultWindowContent({
             })}
           >
             <div ref={translationSourceBoxRef} className="flex-none">
+              {ocrErrorMessage}
               {isSourceInputCollapsed ? (
                 <button
                   type="button"

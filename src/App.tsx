@@ -241,17 +241,6 @@ function Application() {
     let unlisten: (() => void) | undefined;
 
     resultWindowRuntime
-      .loadCurrentPayload()
-      .then((loaded) => {
-        if (!disposed && loaded) {
-          setHasLoadedCaptureResultPayload(true);
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to load capture result window payload:', err);
-      });
-
-    resultWindowRuntime
       .subscribeToPayloads(() => {
         if (!disposed) {
           setHasLoadedCaptureResultPayload(true);

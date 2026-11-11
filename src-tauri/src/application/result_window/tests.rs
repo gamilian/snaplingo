@@ -205,6 +205,8 @@ fn translation_request(text: &str) -> ResultWindowOpenRequest {
 
 fn translation_payload(text: &str, auto_translate: bool) -> ResultWindowPayload {
     ResultWindowPayload {
+        ocr_status: None,
+        ocr_error: None,
         mode: ResultWindowMode::Translation,
         origin: ResultWindowOrigin::Input,
         text: text.to_string(),
@@ -222,6 +224,8 @@ fn ocr_payload(
     image_base64: Option<&str>,
 ) -> ResultWindowPayload {
     ResultWindowPayload {
+        ocr_status: None,
+        ocr_error: None,
         mode: ResultWindowMode::Ocr,
         origin: ResultWindowOrigin::Ocr,
         text: text.to_string(),

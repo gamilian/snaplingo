@@ -1,6 +1,6 @@
 [package]
 name = "snaplingo"
-version = "0.1.23"
+version = "0.1.26"
 description = "A cross-platform screenshot, OCR, and translation tool"
 authors = ["SnapLingo Contributors"]
 license = "MIT"
@@ -65,11 +65,7 @@ lingua = "1.5"
 
 # OCR
 base64 = "0.21"
-oar-ocr-core = { version = "=0.6.0", default-features = false }
-# The 0.6.3 macro release changed the 0.6.0 core's validation syntax.
-oar-ocr-derive = "=0.6.0"
-ort = { version = "=2.0.0-rc.11", default-features = false, features = ["std", "ndarray", "load-dynamic"] }
-ndarray = "0.17"
+ocr-rs = { git = "https://github.com/zibo-chen/ocr-rs", rev = "664a945953e46186b37203fa4902a20d60a32809", default-features = false }
 
 # Configuration
 dirs = "5.0"
@@ -85,8 +81,6 @@ chrono = { version = "0.4", features = ["serde"] }
 parking_lot = { version = "0.12.5", features = ["send_guard"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-ocr-rs = { git = "https://github.com/zibo-chen/ocr-rs", rev = "664a945953e46186b37203fa4902a20d60a32809", default-features = false }
-ort = { version = "=2.0.0-rc.11", default-features = false, features = ["coreml"] }
 accessibility-sys = "0.2"
 core-foundation = "0.9"
 core-graphics = "0.23"
@@ -97,8 +91,6 @@ objc2-vision = { version = "0.3.2", default-features = false, features = ["std",
 xcap = "0.9"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-libloading = "0.9"
-ort = { version = "=2.0.0-rc.11", default-features = false, features = ["directml"] }
 clipboard-win = "5.4.1"
 windows = { version = "0.51", features = [
     "Foundation",

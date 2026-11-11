@@ -8,8 +8,9 @@ mod tests;
 
 #[cfg_attr(not(test), allow(unused_imports))]
 pub(crate) use port::{
-    ResultWindowMode, ResultWindowNotifierPort, ResultWindowOcrIntent, ResultWindowOpenRequest,
-    ResultWindowOrigin, ResultWindowPayload, ResultWindowRequestId, ResultWindowWindowPort,
+    ResultWindowMode, ResultWindowNotifierPort, ResultWindowOcrIntent, ResultWindowOcrStatus,
+    ResultWindowOpenRequest, ResultWindowOrigin, ResultWindowPayload, ResultWindowRequestId,
+    ResultWindowWindowPort,
 };
 #[cfg_attr(not(test), allow(unused_imports))]
 pub(crate) use runtime::ResultWindowRuntime;

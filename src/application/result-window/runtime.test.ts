@@ -11,6 +11,158 @@ import type {
 
 describe('result window application runtime', () => {
   afterEach(() => { vi.useRealTimers(); });
+  it.each(['ocr', 'translation'] as const)('shows pending screenshot %s before recognition finishes and applies the same request completion', async mode => {
+    const { runtime, platform } = createRuntime({ activeProviderIds: ['google'] });
+    runtime.updateSourceText('previous text');
+    const recognition = deferred<CaptureResultWindowPayload>();
+    const translation = deferred<TranslationResult>();
+    platform.commands.takePayload
+      .mockResolvedValueOnce(capturePayload(mode, 'recognizing'))
+      .mockImplementationOnce(() => recognition.promise);
+    platform.commands.translateTextWithProvider.mockImplementation(() => translation.promise);
+
+    await runtime.loadPayload('10');
+    expect(runtime.getState()).toMatchObject({
+      resultWindowMode: mode, resultWindowVisible: true, isOcrRunning: true,
+      sourceText: '', ocrText: '', providerTranslations: [], ocrImageBase64: 'frozen-image',
+    });
+    expect(platform.commands.translateTextWithProvider).not.toHaveBeenCalled();
+    const complete = runtime.loadPayload('10');
+    expect(runtime.getState().isOcrRunning).toBe(true);
+    recognition.resolve(capturePayload(mode, 'complete', { text: 'recognized', detectedLanguage: 'en' }));
+    await complete;
+    expect(runtime.getState()).toMatchObject({ isOcrRunning: false, ocrError: null });
+    if (mode === 'translation') {
+      await vi.waitFor(() => expect(runtime.getState().isTranslating).toBe(true));
+      expect(platform.commands.translateTextWithProvider).toHaveBeenCalledExactlyOnceWith('google', {
+        text: 'recognized', sourceLang: 'en', targetLang: 'zh-CN',
+      });
+      translation.resolve(translationResult('google', '识别内容'));
+      await vi.waitFor(() => expect(runtime.getState().isTranslating).toBe(false));
+    } else {
+      expect(runtime.getState().ocrText).toBe('recognized');
+      expect(platform.commands.translateTextWithProvider).not.toHaveBeenCalled();
+    }
+  });
+
+  it.each(['failed', 'cancelled'] as const)('ends pending screenshot loading when recognition is %s', async status => {
+    const { runtime, platform } = createRuntime();
+    platform.commands.takePayload
+      .mockResolvedValueOnce(capturePayload('translation', 'recognizing'))
+      .mockResolvedValueOnce(capturePayload('translation', status, {
+        ocrError: status === 'failed' ? 'Recognition unavailable' : undefined,
+      }));
+    await runtime.loadPayload('10');
+    await runtime.loadPayload('10');
+    expect(runtime.getState()).toMatchObject({
+      isOcrRunning: false, isTranslating: false,
+      ocrError: status === 'failed' ? 'Recognition unavailable' : null,
+    });
+    expect(platform.commands.translateTextWithProvider).not.toHaveBeenCalled();
+  });
+
+  it.each(['close', 'edit'] as const)('ignores screenshot completion after the user chooses to %s', async action => {
+    const { runtime, platform } = createRuntime();
+    platform.commands.takePayload
+      .mockResolvedValueOnce(capturePayload('translation', 'recognizing'))
+      .mockResolvedValueOnce(capturePayload('translation', 'complete', { text: 'late result' }));
+    await runtime.loadPayload('10');
+    if (action === 'close') await runtime.close('standalone');
+    else runtime.updateSourceText('my own text');
+    await expect(runtime.loadPayload('10')).resolves.toBe(false);
+    expect(runtime.getState()).toMatchObject({
+      isOcrRunning: false,
+      sourceText: action === 'edit' ? 'my own text' : '',
+      resultWindowVisible: action !== 'close',
+    });
+  });
+
+  it('does not apply a claimed screenshot payload after the window closes', async () => {
+    const { runtime, platform } = createRuntime();
+    const payload = deferred<CaptureResultWindowPayload>();
+    platform.commands.takePayload.mockImplementation(() => payload.promise);
+    const load = runtime.loadPayload('10');
+    await runtime.close('standalone');
+    payload.resolve(capturePayload('ocr', 'recognizing'));
+    await expect(load).resolves.toBe(false);
+    expect(runtime.getState().resultWindowVisible).toBe(false);
+  });
+
+  it('does not hydrate a late initial request ID after the window closes', async () => {
+    const { runtime, platform } = createRuntime();
+    const request = deferred<string>();
+    platform.commands.currentPayloadRequestId.mockImplementation(() => request.promise);
+    platform.commands.takePayload.mockResolvedValue(capturePayload('ocr', 'recognizing'));
+    const load = runtime.loadCurrentPayload();
+    await runtime.close('standalone');
+    request.resolve('10');
+    await expect(load).resolves.toBe(false);
+    expect(platform.commands.takePayload).not.toHaveBeenCalled();
+  });
+
+  it('claims completion missed before subscription without consuming recognition first', async () => {
+    const { runtime, platform, unsubscribe } = createRuntime();
+    const subscription = deferred<ResultWindowUnsubscribe>();
+    platform.onPayloadReady.mockImplementation(() => subscription.promise);
+    platform.commands.currentPayloadRequestId.mockResolvedValue('10');
+    platform.commands.takePayload.mockResolvedValue(capturePayload('ocr', 'recognizing'));
+    const loaded = vi.fn();
+    const connecting = runtime.subscribeToPayloads(loaded);
+    await Promise.resolve();
+    expect(platform.commands.currentPayloadRequestId).not.toHaveBeenCalled();
+    expect(platform.commands.takePayload).not.toHaveBeenCalled();
+
+    // OCR completes before the WebView's event subscription is registered.
+    platform.commands.takePayload.mockResolvedValue(capturePayload('ocr', 'complete', { text: 'ready before subscribe' }));
+    subscription.resolve(unsubscribe);
+    const stop = await connecting;
+    await vi.waitFor(() => expect(runtime.getState()).toMatchObject({
+      resultWindowVisible: true, isOcrRunning: false, ocrText: 'ready before subscribe',
+    }));
+    expect(loaded).toHaveBeenCalledOnce();
+    stop();
+    expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the result window position when the same capture finishes', async () => {
+    const { runtime, platform } = createRuntime();
+    platform.commands.takePayload
+      .mockResolvedValueOnce(capturePayload('ocr', 'recognizing'))
+      .mockResolvedValueOnce(capturePayload('ocr', 'complete', { text: 'ready' }));
+    await runtime.loadPayload('10');
+    await runtime.resizeStandaloneWindow({ presentation: 'standalone', visible: true, mode: 'ocr', panelHeightPx: 300 });
+    await runtime.loadPayload('10');
+    await runtime.resizeStandaloneWindow({ presentation: 'standalone', visible: true, mode: 'ocr', panelHeightPx: 400 });
+    expect(platform.resizeTo).toHaveBeenCalledTimes(2);
+    expect(platform.placeAt).toHaveBeenCalledOnce();
+  });
+
+  it('ignores an old screenshot after a newer payload is displayed', async () => {
+    const { runtime, platform } = createRuntime();
+    const old = deferred<CaptureResultWindowPayload>();
+    platform.commands.takePayload
+      .mockImplementationOnce(() => old.promise)
+      .mockResolvedValueOnce(capturePayload('ocr', 'complete', { text: 'new result' }));
+    const pending = runtime.loadPayload('10');
+    await runtime.loadPayload('11');
+    old.resolve(capturePayload('ocr', 'complete', { text: 'old result' }));
+    await expect(pending).resolves.toBe(false);
+    expect(runtime.getState().ocrText).toBe('new result');
+  });
+
+  it('does not return to loading when a same-request payload arrives after completion', async () => {
+    const { runtime, platform } = createRuntime();
+    const initial = deferred<CaptureResultWindowPayload>();
+    platform.commands.takePayload
+      .mockImplementationOnce(() => initial.promise)
+      .mockResolvedValueOnce(capturePayload('ocr', 'complete', { text: 'ready' }));
+    const pending = runtime.loadPayload('10');
+    await runtime.loadPayload('10');
+    initial.resolve(capturePayload('ocr', 'recognizing'));
+    await expect(pending).resolves.toBe(false);
+    expect(runtime.getState()).toMatchObject({ ocrText: 'ready', isOcrRunning: false });
+  });
+
   it('hydrates the current translation payload by request ID', async () => {
     const payload: CaptureResultWindowPayload = {
       mode: 'translation', origin: 'selection',
@@ -968,6 +1120,19 @@ function deferred<T>() {
     reject = rejectPromise;
   });
   return { promise, resolve, reject };
+}
+
+function capturePayload(
+  mode: 'ocr' | 'translation',
+  ocrStatus: NonNullable<CaptureResultWindowPayload['ocrStatus']>,
+  values: Partial<CaptureResultWindowPayload> = {},
+): CaptureResultWindowPayload {
+  return {
+    mode, origin: mode === 'translation' ? 'screenshot' : 'ocr', text: '',
+    autoTranslate: mode === 'translation' && ocrStatus === 'complete',
+    ocrIntent: mode === 'ocr' ? 'display-text' : undefined,
+    imageBase64: 'frozen-image', ocrStatus, ...values,
+  };
 }
 
 function translationResult(providerId = 'google', text = 'translated'): TranslationResult {

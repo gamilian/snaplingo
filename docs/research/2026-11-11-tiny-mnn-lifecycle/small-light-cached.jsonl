@@ -1,0 +1,11 @@
+{"batch":8,"height":100,"image":"/private/tmp/snaplingo-tiny-mnn-lifecycle/images/small-light.png","mode":"cached","parallel":true,"pid":91117,"threads":4,"timing":"load includes model/session creation; recognize includes image pre/postprocessing; decoded input retained in baseline; cold means new process with filesystem cache unspecified","type":"start","width":512}
+{"cpu_ms":0.01899999999999835,"cpu_pct_one_core":0.000948432497632322,"duration_ms":2003.305459,"label":"baseline","peak_rss_bytes":5488640,"rss_after_bytes":5488640,"rss_before_bytes":5472256,"type":"idle"}
+{"chars":118,"iteration":0,"lines":3,"load_ms":42.649959,"peak_rss_bytes":85573632,"recognize_ms":32.52675,"request_ms":75.176958,"rss_after_bytes":85573632,"rss_before_bytes":5488640,"type":"request"}
+{"chars":118,"iteration":1,"lines":3,"load_ms":0.000083,"peak_rss_bytes":89686016,"recognize_ms":26.326124999999998,"request_ms":26.326334,"rss_after_bytes":89653248,"rss_before_bytes":85573632,"type":"request"}
+{"chars":118,"iteration":2,"lines":3,"load_ms":0.000041,"peak_rss_bytes":91045888,"recognize_ms":25.787292,"request_ms":25.787416,"rss_after_bytes":91045888,"rss_before_bytes":89751552,"type":"request"}
+{"chars":118,"iteration":3,"lines":3,"load_ms":0.0,"peak_rss_bytes":92717056,"recognize_ms":26.384,"request_ms":26.384083,"rss_after_bytes":92717056,"rss_before_bytes":91045888,"type":"request"}
+{"chars":118,"iteration":4,"lines":3,"load_ms":0.000041,"peak_rss_bytes":94470144,"recognize_ms":26.442708999999997,"request_ms":26.442791,"rss_after_bytes":94470144,"rss_before_bytes":92717056,"type":"request"}
+{"cpu_ms":0.014999999999986358,"cpu_pct_one_core":0.0007487422534027739,"duration_ms":2003.3596249999998,"label":"cached_session","peak_rss_bytes":94470144,"rss_after_bytes":94470144,"rss_before_bytes":94470144,"type":"idle"}
+{"drop_ms":3.74575,"peak_rss_bytes":94486528,"rss_bytes":94437376,"type":"drop"}
+{"cpu_ms":0.019000000000005457,"cpu_pct_one_core":0.0009487508314873738,"duration_ms":2002.6332909999999,"label":"after_final_drop","peak_rss_bytes":94486528,"rss_after_bytes":94437376,"rss_before_bytes":94437376,"type":"idle"}
+The device supports: i8sdot:1, fp16:1, i8mm: 0, sve2: 0, sme2: 0

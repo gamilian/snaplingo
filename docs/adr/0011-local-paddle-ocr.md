@@ -4,7 +4,38 @@
 
 Accepted (2026-11-01).
 
-## Decision
+## Unified small MNN CPU update — 2026-11-11
+
+Every desktop platform now uses PP-OCRv6 **small with MNN CPU**, replacing
+the macOS tiny trial and Windows/Linux medium ORT route at the user's request. Every request
+starts a short-lived worker from the signed application executable, before Tauri,
+database and tray initialization. It loads the paired small models and dictionary,
+returns the OCR result, and exits. The desktop serializes requests but retains no
+model session. Destroying an in-process session did not return its allocator caches
+to the OS in the measured workloads; process exit provides the requested memory
+lifetime. There is no prewarming or idle inference loop.
+
+Every package includes the same SHA-256-pinned small MNN weights and dictionary,
+15,686,931 bytes (15.69 MB), plus licenses. MNN is statically linked; old tiny,
+medium, ONNX Runtime and DirectML resources and their loading dependencies are
+removed. All targets use CPU, four inference threads, parallel text-line handling
+and recognition batch size eight. The old saved GPU preference is retained for
+settings compatibility but ignored by this CPU-only provider; its UI switch is
+removed. System OCR and user-selected provider identities are unchanged.
+
+The fixed ocr-rs revision builds MNN 3.6.1 from a checksum-pinned source when no
+matching native prebuilt exists. In particular, Windows MSVC's default dynamic
+CRT uses the source-build route because upstream's Windows prebuilt requires
+static CRT. Windows packages retain Visual C++ redistributable DLLs. The shared
+native license archive supplies license text only, not foreign-platform binaries.
+
+The model smoke test checks small directly on macOS, and the installation smoke
+test runs a real OCR request through the signed application's worker entrypoint.
+The small/tiny latency, memory and CPU comparison is recorded in the
+[small worker benchmark](../research/2026-11-11-small-ocr-benchmark.md).
+The initial decision and its historical measurements follow.
+
+## Original decision — 2026-11-01
 
 Add `paddle-ocr` as a selectable local provider using PP-OCRv6 medium detection and recognition. Existing persisted provider selection remains authoritative. Screenshots and file OCR continue through `OcrCoordinator`; capture, translation, history, and result-window workflows do not select inference engines.
 
@@ -32,7 +63,7 @@ Dependencies: ORT Rust rc.11 / C API 1.23, oar-ocr-core/derive 0.6.0 for portabl
 
 Windows preparation also copies the Visual C++ x64 redistributable DLLs from the build machine's Visual Studio C++ Build Tools. They are deployed beside the executable so the installer does not require a separate redistributable installation. Native development/tests load these DLLs from the prepared resources folder. DirectML.dll loads only when creating GPU sessions, so a missing GPU-only dependency can still fall back to CPU. Windows installer smoke tests explicitly check the deployed DLLs and OCR weights.
 
-Run `cargo test --locked --manifest-path src-tauri/Cargo.toml`, and after preparation run `cargo test --locked --manifest-path src-tauri/Cargo.toml bundled_medium_smoke -- --ignored --nocapture`. The smoke fixture is a generated bilingual screenshot workload and checks nonempty output and coordinates, not recognition accuracy. Windows, Intel Mac, and macOS 12/13 still need their respective machine acceptance; local M1 tests also exercise MNN as the compatibility implementation.
+Run `cargo test --locked --manifest-path src-tauri/Cargo.toml`, and after preparation run `cargo test --locked --manifest-path src-tauri/Cargo.toml bundled_small_smoke -- --ignored --nocapture`. The smoke fixture is a generated bilingual screenshot workload and checks nonempty output and coordinates, not recognition accuracy. Windows, Intel Mac, and macOS 12/13 still need their respective machine acceptance; local M1 tests also exercise MNN as the compatibility implementation.
 
 ## Tradeoffs
 

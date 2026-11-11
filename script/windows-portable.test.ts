@@ -33,12 +33,10 @@ function fixture() {
   };
   write('target/release/snaplingo.exe', 'MZ-test-executable');
   for (const file of [
-    'medium_det.onnx',
-    'medium_rec.onnx',
-    'keys.txt',
-    'runtime/onnxruntime.dll',
-    'runtime/DirectML.dll',
-    'licenses/onnxruntime.txt',
+    'small_det.mnn',
+    'small_rec.mnn',
+    'small_keys.txt',
+    'licenses/mnn/LICENSE-MNN.txt',
     '.gitkeep',
   ]) {
     write(`src-tauri/resources/ocr/${file}`);
@@ -83,10 +81,10 @@ describe('Windows portable packaging', () => {
       'MZ-test-executable',
     );
     expect(
-      readFileSync(join(destination, 'ocr/runtime/onnxruntime.dll'), 'utf8'),
-    ).toContain('onnxruntime.dll');
+      readFileSync(join(destination, 'ocr/small_det.mnn'), 'utf8'),
+    ).toContain('small_det.mnn');
     expect(existsSync(join(destination, 'vcruntime140.dll'))).toBe(true);
-    expect(existsSync(join(destination, 'ocr/licenses/onnxruntime.txt'))).toBe(
+    expect(existsSync(join(destination, 'ocr/licenses/mnn/LICENSE-MNN.txt'))).toBe(
       true,
     );
     expect(existsSync(join(destination, 'ocr/.gitkeep'))).toBe(false);
@@ -101,8 +99,7 @@ describe('Windows portable packaging', () => {
 
   it.each([
     'resources/windows-crt/msvcp140.dll',
-    'resources/ocr/runtime/DirectML.dll',
-    'resources/ocr/medium_rec.onnx',
+    'resources/ocr/small_rec.mnn',
   ])('rejects a missing dependency: %s', (relative) => {
     const { context, destination } = fixture();
     rmSync(join(context.repositoryRoot, 'src-tauri', relative));
@@ -113,9 +110,9 @@ describe('Windows portable packaging', () => {
 
   it('rejects empty models and invalid executable files', () => {
     const { context, destination, write } = fixture();
-    write('src-tauri/resources/ocr/medium_det.onnx', '');
+    write('src-tauri/resources/ocr/small_det.mnn', '');
     expect(() => stageWindowsPortable(context, destination)).toThrow(
-      /medium_det.onnx/,
+      /small_det.mnn/,
     );
     write('target/release/snaplingo.exe', 'not-an-executable');
     expect(() => stageWindowsPortable(context, destination)).toThrow(
@@ -143,10 +140,10 @@ describe('Windows portable packaging', () => {
       expect(result.status, result.stderr).toBe(0);
       expect(
         readFileSync(
-          join(extracted, 'SnapLingo_0.2.0/ocr/medium_rec.onnx'),
+          join(extracted, 'SnapLingo_0.2.0/ocr/small_rec.mnn'),
           'utf8',
         ),
-      ).toBe('src-tauri/resources/ocr/medium_rec.onnx');
+      ).toBe('src-tauri/resources/ocr/small_rec.mnn');
       expect(
         existsSync(join(context.bundleDirectory, 'portable/SnapLingo_0.2.0')),
       ).toBe(false);

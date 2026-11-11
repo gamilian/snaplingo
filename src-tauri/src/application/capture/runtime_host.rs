@@ -47,6 +47,15 @@ pub(crate) trait CaptureSessionRuntimeHost: Send + Sync {
         Ok(0)
     }
     fn set_capture_ocr_status(&self, _status: Option<CaptureOcrStatus>) {}
+    async fn begin_capture_ocr_result(
+        &self,
+        _target: CaptureOcrTarget,
+        _result_id: u64,
+        _preview: Option<String>,
+    ) -> Result<()> {
+        Ok(())
+    }
+    async fn cancel_capture_ocr_result(&self, _target: CaptureOcrTarget, _result_id: u64) {}
     async fn publish_capture_ocr(
         &self,
         _target: CaptureOcrTarget,
@@ -55,6 +64,15 @@ pub(crate) trait CaptureSessionRuntimeHost: Send + Sync {
         _preview: Option<String>,
     ) -> Result<()> {
         Err("Capture OCR output is not configured".into())
+    }
+    async fn report_capture_ocr_start_error(
+        &self,
+        target: CaptureOcrTarget,
+        result_id: u64,
+        error: &str,
+    ) {
+        self.report_capture_ocr_error(target, result_id, error)
+            .await;
     }
     async fn report_capture_ocr_error(
         &self,

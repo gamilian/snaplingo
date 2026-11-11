@@ -50,6 +50,10 @@ impl Provider for PaddleOcrProvider {
 impl OcrProvider for PaddleOcrProvider {
     fn acceleration_status(&self) -> Option<OcrAccelerationStatus> {
         let mut status = self.engine.status();
+        if !self.engine.supports_gpu() {
+            status.gpu_enabled = false;
+            return Some(status);
+        }
         let enabled = self.settings.snapshot().ok()?.ocr.gpu_acceleration;
         if status.gpu_enabled != enabled {
             status = OcrAccelerationStatus {
@@ -68,7 +72,8 @@ impl OcrProvider for PaddleOcrProvider {
         let request = request.clone();
         tokio::task::spawn_blocking(move || {
             let before = engine.status();
-            let result = engine.recognize(&request, settings.snapshot()?.ocr.gpu_acceleration);
+            let gpu_enabled = engine.supports_gpu() && settings.snapshot()?.ocr.gpu_acceleration;
+            let result = engine.recognize(&request, gpu_enabled);
             if before != engine.status() {
                 notifier.providers_changed();
             }
@@ -90,11 +95,15 @@ mod tests {
     struct StubEngine {
         calls: Mutex<Vec<bool>>,
         status: Mutex<OcrAccelerationStatus>,
+        gpu_supported: bool,
     }
 
     impl PaddleOcrEngine for StubEngine {
         fn is_available(&self) -> bool {
             true
+        }
+        fn supports_gpu(&self) -> bool {
+            self.gpu_supported
         }
         fn recognize(&self, _: &OcrRequest, gpu_enabled: bool) -> Result<OcrResult> {
             self.calls.lock().push(gpu_enabled);
@@ -124,6 +133,7 @@ mod tests {
         let store = Arc::new(SqliteConfigStore::new_temp());
         let settings = Arc::new(SettingsConfiguration::new(store.clone()));
         let engine = Arc::new(StubEngine {
+            gpu_supported: true,
             calls: Mutex::new(vec![]),
             status: Mutex::new(OcrAccelerationStatus {
                 gpu_enabled: true,
@@ -178,5 +188,37 @@ mod tests {
         let restored: OcrSettings =
             serde_json::from_value(serde_json::to_value(settings).unwrap()).unwrap();
         assert!(!restored.gpu_acceleration);
+    }
+
+    #[tokio::test]
+    async fn cpu_only_engine_ignores_gpu_preference_without_changing_saved_settings() {
+        let store = Arc::new(SqliteConfigStore::new_temp());
+        let settings = Arc::new(SettingsConfiguration::new(store));
+        let engine = Arc::new(StubEngine {
+            gpu_supported: false,
+            calls: Mutex::new(vec![]),
+            status: Mutex::new(OcrAccelerationStatus {
+                gpu_enabled: false,
+                device: Some(OcrExecutionDevice::Cpu),
+                fallback_reason: Some("tiny CPU".into()),
+            }),
+        });
+        let provider =
+            PaddleOcrProvider::new(engine.clone(), settings.clone(), Arc::new(NoopNotifier));
+        assert!(settings.snapshot().unwrap().ocr.gpu_acceleration);
+        assert_eq!(
+            provider.acceleration_status().unwrap().device,
+            Some(OcrExecutionDevice::Cpu)
+        );
+        provider
+            .recognize(&OcrRequest {
+                image_data: vec![1],
+                language: None,
+            })
+            .await
+            .unwrap();
+        assert_eq!(*engine.calls.lock(), vec![false]);
+        assert!(!provider.acceleration_status().unwrap().gpu_enabled);
+        assert!(settings.snapshot().unwrap().ocr.gpu_acceleration);
     }
 }

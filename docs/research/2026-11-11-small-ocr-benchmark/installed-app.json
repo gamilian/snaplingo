@@ -1,0 +1,168 @@
+{
+  "application": "/Applications/SnapLingo.app",
+  "backup": "/private/tmp/snaplingo-small-ocr-benchmark/Installed-SnapLingo-before-small.app",
+  "pid": 63735,
+  "binary_sha256": "8d01a5b626d0f31188ceb863302d338a91e7ef5952ec06eca302040941336be2",
+  "requirement": "designated => identifier \"com.snaplingo.app\" and certificate leaf = H\"260a1cb9386120fc02ca446827e43de2f1645b5e\"",
+  "app_logical_file_bytes": 70238545,
+  "tiny_app_logical_file_bytes": 58586580,
+  "idle_before": {
+    "seconds": 10.06845408299705,
+    "cpu_ms": 0.9805833333333432,
+    "cpu_pct_one_core": 0.009739164773957589,
+    "samples": [
+      {
+        "rss_bytes": 43237376,
+        "physical_footprint_bytes": 13207744,
+        "cpu_ticks": 3299332,
+        "cpu_ns": 137472166.66666666
+      },
+      {
+        "rss_bytes": 43237376,
+        "physical_footprint_bytes": 13207744,
+        "cpu_ticks": 3299332,
+        "cpu_ns": 137472166.66666666
+      },
+      {
+        "rss_bytes": 43220992,
+        "physical_footprint_bytes": 13207744,
+        "cpu_ticks": 3299332,
+        "cpu_ns": 137472166.66666666
+      },
+      {
+        "rss_bytes": 39796736,
+        "physical_footprint_bytes": 13027520,
+        "cpu_ticks": 3305667,
+        "cpu_ns": 137736125.0
+      },
+      {
+        "rss_bytes": 39796736,
+        "physical_footprint_bytes": 13027520,
+        "cpu_ticks": 3321557,
+        "cpu_ns": 138398208.33333334
+      },
+      {
+        "rss_bytes": 39796736,
+        "physical_footprint_bytes": 13027520,
+        "cpu_ticks": 3321557,
+        "cpu_ns": 138398208.33333334
+      },
+      {
+        "rss_bytes": 39796736,
+        "physical_footprint_bytes": 13027520,
+        "cpu_ticks": 3321557,
+        "cpu_ns": 138398208.33333334
+      },
+      {
+        "rss_bytes": 39796736,
+        "physical_footprint_bytes": 13027520,
+        "cpu_ticks": 3321557,
+        "cpu_ns": 138398208.33333334
+      },
+      {
+        "rss_bytes": 39796736,
+        "physical_footprint_bytes": 13027520,
+        "cpu_ticks": 3321557,
+        "cpu_ns": 138398208.33333334
+      },
+      {
+        "rss_bytes": 39796736,
+        "physical_footprint_bytes": 13027520,
+        "cpu_ticks": 3322866,
+        "cpu_ns": 138452750.0
+      },
+      {
+        "rss_bytes": 39796736,
+        "physical_footprint_bytes": 13027520,
+        "cpu_ticks": 3322866,
+        "cpu_ns": 138452750.0
+      }
+    ]
+  },
+  "idle_after": {
+    "seconds": 10.067530333995819,
+    "cpu_ms": 0.0,
+    "cpu_pct_one_core": 0.0,
+    "samples": [
+      {
+        "rss_bytes": 39796736,
+        "physical_footprint_bytes": 13027520,
+        "cpu_ticks": 3322866,
+        "cpu_ns": 138452750.0
+      },
+      {
+        "rss_bytes": 39796736,
+        "physical_footprint_bytes": 13027520,
+        "cpu_ticks": 3322866,
+        "cpu_ns": 138452750.0
+      },
+      {
+        "rss_bytes": 39796736,
+        "physical_footprint_bytes": 13027520,
+        "cpu_ticks": 3322866,
+        "cpu_ns": 138452750.0
+      },
+      {
+        "rss_bytes": 39796736,
+        "physical_footprint_bytes": 13027520,
+        "cpu_ticks": 3322866,
+        "cpu_ns": 138452750.0
+      },
+      {
+        "rss_bytes": 39796736,
+        "physical_footprint_bytes": 13027520,
+        "cpu_ticks": 3322866,
+        "cpu_ns": 138452750.0
+      },
+      {
+        "rss_bytes": 39796736,
+        "physical_footprint_bytes": 13027520,
+        "cpu_ticks": 3322866,
+        "cpu_ns": 138452750.0
+      },
+      {
+        "rss_bytes": 39796736,
+        "physical_footprint_bytes": 13027520,
+        "cpu_ticks": 3322866,
+        "cpu_ns": 138452750.0
+      },
+      {
+        "rss_bytes": 39796736,
+        "physical_footprint_bytes": 13027520,
+        "cpu_ticks": 3322866,
+        "cpu_ns": 138452750.0
+      },
+      {
+        "rss_bytes": 39796736,
+        "physical_footprint_bytes": 13027520,
+        "cpu_ticks": 3322866,
+        "cpu_ns": 138452750.0
+      },
+      {
+        "rss_bytes": 39796736,
+        "physical_footprint_bytes": 13027520,
+        "cpu_ticks": 3322866,
+        "cpu_ns": 138452750.0
+      },
+      {
+        "rss_bytes": 39796736,
+        "physical_footprint_bytes": 13027520,
+        "cpu_ticks": 3322866,
+        "cpu_ns": 138452750.0
+      }
+    ]
+  },
+  "worker": {
+    "elapsed_ms": 1163.485333963763,
+    "peak_rss_bytes": 365248512,
+    "cpu_ms": 3719.766,
+    "exit_code": 0,
+    "lines": 28
+  },
+  "scope": "Main desktop process only; proc_pid_rusage v0 CPU Mach ticks converted with mach_timebase_info, RSS and physical footprint bytes; 10 second idle windows, before/after a separate installed OCR worker",
+  "cpu_timebase": {
+    "numer": 125,
+    "denom": 3,
+    "raw_units": "Mach absolute time ticks"
+  }
+}

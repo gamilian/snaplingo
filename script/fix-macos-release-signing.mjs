@@ -406,8 +406,12 @@ function resolveCodesignIdentity() {
   return ensureLocalCodesignIdentity();
 }
 
-function prepareSigningEntitlements(signing) {
-  if (!existsSync(entitlementsPath) || bundledLibraries.length === 0 || allowAdhoc) {
+function prepareSigningEntitlements() {
+  // OCR is loaded with dlopen from Resources and is absent from the executable's
+  // linked dependencies. Self-signed and ad-hoc libraries have no Apple Team ID,
+  // so hardened applications need this entitlement even with matching signatures.
+  const hasBundledLibraries = bundledLibraries.length > 0 || existsSync(ocrRuntimePath);
+  if (!existsSync(entitlementsPath) || !hasBundledLibraries) {
     return { path: existsSync(entitlementsPath) ? entitlementsPath : null, cleanup: () => {} };
   }
 
@@ -626,7 +630,7 @@ if (existsSync(ocrRuntimePath)) {
   if (signing.keychain) librarySignArgs.push("--keychain", signing.keychain);
   run("/usr/bin/codesign", [...librarySignArgs, ocrRuntimePath]);
 }
-const signingEntitlements = prepareSigningEntitlements(signing);
+const signingEntitlements = prepareSigningEntitlements();
 const signArgs = [
   "--force",
   "--deep",

@@ -1,37 +1,38 @@
-use super::{from_lines, normalized_box, MediumSession};
+use super::{from_lines, normalized_box, MODEL_FILES};
 use crate::domain::ocr::OcrLine;
 use crate::{AppError, Result};
 use image::RgbImage;
 use ocr_rs::{Backend, OcrEngine, OcrEngineConfig, RecOptions};
 use std::path::Path;
 
-pub(super) struct MnnMediumSession {
+pub(super) struct MnnSession {
     engine: OcrEngine,
 }
 
-impl MnnMediumSession {
+impl MnnSession {
     pub(super) fn new(root: &Path) -> Result<Self> {
         let config = OcrEngineConfig::new()
             .with_backend(Backend::CPU)
             .with_threads(4)
+            .with_parallel(true)
             .with_rec_options(RecOptions::default().with_batch_size(8));
         let engine = OcrEngine::new(
-            root.join("medium_det.mnn"),
-            root.join("medium_rec.mnn"),
-            root.join("keys.txt"),
+            root.join(MODEL_FILES[0]),
+            root.join(MODEL_FILES[1]),
+            root.join(MODEL_FILES[2]),
             Some(config),
         )
-        .map_err(|error| AppError::Other(format!("Could not initialize MNN medium: {error}")))?;
+        .map_err(|error| AppError::Other(format!("Could not initialize MNN OCR: {error}")))?;
         Ok(Self { engine })
     }
 }
 
-impl MediumSession for MnnMediumSession {
-    fn recognize(&mut self, image: &RgbImage) -> Result<crate::domain::ocr::OcrResult> {
+impl MnnSession {
+    pub(super) fn recognize(&mut self, image: &RgbImage) -> Result<crate::domain::ocr::OcrResult> {
         let results = self
             .engine
             .recognize(&image::DynamicImage::ImageRgb8(image.clone()))
-            .map_err(|error| AppError::Other(format!("MNN medium inference failed: {error}")))?;
+            .map_err(|error| AppError::Other(format!("MNN OCR inference failed: {error}")))?;
         Ok(from_lines(
             results
                 .into_iter()

@@ -97,6 +97,19 @@ impl CaptureSessionRuntimeHost for TauriCaptureSessionRuntimeHost {
         crate::app_shell::set_capture_ocr_status(&self.app, status);
     }
 
+    async fn begin_capture_ocr_result(
+        &self,
+        target: CaptureOcrTarget,
+        result_id: u64,
+        preview: Option<String>,
+    ) -> Result<()> {
+        self.ocr_delivery.begin(target, result_id, preview).await
+    }
+
+    async fn cancel_capture_ocr_result(&self, target: CaptureOcrTarget, result_id: u64) {
+        self.ocr_delivery.cancel(target, result_id).await;
+    }
+
     async fn publish_capture_ocr(
         &self,
         target: CaptureOcrTarget,
@@ -109,13 +122,26 @@ impl CaptureSessionRuntimeHost for TauriCaptureSessionRuntimeHost {
             .await
     }
 
+    async fn report_capture_ocr_start_error(
+        &self,
+        target: CaptureOcrTarget,
+        result_id: u64,
+        error: &str,
+    ) {
+        self.ocr_delivery
+            .report_start_error(target, result_id, error)
+            .await;
+    }
+
     async fn report_capture_ocr_error(
         &self,
         target: CaptureOcrTarget,
         result_id: u64,
         error: &str,
     ) {
-        self.ocr_delivery.report_error(target, result_id, error);
+        self.ocr_delivery
+            .report_error(target, result_id, error)
+            .await;
     }
 
     async fn begin_capture_presentation(&self) -> Result<()> {

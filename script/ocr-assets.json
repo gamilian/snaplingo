@@ -1,46 +1,30 @@
 {
   "models": [
     {
-      "file": "medium_det.onnx",
-      "url": "https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_det_onnx/resolve/61323801669c338b7891481ec7bac61ce31b576a/inference.onnx",
-      "sha256": "eb13b44b25bb36f89528b68720af8a61d9cf381176107f465db1757b65d086e1",
+      "file": "small_det.mnn",
+      "url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/PP-OCRv6_small_det.mnn",
+      "sha256": "2c6277abbbddb4c77a790f4650cdd7f8ab33512db38fac372ed5471538070619",
       "platforms": [
         "darwin-arm64",
+        "darwin-x64",
         "win32-x64",
         "linux-x64"
       ]
     },
     {
-      "file": "medium_rec.onnx",
-      "url": "https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_rec_onnx/resolve/50c7eacafc52fa7bcf4194e8cd08e46f8558504b/inference.onnx",
-      "sha256": "9c09abf0957f7968c7586464b7397b84ad2387a0497a351af40e9acc71b673ba",
+      "file": "small_rec.mnn",
+      "url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/PP-OCRv6_small_rec.mnn",
+      "sha256": "ed59cc294fe2d564bd64f929b5356b70abd0977f99e7e60e3b08cfeef4ef72be",
       "platforms": [
         "darwin-arm64",
+        "darwin-x64",
         "win32-x64",
         "linux-x64"
       ]
     },
     {
-      "file": "medium_det.mnn",
-      "url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/PP-OCRv6_medium_det.mnn",
-      "sha256": "a174009ef81dd84f29034047cd56e50b73ef624a3a409226418be63ffc46ca60",
-      "platforms": [
-        "darwin-arm64",
-        "darwin-x64"
-      ]
-    },
-    {
-      "file": "medium_rec.mnn",
-      "url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/PP-OCRv6_medium_rec.mnn",
-      "sha256": "11bbedb5af3a33cb7fee505de19223243d85b82c7b507af51e345ea1b4e68e72",
-      "platforms": [
-        "darwin-arm64",
-        "darwin-x64"
-      ]
-    },
-    {
-      "file": "keys.txt",
-      "url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/ppocr_keys_v6_medium.txt",
+      "file": "small_keys.txt",
+      "url": "https://raw.githubusercontent.com/zibo-chen/ocr-rs/664a945953e46186b37203fa4902a20d60a32809/models/ppocr_keys_v6_small.txt",
       "sha256": "b5f2bfe2bdd9448429e3e82b51c789775d9b42f2403d082b00662eb77e401c5d",
       "platforms": [
         "darwin-arm64",
@@ -66,55 +50,19 @@
       "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
       "platforms": [
         "darwin-arm64",
-        "darwin-x64"
+        "darwin-x64",
+        "win32-x64",
+        "linux-x64"
       ]
     }
   ],
   "archives": [
     {
-      "platform": "darwin-arm64",
-      "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.31.1/onnxruntime-osx-arm64-1.31.1.tgz",
-      "sha256": "2e1344a1926ee50eb25b38153cb6992c3567515aef0e677a1a520a1798896d6f",
-      "files": {
-        "onnxruntime-osx-arm64-1.31.1/lib/libonnxruntime.1.31.1.dylib": "runtime/libonnxruntime.dylib",
-        "onnxruntime-osx-arm64-1.31.1/LICENSE": "licenses/onnxruntime.txt",
-        "onnxruntime-osx-arm64-1.31.1/ThirdPartyNotices.txt": "licenses/onnxruntime-third-party.txt"
-      }
-    },
-    {
-      "platform": "linux-x64",
-      "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.31.1/onnxruntime-linux-x64-1.31.1.tgz",
-      "sha256": "c849e36a1ef3e22d4ff217b9d1ce4a3cf5b9467b975610913ae959ad5b16bdc9",
-      "files": {
-        "onnxruntime-linux-x64-1.31.1/lib/libonnxruntime.so.1.31.1": "runtime/libonnxruntime.so",
-        "onnxruntime-linux-x64-1.31.1/LICENSE": "licenses/onnxruntime.txt",
-        "onnxruntime-linux-x64-1.31.1/ThirdPartyNotices.txt": "licenses/onnxruntime-third-party.txt"
-      }
-    },
-    {
-      "platform": "win32-x64",
-      "url": "https://api.nuget.org/v3-flatcontainer/microsoft.ml.onnxruntime.directml/1.24.4/microsoft.ml.onnxruntime.directml.1.24.4.nupkg",
-      "sha256": "57e9f11b73437bef7a309496135d4c1f96b1a8e9ddba60013fa27bfc1d788681",
-      "files": {
-        "runtimes/win-x64/native/onnxruntime.dll": "runtime/onnxruntime.dll",
-        "runtimes/win-x64/native/onnxruntime_providers_shared.dll": "runtime/onnxruntime_providers_shared.dll",
-        "LICENSE": "licenses/onnxruntime.txt",
-        "ThirdPartyNotices.txt": "licenses/onnxruntime-third-party.txt"
-      }
-    },
-    {
-      "platform": "win32-x64",
-      "url": "https://api.nuget.org/v3-flatcontainer/microsoft.ai.directml/1.15.4/microsoft.ai.directml.1.15.4.nupkg",
-      "sha256": "4e7cb7ddce8cf837a7a75dc029209b520ca0101470fcdf275c1f49736a3615b9",
-      "files": {
-        "bin/x64-win/DirectML.dll": "runtime/DirectML.dll",
-        "LICENSE.txt": "licenses/directml.txt"
-      }
-    },
-    {
       "platforms": [
         "darwin-arm64",
-        "darwin-x64"
+        "darwin-x64",
+        "win32-x64",
+        "linux-x64"
       ],
       "url": "https://github.com/zibo-chen/mnn-native-prebuilds/releases/download/mnn-3.6.1-d407447e-r1/mnn-3.6.1-d407447e-r1-macos-universal.tar.gz",
       "sha256": "1bd39996fe07940efb36918b78f349f8e317899a41071f4dcaffb7ce0e124bf3",

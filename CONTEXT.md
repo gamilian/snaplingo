@@ -60,13 +60,19 @@ On macOS, the session pins the selection window and frontend monitor view to the
 
 The workflow that reads one image file, uses those same bytes for both OCR input and its preview, and returns recognition metadata. File access is supplied by an adapter; Provider selection and execution remain with the OCR Coordinator.
 
+The local PaddleOCR provider uses the same small MNN CPU models and dictionary on
+macOS, Windows and Linux, in a worker that exits after each request. It starts
+before Tauri initialization, returns through temporary files, and retains no model
+session in the desktop process. Requests are serialized; no model warmup or idle
+inference is performed. OCR GPU selection and ORT/DirectML loading are removed.
+
 ### Selection Translation
 
 The workflow that reads the current selection-text mode, acquires selected text, and presents it in the Result Window with Selection origin and automatic translation. Hotkey and IPC entry points share the same sequencing; failed acquisition leaves the current result intact.
 
 ### Capture OCR Delivery
 
-The handoff of a Capture Session OCR result to the OCR window, translation window, or clipboard. Window handoffs reserve a Result Window request identity; a newer request supersedes older results and errors. Clipboard delivery does not replace a pending Result Window request.
+The handoff of a Capture Session OCR result to the OCR window, translation window, or clipboard. After releasing the capture overlay, window handoffs open a recognizing state before Provider initialization or inference. Loading, completion, failure and cancellation share a Result Window request identity; completion updates the existing window without showing or focusing it again. A newer request supersedes older results and errors, and closing or editing the result dismisses late updates from that request. Clipboard delivery does not open a result window or replace a pending Result Window request.
 
 ### Capture Editing
 

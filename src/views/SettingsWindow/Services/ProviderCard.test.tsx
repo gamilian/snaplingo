@@ -46,6 +46,20 @@ describe('ProviderCard', () => {
       .toContain('本地处理');
     expect(textContent(ProviderCard({ provider }))).toContain('发送到服务');
   });
+
+  it('shows small CPU status before and after provider status is loaded', () => {
+    const provider = {
+      id: 'paddle-ocr', name: 'PaddleOCR', type: 'ocr' as const,
+      status: 'active' as const, isBuiltin: true, requiresApiKey: false,
+      acceleration: { gpuEnabled: false, device: 'cpu' as const, fallbackReason: 'small · CPU · 识别后释放模型' },
+    };
+    const text = textContent(ProviderCard({ provider }));
+    expect(text).toContain('small · CPU · 识别后释放模型');
+    expect(text).not.toContain('medium');
+    expect(textContent(ProviderCard({ provider: {
+      ...provider, acceleration: undefined,
+    } }))).toContain('small · CPU · 识别后释放模型');
+  });
 });
 
 function textContent(node: ReactNode): string {
