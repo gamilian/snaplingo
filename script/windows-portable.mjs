@@ -37,11 +37,9 @@ export function stageWindowsPortable(context, destination) {
     'vcruntime140_1.dll',
     'msvcp140.dll',
     'msvcp140_1.dll',
-    'ocr/medium_det.onnx',
-    'ocr/medium_rec.onnx',
-    'ocr/keys.txt',
-    'ocr/runtime/onnxruntime.dll',
-    'ocr/runtime/DirectML.dll',
+    'ocr/small_det.mnn',
+    'ocr/small_rec.mnn',
+    'ocr/small_keys.txt',
   ]) {
     const file = join(destination, relative);
     const metadata = statSync(file, { throwIfNoEntry: false });

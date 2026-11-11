@@ -25,8 +25,23 @@ $script:msiProduct = $null
 function Assert-AppStarts([string]$AppPath) {
     if (-not (Test-Path $AppPath)) { throw "Installed executable missing: $AppPath" }
     $applicationDirectory = Split-Path $AppPath -Parent
-    foreach ($relative in @('vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll', 'msvcp140_1.dll', 'ocr\medium_det.onnx', 'ocr\medium_rec.onnx', 'ocr\keys.txt', 'ocr\runtime\onnxruntime.dll', 'ocr\runtime\DirectML.dll')) {
+    foreach ($relative in @('vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll', 'msvcp140_1.dll', 'ocr\small_det.mnn', 'ocr\small_rec.mnn', 'ocr\small_keys.txt')) {
         if (-not (Test-Path (Join-Path $applicationDirectory $relative))) { throw "Installed OCR dependency missing: $relative" }
+    }
+    $resultPath = Join-Path $env:TEMP "snaplingo-small-ocr-$PID.json"
+    $fixture = Join-Path $PWD 'src-tauri/tests/fixtures/ocr-medium-small.png'
+    try {
+        $worker = Start-Process -FilePath $AppPath -ArgumentList @(
+            '--ocr-small-worker',
+            ('"' + (Join-Path $applicationDirectory 'ocr') + '"'),
+            ('"' + $fixture + '"'),
+            ('"' + $resultPath + '"')
+        ) -Wait -PassThru
+        if ($worker.ExitCode -ne 0) { throw "Installed small OCR worker exited with $($worker.ExitCode)" }
+        $result = Get-Content -Path $resultPath -Raw | ConvertFrom-Json
+        if (-not $result.Ok.text -or -not $result.Ok.lines.Count) { throw 'Installed small OCR worker returned no text' }
+    } finally {
+        Remove-Item -Path $resultPath -Force -ErrorAction SilentlyContinue
     }
     $script:smokeProcess = Start-Process -FilePath $AppPath -PassThru
     try {

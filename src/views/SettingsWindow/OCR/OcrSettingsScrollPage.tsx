@@ -43,12 +43,6 @@ export function OcrSettingsScrollPage() {
           label: '识别与文本',
           content: (
             <SettingsGroup>
-              <ToggleRow
-                label="本地模型 GPU 加速"
-                description="用于支持 GPU 的本地模型；macOS 使用 tiny CPU 模型，识别后释放内存"
-                checked={ocr.gpuAcceleration ?? true}
-                onChange={(gpuAcceleration) => updateOcr({ gpuAcceleration })}
-              />
               <SettingRow label="识别语言">
                 <div className="w-[230px]">
                   <CustomSelect

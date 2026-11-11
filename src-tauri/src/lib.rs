@@ -30,8 +30,7 @@ use tauri_plugin_log::{Target, TargetKind};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    #[cfg(target_os = "macos")]
-    if let Some(exit_code) = infrastructure::ocr::tiny_worker::run_if_requested() {
+    if let Some(exit_code) = infrastructure::ocr::small_worker::run_if_requested() {
         std::process::exit(exit_code);
     }
 

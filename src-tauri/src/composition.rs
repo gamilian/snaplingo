@@ -200,10 +200,6 @@ pub(crate) fn build_app_state(
                     .map_err(|error| log::warn!("OCR resource directory is unavailable: {error}"))
                     .ok()
             },
-            database_path
-                .parent()
-                .unwrap_or_else(|| std::path::Path::new("."))
-                .join("cache/ocr"),
         )),
         settings_configuration.clone(),
     );

@@ -1,39 +1,25 @@
-use super::{from_lines, normalized_box, MediumSession};
+use super::{from_lines, normalized_box, MODEL_FILES};
 use crate::domain::ocr::OcrLine;
 use crate::{AppError, Result};
 use image::RgbImage;
 use ocr_rs::{Backend, OcrEngine, OcrEngineConfig, RecOptions};
 use std::path::Path;
 
-pub(super) struct MnnMediumSession {
+pub(super) struct MnnSession {
     engine: OcrEngine,
 }
 
-impl MnnMediumSession {
+impl MnnSession {
     pub(super) fn new(root: &Path) -> Result<Self> {
-        Self::from_models(root, "medium_det.mnn", "medium_rec.mnn", "keys.txt", true)
-    }
-
-    pub(super) fn new_tiny(root: &Path) -> Result<Self> {
-        Self::from_models(root, "tiny_det.mnn", "tiny_rec.mnn", "tiny_keys.txt", true)
-    }
-
-    fn from_models(
-        root: &Path,
-        detection: &str,
-        recognition: &str,
-        dictionary: &str,
-        parallel: bool,
-    ) -> Result<Self> {
         let config = OcrEngineConfig::new()
             .with_backend(Backend::CPU)
             .with_threads(4)
-            .with_parallel(parallel)
+            .with_parallel(true)
             .with_rec_options(RecOptions::default().with_batch_size(8));
         let engine = OcrEngine::new(
-            root.join(detection),
-            root.join(recognition),
-            root.join(dictionary),
+            root.join(MODEL_FILES[0]),
+            root.join(MODEL_FILES[1]),
+            root.join(MODEL_FILES[2]),
             Some(config),
         )
         .map_err(|error| AppError::Other(format!("Could not initialize MNN OCR: {error}")))?;
@@ -41,8 +27,8 @@ impl MnnMediumSession {
     }
 }
 
-impl MediumSession for MnnMediumSession {
-    fn recognize(&mut self, image: &RgbImage) -> Result<crate::domain::ocr::OcrResult> {
+impl MnnSession {
+    pub(super) fn recognize(&mut self, image: &RgbImage) -> Result<crate::domain::ocr::OcrResult> {
         let results = self
             .engine
             .recognize(&image::DynamicImage::ImageRgb8(image.clone()))

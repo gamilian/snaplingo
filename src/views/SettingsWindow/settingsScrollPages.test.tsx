@@ -149,12 +149,9 @@ describe('single-scroll settings pages', () => {
     expect(labels).not.toContain('识别后自动复制');
   });
 
-  it('persists the OCR GPU preference through the settings interface', () => {
+  it('omits the GPU switch for the CPU-only local OCR model', () => {
     const sections = scrollSections(OcrSettingsScrollPage());
-    const toggle = findElements(sections[1].content, element => element.props.label === '本地模型 GPU 加速')[0];
-    expect(toggle.props.checked).toBe(true);
-    toggle.props.onChange!(false);
-    expect(settingsConfig.state.updateOcrSettings).toHaveBeenCalledWith({ gpuAcceleration: false });
+    expect(settingRowLabels(sections)).not.toContain('本地模型 GPU 加速');
   });
 });
 

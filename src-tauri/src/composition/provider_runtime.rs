@@ -238,10 +238,7 @@ mod tests {
             Arc::new(StubHttpClient),
             Arc::new(EventBus::new()),
             Arc::new(TestProviderChangeNotifier),
-            Arc::new(crate::infrastructure::ocr::LocalPaddleOcrEngine::new(
-                None,
-                std::path::PathBuf::new(),
-            )),
+            Arc::new(crate::infrastructure::ocr::LocalPaddleOcrEngine::new(None)),
             Arc::new(crate::SettingsConfiguration::new(Arc::new(
                 SqliteConfigStore::new_temp(),
             ))),

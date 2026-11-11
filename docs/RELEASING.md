@@ -10,7 +10,7 @@
 | macOS 12+ / Intel | DMG | `snaplingo-vX.Y.Z-macos-x86_64.dmg` | Actions `macos-15-intel`，原生 x64 | 与 arm64 同一张证书 |
 | Windows 10 / 11 x64 | NSIS EXE、备选 MSI、便携 ZIP | `snaplingo-vX.Y.Z-windows-x86_64-setup.exe`、`snaplingo-vX.Y.Z-windows-x86_64.msi`、`snaplingo-vX.Y.Z-windows-x86_64-portable.zip` | Actions `windows-2022` | 未签名，可后续申请 SignPath Foundation |
 
-Windows 便携 ZIP 包含可执行文件、OCR 模型、ONNX Runtime、DirectML、Visual C++ 运行库及许可声明；解压后运行 EXE，无需安装 SnapLingo。WebView2 仍是系统依赖，ZIP 不打包此运行时，用户数据与安装版共用。详细用法见 [Windows 便携版](WINDOWS_PORTABLE.md)。离线 WebView2 安装包仍单独构建，不重复发布便携 ZIP。
+Windows 便携 ZIP 包含可执行文件、PP-OCRv6 small MNN 模型、配套字典、Visual C++ 运行库及许可声明；MNN CPU 静态链接在程序内，解压后运行 EXE，无需安装 SnapLingo。WebView2 仍是系统依赖，ZIP 不打包此运行时，用户数据与安装版共用。详细用法见 [Windows 便携版](WINDOWS_PORTABLE.md)。离线 WebView2 安装包仍单独构建，不重复发布便携 ZIP。
 
 以上是兼容目标；最低系统版本是构建约束，并不代替对应系统真机验收。公开发布前需覆盖 macOS 12、13、14、15 及更新版本，以及 Windows 10 / 11 x64 的安装、首次授权、拖动选区、预览、复制、保存和 OCR。Windows runner 是服务器环境，不足以证明 Windows 桌面配置都兼容。此流程不要求本地 Mac 构建 Windows 包。
 

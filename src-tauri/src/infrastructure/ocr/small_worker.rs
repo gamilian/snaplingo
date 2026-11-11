@@ -3,12 +3,11 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus, Stdio};
 
-use super::mnn_engine::MnnMediumSession;
-use super::MediumSession;
+use super::mnn_engine::MnnSession;
 use crate::domain::ocr::{OcrRequest, OcrResult};
 use crate::{AppError, Result};
 
-const WORKER_ARGUMENT: &str = "--ocr-tiny-worker";
+const WORKER_ARGUMENT: &str = "--ocr-small-worker";
 type WorkerResult = std::result::Result<OcrResult, String>;
 
 pub(super) fn recognize(root: &Path, request: &OcrRequest) -> Result<OcrResult> {
@@ -88,7 +87,7 @@ fn run_worker(paths: &WorkerPaths) -> i32 {
         let image = image::load_from_memory(&data)
             .map_err(|error| AppError::Other(format!("Invalid OCR image: {error}")))?
             .to_rgb8();
-        let mut session = MnnMediumSession::new_tiny(&paths.root)?;
+        let mut session = MnnSession::new(&paths.root)?;
         session.recognize(&image)
     })()
     .map_err(|error: AppError| error.to_string());
@@ -106,7 +105,17 @@ fn run_worker(paths: &WorkerPaths) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
     use std::os::unix::process::ExitStatusExt;
+    #[cfg(windows)]
+    use std::os::windows::process::ExitStatusExt;
+
+    fn exit_status(code: u32) -> ExitStatus {
+        #[cfg(unix)]
+        return ExitStatus::from_raw((code as i32) << 8);
+        #[cfg(windows)]
+        return ExitStatus::from_raw(code);
+    }
 
     #[test]
     fn ordinary_launch_arguments_do_not_start_an_ocr_worker() {
@@ -134,10 +143,7 @@ mod tests {
         };
         std::fs::write(&paths.input, b"invalid image").unwrap();
         assert_eq!(run_worker(&paths), 1);
-        let result = decode_response(
-            ExitStatus::from_raw(256),
-            &std::fs::read(paths.response).unwrap(),
-        );
+        let result = decode_response(exit_status(1), &std::fs::read(paths.response).unwrap());
         assert!(result
             .unwrap_err()
             .to_string()
@@ -148,13 +154,8 @@ mod tests {
     fn unsuccessful_exit_cannot_return_a_successful_result() {
         let result: WorkerResult = Ok(OcrResult::from_text("text", Some(0.9)));
         let data = serde_json::to_vec(&result).unwrap();
-        assert!(decode_response(ExitStatus::from_raw(256), &data).is_err());
-        assert!(decode_response(ExitStatus::from_raw(0), b"incomplete json").is_err());
-        assert_eq!(
-            decode_response(ExitStatus::from_raw(0), &data)
-                .unwrap()
-                .text,
-            "text"
-        );
+        assert!(decode_response(exit_status(1), &data).is_err());
+        assert!(decode_response(exit_status(0), b"incomplete json").is_err());
+        assert_eq!(decode_response(exit_status(0), &data).unwrap().text, "text");
     }
 }

@@ -45,7 +45,7 @@ async function cachedDownload(asset, cache) {
 }
 
 function extract(archive, destination) {
-  const result = process.platform === 'win32' && !archive.endsWith('.tgz')
+  const result = process.platform === 'win32' && /\.(zip|nupkg)$/.test(archive)
     ? spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'Expand-Archive -LiteralPath $env:SNAPLINGO_OCR_ARCHIVE -DestinationPath $env:SNAPLINGO_OCR_EXTRACT -Force'], {
         env: { ...process.env, SNAPLINGO_OCR_ARCHIVE: archive, SNAPLINGO_OCR_EXTRACT: destination }, encoding: 'utf8',
       })
@@ -62,8 +62,14 @@ export async function cleanupOcrResources(platform, destination) {
   const managed = new Set([
     ...manifest.models.map(asset => asset.file),
     ...manifest.archives.flatMap(asset => Object.values(asset.files)),
-    // These files were managed by the former macOS medium/ORT distribution.
+    // These files were managed by former macOS model distributions.
     'medium_det.mnn', 'medium_rec.mnn', 'runtime/libonnxruntime.dylib',
+    'medium_det.onnx', 'medium_rec.onnx', 'keys.txt',
+    'small_det.onnx', 'small_rec.onnx',
+    'tiny_det.mnn', 'tiny_rec.mnn', 'tiny_keys.txt',
+    'runtime/libonnxruntime.so', 'runtime/onnxruntime.dll',
+    'runtime/onnxruntime_providers_shared.dll', 'runtime/DirectML.dll',
+    'licenses/onnxruntime.txt', 'licenses/onnxruntime-third-party.txt', 'licenses/directml.txt',
   ]);
   // Model revisions can change without changing .platform. Remove only known
   // assets no longer required by this target, preserving unrelated local files.
@@ -88,6 +94,7 @@ export async function prepareOcr(platform, destination = join(root, 'src-tauri/r
     await copyFile(await cachedDownload(asset, cache), output);
   }
   for (const asset of manifest.archives.filter(asset => asset.platform === platform || asset.platforms?.includes(platform))) {
+    // This archive supplies license text only; Cargo links MNN for the Rust target.
     const marker = join(cache, `prepared-${asset.sha256}.json`);
     if (await exists(marker)) {
       const hashes = JSON.parse(await readFile(marker, 'utf8'));
@@ -119,7 +126,7 @@ export async function prepareOcr(platform, destination = join(root, 'src-tauri/r
   if (platform === 'win32-x64' && process.platform === 'win32') {
     await copyWindowsCrt(await findWindowsCrt(), join(dirname(destination), 'windows-crt'));
   }
-  console.log(`[ocr] PP-OCRv6 ${platform.startsWith('darwin-') ? 'tiny' : 'medium'} assets ready (${platform}).`);
+  console.log(`[ocr] PP-OCRv6 small assets ready (${platform}).`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
