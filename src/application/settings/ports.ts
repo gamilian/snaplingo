@@ -149,18 +149,18 @@ export interface SettingsSnapshot {
 
 export interface DurableSettingsPort {
   getSettingsSnapshot(): Promise<SettingsSnapshot>;
-  updateGeneralSettings(input: GeneralSettings): Promise<SettingsSnapshot>;
+  updateGeneralSettings(input: Partial<GeneralSettings>): Promise<SettingsSnapshot>;
   updateScreenshotSettings(
-    input: ScreenshotSettings,
+    input: Partial<ScreenshotSettings>,
   ): Promise<SettingsSnapshot>;
   updateAnnotationColors(
     colors: AnnotationColorPreset[],
   ): Promise<SettingsSnapshot>;
   updateTranslationSettings(
-    input: TranslationSettings,
+    input: Partial<TranslationSettings>,
   ): Promise<SettingsSnapshot>;
-  updateOcrSettings(input: OcrSettings): Promise<SettingsSnapshot>;
-  updateHistorySettings(input: HistorySettings): Promise<SettingsSnapshot>;
+  updateOcrSettings(input: Partial<OcrSettings>): Promise<SettingsSnapshot>;
+  updateHistorySettings(input: Partial<HistorySettings>): Promise<SettingsSnapshot>;
 }
 
 export interface CredentialField {

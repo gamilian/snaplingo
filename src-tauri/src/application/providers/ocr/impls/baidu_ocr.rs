@@ -14,6 +14,7 @@ use std::sync::Arc;
 ///
 /// Uses the Baidu OCR API which requires API Key and Secret Key.
 /// Authentication is performed via OAuth 2.0 access token.
+#[derive(Clone)]
 pub struct BaiduOcrProvider {
     http_client: Arc<dyn HttpClient>,
     api_key: Option<String>,
@@ -164,6 +165,15 @@ struct BaiduOcrWord {
 
 #[async_trait]
 impl OcrProvider for BaiduOcrProvider {
+    fn with_credentials(
+        &self,
+        credentials: &HashMap<String, String>,
+    ) -> Result<Arc<dyn OcrProvider>> {
+        let mut replacement = self.clone();
+        replacement.reconfigure_credentials(credentials)?;
+        Ok(Arc::new(replacement))
+    }
+
     async fn recognize(&self, request: &OcrRequest) -> Result<OcrResult> {
         if !self.is_configured() {
             return Err(AppError::Other(

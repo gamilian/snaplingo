@@ -23,6 +23,14 @@ impl EventBus {
         }
     }
 
+    /// Construct the bus with its durable subscriber ready before any request can publish.
+    pub(crate) fn with_subscriber(subscriber: Arc<dyn EventSubscriber>) -> Self {
+        Self {
+            subscribers: Arc::new(RwLock::new(vec![subscriber])),
+            pending_events: Arc::new(AtomicUsize::new(0)),
+        }
+    }
+
     /// Subscribe to all events
     pub async fn subscribe(&self, subscriber: Arc<dyn EventSubscriber>) {
         let mut subs = self.subscribers.write().await;

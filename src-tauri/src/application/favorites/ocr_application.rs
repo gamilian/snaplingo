@@ -70,8 +70,7 @@ pub trait OcrFavoriteRecognizer: Send + Sync {
 #[async_trait]
 impl OcrFavoriteRecognizer for OcrCoordinator {
     fn active_provider_id(&self) -> Option<String> {
-        self.get_active()
-            .map(|provider| provider.read().id().to_string())
+        self.get_active().map(|provider| provider.id().to_string())
     }
 
     async fn recognize(&self, image: Vec<u8>) -> Result<OcrResult> {

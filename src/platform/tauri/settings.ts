@@ -293,44 +293,10 @@ export async function getSettingsSnapshot() {
   );
 }
 
-export async function updateGeneralSettings(input: GeneralSettingsInput) {
+export async function updateGeneralSettings(input: Partial<GeneralSettingsInput>) {
   return normalizeSnapshot(
     await invoke<BackendSettingsSnapshot>('update_general_settings', {
-      input: {
-        language: input.language,
-        theme: input.theme,
-        interface_theme: input.interfaceTheme ?? 'native',
-        start_on_boot: input.startOnBoot,
-        proxy_mode: input.proxyMode ?? 'system',
-        proxy_url: input.proxyUrl ?? '',
-        request_timeout_ms: input.requestTimeoutMs ?? 10_000,
-        retry_count: input.retryCount ?? 1,
-        log_level: input.logLevel ?? 'info',
-        log_retention_days: input.logRetentionDays ?? 7,
-        performance_monitoring: input.performanceMonitoring ?? false,
-        experimental_gpu_acceleration:
-          input.experimentalGpuAcceleration ?? false,
-        system_tts_voice: input.systemTtsVoice ?? '',
-        system_tts_rate: input.systemTtsRate ?? 180,
-        ...(input.settingsWindowX !== undefined
-          ? { settings_window_x: input.settingsWindowX }
-          : {}),
-        ...(input.settingsWindowY !== undefined
-          ? { settings_window_y: input.settingsWindowY }
-          : {}),
-        ...(input.settingsWindowWidth !== undefined
-          ? { settings_window_width: input.settingsWindowWidth }
-          : {}),
-        ...(input.settingsWindowHeight !== undefined
-          ? { settings_window_height: input.settingsWindowHeight }
-          : {}),
-        ...(input.lastResultWindowX !== undefined
-          ? { last_result_window_x: input.lastResultWindowX }
-          : {}),
-        ...(input.lastResultWindowY !== undefined
-          ? { last_result_window_y: input.lastResultWindowY }
-          : {}),
-      },
+      input: backendPatch(input),
     }),
   );
 }
@@ -353,36 +319,10 @@ export async function clearAppLogs() {
   await invoke<void>('clear_app_logs');
 }
 
-export async function updateScreenshotSettings(input: ScreenshotSettingsInput) {
+export async function updateScreenshotSettings(input: Partial<ScreenshotSettingsInput>) {
   return normalizeSnapshot(
     await invoke<BackendSettingsSnapshot>('update_screenshot_settings', {
-      input: {
-        save_path: input.savePath,
-        format: input.format,
-        quality: input.quality,
-        naming_rule: input.namingRule,
-        custom_file_name: input.customFileName,
-        auto_copy: input.autoCopy,
-        default_stroke_width: input.defaultStrokeWidth,
-        default_font_size: input.defaultFontSize,
-        remember_last_tool: input.rememberLastTool,
-        show_selection_size: input.showSelectionSize,
-        show_magnifier: input.showMagnifier,
-        magnifier_zoom: input.magnifierZoom ?? 12,
-        pin_opacity: input.pinOpacity,
-        pin_shadow: input.pinShadow,
-        pin_border: input.pinBorder ?? false,
-        pin_position: input.pinPosition ?? 'original',
-        pin_border_shortcut: input.pinBorderShortcut ?? 'b',
-        longshot_max_height: input.longshotMaxHeight ?? 30_000,
-        capture_ui_scale: input.captureUiScale ?? 'auto',
-        annotation_tool_shortcuts: input.annotationToolShortcuts ?? {},
-        annotation_colors: input.annotationColors,
-        selection_border_width: input.selectionBorderWidth ?? 2,
-        selection_border_color:
-          input.selectionBorderColor ?? [91, 127, 255, 242],
-        selection_mask_color: input.selectionMaskColor ?? [0, 0, 0, 46],
-      },
+      input: backendPatch(input),
     }),
   );
 }
@@ -395,63 +335,39 @@ export async function updateAnnotationColors(colors: AnnotationColorPreset[]) {
   );
 }
 
-export async function updateTranslationSettings(
-  input: TranslationSettingsInput,
-) {
+export async function updateTranslationSettings(input: Partial<TranslationSettingsInput>) {
   return normalizeSnapshot(
     await invoke<BackendSettingsSnapshot>('update_translation_settings', {
-      input: {
-        default_source_lang: input.defaultSourceLang,
-        default_target_lang: input.defaultTargetLang,
-        auto_translate: input.autoTranslate,
-        auto_copy: input.autoCopy,
-        preserve_line_breaks: input.preserveLineBreaks,
-        incremental_translation: input.incrementalTranslation,
-        window_always_on_top: input.windowAlwaysOnTop,
-        hide_on_blur: input.hideOnBlur,
-        selection_window_position:
-          input.selectionWindowPosition ?? 'below-cursor',
-        input_window_position: input.inputWindowPosition ?? 'center',
-        selection_input_state: input.selectionInputState ?? 'last',
-        screenshot_input_state: input.screenshotInputState ?? 'last',
-        max_window_height_ratio: input.maxWindowHeightRatio ?? 70,
-        window_width: input.windowWidth ?? 660,
-        selection_text_mode: input.selectionTextMode ?? 'smart',
-      },
+      input: backendPatch(input),
     }),
   );
 }
 
-export async function updateOcrSettings(input: OcrSettingsInput) {
+export async function updateOcrSettings(input: Partial<OcrSettingsInput>) {
   return normalizeSnapshot(
     await invoke<BackendSettingsSnapshot>('update_ocr_settings', {
-      input: {
-        recognition_language: input.recognitionLanguage,
-        gpu_acceleration: input.gpuAcceleration ?? true,
-        preserve_formatting: input.preserveFormatting,
-        remove_chinese_spaces: input.removeChineseSpaces,
-        show_confidence: input.showConfidence,
-        window_position: input.windowPosition ?? 'cursor',
-        hide_silent_status: input.hideSilentStatus ?? false,
-      },
+      input: backendPatch(input),
     }),
   );
 }
 
-export async function updateHistorySettings(input: {
+export async function updateHistorySettings(input: Partial<{
   autoCleanupEnabled: boolean;
   retentionDays: number;
   maximumRecords: number;
   maximumFavorites: number;
-}) {
+}>) {
   return normalizeSnapshot(
     await invoke<BackendSettingsSnapshot>('update_history_settings', {
-      input: {
-        auto_cleanup_enabled: input.autoCleanupEnabled,
-        retention_days: input.retentionDays,
-        maximum_records: input.maximumRecords,
-        maximum_favorites: input.maximumFavorites,
-      },
+      input: backendPatch(input),
     }),
+  );
+}
+
+function backendPatch(input: object) {
+  return Object.fromEntries(
+    Object.entries(input)
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => [key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`), value]),
   );
 }

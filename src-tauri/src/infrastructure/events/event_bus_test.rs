@@ -43,6 +43,35 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn initial_subscriber_receives_the_first_event_and_drain_waits_for_delivery() {
+        let repository = Arc::new(
+            crate::infrastructure::storage::SqliteHistoryRepository::new_in_memory().unwrap(),
+        );
+        let history = Arc::new(crate::application::History::new(repository));
+        let bus = EventBus::with_subscriber(history.clone());
+        bus.publish(DomainEvent::TranslationCompleted {
+            request: TranslationRequest {
+                text: "first request".into(),
+                source_lang: "en".into(),
+                target_lang: "zh".into(),
+            },
+            results: vec![TranslationResult::success(
+                "test",
+                "first result",
+                None,
+                None,
+            )],
+            providers_used: vec!["test".into()],
+            timestamp: Utc::now(),
+            duration_ms: 1,
+        });
+        assert!(bus.drain(std::time::Duration::from_secs(1)).await);
+        let entries = history.get_translation_history(10, 0).await.unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].source_text, "first request");
+    }
+
+    #[tokio::test]
     async fn test_event_bus_can_subscribe_and_publish() {
         // Arrange
         let bus = Arc::new(EventBus::new());

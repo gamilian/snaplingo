@@ -2,9 +2,7 @@ use std::sync::Arc;
 
 use tauri::{AppHandle, Emitter};
 
-use crate::application::history::{
-    EventSubscriber, HistoryChangeNotifier, HistoryRepository, OcrHistoryRecognizer,
-};
+use crate::application::history::{HistoryChangeNotifier, HistoryRepository, OcrHistoryRecognizer};
 use crate::application::providers::ocr::OcrCoordinator;
 use crate::application::settings::SettingsConfiguration;
 use crate::application::History;
@@ -59,14 +57,11 @@ pub(crate) fn build_history(
     ))
 }
 
-pub(crate) fn subscribe_history(app_state: &AppState) {
-    let history_subscriber = app_state.history.history.clone() as Arc<dyn EventSubscriber>;
+pub(crate) fn start_history_cleanup(app_state: &AppState) {
     let history = app_state.history.history.clone();
-    let event_bus = app_state.history.events.clone();
     tauri::async_runtime::spawn(async move {
         if let Err(error) = history.run_cleanup().await {
             log::warn!("Failed to run startup history cleanup: {}", error);
         }
-        event_bus.subscribe(history_subscriber).await;
     });
 }

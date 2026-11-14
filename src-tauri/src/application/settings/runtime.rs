@@ -1,6 +1,6 @@
-use super::SettingsConfiguration;
+use super::{SettingsConfiguration, SettingsPatch};
 use crate::application::History;
-use crate::domain::{GeneralSettings, HistorySettings, SettingsSnapshot};
+use crate::domain::SettingsSnapshot;
 use crate::Result;
 use serde::Serialize;
 use std::sync::Arc;
@@ -41,19 +41,11 @@ impl SettingsApplication {
             logs,
         }
     }
-    pub fn update_general(&self, input: GeneralSettings) -> Result<SettingsSnapshot> {
-        let previous = self.configuration.snapshot()?.general;
-        let changed = input.start_on_boot != previous.start_on_boot;
-        if changed {
-            self.start_on_boot.set_enabled(input.start_on_boot)?;
-        }
-        self.configuration.update_general(input).inspect_err(|_| {
-            if changed {
-                let _ = self.start_on_boot.set_enabled(previous.start_on_boot);
-            }
-        })
+    pub fn update_general(&self, input: SettingsPatch) -> Result<SettingsSnapshot> {
+        self.configuration
+            .update_general_with(input, |enabled| self.start_on_boot.set_enabled(enabled))
     }
-    pub async fn update_history(&self, input: HistorySettings) -> Result<SettingsSnapshot> {
+    pub async fn update_history(&self, input: SettingsPatch) -> Result<SettingsSnapshot> {
         let snapshot = self.configuration.update_history(input)?;
         if let Err(error) = self.history.run_cleanup().await {
             log::warn!("Failed to apply history cleanup after settings update: {error}");

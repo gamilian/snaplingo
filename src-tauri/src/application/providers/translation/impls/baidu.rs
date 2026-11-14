@@ -12,6 +12,7 @@ use std::sync::Arc;
 ///
 /// Uses the Baidu Translation API which requires APP ID and Secret Key.
 /// Authentication is performed using MD5 signature generation.
+#[derive(Clone)]
 pub struct BaiduTranslateProvider {
     http_client: Arc<dyn HttpClient>,
     app_id: Option<String>,
@@ -117,6 +118,15 @@ struct BaiduTranslation {
 
 #[async_trait]
 impl TranslationProvider for BaiduTranslateProvider {
+    fn with_credentials(
+        &self,
+        credentials: &HashMap<String, String>,
+    ) -> Result<Arc<dyn TranslationProvider>> {
+        let mut replacement = self.clone();
+        replacement.reconfigure_credentials(credentials)?;
+        Ok(Arc::new(replacement))
+    }
+
     async fn translate(&self, request: &TranslationRequest) -> Result<TranslationResult> {
         if !self.is_configured() {
             return Err(AppError::Other(

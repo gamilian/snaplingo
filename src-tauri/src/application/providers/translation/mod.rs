@@ -6,6 +6,7 @@ mod trait_def;
 mod coordinator_test;
 
 pub use coordinator::TranslationCoordinator;
+pub(crate) use coordinator::TranslationProviderChange;
 pub use impls::{
     BaiduTranslateProvider, DeepLProvider, GoogleTranslateProvider, LLMTranslationProvider,
 };

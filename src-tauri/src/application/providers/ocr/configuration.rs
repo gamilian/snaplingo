@@ -158,7 +158,7 @@ impl OcrProviderConfiguration {
             .get(provider_id)
             .ok_or_else(|| format!("Provider not found: {}", provider_id))?;
 
-        let fields = provider_lock.read().credential_fields();
+        let fields = provider_lock.credential_fields();
         Ok(fields)
     }
 
@@ -171,8 +171,8 @@ impl OcrProviderConfiguration {
             .coordinator
             .get(provider_id)
             .ok_or_else(|| format!("Provider not found: {}", provider_id))?;
-        let expected_fields = {
-            let provider = provider_lock.read();
+        {
+            let provider = provider_lock;
             let fields = provider.credential_fields();
 
             if fields.is_empty() {
@@ -184,30 +184,13 @@ impl OcrProviderConfiguration {
             }
 
             provider.validate_credentials(credentials)?;
-            fields
         };
 
-        let field_names: Vec<String> = expected_fields
-            .iter()
-            .map(|field| field.name.clone())
-            .collect();
-        let snapshot = self
-            .credential_store
-            .snapshot_provider_credentials(provider_id, &field_names)
-            .map_err(|e| format!("Failed to snapshot credentials: {}", e))?;
-
-        self.credential_store
-            .save_provider_credentials(provider_id, credentials)?;
-
-        if let Err(e) = self
-            .coordinator
-            .reconfigure_provider(provider_id, credentials)
-        {
-            let _ = self
-                .credential_store
-                .restore_provider_credentials(provider_id, &snapshot);
-            return Err(format!("Failed to reconfigure provider: {}", e).into());
-        }
+        self.coordinator
+            .commit_credentials(provider_id, credentials, || {
+                self.credential_store
+                    .save_provider_credentials(provider_id, credentials)
+            })?;
 
         if let Some(notifier) = &self.change_notifier {
             notifier.providers_changed();

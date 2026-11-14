@@ -60,6 +60,8 @@ pub struct LogsRuntime {
 }
 
 pub struct AppState {
+    pub(crate) request_lifecycle:
+        Arc<crate::application::providers::request_lifecycle::RequestLifecycle>,
     pub updates: Arc<crate::application::updates::AppUpdates>,
     pub permissions: Arc<RequiredPermissions>,
     pub settings: Arc<SettingsRuntime>,
@@ -79,7 +81,9 @@ impl AppState {
     /// Gracefully shutdown the application, waiting for pending events to complete
     pub async fn shutdown(&self) -> Result<()> {
         log::info!("Starting graceful shutdown...");
+        self.request_lifecycle.begin_shutdown();
         self.capture.runtime.cancel_background_ocr();
+        self.request_lifecycle.wait_for_idle().await;
 
         // Wait for all pending events to complete (max 5 seconds)
         let drained = self

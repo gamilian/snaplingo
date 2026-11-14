@@ -151,12 +151,6 @@ export function createDurableSettingsConfiguration(port: DurableSettingsPort) {
     return result;
   }
 
-  function requireSnapshot() {
-    const snapshot = projection.getState().snapshot;
-    if (!snapshot) throw new Error('Durable settings have not been loaded');
-    return snapshot;
-  }
-
   function hydrate() {
     const state = projection.getState();
     if (state.hydrated && state.snapshot) return Promise.resolve(state.snapshot);
@@ -173,23 +167,40 @@ export function createDurableSettingsConfiguration(port: DurableSettingsPort) {
   return {
     getState: projection.getState,
     subscribe: projection.subscribe,
+    synchronize(events: Pick<SettingsConfigurationEventsPort, 'subscribeSettingsChanged'>) {
+      let disposed = false;
+      let unlisten: Unsubscribe | undefined;
+      void events.subscribeSettingsChanged(async () => {
+        if (disposed) return;
+        try {
+          await applyLatestSnapshot(() => port.getSettingsSnapshot());
+        } catch (error) {
+          console.warn('Failed to refresh settings:', error);
+        }
+      }).then((cleanup) => {
+        if (disposed) {
+          cleanup();
+          return;
+        }
+        unlisten = cleanup;
+        return hydrate();
+      }).catch((error) => console.warn('Failed to synchronize settings:', error));
+      return () => {
+        disposed = true;
+        unlisten?.();
+      };
+    },
     hydrate,
     refresh: () => applyLatestSnapshot(() => port.getSettingsSnapshot()),
     updateGeneral(input: Partial<GeneralSettings>) {
-      return enqueueUpdate(() => {
-        const current = requireSnapshot().general;
-        return applyLatestSnapshot(() =>
-          port.updateGeneralSettings({ ...current, ...input }),
-        );
-      });
+      return enqueueUpdate(() =>
+        applyLatestSnapshot(() => port.updateGeneralSettings(input)),
+      );
     },
     updateScreenshot(input: Partial<ScreenshotSettings>) {
-      return enqueueUpdate(() => {
-        const current = requireSnapshot().screenshot;
-        return applyLatestSnapshot(() =>
-          port.updateScreenshotSettings({ ...current, ...input }),
-        );
-      });
+      return enqueueUpdate(() =>
+        applyLatestSnapshot(() => port.updateScreenshotSettings(input)),
+      );
     },
     updateAnnotationColors(colors: AnnotationColorPreset[]) {
       return enqueueUpdate(() =>
@@ -197,22 +208,16 @@ export function createDurableSettingsConfiguration(port: DurableSettingsPort) {
       );
     },
     updateTranslation(input: Partial<TranslationSettings>) {
-      return enqueueUpdate(() => {
-        const current = requireSnapshot().translation;
-        return applyLatestSnapshot(() =>
-          port.updateTranslationSettings({ ...current, ...input }),
-        );
-      });
+      return enqueueUpdate(() =>
+        applyLatestSnapshot(() => port.updateTranslationSettings(input)),
+      );
     },
     updateOcr(input: Partial<OcrSettings>) {
-      return enqueueUpdate(() => {
-        const current = requireSnapshot().ocr;
-        return applyLatestSnapshot(() =>
-          port.updateOcrSettings({ ...current, ...input }),
-        );
-      });
+      return enqueueUpdate(() =>
+        applyLatestSnapshot(() => port.updateOcrSettings(input)),
+      );
     },
-    updateHistory(input: HistorySettings) {
+    updateHistory(input: Partial<HistorySettings>) {
       return enqueueUpdate(() =>
         applyLatestSnapshot(() => port.updateHistorySettings(input)),
       );

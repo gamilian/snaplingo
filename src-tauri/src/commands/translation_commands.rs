@@ -62,9 +62,13 @@ pub async fn record_translation_history(
     };
 
     state
-        .history
-        .history
-        .record_translation(translation_request, results, duration_ms)
+        .request_lifecycle
+        .finish(
+            state
+                .history
+                .history
+                .record_translation(translation_request, results, duration_ms),
+        )
         .await
         .map_err(|error| error.to_string())
 }

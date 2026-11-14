@@ -4,11 +4,8 @@ use std::sync::{Arc, Mutex};
 use crate::application::capture::configured_capture_save_dir;
 use crate::application::favorite_capacity::FavoriteCapacityPolicyProvider;
 use crate::application::history::{HistoryCleanupPolicy, HistoryPolicyProvider};
-use crate::application::settings::SettingsStore;
-use crate::domain::{
-    GeneralSettings, HistorySettings, OcrSettings, ScreenshotSettings, SettingsSnapshot,
-    TranslationSettings,
-};
+use crate::application::settings::{SettingsPatch, SettingsStore};
+use crate::domain::{ScreenshotSettings, SettingsSnapshot};
 use crate::{AppError, Result};
 
 pub struct SettingsConfiguration {
@@ -80,11 +77,28 @@ impl SettingsConfiguration {
         }
     }
 
-    pub fn update_general(&self, input: GeneralSettings) -> Result<SettingsSnapshot> {
+    pub fn update_general(&self, input: impl Into<SettingsPatch>) -> Result<SettingsSnapshot> {
+        self.update_general_with(input.into(), |_| Ok(()))
+    }
+
+    pub(super) fn update_general_with(
+        &self,
+        input: SettingsPatch,
+        set_start_on_boot: impl Fn(bool) -> Result<()>,
+    ) -> Result<SettingsSnapshot> {
         let _guard = self.update_lock.lock().unwrap();
         let mut snapshot = self.snapshot()?;
-        snapshot.general = input;
-        self.save_snapshot(snapshot)
+        let previous = snapshot.general.start_on_boot;
+        snapshot.general = input.apply(&snapshot.general)?;
+        let enabled = snapshot.general.start_on_boot;
+        if enabled != previous {
+            set_start_on_boot(enabled)?;
+        }
+        self.save_snapshot(snapshot).inspect_err(|_| {
+            if enabled != previous {
+                let _ = set_start_on_boot(previous);
+            }
+        })
     }
 
     pub fn update_last_result_window_position(&self, x: i32, y: i32) -> Result<()> {
@@ -96,14 +110,15 @@ impl SettingsConfiguration {
         Ok(())
     }
 
-    pub fn update_screenshot(&self, mut input: ScreenshotSettings) -> Result<SettingsSnapshot> {
-        Self::normalized_annotation_shortcuts(&input.annotation_tool_shortcuts)?;
-        Self::normalized_pin_border_shortcut(&input.pin_border_shortcut)?;
+    pub fn update_screenshot(&self, input: impl Into<SettingsPatch>) -> Result<SettingsSnapshot> {
         let _guard = self.update_lock.lock().unwrap();
         let mut snapshot = self.snapshot()?;
-        input.last_save_directory = snapshot.screenshot.last_save_directory;
-        input.last_save_format = snapshot.screenshot.last_save_format;
-        snapshot.screenshot = input;
+        let mut updated: ScreenshotSettings = input.into().apply(&snapshot.screenshot)?;
+        Self::normalized_annotation_shortcuts(&updated.annotation_tool_shortcuts)?;
+        Self::normalized_pin_border_shortcut(&updated.pin_border_shortcut)?;
+        updated.last_save_directory = snapshot.screenshot.last_save_directory;
+        updated.last_save_format = snapshot.screenshot.last_save_format;
+        snapshot.screenshot = updated;
         self.save_snapshot(snapshot)
     }
 
@@ -130,24 +145,24 @@ impl SettingsConfiguration {
         self.save_snapshot(snapshot)
     }
 
-    pub fn update_translation(&self, input: TranslationSettings) -> Result<SettingsSnapshot> {
+    pub fn update_translation(&self, input: impl Into<SettingsPatch>) -> Result<SettingsSnapshot> {
         let _guard = self.update_lock.lock().unwrap();
         let mut snapshot = self.snapshot()?;
-        snapshot.translation = input;
+        snapshot.translation = input.into().apply(&snapshot.translation)?;
         self.save_snapshot(snapshot)
     }
 
-    pub fn update_ocr(&self, input: OcrSettings) -> Result<SettingsSnapshot> {
+    pub fn update_ocr(&self, input: impl Into<SettingsPatch>) -> Result<SettingsSnapshot> {
         let _guard = self.update_lock.lock().unwrap();
         let mut snapshot = self.snapshot()?;
-        snapshot.ocr = input;
+        snapshot.ocr = input.into().apply(&snapshot.ocr)?;
         self.save_snapshot(snapshot)
     }
 
-    pub fn update_history(&self, input: HistorySettings) -> Result<SettingsSnapshot> {
+    pub fn update_history(&self, input: impl Into<SettingsPatch>) -> Result<SettingsSnapshot> {
         let _guard = self.update_lock.lock().unwrap();
         let mut snapshot = self.snapshot()?;
-        snapshot.history = input;
+        snapshot.history = input.into().apply(&snapshot.history)?;
         self.save_snapshot(snapshot)
     }
 
@@ -735,5 +750,50 @@ mod settings_configuration_tests {
             updated.screenshot.annotation_tool_shortcuts["scrolling"],
             "f2"
         );
+    }
+}
+
+#[cfg(test)]
+mod patch_tests {
+    use super::*;
+    use crate::infrastructure::storage::SqliteConfigStore;
+
+    fn patch(value: serde_json::Value) -> SettingsPatch {
+        serde_json::from_value(value).unwrap()
+    }
+
+    #[test]
+    fn independent_window_patches_preserve_the_latest_settings_and_positions() {
+        let configuration = SettingsConfiguration::new(Arc::new(SqliteConfigStore::new_temp()));
+        configuration
+            .update_screenshot(patch(serde_json::json!({"quality": 95})))
+            .unwrap();
+        configuration
+            .update_screenshot(patch(serde_json::json!({"pin_border": true})))
+            .unwrap();
+        configuration
+            .update_last_result_window_position(42, 24)
+            .unwrap();
+        let snapshot = configuration
+            .update_general(patch(serde_json::json!({"theme": "dark"})))
+            .unwrap();
+        assert_eq!(snapshot.screenshot.quality, 95);
+        assert!(snapshot.screenshot.pin_border);
+        assert_eq!(snapshot.general.last_result_window_x, Some(42));
+        assert_eq!(snapshot.general.last_result_window_y, Some(24));
+    }
+
+    #[test]
+    fn invalid_patch_does_not_change_persisted_settings() {
+        let configuration = SettingsConfiguration::new(Arc::new(SqliteConfigStore::new_temp()));
+        let previous = configuration.snapshot().unwrap();
+        for value in [
+            serde_json::json!({"unknown": true}),
+            serde_json::json!({"quality": 999}),
+            serde_json::json!({"quality": null}),
+        ] {
+            assert!(configuration.update_screenshot(patch(value)).is_err());
+            assert_eq!(configuration.snapshot().unwrap(), previous);
+        }
     }
 }

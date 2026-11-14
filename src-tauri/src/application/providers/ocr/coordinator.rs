@@ -6,7 +6,6 @@ use crate::domain::events::DomainEvent;
 use crate::domain::ocr::{infer_language_from_text, OcrRequest, OcrResult};
 use crate::Result;
 use chrono::Utc;
-use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
@@ -23,9 +22,10 @@ use std::time::Instant;
 /// Concurrency model: Providers manage their own internal state.
 /// Coordinator uses Mutex for active provider tracking.
 pub struct OcrCoordinator {
+    lifecycle: Arc<super::super::request_lifecycle::RequestLifecycle>,
     /// Map of provider ID to provider instance
     /// Providers are responsible for their own thread-safety
-    providers: Mutex<HashMap<String, Arc<RwLock<dyn OcrProvider>>>>,
+    providers: Mutex<HashMap<String, Arc<dyn OcrProvider>>>,
     /// Currently active provider ID (single-select)
     active_provider_id: Arc<Mutex<Option<String>>>,
     /// Configuration store for persisting active provider
@@ -36,9 +36,34 @@ pub struct OcrCoordinator {
 }
 
 impl OcrCoordinator {
+    pub(crate) fn commit_credentials(
+        &self,
+        provider_id: &str,
+        credentials: &HashMap<String, String>,
+        persist: impl FnOnce() -> Result<()>,
+    ) -> Result<()> {
+        let mut providers = self.providers.lock().unwrap();
+        let current = providers
+            .get(provider_id)
+            .ok_or_else(|| format!("Provider not found: {provider_id}"))?;
+        let replacement = current.with_credentials(credentials)?;
+        persist()?;
+        providers.insert(provider_id.to_string(), replacement);
+        Ok(())
+    }
+
+    pub(crate) fn with_lifecycle(
+        mut self,
+        lifecycle: Arc<super::super::request_lifecycle::RequestLifecycle>,
+    ) -> Self {
+        self.lifecycle = lifecycle;
+        self
+    }
+
     /// Creates a new OcrCoordinator with the given config store.
     pub fn new(config_store: Arc<dyn ProviderConfigStore>) -> Self {
         Self {
+            lifecycle: Arc::new(super::super::request_lifecycle::RequestLifecycle::default()),
             providers: Mutex::new(HashMap::new()),
             active_provider_id: Arc::new(Mutex::new(None)),
             config_store,
@@ -81,7 +106,7 @@ impl OcrCoordinator {
         if providers.contains_key(&id) {
             return Err(format!("Provider already registered: {}", id).into());
         }
-        providers.insert(id, Arc::new(RwLock::new(provider)));
+        providers.insert(id, Arc::new(provider));
         Ok(())
     }
 
@@ -124,8 +149,8 @@ impl OcrCoordinator {
     ///
     /// # Returns
     ///
-    /// * `Option<Arc<RwLock<dyn OcrProvider>>>` - The active provider if one is set, None otherwise
-    pub fn get_active(&self) -> Option<Arc<RwLock<dyn OcrProvider>>> {
+    /// * `Option<Arc<dyn OcrProvider>>` - The active provider if one is set, None otherwise
+    pub fn get_active(&self) -> Option<Arc<dyn OcrProvider>> {
         let active_id = self.active_provider_id.lock().unwrap();
         let providers = self.providers.lock().unwrap();
         active_id.as_ref().and_then(|id| providers.get(id).cloned())
@@ -135,8 +160,8 @@ impl OcrCoordinator {
     ///
     /// # Returns
     ///
-    /// * `Vec<Arc<RwLock<dyn OcrProvider>>>` - List of all registered providers
-    pub fn list_all(&self) -> Vec<Arc<RwLock<dyn OcrProvider>>> {
+    /// * `Vec<Arc<dyn OcrProvider>>` - List of all registered providers
+    pub fn list_all(&self) -> Vec<Arc<dyn OcrProvider>> {
         let providers = self.providers.lock().unwrap();
         providers.values().cloned().collect()
     }
@@ -149,8 +174,8 @@ impl OcrCoordinator {
     ///
     /// # Returns
     ///
-    /// * `Option<Arc<RwLock<dyn OcrProvider>>>` - The provider if found, None otherwise
-    pub fn get(&self, id: &str) -> Option<Arc<RwLock<dyn OcrProvider>>> {
+    /// * `Option<Arc<dyn OcrProvider>>` - The provider if found, None otherwise
+    pub fn get(&self, id: &str) -> Option<Arc<dyn OcrProvider>> {
         let providers = self.providers.lock().unwrap();
         providers.get(id).cloned()
     }
@@ -192,37 +217,41 @@ impl OcrCoordinator {
     ///
     /// Returns an error if no provider is active.
     pub async fn recognize(&self, request: &OcrRequest) -> Result<OcrResult> {
-        let start = Instant::now();
+        self.lifecycle
+            .run(async {
+                let start = Instant::now();
 
-        // Get active provider (cloned Arc, no lock held)
-        let provider_lock = self
-            .get_active()
-            .ok_or_else(|| "No active OCR provider".to_string())?;
+                // Get active provider (cloned Arc, no lock held)
+                let provider_lock = self
+                    .get_active()
+                    .ok_or_else(|| "No active OCR provider".to_string())?;
 
-        let provider_id = provider_lock.read().id().to_string();
+                let provider_id = provider_lock.id().to_string();
 
-        // Call provider's recognize method
-        let mut result = {
-            let provider = provider_lock.read();
-            provider.recognize_with_recovery(request).await?
-        };
-        result.provider_id = Some(provider_id.clone());
-        if result.detected_language.is_none() {
-            result.detected_language = infer_language_from_text(&result.text);
-        }
+                // Call provider's recognize method
+                let mut result = {
+                    let provider = &provider_lock;
+                    provider.recognize_with_recovery(request).await?
+                };
+                result.provider_id = Some(provider_id.clone());
+                if result.detected_language.is_none() {
+                    result.detected_language = infer_language_from_text(&result.text);
+                }
 
-        // Publish domain event if event sink is attached
-        if let Some(event_sink) = &self.event_sink {
-            event_sink.publish(DomainEvent::OcrCompleted {
-                request: request.clone(),
-                result: result.clone(),
-                provider_used: provider_id,
-                timestamp: Utc::now(),
-                duration_ms: start.elapsed().as_millis() as u64,
-            });
-        }
+                // Publish domain event if event sink is attached
+                if let Some(event_sink) = &self.event_sink {
+                    event_sink.publish(DomainEvent::OcrCompleted {
+                        request: request.clone(),
+                        result: result.clone(),
+                        provider_used: provider_id,
+                        timestamp: Utc::now(),
+                        duration_ms: start.elapsed().as_millis() as u64,
+                    });
+                }
 
-        Ok(result)
+                Ok(result)
+            })
+            .await
     }
 
     pub async fn recognize_image(&self, image_data: Vec<u8>) -> Result<OcrResult> {
@@ -251,18 +280,7 @@ impl OcrCoordinator {
         provider_id: &str,
         credentials: &HashMap<String, String>,
     ) -> Result<()> {
-        let providers = self.providers.lock().unwrap();
-
-        let provider_lock = providers
-            .get(provider_id)
-            .ok_or_else(|| format!("Provider not found: {}", provider_id))?
-            .clone();
-        drop(providers);
-
-        let result = {
-            let mut provider = provider_lock.write();
-            provider.reconfigure_credentials(credentials)
-        };
+        let result = self.commit_credentials(provider_id, credentials, || Ok(()));
 
         if let Err(ref e) = result {
             if let Some(event_sink) = &self.event_sink {

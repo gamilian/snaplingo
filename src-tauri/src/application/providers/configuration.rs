@@ -4,10 +4,13 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::application::providers::common::CredentialField;
-use crate::application::providers::translation::{LLMTranslationProvider, TranslationCoordinator};
+use crate::application::providers::translation::{
+    LLMTranslationProvider, TranslationCoordinator, TranslationProviderChange,
+};
 use crate::application::providers::{
-    LLMProtocol, LlmClientConfig, LlmRuntime, ProviderConfigStore, ProviderCredentialStore,
-    ProviderPromptStrategy, ReasoningLevel, DEFAULT_PROMPT_STRATEGY_ID, SMART_PROMPT_STRATEGY_ID,
+    CredentialMutation, LLMProtocol, LlmClientConfig, LlmRuntime, ProviderConfigStore,
+    ProviderCredentialStore, ProviderPromptStrategy, ReasoningLevel, TranslationProviderMutation,
+    DEFAULT_PROMPT_STRATEGY_ID, SMART_PROMPT_STRATEGY_ID,
 };
 use crate::AppError;
 
@@ -82,91 +85,6 @@ pub struct CustomTranslationProviderView {
     pub reasoning_level: Option<String>,
     pub prompt_strategy_id: String,
     pub prompt_fallback_strategy_id: String,
-}
-
-/// Add a new custom translation provider (internal helper, use ProviderConfiguration::add).
-/// This function is not locked; callers must hold provider_state_lock.
-pub(crate) fn add_custom_translation_provider(
-    input: AddCustomTranslationProviderInput,
-    config_store: Arc<dyn ProviderConfigStore>,
-    credential_store: &dyn ProviderCredentialStore,
-    llm_runtime: Arc<dyn LlmRuntime>,
-    translation_coordinator: &TranslationCoordinator,
-) -> crate::Result<CustomTranslationProviderView> {
-    let id = create_custom_translation_provider_id();
-    let def = build_custom_translation_provider_def(id.clone(), &input)?;
-
-    credential_store
-        .save_provider_credential(&id, &input.api_key)
-        .map_err(|e| AppError::Other(format!("Failed to save API key: {}", e)))?;
-
-    let mut custom_defs = config_store
-        .load_custom_translation_providers()
-        .unwrap_or_default();
-    custom_defs.push(def.clone());
-
-    config_store
-        .save_custom_translation_providers(&custom_defs)
-        .map_err(|e| {
-            let rollback_err = credential_store
-                .delete_provider_credential(&id)
-                .err()
-                .map(|re| format!(" credential cleanup failed: {}", re));
-            match rollback_err {
-                Some(re) => AppError::Other(format!(
-                    "Failed to save config: {}. Rollback also failed:{}",
-                    e, re
-                )),
-                None => AppError::Other(format!("Failed to save config: {}", e)),
-            }
-        })?;
-
-    let provider =
-        create_llm_translation_provider(&def, llm_runtime, input.api_key, config_store.clone());
-    translation_coordinator.register(provider).map_err(|e| {
-        let mut rollback_errors: Vec<String> = Vec::new();
-        custom_defs.pop();
-        if let Err(re) = config_store.save_custom_translation_providers(&custom_defs) {
-            rollback_errors.push(format!("config rollback: {}", re));
-        }
-        if let Err(re) = credential_store.delete_provider_credential(&id) {
-            rollback_errors.push(format!("credential rollback: {}", re));
-        }
-        if rollback_errors.is_empty() {
-            AppError::Other(format!("Failed to register provider: {}", e))
-        } else {
-            AppError::Other(format!(
-                "Failed to register provider: {}. Rollback also failed: {}",
-                e,
-                rollback_errors.join(", ")
-            ))
-        }
-    })?;
-
-    translation_coordinator.activate(&id).map_err(|e| {
-        let mut rollback_errors: Vec<String> = Vec::new();
-        if let Err(re) = translation_coordinator.unregister(&id) {
-            rollback_errors.push(format!("unregister: {}", re));
-        }
-        custom_defs.pop();
-        if let Err(re) = config_store.save_custom_translation_providers(&custom_defs) {
-            rollback_errors.push(format!("config rollback: {}", re));
-        }
-        if let Err(re) = credential_store.delete_provider_credential(&id) {
-            rollback_errors.push(format!("credential rollback: {}", re));
-        }
-        if rollback_errors.is_empty() {
-            AppError::Other(format!("Failed to activate provider: {}", e))
-        } else {
-            AppError::Other(format!(
-                "Failed to activate provider: {}. Rollback also failed: {}",
-                e,
-                rollback_errors.join(", ")
-            ))
-        }
-    })?;
-
-    Ok(custom_translation_provider_view(&def))
 }
 
 fn build_custom_translation_provider_def(
@@ -822,318 +740,147 @@ impl ProviderConfiguration {
     }
 
     /// Add a new custom translation provider.
+    fn commit(
+        &self,
+        runtime: TranslationProviderChange,
+        change: TranslationProviderMutation,
+    ) -> crate::Result<()> {
+        let active = change
+            .active
+            .clone()
+            .unwrap_or_else(|| self.translation_coordinator.active_ids());
+        self.translation_coordinator
+            .commit_change(runtime, active, || {
+                self.config_store
+                    .commit_translation_provider_change(&change)
+            })?;
+        self.notify_changed();
+        Ok(())
+    }
+
     pub fn add(
         &self,
         input: AddCustomTranslationProviderInput,
     ) -> crate::Result<CustomTranslationProviderView> {
         let _guard = self.lock_provider_state()?;
-        let view = add_custom_translation_provider(
-            input,
-            self.config_store.clone(),
-            self.credential_store.as_ref(),
+        let id = create_custom_translation_provider_id();
+        let definition = build_custom_translation_provider_def(id.clone(), &input)?;
+        let provider = create_llm_translation_provider(
+            &definition,
             self.llm_runtime.clone(),
-            &self.translation_coordinator,
+            input.api_key.clone(),
+            self.config_store.clone(),
+        );
+        let mut definitions = self
+            .config_store
+            .load_custom_translation_providers()
+            .unwrap_or_default();
+        definitions.push(definition.clone());
+        let mut active = self.translation_coordinator.active_ids();
+        active.push(id.clone());
+        self.commit(
+            TranslationProviderChange::Add(Arc::new(provider)),
+            TranslationProviderMutation {
+                definitions: Some(definitions),
+                active: Some(active),
+                credentials: Some(CredentialMutation::Save {
+                    provider_id: id,
+                    values: HashMap::from([("api_key".into(), input.api_key)]),
+                }),
+                ..Default::default()
+            },
         )?;
-        self.notify_changed();
-        Ok(view)
+        Ok(custom_translation_provider_view(&definition))
     }
 
-    /// Update an existing custom translation provider.
     pub fn update(
         &self,
         provider_id: String,
         input: UpdateCustomTranslationProviderInput,
     ) -> crate::Result<CustomTranslationProviderView> {
         let _guard = self.lock_provider_state()?;
-
-        // Load current state for rollback
-        let mut custom_defs = self
+        let mut definitions = self
             .config_store
             .load_custom_translation_providers()
             .unwrap_or_default();
-
-        let index = custom_defs
+        let index = definitions
             .iter()
-            .position(|def| def.id == provider_id)
-            .ok_or_else(|| AppError::Other(format!("Provider not found: {}", provider_id)))?;
-
-        let old_def = custom_defs[index].clone();
-
-        // Load old API key for rollback if we're changing it
-        let old_api_key = if input
-            .api_key
-            .as_ref()
-            .map(|k| !k.trim().is_empty())
-            .unwrap_or(false)
-        {
-            // We're changing the key, load old for rollback - must succeed
-            Some(
-                self.credential_store
-                    .load_provider_credential(&provider_id)
-                    .map_err(|e| {
-                        AppError::Other(format!("Cannot load existing key for rollback: {}", e))
-                    })?,
-            )
-        } else {
-            None
-        };
-
-        // Determine API key: use new if provided, otherwise load existing
-        let api_key = if let Some(ref new_key) = input.api_key {
-            let trimmed = new_key.trim();
-            if trimmed.is_empty() {
-                // If explicitly empty, load existing
-                self.credential_store
-                    .load_provider_credential(&provider_id)
-                    .map_err(|e| {
-                        AppError::Other(format!("Failed to load existing API key: {}", e))
-                    })?
-            } else {
-                trimmed.to_string()
-            }
-        } else {
-            self.credential_store
-                .load_provider_credential(&provider_id)
-                .map_err(|e| AppError::Other(format!("Failed to load existing API key: {}", e)))?
-        };
-
-        // Build updated definition
-        let updated_def =
+            .position(|definition| definition.id == provider_id)
+            .ok_or_else(|| AppError::Other(format!("Provider not found: {provider_id}")))?;
+        let definition =
             build_updated_custom_translation_provider_def(provider_id.clone(), &input)?;
-
-        // Step 1: Save config first (no side effects if this fails)
-        custom_defs[index] = updated_def.clone();
-        self.config_store
-            .save_custom_translation_providers(&custom_defs)
-            .map_err(|e| {
-                // Restore in-memory state
-                custom_defs[index] = old_def.clone();
-                AppError::Other(format!("Failed to save config: {}", e))
-            })?;
-
-        // Step 2: Save new API key if provided and non-empty
-        if let Some(ref new_key) = input.api_key {
-            if !new_key.trim().is_empty() {
-                if let Err(e) = self
-                    .credential_store
-                    .save_provider_credential(&provider_id, new_key.trim())
-                {
-                    // Rollback config
-                    custom_defs[index] = old_def.clone();
-                    let rollback_err = self
-                        .config_store
-                        .save_custom_translation_providers(&custom_defs)
-                        .err()
-                        .map(|re| format!(" config rollback failed: {}", re));
-                    return Err(match rollback_err {
-                        Some(re) => AppError::Other(format!(
-                            "Failed to save API key: {}. Rollback also failed:{}",
-                            e, re
-                        )),
-                        None => AppError::Other(format!("Failed to save API key: {}", e)),
-                    });
-                }
-            }
-        }
-
-        // Step 3: Create and register the updated provider
+        let api_key = match input
+            .api_key
+            .as_deref()
+            .map(str::trim)
+            .filter(|key| !key.is_empty())
+        {
+            Some(key) => key.to_string(),
+            None => self
+                .credential_store
+                .load_provider_credential(&provider_id)?,
+        };
         let provider = create_llm_translation_provider(
-            &updated_def,
+            &definition,
             self.llm_runtime.clone(),
-            api_key,
+            api_key.clone(),
             self.config_store.clone(),
         );
-
-        // Step 4: Attempt to replace in coordinator - rollback on failure
-        if let Err(e) = self.translation_coordinator.replace(provider) {
-            let mut rollback_errors: Vec<String> = Vec::new();
-
-            // Rollback config
-            custom_defs[index] = old_def;
-            if let Err(re) = self
-                .config_store
-                .save_custom_translation_providers(&custom_defs)
-            {
-                rollback_errors.push(format!("config rollback: {}", re));
-            }
-
-            // Roll back credentials if we saved a new key.
-            if let Some(ref old_key) = old_api_key {
-                if let Err(re) = self
-                    .credential_store
-                    .save_provider_credential(&provider_id, old_key)
-                {
-                    rollback_errors.push(format!("credential rollback: {}", re));
-                }
-            }
-
-            if rollback_errors.is_empty() {
-                return Err(AppError::Other(format!("Failed to update provider: {}", e)));
-            } else {
-                return Err(AppError::Other(format!(
-                    "Failed to update provider: {}. Rollback also failed: {}",
-                    e,
-                    rollback_errors.join(", ")
-                )));
-            }
-        }
-
-        let view = custom_translation_provider_view(&updated_def);
-        self.notify_changed();
-        Ok(view)
+        definitions[index] = definition.clone();
+        self.commit(
+            TranslationProviderChange::Replace(Arc::new(provider)),
+            TranslationProviderMutation {
+                definitions: Some(definitions),
+                credentials: Some(CredentialMutation::Save {
+                    provider_id,
+                    values: HashMap::from([("api_key".into(), api_key)]),
+                }),
+                ..Default::default()
+            },
+        )?;
+        Ok(custom_translation_provider_view(&definition))
     }
 
-    /// Remove a custom translation provider.
     pub fn remove(&self, provider_id: String) -> crate::Result<()> {
         let _guard = self.lock_provider_state()?;
-
-        // Reject builtin providers
-        let builtin_ids = ["google-translate", "deeplx", "baidu-translate"];
-        if builtin_ids.contains(&provider_id.as_str()) {
+        if ["google-translate", "deeplx", "baidu-translate"].contains(&provider_id.as_str()) {
             return Err(AppError::Other("Cannot remove builtin provider".into()));
         }
-
-        let mut custom_defs = self
+        let mut definitions = self
             .config_store
             .load_custom_translation_providers()
             .unwrap_or_default();
-
-        let index = custom_defs
+        let index = definitions
             .iter()
-            .position(|def| def.id == provider_id)
-            .ok_or_else(|| AppError::Other(format!("Provider not found: {}", provider_id)))?;
-
-        let removed_def = custom_defs[index].clone();
-
-        // Step 0: Snapshot active providers list and order for rollback
-        let active_providers = self.translation_coordinator.get_active();
-        let active_ids: Vec<String> = active_providers
-            .iter()
-            .map(|p| p.read().id().to_string())
-            .collect();
-        let was_active = active_ids.contains(&provider_id);
-
-        // Step 0.5: Collect credential field names BEFORE unregistering
-        let credential_field_names: Vec<String> =
-            if let Some(provider) = self.translation_coordinator.get(&provider_id) {
-                provider
-                    .read()
-                    .credential_fields()
-                    .iter()
-                    .map(|f| f.name.clone())
-                    .collect()
-            } else {
-                // Not registered, infer from custom LLM default
-                vec!["api_key".to_string()]
-            };
-
-        // Snapshot credentials
-        let snapshot = self
-            .credential_store
-            .snapshot_provider_credentials(&provider_id, &credential_field_names)
-            .map_err(|e| AppError::Other(format!("Failed to snapshot credentials: {}", e)))?;
-
-        // Step 1: Remove from config first (lowest risk)
-        custom_defs.remove(index);
-        self.config_store
-            .save_custom_translation_providers(&custom_defs)
-            .map_err(|e| AppError::Other(format!("Failed to save config: {}", e)))?;
-
-        // Step 2: Unregister from coordinator (track whether it was registered)
-        let was_registered = self.translation_coordinator.get(&provider_id).is_some();
-
-        if was_registered {
-            if let Err(e) = self.translation_coordinator.unregister(&provider_id) {
-                // Rollback config
-                custom_defs.insert(index, removed_def.clone());
-                let _ = self
-                    .config_store
-                    .save_custom_translation_providers(&custom_defs);
-                return Err(AppError::Other(format!("Failed to unregister: {}", e)));
-            }
-        }
-
-        // Helper to rollback everything and collect errors
-        let mut rollback = || -> Vec<String> {
-            let mut errors = Vec::new();
-
-            custom_defs.insert(index, removed_def.clone());
-            if let Err(e) = self
-                .config_store
-                .save_custom_translation_providers(&custom_defs)
-            {
-                errors.push(format!("config save: {}", e));
-            }
-
-            if let Err(e) = self
-                .credential_store
-                .restore_provider_credentials(&provider_id, &snapshot)
-            {
-                errors.push(format!("credential restore: {}", e));
-            }
-
-            if was_registered {
-                let api_key = snapshot
-                    .api_key
-                    .clone()
-                    .and_then(|opt| opt)
-                    .unwrap_or_default();
-                let provider = create_llm_translation_provider(
-                    &removed_def,
-                    self.llm_runtime.clone(),
-                    api_key,
-                    self.config_store.clone(),
-                );
-                if let Err(e) = self.translation_coordinator.register(provider) {
-                    errors.push(format!("re-register: {}", e));
-                }
-                if was_active {
-                    if let Err(e) = self.translation_coordinator.activate(&provider_id) {
-                        errors.push(format!("re-activate: {}", e));
-                    }
-                }
-                if let Err(e) = self
-                    .translation_coordinator
-                    .reorder_active(active_ids.clone())
-                {
-                    errors.push(format!("reorder active: {}", e));
-                }
-            }
-
-            errors
-        };
-
-        // Step 3: Delete the known credential fields with rollback on failure.
-        if !credential_field_names.is_empty() {
-            if let Err(e) = self
-                .credential_store
-                .delete_provider_credentials(&provider_id, &credential_field_names)
-            {
-                let rollback_errors = rollback();
-                if rollback_errors.is_empty() {
-                    return Err(AppError::Other(format!(
-                        "Failed to delete structured credentials: {}",
-                        e
-                    )));
-                } else {
-                    return Err(AppError::Other(format!(
-                        "Failed to delete structured credentials: {}. Rollback also failed: {}",
-                        e,
-                        rollback_errors.join(", ")
-                    )));
-                }
-            }
-        }
-
-        self.notify_changed();
-        Ok(())
+            .position(|definition| definition.id == provider_id)
+            .ok_or_else(|| AppError::Other(format!("Provider not found: {provider_id}")))?;
+        definitions.remove(index);
+        let mut active = self.translation_coordinator.active_ids();
+        active.retain(|id| id != &provider_id);
+        let mut inactive = self
+            .config_store
+            .load_inactive_translation_providers()
+            .unwrap_or_default();
+        inactive.retain(|id| id != &provider_id);
+        self.commit(
+            TranslationProviderChange::Remove(provider_id.clone()),
+            TranslationProviderMutation {
+                definitions: Some(definitions),
+                active: Some(active),
+                inactive: Some(inactive),
+                credentials: Some(CredentialMutation::Delete {
+                    provider_id,
+                    fields: vec!["api_key".into()],
+                }),
+            },
+        )
     }
 
     /// List all translation providers with metadata.
     pub fn list_provider_infos(&self) -> Vec<ProviderInfo> {
         let all_providers = self.translation_coordinator.list_all();
         let active = self.translation_coordinator.get_active();
-        let active_ids: Vec<_> = active.iter().map(|p| p.read().id().to_string()).collect();
+        let active_ids: Vec<_> = active.iter().map(|p| p.id().to_string()).collect();
 
         // Load custom provider definitions for extra metadata
         let custom_defs = self
@@ -1144,7 +891,7 @@ impl ProviderConfiguration {
         all_providers
             .iter()
             .map(|p| {
-                let provider = p.read();
+                let provider = p;
                 let id = provider.id().to_string();
                 let is_builtin = matches!(
                     id.as_str(),
@@ -1184,7 +931,7 @@ impl ProviderConfiguration {
             .get(&provider_id)
             .ok_or_else(|| AppError::Other(format!("Provider not found: {}", provider_id)))?;
 
-        let fields = provider.read().credential_fields();
+        let fields = provider.credential_fields();
         Ok(fields)
     }
 
@@ -1195,68 +942,48 @@ impl ProviderConfiguration {
         credentials: Vec<CredentialValue>,
     ) -> crate::Result<()> {
         let _guard = self.lock_provider_state()?;
-
-        // Convert to HashMap for validation and processing
-        let cred_map: HashMap<String, String> =
-            credentials.into_iter().map(|c| (c.key, c.value)).collect();
-
-        // Get provider to validate schema
+        let values: HashMap<String, String> = credentials
+            .into_iter()
+            .map(|credential| (credential.key, credential.value))
+            .collect();
         let provider = self
             .translation_coordinator
             .get(&provider_id)
-            .ok_or_else(|| AppError::Other(format!("Provider not found: {}", provider_id)))?;
-
-        let expected_fields = {
-            let provider = provider.read();
-            provider.validate_credentials(&cred_map)?;
-            provider.credential_fields()
-        };
-
-        // Validate that all provided credentials are non-blank
-        for (key, value) in &cred_map {
+            .ok_or_else(|| AppError::Other(format!("Provider not found: {provider_id}")))?;
+        provider.validate_credentials(&values)?;
+        for (key, value) in &values {
             if value.trim().is_empty() {
                 return Err(AppError::Other(format!(
-                    "Credential '{}' cannot be blank",
-                    key
+                    "Credential '{key}' cannot be blank"
                 )));
             }
         }
-
-        // Snapshot existing credentials for rollback
-        let field_names: Vec<String> = expected_fields.iter().map(|f| f.name.clone()).collect();
-        let snapshot = self
-            .credential_store
-            .snapshot_provider_credentials(&provider_id, &field_names)
-            .map_err(|e| AppError::Other(format!("Failed to snapshot credentials: {}", e)))?;
-
-        // Persist the complete credential set atomically.
-        if let Err(e) = self
-            .credential_store
-            .save_provider_credentials(&provider_id, &cred_map)
-        {
-            return Err(AppError::Other(format!(
-                "Failed to save credentials: {}",
-                e
-            )));
-        }
-
-        // Reconfigure the provider with credentials
-        if let Err(e) = self
-            .translation_coordinator
-            .reconfigure_provider(&provider_id, &cred_map)
-        {
-            // Complete rollback using snapshot
-            let _ = self
-                .credential_store
-                .restore_provider_credentials(&provider_id, &snapshot);
-            return Err(AppError::Other(format!(
-                "Failed to reconfigure provider: {}",
-                e
-            )));
-        }
-
-        self.notify_changed();
-        Ok(())
+        let definition = self
+            .config_store
+            .load_custom_translation_providers()
+            .unwrap_or_default()
+            .into_iter()
+            .find(|definition| definition.id == provider_id);
+        let replacement = if let Some(definition) = definition {
+            Arc::new(create_llm_translation_provider(
+                &definition,
+                self.llm_runtime.clone(),
+                values["api_key"].clone(),
+                self.config_store.clone(),
+            )) as Arc<dyn crate::application::providers::TranslationProvider>
+        } else {
+            provider.with_credentials(&values)?
+        };
+        self.commit(
+            TranslationProviderChange::Replace(replacement),
+            TranslationProviderMutation {
+                credentials: Some(CredentialMutation::Save {
+                    provider_id,
+                    values,
+                }),
+                ..Default::default()
+            },
+        )
     }
 
     /// Activate a translation provider by ID (with provider state lock).
@@ -1296,13 +1023,13 @@ impl ProviderConfiguration {
             .translation_coordinator
             .get_active()
             .iter()
-            .map(|provider| provider.read().id().to_string())
+            .map(|provider| provider.id().to_string())
             .collect::<Vec<_>>();
         let mut expected_ids = self
             .translation_coordinator
             .list_all()
             .iter()
-            .map(|provider| provider.read().id().to_string())
+            .map(|provider| provider.id().to_string())
             .filter(|id| !active_ids.contains(id))
             .collect::<Vec<_>>();
         let mut received_ids = ordered_ids.clone();
@@ -1370,14 +1097,12 @@ impl ProviderConfiguration {
 mod provider_configuration_tests {
     use super::*;
     use crate::application::providers::translation::TranslationCoordinator;
-    use crate::application::providers::{
-        CredentialSnapshot, HttpClient, HttpResponse, LlmRuntime, ProviderCredentialStore,
-    };
+    use crate::application::providers::{HttpClient, HttpResponse, LlmRuntime};
     use crate::infrastructure::storage::{Database, SqliteConfigStore, SqliteCredentialStore};
     use anyhow::Result;
     use async_trait::async_trait;
     use std::collections::HashMap;
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
 
     struct MockHttpClient;
 
@@ -1704,180 +1429,166 @@ mod provider_configuration_tests {
         assert!(remaining_defs.is_empty());
     }
 
-    #[derive(Clone)]
-    struct FailingCredentialStore {
-        inner: Arc<SqliteCredentialStore>,
-        fail_delete: Arc<Mutex<bool>>,
-    }
+    #[test]
+    fn failed_remove_keeps_configuration_credentials_runtime_and_order() {
+        let (configuration, database) = test_provider_configuration_with_database();
+        let view = configuration
+            .add(AddCustomTranslationProviderInput {
+                name: "Atomic delete".into(),
+                protocol: "openai".into(),
+                endpoint: "https://example.com".into(),
+                model: "model".into(),
+                api_key: "old-key".into(),
+                reasoning_level: None,
+                prompt_strategy_id: None,
+                prompt_fallback_strategy_id: None,
+            })
+            .unwrap();
+        let previous_provider = configuration.translation_coordinator.get(&view.id).unwrap();
+        let previous_order = configuration.translation_coordinator.active_ids();
+        let previous_inactive = vec![view.id.clone()];
+        configuration
+            .config_store
+            .save_inactive_translation_providers(&previous_inactive)
+            .unwrap();
+        database.with_connection(|connection| {
+            connection.execute_batch("CREATE TRIGGER fail_credential_delete BEFORE DELETE ON provider_credentials BEGIN SELECT RAISE(ABORT, 'injected delete failure'); END;")?;
+            Ok(())
+        }).unwrap();
 
-    impl FailingCredentialStore {
-        fn new(database: Arc<Database>) -> Self {
-            Self {
-                inner: Arc::new(SqliteCredentialStore::new(database)),
-                fail_delete: Arc::new(Mutex::new(false)),
-            }
-        }
+        assert!(configuration.remove(view.id.clone()).is_err());
+        assert_eq!(
+            configuration
+                .config_store
+                .load_custom_translation_providers()
+                .unwrap()[0]
+                .id,
+            view.id
+        );
+        assert_eq!(
+            configuration
+                .credential_store
+                .load_provider_credential(&view.id)
+                .unwrap(),
+            "old-key"
+        );
+        assert_eq!(
+            configuration.translation_coordinator.active_ids(),
+            previous_order
+        );
+        assert_eq!(
+            configuration
+                .config_store
+                .load_active_translation_providers()
+                .unwrap(),
+            previous_order
+        );
+        assert_eq!(
+            configuration
+                .config_store
+                .load_inactive_translation_providers()
+                .unwrap(),
+            previous_inactive
+        );
+        assert!(Arc::ptr_eq(
+            &previous_provider,
+            &configuration.translation_coordinator.get(&view.id).unwrap()
+        ));
 
-        fn fail_on_delete(&self) {
-            *self.fail_delete.lock().unwrap() = true;
-        }
-    }
-
-    impl ProviderCredentialStore for FailingCredentialStore {
-        fn save_provider_credential(&self, provider_id: &str, api_key: &str) -> crate::Result<()> {
-            self.inner.save_provider_credential(provider_id, api_key)
-        }
-
-        fn load_provider_credential(&self, provider_id: &str) -> crate::Result<String> {
-            self.inner.load_provider_credential(provider_id)
-        }
-
-        fn delete_provider_credential(&self, provider_id: &str) -> crate::Result<()> {
-            self.inner.delete_provider_credential(provider_id)
-        }
-
-        fn save_provider_credentials(
-            &self,
-            provider_id: &str,
-            credentials: &HashMap<String, String>,
-        ) -> crate::Result<()> {
-            self.inner
-                .save_provider_credentials(provider_id, credentials)
-        }
-
-        fn snapshot_provider_credentials(
-            &self,
-            provider_id: &str,
-            field_names: &[String],
-        ) -> crate::Result<CredentialSnapshot> {
-            self.inner
-                .snapshot_provider_credentials(provider_id, field_names)
-        }
-
-        fn restore_provider_credentials(
-            &self,
-            provider_id: &str,
-            snapshot: &CredentialSnapshot,
-        ) -> crate::Result<()> {
-            self.inner
-                .restore_provider_credentials(provider_id, snapshot)
-        }
-
-        fn load_provider_credentials(
-            &self,
-            provider_id: &str,
-            field_names: &[String],
-        ) -> crate::Result<HashMap<String, String>> {
-            self.inner
-                .load_provider_credentials(provider_id, field_names)
-        }
-
-        fn delete_provider_credentials(
-            &self,
-            provider_id: &str,
-            field_names: &[String],
-        ) -> crate::Result<()> {
-            if *self.fail_delete.lock().unwrap() {
-                return Err(crate::AppError::Other(
-                    "Simulated credential delete failure".to_string(),
-                ));
-            }
-            self.inner
-                .delete_provider_credentials(provider_id, field_names)
-        }
+        database
+            .with_connection(|connection| {
+                connection.execute_batch("DROP TRIGGER fail_credential_delete")?;
+                Ok(())
+            })
+            .unwrap();
+        configuration.remove(view.id.clone()).unwrap();
+        assert!(configuration
+            .config_store
+            .load_active_translation_providers()
+            .unwrap()
+            .is_empty());
+        assert!(configuration
+            .config_store
+            .load_inactive_translation_providers()
+            .unwrap()
+            .is_empty());
+        assert!(configuration
+            .config_store
+            .load_custom_translation_providers()
+            .unwrap()
+            .is_empty());
+        assert!(configuration
+            .credential_store
+            .load_provider_credential(&view.id)
+            .is_err());
+        assert!(configuration
+            .translation_coordinator
+            .get(&view.id)
+            .is_none());
     }
 
     #[test]
-    fn remove_rolls_back_all_state_on_structured_credential_delete_failure() {
-        let database = Arc::new(Database::in_memory().unwrap());
-        let credential_store = Arc::new(FailingCredentialStore::new(database.clone()));
-        let config_file = Arc::new(SqliteConfigStore::new(database));
-        let http_client: Arc<dyn HttpClient> = Arc::new(MockHttpClient);
-        let llm_runtime = llm_runtime_from_http(http_client.clone());
-        let coordinator = Arc::new(TranslationCoordinator::new(config_file.clone()));
-        let llm_introspection = Arc::new(crate::application::providers::LlmIntrospection::new(
-            llm_runtime.clone(),
-        ));
-
-        let config = ProviderConfiguration::new(
-            config_file.clone(),
-            credential_store.clone(),
-            llm_runtime.clone(),
-            coordinator.clone(),
-            llm_introspection,
-        );
-
-        // Add a custom provider with structured credentials
-        let def = CustomTranslationProviderDef {
-            id: "test-custom-3".to_string(),
-            name: "Test Custom 3".to_string(),
-            protocol: LLMProtocol::OpenAI,
-            endpoint: "https://api.example.com/v1".to_string(),
-            model: "test-model".to_string(),
+    fn failed_add_and_update_do_not_publish_partial_provider_state() {
+        let (configuration, database) = test_provider_configuration_with_database();
+        database.with_connection(|connection| {
+            connection.execute_batch("CREATE TRIGGER fail_credential_save BEFORE INSERT ON provider_credentials WHEN NEW.value = 'blocked' BEGIN SELECT RAISE(ABORT, 'injected save failure'); END;")?;
+            Ok(())
+        }).unwrap();
+        let input = |key: &str| AddCustomTranslationProviderInput {
+            name: "Atomic save".into(),
+            protocol: "openai".into(),
+            endpoint: "https://example.com".into(),
+            model: "old-model".into(),
+            api_key: key.into(),
             reasoning_level: None,
-            prompt_strategy_id: "default".to_string(),
-            prompt_fallback_strategy_id: "default".to_string(),
+            prompt_strategy_id: None,
+            prompt_fallback_strategy_id: None,
         };
-
-        config_file
-            .save("custom_translation_providers", &vec![def.clone()])
-            .unwrap();
-
-        // Register the provider
-        let provider = create_llm_translation_provider(
-            &def,
-            llm_runtime,
-            "test-key".to_string(),
-            config_file.clone(),
-        );
-        coordinator.register(provider).unwrap();
-        coordinator.activate("test-custom-3").unwrap();
-
-        credential_store
-            .save_provider_credentials(
-                "test-custom-3",
-                &HashMap::from([("api_key".to_string(), "test-key".to_string())]),
+        assert!(configuration.add(input("blocked")).is_err());
+        assert!(configuration
+            .config_store
+            .load_custom_translation_providers()
+            .is_err());
+        assert!(configuration
+            .translation_coordinator
+            .get_active()
+            .is_empty());
+        let view = configuration.add(input("old-key")).unwrap();
+        let previous_provider = configuration.translation_coordinator.get(&view.id).unwrap();
+        assert!(configuration
+            .update(
+                view.id.clone(),
+                UpdateCustomTranslationProviderInput {
+                    name: "Changed".into(),
+                    protocol: "openai".into(),
+                    endpoint: "https://example.com".into(),
+                    model: "new-model".into(),
+                    api_key: Some("blocked".into()),
+                    reasoning_level: None,
+                    prompt_strategy_id: None,
+                    prompt_fallback_strategy_id: None,
+                }
             )
-            .unwrap();
-
-        credential_store.fail_on_delete();
-
-        // Attempt to remove - should fail on structured credential deletion
-        let result = config.remove("test-custom-3".to_string());
-
-        // Should fail
-        assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Failed to delete structured credentials"));
-
-        // Verify complete rollback:
-        // 1. Config should still have the provider
-        let remaining_defs = config_file
-            .load::<Vec<CustomTranslationProviderDef>>("custom_translation_providers")
-            .unwrap();
-        assert_eq!(remaining_defs.len(), 1);
-        assert_eq!(remaining_defs[0].id, "test-custom-3");
-
-        // 2. Simple credential should still exist
-        let simple_key = credential_store.load_provider_credential("test-custom-3");
-        assert!(simple_key.is_ok());
-        assert_eq!(simple_key.unwrap(), "test-key");
-
-        // 3. Structured credential should still exist
-        let struct_creds = credential_store
-            .load_provider_credentials("test-custom-3", &vec!["api_key".to_string()])
-            .unwrap();
-        assert_eq!(struct_creds.get("api_key").unwrap(), "test-key");
-
-        // 4. Provider should still be registered
-        assert!(coordinator.get("test-custom-3").is_some());
-
-        // 5. Provider should still be active
-        let active = coordinator.get_active();
-        let active_ids: Vec<String> = active.iter().map(|p| p.read().id().to_string()).collect();
-        assert!(active_ids.contains(&"test-custom-3".to_string()));
+            .is_err());
+        assert_eq!(
+            configuration
+                .config_store
+                .load_custom_translation_providers()
+                .unwrap()[0]
+                .model,
+            "old-model"
+        );
+        assert_eq!(
+            configuration
+                .credential_store
+                .load_provider_credential(&view.id)
+                .unwrap(),
+            "old-key"
+        );
+        assert!(Arc::ptr_eq(
+            &previous_provider,
+            &configuration.translation_coordinator.get(&view.id).unwrap()
+        ));
     }
 
     #[test]
@@ -1993,40 +1704,21 @@ mod provider_configuration_tests {
         let result1 = h1.join().unwrap();
         let result2 = h2.join().unwrap();
 
-        // Exactly one succeeds (serialized by provider_state_lock).
-        // The lock ensures mutual exclusion: remove and save_credentials cannot
-        // interleave, so the loser sees "provider not found" or similar.
-        assert!(result1.is_ok() ^ result2.is_ok());
-
-        // Invariant: if remove succeeded, provider is gone from all stores
-        if result1.is_ok() {
-            let custom_defs = config
-                .config_store
-                .load_custom_translation_providers()
-                .unwrap_or_default();
-            assert!(!custom_defs.iter().any(|d| d.id == provider_id));
-            assert!(config
-                .credential_store
-                .load_provider_credential(&provider_id)
-                .is_err());
-            assert!(config.translation_coordinator.get(&provider_id).is_none());
+        assert!(result1.is_ok());
+        if let Err(error) = result2 {
+            assert!(error.to_string().contains("Provider not found"));
         }
-
-        // If save_credentials succeeded, provider is still present with new credential
-        if result2.is_ok() {
-            let custom_defs = config
-                .config_store
-                .load_custom_translation_providers()
-                .unwrap();
-            assert!(custom_defs.iter().any(|d| d.id == provider_id));
-            assert_eq!(
-                config
-                    .credential_store
-                    .load_provider_credential(&provider_id)
-                    .unwrap(),
-                "new-key"
-            );
-            assert!(config.translation_coordinator.get(&provider_id).is_some());
-        }
+        let definitions = config
+            .config_store
+            .load_custom_translation_providers()
+            .unwrap();
+        assert!(!definitions
+            .iter()
+            .any(|definition| definition.id == provider_id));
+        assert!(config
+            .credential_store
+            .load_provider_credential(&provider_id)
+            .is_err());
+        assert!(config.translation_coordinator.get(&provider_id).is_none());
     }
 }

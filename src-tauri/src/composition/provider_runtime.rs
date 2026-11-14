@@ -89,6 +89,7 @@ pub(crate) fn build_translation_coordinator(
     config_store: Arc<dyn ProviderConfigStore>,
     http_client: Arc<dyn HttpClient>,
     event_sink: Arc<dyn ProviderEventSink>,
+    lifecycle: Arc<crate::application::providers::request_lifecycle::RequestLifecycle>,
 ) -> Arc<TranslationCoordinator> {
     let translation_coordinator = TranslationCoordinator::new(config_store);
 
@@ -112,7 +113,11 @@ pub(crate) fn build_translation_coordinator(
         log::warn!("Failed to restore active providers from config: {}", e);
     }
 
-    Arc::new(translation_coordinator.with_event_sink(event_sink))
+    Arc::new(
+        translation_coordinator
+            .with_event_sink(event_sink)
+            .with_lifecycle(lifecycle),
+    )
 }
 
 pub(crate) fn build_ocr_coordinator(
@@ -122,6 +127,7 @@ pub(crate) fn build_ocr_coordinator(
     change_notifier: Arc<dyn crate::application::providers::ProviderChangeNotifier>,
     paddle_engine: Arc<dyn PaddleOcrEngine>,
     settings: Arc<crate::SettingsConfiguration>,
+    lifecycle: Arc<crate::application::providers::request_lifecycle::RequestLifecycle>,
 ) -> Arc<OcrCoordinator> {
     let ocr_coordinator = OcrCoordinator::new(config_store);
     ocr_coordinator
@@ -154,7 +160,8 @@ pub(crate) fn build_ocr_coordinator(
     Arc::new(
         ocr_coordinator
             .with_event_sink(event_sink)
-            .with_change_notifier(change_notifier),
+            .with_change_notifier(change_notifier)
+            .with_lifecycle(lifecycle),
     )
 }
 
@@ -242,6 +249,7 @@ mod tests {
             Arc::new(crate::SettingsConfiguration::new(Arc::new(
                 SqliteConfigStore::new_temp(),
             ))),
+            Arc::new(crate::application::providers::request_lifecycle::RequestLifecycle::default()),
         );
 
         assert!(coordinator.get("system-ocr").is_some());

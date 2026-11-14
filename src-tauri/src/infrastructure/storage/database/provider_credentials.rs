@@ -155,7 +155,7 @@ impl ProviderCredentialStore for SqliteCredentialStore {
     }
 }
 
-fn credential_storage_key(provider_id: &str, field_name: &str) -> String {
+pub(super) fn credential_storage_key(provider_id: &str, field_name: &str) -> String {
     format!("provider:{provider_id}:credential:{field_name}")
 }
 
@@ -169,7 +169,7 @@ fn load_optional(connection: &Connection, storage_key: &str) -> Result<Option<St
         .optional()?)
 }
 
-fn upsert(
+pub(super) fn upsert(
     transaction: &Transaction<'_>,
     storage_key: &str,
     value: &str,

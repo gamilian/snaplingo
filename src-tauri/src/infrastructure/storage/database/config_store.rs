@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{params, OptionalExtension, Transaction};
 use serde::{Deserialize, Serialize};
 
 use crate::application::hotkeys::HotkeyStore;
 use crate::application::providers::{
-    CustomTranslationProviderDef, ProviderConfigStore, TranslationPromptStrategyConfig,
+    CredentialMutation, CustomTranslationProviderDef, ProviderConfigStore,
+    TranslationPromptStrategyConfig, TranslationProviderMutation,
 };
 use crate::application::settings::SettingsStore;
 use crate::domain::hotkey_config::HotkeySettingsSnapshot;
@@ -58,22 +59,8 @@ impl SqliteConfigStore {
     }
 
     fn save_namespace<T: Serialize>(&self, namespace: &str, value: &T) -> Result<()> {
-        let payload = serde_json::to_string(value)?;
-        let updated_at = Utc::now().timestamp_millis();
-
-        self.database.with_transaction(|transaction| {
-            transaction.execute(
-                "INSERT INTO settings (namespace, payload_version, payload_json, revision, updated_at)
-                 VALUES (?1, ?2, ?3, 1, ?4)
-                 ON CONFLICT(namespace) DO UPDATE SET
-                    payload_version = excluded.payload_version,
-                    payload_json = excluded.payload_json,
-                    revision = settings.revision + 1,
-                    updated_at = excluded.updated_at",
-                params![namespace, PAYLOAD_VERSION, payload, updated_at],
-            )?;
-            Ok(())
-        })
+        self.database
+            .with_transaction(|transaction| save_namespace(transaction, namespace, value))
     }
 
     fn load_namespace<T: for<'de> Deserialize<'de>>(&self, namespace: &str) -> Result<T> {
@@ -126,6 +113,65 @@ impl HotkeyStore for SqliteConfigStore {
 }
 
 impl ProviderConfigStore for SqliteConfigStore {
+    fn commit_translation_provider_change(
+        &self,
+        change: &TranslationProviderMutation,
+    ) -> Result<()> {
+        self.database.with_transaction(|transaction| {
+            if let Some(definitions) = &change.definitions {
+                save_namespace(
+                    transaction,
+                    CUSTOM_TRANSLATION_PROVIDERS_NAMESPACE,
+                    definitions,
+                )?;
+            }
+            if let Some(active) = &change.active {
+                save_namespace(transaction, ACTIVE_TRANSLATION_PROVIDERS_NAMESPACE, active)?;
+            }
+            if let Some(inactive) = &change.inactive {
+                save_namespace(
+                    transaction,
+                    INACTIVE_TRANSLATION_PROVIDERS_NAMESPACE,
+                    inactive,
+                )?;
+            }
+            match &change.credentials {
+                Some(CredentialMutation::Save {
+                    provider_id,
+                    values,
+                }) => {
+                    for (field, value) in values {
+                        super::provider_credentials::upsert(
+                            transaction,
+                            &super::provider_credentials::credential_storage_key(
+                                provider_id,
+                                field,
+                            ),
+                            value,
+                            Utc::now().timestamp_millis(),
+                        )?;
+                    }
+                }
+                Some(CredentialMutation::Delete {
+                    provider_id,
+                    fields,
+                }) => {
+                    for field in fields {
+                        transaction.execute(
+                            "DELETE FROM provider_credentials WHERE storage_key = ?1",
+                            [super::provider_credentials::credential_storage_key(
+                                provider_id,
+                                field,
+                            )],
+                        )?;
+                    }
+                }
+                None => {}
+            }
+            Ok(())
+        })
+    }
+
     fn load_custom_translation_providers(&self) -> Result<Vec<CustomTranslationProviderDef>> {
         self.load_namespace(CUSTOM_TRANSLATION_PROVIDERS_NAMESPACE)
     }
@@ -197,4 +243,27 @@ mod tests {
 
         assert!(matches!(error, AppError::Config(_)));
     }
+}
+
+fn save_namespace<T: Serialize>(
+    transaction: &Transaction<'_>,
+    namespace: &str,
+    value: &T,
+) -> Result<()> {
+    transaction.execute(
+        "INSERT INTO settings (namespace, payload_version, payload_json, revision, updated_at)
+         VALUES (?1, ?2, ?3, 1, ?4)
+         ON CONFLICT(namespace) DO UPDATE SET
+            payload_version = excluded.payload_version,
+            payload_json = excluded.payload_json,
+            revision = settings.revision + 1,
+            updated_at = excluded.updated_at",
+        params![
+            namespace,
+            PAYLOAD_VERSION,
+            serde_json::to_string(value)?,
+            Utc::now().timestamp_millis()
+        ],
+    )?;
+    Ok(())
 }

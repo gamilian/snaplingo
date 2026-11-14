@@ -10,6 +10,17 @@ use async_trait::async_trait;
 /// and returns an OcrResult.
 #[async_trait]
 pub trait OcrProvider: Provider {
+    /// Builds a replacement without mutating a provider used by an in-flight request.
+    fn with_credentials(
+        &self,
+        _credentials: &std::collections::HashMap<String, String>,
+    ) -> Result<std::sync::Arc<dyn OcrProvider>> {
+        Err(crate::AppError::Other(format!(
+            "Provider {} does not support runtime credential reconfiguration",
+            self.id()
+        )))
+    }
+
     fn acceleration_status(&self) -> Option<super::OcrAccelerationStatus> {
         None
     }

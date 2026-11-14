@@ -539,7 +539,7 @@ function recreateDmg(dmgPath) {
       "-srcfolder",
       stagingDir,
       "-format",
-      "UDZO",
+      "ULMO",
       stagedDmgPath,
     ]);
 

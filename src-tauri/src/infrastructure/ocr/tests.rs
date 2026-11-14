@@ -1,7 +1,45 @@
 use super::*;
 
-#[test]
-fn missing_bundle_resources_do_not_fall_back_to_the_working_directory() {
+#[tokio::test]
+async fn request_queue_is_bounded_and_cancelled_waiters_release_admission() {
+    let root = tempfile::tempdir().unwrap();
+    let engine = std::sync::Arc::new(LocalPaddleOcrEngine::new(Some(root.path().to_path_buf())));
+    let _blocked = engine.request_lock.lock().await;
+    let spawn_request = || {
+        let engine = engine.clone();
+        tokio::spawn(async move {
+            engine
+                .recognize(
+                    &OcrRequest {
+                        image_data: vec![],
+                        language: None,
+                    },
+                    false,
+                )
+                .await
+        })
+    };
+    let first = spawn_request();
+    let second = spawn_request();
+    tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        while engine.request_slots.available_permits() != 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    let rejected = spawn_request().await.unwrap().unwrap_err();
+    assert!(rejected.to_string().contains("OCR is busy"));
+    second.abort();
+    assert!(second.await.unwrap_err().is_cancelled());
+    assert_eq!(engine.request_slots.available_permits(), 1);
+    first.abort();
+    assert!(first.await.unwrap_err().is_cancelled());
+    assert_eq!(engine.request_slots.available_permits(), 2);
+}
+
+#[tokio::test]
+async fn missing_bundle_resources_do_not_fall_back_to_the_working_directory() {
     let engine = LocalPaddleOcrEngine::new(None);
     assert!(!engine.is_available());
     assert!(!engine.supports_gpu());
@@ -13,6 +51,7 @@ fn missing_bundle_resources_do_not_fall_back_to_the_working_directory() {
             },
             true
         )
+        .await
         .unwrap_err()
         .to_string()
         .contains("resources are unavailable"));

@@ -17,7 +17,9 @@ pub use administration::{
 };
 pub use change_notifier::ProviderChangeNotifier;
 pub use common::Provider;
-pub(crate) use config_store::ProviderConfigStore;
+pub(crate) use config_store::{
+    CredentialMutation, ProviderConfigStore, TranslationProviderMutation,
+};
 pub use configuration::{
     build_updated_custom_translation_provider_def, create_llm_translation_provider,
     custom_translation_provider_view, validate_required_credentials,
@@ -40,3 +42,5 @@ pub use translation_prompt::{
     TranslationPromptConfiguration, TranslationPromptStrategy, TranslationPromptStrategyConfig,
     DEFAULT_PROMPT_STRATEGY_ID, SMART_PROMPT_STRATEGY_ID,
 };
+
+pub(crate) mod request_lifecycle;

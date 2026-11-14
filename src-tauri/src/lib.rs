@@ -110,7 +110,7 @@ pub fn run() {
             )?;
             let app_state =
                 composition::build_app_state(database, database_path, app.handle().clone());
-            composition::subscribe_history(&app_state);
+            composition::start_history_cleanup(&app_state);
             let start_on_boot = app_state
                 .settings
                 .configuration

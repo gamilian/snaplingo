@@ -6,6 +6,7 @@ import type {
 } from './ports';
 import {
   createSettingsConfiguration,
+  createDurableSettingsConfiguration,
   type SettingsConfigurationEventsPort,
 } from './configuration';
 
@@ -58,6 +59,82 @@ const hotkeys = {
 };
 
 describe('settings configuration application module', () => {
+  it('subscribes to settings changes before hydrating a lightweight window', async () => {
+    const { durableSettings } = createFixture();
+    const settings = createDurableSettingsConfiguration(durableSettings);
+    let finishSubscription!: (cleanup: () => void) => void;
+    let changed!: () => void | Promise<void>;
+    const unlisten = vi.fn();
+    const events = {
+      subscribeSettingsChanged: vi.fn((handler: () => void | Promise<void>) => {
+        changed = handler;
+        return new Promise<() => void>((resolve) => { finishSubscription = resolve; });
+      }),
+    };
+    const stop = settings.synchronize(events);
+    expect(durableSettings.getSettingsSnapshot).not.toHaveBeenCalled();
+    finishSubscription(unlisten);
+    await vi.waitFor(() => expect(settings.getState().hydrated).toBe(true));
+    const updated = { ...initialSettings, general: { ...initialSettings.general, theme: 'dark' } };
+    durableSettings.getSettingsSnapshot.mockResolvedValueOnce(updated);
+    await changed();
+    expect(settings.getState().snapshot).toBe(updated);
+    stop();
+    expect(unlisten).toHaveBeenCalledOnce();
+    await changed();
+    expect(durableSettings.getSettingsSnapshot).toHaveBeenCalledTimes(2);
+  });
+
+  it('cleans up late subscriptions without hydrating a disposed window', async () => {
+    const { durableSettings } = createFixture();
+    const settings = createDurableSettingsConfiguration(durableSettings);
+    let finishSubscription!: (cleanup: () => void) => void;
+    const unlisten = vi.fn();
+    const stop = settings.synchronize({
+      subscribeSettingsChanged: () => new Promise((resolve) => { finishSubscription = resolve; }),
+    });
+    stop();
+    finishSubscription(unlisten);
+    await vi.waitFor(() => expect(unlisten).toHaveBeenCalledOnce());
+    expect(durableSettings.getSettingsSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('contains refresh errors from settings signals', async () => {
+    const { durableSettings } = createFixture();
+    const settings = createDurableSettingsConfiguration(durableSettings);
+    let changed!: () => void | Promise<void>;
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const stop = settings.synchronize({
+      subscribeSettingsChanged: async (handler) => { changed = handler; return () => {}; },
+    });
+    await vi.waitFor(() => expect(settings.getState().hydrated).toBe(true));
+    durableSettings.getSettingsSnapshot.mockRejectedValueOnce(new Error('offline'));
+    await expect(Promise.resolve(changed())).resolves.toBeUndefined();
+    expect(warning).toHaveBeenCalled();
+    expect(settings.getState().snapshot).toBe(initialSettings);
+    stop();
+    warning.mockRestore();
+  });
+
+  it('preserves independent updates from windows with stale snapshots', async () => {
+    let committed = structuredClone(initialSettings);
+    const port = {
+      getSettingsSnapshot: vi.fn(async () => structuredClone(committed)),
+      updateScreenshotSettings: vi.fn(async (input) => {
+        committed = { ...committed, screenshot: { ...committed.screenshot, ...input } };
+        return structuredClone(committed);
+      }),
+    } as unknown as import('./ports').DurableSettingsPort;
+    const settingsWindow = createDurableSettingsConfiguration(port);
+    const pinnedWindow = createDurableSettingsConfiguration(port);
+    await Promise.all([settingsWindow.hydrate(), pinnedWindow.hydrate()]);
+
+    await settingsWindow.updateScreenshot({ quality: 95 });
+    await pinnedWindow.updateScreenshot({ pinBorder: true });
+
+    expect(committed.screenshot.quality).toBe(95);
+    expect(committed.screenshot.pinBorder).toBe(true);
+  });
   it('shares one hydration request and publishes the durable snapshot', async () => {
     let finishHydration!: (snapshot: SettingsSnapshot) => void;
     const hydration = new Promise<SettingsSnapshot>((resolve) => {
@@ -106,7 +183,7 @@ describe('settings configuration application module', () => {
     expect(configuration.settings.getState().snapshot).toBe(updated);
   });
 
-  it('serializes partial updates against the latest applied snapshot', async () => {
+  it('serializes updates while sending only changed fields', async () => {
     let finishFirst!: (snapshot: SettingsSnapshot) => void;
     const firstResponse = new Promise<SettingsSnapshot>((resolve) => {
       finishFirst = resolve;
@@ -138,7 +215,6 @@ describe('settings configuration application module', () => {
     finishFirst(firstSnapshot);
     await Promise.all([first, second]);
     expect(durableSettings.updateTranslationSettings).toHaveBeenNthCalledWith(2, {
-      ...firstSnapshot.translation,
       preserveLineBreaks: false,
     });
     expect(configuration.settings.getState().snapshot).toBe(secondSnapshot);

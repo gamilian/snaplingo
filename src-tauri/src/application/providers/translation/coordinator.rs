@@ -18,12 +18,12 @@ static TRANSLATION_REQUEST_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 /// and translation execution with concurrent provider support. It replaces
 /// the previous Registry + Service split with a single cohesive component.
 ///
-/// Concurrency model: Uses fine-grained internal locking to allow safe &self
-/// access while maintaining thread-safety. Providers use RwLock for dynamic
-/// registration/removal.
+/// Registry locks protect snapshot replacement and activation order. Requests
+/// clone immutable provider snapshots and release locks before execution.
 pub struct TranslationCoordinator {
-    /// Map of provider ID to provider instance (wrapped for dynamic registration and reconfiguration)
-    providers: Arc<RwLock<HashMap<String, Arc<RwLock<dyn TranslationProvider>>>>>,
+    lifecycle: Arc<super::super::request_lifecycle::RequestLifecycle>,
+    /// Map of provider ID to its current immutable runtime snapshot.
+    providers: Arc<RwLock<HashMap<String, Arc<dyn TranslationProvider>>>>,
     /// List of active provider IDs (in order of activation)
     /// Wrapped in Arc<Mutex<>> for interior mutability
     active: Arc<Mutex<Vec<String>>>,
@@ -33,10 +33,63 @@ pub struct TranslationCoordinator {
     event_sink: Option<Arc<dyn ProviderEventSink>>,
 }
 
+pub(crate) enum TranslationProviderChange {
+    Add(Arc<dyn TranslationProvider>),
+    Replace(Arc<dyn TranslationProvider>),
+    Remove(String),
+}
+
 impl TranslationCoordinator {
+    /// Validate, persist, then publish the new runtime snapshot under one short lock.
+    pub(crate) fn commit_change(
+        &self,
+        change: TranslationProviderChange,
+        active_ids: Vec<String>,
+        persist: impl FnOnce() -> Result<()>,
+    ) -> Result<()> {
+        let mut active = self.active.lock().unwrap();
+        let mut providers = self.providers.write();
+        match &change {
+            TranslationProviderChange::Add(provider) if providers.contains_key(provider.id()) => {
+                return Err(format!("Provider already registered: {}", provider.id()).into());
+            }
+            TranslationProviderChange::Replace(provider)
+                if !providers.contains_key(provider.id()) =>
+            {
+                return Err(format!("Provider not found: {}", provider.id()).into());
+            }
+            _ => {}
+        }
+        persist()?;
+        match change {
+            TranslationProviderChange::Add(provider)
+            | TranslationProviderChange::Replace(provider) => {
+                providers.insert(provider.id().to_string(), provider);
+            }
+            TranslationProviderChange::Remove(id) => {
+                providers.remove(&id);
+            }
+        }
+        *active = active_ids;
+        Ok(())
+    }
+
+    pub(crate) fn active_ids(&self) -> Vec<String> {
+        self.active.lock().unwrap().clone()
+    }
+
+    pub(crate) fn with_lifecycle(
+        mut self,
+        lifecycle: Arc<super::super::request_lifecycle::RequestLifecycle>,
+    ) -> Self {
+        self.lifecycle = lifecycle;
+        self
+    }
+
     /// Creates a new TranslationCoordinator with the given config store.
     pub fn new(config_store: Arc<dyn ProviderConfigStore>) -> Self {
         Self {
+            lifecycle: Arc::new(super::super::request_lifecycle::RequestLifecycle::default()),
             providers: Arc::new(RwLock::new(HashMap::new())),
             active: Arc::new(Mutex::new(Vec::new())),
             config_store,
@@ -70,7 +123,7 @@ impl TranslationCoordinator {
         if providers.contains_key(&id) {
             return Err(format!("Provider already registered: {}", id).into());
         }
-        providers.insert(id, Arc::new(RwLock::new(provider)));
+        providers.insert(id, Arc::new(provider));
         Ok(())
     }
 
@@ -81,7 +134,7 @@ impl TranslationCoordinator {
         if !providers.contains_key(&id) {
             return Err(format!("Provider not found: {}", id).into());
         }
-        providers.insert(id, Arc::new(RwLock::new(provider)));
+        providers.insert(id, Arc::new(provider));
         Ok(())
     }
 
@@ -255,8 +308,8 @@ impl TranslationCoordinator {
     ///
     /// # Returns
     ///
-    /// * `Vec<Arc<RwLock<dyn TranslationProvider>>>` - List of active providers in activation order
-    pub fn get_active(&self) -> Vec<Arc<RwLock<dyn TranslationProvider>>> {
+    /// * `Vec<Arc<dyn TranslationProvider>>` - List of active providers in activation order
+    pub fn get_active(&self) -> Vec<Arc<dyn TranslationProvider>> {
         let active = self.active.lock().unwrap();
         let providers = self.providers.read();
         active
@@ -269,8 +322,8 @@ impl TranslationCoordinator {
     ///
     /// # Returns
     ///
-    /// * `Vec<Arc<RwLock<dyn TranslationProvider>>>` - List of all registered providers
-    pub fn list_all(&self) -> Vec<Arc<RwLock<dyn TranslationProvider>>> {
+    /// * `Vec<Arc<dyn TranslationProvider>>` - List of all registered providers
+    pub fn list_all(&self) -> Vec<Arc<dyn TranslationProvider>> {
         let providers = self.providers.read();
         providers.values().cloned().collect()
     }
@@ -283,8 +336,8 @@ impl TranslationCoordinator {
     ///
     /// # Returns
     ///
-    /// * `Option<Arc<RwLock<dyn TranslationProvider>>>` - The provider if found, None otherwise
-    pub fn get(&self, id: &str) -> Option<Arc<RwLock<dyn TranslationProvider>>> {
+    /// * `Option<Arc<dyn TranslationProvider>>` - The provider if found, None otherwise
+    pub fn get(&self, id: &str) -> Option<Arc<dyn TranslationProvider>> {
         let providers = self.providers.read();
         providers.get(id).cloned()
     }
@@ -325,87 +378,97 @@ impl TranslationCoordinator {
     /// # Errors
     ///
     /// Returns an error if no providers are active.
-    /// Individual provider failures are logged but don't fail the entire request.
+    /// Individual provider failures are returned without failing the entire request.
     pub async fn translate(&self, request: &TranslationRequest) -> Result<Vec<TranslationResult>> {
-        let start = Instant::now();
-        let request_id = next_translation_request_id();
+        self.lifecycle
+            .run(async {
+                let start = Instant::now();
+                let request_id = next_translation_request_id();
 
-        // Get active providers (lock is released immediately after cloning)
-        let active_providers = self.get_active();
+                // Get active providers (lock is released immediately after cloning)
+                let active_providers = self.get_active();
 
-        // Check if any providers are active
-        if active_providers.is_empty() {
-            return Err("No active translation providers".into());
-        }
-
-        // Spawn concurrent translation tasks
-        let mut tasks = Vec::new();
-        for provider_lock in &active_providers {
-            let provider_id = provider_lock.read().id().to_string();
-            let request = request.clone();
-            let provider_lock = provider_lock.clone();
-
-            let task = tokio::spawn(async move {
-                let started_at = Instant::now();
-                let provider = provider_lock.read();
-                let result = provider.translate(&request).await;
-                (result, started_at.elapsed().as_millis() as u64)
-            });
-
-            tasks.push((provider_id, task));
-        }
-
-        // Collect results
-        let mut results = Vec::new();
-        for (provider_id, task) in tasks {
-            match task.await {
-                Ok((Ok(mut result), duration_ms)) => {
-                    result.request_id = Some(request_id.clone());
-                    result.duration_ms = Some(duration_ms);
-                    results.push(result);
+                // Check if any providers are active
+                if active_providers.is_empty() {
+                    return Err("No active translation providers".into());
                 }
-                Ok((Err(e), duration_ms)) => {
-                    eprintln!("Translation provider error: {}", e);
-                    let mut result = translation_failure(
-                        provider_id,
-                        "provider_error",
-                        e.to_string(),
-                        duration_ms,
-                    );
-                    result.request_id = Some(request_id.clone());
-                    results.push(result);
+
+                // Spawn concurrent translation tasks
+                let mut tasks = tokio::task::JoinSet::new();
+                let mut task_providers = HashMap::new();
+                for provider_lock in &active_providers {
+                    let provider_id = provider_lock.id().to_string();
+                    let request = request.clone();
+                    let provider_lock = provider_lock.clone();
+                    let lifecycle = self.lifecycle.clone();
+
+                    let task_provider_id = provider_id.clone();
+                    let task = tasks.spawn(async move {
+                        let started_at = Instant::now();
+                        let provider = &provider_lock;
+                        let result = lifecycle.run(provider.translate(&request)).await;
+                        (provider_id, result, started_at.elapsed().as_millis() as u64)
+                    });
+                    task_providers.insert(task.id(), task_provider_id);
                 }
-                Err(e) => {
-                    eprintln!("Translation task error: {}", e);
-                    let mut result = translation_failure(
-                        provider_id,
-                        "provider_task_failed",
-                        e.to_string(),
-                        start.elapsed().as_millis() as u64,
-                    );
-                    result.request_id = Some(request_id.clone());
-                    results.push(result);
+
+                let mut results = Vec::new();
+                while let Some(task) = tasks.join_next().await {
+                    match task {
+                        Ok((_, Ok(mut result), duration_ms)) => {
+                            result.request_id = Some(request_id.clone());
+                            result.duration_ms = Some(duration_ms);
+                            results.push(result);
+                        }
+                        Ok((provider_id, Err(error), duration_ms)) => {
+                            let mut result = translation_failure(
+                                provider_id,
+                                "provider_error",
+                                error.to_string(),
+                                duration_ms,
+                            );
+                            result.request_id = Some(request_id.clone());
+                            results.push(result);
+                        }
+                        Err(error) => {
+                            let provider_id = task_providers[&error.id()].clone();
+                            let mut result = translation_failure(
+                                provider_id,
+                                "provider_task_failed",
+                                error.to_string(),
+                                start.elapsed().as_millis() as u64,
+                            );
+                            result.request_id = Some(request_id.clone());
+                            results.push(result);
+                        }
+                    }
                 }
-            }
-        }
+                // Preserve the configured display order regardless of completion order.
+                results.sort_by_key(|result| {
+                    active_providers
+                        .iter()
+                        .position(|provider| provider.id() == result.provider_id)
+                });
 
-        // Publish domain event if event sink is attached
-        if let Some(event_sink) = &self.event_sink {
-            let providers_used: Vec<String> = active_providers
-                .iter()
-                .map(|p| p.read().id().to_string())
-                .collect();
+                // Publish domain event if event sink is attached
+                if let Some(event_sink) = &self.event_sink {
+                    let providers_used: Vec<String> = active_providers
+                        .iter()
+                        .map(|p| p.id().to_string())
+                        .collect();
 
-            event_sink.publish(DomainEvent::TranslationCompleted {
-                request: request.clone(),
-                results: results.clone(),
-                providers_used,
-                timestamp: Utc::now(),
-                duration_ms: start.elapsed().as_millis() as u64,
-            });
-        }
+                    event_sink.publish(DomainEvent::TranslationCompleted {
+                        request: request.clone(),
+                        results: results.clone(),
+                        providers_used,
+                        timestamp: Utc::now(),
+                        duration_ms: start.elapsed().as_millis() as u64,
+                    });
+                }
 
-        Ok(results)
+                Ok(results)
+            })
+            .await
     }
 
     /// Translates text using one registered provider.
@@ -414,36 +477,40 @@ impl TranslationCoordinator {
         provider_id: &str,
         request: &TranslationRequest,
     ) -> Result<TranslationResult> {
-        let request_id = next_translation_request_id();
-        let started_at = Instant::now();
-        let Some(provider_lock) = self.get(provider_id) else {
-            let mut result = translation_failure(
-                provider_id.to_string(),
-                "provider_not_found",
-                format!("Provider not found: {}", provider_id),
-                started_at.elapsed().as_millis() as u64,
-            );
-            result.request_id = Some(request_id);
-            return Ok(result);
-        };
-        let provider = provider_lock.read();
-        match provider.translate(request).await {
-            Ok(mut result) => {
-                result.request_id = Some(request_id);
-                result.duration_ms = Some(started_at.elapsed().as_millis() as u64);
-                Ok(result)
-            }
-            Err(error) => {
-                let mut result = translation_failure(
-                    provider_id.to_string(),
-                    "provider_error",
-                    error.to_string(),
-                    started_at.elapsed().as_millis() as u64,
-                );
-                result.request_id = Some(request_id);
-                Ok(result)
-            }
-        }
+        self.lifecycle
+            .run(async {
+                let request_id = next_translation_request_id();
+                let started_at = Instant::now();
+                let Some(provider_lock) = self.get(provider_id) else {
+                    let mut result = translation_failure(
+                        provider_id.to_string(),
+                        "provider_not_found",
+                        format!("Provider not found: {}", provider_id),
+                        started_at.elapsed().as_millis() as u64,
+                    );
+                    result.request_id = Some(request_id);
+                    return Ok(result);
+                };
+                let provider = &provider_lock;
+                match provider.translate(request).await {
+                    Ok(mut result) => {
+                        result.request_id = Some(request_id);
+                        result.duration_ms = Some(started_at.elapsed().as_millis() as u64);
+                        Ok(result)
+                    }
+                    Err(error) => {
+                        let mut result = translation_failure(
+                            provider_id.to_string(),
+                            "provider_error",
+                            error.to_string(),
+                            started_at.elapsed().as_millis() as u64,
+                        );
+                        result.request_id = Some(request_id);
+                        Ok(result)
+                    }
+                }
+            })
+            .await
     }
 
     /// Reconfigures a provider's credentials at runtime.
@@ -463,16 +530,14 @@ impl TranslationCoordinator {
         provider_id: &str,
         credentials: &HashMap<String, String>,
     ) -> Result<()> {
-        let providers = self.providers.read();
-        let provider_lock = providers
-            .get(provider_id)
-            .ok_or_else(|| crate::AppError::Other(format!("Provider not found: {}", provider_id)))?
-            .clone();
-        drop(providers);
-
         let result = {
-            let mut provider = provider_lock.write();
-            provider.reconfigure_credentials(credentials)
+            let mut providers = self.providers.write();
+            let provider = providers.get(provider_id).ok_or_else(|| {
+                crate::AppError::Other(format!("Provider not found: {}", provider_id))
+            })?;
+            provider.with_credentials(credentials).map(|replacement| {
+                providers.insert(provider_id.to_string(), replacement);
+            })
         };
 
         // Publish event on failure

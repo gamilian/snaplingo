@@ -41,6 +41,9 @@ pub(crate) enum AppAction {
 
 pub(crate) fn dispatch_app_action(app: tauri::AppHandle, action: AppAction) {
     let state = app.state::<AppState>();
+    if state.request_lifecycle.is_stopping() {
+        return;
+    }
     if !action_permissions_granted(action, state.permissions.status()) {
         let permission = match action {
             AppAction::OpenCapture(_) => Some(SystemPermission::ScreenRecording),
@@ -132,6 +135,9 @@ pub(crate) fn dispatch_app_action(app: tauri::AppHandle, action: AppAction) {
             }
         }
         AppAction::Quit => {
+            if !app.state::<AppState>().request_lifecycle.begin_shutdown() {
+                return;
+            }
             if let Some(window) = app.get_webview_window(settings_window::SETTINGS_WINDOW_LABEL) {
                 if let Err(err) =
                     settings_window::remember_settings_webview_window_geometry(&window)
@@ -142,7 +148,12 @@ pub(crate) fn dispatch_app_action(app: tauri::AppHandle, action: AppAction) {
                     );
                 }
             }
-            app.exit(0);
+            tauri::async_runtime::spawn(async move {
+                if let Err(error) = app.state::<AppState>().shutdown().await {
+                    log::warn!("Failed to shut down cleanly: {error}");
+                }
+                app.exit(0);
+            });
         }
     }
 }

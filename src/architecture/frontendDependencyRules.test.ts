@@ -153,12 +153,43 @@ function forbiddenPlatformImports(files: SourceFile[]) {
       if (path.startsWith('src/platform/tauri/')) return false;
       if (specifier.startsWith('@tauri-apps/')) return true;
       if (/(?:^|\/)platform(?:\/|$)/.test(specifier)) {
-        return path !== 'src/App.tsx' && path !== 'src/CaptureApp.tsx';
+        return path !== 'src/App.tsx' && path !== 'src/CaptureApp.tsx'
+          && !path.startsWith('src/composition/');
       }
       return /(?:^|\/)tauri(?:\/|$)/.test(specifier);
     })
     .map(({ path, specifier }) => `${path} -> ${specifier}`)
     .sort();
+}
+
+function runtimeDependencies(entry: string, files: SourceFile[]) {
+  const paths = new Set(files.map((file) => file.path));
+  const dependencies = new Set<string>();
+  function visit(path: string) {
+    if (dependencies.has(path)) return;
+    dependencies.add(path);
+    const file = files.find((file) => file.path === path);
+    if (!file) return;
+    for (const statement of parseSourceFile(file).statements) {
+      if (!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) continue;
+      if (ts.isImportDeclaration(statement) && statement.importClause?.isTypeOnly) continue;
+      if (ts.isExportDeclaration(statement) && statement.isTypeOnly) continue;
+      if (!statement.moduleSpecifier || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
+      const specifier = statement.moduleSpecifier.text;
+      if (!specifier.startsWith('.')) continue;
+      const segments = path.split('/').slice(0, -1);
+      for (const segment of specifier.split('/')) {
+        if (segment === '..') segments.pop();
+        else if (segment !== '.') segments.push(segment);
+      }
+      const base = segments.join('/');
+      const target = [base, `${base}.ts`, `${base}.tsx`, `${base}/index.ts`, `${base}/index.tsx`]
+        .find((candidate) => paths.has(candidate));
+      if (target) visit(target);
+    }
+  }
+  visit(entry);
+  return [...dependencies];
 }
 
 function forbiddenApplicationViewImports(files: SourceFile[]) {
@@ -402,13 +433,25 @@ describe('frontend dependency rules', () => {
   });
 
   test.each([
-    ['src/App.tsx', [
-      './application/result-window/platformRuntime',
-      './application/pinned-image/runtime',
-      './application/settings/runtime',
-      './views/ResultWindow',
-      './views/PinnedImageWindow',
-      './views/SettingsWindow',
+    ['src/composition/SettingsApp.tsx', [
+      '../application/settings/runtime',
+      '../views/SettingsWindow',
+      './resultRuntime',
+    ]],
+    ['src/composition/ResultApp.tsx', [
+      '../application/settings/configuration',
+      '../views/ResultWindow',
+      './resultRuntime',
+    ]],
+    ['src/composition/PinnedApp.tsx', [
+      '../application/pinned-image/runtime',
+      '../application/settings/configuration',
+      '../views/PinnedImageWindow',
+    ]],
+    ['src/composition/ScrollingApp.tsx', [
+      '../application/scrolling-capture/runtime',
+      '../application/settings/configuration',
+      '../views/ScrollingCaptureWindow',
     ]],
     ['src/CaptureApp.tsx', [
       './application/capture-workspace/ports',
@@ -424,14 +467,14 @@ describe('frontend dependency rules', () => {
     expect(imports).toEqual(
       expect.arrayContaining(expectedImports),
     );
-    expect(imports.some((specifier) => specifier.startsWith('./platform/tauri/'))).toBe(true);
-    expect(imports.some((specifier) => specifier.startsWith('./tauri/'))).toBe(false);
+    expect(imports.some((specifier) => /(?:^|\/)platform\/tauri\//.test(specifier))).toBe(true);
+    expect(imports.some((specifier) => /^(?:\.\.?\/)+tauri\//.test(specifier))).toBe(false);
     expect(imports.some((specifier) => specifier.startsWith('@tauri-apps/'))).toBe(false);
   });
 
   test('Settings configuration lifecycle stays behind the Application seam', () => {
     const productionFiles = productionSourceFiles();
-    const appFile = productionFiles.find(({ path }) => path === 'src/App.tsx');
+    const appFile = productionFiles.find(({ path }) => path === 'src/composition/SettingsApp.tsx');
     expect(appFile).toBeDefined();
     expect(appFile!.source).toContain(
       'configurationEvents: persistentStateEvents',
@@ -463,16 +506,39 @@ describe('frontend dependency rules', () => {
     ).toEqual([]);
   });
 
+  test.each(['PinnedApp', 'ScrollingApp', 'ScrollingOutlineApp'])(
+    '%s stays independent of Settings, Library, Result and Provider runtimes', (entry) => {
+      const dependencies = runtimeDependencies(`src/composition/${entry}.tsx`, productionSourceFiles());
+      expect(dependencies.length).toBeGreaterThan(1);
+      expect(dependencies.filter((path) =>
+        /src\/views\/(?:SettingsWindow|ResultWindow|Library)(?:\/|\.)/.test(path)
+        || /src\/application\/(?:result-window|providers|library)(?:\/|\.)/.test(path)
+        || path === 'src/application/settings/runtime.ts'
+        || /src\/stores\/(?:provider|resultWindow|history|favorites|screenshotFavorites)Store\.ts/.test(path)
+        || /src\/platform\/tauri\/(?:providers|history|libraryIndex|favorites|screenshotFavorites|translation)\.ts/.test(path),
+      )).toEqual([]);
+    },
+  );
+
+  test('the root router only loads the selected window composition lazily', () => {
+    const file = productionSourceFiles().find(({ path }) => path === 'src/App.tsx')!;
+    const staticImports = parseSourceFile(file).statements.filter(ts.isImportDeclaration)
+      .map((statement) => (statement.moduleSpecifier as ts.StringLiteral).text);
+    expect(staticImports.filter((specifier) => specifier.includes('/composition/'))).toEqual([]);
+    expect(moduleImports([file]).filter(({ specifier }) => specifier.startsWith('./composition/'))).toHaveLength(5);
+    expect(file.source).not.toContain('createSettingsRuntime');
+  });
+
   test('Result Window projects application-owned state and scheduling', () => {
     const productionFiles = productionSourceFiles();
-    const appFile = productionFiles.find(({ path }) => path === 'src/App.tsx');
+    const appFile = productionFiles.find(({ path }) => path === 'src/composition/ResultApp.tsx');
     const viewFile = productionFiles.find(
       ({ path }) => path === 'src/views/ResultWindow/ResultWindow.tsx',
     );
 
     expect(appFile).toBeDefined();
     expect(viewFile).toBeDefined();
-    expect(appFile!.source).toContain('initializeResultWindowStore(resultWindowRuntime)');
+    expect(appFile!.source).toContain('initializeResultWindowStore(runtime)');
     expect(viewFile!.source).not.toContain('autoTranslateRequestId');
     expect(viewFile!.source).not.toContain('incrementalTranslation');
     const storeFile = productionFiles.find(({ path }) => path === 'src/stores/resultWindowStore.ts');

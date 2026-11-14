@@ -10,6 +10,17 @@ use async_trait::async_trait;
 /// and returns a TranslationResult.
 #[async_trait]
 pub trait TranslationProvider: Provider {
+    /// Builds a replacement without mutating a provider used by an in-flight request.
+    fn with_credentials(
+        &self,
+        _credentials: &std::collections::HashMap<String, String>,
+    ) -> Result<std::sync::Arc<dyn TranslationProvider>> {
+        Err(crate::AppError::Other(format!(
+            "Provider {} does not support runtime credential reconfiguration",
+            self.id()
+        )))
+    }
+
     /// Translates text from source language to target language.
     ///
     /// # Arguments

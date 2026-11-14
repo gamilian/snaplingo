@@ -5,7 +5,8 @@ mod tests;
 
 use std::path::PathBuf;
 
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
+use tokio::sync::{Mutex, Semaphore};
 
 use crate::application::providers::ocr::{
     OcrAccelerationStatus, OcrExecutionDevice, PaddleOcrEngine,
@@ -18,6 +19,7 @@ const MODEL_FILES: [&str; 3] = ["small_det.mnn", "small_rec.mnn", "small_keys.tx
 pub(crate) struct LocalPaddleOcrEngine {
     root: Option<PathBuf>,
     request_lock: Mutex<()>,
+    request_slots: Semaphore,
     status: RwLock<OcrAccelerationStatus>,
 }
 
@@ -26,6 +28,7 @@ impl LocalPaddleOcrEngine {
         Self {
             root,
             request_lock: Mutex::new(()),
+            request_slots: Semaphore::new(2),
             status: RwLock::new(OcrAccelerationStatus {
                 gpu_enabled: false,
                 device: Some(OcrExecutionDevice::Cpu),
@@ -35,6 +38,7 @@ impl LocalPaddleOcrEngine {
     }
 }
 
+#[async_trait::async_trait]
 impl PaddleOcrEngine for LocalPaddleOcrEngine {
     fn supports_gpu(&self) -> bool {
         false
@@ -50,14 +54,17 @@ impl PaddleOcrEngine for LocalPaddleOcrEngine {
         self.status.read().clone()
     }
 
-    fn recognize(&self, request: &OcrRequest, _: bool) -> Result<OcrResult> {
+    async fn recognize(&self, request: &OcrRequest, _: bool) -> Result<OcrResult> {
         let root = self
             .root
             .as_deref()
             .ok_or_else(|| AppError::Other("Packaged OCR resources are unavailable".into()))?;
         // Exiting the worker releases both model sessions and native allocator caches.
-        let _request = self.request_lock.lock();
-        let result = small_worker::recognize(root, request);
+        let _slot = self.request_slots.try_acquire().map_err(|_| {
+            AppError::System("OCR is busy; try again after the current request".into())
+        })?;
+        let _request = self.request_lock.lock().await;
+        let result = small_worker::recognize(root, request).await;
         self.status.write().device = result.as_ref().ok().map(|_| OcrExecutionDevice::Cpu);
         result
     }

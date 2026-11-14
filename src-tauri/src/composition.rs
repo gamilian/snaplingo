@@ -21,7 +21,7 @@ use screenshot_favorites_runtime::build_screenshot_favorites;
 use selection_runtime::build_selected_text_acquirer;
 use tts_runtime::build_tts_runtime;
 
-pub(crate) use history_runtime::subscribe_history;
+pub(crate) use history_runtime::start_history_cleanup;
 
 use crate::app_state::{
     AppState, CaptureRuntimeState, FavoritesRuntime, HistoryRuntime, LogsRuntime, ProviderRuntime,
@@ -138,7 +138,6 @@ pub(crate) fn build_app_state(
     let http_client: Arc<dyn HttpClient> = Arc::new(ReqwestHttpClient::with_settings(
         settings_configuration.clone(),
     ));
-    let event_bus = Arc::new(EventBus::new());
     let provider_change_notifier: Arc<dyn ProviderChangeNotifier> =
         Arc::new(TauriProviderChangeNotifier { app: app.clone() });
 
@@ -148,6 +147,9 @@ pub(crate) fn build_app_state(
         settings_configuration.clone(),
         app.clone(),
     );
+    let event_bus = Arc::new(EventBus::with_subscriber(history.clone()));
+    let request_lifecycle =
+        Arc::new(crate::application::providers::request_lifecycle::RequestLifecycle::default());
     let favorite_repository: Arc<dyn FavoriteRepository> =
         Arc::new(SqliteFavoriteRepository::new(database.clone()));
     let favorite_capacity = Arc::new(FavoriteCapacity::new(
@@ -172,6 +174,7 @@ pub(crate) fn build_app_state(
         provider_config_store.clone(),
         http_client.clone(),
         event_bus.clone(),
+        request_lifecycle.clone(),
     );
     let provider_configuration = build_provider_configuration(
         provider_config_store.clone(),
@@ -202,6 +205,7 @@ pub(crate) fn build_app_state(
             },
         )),
         settings_configuration.clone(),
+        request_lifecycle.clone(),
     );
     let ocr_configuration = Arc::new(
         OcrProviderConfiguration::new(ocr_coordinator.clone(), provider_credential_store.clone())
@@ -258,6 +262,7 @@ pub(crate) fn build_app_state(
     ));
 
     AppState {
+        request_lifecycle,
         updates: Arc::new(crate::application::updates::AppUpdates::new(
             Arc::new(
                 crate::infrastructure::system::updates::SystemAppUpdateHost::new(

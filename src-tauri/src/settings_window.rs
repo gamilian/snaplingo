@@ -176,20 +176,18 @@ fn save_settings_window_geometry(
         return Ok(());
     }
     let state = app.state::<crate::AppState>();
-    let mut general = state
-        .settings
-        .configuration
-        .snapshot()
-        .map_err(|error| error.to_string())?
-        .general;
-    general.settings_window_x = Some(geometry.x);
-    general.settings_window_y = Some(geometry.y);
-    general.settings_window_width = Some(geometry.width);
-    general.settings_window_height = Some(geometry.height);
+    let patch =
+        serde_json::from_value::<crate::application::settings::SettingsPatch>(serde_json::json!({
+            "settings_window_x": geometry.x,
+            "settings_window_y": geometry.y,
+            "settings_window_width": geometry.width,
+            "settings_window_height": geometry.height,
+        }))
+        .map_err(|error| error.to_string())?;
     state
         .settings
         .configuration
-        .update_general(general)
+        .update_general(patch)
         .map_err(|error| error.to_string())?;
     Ok(())
 }

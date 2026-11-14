@@ -1,11 +1,8 @@
 use tauri::State;
 
-use crate::application::settings::AppLogEntry;
+use crate::application::settings::{AppLogEntry, SettingsPatch};
 use crate::application::SettingsConfiguration;
-use crate::domain::{
-    GeneralSettings, HistorySettings, OcrSettings, ScreenshotSettings, SettingsSnapshot,
-    TranslationSettings,
-};
+use crate::domain::SettingsSnapshot;
 
 #[tauri::command]
 pub fn get_settings_snapshot(
@@ -16,7 +13,7 @@ pub fn get_settings_snapshot(
 
 #[tauri::command]
 pub fn update_general_settings(
-    input: GeneralSettings,
+    input: SettingsPatch,
     state: State<'_, crate::AppState>,
 ) -> Result<SettingsSnapshot, String> {
     state
@@ -41,7 +38,7 @@ pub fn update_last_result_window_position(
 
 #[tauri::command]
 pub fn update_screenshot_settings(
-    input: ScreenshotSettings,
+    input: SettingsPatch,
     state: State<'_, crate::AppState>,
 ) -> Result<SettingsSnapshot, String> {
     update_screenshot_settings_for_configuration(state.settings.configuration.as_ref(), input)
@@ -57,7 +54,7 @@ pub fn update_annotation_colors(
 
 #[tauri::command]
 pub fn update_translation_settings(
-    input: TranslationSettings,
+    input: SettingsPatch,
     state: State<'_, crate::AppState>,
 ) -> Result<SettingsSnapshot, String> {
     update_translation_settings_for_configuration(state.settings.configuration.as_ref(), input)
@@ -65,7 +62,7 @@ pub fn update_translation_settings(
 
 #[tauri::command]
 pub fn update_ocr_settings(
-    input: OcrSettings,
+    input: SettingsPatch,
     state: State<'_, crate::AppState>,
 ) -> Result<SettingsSnapshot, String> {
     update_ocr_settings_for_configuration(state.settings.configuration.as_ref(), input)
@@ -73,7 +70,7 @@ pub fn update_ocr_settings(
 
 #[tauri::command]
 pub async fn update_history_settings(
-    input: HistorySettings,
+    input: SettingsPatch,
     state: State<'_, crate::AppState>,
 ) -> Result<SettingsSnapshot, String> {
     state
@@ -113,7 +110,7 @@ fn get_settings_snapshot_for_configuration(
 
 fn update_screenshot_settings_for_configuration(
     configuration: &SettingsConfiguration,
-    input: ScreenshotSettings,
+    input: impl Into<SettingsPatch>,
 ) -> Result<SettingsSnapshot, String> {
     configuration
         .update_screenshot(input)
@@ -131,7 +128,7 @@ fn update_annotation_colors_for_configuration(
 
 fn update_translation_settings_for_configuration(
     configuration: &SettingsConfiguration,
-    input: TranslationSettings,
+    input: impl Into<SettingsPatch>,
 ) -> Result<SettingsSnapshot, String> {
     configuration
         .update_translation(input)
@@ -140,7 +137,7 @@ fn update_translation_settings_for_configuration(
 
 fn update_ocr_settings_for_configuration(
     configuration: &SettingsConfiguration,
-    input: OcrSettings,
+    input: impl Into<SettingsPatch>,
 ) -> Result<SettingsSnapshot, String> {
     configuration
         .update_ocr(input)

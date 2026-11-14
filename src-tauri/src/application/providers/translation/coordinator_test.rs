@@ -60,6 +60,7 @@ mod tests {
     #[async_trait]
     impl TranslationProvider for MockTranslationProvider {
         async fn translate(&self, _request: &TranslationRequest) -> Result<TranslationResult> {
+            assert_ne!(self.response_text, "panic", "provider task panicked");
             Ok(TranslationResult {
                 provider_id: self.id().to_string(),
                 translated_text: self.response_text.clone(),
@@ -105,6 +106,166 @@ mod tests {
         }
     }
 
+    #[derive(Clone)]
+    struct SlowCredentialProvider {
+        credential: String,
+        started: Arc<tokio::sync::Notify>,
+        release: Arc<tokio::sync::Notify>,
+        dropped: Arc<std::sync::atomic::AtomicBool>,
+    }
+
+    impl Provider for SlowCredentialProvider {
+        fn id(&self) -> &str {
+            "slow"
+        }
+        fn name(&self) -> &str {
+            "Slow provider"
+        }
+        fn is_configured(&self) -> bool {
+            true
+        }
+        fn requires_api_key(&self) -> bool {
+            true
+        }
+    }
+
+    struct RequestDropped(Arc<std::sync::atomic::AtomicBool>);
+
+    impl Drop for RequestDropped {
+        fn drop(&mut self) {
+            self.0.store(true, std::sync::atomic::Ordering::SeqCst);
+        }
+    }
+
+    #[async_trait]
+    impl TranslationProvider for SlowCredentialProvider {
+        fn with_credentials(
+            &self,
+            credentials: &std::collections::HashMap<String, String>,
+        ) -> Result<Arc<dyn TranslationProvider>> {
+            let mut replacement = self.clone();
+            replacement.credential = credentials["api_key"].clone();
+            Ok(Arc::new(replacement))
+        }
+
+        async fn translate(&self, _: &TranslationRequest) -> Result<TranslationResult> {
+            if self.credential == "old" {
+                let _dropped = RequestDropped(self.dropped.clone());
+                self.started.notify_one();
+                self.release.notified().await;
+            }
+            Ok(TranslationResult::success(
+                self.id(),
+                self.credential.clone(),
+                None,
+                None,
+            ))
+        }
+    }
+
+    fn slow_provider() -> SlowCredentialProvider {
+        SlowCredentialProvider {
+            credential: "old".into(),
+            started: Arc::new(tokio::sync::Notify::new()),
+            release: Arc::new(tokio::sync::Notify::new()),
+            dropped: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        }
+    }
+
+    #[tokio::test]
+    async fn credential_replacement_does_not_wait_for_in_flight_requests() {
+        let coordinator = Arc::new(TranslationCoordinator::new(Arc::new(
+            SqliteConfigStore::new_temp(),
+        )));
+        let provider = slow_provider();
+        coordinator.register(provider.clone()).unwrap();
+        let request = {
+            let coordinator = coordinator.clone();
+            tokio::spawn(async move {
+                coordinator
+                    .translate_with_provider("slow", &sample_request())
+                    .await
+            })
+        };
+        provider.started.notified().await;
+        let reconfiguration = {
+            let coordinator = coordinator.clone();
+            tokio::task::spawn_blocking(move || {
+                coordinator.reconfigure_provider(
+                    "slow",
+                    &std::collections::HashMap::from([("api_key".into(), "new".into())]),
+                )
+            })
+        };
+        let reconfigured =
+            tokio::time::timeout(std::time::Duration::from_secs(2), reconfiguration).await;
+        // Release the old request even when the reconfiguration assertion fails.
+        provider.release.notify_one();
+        reconfigured
+            .expect("reconfiguration must finish before the old request")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            coordinator
+                .translate_with_provider("slow", &sample_request())
+                .await
+                .unwrap()
+                .translated_text,
+            "new"
+        );
+        assert_eq!(request.await.unwrap().unwrap().translated_text, "old");
+    }
+
+    #[tokio::test]
+    async fn shutdown_waits_for_spawned_translation_requests_to_drop() {
+        let lifecycle =
+            Arc::new(crate::application::providers::request_lifecycle::RequestLifecycle::default());
+        let coordinator = Arc::new(
+            TranslationCoordinator::new(Arc::new(SqliteConfigStore::new_temp()))
+                .with_lifecycle(lifecycle.clone()),
+        );
+        let provider = slow_provider();
+        coordinator.register(provider.clone()).unwrap();
+        coordinator.activate("slow").unwrap();
+        let request = tokio::spawn(async move { coordinator.translate(&sample_request()).await });
+        provider.started.notified().await;
+        lifecycle.begin_shutdown();
+        tokio::time::timeout(std::time::Duration::from_secs(2), lifecycle.wait_for_idle())
+            .await
+            .unwrap();
+        assert!(provider.dropped.load(std::sync::atomic::Ordering::SeqCst));
+        assert!(request.await.unwrap().is_err());
+    }
+
+    #[tokio::test]
+    async fn a_panicking_provider_does_not_discard_other_provider_results() {
+        let coordinator = TranslationCoordinator::new(Arc::new(SqliteConfigStore::new_temp()));
+        coordinator
+            .register(MockTranslationProvider::with_response(
+                "broken", "Broken", "panic",
+            ))
+            .unwrap();
+        coordinator
+            .register(MockTranslationProvider::new("healthy", "Healthy"))
+            .unwrap();
+        coordinator.activate("broken").unwrap();
+        coordinator.activate("healthy").unwrap();
+        let results = coordinator.translate(&sample_request()).await.unwrap();
+        assert_eq!(
+            results
+                .iter()
+                .map(|result| result.provider_id.as_str())
+                .collect::<Vec<_>>(),
+            ["broken", "healthy"]
+        );
+        assert_eq!(
+            results[0].error.as_ref().unwrap().code,
+            "provider_task_failed"
+        );
+        assert!(results[0].request_id.is_some());
+        assert_eq!(results[1].translated_text, "translated");
+    }
+
     // ---- Registration & activation tests ----
 
     #[test]
@@ -117,7 +278,7 @@ mod tests {
 
         let all = coordinator.list_all();
         assert_eq!(all.len(), 1);
-        assert_eq!(all[0].read().id(), "google");
+        assert_eq!(all[0].id(), "google");
     }
 
     #[test]
@@ -156,7 +317,7 @@ mod tests {
         let active = coordinator.get_active();
         let active_names: Vec<_> = active
             .iter()
-            .map(|provider| provider.read().name().to_string())
+            .map(|provider| provider.name().to_string())
             .collect();
         assert_eq!(
             active_names,
@@ -183,8 +344,8 @@ mod tests {
 
         let active = coordinator.get_active();
         assert_eq!(active.len(), 2);
-        assert_eq!(active[0].read().id(), "google");
-        assert_eq!(active[1].read().id(), "deepl");
+        assert_eq!(active[0].id(), "google");
+        assert_eq!(active[1].id(), "deepl");
     }
 
     #[test]
@@ -250,7 +411,7 @@ mod tests {
 
         let active = coordinator.get_active();
         assert_eq!(active.len(), 1);
-        assert_eq!(active[0].read().id(), "google");
+        assert_eq!(active[0].id(), "google");
     }
 
     #[test]
@@ -276,7 +437,7 @@ mod tests {
         let active = coordinator.get_active();
         let active_ids: Vec<_> = active
             .iter()
-            .map(|provider| provider.read().id().to_string())
+            .map(|provider| provider.id().to_string())
             .collect();
         assert_eq!(active_ids, vec!["google".to_string(), "deeplx".to_string()]);
     }

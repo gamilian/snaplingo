@@ -82,6 +82,8 @@ macOS CI 使用临时 ad-hoc 签名；Desktop packages 使用固定自签名身�
 
 构建用 `Cargo.lock` 和 `npm ci` 固定依赖。依赖变更后运行 `npm run licenses:generate` 更新关于页与便携包的许可清单；构建会校验清单是否过期。普通构建仅清理 bundle，不删除整个 Rust release 缓存；`npm run tauri:build:beta` 才执行完整清理。避免绕过统一入口直接运行 `npm run tauri build`。
 
+发布编译使用 Thin LTO、单个 codegen unit 并移除符号表，保留默认的运行速度优化和 panic 展开行为。macOS 的最终签名 DMG 使用 ULMO（LZMA）压缩；该格式需要 macOS 10.15+，覆盖项目的 macOS 12+ 目标。首次启用编译优化会重建 release 依赖，之后复用构建缓存。OCR 模型、完整中文字体和许可声明仍随应用提供。
+
 ## 5. 验收边界与必测场景
 
 自动化已经检查：版本、产物非空/可执行、macOS 签名完整性/固定证书指纹/最低系统版本/动态库路径与架构、最终 DMG 内容、Windows NSIS/MSI 安装退出码和实际安装目录、程序存活、卸载与重装后的用户数据保留。macOS 原生回归测试使用临时自签名证书运行实际导入和发布签名脚本，验证两个内容不同的版本具有相同 designated requirement，且切回 ad-hoc 后不再满足旧身份。`npm run release:verify` 会重新做 macOS 原生验证，不只是检查文件存在。

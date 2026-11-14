@@ -13,7 +13,7 @@ import type {
   TranslationSettings,
 } from '../application/settings/ports';
 
-type DurableSettingsConfiguration = SettingsConfiguration['settings'];
+type DurableSettingsConfiguration = Omit<SettingsConfiguration['settings'], 'synchronize'>;
 
 let configuration: DurableSettingsConfiguration | null = null;
 let unsubscribe: (() => void) | null = null;

@@ -83,7 +83,7 @@ impl ProviderAdministration {
             .translation
             .get_active()
             .iter()
-            .map(|provider| provider.read().id().to_string())
+            .map(|provider| provider.id().to_string())
             .collect::<Vec<_>>();
         let inactive_ids = self.translation_configuration.inactive_provider_order();
         order_provider_infos_for_display(providers, &active_ids, &inactive_ids)
@@ -151,7 +151,7 @@ impl ProviderAdministration {
             .translation
             .get_active()
             .iter()
-            .any(|provider| provider.read().id() == provider_id);
+            .any(|provider| provider.id() == provider_id);
         Ok(provider_info_from_custom_view(view, is_active))
     }
 
@@ -224,13 +224,13 @@ impl ProviderAdministration {
         let active_id = self
             .ocr
             .get_active()
-            .map(|provider| provider.read().id().to_string());
+            .map(|provider| provider.id().to_string());
 
         self.ocr
             .list_all()
             .iter()
             .map(|provider| {
-                let provider = provider.read();
+                let provider = provider;
                 let id = provider.id().to_string();
                 OcrProviderInfo {
                     id: id.clone(),

@@ -16,11 +16,12 @@ pub struct OcrAccelerationStatus {
     pub fallback_reason: Option<String>,
 }
 
+#[async_trait::async_trait]
 pub(crate) trait PaddleOcrEngine: Send + Sync {
     fn is_available(&self) -> bool;
     fn supports_gpu(&self) -> bool {
         true
     }
-    fn recognize(&self, request: &OcrRequest, gpu_enabled: bool) -> Result<OcrResult>;
+    async fn recognize(&self, request: &OcrRequest, gpu_enabled: bool) -> Result<OcrResult>;
     fn status(&self) -> OcrAccelerationStatus;
 }

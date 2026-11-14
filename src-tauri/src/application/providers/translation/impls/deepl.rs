@@ -11,6 +11,7 @@ use std::sync::Arc;
 /// DeepLX translation provider implementation.
 ///
 /// Uses a configured DeepLX-compatible endpoint.
+#[derive(Clone)]
 pub struct DeepLProvider {
     http_client: Arc<dyn HttpClient>,
     mode: DeepLMode,
@@ -205,6 +206,15 @@ fn deepl_language_code(lang: &str) -> String {
 
 #[async_trait]
 impl TranslationProvider for DeepLProvider {
+    fn with_credentials(
+        &self,
+        credentials: &HashMap<String, String>,
+    ) -> Result<Arc<dyn TranslationProvider>> {
+        let mut replacement = self.clone();
+        replacement.reconfigure_credentials(credentials)?;
+        Ok(Arc::new(replacement))
+    }
+
     async fn translate(&self, request: &TranslationRequest) -> Result<TranslationResult> {
         if self.mode == DeepLMode::DeepL {
             return self.translate_with_deepl(request).await;

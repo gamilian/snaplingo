@@ -6,7 +6,7 @@ use crate::application::providers::common::Provider;
 use crate::application::providers::ocr::{OcrAccelerationStatus, OcrProvider, PaddleOcrEngine};
 use crate::application::providers::ProviderChangeNotifier;
 use crate::domain::ocr::{OcrRequest, OcrResult};
-use crate::{AppError, Result, SettingsConfiguration};
+use crate::{Result, SettingsConfiguration};
 
 pub struct PaddleOcrProvider {
     engine: Arc<dyn PaddleOcrEngine>,
@@ -66,21 +66,14 @@ impl OcrProvider for PaddleOcrProvider {
     }
 
     async fn recognize(&self, request: &OcrRequest) -> Result<OcrResult> {
-        let engine = self.engine.clone();
-        let settings = self.settings.clone();
-        let notifier = self.change_notifier.clone();
-        let request = request.clone();
-        tokio::task::spawn_blocking(move || {
-            let before = engine.status();
-            let gpu_enabled = engine.supports_gpu() && settings.snapshot()?.ocr.gpu_acceleration;
-            let result = engine.recognize(&request, gpu_enabled);
-            if before != engine.status() {
-                notifier.providers_changed();
-            }
-            result
-        })
-        .await
-        .map_err(|error| AppError::System(format!("PaddleOCR task failed: {error}")))?
+        let before = self.engine.status();
+        let gpu_enabled =
+            self.engine.supports_gpu() && self.settings.snapshot()?.ocr.gpu_acceleration;
+        let result = self.engine.recognize(request, gpu_enabled).await;
+        if before != self.engine.status() {
+            self.change_notifier.providers_changed();
+        }
+        result
     }
 }
 
@@ -98,6 +91,7 @@ mod tests {
         gpu_supported: bool,
     }
 
+    #[async_trait]
     impl PaddleOcrEngine for StubEngine {
         fn is_available(&self) -> bool {
             true
@@ -105,7 +99,7 @@ mod tests {
         fn supports_gpu(&self) -> bool {
             self.gpu_supported
         }
-        fn recognize(&self, _: &OcrRequest, gpu_enabled: bool) -> Result<OcrResult> {
+        async fn recognize(&self, _: &OcrRequest, gpu_enabled: bool) -> Result<OcrResult> {
             self.calls.lock().push(gpu_enabled);
             *self.status.lock() = OcrAccelerationStatus {
                 gpu_enabled,
@@ -169,7 +163,6 @@ mod tests {
             coordinator
                 .get_active()
                 .unwrap()
-                .read()
                 .acceleration_status()
                 .unwrap()
                 .device,

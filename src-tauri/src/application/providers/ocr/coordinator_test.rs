@@ -10,6 +10,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     // Mock OCR Provider for testing
+    #[derive(Clone)]
     struct MockOcrProvider {
         id: String,
         name: String,
@@ -81,6 +82,15 @@ mod tests {
 
     #[async_trait]
     impl OcrProvider for MockOcrProvider {
+        fn with_credentials(
+            &self,
+            credentials: &std::collections::HashMap<String, String>,
+        ) -> Result<Arc<dyn OcrProvider>> {
+            let mut replacement = self.clone();
+            replacement.reconfigure_credentials(credentials)?;
+            Ok(Arc::new(replacement))
+        }
+
         async fn recognize(&self, request: &OcrRequest) -> Result<OcrResult> {
             if let Some(observed_request) = &self.observed_request {
                 *observed_request.lock().unwrap() = Some(request.clone());
@@ -115,7 +125,7 @@ mod tests {
 
         let all = coordinator.list_all();
         assert_eq!(all.len(), 1);
-        assert_eq!(all[0].read().id(), "tesseract");
+        assert_eq!(all[0].id(), "tesseract");
     }
 
     #[test]
@@ -130,7 +140,7 @@ mod tests {
 
         let active = coordinator.get_active();
         assert!(active.is_some());
-        assert_eq!(active.unwrap().read().id(), "tesseract");
+        assert_eq!(active.unwrap().id(), "tesseract");
     }
 
     #[test]
@@ -146,11 +156,11 @@ mod tests {
 
         // Activate first provider
         coordinator.activate("tesseract").unwrap();
-        assert_eq!(coordinator.get_active().unwrap().read().id(), "tesseract");
+        assert_eq!(coordinator.get_active().unwrap().id(), "tesseract");
 
         // Switch to second provider (should replace the first)
         coordinator.activate("baidu").unwrap();
-        assert_eq!(coordinator.get_active().unwrap().read().id(), "baidu");
+        assert_eq!(coordinator.get_active().unwrap().id(), "baidu");
     }
 
     #[test]
