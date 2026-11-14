@@ -133,7 +133,13 @@ describe('Windows portable packaging', () => {
           '-NoProfile',
           '-NonInteractive',
           '-Command',
-          `Expand-Archive -LiteralPath ${quote(archive)} -DestinationPath ${quote(extracted)}`,
+          [
+            "$ErrorActionPreference = 'Stop'",
+            // Windows PowerShell must not load PowerShell 7's archive module
+            // from an inherited PSModulePath; it requires newer .NET APIs.
+            "Import-Module (Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Archive')",
+            `Expand-Archive -LiteralPath ${quote(archive)} -DestinationPath ${quote(extracted)}`,
+          ].join('; '),
         ],
         { encoding: 'utf8' },
       );
