@@ -373,8 +373,8 @@ describe('frontend dependency rules', () => {
   });
 
   test('Domain data does not import workflows or adapters', () => {
-    const violations = moduleImports(productionSourceFiles())
-      .filter(({ path, specifier }) => path.startsWith('src/domain/') && /(?:^|\/)(?:application|platform|views|stores)(?:\/|$)|^@tauri-apps\//.test(specifier));
+    const violations = moduleImports(productionSourceFiles().filter(({ path }) => path.startsWith('src/domain/')))
+      .filter(({ specifier }) => /(?:^|\/)(?:application|platform|views|stores)(?:\/|$)|^@tauri-apps\//.test(specifier));
     expect(violations).toEqual([]);
   });
 
