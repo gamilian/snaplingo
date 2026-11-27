@@ -1,7 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import {
   currentMonitor,
-  cursorPosition,
   getCurrentWindow,
   LogicalSize,
   monitorFromPoint,
@@ -14,36 +13,23 @@ export const resultWindow: ResultWindowPort = {
     return getCurrentWindow().setSize(new LogicalSize(width, height));
   },
   async place(position, lastPosition) {
+    if (position !== 'last-position' || !isFinitePosition(lastPosition)) {
+      await invoke('place_result_window', {
+        position: position === 'last-position' ? 'center' : position,
+      });
+      return;
+    }
     const window = getCurrentWindow();
-    const cursor = await cursorPosition();
-    const storedPosition =
-      position === 'last-position' && isFinitePosition(lastPosition)
-        ? lastPosition
-        : null;
-    const monitor =
-      (storedPosition
-        ? await monitorFromPoint(storedPosition.x, storedPosition.y)
-        : await monitorFromPoint(cursor.x, cursor.y)) ?? (await currentMonitor());
+    const monitor = await monitorFromPoint(lastPosition.x, lastPosition.y) ?? await currentMonitor();
     if (!monitor) return;
-
     const size = await window.innerSize();
     const { position: workPosition, size: workSize } = monitor.workArea;
-    let x = storedPosition?.x ?? cursor.x;
-    let y = storedPosition?.y ?? cursor.y;
-
-    if (position === 'center' || (position === 'last-position' && !storedPosition)) {
-      x = workPosition.x + (workSize.width - size.width) / 2;
-      y = workPosition.y + (workSize.height - size.height) / 2;
-    } else if (position === 'below-cursor') {
-      y += Math.round(12 * monitor.scaleFactor);
-    }
-
-    x = Math.min(
-      Math.max(x, workPosition.x),
+    const x = Math.min(
+      Math.max(lastPosition.x, workPosition.x),
       workPosition.x + Math.max(0, workSize.width - size.width),
     );
-    y = Math.min(
-      Math.max(y, workPosition.y),
+    const y = Math.min(
+      Math.max(lastPosition.y, workPosition.y),
       workPosition.y + Math.max(0, workSize.height - size.height),
     );
 

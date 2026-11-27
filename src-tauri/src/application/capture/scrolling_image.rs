@@ -367,13 +367,21 @@ fn locate(
             }
         }
     }
-    let mut scores = candidates
-        .into_iter()
-        .filter_map(|delta| {
-            let score = overlap_error(previous, next, top, end, delta);
-            (score < 4.0).then_some((delta, score))
-        })
-        .collect::<Vec<_>>();
+    let score_candidates = |candidates: BTreeSet<i64>| {
+        candidates
+            .into_iter()
+            .filter_map(|delta| {
+                let score = overlap_error(previous, next, top, end, delta);
+                (score < 4.0).then_some((delta, score))
+            })
+            .collect::<Vec<_>>()
+    };
+    let mut scores = score_candidates(candidates);
+    if scores.is_empty() {
+        // Exact row hashes can all change during subpixel scrolling. Use tolerant
+        // row anchors, then apply the same complete-overlap and ambiguity checks.
+        scores = score_candidates(approximate_deltas(previous, next, top, end, min_overlap));
+    }
     scores.sort_by(|a, b| {
         a.1.total_cmp(&b.1)
             .then(a.0.unsigned_abs().cmp(&b.0.unsigned_abs()))
@@ -386,6 +394,54 @@ fn locate(
         return None;
     }
     Some(best.0)
+}
+
+fn approximate_deltas(
+    previous: &RgbaImage,
+    next: &RgbaImage,
+    top: usize,
+    end: usize,
+    min_overlap: usize,
+) -> BTreeSet<i64> {
+    let columns = matching_columns(next);
+    let step = ((columns.end - columns.start) as usize / 32).max(1);
+    let mut candidates = BTreeSet::new();
+    let anchors: Vec<_> = (top..end)
+        .filter(|y| {
+            let background = next.get_pixel(columns.start, *y as u32);
+            columns.clone().step_by(step).any(|x| {
+                (0..3).any(|c| next.get_pixel(x, *y as u32)[c].abs_diff(background[c]) > 12)
+            })
+        })
+        .collect();
+    for &y in anchors.iter().step_by((anchors.len() / 16).max(1)).take(16) {
+        let mut matches = Vec::new();
+        for old_y in top..end {
+            let delta = old_y as i64 - y as i64;
+            if delta == 0 || delta.unsigned_abs() as usize + min_overlap > end - top {
+                continue;
+            }
+            let mut error = 0u64;
+            let mut count = 0u64;
+            for x in columns.clone().step_by(step) {
+                let a = previous.get_pixel(x, old_y as u32);
+                let b = next.get_pixel(x, y as u32);
+                error += (0..3).map(|c| a[c].abs_diff(b[c]) as u64).sum::<u64>();
+                count += 3;
+            }
+            if error as f64 / (count as f64) < 4.0 {
+                matches.push(delta);
+                if matches.len() > 32 {
+                    break;
+                }
+            }
+        }
+        // Repeated/blank rows cannot uniquely anchor the scroll offset.
+        if matches.len() <= 32 {
+            candidates.extend(matches);
+        }
+    }
+    candidates
 }
 
 fn overlap_error(
@@ -494,6 +550,49 @@ mod tests {
         assert_eq!(image.push(page(20, 10, 10)), ScrollingStep::Still);
         assert_eq!(image.dimensions(), (64, 100));
         assert_eq!(image.push(page(30, 10, 10)), ScrollingStep::Appended(30));
+    }
+
+    #[test]
+    fn joins_scrolled_content_despite_small_rendering_differences() {
+        let mut image = ScrollingImage::new(page(0, 10, 10)).unwrap();
+        for start in [20, 40, 60] {
+            let mut frame = page(start, 10, 10);
+            // Fractional scrolling and antialiasing can change otherwise matching pixels.
+            for y in 10..90 {
+                for x in 0..frame.width() {
+                    let pixel = frame.get_pixel_mut(x, y);
+                    for c in 0..3 {
+                        pixel[c] = pixel[c].saturating_add(((x + y) % 3 + 1) as u8);
+                    }
+                }
+            }
+            assert_eq!(image.push(frame), ScrollingStep::Appended(20));
+        }
+        assert_eq!(image.dimensions(), (64, 160));
+    }
+
+    #[test]
+    fn stitches_a_large_noisy_viewport_without_stalling_sampling() {
+        let frame = |start: u32, noise: bool| {
+            RgbaImage::from_fn(1920, 1080, |x, y| {
+                let row = y + start;
+                let jitter = if noise { ((x + y) % 3 + 1) as u8 } else { 0 };
+                image::Rgba([
+                    ((row * 13 + x * 7) % 251) as u8 + jitter,
+                    ((row * 29 + x * 3) % 251) as u8 + jitter,
+                    ((row * 3 + x * 11) % 249) as u8 + jitter,
+                    255,
+                ])
+            })
+        };
+        let mut image = ScrollingImage::new(frame(0, false)).unwrap();
+        let next = frame(200, true);
+        let last_pixel = *next.get_pixel(1000, 1079);
+        let started = std::time::Instant::now();
+        assert_eq!(image.push(next), ScrollingStep::Appended(200));
+        assert!(started.elapsed() < std::time::Duration::from_secs(2));
+        assert_eq!(image.dimensions(), (1920, 1280));
+        assert_eq!(*image.image().get_pixel(1000, 1279), last_pixel);
     }
 
     #[test]

@@ -25,6 +25,7 @@ trait ResultWindowSystem {
         &self,
         definition: super::backend::ResultWindowDefinition,
     ) -> Result<Self::Window, String>;
+    fn position_window(&self, window: &Self::Window) -> Result<(), String>;
     fn reveal_window(&self, window: &Self::Window) -> Result<(), String>;
 }
 
@@ -41,6 +42,7 @@ fn show_or_create_result_window_on_system<S: ResultWindowSystem>(
     let window = system
         .existing_window(RESULT_WINDOW_LABEL)
         .map_or_else(|| system.create_window(result_window_definition()), Ok)?;
+    system.position_window(&window)?;
     system.reveal_window(&window)?;
     Ok(window)
 }
@@ -74,6 +76,13 @@ impl ResultWindowSystem for TauriResultWindowSystem<'_> {
             .shadow(definition.shadow)
             .build()
             .map_err(|error| error.to_string())
+    }
+
+    fn position_window(&self, window: &Self::Window) -> Result<(), String> {
+        super::super::window_position::position_near_cursor(
+            window,
+            super::super::window_position::CursorWindowPlacement::Cursor,
+        )
     }
 
     fn reveal_window(&self, window: &Self::Window) -> Result<(), String> {
@@ -188,6 +197,7 @@ mod contract_tests {
         requested_labels: RefCell<Vec<String>>,
         created_definitions: RefCell<Vec<ResultWindowDefinition>>,
         revealed_windows: RefCell<Vec<FakeWindow>>,
+        positioned_windows: RefCell<Vec<FakeWindow>>,
     }
 
     impl FakeResultWindowSystem {
@@ -199,6 +209,7 @@ mod contract_tests {
                 requested_labels: RefCell::new(Vec::new()),
                 created_definitions: RefCell::new(Vec::new()),
                 revealed_windows: RefCell::new(Vec::new()),
+                positioned_windows: RefCell::new(Vec::new()),
             }
         }
     }
@@ -220,7 +231,13 @@ mod contract_tests {
                 .map_or(Ok(FakeWindow::Created), |error| Err(error.to_string()))
         }
 
+        fn position_window(&self, window: &Self::Window) -> Result<(), String> {
+            self.positioned_windows.borrow_mut().push(window.clone());
+            Ok(())
+        }
+
         fn reveal_window(&self, window: &Self::Window) -> Result<(), String> {
+            assert_eq!(self.positioned_windows.borrow().last(), Some(window));
             self.revealed_windows.borrow_mut().push(window.clone());
             self.reveal_error
                 .map_or(Ok(()), |error| Err(error.to_string()))
@@ -275,6 +292,18 @@ mod contract_tests {
         assert!(!definition[0].focused);
         assert!(definition[0].shadow);
         assert_eq!(*system.revealed_windows.borrow(), vec![FakeWindow::Created]);
+    }
+
+    #[test]
+    fn every_result_presentation_repositions_the_window_before_revealing_it() {
+        for existing in [None, Some(FakeWindow::Existing)] {
+            let system = FakeResultWindowSystem {
+                existing,
+                ..FakeResultWindowSystem::missing()
+            };
+            let window = super::show_or_create_result_window_with(&system).unwrap();
+            assert_eq!(*system.positioned_windows.borrow(), vec![window]);
+        }
     }
 
     #[test]

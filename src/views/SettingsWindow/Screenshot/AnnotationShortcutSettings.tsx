@@ -14,7 +14,6 @@ const LABELS: Record<string, string> = {
   line: '直线',
   pen: '画笔',
   highlight: '荧光笔',
-  'region-highlight': '区域高亮',
   blur: '模糊',
   spotlight: '聚光灯',
   mosaic: '马赛克',

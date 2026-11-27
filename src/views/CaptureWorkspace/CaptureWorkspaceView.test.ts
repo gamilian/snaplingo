@@ -30,6 +30,45 @@ afterEach(() => {
 });
 
 describe("CaptureWorkspaceView runtime seam", () => {
+  it("groups redaction styles and keeps only the original highlighter", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    mountedRoots.push({ container, root });
+    const actions = createActions();
+    await act(async () => root.render(createElement(CaptureWorkspaceView, {
+      renderState: createRenderState(), actions,
+    })));
+    expect(container.querySelector('[aria-label="Highlight an area"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Draw highlight annotation"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Blur an area"]')).toBeNull();
+    const group = container.querySelector<HTMLButtonElement>('button[aria-label="Mosaic / Blur"]');
+    await act(async () => group!.click());
+    expect(actions.toggleAnnotationTool).toHaveBeenCalledWith("mosaic");
+    const blur = container.querySelector<HTMLButtonElement>('button[aria-label="Blur an area"]');
+    await act(async () => blur!.click());
+    expect(actions.toggleAnnotationTool).toHaveBeenCalledWith("blur");
+    expect(container.querySelector('[role="menu"][aria-label="Mosaic / Blur"]')).toBeNull();
+  });
+
+  it("opens optional annotation properties only when requested", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    mountedRoots.push({ container, root });
+    const state = createRenderState();
+    await act(async () => root.render(createElement(CaptureWorkspaceView, {
+      renderState: { ...state, toolbar: { ...state.toolbar, isTextSizingActive: true } },
+      actions: createActions(),
+    })));
+    expect(container.querySelector('[role="group"][aria-label="Annotation properties"]')).toBeNull();
+    const properties = container.querySelector<HTMLButtonElement>('button[aria-label="Annotation properties"]');
+    await act(async () => properties!.click());
+    expect(container.querySelector('[aria-label="Annotation font family"]')).not.toBeNull();
+    await act(async () => properties!.click());
+    expect(container.querySelector('[aria-label="Annotation font family"]')).toBeNull();
+  });
+
   it.each(["loading", "preview"] as const)("shows selection processing feedback during %s", async (status) => {
     const container = document.createElement("div");
     document.body.append(container);

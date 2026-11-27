@@ -86,7 +86,7 @@ describe("capture presentation", () => {
     const className = getCaptureEditorToolbarClassName();
 
     expect(className).toContain("min-h-[40px]");
-    expect(className).toContain("flex-wrap");
+    expect(className).toContain("flex-nowrap");
     expect(className).toContain("gap-0.5");
     expect(className).toContain("rounded-[11px]");
     expect(className).toContain("bg-surface");
@@ -140,7 +140,7 @@ describe("capture presentation", () => {
     );
 
     expect(runtimeView).toContain(
-      "const TOOLBAR_SIZE = { width: 700, height: 40 };",
+      "const TOOLBAR_SIZE = { width: 900, height: 40 };",
     );
   });
 

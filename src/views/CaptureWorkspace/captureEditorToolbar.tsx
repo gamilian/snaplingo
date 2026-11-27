@@ -93,21 +93,23 @@ const ANNOTATION_TOOL_BUTTONS: AnnotationToolButton[] = [
     icon: <TextIcon />,
   },
   {
-    tool: "mosaic",
-    title: "Mosaic",
-    ariaLabel: "Draw mosaic annotation",
-    icon: <MosaicIcon />,
-  },
-  {
     tool: "eraser",
     title: "Eraser",
     ariaLabel: "Erase annotation",
     icon: <EraserIcon />,
   },
   { tool: "highlight", title: "Highlighter", ariaLabel: "Draw highlight annotation", icon: <EffectIcon kind="highlight" /> },
-  { tool: "region-highlight", title: "Region highlight", ariaLabel: "Highlight an area", icon: <EffectIcon kind="region-highlight" /> },
-  { tool: "blur", title: "Blur", ariaLabel: "Blur an area", icon: <EffectIcon kind="blur" /> },
   { tool: "spotlight", title: "Spotlight", ariaLabel: "Spotlight an area", icon: <EffectIcon kind="spotlight" /> },
+];
+
+const REDACTION_TOOLS: AnnotationToolButton[] = [
+  {
+    tool: "mosaic",
+    title: "Mosaic",
+    ariaLabel: "Draw mosaic annotation",
+    icon: <MosaicIcon />,
+  },
+  { tool: "blur", title: "Blur", ariaLabel: "Blur an area", icon: <EffectIcon kind="blur" /> },
 ];
 
 const SHAPE_TOOLS: AnnotationToolButton[] = [
@@ -179,7 +181,7 @@ export function CaptureEditorToolbar({
     ? 'Cmd'
     : 'Ctrl';
   const [openPicker, setOpenPicker] = useState<
-    "shape" | "arrow" | "color" | null
+    "shape" | "arrow" | "redaction" | "color" | "properties" | null
   >(null);
   const [visibleColorPresets, setVisibleColorPresets] = useState<
     readonly AnnotationColor[]
@@ -226,7 +228,10 @@ export function CaptureEditorToolbar({
   );
   const primaryShapeTool = activeShapeTool ?? SHAPE_TOOLS[0];
   const primaryArrowTool = activeArrowTool ?? ARROW_TOOLS[0];
-  const togglePicker = (picker: "shape" | "arrow") => {
+  const primaryRedactionTool = REDACTION_TOOLS.find(
+    (button) => button.tool === activeAnnotationTool,
+  ) ?? REDACTION_TOOLS[0];
+  const togglePicker = (picker: "shape" | "arrow" | "redaction" | "properties") => {
     setOpenPicker((current) => (current === picker ? null : picker));
   };
   const selectPickerTool = (tool: AnnotationTool) => {
@@ -321,7 +326,6 @@ export function CaptureEditorToolbar({
         width: `${width / uiScale}px`,
         transform: `scale(${uiScale})`,
         transformOrigin: 'top left',
-        maxWidth: 'calc(100vw - 16px)',
         zIndex: 2,
       }}
       onPointerDown={(event) => {
@@ -366,6 +370,17 @@ export function CaptureEditorToolbar({
         disabled={isRenderingOutput}
         onActivate={selectPickerTool}
         onToggle={() => togglePicker("arrow")}
+      />
+      <ToolGroupButton
+        label="Mosaic / Blur"
+        groupIcon={primaryRedactionTool.icon}
+        primaryTool={primaryRedactionTool}
+        tools={REDACTION_TOOLS}
+        activeTool={activeAnnotationTool}
+        isOpen={openPicker === "redaction"}
+        disabled={isRenderingOutput}
+        onActivate={selectPickerTool}
+        onToggle={() => togglePicker("redaction")}
       />
       {ANNOTATION_TOOL_BUTTONS.map((button) => (
         <IconActionButton
@@ -528,6 +543,18 @@ export function CaptureEditorToolbar({
         ESC
       </button>
       {(isTextSizingActive || hasCornerControl) && (
+        <IconActionButton
+          className={getCaptureEditorIconButtonClassName(openPicker === "properties")}
+          disabled={isRenderingOutput}
+          title="Annotation properties"
+          aria-label="Annotation properties"
+          aria-expanded={openPicker === "properties"}
+          onClick={() => togglePicker("properties")}
+        >
+          ···
+        </IconActionButton>
+      )}
+      {openPicker === "properties" && (isTextSizingActive || hasCornerControl) && (
         <div
           className="absolute left-0 flex w-full flex-wrap items-center gap-2 rounded-md border border-line bg-surface px-3 py-2 text-xs text-ink shadow-lg"
           style={position.y + 120 * uiScale > window.innerHeight ? { bottom: 'calc(100% + 8px)' } : { top: 'calc(100% + 8px)' }}
@@ -1172,10 +1199,9 @@ function ToolPicker({
   );
 }
 
-function EffectIcon({ kind }: { kind: 'highlight' | 'region-highlight' | 'blur' | 'spotlight' }) {
+function EffectIcon({ kind }: { kind: 'highlight' | 'blur' | 'spotlight' }) {
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
     {kind === 'highlight' ? <><path d="m6 14 8-8 4 4-8 8-4-4Z" /><path d="m4 20 3-4 3 3-4 3" /></> : <rect x="4" y="5" width="16" height="14" rx="3" />}
-    {kind === 'region-highlight' && <path d="M7 10h10M7 14h10" strokeWidth="3" opacity="0.6" />}
     {kind === 'blur' && <path d="M7 8h10M7 12h10M7 16h10M9 7v10M15 7v10" opacity="0.5" />}
     {kind === 'spotlight' && <><circle cx="12" cy="12" r="4" /><path d="M4 5h16v14H4z" fill="currentColor" opacity="0.25" /></>}
   </svg>;

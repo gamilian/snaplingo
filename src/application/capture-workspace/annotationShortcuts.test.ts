@@ -7,6 +7,13 @@ import {
 import { captureInterfaceScale } from './interfaceScale';
 
 describe('capture editor preferences', () => {
+  it('retires region highlight bindings while retaining the original highlighter', () => {
+    const overrides = { 'region-highlight': 'q', arrow: 'q' };
+    expect(annotationShortcutConflict(overrides)).toBeNull();
+    expect(annotationShortcutBindings(overrides).q).toBe('arrow');
+    expect(annotationShortcutBindings().h).toBe('highlight');
+    expect(annotationShortcutBindings({ 'region-highlight': 'x' }).x).toBeUndefined();
+  });
   it('uses default keys for old configurations and allows a tool to be cleared or reassigned', () => {
     expect(annotationShortcutBindings().a).toBe('arrow');
     const shortcuts = annotationShortcutBindings({ arrow: 'x', text: '' });

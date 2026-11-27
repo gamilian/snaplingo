@@ -31,7 +31,7 @@ import { virtualPointToViewportPoint } from '../../application/capture-workspace
 import { useCaptureWorkspacePorts } from './runtimeContext';
 
 const TOOLBAR_GAP = 14;
-const TOOLBAR_SIZE = { width: 700, height: 40 };
+const TOOLBAR_SIZE = { width: 900, height: 40 };
 
 interface CaptureWorkspaceRuntimeViewOptions {
   initialMode?: CaptureMode;
@@ -174,10 +174,10 @@ export function useCaptureWorkspaceRuntimeView({
           ? runtimeRenderState.sessionId
           : null,
         toolbarGap: TOOLBAR_GAP,
-        toolbarSize: { width: TOOLBAR_SIZE.width, height: toolbarHeight },
+        toolbarSize: { width: TOOLBAR_SIZE.width * uiScale, height: toolbarHeight },
         toolbarClientBounds,
       }),
-    [runtimeRenderState, toolbarClientBounds, toolbarHeight],
+    [runtimeRenderState, toolbarClientBounds, toolbarHeight, uiScale],
   );
   useEffect(() => {
     if (!derived.isTextSizingActive || !platformPorts.commands.listAnnotationFontFamilies) return;
@@ -355,7 +355,7 @@ export function useCaptureWorkspaceRuntimeView({
       },
       toolbar: {
         fontFamilies,
-        uiScale,
+        uiScale: Math.min(uiScale, derived.toolbarSize.width / TOOLBAR_SIZE.width),
         position: derived.toolbarPosition,
         width: derived.toolbarSize.width,
         isVisible: runtimeRenderState.isAnnotationToolbarVisible,

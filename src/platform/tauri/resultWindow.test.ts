@@ -106,18 +106,16 @@ describe('Tauri result window adapter', () => {
     expect(hide).toHaveBeenCalledOnce();
   });
 
-  it('centers the result window inside the cursor monitor work area', async () => {
-    await resultWindow.place('center');
-
-    expect(setPosition).toHaveBeenCalledWith({ x: 1300, y: 350 });
+  it.each(['cursor', 'below-cursor', 'center'] as const)('uses native desktop coordinates for %s placement', async (position) => {
+    await resultWindow.place(position);
+    expect(invoke).toHaveBeenCalledExactlyOnceWith('place_result_window', { position });
+    expect(cursorPosition).not.toHaveBeenCalled();
+    expect(setPosition).not.toHaveBeenCalled();
   });
 
-  it('places below the cursor and clamps the window into the work area', async () => {
-    cursorPosition.mockResolvedValue({ x: 2100, y: 800 });
-
-    await resultWindow.place('below-cursor');
-
-    expect(setPosition).toHaveBeenCalledWith({ x: 1600, y: 600 });
+  it('centers on the cursor display when no last position has been saved', async () => {
+    await resultWindow.place('last-position');
+    expect(invoke).toHaveBeenCalledExactlyOnceWith('place_result_window', { position: 'center' });
   });
 
   it('starts dragging the current result window', async () => {

@@ -315,6 +315,10 @@ impl SettingsConfiguration {
     ) -> Result<std::collections::HashMap<String, String>> {
         let mut shortcuts = crate::domain::config::default_annotation_tool_shortcuts();
         for (tool, key) in input {
+            // Retired tool: preserve other bindings from older configurations.
+            if tool == "region-highlight" {
+                continue;
+            }
             if !shortcuts.contains_key(tool) {
                 return Err(AppError::Config(format!(
                     "Unknown annotation tool '{}'",
@@ -378,6 +382,21 @@ fn default_screenshot_save_dir() -> PathBuf {
 
 #[cfg(test)]
 mod settings_configuration_tests {
+    #[test]
+    fn retired_region_highlight_does_not_reserve_a_shortcut_in_old_settings() {
+        let shortcuts = super::SettingsConfiguration::normalized_annotation_shortcuts(
+            &[
+                ("region-highlight".into(), "q".into()),
+                ("arrow".into(), "q".into()),
+            ]
+            .into(),
+        )
+        .unwrap();
+        assert_eq!(shortcuts["region-highlight"], "");
+        assert_eq!(shortcuts["arrow"], "q");
+        assert_eq!(shortcuts["highlight"], "h");
+    }
+
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
 

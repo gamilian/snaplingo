@@ -20,6 +20,7 @@ export function annotationShortcutConflict(
 ) {
   const keys = new Map<string, string>();
   for (const [tool, value] of Object.entries({ ...defaults, ...overrides })) {
+    if (tool === 'region-highlight') continue;
     if (!(tool in defaults)) return { kind: 'invalid' as const, tool };
     const key = value.toLowerCase();
     if (!key) continue;
@@ -40,7 +41,7 @@ export function annotationShortcutBindings(
     : { ...defaults, ...overrides };
   return Object.fromEntries(
     Object.entries(shortcuts)
-      .filter(([tool, key]) => tool !== 'scrolling' && key)
+      .filter(([tool, key]) => tool !== 'scrolling' && tool !== 'region-highlight' && key)
       .map(([tool, key]) => [key.toLowerCase(), tool]),
   ) as Record<string, AnnotationTool>;
 }

@@ -182,6 +182,7 @@ pub fn run() {
             commands::take_capture_result_window_payload,
             commands::open_selection_translation_window,
             infrastructure::system::result_window::drag::start_result_window_drag,
+            infrastructure::system::result_window::place_result_window,
             commands::copy_text_to_clipboard,
             commands::get_hotkey_snapshot,
             commands::get_default_hotkey_snapshot,
