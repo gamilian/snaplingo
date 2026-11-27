@@ -107,6 +107,36 @@ describe('CaptureWorkspace React lifecycle', () => {
     }
   });
 
+  it('starts the entrance after native reveal and blends in only decoded frozen images', async () => {
+    const revealed = deferred<void>();
+    const decoded = deferred<void>();
+    vi.spyOn(HTMLImageElement.prototype, 'decode').mockReturnValue(decoded.promise);
+    const platform = createPlatform();
+    platform.window.reveal.mockImplementation(() => revealed.promise.then(() => undefined));
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    try {
+      await act(async () => root.render(createElement(CaptureWorkspace, {
+        ports: platform, initialMode: 'screenshot', initialSessionId: 'entrance-session',
+      })));
+      await vi.waitFor(() => expect(platform.window.reveal).toHaveBeenCalledOnce());
+      const desktop = () => container.querySelector<HTMLElement>('[data-capture-desktop]');
+      const overlay = () => container.querySelector<HTMLElement>('[data-capture-selection-overlay]');
+      expect(desktop()?.dataset.visible).toBe('false');
+      expect(overlay()?.dataset.visible).toBe('false');
+      await act(async () => revealed.resolve());
+      expect(overlay()?.dataset.visible).toBe('true');
+      expect(desktop()?.dataset.visible).toBe('false');
+      await act(async () => decoded.resolve());
+      expect(desktop()?.dataset.visible).toBe('true');
+      expect(platform.window.reveal).toHaveBeenCalledOnce();
+    } finally {
+      await act(async () => { revealed.resolve(); decoded.resolve(); root.unmount(); });
+      container.remove();
+    }
+  });
+
   it('reveals selection while frozen monitor images decode in the background', async () => {
     const sessionRequest = deferred<ReturnType<typeof createSession>>();
     const pixelsRequest = deferred<ReturnType<typeof createSession>>();

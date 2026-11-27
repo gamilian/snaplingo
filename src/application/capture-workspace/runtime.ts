@@ -115,6 +115,7 @@ interface CaptureWorkspaceRuntimeHost {
   resetInteraction(): void;
   resetSession(): void;
   prepareSurface(windowPrepared: Promise<void>): void | Promise<void>;
+  revealSurface?(): void;
   scheduleSelectionOverlayPaint?(): void;
 }
 
@@ -1024,6 +1025,7 @@ export function createCaptureWorkspaceRuntime({
             await platform.window.reveal(sessionId);
             if (!isCurrent()) return;
             hasRevealed = true;
+            host?.revealSurface?.();
             if (sessionId) markPerf('revealed', sessionId);
           } catch (error) {
             if (isCurrent()) {

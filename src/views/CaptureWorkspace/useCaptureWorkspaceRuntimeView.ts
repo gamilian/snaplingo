@@ -72,10 +72,12 @@ export function useCaptureWorkspaceRuntimeView({
   const hostBridgeRef = useRef<{
     reset(): void;
     prepareSurface(windowPrepared: Promise<void>): Promise<void>;
+    revealSurface(): void;
     scheduleSelectionOverlayPaint(): void;
   }>({
     reset: () => undefined,
     prepareSurface: async () => undefined,
+    revealSurface: () => undefined,
     scheduleSelectionOverlayPaint: () => undefined,
   });
   onInactiveRef.current = onInactive;
@@ -105,6 +107,7 @@ export function useCaptureWorkspaceRuntimeView({
           resetInteraction: () => hostBridgeRef.current.reset(),
           resetSession: () => hostBridgeRef.current.reset(),
           prepareSurface: (windowPrepared) => hostBridgeRef.current.prepareSurface(windowPrepared),
+          revealSurface: () => hostBridgeRef.current.revealSurface(),
           scheduleSelectionOverlayPaint: () =>
             hostBridgeRef.current.scheduleSelectionOverlayPaint(),
         },
@@ -241,6 +244,7 @@ export function useCaptureWorkspaceRuntimeView({
     void workflowRuntime.actions.hydrateSnapshots().catch(() => undefined);
   }, [runtimeRenderState.sessionId, workflowRuntime]);
 
+  const [revealedSessionId, setRevealedSessionId] = useState<string | null>(null);
   const [decodedSessionId, setDecodedSessionId] = useState<string | null>(null);
   useEffect(() => {
     const sessionId = runtimeRenderState.sessionId;
@@ -269,6 +273,7 @@ export function useCaptureWorkspaceRuntimeView({
   hostBridgeRef.current = {
     reset: overlay.reset,
     prepareSurface: prepareCaptureSurface,
+    revealSurface: () => setRevealedSessionId(workflowRuntime.renderState.sessionId),
     scheduleSelectionOverlayPaint: overlay.schedulePaint,
   };
 
@@ -333,6 +338,7 @@ export function useCaptureWorkspaceRuntimeView({
     () => ({
       status: runtimeRenderState.status,
       areCaptureImagesDecoded: decodedSessionId === runtimeRenderState.sessionId,
+      hasRevealed: revealedSessionId === runtimeRenderState.sessionId,
       candidateDetectionMode: runtimeRenderState.candidateDetectionMode,
       error: runtimeRenderState.error,
       viewportBounds: derived.viewportBounds,
@@ -410,6 +416,7 @@ export function useCaptureWorkspaceRuntimeView({
       magnifierSourceImage,
       runtimeRenderState,
       decodedSessionId,
+      revealedSessionId,
       screenshotPreferences?.magnifierZoom,
       fontFamilies,
       uiScale,

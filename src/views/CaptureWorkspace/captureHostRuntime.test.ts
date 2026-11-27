@@ -34,7 +34,7 @@ describe('capture surface DOM preparation', () => {
     expect(paint).not.toHaveBeenCalled();
   });
 
-  it('waits for one animation frame before fading in the capture overlay', async () => {
+  it('waits for one paint opportunity before revealing the capture overlay', async () => {
     const calls: string[] = [];
     const pendingFrameCallbacks: FrameRequestCallback[] = [];
     const requestAnimationFrame = (callback: FrameRequestCallback) => {

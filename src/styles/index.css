@@ -142,6 +142,21 @@ body {
 .windows-hotkey-prompt { display: flex; align-items: center; gap: 8px; color: rgb(var(--accent-text)); font-size: 12px; white-space: nowrap; }
 .windows-hotkey-prompt > span { color: rgb(var(--muted)); font-size: 10px; }
 
+[data-capture-desktop],
+[data-capture-selection-overlay] {
+  opacity: 0;
+  transition: none;
+}
+[data-capture-desktop][data-visible='true'],
+[data-capture-selection-overlay][data-visible='true'] {
+  opacity: 1;
+  transition: opacity 100ms cubic-bezier(0.2, 0, 0, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-capture-desktop][data-visible='true'],
+  [data-capture-selection-overlay][data-visible='true'] { transition: none; }
+}
+
 .capture-editor-toolbar { animation: capture-toolbar-enter 110ms ease-out; }
 .capture-output-progress { height: 2px; }
 .capture-output-progress > span {

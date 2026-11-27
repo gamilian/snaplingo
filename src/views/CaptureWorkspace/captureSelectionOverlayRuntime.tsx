@@ -50,6 +50,7 @@ interface UseCaptureSelectionOverlayOptions {
 }
 
 interface CaptureSelectionOverlayCanvasProps {
+  visible: boolean;
   canvasRef: Ref<HTMLCanvasElement>;
   cssSize: CaptureSelectionOverlaySize | null;
   pixelRatio: number;
@@ -74,6 +75,7 @@ export function getSelectionOverlayCanvasSize(
 }
 
 export const CaptureSelectionOverlayCanvas = memo(function CaptureSelectionOverlayCanvas({
+  visible,
   canvasRef,
   cssSize,
   pixelRatio,
@@ -83,6 +85,8 @@ export const CaptureSelectionOverlayCanvas = memo(function CaptureSelectionOverl
   return (
     <canvas
       ref={canvasRef}
+      data-capture-selection-overlay
+      data-visible={visible}
       width={Math.round(cssSize.width * pixelRatio)}
       height={Math.round(cssSize.height * pixelRatio)}
       className={getCaptureSelectionOverlayCanvasClassName()}

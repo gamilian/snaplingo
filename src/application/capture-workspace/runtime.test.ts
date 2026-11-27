@@ -879,6 +879,28 @@ describe('capture workspace runtime', () => {
     expect(platform.window.reveal).toHaveBeenCalledWith('session-reveal');
   });
 
+  it('starts the visual entrance only after the current native reveal completes', async () => {
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockImplementation(async (id) => createSession({ id }));
+    const firstReveal = deferred<void>();
+    platform.window.reveal.mockImplementationOnce(() => firstReveal.promise.then(() => undefined));
+    const revealSurface = vi.fn();
+    const runtime = createCaptureWorkspaceRuntime({
+      platform,
+      host: { resetInteraction: vi.fn(), resetSession: vi.fn(), prepareSurface: vi.fn(), revealSurface },
+    });
+    await runtime.actions.startSession('screenshot', 'old');
+    const revealing = runtime.actions.updateHostReadiness(true);
+    await vi.waitFor(() => expect(platform.window.reveal).toHaveBeenCalledOnce());
+    expect(revealSurface).not.toHaveBeenCalled();
+    await runtime.actions.startSession('screenshot', 'current');
+    firstReveal.resolve();
+    await revealing;
+    expect(revealSurface).not.toHaveBeenCalled();
+    await runtime.actions.updateHostReadiness(true);
+    expect(revealSurface).toHaveBeenCalledOnce();
+  });
+
   it('ignores image decoding from a replaced or closed capture', async () => {
     const platform = createPlatform();
     platform.commands.getCaptureSession.mockImplementation(async (id) => createSession({ id }));

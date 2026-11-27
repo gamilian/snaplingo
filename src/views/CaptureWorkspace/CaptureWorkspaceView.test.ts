@@ -99,6 +99,7 @@ describe("CaptureWorkspaceView runtime seam", () => {
   it("exposes only presentation state and user-triggered actions", () => {
     type ExpectedRenderStateKeys =
       | "areCaptureImagesDecoded"
+      | "hasRevealed"
       | "status"
       | "candidateDetectionMode"
       | "error"
@@ -848,6 +849,7 @@ function createRenderState(): CaptureWorkspaceViewRenderState {
 
   return {
     areCaptureImagesDecoded: true,
+    hasRevealed: true,
     status: "preview",
     candidateDetectionMode: "window",
     error: null,

@@ -62,6 +62,7 @@ interface CaptureSelectionOverlaySize {
 
 export interface CaptureWorkspaceViewRenderState {
   readonly areCaptureImagesDecoded: boolean;
+  readonly hasRevealed: boolean;
   readonly status: 'idle' | 'loading' | 'selecting' | 'preview' | 'scrolling' | 'error';
   readonly candidateDetectionMode: CaptureCandidateDetectionMode;
   readonly error: string | null;
@@ -176,6 +177,7 @@ interface CaptureWorkspaceDomPointerEvent {
 }
 
 interface CaptureDesktopLayerProps {
+  visible: boolean;
   desktopRef: RefObject<HTMLDivElement>;
   monitors: readonly MonitorSnapshotView[];
   selectionBounds: LogicalRect;
@@ -183,6 +185,7 @@ interface CaptureDesktopLayerProps {
 }
 
 const CaptureDesktopLayer = memo(function CaptureDesktopLayer({
+  visible,
   desktopRef,
   monitors,
   selectionBounds,
@@ -191,6 +194,8 @@ const CaptureDesktopLayer = memo(function CaptureDesktopLayer({
   return (
     <div
       ref={desktopRef}
+      data-capture-desktop
+      data-visible={visible}
       className="pointer-events-none absolute inset-0"
       aria-hidden="true"
     >
@@ -428,6 +433,7 @@ export function CaptureWorkspaceView({
     >
       {selectionBounds && (
         <CaptureDesktopLayer
+          visible={renderState.hasRevealed && renderState.areCaptureImagesDecoded}
           desktopRef={renderState.dom.desktopRef}
           monitors={renderState.monitors}
           selectionBounds={selectionBounds}
@@ -604,6 +610,7 @@ export function CaptureWorkspaceView({
         />
       )}
       <CaptureSelectionOverlayCanvas
+        visible={renderState.hasRevealed}
         canvasRef={renderState.dom.selectionOverlay.canvasRef}
         cssSize={renderState.dom.selectionOverlay.cssSize}
         pixelRatio={renderState.dom.selectionOverlay.pixelRatio}
