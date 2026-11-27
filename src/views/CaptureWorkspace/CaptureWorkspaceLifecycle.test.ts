@@ -52,8 +52,9 @@ describe('CaptureWorkspace React lifecycle', () => {
     }
   });
 
-  it.each(['supported', 'rejected'] as const)('drags a selection into a preview when pointer capture is %s', async (capture) => {
-    vi.spyOn(HTMLImageElement.prototype, 'decode').mockResolvedValue(undefined);
+  it.each(['supported', 'rejected'] as const)('drags a selection before image decoding finishes when pointer capture is %s', async (capture) => {
+    const decoded = deferred<void>();
+    vi.spyOn(HTMLImageElement.prototype, 'decode').mockReturnValue(decoded.promise);
     const platform = createPlatform();
     const container = document.createElement('div');
     document.body.append(container);
@@ -67,7 +68,7 @@ describe('CaptureWorkspace React lifecycle', () => {
           initialSessionId: 'drag-session',
         }));
       });
-      await vi.waitFor(() => expect(platform.window.reveal).toHaveBeenCalledOnce());
+      await vi.waitFor(() => expect(platform.window.reveal).toHaveBeenCalledOnce(), { timeout: 200 });
       const surface = container.firstElementChild as HTMLDivElement;
       surface.setPointerCapture = vi.fn(() => {
         if (capture === 'rejected') {
@@ -92,18 +93,21 @@ describe('CaptureWorkspace React lifecycle', () => {
           }));
         });
       }
+      expect(container.querySelector('[data-capture-preview]')).toBeNull();
+      expect(container.querySelector('[data-capture-toolbar]')).not.toBeNull();
+      await act(async () => decoded.resolve());
       const preview = container.querySelector<HTMLCanvasElement>('[data-capture-preview]');
       expect(preview).not.toBeNull();
       expect(preview?.style.width).toBe('160px');
       expect(preview?.style.height).toBe('110px');
       expect(platform.commands.renderCaptureOutput).not.toHaveBeenCalled();
     } finally {
-      await act(async () => root.unmount());
+      await act(async () => { decoded.resolve(); root.unmount(); });
       container.remove();
     }
   });
 
-  it('shows frozen images on every monitor and waits for both images to decode before reveal', async () => {
+  it('reveals selection while frozen monitor images decode in the background', async () => {
     const sessionRequest = deferred<ReturnType<typeof createSession>>();
     const pixelsRequest = deferred<ReturnType<typeof createSession>>();
     const primaryDecoded = deferred<void>();
@@ -168,10 +172,10 @@ describe('CaptureWorkspace React lifecycle', () => {
     expect(images[1].style.top).toBe('0px');
     expect(images[1].style.width).toBe('400px');
     expect(decode).toHaveBeenCalledTimes(2);
-    expect(platform.window.reveal).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(platform.window.reveal).toHaveBeenCalledOnce());
 
     await act(async () => primaryDecoded.resolve());
-    expect(platform.window.reveal).not.toHaveBeenCalled();
+    expect(platform.window.reveal).toHaveBeenCalledOnce();
     await act(async () => secondaryDecoded.resolve());
     await vi.waitFor(() => expect(platform.window.reveal).toHaveBeenCalledOnce());
     expect(platform.window.prepareForReveal).toHaveBeenCalledOnce();

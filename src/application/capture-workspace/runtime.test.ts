@@ -879,6 +879,21 @@ describe('capture workspace runtime', () => {
     expect(platform.window.reveal).toHaveBeenCalledWith('session-reveal');
   });
 
+  it('ignores image decoding from a replaced or closed capture', async () => {
+    const platform = createPlatform();
+    platform.commands.getCaptureSession.mockImplementation(async (id) => createSession({ id }));
+    const runtime = createCaptureWorkspaceRuntime({ platform });
+    await runtime.actions.startSession('screenshot', 'old');
+    await runtime.actions.startSession('screenshot', 'current');
+    runtime.actions.captureImagesDecoded('old', new Error('old image failed'));
+    expect(runtime.renderState.status).toBe('selecting');
+    runtime.actions.captureImagesDecoded('current', new Error('current image failed'));
+    expect(runtime.renderState.error).toBe('current image failed');
+    await runtime.actions.cancelSession();
+    runtime.actions.captureImagesDecoded('current', new Error('late image failure'));
+    expect(runtime.renderState.status).toBe('idle');
+  });
+
   it('starts surface preparation while the native window is still preparing', async () => {
     const nativeReady = deferred<undefined>();
     const surfaceReady = deferred<void>();

@@ -61,6 +61,7 @@ interface CaptureSelectionOverlaySize {
 }
 
 export interface CaptureWorkspaceViewRenderState {
+  readonly areCaptureImagesDecoded: boolean;
   readonly status: 'idle' | 'loading' | 'selecting' | 'preview' | 'scrolling' | 'error';
   readonly candidateDetectionMode: CaptureCandidateDetectionMode;
   readonly error: string | null;
@@ -198,6 +199,7 @@ const CaptureDesktopLayer = memo(function CaptureDesktopLayer({
           <img
             key={monitor.id}
             data-capture-monitor={monitor.id}
+            decoding="async"
             src={captureMonitorImageSource(monitor)!}
             crossOrigin="anonymous"
             alt=""
@@ -476,7 +478,7 @@ export function CaptureWorkspaceView({
         renderState.editor.selection &&
         renderState.editor.selectionViewportRect && (
           <>
-            <CaptureAnnotationCanvas
+            {renderState.areCaptureImagesDecoded && <CaptureAnnotationCanvas
               desktopRef={renderState.dom.desktopRef}
               monitors={renderState.monitors}
               outputPixelSize={getCaptureOutputPixelSize(
@@ -489,7 +491,7 @@ export function CaptureWorkspaceView({
               annotations={renderState.editor.annotations}
               draftAnnotation={renderState.editor.draftAnnotation}
               selectionViewportRect={renderState.editor.selectionViewportRect}
-            />
+            />}
             {renderState.editor.textDraft && (
               <CaptureTextDraftEditor
                 inputRef={renderState.dom.textDraftInputRef}

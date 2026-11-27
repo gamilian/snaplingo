@@ -98,6 +98,7 @@ describe("CaptureWorkspaceView runtime seam", () => {
 
   it("exposes only presentation state and user-triggered actions", () => {
     type ExpectedRenderStateKeys =
+      | "areCaptureImagesDecoded"
       | "status"
       | "candidateDetectionMode"
       | "error"
@@ -846,6 +847,7 @@ function createRenderState(): CaptureWorkspaceViewRenderState {
   const canvasRef: RefObject<HTMLCanvasElement> = { current: null };
 
   return {
+    areCaptureImagesDecoded: true,
     status: "preview",
     candidateDetectionMode: "window",
     error: null,

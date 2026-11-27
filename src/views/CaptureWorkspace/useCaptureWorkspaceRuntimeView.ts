@@ -241,17 +241,30 @@ export function useCaptureWorkspaceRuntimeView({
     void workflowRuntime.actions.hydrateSnapshots().catch(() => undefined);
   }, [runtimeRenderState.sessionId, workflowRuntime]);
 
+  const [decodedSessionId, setDecodedSessionId] = useState<string | null>(null);
+  useEffect(() => {
+    const sessionId = runtimeRenderState.sessionId;
+    if (!sessionId || !derived.areCaptureImagesReady) return;
+    let cancelled = false;
+    const images = Array.from(desktopRef.current?.querySelectorAll('img') ?? []);
+    void Promise.all(images.map((image) => image.decode())).then(() => {
+      if (cancelled) return;
+      setDecodedSessionId(sessionId);
+      workflowRuntime.actions.captureImagesDecoded(sessionId);
+    }).catch((error) => {
+      if (!cancelled) workflowRuntime.actions.captureImagesDecoded(sessionId, error);
+    });
+    return () => { cancelled = true; };
+  }, [runtimeRenderState.sessionId, derived.areCaptureImagesReady, workflowRuntime]);
+
   const prepareCaptureSurface = useCallback(
     (windowPrepared: Promise<void>) =>
       prepareCaptureSurfaceForReveal({
         windowPrepared,
-        images: runtimeRenderState.status === 'error'
-          ? []
-          : Array.from(desktopRef.current?.querySelectorAll('img') ?? []),
         frame: overlay.getCurrentFrame(),
         paintSelectionOverlayFrame: overlay.paintFrame,
       }),
-    [overlay.getCurrentFrame, overlay.paintFrame, runtimeRenderState.status],
+    [overlay.getCurrentFrame, overlay.paintFrame],
   );
   hostBridgeRef.current = {
     reset: overlay.reset,
@@ -319,6 +332,7 @@ export function useCaptureWorkspaceRuntimeView({
   const renderState = useMemo<CaptureWorkspaceViewRenderState>(
     () => ({
       status: runtimeRenderState.status,
+      areCaptureImagesDecoded: decodedSessionId === runtimeRenderState.sessionId,
       candidateDetectionMode: runtimeRenderState.candidateDetectionMode,
       error: runtimeRenderState.error,
       viewportBounds: derived.viewportBounds,
@@ -395,6 +409,7 @@ export function useCaptureWorkspaceRuntimeView({
       isMagnifierShown,
       magnifierSourceImage,
       runtimeRenderState,
+      decodedSessionId,
       screenshotPreferences?.magnifierZoom,
       fontFamilies,
       uiScale,

@@ -1,13 +1,11 @@
 import type { CaptureSelectionOverlayFrame } from './captureSelectionOverlay';
 
 export async function prepareCaptureSurfaceForReveal({
-  images = [],
   windowPrepared,
   frame,
   paintSelectionOverlayFrame,
   waitForPaint = waitForCaptureSurfacePaint,
 }: {
-  images?: readonly Pick<HTMLImageElement, 'decode'>[];
   windowPrepared?: Promise<void>;
   frame: CaptureSelectionOverlayFrame | null;
   paintSelectionOverlayFrame: (
@@ -15,8 +13,8 @@ export async function prepareCaptureSurfaceForReveal({
   ) => void;
   waitForPaint?: typeof waitForCaptureSurfacePaint;
 }) {
-  // Decode while native geometry is prepared, but paint only after both finish.
-  await Promise.all([windowPrepared, ...images.map((image) => image.decode())]);
+  // Selection input only needs geometry and the overlay, not decoded pixels.
+  await windowPrepared;
   paintSelectionOverlayFrame(frame);
   await waitForPaint();
 }

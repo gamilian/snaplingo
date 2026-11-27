@@ -677,7 +677,7 @@ export function createCaptureWorkspaceRuntime({
       state.status === 'preview'
         ? state.activeAnnotationTool
         : initialAnnotationTool();
-    // The view crops the already decoded frozen monitors. Encoding is only
+    // The view crops frozen monitors once decoding finishes. Encoding is only
     // needed for terminal output, so entering or resizing preview never blocks.
     patch({
       status: 'preview',
@@ -1020,7 +1020,7 @@ export function createCaptureWorkspaceRuntime({
             });
             await Promise.all([windowPrepared, host?.prepareSurface(windowPrepared)]);
             if (!isCurrent()) return;
-            markPerf('surface_decoded', sessionId);
+            markPerf('selection_surface_ready', sessionId);
             await platform.window.reveal(sessionId);
             if (!isCurrent()) return;
             hasRevealed = true;
@@ -1038,15 +1038,13 @@ export function createCaptureWorkspaceRuntime({
       if (revealAttempt === attempt && !hasRevealed) {
         revealAttempt = null;
       }
-
-      const perf = perfState;
-      if (
-        perf &&
-        imagesReady &&
-        !perf.hasLoggedImagesReady &&
-        perf.sessionId === sessionId
-      ) {
-        perf.hasLoggedImagesReady = true;
+    },
+    captureImagesDecoded(sessionId, error) {
+      if (disposed || state.session?.id !== sessionId) return;
+      if (error) {
+        patch({ status: 'error', error: errorMessage(error) });
+      } else if (perfState && !perfState.hasLoggedImagesReady) {
+        perfState.hasLoggedImagesReady = true;
         markPerf('images_ready', sessionId);
       }
     },

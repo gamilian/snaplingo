@@ -52,7 +52,7 @@ The only place that chooses concrete adapters and injects them into a runtime.
 
 A frozen snapshot of the desktop used to produce screenshot output, OCR input, and capture-window effects. Capture policy is owned by `application/capture`; OS screenshot and window mechanics are Infrastructure adapters.
 
-The selection surface displays the same frozen monitor images used by preview, magnification, OCR, and output. It waits for every image to decode before reveal; selection completion never replaces the session pixels with another desktop capture. Windows uses one primary-display coordinate scale for the spanning WebView, monitor snapshots, and cursor/window geometry.
+The selection surface displays the same frozen monitor images used by preview, magnification, OCR, and output. Once native geometry and the selection overlay are ready, it accepts input while the frozen images decode in the background; image-based editing waits for those images. Selection completion never replaces the session pixels with another desktop capture. Windows uses one primary-display coordinate scale for the spanning WebView, monitor snapshots, and cursor/window geometry.
 
 On macOS, the session pins the selection window and frontend monitor view to the display under the pointer before capture begins. A spanning NSWindow is clipped to one display when displays have separate Spaces; the session retains all monitor layouts for native cursor coordinates and output.
 
