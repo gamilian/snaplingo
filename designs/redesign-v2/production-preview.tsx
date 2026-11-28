@@ -55,7 +55,7 @@ const resultRuntime = createResultWindowRuntime({
       translateTextWithProvider: async (provider_id) => ({ provider_id, translated_text: result, detected_language: 'en', confidence: null }),
       recordTranslationHistory: noop, favoriteTranslationResult: async () => 1, favoriteOcrResult: async () => 1,
     },
-    clipboard: { copyText: noop }, onPayloadReady: async () => () => undefined, resizeTo: noop,
+    reveal: noop, clipboard: { copyText: noop }, onPayloadReady: async () => () => undefined, resizeTo: noop,
     placeAt: noop, dismiss: noop, beginDrag: async () => ({ x: 0, y: 0 }), setAlwaysOnTop: noop,
   },
   speech: { speak: noop },

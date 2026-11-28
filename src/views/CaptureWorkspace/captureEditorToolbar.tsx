@@ -202,6 +202,11 @@ export function CaptureEditorToolbar({
   const hasBlurControl = activeAnnotationTool === 'blur' || selectedAnnotationType === 'blur';
   const sizeValue = isTextSizingActive ? textFontSize : annotationStyle.strokeWidth;
   const sizeLabel = isTextSizingActive ? 'Text font size' : 'Annotation stroke width';
+  const [red, green, blue] = annotationStyle.color.slice(0, 3).map((channel) => {
+    const value = channel / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  const filledLabelColor = red * 0.2126 + green * 0.7152 + blue * 0.0722 > 0.179 ? '#000' : '#fff';
 
   const handleSaveClick = (event: MouseEvent<HTMLButtonElement>) => {
     const action = getSaveCapturePointerAction(event);
@@ -631,12 +636,19 @@ export function CaptureEditorToolbar({
       <button
         type="button"
         className="settings-action"
+        style={{
+          borderColor: annotationColorToCss(annotationStyle.color),
+          backgroundColor: annotationStyle.filled ? annotationColorToCss(annotationStyle.color) : 'rgb(var(--surface))',
+          color: annotationStyle.filled ? filledLabelColor : 'rgb(var(--ink))',
+        }}
         disabled={isRenderingOutput || !isFillModeActive}
         title="Fill shape"
         aria-label="Fill shape"
         aria-pressed={annotationStyle.filled}
         onClick={() => onApplyAnnotationStyle({ ...annotationStyle, filled: !annotationStyle.filled }, textFontSize)}
-      >{annotationStyle.filled ? '填充模式' : '边框模式'}</button>
+      >
+        {annotationStyle.filled ? '填充模式' : '边框模式'}
+      </button>
 
       </div>
     </div>

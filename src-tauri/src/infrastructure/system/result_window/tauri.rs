@@ -11,10 +11,8 @@ pub fn show_or_create_result_window(app: &AppHandle) -> Result<WebviewWindow, St
     show_or_create_result_window_with(&TauriResultWindowSystem { app })
 }
 
-pub(super) fn show_or_create_result_window_without_context(
-    app: &AppHandle,
-) -> Result<WebviewWindow, String> {
-    show_or_create_result_window_on_system(&TauriResultWindowSystem { app })
+pub(super) fn prepare_result_window(app: &AppHandle) -> Result<WebviewWindow, String> {
+    prepare_result_window_on_system(&TauriResultWindowSystem { app })
 }
 
 trait ResultWindowSystem {
@@ -25,6 +23,7 @@ trait ResultWindowSystem {
         &self,
         definition: super::backend::ResultWindowDefinition,
     ) -> Result<Self::Window, String>;
+    fn hide_window(&self, window: &Self::Window) -> Result<(), String>;
     fn position_window(&self, window: &Self::Window) -> Result<(), String>;
     fn reveal_window(&self, window: &Self::Window) -> Result<(), String>;
 }
@@ -32,18 +31,20 @@ trait ResultWindowSystem {
 fn show_or_create_result_window_with<S: ResultWindowSystem>(
     system: &S,
 ) -> Result<S::Window, String> {
-    show_or_create_result_window_on_system(system)
-        .map_err(|error| format!("Failed to show result window: {error}"))
+    let window = prepare_result_window_on_system(system)
+        .map_err(|error| format!("Failed to show result window: {error}"))?;
+    system
+        .reveal_window(&window)
+        .map_err(|error| format!("Failed to show result window: {error}"))?;
+    Ok(window)
 }
 
-fn show_or_create_result_window_on_system<S: ResultWindowSystem>(
-    system: &S,
-) -> Result<S::Window, String> {
+fn prepare_result_window_on_system<S: ResultWindowSystem>(system: &S) -> Result<S::Window, String> {
     let window = system
         .existing_window(RESULT_WINDOW_LABEL)
         .map_or_else(|| system.create_window(result_window_definition()), Ok)?;
+    system.hide_window(&window)?;
     system.position_window(&window)?;
-    system.reveal_window(&window)?;
     Ok(window)
 }
 
@@ -78,6 +79,10 @@ impl ResultWindowSystem for TauriResultWindowSystem<'_> {
             .map_err(|error| error.to_string())
     }
 
+    fn hide_window(&self, window: &Self::Window) -> Result<(), String> {
+        window.hide().map_err(|error| error.to_string())
+    }
+
     fn position_window(&self, window: &Self::Window) -> Result<(), String> {
         super::super::window_position::position_near_cursor(
             window,
@@ -90,7 +95,7 @@ impl ResultWindowSystem for TauriResultWindowSystem<'_> {
     }
 }
 
-fn reveal_result_window(window: &WebviewWindow) -> Result<(), String> {
+pub(super) fn reveal_result_window(window: &WebviewWindow) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         configure_result_window_for_current_space(window)?;
@@ -231,6 +236,10 @@ mod contract_tests {
                 .map_or(Ok(FakeWindow::Created), |error| Err(error.to_string()))
         }
 
+        fn hide_window(&self, _: &Self::Window) -> Result<(), String> {
+            Ok(())
+        }
+
         fn position_window(&self, window: &Self::Window) -> Result<(), String> {
             self.positioned_windows.borrow_mut().push(window.clone());
             Ok(())
@@ -241,6 +250,21 @@ mod contract_tests {
             self.revealed_windows.borrow_mut().push(window.clone());
             self.reveal_error
                 .map_or(Ok(()), |error| Err(error.to_string()))
+        }
+    }
+
+    #[test]
+    fn result_window_preparation_does_not_expose_previous_content() {
+        for existing in [None, Some(FakeWindow::Existing)] {
+            let system = FakeResultWindowSystem {
+                existing,
+                ..FakeResultWindowSystem::missing()
+            };
+            super::prepare_result_window_on_system(&system).unwrap();
+            assert!(
+                system.revealed_windows.borrow().is_empty(),
+                "The native window exposes its old/default page before the OCR payload is applied"
+            );
         }
     }
 

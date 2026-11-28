@@ -193,6 +193,66 @@ mod tests {
     }
 
     #[test]
+    fn provider_order_survives_reload_without_changing_the_active_provider() {
+        let config = Arc::new(SqliteConfigStore::new_temp());
+        let coordinator = OcrCoordinator::new(config.clone());
+        for id in ["first", "second"] {
+            coordinator.register(MockOcrProvider::new(id, id)).unwrap();
+        }
+        coordinator.activate("first").unwrap();
+        coordinator
+            .reorder_providers(vec!["second".into(), "first".into()])
+            .unwrap();
+        assert_eq!(coordinator.get_active().unwrap().id(), "first");
+
+        let reloaded = OcrCoordinator::new(config);
+        for id in ["new", "first", "second"] {
+            reloaded.register(MockOcrProvider::new(id, id)).unwrap();
+        }
+        reloaded.restore_from_config().unwrap();
+        assert_eq!(
+            reloaded
+                .list_all()
+                .iter()
+                .map(|provider| provider.id())
+                .collect::<Vec<_>>(),
+            vec!["second", "first", "new"]
+        );
+        assert_eq!(reloaded.get_active().unwrap().id(), "first");
+    }
+
+    #[test]
+    fn invalid_provider_orders_leave_the_saved_order_and_selection_intact() {
+        let coordinator = OcrCoordinator::new(Arc::new(SqliteConfigStore::new_temp()));
+        for id in ["first", "second"] {
+            coordinator.register(MockOcrProvider::new(id, id)).unwrap();
+        }
+        coordinator.activate("first").unwrap();
+        coordinator
+            .reorder_providers(vec!["second".into(), "first".into()])
+            .unwrap();
+
+        for invalid in [
+            vec!["first"],
+            vec!["first", "first"],
+            vec!["second", "unknown"],
+        ] {
+            assert!(coordinator
+                .reorder_providers(invalid.into_iter().map(String::from).collect())
+                .is_err());
+            assert_eq!(
+                coordinator
+                    .list_all()
+                    .iter()
+                    .map(|provider| provider.id())
+                    .collect::<Vec<_>>(),
+                vec!["second", "first"]
+            );
+            assert_eq!(coordinator.get_active().unwrap().id(), "first");
+        }
+    }
+
+    #[test]
     fn test_restore_from_config_skips_unregistered() {
         let config = Arc::new(SqliteConfigStore::new_temp());
         config

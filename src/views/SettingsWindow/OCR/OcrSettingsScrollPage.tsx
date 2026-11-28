@@ -1,10 +1,13 @@
 import type { OcrSettings, ResultWindowPosition } from '../../../application/settings/ports';
 import { CustomSelect } from '../../../components/common/CustomSelect';
 import { useSettingsConfigStore } from '../../../stores/settingsConfigStore';
+import { useSettingsStore } from '../../../stores/settingsStore';
 import { SettingRow, SettingsGroup, SettingsToggle } from '../SettingsControls';
 import { SettingsScrollPage } from '../SettingsScrollPage';
 
-export function OcrSettingsScrollPage({ contentOnly = false }: { contentOnly?: boolean } = {}) {
+export function OcrSettingsScrollPage() {
+  const requestedSection = useSettingsStore((state) => state.requestedSection);
+  const consumeRequestedSection = useSettingsStore((state) => state.consumeRequestedSection);
   const ocr = useSettingsConfigStore((state) => state.ocr);
   const updateOcrSettings = useSettingsConfigStore(
     (state) => state.updateOcrSettings,
@@ -21,8 +24,9 @@ export function OcrSettingsScrollPage({ contentOnly = false }: { contentOnly?: b
   return (
     <SettingsScrollPage
       title="OCR"
-      contentOnly={contentOnly}
-     
+      description="识别语言、文字处理与结果窗口设置"
+      requestedSectionId={requestedSection}
+      onRequestedSectionHandled={consumeRequestedSection}
       sections={[
         {
           id: 'recognition',

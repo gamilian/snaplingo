@@ -23,6 +23,7 @@ export interface ResultWindowPlatformRuntime {
     lastPosition?: ResultWindowPhysicalPosition,
   ): Promise<void>;
   dismiss(): Promise<void>;
+  reveal(requestId: string): Promise<void>;
   beginDrag(): Promise<ResultWindowPhysicalPosition>;
   setAlwaysOnTop(value: boolean): Promise<void>;
 }
@@ -50,6 +51,7 @@ export function createResultWindowPlatformRuntime(
         ? ports.window.place(position, lastPosition)
         : ports.window.place(position),
     dismiss: () => ports.window.hide(),
+    reveal: (requestId) => ports.window.reveal(requestId),
     beginDrag: () => ports.window.startDragging(),
     setAlwaysOnTop: (value) => ports.window.setAlwaysOnTop(value),
   };

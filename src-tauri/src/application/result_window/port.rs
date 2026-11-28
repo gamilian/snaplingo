@@ -154,7 +154,8 @@ impl ResultWindowOpenRequest {
 
 #[async_trait]
 pub(crate) trait ResultWindowWindowPort: Send + Sync {
-    async fn show_or_create(&self) -> crate::Result<()>;
+    async fn prepare(&self) -> crate::Result<()>;
+    async fn reveal(&self, request_id: ResultWindowRequestId) -> crate::Result<()>;
 }
 
 #[async_trait]

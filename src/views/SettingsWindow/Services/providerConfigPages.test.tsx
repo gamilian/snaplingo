@@ -97,6 +97,14 @@ vi.mock('../runtimeContext', () => ({
   }),
 }));
 
+vi.mock('./providerSorting', async () => ({
+  ...await vi.importActual<typeof import('./providerSorting')>('./providerSorting'),
+  useProviderSort: ({ ids }: { ids: string[] }) => ({
+    orderedIds: ids, listRef: { current: null },
+    rowProps: () => ({}), handleProps: () => ({}), announcement: '',
+  }),
+}));
+
 import { OcrProvidersPage } from './OcrProvidersPage';
 import { TtsProvidersPage } from './TtsProvidersPage';
 
@@ -108,13 +116,13 @@ describe('provider config pages', () => {
     reactState.useEffect.mockClear();
   });
 
-  it('opens OCR provider configuration inline instead of behind a black modal overlay', () => {
+  it('opens OCR provider configuration in a modal dialog', () => {
     let view = renderPage(OcrProvidersPage);
     findProviderCard(view).props.onConfigure?.();
 
     view = renderPage(OcrProvidersPage);
 
-    expect(findProviderConfig(view).props.presentation).toBe('inline');
+    expect(findProviderConfig(view).props.presentation).toBeUndefined();
   });
 
   it('loads platform system voices for TTS configuration', () => {

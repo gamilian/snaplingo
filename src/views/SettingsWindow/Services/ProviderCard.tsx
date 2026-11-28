@@ -40,15 +40,15 @@ export function ProviderCard({
 
   return (
     <div
+      data-provider-active={highlighted}
       className={`provider-card group/provider relative min-h-[72px] px-5 py-3.5 transition-colors duration-150 ${
         highlighted
           ? 'bg-accent-soft/60'
           : 'hover:bg-sunken'
       }`}
     >
+      {leadingSlot && <div className="absolute inset-y-0 left-0 flex w-4 items-center justify-center text-faint">{leadingSlot}</div>}
       <div className="flex h-full items-center gap-4">
-        {leadingSlot && <div className="flex w-5 flex-shrink-0 justify-center text-faint">{leadingSlot}</div>}
-
         <ProviderBrandIcon {...provider} />
 
         <div className="min-w-0 flex-1">

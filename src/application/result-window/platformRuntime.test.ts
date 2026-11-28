@@ -14,6 +14,7 @@ describe('result window platform runtime', () => {
         resize: vi.fn(async () => undefined),
         place: vi.fn(async () => undefined),
         hide: vi.fn(async () => undefined),
+        reveal: vi.fn(async () => undefined),
         startDragging: vi.fn(async () => ({ x: 320, y: 180 })),
         setAlwaysOnTop: vi.fn(async () => undefined),
       },
@@ -27,6 +28,7 @@ describe('result window platform runtime', () => {
     await runtime.resizeTo(640, 480);
     await runtime.placeAt('below-cursor');
     await runtime.dismiss();
+    await runtime.reveal('42');
     await expect(runtime.beginDrag()).resolves.toEqual({ x: 320, y: 180 });
     await runtime.setAlwaysOnTop(true);
     await runtime.clipboard.copyText('sample');
@@ -37,6 +39,7 @@ describe('result window platform runtime', () => {
     expect(ports.window.resize).toHaveBeenCalledWith(640, 480);
     expect(ports.window.place).toHaveBeenCalledWith('below-cursor');
     expect(ports.window.hide).toHaveBeenCalledTimes(1);
+    expect(ports.window.reveal).toHaveBeenCalledWith('42');
     expect(ports.window.startDragging).toHaveBeenCalledTimes(1);
     expect(ports.window.setAlwaysOnTop).toHaveBeenCalledWith(true);
     expect(ports.clipboard.writeText).toHaveBeenCalledWith('sample');

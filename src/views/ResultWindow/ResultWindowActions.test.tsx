@@ -11,6 +11,7 @@ import { useSettingsConfigStore } from '../../stores/settingsConfigStore';
 import ResultWindow from './ResultWindow';
 
 const runtime = {
+  getState: () => useResultWindowStore.getState(),
   favoriteTranslationResult: vi.fn(),
   favoriteTranslationResults: vi.fn(),
   favoriteOcrResult: vi.fn(),
@@ -251,6 +252,30 @@ describe('result window text actions', () => {
     await view.unmount();
     vi.unstubAllGlobals();
   });
+
+  it.each(['translation', 'ocr'] as const)(
+    'keeps the %s page open when the OCR picker takes focus',
+    async (resultWindowMode) => {
+      useSettingsConfigStore.setState({ translation: {
+        defaultSourceLang: 'auto', defaultTargetLang: 'zh-CN', autoTranslate: true,
+        autoCopy: false, preserveLineBreaks: true, incrementalTranslation: false,
+        windowAlwaysOnTop: true, hideOnBlur: true,
+      } });
+      useResultWindowStore.setState({ resultWindowVisible: true, resultWindowMode });
+      const now = vi.spyOn(performance, 'now').mockReturnValue(0);
+      const view = await renderResultWindow();
+      now.mockReturnValue(400);
+      // Native picker focus can change before React commits the next render.
+      useResultWindowStore.setState({ isSelectingOcrFile: true });
+      await act(async () => window.dispatchEvent(new Event('blur')));
+      expect(runtime.close).not.toHaveBeenCalled();
+      await act(async () => useResultWindowStore.setState({ isSelectingOcrFile: false }));
+      await act(async () => window.dispatchEvent(new Event('blur')));
+      expect(runtime.close).toHaveBeenCalledWith('standalone');
+      now.mockRestore();
+      await view.unmount();
+    },
+  );
 
   it.each(['translation', 'ocr'] as const)(
     'hides an unpinned standalone %s result after it loses focus',

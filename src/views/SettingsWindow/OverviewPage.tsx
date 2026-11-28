@@ -77,7 +77,7 @@ export function OverviewPage() {
         </div>
       </>}
       sections={[
-        { id: 'screenshot', label: '截图与贴图快捷键', content: <><FeatureHotkeysSection category="screenshot" actions={SCREENSHOT_HOTKEYS} /><SettingsGroup><PinBorderShortcutSettings value={screenshot?.pinBorderShortcut} onUpdate={(pinBorderShortcut) => updateScreenshot({ pinBorderShortcut })} /></SettingsGroup></> },
+        { id: 'screenshot', label: '截图快捷键', content: <><FeatureHotkeysSection category="screenshot" actions={SCREENSHOT_HOTKEYS} /><SettingsGroup><PinBorderShortcutSettings value={screenshot?.pinBorderShortcut} onUpdate={(pinBorderShortcut) => updateScreenshot({ pinBorderShortcut })} /></SettingsGroup></> },
         { id: 'translation', label: '翻译快捷键', content: <FeatureHotkeysSection category="translation" actions={TRANSLATION_HOTKEYS} /> },
         { id: 'ocr', label: 'OCR 快捷键', content: <FeatureHotkeysSection category="ocr" actions={OCR_HOTKEYS} /> },
         { id: 'editor', label: '截图编辑器单键', description: '仅在截图编辑器激活时生效', content: <AnnotationShortcutSettings value={screenshot?.annotationToolShortcuts} onUpdate={(annotationToolShortcuts) => updateScreenshot({ annotationToolShortcuts })} /> },

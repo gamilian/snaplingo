@@ -42,6 +42,7 @@ describe('providerStore projection', () => {
       configureTranslation: vi.fn(async () => undefined),
       reorderTranslation: vi.fn(async () => undefined),
       reorderInactiveTranslation: vi.fn(async () => undefined),
+      reorderOcr: vi.fn(async () => undefined),
       activateOcr: vi.fn(async () => undefined),
       configureOcr: vi.fn(async () => undefined),
     };
@@ -56,11 +57,13 @@ describe('providerStore projection', () => {
       activeTranslationProviders: [],
     });
     await useProviderStore.getState().activateOcrProvider(provider.id);
+    await useProviderStore.getState().reorderOcrProviders([provider.id]);
 
     expect(useProviderStore.getState()).toMatchObject({
       ocrProviders: [provider],
       activeOcrProvider: provider.id,
     });
     expect(configuration.activateOcr).toHaveBeenCalledWith(provider.id);
+    expect(configuration.reorderOcr).toHaveBeenCalledWith([provider.id]);
   });
 });

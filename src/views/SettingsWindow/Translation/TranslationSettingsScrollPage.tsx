@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { OcrSettingsScrollPage } from '../OCR/OcrSettingsScrollPage';
 import { useSettingsStore } from '../../../stores/settingsStore';
 import type {
   ResultWindowPosition,
@@ -29,7 +28,6 @@ const INPUT_STATE_OPTIONS = [
 
 export function TranslationSettingsScrollPage() {
   const requestedSection = useSettingsStore((state) => state.requestedSection);
-  const activeTab = useSettingsStore((state) => state.activeMainTab);
   const consumeRequestedSection = useSettingsStore((state) => state.consumeRequestedSection);
   const translation = useSettingsConfigStore((state) => state.translation);
   const updateTranslationSettings = useSettingsConfigStore(
@@ -51,11 +49,10 @@ export function TranslationSettingsScrollPage() {
 
   return (
     <SettingsScrollPage
-      title="翻译与识别"
-      requestedSectionId={requestedSection ?? (activeTab === 'ocr' ? 'ocr' : null)}
+      title="翻译"
+      requestedSectionId={requestedSection}
       onRequestedSectionHandled={consumeRequestedSection}
-      description="默认语种、划词取词、结果浮窗行为与 OCR 文字处理"
-     
+      description="默认语种、划词取词与结果浮窗行为"
       sections={[
         {
           id: 'language',
@@ -231,7 +228,6 @@ export function TranslationSettingsScrollPage() {
             </>
           ),
         },
-        { id: 'ocr', label: 'OCR 识别与文本处理', content: <OcrSettingsScrollPage contentOnly /> },
       ]}
     />
   );

@@ -16,7 +16,7 @@ function ThemeHost({ general, scope }: { general: GeneralSettings; scope: 'setti
 }
 
 describe('shared window theme', () => {
-  it.each(['settings', 'application'] as const)('updates %s windows when settings or system appearance change', async (scope) => {
+  it.each(['settings', 'application'] as const)('uses one native theme and follows system appearance in %s windows', async (scope) => {
     const listeners = new Set<() => void>();
     const media = {
       matches: false,
@@ -30,15 +30,18 @@ describe('shared window theme', () => {
 
     try {
       await act(async () => root.render(<ThemeHost general={general} scope={scope} />));
-      expect(document.documentElement.dataset).toMatchObject({ interfaceTheme: 'paper', theme: 'light', themeScope: scope });
+      expect(document.documentElement.dataset).toMatchObject({ interfaceTheme: 'native', theme: 'light', themeScope: scope });
       media.matches = true;
       act(() => listeners.forEach((listener) => listener()));
-      expect(document.documentElement.dataset).toMatchObject({ interfaceTheme: 'paper', theme: 'dark' });
+      expect(document.documentElement.dataset).toMatchObject({ interfaceTheme: 'native', theme: 'dark' });
 
       await act(async () => root.render(<ThemeHost general={{ ...general, theme: 'light', interfaceTheme: 'studio' }} scope={scope} />));
-      expect(document.documentElement.dataset).toMatchObject({ interfaceTheme: 'studio', theme: 'light' });
-      expect(document.documentElement.style.colorScheme).toBe('light');
-      expect(listeners.size).toBe(0);
+      expect(document.documentElement.dataset).toMatchObject({ interfaceTheme: 'native', theme: 'dark' });
+      expect(document.documentElement.style.colorScheme).toBe('dark');
+      expect(listeners.size).toBe(1);
+      media.matches = false;
+      act(() => listeners.forEach((listener) => listener()));
+      expect(document.documentElement.dataset.theme).toBe('light');
     } finally {
       await act(async () => root.unmount());
       expect(listeners.size).toBe(0);

@@ -193,7 +193,11 @@ mod tests {
     }
     #[async_trait]
     impl ResultWindowWindowPort for Effects {
-        async fn show_or_create(&self) -> Result<()> {
+        async fn reveal(&self, _: ResultWindowRequestId) -> Result<()> {
+            *self.opens.lock().unwrap() += 1;
+            Ok(())
+        }
+        async fn prepare(&self) -> Result<()> {
             *self.opens.lock().unwrap() += 1;
             Ok(())
         }
@@ -312,6 +316,25 @@ mod tests {
         assert_eq!(failed.ocr_error.as_deref(), Some("current failure"));
         assert!(effects.errors.lock().unwrap().is_empty());
     }
+    #[tokio::test]
+    async fn clipboard_ocr_never_prepares_or_reveals_a_result_window() {
+        let (delivery, window, effects) = runtime();
+        let request = delivery
+            .reserve_result(CaptureOcrTarget::Clipboard)
+            .unwrap();
+        delivery
+            .begin(CaptureOcrTarget::Clipboard, request, None)
+            .await
+            .unwrap();
+        delivery
+            .publish(CaptureOcrTarget::Clipboard, request, result(), None)
+            .await
+            .unwrap();
+        assert_eq!(*effects.copies.lock().unwrap(), vec!["recognized"]);
+        assert_eq!(*effects.opens.lock().unwrap(), 0);
+        assert_eq!(window.current_request_id().unwrap(), None);
+    }
+
     #[tokio::test]
     async fn clipboard_delivery_preserves_the_current_window_request() {
         let (delivery, window, effects) = runtime();

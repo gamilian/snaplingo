@@ -107,6 +107,7 @@ export function createResultWindowRuntime({
   let latestPayloadRequestId: bigint | null = null;
   let ignoredPayloadThrough: bigint | null = null;
   let capturePayload: { requestId: string; settled: boolean } | null = null;
+  let pendingPresentationId: string | null = null;
 
   function updateState(update: Partial<ResultWindowState>) {
     state = { ...state, ...update };
@@ -129,7 +130,7 @@ export function createResultWindowRuntime({
 
   function invalidateOcrGeneration() {
     ocrGeneration += 1;
-    updateState({ isOcrRunning: false });
+    updateState({ isOcrRunning: false, isSelectingOcrFile: false });
   }
 
   function dismissCapturePayload() {
@@ -137,6 +138,7 @@ export function createResultWindowRuntime({
     // completion reopen it or replace text the user has started editing.
     payloadGeneration += 1;
     ignoredPayloadThrough = latestPayloadRequestId;
+    pendingPresentationId = null;
     updateState({ isOcrRunning: false, ocrError: null });
   }
 
@@ -381,6 +383,10 @@ export function createResultWindowRuntime({
   }
 
   async function applyPayload(payload: CaptureResultWindowPayload, continuation = false) {
+    if (shouldStartFileOcrForPayload(payload)) {
+      await startFileOcr();
+      return;
+    }
     invalidateTranslationSession();
     invalidateOcrGeneration();
     updateState({
@@ -440,10 +446,6 @@ export function createResultWindowRuntime({
         ocrImageBase64: payload.imageBase64 ?? null,
       });
     }
-    if (shouldStartFileOcrForPayload(payload)) {
-      await startFileOcr();
-      return;
-    }
     updateState({ resultWindowVisible: true, resultWindowMode: 'ocr' });
   }
 
@@ -463,8 +465,13 @@ export function createResultWindowRuntime({
       ? { requestId, settled: payload.ocrStatus !== 'recognizing' }
       : null;
 
-    await applyPayload(payload, continuation);
-    return true;
+    const applying = applyPayload(payload, continuation);
+    if (!continuation) {
+      pendingPresentationId = requestId;
+      updateState({ presentationRequestId: requestId });
+    }
+    await applying;
+    return id === latestPayloadRequestId;
   }
 
   async function loadCurrentPayload() {
@@ -502,36 +509,57 @@ export function createResultWindowRuntime({
   }
 
   async function startFileOcr() {
+    if (state.isSelectingOcrFile) return;
     dismissCapturePayload();
     invalidateTranslationSession();
     const generation = ++ocrGeneration;
     const settings = getOcrSettings?.();
-    updateState({
-      resultWindowVisible: true,
-      resultWindowMode: 'ocr',
-      ocrText: '',
-      ocrConfidence: null,
-      ocrDetectedLanguage: null,
-      ocrImageBase64: null,
-      ocrError: null,
-    });
-    await runOcrFileWorkflow({
-      selectImageFile: platform.commands.selectImageFile,
-      recognizeImageFile: platform.commands.recognizeImageFile,
-      language:
-        settings?.recognitionLanguage === 'auto'
-          ? undefined
-          : settings?.recognitionLanguage,
-      transformText: (text) =>
-        settings ? applyOcrTextPreferences(text, settings) : text,
-      isCurrent: () => generation === ocrGeneration,
-      setText: (ocrText) => updateState({ ocrText }),
-      setConfidence: (ocrConfidence) => updateState({ ocrConfidence }),
-      setDetectedLanguage: (ocrDetectedLanguage) => updateState({ ocrDetectedLanguage }),
-      setImageDataUrl: (ocrImageBase64) => updateState({ ocrImageBase64 }),
-      setRunning: (isOcrRunning) => updateState({ isOcrRunning }),
-      setError: (ocrError) => updateState({ ocrError }),
-    });
+    updateState({ isSelectingOcrFile: true, isOcrRunning: false });
+    try {
+      await runOcrFileWorkflow({
+        selectImageFile: async () => {
+          const path = await platform.commands.selectImageFile();
+          if (generation !== ocrGeneration) return null;
+          updateState({
+            isSelectingOcrFile: false,
+            ...(path ? {
+              resultWindowVisible: true,
+              resultWindowMode: 'ocr' as const,
+              resultWindowOrigin: 'ocr' as const,
+              ocrText: '',
+              ocrConfidence: null,
+              ocrDetectedLanguage: null,
+              ocrImageBase64: null,
+              ocrError: null,
+            } : {}),
+          });
+          return path;
+        },
+        recognizeImageFile: platform.commands.recognizeImageFile,
+        language:
+          settings?.recognitionLanguage === 'auto'
+            ? undefined
+            : settings?.recognitionLanguage,
+        transformText: (text) =>
+          settings ? applyOcrTextPreferences(text, settings) : text,
+        isCurrent: () => generation === ocrGeneration,
+        setText: (ocrText) => updateState({ ocrText }),
+        setConfidence: (ocrConfidence) => updateState({ ocrConfidence }),
+        setDetectedLanguage: (ocrDetectedLanguage) => updateState({ ocrDetectedLanguage }),
+        setImageDataUrl: (ocrImageBase64) => updateState({ ocrImageBase64 }),
+        setRunning: (isOcrRunning) => updateState({ isOcrRunning }),
+        setError: (ocrError) => updateState({ ocrError }),
+      });
+    } catch (error) {
+      if (generation === ocrGeneration) {
+        updateState({
+          resultWindowVisible: true, resultWindowMode: 'ocr', resultWindowOrigin: 'ocr',
+          ocrError: errorMessage(error),
+        });
+      }
+    } finally {
+      if (generation === ocrGeneration) updateState({ isSelectingOcrFile: false });
+    }
   }
 
   async function favoriteOcrResult(
@@ -608,7 +636,8 @@ export function createResultWindowRuntime({
     origin,
     panelHeightPx,
   }: ResultWindowResizeInput) {
-    if (presentation !== 'standalone' || !visible) return;
+    if (presentation !== 'standalone' || !visible || state.isSelectingOcrFile) return;
+    const requestId = state.presentationRequestId;
 
     await platform.resizeTo(
       Math.min(
@@ -623,6 +652,7 @@ export function createResultWindowRuntime({
       ),
       resultWindowStandaloneWindowHeight(panelHeightPx),
     );
+    if (requestId !== state.presentationRequestId) return;
     const position =
       mode === 'ocr'
         ? getOcrSettings?.()?.windowPosition ?? 'center'
@@ -637,6 +667,10 @@ export function createResultWindowRuntime({
       }
       needsPlacement = false;
       lastPlacedPosition = position;
+    }
+    if (requestId && pendingPresentationId === requestId && state.resultWindowVisible && !state.isSelectingOcrFile) {
+      pendingPresentationId = null;
+      await platform.reveal(requestId);
     }
   }
 

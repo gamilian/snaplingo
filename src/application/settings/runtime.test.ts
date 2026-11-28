@@ -165,6 +165,7 @@ function createProviderPort() {
     listGeminiModels: vi.fn(),
     testGemini: vi.fn(),
     listOcr: vi.fn(),
+    reorderOcr: vi.fn(),
     activateOcr: vi.fn(),
     configureOcrCredentials: vi.fn(),
   };

@@ -9,7 +9,6 @@ import { useSettingsRuntime } from '../runtimeContext';
 import { uiText } from '../uiText';
 import { PermissionControls, useRequiredPermissions } from '../../PermissionControls';
 import { SoftwareUpdateSettings } from './SoftwareUpdateSettings';
-import { ThemePicker } from './ThemePicker';
 const ThirdPartyNotices = lazy(() => import('./ThirdPartyNotices'));
 
 export function GeneralPage() {
@@ -34,7 +33,7 @@ export function GeneralPage() {
   return (
     <SettingsScrollPage
       title="通用设置"
-      description="外观、启动项、权限、网络代理、数据容量与软件更新"
+      description="语言、启动项、权限、网络代理、数据容量与软件更新"
      
       autoSaveLabel={t('autoSave')}
       requestedSectionId={requestedSection}
@@ -45,10 +44,6 @@ export function GeneralPage() {
           label: t('interfaceAndStartup'),
           content: (
             <SettingsGroup>
-              <ThemePicker
-                value={general.interfaceTheme ?? 'native'}
-                onChange={(interfaceTheme) => updateGeneralSettings({ interfaceTheme })}
-              />
               <SettingRow label={t('interfaceLanguage')}>
                 <SelectField
                   value={general.language}
@@ -56,17 +51,6 @@ export function GeneralPage() {
                     { value: 'zh-CN', label: '中文简体' },
                   ]}
                   onChange={(language) => updateGeneral({ language })}
-                />
-              </SettingRow>
-              <SettingRow label={t('appearanceMode')}>
-                <SelectField
-                  value={general.theme}
-                  options={[
-                    { value: 'system', label: t('followSystem') },
-                    { value: 'light', label: t('light') },
-                    { value: 'dark', label: t('dark') },
-                  ]}
-                  onChange={(theme) => updateGeneral({ theme })}
                 />
               </SettingRow>
               <SettingRow label={t('startOnBoot')}>

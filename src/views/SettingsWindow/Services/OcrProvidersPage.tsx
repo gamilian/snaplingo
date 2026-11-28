@@ -4,6 +4,7 @@ import { useSettingsConfigStore } from '../../../stores/settingsConfigStore';
 import { ProviderCard } from './ProviderCard';
 import { ProviderConfigDialog } from './ProviderConfigDialog';
 import { useSettingsRuntime } from '../runtimeContext';
+import { ProviderDragHandle, useProviderSort } from './providerSorting';
 
 export function OcrProvidersPage() {
   const runtime = useSettingsRuntime();
@@ -13,6 +14,11 @@ export function OcrProvidersPage() {
   const loadProviders = useProviderStore((state) => state.loadOcrProviders);
   const activateProvider = useProviderStore((state) => state.activateOcrProvider);
   const configureProvider = useProviderStore((state) => state.configureOcrProvider);
+  const reorderProviders = useProviderStore((state) => state.reorderOcrProviders);
+  const sort = useProviderSort({
+    ids: providers.map((provider) => provider.id),
+    onReorder: (ids) => reorderProviders(ids),
+  });
 
   const [configuringProvider, setConfiguringProvider] = useState<string | null>(null);
 
@@ -55,21 +61,26 @@ export function OcrProvidersPage() {
 
   return (
     <div className="max-w-5xl space-y-3">
-      <div className="divide-y divide-line overflow-hidden bg-surface">
-        {providers.map((provider) => (
-          <ProviderCard
-            key={provider.id}
-            provider={provider}
-            onActivate={() => handleActivate(provider.id)}
-            onConfigure={() => handleConfigure(provider.id)}
-            highlighted={provider.id === activeProvider}
-          />
-        ))}
+      <div ref={sort.listRef} className="provider-sort-list" aria-label="OCR 服务排序">
+        {sort.orderedIds.map((id) => {
+          const provider = providers.find((provider) => provider.id === id)!;
+          return (
+            <div key={provider.id} className="provider-sort-row" {...sort.rowProps(provider.id)}>
+              <ProviderCard
+                provider={provider}
+                onActivate={() => handleActivate(provider.id)}
+                onConfigure={() => handleConfigure(provider.id)}
+                highlighted={provider.id === activeProvider}
+                leadingSlot={<ProviderDragHandle {...sort.handleProps(provider.id)} />}
+              />
+            </div>
+          );
+        })}
       </div>
+      <span className="sr-only" role="status">{sort.announcement}</span>
 
       <ProviderConfigDialog
         isOpen={configuringProvider !== null}
-        presentation="inline"
         onClose={() => setConfiguringProvider(null)}
         onSave={handleSaveConfig}
         provider={currentProvider || null}

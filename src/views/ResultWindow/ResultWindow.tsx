@@ -249,6 +249,8 @@ function ResultWindowContent({
     ocrDetectedLanguage,
     ocrImageBase64,
     isOcrRunning,
+    isSelectingOcrFile,
+    presentationRequestId,
     ocrError,
     resultWindowVisible,
     resultWindowMode,
@@ -490,7 +492,7 @@ function ResultWindowContent({
 
     const visibleStartedAtMs = performance.now();
     const handleBlur = () => {
-      if (isResultWindowDraggingRef.current) return;
+      if (isResultWindowDraggingRef.current || runtime.getState().isSelectingOcrFile) return;
 
       if (
         shouldCloseFromWindowBlur(
@@ -526,7 +528,7 @@ function ResultWindowContent({
   }, [resultWindowVisible]);
 
   useEffect(() => {
-    if (!resultWindowVisible || presentation !== 'standalone') return;
+    if (!resultWindowVisible || isSelectingOcrFile || presentation !== 'standalone') return;
 
     if (resultWindowMode === 'ocr') {
       const panel = resultWindowPanelRef.current;
@@ -574,6 +576,8 @@ function ResultWindowContent({
     });
   }, [
     ocrTokens.length,
+    isSelectingOcrFile,
+    presentationRequestId,
     ocrError,
     ocrImageBase64,
     ocrText,

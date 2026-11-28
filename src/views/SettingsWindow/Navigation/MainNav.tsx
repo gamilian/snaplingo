@@ -6,6 +6,7 @@ import { useScreenshotFavoritesStore } from '../../../stores/screenshotFavorites
 import {
   FavoritesIcon,
   OverviewIcon,
+  OcrIcon,
   ScreenshotIcon,
   ServicesIcon,
   SettingsIcon,
@@ -49,9 +50,10 @@ export function MainNav({ activeTab, onTabChange, library }: MainNavProps) {
   );
   const settingsItems: NavItem[] = [
     { key: 'overview', label: '概览与快捷键', icon: <OverviewIcon /> },
-    { key: 'screenshot', label: '截图与贴图', icon: <ScreenshotIcon /> },
-    { key: 'translation', label: '翻译与识别', icon: <TranslationIcon /> },
-    { key: 'services', label: '引擎与语音', icon: <ServicesIcon /> },
+    { key: 'screenshot', label: '截图', icon: <ScreenshotIcon /> },
+    { key: 'translation', label: '翻译', icon: <TranslationIcon /> },
+    { key: 'ocr', label: 'OCR', icon: <OcrIcon /> },
+    { key: 'services', label: '服务', icon: <ServicesIcon /> },
     { key: 'general', label: '通用设置', icon: <SettingsIcon /> },
   ];
   const libraryItems: NavItem[] = [
@@ -309,7 +311,7 @@ function NavGroup({
       )}
       <div className="settings-nav-items space-y-px">
         {items.map((item) => {
-          const active = activeTab === item.key || (item.key === 'translation' && activeTab === 'ocr') || (item.key === 'history' && activeTab === 'favorites');
+          const active = activeTab === item.key || (item.key === 'history' && activeTab === 'favorites');
           return (
             <button
               key={item.key}

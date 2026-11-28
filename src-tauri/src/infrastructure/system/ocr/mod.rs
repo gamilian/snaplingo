@@ -1,3 +1,4 @@
+pub(crate) mod image_dialog;
 mod image_file;
 pub(crate) use image_file::FilesystemImageReader;
 

@@ -88,7 +88,10 @@ mod tests {
     struct Window(AtomicUsize);
     #[async_trait]
     impl ResultWindowWindowPort for Window {
-        async fn show_or_create(&self) -> crate::Result<()> {
+        async fn reveal(&self, _: ResultWindowRequestId) -> crate::Result<()> {
+            Ok(())
+        }
+        async fn prepare(&self) -> crate::Result<()> {
             self.0.fetch_add(1, Ordering::SeqCst);
             Ok(())
         }

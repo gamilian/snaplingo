@@ -778,7 +778,13 @@ mod tests {
     }
     #[async_trait]
     impl crate::application::result_window::ResultWindowWindowPort for OcrWindowEffects {
-        async fn show_or_create(&self) -> crate::Result<()> {
+        async fn reveal(
+            &self,
+            _: crate::application::result_window::ResultWindowRequestId,
+        ) -> crate::Result<()> {
+            Ok(())
+        }
+        async fn prepare(&self) -> crate::Result<()> {
             self.opens.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             if self
                 .fail_open

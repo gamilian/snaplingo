@@ -417,6 +417,8 @@ function createProviderConfiguration(port: SettingsProvidersPort) {
         port.reorderInactiveTranslation(reorderedInactiveIds),
       );
     },
+    reorderOcr: (providerIds: string[]) =>
+      mutateOcr(() => port.reorderOcr(providerIds)),
     activateOcr: (providerId: string) =>
       mutateOcr(() => port.activateOcr(providerId)),
     configureOcr(providerId: string, credentials: Record<string, string>) {

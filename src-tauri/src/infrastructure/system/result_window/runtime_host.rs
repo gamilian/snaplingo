@@ -9,7 +9,7 @@ use crate::application::result_window::{
 use crate::Result;
 
 use super::backend::RESULT_WINDOW_LABEL;
-use super::tauri::show_or_create_result_window_without_context;
+use super::tauri::{prepare_result_window, reveal_result_window};
 
 pub(super) const RESULT_WINDOW_PAYLOAD_READY_EVENT: &str = "capture-result-payload-ready";
 
@@ -29,11 +29,18 @@ impl TauriResultWindowRuntimeHost {
 
 #[async_trait::async_trait]
 impl ResultWindowWindowPort for TauriResultWindowRuntimeHost {
-    async fn show_or_create(&self) -> Result<()> {
+    async fn prepare(&self) -> Result<()> {
         self.platform
-            .show_or_create_on_main_thread()
+            .prepare_on_main_thread()
             .await
-            .map_err(|error| format!("Failed to show result window: {error}").into())
+            .map_err(|error| format!("Failed to prepare result window: {error}").into())
+    }
+
+    async fn reveal(&self, request_id: ResultWindowRequestId) -> Result<()> {
+        self.platform
+            .reveal_on_main_thread(request_id)
+            .await
+            .map_err(Into::into)
     }
 }
 
@@ -83,7 +90,11 @@ fn payload_ready_event(request_id: ResultWindowRequestId) -> ResultWindowPayload
 
 #[async_trait::async_trait]
 trait ResultWindowTauriPlatform: Send + Sync {
-    async fn show_or_create_on_main_thread(&self) -> std::result::Result<(), String>;
+    async fn prepare_on_main_thread(&self) -> std::result::Result<(), String>;
+    async fn reveal_on_main_thread(
+        &self,
+        request_id: ResultWindowRequestId,
+    ) -> std::result::Result<(), String>;
     async fn emit_to_result_window_on_main_thread(
         &self,
         target: &str,
@@ -98,9 +109,31 @@ struct TauriResultWindowPlatform {
 
 #[async_trait::async_trait]
 impl ResultWindowTauriPlatform for TauriResultWindowPlatform {
-    async fn show_or_create_on_main_thread(&self) -> std::result::Result<(), String> {
-        run_on_main_thread(&self.app, "show result window", |app| {
-            show_or_create_result_window_without_context(&app).map(|_| ())
+    async fn prepare_on_main_thread(&self) -> std::result::Result<(), String> {
+        run_on_main_thread(&self.app, "prepare result window", |app| {
+            prepare_result_window(&app).map(|_| ())
+        })
+        .await
+        .map_err(|error| error.to_string())
+    }
+
+    async fn reveal_on_main_thread(
+        &self,
+        request_id: ResultWindowRequestId,
+    ) -> std::result::Result<(), String> {
+        run_on_main_thread(&self.app, "reveal result window", move |app| {
+            if !app
+                .state::<crate::AppState>()
+                .result_window
+                .is_current(request_id)
+                .map_err(|error| error.to_string())?
+            {
+                return Ok(());
+            }
+            let window = app
+                .get_webview_window(RESULT_WINDOW_LABEL)
+                .ok_or("Result window is not available")?;
+            reveal_result_window(&window)
         })
         .await
         .map_err(|error| error.to_string())
@@ -171,7 +204,11 @@ mod tests {
 
     #[async_trait::async_trait]
     impl super::ResultWindowTauriPlatform for FakeTauriPlatform {
-        async fn show_or_create_on_main_thread(&self) -> Result<(), String> {
+        async fn reveal_on_main_thread(&self, _: ResultWindowRequestId) -> Result<(), String> {
+            Ok(())
+        }
+
+        async fn prepare_on_main_thread(&self) -> Result<(), String> {
             *self.show_dispatches.lock().unwrap() += 1;
             self.show_error
                 .map_or(Ok(()), |error| Err(error.to_string()))
@@ -236,7 +273,7 @@ mod tests {
         let platform = platform(None, None);
         let host = super::TauriResultWindowRuntimeHost::with_platform(platform.clone());
 
-        host.show_or_create().await.unwrap();
+        host.prepare().await.unwrap();
 
         assert_eq!(*platform.show_dispatches.lock().unwrap(), 1);
     }
@@ -268,8 +305,8 @@ mod tests {
             None,
         ));
         assert_eq!(
-            host.show_or_create().await.unwrap_err().to_string(),
-            "Failed to show result window: create failed"
+            host.prepare().await.unwrap_err().to_string(),
+            "Failed to prepare result window: create failed"
         );
 
         let notifier =

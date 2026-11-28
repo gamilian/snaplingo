@@ -107,6 +107,48 @@ describe('CaptureWorkspace React lifecycle', () => {
     }
   });
 
+  it.each([
+    ['screenshot-ocr', 'ocr-window'],
+    ['silent-screenshot-ocr', 'clipboard'],
+  ] as const)('finishes %s after selecting without entering the screenshot editor', async (initialMode, target) => {
+    vi.spyOn(HTMLImageElement.prototype, 'decode').mockResolvedValue(undefined);
+    const platform = createPlatform();
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    const enteredEditor: boolean[] = [];
+    const observer = new MutationObserver(() => {
+      if (container.querySelector('[data-capture-toolbar]')) enteredEditor.push(true);
+    });
+    observer.observe(container, { childList: true, subtree: true });
+    try {
+      await act(async () => root.render(createElement(CaptureWorkspace, {
+        ports: platform, initialMode, initialSessionId: 'ocr-selection',
+      })));
+      await vi.waitFor(() => expect(platform.window.reveal).toHaveBeenCalledOnce());
+      const surface = container.firstElementChild as HTMLDivElement;
+      surface.setPointerCapture = vi.fn();
+      for (const [type, x, y] of [
+        ['pointerdown', 40, 50], ['pointermove', 200, 160], ['pointerup', 200, 160],
+      ] as const) {
+        await act(async () => surface.dispatchEvent(new PointerEvent(type, {
+          bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse',
+          button: 0, buttons: type === 'pointerup' ? 0 : 1, clientX: x, clientY: y,
+        })));
+      }
+      await vi.waitFor(() => expect(platform.commands.completeCaptureOcr).toHaveBeenCalledOnce());
+      expect(platform.commands.prepareCaptureOcr).toHaveBeenCalledWith(expect.objectContaining({ target }));
+      expect(container.firstElementChild).toBeNull();
+      expect(enteredEditor).toEqual([]);
+      expect(container.querySelector('[data-capture-toolbar]')).toBeNull();
+      expect(platform.commands.outputCapture).not.toHaveBeenCalled();
+    } finally {
+      observer.disconnect();
+      await act(async () => root.unmount());
+      container.remove();
+    }
+  });
+
   it('starts the entrance after native reveal and blends in only decoded frozen images', async () => {
     const revealed = deferred<void>();
     const decoded = deferred<void>();

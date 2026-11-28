@@ -53,14 +53,6 @@ export function LibraryLayout<Key extends string>({
       <div className="library-columns">
       <section className="flex min-h-0 min-w-0 flex-col border-r border-line bg-sunken/60">
         <header className="library-heading space-y-3 border-b border-line bg-surface px-4 pb-3 pt-5">
-          <div className="flex items-end justify-between gap-3">
-            <h1 className="text-xl font-bold tracking-[-0.035em] text-ink">
-              {title}
-            </h1>
-            <span className="pb-0.5 text-hint tabular-nums text-faint">
-              {total.toLocaleString()} 项
-            </span>
-          </div>
           <label className="relative block">
             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-faint">
               ⌕

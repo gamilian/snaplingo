@@ -19,6 +19,7 @@ export interface ResultWindowPort {
     lastPosition?: ResultWindowPhysicalPosition,
   ): Promise<void>;
   hide(): Promise<void>;
+  reveal(requestId: ResultWindowRequestId): Promise<void>;
   startDragging(): Promise<ResultWindowPhysicalPosition>;
   setAlwaysOnTop(value: boolean): Promise<void>;
 }

@@ -349,7 +349,7 @@ export function ScreenshotSettingsPage() {
 
   return (
     <SettingsScrollPage
-      title="截图与贴图"
+      title="截图"
       description="保存输出、长截图上限、选区外观与桌面贴图行为"
      
       sections={[

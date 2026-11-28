@@ -66,11 +66,10 @@ describe('GeneralPage durable settings', () => {
       (element) => getElementName(element) === 'SelectField',
     );
 
+    expect(selects).toHaveLength(1);
     expect(selects[0].props.value).toBe('zh-CN');
-    expect(selects[1].props.value).toBe('dark');
 
     selects[0].props.onChange?.('zh-CN');
-    selects[1].props.onChange?.('system');
     findElement(
       interfaceContent,
       (element) => getElementName(element) === 'SettingsToggle',
@@ -80,9 +79,6 @@ describe('GeneralPage durable settings', () => {
       language: 'zh-CN',
     });
     expect(settingsConfig.state.updateGeneralSettings).toHaveBeenNthCalledWith(2, {
-      theme: 'system',
-    });
-    expect(settingsConfig.state.updateGeneralSettings).toHaveBeenNthCalledWith(3, {
       startOnBoot: false,
     });
   });

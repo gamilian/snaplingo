@@ -70,6 +70,16 @@ describe('settingsStore navigation persistence', () => {
     }
   });
 
+  it.each(['translation', 'ocr'] as const)(
+    'keeps %s provider links on the unified services page', async (section) => {
+      const { useSettingsStore } = await import('./settingsStore');
+      useSettingsStore.getState().navigate({ tab: 'services', section });
+      expect(useSettingsStore.getState()).toMatchObject({
+        activeMainTab: 'services', requestedSection: section,
+      });
+    },
+  );
+
   it('keeps one-shot section requests out of persisted navigation state', async () => {
     const { useSettingsStore } = await import('./settingsStore');
 

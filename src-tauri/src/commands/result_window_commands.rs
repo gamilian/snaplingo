@@ -102,6 +102,18 @@ pub(crate) async fn open_translation_result_window_for_runtime(
 }
 
 #[tauri::command]
+pub async fn reveal_capture_result_window(
+    request_id: String,
+    state: tauri::State<'_, crate::AppState>,
+) -> Result<(), String> {
+    state
+        .result_window
+        .reveal(parse_request_id(&request_id)?)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 pub fn current_capture_result_window_request_id(
     state: tauri::State<'_, crate::AppState>,
 ) -> Result<Option<String>, String> {
@@ -189,7 +201,11 @@ mod tests {
 
     #[async_trait]
     impl ResultWindowWindowPort for Window {
-        async fn show_or_create(&self) -> crate::Result<()> {
+        async fn reveal(&self, _: ResultWindowRequestId) -> crate::Result<()> {
+            Ok(())
+        }
+
+        async fn prepare(&self) -> crate::Result<()> {
             Ok(())
         }
     }

@@ -46,6 +46,7 @@ interface ProviderState extends ProviderConfigurationState {
   testCustomTranslationProvider: (id: string) => Promise<void>;
   loadOcrProviders: () => Promise<void>;
   activateOcrProvider: (id: string) => Promise<void>;
+  reorderOcrProviders: (ids: string[]) => Promise<void>;
   configureOcrProvider: (
     providerId: string,
     credentials: Record<string, string>,
@@ -79,6 +80,7 @@ export const useProviderStore = create<ProviderState>(() => ({
     await runtime().loadOcr();
   },
   activateOcrProvider: (id) => runtime().activateOcr(id),
+  reorderOcrProviders: (ids) => runtime().reorderOcr(ids),
   configureOcrProvider: (providerId, credentials) =>
     runtime().configureOcr(providerId, credentials),
   updateProviderConfig: (_id, providerId, config) =>

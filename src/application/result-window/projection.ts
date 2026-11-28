@@ -21,6 +21,8 @@ export interface ResultWindowState {
   readonly ocrDetectedLanguage: string | null;
   readonly ocrImageBase64: string | null;
   readonly isOcrRunning: boolean;
+  readonly isSelectingOcrFile: boolean;
+  readonly presentationRequestId: string | null;
   readonly ocrError: string | null;
   readonly resultWindowVisible: boolean;
   readonly resultWindowMode: ResultWindowMode;
@@ -39,6 +41,8 @@ export function createInitialResultWindowState(): ResultWindowState {
     ocrDetectedLanguage: null,
     ocrImageBase64: null,
     isOcrRunning: false,
+    isSelectingOcrFile: false,
+    presentationRequestId: null,
     ocrError: null,
     resultWindowVisible: false,
     resultWindowMode: 'translation',

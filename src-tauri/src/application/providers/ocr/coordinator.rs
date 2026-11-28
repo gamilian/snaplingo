@@ -162,8 +162,52 @@ impl OcrCoordinator {
     ///
     /// * `Vec<Arc<dyn OcrProvider>>` - List of all registered providers
     pub fn list_all(&self) -> Vec<Arc<dyn OcrProvider>> {
+        let mut providers = self
+            .providers
+            .lock()
+            .unwrap()
+            .values()
+            .cloned()
+            .collect::<Vec<_>>();
+        let order = self
+            .config_store
+            .load_ocr_provider_order()
+            .unwrap_or_default();
+        providers.sort_by(|left, right| {
+            let rank = |id: &str| {
+                order
+                    .iter()
+                    .position(|saved| saved == id)
+                    .unwrap_or(usize::MAX)
+            };
+            rank(left.id())
+                .cmp(&rank(right.id()))
+                .then_with(|| left.name().cmp(right.name()))
+                .then_with(|| left.id().cmp(right.id()))
+        });
+        providers
+    }
+
+    /// Save display order independently of the single active OCR provider.
+    pub fn reorder_providers(&self, ordered_ids: Vec<String>) -> Result<()> {
         let providers = self.providers.lock().unwrap();
-        providers.values().cloned().collect()
+        let mut expected = providers.keys().cloned().collect::<Vec<_>>();
+        let mut received = ordered_ids.clone();
+        expected.sort();
+        received.sort();
+        if expected != received {
+            return Err(
+                "OCR reorder must include each registered provider exactly once"
+                    .to_string()
+                    .into(),
+            );
+        }
+        self.config_store.save_ocr_provider_order(&ordered_ids)?;
+        drop(providers);
+        if let Some(notifier) = &self.change_notifier {
+            notifier.providers_changed();
+        }
+        Ok(())
     }
 
     /// Gets a specific provider by ID.

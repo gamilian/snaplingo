@@ -23,6 +23,7 @@ enum WindowOpenOutcome {
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum PresentationEvent {
     WindowOpened,
+    WindowRevealed,
     PayloadReadyNotified,
 }
 
@@ -45,6 +46,7 @@ impl From<std::result::Result<(), String>> for NotificationOutcome {
 struct FakeResultWindow {
     open_outcomes: Mutex<VecDeque<WindowOpenOutcome>>,
     open_calls: Mutex<usize>,
+    reveal_calls: Mutex<Vec<ResultWindowRequestId>>,
     events: Arc<Mutex<Vec<PresentationEvent>>>,
     opening_started: Notify,
     unblock_open: Notify,
@@ -58,6 +60,7 @@ impl FakeResultWindow {
         Self {
             open_outcomes: Mutex::new(open_outcomes.into_iter().collect()),
             open_calls: Mutex::new(0),
+            reveal_calls: Mutex::new(Vec::new()),
             events,
             opening_started: Notify::new(),
             unblock_open: Notify::new(),
@@ -83,7 +86,16 @@ impl FakeResultWindow {
 
 #[async_trait]
 impl ResultWindowWindowPort for FakeResultWindow {
-    async fn show_or_create(&self) -> crate::Result<()> {
+    async fn reveal(&self, request_id: ResultWindowRequestId) -> crate::Result<()> {
+        self.reveal_calls.lock().unwrap().push(request_id);
+        self.events
+            .lock()
+            .unwrap()
+            .push(PresentationEvent::WindowRevealed);
+        Ok(())
+    }
+
+    async fn prepare(&self) -> crate::Result<()> {
         *self.open_calls.lock().unwrap() += 1;
         self.events
             .lock()
@@ -251,6 +263,25 @@ fn make_runtime(
     let runtime = Arc::new(ResultWindowRuntime::new(window.clone(), notifier.clone()));
 
     (runtime, window, notifier)
+}
+
+#[tokio::test]
+async fn result_windows_wait_for_the_current_frontend_presentation() {
+    let (runtime, window, _) = make_runtime([], []);
+    runtime
+        .open(ResultWindowOpenRequest::file_ocr())
+        .await
+        .unwrap();
+    let stale = runtime.current_request_id().unwrap().unwrap();
+    assert!(window.reveal_calls.lock().unwrap().is_empty());
+    runtime.open(translation_request("newer")).await.unwrap();
+    let current = runtime.current_request_id().unwrap().unwrap();
+    runtime.reveal(stale).await.unwrap();
+    assert!(window.reveal_calls.lock().unwrap().is_empty());
+    runtime.take_if_current(current).unwrap();
+    runtime.reveal(current).await.unwrap();
+    runtime.reveal(current).await.unwrap();
+    assert_eq!(*window.reveal_calls.lock().unwrap(), vec![current]);
 }
 
 #[tokio::test]

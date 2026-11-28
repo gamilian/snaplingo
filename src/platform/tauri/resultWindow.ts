@@ -38,6 +38,9 @@ export const resultWindow: ResultWindowPort = {
   hide() {
     return getCurrentWindow().hide();
   },
+  reveal(requestId) {
+    return invoke('reveal_capture_result_window', { requestId });
+  },
   startDragging() {
     const window = getCurrentWindow();
     return new Promise((resolve, reject) => {

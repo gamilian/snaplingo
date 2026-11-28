@@ -263,7 +263,11 @@ mod tests {
 
     #[async_trait]
     impl ResultWindowWindowPort for Window {
-        async fn show_or_create(&self) -> crate::Result<()> {
+        async fn reveal(&self, _: ResultWindowRequestId) -> crate::Result<()> {
+            Ok(())
+        }
+
+        async fn prepare(&self) -> crate::Result<()> {
             Ok(())
         }
     }

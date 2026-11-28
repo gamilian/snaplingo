@@ -254,6 +254,56 @@ describe('result window application runtime', () => {
     expect(onLoaded).not.toHaveBeenCalled();
   });
 
+  it('reveals a payload only after its rendered window is sized and placed', async () => {
+    const { runtime, platform } = createRuntime({ payloads: { '7': {
+      mode: 'ocr', text: 'recognized', autoTranslate: false, ocrIntent: 'display-text',
+    } } });
+    await runtime.loadPayload('7');
+    expect(platform.reveal).not.toHaveBeenCalled();
+    const resized = deferred<undefined>();
+    platform.resizeTo.mockReturnValueOnce(resized.promise);
+    const rendering = runtime.resizeStandaloneWindow({
+      presentation: 'standalone', visible: true, mode: 'ocr', panelHeightPx: 400,
+    });
+    expect(platform.reveal).not.toHaveBeenCalled();
+    resized.resolve(undefined);
+    await rendering;
+    expect(platform.placeAt).toHaveBeenCalled();
+    expect(platform.reveal).toHaveBeenCalledExactlyOnceWith('7');
+    await runtime.resizeStandaloneWindow({
+      presentation: 'standalone', visible: true, mode: 'ocr', panelHeightPx: 420,
+    });
+    expect(platform.reveal).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a cold file OCR request hidden when the picker is cancelled', async () => {
+    const { runtime, platform } = createRuntime({ payloads: { '7': {
+      mode: 'ocr', text: '', autoTranslate: false, ocrIntent: 'file',
+    } } });
+    await runtime.loadPayload('7');
+    expect(runtime.getState()).toMatchObject({ resultWindowVisible: false, isSelectingOcrFile: false });
+    expect(platform.reveal).not.toHaveBeenCalled();
+    expect(platform.commands.recognizeImageFile).not.toHaveBeenCalled();
+  });
+
+  it('keeps the previous page intact and opens only one picker until file selection finishes', async () => {
+    const picked = deferred<string | null>();
+    const { runtime, platform } = createRuntime();
+    await runtime.applyPayload({ mode: 'translation', origin: 'selection', text: 'previous text', autoTranslate: false });
+    platform.commands.selectImageFile.mockReturnValueOnce(picked.promise);
+    const selecting = runtime.startFileOcr();
+    expect(runtime.getState()).toMatchObject({
+      isSelectingOcrFile: true, resultWindowMode: 'translation', sourceText: 'previous text',
+    });
+    await runtime.startFileOcr();
+    expect(platform.commands.selectImageFile).toHaveBeenCalledOnce();
+    picked.resolve(null);
+    await selecting;
+    expect(runtime.getState()).toMatchObject({
+      isSelectingOcrFile: false, resultWindowMode: 'translation', resultWindowOrigin: 'selection', sourceText: 'previous text',
+    });
+  });
+
   it('starts OCR file workflow from a file-intent payload', async () => {
     const { runtime, platform, projectedStates } = createRuntime({
       selectedImagePath: '/tmp/example.png', recognizedFileText: 'file text',
@@ -1065,6 +1115,7 @@ function createRuntime(options: {
       payloadReadyHandler = handler;
       return unsubscribe;
     }),
+    reveal: vi.fn(async (_requestId: string) => undefined),
     resizeTo: vi.fn(async () => undefined),
     placeAt: vi.fn(async () => undefined),
     dismiss: vi.fn(async () => {

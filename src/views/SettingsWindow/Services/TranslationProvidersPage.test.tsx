@@ -82,6 +82,14 @@ vi.mock('../../../stores/providerStore', () => ({
     selector(providerStore.state),
 }));
 
+vi.mock('./providerSorting', async () => ({
+  ...await vi.importActual<typeof import('./providerSorting')>('./providerSorting'),
+  useProviderSort: ({ ids }: { ids: string[] }) => ({
+    orderedIds: ids, listRef: { current: null },
+    rowProps: () => ({}), handleProps: () => ({}), announcement: '',
+  }),
+}));
+
 import { TranslationProvidersPage } from './TranslationProvidersPage';
 
 describe('TranslationProvidersPage', () => {
@@ -99,7 +107,7 @@ describe('TranslationProvidersPage', () => {
     providerStore.state.reorderTranslationProviders.mockClear();
   });
 
-  it('renders a hover-visible drag handle for active provider rows', () => {
+  it('renders shared drag handles for provider rows', () => {
     const view = renderPage();
     const providerCards = findElements(
       view,
@@ -107,29 +115,27 @@ describe('TranslationProvidersPage', () => {
     );
 
     expect(providerCards).toHaveLength(2);
-    expect(providerCards[0].props.leadingSlot?.props.className).toContain('opacity-0');
-    expect(providerCards[0].props.leadingSlot?.props.className).toContain('group-hover:opacity-100');
+    expect(providerCards[0].props.leadingSlot?.type.name).toBe('ProviderDragHandle');
   });
 
-  it('places the add custom provider action below the grouped provider list', () => {
+  it('places the add provider action below the provider list', () => {
     const view = renderPage();
     const addButton = findElement(
       view,
       (element) =>
         getElementName(element) === 'button' &&
-        element.props['aria-label'] === '添加自定义服务',
+        element.props['aria-label'] === '添加 Provider',
     );
 
     expect(addButton.props.className).toContain('inline-flex');
-    // The action now sits in normal flow beneath the list, not absolutely pinned.
     expect(addButton.props.className).not.toContain('absolute');
     expect(addButton.props.className).toContain('hover:text-accent-text');
     expect(addButton.props.children).toContainEqual(
-      expect.objectContaining({ props: expect.objectContaining({ children: '添加自定义服务' }) }),
+      expect.objectContaining({ props: expect.objectContaining({ children: '添加 Provider' }) }),
     );
   });
 
-  it('opens the full custom provider form when configuring a custom provider', () => {
+  it('opens a modal dialog while keeping the provider list mounted when configuring a custom provider', () => {
     let view = renderPage();
     const customProviderCard = findElement(
       view,
@@ -151,21 +157,21 @@ describe('TranslationProvidersPage', () => {
     );
 
     expect(customDialog.props.isOpen).toBe(true);
-    expect(customDialog.props.presentation).toBe('inline');
+    expect(customDialog.props.presentation).toBeUndefined();
     expect(customDialog.props.initialProvider?.id).toBe('custom-gpt');
     expect(genericDialogs).toHaveLength(0);
     expect(
       findElements(view, (element) => getElementName(element) === 'ProviderCard'),
-    ).toHaveLength(0);
+    ).toHaveLength(2);
   });
 
-  it('opens custom provider creation as an inline page instead of a modal over the list', () => {
+  it('opens provider creation in a modal dialog over the provider list', () => {
     let view = renderPage();
     const addButton = findElement(
       view,
       (element) =>
         getElementName(element) === 'button' &&
-        element.props['aria-label'] === '添加自定义服务',
+        element.props['aria-label'] === '添加 Provider',
     );
 
     addButton.props.onClick();
@@ -177,10 +183,10 @@ describe('TranslationProvidersPage', () => {
     );
 
     expect(customForm.props.isOpen).toBe(true);
-    expect(customForm.props.presentation).toBe('inline');
+    expect(customForm.props.presentation).toBeUndefined();
     expect(
       findElements(view, (element) => getElementName(element) === 'ProviderCard'),
-    ).toHaveLength(0);
+    ).toHaveLength(2);
   });
 
   it('tests custom provider connectivity from the hover action', async () => {
@@ -288,6 +294,7 @@ type PageElement = ReactElement & {
     onConfigure?: () => unknown;
     onTest?: () => Promise<void>;
     leadingSlot?: {
+      type: { name: string };
       props?: {
         className?: string;
       };

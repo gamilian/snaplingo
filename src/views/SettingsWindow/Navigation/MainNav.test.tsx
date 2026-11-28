@@ -35,6 +35,22 @@ describe('settings main navigation', () => {
     }
   });
 
+  it('selects only OCR when the independent OCR page is active', async () => {
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    mountedRoots.push(root);
+    const onTabChange = vi.fn();
+
+    await act(async () => {
+      root.render(<MainNav activeTab="ocr" onTabChange={onTabChange} />);
+    });
+
+    expect([...container.querySelectorAll('[aria-current="page"]')].map((button) => button.textContent)).toEqual(['OCR']);
+    const translation = [...container.querySelectorAll('button')].find((button) => button.textContent === '翻译');
+    await act(async () => translation?.click());
+    expect(onTabChange).toHaveBeenCalledWith('translation');
+  });
+
   it('groups settings separately from the library without a workspace group', async () => {
     const container = document.createElement('div');
     const root = createRoot(container);
@@ -46,7 +62,7 @@ describe('settings main navigation', () => {
 
     expect(container.textContent).toContain('设置');
     expect(container.textContent).toContain('资料库');
-    expect([...container.querySelectorAll('[aria-label="主导航"] button')].map((button) => button.textContent)).toEqual(['概览与快捷键', '截图与贴图', '翻译与识别', '引擎与语音', '通用设置', '资料库']);
+    expect([...container.querySelectorAll('[aria-label="主导航"] button')].map((button) => button.textContent)).toEqual(['概览与快捷键', '截图', '翻译', 'OCR', '服务', '通用设置', '资料库']);
     expect(container.textContent).not.toContain('工作区');
     expect(container.textContent).not.toContain('高级');
     expect(container.textContent).toContain('收藏已用');

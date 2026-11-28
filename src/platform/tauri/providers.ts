@@ -303,6 +303,9 @@ export const settingsProviders: SettingsProvidersPort = {
     );
     return providers.map(toOcrProviderInfo);
   },
+  reorderOcr(providerIds) {
+    return invoke<void>('reorder_ocr_providers', { providerIds });
+  },
   activateOcr(providerId) {
     return invoke<void>('activate_ocr_provider', { providerId });
   },

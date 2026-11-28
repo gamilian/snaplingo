@@ -182,6 +182,18 @@ export function CustomTranslationProviderDialog({
     void loadPromptStrategies(values.promptStrategyId);
   }, [isOpen, initialProvider?.id]);
 
+  useEffect(() => {
+    if (!isOpen || presentation !== 'dialog' || typeof window === 'undefined') return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !isSaving) {
+        event.preventDefault();
+        resetAndClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isSaving, presentation]);
+
   const resetAndClose = () => {
     setName('');
     setProtocol('openai');
@@ -335,8 +347,8 @@ export function CustomTranslationProviderDialog({
     canUpdate: Boolean(onUpdate),
   });
   const dialogTitle = isEditing
-    ? `配置 ${initialProvider?.name || '自定义翻译服务'}`
-    : '添加自定义翻译服务';
+    ? `配置 ${initialProvider?.name || 'Provider'}`
+    : '添加 Provider';
   const protocolFamily = getProtocolFamily(protocol);
 
   const form = (
@@ -397,7 +409,12 @@ export function CustomTranslationProviderDialog({
   }
 
   return createPortal(
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div
+      className="provider-dialog-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !isSaving) resetAndClose();
+      }}
+    >
       {form}
     </div>,
     document.body,

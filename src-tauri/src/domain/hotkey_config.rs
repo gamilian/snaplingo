@@ -77,12 +77,12 @@ pub const DEFAULT_HOTKEYS: &[DefaultHotkey] = &[
     DefaultHotkey {
         category: OCR_CATEGORY,
         action: SILENT_SCREENSHOT_OCR_ACTION,
-        hotkey: HOTKEY_UNSET,
+        hotkey: "⌥C",
     },
     DefaultHotkey {
         category: OCR_CATEGORY,
         action: FILE_OCR_ACTION,
-        hotkey: HOTKEY_UNSET,
+        hotkey: "⌥O",
     },
 ];
 
@@ -158,7 +158,7 @@ pub fn hotkey_category_mut<'a>(
 
 #[cfg(test)]
 mod hotkey_config_tests {
-    use super::{default_hotkey_snapshot, validate_hotkey_action, HOTKEY_UNSET};
+    use super::{default_hotkey_snapshot, validate_hotkey_action};
 
     #[test]
     fn hotkey_config_defaults_are_sectioned_by_feature() {
@@ -199,12 +199,9 @@ mod hotkey_config_tests {
         assert_eq!(snapshot.ocr.get("screenshot-ocr"), Some(&"⇧⌥S".to_string()));
         assert_eq!(
             snapshot.ocr.get("silent-screenshot-ocr"),
-            Some(&HOTKEY_UNSET.to_string())
+            Some(&"⌥C".to_string())
         );
-        assert_eq!(
-            snapshot.ocr.get("file-ocr"),
-            Some(&HOTKEY_UNSET.to_string())
-        );
+        assert_eq!(snapshot.ocr.get("file-ocr"), Some(&"⌥O".to_string()));
         assert!(!snapshot.ocr.contains_key("show-window"));
     }
 

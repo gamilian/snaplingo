@@ -209,7 +209,7 @@ mod tests {
             (SCREENSHOT_TRANSLATE_ID, Some("Alt+KeyS")),
             (SCREENSHOT_OCR_ID, Some("Shift+Alt+KeyS")),
             (SHOW_TRANSLATION_ID, Some("Alt+KeyA")),
-            (FILE_OCR_ID, None),
+            (FILE_OCR_ID, Some("Alt+KeyO")),
             (HISTORY_ID, None),
             (SETTINGS_ID, None),
             (ABOUT_ID, None),
@@ -253,7 +253,10 @@ mod tests {
             );
         }
         let hotkeys = configuration.reset_category(OCR_CATEGORY).unwrap();
-        assert_eq!(menu_shortcut(FILE_OCR_ID, &hotkeys).unwrap(), None);
+        assert_eq!(
+            menu_shortcut(FILE_OCR_ID, &hotkeys).unwrap(),
+            Some("Alt+KeyO".into())
+        );
     }
 
     #[cfg(target_os = "macos")]

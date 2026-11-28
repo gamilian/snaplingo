@@ -317,6 +317,7 @@ describe('Tauri providers command adapter', () => {
     await settingsProviders.removeCustomTranslation('custom-gpt');
     await settingsProviders.testCustomTranslation('custom-gpt');
     await settingsProviders.activateOcr('system-ocr');
+    await settingsProviders.reorderOcr(['baidu-ocr', 'system-ocr']);
 
     expect(invoke).toHaveBeenCalledWith('activate_translation_provider', {
       providerId: 'deeplx',
@@ -342,6 +343,9 @@ describe('Tauri providers command adapter', () => {
     });
     expect(invoke).toHaveBeenCalledWith('test_custom_translation_provider', {
       providerId: 'custom-gpt',
+    });
+    expect(invoke).toHaveBeenCalledWith('reorder_ocr_providers', {
+      providerIds: ['baidu-ocr', 'system-ocr'],
     });
     expect(invoke).toHaveBeenCalledWith('activate_ocr_provider', {
       providerId: 'system-ocr',

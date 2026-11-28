@@ -27,7 +27,9 @@ describe('Tauri OCR command adapter', () => {
 
   it('returns null when image selection is cancelled', async () => {
     const { selectImageFile } = await import('./ocr');
-    open.mockResolvedValueOnce(null);
+    invoke.mockResolvedValueOnce(null);
     await expect(selectImageFile()).resolves.toBeNull();
+    expect(invoke).toHaveBeenLastCalledWith('select_ocr_image_file');
+    expect(open).not.toHaveBeenCalled();
   });
 });

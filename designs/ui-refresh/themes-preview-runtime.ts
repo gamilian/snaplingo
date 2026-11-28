@@ -30,7 +30,7 @@ const save = async <K extends keyof SettingsSnapshot>(section: K, value: Setting
 const defaults: HotkeySnapshot = {
   screenshot: { screenshot: 'F1', 'screenshot-copy': '⌘F1', pin: 'F3', 'pin-toggle-all': '⇧F3', 'pin-switch-group': '⌘F3' },
   translation: { 'selection-translate': '⌥D', 'screenshot-translate': '⌥S', 'show-window': '⌥A' },
-  ocr: { 'screenshot-ocr': '⇧⌥S', 'silent-screenshot-ocr': '未设置', 'file-ocr': '未设置' },
+  ocr: { 'screenshot-ocr': '⇧⌥S', 'silent-screenshot-ocr': '⌥C', 'file-ocr': '⌥O' },
 };
 let hotkeys = copy(defaults);
 let providers: ProviderInfo[] = [
@@ -61,7 +61,8 @@ export const runtime = createSettingsRuntime({
     listTranslation: async () => copy(providers),
     activateTranslation: async id => { providers = providers.map(p => p.id === id ? { ...p, isActive: true } : p); },
     deactivateTranslation: async id => { providers = providers.map(p => p.id === id ? { ...p, isActive: false } : p); },
-    reorderActiveTranslation: async ids => { providers.sort((a,b) => ids.indexOf(a.id) - ids.indexOf(b.id)); },
+    reorderActiveTranslation: async ids => { const active = ids.map(id => providers.find(p => p.id === id)!); providers = [...active, ...providers.filter(p => !p.isActive)]; },
+    reorderInactiveTranslation: async ids => { const inactive = ids.map(id => providers.find(p => p.id === id)!); providers = [...providers.filter(p => p.isActive), ...inactive]; },
     getTranslationCredentialSchema: async () => [{ name: 'api_key', label: 'API 密钥', secret: true }],
     getOcrCredentialSchema: async () => [{ name: 'api_key', label: 'API 密钥', secret: true }],
     configureTranslationCredentials: async id => { providers = providers.map(p => p.id === id ? { ...p, isConfigured: true } : p); },
@@ -73,6 +74,7 @@ export const runtime = createSettingsRuntime({
     listOpenAICompatibleModels: async () => [], testOpenAICompatible: disconnected, testOpenAIResponses: disconnected,
     listAnthropicModels: async () => [], testAnthropic: disconnected, listGeminiModels: async () => [], testGemini: disconnected,
     listOcr: async () => copy(ocrProviders),
+    reorderOcr: async ids => { ocrProviders = ids.map(id => ocrProviders.find(p => p.id === id)!); },
     activateOcr: async id => { ocrProviders = ocrProviders.map(p => ({ ...p, isActive: p.id === id })); },
     configureOcrCredentials: noop,
   },

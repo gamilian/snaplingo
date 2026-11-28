@@ -5,6 +5,7 @@ import { GeneralPage } from './General/GeneralPage';
 import { ScreenshotSettingsPage } from './Screenshot/ScreenshotSettingsPage';
 import { ServicesPage } from './Services/ServicesPage';
 import { TranslationSettingsScrollPage } from './Translation/TranslationSettingsScrollPage';
+import { OcrSettingsScrollPage } from './OCR/OcrSettingsScrollPage';
 import { FavoritesLibraryPage } from './Library/FavoritesLibraryPage';
 import { HistoryLibraryPage } from './Library/HistoryLibraryPage';
 
@@ -18,13 +19,13 @@ export interface SettingsSection {
 
 export const settingsSections: SettingsSection[] = [
   { key: 'overview', label: '概览与快捷键', render: () => <OverviewPage /> },
-  { key: 'screenshot', label: '截图与贴图', render: () => <ScreenshotSettingsPage /> },
-  { key: 'translation', label: '翻译与识别', render: () => <TranslationSettingsScrollPage /> },
-  { key: 'services', label: '引擎与语音', render: () => <ServicesPage /> },
+  { key: 'screenshot', label: '截图', render: () => <ScreenshotSettingsPage /> },
+  { key: 'translation', label: '翻译', render: () => <TranslationSettingsScrollPage /> },
+  { key: 'ocr', label: 'OCR', render: () => <OcrSettingsScrollPage /> },
+  { key: 'services', label: '服务', render: () => <ServicesPage /> },
   { key: 'general', label: '通用设置', render: () => <GeneralPage /> },
   { key: 'history', label: '资料库', render: () => <HistoryLibraryPage /> },
-  // Existing native navigation requests and persisted destinations remain valid.
-  { key: 'ocr', label: '翻译与识别', render: () => <TranslationSettingsScrollPage /> },
+  // Existing favorites navigation requests and persisted destinations remain valid.
   { key: 'favorites', label: '资料库', render: () => <FavoritesLibraryPage /> },
 ];
 

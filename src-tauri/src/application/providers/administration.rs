@@ -245,6 +245,10 @@ impl ProviderAdministration {
             .collect()
     }
 
+    pub fn reorder_ocr_providers(&self, provider_ids: Vec<String>) -> Result<()> {
+        self.ocr.reorder_providers(provider_ids)
+    }
+
     pub fn activate_ocr_provider(&self, provider_id: String) -> Result<()> {
         self.ocr.activate(&provider_id)
     }

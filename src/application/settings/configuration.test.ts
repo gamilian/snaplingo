@@ -59,6 +59,26 @@ const hotkeys = {
 };
 
 describe('settings configuration application module', () => {
+  it('persists OCR ordering and reloads it without changing the selected engine', async () => {
+    const { configuration, providers } = createFixture();
+    let items: OcrProviderInfo[] = ['system-ocr', 'baidu-ocr'].map((id) => ({
+      id, name: id, isActive: id === 'system-ocr', isConfigured: true, requiresApiKey: false,
+    }));
+    providers.listOcr.mockImplementation(async () => items);
+    providers.reorderOcr.mockImplementation(async (ids: string[]) => {
+      items = ids.map((id) => items.find((item) => item.id === id)!);
+    });
+    await configuration.providers.loadOcr();
+    await configuration.providers.reorderOcr(['baidu-ocr', 'system-ocr']);
+    await configuration.providers.loadOcr();
+
+    expect(providers.reorderOcr).toHaveBeenCalledWith(['baidu-ocr', 'system-ocr']);
+    expect(configuration.providers.getState().ocrProviders.map((provider) => provider.id))
+      .toEqual(['baidu-ocr', 'system-ocr']);
+    expect(configuration.providers.getState().activeOcrProvider).toBe('system-ocr');
+    expect(providers.activateOcr).not.toHaveBeenCalled();
+  });
+
   it('subscribes to settings changes before hydrating a lightweight window', async () => {
     const { durableSettings } = createFixture();
     const settings = createDurableSettingsConfiguration(durableSettings);
@@ -410,6 +430,7 @@ function createProviderPort() {
     listGeminiModels: vi.fn(),
     testGemini: vi.fn(),
     listOcr: vi.fn(async () => [] as OcrProviderInfo[]),
+    reorderOcr: vi.fn(async (_ids: string[]) => undefined),
     activateOcr: vi.fn(async () => undefined),
     configureOcrCredentials: vi.fn(async () => undefined),
   };

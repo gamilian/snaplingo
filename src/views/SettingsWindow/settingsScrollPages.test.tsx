@@ -108,7 +108,6 @@ describe('single-scroll settings pages', () => {
       '语言与取词',
       '窗口与输入框',
       '翻译行为',
-      'OCR 识别与文本处理',
     ]);
     const labels = settingRowLabels(sections);
     expect(labels).toContain('取词模式');

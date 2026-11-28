@@ -3,6 +3,7 @@ import { useProviderStore } from '../../../stores/providerStore';
 import { ProviderCard } from './ProviderCard';
 import { ProviderConfigDialog } from './ProviderConfigDialog';
 import { CustomTranslationProviderDialog } from './CustomTranslationProviderDialog';
+import { ProviderDragHandle, useProviderSort } from './providerSorting';
 
 export function TranslationProvidersPage({ addRequest = 0, showAddAction = true }: { addRequest?: number; showAddAction?: boolean } = {}) {
   const providers = useProviderStore((state) => state.translationProviders);
@@ -23,8 +24,22 @@ export function TranslationProvidersPage({ addRequest = 0, showAddAction = true 
   useEffect(() => {
     if (addRequest > 0) { setConfiguringProvider(null); setAddingCustomProvider(true); }
   }, [addRequest]);
-  const [drag, setDrag] = useState<{ id: string; pointerId: number } | null>(null);
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const activeProvidersList = activeProviders
+    .map((id) => providers.find((provider) => provider.id === id))
+    .filter((provider): provider is NonNullable<typeof provider> => provider !== undefined);
+  const inactiveProvidersList = providers.filter((provider) => !activeProviders.includes(provider.id));
+  const orderedProviders = [...activeProvidersList, ...inactiveProvidersList];
+  const sort = useProviderSort({
+    ids: orderedProviders.map((provider) => provider.id),
+    groupForId: (id) => activeProviders.includes(id) ? 'active' : 'inactive',
+    onReorder: async (ids, draggedId) => {
+      if (activeProviders.includes(draggedId)) {
+        await reorderProviders(ids.filter((id) => activeProviders.includes(id)));
+      } else {
+        await reorderInactiveProviders(ids.filter((id) => !activeProviders.includes(id)));
+      }
+    },
+  });
 
   // 加载 providers
   useEffect(() => {
@@ -85,132 +100,24 @@ export function TranslationProvidersPage({ addRequest = 0, showAddAction = true 
     setConfiguringProvider(null);
   };
 
-  // 拖拽处理
-  const handleDragStart = (e: React.PointerEvent, id: string) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    setDrag({ id, pointerId: e.pointerId });
-  };
-
-  const providerAtPointer = (e: React.PointerEvent) => {
-    const row = document.elementFromPoint(e.clientX, e.clientY)
-      ?.closest<HTMLElement>('[data-translation-provider-id]');
-    const id = row?.dataset.translationProviderId;
-    return id && providers.some((provider) => provider.id === id) ? id : null;
-  };
-
-  const canDropOn = (sourceId: string, targetId: string) =>
-    activeProviders.includes(sourceId) === activeProviders.includes(targetId);
-
-  const handleDragOver = (e: React.PointerEvent) => {
-    if (!drag || drag.pointerId !== e.pointerId) return;
-    const id = providerAtPointer(e);
-    setDragOverId(
-      id && id !== drag.id && canDropOn(drag.id, id) ? id : null,
-    );
-  };
-
-  const handleDragEnd = (e: React.PointerEvent) => {
-    if (drag?.pointerId !== e.pointerId) return;
-    setDrag(null);
-    setDragOverId(null);
-  };
-
-  const handleDrop = async (e: React.PointerEvent) => {
-    if (!drag || drag.pointerId !== e.pointerId) return;
-    const draggedId = drag.id;
-    const targetId = providerAtPointer(e);
-    handleDragEnd(e);
-
-    if (
-      !targetId ||
-      draggedId === targetId ||
-      !canDropOn(draggedId, targetId)
-    ) {
-      return;
-    }
-
-    // 计算新顺序
-    const isActive = activeProviders.includes(draggedId);
-    const newOrder = isActive
-      ? [...activeProviders]
-      : providers
-          .filter((provider) => !activeProviders.includes(provider.id))
-          .map((provider) => provider.id);
-    const draggedIndex = newOrder.indexOf(draggedId);
-    const targetIndex = newOrder.indexOf(targetId);
-
-    newOrder.splice(draggedIndex, 1);
-    newOrder.splice(targetIndex, 0, draggedId);
-
-    try {
-      if (isActive) {
-        await reorderProviders(newOrder);
-      } else {
-        await reorderInactiveProviders(newOrder);
-      }
-    } catch (error) {
-      alert(`重新排序失败: ${error}`);
-    }
-  };
-
   const currentProvider = providers.find((p) => p.id === configuringProvider);
   const isConfiguringCustomProvider = Boolean(
     currentProvider && !currentProvider.isBuiltin,
   );
 
-  if (addingCustomProvider || currentProvider) {
-    return (
-      <div className="max-w-5xl">
-        {currentProvider && !isConfiguringCustomProvider ? (
-          <ProviderConfigDialog
-            isOpen
-            presentation="inline"
-            onClose={() => setConfiguringProvider(null)}
-            onSave={handleSaveConfig}
-            provider={currentProvider}
-          />
-        ) : (
-          <CustomTranslationProviderDialog
-            isOpen
-            presentation="inline"
-            onClose={() => {
-              setAddingCustomProvider(false);
-              setConfiguringProvider(null);
-            }}
-            onSave={handleSaveCustomProvider}
-            onUpdate={handleUpdateCustomProvider}
-            initialProvider={isConfiguringCustomProvider ? currentProvider : null}
-          />
-        )}
-      </div>
-    );
-  }
-
-  // 分离 active 和 inactive providers
-  const activeProvidersList = activeProviders
-    .map((id) => providers.find((p) => p.id === id))
-    .filter((p): p is NonNullable<typeof p> => p !== undefined);
-
-  const inactiveProvidersList = providers.filter((p) => !activeProviders.includes(p.id));
-  const orderedProviders = [...activeProvidersList, ...inactiveProvidersList];
-
   return (
     <div className="max-w-5xl">
-      <div className="divide-y divide-line overflow-hidden bg-surface">
-        {orderedProviders.map((provider) => {
+      <div ref={sort.listRef} className="provider-sort-list" aria-label="翻译服务排序">
+        {sort.orderedIds.map((id) => {
+          const provider = providers.find((provider) => provider.id === id)!;
           const isActive = activeProviders.includes(provider.id);
 
           return (
             <div
               key={provider.id}
               data-translation-provider-id={provider.id}
-              className={`group relative transition-all ${
-                drag?.id === provider.id ? 'opacity-50' : ''
-              } ${
-                dragOverId === provider.id ? 'ring-2 ring-inset ring-accent-line' : ''
-              }`}
+              className="provider-sort-row"
+              {...sort.rowProps(provider.id)}
             >
               <ProviderCard
                 provider={provider}
@@ -220,42 +127,46 @@ export function TranslationProvidersPage({ addRequest = 0, showAddAction = true 
                 onTest={!provider.isBuiltin ? () => handleTest(provider.id) : undefined}
                 onRemove={() => handleRemove(provider.id)}
                 highlighted={isActive}
-                leadingSlot={
-                  <button
-                    type="button"
-                    aria-label="拖动排序"
-                    title="拖动排序"
-                    onPointerDown={(e) => handleDragStart(e, provider.id)}
-                    onPointerMove={handleDragOver}
-                    onPointerUp={handleDrop}
-                    onPointerCancel={handleDragEnd}
-                    onLostPointerCapture={handleDragEnd}
-                    className="grid h-8 w-5 touch-none select-none cursor-grab grid-cols-2 content-center justify-items-center gap-0.5 opacity-0 transition-opacity active:cursor-grabbing group-hover:opacity-100 group-focus-within:opacity-100"
-                  >
-                    {Array.from({ length: 6 }).map((_, index) => (
-                      <span
-                        key={index}
-                        className="h-1 w-1 rounded-full bg-faint"
-                      />
-                    ))}
-                  </button>
-                }
+                leadingSlot={<ProviderDragHandle {...sort.handleProps(provider.id)} />}
               />
             </div>
           );
         })}
       </div>
+      <span className="sr-only" role="status">{sort.announcement}</span>
 
       {showAddAction && <button
         type="button"
-        title="添加自定义服务"
-        aria-label="添加自定义服务"
+        title="添加 Provider"
+        aria-label="添加 Provider"
         onClick={handleAddCustom}
         className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-line bg-surface px-3.5 text-xs font-semibold text-muted transition-colors hover:border-accent-line hover:text-accent-text focus:outline-none focus:ring-2 focus:ring-accent-line"
       >
         <PlusIcon />
-        <span>添加自定义服务</span>
+        <span>添加 Provider</span>
       </button>}
+
+      {currentProvider && !isConfiguringCustomProvider && (
+        <ProviderConfigDialog
+          isOpen
+          onClose={() => setConfiguringProvider(null)}
+          onSave={handleSaveConfig}
+          provider={currentProvider}
+        />
+      )}
+
+      {(addingCustomProvider || isConfiguringCustomProvider) && (
+        <CustomTranslationProviderDialog
+          isOpen
+          onClose={() => {
+            setAddingCustomProvider(false);
+            setConfiguringProvider(null);
+          }}
+          onSave={handleSaveCustomProvider}
+          onUpdate={handleUpdateCustomProvider}
+          initialProvider={isConfiguringCustomProvider ? currentProvider : null}
+        />
+      )}
     </div>
   );
 }

@@ -14,6 +14,7 @@ pub(crate) struct ResultWindowRuntime {
 struct ResultWindowState {
     latest_request_id: u64,
     pending: Option<PendingResultWindowPayload>,
+    pending_presentation: Option<ResultWindowRequestId>,
 }
 
 struct PendingResultWindowPayload {
@@ -32,6 +33,7 @@ impl ResultWindowRuntime {
             state: Mutex::new(ResultWindowState {
                 latest_request_id: 0,
                 pending: None,
+                pending_presentation: None,
             }),
         }
     }
@@ -56,7 +58,14 @@ impl ResultWindowRuntime {
             return Ok(());
         }
 
-        if let Err(error) = self.window.show_or_create().await {
+        {
+            let mut state = self.lock_state()?;
+            if state.latest_request_id != request_id.0 {
+                return Ok(());
+            }
+            state.pending_presentation = Some(request_id);
+        }
+        if let Err(error) = self.window.prepare().await {
             self.remove_if_current(request_id)?;
             return Err(error);
         }
@@ -66,6 +75,19 @@ impl ResultWindowRuntime {
         }
 
         self.notifier.notify_payload_ready(request_id).await
+    }
+
+    pub(crate) async fn reveal(&self, request_id: ResultWindowRequestId) -> crate::Result<()> {
+        {
+            let mut state = self.lock_state()?;
+            if state.latest_request_id != request_id.0
+                || state.pending_presentation != Some(request_id)
+            {
+                return Ok(());
+            }
+            state.pending_presentation = None;
+        }
+        self.window.reveal(request_id).await
     }
 
     /// Update an already-open request without showing or focusing its window again.
@@ -115,6 +137,7 @@ impl ResultWindowRuntime {
             .checked_add(1)
             .ok_or("Result window request ID exhausted")?;
         state.pending = None;
+        state.pending_presentation = None;
         Ok(ResultWindowRequestId(state.latest_request_id))
     }
 
@@ -193,6 +216,9 @@ impl ResultWindowRuntime {
 
     fn remove_if_current(&self, request_id: ResultWindowRequestId) -> crate::Result<()> {
         let mut state = self.lock_state()?;
+        if state.pending_presentation == Some(request_id) {
+            state.pending_presentation = None;
+        }
         if state
             .pending
             .as_ref()

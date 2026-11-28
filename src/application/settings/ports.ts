@@ -288,6 +288,7 @@ export interface SettingsProvidersPort {
   listGeminiModels(request: ProviderModelsRequest): Promise<ProviderModelInfo[]>;
   testGemini(request: TestProviderRequest): Promise<void>;
   listOcr(): Promise<OcrProviderInfo[]>;
+  reorderOcr(providerIds: string[]): Promise<void>;
   activateOcr(providerId: string): Promise<void>;
   configureOcrCredentials(
     providerId: string,

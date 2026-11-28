@@ -1,20 +1,9 @@
 import { invoke } from '@tauri-apps/api/core';
-import { open } from '@tauri-apps/plugin-dialog';
 import type { OcrResult } from '../../domain/capture';
 import type { OcrFileResult } from '../../application/result-window/ports';
 
-export async function selectImageFile() {
-  const selected = await open({
-    multiple: false,
-    filters: [
-      {
-        name: 'Images',
-        extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'tif', 'tiff'],
-      },
-    ],
-  });
-
-  return typeof selected === 'string' ? selected : null;
+export function selectImageFile() {
+  return invoke<string | null>('select_ocr_image_file');
 }
 
 export async function recognizeImageFile(path: string, language?: string) {

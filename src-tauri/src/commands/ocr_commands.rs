@@ -75,6 +75,18 @@ pub async fn list_ocr_providers(
 }
 
 #[tauri::command]
+pub async fn reorder_ocr_providers(
+    provider_ids: Vec<String>,
+    state: State<'_, crate::AppState>,
+) -> Result<(), String> {
+    state
+        .providers
+        .administration
+        .reorder_ocr_providers(provider_ids)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn activate_ocr_provider(
     provider_id: String,
     state: State<'_, crate::AppState>,

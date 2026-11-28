@@ -100,6 +100,13 @@ describe('Tauri result window adapter', () => {
     expect(setSize).toHaveBeenCalledWith({ width: 660, height: 480 });
   });
 
+  it('reveals only the prepared result request through native presentation', async () => {
+    await resultWindow.reveal('9007199254740993');
+    expect(invoke).toHaveBeenCalledExactlyOnceWith('reveal_capture_result_window', {
+      requestId: '9007199254740993',
+    });
+  });
+
   it('hides the current result window instead of closing it', async () => {
     await resultWindow.hide();
 

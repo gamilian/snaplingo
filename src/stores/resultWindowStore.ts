@@ -46,6 +46,8 @@ export function useResultWindowProjection(): ResultWindowProjection {
     ocrDetectedLanguage: resultWindow.ocrDetectedLanguage,
     ocrImageBase64: resultWindow.ocrImageBase64,
     isOcrRunning: resultWindow.isOcrRunning,
+    isSelectingOcrFile: resultWindow.isSelectingOcrFile,
+    presentationRequestId: resultWindow.presentationRequestId,
     ocrError: resultWindow.ocrError,
     resultWindowVisible: resultWindow.resultWindowVisible,
     resultWindowMode: resultWindow.resultWindowMode,

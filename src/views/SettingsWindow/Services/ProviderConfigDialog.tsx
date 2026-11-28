@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { CredentialField } from '../../../application/settings/ports';
 import { Provider } from '../../../stores/providerStore';
 import IconActionButton from '../../../components/common/IconActionButton';
+import { ProviderBrandIcon } from '../../../components/common/ProviderBrandIcon';
 import { useSettingsRuntime } from '../runtimeContext';
 
 interface ProviderConfigDialogProps {
@@ -57,6 +59,18 @@ export function ProviderConfigDialog({
       });
   }, [credentialSchemaLoader, isOpen, onClose, provider]);
 
+  useEffect(() => {
+    if (!isOpen || presentation !== 'dialog' || typeof window === 'undefined') return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        handleClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, presentation]);
+
   const handleSave = () => {
     if (provider?.id === 'deeplx') {
       const mode = credentials.mode === 'deepl' ? 'deepl' : 'deeplx';
@@ -107,132 +121,131 @@ export function ProviderConfigDialog({
   if (!isOpen || !provider) return null;
 
   const form = (
-    <div
-      className={
-        presentation === 'inline'
-          ? 'w-full'
-          : 'bg-surface rounded-xl shadow-2xl w-[500px] max-h-[80vh] overflow-y-auto'
-      }
+    <section
+      role={presentation === 'dialog' ? 'dialog' : undefined}
+      aria-modal={presentation === 'dialog' ? true : undefined}
+      aria-label={`配置 ${provider.name}`}
+      className={presentation === 'inline' ? 'provider-dialog provider-dialog-inline' : 'provider-dialog provider-dialog-compact'}
       onClick={(e) => e.stopPropagation()}
     >
-        <div className="p-6 border-b border-line">
-          <div className="flex items-center gap-3">
-            {presentation === 'inline' && (
-              <IconActionButton
-                onClick={handleClose}
-                title="返回供应商列表"
-                tooltipPlacement="bottom"
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface text-muted transition-colors hover:bg-sunken"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                </svg>
-              </IconActionButton>
-            )}
-            <h3 className="text-xl font-bold text-ink">配置 {provider.name}</h3>
-          </div>
-          <p className="text-sm text-muted mt-1">{provider.description}</p>
-        </div>
-
-        <div className="p-6 space-y-6">
-          {loading ? (
-            <div className="text-center py-8 text-muted">加载中...</div>
+      <header className="provider-dialog-header">
+        <div className="flex min-w-0 items-center gap-3">
+          {presentation === 'inline' ? (
+            <IconActionButton
+              onClick={handleClose}
+              title="返回供应商列表"
+              tooltipPlacement="bottom"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-muted transition-colors hover:bg-sunken"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </IconActionButton>
           ) : (
-            <>
-              {provider.id === 'deeplx' ? (
-                <DeepLXCredentialFields
-                  credentials={credentials}
-                  onChange={updateCredential}
-                />
-              ) : (
-                fields.map((field) => (
-                  <div key={field.name}>
-                    <label className="block font-medium text-ink mb-2">
-                      {field.label} <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type={field.secret ? 'password' : 'text'}
-                      value={credentials[field.name] || ''}
-                      onChange={(e) => updateCredential(field.name, e.target.value)}
-                      placeholder={`请输入 ${field.label}`}
-                      className="w-full px-4 py-2 border border-line-strong rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                    />
-                  </div>
-                ))
-              )}
-
-              {/* Baidu 特殊提示 */}
-              {provider.id === 'baidu-translate' && (
-                <p className="text-xs text-muted">
-                  获取地址：<a href="https://fanyi-api.baidu.com/" target="_blank" rel="noopener noreferrer" className="text-accent-text hover:underline">https://fanyi-api.baidu.com/</a>
-                </p>
-              )}
-
-              {provider.id === 'baidu-ocr' && (
-                <p className="text-xs text-muted">
-                  获取地址：<a href="https://cloud.baidu.com/product/ocr" target="_blank" rel="noopener noreferrer" className="text-accent-text hover:underline">https://cloud.baidu.com/product/ocr</a>
-                </p>
-              )}
-
-              {provider.id === 'deeplx' && (
-                <p className="text-xs text-muted">
-                  项目地址：<a href="https://github.com/OwO-Network/DeepLX" target="_blank" rel="noopener noreferrer" className="text-accent-text hover:underline">https://github.com/OwO-Network/DeepLX</a>
-                </p>
-              )}
-
-              {/* 提示信息 */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-start space-x-3">
-                  <svg
-                    className="w-5 h-5 text-accent-text flex-shrink-0 mt-0.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  <div className="text-sm text-blue-800">
-                    <p className="font-medium mb-1">安全提示</p>
-                    <p>凭证仅保存在本机 SnapLingo 数据库中，不会上传到任何服务器</p>
-                  </div>
-                </div>
-              </div>
-            </>
+            <ProviderBrandIcon {...provider} />
           )}
+          <div className="min-w-0">
+            <h3 className="truncate text-[16px] font-bold tracking-[-0.02em] text-ink">配置 {provider.name}</h3>
+            {provider.description && <p className="mt-0.5 text-xs text-muted">{provider.description}</p>}
+          </div>
         </div>
-
-        <div className="p-6 border-t border-line flex items-center justify-between">
+        {presentation === 'dialog' && (
           <button
+            type="button"
             onClick={handleClose}
-            className="px-4 py-2 text-sm text-muted hover:text-ink hover:bg-raised rounded-lg transition-colors"
+            aria-label="关闭"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-faint transition-colors hover:bg-raised hover:text-ink"
           >
-            取消
+            ×
           </button>
-          <button
-            onClick={handleSave}
-            disabled={loading || isSaveDisabled(provider, fields, credentials)}
-            className="px-6 py-2 text-sm bg-accent hover:bg-accent-hover text-accent-on rounded-lg transition-colors disabled:bg-line-strong disabled:cursor-not-allowed"
-          >
-            保存配置
-          </button>
-        </div>
-    </div>
+        )}
+      </header>
+
+      <div className="provider-dialog-body">
+        {loading ? (
+          <div className="py-8 text-center text-xs text-muted">加载中...</div>
+        ) : (
+          <>
+            {provider.id === 'deeplx' ? (
+              <DeepLXCredentialFields
+                credentials={credentials}
+                onChange={updateCredential}
+              />
+            ) : (
+              fields.map((field) => (
+                <label key={field.name} className="provider-dialog-field">
+                  <span>{field.label} <em className="not-italic text-danger">*</em></span>
+                  <input
+                    type={field.secret ? 'password' : 'text'}
+                    value={credentials[field.name] || ''}
+                    onChange={(e) => updateCredential(field.name, e.target.value)}
+                    placeholder={`请输入 ${field.label}`}
+                    className="provider-dialog-input"
+                  />
+                </label>
+              ))
+            )}
+
+            {provider.id === 'baidu-translate' && (
+              <p className="text-xs text-muted">
+                获取地址：<a href="https://fanyi-api.baidu.com/" target="_blank" rel="noopener noreferrer" className="text-accent-text hover:underline">https://fanyi-api.baidu.com/</a>
+              </p>
+            )}
+
+            {provider.id === 'baidu-ocr' && (
+              <p className="text-xs text-muted">
+                获取地址：<a href="https://cloud.baidu.com/product/ocr" target="_blank" rel="noopener noreferrer" className="text-accent-text hover:underline">https://cloud.baidu.com/product/ocr</a>
+              </p>
+            )}
+
+            {provider.id === 'deeplx' && (
+              <p className="text-xs text-muted">
+                项目地址：<a href="https://github.com/OwO-Network/DeepLX" target="_blank" rel="noopener noreferrer" className="text-accent-text hover:underline">https://github.com/OwO-Network/DeepLX</a>
+              </p>
+            )}
+
+            <div className="rounded-lg border border-line bg-sunken px-3.5 py-2.5 text-xs leading-relaxed text-muted">
+              <span className="font-medium text-ink">安全提示：</span>凭证仅保存在本机 SnapLingo 数据库中，不会上传到任何服务器。
+            </div>
+          </>
+        )}
+      </div>
+
+      <footer className="provider-dialog-footer justify-end">
+        <button
+          type="button"
+          onClick={handleClose}
+          className="h-8 rounded-lg border border-line bg-surface px-3.5 text-xs font-medium text-muted transition-colors hover:bg-raised hover:text-ink"
+        >
+          取消
+        </button>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={loading || isSaveDisabled(provider, fields, credentials)}
+          className="h-8 rounded-lg bg-accent px-4 text-xs font-semibold text-accent-on transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line-strong"
+        >
+          保存配置
+        </button>
+      </footer>
+    </section>
   );
 
   if (presentation === 'inline') {
     return form;
   }
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={handleClose}>
+  const backdrop = (
+    <div
+      className="provider-dialog-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) handleClose();
+      }}
+    >
       {form}
     </div>
   );
+  return typeof document === 'undefined' || !document.body ? backdrop : createPortal(backdrop, document.body);
 }
 
 function DeepLXCredentialFields({
